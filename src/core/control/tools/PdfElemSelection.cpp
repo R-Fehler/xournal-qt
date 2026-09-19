@@ -60,9 +60,11 @@ bool PdfElemSelection::finalizeSelection(XojPdfPageSelectionStyle style) {
     this->selectedTextRegion = std::move(selection.region);
     this->selectedTextRects = std::move(selection.rects);
     this->selectedText = this->pdf->selectText(this->bounds, style);
+#ifndef XOJ_NO_GTK  // xournal-qt: the Qt canvas sets the primary selection itself (QClipboard::Selection)
     // Informs the windowing system of the selection -- i.e. for accessibility purposes
     gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), this->selectedText.c_str(),
                            strict_cast<gint>(this->selectedText.length()));
+#endif
     return !this->selectedTextRects.empty();
 }
 

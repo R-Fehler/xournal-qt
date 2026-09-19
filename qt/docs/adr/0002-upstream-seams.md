@@ -42,6 +42,7 @@ The Qt build defines `XOJ_NO_GTK=1`. The upstream GTK build is unaffected by the
 | `src/core/control/jobs/ExportBackgroundType.h` (new) | `ExportBackgroundType` moved out of `BaseExportJob.h`, which drags in GTK. |
 | `BaseExportJob.h`, `ExportHelper.h`, `ImageExport.h/.cpp`, `pdf/base/XojPdfExport.h`, `XojCairoPdfExport.h` | Include `ExportBackgroundType.h` instead of `BaseExportJob.h`. |
 | `src/core/model/DocumentOutline.h` (new) | Toolkit-independent outline type, used by the Qt build. |
+| `src/core/control/tools/PdfElemSelection.cpp` | The GTK primary-selection call is guarded (`#ifndef XOJ_NO_GTK`); the Qt canvas sets `QClipboard::Selection` itself. |
 | `src/core/model/Element.cpp` | `getBoundingBox()` / `getSnappedBounds()` set `sizeCalculated` after `calcSize()`, not before. With several render threads (shared document lock) another thread otherwise used the empty bounds and culled the element (text missing in thumbnails). Sizes are also computed once after loading. |
 | `src/core/model/DocumentListener.cpp` | `unregisterListener()` forgets the handler, so a second call (e.g. from the destructor, after the handler is gone) is harmless. Needed by listeners that follow the current tab (`PagesModel`). |
 | `src/core/model/Document.h` | `setDocumentHandler()`: re-target document events from the `LoadHandler` to the session that owns the document, instead of copying documents with `operator=` (upstream's `replaceDocument`, which relies on `try_lock` on an already locked mutex). |

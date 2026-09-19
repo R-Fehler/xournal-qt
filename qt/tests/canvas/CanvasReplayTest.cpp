@@ -12,6 +12,9 @@
 #include <QElapsedTimer>
 #include <QPointingDevice>
 #include <QTabletEvent>
+#include <QSignalSpy>
+#include <QGuiApplication>
+#include <QClipboard>
 #include <QImage>
 #include <QBuffer>
 #include <QKeyEvent>
@@ -33,12 +36,14 @@
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "config-test.h"
 #include "TextEditor.h"
 
 using namespace xqt;
@@ -566,4 +571,62 @@ TEST_F(CanvasReplayTest, insertedImageIsSelectedAndFitsTheView) {
     session->getUndoRedoHandler()->undo();
     EXPECT_EQ(elementCount(0), 0u);
     EXPECT_FALSE(view->insertImage(QByteArray("not an image")));
+}
+
+// PDF text tools: select text of the background PDF and mark it (upstream's PdfElemSelection + marker strokes).
+TEST_F(CanvasReplayTest, pdfTextIsHighlightedByDraggingOverIt) {
+    // Use a document with a PDF background instead of the fixture's blank one.
+    input.reset();
+    view.reset();
+    auto loaded = DocumentSession::loadFile(GET_TESTFILE(u8"packaged_xopp/pdfBackground/old.xopp"));
+    ASSERT_TRUE(loaded.document);
+    session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    view = std::make_unique<CanvasView>(*session);
+    view->getViewController().setViewSize(QSizeF(900, 1200));
+    input = std::make_unique<CanvasInput>(*view);
+    processEvents();
+
+    // Where is "Test PDF" on page 1?
+    QSignalSpy searched(&session->search(), &DocumentSearch::finished);
+    session->search().setQuery("Test PDF", false);
+    ASSERT_TRUE(searched.wait(3000));
+    ASSERT_FALSE(session->search().hits().empty());
+    const QRectF hit = session->search().hits().front().rect;
+    session->search().clear();
+
+    auto dragOver = [&] {
+        tablet(QEvent::TabletPress, viewPos(0, QPointF(hit.left() - 2, hit.center().y())), 0.5, Qt::LeftButton,
+               Qt::LeftButton);
+        for (int i = 1; i <= 10; ++i) {
+            tablet(QEvent::TabletMove, viewPos(0, QPointF(hit.left() - 2 + (hit.width() + 4) * i / 10.0, hit.center().y())),
+                   0.5, Qt::NoButton, Qt::LeftButton);
+        }
+        tablet(QEvent::TabletRelease, viewPos(0, QPointF(hit.right() + 2, hit.center().y())), 0.0, Qt::LeftButton,
+               Qt::NoButton);
+        processEvents();
+    };
+
+    app->getToolHandler()->selectTool(TOOL_SELECT_PDF_TEXT_LINEAR);
+    view->setPdfTextMode(CanvasView::PdfTextMode::Highlight);
+    dragOver();
+    const size_t marks = elementCount(0);
+    ASSERT_GE(marks, 1u) << "highlight strokes over the text";
+    const auto* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+    const auto* s = dynamic_cast<const Stroke*>(layer->getElementsView().front());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->getToolType(), StrokeTool::HIGHLIGHTER);
+    EXPECT_FALSE(view->hasPdfTextSelection()) << "marked right away";
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(elementCount(0), 0u) << "one undo step for all lines";
+
+    // Select mode: the selection stays for copying.
+    view->setPdfTextMode(CanvasView::PdfTextMode::Select);
+    QSignalSpy selected(view.get(), &CanvasView::pdfTextSelected);
+    dragOver();
+    EXPECT_TRUE(view->hasPdfTextSelection());
+    EXPECT_EQ(selected.count(), 1);
+    EXPECT_TRUE(view->copyPdfText());
+    EXPECT_TRUE(QGuiApplication::clipboard()->text().contains("Test"));
+    EXPECT_TRUE(view->markPdfText(CanvasView::PdfTextMode::Underline));
+    EXPECT_EQ(elementCount(0), marks);
 }

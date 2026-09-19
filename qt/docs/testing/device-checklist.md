@@ -109,6 +109,11 @@ cd build-qt
 - [ ] After a jump (link, page grid, sidebar), the ← → pill appears; ← returns to the exact place, → goes back to the target; Alt+Left/Right too.
 - [ ] ⋮ → "Export as PDF…": the exported PDF opens in a PDF viewer with the PDF pages, ink, text and images.
 
+## PDF text
+- [ ] "Mark PDF text" tool, mode Highlight: drag over a line of PDF text: highlighted when lifting the pen (snapped to the text lines); undo removes it in one step.
+- [ ] Modes Underline / Strike through (pen color); "Select by area" for columns.
+- [ ] Mode Select: the bar offers Highlight / Underline / Strike through / Copy text; the copied text pastes elsewhere.
+
 ## Page operations
 - [ ] Sidebar: Ctrl+click / Shift+click select pages (blue, check mark); a plain tap goes to the page.
 - [ ] Ctrl+C, then Ctrl+V: the pages are pasted after the selection; pasting into another tab works (PDF pages keep their look).

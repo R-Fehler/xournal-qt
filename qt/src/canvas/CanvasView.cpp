@@ -10,6 +10,11 @@
 #include <QBuffer>
 
 #include "control/PdfCache.h"
+#include "model/LineStyle.h"
+#include "model/Point.h"
+#include "undo/GroupUndoAction.h"
+#include "view/overlays/PdfElementSelectionView.h"
+#include "control/tools/PdfElemSelection.h"
 #include "model/LinkDestination.h"
 #include "pdf/base/XojPdfAction.h"
 #include "view/overlays/OverlayView.h"
@@ -82,6 +87,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     // Upstream's Control::clearSelectionEndText (before saving, undo, page operations, ...): the elements go back.
     connect(&session, &DocumentSession::clearSelectionRequested, this, [this] {
         endTextEditing();
+        clearPdfTextSelection();
         if (selection) {
             clearSelection();
         }
@@ -110,6 +116,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 
 CanvasView::~CanvasView() {
     endTextEditing();
+    pdfSelection.reset();
     selection.reset();  // the selected elements go back into the document
     session.setXournalView(nullptr);
     session.setZoomControl(nullptr);
@@ -440,6 +447,129 @@ bool CanvasView::tapAt(QPointF viewPos) {
         return true;
     }
     return false;
+}
+
+// --- PDF text ----------------------------------------------------------------------------------------------------
+
+bool CanvasView::hasPdfTextSelection() const { return pdfSelection && pdfSelection->isFinalized(); }
+
+void CanvasView::clearPdfTextSelection() {
+    if (!pdfSelection) {
+        return;
+    }
+    if (pdfSelectionPage) {
+        pdfSelectionPage->removeOverlayViewsOf(pdfSelection.get());
+    }
+    pdfSelection.reset();
+    pdfSelectionPage = nullptr;
+    Q_EMIT pdfTextSelectionCleared();
+    Q_EMIT updateRequested();
+}
+
+void CanvasView::pdfTextPress(CanvasPage& page, double x, double y) {
+    clearPdfTextSelection();
+    if (page.getPage()->getPdfPageNr() == npos) {
+        return;  // no PDF on this page
+    }
+    pdfSelection = std::make_unique<PdfElemSelection>(x, y, &session);
+    pdfSelectionPage = &page;
+    page.addOverlayView(std::make_unique<xoj::view::PdfElementSelectionView>(
+            pdfSelection.get(), &page, session.getSettings()->getSelectionColor()));
+}
+
+void CanvasView::pdfTextMove(CanvasPage& page, double x, double y) {
+    if (pdfSelection && pdfSelectionPage == &page && !pdfSelection->isFinalized()) {
+        pdfSelection->currentPos(x, y,
+                                 PdfElemSelection::selectionStyleForToolType(session.getToolHandler()->getToolType()));
+    }
+}
+
+void CanvasView::pdfTextRelease(CanvasPage& page) {
+    if (!pdfSelection || pdfSelectionPage != &page || pdfSelection->isFinalized()) {
+        return;
+    }
+    const auto style = PdfElemSelection::selectionStyleForToolType(session.getToolHandler()->getToolType());
+    if (!pdfSelection->finalizeSelectionAndRepaint(style)) {
+        clearPdfTextSelection();  // no text there
+        return;
+    }
+    // Like upstream: the selected text becomes the primary selection (middle click paste).
+    if (QClipboard* cb = QGuiApplication::clipboard(); cb->supportsSelection()) {
+        cb->setText(QString::fromStdString(pdfSelection->getSelectedText()), QClipboard::Selection);
+    }
+    if (pdfTextMode != PdfTextMode::Select) {
+        markPdfText(pdfTextMode);  // marking right away: no extra tap
+        return;
+    }
+    // Where to show the actions: around the selected text.
+    QRectF box;
+    const double zoom = viewController.zoom();
+    const QRectF pageRect = pageViewRect(*indexOf(&page));
+    for (const auto& r: pdfSelection->getSelectedTextRects()) {
+        box |= QRectF(QPointF(std::min(r.x1, r.x2), std::min(r.y1, r.y2)), QPointF(std::max(r.x1, r.x2), std::max(r.y1, r.y2)));
+    }
+    Q_EMIT pdfTextSelected(QRectF(pageRect.topLeft() + box.topLeft() * zoom, box.size() * zoom));
+}
+
+bool CanvasView::markPdfText(PdfTextMode mode) {
+    // Port of PdfFloatingToolbox::createStrokes: marker strokes over the selected text lines.
+    if (!hasPdfTextSelection() || mode == PdfTextMode::Select) {
+        return false;
+    }
+    const auto textRects = pdfSelection->getSelectedTextRects();
+    CanvasPage* page = pdfSelectionPage;
+    clearPdfTextSelection();
+    if (textRects.empty() || !page) {
+        return false;
+    }
+    ToolHandler* th = session.getToolHandler();
+    const bool highlight = mode == PdfTextMode::Highlight;
+    // Highlight in the highlighter's color, lines in the pen's color.
+    const Color color = th->getTool(highlight ? TOOL_HIGHLIGHTER : TOOL_PEN).getColor();
+    const int opacity = highlight ? th->getSelectPDFTextMarkerOpacity() : 230;
+    PageRef pageRef = page->getPage();
+    Layer* layer = pageRef->getSelectedLayer();
+    Range dirty;
+    std::vector<ElementPtr> strokes;
+    for (const XojPdfRectangle& rect: textRects) {
+        const double top = std::min(rect.y1, rect.y2), bottom = std::max(rect.y1, rect.y2);
+        const double h = mode == PdfTextMode::Underline ? bottom : (top + bottom) / 2;
+        const double w = highlight ? std::abs(rect.y2 - rect.y1) : 1;
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setColor(color);
+        stroke->setFill(opacity);
+        stroke->setToolType(StrokeTool::HIGHLIGHTER);
+        stroke->setWidth(w);
+        stroke->addPoint(Point(rect.x1, h, -1));
+        stroke->addPoint(Point(rect.x2, h, -1));
+        stroke->setStrokeCapStyle(StrokeCapStyle::BUTT);
+        dirty.addPoint(rect.x1, h - 0.5 * w);
+        dirty.addPoint(rect.x2, h + 0.5 * w);
+        strokes.push_back(std::move(stroke));
+    }
+    std::vector<const Element*> ptrs;
+    Document* doc = session.getDocument();
+    doc->lock();
+    for (auto&& st: strokes) {
+        ptrs.push_back(st.get());
+        layer->addElement(std::move(st));
+    }
+    doc->unlock();
+    pageRef->fireElementsChanged(ptrs, dirty);
+    auto undo = std::make_unique<GroupUndoAction>();
+    for (const Element* e: ptrs) {
+        undo->addAction(std::make_unique<InsertUndoAction>(pageRef, layer, e));
+    }
+    session.getUndoRedoHandler()->addUndoAction(std::move(undo));
+    return true;
+}
+
+bool CanvasView::copyPdfText() {
+    if (!hasPdfTextSelection()) {
+        return false;
+    }
+    QGuiApplication::clipboard()->setText(QString::fromStdString(pdfSelection->getSelectedText()));
+    return true;
 }
 
 CanvasView::NavPoint CanvasView::currentPlace() const {

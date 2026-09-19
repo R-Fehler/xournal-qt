@@ -36,6 +36,7 @@
 
 class EditSelection;
 class PdfCache;
+class PdfElemSelection;
 
 namespace xqt {
 
@@ -127,6 +128,20 @@ public:
     /// A tap (finger, or pen/mouse with the hand or a select tool) at a view position: shows a link there.
     bool tapAt(QPointF viewPos);
 
+    // --- PDF text (PDF text tools; port of upstream's PdfElemSelection use and PdfFloatingToolbox) ---
+    enum class PdfTextMode { Highlight, Underline, Strikethrough, Select };
+    void setPdfTextMode(PdfTextMode mode) { pdfTextMode = mode; }
+    PdfTextMode getPdfTextMode() const { return pdfTextMode; }
+    /// Input of the PDF text tools on a page (page coordinates, points).
+    void pdfTextPress(CanvasPage& page, double x, double y);
+    void pdfTextMove(CanvasPage& page, double x, double y);
+    void pdfTextRelease(CanvasPage& page);
+    /// The selected PDF text: mark it (strokes over the text, one undo step) / copy it / drop the selection.
+    bool markPdfText(PdfTextMode mode);
+    bool copyPdfText();
+    void clearPdfTextSelection();
+    bool hasPdfTextSelection() const;
+
     // --- navigation history: jumps (links, page grid, sidebar) can be gone back and forth, like a browser ---
     /// Go to a page and remember where the view was.
     void jumpToPage(size_t page);
@@ -161,6 +176,9 @@ Q_SIGNALS:
     /// A PDF link was tapped (the UI offers to follow it).
     void linkTapped(const QString& uri, int page, QRectF viewRect);
     void navigationChanged();
+    /// PDF text was selected (Select mode): the UI offers marking / copying it; rect in view coordinates.
+    void pdfTextSelected(QRectF viewRect);
+    void pdfTextSelectionCleared();
 
 private:
     void rebuildPages();
@@ -183,6 +201,9 @@ private:
     QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
+    std::unique_ptr<PdfElemSelection> pdfSelection;
+    CanvasPage* pdfSelectionPage = nullptr;
+    PdfTextMode pdfTextMode = PdfTextMode::Highlight;
     /// A place in the document: a page (kept even if it is moved) and the view's top-left on it (points).
     struct NavPoint {
         PageRef page;

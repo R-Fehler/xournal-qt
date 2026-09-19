@@ -168,6 +168,39 @@ ApplicationWindow {
                     }
                 }
             }
+            IconButton {
+                objectName: "pdfTextButton"
+                readonly property var icons: ({ "highlight": "xopp-select-pdf-text-ht", "underline": "xqt-underline",
+                                                "strikethrough": "xqt-strikethrough", "select": "xopp-select-pdf-text-area" })
+                iconName: icons[app.pdfTextMode] || "xopp-select-pdf-text-ht"
+                tip: qsTr("Mark PDF text (drag over the text)")
+                checked: app.tool === "selectPdfTextLinear" || app.tool === "selectPdfTextRect"
+                onClicked: checked ? pdfTextMenu.popup() : app.selectTool("selectPdfTextLinear")
+                onPressAndHold: pdfTextMenu.popup()
+                Menu {
+                    id: pdfTextMenu
+                    component ModeItem: MenuItem {
+                        property string mode
+                        checkable: true
+                        checked: app.pdfTextMode === mode
+                        onTriggered: {
+                            app.pdfTextMode = mode
+                            if (app.tool !== "selectPdfTextRect") app.selectTool("selectPdfTextLinear")
+                        }
+                    }
+                    ModeItem { text: qsTr("Highlight"); mode: "highlight" }
+                    ModeItem { text: qsTr("Underline"); mode: "underline" }
+                    ModeItem { text: qsTr("Strike through"); mode: "strikethrough" }
+                    ModeItem { text: qsTr("Select (then copy or mark)"); mode: "select" }
+                    MenuSeparator {}
+                    MenuItem {
+                        text: qsTr("Select by area (columns, tables)")
+                        checkable: true
+                        checked: app.tool === "selectPdfTextRect"
+                        onTriggered: app.selectTool(checked ? "selectPdfTextRect" : "selectPdfTextLinear")
+                    }
+                }
+            }
             IconButton { objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
             IconButton { objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
             IconButton { objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
@@ -410,6 +443,39 @@ ApplicationWindow {
             IconButton { iconName: "xqt-delete"; tip: qsTr("Delete (Del)"); onClicked: app.deleteSelection() }
             ToolSeparator {}
             IconButton { iconName: "xqt-close"; tip: qsTr("Deselect (Esc)"); onClicked: app.clearSelection() }
+        }
+    }
+
+    // Selected PDF text (select mode): mark or copy it.
+    Pane {
+        id: pdfTextBar
+        objectName: "pdfTextBar"
+        visible: false
+        padding: 2
+        Material.foreground: "#303030"
+        background: Rectangle {
+            radius: height / 2
+            color: "#f7fafafa"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        Connections {
+            target: app
+            function onPdfTextSelected(rect) {
+                pdfTextBar.x = Math.max(canvas.x + 8, Math.min(canvas.x + rect.x, canvas.x + canvas.width - pdfTextBar.width - 8))
+                pdfTextBar.y = canvas.y + rect.y - pdfTextBar.height - 8 < canvas.y
+                        ? canvas.y + rect.y + rect.height + 8 : canvas.y + rect.y - pdfTextBar.height - 8
+                pdfTextBar.visible = true
+            }
+            function onPdfTextSelectionCleared() { pdfTextBar.visible = false }
+            function onDocumentChanged() { pdfTextBar.visible = false }
+        }
+        RowLayout {
+            spacing: 0
+            IconButton { iconName: "xopp-select-pdf-text-ht"; tip: qsTr("Highlight"); onClicked: app.markPdfText("highlight") }
+            IconButton { iconName: "xqt-underline"; tip: qsTr("Underline"); onClicked: app.markPdfText("underline") }
+            IconButton { iconName: "xqt-strikethrough"; tip: qsTr("Strike through"); onClicked: app.markPdfText("strikethrough") }
+            IconButton { iconName: "xopp-edit-copy"; tip: qsTr("Copy text"); onClicked: app.copyPdfText() }
         }
     }
 

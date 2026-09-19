@@ -132,6 +132,10 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
         currentConnections.push_back(
                 connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
+        currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
+        currentConnections.push_back(
+                connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
+        applyPdfTextMode();
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
     }
@@ -768,6 +772,44 @@ void AppController::goToPage(int index) {
     if (session() && index >= 0 && static_cast<size_t>(index) < session()->getDocument()->getPageCount()) {
         session()->setCurrentPageNo(index);
         canvas()->getViewController().scrollToPage(index);
+    }
+}
+
+namespace {
+CanvasView::PdfTextMode pdfModeFrom(const QString& m) {
+    return m == "underline"       ? CanvasView::PdfTextMode::Underline
+           : m == "strikethrough" ? CanvasView::PdfTextMode::Strikethrough
+           : m == "select"        ? CanvasView::PdfTextMode::Select
+                                  : CanvasView::PdfTextMode::Highlight;
+}
+}  // namespace
+
+void AppController::applyPdfTextMode() {
+    for (int i = 0; i < tabs->count(); ++i) {
+        tabs->view(i)->setPdfTextMode(pdfModeFrom(pdfMode));
+    }
+}
+
+void AppController::setPdfTextMode(const QString& mode) {
+    if (mode != pdfMode) {
+        pdfMode = mode;
+        applyPdfTextMode();
+        Q_EMIT pdfTextModeChanged();
+    }
+}
+
+bool AppController::markPdfText(const QString& mode) { return canvas() && canvas()->markPdfText(pdfModeFrom(mode)); }
+bool AppController::copyPdfText() {
+    const bool ok = canvas() && canvas()->copyPdfText();
+    if (ok) {
+        canvas()->clearPdfTextSelection();
+        Q_EMIT pageActionDone(tr("Text copied"), false);
+    }
+    return ok;
+}
+void AppController::clearPdfTextSelection() {
+    if (canvas()) {
+        canvas()->clearPdfTextSelection();
     }
 }
 

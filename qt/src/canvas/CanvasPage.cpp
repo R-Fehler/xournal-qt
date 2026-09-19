@@ -151,6 +151,8 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         }
     } else if (h->getToolType() == TOOL_TEXT) {
         view.startText(*this, x, y);
+    } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
+        view.pdfTextPress(*this, x, y);
     } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
         const bool aggregate = pos.isShiftDown() && view.getSelection();
         selectObjectAt(x, y, false, aggregate);
@@ -256,6 +258,8 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
         // input handler used this event
     } else if (this->selector) {
         this->selector->currentPos(x, y);
+    } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
+        view.pdfTextMove(*this, x, y);
     } else if (TextEditor* editor = view.getTextEditor(); editor && &editor->getPage() == this &&
                                                             h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
         editor->mouseMoved(x, y);  // drag: select text
@@ -283,6 +287,10 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         doc->lock();
         this->eraser->finalize();
         doc->unlock();
+    }
+    if (ToolType t = control.getToolHandler()->getToolType();
+        t == TOOL_SELECT_PDF_TEXT_LINEAR || t == TOOL_SELECT_PDF_TEXT_RECT) {
+        view.pdfTextRelease(*this);
     }
     if (this->selector) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)

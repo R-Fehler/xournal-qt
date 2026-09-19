@@ -57,7 +57,8 @@
   - "Export as PDF…" (⋮ menu, Ctrl+E) with upstream's exporter; the suggestion never overwrites the background PDF.
   - PDF links: a finger tap (or a tap with the hand / select tools) on a link offers "Open" (web) or "Go to page N"; the pen keeps writing on links. (Upstream only follows links with the PDF text tool.)
   - Back / forward: jumps by links, the page grid and the sidebar remember the place; a ← → pill (Alt+Left/Right) goes back and forth.
-- **Next:** PDF text highlighting (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
+- **PDF text marking: done (awaiting on-device test).** "Mark PDF text" tool with a sticky mode: highlight (highlighter color), underline, strike through (pen color) are applied right when the drag over the text ends (upstream needs a second tap in its floating toolbox); "select" mode shows a bar with the marks and "copy text"; "select by area" for columns/tables. Upstream's `PdfElemSelection` / `PdfElementSelectionView` compiled (one seam: primary selection), marker strokes as in `PdfFloatingToolbox::createStrokes`, one undo step.
+- **The scope before MuPDF is complete.** Next: MuPDF on the `mupdf` branch (not started; the user starts it), then PDF-native annotations and the library. (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

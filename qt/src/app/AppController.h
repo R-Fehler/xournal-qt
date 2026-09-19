@@ -86,6 +86,8 @@ class AppController: public QObject {
     /// Back / forward after jumps (links, page grid, sidebar), per tab
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
+    /// What the PDF text tools do with the selected text: highlight, underline, strikethrough, select
+    Q_PROPERTY(QString pdfTextMode READ pdfTextMode WRITE setPdfTextMode NOTIFY pdfTextModeChanged)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -128,6 +130,8 @@ public:
     int searchHitPageCount() const;
     bool hasSelection() const;
     bool canGoBack() const;
+    QString pdfTextMode() const { return pdfMode; }
+    void setPdfTextMode(const QString& mode);
     bool canGoForward() const;
     bool canUndoPages() const;
     bool canRedoPages() const;
@@ -218,6 +222,10 @@ public:
     Q_INVOKABLE void navigateBack();
     Q_INVOKABLE void navigateForward();
     Q_INVOKABLE void clearNavigation();
+    /// The selected PDF text (select mode): mark it ("highlight", "underline", "strikethrough") or copy it.
+    Q_INVOKABLE bool markPdfText(const QString& mode);
+    Q_INVOKABLE bool copyPdfText();
+    Q_INVOKABLE void clearPdfTextSelection();
     Q_INVOKABLE void insertPageBefore(int index);
     Q_INVOKABLE void insertPageAfter(int index);
     Q_INVOKABLE void duplicatePage(int index);
@@ -270,6 +278,10 @@ Q_SIGNALS:
     void selectionChanged();
     void fontChanged();
     void navigationChanged();
+    void pdfTextModeChanged();
+    /// PDF text was selected (select mode); rect in canvas coordinates.
+    void pdfTextSelected(QRectF rect);
+    void pdfTextSelectionCleared();
     /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.
     void linkTapped(const QString& uri, int page, QRectF rect);
     void copiedPagesChanged();
@@ -294,5 +306,7 @@ private:
     std::unique_ptr<xqt::SettingsModel> settingsView;
     std::unique_ptr<xqt::SessionRecovery> recovery;  // after `tabs`: destroyed first
     bool recoveryPending = false;
+    QString pdfMode = "highlight";
+    void applyPdfTextMode();
     std::vector<QMetaObject::Connection> currentConnections;
 };
