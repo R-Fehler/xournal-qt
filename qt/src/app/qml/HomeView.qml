@@ -105,6 +105,15 @@ Rectangle {
         if (searchField.text === "" || searchField.text.length >= 4) searchTyping.restart()
         else searchTyping.stop()
     }
+    /// Imports into the Downloads folder (a short-lived place) are confirmed first.
+    function confirmImport(targetIsTemporary, action) {
+        if (!targetIsTemporary) {
+            action()
+            return
+        }
+        temporaryImportDialog.action = action
+        temporaryImportDialog.open()
+    }
     function countText(n) { return n === 1 ? qsTr("1 item") : qsTr("%1 items").arg(n) }
     function askTransfer(paths, copy) {
         transferDialog.paths = paths
@@ -297,9 +306,10 @@ Rectangle {
                             id: libraryItem
                             required property var modelData
                             readonly property bool current: modelData.current
-                            text: current ? qsTr("%1 — this window").arg(modelData.name) : modelData.name
+                            readonly property string label: modelData.downloads ? qsTr("Downloads folder (quick library)") : modelData.name
+                            text: current ? qsTr("%1 — this window").arg(label) : label
                             font.weight: current ? Font.DemiBold : Font.Normal
-                            icon.source: app.iconUrl("xqt-library")
+                            icon.source: app.iconUrl(modelData.downloads ? "xqt-download" : "xqt-library")
                             icon.color: current ? Material.accentColor : "#566d86"
                             background: Rectangle {
                                 color: libraryItem.current ? "#e8eaf6" : (libraryItem.highlighted ? "#f1f3f4" : "transparent")
@@ -559,6 +569,34 @@ Rectangle {
             }
         }
 
+        // The Downloads folder as library: a hint that its files are short-lived
+        Rectangle {
+            objectName: "temporaryBanner"
+            visible: home.page === 0 && app.library.temporary
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.preferredHeight: bannerLabel.implicitHeight + 16
+            radius: 8
+            color: "#fff4e5"
+            border.width: 1
+            border.color: "#ffcc80"
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                Image { source: app.iconUrl("xqt-download"); sourceSize.width: 18; sourceSize.height: 18 }
+                Label {
+                    id: bannerLabel
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    color: "#6d4c00"
+                    text: qsTr("This is your Downloads folder: a quick look at downloaded papers. Its files are often "
+                               + "cleaned up; copy documents you want to keep into a library (menu of a card → Copy to…).")
+                }
+            }
+        }
+
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -756,7 +794,8 @@ Rectangle {
                     onDropped: function(drop) {
                         libraryGrid.dropIndex = -1
                         if (drop.hasUrls) {
-                            app.library.importUrls(drop.urls, targetFolder)
+                            const urls = drop.urls, folder = targetFolder
+                            home.confirmImport(app.library.temporary, function() { app.library.importUrls(urls, folder) })
                             drop.accept(Qt.CopyAction)
                         }
                     }
@@ -1071,37 +1110,78 @@ Rectangle {
         onAccepted: if (folderField.text.trim() !== "") app.library.createFolder(folderField.text)
     }
 
-    // Where to copy / move documents and folders: a folder of the library.
+    // Where to copy / move documents and folders: a folder of this library or of another one.
     Dialog {
         id: transferDialog
         objectName: "transferDialog"
         property var paths: []
         property bool copy: false
+        property var libraries: []
+        property string targetRoot: ""
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
         title: (copy ? qsTr("Copy %1 to") : qsTr("Move %1 to"))
                    .arg(paths.length === 1 ? "“" + paths[0].substring(paths[0].lastIndexOf("/") + 1) + "”" : home.countText(paths.length))
-        width: Math.min(parent ? parent.width * 0.9 : 460, 460)
-        height: Math.min(parent ? parent.height * 0.8 : 500, 520)
+        width: Math.min(parent ? parent.width * 0.9 : 480, 480)
+        height: Math.min(parent ? parent.height * 0.85 : 560, 580)
         standardButtons: Dialog.Cancel
-        ListView {
-            objectName: "transferFolders"
+        onAboutToShow: {
+            libraries = app.libraries()
+            targetRoot = app.library.rootPath
+            libraryBox.currentIndex = Math.max(0, libraryBox.indexOfValue(targetRoot))
+        }
+        function choose(folderPath) {
+            const paths = transferDialog.paths, copy = transferDialog.copy
+            transferDialog.close()
+            // Into the Downloads folder from elsewhere: short-lived, ask first
+            home.confirmImport(app.library.isTemporaryFolder(folderPath) && !app.library.temporary, function() {
+                app.library.transferTo(paths, folderPath, copy)
+                app.recent.clearSelection()
+            })
+        }
+        ColumnLayout {
             anchors.fill: parent
-            clip: true
-            model: transferDialog.opened ? app.library.folderList() : []
-            ScrollBar.vertical: ScrollBar {}
-            delegate: ItemDelegate {
-                required property var modelData
-                width: ListView.view.width
-                leftPadding: 16 + modelData.depth * 20
-                text: modelData.name
-                icon.source: app.iconUrl(modelData.depth === 0 ? "xqt-library" : "xqt-folder")
-                icon.color: "#566d86"
-                onClicked: {
-                    app.library.transfer(transferDialog.paths, modelData.folder, transferDialog.copy)
-                    app.recent.clearSelection()
-                    transferDialog.close()
+            spacing: 6
+            ComboBox {
+                id: libraryBox
+                objectName: "transferLibraryBox"
+                Layout.fillWidth: true
+                model: transferDialog.libraries
+                valueRole: "path"
+                delegate: ItemDelegate {
+                    required property var modelData
+                    required property int index
+                    width: ListView.view ? ListView.view.width : implicitWidth
+                    text: modelData.downloads ? qsTr("Downloads folder") : modelData.name
+                    font.weight: modelData.current ? Font.DemiBold : Font.Normal
+                    icon.source: app.iconUrl(modelData.downloads ? "xqt-download" : "xqt-library")
+                    icon.color: "#566d86"
+                    highlighted: libraryBox.highlightedIndex === index
+                }
+                displayText: {
+                    const lib = transferDialog.libraries[currentIndex]
+                    if (!lib) return ""
+                    const name = lib.downloads ? qsTr("Downloads folder") : lib.name
+                    return lib.current ? qsTr("%1 (this library)").arg(name) : qsTr("Library: %1").arg(name)
+                }
+                onActivated: transferDialog.targetRoot = currentValue
+            }
+            ListView {
+                objectName: "transferFolders"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: transferDialog.opened ? app.library.foldersOf(transferDialog.targetRoot) : []
+                ScrollBar.vertical: ScrollBar {}
+                delegate: ItemDelegate {
+                    required property var modelData
+                    width: ListView.view.width
+                    leftPadding: 16 + modelData.depth * 20
+                    text: modelData.name
+                    icon.source: app.iconUrl(modelData.depth === 0 ? "xqt-library" : "xqt-folder")
+                    icon.color: "#566d86"
+                    onClicked: transferDialog.choose(modelData.path)
                 }
             }
         }
@@ -1178,12 +1258,48 @@ Rectangle {
         title: qsTr("Import into the library")
         fileMode: FileDialog.OpenFiles
         nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("All files (*)")]
-        onAccepted: app.library.importUrls(selectedFiles, app.library.flat || home.searching ? "" : app.library.folder)
+        onAccepted: {
+            const files = selectedFiles, folder = app.library.flat || home.searching ? "" : app.library.folder
+            home.confirmImport(app.library.temporary, function() { app.library.importUrls(files, folder) })
+        }
     }
     FolderDialog {
         id: importFolderDialog
         title: qsTr("Import a folder (with its subfolders) into the library")
-        onAccepted: app.library.importUrls([selectedFolder], app.library.flat || home.searching ? "" : app.library.folder)
+        onAccepted: {
+            const dir = selectedFolder, folder = app.library.flat || home.searching ? "" : app.library.folder
+            home.confirmImport(app.library.temporary, function() { app.library.importUrls([dir], folder) })
+        }
+    }
+
+    Dialog {
+        id: temporaryImportDialog
+        objectName: "temporaryImportDialog"
+        property var action: null
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Import into Downloads?")
+        width: Math.min(parent ? parent.width * 0.9 : 520, 520)
+        ColumnLayout {
+            width: temporaryImportDialog.availableWidth
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("This goes into your Downloads folder. Files there are often cleaned up or deleted. "
+                           + "Documents you want to keep are better in one of your libraries.")
+            }
+        }
+        footer: DialogButtonBox {
+            Button { text: qsTr("Import anyway"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+            Button { text: qsTr("Cancel"); highlighted: true; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        onAccepted: {
+            const action = temporaryImportDialog.action
+            temporaryImportDialog.action = null
+            if (action) action()
+        }
+        onRejected: action = null
     }
 
     NewDocumentDialog { id: newDocumentDialog }

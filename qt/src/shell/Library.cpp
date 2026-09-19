@@ -52,6 +52,15 @@ fs::path Library::librariesFolder() {
 
 fs::path Library::defaultRoot() { return librariesFolder() / "Default"; }
 
+fs::path Library::downloadsFolder() {
+    return fs::path(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation).toStdString());
+}
+
+bool Library::isTemporary() const {
+    const fs::path downloads = normalized(downloadsFolder());
+    return !downloads.empty() && DocumentFiles::remap(rootDir, downloads, "/") != rootDir;
+}
+
 QString Library::name() const { return QString::fromStdString(rootDir.filename().string()); }
 
 bool Library::isDefault() const { return rootDir == normalized(defaultRoot()); }
@@ -59,6 +68,9 @@ bool Library::isDefault() const { return rootDir == normalized(defaultRoot()); }
 std::string Library::key() const { return hashOf(rootDir.string(), 12).toStdString(); }
 
 fs::path Library::metaDir() const {
+    if (isTemporary()) {
+        return Util::getCacheSubfolder(fs::path("libraries") / key());  // Downloads stays as it is
+    }
     const fs::path dir = rootDir / DocumentFiles::META_DIR;
     std::error_code ec;
     if ((fs::is_directory(dir, ec) || fs::create_directories(dir, ec)) &&

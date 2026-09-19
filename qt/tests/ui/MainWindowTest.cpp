@@ -813,3 +813,64 @@ TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     click(button);
     EXPECT_TRUE(find<QQuickItem>("pageGrid")->isVisible());
 }
+
+TEST_F(HomeScreenTest, movesToAnotherLibraryAndWarnsAboutDownloads) {
+    // A Downloads folder of our own (XDG user dirs in the tests' config folder)
+    QTemporaryDir dl;
+    const fs::path downloads = fs::path(dl.path().toStdString());
+    const QString config = qEnvironmentVariable("XDG_CONFIG_HOME");
+    fs::create_directories(config.toStdString());
+    {
+        QFile dirs(config + "/user-dirs.dirs");
+        ASSERT_TRUE(dirs.open(QIODevice::WriteOnly));
+        dirs.write(("XDG_DOWNLOAD_DIR=\"" + downloads.string() + "\"\n").c_str());
+    }
+    wait(50);
+    // Menu of "notes" → Move to… → the Downloads library → its top folder
+    const int row = rowOf("notes.xopp");
+    ASSERT_GE(row, 0);
+    QQuickItem* menuButton = nullptr;
+    for (auto* c: card(row)->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "cardMenuButton") {
+            menuButton = c;
+        }
+    }
+    click(menuButton);
+    QObject* menu = find("homeItemMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* moveItem = nullptr;
+    for (auto* c: menu->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "moveToItem") {
+            moveItem = c;
+        }
+    }
+    click(moveItem);
+    QObject* dialog = find("transferDialog");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    auto* box = find<QQuickItem>("transferLibraryBox");
+    ASSERT_NE(box, nullptr);
+    const QVariantList libs = box->property("model").toList();
+    int downloadsIndex = -1;
+    for (int i = 0; i < libs.size(); ++i) {
+        if (libs[i].toMap().value("downloads").toBool()) {
+            downloadsIndex = i;
+        }
+    }
+    ASSERT_GE(downloadsIndex, 0) << "the Downloads folder is offered";
+    box->setProperty("currentIndex", downloadsIndex);
+    QMetaObject::invokeMethod(box, "activated", Q_ARG(int, downloadsIndex));
+    wait(50);
+    auto* folders = find<QQuickItem>("transferFolders");
+    ASSERT_GE(folders->property("count").toInt(), 1);
+    click(itemAt(folders, 0));
+
+    // Into Downloads: asked first
+    QObject* warning = find("temporaryImportDialog");
+    ASSERT_TRUE(waitOpened(warning, true));
+    EXPECT_TRUE(fs::exists(root / "notes.xopp")) << "not before the answer";
+    QMetaObject::invokeMethod(warning, "accept");
+    wait(100);
+    EXPECT_TRUE(fs::exists(downloads / "notes.xopp"));
+    EXPECT_FALSE(fs::exists(root / "notes.xopp"));
+    QFile::remove(config + "/user-dirs.dirs");
+}

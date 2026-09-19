@@ -8,6 +8,12 @@ A **library** is a plain folder of documents that a window works in, like a work
 - The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
   as library…". A window never shows two libraries.
+- The Downloads folder is offered there too, as a quick library: all downloaded papers at once. Its metadata
+  (previews, search index) goes to the cache, not into Downloads. A note in the library says that its files are
+  short-lived, and importing or copying documents into it from elsewhere asks first.
+- "Copy to…" / "Move to…" can go into another library: the dialog has a library choice above the folders.
+  Documents keep their PDF (the .xopp is rewritten), folders keep their subfolders; on another disk a moved folder
+  is copied, then deleted.
 - Starting the app again for the same library hands the files over to the running window. Each library has its own
   single-instance socket and its own session journal: `session.json` for the default library, else
   `sessions/<hash>.json` in the config folder.

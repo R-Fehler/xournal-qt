@@ -521,6 +521,17 @@ Result moveFolder(const fs::path& folder, const fs::path& target) {
     }
     const fs::path dest = target / uniqueName(target, folder.filename().string());
     fs::rename(folder, dest, ec);
+    if (ec == std::errc::cross_device_link) {
+        // Another disk (e.g. a library on a USB stick): copy everything, then delete the original.
+        ec.clear();
+        fs::copy(folder, dest, fs::copy_options::recursive | fs::copy_options::copy_symlinks, ec);
+        if (ec) {
+            std::error_code rec;
+            fs::remove_all(dest, rec);
+            return failure("Could not move the folder: " + ec.message());
+        }
+        fs::remove_all(folder, ec);
+    }
     if (ec) {
         return failure("Could not move the folder: " + ec.message());
     }

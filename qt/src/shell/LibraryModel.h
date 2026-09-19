@@ -34,6 +34,8 @@ class LibraryModel final: public QAbstractListModel {
     Q_PROPERTY(bool available READ available NOTIFY libraryChanged)
     Q_PROPERTY(QString name READ name NOTIFY libraryChanged)
     Q_PROPERTY(QString rootPath READ rootPath NOTIFY libraryChanged)
+    /// The library is the Downloads folder (or in it): short-lived files, imports get a warning
+    Q_PROPERTY(bool temporary READ temporary NOTIFY libraryChanged)
     /// Current folder, relative to the library ("" = the library itself)
     Q_PROPERTY(QString folder READ folder WRITE setFolder NOTIFY folderChanged)
     /// [{ name, folder }] from the library down to the current folder
@@ -94,6 +96,9 @@ public:
     bool available() const { return lib != nullptr; }
     QString name() const;
     QString rootPath() const;
+    bool temporary() const { return lib && lib->isTemporary(); }
+    /// A folder in the Downloads folder (a target for copies that gets a warning).
+    Q_INVOKABLE bool isTemporaryFolder(const QString& path) const;
     QString folder() const { return currentFolder; }
     void setFolder(const QString& folder);
     QVariantList breadcrumbs() const;
@@ -126,6 +131,11 @@ public:
     /// Copy or move documents and folders (absolute paths: the selection, recent documents) into a folder of the
     /// library (relative). Copies are made in the background, like imports. A document keeps its PDF.
     Q_INVOKABLE bool transfer(const QStringList& paths, const QString& folder, bool copy);
+    /// The same into any folder (absolute), e.g. of another library.
+    Q_INVOKABLE bool transferTo(const QStringList& paths, const QString& folder, bool copy);
+    /// The folders of a library (its root first): [{ folder (relative), name, depth, path (absolute) }], e.g. of
+    /// another library as a target for "Move to" / "Copy to".
+    Q_INVOKABLE QVariantList foldersOf(const QString& root) const;
     /// Move documents and folders to the trash.
     Q_INVOKABLE bool trashPaths(const QStringList& paths);
 

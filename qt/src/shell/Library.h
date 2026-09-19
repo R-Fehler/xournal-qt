@@ -44,10 +44,14 @@ public:
     /// "<Documents>/Xournal_Libraries"
     static fs::path librariesFolder();
     static fs::path defaultRoot();
+    /// The user's Downloads folder: can be opened as a (quick) library, but its files are short-lived.
+    static fs::path downloadsFolder();
 
     const fs::path& root() const { return rootDir; }
     QString name() const;
     bool isDefault() const;
+    /// The Downloads folder or a folder in it: files there are often cleaned up (the UI warns before importing).
+    bool isTemporary() const;
     /// Short hash of the root (one instance and one session journal per library).
     std::string key() const;
     /// The metadata folder (created when needed). For folders that cannot be written: in the user's cache.

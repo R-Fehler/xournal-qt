@@ -140,6 +140,11 @@ cd build-qt
 - [ ] Search one or two letters (document, tab overview, library): nothing happens while typing ("Enter ↵"); Enter or the search icon searches; a single letter in a long PDF stays responsive.
 - [ ] Open 20+ documents: the tabs fill the whole strip before it scrolls, the + stays at the right end.
 
+## Downloads and other libraries
+- [ ] Library menu (▾): "Downloads folder (quick library)" opens ~/Downloads in its own window, with a note that its files are short-lived; no .xournal_library folder appears in Downloads.
+- [ ] In the Downloads library: Import (files, folder) and dropping files ask "Import into Downloads?" first.
+- [ ] Menu of a card → Move to… / Copy to…: choose another library in the box at the top, then a folder: the document (with its PDF) or folder is there; moving into Downloads from another library asks first.
+
 ## Tool bar, full screen, colors, pages
 - [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
 - [ ] F11: only the tool square and the page / zoom pill are left; drag the square; tap it: tools, colors, sizes; choosing one closes them; the pen works right away; Esc leaves full screen.

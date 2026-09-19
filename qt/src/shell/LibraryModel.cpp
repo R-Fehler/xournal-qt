@@ -74,6 +74,10 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
 }
 
 QString LibraryModel::name() const { return lib ? lib->name() : QString(); }
+
+bool LibraryModel::isTemporaryFolder(const QString& path) const {
+    return !path.isEmpty() && Library(toPath(path)).isTemporary();
+}
 QString LibraryModel::rootPath() const { return lib ? qstr(lib->root()) : QString(); }
 
 fs::path LibraryModel::dirOf(const QString& relative) const {
@@ -586,10 +590,31 @@ QStringList LibraryModel::documentsIn(const QStringList& paths) const {
 }
 
 bool LibraryModel::transfer(const QStringList& paths, const QString& folder, bool copy) {
-    if (!lib || paths.isEmpty()) {
+    return lib && transferTo(paths, qstr(dirOf(folder)), copy);
+}
+
+QVariantList LibraryModel::foldersOf(const QString& rootPath) const {
+    QVariantList list;
+    if (rootPath.isEmpty()) {
+        return list;
+    }
+    const Library other(toPath(rootPath));
+    list.append(QVariantMap{{"folder", QString()}, {"name", other.name()}, {"depth", 0}, {"path", qstr(other.root())}});
+    for (const auto& f: DocumentFiles::foldersRecursive(other.root())) {
+        const QString rel = QString::fromStdString(other.relative(f));
+        list.append(QVariantMap{{"folder", rel},
+                                {"name", QString::fromStdString(f.filename().string())},
+                                {"depth", static_cast<int>(rel.count('/')) + 1},
+                                {"path", qstr(f)}});
+    }
+    return list;
+}
+
+bool LibraryModel::transferTo(const QStringList& paths, const QString& folder, bool copy) {
+    if (paths.isEmpty() || folder.isEmpty()) {
         return false;
     }
-    const fs::path target = dirOf(folder);
+    const fs::path target = toPath(folder);
     std::vector<fs::path> files;
     for (const QString& p: paths) {
         files.push_back(toPath(p));

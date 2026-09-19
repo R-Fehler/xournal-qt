@@ -709,3 +709,60 @@ TEST_F(LibraryTest, benchIndexUpdates) {
     index.waitForDone();
     std::cout << "nothing changed: " << t.elapsed() << " ms\n";
 }
+
+TEST_F(LibraryTest, documentsAndFoldersMoveOrCopyToAnotherLibrary) {
+    const fs::path a = root / "A", b = root / "B";
+    makePdf(a / "lecture.pdf");
+    makeAnnotation(a / "lecture.pdf", a / "lecture.xopp");
+    makePdf(a / "Course" / "Week 1" / "sheet.pdf");
+    fs::create_directories(b / "Inbox");
+    LibraryModel model;
+    int changes = 0;
+    model.onFilesChanged = [&](const DocumentFiles::Result&) { ++changes; };
+    model.setLibrary(std::make_unique<Library>(a));
+
+    // The folders of the other library, as targets
+    const QVariantList targets = model.foldersOf(QString::fromStdString(b.string()));
+    ASSERT_EQ(targets.size(), 2);
+    EXPECT_EQ(targets[0].toMap().value("name").toString(), "B");
+    EXPECT_EQ(targets[1].toMap().value("path").toString().toStdString(), (b / "Inbox").string());
+
+    // Move the pair: both files, the reference follows; gone from this library
+    const QString lecture = QString::fromStdString((a / "lecture.xopp").string());
+    ASSERT_TRUE(model.transferTo({lecture}, QString::fromStdString((b / "Inbox").string()), false));
+    EXPECT_EQ(backgroundOf(b / "Inbox" / "lecture.xopp"), b / "Inbox" / "lecture.pdf");
+    EXPECT_FALSE(fs::exists(a / "lecture.pdf"));
+    EXPECT_EQ(changes, 1) << "open tabs follow";
+    EXPECT_LT(model.rowOf(lecture), 0);
+
+    // Copy a folder with its subfolders
+    QSignalSpy imported(&model, &LibraryModel::imported);
+    ASSERT_TRUE(model.transferTo({QString::fromStdString((a / "Course").string())}, QString::fromStdString(b.string()), true));
+    waitFor([&] { return imported.count() > 0; });
+    EXPECT_TRUE(fs::exists(b / "Course" / "Week 1" / "sheet.pdf"));
+    EXPECT_TRUE(fs::exists(a / "Course" / "Week 1" / "sheet.pdf"));
+}
+
+TEST_F(LibraryTest, theDownloadsFolderIsATemporaryLibrary) {
+    // The Downloads folder of the XDG user dirs (the tests have their own config folder)
+    const fs::path downloads = root / "Downloads";
+    fs::create_directories(downloads / "papers");
+    const QString config = qEnvironmentVariable("XDG_CONFIG_HOME");
+    ASSERT_FALSE(config.isEmpty());
+    fs::create_directories(config.toStdString());
+    {
+        QFile dirs(config + "/user-dirs.dirs");
+        ASSERT_TRUE(dirs.open(QIODevice::WriteOnly));
+        dirs.write(("XDG_DOWNLOAD_DIR=\"" + downloads.string() + "\"\n").c_str());
+    }
+    EXPECT_EQ(Library(Library::downloadsFolder()).root(), Library(downloads).root());
+    EXPECT_TRUE(Library(downloads).isTemporary());
+    EXPECT_TRUE(Library(downloads / "papers").isTemporary());
+    EXPECT_FALSE(Library(root / "lib").isTemporary());
+    EXPECT_NE(Library(downloads).metaDir().string().find("cache"), std::string::npos)
+            << "no .xournal_library in Downloads";
+    EXPECT_FALSE(fs::exists(downloads / ".xournal_library"));
+    LibraryModel model;
+    EXPECT_TRUE(model.isTemporaryFolder(QString::fromStdString((downloads / "papers").string())));
+    QFile::remove(config + "/user-dirs.dirs");
+}

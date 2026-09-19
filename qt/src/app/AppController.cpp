@@ -683,10 +683,18 @@ QVariantList AppController::libraries() const {
         dirs.push_back(current);  // a folder opened as library
     }
     std::sort(dirs.begin(), dirs.end());
+    // The Downloads folder: a quick library (all downloaded papers at once), last
+    const fs::path downloads = Library(Library::downloadsFolder()).root();
+    std::erase_if(dirs, [&](const fs::path& d) { return Library(d).root() == downloads; });
+    if (fs::is_directory(downloads, ec)) {
+        dirs.push_back(downloads);
+    }
     for (const auto& d: dirs) {
-        list.append(QVariantMap{{"name", QString::fromStdString(d.filename().string())},
+        const bool isDownloads = Library(d).root() == downloads;
+        list.append(QVariantMap{{"name", isDownloads ? tr("Downloads") : QString::fromStdString(d.filename().string())},
                                 {"path", QString::fromStdString(d.string())},
-                                {"current", Library(d).root() == current}});
+                                {"current", Library(d).root() == current},
+                                {"downloads", isDownloads}});
     }
     return list;
 }
