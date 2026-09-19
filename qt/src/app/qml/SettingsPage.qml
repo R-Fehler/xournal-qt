@@ -187,11 +187,12 @@ Popup {
                     spacing: 10
                     SectionTitle { text: qsTr("Palm rejection") }
                     Hint {
-                        text: qsTr("Touch is ignored while the pen is near the screen, and for a moment after the "
-                                   + "pen was used.")
+                        text: qsTr("Touch is ignored while the pen is near the screen (a hand resting on the screen "
+                                   + "while writing is ignored until it is lifted). For pens that do not report "
+                                   + "when they are near, touch is ignored for a while after the pen was used:")
                     }
                     SliderRow {
-                        key: "palmRejectionTimeout"; text: qsTr("Ignore touch after the pen for")
+                        key: "palmRejectionTimeout"; text: qsTr("Pens without proximity: ignore touch for")
                         from: 0; to: 3000; stepSize: 100; decimals: 1; factor: 0.001; suffix: " s"
                     }
                     SectionTitle { text: qsTr("Gestures") }

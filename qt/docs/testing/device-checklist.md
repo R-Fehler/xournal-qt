@@ -22,6 +22,7 @@ cd build-qt
 - [ ] Two-finger tap: undo. Three-finger tap: redo.
 - [ ] Palm on the screen while writing or hovering: the page never moves.
 - [ ] Pen touching down while a finger pans: the pan stops and the pen draws.
+- [ ] Right after writing (pen lifted away from the screen), pinch zoom works at once; a hand resting on the screen while writing still does not move the page.
 
 ## Document
 - [ ] Undo/redo buttons and Ctrl+Z / Ctrl+Y.

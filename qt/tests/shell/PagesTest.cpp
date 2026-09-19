@@ -3,6 +3,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <atomic>
+#include <thread>
+
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QImage>
@@ -214,4 +217,52 @@ TEST(Pages, filterShowsOnlyPagesWithHits) {
     c.clearSearch();  // the filter ends with the search
     EXPECT_FALSE(filter->onlySearchHits());
     EXPECT_EQ(filter->count(), 11);
+}
+
+TEST(Pages, typicalAspectFollowsTheDocument) {
+    AppController c;
+    PagesModel& m = pagesOf(c);
+    EXPECT_NEAR(m.typicalAspect(), 1.414, 0.01) << "A4 portrait";
+    // Slides (16:9) with one portrait page in between: the grid cells follow the slides.
+    DocumentSession* s = c.tabManager().currentSession();
+    auto slide = [] { return std::make_shared<XojPage>(1600.0, 900.0); };
+    s->insertPage(slide(), 1);
+    s->insertPage(slide(), 2);
+    s->insertPage(slide(), 3);
+    EXPECT_NEAR(m.typicalAspect(), 900.0 / 1600.0, 0.001);
+}
+
+// Text renders the same from several threads at once (thumbnails and the page renderer run in parallel).
+TEST(Pages, concurrentTextRenderingIsComplete) {
+    // Reference: rendered one after the other, from a separately loaded copy.
+    std::vector<QImage> reference;
+    {
+        AppController r;
+        ASSERT_TRUE(r.openPath(fixture(u8"load/pages.xopp")));
+        for (size_t p = 0; p < 11; ++p) {
+            reference.push_back(ThumbnailProvider::render(*r.tabManager().currentSession(), p, 200));
+        }
+    }
+    // A freshly loaded document, rendered from several threads at once from the start.
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    DocumentSession* s = c.tabManager().currentSession();
+    std::atomic<int> mismatches{0};
+    std::vector<std::thread> threads;
+    for (int t = 0; t < 6; ++t) {
+        threads.emplace_back([&, t] {
+            for (int round = 0; round < 5; ++round) {
+                for (size_t p = 0; p < 11; ++p) {
+                    const size_t page = (p + static_cast<size_t>(t)) % 11;
+                    if (ThumbnailProvider::render(*s, page, 200) != reference[page]) {
+                        ++mismatches;
+                    }
+                }
+            }
+        });
+    }
+    for (auto& th: threads) {
+        th.join();
+    }
+    EXPECT_EQ(mismatches.load(), 0);
 }

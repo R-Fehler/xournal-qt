@@ -12,6 +12,7 @@
 #include <QElapsedTimer>
 #include <QPointingDevice>
 #include <QTabletEvent>
+#include <QTouchEvent>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QWheelEvent>
@@ -111,6 +112,8 @@ protected:
     QPointingDevice eraser{"test eraser", 1002, QInputDevice::DeviceType::Stylus,
                            QPointingDevice::PointerType::Eraser,
                            QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3};
+    QPointingDevice touchscreen{"test touchscreen", 1004, QInputDevice::DeviceType::TouchScreen,
+                                QPointingDevice::PointerType::Finger, QInputDevice::Capability::Position, 10, 0};
     QPointingDevice touchpad{"test touchpad", 1003, QInputDevice::DeviceType::TouchPad,
                              QPointingDevice::PointerType::Finger,
                              QInputDevice::Capability::Position | QInputDevice::Capability::Scroll, 2, 0};
@@ -261,4 +264,62 @@ TEST_F(CanvasReplayTest, mouseWheelHasNoMomentum) {
     EXPECT_NEAR(after - startY, 48, 1);
     processEvents(200);
     EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), after);
+}
+
+namespace {
+// (The touch screen device lives in the test, not in a static: QPointingDevice must not outlive the application.)
+void touch(CanvasInput& input, const QPointingDevice& screen, QEvent::Type type, QEventPoint::State state,
+           QPointF pos) {
+    QEventPoint p(1, state, pos, pos);
+    QTouchEvent e(type, &screen, Qt::NoModifier, {p});
+    input.touchEvent(&e, [](QPointF scene) { return scene; });
+}
+
+/// One finger dragging upwards; returns how far the view scrolled.
+double fingerPan(CanvasInput& input, const QPointingDevice& screen, CanvasView& view) {
+    auto& vc = view.getViewController();
+    const double before = vc.visibleContentRect().top();
+    touch(input, screen, QEvent::TouchBegin, QEventPoint::State::Pressed, QPointF(400, 400));
+    for (int i = 1; i <= 10; ++i) {
+        touch(input, screen, QEvent::TouchUpdate, QEventPoint::State::Updated, QPointF(400, 400 - 20 * i));
+    }
+    touch(input, screen, QEvent::TouchEnd, QEventPoint::State::Released, QPointF(400, 200));
+    vc.stopMomentum();
+    return vc.visibleContentRect().top() - before;
+}
+}  // namespace
+
+// Palm rejection with a pen that reports proximity: no long dead time after writing (pinch/pan right away), but
+// a hand that rests on the screen while the pen is near stays ignored.
+TEST_F(CanvasReplayTest, touchWorksRightAfterThePenLeaves) {
+    for (int i = 0; i < 6; ++i) {
+        session->insertNewPage(1);
+    }
+    view->getViewController().setViewSize(QSizeF(900, 600));
+    processEvents();
+
+    input->proximityEvent(true);
+    EXPECT_DOUBLE_EQ(fingerPan(*input, touchscreen, *view), 0.0) << "touch while the pen is near";
+    input->proximityEvent(false);
+    processEvents(200);
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "touch shortly after the pen left";
+}
+
+TEST_F(CanvasReplayTest, restingHandStaysIgnoredAfterThePenLeaves) {
+    for (int i = 0; i < 6; ++i) {
+        session->insertNewPage(1);
+    }
+    view->getViewController().setViewSize(QSizeF(900, 600));
+    processEvents();
+
+    input->proximityEvent(true);
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, QPointF(400, 400));  // palm
+    input->proximityEvent(false);
+    processEvents(200);
+    const double before = view->getViewController().visibleContentRect().top();
+    for (int i = 1; i <= 10; ++i) {
+        touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, QPointF(400, 400 - 20 * i));
+    }
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, QPointF(400, 200));
+    EXPECT_DOUBLE_EQ(view->getViewController().visibleContentRect().top(), before);
 }

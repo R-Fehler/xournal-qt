@@ -17,18 +17,21 @@ Element::Element(ElementType type): type(type) {}
 
 auto Element::getType() const -> ElementType { return this->type; }
 
+// xournal-qt: the flag is set after the size is computed. Pages are rendered by several threads at once (with a
+// shared document lock); setting it first let another thread use the not yet computed (empty) bounds, and the
+// element was not drawn.
 auto Element::getBoundingBox() const -> const Rectangle<double>& {
     if (!this->sizeCalculated) {
-        this->sizeCalculated = true;
         calcSize();
+        this->sizeCalculated = true;
     }
     return this->boundingBox;
 }
 
 auto Element::getSnappedBounds() const -> const Rectangle<double>& {
     if (!this->sizeCalculated) {
-        this->sizeCalculated = true;
         calcSize();
+        this->sizeCalculated = true;
     }
     return this->snappedBounds;
 }

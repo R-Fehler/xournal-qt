@@ -66,8 +66,9 @@ Rectangle {
         cacheBuffer: height
         maximumFlickVelocity: 9000
         cellWidth: Math.floor(width / pageGrid.columns)
-        // Room for an A4 portrait page and its number; other formats are fitted in.
-        cellHeight: Math.round((cellWidth - pageGrid.spacing) * 1.414) + pageGrid.labelHeight + pageGrid.spacing
+        // Room for a page of the document's usual format (A4, slides, ...) and its number; others are fitted in.
+        cellHeight: Math.round((cellWidth - pageGrid.spacing) * app.pages.typicalAspect) + pageGrid.labelHeight
+                    + pageGrid.spacing
         header: Item { height: pageGrid.spacing }
         footer: Item { height: 80 }  // not under the zoom controls
         ScrollBar.vertical: ScrollBar { minimumSize: 0.05 }

@@ -27,6 +27,8 @@ namespace xqt {
 
 namespace {
 constexpr int PALM_TIMEOUT_MS = 1000;  // upstream HandRecognition default ("touch" / "timeout" setting)
+/// Pens that report proximity: touch works again this soon after the pen left.
+constexpr int PROXIMITY_GRACE_MS = 150;
 constexpr double TAP_MAX_MS = 250.0;
 constexpr double TAP_SLOP_PX = 16.0;  // Krita's TOUCH_SLOP
 
@@ -422,9 +424,13 @@ bool CanvasInput::touchBlocked() const {
     if (deviceClassPressed && runningDeviceClass != DeviceClass::Mouse) {
         return true;
     }
-    if (proximityEverSeen && penInProximity) {
-        return true;
+    if (proximityEverSeen) {
+        // The pen tells when it is near: block touch while it is, and only a moment after it left. A touch that
+        // began while the pen was near (the resting palm) stays ignored for its whole duration anyway, so no long
+        // timeout is needed; it would only delay pinch zoom after writing.
+        return penInProximity || monotonicMs() - lastPenEventMs < PROXIMITY_GRACE_MS;
     }
+    // Pens without proximity events: upstream's timeout after the last pen event.
     int timeoutMs = PALM_TIMEOUT_MS;
     view.getSession().getSettings()->getCustomElement("touch").getInt("timeout", timeoutMs);
     return monotonicMs() - lastPenEventMs < timeoutMs;

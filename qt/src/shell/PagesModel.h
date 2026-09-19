@@ -27,6 +27,8 @@ class PagesModel final: public QAbstractListModel, public DocumentListener {
     Q_OBJECT
     Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
     Q_PROPERTY(int currentPage READ currentPage NOTIFY currentPageChanged)
+    /// Height / width of most pages (median): the page grid sizes its cells with it (slides, A4, ...).
+    Q_PROPERTY(qreal typicalAspect READ typicalAspect NOTIFY typicalAspectChanged)
 public:
     enum Roles {
         PageNumberRole = Qt::UserRole + 1,
@@ -53,6 +55,7 @@ public:
     QVariant data(const QModelIndex& index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
     int currentPage() const;
+    qreal typicalAspect() const { return aspect; }
 
     /// Milliseconds to collect content changes before thumbnails are refreshed.
     void setRefreshDelay(int ms) { refreshTimer.setInterval(ms); }
@@ -68,9 +71,11 @@ public:
 Q_SIGNALS:
     void countChanged();
     void currentPageChanged();
+    void typicalAspectChanged();
 
 private:
     void reset();
+    void updateTypicalAspect();
     void markChanged(size_t page);
     void flushChanges();
 
@@ -82,6 +87,7 @@ private:
     std::set<size_t> changed;
     QTimer refreshTimer;
     int current = 0;
+    qreal aspect = 1.414;
     std::vector<QMetaObject::Connection> connections;
 };
 

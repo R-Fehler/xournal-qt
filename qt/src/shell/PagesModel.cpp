@@ -1,6 +1,7 @@
 #include "PagesModel.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include <shared_mutex>
 
@@ -68,6 +69,7 @@ void PagesModel::reset() {
         current = static_cast<int>(session->getCurrentPageNo());
     }
     endResetModel();
+    updateTypicalAspect();
     Q_EMIT countChanged();
     Q_EMIT currentPageChanged();
 }
@@ -138,6 +140,26 @@ QHash<int, QByteArray> PagesModel::roleNames() const {
             {SearchHitCountRole, "searchHitCount"}, {PageIndexRole, "pageIndex"}};
 }
 
+void PagesModel::updateTypicalAspect() {
+    std::vector<qreal> aspects;
+    aspects.reserve(sizes.size());
+    for (const QSizeF& s: sizes) {
+        if (s.width() > 0) {
+            aspects.push_back(s.height() / s.width());
+        }
+    }
+    qreal median = 1.414;
+    if (!aspects.empty()) {
+        std::nth_element(aspects.begin(), aspects.begin() + static_cast<std::ptrdiff_t>(aspects.size() / 2),
+                         aspects.end());
+        median = aspects[aspects.size() / 2];
+    }
+    if (std::abs(median - aspect) > 1e-6) {
+        aspect = median;
+        Q_EMIT typicalAspectChanged();
+    }
+}
+
 void PagesModel::markChanged(size_t page) {
     if (page < revisions.size()) {
         changed.insert(page);
@@ -168,6 +190,7 @@ void PagesModel::pageSizeChanged(size_t page) {
         sizes[page] = QSizeF(p->getWidth(), p->getHeight());
         revisions[page] = nextRevision++;
         Q_EMIT dataChanged(index(static_cast<int>(page)), index(static_cast<int>(page)), {AspectRole, ThumbnailRole});
+        updateTypicalAspect();
     }
 }
 
@@ -190,6 +213,7 @@ void PagesModel::pageInserted(size_t page) {
     endInsertRows();
     // Page numbers after the insertion changed.
     Q_EMIT dataChanged(index(static_cast<int>(page)), index(rowCount() - 1), {PageNumberRole});
+    updateTypicalAspect();
     Q_EMIT countChanged();
 }
 
@@ -205,6 +229,7 @@ void PagesModel::pageDeleted(size_t page) {
     if (static_cast<int>(page) < rowCount()) {
         Q_EMIT dataChanged(index(static_cast<int>(page)), index(rowCount() - 1), {PageNumberRole});
     }
+    updateTypicalAspect();
     Q_EMIT countChanged();
 }
 

@@ -16,6 +16,7 @@
 #include "control/xojfile/LoadHandler.h"
 #include "control/xojfile/SaveHandler.h"
 #include "model/Document.h"
+#include "model/Layer.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "undo/InsertDeletePageUndoAction.h"
@@ -73,6 +74,15 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
         result.fileVersion = loadHandler.getFileVersion();
         if (result.document) {
             result.document->setDocumentHandler(&detachedHandler());  // the LoadHandler's handler dies with it
+            // Element sizes are computed lazily, also by the (parallel) renderers: compute them once, here, before
+            // any renderer sees the document.
+            for (size_t i = 0; i < result.document->getPageCount(); ++i) {
+                for (const Layer* layer: result.document->getPage(i)->getLayers()) {
+                    for (const auto& e: layer->getElementsView()) {
+                        e->getBoundingBox();
+                    }
+                }
+            }
         }
     } catch (const std::exception& e) {
         result.document.reset();
