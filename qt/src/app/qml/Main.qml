@@ -24,7 +24,7 @@ ApplicationWindow {
     readonly property string toolbarPosition: app.toolbarPosition
     readonly property bool sideToolbar: toolbarPosition === "left" || toolbarPosition === "right"
     /// Full screen: no tab strip, tool bar or page sidebar; a small square shows the current tool, a tap on it offers
-    /// the tools (the same ones) and colors.
+    /// the tools (the same ones) and colors. The page / zoom pill stays.
     property bool fullScreenMode: false
     property int visibilityBeforeFullScreen: Window.Windowed
     onFullScreenModeChanged: {
@@ -458,7 +458,8 @@ ApplicationWindow {
     // Page and zoom status, floating over the canvas.
     Pane {
         id: viewPill
-        visible: !pageGrid.visible && !contentsOverview.visible && !win.fullScreenMode
+        objectName: "viewPill"
+        visible: !pageGrid.visible && !contentsOverview.visible  // also in full screen
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: 28

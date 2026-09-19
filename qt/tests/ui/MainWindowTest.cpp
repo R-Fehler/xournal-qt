@@ -728,6 +728,7 @@ TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
     EXPECT_FALSE(find<QQuickItem>("sidebar")->isVisible());
     auto* gridButton = find<QQuickItem>("contentsButton");  // a tool bar button
     EXPECT_FALSE(gridButton->isVisible()) << "the tools are hidden";
+    EXPECT_TRUE(find<QQuickItem>("viewPill")->isVisible()) << "page number, zoom and the page grid stay";
 
     // Tap the square: all tools; choosing one closes them
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, square->mapToScene(QPointF(28, 28)).toPoint());
