@@ -179,7 +179,6 @@ ApplicationWindow {
             columnSpacing: 2
 
             IconButton { iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: sidebarShown; onClicked: sidebarShown = !sidebarShown }
-            IconButton { objectName: "pageGridButton"; iconName: "xqt-pages-grid"; tip: qsTr("All pages (Ctrl+Alt+G)"); checked: pageGrid.visible; onClicked: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
             IconButton {
                 objectName: "contentsButton"
                 iconName: "xqt-toc"
@@ -529,6 +528,14 @@ ApplicationWindow {
                 }
             }
             ToolSeparator {}
+            IconButton {
+                objectName: "pageGridButton"
+                iconName: "xqt-pages-grid"
+                tip: qsTr("All pages (Ctrl+Alt+G)")
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 22; icon.height: 22
+                onClicked: pageGrid.open()
+            }
             Label { text: app.pageNumber + " / " + app.pageCount; color: "#505050"; Layout.rightMargin: 6 }
             ToolSeparator {}
             ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }

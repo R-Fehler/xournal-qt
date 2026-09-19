@@ -25,6 +25,7 @@
 #include "shell/HitPages.h"
 #include "shell/LibraryModel.h"
 #include "shell/PagesModel.h"
+#include "shell/RecentFiles.h"
 #include "shell/Previews.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
@@ -475,6 +476,7 @@ protected:
         fs::copy_file(pdf, root / "lecture.pdf");
         fs::copy_file(fs::path(GET_TESTFILE(u8"load/strokes.xopp")), root / "notes.xopp");
         controller->setLibraryRoot(root);
+        qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();  // (tests share the config folder)
     }
     QQuickItem* grid() const { return find<QQuickItem>("libraryGrid"); }
     int gridCount() const { return grid()->property("count").toInt(); }
@@ -692,7 +694,7 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
 }
 
 TEST_F(MainWindowTest, toolbarMovesToTheLeftOrRight) {
-    auto* gridButton = find<QQuickItem>("pageGridButton");
+    auto* gridButton = find<QQuickItem>("contentsButton");  // a tool bar button
     auto* canvas = find<QQuickItem>("canvas");
     ASSERT_NE(gridButton, nullptr);
     auto sceneX = [](QQuickItem* i) { return i->mapToScene(QPointF(0, 0)).x(); };
@@ -724,7 +726,7 @@ TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
     EXPECT_TRUE(window->property("fullScreenMode").toBool());
     EXPECT_TRUE(square->isVisible());
     EXPECT_FALSE(find<QQuickItem>("sidebar")->isVisible());
-    auto* gridButton = find<QQuickItem>("pageGridButton");
+    auto* gridButton = find<QQuickItem>("contentsButton");  // a tool bar button
     EXPECT_FALSE(gridButton->isVisible()) << "the tools are hidden";
 
     // Tap the square: all tools; choosing one closes them
@@ -798,4 +800,15 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     click(page4);
     EXPECT_FALSE(overview->isVisible());
     EXPECT_EQ(controller->pageNumber(), 4);
+}
+
+TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* button = find<QQuickItem>("pageGridButton");
+    ASSERT_NE(button, nullptr);
+    auto* canvas = find<QQuickItem>("canvas");
+    const QPointF p = button->mapToScene(QPointF(0, 0));
+    EXPECT_GT(p.y(), canvas->mapToScene(QPointF(0, canvas->height() / 2)).y()) << "at the bottom, over the canvas";
+    click(button);
+    EXPECT_TRUE(find<QQuickItem>("pageGrid")->isVisible());
 }
