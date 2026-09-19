@@ -564,9 +564,19 @@ QVariantList AppController::palette() const {
 }
 
 namespace {
-constexpr int DEFAULT_TOOLBAR_COLORS = 9;  // upstream palette: black ... magenta, orange
 const char* const CUSTOM = "xournalQt";
 }  // namespace
+
+QVariantList AppController::defaultToolbarColors() const {
+    // Upstream's palette (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow), not white
+    QVariantList list;
+    for (const QVariant& c: palette()) {
+        if (c.value<QColor>() != QColor(Qt::white)) {
+            list.append(c);
+        }
+    }
+    return list;
+}
 
 QVariantList AppController::toolbarColors() const {
     std::string stored;
@@ -579,8 +589,7 @@ QVariantList AppController::toolbarColors() const {
         }
         return list;
     }
-    const QVariantList all = palette();
-    return all.mid(0, DEFAULT_TOOLBAR_COLORS);
+    return defaultToolbarColors();
 }
 
 void AppController::storeToolbarColors(const QVariantList& list) {
@@ -612,7 +621,7 @@ void AppController::removeToolbarColor(int index) {
     }
 }
 
-void AppController::resetToolbarColors() { storeToolbarColors(palette().mid(0, DEFAULT_TOOLBAR_COLORS)); }
+void AppController::resetToolbarColors() { storeToolbarColors(defaultToolbarColors()); }
 
 QString AppController::toolbarPosition() const {
     std::string stored;
@@ -1112,6 +1121,14 @@ void AppController::zoomIn() {
     if (canvas()) {
         auto& vc = canvas()->getViewController();
         vc.zoomBy(1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
+    }
+}
+
+void AppController::setZoomPercent(int percent) {
+    if (canvas() && percent > 0 && zoomPercent() > 0) {
+        auto& vc = canvas()->getViewController();
+        vc.zoomBy(percent / (vc.zoom() / vc.zoom100() * 100.0),
+                  QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
 }
 

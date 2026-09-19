@@ -25,7 +25,7 @@ cd build-qt
 - [ ] Right after writing (pen lifted away from the screen), pinch zoom works at once; a hand resting on the screen while writing still does not move the page.
 
 ## Document
-- [ ] Undo/redo buttons and Ctrl+Z / Ctrl+Y.
+- [ ] Undo/redo buttons (in the page / zoom pill, also in full screen) and Ctrl+Z / Ctrl+Y.
 - [ ] Add a page (+ page icon); scrolling through many pages stays smooth.
 - [ ] Open a .xopp with a PDF background, and open a plain .pdf to annotate.
 - [ ] Save / save as; the file then opens in upstream Xournal++ and looks identical.
@@ -142,7 +142,8 @@ cd build-qt
 
 ## Text mode
 - [ ] Text mode button (or Ctrl+Alt+E): type "# Title", Enter, a paragraph, "- item", Enter, "item", Enter, Enter, text: the page shows it at the top left while typing (heading big, bullets with hanging indent).
-- [ ] H1/H2/H3, lists, B, I, A−/A+, colors act on the paragraph at the cursor (or the selected ones); Tab / Shift+Tab change the list level.
+- [ ] The editor is beside the page (right), not over it; the whole page width is visible next to it; closing it gives the old zoom back.
+- [ ] H1/H2/H3, lists, B, I, A−/A+, colors (the same as the pen colors) act on the paragraph at the cursor (or the selected ones); Tab / Shift+Tab change the list level.
 - [ ] Done; Ctrl+Z removes the whole text, Ctrl+Y brings it back; open the text mode again: the same paragraphs are in the editor.
 - [ ] Writing with the pen over the text: the ink is on top; the text tool edits single text boxes.
 - [ ] Save, open the file in Xournal++ (GTK): the same text (text boxes in a layer "Text").
@@ -156,7 +157,7 @@ cd build-qt
 ## Tool bar, full screen, colors, pages
 - [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
 - [ ] F11: only the tool square and the page / zoom pill are left; drag the square; tap it: tools, colors, sizes; choosing one closes them; the pen works right away; Esc leaves full screen.
-- [ ] Colors: orange is there; "+" adds a color from the color dialog; press and hold a color: remove it; "Default colors".
+- [ ] Colors: the Xournal++ palette without white (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow); "+" adds a color from the color dialog; press and hold a color: remove it; "Default colors".
 - [ ] Mark PDF text: the three highlight colors in the tool's menu and in the select bar; highlights come in the chosen color.
 - [ ] Press and hold "add page" (or ⋮ → Insert pages…): 3 graph pages, landscape, after this page; one undo in the sidebar removes them.
 

@@ -1,13 +1,14 @@
 # Text mode
 
 A keyboard-oriented way to write the text of a page, like in a word processor (toolbar button "Text mode",
-Ctrl+Alt+E). The page shows the text while you type, laid out from its top-left margin (2 cm; on a ruled page with a
-margin line: beside the line) and broken into lines at the right margin.
+Ctrl+Alt+E). The editor opens beside the pages (on the right; the page is zoomed to fit next to it and gets its
+zoom back afterwards). The page shows the text while you type, laid out from its top-left margin (2 cm; on a ruled
+page with a margin line: beside the line) and broken into lines at the right margin.
 
 ## What it can do
 - Kinds of paragraphs: text, headings 1–3 (24 / 18 / 15 pt, bold), bullet and numbered lists with levels
   (Tab / Shift+Tab).
-- Per paragraph: bold, italic, size (A− / A+), color.
+- Per paragraph: bold, italic, size (A− / A+), color (the pen colors of the tool bar).
 - Markdown shortcuts at the start of a line: `# `, `## `, `### `, `- ` / `* `, `1. `. Enter after a heading starts a
   paragraph; Enter on an empty list item ends the list. Ctrl+B / Ctrl+I, Ctrl+1/2/3 (headings), Ctrl+0 (text).
 - Done (or Esc) keeps it; the whole edit is one undo step. Cancel puts the page back as it was.

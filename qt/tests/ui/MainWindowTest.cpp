@@ -888,6 +888,10 @@ TEST_F(MainWindowTest, textModeTypesThePageText) {
     EXPECT_TRUE(controller->textFlowActive());
     auto* area = find<QQuickItem>("textFlowArea");
     ASSERT_TRUE(area->hasActiveFocus());
+    // Beside the pages, not over them
+    auto* canvasItem = find<QQuickItem>("canvas");
+    EXPECT_LE(canvasItem->mapToScene({canvasItem->width(), 0}).x(), panel->mapToScene({0, 0}).x() + 0.5);
+    EXPECT_GT(canvasItem->width(), 100);
 
     type("# Lecture 5");
     key(Qt::Key_Return);  // after a heading: a paragraph
@@ -927,9 +931,13 @@ TEST_F(MainWindowTest, textModeTypesThePageText) {
     click(find<QQuickItem>("textFlowDone"));
     EXPECT_FALSE(panel->isVisible());
     EXPECT_FALSE(controller->textFlowActive());
-    controller->undo();  // one step for the whole text
+    // One step for the whole text; undo / redo are in the page pill
+    auto* undoButton = find<QQuickItem>("undoButton");
+    ASSERT_NE(undoButton, nullptr);
+    EXPECT_TRUE(find<QQuickItem>("viewPill")->isAncestorOf(undoButton));
+    click(undoButton);
     EXPECT_TRUE(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).empty());
-    controller->redo();
+    click(find<QQuickItem>("redoButton"));
     EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
 
     // Cancel restores the page

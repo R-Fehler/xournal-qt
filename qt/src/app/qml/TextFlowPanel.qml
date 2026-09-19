@@ -13,15 +13,20 @@ Pane {
     objectName: "textFlowPanel"
     visible: false
     padding: 0
-    Material.elevation: 6
-    background: Rectangle { color: "#fafafa"; border.width: 1; border.color: "#d5d8dc" }
+    background: Rectangle {
+        color: "#fafafa"
+        Rectangle { width: 1; anchors.top: parent.top; anchors.bottom: parent.bottom; color: "#d5d8dc" }  // towards the pages
+    }
 
+    property int zoomBefore: 100
     function open() {
         editor.family = app.textFlowFamily()
         editor.bodySize = app.fontSize
         const blocks = app.beginTextFlow()
         editor.load(blocks)
+        zoomBefore = app.zoomPercent
         visible = true
+        Qt.callLater(app.fitWidth)  // the whole page beside the panel
         area.cursorPosition = area.length
         area.forceActiveFocus()
     }
@@ -30,6 +35,7 @@ Pane {
         if (keep) app.updateTextFlow(editor.blocks())
         app.endTextFlow(keep)
         visible = false
+        Qt.callLater(app.setZoomPercent, zoomBefore)
     }
     // The page follows shortly after typing
     Timer {
@@ -141,20 +147,26 @@ Pane {
             Label { text: Math.round(editor.fontSize); anchors.verticalCenter: undefined; height: 40; verticalAlignment: Text.AlignVCenter; color: "#5f6368" }
             ToolButton { text: "A+"; implicitWidth: 40; enabled: editor.blockKind < 1 || editor.blockKind > 3; onClicked: { editor.changeSize(1); area.forceActiveFocus() } }
             ToolSeparator {}
+            // Text color: the pen colors of the tool bar
             Repeater {
-                model: app.toolbarColors.slice(0, 6)
+                model: app.toolbarColors
                 delegate: AbstractButton {
+                    id: swatch
                     required property color modelData
-                    implicitWidth: 30
+                    objectName: "textColor"
+                    implicitWidth: 34
                     implicitHeight: 40
                     onClicked: { editor.setColor(modelData); area.forceActiveFocus() }
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Text color of the paragraph")
+                    ToolTip.delay: 600
                     contentItem: Item {
                         Rectangle {
                             anchors.centerIn: parent
-                            width: 20; height: 20; radius: 10
-                            color: parent.parent.modelData
-                            border.width: Qt.colorEqual(editor.color, parent.parent.modelData) ? 3 : 1
-                            border.color: Qt.colorEqual(editor.color, parent.parent.modelData) ? Material.accentColor : "#9e9e9e"
+                            width: 24; height: 24; radius: 12
+                            color: swatch.modelData
+                            border.width: Qt.colorEqual(editor.color, swatch.modelData) ? 3 : 1
+                            border.color: Qt.colorEqual(editor.color, swatch.modelData) ? Material.accentColor : "#9e9e9e"
                         }
                     }
                 }

@@ -191,9 +191,6 @@ ApplicationWindow {
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
             IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
-            IconButton { iconName: "xopp-edit-undo"; tip: qsTr("Undo"); enabled: app.canUndo; onClicked: app.undo() }
-            IconButton { iconName: "xopp-edit-redo"; tip: qsTr("Redo"); enabled: app.canRedo; onClicked: app.redo() }
-            ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { iconName: "xopp-tool-pencil"; tip: qsTr("Pen"); checked: app.tool === "pen"; onClicked: app.selectTool("pen") }
             IconButton { iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
             IconButton { iconName: "xopp-tool-eraser"; tip: qsTr("Eraser"); checked: app.tool === "eraser"; onClicked: app.selectTool("eraser") }
@@ -456,7 +453,8 @@ ApplicationWindow {
         objectName: "canvas"
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
+        anchors.right: textFlowPanel.visible ? textFlowPanel.left
+                                             : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible ? sidebar.right : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
@@ -483,6 +481,25 @@ ApplicationWindow {
         }
         RowLayout {
             spacing: 0
+            IconButton {
+                objectName: "undoButton"
+                iconName: "xopp-edit-undo"
+                tip: qsTr("Undo (Ctrl+Z)")
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 22; icon.height: 22
+                enabled: app.canUndo
+                onClicked: app.undo()
+            }
+            IconButton {
+                objectName: "redoButton"
+                iconName: "xopp-edit-redo"
+                tip: qsTr("Redo (Ctrl+Y)")
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 22; icon.height: 22
+                enabled: app.canRedo
+                onClicked: app.redo()
+            }
+            ToolSeparator {}
             IconButton {
                 objectName: "layoutButton"
                 iconName: "xqt-columns"
@@ -563,13 +580,13 @@ ApplicationWindow {
         objectName: "pageGrid"
         anchors.fill: canvas
     }
+    // Text mode: beside the pages (right), the canvas makes room
     TextFlowPanel {
         id: textFlowPanel
-        anchors.top: canvas.top
-        anchors.bottom: canvas.bottom
-        anchors.right: canvas.right
-        width: Math.min(canvas.width * 0.5, 620)
-        z: 5
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
+        width: visible ? Math.min(Math.max(360, win.width * 0.38), 600) : 0
     }
     ContentsOverview {
         id: contentsOverview

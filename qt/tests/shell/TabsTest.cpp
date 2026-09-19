@@ -237,15 +237,17 @@ TEST(ToolbarColors, orangeByDefaultAddRemoveReset) {
     AppController c;
     c.resetToolbarColors();
     const QVariantList defaults = c.toolbarColors();
-    ASSERT_EQ(defaults.size(), 9);
-    EXPECT_EQ(defaults.last().value<QColor>(), QColor(255, 128, 0)) << "orange";
+    ASSERT_EQ(defaults.size(), 10) << "the Xournal++ palette without white";
+    EXPECT_EQ(defaults[8].value<QColor>(), QColor(255, 128, 0)) << "orange";
+    EXPECT_EQ(defaults[9].value<QColor>(), QColor(255, 255, 0)) << "yellow";
+    EXPECT_FALSE(defaults.contains(QColor(Qt::white)));
     QSignalSpy changed(&c, &AppController::toolbarColorsChanged);
     c.addToolbarColor(QColor("#123456"));
     c.addToolbarColor(QColor("#123456"));  // not twice
-    EXPECT_EQ(c.toolbarColors().size(), 10);
+    EXPECT_EQ(c.toolbarColors().size(), 11);
     EXPECT_EQ(c.toolbarColors().last().value<QColor>(), QColor("#123456"));
     c.removeToolbarColor(0);  // black
-    EXPECT_EQ(c.toolbarColors().size(), 9);
+    EXPECT_EQ(c.toolbarColors().size(), 10);
     EXPECT_NE(c.toolbarColors().first().value<QColor>(), QColor(Qt::black));
     EXPECT_GE(changed.count(), 2);
     c.resetToolbarColors();

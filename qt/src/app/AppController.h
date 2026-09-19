@@ -151,6 +151,8 @@ public:
     int size() const;
     QVariantList palette() const;
     QVariantList toolbarColors() const;
+    /// Upstream's palette without white
+    QVariantList defaultToolbarColors() const;
     /// Add a color to the tool bar (not twice) / remove the color at `index` / back to the default colors.
     Q_INVOKABLE void addToolbarColor(const QColor& color);
     Q_INVOKABLE void removeToolbarColor(int index);
@@ -287,6 +289,8 @@ public:
     Q_INVOKABLE void redo();
     Q_INVOKABLE void fitWidth();
     Q_INVOKABLE void zoomIn();
+    /// Zoom to this (around the middle of the view), e.g. back to what it was.
+    Q_INVOKABLE void setZoomPercent(int percent);
     Q_INVOKABLE void zoomOut();
     Q_INVOKABLE void addPageAfterCurrent();
 
