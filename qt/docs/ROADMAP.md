@@ -12,7 +12,10 @@
 - **Refinement of R4: shadow headers instead of new interface names.**
   - `qt/compat/include/control/Control.h` and friends are abstract interfaces with upstream's names and signatures. Reused upstream files therefore need **no edits at all**.
   - The per-tab session in M2 implements `Control`.
-- **Next: M2**, the headless session (`Control` implementation) and the render service (`PageRaster`, a port of `RenderJob`).
+- **M2 headless session and render service: done.**
+  - `xoj-render`: `PageRaster` (port of `RenderJob` and the `XojPageView` buffer) and `RenderService` (worker pool, zoom block). Output is pixel identical to upstream rendering, also at fractional DPR; the PDF is rendered outside the document lock.
+  - `xqt-session`: `AppContext` (shared settings in `~/.config/xournal-qt`, `ToolHandler`, page templates, render workers) and `DocumentSession` (per tab, implements `Control`: load/new/annotate PDF, save/save-as/autosave ported from upstream, insert page).
+- **Next: M3 tools (headless)**: `ToolContext` via the shadow `Control`, port the page-view dispatch (`XojPageView::onButton*`) into a `CanvasPage`, and add replay tests for StrokeHandler, the stabilizers, the eraser and shapes.
 
 ---
 

@@ -1,0 +1,24 @@
+# ThreadSanitizer suppressions for xournal-qt test runs.
+#
+# System libraries are not TSan-instrumented; their internal synchronisation (atomics, own locks) is invisible to
+# TSan and shows up as races when text is laid out on several render threads (same pattern as upstream Xournal++).
+called_from_lib:libfontconfig.so.1
+called_from_lib:libpangoft2-1.0.so.0
+called_from_lib:libpango-1.0.so.0
+called_from_lib:libharfbuzz.so.0
+race:libglib-2.0.so.0
+race:libfontconfig.so.1
+race:libpangoft2-1.0.so.0
+# Lock bookkeeping inside the same uninstrumented libraries (GRWLock / GType class locks used by pango).
+mutex:libglib-2.0.so.0
+mutex:libgobject-2.0.so.0
+deadlock:libglib-2.0.so.0
+deadlock:libgobject-2.0.so.0
+#
+# Usage (gcc 11's libtsan needs ASLR disabled on Linux >= 6.x, and does not intercept pthread_cond_clockwait, which
+# libstdc++ uses for steady_clock waits, e.g. RenderService::blockRerenderZoom: those reports are false positives):
+#   cmake -S qt -B build-tsan -G Ninja -DXQT_BUILD_SPIKES=OFF -DCMAKE_CXX_FLAGS=-fsanitize=thread \
+#         -DCMAKE_C_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread
+#   cmake --build build-tsan --target xoj-unit-tests
+#   TSAN_OPTIONS=suppressions=qt/tools/tsan.supp setarch $(uname -m) -R build-tsan/xoj-unit-tests \
+#         --gtest_filter='*PageRaster*:QtUndoRedo*:-*detachedRaster*'

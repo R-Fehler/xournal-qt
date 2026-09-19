@@ -76,6 +76,14 @@ target_link_libraries(xoj-util PUBLIC xoj-defaults)
 add_library(xoj-core STATIC ${XOJ_CORE_SOURCES})
 target_link_libraries(xoj-core PUBLIC xoj-util)
 
+# Render service (Qt-free): page rasters rendered by worker threads, port of upstream RenderJob.
+add_library(xoj-render STATIC
+    "${CMAKE_CURRENT_LIST_DIR}/../src/render/PageRaster.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/../src/render/RenderService.cpp")
+target_include_directories(xoj-render PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src")
+target_link_libraries(xoj-render PUBLIC xoj-core)
+set_target_properties(xoj-render PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+
 # The core is Qt-free: no moc/uic/rcc scanning.
 set_target_properties(xoj-util xoj-core PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 

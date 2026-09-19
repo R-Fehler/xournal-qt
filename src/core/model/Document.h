@@ -43,6 +43,10 @@ public:
     Document(DocumentHandler* handler);
     virtual ~Document();
 
+    /// xournal-qt: re-target document events, e.g. from the LoadHandler that created the document to the session
+    /// that owns it (instead of copying the document with operator=).
+    void setDocumentHandler(DocumentHandler* h) { this->handler = h; }
+
 public:
     enum DocumentType { XOPP, XOJ, PDF };
 

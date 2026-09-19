@@ -1,0 +1,147 @@
+/*
+ * xournal-qt: one open document (one tab).
+ *
+ * Implements the shadow `Control` interface (qt/compat/include/control/Control.h), i.e. it is what reused upstream
+ * code (undo actions, layer controller, tools, input handlers) sees as "the control". Unlike upstream's GTK Control,
+ * which exists once per window and swaps documents in and out, a session owns exactly one Document for its whole
+ * lifetime. Shared state (settings, tools, page templates, render workers) lives in AppContext.
+ *
+ * File handling is ported from upstream (Control::openXoppFile/openPdfFile/createNewDocument, SaveJob::save,
+ * AutosaveJob::run, Control::insertPage, PageBackgroundChangeController::insertNewPage).
+ *
+ * @license GNU GPLv2 or later
+ */
+#pragma once
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <QObject>
+#include <QTimer>
+
+#include "control/Control.h"
+#include "undo/UndoRedoHandler.h"  // for UndoRedoListener
+
+#include "HeadlessViews.h"
+#include "SessionActions.h"
+#include "filesystem.h"
+
+class LayerController;
+
+namespace xqt {
+
+class AppContext;
+
+class DocumentSession final: public QObject, public Control, private UndoRedoListener {
+    Q_OBJECT
+public:
+    struct LoadResult {
+        std::unique_ptr<Document> document;  ///< nullptr if loading failed
+        std::string error;                   ///< why loading failed
+        std::vector<std::string> warnings;   ///< non-fatal problems: some content may be lost
+        fs::path missingPdf;                 ///< background PDF that could not be found
+        bool attachedPdfMissing = false;
+        int fileVersion = 0;
+        bool isNewerFileVersion() const;
+    };
+    /// Load a .xopp, .xoj or .pdf file (a PDF gets one page per PDF page). Does not touch any session, so it may
+    /// run on a worker thread before the tab is created.
+    static LoadResult loadFile(const fs::path& path, bool attachPdf = false);
+
+    /// A new document with one page from the page template settings.
+    explicit DocumentSession(AppContext& app, QObject* parent = nullptr);
+    /// A loaded document (see loadFile). The session takes ownership.
+    DocumentSession(AppContext& app, std::unique_ptr<Document> document, QObject* parent = nullptr);
+    ~DocumentSession() override;
+
+    AppContext& getApp() const { return app; }
+
+    // --- file handling ----------------------------------------------------------------------------------------
+    struct SaveResult {
+        bool ok = false;
+        std::string error;
+    };
+    /// Save to the document's path (as .xopp). Requires hasFilePath().
+    SaveResult save();
+    /// Save to a new path; the document takes this path ("Save as").
+    SaveResult saveAs(fs::path target);
+    /// Write the autosave file if there are unsaved changes since the last autosave.
+    SaveResult autosave();
+
+    bool hasFilePath() const;
+    fs::path getFilePath() const;
+    /// Title for the tab: file name, or "Untitled" / the PDF name for unsaved documents.
+    std::string getDisplayName() const;
+    bool isModified() const;
+    const fs::path& getLastAutosaveFile() const { return lastAutosaveFile; }
+    /// Remove the last autosave file (after closing the document without losing data).
+    void deleteAutosaveFile();
+
+    // --- view side --------------------------------------------------------------------------------------------
+    /// The view showing this session (nullptr: headless). Not owned.
+    void setXournalView(XournalView* view);
+    /// Cursor implementation of the view (nullptr: headless). Not owned.
+    void setCursor(XournalppCursor* cursor);
+    void setCurrentPageNo(size_t page);
+    SessionActions& getActions() { return actions; }
+
+    // --- Control (shadow interface for reused upstream code) ----------------------------------------------------
+    Settings* getSettings() const override;
+    ToolHandler* getToolHandler() const override;
+    ZoomControl* getZoomControl() const override;
+    Document* getDocument() const override;
+    UndoRedoHandler* getUndoRedoHandler() const override;
+    MainWindow* getWindow() const override;
+    ScrollHandler* getScrollHandler() const override;
+    PageRef getCurrentPage() override;
+    size_t getCurrentPageNo() const override;
+    XournalppCursor* getCursor() const override;
+    PageTypeHandler* getPageTypes() const override;
+    LayerController* getLayerController() const override;
+    ActionDatabase* getActionDatabase() const override;
+    void clearSelectionEndText() override;
+    void setCopyCutEnabled(bool enabled) override;
+    void insertNewPage(size_t position, bool automatedInsertion = false) override;
+    void insertPage(const PageRef& page, size_t position, bool shouldScrollToPage = true) override;
+
+Q_SIGNALS:
+    void modifiedChanged(bool modified);
+    void undoRedoStateChanged();
+    void filePathChanged();
+    void currentPageChanged(qulonglong page);
+    /// Reused upstream code wants a page to be shown (e.g. after undoing a page deletion).
+    void scrollToPageRequested(qulonglong page);
+    /// The view should end text editing and clear its selection (before document modifications).
+    void clearSelectionRequested();
+
+private:
+    void init();
+    void enableAutosave(bool enable);
+    void updatePageActions();
+    void setLastAutosaveFile(fs::path file);
+    void updatePreview();
+    SaveResult saveImpl(fs::path target);
+
+    // UndoRedoListener
+    void undoRedoChanged() override;
+    void undoRedoPageChanged(PageRef page) override;
+
+    AppContext& app;
+    std::unique_ptr<Document> doc;
+    std::unique_ptr<UndoRedoHandler> undoRedo;
+    std::unique_ptr<LayerController> layerController;
+    SessionActions actions;
+    SessionWindow window;
+    HeadlessXournalView headlessView;
+    HeadlessCursor headlessCursor;
+    XournalppCursor* cursor = &headlessCursor;
+    SessionScrollHandler scrollHandler;
+    size_t currentPage = 0;
+    bool lastModified = false;
+
+    QTimer autosaveTimer;
+    fs::path lastAutosaveFile;
+};
+
+}  // namespace xqt

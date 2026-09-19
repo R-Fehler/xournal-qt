@@ -37,6 +37,16 @@ The Qt build defines `XOJ_NO_GTK=1`. The upstream GTK build is unaffected by the
 | `src/core/control/jobs/ExportBackgroundType.h` (new) | `ExportBackgroundType` moved out of `BaseExportJob.h`, which drags in GTK. |
 | `BaseExportJob.h`, `ExportHelper.h`, `ImageExport.h/.cpp`, `pdf/base/XojPdfExport.h`, `XojCairoPdfExport.h` | Include `ExportBackgroundType.h` instead of `BaseExportJob.h`. |
 | `src/core/model/DocumentOutline.h` (new) | Toolkit-independent outline type, used by the Qt build. |
+| `src/core/model/Document.h` | `setDocumentHandler()`: re-target document events from the `LoadHandler` to the session that owns the document, instead of copying documents with `operator=` (upstream's `replaceDocument`, which relies on `try_lock` on an already locked mutex). |
+
+## Ported, not reused (the upstream original is GTK-bound)
+Each port records its upstream origin in a comment. Re-check them after upstream merges touch the originals.
+
+| Fork file | Upstream origin |
+|-----------|-----------------|
+| `qt/src/render/PageRaster.*` | `control/jobs/RenderJob.cpp`; buffer handling of `gui/PageView.cpp` (`rerenderPage`, `rerenderRect`). Additions: fractional DPI (scaled template surface for `Mask`), and the PDF background rendered outside the document lock. |
+| `qt/src/render/RenderService.*` | `control/jobs/Scheduler.cpp` / `XournalScheduler.cpp` (render part, including `blockRerenderZoom`). Several worker threads instead of one. |
+| `qt/src/session/DocumentSession.*` | `Control::openXoppFile/openPdfFile/createNewDocument/addDefaultPage/insertPage/updatePageActions/resetSavedStatus/setLastAutosaveFile`, `SaveJob::save/updatePreview`, `AutosaveJob::run`, `PageBackgroundChangeController::insertNewPage/copyBackgroundFromOtherPage` (default branch). |
 
 ## Not compiled in the Qt build
 - `src/util`: `GtkUtil.cpp`, `gtk4_helper.cpp`, `gdk4_helper.cpp`, `XojMsgBox.cpp`, `VersionInfo.cpp` (replaced by `qt/compat`).
@@ -51,4 +61,6 @@ The Qt build defines `XOJ_NO_GTK=1`. The upstream GTK build is unaffected by the
   - `golden-full`, opt-in (several minutes): every fixture in `test/files` at 72 and 150 dpi. Run `ctest -C Full -L golden-full` for upstream merges (done by `qt/tools/merge-upstream.sh`) and milestone sign-off.
 - `xoj-unit-tests`: the upstream unit tests (`test/unit_tests`, all suites except the GTK-only `ActionDatabaseTest`) run against the Qt-free core.
   - Also `qt/tests/unit/UndoRedoTest.cpp`: upstream undo actions and `UndoRedoHandler` driven through a test implementation of the shadow `Control`.
+  - Also `qt/tests/unit/PageRasterTest.cpp`: the render service matches a direct upstream `DocumentView` render pixel for pixel. This covers full renders (several fixtures, zooms, DPR 1.25, PDF backgrounds), partial re-renders, and a concurrent edit/render stress test (also run under ThreadSanitizer).
+- `xqt-session-tests`: `DocumentSession` (new, open, annotate PDF, save/save-as/backup, autosave, insert page, undo). Upstream `LayerController` runs through the session.
 - The upstream GTK build (`cmake -S . -B build-gtk`) must keep compiling with all seams applied.

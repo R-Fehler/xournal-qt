@@ -44,10 +44,11 @@ set(XOJ_UNIT_TEST_SOURCES
 )
 set(XQT_UNIT_TEST_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/../tests/unit/UndoRedoTest.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../tests/unit/PageRasterTest.cpp
 )
 add_executable(xoj-unit-tests "${CMAKE_CURRENT_LIST_DIR}/../tests/unit/main.cpp"
     ${XOJ_UNIT_TEST_SOURCES} ${XQT_UNIT_TEST_SOURCES})
-target_link_libraries(xoj-unit-tests PRIVATE xoj-core GTest::gtest)
+target_link_libraries(xoj-unit-tests PRIVATE xoj-render xoj-core GTest::gtest)
 target_include_directories(xoj-unit-tests PRIVATE "${TEST_CONFIG_DIR}")
 set_target_properties(xoj-unit-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 
