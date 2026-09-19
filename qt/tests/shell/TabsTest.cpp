@@ -232,3 +232,29 @@ TEST(Export, pdfExportAndSuggestedName) {
     ASSERT_TRUE(d.openPath(QString::fromStdString(fs::path(r.document->getPdfFilepath()).string())));
     EXPECT_TRUE(d.suggestedExportFile().toLocalFile().endsWith("export_annotated.pdf"));
 }
+
+TEST(ToolbarColors, orangeByDefaultAddRemoveReset) {
+    AppController c;
+    c.resetToolbarColors();
+    const QVariantList defaults = c.toolbarColors();
+    ASSERT_EQ(defaults.size(), 9);
+    EXPECT_EQ(defaults.last().value<QColor>(), QColor(255, 128, 0)) << "orange";
+    QSignalSpy changed(&c, &AppController::toolbarColorsChanged);
+    c.addToolbarColor(QColor("#123456"));
+    c.addToolbarColor(QColor("#123456"));  // not twice
+    EXPECT_EQ(c.toolbarColors().size(), 10);
+    EXPECT_EQ(c.toolbarColors().last().value<QColor>(), QColor("#123456"));
+    c.removeToolbarColor(0);  // black
+    EXPECT_EQ(c.toolbarColors().size(), 9);
+    EXPECT_NE(c.toolbarColors().first().value<QColor>(), QColor(Qt::black));
+    EXPECT_GE(changed.count(), 2);
+    c.resetToolbarColors();
+    EXPECT_EQ(c.toolbarColors(), defaults);
+
+    // Highlight colors: three presets, yellow first
+    ASSERT_EQ(c.pdfHighlightColors().size(), 3);
+    EXPECT_EQ(c.pdfHighlightColor(), c.pdfHighlightColors().first().value<QColor>());
+    c.setPdfHighlightColor(c.pdfHighlightColors().at(2).value<QColor>());
+    EXPECT_EQ(c.pdfHighlightColor(), c.pdfHighlightColors().at(2).value<QColor>());
+    c.setPdfHighlightColor(c.pdfHighlightColors().first().value<QColor>());
+}

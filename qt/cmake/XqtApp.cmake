@@ -73,7 +73,8 @@ set(XQT_QML_FILES
     src/app/qml/HomeView.qml
     src/app/qml/DocumentCard.qml
     src/app/qml/NewDocumentDialog.qml
-    src/app/qml/BackgroundPreview.qml)
+    src/app/qml/BackgroundPreview.qml
+    src/app/qml/HighlightColors.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})

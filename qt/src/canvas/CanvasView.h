@@ -25,6 +25,7 @@
 #include <QTimer>
 
 #include "gui/Layout.h"
+#include "util/Color.h"
 #include "gui/XournalView.h"
 #include "model/DocumentListener.h"
 #include "render/PageRaster.h"
@@ -131,6 +132,8 @@ public:
     // --- PDF text (PDF text tools; port of upstream's PdfElemSelection use and PdfFloatingToolbox) ---
     enum class PdfTextMode { Highlight, Underline, Strikethrough, Select };
     void setPdfTextMode(PdfTextMode mode) { pdfTextMode = mode; }
+    /// Color of highlights (none: the highlighter's color, as upstream)
+    void setPdfHighlightColor(std::optional<Color> c) { pdfHighlightColor = c; }
     PdfTextMode getPdfTextMode() const { return pdfTextMode; }
     /// Input of the PDF text tools on a page (page coordinates, points).
     void pdfTextPress(CanvasPage& page, double x, double y);
@@ -204,6 +207,7 @@ private:
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;
     PdfTextMode pdfTextMode = PdfTextMode::Highlight;
+    std::optional<Color> pdfHighlightColor;
     /// A place in the document: a page (kept even if it is moved) and the view's top-left on it (points).
     struct NavPoint {
         PageRef page;

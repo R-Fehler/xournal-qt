@@ -181,6 +181,8 @@ ApplicationWindow {
                 onPressAndHold: pdfTextMenu.popup()
                 Menu {
                     id: pdfTextMenu
+                    objectName: "pdfTextMenu"
+                    width: 320
                     component ModeItem: MenuItem {
                         property string mode
                         checkable: true
@@ -191,6 +193,13 @@ ApplicationWindow {
                         }
                     }
                     ModeItem { text: qsTr("Highlight"); mode: "highlight" }
+                    // The highlight color: three presets
+                    RowLayout {
+                        objectName: "highlightColors"
+                        width: parent ? parent.width : implicitWidth
+                        Label { text: qsTr("Highlight color"); Layout.leftMargin: 16; Layout.fillWidth: true; color: "#5f6368" }
+                        HighlightColors { Layout.rightMargin: 8 }
+                    }
                     ModeItem { text: qsTr("Underline"); mode: "underline" }
                     ModeItem { text: qsTr("Strike through"); mode: "strikethrough" }
                     ModeItem { text: qsTr("Select (then copy or mark)"); mode: "select" }
@@ -237,21 +246,55 @@ ApplicationWindow {
                 }
             }
             ToolSeparator {}
+            // The preset colors: tap to use; press and hold / right click to remove; + adds one.
             Repeater {
-                model: app.palette.slice(0, 8)
+                model: app.toolbarColors
                 delegate: AbstractButton {
+                    id: swatch
                     required property color modelData
+                    required property int index
+                    objectName: "colorSwatch"
                     implicitWidth: 40
                     implicitHeight: 44
                     onClicked: app.setColor(modelData)
+                    onPressAndHold: swatchMenu.popup()
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: swatchMenu.popup()
+                    }
                     contentItem: Item {
                         Rectangle {
                             anchors.centerIn: parent
                             width: 28; height: 28; radius: 14
-                            color: modelData
-                            border.width: Qt.colorEqual(app.color, modelData) ? 3 : 1
-                            border.color: Qt.colorEqual(app.color, modelData) ? Material.accentColor : "#9e9e9e"
+                            color: swatch.modelData
+                            border.width: Qt.colorEqual(app.color, swatch.modelData) ? 3 : 1
+                            border.color: Qt.colorEqual(app.color, swatch.modelData) ? Material.accentColor : "#9e9e9e"
                         }
+                    }
+                    Menu {
+                        id: swatchMenu
+                        MenuItem { text: qsTr("Remove from the tool bar"); onTriggered: app.removeToolbarColor(swatch.index) }
+                        MenuItem { text: qsTr("Add a color…"); onTriggered: colorDialog.open() }
+                        MenuItem { text: qsTr("Default colors"); onTriggered: app.resetToolbarColors() }
+                    }
+                }
+            }
+            AbstractButton {
+                objectName: "addColorButton"
+                implicitWidth: 40
+                implicitHeight: 44
+                onClicked: colorDialog.open()
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Add a color (press and hold a color to remove it)")
+                ToolTip.delay: 600
+                contentItem: Item {
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 28; height: 28; radius: 14
+                        color: "transparent"
+                        border.width: 1
+                        border.color: "#9e9e9e"
+                        Label { anchors.centerIn: parent; text: "+"; font.pixelSize: 18; color: "#5f6368" }
                     }
                 }
             }
@@ -475,6 +518,8 @@ ApplicationWindow {
         RowLayout {
             spacing: 0
             IconButton { iconName: "xopp-select-pdf-text-ht"; tip: qsTr("Highlight"); onClicked: app.markPdfText("highlight") }
+            HighlightColors { onPicked: app.markPdfText("highlight") }  // a color: highlight in it right away
+            ToolSeparator {}
             IconButton { iconName: "xqt-underline"; tip: qsTr("Underline"); onClicked: app.markPdfText("underline") }
             IconButton { iconName: "xqt-strikethrough"; tip: qsTr("Strike through"); onClicked: app.markPdfText("strikethrough") }
             IconButton { iconName: "xopp-edit-copy"; tip: qsTr("Copy text"); onClicked: app.copyPdfText() }
@@ -656,6 +701,16 @@ ApplicationWindow {
         defaultSuffix: "pdf"
         nameFilters: [qsTr("PDF (*.pdf)")]
         onAccepted: app.exportPdf(selectedFile)
+    }
+
+    ColorDialog {
+        id: colorDialog
+        title: qsTr("Add a color to the tool bar")
+        selectedColor: app.color
+        onAccepted: {
+            app.addToolbarColor(selectedColor)
+            app.setColor(selectedColor)
+        }
     }
 
     FileDialog {

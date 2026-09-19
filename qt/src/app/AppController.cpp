@@ -488,6 +488,82 @@ QVariantList AppController::palette() const {
     return list;
 }
 
+namespace {
+constexpr int DEFAULT_TOOLBAR_COLORS = 9;  // upstream palette: black ... magenta, orange
+const char* const CUSTOM = "xournalQt";
+}  // namespace
+
+QVariantList AppController::toolbarColors() const {
+    std::string stored;
+    QVariantList list;
+    if (app->getSettings()->getCustomElement(CUSTOM).getString("toolbarColors", stored)) {
+        for (const QString& c: QString::fromStdString(stored).split(',', Qt::SkipEmptyParts)) {
+            if (const QColor color(c.trimmed()); color.isValid()) {
+                list.append(color);
+            }
+        }
+        return list;
+    }
+    const QVariantList all = palette();
+    return all.mid(0, DEFAULT_TOOLBAR_COLORS);
+}
+
+void AppController::storeToolbarColors(const QVariantList& list) {
+    QStringList names;
+    for (const QVariant& c: list) {
+        names << c.value<QColor>().name();
+    }
+    app->getSettings()->getCustomElement(CUSTOM).setString("toolbarColors", names.join(',').toStdString());
+    app->getSettings()->customSettingsChanged();
+    Q_EMIT toolbarColorsChanged();
+}
+
+void AppController::addToolbarColor(const QColor& color) {
+    QVariantList list = toolbarColors();
+    for (const QVariant& c: list) {
+        if (c.value<QColor>().rgb() == color.rgb()) {
+            return;
+        }
+    }
+    list.append(QColor(color.rgb()));
+    storeToolbarColors(list);
+}
+
+void AppController::removeToolbarColor(int index) {
+    QVariantList list = toolbarColors();
+    if (index >= 0 && index < list.size()) {
+        list.removeAt(index);
+        storeToolbarColors(list);
+    }
+}
+
+void AppController::resetToolbarColors() { storeToolbarColors(palette().mid(0, DEFAULT_TOOLBAR_COLORS)); }
+
+QVariantList AppController::pdfHighlightColors() const {
+    // Yellow (upstream's highlighter), green, pink
+    return {QColor(0xff, 0xff, 0x00), QColor(0x7c, 0xfc, 0x3c), QColor(0xff, 0x80, 0xc0)};
+}
+
+QColor AppController::pdfHighlightColor() const {
+    std::string stored;
+    if (app->getSettings()->getCustomElement(CUSTOM).getString("pdfHighlightColor", stored)) {
+        if (const QColor c(QString::fromStdString(stored)); c.isValid()) {
+            return c;
+        }
+    }
+    return pdfHighlightColors().value(0).value<QColor>();
+}
+
+void AppController::setPdfHighlightColor(const QColor& color) {
+    if (!color.isValid() || color.rgb() == pdfHighlightColor().rgb()) {
+        return;
+    }
+    app->getSettings()->getCustomElement(CUSTOM).setString("pdfHighlightColor", color.name().toStdString());
+    app->getSettings()->customSettingsChanged();
+    applyPdfTextMode();
+    Q_EMIT pdfTextModeChanged();
+}
+
 int AppController::zoomPercent() const {
     if (!canvas()) {
         return 100;
@@ -969,8 +1045,10 @@ CanvasView::PdfTextMode pdfModeFrom(const QString& m) {
 }  // namespace
 
 void AppController::applyPdfTextMode() {
+    const Color highlight = toColor(pdfHighlightColor());
     for (int i = 0; i < tabs->count(); ++i) {
         tabs->view(i)->setPdfTextMode(pdfModeFrom(pdfMode));
+        tabs->view(i)->setPdfHighlightColor(highlight);
     }
 }
 

@@ -616,8 +616,18 @@ TEST_F(CanvasReplayTest, pdfTextIsHighlightedByDraggingOverIt) {
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->getToolType(), StrokeTool::HIGHLIGHTER);
     EXPECT_FALSE(view->hasPdfTextSelection()) << "marked right away";
+    EXPECT_EQ(s->getColor(), app->getToolHandler()->getTool(TOOL_HIGHLIGHTER).getColor())
+            << "no highlight color chosen: the highlighter's";
     session->getUndoRedoHandler()->undo();
     EXPECT_EQ(elementCount(0), 0u) << "one undo step for all lines";
+
+    // A chosen highlight color (one of the presets)
+    view->setPdfHighlightColor(Color(0xff80c0u));
+    dragOver();
+    ASSERT_GE(elementCount(0), 1u);
+    EXPECT_EQ(dynamic_cast<const Stroke*>(layer->getElementsView().front())->getColor(), Color(0xff80c0u));
+    session->getUndoRedoHandler()->undo();
+    view->setPdfHighlightColor(std::nullopt);
 
     // Select mode: the selection stays for copying.
     view->setPdfTextMode(CanvasView::PdfTextMode::Select);

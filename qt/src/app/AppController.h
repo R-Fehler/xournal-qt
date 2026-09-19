@@ -74,6 +74,11 @@ class AppController: public QObject {
     Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
     Q_PROPERTY(int size READ size NOTIFY toolChanged)
     Q_PROPERTY(QVariantList palette READ palette CONSTANT)
+    /// The colors in the tool bar (user's choice; default: the first colors of the palette, with orange)
+    Q_PROPERTY(QVariantList toolbarColors READ toolbarColors NOTIFY toolbarColorsChanged)
+    /// Color of PDF text highlights, one of three presets
+    Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
+    Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
@@ -134,6 +139,14 @@ public:
     void setDrawingType(const QString& type);
     int size() const;
     QVariantList palette() const;
+    QVariantList toolbarColors() const;
+    /// Add a color to the tool bar (not twice) / remove the color at `index` / back to the default colors.
+    Q_INVOKABLE void addToolbarColor(const QColor& color);
+    Q_INVOKABLE void removeToolbarColor(int index);
+    Q_INVOKABLE void resetToolbarColors();
+    QColor pdfHighlightColor() const;
+    void setPdfHighlightColor(const QColor& color);
+    QVariantList pdfHighlightColors() const;
     int zoomPercent() const;
     int pageNumber() const;
     int pageCount() const;
@@ -324,6 +337,7 @@ Q_SIGNALS:
     /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.
     void linkTapped(const QString& uri, int page, QRectF rect);
     void copiedPagesChanged();
+    void toolbarColorsChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 
@@ -353,5 +367,6 @@ private:
     bool recoveryPending = false;
     QString pdfMode = "highlight";
     void applyPdfTextMode();
+    void storeToolbarColors(const QVariantList& colors);
     std::vector<QMetaObject::Connection> currentConnections;
 };

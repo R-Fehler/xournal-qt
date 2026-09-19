@@ -524,8 +524,9 @@ bool CanvasView::markPdfText(PdfTextMode mode) {
     }
     ToolHandler* th = session.getToolHandler();
     const bool highlight = mode == PdfTextMode::Highlight;
-    // Highlight in the highlighter's color, lines in the pen's color.
-    const Color color = th->getTool(highlight ? TOOL_HIGHLIGHTER : TOOL_PEN).getColor();
+    // Highlight in the chosen highlight color (else the highlighter's), lines in the pen's color.
+    const Color color = highlight && pdfHighlightColor ? *pdfHighlightColor
+                                                       : th->getTool(highlight ? TOOL_HIGHLIGHTER : TOOL_PEN).getColor();
     const int opacity = highlight ? th->getSelectPDFTextMarkerOpacity() : 230;
     PageRef pageRef = page->getPage();
     Layer* layer = pageRef->getSelectedLayer();
