@@ -221,6 +221,14 @@ bool DocumentCanvasItem::claims(QPointF scenePos) const {
     return top == this || (top && isAncestorOf(top));
 }
 
+void DocumentCanvasItem::takeKeyboardFocus() {
+    // Working on the canvas: the keys (Ctrl+Z, Ctrl+C, Delete, ...) are for the document again, not for the page
+    // sidebar or grid that may have had the focus.
+    if (!hasActiveFocus()) {
+        forceActiveFocus(Qt::MouseFocusReason);
+    }
+}
+
 bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
     if (!input) {
         return false;
@@ -244,6 +252,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             }
             if (e->type() == QEvent::TabletPress && t->button() == Qt::LeftButton) {
                 penGrab = true;
+                takeKeyboardFocus();
             } else if (e->type() == QEvent::TabletRelease && t->button() == Qt::LeftButton) {
                 penGrab = false;
             }
@@ -258,6 +267,9 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             auto* t = static_cast<QTouchEvent*>(e);
             if (e->type() == QEvent::TouchBegin) {
                 touchSessionOwned = !t->points().isEmpty() && claims(t->points().first().scenePosition());
+                if (touchSessionOwned) {
+                    takeKeyboardFocus();
+                }
             }
             if (!touchSessionOwned) {
                 return false;
@@ -279,6 +291,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             }
             if (e->type() == QEvent::MouseButtonPress) {
                 mouseGrab = true;
+                takeKeyboardFocus();
             } else if (e->type() == QEvent::MouseButtonRelease && m->buttons() == Qt::NoButton) {
                 mouseGrab = false;
             }

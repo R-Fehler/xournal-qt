@@ -76,10 +76,10 @@ TEST_F(DocumentSessionTest, insertNewPageIsUndoableAndScrolls) {
     EXPECT_TRUE(session.isModified());
     EXPECT_TRUE(session.getActions().isActionEnabled(Action::DELETE_PAGE));
 
-    session.getUndoRedoHandler()->undo();  // upstream InsertDeletePageUndoAction through the shadow Control
+    session.getPageUndoRedoHandler()->undo();  // upstream InsertDeletePageUndoAction through the shadow Control
     EXPECT_EQ(session.getDocument()->getPageCount(), 1u);
     EXPECT_FALSE(session.isModified());
-    session.getUndoRedoHandler()->redo();
+    session.getPageUndoRedoHandler()->redo();
     EXPECT_EQ(session.getDocument()->getPageCount(), 2u);
 }
 
@@ -202,7 +202,7 @@ TEST_F(DocumentSessionTest, pageOperationsAreUndoable) {
     EXPECT_NE(doc->getPage(1), p0);
     EXPECT_EQ(doc->getPage(1)->getSelectedLayer()->getElements().size(), 1u);
     EXPECT_EQ(session.getCurrentPageNo(), 1u);
-    session.getUndoRedoHandler()->undo();
+    session.getPageUndoRedoHandler()->undo();
     ASSERT_EQ(doc->getPageCount(), 3u);
     EXPECT_EQ(doc->getPage(1), p1);
 
@@ -214,8 +214,8 @@ TEST_F(DocumentSessionTest, pageOperationsAreUndoable) {
     EXPECT_EQ(session.getCurrentPageNo(), 1u);
     session.movePageTowardsBeginning();
     EXPECT_EQ(doc->getPage(0), p0);
-    session.getUndoRedoHandler()->undo();
-    session.getUndoRedoHandler()->undo();
+    session.getPageUndoRedoHandler()->undo();
+    session.getPageUndoRedoHandler()->undo();
     EXPECT_EQ(doc->getPage(0), p0);
     EXPECT_EQ(doc->getPage(1), p1);
     session.movePageTowardsBeginning();  // already first: nothing
@@ -226,7 +226,7 @@ TEST_F(DocumentSessionTest, pageOperationsAreUndoable) {
     session.deletePage();
     ASSERT_EQ(doc->getPageCount(), 2u);
     EXPECT_EQ(session.getCurrentPageNo(), 1u);
-    session.getUndoRedoHandler()->undo();
+    session.getPageUndoRedoHandler()->undo();
     ASSERT_EQ(doc->getPageCount(), 3u);
     EXPECT_EQ(doc->getPage(2), p2);
 }
@@ -235,7 +235,7 @@ TEST_F(DocumentSessionTest, theLastPageIsNotDeleted) {
     DocumentSession session(*app);
     session.deletePage();
     EXPECT_EQ(session.getDocument()->getPageCount(), 1u);
-    EXPECT_FALSE(session.getUndoRedoHandler()->canUndo());
+    EXPECT_FALSE(session.getPageUndoRedoHandler()->canUndo());
 }
 
 TEST_F(DocumentSessionTest, undoAndRedoReportTheChangedPage) {
@@ -250,4 +250,48 @@ TEST_F(DocumentSessionTest, undoAndRedoReportTheChangedPage) {
     session.getUndoRedoHandler()->redo();
     ASSERT_GE(changed.count(), 1);
     EXPECT_EQ(changed.last().at(0).toULongLong(), 1u);
+}
+
+TEST_F(DocumentSessionTest, severalPagesAtOnceWithTheirOwnUndo) {
+    DocumentSession session(*app);
+    for (size_t i = 1; i < 6; ++i) {
+        session.insertNewPage(i);
+    }
+    addStroke(session, 0);  // an annotation: on the other undo stack
+    Document* doc = session.getDocument();
+    const auto original = session.pageOrder();
+    ASSERT_EQ(original.size(), 6u);
+
+    // Delete 1, 3, 4
+    ASSERT_TRUE(session.deletePages({4, 1, 3}));
+    EXPECT_EQ(session.pageOrder(), (std::vector<PageRef>{original[0], original[2], original[5]}));
+    EXPECT_FALSE(session.deletePages({0, 1, 2})) << "not all pages";
+
+    // Move page 5 (now at index 2) to the front, then pages 0 and 2 behind the last one
+    ASSERT_TRUE(session.movePages({2}, 0));
+    EXPECT_EQ(session.pageOrder(), (std::vector<PageRef>{original[5], original[0], original[2]}));
+    ASSERT_TRUE(session.movePages({0, 2}, 3));
+    EXPECT_EQ(session.pageOrder(), (std::vector<PageRef>{original[0], original[5], original[2]}));
+    EXPECT_FALSE(session.movePages({1}, 1)) << "same place";
+
+    // Paste two copies before index 1
+    auto a = std::make_shared<XojPage>(*original[0]), b = std::make_shared<XojPage>(*original[1]);
+    session.insertPages({a, b}, 1);
+    EXPECT_EQ(session.pageOrder(), (std::vector<PageRef>{original[0], a, b, original[5], original[2]}));
+
+    // Page undo steps back through the page operations only; the stroke stays.
+    UndoRedoHandler* pages = session.getPageUndoRedoHandler();
+    pages->undo();  // paste
+    pages->undo();  // move
+    pages->undo();  // move
+    pages->undo();  // delete
+    EXPECT_EQ(session.pageOrder(), original);
+    EXPECT_EQ(doc->getPage(0)->getSelectedLayer()->getElements().size(), 1u);
+    EXPECT_TRUE(session.getUndoRedoHandler()->canUndo()) << "the annotation undo is untouched";
+    pages->redo();
+    EXPECT_EQ(session.pageOrder().size(), 3u);
+
+    // Both stacks count for "modified"
+    session.getUndoRedoHandler()->undo();
+    EXPECT_TRUE(session.isModified());
 }

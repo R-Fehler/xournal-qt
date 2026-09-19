@@ -4,6 +4,7 @@
 #include <cmath>
 #include <atomic>
 #include <limits>
+#include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
 #include <utility>
@@ -33,6 +34,7 @@
 
 #include "AppContext.h"
 #include "DocumentSearch.h"
+#include "PageOrderUndoAction.h"
 #include "config.h"  // for FILE_FORMAT_VERSION
 
 namespace xqt {
@@ -115,6 +117,10 @@ void DocumentSession::init() {
     window.view = &headlessView;
     undoRedo = std::make_unique<UndoRedoHandler>(this);
     undoRedo->addUndoRedoListener(this);
+    // xournal-qt: page structure (insert, delete, move, paste) has its own undo stack, so that undoing a page
+    // operation does not first undo everything written since.
+    pageUndo = std::make_unique<UndoRedoHandler>(this);
+    pageUndo->addUndoRedoListener(this);
     layerController = std::make_unique<LayerController>(this);
     layerController->registerListener(this);
 
@@ -126,7 +132,7 @@ void DocumentSession::init() {
 
     autosaveTimer.setSingleShot(false);
     connect(&autosaveTimer, &QTimer::timeout, this, [this] {
-        if (undoRedo->isChangedAutosave()) {
+        if (undoRedo->isChangedAutosave() || pageUndo->isChangedAutosave()) {
             autosave();
         }
     });
@@ -222,7 +228,7 @@ void DocumentSession::insertPage(const PageRef& page, size_t position, bool shou
     doc->lock();
     doc->insertPage(page, position);
     doc->unlock();
-    undoRedo->addUndoAction(std::make_unique<InsertDeletePageUndoAction>(page, position, true));
+    pageUndo->addUndoAction(std::make_unique<InsertDeletePageUndoAction>(page, position, true));
     firePageInserted(position);
     getCursor()->updateCursor();
     if (shouldScrollToPage) {
@@ -240,13 +246,141 @@ void DocumentSession::updatePageActions() {
     actions.enableAction(Action::MOVE_PAGE_TOWARDS_END, currentPage + 1 < nbPages);
 }
 
+// --- page operations on several pages (own undo action, see PageOrderUndoAction) ------------------------------
+
+std::vector<PageRef> DocumentSession::pageOrder() const {
+    std::shared_lock lock(*doc);
+    std::vector<PageRef> pages;
+    pages.reserve(doc->getPageCount());
+    for (size_t i = 0; i < doc->getPageCount(); ++i) {
+        pages.push_back(doc->getPage(i));
+    }
+    return pages;
+}
+
+void DocumentSession::applyPageOrder(const std::vector<PageRef>& target, const std::vector<PageRef>& moved) {
+    // Pages that go away or move are removed (last first), then the missing ones inserted at their place (first
+    // first): the pages in between keep their order, so each insertion index is final. Events as in upstream's
+    // InsertDeletePageUndoAction (first the event, then the deletion).
+    clearSelectionEndText();
+    std::unordered_set<const XojPage*> keep, move;
+    for (const auto& p: target) {
+        keep.insert(p.get());
+    }
+    for (const auto& p: moved) {
+        move.insert(p.get());
+    }
+    for (size_t i = doc->getPageCount(); i-- > 0;) {
+        const XojPage* p = doc->getPage(i).get();
+        if (!keep.count(p) || move.count(p)) {
+            firePageDeleted(i);
+            doc->lock();
+            doc->deletePage(i);
+            doc->unlock();
+        }
+    }
+    std::unordered_set<const XojPage*> present;
+    for (const auto& p: pageOrder()) {
+        present.insert(p.get());
+    }
+    size_t firstChange = npos;
+    for (size_t i = 0; i < target.size(); ++i) {
+        if (!present.count(target[i].get())) {
+            doc->lock();
+            doc->insertPage(target[i], i);
+            doc->unlock();
+            firePageInserted(i);
+            firstChange = std::min(firstChange, i);
+        }
+    }
+    getCursor()->updateCursor();
+    const size_t count = doc->getPageCount();
+    const size_t show = firstChange != npos ? firstChange : std::min(getCurrentPageNo(), count - 1);
+    currentPage = std::numeric_limits<size_t>::max();  // force the update below
+    setCurrentPageNo(std::min(show, count - 1));
+    scrollHandler.scrollToPage(std::min(show, count - 1));
+    updatePageActions();
+}
+
+bool DocumentSession::deletePages(std::vector<size_t> pages) {
+    std::sort(pages.begin(), pages.end());
+    pages.erase(std::unique(pages.begin(), pages.end()), pages.end());
+    const auto before = pageOrder();
+    pages.erase(std::remove_if(pages.begin(), pages.end(), [&](size_t p) { return p >= before.size(); }), pages.end());
+    if (pages.empty() || pages.size() >= before.size()) {
+        return false;  // there is always at least one page (upstream)
+    }
+    std::vector<PageRef> after;
+    for (size_t i = 0, k = 0; i < before.size(); ++i) {
+        if (k < pages.size() && pages[k] == i) {
+            ++k;
+        } else {
+            after.push_back(before[i]);
+        }
+    }
+    applyPageOrder(after, {});
+    pageUndo->addUndoAction(std::make_unique<PageOrderUndoAction>(
+            before, after, std::vector<PageRef>{},
+            pages.size() == 1 ? "Delete page" : "Delete " + std::to_string(pages.size()) + " pages"));
+    return true;
+}
+
+void DocumentSession::insertPages(const std::vector<PageRef>& pages, size_t position) {
+    if (pages.empty()) {
+        return;
+    }
+    const auto before = pageOrder();
+    position = std::min(position, before.size());
+    std::vector<PageRef> after(before.begin(), before.begin() + static_cast<std::ptrdiff_t>(position));
+    after.insert(after.end(), pages.begin(), pages.end());
+    after.insert(after.end(), before.begin() + static_cast<std::ptrdiff_t>(position), before.end());
+    applyPageOrder(after, {});
+    pageUndo->addUndoAction(std::make_unique<PageOrderUndoAction>(
+            before, after, std::vector<PageRef>{},
+            pages.size() == 1 ? "Insert page" : "Insert " + std::to_string(pages.size()) + " pages"));
+}
+
+bool DocumentSession::movePages(std::vector<size_t> pages, size_t target) {
+    std::sort(pages.begin(), pages.end());
+    pages.erase(std::unique(pages.begin(), pages.end()), pages.end());
+    const auto before = pageOrder();
+    pages.erase(std::remove_if(pages.begin(), pages.end(), [&](size_t p) { return p >= before.size(); }), pages.end());
+    if (pages.empty()) {
+        return false;
+    }
+    target = std::min(target, before.size());
+    std::vector<PageRef> moved, rest;
+    size_t insertAt = 0;  // in `rest`
+    for (size_t i = 0, k = 0; i < before.size(); ++i) {
+        if (k < pages.size() && pages[k] == i) {
+            moved.push_back(before[i]);
+            ++k;
+        } else {
+            rest.push_back(before[i]);
+            if (i < target) {
+                ++insertAt;
+            }
+        }
+    }
+    std::vector<PageRef> after(rest.begin(), rest.begin() + static_cast<std::ptrdiff_t>(insertAt));
+    after.insert(after.end(), moved.begin(), moved.end());
+    after.insert(after.end(), rest.begin() + static_cast<std::ptrdiff_t>(insertAt), rest.end());
+    if (after == before) {
+        return false;
+    }
+    applyPageOrder(after, moved);
+    pageUndo->addUndoAction(std::make_unique<PageOrderUndoAction>(
+            before, after, moved, moved.size() == 1 ? "Move page" : "Move " + std::to_string(moved.size()) + " pages"));
+    return true;
+}
+
 // --- undo/redo ---------------------------------------------------------------------------------------------------
 
 void DocumentSession::undoRedoChanged() {
     actions.enableAction(Action::UNDO, undoRedo->canUndo());
     actions.enableAction(Action::REDO, undoRedo->canRedo());
     Q_EMIT undoRedoStateChanged();
-    if (const bool modified = undoRedo->isChanged(); modified != lastModified) {
+    if (const bool modified = isModified(); modified != lastModified) {
         lastModified = modified;
         Q_EMIT modifiedChanged(modified);
     }
@@ -284,7 +418,7 @@ void DocumentSession::deletePage() {
     doc->lock();
     doc->deletePage(pNr);
     doc->unlock();
-    undoRedo->addUndoAction(std::make_unique<InsertDeletePageUndoAction>(page, pNr, false));
+    pageUndo->addUndoAction(std::make_unique<InsertDeletePageUndoAction>(page, pNr, false));
     if (pNr >= doc->getPageCount()) {
         pNr = doc->getPageCount() - 1;
     }
@@ -317,7 +451,7 @@ void DocumentSession::movePageTowardsBeginning() {
     doc->insertPage(page, currentPageNo - 1);
     lock.unlock();
 
-    undoRedo->addUndoAction(std::make_unique<SwapUndoAction>(currentPageNo - 1, true, page, otherPage));
+    pageUndo->addUndoAction(std::make_unique<SwapUndoAction>(currentPageNo - 1, true, page, otherPage));
     firePageDeleted(currentPageNo);
     firePageInserted(currentPageNo - 1);
     firePageSelected(currentPageNo - 1);
@@ -338,7 +472,7 @@ void DocumentSession::movePageTowardsEnd() {
     doc->insertPage(page, currentPageNo + 1);
     lock.unlock();
 
-    undoRedo->addUndoAction(std::make_unique<SwapUndoAction>(currentPageNo, false, page, otherPage));
+    pageUndo->addUndoAction(std::make_unique<SwapUndoAction>(currentPageNo, false, page, otherPage));
     firePageDeleted(currentPageNo);
     firePageInserted(currentPageNo + 1);
     firePageSelected(currentPageNo + 1);
@@ -377,7 +511,7 @@ std::string DocumentSession::getDisplayName() const {
     return _("Untitled");
 }
 
-bool DocumentSession::isModified() const { return undoRedo->isChanged(); }
+bool DocumentSession::isModified() const { return undoRedo->isChanged() || pageUndo->isChanged(); }
 
 void DocumentSession::updatePreview() {
     // Port of SaveJob::updatePreview: 128 px preview of the first page stored in the file.
@@ -462,6 +596,7 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
 
     // Port of Control::resetSavedStatus
     undoRedo->documentSaved();
+    pageUndo->documentSaved();
     undoRedoChanged();
     Q_EMIT filePathChanged();
     return {true, {}};
@@ -487,6 +622,7 @@ auto DocumentSession::autosave() -> SaveResult {
     // Port of AutosaveJob::run
     SaveHandler handler;
     undoRedo->documentAutosaved();
+    pageUndo->documentAutosaved();
 
     const fs::path filepath = autosavePath();
     doc->lock_shared();

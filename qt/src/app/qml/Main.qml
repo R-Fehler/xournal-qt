@@ -455,6 +455,19 @@ ApplicationWindow {
         property alias text: messageLabel.text
         Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }
     }
+    Snackbar {
+        id: snackbar
+        objectName: "snackbar"
+        z: 100
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.bottom: canvas.bottom
+        anchors.bottomMargin: 96
+    }
+    Connections {
+        target: app
+        function onPageActionDone(text, undoable) { snackbar.show(text, undoable) }
+    }
+
     Connections {
         target: app
         function onMessage(title, text, error) {

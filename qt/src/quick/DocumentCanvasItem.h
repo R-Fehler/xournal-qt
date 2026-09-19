@@ -61,6 +61,7 @@ protected:
 
 private:
     void updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale);
+    void takeKeyboardFocus();
     bool claims(QPointF scenePos) const;
     void updateViewGeometry();
 

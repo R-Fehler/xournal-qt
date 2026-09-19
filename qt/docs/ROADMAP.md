@@ -45,6 +45,10 @@
   - Tab overview: "Search all documents" marks the documents with hits (count) and dims the others; opening one shows its search at the first hit from its current page.
 - **Page grid: done (awaiting on-device test).** Grid button (Ctrl+Alt+G): all pages of the document over the canvas with small gaps; fling through it, tap a page to go there; pinch / Ctrl+wheel / −+ change the number of columns (1–12). Search hits are marked on the previews (and in the sidebar), with a hit count per page; pages with hits get an orange frame, and "N pages with hits" (sidebar and grid) shows only those pages, to skim long PDFs.
 - **Column layouts: done (awaiting on-device test).** Layout button in the zoom pill: one page per row, two pages side by side, book (cover alone), or N columns (1–8). Upstream's settings (`viewColumns`, `showPairedPages`, `numPairsOffset`) and its layout rules (horizontal layout, fixed columns; column/row size from the largest page); pairs meet in the middle. Fit width covers the whole row. Not ported: vertical (column-first) and right-to-left/bottom-to-top layouts.
+- **Page operations: done (awaiting on-device test).**
+  - Select pages in the sidebar and the page grid: Ctrl/Shift+click, "Select" mode for touch, Ctrl+A. Copy / cut / paste (Ctrl+C/X/V, also into another tab: PDF pages become image backgrounds there), duplicate (Ctrl+D), delete (Delete), move by press-and-hold drag and drop (several pages at once), page menu (right click, ⋮), action bar in the grid.
+  - Page operations have their own undo stack (Ctrl+Z in the sidebar/grid, the grid's undo button, "Undo" in the note after an operation); Ctrl+Z on the canvas stays the annotation undo. The document is modified if either stack has changes.
+  - Touchpad momentum in the page grid, sidebar and tab overview.
 - **Next:** the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
 
 ---

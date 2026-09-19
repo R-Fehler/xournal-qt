@@ -1,6 +1,7 @@
 // Grid of all pages of the current document over the canvas: fling through the whole document, tap a page to go
 // there. Zoom (pinch, Ctrl+wheel, −/+) changes the number of columns: bigger previews, fewer per row.
-// Search hits are marked on the previews.
+// Search hits are marked on the previews. Pages can be selected (Ctrl/Shift+click, or "Select" for touch), copied,
+// pasted, deleted and dragged to another place (press and hold), with their own undo (see PageKeys).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -15,6 +16,8 @@ Rectangle {
 
     /// Preview width the user zoomed to; the columns follow from it.
     property real cellTarget: 200
+    /// Touch: taps select pages instead of opening them.
+    property bool selectionMode: false
     readonly property int columns: Math.max(1, Math.min(12, Math.round(grid.width / cellTarget)))
     readonly property int spacing: 6
     readonly property int labelHeight: 18
@@ -30,6 +33,7 @@ Rectangle {
     }
     function close() {
         visible = false
+        selectionMode = false
     }
     function choose(index) {
         app.goToPage(index)
@@ -52,7 +56,8 @@ Rectangle {
         }
     }
 
-    Keys.onEscapePressed: close()
+    PageKeys { id: pageKeys }
+    PageMenu { id: pageMenu }
 
     GridView {
         id: grid
@@ -76,8 +81,15 @@ Rectangle {
         Keys.onReturnPressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
         Keys.onEnterPressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
         Keys.onSpacePressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
+        Keys.onShortcutOverride: function(event) { event.accepted = pageKeys.isPageKey(event) }
         Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal) {
+            if (pageKeys.handle(event)) {
+                event.accepted = true
+            } else if (event.key === Qt.Key_Escape) {
+                if (app.pages.selectionCount > 0) app.pages.clearSelection()
+                else pageGrid.close()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal) {
                 pageGrid.setColumns(pageGrid.columns - 1)
                 event.accepted = true
             } else if (event.key === Qt.Key_Minus) {
@@ -97,6 +109,7 @@ Rectangle {
             required property var searchHits
             required property int currentSearchHit
             required property int searchHitCount
+            required property bool selected
             width: grid.cellWidth
             height: grid.cellHeight
 
@@ -114,8 +127,8 @@ Rectangle {
                 height: Math.round(cell.frameW * cell.aspect)
                 color: "white"
                 // The current page, and pages with search hits
-                border.width: cell.current || cell.searchHitCount > 0 ? 3 : 0
-                border.color: cell.current ? Material.accentColor : "#f9a825"
+                border.width: cell.current || cell.selected || cell.searchHitCount > 0 ? 3 : 0
+                border.color: cell.current || cell.selected ? Material.accentColor : "#f9a825"
 
                 // A small preview right away, a sharp one for big cells (loads on top of it).
                 Image {
@@ -160,6 +173,7 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.margins: 4
                 }
+                SelectionMark { visible: cell.selected }
                 // Keyboard position
                 Rectangle {
                     anchors.fill: parent
@@ -180,8 +194,19 @@ Rectangle {
                 color: cell.current ? "#ffffff" : "#d0d3d8"
                 font.weight: cell.current ? Font.DemiBold : Font.Normal
             }
-            TapHandler {
-                onTapped: pageGrid.choose(cell.pageIndex)
+            PageArea {
+                dragOverlay: pageDrag
+                pageIndex: cell.pageIndex
+                delegateItem: cell
+                onTapped: function(modifiers) {
+                    grid.forceActiveFocus()
+                    grid.currentIndex = cell.index
+                    if (modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) app.pages.select(cell.pageIndex, modifiers)
+                    else if (pageGrid.selectionMode) app.pages.toggleSelected(cell.pageIndex)
+                    else pageGrid.choose(cell.pageIndex)
+                }
+                onHeld: grid.forceActiveFocus()
+                onMenuRequested: function(x, y) { pageMenu.openFor(cell.pageIndex, cell, x, y) }
             }
         }
 
@@ -202,6 +227,64 @@ Rectangle {
             acceptedModifiers: Qt.ControlModifier
             onWheel: function(event) {
                 pageGrid.setColumns(pageGrid.columns + (event.angleDelta.y > 0 ? -1 : 1))
+            }
+        }
+    }
+
+    PageDragOverlay {
+        id: pageDrag
+        view: grid
+        horizontal: true
+    }
+
+    // Actions on the selected pages (touch friendly)
+    Pane {
+        id: actionBar
+        objectName: "pageActionBar"
+        visible: pageGrid.selectionMode || app.pages.selectionCount > 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 88
+        padding: 2
+        leftPadding: 12
+        rightPadding: 4
+        Material.foreground: "#303030"
+        background: Rectangle {
+            radius: height / 2
+            color: "#f2fafafa"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        RowLayout {
+            spacing: 0
+            Label {
+                text: app.pages.selectionCount === 0 ? qsTr("Tap pages to select them")
+                    : app.pages.selectionCount === 1 ? qsTr("1 page selected")
+                    : qsTr("%1 pages selected").arg(app.pages.selectionCount)
+                color: "#505050"
+                Layout.rightMargin: 8
+            }
+            ToolSeparator {}
+            ToolButton { text: qsTr("Copy"); enabled: app.pages.selectionCount > 0; onClicked: app.copyPages(app.pages.selectedPages()) }
+            ToolButton { text: qsTr("Cut"); enabled: app.pages.selectionCount > 0; onClicked: app.cutPages(app.pages.selectedPages()) }
+            ToolButton { text: qsTr("Paste"); enabled: app.copiedPages > 0; onClicked: app.pastePages(-1) }
+            ToolButton { text: qsTr("Duplicate"); enabled: app.pages.selectionCount > 0; onClicked: app.duplicatePages(app.pages.selectedPages()) }
+            ToolButton {
+                text: qsTr("Delete")
+                enabled: app.pages.selectionCount > 0 && app.pages.selectionCount < app.pages.count
+                onClicked: app.deletePages(app.pages.selectedPages())
+            }
+            ToolSeparator {}
+            IconButton {
+                iconName: "xopp-edit-undo"; tip: qsTr("Undo page change (Ctrl+Z)")
+                implicitWidth: 44; implicitHeight: 44
+                enabled: app.canUndoPages
+                onClicked: app.undoPages()
+            }
+            IconButton {
+                iconName: "xqt-close"; tip: qsTr("Clear the selection")
+                implicitWidth: 44; implicitHeight: 44
+                onClicked: { app.pages.clearSelection(); pageGrid.selectionMode = false }
             }
         }
     }
@@ -228,6 +311,16 @@ Rectangle {
                 visible: app.searchQuery !== ""
                 Layout.rightMargin: 6
             }
+            ToolButton {
+                objectName: "selectModeButton"
+                text: qsTr("Select")
+                checkable: true
+                checked: pageGrid.selectionMode
+                onToggled: pageGrid.selectionMode = checked
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Tap pages to select them (Ctrl/Shift+click also works)")
+            }
+            ToolSeparator {}
             ToolButton {
                 text: "−"; font.pixelSize: 22; implicitWidth: 44
                 enabled: pageGrid.columns < 12

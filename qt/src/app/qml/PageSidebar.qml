@@ -1,5 +1,7 @@
-// Page sidebar: thumbnails of the current document; tap to go to a page, long-press or ⋮ for page operations.
-// While searching, pages with hits are framed and the list can be limited to them.
+// Page sidebar: thumbnails of the current document. Tap a page to go there; Ctrl/Shift+click to select pages;
+// press and hold to drag the selected pages to another place; right click or ⋮ for the page menu; Ctrl+C/X/V,
+// Delete and Ctrl+Z (page undo) with the keyboard. While searching, pages with hits are framed and the list can
+// be limited to them.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -19,6 +21,9 @@ Rectangle {
         visible: app.searchQuery !== ""
     }
 
+    PageKeys { id: pageKeys }
+    PageMenu { id: pageMenu }
+
     ListView {
         id: list
         objectName: "sidebarList"
@@ -34,9 +39,15 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         // (count: re-evaluated when the filter changes)
         currentIndex: (app.filteredPages.count, app.filteredPages.rowOf(app.pages.currentPage))
-        onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
+        onCurrentIndexChanged: if (currentIndex >= 0 && !pageDrag.active) positionViewAtIndex(currentIndex, ListView.Contain)
         ScrollBar.vertical: ScrollBar {}
         TouchpadMomentum { flickable: list }
+
+        Keys.onShortcutOverride: function(event) { event.accepted = pageKeys.isPageKey(event) }
+        Keys.onPressed: function(event) {
+            if (pageKeys.handle(event)) event.accepted = true
+            else if (event.key === Qt.Key_Escape) { app.pages.clearSelection(); event.accepted = true }
+        }
 
         delegate: Item {
             id: entry
@@ -45,6 +56,7 @@ Rectangle {
             required property real aspect
             required property string thumbnail
             required property bool current
+            required property bool selected
             required property var searchHits
             required property int currentSearchHit
             required property int searchHitCount
@@ -57,8 +69,9 @@ Rectangle {
                 width: list.width - 36
                 height: width * entry.aspect
                 color: "white"
-                border.width: entry.current || entry.searchHitCount > 0 ? 3 : 1
-                border.color: entry.current ? Material.accentColor : (entry.searchHitCount > 0 ? "#f9a825" : "#b9bcc1")
+                border.width: entry.current || entry.selected || entry.searchHitCount > 0 ? 3 : 1
+                border.color: entry.selected || entry.current ? Material.accentColor
+                            : (entry.searchHitCount > 0 ? "#f9a825" : "#b9bcc1")
                 Image {
                     anchors.fill: parent
                     anchors.margins: frame.border.width
@@ -81,10 +94,24 @@ Rectangle {
                         color: index === entry.currentSearchHit ? "#ccff7800" : "#a0ffd200"
                     }
                 }
+                SelectionMark { visible: entry.selected }
                 HitBadge { count: entry.searchHitCount; anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 4 }
-                TapHandler {
-                    onTapped: app.goToPage(entry.pageIndex)
-                    onLongPressed: pageMenu.popup()
+                PageArea {
+                    dragOverlay: pageDrag
+                    pageIndex: entry.pageIndex
+                    delegateItem: entry
+                    onTapped: function(modifiers) {
+                        list.forceActiveFocus()
+                        if (modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) {
+                            app.pages.select(entry.pageIndex, modifiers)
+                        } else {
+                            app.pages.clearSelection()
+                            app.pages.setAnchor(entry.pageIndex)
+                            app.goToPage(entry.pageIndex)
+                        }
+                    }
+                    onHeld: list.forceActiveFocus()
+                    onMenuRequested: function(x, y) { pageMenu.openFor(entry.pageIndex, frame, x, y) }
                 }
                 ToolButton {
                     anchors.top: parent.top
@@ -94,8 +121,8 @@ Rectangle {
                     text: "⋮"
                     font.pixelSize: 20
                     Material.foreground: "#3c4043"
-                    opacity: entry.current || hovered ? 1 : 0.55
-                    onClicked: pageMenu.popup()
+                    opacity: entry.current || entry.selected || hovered ? 1 : 0.55
+                    onClicked: pageMenu.openFor(entry.pageIndex, this, 0, height)
                 }
             }
             Label {
@@ -107,30 +134,10 @@ Rectangle {
                 color: entry.current ? Material.accentColor : "#5f6368"
                 font.weight: entry.current ? Font.DemiBold : Font.Normal
             }
-
-            Menu {
-                id: pageMenu
-                MenuItem { text: qsTr("Insert page before"); onTriggered: app.insertPageBefore(entry.pageIndex) }
-                MenuItem { text: qsTr("Insert page after"); onTriggered: app.insertPageAfter(entry.pageIndex) }
-                MenuItem { text: qsTr("Duplicate page"); onTriggered: app.duplicatePage(entry.pageIndex) }
-                MenuSeparator {}
-                MenuItem {
-                    text: qsTr("Move up")
-                    enabled: entry.pageIndex > 0
-                    onTriggered: app.movePageUp(entry.pageIndex)
-                }
-                MenuItem {
-                    text: qsTr("Move down")
-                    enabled: entry.pageIndex < app.pages.count - 1
-                    onTriggered: app.movePageDown(entry.pageIndex)
-                }
-                MenuSeparator {}
-                MenuItem {
-                    text: qsTr("Delete page")
-                    enabled: app.pages.count > 1
-                    onTriggered: app.deletePage(entry.pageIndex)
-                }
-            }
         }
+    }
+    PageDragOverlay {
+        id: pageDrag
+        view: list
     }
 }

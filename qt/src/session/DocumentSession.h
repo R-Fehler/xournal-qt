@@ -133,6 +133,21 @@ public:
     void movePageTowardsBeginning();
     void movePageTowardsEnd();
 
+    // --- several pages at once (sidebar / page grid selection) --------------------------------------------------
+    /// Undo stack of the page structure (insert, delete, move, paste); the annotations have getUndoRedoHandler().
+    UndoRedoHandler* getPageUndoRedoHandler() const { return pageUndo.get(); }
+    /// Delete pages (indices). Not all of them: a document keeps at least one page. False if nothing was deleted.
+    bool deletePages(std::vector<size_t> pages);
+    /// Insert pages (not yet in the document) before `position`.
+    void insertPages(const std::vector<PageRef>& pages, size_t position);
+    /// Move pages (indices) so that they come, in their order, before the page that is at index `target` now
+    /// (target = page count: to the end). False if the order does not change.
+    bool movePages(std::vector<size_t> pages, size_t target);
+    /// The pages in document order.
+    std::vector<PageRef> pageOrder() const;
+    /// Make the document's pages `target` (used by undo/redo of the above); `moved`: pages that change place.
+    void applyPageOrder(const std::vector<PageRef>& target, const std::vector<PageRef>& moved);
+
 Q_SIGNALS:
     void modifiedChanged(bool modified);
     void undoRedoStateChanged();
@@ -162,6 +177,7 @@ private:
     AppContext& app;
     std::unique_ptr<Document> doc;
     std::unique_ptr<UndoRedoHandler> undoRedo;
+    std::unique_ptr<UndoRedoHandler> pageUndo;
     std::unique_ptr<LayerController> layerController;
     SessionActions actions;
     SessionWindow window;

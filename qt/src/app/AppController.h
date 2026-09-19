@@ -30,6 +30,7 @@ class DocumentSession;
 class TabManager;
 class PagesModel;
 class PageFilterModel;
+class PageClipboard;
 class SettingsModel;
 class SessionRecovery;
 }  // namespace xqt
@@ -69,6 +70,10 @@ class AppController: public QObject {
     Q_PROPERTY(int viewColumns READ viewColumns WRITE setViewColumns NOTIFY viewLayoutChanged)
     Q_PROPERTY(bool pairedPages READ pairedPages WRITE setPairedPages NOTIFY viewLayoutChanged)
     Q_PROPERTY(int pairsOffset READ pairsOffset WRITE setPairsOffset NOTIFY viewLayoutChanged)
+    // Page operations (sidebar, page grid) have their own undo stack
+    Q_PROPERTY(bool canUndoPages READ canUndoPages NOTIFY pageUndoChanged)
+    Q_PROPERTY(bool canRedoPages READ canRedoPages NOTIFY pageUndoChanged)
+    Q_PROPERTY(int copiedPages READ copiedPages NOTIFY copiedPagesChanged)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -101,6 +106,9 @@ public:
     int searchCurrent() const;
     bool searchRunning() const;
     int searchHitPageCount() const;
+    bool canUndoPages() const;
+    bool canRedoPages() const;
+    int copiedPages() const;
     int viewColumns() const;
     void setViewColumns(int columns);
     bool pairedPages() const;
@@ -115,6 +123,19 @@ public:
     /// Answer to the recovery offer: reopen the tabs of the crashed run, with the recovered changes (accept) or as
     /// last saved (discard; the recovery files are deleted).
     Q_INVOKABLE void recover(bool accept);
+
+    // --- several pages (sidebar / page grid selection; page indices). Empty list: the current page ---
+    Q_INVOKABLE void copyPages(const QList<int>& pages);
+    Q_INVOKABLE void cutPages(const QList<int>& pages);
+    /// Paste the copied pages before `position` (-1: after the selection, else after the current page). The pasted
+    /// pages are selected. Returns their number.
+    Q_INVOKABLE int pastePages(int position = -1);
+    Q_INVOKABLE bool deletePages(const QList<int>& pages);
+    /// Move pages before the page at index `target` now (page count: to the end); they stay selected.
+    Q_INVOKABLE bool movePages(const QList<int>& pages, int target);
+    Q_INVOKABLE void duplicatePages(const QList<int>& pages);
+    Q_INVOKABLE void undoPages();
+    Q_INVOKABLE void redoPages();
 
     // --- search ---
     Q_INVOKABLE void searchNext();
@@ -199,6 +220,10 @@ Q_SIGNALS:
     void recoveryChanged();
     void searchChanged();
     void viewLayoutChanged();
+    void pageUndoChanged();
+    void copiedPagesChanged();
+    /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
+    void pageActionDone(const QString& text, bool undoable);
 
 private:
     xqt::DocumentSession* session() const;
@@ -213,6 +238,8 @@ private:
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
+    std::unique_ptr<xqt::PageClipboard> pageClipboard;
+    std::vector<size_t> pageList(const QList<int>& pages) const;
     std::unique_ptr<xqt::SettingsModel> settingsView;
     std::unique_ptr<xqt::SessionRecovery> recovery;  // after `tabs`: destroyed first
     bool recoveryPending = false;

@@ -57,6 +57,8 @@ void PagesModel::reset() {
     beginResetModel();
     sizes.clear();
     revisions.clear();
+    selected.clear();
+    anchor = -1;
     changed.clear();
     if (session) {
         Document* doc = session->getDocument();
@@ -65,11 +67,13 @@ void PagesModel::reset() {
             auto p = doc->getPage(i);
             sizes.emplace_back(p->getWidth(), p->getHeight());
             revisions.push_back(nextRevision++);
+            selected.push_back(0);
         }
         current = static_cast<int>(session->getCurrentPageNo());
     }
     endResetModel();
     updateTypicalAspect();
+    Q_EMIT selectionChanged();
     Q_EMIT countChanged();
     Q_EMIT currentPageChanged();
 }
@@ -96,6 +100,8 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             return index.row() == current;
         case PageIndexRole:
             return index.row();
+        case SelectedRole:
+            return row < selected.size() && selected[row];
         case SearchHitCountRole: {
             if (!session) {
                 return 0;
@@ -137,7 +143,81 @@ QHash<int, QByteArray> PagesModel::roleNames() const {
     return {{PageNumberRole, "pageNumber"},     {AspectRole, "aspect"},
             {ThumbnailRole, "thumbnail"},       {CurrentRole, "current"},
             {SearchHitsRole, "searchHits"},     {CurrentSearchHitRole, "currentSearchHit"},
-            {SearchHitCountRole, "searchHitCount"}, {PageIndexRole, "pageIndex"}};
+            {SearchHitCountRole, "searchHitCount"}, {PageIndexRole, "pageIndex"},
+            {SelectedRole, "selected"}};
+}
+
+void PagesModel::select(int page, int modifiers) {
+    if (page < 0 || page >= rowCount()) {
+        return;
+    }
+    const auto m = static_cast<Qt::KeyboardModifiers>(modifiers);
+    std::vector<char> next = selected;
+    if (m & Qt::ShiftModifier) {
+        const int from = anchor >= 0 ? anchor : (current >= 0 && current < rowCount() ? current : page);
+        if (!(m & Qt::ControlModifier)) {
+            std::fill(next.begin(), next.end(), 0);
+        }
+        for (int i = std::min(from, page); i <= std::max(from, page); ++i) {
+            next[static_cast<size_t>(i)] = 1;
+        }
+    } else if (m & Qt::ControlModifier) {
+        next[static_cast<size_t>(page)] = !next[static_cast<size_t>(page)];
+        anchor = page;
+    } else {
+        std::fill(next.begin(), next.end(), 0);
+        next[static_cast<size_t>(page)] = 1;
+        anchor = page;
+    }
+    setSelection(std::move(next));
+}
+
+void PagesModel::toggleSelected(int page) { select(page, Qt::ControlModifier); }
+
+void PagesModel::selectPages(const QList<int>& pages) {
+    std::vector<char> next(selected.size(), 0);
+    for (int p: pages) {
+        if (p >= 0 && p < rowCount()) {
+            next[static_cast<size_t>(p)] = 1;
+        }
+    }
+    if (!pages.isEmpty()) {
+        anchor = pages.first();
+    }
+    setSelection(std::move(next));
+}
+
+void PagesModel::selectAll() { setSelection(std::vector<char>(selected.size(), 1)); }
+
+void PagesModel::clearSelection() { setSelection(std::vector<char>(selected.size(), 0)); }
+
+bool PagesModel::isSelected(int page) const {
+    return page >= 0 && page < rowCount() && selected[static_cast<size_t>(page)];
+}
+
+QList<int> PagesModel::selectedPages() const {
+    QList<int> pages;
+    for (size_t i = 0; i < selected.size(); ++i) {
+        if (selected[i]) {
+            pages.append(static_cast<int>(i));
+        }
+    }
+    return pages;
+}
+
+int PagesModel::selectionCount() const { return static_cast<int>(std::count(selected.begin(), selected.end(), 1)); }
+
+void PagesModel::setSelection(std::vector<char> next) {
+    if (next == selected) {
+        return;
+    }
+    for (size_t i = 0; i < next.size(); ++i) {
+        if (next[i] != selected[i]) {
+            selected[i] = next[i];
+            Q_EMIT dataChanged(index(static_cast<int>(i)), index(static_cast<int>(i)), {SelectedRole});
+        }
+    }
+    Q_EMIT selectionChanged();
 }
 
 void PagesModel::updateTypicalAspect() {
@@ -210,6 +290,10 @@ void PagesModel::pageInserted(size_t page) {
     beginInsertRows(QModelIndex(), static_cast<int>(page), static_cast<int>(page));
     sizes.insert(sizes.begin() + static_cast<std::ptrdiff_t>(page), size);
     revisions.insert(revisions.begin() + static_cast<std::ptrdiff_t>(page), nextRevision++);
+    selected.insert(selected.begin() + static_cast<std::ptrdiff_t>(page), 0);
+    if (anchor >= static_cast<int>(page)) {
+        ++anchor;
+    }
     endInsertRows();
     // Page numbers after the insertion changed.
     Q_EMIT dataChanged(index(static_cast<int>(page)), index(rowCount() - 1), {PageNumberRole});
@@ -225,7 +309,17 @@ void PagesModel::pageDeleted(size_t page) {
     beginRemoveRows(QModelIndex(), static_cast<int>(page), static_cast<int>(page));
     sizes.erase(sizes.begin() + static_cast<std::ptrdiff_t>(page));
     revisions.erase(revisions.begin() + static_cast<std::ptrdiff_t>(page));
+    const bool wasSelected = selected[page];
+    selected.erase(selected.begin() + static_cast<std::ptrdiff_t>(page));
+    if (anchor == static_cast<int>(page)) {
+        anchor = -1;
+    } else if (anchor > static_cast<int>(page)) {
+        --anchor;
+    }
     endRemoveRows();
+    if (wasSelected) {
+        Q_EMIT selectionChanged();
+    }
     if (static_cast<int>(page) < rowCount()) {
         Q_EMIT dataChanged(index(static_cast<int>(page)), index(rowCount() - 1), {PageNumberRole});
     }

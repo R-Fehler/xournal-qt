@@ -20,6 +20,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "shell/PageClipboard.h"
 #include "shell/PageFilterModel.h"
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
@@ -58,6 +59,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
 
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
+    pageClipboard = std::make_unique<PageClipboard>();
     // "Only pages with hits" ends with the search.
     connect(this, &AppController::searchChanged, this, [this] {
         if (searchQuery().isEmpty()) {
@@ -106,6 +108,8 @@ void AppController::currentTabChanged() {
                 connect(s, &DocumentSession::modifiedChanged, this, &AppController::modifiedChanged));
         currentConnections.push_back(
                 connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::undoRedoChanged));
+        currentConnections.push_back(
+                connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::pageUndoChanged));
         currentConnections.push_back(connect(s, &DocumentSession::filePathChanged, this, &AppController::titleChanged));
         currentConnections.push_back(
                 connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
@@ -127,6 +131,7 @@ void AppController::currentTabChanged() {
     Q_EMIT zoomChanged();
     Q_EMIT pageChanged();
     Q_EMIT searchChanged();
+    Q_EMIT pageUndoChanged();
 }
 
 QString AppController::searchQuery() const { return session() ? session()->search().query() : QString(); }
@@ -140,6 +145,139 @@ int AppController::searchHitCount() const {
 }
 int AppController::searchCurrent() const { return session() ? session()->search().currentHit() + 1 : 0; }
 bool AppController::searchRunning() const { return session() && session()->search().isRunning(); }
+// --- several pages ---------------------------------------------------------------------------------------------
+
+std::vector<size_t> AppController::pageList(const QList<int>& list) const {
+    std::vector<size_t> result;
+    if (list.isEmpty() && session()) {
+        result.push_back(session()->getCurrentPageNo());
+    }
+    for (int p: list) {
+        if (p >= 0) {
+            result.push_back(static_cast<size_t>(p));
+        }
+    }
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
+}
+
+bool AppController::canUndoPages() const { return session() && session()->getPageUndoRedoHandler()->canUndo(); }
+bool AppController::canRedoPages() const { return session() && session()->getPageUndoRedoHandler()->canRedo(); }
+int AppController::copiedPages() const { return static_cast<int>(pageClipboard->size()); }
+
+void AppController::copyPages(const QList<int>& list) {
+    if (!session()) {
+        return;
+    }
+    const auto indices = pageList(list);
+    pageClipboard->copy(*session()->getDocument(), indices);
+    Q_EMIT copiedPagesChanged();
+    Q_EMIT pageActionDone(indices.size() == 1 ? tr("Page copied") : tr("%1 pages copied").arg(indices.size()), false);
+}
+
+void AppController::cutPages(const QList<int>& list) {
+    copyPages(list);
+    deletePages(list);
+}
+
+int AppController::pastePages(int position) {
+    if (!session() || pageClipboard->isEmpty()) {
+        return 0;
+    }
+    if (position < 0) {
+        const QList<int> sel = pages->selectedPages();
+        position = (sel.isEmpty() ? static_cast<int>(session()->getCurrentPageNo()) : sel.last()) + 1;
+    }
+    auto copies = pageClipboard->pagesFor(*session()->getDocument());
+    const int n = static_cast<int>(copies.size());
+    session()->insertPages(copies, static_cast<size_t>(position));
+    QList<int> pasted;
+    for (int i = 0; i < n; ++i) {
+        pasted.append(position + i);
+    }
+    pages->selectPages(pasted);
+    Q_EMIT pageActionDone(n == 1 ? tr("Page pasted") : tr("%1 pages pasted").arg(n), true);
+    return n;
+}
+
+bool AppController::deletePages(const QList<int>& list) {
+    if (!session()) {
+        return false;
+    }
+    const auto indices = pageList(list);
+    if (indices.size() >= session()->getDocument()->getPageCount()) {
+        Q_EMIT message(tr("Delete pages"), tr("A document keeps at least one page."), false);
+        return false;
+    }
+    if (!session()->deletePages(indices)) {
+        return false;
+    }
+    pages->clearSelection();
+    Q_EMIT pageActionDone(indices.size() == 1 ? tr("Page deleted") : tr("%1 pages deleted").arg(indices.size()),
+                          true);
+    return true;
+}
+
+bool AppController::movePages(const QList<int>& list, int target) {
+    if (!session() || target < 0) {
+        return false;
+    }
+    const auto indices = pageList(list);
+    std::vector<PageRef> moved;
+    {
+        const auto order = session()->pageOrder();
+        for (size_t i: indices) {
+            if (i < order.size()) {
+                moved.push_back(order[i]);
+            }
+        }
+    }
+    if (!session()->movePages(indices, static_cast<size_t>(target))) {
+        return false;
+    }
+    // Keep them selected at their new place.
+    const auto order = session()->pageOrder();
+    QList<int> now;
+    for (const auto& p: moved) {
+        now.append(static_cast<int>(std::find(order.begin(), order.end(), p) - order.begin()));
+    }
+    pages->selectPages(now);
+    Q_EMIT pageActionDone(moved.size() == 1 ? tr("Page moved") : tr("%1 pages moved").arg(moved.size()), true);
+    return true;
+}
+
+void AppController::duplicatePages(const QList<int>& list) {
+    if (!session()) {
+        return;
+    }
+    const auto indices = pageList(list);
+    PageClipboard copies;  // (not the user's clipboard)
+    copies.copy(*session()->getDocument(), indices);
+    auto newPages = copies.pagesFor(*session()->getDocument());
+    const size_t position = indices.back() + 1;
+    session()->insertPages(newPages, position);
+    QList<int> added;
+    for (size_t i = 0; i < newPages.size(); ++i) {
+        added.append(static_cast<int>(position + i));
+    }
+    pages->selectPages(added);
+}
+
+void AppController::undoPages() {
+    if (session() && session()->getPageUndoRedoHandler()->canUndo()) {
+        session()->getPageUndoRedoHandler()->undo();
+        pages->clearSelection();
+    }
+}
+
+void AppController::redoPages() {
+    if (session() && session()->getPageUndoRedoHandler()->canRedo()) {
+        session()->getPageUndoRedoHandler()->redo();
+        pages->clearSelection();
+    }
+}
+
 int AppController::viewColumns() const { return std::max(1, app->getSettings()->getViewColumns()); }
 bool AppController::pairedPages() const { return app->getSettings()->isShowPairedPages(); }
 int AppController::pairsOffset() const { return app->getSettings()->getPairsOffset(); }

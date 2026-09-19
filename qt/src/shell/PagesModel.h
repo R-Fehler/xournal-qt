@@ -29,6 +29,7 @@ class PagesModel final: public QAbstractListModel, public DocumentListener {
     Q_PROPERTY(int currentPage READ currentPage NOTIFY currentPageChanged)
     /// Height / width of most pages (median): the page grid sizes its cells with it (slides, A4, ...).
     Q_PROPERTY(qreal typicalAspect READ typicalAspect NOTIFY typicalAspectChanged)
+    Q_PROPERTY(int selectionCount READ selectionCount NOTIFY selectionChanged)
 public:
     enum Roles {
         PageNumberRole = Qt::UserRole + 1,
@@ -42,7 +43,9 @@ public:
         /// Number of search hits on the page
         SearchHitCountRole,
         /// 0-based page index (the row; stays right in filtered views)
-        PageIndexRole
+        PageIndexRole,
+        /// The page is selected (for page operations in the sidebar and the page grid)
+        SelectedRole
     };
 
     explicit PagesModel(QObject* parent = nullptr);
@@ -56,6 +59,19 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     int currentPage() const;
     qreal typicalAspect() const { return aspect; }
+
+    // --- selection (like a file manager: Ctrl toggles, Shift selects a range from the last clicked page) ---
+    Q_INVOKABLE void select(int page, int modifiers = 0);
+    Q_INVOKABLE void toggleSelected(int page);
+    Q_INVOKABLE void selectPages(const QList<int>& pages);
+    Q_INVOKABLE void selectAll();
+    Q_INVOKABLE void clearSelection();
+    /// Start of a later Shift+click range (e.g. the page opened by a plain click).
+    Q_INVOKABLE void setAnchor(int page) { anchor = page; }
+    Q_INVOKABLE bool isSelected(int page) const;
+    /// Selected pages in document order.
+    Q_INVOKABLE QList<int> selectedPages() const;
+    int selectionCount() const;
 
     /// Milliseconds to collect content changes before thumbnails are refreshed.
     void setRefreshDelay(int ms) { refreshTimer.setInterval(ms); }
@@ -72,10 +88,12 @@ Q_SIGNALS:
     void countChanged();
     void currentPageChanged();
     void typicalAspectChanged();
+    void selectionChanged();
 
 private:
     void reset();
     void updateTypicalAspect();
+    void setSelection(std::vector<char> next);
     void markChanged(size_t page);
     void flushChanges();
 
@@ -88,6 +106,8 @@ private:
     QTimer refreshTimer;
     int current = 0;
     qreal aspect = 1.414;
+    std::vector<char> selected;  ///< per row
+    int anchor = -1;             ///< last page clicked (Shift+click range start)
     std::vector<QMetaObject::Connection> connections;
 };
 

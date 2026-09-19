@@ -18,6 +18,8 @@
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 
+#include "session/DocumentSession.h"
+#include "shell/PagesModel.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
@@ -329,4 +331,83 @@ TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
     wheel(0, Qt::ScrollEnd);
     wait(300);
     EXPECT_GT(grid->property("contentY").toDouble(), atLift + 50) << "no momentum after lifting the fingers";
+}
+
+namespace {
+QQuickItem* itemAt(QQuickItem* view, int row) {
+    QQuickItem* item = nullptr;
+    QMetaObject::invokeMethod(view, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, item), Q_ARG(int, row));
+    return item;
+}
+QPoint centerOf(QQuickItem* item) { return item->mapToScene(QPointF(item->width() / 2, item->height() / 3)).toPoint(); }
+}  // namespace
+
+TEST_F(MainWindowTest, sidebarSelectCopyPasteDeleteWithPageUndo) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* list = find<QQuickItem>("sidebarList");
+    ASSERT_NE(list, nullptr);
+    wait(100);
+    auto* pagesModel = qobject_cast<xqt::PagesModel*>(controller->pagesModel());
+
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(list, 0)));
+    QTest::mouseClick(window, Qt::LeftButton, Qt::ShiftModifier, centerOf(itemAt(list, 1)));
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({0, 1})) << "Shift+click from the clicked page";
+    QTest::mouseClick(window, Qt::LeftButton, Qt::ControlModifier, centerOf(itemAt(list, 1)));  // off
+    QTest::mouseClick(window, Qt::LeftButton, Qt::ControlModifier, centerOf(itemAt(list, 2)));  // on
+    ASSERT_EQ(pagesModel->selectedPages(), QList<int>({0, 2}));
+
+    key(Qt::Key_C, Qt::ControlModifier);
+    EXPECT_EQ(controller->copiedPages(), 2);
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(controller->pageCount(), 13) << "pasted after the selection";
+
+    key(Qt::Key_Delete);
+    EXPECT_EQ(controller->pageCount(), 11) << "the pasted (selected) pages are deleted";
+    auto* snackbar = find<QQuickItem>("snackbar");
+    ASSERT_NE(snackbar, nullptr);
+    EXPECT_TRUE(snackbar->isVisible());
+    key(Qt::Key_Z, Qt::ControlModifier);  // page undo (the sidebar has the focus)
+    EXPECT_EQ(controller->pageCount(), 13);
+
+    // On the canvas, Ctrl+Z is the annotation undo again.
+    auto* canvas = find<QQuickItem>("canvas");
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                      canvas->mapToScene(QPointF(canvas->width() / 2, canvas->height() / 2)).toPoint());
+    EXPECT_TRUE(canvas->hasActiveFocus());
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(controller->pageCount(), 13) << "no page undo from the canvas";
+}
+
+TEST_F(MainWindowTest, pageGridDragAndDropMovesSelectedPages) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* session = controller->tabManager().currentSession();
+    const auto original = session->pageOrder();
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    wait(100);
+    auto* pagesModel = qobject_cast<xqt::PagesModel*>(controller->pagesModel());
+    pagesModel->selectPages({0, 1});
+
+    // Press and hold on page 1, drag to the right half of page 4 (index 3), drop.
+    const QPoint from = centerOf(itemAt(grid, 0));
+    QQuickItem* targetCell = itemAt(grid, 3);
+    const QPoint to = targetCell->mapToScene(QPointF(targetCell->width() * 0.8, targetCell->height() / 2)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+    wait(600);  // press and hold
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, from + (to - from) * i / 10);
+        wait(10);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+    wait(50);
+    const auto order = session->pageOrder();
+    EXPECT_EQ(order[2], original[0]);
+    EXPECT_EQ(order[3], original[1]);
+    EXPECT_EQ(order[1], original[3]);
+    EXPECT_EQ(pagesModel->selectedPages(), QList<int>({2, 3}));
+    EXPECT_TRUE(find<QQuickItem>("pageGrid")->isVisible()) << "dragging does not open the page";
+
+    controller->undoPages();
+    EXPECT_EQ(session->pageOrder(), original);
 }

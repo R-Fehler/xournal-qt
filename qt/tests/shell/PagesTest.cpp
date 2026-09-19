@@ -98,10 +98,11 @@ TEST(Pages, modelFollowsPageOperations) {
     c.movePageUp(2);
     expectLayoutMatchesDocument(c);
 
-    c.undo();  // move
-    c.undo();  // duplicate
-    c.undo();  // delete
+    c.undoPages();  // move
+    c.undoPages();  // duplicate
+    c.undoPages();  // delete
     EXPECT_EQ(m.rowCount(), 3);
+    EXPECT_EQ(m.currentPage() >= 0, true);
     expectLayoutMatchesDocument(c);
     EXPECT_GE(count.count(), 5);
 }
@@ -265,4 +266,88 @@ TEST(Pages, concurrentTextRenderingIsComplete) {
         th.join();
     }
     EXPECT_EQ(mismatches.load(), 0);
+}
+
+TEST(Pages, selectionLikeAFileManager) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    PagesModel& m = pagesOf(c);
+    m.select(2);
+    EXPECT_EQ(m.selectedPages(), QList<int>({2}));
+    m.select(5, Qt::ShiftModifier);
+    EXPECT_EQ(m.selectedPages(), QList<int>({2, 3, 4, 5}));
+    m.select(8, Qt::ControlModifier);
+    m.select(3, Qt::ControlModifier);
+    EXPECT_EQ(m.selectedPages(), QList<int>({2, 4, 5, 8}));
+    m.select(10, Qt::ShiftModifier | Qt::ControlModifier);  // adds the range from the last clicked page (3)
+    EXPECT_EQ(m.selectedPages(), QList<int>({2, 3, 4, 5, 6, 7, 8, 9, 10}));
+    m.select(1);
+    EXPECT_EQ(m.selectionCount(), 1);
+    EXPECT_TRUE(m.data(m.index(1), PagesModel::SelectedRole).toBool());
+    m.clearSelection();
+    EXPECT_EQ(m.selectionCount(), 0);
+}
+
+TEST(Pages, copyPasteDeleteMoveWithPageUndo) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    PagesModel& m = pagesOf(c);
+    DocumentSession* s = c.tabManager().currentSession();
+    const auto original = s->pageOrder();
+
+    c.copyPages({0, 1});
+    EXPECT_EQ(c.copiedPages(), 2);
+    m.select(10);
+    EXPECT_EQ(c.pastePages(), 2) << "after the selection";
+    ASSERT_EQ(s->getDocument()->getPageCount(), 13u);
+    EXPECT_EQ(m.selectedPages(), QList<int>({11, 12})) << "the pasted pages are selected";
+    EXPECT_NE(s->pageOrder()[11], original[0]) << "a copy";
+    EXPECT_EQ(s->pageOrder()[11]->getSelectedLayer()->getElements().size(),
+              original[0]->getSelectedLayer()->getElements().size());
+
+    QSignalSpy done(&c, &AppController::pageActionDone);
+    ASSERT_TRUE(c.deletePages({11, 12}));
+    EXPECT_EQ(s->pageOrder(), original);
+    ASSERT_EQ(done.count(), 1);
+    EXPECT_TRUE(done.first().at(1).toBool()) << "offered for undo";
+
+    ASSERT_TRUE(c.movePages({0, 1}, 5));
+    EXPECT_EQ(s->pageOrder()[3], original[0]);
+    EXPECT_EQ(m.selectedPages(), QList<int>({3, 4})) << "the moved pages stay selected";
+    EXPECT_FALSE(c.deletePages({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10})) << "not all pages";
+
+    EXPECT_TRUE(c.canUndoPages());
+    c.undoPages();  // move
+    c.undoPages();  // delete
+    c.undoPages();  // paste
+    EXPECT_EQ(s->pageOrder(), original);
+    EXPECT_FALSE(c.canUndoPages());
+    EXPECT_FALSE(c.canUndo()) << "the annotation undo stack is separate";
+    EXPECT_TRUE(c.canRedoPages());
+}
+
+TEST(Pages, pdfPagesPastedIntoAnotherDocumentBecomeImages) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
+    c.copyPages({1});
+    c.pastePages(0);  // same document: still the PDF page
+    DocumentSession* pdfDoc = c.tabManager().currentSession();
+    EXPECT_TRUE(pdfDoc->getDocument()->getPage(0)->getBackgroundType().isPdfPage());
+    EXPECT_EQ(pdfDoc->getDocument()->getPage(0)->getPdfPageNr(), 1u);
+
+    c.newDocument();
+    ASSERT_EQ(c.pastePages(1), 1);
+    DocumentSession* other = c.tabManager().currentSession();
+    auto page = other->getDocument()->getPage(1);
+    EXPECT_TRUE(page->getBackgroundType().isImagePage());
+    EXPECT_FALSE(page->getBackgroundImage().isEmpty());
+    // The image shows the PDF page (the thumbnail has the dark shapes of the test PDF).
+    const QImage thumb = ThumbnailProvider::render(*other, 1, 120);
+    int dark = 0;
+    for (int y = 0; y < thumb.height(); ++y) {
+        for (int x = 0; x < thumb.width(); ++x) {
+            dark += qGray(thumb.pixel(x, y)) < 100;
+        }
+    }
+    EXPECT_GT(dark, thumb.width() * thumb.height() / 20);
 }
