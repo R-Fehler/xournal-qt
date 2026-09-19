@@ -10,7 +10,8 @@ cd build-qt
 ## Pen
 - [ ] Writing: pressure visible, looks like Xournal++, no gaps when writing fast, ink follows the tip without lag.
 - [ ] Highlighter: translucent, multiplies with what is underneath (text stays readable).
-- [ ] Side button (eraser tool switch): erases while held; the pen draws again afterwards. The hover dot turns red.
+- [ ] Both side buttons of the pen erase while held (the default), also while drawing; the pen draws again afterwards. The hover dot turns red.
+- [ ] Turning the pen around (eraser end) erases as well.
 - [ ] Eraser tool from the tool bar.
 - [ ] Hand tool: dragging with the pen scrolls.
 - [ ] Hover: the dot follows the pen above the screen.
@@ -51,7 +52,7 @@ cd build-qt
 ## Settings and tab overview (M5c)
 - [ ] Gear button: the settings sheet opens; every section scrolls with a finger; sliders and switches work with pen and finger.
 - [ ] Changing the pressure multiplier or the stabilizer changes the next stroke without restarting.
-- [ ] Side button set to "Hand": the side button scrolls instead of erasing. Set back to "Eraser".
+- [ ] Settings → Pen: "Lower side button" / "Upper side button" set to "Hand": that button scrolls instead of erasing. Set back to "Eraser".
 - [ ] Palm rejection timeout: with a long timeout, touch stays blocked for a moment after writing.
 - [ ] Pinch zoom off: two fingers only pan.
 - [ ] New pages: background/size/color from the settings are used by "add page".

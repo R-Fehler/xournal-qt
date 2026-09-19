@@ -42,6 +42,9 @@ public:
 
     Settings* getSettings() const { return settings.get(); }
     ToolHandler* getToolHandler() const { return toolHandler.get(); }
+    /// Make the tools of the pen and mouse buttons from the settings (port of Control::initButtonTool). Call it
+    /// after changing a button's tool.
+    void initButtonTools();
     PageTypeHandler* getPageTypes() const { return pageTypes.get(); }
     RenderService* getRenderService() const { return renderService.get(); }
     const fs::path& getResourceDir() const { return resourceDir; }

@@ -226,6 +226,40 @@ TEST_F(CanvasReplayTest, highlighterAndWhiteout) {
     EXPECT_EQ(dynamic_cast<const Stroke*>(*it)->getToolType(), StrokeTool::ERASER);  // whiteout stroke
 }
 
+TEST_F(CanvasReplayTest, sideButtonOfThePenErases) {
+    ToolHandler* th = app->getToolHandler();
+    EXPECT_EQ(th->getToolType(), TOOL_PEN);
+    drawLine(0, QPointF(100, 400), QPointF(300, 400));
+    processEvents();
+    ASSERT_EQ(elementCount(0), 1u);
+
+    // Hold the lower side button: the eraser (the pen stays chosen in the tool bar)
+    tablet(QEvent::TabletPress, viewPos(0, QPointF(90, 400)), 0.0, Qt::MiddleButton, Qt::MiddleButton);
+    EXPECT_EQ(th->getToolType(), TOOL_ERASER) << "the side button erases";
+    tablet(QEvent::TabletPress, viewPos(0, QPointF(90, 400)), 0.5, Qt::LeftButton,
+           Qt::LeftButton | Qt::MiddleButton);
+    for (int i = 1; i <= 20; ++i) {
+        tablet(QEvent::TabletMove, viewPos(0, QPointF(90 + 11.0 * i, 400)), 0.5, Qt::NoButton,
+               Qt::LeftButton | Qt::MiddleButton);
+    }
+    tablet(QEvent::TabletRelease, viewPos(0, QPointF(310, 400)), 0.0, Qt::LeftButton, Qt::MiddleButton);
+    processEvents();
+    EXPECT_EQ(elementCount(0), 0u) << "the stroke is erased";
+
+    // Letting go: the tool of the tool bar again
+    tablet(QEvent::TabletRelease, viewPos(0, QPointF(310, 400)), 0.0, Qt::MiddleButton, Qt::NoButton);
+    EXPECT_EQ(th->getToolType(), TOOL_PEN);
+
+    // The upper side button as well
+    drawLine(0, QPointF(100, 500), QPointF(300, 500));
+    processEvents();
+    ASSERT_EQ(elementCount(0), 1u);
+    tablet(QEvent::TabletPress, viewPos(0, QPointF(90, 500)), 0.0, Qt::RightButton, Qt::RightButton);
+    EXPECT_EQ(th->getToolType(), TOOL_ERASER);
+    tablet(QEvent::TabletRelease, viewPos(0, QPointF(90, 500)), 0.0, Qt::RightButton, Qt::NoButton);
+    EXPECT_EQ(th->getToolType(), TOOL_PEN);
+}
+
 namespace {
 void sendWheel(CanvasInput& input, const QPointingDevice& touchpad, QPoint pixelDelta, Qt::ScrollPhase phase) {
     QWheelEvent e(QPointF(400, 300), QPointF(400, 300), pixelDelta, pixelDelta * 2, Qt::NoButton, Qt::NoModifier, phase,

@@ -21,6 +21,8 @@ auto ButtonConfig::getDrawingType() const -> DrawingType { return this->drawingT
 
 auto ButtonConfig::getAction() const -> ToolType { return this->action; }
 
+void ButtonConfig::setAction(ToolType action) { this->action = action; }
+
 void ButtonConfig::initButton(ToolHandler* toolHandler, Button button) const {
     toolHandler->resetButtonTool(this->action, button);
 

@@ -60,6 +60,8 @@ public:
 
 
     ToolType getAction() const;
+    /// xournal-qt: the tool of the button (TOOL_NONE: the button does not change the tool)
+    void setAction(ToolType action);
     bool getDisableDrawing() const;
     DrawingType getDrawingType() const;
 

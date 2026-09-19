@@ -156,10 +156,21 @@ Popup {
                         ]
                     }
                     ComboRow {
-                        key: "stylusButtonTool"; text: qsTr("Barrel button")
+                        key: "stylusButtonTool"; text: qsTr("Lower side button")
                         options: [
-                            { text: qsTr("No change (keep the tool)"), value: "none" },
                             { text: qsTr("Eraser"), value: "eraser" },
+                            { text: qsTr("No change (keep the tool)"), value: "none" },
+                            { text: qsTr("Hand (scroll)"), value: "hand" },
+                            { text: qsTr("Highlighter"), value: "highlighter" },
+                            { text: qsTr("Rectangle selection"), value: "selectRect" },
+                            { text: qsTr("Lasso selection"), value: "selectRegion" }
+                        ]
+                    }
+                    ComboRow {
+                        key: "stylusButton2Tool"; text: qsTr("Upper side button")
+                        options: [
+                            { text: qsTr("Eraser"), value: "eraser" },
+                            { text: qsTr("No change (keep the tool)"), value: "none" },
                             { text: qsTr("Hand (scroll)"), value: "hand" },
                             { text: qsTr("Highlighter"), value: "highlighter" },
                             { text: qsTr("Rectangle selection"), value: "selectRect" },

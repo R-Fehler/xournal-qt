@@ -67,6 +67,7 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                                                       TOOL_SIZE_NONE, DRAWING_TYPE_DEFAULT, ERASER_TYPE_NONE);
                              replacement.device = cfg->device;
                              *cfg = replacement;
+                             this->app.initButtonTools();  // the button needs its tool (else it does nothing)
                              settings.customSettingsChanged();
                          }};
     };
@@ -74,6 +75,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
     add("eraserButtonTool", eraserGet, eraserSet);
     auto [stylusGet, stylusSet] = buttonTool(BUTTON_STYLUS_ONE);
     add("stylusButtonTool", stylusGet, stylusSet);
+    auto [stylus2Get, stylus2Set] = buttonTool(BUTTON_STYLUS_TWO);
+    add("stylusButton2Tool", stylus2Get, stylus2Set);
     add("eraserMode",
         [&app] { return QVariant(QString::fromUtf8(eraserTypeToString(app.getToolHandler()->getEraserType()).data())); },
         [&app](const QVariant& v) {
