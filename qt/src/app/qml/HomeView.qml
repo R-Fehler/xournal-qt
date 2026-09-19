@@ -79,6 +79,11 @@ Rectangle {
         }
         model.clearSelection()
     }
+    /// Short texts (fewer than 4 characters: hits everywhere) are searched on Enter or the search icon only.
+    function typed() {
+        if (searchField.text === "" || searchField.text.length >= 4) searchTyping.restart()
+        else searchTyping.stop()
+    }
     function countText(n) { return n === 1 ? qsTr("1 item") : qsTr("%1 items").arg(n) }
     function askTransfer(paths, copy) {
         transferDialog.paths = paths
@@ -291,7 +296,17 @@ Rectangle {
                     anchors.fill: parent
                     anchors.leftMargin: 14
                     anchors.rightMargin: 4
-                    Image { source: app.iconUrl("xqt-search"); sourceSize.width: 18; sourceSize.height: 18 }
+                    ToolButton {
+                        objectName: "librarySearchButton"
+                        implicitWidth: 36; implicitHeight: 36
+                        icon.source: app.iconUrl("xqt-search")
+                        icon.color: "#3c4043"
+                        display: AbstractButton.IconOnly
+                        onClicked: { searchTyping.stop(); home.lib.searchQuery = searchField.text }
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Search (Enter)")
+                        ToolTip.delay: 600
+                    }
                     TextField {
                         id: searchField
                         objectName: "librarySearchField"
@@ -305,11 +320,18 @@ Rectangle {
                             text: qsTr("Search the library")
                             color: "#8a8d91"
                         }
-                        onTextEdited: searchTyping.restart()
+                        onTextEdited: home.typed()
                         Keys.onReturnPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
                         Keys.onEnterPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
                         Keys.onDownPressed: libraryGrid.forceActiveFocus()
                         Keys.onEscapePressed: { text = ""; home.lib.searchQuery = ""; libraryGrid.forceActiveFocus() }
+                    }
+                    Label {
+                        objectName: "librarySearchHint"
+                        visible: searchField.text !== "" && searchField.text.length < 4 && searchField.text !== home.lib.searchQuery
+                        text: qsTr("Enter ↵")
+                        color: "#6b6f75"
+                        font.pixelSize: 12
                     }
                     ToolButton {
                         visible: searchField.text !== ""
@@ -516,7 +538,7 @@ Rectangle {
                         } else if (event.text.length === 1 && event.text.trim() !== "" && !(event.modifiers & Qt.ControlModifier)) {
                             searchField.forceActiveFocus()  // typing searches
                             searchField.text += event.text
-                            searchTyping.restart()
+                            home.typed()
                             event.accepted = true
                         }
                     }

@@ -1,5 +1,6 @@
 // Search in the current document: a floating bar over the canvas (Ctrl+F). Enter / Shift+Enter or the arrows go to
-// the next / previous hit; Escape or × ends the search.
+// the next / previous hit; Escape or × ends the search. Short texts (fewer than 4 characters: thousands of hits in a
+// long document) are only searched on Enter or a tap on the search icon, not while typing.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -44,14 +45,25 @@ Pane {
         interval: 250
         onTriggered: app.searchQuery = field.text
     }
+    readonly property int liveSearchLength: 4
+    /// The text in the field waits for Enter (too short to search while typing).
+    readonly property bool waitingForEnter: field.text !== "" && field.text !== app.searchQuery
+                                            && field.text.length < liveSearchLength
+    function searchNow() {
+        typing.stop()
+        app.searchQuery = field.text
+    }
 
     RowLayout {
         spacing: 2
-        Image {
-            source: app.iconUrl("xqt-search")
-            sourceSize.width: 20
-            sourceSize.height: 20
-            Layout.rightMargin: 4
+        IconButton {
+            objectName: "searchNowButton"
+            iconName: "xqt-search"
+            tip: qsTr("Search (Enter)")
+            implicitWidth: 36; implicitHeight: 36
+            icon.width: 20; icon.height: 20
+            checked: bar.waitingForEnter
+            onClicked: bar.searchNow()
         }
         TextField {
             id: field
@@ -68,7 +80,10 @@ Pane {
                 color: "#8a8d91"
             }
             text: app.searchQuery
-            onTextEdited: typing.restart()
+            onTextEdited: {
+                if (text === "" || text.length >= bar.liveSearchLength) typing.restart()
+                else typing.stop()  // short: on Enter only
+            }
             Keys.onReturnPressed: function(event) { go(event) }
             Keys.onEnterPressed: function(event) { go(event) }
             Keys.onEscapePressed: bar.closeBar()
@@ -88,7 +103,8 @@ Pane {
             Layout.minimumWidth: 76
             horizontalAlignment: Text.AlignHCenter
             color: app.searchQuery !== "" && app.searchHitCount === 0 && !app.searchRunning ? "#b3261e" : "#505050"
-            text: app.searchQuery === "" ? ""
+            text: bar.waitingForEnter ? qsTr("Enter ↵")
+                : app.searchQuery === "" ? ""
                 : app.searchHitCount === 0 ? (app.searchRunning ? qsTr("Searching…") : qsTr("No results"))
                 : (app.searchCurrent > 0 ? app.searchCurrent + " / " : "") + app.searchHitCount
                   + (app.searchRunning ? "…" : "")

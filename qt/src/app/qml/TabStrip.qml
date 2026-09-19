@@ -64,8 +64,13 @@ Rectangle {
         }
         ListView {
             id: list
+            objectName: "tabList"
+            // As wide as the tabs, up to all the room there is (then it scrolls); the spacer behind it only gets
+            // what is left (two fill items would share the room: the tabs would scroll at half the width).
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumWidth: 0
+            Layout.preferredWidth: contentWidth
             Layout.maximumWidth: contentWidth
             orientation: ListView.Horizontal
             model: app.tabs
@@ -133,6 +138,7 @@ Rectangle {
             }
         }
         ToolButton {
+            objectName: "newTabButton"
             Layout.alignment: Qt.AlignVCenter
             implicitWidth: 44
             implicitHeight: 40
@@ -144,6 +150,6 @@ Rectangle {
             ToolTip.text: qsTr("New document")
             ToolTip.delay: 600
         }
-        Item { Layout.fillWidth: true }
+        Item { Layout.fillWidth: true; Layout.preferredWidth: 0 }
     }
 }

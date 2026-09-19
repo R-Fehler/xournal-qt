@@ -134,5 +134,7 @@ cd build-qt
 - [ ] Recent tab: documents opened before; rename; select several and "Remove from list".
 - [ ] Closing the last tab shows the home screen; the library tab switches to it with documents open; Ctrl+Tab returns.
 - [ ] While a tool tip is shown (hover a tool button), the pen still writes on the canvas right away.
+- [ ] Search one or two letters (document, tab overview, library): nothing happens while typing ("Enter ↵"); Enter or the search icon searches; a single letter in a long PDF stays responsive.
+- [ ] Open 20+ documents: the tabs fill the whole strip before it scrolls, the + stays at the right end.
 
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

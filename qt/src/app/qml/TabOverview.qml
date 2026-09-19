@@ -47,8 +47,15 @@ Popup {
 
     Timer {
         id: searchTyping
+        property bool pending: false  // short text typed, waiting for Enter
         interval: 300
-        onTriggered: app.searchAllTabs(searchField.text)
+        onTriggered: { pending = false; app.searchAllTabs(searchField.text) }
+    }
+    /// Short texts (fewer than 4 characters) are searched on Enter or the search icon only, not while typing.
+    function typed() {
+        searchTyping.pending = searchField.text.length > 0 && searchField.text.length < 4
+        if (!searchTyping.pending) searchTyping.restart()
+        else searchTyping.stop()
     }
 
     ColumnLayout {
@@ -78,7 +85,16 @@ Popup {
                     anchors.fill: parent
                     anchors.leftMargin: 14
                     anchors.rightMargin: 4
-                    Image { source: app.iconUrl("xqt-search"); sourceSize.width: 18; sourceSize.height: 18 }
+                    ToolButton {
+                        implicitWidth: 36; implicitHeight: 36
+                        icon.source: app.iconUrl("xqt-search")
+                        icon.color: "#3c4043"
+                        display: AbstractButton.IconOnly
+                        onClicked: { searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs(searchField.text) }
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Search (Enter)")
+                        ToolTip.delay: 600
+                    }
                     TextField {
                         id: searchField
                         objectName: "overviewSearchField"
@@ -92,10 +108,16 @@ Popup {
                             color: "#8a8d91"
                         }
                         selectByMouse: true
-                        onTextEdited: searchTyping.restart()
-                        Keys.onReturnPressed: { searchTyping.stop(); app.searchAllTabs(text); grid.forceActiveFocus() }
-                        Keys.onEnterPressed: { searchTyping.stop(); app.searchAllTabs(text); grid.forceActiveFocus() }
+                        onTextEdited: overview.typed()
+                        Keys.onReturnPressed: { searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs(text); grid.forceActiveFocus() }
+                        Keys.onEnterPressed: { searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs(text); grid.forceActiveFocus() }
                         Keys.onDownPressed: grid.forceActiveFocus()
+                    }
+                    Label {
+                        visible: searchField.text !== "" && searchField.text.length < 4 && searchTyping.pending
+                        text: qsTr("Enter ↵")
+                        color: "#6b6f75"
+                        font.pixelSize: 12
                     }
                     ToolButton {
                         visible: searchField.text !== ""
@@ -103,7 +125,7 @@ Popup {
                         icon.source: app.iconUrl("xqt-close")
                         icon.color: "#3c4043"
                         display: AbstractButton.IconOnly
-                        onClicked: { searchField.text = ""; searchTyping.stop(); app.searchAllTabs("") }
+                        onClicked: { searchField.text = ""; searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs("") }
                     }
                 }
             }
@@ -141,7 +163,7 @@ Popup {
                 if (event.text.length === 1 && event.text.trim() !== "" && !(event.modifiers & Qt.ControlModifier)) {
                     searchField.forceActiveFocus()
                     searchField.text += event.text
-                    searchTyping.restart()
+                    overview.typed()
                     event.accepted = true
                 }
             }

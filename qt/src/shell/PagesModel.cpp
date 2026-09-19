@@ -125,8 +125,16 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             QVariantList rects;
             int currentOnPage = -1;
             const QSizeF size = sizes[row];
-            for (; it != hits.end() && it->page == row; ++it) {
-                if (static_cast<int>(it - hits.begin()) == search.currentHit()) {
+            // A thumbnail shows a limited number of marks, spread over the page (a one-letter search has hundreds per
+            // page: that many marks cost a lot of memory and time, and at this size they cover the page anyway).
+            const auto end = std::find_if(it, hits.end(), [row](const DocumentSearch::Hit& h) { return h.page != row; });
+            const auto step = std::max<std::ptrdiff_t>(1, ((end - it) + MAX_THUMBNAIL_HITS - 1) / MAX_THUMBNAIL_HITS);
+            for (auto first = it; it != end; ++it) {
+                const bool current = static_cast<int>(it - hits.begin()) == search.currentHit();
+                if ((it - first) % step != 0 && !current) {
+                    continue;
+                }
+                if (current) {
                     currentOnPage = static_cast<int>(rects.size());
                 }
                 rects.append(QRectF(it->rect.x() / size.width(), it->rect.y() / size.height(),

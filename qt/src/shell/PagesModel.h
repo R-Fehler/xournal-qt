@@ -36,7 +36,8 @@ public:
         AspectRole,
         ThumbnailRole,
         CurrentRole,
-        /// Search hits on the page: list of rectangles relative to the page size (0..1)
+        /// Search hits on the page: list of rectangles relative to the page size (0..1), at most
+        /// MAX_THUMBNAIL_HITS (and the current hit)
         SearchHitsRole,
         /// Index of the current search hit in SearchHitsRole, or -1
         CurrentSearchHitRole,
@@ -47,6 +48,8 @@ public:
         /// The page is selected (for page operations in the sidebar and the page grid)
         SelectedRole
     };
+
+    static constexpr int MAX_THUMBNAIL_HITS = 50;
 
     explicit PagesModel(QObject* parent = nullptr);
     ~PagesModel() override;

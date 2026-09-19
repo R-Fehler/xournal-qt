@@ -67,6 +67,8 @@
   - Several items can be selected (Ctrl/Shift+click, the circle on a card, "Select" in the menu, Ctrl+A) and opened, copied, moved or trashed together; dragging a selected card moves all of them.
   - Library search: text of all documents (PDF text and text elements) from a background index in `.xournal_library/index`, plus names; hits with count and a text snippet; opening one shows the document search at the first hit.
   - Fix on the way: a tool tip (any non-modal popup) no longer blocks pen and mouse input on the canvas.
+- **Search with short texts** (user report: a one-letter search in a large document could crash): texts shorter than 4 characters are searched on Enter or a tap on the search icon only (document, tab overview, library). A one-letter search in a 300-page PDF (207k hits) peaked at ~1 GB: the sidebar and page grid made one QML item per hit. Thumbnails now show at most 50 marks per page, spread over it (the count badge stays exact): ~260 MB.
+- **Tab strip with many tabs:** the tabs use the whole width before they scroll, and the + button stays at the right end (the list and the spacer used to share the room).
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

@@ -537,3 +537,45 @@ TEST_F(HomeScreenTest, newDocumentIsSavedInTheLibrary) {
     EXPECT_TRUE(fs::exists(root / "Week.xopp"));
     EXPECT_EQ(controller->title(), "Week.xopp");
 }
+
+TEST_F(MainWindowTest, tabStripUsesTheWholeWidthForManyTabs) {
+    auto* list = find<QQuickItem>("tabList");
+    auto* plus = find<QQuickItem>("newTabButton");
+    ASSERT_NE(list, nullptr);
+    ASSERT_NE(plus, nullptr);
+    const double few = list->width();
+    EXPECT_GT(few, 0);
+    for (int i = 0; i < 20; ++i) {
+        controller->newDocument();
+    }
+    wait(100);
+    EXPECT_GT(list->property("contentWidth").toDouble(), window->width()) << "more tabs than room";
+    EXPECT_GT(plus->mapToScene(QPointF(plus->width(), 0)).x(), window->width() - 60)
+            << "the + button follows the tabs to the right end";
+    EXPECT_GT(list->width(), window->width() * 0.75);
+}
+
+TEST_F(MainWindowTest, shortSearchTextsWaitForEnter) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    key(Qt::Key_F, Qt::ControlModifier);
+    type("p1");
+    wait(400);
+    EXPECT_EQ(controller->searchQuery(), "") << "fewer than 4 characters: not while typing";
+    key(Qt::Key_Return);
+    EXPECT_EQ(controller->searchQuery(), "p1");
+    EXPECT_GT(controller->searchHitCount() + (controller->searchRunning() ? 1 : 0), 0);
+    type("0 x");  // "p10 x": long enough
+    wait(400);
+    EXPECT_EQ(controller->searchQuery(), "p10 x");
+}
+
+TEST_F(HomeScreenTest, shortLibrarySearchWaitsForEnter) {
+    auto* field = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(field, nullptr);
+    field->forceActiveFocus();
+    type("le");
+    wait(400);
+    EXPECT_EQ(controller->libraryModel()->property("searchQuery").toString(), "");
+    key(Qt::Key_Return);
+    EXPECT_EQ(controller->libraryModel()->property("searchQuery").toString(), "le");
+}
