@@ -89,6 +89,12 @@ int main(int argc, char* argv[]) {
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
     // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).
     if (const auto shot = qEnvironmentVariable("XQT_SCREENSHOT"); !shot.isEmpty()) {
+        // XQT_SCREENSHOT_ACTION=<method> calls an AppController method without arguments (e.g. selectAllOnPage).
+        if (const auto action = qEnvironmentVariable("XQT_SCREENSHOT_ACTION"); !action.isEmpty()) {
+            QTimer::singleShot(400, &controller, [&controller, action] {
+                QMetaObject::invokeMethod(&controller, action.toLatin1().constData());
+            });
+        }
         // XQT_SCREENSHOT_SELECT=1,3,4 selects pages (sidebar, page grid).
         if (const auto sel = qEnvironmentVariable("XQT_SCREENSHOT_SELECT"); !sel.isEmpty()) {
             QTimer::singleShot(200, &controller, [&controller, sel] {

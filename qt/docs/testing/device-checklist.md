@@ -87,6 +87,13 @@ cd build-qt
 - [ ] "Recognize shapes": a hand-drawn rectangle, circle, triangle or line becomes straight after lifting the pen.
 - [ ] "Freehand" returns to normal writing.
 
+## Selection
+- [ ] Rectangle and lasso tools: drag around ink to select it (frame with handles); a tap on a stroke selects it; Shift adds.
+- [ ] Drag inside the selection to move it (also onto another page); handles resize; the red handle rotates; × deletes.
+- [ ] Copy / cut / paste (bar or Ctrl+C/X/V), also into another tab; Delete; Esc or a tap outside deselects; Ctrl+A selects the page.
+- [ ] Undo/redo of moves, resizes, deletes and pastes.
+- [ ] The side button set to "Lasso selection" in the settings selects while held.
+
 ## Page operations
 - [ ] Sidebar: Ctrl+click / Shift+click select pages (blue, check mark); a plain tap goes to the page.
 - [ ] Ctrl+C, then Ctrl+V: the pages are pasted after the selection; pasting into another tab works (PDF pages keep their look).

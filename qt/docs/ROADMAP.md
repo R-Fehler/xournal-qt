@@ -50,7 +50,16 @@
   - Page operations have their own undo stack (Ctrl+Z in the sidebar/grid, the grid's undo button, "Undo" in the note after an operation); Ctrl+Z on the canvas stays the annotation undo. The document is modified if either stack has changes.
   - Touchpad momentum in the page grid, sidebar and tab overview.
 - **M6a shapes: done (awaiting on-device test).** Shapes button: freehand, shape recognizer, line, rectangle, ellipse, arrow, double arrow, coordinate system — upstream's handlers (`RulerHandler`, `RectangleHandler`, ... and `ShapeRecognizer`) compiled unmodified; Shift/Ctrl modifiers as upstream. `ZoomControl` shadow for reused code.
-- **Next:** selection (lasso/rectangle, move/resize/rotate), text, image (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
+- **M6b selection: done (awaiting on-device test).** Rectangle and lasso select tools (also tap to select one element, Shift to add); move, resize, rotate, delete (× handle, Delete), copy / cut / paste (Ctrl+C/X/V, upstream's `application/xournal` clipboard data, also between tabs and windows), select all on the page (Ctrl+A); action bar. Upstream's `Selector`, `EditSelection`, `EditSelectionContents` and `SelectorView` compiled unmodified against new shadows (`gui/PageView.h`, `gui/Layout.h`, more of `XournalView`); the selection is drawn by the canvas item (texture from `EditSelection::paint`).
+- **Next:** text, image insert; then PDF links and text highlighting, PDF export (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
+
+## Backlog (decide later)
+- **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
+  1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
+  2. The PDF-native model (M9/M10 direction): work on the PDF itself, ink as PDF annotations; copying pages = copying PDF pages (with their text) between PDFs.
+  Not an option: several PDFs per .xopp (format change, incompatible with Xournal++).
+- **Selected elements in autosave / emergency save.** While a selection exists its elements are held by the selection (upstream's design), so an autosave or crash save taken at that moment does not contain them (same in upstream). Option: serialize the active selection into the saved copy.
+- **Touch-sized selection handles.** Upstream's handles are small for fingers; consider larger hit areas in touch mode.
 
 ---
 

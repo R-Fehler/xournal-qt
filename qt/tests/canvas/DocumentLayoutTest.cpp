@@ -96,12 +96,12 @@ TEST(DocumentLayout, viewFollowsTheColumnSettings) {
     session.insertNewPage(2);
     CanvasView view(session);
     view.getViewController().setViewSize(QSizeF(1200, 800));
-    EXPECT_EQ(view.getLayout().columns(), 1u);
+    EXPECT_EQ(view.documentLayout().columns(), 1u);
 
     app.getSettings()->setViewColumns(3);
     Q_EMIT app.settingsChanged();
-    EXPECT_EQ(view.getLayout().columns(), 3u);
+    EXPECT_EQ(view.documentLayout().columns(), 3u);
     const double z = view.getViewController().zoom();
-    EXPECT_EQ(view.getLayout().pageRect(0, z).top(), view.getLayout().pageRect(2, z).top()) << "one row";
-    EXPECT_LE(view.getLayout().contentSize(z).width(), 1200.0 + 1) << "fits the width";
+    EXPECT_EQ(view.documentLayout().pageRect(0, z).top(), view.documentLayout().pageRect(2, z).top()) << "one row";
+    EXPECT_LE(view.documentLayout().contentSize(z).width(), 1200.0 + 1) << "fits the width";
 }

@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include "control/ToolHandler.h"  // (upstream's Control.h includes it; reused code relies on it)
 #include <cstddef>  // for size_t
 
 #include <gtk/gtk.h>  // xournal-qt shim: GtkWindow (always nullptr in the Qt build)

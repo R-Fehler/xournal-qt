@@ -199,6 +199,10 @@ set(XOJ_TOOLS_SOURCES
     ${XOJ_SRC}/core/view/overlays/BaseShapeOrSplineToolView.cpp
     ${XOJ_SRC}/core/view/overlays/ShapeToolView.cpp
     ${XOJ_SRC}/core/view/overlays/SplineToolView.cpp
+    ${XOJ_SRC}/core/control/tools/Selector.cpp
+    ${XOJ_SRC}/core/control/tools/EditSelection.cpp
+    ${XOJ_SRC}/core/control/tools/EditSelectionContents.cpp
+    ${XOJ_SRC}/core/view/overlays/SelectorView.cpp
     ${XOJ_SRC}/core/view/overlays/BaseStrokeToolView.cpp
     ${XOJ_SRC}/core/view/overlays/StrokeToolView.cpp
     ${XOJ_SRC}/core/view/overlays/StrokeToolFilledView.cpp

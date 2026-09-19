@@ -605,6 +605,7 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
 }
 
 auto DocumentSession::save() -> SaveResult {
+    clearSelectionEndText();  // like upstream's Control::saveImpl: the selected elements go back first
     if (!hasFilePath()) {
         return {false, _("The document has no file name yet (use \"Save as\").")};
     }
@@ -612,6 +613,7 @@ auto DocumentSession::save() -> SaveResult {
 }
 
 auto DocumentSession::saveAs(fs::path target) -> SaveResult {
+    clearSelectionEndText();
     // Like Control::saveImpl(saveAs=true): the document takes the new path before saving (the location of an
     // attached background PDF is derived from it).
     doc->lock();

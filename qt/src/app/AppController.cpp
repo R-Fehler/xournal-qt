@@ -9,6 +9,7 @@
 
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
+#include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
 #include "gui/toolbarMenubar/model/ColorPalette.h"
 #include "model/Document.h"
@@ -121,6 +122,7 @@ void AppController::currentTabChanged() {
     pages->setSession(session());
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
+        currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
     }
@@ -132,6 +134,31 @@ void AppController::currentTabChanged() {
     Q_EMIT pageChanged();
     Q_EMIT searchChanged();
     Q_EMIT pageUndoChanged();
+    Q_EMIT selectionChanged();
+}
+
+bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
+bool AppController::copySelection() { return canvas() && canvas()->copySelection(); }
+bool AppController::cutSelection() { return canvas() && canvas()->cutSelection(); }
+bool AppController::pasteElements() { return canvas() && canvas()->pasteElements(); }
+void AppController::deleteSelection() {
+    if (canvas()) {
+        canvas()->deleteSelection();
+    }
+}
+void AppController::selectAllOnPage() {
+    if (canvas()) {
+        if (app->getToolHandler()->getToolType() != TOOL_SELECT_RECT &&
+            app->getToolHandler()->getToolType() != TOOL_SELECT_REGION) {
+            selectTool("selectRegion");  // so that the selection can be moved right away
+        }
+        canvas()->selectAllOnPage();
+    }
+}
+void AppController::clearSelection() {
+    if (canvas()) {
+        canvas()->clearSelection();
+    }
 }
 
 QString AppController::searchQuery() const { return session() ? session()->search().query() : QString(); }

@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <cairo.h>
+
 #include <QCoreApplication>
 #include <QMatrix4x4>
 #include <QQmlEngine>
@@ -18,6 +20,7 @@
 #include <QTouchEvent>
 #include <QWheelEvent>
 
+#include "control/tools/EditSelection.h"
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
@@ -72,10 +75,17 @@ public:
     CanvasRootNode() {
         pagesRoot = new QSGTransformNode;
         appendChildNode(pagesRoot);
+        selectionRoot = new QSGTransformNode;
+        appendChildNode(selectionRoot);
         hover = new QSGSimpleRectNode(QRectF(), QColor(0x1d, 0x2b, 0x8f));
         appendChildNode(hover);
     }
     QSGTransformNode* pagesRoot;
+    QSGTransformNode* selectionRoot;  ///< the selection (EditSelection::paint), above the pages
+    TileNode* selection = nullptr;
+    quint64 selectionRevision = ~quint64(0);
+    double selectionZoom = 0;
+    QRectF selectionRegion;  ///< in the selection page's view pixels
     QSGSimpleRectNode* hover;
     std::unordered_map<const xqt::CanvasPage*, PageNode*> pages;
 };
@@ -139,11 +149,11 @@ void DocumentCanvasItem::setView(QObject* object) {
 }
 
 qreal DocumentCanvasItem::contentWidth() const {
-    return canvasView ? canvasView->getLayout().contentSize(canvasView->getViewController().zoom()).width() : 0;
+    return canvasView ? canvasView->documentLayout().contentSize(canvasView->getViewController().zoom()).width() : 0;
 }
 
 qreal DocumentCanvasItem::contentHeight() const {
-    return canvasView ? canvasView->getLayout().contentSize(canvasView->getViewController().zoom()).height() : 0;
+    return canvasView ? canvasView->documentLayout().contentSize(canvasView->getViewController().zoom()).height() : 0;
 }
 
 qreal DocumentCanvasItem::contentX() const {
@@ -324,6 +334,57 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
 
 void DocumentCanvasItem::releaseResources() { viewReplaced = true; }
 
+void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, double dpr) {
+    auto* root = static_cast<CanvasRootNode*>(rootNode);
+    EditSelection* sel = canvasView->getSelection();
+    auto idx = sel ? canvasView->indexOf(static_cast<xqt::CanvasPage*>(sel->getView())) : std::nullopt;
+    if (!sel || !idx) {
+        if (root->selection) {
+            root->selectionRoot->removeChildNode(root->selection);
+            delete root->selection;
+            root->selection = nullptr;
+        }
+        root->selectionRevision = ~quint64(0);
+        return;
+    }
+    const QPointF pageOrigin = canvasView->pageViewRect(*idx).topLeft();
+    if (!root->selection || root->selectionRevision != canvasView->selectionRevision() || root->selectionZoom != zoom) {
+        // Upstream's XournalWidget draws the selection in its page's pixel coordinates: selection->paint(cr, zoom).
+        // Render the part around it (handles, rotation) into a texture.
+        const double cx = (sel->getXOnView() + sel->getWidth() / 2) * zoom;
+        const double cy = (sel->getYOnView() + sel->getHeight() / 2) * zoom;
+        const double r = std::hypot(sel->getWidth(), sel->getHeight()) / 2 * zoom + 60;
+        const QRectF region(std::floor(cx - r), std::floor(cy - r), std::ceil(2 * r), std::ceil(2 * r));
+        QImage img(QSize(std::max(1, static_cast<int>(region.width() * dpr)),
+                         std::max(1, static_cast<int>(region.height() * dpr))),
+                   QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        cairo_surface_t* surface = cairo_image_surface_create_for_data(
+                img.bits(), CAIRO_FORMAT_ARGB32, img.width(), img.height(), static_cast<int>(img.bytesPerLine()));
+        cairo_t* cr = cairo_create(surface);
+        cairo_scale(cr, dpr, dpr);
+        cairo_translate(cr, -region.x(), -region.y());
+        sel->paint(cr, zoom);
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+        const bool fresh = !root->selection;
+        if (fresh) {
+            root->selection = new TileNode;
+            root->selection->setFiltering(QSGTexture::Linear);
+        }
+        QSGTexture* previous = root->selection->texture();
+        root->selection->setTexture(window()->createTextureFromImage(img));
+        delete previous;
+        if (fresh) {  // (only with a texture: the software renderer crashes on texture nodes without one)
+            root->selectionRoot->appendChildNode(root->selection);
+        }
+        root->selectionRevision = canvasView->selectionRevision();
+        root->selectionZoom = zoom;
+        root->selectionRegion = region;
+    }
+    root->selection->setRect(root->selectionRegion.translated(pageOrigin));
+}
+
 void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale) {
     auto* node = static_cast<PageNode*>(pageNode);
     const xqt::DocumentSearch& search = canvasView->getSession().search();
@@ -466,6 +527,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         delete node;
     }
     root->pages = std::move(keep);
+    updateSelectionNode(root, zoom, dpr);
 
     if (auto h = input ? input->hoverPosition() : std::nullopt) {
         root->hover->setRect(QRectF(h->x() - 3, h->y() - 3, 6, 6));

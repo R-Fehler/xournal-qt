@@ -9,7 +9,13 @@
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
 #include "control/settings/Settings.h"
+#include "control/layer/LayerController.h"
+#include "control/tools/EditSelection.h"
 #include "control/tools/EraseHandler.h"
+#include "control/tools/Selector.h"
+#include "util/safe_casts.h"
+#include "model/Layer.h"
+#include "view/overlays/SelectorView.h"
 #include "control/tools/InputHandler.h"
 #include "control/tools/ArrowHandler.h"
 #include "control/tools/CoordinateSystemHandler.h"
@@ -128,9 +134,100 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     } else if (h->getToolType() == TOOL_ERASER) {
         this->eraser->erase(x, y);
         this->inEraser = true;
+    } else if (h->getToolType() == TOOL_SELECT_RECT || h->getToolType() == TOOL_SELECT_REGION ||
+               h->getToolType() == TOOL_SELECT_MULTILAYER_RECT || h->getToolType() == TOOL_SELECT_MULTILAYER_REGION) {
+        if (!selector) {
+            const bool multiLayer =
+                    h->getToolType() == TOOL_SELECT_MULTILAYER_RECT || h->getToolType() == TOOL_SELECT_MULTILAYER_REGION;
+            if (h->getToolType() == TOOL_SELECT_RECT || h->getToolType() == TOOL_SELECT_MULTILAYER_RECT) {
+                this->selector = std::make_unique<RectangularSelector>(x, y, multiLayer);
+            } else {
+                this->selector = std::make_unique<LassoSelector>(x, y, multiLayer);
+            }
+            this->overlayViews.emplace_back(
+                    std::make_unique<xoj::view::SelectorView>(this->selector.get(), this,
+                                                              control.getSettings()->getSelectionColor()));
+        }
+    } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
+        const bool aggregate = pos.isShiftDown() && view.getSelection();
+        selectObjectAt(x, y, false, aggregate);
     }
     return true;
 }
+
+bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggregate) {
+    // Port of SelectObject::at / atAggregate (gui/PageViewFindObjectHelper.h)
+    DocumentSession& ctrl = view.getSession();
+    EditSelection* previous = aggregate ? view.getSelection() : nullptr;
+    if (!aggregate) {
+        view.clearSelection();
+    }
+    const Element* match = nullptr;
+    Element::Index matchIndex = 0;
+    auto checkLayer = [&](const Layer* l) {
+        constexpr double ACTION_RADIUS = 5.;
+        double minDistance = ACTION_RADIUS;
+        Element::Index pos = as_signed(l->getElementsView().size());
+        for (auto it = l->getElementsView().rbegin(); it < l->getElementsView().rend(); ++it) {
+            pos--;
+            if ((*it)->intersectsArea(x - minDistance, y - minDistance, 2. * minDistance, 2. * minDistance)) {
+                const double d = (*it)->distanceTo(x, y);
+                if (d == 0.0) {
+                    match = *it;
+                    matchIndex = pos;
+                    return true;
+                }
+                if (d < minDistance) {
+                    match = *it;
+                    matchIndex = pos;
+                    minDistance = d;
+                }
+            }
+        }
+        return minDistance != ACTION_RADIUS;
+    };
+    {
+        std::shared_lock lock(*ctrl.getDocument());
+        if (multiLayer && !aggregate) {
+            const auto& layers = page->getLayers();
+            size_t layerNo = layers.size();
+            for (auto l = layers.rbegin(); l != layers.rend(); l++, layerNo--) {
+                if (checkLayer(*l)) {
+                    lock.unlock();
+                    ctrl.getLayerController()->switchToLay(as_unsigned(std::distance(l, layers.rend())));
+                    break;
+                }
+            }
+        } else {
+            checkLayer(page->getSelectedLayer());
+        }
+    }
+    if (!match) {
+        return false;
+    }
+    if (aggregate && previous) {
+        auto sel = SelectionFactory::addElementFromActiveLayer(&ctrl, previous, match, matchIndex);
+        view.setSelection(sel.release());
+    } else {
+        auto sel = SelectionFactory::createFromElementOnActiveLayer(&ctrl, page, this, match, matchIndex);
+        view.setSelection(sel.release());
+    }
+    repaintPage();
+    return true;
+}
+
+XournalView* CanvasPage::getXournal() const { return &view; }
+
+xoj::util::Point<int> CanvasPage::getPixelPosition() const {
+    // Content pixels (upstream: the page's position in the layout, independent of scrolling).
+    if (auto idx = view.indexOf(this)) {
+        const QRectF r = view.documentLayout().pageRect(*idx, view.getViewController().zoom());
+        return {static_cast<int>(std::lround(r.x())), static_cast<int>(std::lround(r.y()))};
+    }
+    return {0, 0};
+}
+
+ZoomControl* CanvasPage::getZoomControl() const { return view.getZoomControl(); }
 
 bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
     if (currentSequenceDeviceId && currentSequenceDeviceId != pos.deviceId) {
@@ -144,6 +241,8 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
 
     if (this->inputHandler && this->inputHandler->onMotionNotifyEvent(pos, zoom)) {
         // input handler used this event
+    } else if (this->selector) {
+        this->selector->currentPos(x, y);
     } else if (h->getToolType() == TOOL_ERASER && h->getEraserType() != ERASER_TYPE_WHITEOUT && this->inEraser) {
         this->eraser->erase(x, y);
     }
@@ -169,6 +268,27 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         this->eraser->finalize();
         doc->unlock();
     }
+    if (this->selector) {
+        // Port of XojPageView::onButtonReleaseEvent (selector part)
+        const bool aggregate = pos.isShiftDown() && view.getSelection();
+        const size_t layerOfFinalizedSel = this->selector->finalize(this->page, aggregate, control.getDocument());
+        if (layerOfFinalizedSel) {
+            if (aggregate) {
+                auto sel = selector->releaseElements();
+                view.setSelection(
+                        SelectionFactory::addElementsFromActiveLayer(&control, view.getSelection(), sel).release());
+            } else {
+                // with a multi-layer selector the objects might be on another layer
+                control.getLayerController()->switchToLay(layerOfFinalizedSel);
+                view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, page, this,
+                                                                                    selector->releaseElements())
+                                          .release());
+            }
+        } else if (const double zoom = getZoom(); selector->userTapped(zoom)) {
+            selectObjectAt(pos.x / zoom, pos.y / zoom, this->selector->isMultiLayerSelection(), aggregate);
+        }
+        this->selector.reset();
+    }
     return false;
 }
 
@@ -189,6 +309,7 @@ void CanvasPage::onSequenceCancelEvent(DeviceId deviceId) {
         this->eraser->finalize();
         doc->unlock();
     }
+    this->selector.reset();  // (its view goes with it)
 }
 
 // --- display -----------------------------------------------------------------------------------------------------
@@ -271,7 +392,7 @@ void CanvasPage::rasterUpdated(std::optional<Rectangle<double>> area) {
 
 Range CanvasPage::getVisiblePart() const {
     const QRectF pageView = viewRect();
-    const QRectF visible = QRectF(QPointF(0, 0), view.getLayout().pageCount() ? view.getViewController().viewSize()
+    const QRectF visible = QRectF(QPointF(0, 0), view.documentLayout().pageCount() ? view.getViewController().viewSize()
                                                                                : QSizeF())
                                    .intersected(pageView);
     if (visible.isEmpty()) {

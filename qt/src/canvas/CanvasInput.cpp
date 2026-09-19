@@ -13,6 +13,8 @@
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
 #include "control/settings/Settings.h"
+#include "control/tools/CursorSelectionType.h"
+#include "control/tools/EditSelection.h"
 #include "gui/inputdevices/InputUtils.h"
 #include "model/Point.h"
 #include "undo/UndoRedoHandler.h"
@@ -309,7 +311,35 @@ bool CanvasInput::actionStart(const Event& event) {
 
     this->sequenceStartPage = currentPage;
     if (toolType == TOOL_HAND) {
-        return true;
+        return true;  // the hand tool does not change the selection (scrolling keeps it)
+    }
+
+    // Port of PenInputHandler::actionStart (selection part): a press on the selection moves, resizes or rotates it
+    // (or deletes it: the × button); a press elsewhere ends it.
+    if (EditSelection* selection = view.getSelection()) {
+        bool changeSelection = true;
+        if ((event.state & GDK_SHIFT_MASK) && isSelectToolTypeSingleLayer(toolType)) {
+            changeSelection = false;  // Shift with a select tool adds to the selection
+        }
+        if (changeSelection) {
+            CanvasPage* selectionPage = static_cast<CanvasPage*>(selection->getView());
+            PositionInputData selectionPos = this->getInputDataRelativeToCurrentPage(selectionPage, event);
+            const CursorSelectionType selType =
+                    selection->getSelectionTypeForPos(selectionPos.x, selectionPos.y, view.getZoom());
+            if (selType) {
+                if (selType == CURSOR_SELECTION_MOVE && modifier3) {
+                    selection->copySelection();
+                }
+                selection->mouseDown(selType, selectionPos.x, selectionPos.y);
+                return true;
+            }
+            view.clearSelection();
+            changeTool(event);
+            // Stop here: a tap outside the selection only deselects, it does not also draw.
+            if (toolHandler->isDrawingTool()) {
+                return true;
+            }
+        }
     }
 
     if (currentPage) {
@@ -337,6 +367,25 @@ bool CanvasInput::actionMotion(const Event& event) {
         }
         this->updateLastEvent(event);
         return true;
+    }
+
+    // Port of PenInputHandler::actionMotion (selection part)
+    if (EditSelection* selection = view.getSelection()) {
+        const bool isShiftDown = event.state & GDK_SHIFT_MASK;
+        bool handleSelectionMove = true;
+        if (isSelectToolTypeSingleLayer(toolHandler->getToolType()) && !selection->isMoving() &&
+            (isShiftDown || this->deviceClassPressed)) {
+            handleSelectionMove = false;  // drawing another rectangle/lasso (to add with Shift)
+        }
+        if (handleSelectionMove) {
+            CanvasPage* selectionPage = static_cast<CanvasPage*>(selection->getView());
+            PositionInputData pos = this->getInputDataRelativeToCurrentPage(selectionPage, event);
+            if (selection->isMoving()) {
+                selection->mouseMove(pos.x, pos.y, pos.isAltDown());
+            }
+            this->updateLastEvent(event);
+            return true;
+        }
     }
 
     // Check if page was left / entered
@@ -392,6 +441,9 @@ bool CanvasInput::actionMotion(const Event& event) {
 
 bool CanvasInput::actionEnd(const Event& event) {
     ToolHandler* toolHandler = view.getSession().getToolHandler();
+    if (EditSelection* selection = view.getSelection()) {
+        selection->mouseUp();
+    }
 
     if (this->sequenceStartPage && toolHandler->isSinglePageTool()) {
         PositionInputData pos = getInputDataRelativeToCurrentPage(this->sequenceStartPage, event);

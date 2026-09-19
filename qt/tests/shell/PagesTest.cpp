@@ -64,10 +64,10 @@ void expectLayoutMatchesDocument(AppController& c) {
     CanvasView* view = c.tabManager().view(c.currentTab());
     Document* doc = s->getDocument();
     ASSERT_EQ(view->pageCount(), doc->getPageCount());
-    ASSERT_EQ(view->getLayout().pageCount(), doc->getPageCount());
+    ASSERT_EQ(view->documentLayout().pageCount(), doc->getPageCount());
     for (size_t i = 0; i < doc->getPageCount(); ++i) {
         EXPECT_EQ(view->getPage(i)->getPage(), doc->getPage(i)) << "page " << i;
-        const QRectF r = view->getLayout().pageRect(i, 1.0);
+        const QRectF r = view->documentLayout().pageRect(i, 1.0);
         EXPECT_DOUBLE_EQ(r.width(), doc->getPage(i)->getWidth()) << "page " << i;
         EXPECT_DOUBLE_EQ(r.height(), doc->getPage(i)->getHeight()) << "page " << i;
     }

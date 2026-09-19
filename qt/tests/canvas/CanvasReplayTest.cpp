@@ -20,6 +20,7 @@
 
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
+#include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/Layer.h"
@@ -373,4 +374,84 @@ TEST_F(CanvasReplayTest, shapeRecognizerStraightensARectangle) {
     const auto* s = dynamic_cast<const Stroke*>(layer->getElementsView().front());
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->getPointCount(), 5u) << "recognized as a rectangle";
+}
+
+// Selection: upstream's selectors and EditSelection behind the Qt canvas.
+TEST_F(CanvasReplayTest, rectangleSelectionMovesElementsWithUndo) {
+    view->getViewController().setViewSize(QSizeF(1000, 1200));
+    processEvents();
+    drawLine(0, QPointF(100, 100), QPointF(200, 150));
+    processEvents();
+    ASSERT_EQ(elementCount(0), 1u);
+    auto* tools = app->getToolHandler();
+
+    tools->selectTool(TOOL_SELECT_RECT);
+    drawLine(0, QPointF(80, 80), QPointF(250, 200));  // the rubber band
+    processEvents();
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_EQ(view->getSelection()->getElementsView().size(), 1u);
+    EXPECT_EQ(elementCount(0), 0u) << "selected elements are held by the selection";
+
+    drawLine(0, QPointF(150, 125), QPointF(250, 225));  // drag the selection
+    processEvents();
+    view->clearSelection();
+    ASSERT_EQ(elementCount(0), 1u);
+    const auto* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+    auto box = layer->getElementsView().front()->getBoundingBox();
+    EXPECT_NEAR(box.x, 200, 5) << "moved by the drag";
+    EXPECT_NEAR(box.y, 200, 5);
+
+    session->getUndoRedoHandler()->undo();  // the move
+    box = layer->getElementsView().front()->getBoundingBox();
+    EXPECT_NEAR(box.x, 100, 5);
+}
+
+TEST_F(CanvasReplayTest, lassoTapDeleteCopyPaste) {
+    view->getViewController().setViewSize(QSizeF(1000, 1200));
+    processEvents();
+    drawLine(0, QPointF(100, 100), QPointF(200, 150));
+    drawLine(0, QPointF(400, 400), QPointF(450, 480));
+    processEvents();
+    auto* tools = app->getToolHandler();
+
+    // Lasso around the first stroke only.
+    tools->selectTool(TOOL_SELECT_REGION);
+    const std::vector<QPointF> loop{{80, 80}, {260, 80}, {260, 180}, {80, 180}, {80, 82}};
+    tablet(QEvent::TabletPress, viewPos(0, loop[0]), 0.5, Qt::LeftButton, Qt::LeftButton);
+    for (size_t k = 1; k < loop.size(); ++k) {
+        for (int i = 1; i <= 10; ++i) {
+            tablet(QEvent::TabletMove, viewPos(0, loop[k - 1] + (loop[k] - loop[k - 1]) * (i / 10.0)), 0.5,
+                   Qt::NoButton, Qt::LeftButton);
+        }
+    }
+    tablet(QEvent::TabletRelease, viewPos(0, loop.back()), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_EQ(view->getSelection()->getElementsView().size(), 1u);
+    EXPECT_EQ(elementCount(0), 1u);
+
+    // Copy, paste: a second copy (as a new selection).
+    EXPECT_TRUE(view->copySelection());
+    EXPECT_TRUE(view->pasteElements());
+    view->clearSelection();
+    EXPECT_EQ(elementCount(0), 3u);
+
+    // Tap on the second stroke selects it; delete (undoable).
+    tools->selectTool(TOOL_SELECT_RECT);
+    tablet(QEvent::TabletPress, viewPos(0, QPointF(425, 440)), 0.5, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, viewPos(0, QPointF(425, 440)), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_EQ(view->getSelection()->getElementsView().size(), 1u);
+    view->deleteSelection();
+    EXPECT_EQ(elementCount(0), 2u);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(elementCount(0), 3u);
+
+    // Select all on the page.
+    view->selectAllOnPage();
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_EQ(view->getSelection()->getElementsView().size(), 3u);
+    view->clearSelection();
+    EXPECT_EQ(elementCount(0), 3u);
 }

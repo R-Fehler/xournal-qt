@@ -20,6 +20,7 @@
 #include <QRectF>
 
 #include "gui/LegacyRedrawable.h"
+#include "gui/PageView.h"
 #include "gui/inputdevices/DeviceId.h"
 #include "model/PageListener.h"
 #include "model/PageRef.h"
@@ -28,6 +29,7 @@
 #include "view/Repaintable.h"
 
 class EraseHandler;
+class Selector;
 class InputHandler;
 class PositionInputData;
 
@@ -40,12 +42,16 @@ namespace xqt {
 
 class CanvasView;
 
-class CanvasPage final: public xoj::view::Repaintable, public LegacyRedrawable, public PageListener {
+class CanvasPage final: public XojPageView {
 public:
     CanvasPage(CanvasView& view, PageRef page);
     ~CanvasPage() override;
 
-    const PageRef& getPage() const { return page; }
+    // --- XojPageView (shadow; for the selection) --------------------------------------------------------------
+    const PageRef getPage() const override { return page; }
+    XournalView* getXournal() const override;
+    xoj::util::Point<int> getPixelPosition() const override;
+
     PageRaster& getRaster() const { return *raster; }
     /// Page rectangle in view coordinates at the current zoom.
     QRectF viewRect() const;
@@ -76,7 +82,7 @@ public:
     // --- xoj::view::Repaintable -------------------------------------------------------------------------------
     Range getVisiblePart() const override;
     double getZoom() const override;
-    ZoomControl* getZoomControl() const override { return nullptr; }
+    ZoomControl* getZoomControl() const override;
     double getWidth() const override;
     double getHeight() const override;
     xoj::util::Point<double> toWidgetCoordinates(const xoj::util::Point<double>& p) const override;
@@ -109,6 +115,9 @@ private:
     std::unique_ptr<InputHandler> inputHandler;
     std::unique_ptr<EraseHandler> eraser;
     bool inEraser = false;
+    std::unique_ptr<Selector> selector;  ///< rectangle / lasso being drawn (select tools)
+    /// Select the element under a tap (port of upstream's SelectObject). `aggregate`: add to the selection.
+    bool selectObjectAt(double x, double y, bool multiLayer, bool aggregate);
     DeviceId currentSequenceDeviceId;
 
     mutable std::vector<Range> dirtyRanges;  ///< page coordinates

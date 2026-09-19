@@ -22,6 +22,7 @@
 #include <QRectF>
 #include <QTimer>
 
+#include "gui/Layout.h"
 #include "gui/XournalView.h"
 #include "model/DocumentListener.h"
 #include "render/PageRaster.h"
@@ -31,6 +32,7 @@
 #include "DocumentLayout.h"
 #include "ViewController.h"
 
+class EditSelection;
 class PdfCache;
 
 namespace xqt {
@@ -39,7 +41,7 @@ class CanvasPage;
 class DocumentSession;
 class RenderService;
 
-class CanvasView final: public QObject, public XournalView, public RasterHost, public DocumentListener {
+class CanvasView final: public QObject, public XournalView, public Layout, public RasterHost, public DocumentListener {
     Q_OBJECT
 public:
     explicit CanvasView(DocumentSession& session, QObject* parent = nullptr);
@@ -48,7 +50,7 @@ public:
     DocumentSession& getSession() const { return session; }
     RenderService& getRenderService() const { return renderService; }
     ViewController& getViewController() { return viewController; }
-    const DocumentLayout& getLayout() const { return layout; }
+    const DocumentLayout& documentLayout() const { return layout; }
 
     size_t pageCount() const { return pages.size(); }
     CanvasPage* getPage(size_t index) const { return pages[index].get(); }
@@ -81,11 +83,45 @@ public:
     void pageDeleted(size_t page) override;
     void pageSelected(size_t page) override;
 
+    // XournalView: the selection (port of upstream XournalView's selection handling). The view owns it; while it
+    // exists, the selected elements are out of their layer (upstream's EditSelection).
+    EditSelection* getSelection() const override { return selection.get(); }
+    void setSelection(EditSelection* selection) override;
+    void clearSelection() override;
+    void deleteSelection(EditSelection* sel = nullptr) override;
+    void repaintSelection(bool evenWithoutSelection = false) override;
+    double getZoom() const override;
+    XournalppCursor* getCursor() const override;
+    Control* getControl() const override;
+    Layout* getLayout() const override { return const_cast<CanvasView*>(this); }
+    void ensureRectIsVisible(int x, int y, int width, int height) override;
+    /// Revision of the selection's look (changes, moves): the canvas item redraws it.
+    quint64 selectionRevision() const { return selectionRev; }
+    ZoomControl* getZoomControl() { return &zoomControl; }
+
+    // --- selection actions (ports of upstream Control / ClipboardHandler) ---
+    /// Put the selection on the clipboard (upstream's "application/xournal" data, and the text of text elements).
+    bool copySelection();
+    bool cutSelection();
+    /// Paste elements from the clipboard as a new selection in the middle of the visible part of the current page.
+    bool pasteElements();
+    /// Select everything on the active layer of the current page (Control::selectAllOnPage).
+    void selectAllOnPage();
+
+    // Layout (upstream gui/Layout, content pixels)
+    XojPageView* getPageViewAt(int x, int y) const override;
+    int getTotalPixelWidth() const override;
+    int getTotalPixelHeight() const override;
+    xoj::util::Rectangle<double> getVisibleRect() override;
+    void scrollRelative(double x, double y) override;
+
 Q_SIGNALS:
     /// Something visible changed: the canvas item should repaint.
     void updateRequested();
     /// The set or geometry of pages changed.
     void pagesChanged();
+    /// A selection was made or cleared.
+    void selectionChanged(bool hasSelection);
 
 private:
     void rebuildPages();
@@ -106,6 +142,8 @@ private:
     std::atomic<double> renderZoom{1.0};
     std::atomic<double> renderDpr{1.0};
     QTimer releaseTimer;
+    std::unique_ptr<EditSelection> selection;
+    quint64 selectionRev = 0;
 };
 
 }  // namespace xqt

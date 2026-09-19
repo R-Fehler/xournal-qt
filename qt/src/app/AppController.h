@@ -73,6 +73,8 @@ class AppController: public QObject {
     Q_PROPERTY(int viewColumns READ viewColumns WRITE setViewColumns NOTIFY viewLayoutChanged)
     Q_PROPERTY(bool pairedPages READ pairedPages WRITE setPairedPages NOTIFY viewLayoutChanged)
     Q_PROPERTY(int pairsOffset READ pairsOffset WRITE setPairsOffset NOTIFY viewLayoutChanged)
+    /// Elements are selected on the canvas (select tools).
+    Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     // Page operations (sidebar, page grid) have their own undo stack
     Q_PROPERTY(bool canUndoPages READ canUndoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(bool canRedoPages READ canRedoPages NOTIFY pageUndoChanged)
@@ -111,6 +113,7 @@ public:
     int searchCurrent() const;
     bool searchRunning() const;
     int searchHitPageCount() const;
+    bool hasSelection() const;
     bool canUndoPages() const;
     bool canRedoPages() const;
     int copiedPages() const;
@@ -141,6 +144,15 @@ public:
     Q_INVOKABLE void duplicatePages(const QList<int>& pages);
     Q_INVOKABLE void undoPages();
     Q_INVOKABLE void redoPages();
+
+    // --- selected elements on the canvas ---
+    Q_INVOKABLE bool copySelection();
+    Q_INVOKABLE bool cutSelection();
+    /// Paste elements (copied in this or another tab, or another Xournal Qt window) as a selection.
+    Q_INVOKABLE bool pasteElements();
+    Q_INVOKABLE void deleteSelection();
+    Q_INVOKABLE void selectAllOnPage();
+    Q_INVOKABLE void clearSelection();
 
     // --- search ---
     Q_INVOKABLE void searchNext();
@@ -226,6 +238,7 @@ Q_SIGNALS:
     void searchChanged();
     void viewLayoutChanged();
     void pageUndoChanged();
+    void selectionChanged();
     void copiedPagesChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);

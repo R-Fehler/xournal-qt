@@ -15,6 +15,8 @@ The Qt build compiles upstream Xournal++ sources from `src/` unchanged wherever 
 | `qt/compat/include/control/Control.h` | **Shadow of the GTK application object.** An abstract *per-document session* interface with the subset of upstream `Control` methods that reused code calls (same names and signatures). It derives from `DocumentHandler`, so the `fire*` events are upstream's. The Qt app implements it once per tab. |
 | `qt/compat/include/gui/MainWindow.h`, `gui/XournalView.h`, `gui/XournalppCursor.h`, `control/ScrollHandler.h` | Abstract shadows of the GTK glue classes that reused code reaches through `Control` (for example `control->getWindow()->getXournal()->recreatePdfCache()`). |
 | `qt/compat/DeviceId.cpp` | GDK-free implementation of upstream `gui/inputdevices/DeviceId.h` (device identity = address of the `QPointingDevice`). |
+| `qt/compat/include/gui/PageView.h` | `XojPageView` as seen by the selection code (page, pixel position, selection color, re-render); implemented by `CanvasPage`. |
+| `qt/compat/include/gui/Layout.h` | Page at a point, total size, visible rectangle, relative scroll (moving a selection across pages, edge scrolling); implemented by `CanvasView`. |
 | `qt/compat/include/control/zoom/ZoomControl.h` | Zoom values and zoom listeners for reused tools (spline, selection), fed by the canvas' `ViewController`. |
 | `qt/compat/gtkshim/gdk/gdkkeysyms.h` | GDK key symbol values used by reused tools. |
 | `qt/compat/include/control/actions/ActionDatabase.h` | Abstract action sink with upstream's API (`enableAction`, `setActionState<T>`, `fireChangeActionState<T>`, `fireActivateAction`). States are a small `std::variant` instead of `GVariant`. |

@@ -127,6 +127,8 @@ ApplicationWindow {
             IconButton { iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
             IconButton { iconName: "xopp-tool-eraser"; tip: qsTr("Eraser"); checked: app.tool === "eraser"; onClicked: app.selectTool("eraser") }
             IconButton { iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
+            IconButton { objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
+            IconButton { objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
             IconButton {
                 objectName: "shapeButton"
                 readonly property var icons: ({
@@ -321,6 +323,35 @@ ApplicationWindow {
         id: pageGrid
         objectName: "pageGrid"
         anchors.fill: canvas
+    }
+
+    // Actions on the selected elements (select tools).
+    Pane {
+        id: selectionBar
+        objectName: "selectionBar"
+        visible: app.hasSelection && !pageGrid.visible
+        anchors.bottom: canvas.bottom
+        anchors.bottomMargin: 24
+        anchors.horizontalCenter: canvas.horizontalCenter
+        padding: 2
+        leftPadding: 8
+        rightPadding: 8
+        Material.foreground: "#303030"
+        background: Rectangle {
+            radius: height / 2
+            color: "#f7fafafa"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        RowLayout {
+            spacing: 0
+            IconButton { iconName: "xopp-edit-copy"; tip: qsTr("Copy (Ctrl+C)"); onClicked: app.copySelection() }
+            IconButton { iconName: "xopp-edit-cut"; tip: qsTr("Cut (Ctrl+X)"); onClicked: app.cutSelection() }
+            IconButton { iconName: "xopp-edit-paste"; tip: qsTr("Paste (Ctrl+V)"); onClicked: app.pasteElements() }
+            IconButton { iconName: "xqt-delete"; tip: qsTr("Delete (Del)"); onClicked: app.deleteSelection() }
+            ToolSeparator {}
+            IconButton { iconName: "xqt-close"; tip: qsTr("Deselect (Esc)"); onClicked: app.clearSelection() }
+        }
     }
 
     SearchBar {
@@ -536,6 +567,13 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+,"; onActivated: settingsPage.open() }
     Shortcut { sequence: "Ctrl+Alt+G"; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: [StandardKey.Find]; onActivated: searchBar.openBar() }
+    // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
+    Shortcut { sequences: [StandardKey.Copy]; onActivated: app.copySelection() }
+    Shortcut { sequences: [StandardKey.Cut]; onActivated: app.cutSelection() }
+    Shortcut { sequences: [StandardKey.Paste]; onActivated: app.pasteElements() }
+    Shortcut { sequences: [StandardKey.Delete, "Backspace"]; enabled: app.hasSelection; onActivated: app.deleteSelection() }
+    Shortcut { sequences: [StandardKey.SelectAll]; onActivated: app.selectAllOnPage() }
+    Shortcut { sequence: "Escape"; enabled: app.hasSelection; onActivated: app.clearSelection() }
     Shortcut { sequences: [StandardKey.FindNext]; onActivated: app.searchNext() }
     Shortcut { sequences: [StandardKey.FindPrevious]; onActivated: app.searchPrevious() }
     Shortcut { sequences: [StandardKey.ZoomIn]; onActivated: app.zoomIn() }
