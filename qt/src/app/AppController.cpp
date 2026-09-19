@@ -18,6 +18,7 @@
 #include "CanvasView.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "shell/TabManager.h"
 
 using namespace xqt;
 
@@ -48,36 +49,51 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+
+    tabs = std::make_unique<TabManager>(*app);
+    connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     newDocument();
 }
 
 AppController::~AppController() {
     xoj::compat::setMessageSink({});
-    canvas.reset();
-    session.reset();
+    for (auto& c: currentConnections) {
+        disconnect(c);
+    }
+    tabs.reset();
 }
 
 void AppController::shutdown() {
-    if (session) {
-        session->deleteAutosaveFile();
+    for (int i = 0; i < tabs->count(); ++i) {
+        tabs->session(i)->deleteAutosaveFile();
     }
     app->getToolHandler()->saveSettings();
     app->getSettings()->save();
 }
 
-void AppController::setSession(std::unique_ptr<DocumentSession> s) {
-    canvas.reset();
-    if (session) {
-        session->deleteAutosaveFile();
+DocumentSession* AppController::session() const { return tabs->currentSession(); }
+CanvasView* AppController::canvas() const { return tabs->currentView(); }
+
+void AppController::currentTabChanged() {
+    // Follow the signals of the current tab only.
+    for (auto& c: currentConnections) {
+        disconnect(c);
     }
-    session = std::move(s);
-    canvas = std::make_unique<CanvasView>(*session);
-    connect(session.get(), &DocumentSession::modifiedChanged, this, &AppController::modifiedChanged);
-    connect(session.get(), &DocumentSession::undoRedoStateChanged, this, &AppController::undoRedoChanged);
-    connect(session.get(), &DocumentSession::filePathChanged, this, &AppController::titleChanged);
-    connect(session.get(), &DocumentSession::currentPageChanged, this, &AppController::pageChanged);
-    connect(canvas.get(), &CanvasView::pagesChanged, this, &AppController::pageChanged);
-    connect(&canvas->getViewController(), &ViewController::zoomChanged, this, &AppController::zoomChanged);
+    currentConnections.clear();
+    if (DocumentSession* s = session()) {
+        currentConnections.push_back(
+                connect(s, &DocumentSession::modifiedChanged, this, &AppController::modifiedChanged));
+        currentConnections.push_back(
+                connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::undoRedoChanged));
+        currentConnections.push_back(connect(s, &DocumentSession::filePathChanged, this, &AppController::titleChanged));
+        currentConnections.push_back(
+                connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
+    }
+    if (CanvasView* v = canvas()) {
+        currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
+        currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
+                                             &AppController::zoomChanged));
+    }
     Q_EMIT documentChanged();
     Q_EMIT titleChanged();
     Q_EMIT modifiedChanged();
@@ -86,13 +102,16 @@ void AppController::setSession(std::unique_ptr<DocumentSession> s) {
     Q_EMIT pageChanged();
 }
 
-QObject* AppController::view() const { return canvas.get(); }
+QObject* AppController::tabsModel() const { return tabs.get(); }
+int AppController::currentTab() const { return tabs->currentIndex(); }
+void AppController::setCurrentTab(int index) { tabs->setCurrentIndex(index); }
+QObject* AppController::view() const { return canvas(); }
 
-QString AppController::title() const { return session ? QString::fromStdString(session->getDisplayName()) : QString(); }
-bool AppController::modified() const { return session && session->isModified(); }
-bool AppController::hasFilePath() const { return session && session->hasFilePath(); }
-bool AppController::canUndo() const { return session && session->getUndoRedoHandler()->canUndo(); }
-bool AppController::canRedo() const { return session && session->getUndoRedoHandler()->canRedo(); }
+QString AppController::title() const { return session() ? QString::fromStdString(session()->getDisplayName()) : QString(); }
+bool AppController::modified() const { return session() && session()->isModified(); }
+bool AppController::hasFilePath() const { return session() && session()->hasFilePath(); }
+bool AppController::canUndo() const { return session() && session()->getUndoRedoHandler()->canUndo(); }
+bool AppController::canRedo() const { return session() && session()->getUndoRedoHandler()->canRedo(); }
 
 QString AppController::tool() const {
     switch (app->getToolHandler()->getToolType()) {
@@ -121,27 +140,88 @@ QVariantList AppController::palette() const {
 }
 
 int AppController::zoomPercent() const {
-    if (!canvas) {
+    if (!canvas()) {
         return 100;
     }
-    const auto& vc = canvas->getViewController();
+    const auto& vc = canvas()->getViewController();
     return static_cast<int>(std::lround(vc.zoom() / vc.zoom100() * 100.0));
 }
 
-int AppController::pageNumber() const { return session ? static_cast<int>(session->getCurrentPageNo()) + 1 : 0; }
-int AppController::pageCount() const { return canvas ? static_cast<int>(canvas->pageCount()) : 0; }
+int AppController::pageNumber() const { return session() ? static_cast<int>(session()->getCurrentPageNo()) + 1 : 0; }
+int AppController::pageCount() const { return canvas() ? static_cast<int>(canvas()->pageCount()) : 0; }
 
-void AppController::newDocument() { setSession(std::make_unique<DocumentSession>(*app)); }
+void AppController::newDocument() { tabs->addTab(std::make_unique<DocumentSession>(*app)); }
+
+void AppController::openPaths(const QStringList& paths) {
+    for (const QString& p: paths) {
+        openPath(p);
+    }
+    Q_EMIT raiseRequested();
+}
+
+void AppController::openUrls(const QList<QUrl>& urls) {
+    for (const QUrl& u: urls) {
+        openPath(u.toLocalFile());
+    }
+}
+
+void AppController::closeTab(int index) {
+    tabs->closeTab(index);
+    if (tabs->count() == 0) {
+        newDocument();  // there is always a document to write on
+    }
+}
+
+void AppController::moveTab(int from, int to) { tabs->moveTab(from, to); }
+
+void AppController::nextTab() {
+    if (tabs->count() > 1) {
+        tabs->setCurrentIndex((tabs->currentIndex() + 1) % tabs->count());
+    }
+}
+
+void AppController::previousTab() {
+    if (tabs->count() > 1) {
+        tabs->setCurrentIndex((tabs->currentIndex() + tabs->count() - 1) % tabs->count());
+    }
+}
+
+int AppController::tabCount() const { return tabs->count(); }
+bool AppController::tabModified(int index) const { return tabs->session(index) && tabs->session(index)->isModified(); }
+
+QString AppController::tabTitle(int index) const {
+    return tabs->session(index) ? QString::fromStdString(tabs->session(index)->getDisplayName()) : QString();
+}
+
+QVariantList AppController::modifiedTabs() const {
+    QVariantList list;
+    for (int i = 0; i < tabs->count(); ++i) {
+        if (tabs->session(i)->isModified()) {
+            list.append(i);
+        }
+    }
+    return list;
+}
 
 bool AppController::openFile(const QUrl& url) { return openPath(url.toLocalFile()); }
 
 bool AppController::openPath(const QString& path) {
-    auto result = DocumentSession::loadFile(fs::path(path.toStdString()));
+    const fs::path file(path.toStdString());
+    if (int existing = tabs->indexOfFile(file); existing >= 0) {
+        tabs->setCurrentIndex(existing);  // already open: show it
+        return true;
+    }
+    auto result = DocumentSession::loadFile(file);
     if (!result.document) {
         Q_EMIT message(tr("Cannot open file"), QString::fromStdString(result.error), true);
         return false;
     }
-    setSession(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+    // An untouched new document is replaced instead of keeping an empty tab around.
+    const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
+    tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+    if (pristine >= 0) {
+        tabs->closeTab(pristine);
+    }
     app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
     if (!result.missingPdf.empty() || result.attachedPdfMissing) {
         Q_EMIT message(tr("PDF background missing"),
@@ -163,10 +243,10 @@ bool AppController::openPath(const QString& path) {
 }
 
 bool AppController::save() {
-    if (!session || !session->hasFilePath()) {
+    if (!session() || !session()->hasFilePath()) {
         return false;
     }
-    auto r = session->save();
+    auto r = session()->save();
     if (!r.ok) {
         Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
     }
@@ -175,11 +255,11 @@ bool AppController::save() {
 }
 
 bool AppController::saveAs(const QUrl& url) {
-    if (!session) {
+    if (!session()) {
         return false;
     }
     const fs::path target(url.toLocalFile().toStdString());
-    auto r = session->saveAs(target);
+    auto r = session()->saveAs(target);
     if (!r.ok) {
         Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
     } else {
@@ -191,15 +271,15 @@ bool AppController::saveAs(const QUrl& url) {
 
 void AppController::undo() {
     if (canUndo()) {
-        session->clearSelectionEndText();
-        session->getUndoRedoHandler()->undo();
+        session()->clearSelectionEndText();
+        session()->getUndoRedoHandler()->undo();
     }
 }
 
 void AppController::redo() {
     if (canRedo()) {
-        session->clearSelectionEndText();
-        session->getUndoRedoHandler()->redo();
+        session()->clearSelectionEndText();
+        session()->getUndoRedoHandler()->redo();
     }
 }
 
@@ -228,28 +308,28 @@ void AppController::setSize(int s) {
 }
 
 void AppController::fitWidth() {
-    if (canvas) {
-        canvas->getViewController().fitWidth();
+    if (canvas()) {
+        canvas()->getViewController().fitWidth();
     }
 }
 
 void AppController::zoomIn() {
-    if (canvas) {
-        auto& vc = canvas->getViewController();
+    if (canvas()) {
+        auto& vc = canvas()->getViewController();
         vc.zoomBy(1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
 }
 
 void AppController::zoomOut() {
-    if (canvas) {
-        auto& vc = canvas->getViewController();
+    if (canvas()) {
+        auto& vc = canvas()->getViewController();
         vc.zoomBy(1 / 1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
 }
 
 void AppController::addPageAfterCurrent() {
-    if (session) {
-        session->insertNewPage(session->getCurrentPageNo() + 1);
+    if (session()) {
+        session()->insertNewPage(session()->getCurrentPageNo() + 1);
     }
 }
 
@@ -259,16 +339,16 @@ QUrl AppController::iconUrl(const QString& name) const {
 }
 
 QUrl AppController::openFolder() const {
-    if (session && session->hasFilePath()) {
-        return QUrl::fromLocalFile(QString::fromStdString(session->getFilePath().parent_path().string()));
+    if (session() && session()->hasFilePath()) {
+        return QUrl::fromLocalFile(QString::fromStdString(session()->getFilePath().parent_path().string()));
     }
     const fs::path& last = app->getSettings()->getLastOpenPath();
     return last.empty() ? QUrl() : QUrl::fromLocalFile(QString::fromStdString(last.string()));
 }
 
 QUrl AppController::suggestedSaveFile() const {
-    if (!session) {
+    if (!session()) {
         return {};
     }
-    return QUrl::fromLocalFile(QString::fromStdString(session->suggestSavePath().string()));
+    return QUrl::fromLocalFile(QString::fromStdString(session()->suggestSavePath().string()));
 }

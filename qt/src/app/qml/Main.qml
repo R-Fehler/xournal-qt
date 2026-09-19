@@ -47,15 +47,51 @@ ApplicationWindow {
         }
     }
 
+    // Close a tab; unsaved changes are asked about first (with that tab shown).
+    function requestCloseTab(index) {
+        if (!app.tabModified(index)) {
+            app.closeTab(index)
+            return
+        }
+        app.currentTab = index
+        withSavedChanges(function() { app.closeTab(app.currentTab) })
+    }
+    // Quitting: go through the tabs with unsaved changes one by one.
+    function closeWindow() {
+        const pending = app.modifiedTabs()
+        if (pending.length === 0) {
+            quitting = true
+            win.close()
+            return
+        }
+        app.currentTab = pending[0]
+        withSavedChanges(function() { app.closeTab(app.currentTab); closeWindow() })
+    }
+
     onClosing: function(close) {
-        if (app.modified && !quitting) {
+        if (!quitting && app.modifiedTabs().length > 0) {
             close.accepted = false
-            withSavedChanges(function() { quitting = true; win.close() })
+            closeWindow()
         }
     }
 
-    header: ToolBar {
-        Material.background: "#fafafa"
+    Connections {
+        target: app
+        function onRaiseRequested() {
+            if (win.visibility === Window.Minimized) win.showNormal()
+            win.raise()
+            win.requestActivate()
+        }
+    }
+
+    header: Column {
+      TabStrip {
+        width: parent.width
+        onCloseRequested: function(index) { requestCloseTab(index) }
+      }
+      ToolBar {
+        width: parent.width
+        Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: 56
         RowLayout {
@@ -64,8 +100,8 @@ ApplicationWindow {
             anchors.rightMargin: 6
             spacing: 2
 
-            IconButton { iconName: "xopp-document-new"; tip: qsTr("New"); onClicked: withSavedChanges(app.newDocument) }
-            IconButton { iconName: "xopp-document-open"; tip: qsTr("Open"); onClicked: withSavedChanges(function() { openDialog.open() }) }
+            IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
+            IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
             IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
             ToolSeparator {}
             IconButton { iconName: "xopp-edit-undo"; tip: qsTr("Undo"); enabled: app.canUndo; onClicked: app.undo() }
@@ -123,6 +159,7 @@ ApplicationWindow {
             ToolButton { text: app.zoomPercent + " %"; onClicked: app.fitWidth(); ToolTip.visible: hovered; ToolTip.text: qsTr("Fit page width") }
             ToolButton { text: "+"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomIn() }
         }
+      }
     }
 
     DocumentCanvas {
@@ -190,7 +227,8 @@ ApplicationWindow {
         title: qsTr("Open document or PDF")
         currentFolder: app.openFolder()
         nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("Xournal++ files (*.xopp *.xoj)"), qsTr("PDF files (*.pdf)"), qsTr("All files (*)")]
-        onAccepted: app.openFile(selectedFile)
+        fileMode: FileDialog.OpenFiles
+        onAccepted: app.openUrls(selectedFiles)
     }
     FileDialog {
         id: saveDialog
@@ -251,8 +289,11 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Redo, "Ctrl+Y"]; onActivated: app.redo() }
     Shortcut { sequences: [StandardKey.Save]; onActivated: saveOrAsk(null) }
     Shortcut { sequences: [StandardKey.SaveAs]; onActivated: openSaveDialog(null) }
-    Shortcut { sequences: [StandardKey.Open]; onActivated: withSavedChanges(function() { openDialog.open() }) }
-    Shortcut { sequences: [StandardKey.New]; onActivated: withSavedChanges(app.newDocument) }
+    Shortcut { sequences: [StandardKey.Open]; onActivated: openDialog.open() }
+    Shortcut { sequences: [StandardKey.New, StandardKey.AddTab]; onActivated: app.newDocument() }
+    Shortcut { sequences: [StandardKey.Close]; onActivated: requestCloseTab(app.currentTab) }
+    Shortcut { sequences: [StandardKey.NextChild, "Ctrl+PgDown"]; onActivated: app.nextTab() }
+    Shortcut { sequences: [StandardKey.PreviousChild, "Ctrl+PgUp"]; onActivated: app.previousTab() }
     Shortcut { sequences: [StandardKey.ZoomIn]; onActivated: app.zoomIn() }
     Shortcut { sequences: [StandardKey.ZoomOut]; onActivated: app.zoomOut() }
     Shortcut { sequence: "Ctrl+0"; onActivated: app.fitWidth() }

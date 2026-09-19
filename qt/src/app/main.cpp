@@ -15,7 +15,11 @@
 #include <QQuickWindow>
 #include <QTimer>
 
+#include <QDir>
+#include <QFileInfo>
+
 #include "AppController.h"
+#include "shell/SingleInstance.h"
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
 
@@ -38,12 +42,30 @@ int main(int argc, char* argv[]) {
     parser.addPositionalArgument("file", "Document to open (.xopp, .xoj or .pdf)");
     parser.process(qapp);
 
+    QStringList files;
+    for (const QString& arg: parser.positionalArguments()) {
+        files << QFileInfo(arg).absoluteFilePath();
+    }
+    // One instance per user: a second start hands its files to the running window (as tabs) and exits.
+    // Off-screen runs (tests, screenshots) are always independent.
+    xqt::SingleInstance instance;
+    const bool independent = qEnvironmentVariableIsSet("XQT_NO_SINGLE_INSTANCE") ||
+                             qEnvironmentVariableIsSet("XQT_SCREENSHOT") ||
+                             QGuiApplication::platformName() == "offscreen";
+    if (!independent) {
+        if (instance.sendToRunningInstance(files)) {
+            return 0;
+        }
+        instance.listen();
+    }
+
     QQuickStyle::setStyle("Material");
     xqt::registerQuickTypes();
     AppController controller;
-    if (!parser.positionalArguments().isEmpty()) {
-        controller.openPath(parser.positionalArguments().first());
+    for (const QString& f: files) {
+        controller.openPath(f);
     }
+    QObject::connect(&instance, &xqt::SingleInstance::filesRequested, &controller, &AppController::openPaths);
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("app", &controller);
