@@ -140,4 +140,19 @@ cd build-qt
 - [ ] Search one or two letters (document, tab overview, library): nothing happens while typing ("Enter ↵"); Enter or the search icon searches; a single letter in a long PDF stays responsive.
 - [ ] Open 20+ documents: the tabs fill the whole strip before it scrolls, the + stays at the right end.
 
+## Tool bar, full screen, colors, pages
+- [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
+- [ ] F11: only the tool square and the page / zoom pill are left; drag the square; tap it: tools, colors, sizes; choosing one closes them; the pen works right away; Esc leaves full screen.
+- [ ] Colors: orange is there; "+" adds a color from the color dialog; press and hold a color: remove it; "Default colors".
+- [ ] Mark PDF text: the three highlight colors in the tool's menu and in the select bar; highlights come in the chosen color.
+- [ ] Press and hold "add page" (or ⋮ → Insert pages…): 3 graph pages, landscape, after this page; one undo in the sidebar removes them.
+
+## Table of contents
+- [ ] A PDF with bookmarks (e.g. a book or thesis): sidebar "Contents": indented headings, current section highlighted, tap goes there, arrows collapse.
+- [ ] Contents overview (toolbar button or Ctrl+Alt+O): chapters big, sections smaller and indented, the pages of each section in a row (swipe sideways); tap a page: it opens there; "Chapters only"; − / +.
+- [ ] The grid button next to the page number in the pill opens the page grid.
+
+## Package
+- [ ] `sudo apt install ./build-deb/packages/xournal-qt_0.1.0_amd64.deb`: Xournal Qt in the application menu with its icon; PDFs and .xopp files offer "Open with Xournal Qt"; right click on a folder in Dolphin: "Open as Xournal Qt library" opens it in its own window.
+
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

@@ -70,6 +70,15 @@
   - Search index in two parts (PDF text per PDF page, tied to the PDF used; per page its PDF page and text elements): an annotation change re-reads only the .xopp, renames/moves in the app carry the entries along, and changes of attached or external PDFs are noticed.
   - Extended search: the pages with hits of each result (marked in the page images, drawn from kept documents and page images), tap one to open the document there with the search; grid zoom (− / +, Ctrl+wheel, pinch).
   - Fix on the way: a tool tip (any non-modal popup) no longer blocks pen and mouse input on the canvas.
+- **Batch of 2026-09-19 (done, awaiting on-device test):**
+  - Tool bar colors: orange added to the defaults; "+" adds a color (color dialog), press and hold / right click removes one or restores the defaults.
+  - PDF text highlights: three preset colors (yellow, green, pink) in the "Mark PDF text" menu and the select-mode bar.
+  - "Insert pages…": background, paper size, orientation, count, before/after (page menu, ⋮ menu, press and hold on add page); one page-undo step.
+  - Tool bar at the top, left or right (⋮ → Tool bar position).
+  - Full screen (F11): only a small current-tool square (drag it; tap: all tools and colors) and the page / zoom pill.
+  - Table of contents: Pages | Contents in the sidebar; contents overview (Ctrl+Alt+O) with level-styled headings and the pages of each section side by side. The page grid button moved into the page / zoom pill.
+  - Program icon and a .deb (CPack as upstream; qt/packaging/README.md): desktop file for PDF/.xopp/.xoj, mime types, Dolphin "Open as Xournal Qt library" for folders.
+  - Text editing mode: compatibility assessed, design proposed, not built yet (waits for the user's decision).
 - **Search with short texts** (user report: a one-letter search in a large document could crash): texts shorter than 4 characters are searched on Enter or a tap on the search icon only (document, tab overview, library). A one-letter search in a 300-page PDF (207k hits) peaked at ~1 GB: the sidebar and page grid made one QML item per hit. Thumbnails now show at most 50 marks per page, spread over it (the count badge stays exact): ~260 MB.
 - **Tab strip with many tabs:** the tabs use the whole width before they scroll, and the + button stays at the right end (the list and the spacer used to share the room).
 
