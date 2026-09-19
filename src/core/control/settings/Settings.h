@@ -468,10 +468,14 @@ public:
 
     void loadDeviceClasses();
     void saveDeviceClasses();
+#ifndef XOJ_NO_GTK  // xournal-qt: GdkDevice based overloads
     void setDeviceClassForDevice(GdkDevice* device, InputDeviceTypeOption deviceClass);
+#endif
     void setDeviceClassForDevice(const std::string& deviceName, GdkInputSource deviceSource,
                                  InputDeviceTypeOption deviceClass);
+#ifndef XOJ_NO_GTK  // xournal-qt: GdkDevice based overloads
     InputDeviceTypeOption getDeviceClassForDevice(GdkDevice* device) const;
+#endif
     InputDeviceTypeOption getDeviceClassForDevice(const std::string& deviceName, GdkInputSource deviceSource) const;
     std::vector<InputDevice> getKnownInputDevices() const;
 

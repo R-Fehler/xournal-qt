@@ -8,7 +8,7 @@
 
 #include <cairo-svg.h>  // for cairo_svg_surface_create
 
-#include "control/jobs/BaseExportJob.h"  // for EXPORT_BACKGROUND_NONE, EXPO...
+#include "control/jobs/ExportBackgroundType.h"  // for EXPORT_BACKGROUND_NONE, EXPO...
 #include "model/Document.h"              // for Document
 #include "model/PageRef.h"               // for PageRef
 #include "model/PageType.h"              // for PageType

@@ -16,7 +16,9 @@
 #include <gtk/gtk.h>
 
 #include "control/settings/PageTemplateSettings.h"
+#ifndef XOJ_NO_GTK  // xournal-qt: GtkPaperSize support is GTK only
 #include "gui/PaperFormatUtils.h"
+#endif
 
 #pragma once
 
@@ -56,7 +58,9 @@ public:
     [[nodiscard]] auto orientation() const -> PaperOrientation;
 
     // Constructors
+#ifndef XOJ_NO_GTK  // xournal-qt
     explicit PaperSize(const xoj::util::GtkPaperSizeUPtr& gtkPaperSize);
+#endif
     explicit PaperSize(const PageTemplateSettings& model);
     PaperSize(double width, double height);
 };

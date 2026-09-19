@@ -1,6 +1,7 @@
 #include "util/Util.h"
 
 #include <array>    // for array
+#include <atomic>   // xournal-qt: for the UI thread dispatcher
 #include <cstdlib>  // for system
 #include <string>   // for allocator, string
 #include <utility>  // for move
@@ -39,6 +40,29 @@ auto Util::getPid() -> PID {
 #endif
 }
 
+#ifdef XOJ_NO_GTK
+// xournal-qt: GTK-free UI thread dispatch (see Util.h)
+namespace {
+std::atomic<Util::UiThreadDispatcher> uiThreadDispatcher{nullptr};
+}
+
+void Util::setUiThreadDispatcher(UiThreadDispatcher dispatcher) { uiThreadDispatcher = dispatcher; }
+
+void Util::dispatchToUiThread(xoj::util::move_only_function<void()> callback, gint priority) {
+    if (auto dispatcher = uiThreadDispatcher.load(); dispatcher) {
+        dispatcher(std::move(callback), priority);
+        return;
+    }
+    using Fn = xoj::util::move_only_function<void()>;
+    g_idle_add_full(
+            priority,
+            +[](gpointer data) -> gboolean {
+                (*static_cast<Fn*>(data))();
+                return G_SOURCE_REMOVE;
+            },
+            new Fn(std::move(callback)), +[](gpointer data) { delete static_cast<Fn*>(data); });
+}
+#else
 auto Util::paintBackgroundWhite(GtkWidget* widget, cairo_t* cr, void*) -> gboolean {
     GtkAllocation alloc;
     gtk_widget_get_allocation(widget, &alloc);
@@ -47,6 +71,8 @@ auto Util::paintBackgroundWhite(GtkWidget* widget, cairo_t* cr, void*) -> gboole
     cairo_fill(cr);
     return false;
 }
+
+#endif
 
 void Util::cairo_set_dash_from_vector(cairo_t* cr, const std::vector<double>& dashes, double offset) {
     cairo_set_dash(cr, dashes.data(), static_cast<int>(dashes.size()), offset);

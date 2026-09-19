@@ -18,7 +18,7 @@
 
 #include "util/ElementRange.h"  // for PageRangeVector, LayerRangeVector
 
-#include "BaseExportJob.h"  // for ExportBackgroundType, EXPORT_BACKGROUND_ALL
+#include "ExportBackgroundType.h"  // for ExportBackgroundType, EXPORT_BACKGROUND_ALL
 #include "filesystem.h"     // for path
 
 class Document;

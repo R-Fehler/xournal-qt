@@ -28,6 +28,7 @@
 #endif
 
 #include "util/glib_casts.h"
+#include "util/move_only_function.h"  // xournal-qt: for the GTK-free execInUiThread
 
 #include "Point.h"
 
@@ -58,6 +59,22 @@ bool isFlatpakInstallation();
  *
  * Make sure the container class is not deleted before the UI stuff is finished!
  */
+#ifdef XOJ_NO_GTK
+// xournal-qt: GTK-free UI thread dispatch. The Qt application installs a dispatcher posting to the Qt event loop;
+// without one, callbacks are run from a GLib idle source (Qt on Linux dispatches GLib sources).
+using UiThreadDispatcher = void (*)(xoj::util::move_only_function<void()> callback, gint priority);
+void setUiThreadDispatcher(UiThreadDispatcher dispatcher);
+void dispatchToUiThread(xoj::util::move_only_function<void()> callback, gint priority);
+
+template <typename Fun>
+void execInUiThread(Fun&& callback, gint priority = G_PRIORITY_DEFAULT_IDLE) {
+    if constexpr (std::is_function_v<std::remove_reference_t<Fun>>) {
+        dispatchToUiThread([callback]() { callback(nullptr); }, priority);
+    } else {
+        dispatchToUiThread(xoj::util::move_only_function<void()>(std::forward<Fun>(callback)), priority);
+    }
+}
+#else
 template <typename Fun>
 void execInUiThread(Fun&& callback, gint priority = G_PRIORITY_DEFAULT_IDLE) {
     if constexpr (std::is_function_v<Fun>) {
@@ -72,7 +89,11 @@ void execInUiThread(Fun&& callback, gint priority = G_PRIORITY_DEFAULT_IDLE) {
     }
 }
 
+#endif
+
+#ifndef XOJ_NO_GTK  // xournal-qt: GTK widget helper
 gboolean paintBackgroundWhite(GtkWidget* widget, cairo_t* cr, void* unused);
+#endif
 
 void cairo_set_dash_from_vector(cairo_t* cr, const std::vector<double>& dashes, double offset);
 

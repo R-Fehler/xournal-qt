@@ -16,15 +16,9 @@
 
 #include <gtk/gtk.h>  // for GtkWidget
 
-#include "BlockingJob.h"  // for BlockingJob
-#include "filesystem.h"   // for path
-
-/**
- *  @brief List of types for the export of background components.
- *  The order must agree with the corresponding listBackgroundType in ui/exportSettings.glade.
- *  It is constructed so that one can check for intermediate types using comparison.
- */
-enum ExportBackgroundType { EXPORT_BACKGROUND_NONE, EXPORT_BACKGROUND_UNRULED, EXPORT_BACKGROUND_ALL };
+#include "BlockingJob.h"           // for BlockingJob
+#include "ExportBackgroundType.h"  // for ExportBackgroundType
+#include "filesystem.h"            // for path
 
 class Control;
 

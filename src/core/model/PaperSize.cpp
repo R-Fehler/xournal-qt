@@ -2,9 +2,11 @@
 
 static auto areDoublesEqual(double x, double y) -> bool { return std::abs(x - y) <= 0.01; }
 
+#ifndef XOJ_NO_GTK  // xournal-qt: GtkPaperSize support is GTK only
 PaperSize::PaperSize(const xoj::util::GtkPaperSizeUPtr& gtkPaperSize):
         width(gtk_paper_size_get_width(gtkPaperSize.get(), GTK_UNIT_POINTS)),
         height(gtk_paper_size_get_height(gtkPaperSize.get(), GTK_UNIT_POINTS)) {}
+#endif
 
 PaperSize::PaperSize(const PageTemplateSettings& model): width(model.getPageWidth()), height(model.getPageHeight()) {}
 

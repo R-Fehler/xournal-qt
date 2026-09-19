@@ -40,6 +40,9 @@ Document::~Document() {
     freeTreeContentModel();
 }
 
+#ifdef XOJ_NO_GTK  // xournal-qt: toolkit-independent outline
+void Document::freeTreeContentModel() { this->outline.clear(); }
+#else
 void Document::freeTreeContentModel() {
     if (this->contentsModel) {
         gtk_tree_model_foreach(this->contentsModel.get(), xoj::util::wrap_v<freeTreeContentEntry>, this);
@@ -63,6 +66,7 @@ auto Document::freeTreeContentEntry(GtkTreeModel* treeModel, GtkTreePath* path, 
 
     return false;
 }
+#endif
 
 void Document::lock() { this->documentLock.lock(); }
 void Document::unlock() { this->documentLock.unlock(); }
@@ -219,6 +223,24 @@ auto Document::findPdfPage(size_t pdfPage) const -> size_t {
     }
 }
 
+#ifdef XOJ_NO_GTK  // xournal-qt: toolkit-independent outline
+void Document::buildOutline(DocumentOutline& entries, XojPdfBookmarkIterator* iter) {
+    do {
+        std::unique_ptr<XojPdfAction> action(iter->getAction());
+        if (action->getTitle().empty()) {
+            continue;
+        }
+        DocumentOutlineEntry entry{action->getTitle(), *action->getDestination(), {}, {}};
+        entry.dest.setExpand(iter->isOpen());
+
+        std::unique_ptr<XojPdfBookmarkIterator> child(iter->getChildIter());
+        if (child) {
+            buildOutline(entry.children, child.get());
+        }
+        entries.push_back(std::move(entry));
+    } while (iter->next());
+}
+#else
 void Document::buildTreeContentsModel(GtkTreeIter* parent, XojPdfBookmarkIterator* iter) {
     do {
         GtkTreeIter treeIter = {0};
@@ -255,6 +277,7 @@ void Document::buildTreeContentsModel(GtkTreeIter* parent, XojPdfBookmarkIterato
 
     } while (iter->next());
 }
+#endif
 
 void Document::indexPdfPages() {
     auto index = std::make_unique<PageIndex>();
@@ -268,6 +291,33 @@ void Document::indexPdfPages() {
 }
 
 
+#ifdef XOJ_NO_GTK  // xournal-qt: toolkit-independent outline
+void Document::buildContentsModel() {
+    freeTreeContentModel();
+
+    std::unique_ptr<XojPdfBookmarkIterator> iter(pdfDocument.getContentsIter());
+    if (!iter) {
+        // No Bookmarks
+        return;
+    }
+    buildOutline(this->outline, iter.get());
+}
+
+auto Document::getOutline() const -> const DocumentOutline& { return this->outline; }
+
+void Document::fillOutlinePageLabels(DocumentOutline& entries) {
+    for (auto& entry: entries) {
+        auto page = findPdfPage(entry.dest.getPdfPage());
+        entry.pageLabel = page != npos ? std::to_string(page + 1) : std::string();
+        fillOutlinePageLabels(entry.children);
+    }
+}
+
+void Document::updateIndexPageNumbers() {
+    indexPdfPages();
+    fillOutlinePageLabels(this->outline);
+}
+#else
 void Document::buildContentsModel() {
     freeTreeContentModel();
 
@@ -313,6 +363,7 @@ void Document::updateIndexPageNumbers() {
         gtk_tree_model_foreach(this->contentsModel.get(), xoj::util::wrap_v<fillPageLabels>, this);
     }
 }
+#endif
 
 void Document::setPdfAttributes(const fs::path& filename, bool attachToDocument) {
     this->pdfFilepath = filename;

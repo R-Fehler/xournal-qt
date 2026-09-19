@@ -23,7 +23,9 @@ class Settings;
 class InputDevice {
 public:
     InputDevice();
+#ifndef XOJ_NO_GTK  // xournal-qt
     explicit InputDevice(GdkDevice* device);
+#endif
     explicit InputDevice(std::string name, GdkInputSource source);
     ~InputDevice() = default;
 
@@ -40,7 +42,9 @@ private:
     GdkInputSource source{GDK_SOURCE_MOUSE};
 };
 
+#ifndef XOJ_NO_GTK  // xournal-qt: GDK seat based device enumeration
 namespace DeviceListHelper {
 std::vector<InputDevice> getDeviceList(Settings* settings, bool ignoreTouchDevices = false);
 InputDeviceClass getSourceMapping(GdkInputSource source, Settings* settings);
 }  // namespace DeviceListHelper
+#endif

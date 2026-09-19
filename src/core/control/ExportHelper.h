@@ -12,7 +12,7 @@
 #pragma once
 
 
-#include "control/jobs/BaseExportJob.h"  // for ExportBackgroundType
+#include "control/jobs/ExportBackgroundType.h"  // for ExportBackgroundType
 #include "pdf/base/PdfExportBackend.h"
 
 #include "filesystem.h"

@@ -1,4 +1,22 @@
-# xournal_qt: a Qt 6 fork of Xournal++ with tabs and a tablet-first UI
+# xournal-qt roadmap
+
+## Status (2026-09-19)
+- **M0 fork and spike: done, except the on-device evaluation.**
+  - The fork has upstream history. The build root is `qt/CMakeLists.txt`.
+  - `qt/spikes/inkpad` (quick and widget hosts) still needs to be run on the device to decide [ADR-0001](adr/0001-ui-host.md).
+- **M1 Qt-free core: done.**
+  - `xoj-util` and `xoj-core` build without GTK; see [ADR-0002](adr/0002-upstream-seams.md).
+  - `xournal-qt-cli` output is pixel identical to upstream `xournalpp` for PNG and PDF export on all 49 fixtures (golden tests), and round trips keep the document structure.
+  - All 116 upstream unit tests pass.
+  - Upstream undo and the layer controller compile unmodified against the shadow `Control` interface.
+- **Refinement of R4: shadow headers instead of new interface names.**
+  - `qt/compat/include/control/Control.h` and friends are abstract interfaces with upstream's names and signatures. Reused upstream files therefore need **no edits at all**.
+  - The per-tab session in M2 implements `Control`.
+- **Next: M2**, the session (`Control` implementation), render service and canvas, based on the ADR-0001 decision.
+
+---
+
+# Plan (as approved)
 
 ## Context
 The goal is a pen-first app for notes and PDF annotation. It keeps Xournal++'s tested core:

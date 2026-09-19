@@ -30,6 +30,9 @@
 #include "util/raii/GObjectSPtr.h"    // for GObjectSptr
 
 #include "PageRef.h"     // for PageRef
+#ifdef XOJ_NO_GTK  // xournal-qt: toolkit-independent outline instead of a GtkTreeModel
+#include "DocumentOutline.h"  // for DocumentOutline
+#endif
 #include "filesystem.h"  // for path
 
 class DocumentHandler;
@@ -84,7 +87,11 @@ public:
 
     fs::path getEvMetadataFilename() const;
 
+#ifdef XOJ_NO_GTK  // xournal-qt
+    const DocumentOutline& getOutline() const;
+#else
     GtkTreeModel* getContentsModel() const;
+#endif
 
     void setCreateBackupOnSave(bool backup);
     bool shouldCreateBackupOnSave() const;
@@ -109,11 +116,18 @@ public:
 private:
     void buildContentsModel();
     void freeTreeContentModel();
+#ifdef XOJ_NO_GTK  // xournal-qt
+    void buildOutline(DocumentOutline& entries, XojPdfBookmarkIterator* iter);
+    void fillOutlinePageLabels(DocumentOutline& entries);
+#else
     static bool freeTreeContentEntry(GtkTreeModel* treeModel, GtkTreePath* path, GtkTreeIter* iter, Document* doc);
 
     void buildTreeContentsModel(GtkTreeIter* parent, XojPdfBookmarkIterator* iter);
+#endif
     void updateIndexPageNumbers();
+#ifndef XOJ_NO_GTK  // xournal-qt
     static bool fillPageLabels(GtkTreeModel* treeModel, GtkTreePath* path, GtkTreeIter* iter, Document* doc);
+#endif
 
 private:
     DocumentHandler* handler = nullptr;
@@ -158,7 +172,11 @@ private:
     /**
      * The bookmark contents model
      */
+#ifdef XOJ_NO_GTK  // xournal-qt
+    DocumentOutline outline;
+#else
     xoj::util::GObjectSPtr<GtkTreeModel> contentsModel;
+#endif
 
     /**
      *  create a backup before save

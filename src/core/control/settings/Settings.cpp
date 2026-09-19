@@ -2389,9 +2389,11 @@ void Settings::setInputSystemDrawOutsideWindowEnabled(bool drawOutsideWindowEnab
 
 auto Settings::getInputSystemDrawOutsideWindowEnabled() const -> bool { return this->inputSystemDrawOutsideWindow; }
 
+#ifndef XOJ_NO_GTK  // xournal-qt: GdkDevice based overloads
 void Settings::setDeviceClassForDevice(GdkDevice* device, InputDeviceTypeOption deviceClass) {
     this->setDeviceClassForDevice(gdk_device_get_name(device), gdk_device_get_source(device), deviceClass);
 }
+#endif
 
 void Settings::setDeviceClassForDevice(const string& deviceName, GdkInputSource deviceSource,
                                        InputDeviceTypeOption deviceClass) {
@@ -2414,9 +2416,11 @@ auto Settings::getKnownInputDevices() const -> std::vector<InputDevice> {
     return inputDevices;
 }
 
+#ifndef XOJ_NO_GTK  // xournal-qt: GdkDevice based overloads
 auto Settings::getDeviceClassForDevice(GdkDevice* device) const -> InputDeviceTypeOption {
     return this->getDeviceClassForDevice(gdk_device_get_name(device), gdk_device_get_source(device));
 }
+#endif
 
 auto Settings::getDeviceClassForDevice(const string& deviceName, GdkInputSource deviceSource) const
         -> InputDeviceTypeOption {

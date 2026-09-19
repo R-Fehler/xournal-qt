@@ -18,6 +18,7 @@ endif()
 set(XOJ_UPSTREAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE INTERNAL "")
 
 option(XQT_BUILD_SPIKES "Build experimental spikes (qt/spikes)" ON)
+option(XQT_BUILD_CORE "Build the Qt-free Xournal++ core libraries and CLI" ON)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Quick QuickControls2)
 find_package(PkgConfig REQUIRED)
@@ -28,6 +29,15 @@ qt_standard_project_setup(REQUIRES 6.5)
 
 # glib/gio headers use "signals" as an identifier: never use Qt's keyword macros.
 add_compile_definitions(QT_NO_KEYWORDS)
+
+option(XQT_BUILD_TESTS "Build the unit tests (downloads GoogleTest if not installed)" ON)
+
+if(XQT_BUILD_CORE)
+    include(cmake/XojCore.cmake)
+    if(XQT_BUILD_TESTS)
+        include(cmake/XojTests.cmake)
+    endif()
+endif()
 
 if(XQT_BUILD_SPIKES)
     add_subdirectory(spikes/inkpad)

@@ -7,10 +7,13 @@
 #include <glib.h>  // for g_list_free, g_warning
 
 #include "control/settings/Settings.h"  // for Settings
+#ifndef XOJ_NO_GTK                      // xournal-qt
 #include "util/GListView.h"             // for GListView, GListView<>::GList...
+#endif
 #include "util/i18n.h"                  // for _
 
 
+#ifndef XOJ_NO_GTK  // xournal-qt: GDK seat based device enumeration (Qt build: QInputDevice)
 void storeNewUnlistedDevice(std::vector<InputDevice>& deviceList, GdkDevice* device) {
     // This could potentially be problematic with systems having a multitude of input devices as it searches linearily
     auto it = std::find(deviceList.begin(), deviceList.end(), InputDevice(device));
@@ -78,10 +81,13 @@ InputDeviceClass DeviceListHelper::getSourceMapping(GdkInputSource source, Setti
 
     return InputDeviceClass::INPUT_DEVICE_IGNORE;
 }
+#endif
 
 InputDevice::InputDevice() = default;
 
+#ifndef XOJ_NO_GTK  // xournal-qt
 InputDevice::InputDevice(GdkDevice* device): name(gdk_device_get_name(device)), source(gdk_device_get_source(device)) {}
+#endif
 
 InputDevice::InputDevice(std::string name, GdkInputSource source): name(std::move(name)), source(source) {}
 

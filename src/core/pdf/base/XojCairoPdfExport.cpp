@@ -71,6 +71,52 @@ void XojCairoPdfExport::configureCairoFontOptions() {
 }
 
 #if CAIRO_VERSION >= CAIRO_VERSION_ENCODE(1, 16, 0)
+#ifdef XOJ_NO_GTK  // xournal-qt: walk the toolkit-independent outline (same traversal order as below)
+void XojCairoPdfExport::populatePdfOutline() {
+    const DocumentOutline& outline = doc->getOutline();
+    if (outline.empty()) {
+        return;
+    }
+
+    struct Node {
+        const DocumentOutline* siblings;
+        size_t index;
+        int parentId;
+    };
+    int idCounter = CAIRO_PDF_OUTLINE_ROOT;
+    std::stack<Node> nodeStack;
+
+    nodeStack.push(Node{&outline, 0, idCounter});
+    while (!nodeStack.empty()) {
+        auto [siblings, index, parentId] = nodeStack.top();
+        nodeStack.pop();
+        const int currentId = ++idCounter;
+        const DocumentOutlineEntry& entry = (*siblings)[index];
+        const LinkDestination* dest = &entry.dest;
+
+        auto pdfBgPage = dest->getPdfPage();  // Link destination in original background PDF
+        auto pageDest = pdfBgPage == npos ? npos : doc->findPdfPage(pdfBgPage);  // Destination in document
+        if (pageDest != npos) {
+            auto linkAttrBuf = serdes_stream<std::ostringstream>();
+            linkAttrBuf << "page=" << pageDest + 1;
+            if (dest->shouldChangeLeft() && dest->shouldChangeTop()) {
+                linkAttrBuf << " pos=[" << dest->getLeft() << " " << dest->getTop() << "]";
+            }
+            const auto linkAttr = linkAttrBuf.str();
+            auto outlineFlags = dest->getExpand() ? CAIRO_PDF_OUTLINE_FLAG_OPEN : 0;
+            cairo_pdf_surface_add_outline(this->surface, parentId, dest->getName().data(), linkAttr.data(),
+                                          static_cast<cairo_pdf_outline_flags_t>(outlineFlags));
+        }
+
+        if (!entry.children.empty()) {
+            nodeStack.push(Node{&entry.children, 0, currentId});
+        }
+        if (index + 1 < siblings->size()) {
+            nodeStack.push(Node{siblings, index + 1, parentId});
+        }
+    }
+}
+#else
 void XojCairoPdfExport::populatePdfOutline() {
     auto tocModel = doc->getContentsModel();
     if (tocModel == nullptr)
@@ -119,6 +165,7 @@ void XojCairoPdfExport::populatePdfOutline() {
         }
     }
 }
+#endif  // XOJ_NO_GTK
 #endif
 
 bool XojCairoPdfExport::endPdf() {
