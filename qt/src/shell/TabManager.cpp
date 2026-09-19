@@ -81,14 +81,20 @@ void TabManager::tabDataChanged(const DocumentSession* s, const QList<int>& role
 }
 
 int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
-    const int row = tabs.empty() ? 0 : current + 1;
     Tab tab;
     tab.view = std::make_unique<CanvasView>(*session);
     tab.session = std::move(session);
-    tab.releaseTimer = std::make_unique<QTimer>();
-    tab.releaseTimer->setSingleShot(true);
+    return insertTab(std::move(tab));
+}
+
+void TabManager::listenTo(Tab& tab) {
     DocumentSession* s = tab.session.get();
     CanvasView* v = tab.view.get();
+    if (!tab.releaseTimer) {
+        tab.releaseTimer = std::make_unique<QTimer>();
+        tab.releaseTimer->setSingleShot(true);
+    }
+    tab.releaseTimer->disconnect();
     connect(tab.releaseTimer.get(), &QTimer::timeout, this, [v] {
         for (size_t i = 0; i < v->pageCount(); ++i) {
             v->getPage(i)->deleteViewBuffer();
@@ -109,7 +115,11 @@ int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
     connect(&s->search(), &DocumentSearch::changed, this, searchChanged);
     connect(&s->search(), &DocumentSearch::finished, this, searchChanged);
     connect(s, &DocumentSession::currentPageChanged, this, thumbnailChanged);
+}
 
+int TabManager::insertTab(Tab tab) {
+    const int row = tabs.empty() ? 0 : current + 1;
+    listenTo(tab);
     beginInsertRows(QModelIndex(), row, row);
     tabs.insert(tabs.begin() + row, std::move(tab));
     endInsertRows();
@@ -120,6 +130,39 @@ int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
     Q_EMIT currentIndexChanged();
     Q_EMIT currentTabChanged();
     return row;
+}
+
+std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
+    if (index < 0 || index >= count()) {
+        return nullptr;
+    }
+    auto tab = std::make_unique<Tab>(std::move(tabs[static_cast<size_t>(index)]));
+    // It reports to its new list from now on
+    DocumentSession* s = tab->session.get();
+    disconnect(s, nullptr, this, nullptr);
+    disconnect(&s->search(), nullptr, this, nullptr);
+    tab->releaseTimer->stop();
+    tab->releaseTimer->disconnect();
+
+    beginRemoveRows(QModelIndex(), index, index);
+    tabs.erase(tabs.begin() + index);
+    endRemoveRows();
+    Q_EMIT countChanged();
+    const int old = current;
+    if (current > index || current >= count()) {
+        current = std::min(current - (current > index ? 1 : 0), count() - 1);
+    }
+    backgroundChanged(old);
+    Q_EMIT currentIndexChanged();
+    Q_EMIT currentTabChanged();
+    return tab;
+}
+
+int TabManager::adoptTab(std::unique_ptr<Tab> tab) {
+    if (!tab || !tab->session) {
+        return -1;
+    }
+    return insertTab(std::move(*tab));
 }
 
 void TabManager::closeTab(int index) {

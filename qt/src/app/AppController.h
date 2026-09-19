@@ -22,6 +22,10 @@
 #include <QUrl>
 #include <QVariantList>
 
+#include <functional>
+#include <memory>
+#include <vector>
+
 #include "filesystem.h"
 
 namespace xqt {
@@ -47,6 +51,8 @@ class Palette;
 
 class AppController: public QObject {
     Q_OBJECT
+    /// A window of its own for undocked documents: no home screen, it closes with its last tab.
+    Q_PROPERTY(bool secondaryWindow READ isSecondary CONSTANT)
     Q_PROPERTY(QObject* tabs READ tabsModel CONSTANT)
     /// Pages of the current tab (for the page sidebar).
     Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
@@ -122,6 +128,8 @@ class AppController: public QObject {
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
     explicit AppController(QObject* parent = nullptr);
+    /// A window of its own: the settings, tools, library and rendering of the main window, own tabs.
+    explicit AppController(AppController& mainWindow, QObject* parent = nullptr);
     ~AppController() override;
 
     QObject* tabsModel() const;
@@ -356,7 +364,22 @@ public:
     xqt::AppContext& context() const { return *app; }
     xqt::TabManager& tabManager() const { return *tabs; }
 
+    // --- windows (undocked documents) ---
+    /// The controller of the main window (this one is a window of its own if it has one).
+    AppController* mainWindow() const { return primary; }
+    bool isSecondary() const { return primary != nullptr; }
+    /// Makes the windows of undocked documents. Set once, from main().
+    static void setWindowFactory(std::function<void(AppController*)> factory);
+    /// Move the tab into a window of its own (a new one). Does nothing for the last tab of such a window.
+    Q_INVOKABLE void undockTab(int index);
+    /// Move the tab back into the main window (and close this window if it was the last one).
+    Q_INVOKABLE void dockTab(int index);
+    /// The window was closed: its documents go back to the main window if they have unsaved changes.
+    Q_INVOKABLE void windowClosed();
+
 Q_SIGNALS:
+    /// This window should be closed (its last document was moved away).
+    void closeWindowRequested();
     void documentChanged();
     void homeVisibleChanged();
     void titleChanged();
@@ -396,12 +419,17 @@ private:
     /// Files were renamed or moved (library, recent files): open documents and the recent list follow.
     void filesChanged(const xqt::DocumentFiles::Result& result);
     void currentTabChanged();
+    /// The tab list of this window (with its signals).
+    void makeTabs();
     /// Reopens the tabs of a journal; `recovered`: tab index -> recovery file to load instead of the file.
     void reopenTabs(const std::vector<std::pair<fs::path, int>>& tabs, int current,
                     const std::map<size_t, std::pair<fs::path, fs::path>>& recovered);
 
-    std::unique_ptr<xqt::AppContext> app;
-    std::unique_ptr<Palette> colors;
+    /// Shared by all windows of the process (settings, tools, rendering)
+    std::shared_ptr<xqt::AppContext> app;
+    std::shared_ptr<Palette> colors;
+    AppController* primary = nullptr;  ///< the main window's controller (nullptr: this is the main window)
+    std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
@@ -412,9 +440,13 @@ private:
     double flowOverflow = 0;
     std::unique_ptr<xqt::PageClipboard> pageClipboard;
     std::vector<size_t> pageList(const QList<int>& pages) const;
-    std::unique_ptr<xqt::SettingsModel> settingsView;
-    std::unique_ptr<xqt::LibraryModel> library;
-    std::unique_ptr<xqt::RecentFiles> recent;
+    // The main window owns these; the other windows use the same ones (one library and one list of recent files).
+    std::unique_ptr<xqt::SettingsModel> ownSettingsView;
+    std::unique_ptr<xqt::LibraryModel> ownLibrary;
+    std::unique_ptr<xqt::RecentFiles> ownRecent;
+    xqt::SettingsModel* settingsView = nullptr;
+    xqt::LibraryModel* library = nullptr;
+    xqt::RecentFiles* recent = nullptr;
     bool home = true;
     fs::path journalFile;
     std::unique_ptr<xqt::SessionRecovery> recovery;  // after `tabs`: destroyed first

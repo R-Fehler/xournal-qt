@@ -8,6 +8,7 @@ import QtQuick.Layouts
 Rectangle {
     id: strip
     signal closeRequested(int index)
+    signal overviewRequested()
     implicitHeight: 46
     color: "#dfe1e5"
 
@@ -61,6 +62,19 @@ Rectangle {
                     }
                 }
             }
+        }
+        // All open documents: beside the tabs it belongs to
+        IconButton {
+            objectName: "overviewButton"
+            iconName: "xqt-tabs-grid"
+            tip: qsTr("All open documents (Ctrl+Shift+E)")
+            implicitWidth: 38
+            implicitHeight: 38
+            icon.width: 22
+            icon.height: 22
+            Layout.rightMargin: 4
+            Layout.alignment: Qt.AlignVCenter
+            onClicked: strip.overviewRequested()
         }
         ListView {
             id: list

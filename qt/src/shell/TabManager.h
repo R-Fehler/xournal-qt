@@ -13,6 +13,8 @@
 #include <memory>
 #include <vector>
 
+#include <QTimer>
+
 #include <QAbstractListModel>
 #include <QTimer>
 
@@ -43,8 +45,20 @@ public:
     int currentIndex() const { return current; }
     void setCurrentIndex(int index);
 
+    /// One open document: its session, the view showing it, when to release its rendered pages.
+    struct Tab {
+        std::unique_ptr<DocumentSession> session;
+        std::unique_ptr<CanvasView> view;
+        std::unique_ptr<QTimer> releaseTimer;
+        quint64 thumbnailRevision = 0;  ///< increased when the current page or its content changed
+    };
+
     /// Adds a tab after the current one and makes it current. Returns its index.
     int addTab(std::unique_ptr<DocumentSession> session);
+    /// Takes the tab out (with its zoom, undo history and rendered pages): for another window's tab list.
+    std::unique_ptr<Tab> takeTab(int index);
+    /// Adds a tab that another window gave up. Returns its index.
+    int adoptTab(std::unique_ptr<Tab> tab);
     /// Removes a tab (no questions asked: the UI deals with unsaved changes first).
     void closeTab(int index);
     void moveTab(int from, int to);
@@ -69,12 +83,9 @@ Q_SIGNALS:
     void currentTabChanged();
 
 private:
-    struct Tab {
-        std::unique_ptr<DocumentSession> session;
-        std::unique_ptr<CanvasView> view;
-        std::unique_ptr<QTimer> releaseTimer;
-        quint64 thumbnailRevision = 0;  ///< increased when the current page or its content changed
-    };
+    /// The tab reports to this list (and stops reporting to the one it came from).
+    void listenTo(Tab& tab);
+    int insertTab(Tab tab);
     int rowOf(const DocumentSession* s) const;
     void tabDataChanged(const DocumentSession* s, const QList<int>& roles);
     void backgroundChanged(int oldCurrent);

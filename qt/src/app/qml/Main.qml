@@ -121,6 +121,7 @@ ApplicationWindow {
         width: parent.width
         visible: !win.fullScreenMode
         onCloseRequested: function(index) { requestCloseTab(index) }
+        onOverviewRequested: tabOverview.open()
       }
       ToolBar {
         id: topTools
@@ -434,7 +435,6 @@ ApplicationWindow {
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
-            IconButton { objectName: "overviewButton"; iconName: "xqt-tabs-grid"; tip: qsTr("All open documents (Ctrl+Shift+E)"); onClicked: tabOverview.open() }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
             IconButton {
                 objectName: "moreButton"

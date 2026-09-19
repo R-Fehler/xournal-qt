@@ -54,8 +54,8 @@ Color toColor(const QColor& c) {
 }  // namespace
 
 AppController::AppController(QObject* parent): QObject(parent) {
-    app = std::make_unique<AppContext>(AppContext::defaultResourceDir());
-    colors = std::make_unique<Palette>(app->getResourceDir() / "palettes" / "xournal.gpl");
+    app = std::make_shared<AppContext>(AppContext::defaultResourceDir());
+    colors = std::make_shared<Palette>(app->getResourceDir() / "palettes" / "xournal.gpl");
     try {
         colors->load();
     } catch (const std::exception& e) {
@@ -85,22 +85,55 @@ AppController::AppController(QObject* parent): QObject(parent) {
             filteredPages->setOnlySearchHits(false);
         }
     });
-    settingsView = std::make_unique<SettingsModel>(*app);
-    tabs = std::make_unique<TabManager>(*app);
-    connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
-    connect(tabs.get(), &TabManager::countChanged, this, [this] {
-        if (tabs->count() == 0) {
-            setHomeVisible(true);  // no document: the home screen
-        }
-    });
-    library = std::make_unique<LibraryModel>();
+    ownSettingsView = std::make_unique<SettingsModel>(*app);
+    settingsView = ownSettingsView.get();
+    makeTabs();
+    ownLibrary = std::make_unique<LibraryModel>();
+    library = ownLibrary.get();
     library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
-    recent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
+    ownRecent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
+    recent = ownRecent.get();
     recent->onFilesChanged = [this](const DocumentFiles::Result& r) {
         library->filesMoved(r);  // a renamed library document keeps its search index entry
         filesChanged(r);
     };
     journalFile = SessionRecovery::defaultJournalFile();
+}
+
+// A window of its own: the same settings, tools, library and rendering, but its own documents.
+AppController::AppController(AppController& mainWindow, QObject* parent): QObject(parent) {
+    primary = &mainWindow;
+    app = mainWindow.app;
+    colors = mainWindow.colors;
+    settingsView = mainWindow.settingsView;
+    library = mainWindow.library;
+    recent = mainWindow.recent;
+    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
+    connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+    pages = std::make_unique<PagesModel>();
+    filteredPages = std::make_unique<PageFilterModel>(*pages);
+    outline = std::make_unique<OutlineModel>();
+    connect(this, &AppController::searchChanged, this, [this] {
+        if (searchQuery().isEmpty()) {
+            filteredPages->setOnlySearchHits(false);
+        }
+    });
+    makeTabs();
+    home = false;  // it shows documents, never the home screen
+}
+
+void AppController::makeTabs() {
+    tabs = std::make_unique<TabManager>(*app);
+    connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
+    connect(tabs.get(), &TabManager::countChanged, this, [this] {
+        if (tabs->count() == 0) {
+            if (isSecondary()) {
+                Q_EMIT closeWindowRequested();  // the last document went away with its window
+            } else {
+                setHomeVisible(true);  // no document: the home screen
+            }
+        }
+    });
 }
 
 AppController::~AppController() {
@@ -113,6 +146,58 @@ AppController::~AppController() {
     outline->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
     tabs.reset();
+}
+
+namespace {
+std::function<void(AppController*)> windowFactory;  // set by main(): makes the window for a controller
+}  // namespace
+
+void AppController::setWindowFactory(std::function<void(AppController*)> factory) {
+    windowFactory = std::move(factory);
+}
+
+void AppController::undockTab(int index) {
+    if (index < 0 || index >= tabs->count() || (isSecondary() && tabs->count() == 1)) {
+        return;  // (the only document of its own window is undocked already)
+    }
+    AppController* main = isSecondary() ? primary : this;
+    auto tab = tabs->takeTab(index);
+    if (!tab) {
+        return;
+    }
+    auto* window = new AppController(*main, main);
+    main->windows.push_back(window);
+    window->tabManager().adoptTab(std::move(tab));
+    if (windowFactory) {
+        windowFactory(window);
+    }
+}
+
+void AppController::dockTab(int index) {
+    if (!isSecondary() || index < 0 || index >= tabs->count()) {
+        return;
+    }
+    if (auto tab = tabs->takeTab(index)) {
+        primary->tabManager().adoptTab(std::move(tab));
+        primary->setHomeVisible(false);
+        Q_EMIT primary->raiseRequested();
+    }
+}
+
+void AppController::windowClosed() {
+    if (!isSecondary()) {
+        return;
+    }
+    // Documents with unsaved changes are not lost: they go back to the main window.
+    for (int i = tabs->count() - 1; i >= 0; --i) {
+        if (tabs->session(i) && tabs->session(i)->isModified()) {
+            primary->tabManager().adoptTab(tabs->takeTab(i));
+            primary->setHomeVisible(false);
+        }
+    }
+    auto& list = primary->windows;
+    list.erase(std::remove(list.begin(), list.end(), this), list.end());
+    deleteLater();
 }
 
 void AppController::shutdown() {
@@ -501,9 +586,9 @@ void AppController::openSearchResult(int index) {
 
 QObject* AppController::tabsModel() const { return tabs.get(); }
 QObject* AppController::pagesModel() const { return pages.get(); }
-QObject* AppController::settingsModel() const { return settingsView.get(); }
-QObject* AppController::libraryModel() const { return library.get(); }
-QObject* AppController::recentModel() const { return recent.get(); }
+QObject* AppController::settingsModel() const { return settingsView; }
+QObject* AppController::libraryModel() const { return library; }
+QObject* AppController::recentModel() const { return recent; }
 bool AppController::homeVisible() const { return home || tabs->count() == 0; }
 void AppController::setHomeVisible(bool visible) {
     if (visible != home) {
