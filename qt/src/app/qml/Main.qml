@@ -160,6 +160,7 @@ ApplicationWindow {
                     }
                 }
             }
+            IconButton { objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
             IconButton { objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
             IconButton { objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
             IconButton {
@@ -469,6 +470,13 @@ ApplicationWindow {
             afterSave = null
         }
         onRejected: afterSave = null
+    }
+
+    FileDialog {
+        id: imageDialog
+        title: qsTr("Insert image")
+        nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.svg)"), qsTr("All files (*)")]
+        onAccepted: app.insertImage(selectedFile)
     }
 
     Dialog {

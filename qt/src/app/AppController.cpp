@@ -5,6 +5,7 @@
 
 #include <shared_mutex>
 
+#include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
 
@@ -158,6 +159,22 @@ void AppController::selectAllOnPage() {
         canvas()->selectAllOnPage();
     }
 }
+bool AppController::insertImage(const QUrl& url) {
+    QFile f(url.toLocalFile());
+    if (!canvas() || !f.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    if (app->getToolHandler()->getToolType() != TOOL_SELECT_RECT &&
+        app->getToolHandler()->getToolType() != TOOL_SELECT_REGION) {
+        selectTool("selectRect");  // so that the image can be moved and resized right away
+    }
+    if (!canvas()->insertImage(f.readAll())) {
+        Q_EMIT message(tr("Insert image"), tr("\"%1\" is not an image that can be read.").arg(url.fileName()), true);
+        return false;
+    }
+    return true;
+}
+
 void AppController::clearSelection() {
     if (canvas()) {
         canvas()->clearSelection();

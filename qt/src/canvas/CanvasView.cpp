@@ -7,6 +7,7 @@
 #include <QMimeData>
 #include <QGuiApplication>
 #include <QClipboard>
+#include <QBuffer>
 
 #include "control/PdfCache.h"
 #include "view/overlays/OverlayView.h"
@@ -16,6 +17,7 @@
 #include "util/serializing/ObjectInputStream.h"
 #include "util/serializing/BinObjectEncoding.h"
 #include "undo/AddUndoAction.h"
+#include "undo/InsertUndoAction.h"
 #include "model/XojPage.h"
 #include "model/Layer.h"
 #include "model/Link.h"
@@ -269,6 +271,14 @@ bool CanvasView::cutSelection() {
 bool CanvasView::pasteElements() {
     // Port of Control::clipboardPasteXournal
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    if (mime && !mime->hasFormat(XOURNAL_MIME) && mime->hasImage()) {
+        // An image copied elsewhere (browser, screenshot tool): insert it as an image element.
+        QByteArray png;
+        QBuffer buffer(&png);
+        buffer.open(QIODevice::WriteOnly);
+        qvariant_cast<QImage>(mime->imageData()).save(&buffer, "PNG");
+        return insertImage(png);
+    }
     if (!mime || !mime->hasFormat(XOURNAL_MIME)) {
         return false;
     }
@@ -336,6 +346,44 @@ bool CanvasView::pasteElements() {
         g_warning("could not paste: %s", e.what());
         return false;
     }
+}
+
+bool CanvasView::insertImage(const QByteArray& data) {
+    const size_t pNr = session.getCurrentPageNo();
+    if (pNr >= pages.size() || data.isEmpty()) {
+        return false;
+    }
+    endTextEditing();
+    clearSelection();
+    auto img = std::make_unique<Image>();
+    try {
+        img->setImage(std::string(data.constData(), static_cast<size_t>(data.size())));
+    } catch (const std::exception& e) {
+        g_warning("Not an image: %s", e.what());
+        return false;
+    }
+    const auto [w, h] = img->getNaturalSize();
+    if (w <= 0 || h <= 0) {
+        return false;
+    }
+    // Fit into the visible part of the page (and the page), centered there (upstream: automaticScaling).
+    const double zoom = viewController.zoom();
+    const QRectF pageRect = layout.pageRect(pNr, zoom);
+    QRectF visible = pageRect.intersected(viewController.visibleContentRect());
+    if (visible.isEmpty()) {
+        visible = pageRect;
+    }
+    const QRectF area((visible.topLeft() - pageRect.topLeft()) / zoom, visible.size() / zoom);
+    const double scale = std::min({1.0, area.width() * 0.8 / w, area.height() * 0.8 / h});
+    const QPointF origin = area.center() - QPointF(w * scale / 2, h * scale / 2);
+    img->setTransformation({scale, 0, 0, scale, {std::max(0.0, origin.x()), std::max(0.0, origin.y())}});
+
+    PageRef page = pages[pNr]->getPage();
+    Layer* layer = page->getSelectedLayer();
+    session.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, img.get()));
+    auto sel = SelectionFactory::createFromFloatingElement(&session, page, layer, pages[pNr].get(), std::move(img));
+    setSelection(sel.release());
+    return true;
 }
 
 void CanvasView::selectAllOnPage() {

@@ -12,6 +12,8 @@
 #include <QElapsedTimer>
 #include <QPointingDevice>
 #include <QTabletEvent>
+#include <QImage>
+#include <QBuffer>
 #include <QKeyEvent>
 #include <QInputMethodEvent>
 #include <QTouchEvent>
@@ -535,4 +537,33 @@ TEST_F(CanvasReplayTest, textToolWritesAndEditsText) {
     tap(QPointF(box.x + 5, box.y + 5));
     view->endTextEditing();
     EXPECT_EQ(session->getUndoRedoHandler()->canRedo(), couldRedo);
+}
+
+TEST_F(CanvasReplayTest, insertedImageIsSelectedAndFitsTheView) {
+    view->getViewController().setViewSize(QSizeF(800, 600));
+    processEvents();
+    QImage big(4000, 2000, QImage::Format_RGB32);
+    big.fill(Qt::red);
+    QByteArray png;
+    QBuffer buffer(&png);
+    buffer.open(QIODevice::WriteOnly);
+    ASSERT_TRUE(big.save(&buffer, "PNG"));
+
+    ASSERT_TRUE(view->insertImage(png));
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_EQ(view->getSelection()->getElementsView().size(), 1u);
+    view->clearSelection();
+    ASSERT_EQ(elementCount(0), 1u);
+    const auto* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+    const Element* e = layer->getElementsView().front();
+    EXPECT_EQ(e->getType(), ELEMENT_IMAGE);
+    const auto box = e->getBoundingBox();
+    const auto* page = session->getDocument()->getPage(0).get();
+    EXPECT_LE(box.width, page->getWidth()) << "scaled down to fit";
+    EXPECT_NEAR(box.width / box.height, 2.0, 0.01) << "aspect ratio kept";
+    EXPECT_GE(box.x, 0);
+
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(elementCount(0), 0u);
+    EXPECT_FALSE(view->insertImage(QByteArray("not an image")));
 }

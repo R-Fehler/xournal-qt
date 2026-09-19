@@ -161,6 +161,8 @@ public:
     Q_INVOKABLE bool pasteElements();
     Q_INVOKABLE void deleteSelection();
     Q_INVOKABLE void selectAllOnPage();
+    /// Insert an image file on the current page (as a selection).
+    Q_INVOKABLE bool insertImage(const QUrl& file);
     Q_INVOKABLE void clearSelection();
 
     // --- search ---

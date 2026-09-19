@@ -100,6 +100,10 @@ cd build-qt
 - [ ] Tap outside or Esc ends; undo removes/restores; emptying a text removes it.
 - [ ] Text button again (or long press): font family and size, also for the text being edited.
 
+## Images
+- [ ] Image button: choose a photo; it appears in the middle of the page, selected; move/resize it with the pen; undo removes it.
+- [ ] Copy an image in a browser or screenshot tool, Ctrl+V on the canvas: inserted the same way.
+
 ## Page operations
 - [ ] Sidebar: Ctrl+click / Shift+click select pages (blue, check mark); a plain tap goes to the page.
 - [ ] Ctrl+C, then Ctrl+V: the pages are pasted after the selection; pasting into another tab works (PDF pages keep their look).

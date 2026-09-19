@@ -108,6 +108,10 @@ public:
     bool pasteElements();
     /// Select everything on the active layer of the current page (Control::selectAllOnPage).
     void selectAllOnPage();
+    /// Insert an image (file contents: PNG, JPEG, ...) on the current page, in the middle of its visible part and
+    /// fitted into it, as a selection to move or resize (port of ImageHandler::addImageToDocument). False if the data
+    /// is not an image.
+    bool insertImage(const QByteArray& data);
 
     // --- text tool (port of XojPageView::startText / XournalView::endTextAllPages): one editor per view ---
     TextEditor* getTextEditor() const { return textEditor.get(); }
