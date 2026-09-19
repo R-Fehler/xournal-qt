@@ -63,4 +63,10 @@ cd build-qt
 - [ ] Same, but "Discard changes": the documents open as last saved.
 - [ ] Settings → Documents → "Reopen the documents of the last session" off: the app starts with an empty document.
 
+## Search
+- [ ] Ctrl+F or the search button: typing searches the document (PDF text and typed text); hits are yellow, the current one orange; Enter / Shift+Enter and the arrows step through them and scroll.
+- [ ] A big PDF: the count grows while searching ("…"), the app stays responsive.
+- [ ] Tab overview: typing searches all open documents; documents with hits get an orange frame and a hit count, others are dimmed; tapping one opens it at its first hit with the search bar showing.
+- [ ] Esc or × in the search bar clears the highlights.
+
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

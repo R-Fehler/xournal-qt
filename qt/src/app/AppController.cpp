@@ -17,6 +17,7 @@
 
 #include "CanvasView.h"
 #include "session/AppContext.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
@@ -99,6 +100,10 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(s, &DocumentSession::filePathChanged, this, &AppController::titleChanged));
         currentConnections.push_back(
                 connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
+        currentConnections.push_back(
+                connect(&s->search(), &DocumentSearch::changed, this, &AppController::searchChanged));
+        currentConnections.push_back(
+                connect(&s->search(), &DocumentSearch::finished, this, &AppController::searchChanged));
     }
     pages->setSession(session());
     if (CanvasView* v = canvas()) {
@@ -112,6 +117,47 @@ void AppController::currentTabChanged() {
     Q_EMIT undoRedoChanged();
     Q_EMIT zoomChanged();
     Q_EMIT pageChanged();
+    Q_EMIT searchChanged();
+}
+
+QString AppController::searchQuery() const { return session() ? session()->search().query() : QString(); }
+void AppController::setSearchQuery(const QString& query) {
+    if (session()) {
+        session()->search().setQuery(query, true);
+    }
+}
+int AppController::searchHitCount() const {
+    return session() ? static_cast<int>(session()->search().hits().size()) : 0;
+}
+int AppController::searchCurrent() const { return session() ? session()->search().currentHit() + 1 : 0; }
+bool AppController::searchRunning() const { return session() && session()->search().isRunning(); }
+void AppController::searchNext() {
+    if (session()) {
+        session()->search().next();
+    }
+}
+void AppController::searchPrevious() {
+    if (session()) {
+        session()->search().previous();
+    }
+}
+void AppController::clearSearch() {
+    if (session()) {
+        session()->search().clear();
+    }
+}
+
+void AppController::searchAllTabs(const QString& query) {
+    for (int i = 0; i < tabs->count(); ++i) {
+        tabs->session(i)->search().setQuery(query, false);
+    }
+}
+
+void AppController::openSearchResult(int index) {
+    tabs->setCurrentIndex(index);
+    if (DocumentSession* s = session(); s && !s->search().query().isEmpty()) {
+        s->search().jumpToFirstFromCurrentPage();
+    }
 }
 
 QObject* AppController::tabsModel() const { return tabs.get(); }

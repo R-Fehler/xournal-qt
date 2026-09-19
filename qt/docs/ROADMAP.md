@@ -40,7 +40,10 @@
   - Fatal signals (crash, SIGTERM at logout, SIGINT) write every modified tab to `<cache>/autosaves/<pid>-<serial>.emergency.xopp` (upstream's CrashHandler, for all tabs).
   - Next start after a crash: "Recover unsaved changes?" lists the tabs whose emergency/autosave file is newer than the document; recovered tabs keep their original file path and are marked unsaved (upstream's EmergencySaveRestore). After a normal exit: the last tabs, current tab and pages are reopened (setting "Reopen the documents of the last session").
   - Fix: unsaved tabs autosaved to the same file (upstream's `<pid>.xopp`); each tab has its own now.
-- **Next:** the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
+- **Search: done (awaiting on-device test).**
+  - Search bar (Ctrl+F, search button): PDF text and text elements, per page as upstream's `SearchControl`; the whole document is searched incrementally on the UI thread. Hits are highlighted over the pages (current hit orange); Enter / Shift+Enter or the arrows step through them, starting at the current page.
+  - Tab overview: "Search all documents" marks the documents with hits (count) and dims the others; opening one shows its search at the first hit from its current page.
+- **Next:** page grid overview (whole document, zoomable, with search hits); then the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
 
 ---
 

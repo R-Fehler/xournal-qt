@@ -89,11 +89,21 @@ int main(int argc, char* argv[]) {
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
     // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).
     if (const auto shot = qEnvironmentVariable("XQT_SCREENSHOT"); !shot.isEmpty()) {
+        // XQT_SCREENSHOT_SEARCH=<text> searches all tabs (and shows the hits of the current one).
+        if (const auto query = qEnvironmentVariable("XQT_SCREENSHOT_SEARCH"); !query.isEmpty()) {
+            QTimer::singleShot(200, &controller, [&controller, query] {
+                controller.searchAllTabs(query);
+                controller.openSearchResult(controller.currentTab());
+            });
+        }
         if (const auto popup = qEnvironmentVariable("XQT_SCREENSHOT_POPUP"); !popup.isEmpty()) {
             QTimer::singleShot(300, [&engine, popup] {
                 if (auto* w = engine.rootObjects().value(0)) {
                     if (QObject* p = w->findChild<QObject*>(popup)) {
                         QMetaObject::invokeMethod(p, "open");
+                    }
+                    if (QObject* field = w->findChild<QObject*>("overviewSearchField")) {
+                        field->setProperty("text", qEnvironmentVariable("XQT_SCREENSHOT_SEARCH"));
                     }
                 }
             });

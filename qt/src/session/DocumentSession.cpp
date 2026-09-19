@@ -31,6 +31,7 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "AppContext.h"
+#include "DocumentSearch.h"
 #include "config.h"  // for FILE_FORMAT_VERSION
 
 namespace xqt {
@@ -100,6 +101,7 @@ DocumentSession::DocumentSession(AppContext& app, std::unique_ptr<Document> docu
 void DocumentSession::init() {
     static std::atomic<quint64> nextSerial{1};
     serialNo = nextSerial++;
+    searcher = std::make_unique<DocumentSearch>(*this);
     window.view = &headlessView;
     undoRedo = std::make_unique<UndoRedoHandler>(this);
     undoRedo->addUndoRedoListener(this);

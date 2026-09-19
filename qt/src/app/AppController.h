@@ -54,6 +54,12 @@ class AppController: public QObject {
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
+    // Search in the current document
+    Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchChanged)
+    Q_PROPERTY(int searchHitCount READ searchHitCount NOTIFY searchChanged)
+    /// 1-based number of the current hit (0: none)
+    Q_PROPERTY(int searchCurrent READ searchCurrent NOTIFY searchChanged)
+    Q_PROPERTY(bool searchRunning READ searchRunning NOTIFY searchChanged)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -79,6 +85,11 @@ public:
     int pageNumber() const;
     int pageCount() const;
     QVariantList recoveryItems() const;
+    QString searchQuery() const;
+    void setSearchQuery(const QString& query);
+    int searchHitCount() const;
+    int searchCurrent() const;
+    bool searchRunning() const;
 
     // --- start and recovery ---
     /// Start of the app: offers recovery after a crash (recoveryItems), else reopens the last tabs (setting), then
@@ -87,6 +98,15 @@ public:
     /// Answer to the recovery offer: reopen the tabs of the crashed run, with the recovered changes (accept) or as
     /// last saved (discard; the recovery files are deleted).
     Q_INVOKABLE void recover(bool accept);
+
+    // --- search ---
+    Q_INVOKABLE void searchNext();
+    Q_INVOKABLE void searchPrevious();
+    Q_INVOKABLE void clearSearch();
+    /// Search all open documents (tab overview); the hits per tab are in the tabs model ("searchHits").
+    Q_INVOKABLE void searchAllTabs(const QString& query);
+    /// Switch to a tab found by searchAllTabs and show its first hit from the current page on.
+    Q_INVOKABLE void openSearchResult(int index);
 
     // --- tabs ---
     /// New empty document in a new tab.
@@ -160,6 +180,7 @@ Q_SIGNALS:
     /// The window should come to the front (e.g. another instance handed over files).
     void raiseRequested();
     void recoveryChanged();
+    void searchChanged();
 
 private:
     xqt::DocumentSession* session() const;

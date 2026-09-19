@@ -60,6 +60,7 @@ protected:
     void releaseResources() override;
 
 private:
+    void updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale);
     bool claims(QPointF scenePos) const;
     void updateViewGeometry();
 

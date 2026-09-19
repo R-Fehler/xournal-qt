@@ -18,6 +18,7 @@
 #include <vector>
 
 #include <QObject>
+#include <QRectF>
 #include <QTimer>
 
 #include "control/Control.h"
@@ -30,6 +31,8 @@
 class LayerController;
 
 namespace xqt {
+
+class DocumentSearch;
 
 class AppContext;
 
@@ -102,6 +105,8 @@ public:
     void setCursor(XournalppCursor* cursor);
     void setCurrentPageNo(size_t page);
     SessionActions& getActions() { return actions; }
+    /// Text search in this document.
+    DocumentSearch& search() const { return *searcher; }
 
     // --- Control (shadow interface for reused upstream code) ----------------------------------------------------
     Settings* getSettings() const override;
@@ -139,6 +144,8 @@ Q_SIGNALS:
     void clearSelectionRequested();
     /// The content of a page changed through an undoable action (thumbnails should be updated).
     void pageContentChanged(qulonglong page);
+    /// Show this rectangle of a page (page points), e.g. a search hit.
+    void scrollToRectRequested(qulonglong page, QRectF rect);
 
 private:
     void init();
@@ -168,6 +175,7 @@ private:
     QTimer autosaveTimer;
     fs::path lastAutosaveFile;
     quint64 serialNo = 0;
+    std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };
 
 }  // namespace xqt

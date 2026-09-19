@@ -29,7 +29,8 @@ class TabManager final: public QAbstractListModel {
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentIndexChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 public:
-    enum Roles { TitleRole = Qt::UserRole + 1, ModifiedRole, FilePathRole, CurrentRole, ThumbnailRole, PageCountRole };
+    enum Roles { TitleRole = Qt::UserRole + 1, ModifiedRole, FilePathRole, CurrentRole, ThumbnailRole, PageCountRole,
+                 SearchHitsRole, SearchRunningRole };
 
     explicit TabManager(AppContext& app, QObject* parent = nullptr);
     ~TabManager() override;

@@ -3,6 +3,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <functional>
 #include <memory>
 
 #include <QCoreApplication>
@@ -17,9 +18,11 @@
 #include <gtest/gtest.h>
 
 #include "shell/SettingsModel.h"
+#include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "config-test.h"
 
 namespace {
 class MainWindowTest: public ::testing::Test {
@@ -68,6 +71,13 @@ protected:
     }
     void key(Qt::Key k, Qt::KeyboardModifiers m = Qt::NoModifier) {
         QTest::keyClick(window, k, m);
+        wait(20);
+    }
+    /// Types text into the focused item (QTest::keyClicks is for widgets only).
+    void type(const char* text) {
+        for (const char* c = text; *c; ++c) {
+            QTest::keyClick(window, *c);
+        }
         wait(20);
     }
 
@@ -152,4 +162,75 @@ TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {
     const QByteArray xml = f.readAll();
     EXPECT_TRUE(xml.contains("name=\"pressureMultiplier\" value=\"2.5")) << xml.left(400).toStdString();
     EXPECT_TRUE(xml.contains("name=\"autosaveTimeout\" value=\"7\""));
+}
+
+namespace {
+QString fixturePath(const char8_t* rel) {
+    const auto p = GET_TESTFILE(rel);
+    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
+}
+bool waitFor(const std::function<bool()>& done, int ms = 3000) {
+    QElapsedTimer t;
+    t.start();
+    while (!done() && t.elapsed() < ms) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    return done();
+}
+}  // namespace
+
+TEST_F(MainWindowTest, searchBarFindsAndSteps) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* bar = find<QQuickItem>("searchBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_FALSE(bar->isVisible());
+    key(Qt::Key_F, Qt::ControlModifier);
+    EXPECT_TRUE(bar->isVisible());
+    type("p1");
+    key(Qt::Key_Return);  // search now
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 3 && !controller->searchRunning(); }));
+    EXPECT_EQ(controller->searchCurrent(), 1);
+    key(Qt::Key_Return);
+    EXPECT_EQ(controller->searchCurrent(), 2);
+    EXPECT_EQ(controller->pageNumber(), 10);
+    key(Qt::Key_Return, Qt::ShiftModifier);
+    EXPECT_EQ(controller->searchCurrent(), 1);
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(bar->isVisible());
+    EXPECT_EQ(controller->searchQuery(), "");
+}
+
+TEST_F(MainWindowTest, tabOverviewSearchesAllDocuments) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/strokes.xopp")));
+    ASSERT_EQ(controller->tabCount(), 3);
+    QObject* overview = find("tabOverview");
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+
+    // Typing in the grid starts the search in all documents.
+    type("page");
+    key(Qt::Key_Return);
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    auto hits = [&](int row) { return tabs->index(row, 0).data(xqt::TabManager::SearchHitsRole).toInt(); };
+    auto running = [&](int row) { return tabs->index(row, 0).data(xqt::TabManager::SearchRunningRole).toBool(); };
+    ASSERT_TRUE(waitFor([&] { return !running(0) && !running(1) && !running(2); }));
+    EXPECT_EQ(hits(0), 0) << "pages.xopp: only p1..p11";
+    EXPECT_GE(hits(1), 1) << "old.xopp: \"Page 2\" in the PDF";
+    EXPECT_EQ(hits(2), 0);
+
+    // Opening the document with hits shows its search, at its first hit.
+    auto* grid = find<QQuickItem>("tabGrid");
+    QQuickItem* card = nullptr;
+    QMetaObject::invokeMethod(grid, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, card), Q_ARG(int, 1));
+    ASSERT_NE(card, nullptr);
+    const QPointF center = card->mapToScene(QPointF(card->width() / 2, card->height() / 2));
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, center.toPoint());
+    ASSERT_TRUE(waitOpened(overview, false));
+    EXPECT_EQ(controller->currentTab(), 1);
+    EXPECT_EQ(controller->searchQuery(), "page");
+    EXPECT_EQ(controller->searchCurrent(), 1);
+    EXPECT_TRUE(find<QQuickItem>("searchBar")->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 2) << "scrolled to the hit on page 2";
 }

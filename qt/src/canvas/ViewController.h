@@ -56,6 +56,8 @@ public:
     void fitWidth();
     void panBy(QPointF deltaView);
     void scrollToPage(size_t page);
+    /// Make a rectangle of a page (in page points) visible, centred if it has to scroll (e.g. a search hit).
+    void scrollToPageRect(size_t page, QRectF rectPt);
 
     void pinchBegin(QPointF centroid, double distance);
     void pinchUpdate(QPointF centroid, double distance);

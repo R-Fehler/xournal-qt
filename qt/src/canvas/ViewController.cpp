@@ -122,6 +122,31 @@ void ViewController::panBy(QPointF delta) {
     Q_EMIT changed();
 }
 
+void ViewController::scrollToPageRect(size_t page, QRectF rectPt) {
+    if (page >= layout->pageCount()) {
+        return;
+    }
+    if (!initialized) {
+        pendingPage = page;
+        return;
+    }
+    stopMomentum();
+    const QRectF p = layout->pageRect(page, z);
+    const QRectF r(p.x() + rectPt.x() * z, p.y() + rectPt.y() * z, rectPt.width() * z, rectPt.height() * z);
+    const QRectF visible = visibleContentRect().adjusted(0, 40, 0, -40);  // not under floating bars
+    if (visible.contains(r)) {
+        return;
+    }
+    if (r.top() < visible.top() || r.bottom() > visible.bottom()) {
+        scrollPos.setY(r.center().y() - view.height() / 2);
+    }
+    if (r.left() < visible.left() || r.right() > visible.right()) {
+        scrollPos.setX(r.center().x() - view.width() / 2);
+    }
+    clamp();
+    Q_EMIT changed();
+}
+
 void ViewController::scrollToPage(size_t page) {
     if (page >= layout->pageCount()) {
         return;

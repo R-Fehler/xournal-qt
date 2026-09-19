@@ -7,6 +7,7 @@
 #include "Thumbnails.h"
 #include "model/Document.h"
 #include "undo/UndoRedoHandler.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 
 namespace xqt {
@@ -49,6 +50,10 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
                     .arg(tabs[static_cast<size_t>(index.row())].thumbnailRevision);
         case PageCountRole:
             return static_cast<int>(s->getDocument()->getPageCount());
+        case SearchHitsRole:
+            return static_cast<int>(s->search().hits().size());
+        case SearchRunningRole:
+            return s->search().isRunning();
         default:
             return {};
     }
@@ -56,7 +61,8 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
 
 QHash<int, QByteArray> TabManager::roleNames() const {
     return {{TitleRole, "title"},         {ModifiedRole, "modified"},     {FilePathRole, "filePath"},
-            {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"}};
+            {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"},
+            {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}};
 }
 
 int TabManager::rowOf(const DocumentSession* s) const {
@@ -99,6 +105,9 @@ int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
         }
     };
     connect(s, &DocumentSession::pageContentChanged, this, thumbnailChanged);
+    auto searchChanged = [this, s] { tabDataChanged(s, {SearchHitsRole, SearchRunningRole}); };
+    connect(&s->search(), &DocumentSearch::changed, this, searchChanged);
+    connect(&s->search(), &DocumentSearch::finished, this, searchChanged);
     connect(s, &DocumentSession::currentPageChanged, this, thumbnailChanged);
 
     beginInsertRows(QModelIndex(), row, row);

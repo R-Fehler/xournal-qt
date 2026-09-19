@@ -170,6 +170,7 @@ ApplicationWindow {
             Item { Layout.fillWidth: true }
             IconButton { iconName: "xopp-page-add"; tip: qsTr("Add page after the current one"); onClicked: app.addPageAfterCurrent() }
             ToolSeparator {}
+            IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
             IconButton { objectName: "overviewButton"; iconName: "xqt-tabs-grid"; tip: qsTr("All open documents (Ctrl+Shift+E)"); onClicked: tabOverview.open() }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
         }
@@ -229,6 +230,14 @@ ApplicationWindow {
             }
             ToolButton { text: "+"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomIn() }
         }
+    }
+
+    SearchBar {
+        id: searchBar
+        objectName: "searchBar"
+        anchors.top: canvas.top
+        anchors.topMargin: 12
+        anchors.horizontalCenter: canvas.horizontalCenter
     }
 
     // Scroll bars over the canvas: wide enough to be dragged with a finger or the pen.
@@ -312,7 +321,12 @@ ApplicationWindow {
         anchors.centerIn: parent
         modal: true
         title: qsTr("Unsaved changes")
-        Label { text: qsTr("\"%1\" has unsaved changes.").arg(app.title) }
+        width: Math.min(win.width * 0.9, 480)
+        Label {
+            width: unsavedDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("\"%1\" has unsaved changes.").arg(app.title)
+        }
         footer: DialogButtonBox {
             Button { text: qsTr("Save"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
             Button { text: qsTr("Discard"); DialogButtonBox.buttonRole: DialogButtonBox.DestructiveRole }
@@ -340,7 +354,7 @@ ApplicationWindow {
         width: Math.min(win.width * 0.9, 560)
         title: qsTr("Recover unsaved changes?")
         ColumnLayout {
-            width: parent.width
+            width: recoveryDialog.availableWidth
             spacing: 8
             Label {
                 Layout.fillWidth: true
@@ -416,6 +430,9 @@ ApplicationWindow {
     }
     Shortcut { sequence: "Ctrl+Shift+E"; onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
     Shortcut { sequence: "Ctrl+,"; onActivated: settingsPage.open() }
+    Shortcut { sequences: [StandardKey.Find]; onActivated: searchBar.openBar() }
+    Shortcut { sequences: [StandardKey.FindNext]; onActivated: app.searchNext() }
+    Shortcut { sequences: [StandardKey.FindPrevious]; onActivated: app.searchPrevious() }
     Shortcut { sequences: [StandardKey.ZoomIn]; onActivated: app.zoomIn() }
     Shortcut { sequences: [StandardKey.ZoomOut]; onActivated: app.zoomOut() }
     Shortcut { sequence: "Ctrl+0"; onActivated: app.fitWidth() }

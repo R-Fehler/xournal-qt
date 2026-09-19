@@ -12,6 +12,7 @@
 
 #include "CanvasPage.h"
 #include "session/AppContext.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 
 namespace xqt {
@@ -38,6 +39,10 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     connect(&session, &DocumentSession::scrollToPageRequested, this,
             [this](qulonglong page) { viewController.scrollToPage(page); });
+    connect(&session, &DocumentSession::scrollToRectRequested, this,
+            [this](qulonglong page, QRectF rect) { viewController.scrollToPageRect(page, rect); });
+    // Search hits are drawn by the canvas item over the pages.
+    connect(&session.search(), &DocumentSearch::changed, this, &CanvasView::updateRequested);
 
     releaseTimer.setSingleShot(true);
     releaseTimer.setInterval(1000);

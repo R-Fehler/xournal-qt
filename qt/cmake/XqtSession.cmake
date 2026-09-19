@@ -11,6 +11,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/AppContext.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HeadlessViews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.cpp
@@ -40,7 +42,8 @@ set_target_properties(xqt-canvas PROPERTIES AUTOMOC ON)
 if(XQT_BUILD_TESTS)
     add_executable(xqt-session-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/main.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSessionTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSessionTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSearchTest.cpp)
     target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")

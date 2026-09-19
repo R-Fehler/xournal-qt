@@ -21,6 +21,8 @@
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "session/DocumentSearch.h"
+#include "session/DocumentSession.h"
 
 namespace {
 constexpr int TILE = 256;
@@ -38,6 +40,9 @@ public:
         appendChildNode(shadow);
         placeholder = new QSGSimpleRectNode(QRectF(), Qt::white);
         appendChildNode(placeholder);
+        // Search hits over the tiles (tiles are inserted before this node).
+        searchRoot = new QSGTransformNode;
+        appendChildNode(searchRoot);
     }
     void clearTiles() {
         for (auto* t: tiles) {
@@ -49,6 +54,9 @@ public:
     }
     QSGSimpleRectNode* shadow;
     QSGSimpleRectNode* placeholder;
+    QSGTransformNode* searchRoot;
+    quint64 searchRevision = ~quint64(0);
+    double searchScale = 0;
     std::vector<TileNode*> tiles;
     int cols = 0, rows = 0;
     double bufferZoom = 0;
@@ -303,6 +311,29 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
 
 void DocumentCanvasItem::releaseResources() { viewReplaced = true; }
 
+void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale) {
+    auto* node = static_cast<PageNode*>(pageNode);
+    const xqt::DocumentSearch& search = canvasView->getSession().search();
+    if (node->searchRevision == search.revision() && node->searchScale == scale) {
+        return;
+    }
+    node->searchRevision = search.revision();
+    node->searchScale = scale;
+    while (QSGNode* child = node->searchRoot->firstChild()) {
+        node->searchRoot->removeChildNode(child);
+        delete child;
+    }
+    const auto& hits = search.hits();
+    auto it = std::lower_bound(hits.begin(), hits.end(), pageIndex,
+                               [](const xqt::DocumentSearch::Hit& h, size_t p) { return h.page < p; });
+    for (; it != hits.end() && it->page == pageIndex; ++it) {
+        const bool current = static_cast<int>(it - hits.begin()) == search.currentHit();
+        const QRectF r(it->rect.x() * scale, it->rect.y() * scale, it->rect.width() * scale, it->rect.height() * scale);
+        node->searchRoot->appendChildNode(new QSGSimpleRectNode(
+                r.adjusted(-1, -1, 1, 1), current ? QColor(255, 120, 0, 150) : QColor(255, 210, 0, 110)));
+    }
+}
+
 QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*) {
     auto* root = static_cast<CanvasRootNode*>(old);
     if (!root) {
@@ -351,6 +382,8 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
 
         QMatrix4x4 m;
         m.translate(static_cast<float>(snap(r.x(), dpr)), static_cast<float>(snap(r.y(), dpr)));
+        // Children are in view pixels (no buffer yet) or buffer pixels (scaled by the node's transform).
+        updateSearchHits(node, i, info.valid ? info.zoom : zoom);
         if (!info.valid) {
             node->clearTiles();
             node->setMatrix(m);
@@ -410,7 +443,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             tile->setTexture(window()->createTextureFromImage(img, QQuickWindow::TextureIsOpaque));
             delete previous;
             if (!tile->parent()) {
-                node->appendChildNode(tile);
+                node->insertChildNodeBefore(tile, node->searchRoot);
             }
         }
     }

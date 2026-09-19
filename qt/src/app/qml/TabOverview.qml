@@ -1,5 +1,7 @@
 // Overview of all open documents (tabs) as a grid of cards with the current page of each: tap a card to switch to
 // it, × to close it, + for a new document. Keyboard: arrows, Enter, Delete, Escape.
+// The search field searches all open documents: documents with hits are marked; opening one shows its hits (the
+// document's own search, from its current page on).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -32,9 +34,21 @@ Popup {
     enter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 120 } }
     exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 } }
 
+    readonly property bool searching: searchField.text !== ""
+
     function activate(index) {
-        app.currentTab = index
+        if (searching) {
+            app.openSearchResult(index)
+        } else {
+            app.currentTab = index
+        }
         overview.close()
+    }
+
+    Timer {
+        id: searchTyping
+        interval: 300
+        onTriggered: app.searchAllTabs(searchField.text)
     }
 
     ColumnLayout {
@@ -50,8 +64,50 @@ Popup {
                 text: grid.count === 1 ? qsTr("1 open document") : qsTr("%1 open documents").arg(grid.count)
                 font.pixelSize: 20
                 font.weight: Font.DemiBold
-                Layout.fillWidth: true
             }
+            Item { Layout.fillWidth: true }
+            // Search in all open documents
+            Rectangle {
+                Layout.preferredWidth: Math.min(380, overview.width * 0.4)
+                Layout.preferredHeight: 44
+                radius: 22
+                color: "#ffffff"
+                border.width: searchField.activeFocus ? 2 : 1
+                border.color: searchField.activeFocus ? Material.accentColor : "#c9ccd1"
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 4
+                    Image { source: app.iconUrl("xqt-search"); sourceSize.width: 18; sourceSize.height: 18 }
+                    TextField {
+                        id: searchField
+                        objectName: "overviewSearchField"
+                        Layout.fillWidth: true
+                        background: null
+                        Label {
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: parent.leftPadding
+                            visible: parent.text === "" && parent.preeditText === ""
+                            text: qsTr("Search all documents")
+                            color: "#8a8d91"
+                        }
+                        selectByMouse: true
+                        onTextEdited: searchTyping.restart()
+                        Keys.onReturnPressed: { searchTyping.stop(); app.searchAllTabs(text); grid.forceActiveFocus() }
+                        Keys.onEnterPressed: { searchTyping.stop(); app.searchAllTabs(text); grid.forceActiveFocus() }
+                        Keys.onDownPressed: grid.forceActiveFocus()
+                    }
+                    ToolButton {
+                        visible: searchField.text !== ""
+                        implicitWidth: 36; implicitHeight: 36
+                        icon.source: app.iconUrl("xqt-close")
+                        icon.color: "#3c4043"
+                        display: AbstractButton.IconOnly
+                        onClicked: { searchField.text = ""; searchTyping.stop(); app.searchAllTabs("") }
+                    }
+                }
+            }
+            Item { Layout.fillWidth: true }
             IconButton {
                 iconName: "xopp-document-new"
                 tip: qsTr("New document")
@@ -79,6 +135,15 @@ Popup {
             Keys.onEnterPressed: overview.activate(currentIndex)
             Keys.onSpacePressed: overview.activate(currentIndex)
             Keys.onDeletePressed: overview.closeRequested(currentIndex)
+            Keys.onPressed: function(event) {
+                // Typing starts a search.
+                if (event.text.length === 1 && event.text.trim() !== "" && !(event.modifiers & Qt.ControlModifier)) {
+                    searchField.forceActiveFocus()
+                    searchField.text += event.text
+                    searchTyping.restart()
+                    event.accepted = true
+                }
+            }
 
             delegate: Item {
                 id: cell
@@ -88,17 +153,22 @@ Popup {
                 required property bool current
                 required property string thumbnail
                 required property int pageCount
+                required property int searchHits
+                required property bool searchRunning
                 width: grid.cellWidth
                 height: grid.cellHeight
                 readonly property bool highlighted: GridView.isCurrentItem && grid.activeFocus
+                // Searching: documents without hits step back.
+                readonly property bool hit: overview.searching && searchHits > 0
+                opacity: overview.searching && searchHits === 0 && !searchRunning ? 0.45 : 1
 
                 Rectangle {
                     anchors.fill: parent
                     anchors.margins: 10
                     radius: 12
                     color: "#ffffff"
-                    border.width: cell.current || cell.highlighted ? 3 : 1
-                    border.color: cell.current || cell.highlighted ? Material.accentColor : "#c9ccd1"
+                    border.width: cell.current || cell.highlighted || cell.hit ? 3 : 1
+                    border.color: cell.hit ? "#f9a825" : (cell.current || cell.highlighted ? Material.accentColor : "#c9ccd1")
 
                     ColumnLayout {
                         anchors.fill: parent
@@ -135,9 +205,30 @@ Popup {
                                 font.weight: cell.current ? Font.DemiBold : Font.Normal
                             }
                             Label {
+                                visible: !overview.searching
                                 text: cell.pageCount === 1 ? qsTr("1 page") : qsTr("%1 pages").arg(cell.pageCount)
                                 color: "#6b6f75"
                                 font.pixelSize: 12
+                            }
+                            // Search result of this document
+                            Rectangle {
+                                visible: overview.searching
+                                radius: 10
+                                implicitWidth: hitLabel.implicitWidth + 16
+                                implicitHeight: 22
+                                color: cell.searchHits > 0 ? "#fff3c4" : "#eceef1"
+                                Label {
+                                    id: hitLabel
+                                    objectName: "hitLabel"
+                                    anchors.centerIn: parent
+                                    font.pixelSize: 12
+                                    font.weight: cell.searchHits > 0 ? Font.DemiBold : Font.Normal
+                                    color: cell.searchHits > 0 ? "#7a5200" : "#6b6f75"
+                                    text: cell.searchHits > 0
+                                          ? (cell.searchHits === 1 ? qsTr("1 hit") : qsTr("%1 hits").arg(cell.searchHits))
+                                            + (cell.searchRunning ? "…" : "")
+                                          : (cell.searchRunning ? qsTr("Searching…") : qsTr("No hits"))
+                                }
                             }
                         }
                     }
