@@ -16,6 +16,9 @@ void DocumentListener::registerListener(DocumentHandler* handler) {
 void DocumentListener::unregisterListener() {
     if (this->handler) {
         this->handler->removeListener(this);
+        // xournal-qt: forget the handler, so that unregistering again (e.g. in the destructor, after the handler is
+        // gone) is harmless. Listeners that move between documents rely on it.
+        this->handler = nullptr;
     }
 }
 

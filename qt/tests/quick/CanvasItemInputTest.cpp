@@ -14,6 +14,7 @@
 #include <QElapsedTimer>
 #include <QPointingDevice>
 #include <QQmlApplicationEngine>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTemporaryDir>
@@ -42,6 +43,8 @@ import QtQuick.Controls
 import XournalQt.Canvas
 ApplicationWindow {
     width: 800; height: 700; visible: true
+    // A background item (z -1, declared after the content) must not hide the canvas from input.
+    background: Rectangle { color: "#404040" }
     property int clicks: 0
     property alias dialog: dialog
     DocumentCanvas { id: canvas; objectName: "canvas"; anchors.fill: parent }
@@ -257,4 +260,26 @@ TEST_F(CanvasItemInputTest, scrollBarScrollsWithMouseAndPenWithoutDrawing) {
     wait(50);
     EXPECT_GT(contentY(), afterMouse + 50) << "dragging the scroll bar with the pen did not scroll";
     EXPECT_EQ(strokeCount(), 0u) << "scroll bar drags drew on the canvas";
+}
+
+// Regression test: with Qt Quick's software backend (offscreen, no GPU) the pages were drawn at the canvas's old
+// position after the canvas moved (sidebar shown), over the items next to it.
+TEST_F(CanvasItemInputTest, pagesFollowTheCanvasWhenItMoves) {
+    QQmlProperty(canvas, "anchors.leftMargin").write(300);
+    wait(100);
+    QMetaObject::invokeMethod(canvas, "scrollTo", Q_ARG(qreal, 0), Q_ARG(qreal, 0));
+    wait(300);
+    ASSERT_DOUBLE_EQ(canvas->mapToScene(QPointF(0, 0)).x(), 300.0);
+    const QImage shot = window->grabWindow();
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        shot.save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    // The first page's left edge is where the view says it is, in the moved canvas.
+    const QRectF page = view->pageViewRect(0).translated(canvas->mapToScene(QPointF(0, 0)));
+    ASSERT_GT(page.left(), 305.0);
+    const int y = static_cast<int>(page.top()) + 40;
+    for (int x = 0; x < static_cast<int>(page.left()) - 1; x += 5) {
+        ASSERT_EQ(QColor(shot.pixel(x, y)), QColor("#404040")) << "page drawn left of its position at x=" << x;
+    }
+    EXPECT_EQ(QColor(shot.pixel(static_cast<int>(page.left()) + 3, y)), QColor(Qt::white)) << "page missing";
 }

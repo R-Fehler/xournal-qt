@@ -87,6 +87,7 @@ Q_SIGNALS:
 
 private:
     void rebuildPages();
+    void refreshLayout();
     void updateVisibility();
     void releaseFarBuffers();
     void updateRenderParams();

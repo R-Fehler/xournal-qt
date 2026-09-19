@@ -18,6 +18,7 @@ ApplicationWindow {
     color: "#5f6368"
 
     property var afterDiscardCheck: null
+    property bool sidebarShown: width >= 900
     property bool quitting: false
 
     function withSavedChanges(action) {
@@ -94,12 +95,26 @@ ApplicationWindow {
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: 56
-        RowLayout {
+        // Scrolls sideways when the window is too narrow for all tools (portrait tablet).
+        Flickable {
+            id: toolFlick
             anchors.fill: parent
             anchors.leftMargin: 6
             anchors.rightMargin: 6
+            contentWidth: toolRow.width
+            contentHeight: height
+            flickableDirection: Flickable.HorizontalFlick
+            boundsBehavior: Flickable.StopAtBounds
+            interactive: contentWidth > width
+            clip: true
+        RowLayout {
+            id: toolRow
+            height: toolFlick.height
+            width: Math.max(toolFlick.width, implicitWidth)
             spacing: 2
 
+            IconButton { iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: sidebarShown; onClicked: sidebarShown = !sidebarShown }
+            ToolSeparator {}
             IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
             IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
@@ -154,18 +169,63 @@ ApplicationWindow {
             }
             Item { Layout.fillWidth: true }
             IconButton { iconName: "xopp-page-add"; tip: qsTr("Add page after the current one"); onClicked: app.addPageAfterCurrent() }
-            Label { text: app.pageNumber + " / " + app.pageCount; color: "#505050"; Layout.rightMargin: 8 }
-            ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }
-            ToolButton { text: app.zoomPercent + " %"; onClicked: app.fitWidth(); ToolTip.visible: hovered; ToolTip.text: qsTr("Fit page width") }
-            ToolButton { text: "+"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomIn() }
+        }
         }
       }
     }
 
+    PageSidebar {
+        id: sidebar
+        objectName: "sidebar"
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        width: 210
+        visible: sidebarShown
+    }
+
     DocumentCanvas {
         id: canvas
-        anchors.fill: parent
+        objectName: "canvas"
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.left: sidebar.visible ? sidebar.right : parent.left
+        clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
+    }
+
+    // Page and zoom status, floating over the canvas.
+    Pane {
+        id: viewPill
+        anchors.right: canvas.right
+        anchors.bottom: canvas.bottom
+        anchors.rightMargin: 28
+        anchors.bottomMargin: 24
+        padding: 2
+        leftPadding: 14
+        rightPadding: 4
+        Material.foreground: "#303030"
+        background: Rectangle {
+            radius: height / 2
+            color: "#f2fafafa"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        RowLayout {
+            spacing: 0
+            Label { text: app.pageNumber + " / " + app.pageCount; color: "#505050"; Layout.rightMargin: 6 }
+            ToolSeparator {}
+            ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }
+            ToolButton {
+                text: app.zoomPercent + " %"
+                implicitWidth: 72
+                onClicked: app.fitWidth()
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Fit page width")
+            }
+            ToolButton { text: "+"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomIn() }
+        }
     }
 
     // Scroll bars over the canvas: wide enough to be dragged with a finger or the pen.

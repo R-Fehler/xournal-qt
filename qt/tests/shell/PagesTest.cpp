@@ -1,0 +1,165 @@
+/*
+ * xournal-qt: the page sidebar model (PagesModel), thumbnails and page operations through AppController.
+ *
+ * @license GNU GPLv2 or later
+ */
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QImage>
+#include <QSignalSpy>
+#include <gtest/gtest.h>
+
+#include "model/Document.h"
+#include "model/Layer.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
+#include "model/XojPage.h"
+#include "session/DocumentSession.h"
+#include "shell/PagesModel.h"
+#include "shell/TabManager.h"
+#include "shell/Thumbnails.h"
+#include "undo/InsertUndoAction.h"
+#include "undo/UndoRedoHandler.h"
+
+#include "AppController.h"
+#include "CanvasPage.h"
+#include "CanvasView.h"
+#include "config-test.h"
+
+using namespace xqt;
+
+namespace {
+void processEvents(int ms) {
+    QElapsedTimer t;
+    t.start();
+    while (t.elapsed() < ms) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+}
+
+QString fixture(const char8_t* rel) {
+    const auto p = GET_TESTFILE(rel);
+    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
+}
+
+PagesModel& pagesOf(AppController& c) { return *qobject_cast<PagesModel*>(c.pagesModel()); }
+
+std::string thumbnailUrl(PagesModel& m, int row) {
+    return m.data(m.index(row), PagesModel::ThumbnailRole).toString().toStdString();
+}
+
+/// "image://thumbnail/<session>" of a thumbnail URL.
+std::string sessionPart(const std::string& url) {
+    return url.substr(0, url.find('/', std::string("image://thumbnail/").size()));
+}
+
+/// Layout and document agree: one layout slot per page, with the page's size.
+void expectLayoutMatchesDocument(AppController& c) {
+    DocumentSession* s = c.tabManager().currentSession();
+    CanvasView* view = c.tabManager().view(c.currentTab());
+    Document* doc = s->getDocument();
+    ASSERT_EQ(view->pageCount(), doc->getPageCount());
+    ASSERT_EQ(view->getLayout().pageCount(), doc->getPageCount());
+    for (size_t i = 0; i < doc->getPageCount(); ++i) {
+        EXPECT_EQ(view->getPage(i)->getPage(), doc->getPage(i)) << "page " << i;
+        const QRectF r = view->getLayout().pageRect(i, 1.0);
+        EXPECT_DOUBLE_EQ(r.width(), doc->getPage(i)->getWidth()) << "page " << i;
+        EXPECT_DOUBLE_EQ(r.height(), doc->getPage(i)->getHeight()) << "page " << i;
+    }
+}
+}  // namespace
+
+TEST(Pages, modelFollowsPageOperations) {
+    AppController c;
+    PagesModel& m = pagesOf(c);
+    EXPECT_EQ(m.rowCount(), 1);
+    QSignalSpy count(&m, &PagesModel::countChanged);
+
+    c.insertPageAfter(0);
+    c.insertPageAfter(1);
+    EXPECT_EQ(m.rowCount(), 3);
+    EXPECT_EQ(m.currentPage(), 2);
+    EXPECT_EQ(m.data(m.index(2), PagesModel::PageNumberRole).toInt(), 3);
+    expectLayoutMatchesDocument(c);
+
+    c.deletePage(0);
+    EXPECT_EQ(m.rowCount(), 2);
+    EXPECT_EQ(m.currentPage(), 0);
+    expectLayoutMatchesDocument(c);
+
+    c.duplicatePage(1);
+    EXPECT_EQ(m.rowCount(), 3);
+    expectLayoutMatchesDocument(c);
+    c.movePageUp(2);
+    expectLayoutMatchesDocument(c);
+
+    c.undo();  // move
+    c.undo();  // duplicate
+    c.undo();  // delete
+    EXPECT_EQ(m.rowCount(), 3);
+    expectLayoutMatchesDocument(c);
+    EXPECT_GE(count.count(), 5);
+}
+
+TEST(Pages, modelFollowsTheCurrentTab) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
+    PagesModel& m = pagesOf(c);
+    EXPECT_EQ(m.rowCount(), 2);
+    const std::string firstTab = sessionPart(thumbnailUrl(m, 0));
+    c.newDocument();
+    EXPECT_EQ(m.rowCount(), 1);
+    EXPECT_NE(sessionPart(thumbnailUrl(m, 0)), firstTab) << "thumbnail URLs must name the tab's session";
+    c.setCurrentTab(0);
+    EXPECT_EQ(m.rowCount(), 2);
+    EXPECT_EQ(sessionPart(thumbnailUrl(m, 0)), firstTab);
+}
+
+TEST(Pages, editsChangeTheThumbnailRevision) {
+    AppController c;
+    PagesModel& m = pagesOf(c);
+    m.setRefreshDelay(10);
+    const std::string before = thumbnailUrl(m, 0);
+
+    DocumentSession* s = c.tabManager().currentSession();
+    auto page = s->getDocument()->getPage(0);
+    auto stroke = std::make_unique<Stroke>();
+    stroke->setWidth(1.41);
+    stroke->addPoint(Point(10, 10, 1));
+    stroke->addPoint(Point(50, 40, 1));
+    const Stroke* raw = stroke.get();
+    Layer* layer = page->getSelectedLayer();
+    s->getDocument()->lock();
+    layer->addElement(std::move(stroke));
+    s->getDocument()->unlock();
+    QSignalSpy changed(&m, &QAbstractItemModel::dataChanged);
+    // Like the stroke tool: the undo action announces the changed page.
+    s->getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+    processEvents(80);
+    ASSERT_GE(changed.count(), 1);
+    const std::string afterEdit = thumbnailUrl(m, 0);
+    EXPECT_NE(afterEdit, before);
+
+    c.undo();
+    processEvents(80);
+    EXPECT_NE(thumbnailUrl(m, 0), afterEdit) << "undo must refresh the thumbnail too";
+}
+
+TEST(Pages, thumbnailShowsThePage) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
+    DocumentSession* s = c.tabManager().currentSession();
+    const QImage img = ThumbnailProvider::render(*s, 0, 160);
+    ASSERT_EQ(img.width(), 160);
+    const auto* page = s->getDocument()->getPage(0).get();
+    EXPECT_NEAR(img.height(), 160 * page->getHeight() / page->getWidth(), 1);
+    // The PDF background (large dark shapes) is in the thumbnail.
+    int dark = 0;
+    for (int y = 0; y < img.height(); ++y) {
+        for (int x = 0; x < img.width(); ++x) {
+            dark += qGray(img.pixel(x, y)) < 100;
+        }
+    }
+    EXPECT_GT(dark, img.width() * img.height() / 20);
+    EXPECT_TRUE(ThumbnailProvider::render(*s, 99, 160).isNull()) << "no page 99";
+}

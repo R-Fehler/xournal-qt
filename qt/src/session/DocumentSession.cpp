@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <mutex>
 #include <shared_mutex>
 #include <utility>
 
@@ -16,7 +18,9 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "undo/InsertDeletePageUndoAction.h"
+#include "undo/SwapUndoAction.h"
 #include "util/PathUtil.h"
+#include "util/Util.h"
 #include "util/PlaceholderString.h"
 #include "util/i18n.h"
 #include "util/raii/CairoWrappers.h"
@@ -225,7 +229,99 @@ void DocumentSession::undoRedoChanged() {
     }
 }
 
-void DocumentSession::undoRedoPageChanged(PageRef) {}
+void DocumentSession::undoRedoPageChanged(PageRef page) {
+    if (!page) {
+        return;
+    }
+    size_t index = 0;
+    {
+        std::shared_lock lock(*doc);
+        index = doc->indexOf(page);
+    }
+    if (index != npos) {
+        Q_EMIT pageContentChanged(index);
+    }
+}
+
+void DocumentSession::deletePage() {
+    // Port of Control::deletePage
+    clearSelectionEndText();
+    size_t pNr = getCurrentPageNo();
+    // Don't delete the last page: there is always at least one page.
+    if (doc->getPageCount() < 2 || pNr >= doc->getPageCount()) {
+        return;
+    }
+    PageRef page;
+    {
+        std::shared_lock lock(*doc);
+        page = doc->getPage(pNr);
+    }
+    // Upstream: first send the event, then delete the page.
+    firePageDeleted(pNr);
+    doc->lock();
+    doc->deletePage(pNr);
+    doc->unlock();
+    undoRedo->addUndoAction(std::make_unique<InsertDeletePageUndoAction>(page, pNr, false));
+    if (pNr >= doc->getPageCount()) {
+        pNr = doc->getPageCount() - 1;
+    }
+    currentPage = std::numeric_limits<size_t>::max();  // force the update below
+    setCurrentPageNo(pNr);
+    scrollHandler.scrollToPage(pNr);
+    updatePageActions();
+}
+
+void DocumentSession::duplicatePage() {
+    // Port of Control::duplicatePage
+    auto page = getCurrentPage();
+    if (!page) {
+        return;
+    }
+    auto pageCopy = std::make_shared<XojPage>(*page);
+    insertPage(pageCopy, getCurrentPageNo() + 1);
+}
+
+void DocumentSession::movePageTowardsBeginning() {
+    // Port of Control::movePageTowardsBeginning
+    const size_t currentPageNo = getCurrentPageNo();
+    if (currentPageNo < 1 || currentPageNo >= doc->getPageCount()) {
+        return;
+    }
+    auto lock = std::unique_lock(*doc);
+    PageRef page = doc->getPage(currentPageNo);
+    PageRef otherPage = doc->getPage(currentPageNo - 1);
+    doc->deletePage(currentPageNo);
+    doc->insertPage(page, currentPageNo - 1);
+    lock.unlock();
+
+    undoRedo->addUndoAction(std::make_unique<SwapUndoAction>(currentPageNo - 1, true, page, otherPage));
+    firePageDeleted(currentPageNo);
+    firePageInserted(currentPageNo - 1);
+    firePageSelected(currentPageNo - 1);
+    setCurrentPageNo(currentPageNo - 1);
+    scrollHandler.scrollToPage(currentPageNo - 1);
+}
+
+void DocumentSession::movePageTowardsEnd() {
+    // Port of Control::movePageTowardsEnd
+    const size_t currentPageNo = getCurrentPageNo();
+    auto lock = std::unique_lock(*doc);
+    if (currentPageNo + 1 >= doc->getPageCount()) {
+        return;
+    }
+    PageRef page = doc->getPage(currentPageNo);
+    PageRef otherPage = doc->getPage(currentPageNo + 1);
+    doc->deletePage(currentPageNo);
+    doc->insertPage(page, currentPageNo + 1);
+    lock.unlock();
+
+    undoRedo->addUndoAction(std::make_unique<SwapUndoAction>(currentPageNo, false, page, otherPage));
+    firePageDeleted(currentPageNo);
+    firePageInserted(currentPageNo + 1);
+    firePageSelected(currentPageNo + 1);
+    setCurrentPageNo(currentPageNo + 1);
+    scrollHandler.scrollToPage(currentPageNo + 1);
+}
 
 // --- file handling -----------------------------------------------------------------------------------------------
 

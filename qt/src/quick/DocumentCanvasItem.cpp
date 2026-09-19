@@ -56,15 +56,18 @@ public:
     QSize pixelSize;
 };
 
-class CanvasRootNode final: public QSGNode {
+// Containers are (identity) transform nodes, not plain QSGNodes: Qt Quick's software backend re-resolves a changed
+// node's transform and clip from its parent, and only records them for transform/clip/opacity nodes. Under a plain
+// parent a re-positioned page would lose the item's position.
+class CanvasRootNode final: public QSGTransformNode {
 public:
     CanvasRootNode() {
-        pagesRoot = new QSGNode;
+        pagesRoot = new QSGTransformNode;
         appendChildNode(pagesRoot);
         hover = new QSGSimpleRectNode(QRectF(), QColor(0x1d, 0x2b, 0x8f));
         appendChildNode(hover);
     }
-    QSGNode* pagesRoot;
+    QSGTransformNode* pagesRoot;
     QSGSimpleRectNode* hover;
     std::unordered_map<const xqt::CanvasPage*, PageNode*> pages;
 };
@@ -187,9 +190,14 @@ namespace {
 /// Deepest visible item at a scene position, following the stacking order (topmost first), like Qt Quick's
 /// delivery. Popups, dialogs and their modal dimmer live in the window's overlay, which is above the content.
 QQuickItem* topmostItemAt(QQuickItem* item, QPointF scenePos) {
-    const QPointF p = item->mapFromScene(scenePos);
-    if (QQuickItem* child = item->childAt(p.x(), p.y())) {
-        return topmostItemAt(child, scenePos);
+    // Paint order: by z, then declaration order. (QQuickItem::childAt ignores z, and would e.g. find an
+    // ApplicationWindow's background (z -1) on top of the content.)
+    QList<QQuickItem*> children = item->childItems();
+    std::stable_sort(children.begin(), children.end(), [](QQuickItem* a, QQuickItem* b) { return a->z() < b->z(); });
+    for (auto it = children.crbegin(); it != children.crend(); ++it) {
+        if ((*it)->isVisible() && (*it)->contains((*it)->mapFromScene(scenePos))) {
+            return topmostItemAt(*it, scenePos);
+        }
     }
     return item;
 }

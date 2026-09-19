@@ -18,10 +18,14 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
-target_link_libraries(xqt-shell PUBLIC Qt6::Network xqt-canvas)
+target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::Quick xqt-canvas)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
 
 qt_add_executable(xournal-qt
@@ -30,6 +34,7 @@ qt_add_executable(xournal-qt
 set_source_files_properties(src/app/qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
 set_source_files_properties(src/app/qml/IconButton.qml PROPERTIES QT_RESOURCE_ALIAS IconButton.qml)
 set_source_files_properties(src/app/qml/TabStrip.qml PROPERTIES QT_RESOURCE_ALIAS TabStrip.qml)
+set_source_files_properties(src/app/qml/PageSidebar.qml PROPERTIES QT_RESOURCE_ALIAS PageSidebar.qml)
 qt_add_qml_module(xournal-qt
     URI XournalQt
     VERSION 1.0
@@ -37,6 +42,7 @@ qt_add_qml_module(xournal-qt
         src/app/qml/Main.qml
         src/app/qml/IconButton.qml
         src/app/qml/TabStrip.qml
+        src/app/qml/PageSidebar.qml
 )
 target_include_directories(xournal-qt PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xournal-qt PRIVATE Qt6::Widgets Qt6::Quick Qt6::QuickControls2 xqt-quick xqt-shell)
@@ -53,7 +59,8 @@ if(XQT_BUILD_TESTS)
 
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

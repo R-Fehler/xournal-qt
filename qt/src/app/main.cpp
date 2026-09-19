@@ -20,6 +20,7 @@
 
 #include "AppController.h"
 #include "shell/SingleInstance.h"
+#include "shell/Thumbnails.h"
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
 
@@ -68,6 +69,7 @@ int main(int argc, char* argv[]) {
     QObject::connect(&instance, &xqt::SingleInstance::filesRequested, &controller, &AppController::openPaths);
 
     QQmlApplicationEngine engine;
+    engine.addImageProvider("thumbnail", new xqt::ThumbnailProvider);  // the engine takes ownership
     engine.rootContext()->setContextProperty("app", &controller);
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &qapp, [] { QCoreApplication::exit(1); },

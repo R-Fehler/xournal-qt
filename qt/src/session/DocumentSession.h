@@ -110,6 +110,12 @@ public:
     void insertNewPage(size_t position, bool automatedInsertion = false) override;
     void insertPage(const PageRef& page, size_t position, bool shouldScrollToPage = true) override;
 
+    // --- page operations on the current page (ports of upstream Control, undoable) ------------------------------
+    void deletePage();
+    void duplicatePage();
+    void movePageTowardsBeginning();
+    void movePageTowardsEnd();
+
 Q_SIGNALS:
     void modifiedChanged(bool modified);
     void undoRedoStateChanged();
@@ -119,6 +125,8 @@ Q_SIGNALS:
     void scrollToPageRequested(qulonglong page);
     /// The view should end text editing and clear its selection (before document modifications).
     void clearSelectionRequested();
+    /// The content of a page changed through an undoable action (thumbnails should be updated).
+    void pageContentChanged(qulonglong page);
 
 private:
     void init();

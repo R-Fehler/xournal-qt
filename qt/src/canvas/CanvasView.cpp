@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <shared_mutex>
 
 #include "control/PdfCache.h"
 #include "control/settings/Settings.h"
@@ -96,12 +97,26 @@ void CanvasView::updateRenderParams() {
 
 void CanvasView::rebuildPages() {
     pages.clear();
-    layout.update(*session.getDocument());
-    const size_t n = layout.pageCount();
+    Document* doc = session.getDocument();
+    size_t n = 0;
+    {
+        std::shared_lock lock(*doc);
+        n = doc->getPageCount();
+    }
     pages.reserve(n);
     for (size_t i = 0; i < n; ++i) {
-        pages.push_back(std::make_unique<CanvasPage>(*this, session.getDocument()->getPage(i)));
+        pages.push_back(std::make_unique<CanvasPage>(*this, doc->getPage(i)));
     }
+    refreshLayout();
+}
+
+void CanvasView::refreshLayout() {
+    std::vector<PageRef> refs;
+    refs.reserve(pages.size());
+    for (const auto& p: pages) {
+        refs.push_back(p->getPage());
+    }
+    layout.update(*session.getDocument(), refs);
     viewController.layoutChanged();
     Q_EMIT pagesChanged();
 }
@@ -190,12 +205,10 @@ void CanvasView::documentChanged(DocumentChangeType type) {
 }
 
 void CanvasView::pageSizeChanged(size_t page) {
-    layout.update(*session.getDocument());
     if (page < pages.size()) {
         pages[page]->rerenderPage(true);
     }
-    viewController.layoutChanged();
-    Q_EMIT pagesChanged();
+    refreshLayout();
 }
 
 void CanvasView::pageChanged(size_t page) {
@@ -205,20 +218,21 @@ void CanvasView::pageChanged(size_t page) {
 }
 
 void CanvasView::pageInserted(size_t page) {
-    layout.update(*session.getDocument());
-    pages.insert(pages.begin() + static_cast<std::ptrdiff_t>(page),
-                 std::make_unique<CanvasPage>(*this, session.getDocument()->getPage(page)));
-    viewController.layoutChanged();
-    Q_EMIT pagesChanged();
+    PageRef ref;
+    {
+        std::shared_lock lock(*session.getDocument());
+        ref = session.getDocument()->getPage(page);
+    }
+    pages.insert(pages.begin() + static_cast<std::ptrdiff_t>(std::min(page, pages.size())),
+                 std::make_unique<CanvasPage>(*this, std::move(ref)));
+    refreshLayout();
 }
 
 void CanvasView::pageDeleted(size_t page) {
     if (page < pages.size()) {
         pages.erase(pages.begin() + static_cast<std::ptrdiff_t>(page));
     }
-    layout.update(*session.getDocument());
-    viewController.layoutChanged();
-    Q_EMIT pagesChanged();
+    refreshLayout();
 }
 
 void CanvasView::pageSelected(size_t) {}

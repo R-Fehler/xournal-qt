@@ -4,6 +4,7 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "Thumbnails.h"
 #include "model/Document.h"
 #include "undo/UndoRedoHandler.h"
 #include "session/DocumentSession.h"
@@ -15,6 +16,7 @@ TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(par
 TabManager::~TabManager() {
     beginResetModel();
     for (auto& t: tabs) {
+        ThumbnailProvider::unregisterSession(t.session.get());
         t.view.reset();  // the view refers to the session
         t.session.reset();
     }
@@ -114,7 +116,8 @@ void TabManager::closeTab(int index) {
         backgroundChanged(-1);
         Q_EMIT currentTabChanged();
     }
-    // Destroy after the UI switched away from it.
+    // Destroy after the UI switched away from it (and after running thumbnail renders of it finished).
+    ThumbnailProvider::unregisterSession(tab.session.get());
     tab.session->deleteAutosaveFile();
     tab.view.reset();
     tab.session.reset();

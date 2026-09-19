@@ -8,15 +8,15 @@
 
 namespace xqt {
 
-void DocumentLayout::update(Document& doc) {
+void DocumentLayout::update(Document& doc, const std::vector<PageRef>& pages) {
     std::shared_lock lock(doc);
-    const size_t n = doc.getPageCount();
+    const size_t n = pages.size();
     sizes.resize(n);
     heightPrefix.resize(n + 1);
     heightPrefix[0] = 0;
     maxWidth = 0;
     for (size_t i = 0; i < n; ++i) {
-        auto page = doc.getPage(i);
+        const auto& page = pages[i];
         sizes[i] = QSizeF(page->getWidth(), page->getHeight());
         heightPrefix[i + 1] = heightPrefix[i] + sizes[i].height();
         maxWidth = std::max(maxWidth, sizes[i].width());

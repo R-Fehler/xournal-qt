@@ -19,6 +19,8 @@
 #include <QRectF>
 #include <QSizeF>
 
+#include "model/PageRef.h"
+
 class Document;
 
 namespace xqt {
@@ -28,8 +30,10 @@ public:
     static constexpr double PADDING = 10.0;          ///< upstream XOURNAL_PADDING
     static constexpr double PADDING_BETWEEN = 15.0;  ///< upstream XOURNAL_PADDING_BETWEEN
 
-    /// Re-read the page sizes. Call on the UI thread (takes a shared document lock).
-    void update(Document& doc);
+    /// Re-read the page sizes of the view's pages. Call on the UI thread (takes a shared document lock).
+    /// Like upstream's Layout, this follows the view's own page list, not the document: upstream fires
+    /// "page deleted" before it removes the page from the document.
+    void update(Document& doc, const std::vector<PageRef>& pages);
 
     size_t pageCount() const { return sizes.size(); }
     QSizeF pageSize(size_t page) const { return sizes[page]; }

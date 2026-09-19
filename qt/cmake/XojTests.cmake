@@ -53,4 +53,10 @@ target_include_directories(xoj-unit-tests PRIVATE "${TEST_CONFIG_DIR}")
 set_target_properties(xoj-unit-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 
 include(GoogleTest)
-gtest_discover_tests(xoj-unit-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS unit)
+# Some upstream suites write to fixed paths in the temp directory (e.g. /tmp/xournalpp-test-units.xopp): they must
+# not run in parallel with each other (ctest -j). The rest runs freely.
+set(XOJ_UNIT_TMPFILE_SUITES "ControlLoadHandler.*:SettingsTest.*:Metadata.*")
+gtest_discover_tests(xoj-unit-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "${XOJ_UNIT_TMPFILE_SUITES}"
+    PROPERTIES LABELS unit RESOURCE_LOCK xoj-unit-tmpfiles)
+gtest_discover_tests(xoj-unit-tests DISCOVERY_TIMEOUT 30 TEST_FILTER "-${XOJ_UNIT_TMPFILE_SUITES}"
+    PROPERTIES LABELS unit)

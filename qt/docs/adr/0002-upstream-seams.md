@@ -38,6 +38,7 @@ The Qt build defines `XOJ_NO_GTK=1`. The upstream GTK build is unaffected by the
 | `src/core/control/jobs/ExportBackgroundType.h` (new) | `ExportBackgroundType` moved out of `BaseExportJob.h`, which drags in GTK. |
 | `BaseExportJob.h`, `ExportHelper.h`, `ImageExport.h/.cpp`, `pdf/base/XojPdfExport.h`, `XojCairoPdfExport.h` | Include `ExportBackgroundType.h` instead of `BaseExportJob.h`. |
 | `src/core/model/DocumentOutline.h` (new) | Toolkit-independent outline type, used by the Qt build. |
+| `src/core/model/DocumentListener.cpp` | `unregisterListener()` forgets the handler, so a second call (e.g. from the destructor, after the handler is gone) is harmless. Needed by listeners that follow the current tab (`PagesModel`). |
 | `src/core/model/Document.h` | `setDocumentHandler()`: re-target document events from the `LoadHandler` to the session that owns the document, instead of copying documents with `operator=` (upstream's `replaceDocument`, which relies on `try_lock` on an already locked mutex). |
 
 ## Ported, not reused (the upstream original is GTK-bound)
@@ -50,7 +51,8 @@ Each port records its upstream origin in a comment. Re-check them after upstream
 | `qt/src/canvas/CanvasPage.*` | `gui/PageView.cpp` (`XojPageView`): `onButtonPressEvent/onMotionNotifyEvent/onButtonReleaseEvent/onSequenceCancelEvent` (pen/highlighter/whiteout, eraser), `drawAndDeleteToolView`, `elementChanged`, `paintPage` (buffer plus overlays, now per tile). |
 | `qt/src/canvas/CanvasInput.*` | `gui/inputdevices/PenInputHandler.cpp` (`actionStart/Motion/End`, `filterPressure`, `inferPressureValue`, page crossing), `StylusInputHandler.cpp` (barrel buttons, `changeTool`), `MouseInputHandler.cpp`, `AbstractInputHandler::getInputDataRelativeToCurrentPage`. Touch navigation and palm rejection follow the M0 spike and Krita (ADR-0001). |
 | `qt/src/canvas/CanvasView.*`, `DocumentLayout.*`, `ViewController.*` | `gui/XournalView.cpp` (page views, `cleanupBufferCache`), `gui/Layout.cpp` (single column, fixed pixel paddings), `control/zoom/ZoomControl.cpp` (anchored zoom, fit width, zoom limits). |
-| `qt/src/session/DocumentSession.*` | `Control::openXoppFile/openPdfFile/createNewDocument/addDefaultPage/insertPage/updatePageActions/resetSavedStatus/setLastAutosaveFile`, `SaveJob::save/updatePreview`, `AutosaveJob::run`, `PageBackgroundChangeController::insertNewPage/copyBackgroundFromOtherPage` (default branch). |
+| `qt/src/session/DocumentSession.*` | `Control::openXoppFile/openPdfFile/createNewDocument/addDefaultPage/insertPage/deletePage/duplicatePage/movePageTowardsBeginning/movePageTowardsEnd/updatePageActions/resetSavedStatus/setLastAutosaveFile`, `SaveJob::save/updatePreview`, `AutosaveJob::run`, `PageBackgroundChangeController::insertNewPage/copyBackgroundFromOtherPage` (default branch). |
+| `qt/src/shell/Thumbnails.*` | `control/jobs/PreviewJob.cpp` / `SaveJob::updatePreview` (PDF background rendered directly, then `DocumentView::drawPage`). |
 
 ## Not compiled in the Qt build
 - `src/util`: `GtkUtil.cpp`, `gtk4_helper.cpp`, `gdk4_helper.cpp`, `XojMsgBox.cpp`, `VersionInfo.cpp` (replaced by `qt/compat`).
@@ -66,5 +68,7 @@ Each port records its upstream origin in a comment. Re-check them after upstream
 - `xoj-unit-tests`: the upstream unit tests (`test/unit_tests`, all suites except the GTK-only `ActionDatabaseTest`) run against the Qt-free core.
   - Also `qt/tests/unit/UndoRedoTest.cpp`: upstream undo actions and `UndoRedoHandler` driven through a test implementation of the shadow `Control`.
   - Also `qt/tests/unit/PageRasterTest.cpp`: the render service matches a direct upstream `DocumentView` render pixel for pixel. This covers full renders (several fixtures, zooms, DPR 1.25, PDF backgrounds), partial re-renders, and a concurrent edit/render stress test (also run under ThreadSanitizer).
-- `xqt-session-tests`: `DocumentSession` (new, open, annotate PDF, save/save-as/backup, autosave, insert page, undo). Upstream `LayerController` runs through the session.
+- `xqt-session-tests`: `DocumentSession` (new, open, annotate PDF, save/save-as/backup, autosave, page operations, undo). Upstream `LayerController` runs through the session.
+- `xqt-canvas-tests`, `xqt-quick-tests`, `xqt-shell-tests`: replayed pen/touch/touchpad input through the upstream tools, input routing in a real Qt Quick window (dialogs, scroll bars, moved canvas), tabs, single instance, page sidebar model and thumbnails.
+- Plain `ctest` (also with `-j`) runs everything except `golden-full` in a few seconds. Upstream suites that write fixed temp files share a `RESOURCE_LOCK`.
 - The upstream GTK build (`cmake -S . -B build-gtk`) must keep compiling with all seams applied.

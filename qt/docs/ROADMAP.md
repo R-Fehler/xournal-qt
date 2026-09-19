@@ -15,14 +15,23 @@
 - **M2 headless session and render service: done.**
   - `xoj-render`: `PageRaster` (port of `RenderJob` and the `XojPageView` buffer) and `RenderService` (worker pool, zoom block). Output is pixel identical to upstream rendering, also at fractional DPR; the PDF is rendered outside the document lock.
   - `xqt-session`: `AppContext` (shared settings in `~/.config/xournal-qt`, `ToolHandler`, page templates, render workers) and `DocumentSession` (per tab, implements `Control`: load/new/annotate PDF, save/save-as/autosave ported from upstream, insert page).
-- **M3+M4 merged (user request) — first app window: done (awaiting on-device test).**
+- **M3+M4 merged (user request) — first app window: done, confirmed on the device.**
   - `xournal-qt`: Qt Quick window with a minimal touch tool bar (upstream Lucide icons): new/open/save, undo/redo, pen/highlighter/eraser/hand, palette, sizes, add page, zoom.
   - `xoj-tools`: upstream `StrokeHandler`, `StrokeStabilizer`, `EraseHandler` and the stroke overlays, compiled unmodified.
   - `xqt-canvas`: `CanvasPage` (port of `XojPageView`), `CanvasInput` (port of `PenInputHandler` & co. plus touch gestures and palm rejection), `CanvasView`, `DocumentLayout`, `ViewController`.
   - `DocumentCanvasItem`: tiles composed from the page buffer and overlays, with GPU zoom.
-  - Replay tests (`xqt-canvas-tests`): synthetic pen input through the whole pipeline.
+  - Replay tests (`xqt-canvas-tests`): synthetic pen input through the whole pipeline. Quick tests (`xqt-quick-tests`): input routing with dialogs, scroll bars.
+  - After the first device test: dialogs usable (the canvas only takes events where it is the topmost item), touchpad momentum, scroll bars, resizable native file dialogs (`QApplication` for the KDE platform theme), "Save as" suggests the `.xopp` next to an annotated PDF.
   - Checklist: `docs/testing/device-checklist.md`.
-- **Next: M5**: tabs and the app shell (tabs, page thumbnails, settings, crash recovery), then lasso selection, text, images, PDF export and search.
+- **M5a tabs and single instance: done, confirmed on the device.**
+  - `xqt-shell`: `TabManager` (one `DocumentSession` + `CanvasView` per tab; background tabs release their page buffers after 30 s), `SingleInstance` (`QLocalServer`; files opened from the file manager go to the running window as new tabs), `AppController`.
+  - Tab strip with close buttons, reordering, unsaved-changes prompts per tab and on quit.
+- **M5b page sidebar and page operations: done (awaiting on-device test).**
+  - Sidebar with page thumbnails (`ThumbnailProvider`: async, rendered like upstream's `PreviewJob`; `PagesModel` follows the document events and refreshes thumbnails 400 ms after edits, undo and redo).
+  - Tap a thumbnail to go to the page; long-press or ⋮ for insert before/after, duplicate, move up/down, delete. All undoable through upstream's undo actions (ports of `Control::deletePage/duplicatePage/movePageTowards*`).
+  - Page counter and zoom moved to a floating pill over the canvas; the tool bar scrolls sideways when the window is narrow.
+  - Fixed on the way: canvas drawn at a stale position by Qt Quick's software backend (containers are transform nodes now); canvas input blocked by an `ApplicationWindow` background item (hit test follows z order); `DocumentListener::unregisterListener` is idempotent (seam, see ADR-0002).
+- **Next: M5c** settings screen, **M5d** crash recovery and session restore; then lasso selection, text, images, PDF export and search.
 
 ---
 

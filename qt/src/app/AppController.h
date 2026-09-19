@@ -23,12 +23,15 @@ class AppContext;
 class CanvasView;
 class DocumentSession;
 class TabManager;
+class PagesModel;
 }  // namespace xqt
 class Palette;
 
 class AppController: public QObject {
     Q_OBJECT
     Q_PROPERTY(QObject* tabs READ tabsModel CONSTANT)
+    /// Pages of the current tab (for the page sidebar).
+    Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
     Q_PROPERTY(int currentTab READ currentTab WRITE setCurrentTab NOTIFY documentChanged)
     Q_PROPERTY(QObject* view READ view NOTIFY documentChanged)
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
@@ -48,6 +51,7 @@ public:
     ~AppController() override;
 
     QObject* tabsModel() const;
+    QObject* pagesModel() const;
     int currentTab() const;
     void setCurrentTab(int index);
     QObject* view() const;
@@ -95,6 +99,15 @@ public:
     Q_INVOKABLE void zoomOut();
     Q_INVOKABLE void addPageAfterCurrent();
 
+    // --- pages of the current document (index: 0-based page) ---
+    Q_INVOKABLE void goToPage(int index);
+    Q_INVOKABLE void insertPageBefore(int index);
+    Q_INVOKABLE void insertPageAfter(int index);
+    Q_INVOKABLE void duplicatePage(int index);
+    Q_INVOKABLE void deletePage(int index);
+    Q_INVOKABLE void movePageUp(int index);
+    Q_INVOKABLE void movePageDown(int index);
+
     // --- tools (shared by all tabs) ---
     /// "pen", "highlighter", "eraser", "hand"
     Q_INVOKABLE void selectTool(const QString& tool);
@@ -135,5 +148,6 @@ private:
     std::unique_ptr<xqt::AppContext> app;
     std::unique_ptr<Palette> colors;
     std::unique_ptr<xqt::TabManager> tabs;
+    std::unique_ptr<xqt::PagesModel> pages;
     std::vector<QMetaObject::Connection> currentConnections;
 };

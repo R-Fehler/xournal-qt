@@ -185,3 +185,69 @@ TEST_F(DocumentSessionTest, saveSuggestionForNewDocumentUsesTheLastSaveFolder) {
     EXPECT_EQ(suggestion.parent_path(), fs::path(tmp.path().toStdString()));
     EXPECT_EQ(suggestion.extension(), ".xopp");
 }
+
+TEST_F(DocumentSessionTest, pageOperationsAreUndoable) {
+    DocumentSession session(*app);
+    Document* doc = session.getDocument();
+    addStroke(session, 0);
+    session.insertNewPage(1);
+    session.insertNewPage(2);
+    ASSERT_EQ(doc->getPageCount(), 3u);
+    const PageRef p0 = doc->getPage(0), p1 = doc->getPage(1), p2 = doc->getPage(2);
+
+    // Duplicate: a copy (not the same page) after the current page, with its content.
+    session.setCurrentPageNo(0);
+    session.duplicatePage();
+    ASSERT_EQ(doc->getPageCount(), 4u);
+    EXPECT_NE(doc->getPage(1), p0);
+    EXPECT_EQ(doc->getPage(1)->getSelectedLayer()->getElements().size(), 1u);
+    EXPECT_EQ(session.getCurrentPageNo(), 1u);
+    session.getUndoRedoHandler()->undo();
+    ASSERT_EQ(doc->getPageCount(), 3u);
+    EXPECT_EQ(doc->getPage(1), p1);
+
+    // Move: the current page swaps with its neighbour and stays current.
+    session.setCurrentPageNo(0);
+    session.movePageTowardsEnd();
+    EXPECT_EQ(doc->getPage(0), p1);
+    EXPECT_EQ(doc->getPage(1), p0);
+    EXPECT_EQ(session.getCurrentPageNo(), 1u);
+    session.movePageTowardsBeginning();
+    EXPECT_EQ(doc->getPage(0), p0);
+    session.getUndoRedoHandler()->undo();
+    session.getUndoRedoHandler()->undo();
+    EXPECT_EQ(doc->getPage(0), p0);
+    EXPECT_EQ(doc->getPage(1), p1);
+    session.movePageTowardsBeginning();  // already first: nothing
+    EXPECT_EQ(doc->getPage(0), p0);
+
+    // Delete the last page: the page before becomes current; undo puts the same page back.
+    session.setCurrentPageNo(2);
+    session.deletePage();
+    ASSERT_EQ(doc->getPageCount(), 2u);
+    EXPECT_EQ(session.getCurrentPageNo(), 1u);
+    session.getUndoRedoHandler()->undo();
+    ASSERT_EQ(doc->getPageCount(), 3u);
+    EXPECT_EQ(doc->getPage(2), p2);
+}
+
+TEST_F(DocumentSessionTest, theLastPageIsNotDeleted) {
+    DocumentSession session(*app);
+    session.deletePage();
+    EXPECT_EQ(session.getDocument()->getPageCount(), 1u);
+    EXPECT_FALSE(session.getUndoRedoHandler()->canUndo());
+}
+
+TEST_F(DocumentSessionTest, undoAndRedoReportTheChangedPage) {
+    DocumentSession session(*app);
+    session.insertNewPage(1);
+    addStroke(session, 1);
+    QSignalSpy changed(&session, &DocumentSession::pageContentChanged);
+    session.getUndoRedoHandler()->undo();
+    ASSERT_GE(changed.count(), 1);
+    EXPECT_EQ(changed.last().at(0).toULongLong(), 1u);
+    changed.clear();
+    session.getUndoRedoHandler()->redo();
+    ASSERT_GE(changed.count(), 1);
+    EXPECT_EQ(changed.last().at(0).toULongLong(), 1u);
+}

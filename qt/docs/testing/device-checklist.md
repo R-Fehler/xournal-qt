@@ -25,10 +25,25 @@ cd build-qt
 
 ## Document
 - [ ] Undo/redo buttons and Ctrl+Z / Ctrl+Y.
-- [ ] Add a page (+ page icon); page counter; scrolling through many pages stays smooth.
+- [ ] Add a page (+ page icon); scrolling through many pages stays smooth.
 - [ ] Open a .xopp with a PDF background, and open a plain .pdf to annotate.
 - [ ] Save / save as; the file then opens in upstream Xournal++ and looks identical.
 - [ ] Closing or opening with unsaved changes asks first.
 - [ ] Colors and the three sizes apply to pen and highlighter.
+
+## Tabs (M5a)
+- [ ] Open several files: each opens in its own tab; opening a file from the file manager while the app runs adds a tab to the running window.
+- [ ] Switching tabs keeps each tab's zoom, scroll position and undo history.
+- [ ] Closing a tab with unsaved changes asks first; quitting asks for every modified tab.
+
+## Pages sidebar (M5b)
+- [ ] The sidebar (first tool bar button) shows the pages; the current page is highlighted and follows scrolling.
+- [ ] Tap a thumbnail (finger or pen): the canvas jumps to that page.
+- [ ] Long-press or ⋮ on a thumbnail: insert before/after, duplicate, move up/down, delete. Each can be undone.
+- [ ] After writing on a page, its thumbnail updates within about half a second, also after undo/redo.
+- [ ] PDF pages show their PDF content in the thumbnail.
+- [ ] Zoomed in, the page never draws over the sidebar.
+- [ ] Page counter and zoom (−, %, +) in the pill at the bottom right; tapping the % fits the page width.
+- [ ] Portrait (narrow window): the tool bar can be swiped sideways to reach all tools.
 
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

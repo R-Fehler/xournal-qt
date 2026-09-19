@@ -18,6 +18,7 @@
 #include "CanvasView.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "shell/PagesModel.h"
 #include "shell/TabManager.h"
 
 using namespace xqt;
@@ -50,6 +51,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
 
+    pages = std::make_unique<PagesModel>();
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     newDocument();
@@ -60,6 +62,7 @@ AppController::~AppController() {
     for (auto& c: currentConnections) {
         disconnect(c);
     }
+    pages->setSession(nullptr);
     tabs.reset();
 }
 
@@ -89,6 +92,7 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
     }
+    pages->setSession(session());
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
@@ -103,11 +107,14 @@ void AppController::currentTabChanged() {
 }
 
 QObject* AppController::tabsModel() const { return tabs.get(); }
+QObject* AppController::pagesModel() const { return pages.get(); }
 int AppController::currentTab() const { return tabs->currentIndex(); }
 void AppController::setCurrentTab(int index) { tabs->setCurrentIndex(index); }
 QObject* AppController::view() const { return canvas(); }
 
-QString AppController::title() const { return session() ? QString::fromStdString(session()->getDisplayName()) : QString(); }
+QString AppController::title() const {
+    return session() ? QString::fromStdString(session()->getDisplayName()) : QString();
+}
 bool AppController::modified() const { return session() && session()->isModified(); }
 bool AppController::hasFilePath() const { return session() && session()->hasFilePath(); }
 bool AppController::canUndo() const { return session() && session()->getUndoRedoHandler()->canUndo(); }
@@ -330,6 +337,56 @@ void AppController::zoomOut() {
 void AppController::addPageAfterCurrent() {
     if (session()) {
         session()->insertNewPage(session()->getCurrentPageNo() + 1);
+    }
+}
+
+void AppController::goToPage(int index) {
+    if (session() && index >= 0 && static_cast<size_t>(index) < session()->getDocument()->getPageCount()) {
+        session()->setCurrentPageNo(index);
+        canvas()->getViewController().scrollToPage(index);
+    }
+}
+
+// Upstream's page operations work on the current page: select the page first.
+void AppController::insertPageBefore(int index) {
+    if (session()) {
+        goToPage(index);
+        session()->insertNewPage(static_cast<size_t>(std::max(0, index)));
+    }
+}
+
+void AppController::insertPageAfter(int index) {
+    if (session()) {
+        goToPage(index);
+        session()->insertNewPage(static_cast<size_t>(index) + 1);
+    }
+}
+
+void AppController::duplicatePage(int index) {
+    if (session()) {
+        goToPage(index);
+        session()->duplicatePage();
+    }
+}
+
+void AppController::deletePage(int index) {
+    if (session()) {
+        goToPage(index);
+        session()->deletePage();
+    }
+}
+
+void AppController::movePageUp(int index) {
+    if (session()) {
+        goToPage(index);
+        session()->movePageTowardsBeginning();
+    }
+}
+
+void AppController::movePageDown(int index) {
+    if (session()) {
+        goToPage(index);
+        session()->movePageTowardsEnd();
     }
 }
 
