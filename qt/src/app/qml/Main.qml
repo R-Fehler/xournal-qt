@@ -40,6 +40,14 @@ ApplicationWindow {
         }
         saveDialog.open()
     }
+    function openExportDialog() {
+        const suggestion = app.suggestedExportFile().toString()
+        if (suggestion !== "") {
+            exportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
+            exportDialog.selectedFile = suggestion
+        }
+        exportDialog.open()
+    }
     function saveOrAsk(then) {
         if (app.hasFilePath) {
             if (app.save() && then) then()
@@ -240,6 +248,23 @@ ApplicationWindow {
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
             IconButton { objectName: "overviewButton"; iconName: "xqt-tabs-grid"; tip: qsTr("All open documents (Ctrl+Shift+E)"); onClicked: tabOverview.open() }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
+            IconButton {
+                objectName: "moreButton"
+                iconName: "xqt-more"
+                tip: qsTr("More")
+                onClicked: moreMenu.popup()
+                Menu {
+                    id: moreMenu
+                    MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
+                    MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
+                    MenuSeparator {}
+                    MenuItem { text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
+                    MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
+                    MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
+                    MenuSeparator {}
+                    MenuItem { text: qsTr("Settings"); onTriggered: settingsPage.open() }
+                }
+            }
         }
         }
       }
@@ -388,6 +413,90 @@ ApplicationWindow {
         }
     }
 
+    // Back / forward after jumps (links, page grid, sidebar)
+    Pane {
+        id: navPill
+        objectName: "navPill"
+        visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible
+        anchors.left: canvas.left
+        anchors.bottom: canvas.bottom
+        anchors.leftMargin: 20
+        anchors.bottomMargin: 24
+        padding: 2
+        Material.foreground: "#303030"
+        background: Rectangle {
+            radius: height / 2
+            color: "#f7fafafa"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        RowLayout {
+            spacing: 0
+            IconButton {
+                objectName: "navBack"
+                iconName: "xopp-navigate-back"
+                tip: qsTr("Back to where you were (Alt+Left)")
+                enabled: app.canGoBack
+                onClicked: app.navigateBack()
+            }
+            IconButton {
+                objectName: "navForward"
+                iconName: "xopp-navigate-forward"
+                tip: qsTr("Forward (Alt+Right)")
+                enabled: app.canGoForward
+                onClicked: app.navigateForward()
+            }
+            IconButton {
+                iconName: "xqt-close"
+                tip: qsTr("Forget these places")
+                implicitWidth: 36
+                onClicked: app.clearNavigation()
+            }
+        }
+    }
+
+    // A tapped PDF link: open it / go to the page (not at once: a tap can be a mistake).
+    Popup {
+        id: linkPopup
+        objectName: "linkPopup"
+        property string uri
+        property int page: -1
+        padding: 6
+        Connections {
+            target: app
+            function onLinkTapped(uri, page, rect) {
+                linkPopup.uri = uri
+                linkPopup.page = page
+                linkPopup.x = Math.max(8, Math.min(canvas.x + rect.x, win.width - linkPopup.width - 8))
+                linkPopup.y = canvas.y + rect.y + rect.height + 6
+                if (linkPopup.y + 60 > win.height) linkPopup.y = canvas.y + rect.y - 60
+                linkPopup.open()
+            }
+        }
+        RowLayout {
+            spacing: 4
+            Image { source: app.iconUrl("xqt-link"); sourceSize.width: 18; sourceSize.height: 18; Layout.leftMargin: 6 }
+            Label {
+                visible: linkPopup.uri !== ""
+                text: linkPopup.uri
+                elide: Text.ElideMiddle
+                Layout.maximumWidth: 320
+            }
+            Button {
+                objectName: "linkButton"
+                flat: true
+                text: linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
+                                                                              : qsTr("Page not in this document")
+                enabled: linkPopup.uri !== "" || linkPopup.page >= 0
+                onClicked: {
+                    if (linkPopup.uri !== "") app.openLink(linkPopup.uri)
+                    else app.jumpToPage(linkPopup.page)
+                    linkPopup.close()
+                }
+            }
+        }
+    }
+
     SearchBar {
         id: searchBar
         objectName: "searchBar"
@@ -470,6 +579,15 @@ ApplicationWindow {
             afterSave = null
         }
         onRejected: afterSave = null
+    }
+
+    FileDialog {
+        id: exportDialog
+        title: qsTr("Export as PDF")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "pdf"
+        nameFilters: [qsTr("PDF (*.pdf)")]
+        onAccepted: app.exportPdf(selectedFile)
     }
 
     FileDialog {
@@ -606,6 +724,9 @@ ApplicationWindow {
     }
     Shortcut { sequence: "Ctrl+Shift+E"; onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
     Shortcut { sequence: "Ctrl+,"; onActivated: settingsPage.open() }
+    Shortcut { sequence: "Ctrl+E"; onActivated: openExportDialog() }
+    Shortcut { sequences: [StandardKey.Back]; onActivated: app.navigateBack() }
+    Shortcut { sequences: [StandardKey.Forward]; onActivated: app.navigateForward() }
     Shortcut { sequence: "Ctrl+Alt+G"; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: [StandardKey.Find]; onActivated: searchBar.openBar() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)

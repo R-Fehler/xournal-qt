@@ -118,6 +118,9 @@ private:
     int touchSessionMaxPoints = 0;
     double touchSessionStartMs = 0;
     double touchSessionTravel = 0;
+    QPointF touchSessionStartPos;
+    QPointF pressViewPos;
+    double pressTimeMs = 0;
     bool pinching = false;
     double pinchStartDistance = 1;
     bool panning = false;

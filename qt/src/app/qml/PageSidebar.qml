@@ -107,7 +107,7 @@ Rectangle {
                         } else {
                             app.pages.clearSelection()
                             app.pages.setAnchor(entry.pageIndex)
-                            app.goToPage(entry.pageIndex)
+                            app.jumpToPage(entry.pageIndex)
                         }
                     }
                     onHeld: list.forceActiveFocus()

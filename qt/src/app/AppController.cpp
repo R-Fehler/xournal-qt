@@ -6,10 +6,12 @@
 #include <shared_mutex>
 
 #include <QFile>
+#include <QDesktopServices>
 #include <QFileInfo>
 #include <QFontDatabase>
 
 #include "control/ToolEnums.h"
+#include "control/ExportHelper.h"
 #include "control/ToolHandler.h"
 #include "TextEditor.h"
 #include "model/Font.h"
@@ -127,6 +129,9 @@ void AppController::currentTabChanged() {
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
+        currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
+        currentConnections.push_back(
+                connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
     }
@@ -139,6 +144,7 @@ void AppController::currentTabChanged() {
     Q_EMIT searchChanged();
     Q_EMIT pageUndoChanged();
     Q_EMIT selectionChanged();
+    Q_EMIT navigationChanged();
 }
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
@@ -765,6 +771,29 @@ void AppController::goToPage(int index) {
     }
 }
 
+void AppController::jumpToPage(int index) {
+    if (canvas() && index >= 0) {
+        canvas()->jumpToPage(static_cast<size_t>(index));
+    }
+}
+bool AppController::canGoBack() const { return canvas() && canvas()->canGoBack(); }
+bool AppController::canGoForward() const { return canvas() && canvas()->canGoForward(); }
+void AppController::navigateBack() {
+    if (canvas()) {
+        canvas()->navigateBack();
+    }
+}
+void AppController::navigateForward() {
+    if (canvas()) {
+        canvas()->navigateForward();
+    }
+}
+void AppController::clearNavigation() {
+    if (canvas()) {
+        canvas()->clearNavigation();
+    }
+}
+
 // Upstream's page operations work on the current page: select the page first.
 void AppController::insertPageBefore(int index) {
     if (session()) {
@@ -819,6 +848,45 @@ QUrl AppController::openFolder() const {
     }
     const fs::path& last = app->getSettings()->getLastOpenPath();
     return last.empty() ? QUrl() : QUrl::fromLocalFile(QString::fromStdString(last.string()));
+}
+
+void AppController::openLink(const QString& uri) { QDesktopServices::openUrl(QUrl(uri)); }
+
+QUrl AppController::suggestedExportFile() const {
+    if (!session()) {
+        return {};
+    }
+    fs::path target;
+    if (session()->hasFilePath()) {
+        target = session()->getFilePath();
+        target.replace_extension(".pdf");
+    } else if (const fs::path pdf = session()->getDocument()->getPdfFilepath(); !pdf.empty()) {
+        target = pdf.parent_path() / (pdf.stem().string() + "_annotated.pdf");  // never the background PDF itself
+    } else {
+        target = session()->suggestSavePath();
+        target.replace_extension(".pdf");
+    }
+    return QUrl::fromLocalFile(QString::fromStdString(target.string()));
+}
+
+bool AppController::exportPdf(const QUrl& url) {
+    if (!session()) {
+        return false;
+    }
+    session()->clearSelectionEndText();  // everything back in the document
+    fs::path target(url.toLocalFile().toStdString());
+    if (target.extension() != ".pdf") {
+        target += ".pdf";
+    }
+    try {
+        // Port of PdfExportJob: upstream blocks the UI while exporting, too.
+        ExportHelper::exportPdf(session()->getDocument(), target, nullptr, nullptr, EXPORT_BACKGROUND_ALL, false);
+    } catch (const std::exception& e) {
+        Q_EMIT message(tr("Export failed"), QString::fromUtf8(e.what()), true);
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
+    return true;
 }
 
 QUrl AppController::suggestedSaveFile() const {

@@ -16,6 +16,7 @@
 #include <QColor>
 #include <QMetaObject>
 #include <QObject>
+#include <QRectF>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
@@ -82,6 +83,9 @@ class AppController: public QObject {
     Q_PROPERTY(bool canUndoPages READ canUndoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(bool canRedoPages READ canRedoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(int copiedPages READ copiedPages NOTIFY copiedPagesChanged)
+    /// Back / forward after jumps (links, page grid, sidebar), per tab
+    Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
+    Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -123,6 +127,8 @@ public:
     bool searchRunning() const;
     int searchHitPageCount() const;
     bool hasSelection() const;
+    bool canGoBack() const;
+    bool canGoForward() const;
     bool canUndoPages() const;
     bool canRedoPages() const;
     int copiedPages() const;
@@ -207,6 +213,11 @@ public:
 
     // --- pages of the current document (index: 0-based page) ---
     Q_INVOKABLE void goToPage(int index);
+    /// Go to a page and remember the place for "back" (links, page grid, sidebar).
+    Q_INVOKABLE void jumpToPage(int index);
+    Q_INVOKABLE void navigateBack();
+    Q_INVOKABLE void navigateForward();
+    Q_INVOKABLE void clearNavigation();
     Q_INVOKABLE void insertPageBefore(int index);
     Q_INVOKABLE void insertPageAfter(int index);
     Q_INVOKABLE void duplicatePage(int index);
@@ -227,6 +238,13 @@ public:
     Q_INVOKABLE QUrl openFolder() const;
     /// Suggestion for "Save as" (upstream Control::saveImpl): for an annotated PDF the .xopp next to the PDF.
     Q_INVOKABLE QUrl suggestedSaveFile() const;
+    /// Suggestion for "Export as PDF": next to the document (name.pdf), for an unsaved annotated PDF
+    /// "name_annotated.pdf" next to the PDF.
+    Q_INVOKABLE QUrl suggestedExportFile() const;
+    /// Export the document as a PDF (upstream's exporter: background PDF pages, ink, text, images).
+    Q_INVOKABLE bool exportPdf(const QUrl& file);
+    /// Open an external link (from a PDF) in the browser / its application.
+    Q_INVOKABLE void openLink(const QString& uri);
     /// Call before quitting: writes settings.
     Q_INVOKABLE void shutdown();
 
@@ -251,6 +269,9 @@ Q_SIGNALS:
     void pageUndoChanged();
     void selectionChanged();
     void fontChanged();
+    void navigationChanged();
+    /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.
+    void linkTapped(const QString& uri, int page, QRectF rect);
     void copiedPagesChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);

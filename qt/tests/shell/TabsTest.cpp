@@ -5,6 +5,7 @@
  */
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
@@ -192,4 +193,25 @@ TEST(Tabs, pageLayoutAppliesToAllTabs) {
     c.setViewColumns(1);
     EXPECT_EQ(c.tabManager().view(1)->documentLayout().columns(), 1u);
     EXPECT_EQ(changed.count(), 4);
+}
+
+TEST(Export, pdfExportAndSuggestedName) {
+    QTemporaryDir tmp;
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
+    EXPECT_TRUE(c.suggestedExportFile().toLocalFile().endsWith("old.pdf"));
+    const QString out = tmp.filePath("export.pdf");
+    ASSERT_TRUE(c.exportPdf(QUrl::fromLocalFile(out)));
+    QFile f(out);
+    ASSERT_TRUE(f.open(QIODevice::ReadOnly));
+    EXPECT_TRUE(f.read(5) == "%PDF-");
+    // The exported PDF has the document's pages.
+    auto r = DocumentSession::loadFile(fs::path(out.toStdString()));
+    ASSERT_TRUE(r.document);
+    EXPECT_EQ(r.document->getPageCount(), 2u);
+
+    // An unsaved annotated PDF: never suggest overwriting the PDF itself.
+    AppController d;
+    ASSERT_TRUE(d.openPath(QString::fromStdString(fs::path(r.document->getPdfFilepath()).string())));
+    EXPECT_TRUE(d.suggestedExportFile().toLocalFile().endsWith("export_annotated.pdf"));
 }

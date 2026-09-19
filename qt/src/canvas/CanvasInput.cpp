@@ -310,6 +310,8 @@ bool CanvasInput::actionStart(const Event& event) {
     view.getViewController().stopMomentum();
 
     this->sequenceStartPage = currentPage;
+    this->pressViewPos = event.viewPos;
+    this->pressTimeMs = monotonicMs();
     if (toolType == TOOL_HAND) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
     }
@@ -462,6 +464,16 @@ bool CanvasInput::actionEnd(const Event& event) {
         }
     }
 
+    // A tap with the hand or a select tool that selected nothing: maybe a PDF link.
+    const ToolType tt = toolHandler->getToolType();
+    const bool tapTool = tt == TOOL_HAND || tt == TOOL_SELECT_RECT || tt == TOOL_SELECT_REGION ||
+                         tt == TOOL_SELECT_OBJECT || tt == TOOL_SELECT_PDF_TEXT_LINEAR ||
+                         tt == TOOL_SELECT_PDF_TEXT_RECT;
+    if (tapTool && !view.getSelection() && monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
+        std::hypot(event.viewPos.x() - pressViewPos.x(), event.viewPos.y() - pressViewPos.y()) <= TAP_SLOP_PX / 2) {
+        view.tapAt(event.viewPos);
+    }
+
     this->sequenceStartPage = nullptr;
     if (toolHandler->pointActiveToolToToolbarTool()) {
         toolHandler->fireToolChanged();
@@ -537,6 +549,9 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         }
         touchSessionMaxPoints = 0;
         touchSessionStartMs = now;
+        if (!e->points().isEmpty()) {
+            touchSessionStartPos = sceneToView(e->points().first().scenePosition());
+        }
         touchSessionTravel = 0;
         velocitySamples.clear();
     }
@@ -627,6 +642,8 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                 } else if (touchSessionMaxPoints == 3) {
                     redo();
                 }
+            } else if (duration <= TAP_MAX_MS && touchSessionTravel <= TAP_SLOP_PX && touchSessionMaxPoints == 1) {
+                view.tapAt(touchSessionStartPos);  // e.g. a PDF link
             } else if (velocitySamples.size() >= 2) {
                 const auto& a = velocitySamples.front();
                 const auto& b = velocitySamples.back();

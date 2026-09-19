@@ -104,6 +104,11 @@ cd build-qt
 - [ ] Image button: choose a photo; it appears in the middle of the page, selected; move/resize it with the pen; undo removes it.
 - [ ] Copy an image in a browser or screenshot tool, Ctrl+V on the canvas: inserted the same way.
 
+## PDF links, export, back/forward
+- [ ] In a PDF with links (e.g. a paper with references or a table of contents): tap a link with a finger: "Open" or "Go to page N"; writing over a link with the pen just writes.
+- [ ] After a jump (link, page grid, sidebar), the ← → pill appears; ← returns to the exact place, → goes back to the target; Alt+Left/Right too.
+- [ ] ⋮ → "Export as PDF…": the exported PDF opens in a PDF viewer with the PDF pages, ink, text and images.
+
 ## Page operations
 - [ ] Sidebar: Ctrl+click / Shift+click select pages (blue, check mark); a plain tap goes to the page.
 - [ ] Ctrl+C, then Ctrl+V: the pages are pasted after the selection; pasting into another tab works (PDF pages keep their look).

@@ -5,7 +5,11 @@
  */
 #include <memory>
 
+#include <QSignalSpy>
 #include <QTemporaryDir>
+
+#include <cstdio>
+#include <fstream>
 #include <gtest/gtest.h>
 
 #include "control/settings/Settings.h"
@@ -104,4 +108,96 @@ TEST(DocumentLayout, viewFollowsTheColumnSettings) {
     const double z = view.getViewController().zoom();
     EXPECT_EQ(view.documentLayout().pageRect(0, z).top(), view.documentLayout().pageRect(2, z).top()) << "one row";
     EXPECT_LE(view.documentLayout().contentSize(z).width(), 1200.0 + 1) << "fits the width";
+}
+
+TEST(PdfLinks, linksAreFoundAtTheirPlace) {
+    QTemporaryDir tmp;
+    // A small PDF with an external link and a link to page 2 (written by hand: cairo 1.16 cannot write page links).
+    const std::string pdfPath = tmp.filePath("links.pdf").toStdString();
+    {
+        const std::vector<std::string> objects{
+                "<< /Type /Catalog /Pages 2 0 R >>",
+                "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Annots [5 0 R 6 0 R] >>",
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] >>",
+                // (PDF y goes up: page y 50..80 from the top is 320..350)
+                "<< /Type /Annot /Subtype /Link /Rect [50 320 150 350] /Border [0 0 0] "
+                "/A << /S /URI /URI (https://example.org/doc) >> >>",
+                "<< /Type /Annot /Subtype /Link /Rect [50 170 150 200] /Border [0 0 0] /Dest [4 0 R /XYZ 0 400 0] >>"};
+        std::string pdf = "%PDF-1.4\n";
+        std::vector<size_t> offsets;
+        for (size_t i = 0; i < objects.size(); ++i) {
+            offsets.push_back(pdf.size());
+            pdf += std::to_string(i + 1) + " 0 obj\n" + objects[i] + "\nendobj\n";
+        }
+        const size_t xref = pdf.size();
+        pdf += "xref\n0 " + std::to_string(objects.size() + 1) + "\n0000000000 65535 f \n";
+        for (size_t o: offsets) {
+            char line[24];
+            std::snprintf(line, sizeof(line), "%010zu 00000 n \n", o);
+            pdf += line;
+        }
+        pdf += "trailer\n<< /Size " + std::to_string(objects.size() + 1) + " /Root 1 0 R >>\nstartxref\n" +
+               std::to_string(xref) + "\n%%EOF\n";
+        std::ofstream(pdfPath, std::ios::binary) << pdf;
+    }
+    AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(tmp.filePath("settings.xml").toStdString()), 1);
+    auto loaded = DocumentSession::loadFile(pdfPath);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    DocumentSession session(app, std::move(loaded.document));
+    CanvasView view(session);
+    view.getViewController().setViewSize(QSizeF(800, 1000));
+    auto at = [&](double x, double y) {
+        const QRectF r = view.pageViewRect(0);
+        return r.topLeft() + QPointF(x, y) * view.getViewController().zoom();
+    };
+    auto external = view.linkAt(at(100, 65));
+    ASSERT_TRUE(external);
+    EXPECT_EQ(external->uri, "https://example.org/doc");
+    auto internal = view.linkAt(at(100, 215));
+    ASSERT_TRUE(internal);
+    EXPECT_TRUE(internal->uri.isEmpty());
+    EXPECT_EQ(internal->pdfPage, 1);
+    EXPECT_EQ(internal->page, 1);
+    EXPECT_FALSE(view.linkAt(at(300, 300))) << "no link there";
+
+    QSignalSpy tapped(&view, &CanvasView::linkTapped);
+    EXPECT_TRUE(view.tapAt(at(100, 65)));
+    EXPECT_EQ(tapped.count(), 1);
+}
+
+TEST(Navigation, backAndForwardAfterJumps) {
+    QTemporaryDir tmp;
+    AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(tmp.filePath("settings.xml").toStdString()), 1);
+    DocumentSession session(app);
+    for (size_t i = 1; i < 10; ++i) {
+        session.insertNewPage(i);
+    }
+    CanvasView view(session);
+    view.getViewController().setViewSize(QSizeF(800, 600));
+    view.getViewController().setScrollPosition(QPointF(0, 0));
+    const double startY = view.getViewController().scrollPosition().y();
+    EXPECT_FALSE(view.canGoBack());
+
+    view.jumpToPage(7);
+    EXPECT_EQ(session.getCurrentPageNo(), 7u);
+    EXPECT_TRUE(view.canGoBack());
+    view.jumpToPage(3);
+    ASSERT_TRUE(view.navigateBack());
+    EXPECT_EQ(session.getCurrentPageNo(), 7u);
+    ASSERT_TRUE(view.navigateBack());
+    EXPECT_EQ(session.getCurrentPageNo(), 0u);
+    EXPECT_NEAR(view.getViewController().scrollPosition().y(), startY, 1) << "the exact place";
+    EXPECT_FALSE(view.canGoBack());
+    ASSERT_TRUE(view.navigateForward());
+    EXPECT_EQ(session.getCurrentPageNo(), 7u);
+    EXPECT_TRUE(view.canGoForward());
+
+    // A new jump drops the forward places; a deleted page is skipped.
+    view.jumpToPage(9);
+    EXPECT_FALSE(view.canGoForward());
+    session.setCurrentPageNo(7);
+    session.deletePage();  // page 7 (a place in the history) is gone
+    ASSERT_TRUE(view.navigateBack());
+    EXPECT_EQ(session.getCurrentPageNo(), 0u) << "skipped the deleted page";
 }

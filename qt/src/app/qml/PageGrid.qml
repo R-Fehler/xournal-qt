@@ -36,7 +36,7 @@ Rectangle {
         selectionMode = false
     }
     function choose(index) {
-        app.goToPage(index)
+        app.jumpToPage(index)
         close()
     }
     function setColumns(n) {

@@ -10,6 +10,8 @@
 #include <QBuffer>
 
 #include "control/PdfCache.h"
+#include "model/LinkDestination.h"
+#include "pdf/base/XojPdfAction.h"
 #include "view/overlays/OverlayView.h"
 #include "config.h"
 #include "util/serializing/InputStreamException.h"
@@ -384,6 +386,139 @@ bool CanvasView::insertImage(const QByteArray& data) {
     auto sel = SelectionFactory::createFromFloatingElement(&session, page, layer, pages[pNr].get(), std::move(img));
     setSelection(sel.release());
     return true;
+}
+
+std::optional<CanvasView::LinkTarget> CanvasView::linkAt(QPointF viewPos) const {
+    // Port of XojPageView::displayLinkPopover (finding the link)
+    const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
+    if (!idx) {
+        return std::nullopt;
+    }
+    Document* doc = session.getDocument();
+    XojPdfPageSPtr pdf;
+    {
+        std::shared_lock lock(*doc);
+        PageRef page = doc->getPage(*idx);
+        if (!page->getBackgroundType().isPdfPage()) {
+            return std::nullopt;
+        }
+        pdf = doc->getPdfPage(page->getPdfPageNr());
+    }
+    if (!pdf) {
+        return std::nullopt;
+    }
+    const double zoom = viewController.zoom();
+    const QRectF pageRect = pageViewRect(*idx);
+    const QPointF pt = (viewPos - pageRect.topLeft()) / zoom;
+    for (auto&& [rect, action]: pdf->getLinks()) {
+        if (!(rect.x1 <= pt.x() && pt.x() <= rect.x2 && rect.y1 <= pt.y() && pt.y() <= rect.y2)) {
+            continue;
+        }
+        LinkTarget t;
+        t.viewRect = QRectF(pageRect.topLeft() + QPointF(rect.x1, rect.y1) * zoom,
+                            QSizeF(rect.x2 - rect.x1, rect.y2 - rect.y1) * zoom);
+        auto dest = action->getDestination();
+        if (!dest) {
+            continue;
+        }
+        if (auto uri = dest->getURI()) {
+            t.uri = QString::fromStdString(*uri);
+        } else {
+            t.pdfPage = static_cast<int>(dest->getPdfPage());
+            std::shared_lock lock(*doc);
+            const size_t page = doc->findPdfPage(dest->getPdfPage());
+            t.page = page == npos ? -1 : static_cast<int>(page);
+        }
+        return t;
+    }
+    return std::nullopt;
+}
+
+bool CanvasView::tapAt(QPointF viewPos) {
+    if (auto link = linkAt(viewPos)) {
+        Q_EMIT linkTapped(link->uri, link->page, link->viewRect);
+        return true;
+    }
+    return false;
+}
+
+CanvasView::NavPoint CanvasView::currentPlace() const {
+    const double zoom = viewController.zoom();
+    const QPointF topLeft = viewController.visibleContentRect().topLeft();
+    const QSizeF size = viewController.viewSize();
+    const size_t idx = layout.nearestPage(topLeft + QPointF(size.width() / 2, size.height() / 2), zoom);
+    if (idx >= pages.size()) {
+        return {};
+    }
+    return {pages[idx]->getPage(), (topLeft - layout.pageRect(idx, zoom).topLeft()) / zoom};
+}
+
+bool CanvasView::restorePlace(const NavPoint& place) {
+    std::optional<size_t> idx;
+    for (size_t i = 0; i < pages.size(); ++i) {
+        if (pages[i]->getPage() == place.page) {
+            idx = i;
+        }
+    }
+    if (!idx) {
+        return false;  // the page was deleted
+    }
+    const double zoom = viewController.zoom();
+    viewController.setScrollPosition(layout.pageRect(*idx, zoom).topLeft() + place.offset * zoom);
+    return true;  // (the most visible page becomes the current one, see updateVisibility)
+}
+
+void CanvasView::jumpToPage(size_t page) {
+    if (page >= pages.size()) {
+        return;
+    }
+    const NavPoint here = currentPlace();
+    if (here.page && here.page != pages[page]->getPage()) {
+        backStack.push_back(here);
+        if (backStack.size() > 50) {
+            backStack.erase(backStack.begin());
+        }
+        forwardStack.clear();
+        Q_EMIT navigationChanged();
+    }
+    session.setCurrentPageNo(page);
+    viewController.scrollToPage(page);
+}
+
+bool CanvasView::navigateBack() {
+    while (!backStack.empty()) {
+        NavPoint target = backStack.back();
+        backStack.pop_back();
+        const NavPoint here = currentPlace();
+        if (restorePlace(target)) {
+            forwardStack.push_back(here);
+            Q_EMIT navigationChanged();
+            return true;
+        }
+    }
+    Q_EMIT navigationChanged();
+    return false;
+}
+
+bool CanvasView::navigateForward() {
+    while (!forwardStack.empty()) {
+        NavPoint target = forwardStack.back();
+        forwardStack.pop_back();
+        const NavPoint here = currentPlace();
+        if (restorePlace(target)) {
+            backStack.push_back(here);
+            Q_EMIT navigationChanged();
+            return true;
+        }
+    }
+    Q_EMIT navigationChanged();
+    return false;
+}
+
+void CanvasView::clearNavigation() {
+    backStack.clear();
+    forwardStack.clear();
+    Q_EMIT navigationChanged();
 }
 
 void CanvasView::selectAllOnPage() {

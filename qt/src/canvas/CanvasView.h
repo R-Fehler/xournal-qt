@@ -15,11 +15,13 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <QObject>
 #include <QPointF>
 #include <QRectF>
+#include <QString>
 #include <QTimer>
 
 #include "gui/Layout.h"
@@ -113,6 +115,27 @@ public:
     /// is not an image.
     bool insertImage(const QByteArray& data);
 
+    // --- PDF links ---
+    struct LinkTarget {
+        QString uri;      ///< external link, or
+        int page = -1;    ///< page of this document (-1: none)
+        int pdfPage = -1; ///< the PDF page the link points to (also when the document has no page for it)
+        QRectF viewRect;  ///< the link area in view coordinates
+    };
+    /// The PDF link under a view position, if any.
+    std::optional<LinkTarget> linkAt(QPointF viewPos) const;
+    /// A tap (finger, or pen/mouse with the hand or a select tool) at a view position: shows a link there.
+    bool tapAt(QPointF viewPos);
+
+    // --- navigation history: jumps (links, page grid, sidebar) can be gone back and forth, like a browser ---
+    /// Go to a page and remember where the view was.
+    void jumpToPage(size_t page);
+    bool canGoBack() const { return !backStack.empty(); }
+    bool canGoForward() const { return !forwardStack.empty(); }
+    bool navigateBack();
+    bool navigateForward();
+    void clearNavigation();
+
     // --- text tool (port of XojPageView::startText / XournalView::endTextAllPages): one editor per view ---
     TextEditor* getTextEditor() const { return textEditor.get(); }
     /// A tap with the text tool at a page position (points).
@@ -135,6 +158,9 @@ Q_SIGNALS:
     void selectionChanged(bool hasSelection);
     /// Text editing started or ended (keyboard / input method for the canvas).
     void textEditingChanged(bool editing);
+    /// A PDF link was tapped (the UI offers to follow it).
+    void linkTapped(const QString& uri, int page, QRectF viewRect);
+    void navigationChanged();
 
 private:
     void rebuildPages();
@@ -157,6 +183,14 @@ private:
     QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
+    /// A place in the document: a page (kept even if it is moved) and the view's top-left on it (points).
+    struct NavPoint {
+        PageRef page;
+        QPointF offset;
+    };
+    NavPoint currentPlace() const;
+    bool restorePlace(const NavPoint& place);
+    std::vector<NavPoint> backStack, forwardStack;
     quint64 selectionRev = 0;
 };
 
