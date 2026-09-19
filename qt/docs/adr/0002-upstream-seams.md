@@ -28,6 +28,7 @@ The Qt build defines `XOJ_NO_GTK=1`. The upstream GTK build is unaffected by the
 | `src/core/pdf/base/XojCairoPdfExport.cpp` | `populatePdfOutline()` walks `DocumentOutline`, in the same traversal order as upstream. | `GtkTreeModel` |
 | `src/core/model/PaperSize.h`, `.cpp` | The `GtkPaperSize` constructor and the `gui/PaperFormatUtils.h` include are guarded. | `GtkPaperSize`, `GtkComboBox` |
 | `src/core/control/settings/Settings.h`, `.cpp` | The `GdkDevice*` overloads of `get/setDeviceClassForDevice` are guarded. | `gdk_device_get_*` |
+| `src/util/PathUtil.cpp` | `CONFIG_FOLDER_NAME` comes from `XOJ_CONFIG_FOLDER_NAME` when defined (the Qt build uses `xournal-qt`), so settings, cache and autosaves never touch upstream Xournal++'s folders. | own config dir |
 | `src/core/control/DeviceListHelper.h`, `.cpp` | GDK seat enumeration (`getDeviceList`, `getSourceMapping`, `InputDevice(GdkDevice*)`) is guarded. `InputDevice` stays. | `GdkSeat` |
 
 ## 3. Small upstreamable refactorings (valid for both builds)
