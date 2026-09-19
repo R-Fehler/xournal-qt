@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The Xournal++ file types (as in upstream's com.github.xournalpp.xournalpp.xml), so that they are known also
-     without Xournal++ installed. -->
+     without Xournal++ installed. Own file and icon names: installable next to the xournalpp package. -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="application/x-xojpp">
     <comment>Xournal note file</comment>
+    <icon name="xournal-qt-application-x-xojpp"/>
     <glob pattern="*.xoj"/>
   </mime-type>
   <mime-type type="application/x-xopp">
     <comment>Xournal++ note file</comment>
+    <icon name="xournal-qt-application-x-xopp"/>
     <glob pattern="*.xopp"/>
   </mime-type>
 </mime-info>

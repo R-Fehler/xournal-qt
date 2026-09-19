@@ -12,9 +12,12 @@ install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR
 install(FILES "${XQT_PACKAGING_DIR}/xournal-qt.desktop" DESTINATION share/applications)
 install(FILES "${XQT_PACKAGING_DIR}/xournal-qt.xml" DESTINATION share/mime/packages)
 install(FILES "${XQT_PACKAGING_DIR}/xournal-qt.svg" DESTINATION share/icons/hicolor/scalable/apps)
+# The file type icons under names of our own: the xournalpp package has upstream's names (a second package with the
+# same file cannot be installed next to it).
 install(FILES "${XOJ_UPSTREAM_DIR}/ui/pixmaps/application-x-xopp.svg"
-              "${XOJ_UPSTREAM_DIR}/ui/pixmaps/application-x-xojpp.svg"
-        DESTINATION share/icons/hicolor/scalable/mimetypes)
+        DESTINATION share/icons/hicolor/scalable/mimetypes RENAME xournal-qt-application-x-xopp.svg)
+install(FILES "${XOJ_UPSTREAM_DIR}/ui/pixmaps/application-x-xojpp.svg"
+        DESTINATION share/icons/hicolor/scalable/mimetypes RENAME xournal-qt-application-x-xojpp.svg)
 install(FILES "${XQT_PACKAGING_DIR}/xournal-qt-library.desktop" DESTINATION share/kio/servicemenus
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 install(FILES "${XQT_PACKAGING_DIR}/copyright" DESTINATION share/doc/xournal-qt)

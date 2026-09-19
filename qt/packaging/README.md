@@ -12,10 +12,14 @@ It installs:
 - `/usr/bin/xournal-qt` and its resources in `/usr/share/xournal-qt` (page templates, palettes, icons);
 - `xournal-qt.desktop`: in the menu, and "Open with" for PDF, .xopp and .xoj files;
 - `xournal-qt.xml`: the Xournal++ file types (known also without Xournal++);
-- the icon (`hicolor/scalable/apps/xournal-qt.svg`) and the .xopp file icon;
+- the icon (`hicolor/scalable/apps/xournal-qt.svg`) and the .xopp / .xoj file icons (as
+  `xournal-qt-application-x-*.svg`);
 - a Dolphin service menu for folders: "Open as Xournal Qt library" (right click on a folder).
   Folders are not registered as a file type of the application (`inode/directory` in the desktop file): that can
   make an application the default for opening folders.
+
+Every installed file has a name of its own (`xournal-qt…`), so the package can be installed next to the xournalpp
+package (Xournal++ GTK). `packaging/check-conflicts.sh <deb>` compares the files with those of installed packages.
 
 The dependencies come from the libraries the program uses (`dpkg-shlibdeps`), plus the QML modules and the SVG
 image plugin (package names of KDE neon / Ubuntu).
