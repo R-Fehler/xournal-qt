@@ -111,6 +111,9 @@ protected:
     QPointingDevice eraser{"test eraser", 1002, QInputDevice::DeviceType::Stylus,
                            QPointingDevice::PointerType::Eraser,
                            QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3};
+    QPointingDevice touchpad{"test touchpad", 1003, QInputDevice::DeviceType::TouchPad,
+                             QPointingDevice::PointerType::Finger,
+                             QInputDevice::Capability::Position | QInputDevice::Capability::Scroll, 2, 0};
     ulong timestamp = 1000;
 };
 }  // namespace
@@ -209,10 +212,7 @@ TEST_F(CanvasReplayTest, highlighterAndWhiteout) {
 }
 
 namespace {
-QPointingDevice touchpad{"test touchpad", 1003, QInputDevice::DeviceType::TouchPad, QPointingDevice::PointerType::Finger,
-                         QInputDevice::Capability::Position | QInputDevice::Capability::Scroll, 2, 0};
-
-void sendWheel(CanvasInput& input, QPoint pixelDelta, Qt::ScrollPhase phase) {
+void sendWheel(CanvasInput& input, const QPointingDevice& touchpad, QPoint pixelDelta, Qt::ScrollPhase phase) {
     QWheelEvent e(QPointF(400, 300), QPointF(400, 300), pixelDelta, pixelDelta * 2, Qt::NoButton, Qt::NoModifier, phase,
                   false, Qt::MouseEventNotSynthesized, &touchpad);
     input.wheelEvent(&e, QPointF(400, 300));
@@ -228,19 +228,19 @@ TEST_F(CanvasReplayTest, touchpadScrollContinuesWithMomentumAfterLift) {
     auto& vc = view->getViewController();
     const double startY = vc.visibleContentRect().top();
 
-    sendWheel(*input, QPoint(0, -20), Qt::ScrollBegin);
+    sendWheel(*input, touchpad, QPoint(0, -20), Qt::ScrollBegin);
     for (int i = 0; i < 8; ++i) {
         QThread::msleep(10);
-        sendWheel(*input, QPoint(0, -20), Qt::ScrollUpdate);
+        sendWheel(*input, touchpad, QPoint(0, -20), Qt::ScrollUpdate);
     }
     const double atLift = vc.visibleContentRect().top();
     EXPECT_NEAR(atLift - startY, 180, 1) << "two-finger scrolling moves the content by the deltas";
-    sendWheel(*input, QPoint(0, 0), Qt::ScrollEnd);
+    sendWheel(*input, touchpad, QPoint(0, 0), Qt::ScrollEnd);
     processEvents(300);
     EXPECT_GT(vc.visibleContentRect().top(), atLift + 50) << "no momentum after lifting the fingers";
 
     // Fingers down again stop the fling.
-    sendWheel(*input, QPoint(0, 0), Qt::ScrollBegin);
+    sendWheel(*input, touchpad, QPoint(0, 0), Qt::ScrollBegin);
     const double stopped = vc.visibleContentRect().top();
     processEvents(100);
     EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), stopped);
