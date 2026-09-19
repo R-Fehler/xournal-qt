@@ -38,6 +38,7 @@ if(XQT_BUILD_CORE)
         include(cmake/XojTests.cmake)
     endif()
     include(cmake/XqtSession.cmake)
+    include(cmake/XqtApp.cmake)
 endif()
 
 if(XQT_BUILD_SPIKES)

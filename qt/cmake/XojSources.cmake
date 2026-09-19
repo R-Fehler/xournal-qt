@@ -180,3 +180,19 @@ set(XOJ_CORE_SOURCES
     ${XOJ_SRC}/core/undo/UndoAction.cpp
     ${XOJ_SRC}/core/undo/UndoRedoHandler.cpp
 )
+
+# tools: upstream input handlers and their overlay views, compiled unmodified against the shadow interfaces
+set(XOJ_TOOLS_SOURCES
+    ${XOJ_SRC}/core/control/tools/InputHandler.cpp
+    ${XOJ_SRC}/core/control/tools/StrokeHandler.cpp
+    ${XOJ_SRC}/core/control/tools/StrokeStabilizer.cpp
+    ${XOJ_SRC}/core/control/tools/SnapToGridInputHandler.cpp
+    ${XOJ_SRC}/core/control/tools/EraseHandler.cpp
+    ${XOJ_SRC}/core/view/overlays/BaseStrokeToolView.cpp
+    ${XOJ_SRC}/core/view/overlays/StrokeToolView.cpp
+    ${XOJ_SRC}/core/view/overlays/StrokeToolFilledView.cpp
+    ${XOJ_SRC}/core/view/overlays/StrokeToolFilledHighlighterView.cpp
+    ${XOJ_SRC}/core/gui/inputdevices/InputUtils.cpp
+    ${XOJ_SRC}/core/gui/inputdevices/PositionInputData.cpp
+    ${XOJ_SRC}/core/gui/LegacyRedrawable.cpp
+)

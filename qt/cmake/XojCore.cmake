@@ -76,6 +76,11 @@ target_link_libraries(xoj-util PUBLIC xoj-defaults)
 add_library(xoj-core STATIC ${XOJ_CORE_SOURCES})
 target_link_libraries(xoj-core PUBLIC xoj-util)
 
+# Tools (Qt-free): upstream input handlers + overlay views
+add_library(xoj-tools STATIC ${XOJ_TOOLS_SOURCES} "${CMAKE_CURRENT_LIST_DIR}/../compat/DeviceId.cpp")
+target_link_libraries(xoj-tools PUBLIC xoj-core)
+set_target_properties(xoj-tools PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+
 # Render service (Qt-free): page rasters rendered by worker threads, port of upstream RenderJob.
 add_library(xoj-render STATIC
     "${CMAKE_CURRENT_LIST_DIR}/../src/render/PageRaster.cpp"

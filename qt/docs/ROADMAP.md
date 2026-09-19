@@ -15,7 +15,14 @@
 - **M2 headless session and render service: done.**
   - `xoj-render`: `PageRaster` (port of `RenderJob` and the `XojPageView` buffer) and `RenderService` (worker pool, zoom block). Output is pixel identical to upstream rendering, also at fractional DPR; the PDF is rendered outside the document lock.
   - `xqt-session`: `AppContext` (shared settings in `~/.config/xournal-qt`, `ToolHandler`, page templates, render workers) and `DocumentSession` (per tab, implements `Control`: load/new/annotate PDF, save/save-as/autosave ported from upstream, insert page).
-- **Next: M3 tools (headless)**: `ToolContext` via the shadow `Control`, port the page-view dispatch (`XojPageView::onButton*`) into a `CanvasPage`, and add replay tests for StrokeHandler, the stabilizers, the eraser and shapes.
+- **M3+M4 merged (user request) — first app window: done (awaiting on-device test).**
+  - `xournal-qt`: Qt Quick window with a minimal touch tool bar (upstream Lucide icons): new/open/save, undo/redo, pen/highlighter/eraser/hand, palette, sizes, add page, zoom.
+  - `xoj-tools`: upstream `StrokeHandler`, `StrokeStabilizer`, `EraseHandler` and the stroke overlays, compiled unmodified.
+  - `xqt-canvas`: `CanvasPage` (port of `XojPageView`), `CanvasInput` (port of `PenInputHandler` & co. plus touch gestures and palm rejection), `CanvasView`, `DocumentLayout`, `ViewController`.
+  - `DocumentCanvasItem`: tiles composed from the page buffer and overlays, with GPU zoom.
+  - Replay tests (`xqt-canvas-tests`): synthetic pen input through the whole pipeline.
+  - Checklist: `docs/testing/device-checklist.md`.
+- **Next: M5**: tabs and the app shell (tabs, page thumbnails, settings, crash recovery), then lasso selection, text, images, PDF export and search.
 
 ---
 

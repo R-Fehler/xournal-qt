@@ -20,6 +20,23 @@ target_link_libraries(xqt-session PUBLIC Qt6::Core xoj-render xoj-core)
 target_compile_definitions(xqt-session PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
 set_target_properties(xqt-session PROPERTIES AUTOMOC ON)
 
+# Canvas model: pages (port of XojPageView), layout, zoom/scroll, input (port of PenInputHandler & co.)
+add_library(xqt-canvas STATIC
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/DocumentLayout.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/DocumentLayout.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasView.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasView.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.cpp
+)
+target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
+target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)
+set_target_properties(xqt-canvas PROPERTIES AUTOMOC ON)
+
 if(XQT_BUILD_TESTS)
     add_executable(xqt-session-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/main.cpp
@@ -28,5 +45,13 @@ if(XQT_BUILD_TESTS)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-session-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS session
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    add_executable(xqt-canvas-tests
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/main.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasReplayTest.cpp)
+    target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
+    target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
+    gtest_discover_tests(xqt-canvas-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS canvas
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
