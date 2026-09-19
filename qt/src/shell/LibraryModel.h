@@ -84,6 +84,8 @@ public:
     LibraryIndex* searchIndex() const { return idx.get(); }
     /// Files were renamed, moved or trashed (open tabs, recent files follow).
     std::function<void(const DocumentFiles::Result&)> onFilesChanged;
+    /// Files were renamed or moved elsewhere in the app (recent files): the search index keeps their entries.
+    void filesMoved(const DocumentFiles::Result& r);
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;

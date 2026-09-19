@@ -13,7 +13,12 @@
 #include <QUrl>
 #include <gtest/gtest.h>
 
+#include <cairo-pdf.h>
+
 #include "model/Document.h"
+#include "model/Layer.h"
+#include "model/Text.h"
+#include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
@@ -538,4 +543,169 @@ TEST_F(LibraryTest, benchHitPages) {
         HitPageProvider::render(fs::path(pdf.toStdString()), p, query + "x", 256);
     }
     std::cout << "the same 20 pages, other search (marks only): " << t.elapsed() << " ms\n";
+}
+
+namespace {
+/// A one-page PDF with `word` on it.
+void makeWordPdf(const fs::path& p, const char* word) {
+    fs::create_directories(p.parent_path());
+    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 24);
+    cairo_move_to(cr, 72, 100);
+    cairo_show_text(cr, word);
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+/// Add a text element to a page of a .xopp and save it.
+void addText(const fs::path& xopp, size_t page, const char* text) {
+    auto loaded = DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(loaded.document);
+    auto t = std::make_unique<Text>();
+    t->setText(text);
+    t->move(100, 100);
+    loaded.document->getPage(page)->getSelectedLayer()->addElement(std::move(t));
+    ASSERT_TRUE(DocumentSession::writeDocument(*loaded.document, xopp).ok);
+}
+}  // namespace
+
+TEST_F(LibraryTest, onlyTheXoppIsReadAgainWhenAnnotationsChange) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    const fs::path dir = root / ".xournal_library" / "index";
+    LibraryIndex index(root, dir);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    ASSERT_EQ(index.documentsRead(), 1);
+    ASSERT_EQ(index.pdfPagesRead(), 2);
+
+    addText(root / "lecture.xopp", 1, "unicorn");  // an annotation on page 2
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    EXPECT_EQ(index.documentsRead(), 2) << "the .xopp is read again";
+    EXPECT_EQ(index.pdfPagesRead(), 2) << "the PDF text is kept";
+    auto hits = index.search("unicorn");
+    ASSERT_EQ(hits.size(), 1u);
+    EXPECT_EQ(hits[0].firstPage, 1);
+    ASSERT_EQ(index.search("page 2").size(), 1u) << "the PDF text is still there";
+
+    // Nothing changed: nothing is read, also not by a new index (from the stored files)
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    EXPECT_EQ(index.documentsRead(), 2);
+    LibraryIndex again(root, dir);
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.documentsRead(), 0);
+    EXPECT_EQ(again.search("unicorn").size(), 1u);
+
+    // A new PDF version: its text is read again
+    fs::remove(root / "lecture.pdf");
+    makeWordPdf(root / "lecture.pdf", "zebra");
+    fs::resize_file(root / "lecture.pdf", fs::file_size(root / "lecture.pdf"));  // (only the content changed)
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.search("zebra").size(), 1u);
+    EXPECT_TRUE(again.search("page 2").empty());
+    EXPECT_EQ(again.search("unicorn").size(), 1u) << "the text elements stay";
+}
+
+TEST_F(LibraryTest, renamedAndMovedDocumentsKeepTheirIndex) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    addText(root / "lecture.xopp", 1, "unicorn");
+    makePdf(root / "Archive" / "old.pdf");
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    LibraryIndex* index = model.searchIndex();
+    index->waitForDone();
+    ASSERT_EQ(index->documentsRead(), 2);
+    const int pdfPagesAtStart = index->pdfPagesRead();
+    auto rowOf = [&](const fs::path& p) { return model.rowOf(QString::fromStdString(p.string())); };
+    auto foundIn = [&](const char* query) {
+        index->waitForDone();
+        const auto hits = index->search(query);
+        return hits.empty() ? fs::path() : hits.front().file;
+    };
+
+    ASSERT_TRUE(model.rename(rowOf(root / "lecture.xopp"), "Week 1"));
+    EXPECT_EQ(foundIn("unicorn"), root / "Week 1.xopp");
+    ASSERT_TRUE(model.moveTo(rowOf(root / "Week 1.xopp"), "Archive"));
+    EXPECT_EQ(foundIn("unicorn"), root / "Archive" / "Week 1.xopp");
+    ASSERT_TRUE(model.createFolder("Semester"));
+    ASSERT_TRUE(model.moveTo(rowOf(root / "Archive"), "Semester"));  // a folder with both documents
+    EXPECT_EQ(foundIn("unicorn"), root / "Semester" / "Archive" / "Week 1.xopp");
+    EXPECT_EQ(index->pdfPagesRead(), pdfPagesAtStart) << "no PDF text is read again";
+    EXPECT_EQ(index->documentsRead(), 4) << "only the .xopp written again by the rename and the move (new PDF path); "
+                                            "the folder move reads nothing";
+    EXPECT_EQ(index->search("xournal").size(), 2u);
+
+    size_t files = 0;
+    for ([[maybe_unused]] const auto& e: fs::directory_iterator(root / ".xournal_library" / "index")) {
+        ++files;
+    }
+    EXPECT_EQ(files, 2u) << "the index files moved along";
+
+    // Renamed by another program: the PDF text is taken over (same file: size and time), only the .xopp is read
+    const int pdfPages = index->pdfPagesRead();
+    fs::rename(root / "Semester" / "Archive" / "old.pdf", root / "Semester" / "Archive" / "older.pdf");
+    model.refresh();
+    index->waitForDone();
+    EXPECT_EQ(index->pdfPagesRead(), pdfPages);
+    EXPECT_EQ(index->search("xournal").size(), 2u);
+    EXPECT_EQ(model.searchIndex()->pageCount(root / "Semester" / "Archive" / "older.pdf"), 2);
+}
+
+TEST_F(LibraryTest, changesOfAttachedOrOtherPdfsAreNoticed) {
+    // Attached PDF ("name.xopp.bg.pdf")
+    fs::copy_file(fixture(u8"packaged_xopp/pdfBackground/old.xopp"), root / "att.xopp");
+    fs::copy_file(fixture(u8"packaged_xopp/pdfBackground/old.xopp.bg.pdf"), root / "att.xopp.bg.pdf");
+    // A PDF outside the library
+    QTemporaryDir outside;
+    const fs::path script = fs::path(outside.path().toStdString()) / "script.pdf";
+    makePdf(script);
+    makeAnnotation(script, root / "notes.xopp");
+
+    LibraryIndex index(root, root / ".xournal_library" / "index");
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    ASSERT_EQ(index.search("xournal").size(), 2u);
+
+    fs::remove(root / "att.xopp.bg.pdf");
+    makeWordPdf(root / "att.xopp.bg.pdf", "zebra");
+    fs::remove(script);
+    makeWordPdf(script, "giraffe");
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    ASSERT_EQ(index.search("zebra").size(), 1u);
+    EXPECT_EQ(index.search("zebra")[0].file, root / "att.xopp");
+    ASSERT_EQ(index.search("giraffe").size(), 1u);
+    EXPECT_EQ(index.search("giraffe")[0].file, root / "notes.xopp");
+    EXPECT_TRUE(index.search("xournal").empty());
+}
+
+// Opt-in timing: XQT_BENCH_PDF=<a long PDF>
+TEST_F(LibraryTest, benchIndexUpdates) {
+    const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
+    if (pdf.isEmpty()) {
+        GTEST_SKIP() << "set XQT_BENCH_PDF";
+    }
+    fs::copy_file(fs::path(pdf.toStdString()), root / "long.pdf");
+    makeAnnotation(root / "long.pdf", root / "long.xopp");
+    LibraryIndex index(root, root / ".xournal_library" / "index");
+    QElapsedTimer t;
+    t.start();
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    std::cout << "first indexing: " << t.elapsed() << " ms (" << index.pdfPagesRead() << " PDF pages)\n";
+    addText(root / "long.xopp", 9, "unicorn");
+    t.restart();
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    std::cout << "after a text on page 10: " << t.elapsed() << " ms (" << index.pdfPagesRead() << " PDF pages in all)\n";
+    t.restart();
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    std::cout << "nothing changed: " << t.elapsed() << " ms\n";
 }

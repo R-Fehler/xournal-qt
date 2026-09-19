@@ -6,8 +6,12 @@
  * Metadata that only speeds things up (first-page previews, the search index) lives in the hidden folder
  * ".xournal_library" of the library; it can be deleted at any time.
  *
- * LibraryIndex keeps the text of every document (PDF text and text elements, per page) for library-wide search.
- * Changed documents are indexed again in the background; the text is stored as one JSON file per document.
+ * LibraryIndex keeps the text of every document for library-wide search, in two parts: the text of the PDF pages
+ * (tied to the PDF the document uses and its size / modification time) and, per page, which PDF page it shows and
+ * the text of its text elements. When only the .xopp changed (annotations, text elements, pages moved), it is read
+ * again but the PDF text is kept; PDF text is read only for PDF pages not seen before, or when the PDF changed.
+ * Documents renamed or moved by the app keep their entries. Everything happens in the background; the text is
+ * stored as one JSON file per document.
  *
  * @license GNU GPLv2 or later
  */
@@ -57,8 +61,11 @@ private:
     fs::path rootDir;
 };
 
-/// A string that changes when one of the document's files changes (size, modification time).
+/// A string that changes when one of the document's files changes (size, modification time): the .xopp, the PDF next
+/// to it, an attached PDF.
 QString documentStamp(const DocumentItem& item);
+/// Size and modification time of one file ("" if it does not exist).
+QString fileStamp(const fs::path& file);
 
 class LibraryIndex final: public QObject {
     Q_OBJECT
@@ -75,6 +82,13 @@ public:
     int total() const { return totalCount.load(); }
     /// Wait until the background work is done (tests).
     void waitForDone();
+    /// Files and folders were renamed or moved by the app (old, new): the entries of the documents follow (their
+    /// text did not change): nothing is read again, except a .xopp that was written again (a renamed pair: the new
+    /// path of its PDF), without its PDF text. In the background, before the next update.
+    void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
+    /// Work done so far (tests): documents read, PDF pages whose text was read.
+    int documentsRead() const { return docsRead.load(); }
+    int pdfPagesRead() const { return pdfRead.load(); }
 
     struct PageHits {
         int page = 0;        ///< 0-based
@@ -95,10 +109,8 @@ public:
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
 
-    /// The text of every page: the PDF text, then the text elements (upstream Text) of all layers.
-    static QStringList extractText(Document& doc);
     /// Format of the stored index files (older ones are indexed again).
-    static constexpr int FORMAT = 2;
+    static constexpr int FORMAT = 3;
     /// Whitespace runs to one space (the PDF text has line breaks where the page has them).
     static QString simplified(const QString& text);
 
@@ -108,13 +120,25 @@ Q_SIGNALS:
 
 private:
     struct Entry {
-        QString stamp;
+        fs::path file;                   ///< the document's main file
         QString name;
-        fs::path file;
-        QStringList pages;  ///< simplified text per page
-        std::vector<double> aspects;  ///< height / width per page
+        QString xoppStamp;               ///< of the .xopp ("": a PDF alone)
+        fs::path pdf;                    ///< the PDF it uses (next to it, elsewhere, attached; "": none)
+        QString pdfStamp;
+        std::map<int, QString> pdfText;  ///< simplified text of the PDF pages it shows
+        std::vector<int> pdfPage;        ///< per page: the PDF page it shows (-1: none)
+        QStringList elementText;         ///< per page: the text of its text elements (simplified)
+        std::vector<double> aspects;     ///< per page: height / width
+        int pageCount() const { return static_cast<int>(elementText.size()); }
+        /// Nothing changed since it was read.
+        bool upToDate(const DocumentItem& item) const;
     };
     void run(std::vector<DocumentItem> items, quint64 generation);
+    void applyMoves(const std::vector<std::pair<fs::path, fs::path>>& moves);
+    /// Read a document; PDF text is taken from `previous` or another entry with the same PDF where possible.
+    std::shared_ptr<Entry> read(const DocumentItem& item, const std::shared_ptr<const Entry>& previous);
+    std::shared_ptr<const Entry> loadStored(const fs::path& file) const;
+    void store(const Entry& e) const;
     fs::path indexFile(const fs::path& file) const;
 
     fs::path rootDir, indexDir;
@@ -124,6 +148,7 @@ private:
     std::atomic<quint64> generation{0};
     std::atomic<bool> running{false};
     std::atomic<int> doneCount{0}, totalCount{0};
+    std::atomic<int> docsRead{0}, pdfRead{0};
 };
 
 }  // namespace xqt

@@ -375,10 +375,20 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {HitPageBaseRole, "hitPageBase"}};
 }
 
+void LibraryModel::filesMoved(const DocumentFiles::Result& r) {
+    if (idx && !r.moved.empty()) {
+        idx->moved(r.moved);
+        refresh();
+    }
+}
+
 void LibraryModel::applyResult(const DocumentFiles::Result& r) {
     if (!r.ok) {
         Q_EMIT error(QString::fromStdString(r.error));
         return;
+    }
+    if (idx) {
+        idx->moved(r.moved);  // before the refresh: the entries are not read again
     }
     if (onFilesChanged) {
         onFilesChanged(r);
@@ -596,7 +606,12 @@ bool LibraryModel::transfer(const QStringList& paths, const QString& folder, boo
                                                : DocumentFiles::move(DocumentFiles::itemOf(f), target);
         if (!r.ok) {
             errors << QString::fromStdString(r.error);
-        } else if (onFilesChanged) {
+            continue;
+        }
+        if (idx) {
+            idx->moved(r.moved);
+        }
+        if (onFilesChanged) {
             onFilesChanged(r);
         }
     }

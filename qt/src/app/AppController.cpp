@@ -90,7 +90,10 @@ AppController::AppController(QObject* parent): QObject(parent) {
     library = std::make_unique<LibraryModel>();
     library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
     recent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
-    recent->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
+    recent->onFilesChanged = [this](const DocumentFiles::Result& r) {
+        library->filesMoved(r);  // a renamed library document keeps its search index entry
+        filesChanged(r);
+    };
     journalFile = SessionRecovery::defaultJournalFile();
 }
 

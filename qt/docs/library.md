@@ -36,9 +36,23 @@ This folder is only a cache, and it can be deleted at any time. For folders that
 - `previews/<hash>.png`: the first page, 360 px wide, rendered like the page thumbnails. The file name comes from the
   path, sizes and modification times, so a changed document gets a new preview. Previews of documents outside a
   library (recent files) go to `~/.cache/xournal-qt/previews`.
-- `index/<hash>.json`: the text of every page (PDF text and text elements) and the page shapes, for the library
-  search. A background thread builds it, one document at a time, and rebuilds it when a document changes (or the
-  format changes).
+- `index/<hash>.json`: what the library search searches, per document, in two parts:
+  - the text of the PDF pages the document shows, with the path of the PDF it uses (next to it, elsewhere or
+    attached) and that PDF's size and modification time;
+  - per page: which PDF page it shows, the text of its text elements, its shape.
+
+  A background thread keeps it up to date, one document at a time:
+  - nothing changed (the `.xopp` and the PDF it uses have their size and time): nothing is read;
+  - only the `.xopp` changed (annotations, text elements, pages added or moved): the `.xopp` is read again, the PDF
+    text is kept (only PDF pages not shown before are read) — e.g. 100 ms instead of 470 ms for a 300-page PDF;
+  - the PDF changed (also an attached one, or one elsewhere): its text is read again;
+  - renamed or moved in the app (also whole folders): the entries move along; only a pair's `.xopp`, which is written
+    again with the new path of its PDF, is read again (without PDF text). Renamed by another program: the PDF text
+    is taken over from the entry of the same file (same size and time);
+  - a document that is gone: its entry is removed;
+  - an older index format: everything is read once.
+
+  Unsaved changes of open documents are not in the index (it reads the files).
 
 The pages with hits of the extended search are drawn on demand (`HitPages.*`): the last 12 documents used stay
 loaded, drawn pages stay in memory (up to 128 MB) without marks, and the marks are painted into the page image.
