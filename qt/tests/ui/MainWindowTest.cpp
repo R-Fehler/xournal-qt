@@ -106,6 +106,14 @@ protected:
         };
         return walk(window->contentItem());
     }
+    /// Waits until something is true (animations, delegates of a list, a popup fading out).
+    void until(const std::function<bool()>& done, int ms = 1500) {
+        QElapsedTimer t;
+        t.start();
+        while (!done() && t.elapsed() < ms) {
+            wait(20);
+        }
+    }
     void click(QQuickItem* item, Qt::KeyboardModifiers m = Qt::NoModifier) {
         ASSERT_NE(item, nullptr);
         QTest::mouseClick(window, Qt::LeftButton, m,
@@ -707,14 +715,6 @@ TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {
     ASSERT_NE(grid, nullptr);
     ASSERT_NE(overview, nullptr);
     auto overviewShown = [&] { return overview->property("visible").toBool(); };
-    // Popups fade out, so give them a moment
-    auto until = [&](const std::function<bool()>& done) {
-        QElapsedTimer t;
-        t.start();
-        while (!done() && t.elapsed() < 1000) {
-            wait(20);
-        }
-    };
     auto tap = [&](int fingers) {
         {
             auto down = QTest::touchEvent(window, screen);
@@ -867,7 +867,7 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     auto* overview = find<QQuickItem>("contentsOverview");
     ASSERT_TRUE(overview->isVisible());
     auto* list = find<QQuickItem>("contentsList");
-    wait(100);
+    until([&] { return itemAt(list, 1) != nullptr; });
     QQuickItem* section = itemAt(list, 1);  // Section 1.1: pages 3, 4
     ASSERT_NE(section, nullptr);
     QQuickItem* strip = nullptr;
@@ -878,9 +878,11 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     }
     ASSERT_NE(strip, nullptr);
     EXPECT_EQ(strip->property("count").toInt(), 2);
+    until([&] { return itemAt(strip, 1) != nullptr; });
     QQuickItem* page4 = itemAt(strip, 1);
     ASSERT_NE(page4, nullptr);
     click(page4);
+    until([&] { return !overview->isVisible(); });
     EXPECT_FALSE(overview->isVisible());
     EXPECT_EQ(controller->pageNumber(), 4);
 }
