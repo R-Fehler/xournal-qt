@@ -159,12 +159,15 @@ int main(int argc, char* argv[]) {
         }
         // XQT_SCREENSHOT_SET=<objectName>.<property>=<value> sets a property of a QML item (e.g. homeView.extended=true).
         if (const auto set = qEnvironmentVariable("XQT_SCREENSHOT_SET"); !set.isEmpty()) {
-            QTimer::singleShot(100, [&engine, set] {
+            QTimer::singleShot(100, [&engine, &controller, set] {
                 const QString target = set.section('=', 0, 0);
-                if (auto* w = engine.rootObjects().value(0)) {
-                    if (QObject* o = w->findChild<QObject*>(target.section('.', 0, 0))) {
-                        o->setProperty(target.section('.', 1).toLatin1().constData(), set.section('=', 1));
-                    }
+                const QString name = target.section('.', 0, 0);
+                QObject* o = name == "app" ? &controller : nullptr;  // "app.<property>": the controller
+                if (auto* w = engine.rootObjects().value(0); w && !o) {
+                    o = w->findChild<QObject*>(name);
+                }
+                if (o) {
+                    o->setProperty(target.section('.', 1).toLatin1().constData(), set.section('=', 1));
                 }
             });
         }

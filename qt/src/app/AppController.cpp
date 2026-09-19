@@ -541,6 +541,20 @@ void AppController::removeToolbarColor(int index) {
 
 void AppController::resetToolbarColors() { storeToolbarColors(palette().mid(0, DEFAULT_TOOLBAR_COLORS)); }
 
+QString AppController::toolbarPosition() const {
+    std::string stored;
+    app->getSettings()->getCustomElement(CUSTOM).getString("toolbarPosition", stored);
+    return stored == "left" || stored == "right" ? QString::fromStdString(stored) : QStringLiteral("top");
+}
+
+void AppController::setToolbarPosition(const QString& position) {
+    if (position != toolbarPosition() && (position == "top" || position == "left" || position == "right")) {
+        app->getSettings()->getCustomElement(CUSTOM).setString("toolbarPosition", position.toStdString());
+        app->getSettings()->customSettingsChanged();
+        Q_EMIT toolbarPositionChanged();
+    }
+}
+
 QVariantList AppController::pdfHighlightColors() const {
     // Yellow (upstream's highlighter), green, pink
     return {QColor(0xff, 0xff, 0x00), QColor(0x7c, 0xfc, 0x3c), QColor(0xff, 0x80, 0xc0)};

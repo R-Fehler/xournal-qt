@@ -21,6 +21,8 @@ ApplicationWindow {
     property var afterDiscardCheck: null
     property bool sidebarShown: width >= 900
     property bool quitting: false
+    readonly property string toolbarPosition: app.toolbarPosition
+    readonly property bool sideToolbar: toolbarPosition === "left" || toolbarPosition === "right"
 
     function withSavedChanges(action) {
         if (!app.modified) {
@@ -100,39 +102,71 @@ ApplicationWindow {
         onCloseRequested: function(index) { requestCloseTab(index) }
       }
       ToolBar {
+        id: topTools
         width: parent.width
-        visible: !app.homeVisible
+        visible: !app.homeVisible && !win.sideToolbar
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: 56
-        // Scrolls sideways when the window is too narrow for all tools (portrait tablet).
+      }
+    }
+
+    // The tools: in the header (top), or a column at the left or right side (setting). One set of tools, moved.
+    Rectangle {
+        id: sideTools
+        objectName: "sideTools"
+        visible: !app.homeVisible && win.sideToolbar
+        width: visible ? 104 : 0
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        x: win.toolbarPosition === "right" ? parent.width - width : 0
+        color: "#ffffff"
+        Rectangle {  // the line towards the pages
+            width: 1
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            x: win.toolbarPosition === "right" ? 0 : parent.width - 1
+            color: "#d5d8dc"
+        }
+    }
+    Item {
+        id: toolArea
+        parent: win.sideToolbar ? sideTools : topTools
+        anchors.fill: parent
+        anchors.margins: win.sideToolbar ? 4 : 0
+        anchors.leftMargin: 6
+        anchors.rightMargin: 6
+        Material.foreground: "#303030"
+        // Scrolls when the window is too small for all tools (sideways on top, up and down at a side).
         Flickable {
             id: toolFlick
             anchors.fill: parent
-            anchors.leftMargin: 6
-            anchors.rightMargin: 6
             contentWidth: toolRow.width
-            contentHeight: height
-            flickableDirection: Flickable.HorizontalFlick
+            contentHeight: toolRow.height
+            flickableDirection: win.sideToolbar ? Flickable.VerticalFlick : Flickable.HorizontalFlick
             boundsBehavior: Flickable.StopAtBounds
-            interactive: contentWidth > width
+            interactive: win.sideToolbar ? contentHeight > height : contentWidth > width
             clip: true
-        RowLayout {
+        GridLayout {
             id: toolRow
-            height: toolFlick.height
-            width: Math.max(toolFlick.width, implicitWidth)
-            spacing: 2
+            objectName: "toolRow"
+            rows: win.sideToolbar ? -1 : 1
+            columns: win.sideToolbar ? 2 : -1
+            height: win.sideToolbar ? Math.max(toolFlick.height, implicitHeight) : toolFlick.height
+            width: win.sideToolbar ? toolFlick.width : Math.max(toolFlick.width, implicitWidth)
+            rowSpacing: 2
+            columnSpacing: 2
 
             IconButton { iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: sidebarShown; onClicked: sidebarShown = !sidebarShown }
             IconButton { objectName: "pageGridButton"; iconName: "xqt-pages-grid"; tip: qsTr("All pages (Ctrl+Alt+G)"); checked: pageGrid.visible; onClicked: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
-            ToolSeparator {}
+            ToolSeparator { orientation: win.sideToolbar ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.sideToolbar ? 2 : 1; Layout.fillWidth: win.sideToolbar }
             IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
             IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
-            ToolSeparator {}
+            ToolSeparator { orientation: win.sideToolbar ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.sideToolbar ? 2 : 1; Layout.fillWidth: win.sideToolbar }
             IconButton { iconName: "xopp-edit-undo"; tip: qsTr("Undo"); enabled: app.canUndo; onClicked: app.undo() }
             IconButton { iconName: "xopp-edit-redo"; tip: qsTr("Redo"); enabled: app.canRedo; onClicked: app.redo() }
-            ToolSeparator {}
+            ToolSeparator { orientation: win.sideToolbar ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.sideToolbar ? 2 : 1; Layout.fillWidth: win.sideToolbar }
             IconButton { iconName: "xopp-tool-pencil"; tip: qsTr("Pen"); checked: app.tool === "pen"; onClicked: app.selectTool("pen") }
             IconButton { iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
             IconButton { iconName: "xopp-tool-eraser"; tip: qsTr("Eraser"); checked: app.tool === "eraser"; onClicked: app.selectTool("eraser") }
@@ -146,7 +180,8 @@ ApplicationWindow {
                 onPressAndHold: fontPopup.open()
                 Popup {
                     id: fontPopup
-                    y: parent.height
+                    x: win.toolbarPosition === "left" ? parent.width : win.toolbarPosition === "right" ? -width : 0
+                    y: win.sideToolbar ? 0 : parent.height
                     padding: 12
                     ColumnLayout {
                         spacing: 8
@@ -245,7 +280,7 @@ ApplicationWindow {
                     ShapeItem { text: qsTr("Coordinate system"); type: "drawCoordinateSystem" }
                 }
             }
-            ToolSeparator {}
+            ToolSeparator { orientation: win.sideToolbar ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.sideToolbar ? 2 : 1; Layout.fillWidth: win.sideToolbar }
             // The preset colors: tap to use; press and hold / right click to remove; + adds one.
             Repeater {
                 model: app.toolbarColors
@@ -298,7 +333,7 @@ ApplicationWindow {
                     }
                 }
             }
-            ToolSeparator {}
+            ToolSeparator { orientation: win.sideToolbar ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.sideToolbar ? 2 : 1; Layout.fillWidth: win.sideToolbar }
             Repeater {
                 model: [ { size: 1, dot: 6 }, { size: 2, dot: 10 }, { size: 3, dot: 15 } ]
                 delegate: AbstractButton {
@@ -320,7 +355,7 @@ ApplicationWindow {
                     }
                 }
             }
-            Item { Layout.fillWidth: true }
+            Item { Layout.fillWidth: !win.sideToolbar; Layout.fillHeight: win.sideToolbar; Layout.columnSpan: win.sideToolbar ? 2 : 1 }
             IconButton {
                 objectName: "addPageButton"
                 iconName: "xopp-page-add"
@@ -328,7 +363,7 @@ ApplicationWindow {
                 onClicked: app.addPageAfterCurrent()
                 onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
             }
-            ToolSeparator {}
+            ToolSeparator { orientation: win.sideToolbar ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.sideToolbar ? 2 : 1; Layout.fillWidth: win.sideToolbar }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
             IconButton { objectName: "overviewButton"; iconName: "xqt-tabs-grid"; tip: qsTr("All open documents (Ctrl+Shift+E)"); onClicked: tabOverview.open() }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
@@ -348,11 +383,22 @@ ApplicationWindow {
                     MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Settings"); onTriggered: settingsPage.open() }
+                    Menu {
+                        title: qsTr("Tool bar position")
+                        component PositionItem: MenuItem {
+                            property string position
+                            checkable: true
+                            checked: app.toolbarPosition === position
+                            onTriggered: app.toolbarPosition = position
+                        }
+                        PositionItem { text: qsTr("Top"); position: "top" }
+                        PositionItem { text: qsTr("Left"); position: "left" }
+                        PositionItem { text: qsTr("Right"); position: "right" }
+                    }
                 }
             }
         }
         }
-      }
     }
 
     PageSidebar {
@@ -360,7 +406,7 @@ ApplicationWindow {
         objectName: "sidebar"
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.left: parent.left
+        anchors.left: win.toolbarPosition === "left" ? sideTools.right : parent.left
         width: 210
         visible: sidebarShown
     }
@@ -370,8 +416,8 @@ ApplicationWindow {
         objectName: "canvas"
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        anchors.left: sidebar.visible ? sidebar.right : parent.left
+        anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
+        anchors.left: sidebar.visible ? sidebar.right : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
     }

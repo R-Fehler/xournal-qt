@@ -668,3 +668,28 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     click(find<QQuickItem>("zoomInButton"));
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
 }
+
+TEST_F(MainWindowTest, toolbarMovesToTheLeftOrRight) {
+    auto* gridButton = find<QQuickItem>("pageGridButton");
+    auto* canvas = find<QQuickItem>("canvas");
+    ASSERT_NE(gridButton, nullptr);
+    auto sceneX = [](QQuickItem* i) { return i->mapToScene(QPointF(0, 0)).x(); };
+    const double canvasWidthOnTop = canvas->width();
+
+    controller->setToolbarPosition("left");
+    wait(50);
+    EXPECT_LT(sceneX(gridButton), 110);
+    EXPECT_GT(gridButton->mapToScene(QPointF(0, 0)).y(), 0) << "below the tab strip, not in the header";
+    EXPECT_LT(canvas->width(), canvasWidthOnTop);
+    EXPECT_GE(sceneX(find<QQuickItem>("sidebar")), 100) << "the page sidebar right of the tools";
+
+    controller->setToolbarPosition("right");
+    wait(50);
+    EXPECT_GT(sceneX(gridButton), window->width() - 110);
+    EXPECT_LE(sceneX(canvas) + canvas->width(), window->width() - 100);
+
+    controller->setToolbarPosition("top");
+    wait(50);
+    EXPECT_DOUBLE_EQ(canvas->width(), canvasWidthOnTop);
+    EXPECT_EQ(controller->toolbarPosition(), "top");
+}

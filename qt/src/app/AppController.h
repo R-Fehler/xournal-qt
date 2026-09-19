@@ -79,6 +79,8 @@ class AppController: public QObject {
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
     Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
+    /// Where the tool bar is: "top", "left" or "right"
+    Q_PROPERTY(QString toolbarPosition READ toolbarPosition WRITE setToolbarPosition NOTIFY toolbarPositionChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
@@ -147,6 +149,8 @@ public:
     QColor pdfHighlightColor() const;
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
+    QString toolbarPosition() const;
+    void setToolbarPosition(const QString& position);
     int zoomPercent() const;
     int pageNumber() const;
     int pageCount() const;
@@ -347,6 +351,7 @@ Q_SIGNALS:
     void copiedPagesChanged();
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
+    void toolbarPositionChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 
