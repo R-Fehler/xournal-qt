@@ -127,6 +127,39 @@ ApplicationWindow {
             IconButton { iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
             IconButton { iconName: "xopp-tool-eraser"; tip: qsTr("Eraser"); checked: app.tool === "eraser"; onClicked: app.selectTool("eraser") }
             IconButton { iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
+            IconButton {
+                objectName: "textButton"
+                iconName: "xopp-tool-text"
+                tip: qsTr("Text (tap to write; tap a text to edit it)")
+                checked: app.tool === "text"
+                onClicked: app.tool === "text" ? fontPopup.open() : app.selectTool("text")
+                onPressAndHold: fontPopup.open()
+                Popup {
+                    id: fontPopup
+                    y: parent.height
+                    padding: 12
+                    ColumnLayout {
+                        spacing: 8
+                        Label { text: qsTr("Font"); font.weight: Font.DemiBold }
+                        ComboBox {
+                            id: familyBox
+                            Layout.preferredWidth: 260
+                            model: fontPopup.opened ? app.fontFamilies() : []
+                            currentIndex: model.indexOf(app.fontFamily)
+                            onActivated: app.fontFamily = currentText
+                        }
+                        RowLayout {
+                            Label { text: qsTr("Size"); Layout.fillWidth: true }
+                            SpinBox {
+                                from: 4; to: 200
+                                value: Math.round(app.fontSize)
+                                editable: true
+                                onValueModified: app.fontSize = value
+                            }
+                        }
+                    }
+                }
+            }
             IconButton { objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
             IconButton { objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
             IconButton {

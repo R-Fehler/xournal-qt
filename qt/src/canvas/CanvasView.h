@@ -39,6 +39,7 @@ namespace xqt {
 
 class CanvasPage;
 class DocumentSession;
+class TextEditor;
 class RenderService;
 
 class CanvasView final: public QObject, public XournalView, public Layout, public RasterHost, public DocumentListener {
@@ -108,6 +109,12 @@ public:
     /// Select everything on the active layer of the current page (Control::selectAllOnPage).
     void selectAllOnPage();
 
+    // --- text tool (port of XojPageView::startText / XournalView::endTextAllPages): one editor per view ---
+    TextEditor* getTextEditor() const { return textEditor.get(); }
+    /// A tap with the text tool at a page position (points).
+    void startText(CanvasPage& page, double x, double y);
+    void endTextEditing();
+
     // Layout (upstream gui/Layout, content pixels)
     XojPageView* getPageViewAt(int x, int y) const override;
     int getTotalPixelWidth() const override;
@@ -122,6 +129,8 @@ Q_SIGNALS:
     void pagesChanged();
     /// A selection was made or cleared.
     void selectionChanged(bool hasSelection);
+    /// Text editing started or ended (keyboard / input method for the canvas).
+    void textEditingChanged(bool editing);
 
 private:
     void rebuildPages();
@@ -143,6 +152,7 @@ private:
     std::atomic<double> renderDpr{1.0};
     QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
+    std::unique_ptr<TextEditor> textEditor;
     quint64 selectionRev = 0;
 };
 

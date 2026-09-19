@@ -94,6 +94,12 @@ cd build-qt
 - [ ] Undo/redo of moves, resizes, deletes and pastes.
 - [ ] The side button set to "Lasso selection" in the settings selects while held.
 
+## Text
+- [ ] Text tool: tap on a page, type (hardware keyboard and the on-screen keyboard, also accents), Enter for new lines; the text looks the same while and after editing.
+- [ ] Tap an existing text to edit it at the tapped place; arrows, Shift+arrows, dragging to select, Ctrl+C/X/V.
+- [ ] Tap outside or Esc ends; undo removes/restores; emptying a text removes it.
+- [ ] Text button again (or long press): font family and size, also for the text being edited.
+
 ## Page operations
 - [ ] Sidebar: Ctrl+click / Shift+click select pages (blue, check mark); a plain tap goes to the page.
 - [ ] Ctrl+C, then Ctrl+V: the pages are pasted after the selection; pasting into another tab works (PDF pages keep their look).

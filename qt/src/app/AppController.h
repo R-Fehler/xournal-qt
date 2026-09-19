@@ -53,6 +53,9 @@ class AppController: public QObject {
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
     Q_PROPERTY(QString tool READ tool NOTIFY toolChanged)
     Q_PROPERTY(QColor color READ color NOTIFY toolChanged)
+    /// Font of the text tool (upstream's settings font)
+    Q_PROPERTY(QString fontFamily READ fontFamily WRITE setFontFamily NOTIFY fontChanged)
+    Q_PROPERTY(double fontSize READ fontSize WRITE setFontSize NOTIFY fontChanged)
     /// Upstream's drawing type of the tool: default (freehand), strokeRecognizer, line, rectangle, ellipse, arrow,
     /// doubleArrow, drawCoordinateSystem
     Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
@@ -99,6 +102,12 @@ public:
     bool canRedo() const;
     QString tool() const;
     QColor color() const;
+    QString fontFamily() const;
+    double fontSize() const;
+    void setFontFamily(const QString& family);
+    void setFontSize(double size);
+    void setFont(const QString& family, double size);
+    Q_INVOKABLE QStringList fontFamilies() const;
     QString drawingType() const;
     void setDrawingType(const QString& type);
     int size() const;
@@ -239,6 +248,7 @@ Q_SIGNALS:
     void viewLayoutChanged();
     void pageUndoChanged();
     void selectionChanged();
+    void fontChanged();
     void copiedPagesChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);

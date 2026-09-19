@@ -6,9 +6,12 @@
 #include <shared_mutex>
 
 #include <QFileInfo>
+#include <QFontDatabase>
 
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
+#include "TextEditor.h"
+#include "model/Font.h"
 #include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
 #include "gui/toolbarMenubar/model/ColorPalette.h"
@@ -657,18 +660,40 @@ bool AppController::saveAs(const QUrl& url) {
 }
 
 void AppController::undo() {
+    if (!session()) {
+        return;
+    }
+    session()->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
     if (canUndo()) {
-        session()->clearSelectionEndText();
         session()->getUndoRedoHandler()->undo();
     }
 }
 
 void AppController::redo() {
+    if (!session()) {
+        return;
+    }
+    session()->clearSelectionEndText();
     if (canRedo()) {
-        session()->clearSelectionEndText();
         session()->getUndoRedoHandler()->redo();
     }
 }
+
+QString AppController::fontFamily() const { return QString::fromStdString(app->getSettings()->getFont().getName()); }
+double AppController::fontSize() const { return app->getSettings()->getFont().getSize(); }
+
+void AppController::setFont(const QString& family, double size) {
+    XojFont font(family.toStdString(), std::clamp(size, 4.0, 400.0));
+    app->getSettings()->setFont(font);
+    if (canvas() && canvas()->getTextEditor()) {
+        canvas()->getTextEditor()->setFont(font);  // the text being edited follows
+    }
+    Q_EMIT fontChanged();
+}
+void AppController::setFontFamily(const QString& family) { setFont(family, fontSize()); }
+void AppController::setFontSize(double size) { setFont(fontFamily(), size); }
+
+QStringList AppController::fontFamilies() const { return QFontDatabase::families(); }
 
 void AppController::selectTool(const QString& name) {
     ToolType type = toolTypeFromString(name.toStdString());

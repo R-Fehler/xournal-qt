@@ -29,6 +29,7 @@
 #include "view/Repaintable.h"
 
 class EraseHandler;
+class OverlayBase;
 class Selector;
 class InputHandler;
 class PositionInputData;
@@ -75,6 +76,8 @@ public:
     /// Dirty areas since the last call, in buffer pixels of the given buffer geometry. `all` = everything.
     std::vector<QRect> takeDirty(const BufferInfo& info, bool& all);
     bool hasOverlays() const { return !overlayViews.empty(); }
+    void addOverlayView(std::unique_ptr<xoj::view::OverlayView> v);
+    void removeOverlayViewsOf(const OverlayBase* o);
 
     /// Called by the CanvasView (UI thread) when the raster finished rendering.
     void rasterUpdated(std::optional<xoj::util::Rectangle<double>> area);

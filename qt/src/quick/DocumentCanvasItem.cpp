@@ -9,6 +9,10 @@
 #include <cairo.h>
 
 #include <QCoreApplication>
+#include <QKeyEvent>
+#include <QInputMethodEvent>
+#include <QInputMethod>
+#include <QGuiApplication>
 #include <QMatrix4x4>
 #include <QQmlEngine>
 #include <QNativeGestureEvent>
@@ -24,6 +28,7 @@
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "TextEditor.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 
@@ -141,6 +146,17 @@ void DocumentCanvasItem::setView(QObject* object) {
             update();
         });
         connect(input.get(), &xqt::CanvasInput::hoverChanged, this, &QQuickItem::update);
+        connect(canvasView, &xqt::CanvasView::textEditingChanged, this, [this](bool editing) {
+            setFlag(ItemAcceptsInputMethod, editing);
+            if (editing) {
+                forceActiveFocus(Qt::OtherFocusReason);
+                QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
+                QGuiApplication::inputMethod()->show();  // tablets: the on-screen keyboard
+            } else {
+                QGuiApplication::inputMethod()->hide();
+                QGuiApplication::inputMethod()->update(Qt::ImEnabled);
+            }
+        });
         updateViewGeometry();
     }
     Q_EMIT viewChanged();
@@ -333,6 +349,59 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
 }
 
 void DocumentCanvasItem::releaseResources() { viewReplaced = true; }
+
+bool DocumentCanvasItem::event(QEvent* e) {
+    // While editing text, typing keys belong to the editor, not to the window's shortcuts (Ctrl+C, Delete, ...).
+    if (e->type() == QEvent::ShortcutOverride && canvasView && canvasView->getTextEditor() &&
+        xqt::TextEditor::wantsKey(static_cast<QKeyEvent*>(e))) {
+        e->accept();
+        return true;
+    }
+    return QQuickItem::event(e);
+}
+
+void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
+    xqt::TextEditor* editor = canvasView ? canvasView->getTextEditor() : nullptr;
+    bool finish = false;
+    if (editor && editor->keyPressed(e, finish)) {
+        if (finish) {
+            canvasView->endTextEditing();
+        } else {
+            QGuiApplication::inputMethod()->update(Qt::ImCursorRectangle | Qt::ImSurroundingText |
+                                                   Qt::ImCursorPosition | Qt::ImAnchorPosition);
+        }
+        e->accept();
+        return;
+    }
+    QQuickItem::keyPressEvent(e);
+}
+
+void DocumentCanvasItem::inputMethodEvent(QInputMethodEvent* e) {
+    if (xqt::TextEditor* editor = canvasView ? canvasView->getTextEditor() : nullptr) {
+        editor->inputMethodEvent(e);
+        e->accept();
+        return;
+    }
+    QQuickItem::inputMethodEvent(e);
+}
+
+QVariant DocumentCanvasItem::inputMethodQuery(Qt::InputMethodQuery query) const {
+    xqt::TextEditor* editor = canvasView ? canvasView->getTextEditor() : nullptr;
+    if (!editor) {
+        return query == Qt::ImEnabled ? QVariant(false) : QQuickItem::inputMethodQuery(query);
+    }
+    if (query == Qt::ImCursorRectangle) {
+        auto idx = canvasView->indexOf(&editor->getPage());
+        if (!idx) {
+            return QRectF();
+        }
+        const double zoom = canvasView->getViewController().zoom();
+        const QRectF r = editor->cursorRectOnPage();
+        const QPointF origin = canvasView->pageViewRect(*idx).topLeft();
+        return QRectF(origin + r.topLeft() * zoom, r.size() * zoom);
+    }
+    return editor->inputMethodQuery(query);
+}
 
 void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, double dpr) {
     auto* root = static_cast<CanvasRootNode*>(rootNode);

@@ -12,6 +12,8 @@
 #include <QElapsedTimer>
 #include <QPointingDevice>
 #include <QTabletEvent>
+#include <QKeyEvent>
+#include <QInputMethodEvent>
 #include <QTouchEvent>
 #include <QTemporaryDir>
 #include <QThread>
@@ -25,6 +27,7 @@
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Stroke.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
@@ -34,6 +37,7 @@
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "TextEditor.h"
 
 using namespace xqt;
 
@@ -454,4 +458,81 @@ TEST_F(CanvasReplayTest, lassoTapDeleteCopyPaste) {
     EXPECT_EQ(view->getSelection()->getElementsView().size(), 3u);
     view->clearSelection();
     EXPECT_EQ(elementCount(0), 3u);
+}
+
+namespace {
+void typeInto(xqt::TextEditor& editor, const QString& text) {
+    for (QChar c: text) {
+        const int key = c == '\n' ? Qt::Key_Return : c.toUpper().unicode();
+        QKeyEvent e(QEvent::KeyPress, key, Qt::NoModifier, c == '\n' ? QString() : QString(c));
+        bool finish = false;
+        editor.keyPressed(&e, finish);
+    }
+}
+void pressKey(xqt::TextEditor& editor, int key, Qt::KeyboardModifiers m = Qt::NoModifier) {
+    QKeyEvent e(QEvent::KeyPress, key, m);
+    bool finish = false;
+    editor.keyPressed(&e, finish);
+}
+}  // namespace
+
+TEST_F(CanvasReplayTest, textToolWritesAndEditsText) {
+    view->getViewController().setViewSize(QSizeF(1000, 1200));
+    processEvents();
+    app->getToolHandler()->selectTool(TOOL_TEXT);
+    auto tap = [&](QPointF p) {
+        tablet(QEvent::TabletPress, viewPos(0, p), 0.5, Qt::LeftButton, Qt::LeftButton);
+        tablet(QEvent::TabletRelease, viewPos(0, p), 0.0, Qt::LeftButton, Qt::NoButton);
+        processEvents();
+    };
+    auto onlyText = [&]() -> const Text* {
+        const auto* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+        return layer->getElementsView().size() == 0 ? nullptr
+                                                      : dynamic_cast<const Text*>(layer->getElementsView().front());
+    };
+
+    tap(QPointF(100, 100));
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    typeInto(*view->getTextEditor(), "Hello\nWorld");
+    QInputMethodEvent im;  // an accented letter from the on-screen keyboard / a dead key
+    im.setCommitString(QString::fromUtf8(" é"));
+    view->getTextEditor()->inputMethodEvent(&im);
+    view->endTextEditing();
+    ASSERT_NE(onlyText(), nullptr);
+    EXPECT_EQ(onlyText()->getText(), "Hello\nWorld é");
+
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(onlyText(), nullptr);
+    session->getUndoRedoHandler()->redo();
+    ASSERT_NE(onlyText(), nullptr);
+
+    // Edit: tap on the text, go to the end, add.
+    const auto box = onlyText()->getBoundingBox();
+    tap(QPointF(box.x + 5, box.y + 5));
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    EXPECT_TRUE(onlyText()->isInEditing()) << "the original is hidden while editing";
+    pressKey(*view->getTextEditor(), Qt::Key_End, Qt::ControlModifier);
+    typeInto(*view->getTextEditor(), "!");
+    view->endTextEditing();
+    ASSERT_NE(onlyText(), nullptr);
+    EXPECT_EQ(onlyText()->getText(), "Hello\nWorld é!");
+    EXPECT_FALSE(onlyText()->isInEditing());
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(onlyText()->getText(), "Hello\nWorld é");
+
+    // Emptying a text deletes it (undoable).
+    tap(QPointF(box.x + 5, box.y + 5));
+    pressKey(*view->getTextEditor(), Qt::Key_A, Qt::ControlModifier);
+    pressKey(*view->getTextEditor(), Qt::Key_Backspace);
+    view->endTextEditing();
+    EXPECT_EQ(onlyText(), nullptr);
+    session->getUndoRedoHandler()->undo();
+    ASSERT_NE(onlyText(), nullptr);
+    EXPECT_FALSE(onlyText()->isInEditing());
+
+    // Tapping into a text and out again changes nothing (no undo step).
+    const bool couldRedo = session->getUndoRedoHandler()->canRedo();
+    tap(QPointF(box.x + 5, box.y + 5));
+    view->endTextEditing();
+    EXPECT_EQ(session->getUndoRedoHandler()->canRedo(), couldRedo);
 }

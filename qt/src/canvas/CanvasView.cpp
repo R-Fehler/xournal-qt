@@ -9,6 +9,7 @@
 #include <QClipboard>
 
 #include "control/PdfCache.h"
+#include "view/overlays/OverlayView.h"
 #include "config.h"
 #include "util/serializing/InputStreamException.h"
 #include "util/serializing/ObjectOutputStream.h"
@@ -34,6 +35,7 @@
 #include "render/RenderService.h"
 
 #include "CanvasPage.h"
+#include "TextEditor.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
@@ -73,10 +75,17 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
             [this](qulonglong page, QRectF rect) { viewController.scrollToPageRect(page, rect); });
     // Search hits are drawn by the canvas item over the pages.
     connect(&session.search(), &DocumentSearch::changed, this, &CanvasView::updateRequested);
-    // Upstream's Control::clearSelectionEndText (before saving, page operations, ...): the elements go back.
+    // Upstream's Control::clearSelectionEndText (before saving, undo, page operations, ...): the elements go back.
     connect(&session, &DocumentSession::clearSelectionRequested, this, [this] {
+        endTextEditing();
         if (selection) {
             clearSelection();
+        }
+    });
+    // Another tool ends the text editing (upstream: ToolHandler listener).
+    connect(&session.getApp(), &AppContext::activeToolChanged, this, [this] {
+        if (textEditor && this->session.getToolHandler()->getToolType() != TOOL_TEXT) {
+            endTextEditing();
         }
     });
     // Column layout changed in the settings: lay out again, keep the current page in view.
@@ -96,6 +105,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 }
 
 CanvasView::~CanvasView() {
+    endTextEditing();
     selection.reset();  // the selected elements go back into the document
     session.setXournalView(nullptr);
     session.setZoomControl(nullptr);
@@ -353,6 +363,31 @@ void CanvasView::selectAllOnPage() {
         page->fireRangeChanged(rg);
         setSelection(sel.release());
     }
+}
+
+void CanvasView::startText(CanvasPage& page, double x, double y) {
+    // Port of XojPageView::startText
+    if (textEditor) {
+        if (&textEditor->getPage() == &page && textEditor->contains(x, y)) {
+            textEditor->mousePressed(x, y);
+            return;
+        }
+        endTextEditing();
+    }
+    textEditor = std::make_unique<TextEditor>(session, page, x, y);
+    page.addOverlayView(textEditor->createView());
+    Q_EMIT textEditingChanged(true);
+}
+
+void CanvasView::endTextEditing() {
+    if (!textEditor) {
+        return;
+    }
+    CanvasPage& page = textEditor->getPage();
+    page.removeOverlayViewsOf(textEditor.get());
+    textEditor.reset();  // finishes (undo action)
+    Q_EMIT textEditingChanged(false);
+    Q_EMIT updateRequested();
 }
 
 double CanvasView::getZoom() const { return viewController.zoom(); }

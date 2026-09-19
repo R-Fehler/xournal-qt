@@ -36,6 +36,7 @@
 #include "view/overlays/OverlayView.h"
 
 #include "CanvasView.h"
+#include "TextEditor.h"
 #include "render/RenderService.h"
 #include "session/DocumentSession.h"
 
@@ -148,6 +149,8 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
                     std::make_unique<xoj::view::SelectorView>(this->selector.get(), this,
                                                               control.getSettings()->getSelectionColor()));
         }
+    } else if (h->getToolType() == TOOL_TEXT) {
+        view.startText(*this, x, y);
     } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
         const bool aggregate = pos.isShiftDown() && view.getSelection();
         selectObjectAt(x, y, false, aggregate);
@@ -218,6 +221,16 @@ bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggreg
 
 XournalView* CanvasPage::getXournal() const { return &view; }
 
+void CanvasPage::addOverlayView(std::unique_ptr<xoj::view::OverlayView> v) {
+    overlayViews.emplace_back(std::move(v));
+    flagDirtyRegion(Range(0, 0, getWidth(), getHeight()));
+}
+
+void CanvasPage::removeOverlayViewsOf(const OverlayBase* o) {
+    eraseViewsOf(overlayViews, o);
+    flagDirtyRegion(Range(0, 0, getWidth(), getHeight()));
+}
+
 xoj::util::Point<int> CanvasPage::getPixelPosition() const {
     // Content pixels (upstream: the page's position in the layout, independent of scrolling).
     if (auto idx = view.indexOf(this)) {
@@ -243,6 +256,9 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
         // input handler used this event
     } else if (this->selector) {
         this->selector->currentPos(x, y);
+    } else if (TextEditor* editor = view.getTextEditor(); editor && &editor->getPage() == this &&
+                                                            h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
+        editor->mouseMoved(x, y);  // drag: select text
     } else if (h->getToolType() == TOOL_ERASER && h->getEraserType() != ERASER_TYPE_WHITEOUT && this->inEraser) {
         this->eraser->erase(x, y);
     }

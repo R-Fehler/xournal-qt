@@ -58,6 +58,11 @@ protected:
     void itemChange(ItemChange change, const ItemChangeData& value) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
     void releaseResources() override;
+    // Text tool: keys and input methods (on-screen keyboard) go to the text editor.
+    bool event(QEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void inputMethodEvent(QInputMethodEvent* event) override;
+    QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
 
 private:
     void updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale);
