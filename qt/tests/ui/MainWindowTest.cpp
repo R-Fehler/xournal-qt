@@ -597,3 +597,26 @@ TEST_F(HomeScreenTest, searchFindsFoldersAndOpensThem) {
     EXPECT_EQ(field->property("text").toString(), "");
     EXPECT_EQ(gridCount(), 1);  // sheet.pdf
 }
+
+TEST_F(HomeScreenTest, libraryMenuMarksThisLibraryWithoutToggles) {
+    click(find<QQuickItem>("libraryMenuButton"));
+    QObject* menu = find("libraryMenu");
+    ASSERT_NE(menu, nullptr);
+    ASSERT_TRUE(waitOpened(menu, true));
+    int current = 0;
+    const int n = menu->property("count").toInt();
+    for (int i = 0; i < n; ++i) {
+        QQuickItem* item = nullptr;
+        QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, item), Q_ARG(int, i));
+        ASSERT_NE(item, nullptr);
+        EXPECT_FALSE(item->property("checkable").toBool()) << "no toggles: " << item->property("text").toString().toStdString();
+        if (item->property("current").toBool()) {
+            ++current;
+            EXPECT_TRUE(item->property("text").toString().contains(QString::fromStdString(root.filename().string())));
+            click(item);  // this library: stays in this window
+        }
+    }
+    EXPECT_EQ(current, 1) << "this window's library is marked";
+    EXPECT_TRUE(waitOpened(menu, false));
+    EXPECT_TRUE(controller->homeVisible());
+}

@@ -254,28 +254,48 @@ Rectangle {
                 tip: qsTr("Libraries")
                 implicitWidth: 36
                 onClicked: libraryMenu.popup()
+                // The libraries: this window shows one (highlighted); another one opens in a new window.
                 Menu {
                     id: libraryMenu
                     objectName: "libraryMenu"
-                    width: 300
+                    width: 320
                     property var libraries: []
                     onAboutToShow: libraries = app.libraries()
+                    Label {
+                        text: qsTr("Libraries (another one opens in a new window)")
+                        leftPadding: 16
+                        rightPadding: 16
+                        topPadding: 8
+                        bottomPadding: 4
+                        width: libraryMenu.width
+                        wrapMode: Text.Wrap
+                        font.pixelSize: 12
+                        color: "#6b6f75"
+                    }
                     Instantiator {
                         id: libraryList
                         model: libraryMenu.libraries
                         delegate: MenuItem {
+                            id: libraryItem
                             required property var modelData
-                            text: modelData.name
-                            checkable: true
-                            checked: modelData.current
-                            onTriggered: app.openLibrary("file://" + modelData.path)
+                            readonly property bool current: modelData.current
+                            text: current ? qsTr("%1 — this window").arg(modelData.name) : modelData.name
+                            font.weight: current ? Font.DemiBold : Font.Normal
+                            icon.source: app.iconUrl("xqt-library")
+                            icon.color: current ? Material.accentColor : "#566d86"
+                            background: Rectangle {
+                                color: libraryItem.current ? "#e8eaf6" : (libraryItem.highlighted ? "#f1f3f4" : "transparent")
+                            }
+                            // This library: just the home screen; another: a new window (one library per window)
+                            onTriggered: current ? (app.homeVisible = true) : app.openLibrary("file://" + modelData.path)
                         }
-                        onObjectAdded: function(index, object) { libraryMenu.insertItem(index, object) }
+                        // after the heading
+                        onObjectAdded: function(index, object) { libraryMenu.insertItem(index + 1, object) }
                         onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
                     }
                     MenuSeparator {}
-                    MenuItem { text: qsTr("New library…"); onTriggered: newLibraryDialog.open() }
-                    MenuItem { text: qsTr("Open a folder as library…"); onTriggered: openLibraryDialog.open() }
+                    MenuItem { text: qsTr("New library… (new window)"); onTriggered: newLibraryDialog.open() }
+                    MenuItem { text: qsTr("Open a folder as library… (new window)"); onTriggered: openLibraryDialog.open() }
                     MenuItem {
                         text: qsTr("Show in file manager")
                         enabled: app.library.available

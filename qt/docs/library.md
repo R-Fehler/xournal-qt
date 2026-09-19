@@ -5,6 +5,9 @@ A **library** is a plain folder of documents that a window works in, like a work
 
 - `xournal-qt` opens the default library `<Documents>/Xournal_Libraries/Default` and creates it if needed.
 - `xournal-qt <folder> [files…]` opens a folder as library. Any folder with PDFs and `.xopp` files works.
+- The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
+  this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
+  as library…". A window never shows two libraries.
 - Starting the app again for the same library hands the files over to the running window. Each library has its own
   single-instance socket and its own session journal: `session.json` for the default library, else
   `sessions/<hash>.json` in the config folder.
