@@ -330,6 +330,47 @@ ApplicationWindow {
         }
     }
 
+    // After a crash: offer the documents with unsaved changes (from emergency and autosave files).
+    Dialog {
+        id: recoveryDialog
+        objectName: "recoveryDialog"
+        anchors.centerIn: parent
+        modal: true
+        closePolicy: Popup.NoAutoClose
+        width: Math.min(win.width * 0.9, 560)
+        title: qsTr("Recover unsaved changes?")
+        ColumnLayout {
+            width: parent.width
+            spacing: 8
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("Xournal Qt did not close properly. These documents have changes that were not saved:")
+            }
+            Repeater {
+                model: app.recoveryItems
+                delegate: RowLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Label { text: modelData.title; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideMiddle }
+                    Label { text: modelData.time; color: "#6b6f75" }
+                }
+            }
+        }
+        footer: DialogButtonBox {
+            Button { text: qsTr("Recover"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+            Button { text: qsTr("Discard changes"); DialogButtonBox.buttonRole: DialogButtonBox.DestructiveRole }
+            onAccepted: { recoveryDialog.close(); app.recover(true) }
+            onClicked: function(button) {
+                if (button.DialogButtonBox.buttonRole === DialogButtonBox.DestructiveRole) {
+                    recoveryDialog.close()
+                    app.recover(false)
+                }
+            }
+        }
+    }
+    Component.onCompleted: if (app.recoveryItems.length > 0) recoveryDialog.open()
+
     Dialog {
         id: messageDialog
         anchors.centerIn: parent

@@ -26,6 +26,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
@@ -85,7 +87,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

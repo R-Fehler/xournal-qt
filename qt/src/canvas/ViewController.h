@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include <optional>
+
 #include <cstddef>
 
 #include <QElapsedTimer>
@@ -88,6 +90,7 @@ private:
     QPointF scrollPos;  ///< content coordinate of the view's top-left corner (when content is larger than the view)
     QSizeF view;
     bool initialized = false;
+    std::optional<size_t> pendingPage;
 
     Anchor pinchAnchor;
     double pinchStartDistance = 1.0;

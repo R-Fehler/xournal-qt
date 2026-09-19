@@ -80,6 +80,18 @@ public:
     std::string getDisplayName() const;
     bool isModified() const;
     const fs::path& getLastAutosaveFile() const { return lastAutosaveFile; }
+    /// Unique number of this session in this process (names its autosave and emergency files).
+    quint64 serial() const { return serialNo; }
+    /// Where autosave() writes: ".name.autosave.xopp" next to the document (upstream), or for unsaved
+    /// documents "<cache>/autosaves/<pid>-<serial>.autosave.xopp" (one file per tab).
+    fs::path autosavePath() const;
+    /// Where a crash (emergency) save of this session goes: "<cache>/autosaves/<pid>-<serial>.emergency.xopp".
+    static fs::path emergencyPath(qint64 pid, quint64 serial);
+    static fs::path unnamedAutosavePath(qint64 pid, quint64 serial);
+    static fs::path namedAutosavePath(fs::path document);
+    /// This document was restored from an autosave/emergency file: it belongs to `original` (empty: unsaved) and
+    /// has unsaved changes (upstream's EmergencySaveRestore undo action).
+    void markRecovered(const fs::path& original);
     /// Remove the last autosave file (after closing the document without losing data).
     void deleteAutosaveFile();
 
@@ -155,6 +167,7 @@ private:
 
     QTimer autosaveTimer;
     fs::path lastAutosaveFile;
+    quint64 serialNo = 0;
 };
 
 }  // namespace xqt

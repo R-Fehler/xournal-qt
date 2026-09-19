@@ -8,7 +8,10 @@
  */
 #pragma once
 
+#include <map>
 #include <memory>
+#include <utility>
+#include <vector>
 
 #include <QColor>
 #include <QMetaObject>
@@ -18,6 +21,8 @@
 #include <QUrl>
 #include <QVariantList>
 
+#include "filesystem.h"
+
 namespace xqt {
 class AppContext;
 class CanvasView;
@@ -25,6 +30,7 @@ class DocumentSession;
 class TabManager;
 class PagesModel;
 class SettingsModel;
+class SessionRecovery;
 }  // namespace xqt
 class Palette;
 
@@ -48,6 +54,8 @@ class AppController: public QObject {
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
+    /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
+    Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
     explicit AppController(QObject* parent = nullptr);
     ~AppController() override;
@@ -70,6 +78,15 @@ public:
     int zoomPercent() const;
     int pageNumber() const;
     int pageCount() const;
+    QVariantList recoveryItems() const;
+
+    // --- start and recovery ---
+    /// Start of the app: offers recovery after a crash (recoveryItems), else reopens the last tabs (setting), then
+    /// opens `files`. Starts protecting the open documents (journal, emergency saves).
+    void startSession(const QStringList& files);
+    /// Answer to the recovery offer: reopen the tabs of the crashed run, with the recovered changes (accept) or as
+    /// last saved (discard; the recovery files are deleted).
+    Q_INVOKABLE void recover(bool accept);
 
     // --- tabs ---
     /// New empty document in a new tab.
@@ -142,16 +159,22 @@ Q_SIGNALS:
     void message(const QString& title, const QString& text, bool error);
     /// The window should come to the front (e.g. another instance handed over files).
     void raiseRequested();
+    void recoveryChanged();
 
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
     void currentTabChanged();
+    /// Reopens the tabs of a journal; `recovered`: tab index -> recovery file to load instead of the file.
+    void reopenTabs(const std::vector<std::pair<fs::path, int>>& tabs, int current,
+                    const std::map<size_t, std::pair<fs::path, fs::path>>& recovered);
 
     std::unique_ptr<xqt::AppContext> app;
     std::unique_ptr<Palette> colors;
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::SettingsModel> settingsView;
+    std::unique_ptr<xqt::SessionRecovery> recovery;  // after `tabs`: destroyed first
+    bool recoveryPending = false;
     std::vector<QMetaObject::Connection> currentConnections;
 };

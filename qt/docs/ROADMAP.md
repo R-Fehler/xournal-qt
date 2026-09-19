@@ -35,7 +35,12 @@
   - Settings sheet (gear button, Ctrl+,) over upstream's `Settings`, same settings.xml keys: pressure (sensitivity, minimum, multiplier, guessing), side/barrel button tool, eraser mode, palm rejection timeout, pinch zoom on/off, stroke stabilizer (all upstream parameters), autosave, default file name, new page template (background, paper size, orientation, color, copy from current page). Changes apply live and are saved once when the sheet closes (upstream's settings transaction).
   - `SettingsModel` (key/value access for QML), unit tests; `xqt-ui-tests` load the real `Main.qml` off-screen.
 - **Tab switching and overview: done (awaiting on-device test).** Ctrl+Tab / Ctrl+Shift+Tab (and Ctrl+PgDown/PgUp) cycle tabs; the grid button (Ctrl+Shift+E) shows all open documents as cards with their current page: tap to switch, × to close, keyboard navigation.
-- **Next:** M5d crash recovery and session restore; then the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
+- **M5d crash recovery and session restore: done (awaiting on-device test).**
+  - Journal of the open tabs (`session.json` in the config folder), written when tabs open/close/move and shortly after page changes; marked clean on a normal exit.
+  - Fatal signals (crash, SIGTERM at logout, SIGINT) write every modified tab to `<cache>/autosaves/<pid>-<serial>.emergency.xopp` (upstream's CrashHandler, for all tabs).
+  - Next start after a crash: "Recover unsaved changes?" lists the tabs whose emergency/autosave file is newer than the document; recovered tabs keep their original file path and are marked unsaved (upstream's EmergencySaveRestore). After a normal exit: the last tabs, current tab and pages are reopened (setting "Reopen the documents of the last session").
+  - Fix: unsaved tabs autosaved to the same file (upstream's `<pid>.xopp`); each tab has its own now.
+- **Next:** the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
 
 ---
 

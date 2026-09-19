@@ -57,4 +57,10 @@ cd build-qt
 - [ ] Ctrl+Tab / Ctrl+Shift+Tab switch tabs.
 - [ ] Grid button (or Ctrl+Shift+E): all open documents as cards; tapping one switches to it; × closes it (asks if unsaved).
 
+## Crash recovery and session restore (M5d)
+- [ ] Open two documents, quit normally, start again: both reopen, with the same current tab and page.
+- [ ] Write in a saved document and in a new one, then kill the app (`pkill -SEGV xournal-qt`). Start again: "Recover unsaved changes?" lists both; Recover restores the ink (tab marked unsaved; Save writes to the original file).
+- [ ] Same, but "Discard changes": the documents open as last saved.
+- [ ] Settings → Documents → "Reopen the documents of the last session" off: the app starts with an empty document.
+
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

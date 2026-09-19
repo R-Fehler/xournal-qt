@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <atomic>
 #include <limits>
 #include <mutex>
 #include <shared_mutex>
@@ -18,6 +19,7 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "undo/InsertDeletePageUndoAction.h"
+#include "undo/EmergencySaveRestore.h"
 #include "undo/SwapUndoAction.h"
 #include "util/PathUtil.h"
 #include "util/Util.h"
@@ -96,6 +98,8 @@ DocumentSession::DocumentSession(AppContext& app, std::unique_ptr<Document> docu
 }
 
 void DocumentSession::init() {
+    static std::atomic<quint64> nextSerial{1};
+    serialNo = nextSerial++;
     window.view = &headlessView;
     undoRedo = std::make_unique<UndoRedoHandler>(this);
     undoRedo->addUndoRedoListener(this);
@@ -472,15 +476,8 @@ auto DocumentSession::autosave() -> SaveResult {
     SaveHandler handler;
     undoRedo->documentAutosaved();
 
+    const fs::path filepath = autosavePath();
     doc->lock_shared();
-    auto filepath = doc->getFilepath();
-    if (filepath.empty()) {
-        filepath = Util::getAutosaveFilepath();
-    } else {
-        filepath.replace_filename(fs::path(".") += filepath.filename());
-    }
-    Util::clearExtensions(filepath);
-    filepath += ".autosave.xopp";
     handler.prepareSave(doc.get(), filepath);
     doc->unlock_shared();
 
@@ -513,6 +510,45 @@ auto DocumentSession::autosave() -> SaveResult {
                           filepath.u8string() % e.what())};
     }
     return {true, {}};
+}
+
+fs::path DocumentSession::unnamedAutosavePath(qint64 pid, quint64 serial) {
+    // xournal-qt: upstream uses "<pid>.xopp" (one document per process); here every tab needs its own file.
+    fs::path p = Util::getAutosaveFilepath();
+    p.replace_filename(std::to_string(pid) + "-" + std::to_string(serial) + ".autosave.xopp");
+    return p;
+}
+
+fs::path DocumentSession::emergencyPath(qint64 pid, quint64 serial) {
+    fs::path p = Util::getAutosaveFilepath();
+    p.replace_filename(std::to_string(pid) + "-" + std::to_string(serial) + ".emergency.xopp");
+    return p;
+}
+
+fs::path DocumentSession::autosavePath() const {
+    // Port of AutosaveJob::run (target path)
+    fs::path filepath;
+    {
+        std::shared_lock lock(*doc);
+        filepath = doc->getFilepath();
+    }
+    return filepath.empty() ? unnamedAutosavePath(Util::getPid(), serialNo) : namedAutosavePath(filepath);
+}
+
+fs::path DocumentSession::namedAutosavePath(fs::path document) {
+    document.replace_filename(fs::path(".") += document.filename());
+    Util::clearExtensions(document);
+    document += ".autosave.xopp";
+    return document;
+}
+
+void DocumentSession::markRecovered(const fs::path& original) {
+    // Like upstream's checkForEmergencySave: the content is not saved anywhere yet.
+    doc->lock();
+    doc->setFilepath(original);
+    doc->unlock();
+    undoRedo->addUndoAction(std::make_unique<EmergencySaveRestore>());
+    Q_EMIT filePathChanged();
 }
 
 void DocumentSession::setLastAutosaveFile(fs::path file) {

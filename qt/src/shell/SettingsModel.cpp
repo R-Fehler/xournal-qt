@@ -138,6 +138,17 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             }
         });
 
+    add("restoreSession",
+        [&s] {
+            bool restore = true;
+            s.getCustomElement("xournalQt").getBool("restoreSession", restore);
+            return QVariant(restore);
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setBool("restoreSession", v.toBool());
+            s.customSettingsChanged();
+        });
+
     // --- new pages (upstream's page template) ---
     auto withTemplate = [&s](auto&& change) {
         PageTemplateSettings tpl = s.getPageTemplateSettings();

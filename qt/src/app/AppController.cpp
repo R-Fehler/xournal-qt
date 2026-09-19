@@ -19,6 +19,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "shell/PagesModel.h"
+#include "shell/SessionRecovery.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 
@@ -65,11 +66,15 @@ AppController::~AppController() {
         disconnect(c);
     }
     pages->setSession(nullptr);
+    recovery.reset();  // unregisters the sessions from the crash handler before they go away
     tabs.reset();
 }
 
 void AppController::shutdown() {
     settingsView->end();  // settings screen still open: save its changes
+    if (recovery) {
+        recovery->finish();  // a normal exit: reopen these tabs next time
+    }
     for (int i = 0; i < tabs->count(); ++i) {
         tabs->session(i)->deleteAutosaveFile();
     }
@@ -162,6 +167,109 @@ int AppController::pageNumber() const { return session() ? static_cast<int>(sess
 int AppController::pageCount() const { return canvas() ? static_cast<int>(canvas()->pageCount()) : 0; }
 
 void AppController::newDocument() { tabs->addTab(std::make_unique<DocumentSession>(*app)); }
+
+void AppController::startSession(const QStringList& files) {
+    recovery = std::make_unique<SessionRecovery>(*tabs, SessionRecovery::defaultJournalFile());
+    const auto& previous = recovery->previous();
+    if (!recovery->candidates().empty()) {
+        // Ask first (QML shows recoveryItems); the previous tabs are reopened by recover().
+        recoveryPending = true;
+        Q_EMIT recoveryChanged();
+        for (const QString& f: files) {
+            openPath(f);
+        }
+        return;
+    }
+    if (previous && (previous->clean || recovery->previousCrashed()) && settingsView->get("restoreSession").toBool()) {
+        std::vector<std::pair<fs::path, int>> last;
+        for (const auto& t: previous->tabs) {
+            last.emplace_back(t.file, t.page);
+        }
+        reopenTabs(last, previous->current, {});
+    }
+    for (const QString& f: files) {
+        openPath(f);
+    }
+    recovery->start();
+}
+
+QVariantList AppController::recoveryItems() const {
+    QVariantList items;
+    if (!recoveryPending || !recovery) {
+        return items;
+    }
+    for (const auto& c: recovery->candidates()) {
+        const QString name = c.originalFile.empty() ? tr("Unsaved document")
+                                                    : QString::fromStdString(c.originalFile.filename().string());
+        items.append(QVariantMap{{"title", name}, {"time", c.time.toString("yyyy-MM-dd hh:mm")}});
+    }
+    return items;
+}
+
+void AppController::recover(bool accept) {
+    if (!recoveryPending || !recovery || !recovery->previous()) {
+        return;
+    }
+    const auto& previous = *recovery->previous();
+    const auto candidates = recovery->candidates();
+    std::map<size_t, std::pair<fs::path, fs::path>> recovered;
+    if (accept) {
+        for (const auto& c: candidates) {
+            recovered[c.tab] = {c.recoveryFile, c.originalFile};
+        }
+    }
+    std::vector<std::pair<fs::path, int>> last;
+    for (const auto& t: previous.tabs) {
+        last.emplace_back(t.file, t.page);
+    }
+    reopenTabs(last, previous.current, recovered);
+    // The recovered content is in the tabs now (unsaved), or was discarded.
+    for (const auto& c: candidates) {
+        std::error_code ec;
+        fs::remove(c.recoveryFile, ec);
+    }
+    recoveryPending = false;
+    Q_EMIT recoveryChanged();
+    recovery->start();
+}
+
+void AppController::reopenTabs(const std::vector<std::pair<fs::path, int>>& last, int current,
+                               const std::map<size_t, std::pair<fs::path, fs::path>>& recovered) {
+    int currentTabAfter = -1;
+    for (size_t i = 0; i < last.size(); ++i) {
+        const auto& [file, page] = last[i];
+        bool opened = false;
+        if (auto it = recovered.find(i); it != recovered.end()) {
+            auto result = DocumentSession::loadFile(it->second.first);
+            if (result.document) {
+                const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
+                tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+                tabs->currentSession()->markRecovered(it->second.second);
+                if (pristine >= 0) {
+                    tabs->closeTab(pristine);
+                }
+                opened = true;
+            }
+        }
+        if (!opened && !file.empty()) {
+            std::error_code ec;
+            opened = fs::exists(file, ec) && openPath(QString::fromStdString(file.string()));
+        }
+        if (opened) {
+            DocumentSession* s = tabs->currentSession();
+            const size_t p = std::min<size_t>(static_cast<size_t>(std::max(0, page)),
+                                              s->getDocument()->getPageCount() - 1);
+            s->setCurrentPageNo(p);
+            s->getScrollHandler()->scrollToPage(p);
+            if (static_cast<int>(i) == current) {
+                currentTabAfter = tabs->currentIndex();
+            }
+        }
+    }
+    if (currentTabAfter >= 0) {
+        tabs->setCurrentIndex(currentTabAfter);
+    }
+}
 
 void AppController::openPaths(const QStringList& paths) {
     for (const QString& p: paths) {

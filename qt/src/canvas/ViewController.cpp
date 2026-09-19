@@ -29,6 +29,11 @@ void ViewController::setViewSize(QSizeF size) {
     if (!initialized) {
         initialized = true;
         fitWidth();
+        if (pendingPage) {  // requested before the view had a size (e.g. a restored tab)
+            const size_t page = *pendingPage;
+            pendingPage.reset();
+            scrollToPage(page);
+        }
         return;
     }
     placeAnchor(keep, QPointF(view.width() / 2, 0));
@@ -119,6 +124,10 @@ void ViewController::panBy(QPointF delta) {
 
 void ViewController::scrollToPage(size_t page) {
     if (page >= layout->pageCount()) {
+        return;
+    }
+    if (!initialized) {
+        pendingPage = page;
         return;
     }
     stopMomentum();

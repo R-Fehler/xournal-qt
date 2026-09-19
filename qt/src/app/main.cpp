@@ -20,6 +20,7 @@
 #include <QFileInfo>
 
 #include "AppController.h"
+#include "shell/SessionRecovery.h"
 #include "shell/SingleInstance.h"
 #include "shell/Thumbnails.h"
 #include "DocumentCanvasItem.h"
@@ -66,8 +67,14 @@ int main(int argc, char* argv[]) {
     QQuickStyle::setStyle("Material");
     xqt::registerQuickTypes();
     AppController controller;
-    for (const QString& f: files) {
-        controller.openPath(f);
+    // Crash recovery and reopening the last tabs; not for off-screen runs (tests, screenshots).
+    if (independent && QGuiApplication::platformName() == "offscreen") {
+        for (const QString& f: files) {
+            controller.openPath(f);
+        }
+    } else {
+        xqt::SessionRecovery::installCrashHandlers();
+        controller.startSession(files);
     }
     QObject::connect(&instance, &xqt::SingleInstance::filesRequested, &controller, &AppController::openPaths);
 
