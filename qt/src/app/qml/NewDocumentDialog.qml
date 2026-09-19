@@ -52,54 +52,11 @@ Dialog {
         }
 
         Label { text: qsTr("Background"); font.weight: Font.DemiBold }
-        Flow {
+        BackgroundChooser {
             Layout.fillWidth: true
-            spacing: 8
-            Repeater {
-                model: dlg.s.pageBackgrounds
-                delegate: AbstractButton {
-                    id: bgButton
-                    required property int index
-                    required property string modelData
-                    readonly property string format: dlg.s.pageBackgroundFormats[index]
-                    // Only real patterns (not "copy the current page", PDF or image backgrounds).
-                    visible: ["plain", "ruled", "lined", "staves", "graph", "dotted", "isodotted", "isograph"].indexOf(format) >= 0
-                    width: 100
-                    height: 132
-                    onClicked: dlg.bgIndex = index
-                    contentItem: ColumnLayout {
-                        spacing: 4
-                        Rectangle {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.preferredWidth: dlg.landscape ? 72 : 52
-                            Layout.preferredHeight: dlg.landscape ? 52 : 72
-                            color: "#ffffff"
-                            border.width: dlg.bgIndex === bgButton.index ? 3 : 1
-                            border.color: dlg.bgIndex === bgButton.index ? Material.accentColor : "#c9ccd1"
-                            radius: 3
-                            BackgroundPreview {
-                                anchors.fill: parent
-                                anchors.margins: parent.border.width
-                                format: bgButton.format
-                            }
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            text: bgButton.modelData
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 2
-                            elide: Text.ElideRight
-                            font.pixelSize: 12
-                            color: dlg.bgIndex === bgButton.index ? Material.accentColor : "#3c4043"
-                        }
-                    }
-                    background: Rectangle {
-                        radius: 8
-                        color: bgButton.hovered ? "#f1f3f4" : "transparent"
-                    }
-                }
-            }
+            selected: dlg.bgIndex
+            landscape: dlg.landscape
+            onChosen: function(index) { dlg.bgIndex = index }
         }
 
         RowLayout {

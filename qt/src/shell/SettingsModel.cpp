@@ -35,6 +35,13 @@ constexpr std::array<PaperFormat, 5> PAPER_FORMATS{{{"A5", 419.527559, 595.27559
 constexpr int DEFAULT_PALM_TIMEOUT_MS = 1000;
 }  // namespace
 
+QSizeF SettingsModel::paperSize(int index) {
+    if (index < 0 || index >= static_cast<int>(PAPER_FORMATS.size())) {
+        return {};
+    }
+    return {PAPER_FORMATS[static_cast<size_t>(index)].width, PAPER_FORMATS[static_cast<size_t>(index)].height};
+}
+
 SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         QObject(parent), app(app), settings(*app.getSettings()) {
     Settings& s = settings;

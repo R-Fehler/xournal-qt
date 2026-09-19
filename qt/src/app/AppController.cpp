@@ -21,6 +21,8 @@
 #include "control/settings/Settings.h"
 #include "gui/toolbarMenubar/model/ColorPalette.h"
 #include "model/Document.h"
+#include "model/XojPage.h"
+#include "control/pagetype/PageTypeHandler.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/NamedColor.h"
 #include "util/XojMsgBox.h"
@@ -1099,6 +1101,57 @@ void AppController::clearNavigation() {
 }
 
 // Upstream's page operations work on the current page: select the page first.
+bool AppController::insertPages(int position, int background, int paper, bool landscape, int count) {
+    DocumentSession* s = session();
+    const auto& types = app->getPageTypes()->getPageTypes();
+    if (!s || background < 0 || background >= static_cast<int>(types.size()) || count < 1) {
+        return false;
+    }
+    Document* doc = s->getDocument();
+    QSizeF size = SettingsModel::paperSize(paper);
+    if (!size.isValid()) {
+        std::shared_lock lock(*doc);
+        const PageRef current = doc->getPage(std::min(s->getCurrentPageNo(), doc->getPageCount() - 1));
+        size = QSizeF(std::min(current->getWidth(), current->getHeight()), std::max(current->getWidth(), current->getHeight()));
+    }
+    if (landscape) {
+        size.transpose();
+    }
+    const Color bgColor = app->getSettings()->getPageTemplateSettings().getBackgroundColor();
+    std::vector<PageRef> pages;
+    for (int i = 0; i < count; ++i) {
+        auto page = std::make_shared<XojPage>(size.width(), size.height());
+        page->setBackgroundType(types[static_cast<size_t>(background)]->page);
+        page->setBackgroundColor(bgColor);
+        pages.push_back(std::move(page));
+    }
+    const size_t at = std::min<size_t>(static_cast<size_t>(std::max(0, position)), doc->getPageCount());
+    s->clearSelectionEndText();
+    s->insertPages(pages, at);
+    s->setCurrentPageNo(at);
+    s->getScrollHandler()->scrollToPage(at);
+    Q_EMIT pageActionDone(count == 1 ? tr("Page inserted") : tr("%1 pages inserted").arg(count), true);
+    return true;
+}
+
+QVariantMap AppController::currentPageFormat() const {
+    if (!session()) {
+        return {};
+    }
+    Document* doc = session()->getDocument();
+    std::shared_lock lock(*doc);
+    const PageRef p = doc->getPage(std::min(session()->getCurrentPageNo(), doc->getPageCount() - 1));
+    int background = -1;
+    const auto& types = app->getPageTypes()->getPageTypes();
+    for (size_t i = 0; i < types.size(); ++i) {
+        if (types[i]->page == p->getBackgroundType()) {
+            background = static_cast<int>(i);
+            break;
+        }
+    }
+    return {{"background", background}, {"landscape", p->getWidth() > p->getHeight()}};
+}
+
 void AppController::insertPageBefore(int index) {
     if (session()) {
         goToPage(index);

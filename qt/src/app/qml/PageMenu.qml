@@ -26,6 +26,11 @@ Menu {
     MenuItem { text: qsTr("Insert page before"); onTriggered: app.insertPageBefore(menu.pages[0]) }
     MenuItem { text: qsTr("Insert page after"); onTriggered: app.insertPageAfter(menu.pages[menu.pages.length - 1]) }
     MenuItem {
+        objectName: "insertPagesItem"
+        text: qsTr("Insert pages… (background, size)")
+        onTriggered: app.requestInsertPages(menu.pages[menu.pages.length - 1] + 1)
+    }
+    MenuItem {
         text: qsTr("Move up")
         enabled: menu.pages[0] > 0
         onTriggered: app.movePages(menu.pages, menu.pages[0] - 1)

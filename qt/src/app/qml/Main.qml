@@ -321,7 +321,13 @@ ApplicationWindow {
                 }
             }
             Item { Layout.fillWidth: true }
-            IconButton { iconName: "xopp-page-add"; tip: qsTr("Add page after the current one"); onClicked: app.addPageAfterCurrent() }
+            IconButton {
+                objectName: "addPageButton"
+                iconName: "xopp-page-add"
+                tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
+                onClicked: app.addPageAfterCurrent()
+                onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
+            }
             ToolSeparator {}
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
             IconButton { objectName: "overviewButton"; iconName: "xqt-tabs-grid"; tip: qsTr("All open documents (Ctrl+Shift+E)"); onClicked: tabOverview.open() }
@@ -337,6 +343,7 @@ ApplicationWindow {
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
+                    MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
                     MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
                     MenuSeparator {}
@@ -827,6 +834,12 @@ ApplicationWindow {
         z: 50
         visible: app.homeVisible
         onOpenFileRequested: openDialog.open()
+    }
+
+    InsertPagesDialog { id: insertPagesDialog }
+    Connections {
+        target: app
+        function onInsertPagesRequested(position) { insertPagesDialog.openAt(position) }
     }
 
     SettingsPage { id: settingsPage; objectName: "settingsPage" }

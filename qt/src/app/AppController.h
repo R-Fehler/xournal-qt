@@ -277,6 +277,14 @@ public:
     Q_INVOKABLE bool markPdfText(const QString& mode);
     Q_INVOKABLE bool copyPdfText();
     Q_INVOKABLE void clearPdfTextSelection();
+    /// Insert `count` new pages before `position` (0-based; page count: at the end): background `background` (index
+    /// in the settings' pageBackgrounds), paper `paper` (index in paperFormats; -1: the size of the current page),
+    /// portrait or landscape. One step on the page undo stack.
+    Q_INVOKABLE bool insertPages(int position, int background, int paper, bool landscape, int count = 1);
+    /// The current page: { background (index in pageBackgrounds, -1: other), landscape }
+    Q_INVOKABLE QVariantMap currentPageFormat() const;
+    /// Ask the window for the "insert pages" dialog (page menu); position as for insertPages.
+    Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
     Q_INVOKABLE void insertPageBefore(int index);
     Q_INVOKABLE void insertPageAfter(int index);
     Q_INVOKABLE void duplicatePage(int index);
@@ -338,6 +346,7 @@ Q_SIGNALS:
     void linkTapped(const QString& uri, int page, QRectF rect);
     void copiedPagesChanged();
     void toolbarColorsChanged();
+    void insertPagesRequested(int position);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 

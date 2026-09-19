@@ -14,6 +14,7 @@
 
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/PageType.h"
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
@@ -21,6 +22,7 @@
 #include "session/DocumentSession.h"
 #include "shell/PageFilterModel.h"
 #include "shell/PagesModel.h"
+#include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
 #include "undo/InsertUndoAction.h"
@@ -361,4 +363,42 @@ TEST(Pages, pdfPagesPastedIntoAnotherDocumentBecomeImages) {
         }
     }
     EXPECT_GT(dark, thumb.width() * thumb.height() / 20);
+}
+
+TEST(Pages, insertPagesWithBackgroundSizeAndOrientation) {
+    AppController c;
+    c.newDocument();
+    auto* settings = qobject_cast<SettingsModel*>(c.settingsModel());
+    const QStringList formats = settings->pageBackgroundFormats();
+    const int plain = static_cast<int>(formats.indexOf("plain"));
+    const int graph = static_cast<int>(formats.indexOf("graph"));
+    ASSERT_GE(plain, 0);
+    ASSERT_GE(graph, 0);
+    DocumentSession* s = c.tabManager().currentSession();
+    Document* doc = s->getDocument();
+
+    // Three plain landscape A4 pages after the first one
+    ASSERT_TRUE(c.insertPages(1, plain, 1, true, 3));
+    ASSERT_EQ(doc->getPageCount(), 4u);
+    for (size_t i = 1; i <= 3; ++i) {
+        EXPECT_NEAR(doc->getPage(i)->getWidth(), 841.89, 0.1);
+        EXPECT_NEAR(doc->getPage(i)->getHeight(), 595.28, 0.1);
+        EXPECT_EQ(doc->getPage(i)->getBackgroundType().format, PageTypeFormat::Plain);
+    }
+    EXPECT_EQ(c.pageNumber(), 2) << "shows the first new page";
+    EXPECT_EQ(c.currentPageFormat().value("background").toInt(), plain);
+    EXPECT_TRUE(c.currentPageFormat().value("landscape").toBool());
+
+    // A graph page before the first one, with the size of the current page (landscape A4) turned to portrait
+    ASSERT_TRUE(c.insertPages(0, graph, -1, false, 1));
+    ASSERT_EQ(doc->getPageCount(), 5u);
+    EXPECT_EQ(doc->getPage(0)->getBackgroundType().format, PageTypeFormat::Graph);
+    EXPECT_NEAR(doc->getPage(0)->getWidth(), 595.28, 0.1);
+
+    // One undo step each
+    c.undoPages();
+    EXPECT_EQ(doc->getPageCount(), 4u);
+    c.undoPages();
+    EXPECT_EQ(doc->getPageCount(), 1u);
+    EXPECT_FALSE(c.insertPages(0, 999, -1, false, 1)) << "no such background";
 }
