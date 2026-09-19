@@ -6,6 +6,9 @@
  * (minimum pressure, multiplier, pressure inference), page crossing for multi-page tools and forwarding to the
  * page (CanvasPage, which runs upstream's StrokeHandler / EraseHandler).
  *
+ * Touchpad: two-finger scrolling with momentum after the fingers are lifted (Wayland reports no kinetic scrolling,
+ * GTK/upstream Xournal++ add it themselves), pinch zoom; Ctrl + wheel zooms.
+ *
  * Touch: navigation (pan with momentum, anchored pinch zoom), 2-finger tap = undo, 3-finger tap = redo, and
  * Krita-style palm rejection: touch is ignored while the pen is in proximity, pressed or was used recently, and a
  * pen press cancels a running touch gesture. Touch drawing is not supported yet (upstream default: off).
@@ -123,6 +126,13 @@ private:
         QPointF pos;
     };
     std::vector<VelocitySample> velocitySamples;
+
+    // touchpad scrolling: recent deltas, for momentum when the fingers are lifted
+    struct WheelSample {
+        double t;
+        QPointF delta;
+    };
+    std::vector<WheelSample> wheelSamples;
 };
 
 }  // namespace xqt

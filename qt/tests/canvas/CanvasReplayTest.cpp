@@ -14,6 +14,7 @@
 #include <QTabletEvent>
 #include <QTemporaryDir>
 #include <QThread>
+#include <QWheelEvent>
 #include <gtest/gtest.h>
 
 #include "control/ToolEnums.h"
@@ -205,4 +206,59 @@ TEST_F(CanvasReplayTest, highlighterAndWhiteout) {
     EXPECT_EQ(dynamic_cast<const Stroke*>(*it)->getToolType(), StrokeTool::HIGHLIGHTER);
     ++it;
     EXPECT_EQ(dynamic_cast<const Stroke*>(*it)->getToolType(), StrokeTool::ERASER);  // whiteout stroke
+}
+
+namespace {
+QPointingDevice touchpad{"test touchpad", 1003, QInputDevice::DeviceType::TouchPad, QPointingDevice::PointerType::Finger,
+                         QInputDevice::Capability::Position | QInputDevice::Capability::Scroll, 2, 0};
+
+void sendWheel(CanvasInput& input, QPoint pixelDelta, Qt::ScrollPhase phase) {
+    QWheelEvent e(QPointF(400, 300), QPointF(400, 300), pixelDelta, pixelDelta * 2, Qt::NoButton, Qt::NoModifier, phase,
+                  false, Qt::MouseEventNotSynthesized, &touchpad);
+    input.wheelEvent(&e, QPointF(400, 300));
+}
+}  // namespace
+
+TEST_F(CanvasReplayTest, touchpadScrollContinuesWithMomentumAfterLift) {
+    for (int i = 0; i < 6; ++i) {
+        session->insertNewPage(1);  // make the document scrollable
+    }
+    view->getViewController().setViewSize(QSizeF(900, 600));
+    processEvents();
+    auto& vc = view->getViewController();
+    const double startY = vc.visibleContentRect().top();
+
+    sendWheel(*input, QPoint(0, -20), Qt::ScrollBegin);
+    for (int i = 0; i < 8; ++i) {
+        QThread::msleep(10);
+        sendWheel(*input, QPoint(0, -20), Qt::ScrollUpdate);
+    }
+    const double atLift = vc.visibleContentRect().top();
+    EXPECT_NEAR(atLift - startY, 180, 1) << "two-finger scrolling moves the content by the deltas";
+    sendWheel(*input, QPoint(0, 0), Qt::ScrollEnd);
+    processEvents(300);
+    EXPECT_GT(vc.visibleContentRect().top(), atLift + 50) << "no momentum after lifting the fingers";
+
+    // Fingers down again stop the fling.
+    sendWheel(*input, QPoint(0, 0), Qt::ScrollBegin);
+    const double stopped = vc.visibleContentRect().top();
+    processEvents(100);
+    EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), stopped);
+}
+
+TEST_F(CanvasReplayTest, mouseWheelHasNoMomentum) {
+    for (int i = 0; i < 6; ++i) {
+        session->insertNewPage(1);
+    }
+    view->getViewController().setViewSize(QSizeF(900, 600));
+    processEvents();
+    auto& vc = view->getViewController();
+    const double startY = vc.visibleContentRect().top();
+    QWheelEvent e(QPointF(400, 300), QPointF(400, 300), QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
+                  Qt::NoScrollPhase, false);
+    input->wheelEvent(&e, QPointF(400, 300));
+    const double after = vc.visibleContentRect().top();
+    EXPECT_NEAR(after - startY, 48, 1);
+    processEvents(200);
+    EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), after);
 }

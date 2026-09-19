@@ -8,6 +8,7 @@
 
 #include <QCoreApplication>
 #include <QMatrix4x4>
+#include <QQmlEngine>
 #include <QNativeGestureEvent>
 #include <QQuickWindow>
 #include <QSGSimpleRectNode>
@@ -75,6 +76,8 @@ QRect tileRect(int index, int cols, QSize pixelSize) {
 
 double snap(double v, double dpr) { return std::round(v * dpr) / dpr; }
 }  // namespace
+
+void xqt::registerQuickTypes() { qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas"); }
 
 DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     setFlag(ItemHasContents, true);
@@ -154,8 +157,26 @@ void DocumentCanvasItem::itemChange(ItemChange change, const ItemChangeData& val
     QQuickItem::itemChange(change, value);
 }
 
+namespace {
+/// Deepest visible item at a scene position, following the stacking order (topmost first), like Qt Quick's
+/// delivery. Popups, dialogs and their modal dimmer live in the window's overlay, which is above the content.
+QQuickItem* topmostItemAt(QQuickItem* item, QPointF scenePos) {
+    const QPointF p = item->mapFromScene(scenePos);
+    if (QQuickItem* child = item->childAt(p.x(), p.y())) {
+        return topmostItemAt(child, scenePos);
+    }
+    return item;
+}
+}  // namespace
+
 bool DocumentCanvasItem::claims(QPointF scenePos) const {
-    return isVisible() && QRectF(0, 0, width(), height()).contains(mapFromScene(scenePos));
+    if (!isVisible() || !isEnabled() || !window() ||
+        !QRectF(0, 0, width(), height()).contains(mapFromScene(scenePos))) {
+        return false;
+    }
+    // Only take events the canvas would get anyway: not those for a dialog, popup or control on top of it.
+    const QQuickItem* top = topmostItemAt(window()->contentItem(), scenePos);
+    return top == this || (top && isAncestorOf(top));
 }
 
 bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {

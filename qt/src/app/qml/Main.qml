@@ -5,6 +5,7 @@ import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import XournalQt
+import XournalQt.Canvas
 
 ApplicationWindow {
     id: win

@@ -583,13 +583,61 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
 
 bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
     ViewController& vc = view.getViewController();
-    vc.stopMomentum();
     if (e->modifiers() & Qt::ControlModifier) {
+        vc.stopMomentum();
         vc.zoomBy(std::pow(1.0015, e->angleDelta().y()), viewPos);
-    } else if (!e->pixelDelta().isNull()) {
-        vc.panBy(QPointF(e->pixelDelta()));
-    } else {
-        vc.panBy(QPointF(e->angleDelta()) / 120.0 * 48.0);
+        return true;
+    }
+    const QPointF delta =
+            !e->pixelDelta().isNull() ? QPointF(e->pixelDelta()) : QPointF(e->angleDelta()) / 120.0 * 48.0;
+    const double now = monotonicMs();
+
+    switch (e->phase()) {
+        case Qt::NoScrollPhase:
+            // Mouse wheel (no gesture phases): plain scrolling.
+            vc.stopMomentum();
+            vc.panBy(delta);
+            break;
+        case Qt::ScrollBegin:
+            // Fingers on the touchpad: stop a running fling.
+            vc.stopMomentum();
+            wheelSamples.clear();
+            if (!delta.isNull()) {
+                vc.panBy(delta);
+                wheelSamples.push_back({now, delta});
+            }
+            break;
+        case Qt::ScrollUpdate:
+            vc.panBy(delta);
+            wheelSamples.push_back({now, delta});
+            while (wheelSamples.size() > 2 && wheelSamples.front().t < now - 120.0) {
+                wheelSamples.erase(wheelSamples.begin());
+            }
+            break;
+        case Qt::ScrollMomentum:
+            // The platform generates the momentum itself (macOS): just follow it.
+            vc.panBy(delta);
+            break;
+        case Qt::ScrollEnd: {
+            // Fingers lifted: continue with the recent velocity (like GTK's kinetic scrolling on touchpads).
+            if (!delta.isNull()) {
+                vc.panBy(delta);
+                wheelSamples.push_back({now, delta});
+            }
+            // Only if the fingers were still moving when lifted.
+            if (wheelSamples.size() >= 2 && now - wheelSamples.back().t < 60.0) {
+                const double dt = wheelSamples.back().t - wheelSamples.front().t;
+                QPointF distance;
+                for (size_t i = 1; i < wheelSamples.size(); ++i) {
+                    distance += wheelSamples[i].delta;  // the first delta happened before the first timestamp
+                }
+                if (dt > 5.0) {
+                    vc.fling(distance / dt);
+                }
+            }
+            wheelSamples.clear();
+            break;
+        }
     }
     return true;
 }

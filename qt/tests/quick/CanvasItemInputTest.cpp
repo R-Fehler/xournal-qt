@@ -1,0 +1,210 @@
+/*
+ * xournal-qt: input routing of the canvas item in a real Qt Quick window.
+ *
+ * Regression test for: dialogs (Save as, unsaved changes, messages) could not be used because the canvas took all
+ * pen/touch/mouse events inside its rectangle, including those for the dialog drawn on top of it.
+ * Events are injected through QWindowSystemInterface, i.e. the same path as events from Wayland (including Qt's
+ * synthesis of mouse events from unaccepted tablet events).
+ *
+ * @license GNU GPLv2 or later
+ */
+#include <memory>
+
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QPointingDevice>
+#include <QQmlApplicationEngine>
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QTemporaryDir>
+#include <QTest>
+#include <gtest/gtest.h>
+#include <qpa/qwindowsysteminterface.h>
+
+#include "control/ToolEnums.h"
+#include "control/ToolHandler.h"
+#include "model/Document.h"
+#include "model/Layer.h"
+#include "model/XojPage.h"
+#include "render/RenderService.h"
+#include "session/AppContext.h"
+#include "session/DocumentSession.h"
+
+#include "CanvasView.h"
+#include "DocumentCanvasItem.h"
+
+using namespace xqt;
+
+namespace {
+const char* QML = R"(
+import QtQuick
+import QtQuick.Controls
+import XournalQt.Canvas
+ApplicationWindow {
+    width: 800; height: 700; visible: true
+    property int clicks: 0
+    property alias dialog: dialog
+    DocumentCanvas { objectName: "canvas"; anchors.fill: parent }
+    Dialog {
+        id: dialog
+        modal: true
+        x: 250; y: 250; width: 300; height: 200
+        Button { objectName: "ok"; anchors.centerIn: parent; width: 120; height: 50; text: "OK"; onClicked: clicks++ }
+    }
+}
+)";
+
+class CanvasItemInputTest: public ::testing::Test {
+protected:
+    void SetUp() override {
+        ASSERT_TRUE(tmp.isValid());
+        app = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR),
+                                           fs::path(tmp.filePath("settings.xml").toStdString()), 2);
+        app->getToolHandler()->selectTool(TOOL_PEN);
+        session = std::make_unique<DocumentSession>(*app);
+        view = std::make_unique<CanvasView>(*session);
+
+        engine.loadData(QML);
+        ASSERT_FALSE(engine.rootObjects().isEmpty());
+        window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        ASSERT_NE(window, nullptr);
+        canvas = window->findChild<DocumentCanvasItem*>("canvas");
+        ASSERT_NE(canvas, nullptr);
+        canvas->setView(view.get());
+        ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
+        wait(200);
+        QWindowSystemInterface::registerInputDevice(&pen);
+    }
+    void TearDown() override {
+        canvas->setView(nullptr);
+        view.reset();
+        session.reset();
+    }
+
+    void wait(int ms) {
+        QElapsedTimer t;
+        t.start();
+        while (t.elapsed() < ms) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+            app->getRenderService()->waitForIdle();
+        }
+    }
+
+    size_t strokeCount() const {
+        size_t n = 0;
+        for (size_t i = 0; i < session->getDocument()->getPageCount(); ++i) {
+            for (const Layer* l: session->getDocument()->getPage(i)->getLayersView()) {
+                n += l->getElementsView().size();
+            }
+        }
+        return n;
+    }
+
+    void openDialog() {
+        QObject* dialog = window->property("dialog").value<QObject*>();
+        QMetaObject::invokeMethod(dialog, "open");
+        wait(400);  // opening transition
+        ASSERT_TRUE(dialog->property("opened").toBool());
+    }
+
+    QPoint okButtonCenter() const {
+        auto* ok = window->findChild<QQuickItem*>("ok");
+        return ok->mapToScene(QPointF(ok->width() / 2, ok->height() / 2)).toPoint();
+    }
+
+    void tablet(QPointF pos, Qt::MouseButtons buttons, double pressure) {
+        QWindowSystemInterface::handleTabletEvent(window, timestamp, &pen, pos, window->mapToGlobal(pos), buttons,
+                                                  pressure, 0, 0, 0, 0, 0, Qt::NoModifier);
+        timestamp += 5;
+        QWindowSystemInterface::flushWindowSystemEvents();
+    }
+    void penStroke(QPointF from, QPointF to) {
+        tablet(from, Qt::LeftButton, 0.5);
+        for (int i = 1; i <= 10; ++i) {
+            tablet(from + (to - from) * (i / 10.0), Qt::LeftButton, 0.6);
+        }
+        tablet(to, Qt::NoButton, 0.0);
+        wait(50);
+    }
+    void mouseStroke(QPoint from, QPoint to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 10; ++i) {
+            QTest::mouseMove(window, from + (to - from) * i / 10);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(50);
+    }
+
+    QTemporaryDir tmp;
+    std::unique_ptr<AppContext> app;
+    std::unique_ptr<DocumentSession> session;
+    std::unique_ptr<CanvasView> view;
+    QQmlApplicationEngine engine;
+    QQuickWindow* window = nullptr;
+    DocumentCanvasItem* canvas = nullptr;
+    QPointingDevice pen{"test pen", 2001, QInputDevice::DeviceType::Stylus, QPointingDevice::PointerType::Pen,
+                        QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3};
+    ulong timestamp = 1000;
+};
+}  // namespace
+
+TEST_F(CanvasItemInputTest, penAndMouseDrawOnTheCanvas) {
+    penStroke(QPointF(200, 150), QPointF(500, 200));
+    EXPECT_EQ(strokeCount(), 1u);
+    mouseStroke(QPoint(200, 300), QPoint(500, 350));
+    EXPECT_EQ(strokeCount(), 2u);
+}
+
+TEST_F(CanvasItemInputTest, dialogButtonWorksWithMouse) {
+    openDialog();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, okButtonCenter());
+    wait(50);
+    EXPECT_EQ(window->property("clicks").toInt(), 1);
+    EXPECT_EQ(strokeCount(), 0u) << "the click went to the canvas behind the dialog";
+}
+
+namespace {
+struct EventTracer: QObject {
+    bool eventFilter(QObject* o, QEvent* e) override {
+        switch (e->type()) {
+            case QEvent::TabletPress:
+            case QEvent::TabletRelease:
+            case QEvent::MouseButtonPress:
+            case QEvent::MouseButtonRelease:
+                fprintf(stderr, "TRACE %s -> %s(%s) accepted=%d\n",
+                        e->type() == QEvent::TabletPress     ? "TabletPress" :
+                        e->type() == QEvent::TabletRelease   ? "TabletRelease" :
+                        e->type() == QEvent::MouseButtonPress ? "MousePress" :
+                                                                "MouseRelease",
+                        o->metaObject()->className(), qPrintable(o->objectName()), e->isAccepted());
+                break;
+            default:
+                break;
+        }
+        return false;
+    }
+};
+}  // namespace
+
+TEST_F(CanvasItemInputTest, dialogButtonWorksWithPen) {
+    openDialog();
+    EventTracer tracer;
+    if (qEnvironmentVariableIsSet("XQT_TRACE")) {
+        qApp->installEventFilter(&tracer);
+    }
+    const QPointF c = okButtonCenter();
+    tablet(c, Qt::LeftButton, 0.5);
+    tablet(c, Qt::NoButton, 0.0);
+    wait(50);
+    EXPECT_EQ(window->property("clicks").toInt(), 1);
+    EXPECT_EQ(strokeCount(), 0u);
+}
+
+TEST_F(CanvasItemInputTest, modalDialogBlocksCanvasInput) {
+    openDialog();
+    // Outside the dialog, on the modal dimmer.
+    penStroke(QPointF(50, 50), QPointF(200, 120));
+    mouseStroke(QPoint(50, 600), QPoint(200, 650));
+    EXPECT_EQ(strokeCount(), 0u) << "the canvas received input while a modal dialog was open";
+    EXPECT_EQ(window->property("clicks").toInt(), 0);
+}

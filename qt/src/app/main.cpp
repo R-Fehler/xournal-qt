@@ -16,6 +16,7 @@
 #include <QTimer>
 
 #include "AppController.h"
+#include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
 
 int main(int argc, char* argv[]) {
@@ -36,6 +37,7 @@ int main(int argc, char* argv[]) {
     parser.process(qapp);
 
     QQuickStyle::setStyle("Material");
+    xqt::registerQuickTypes();
     AppController controller;
     if (!parser.positionalArguments().isEmpty()) {
         controller.openPath(parser.positionalArguments().first());

@@ -20,11 +20,13 @@
 namespace xqt {
 class CanvasInput;
 class CanvasView;
+
+/// Registers the QML types of the canvas: `import XournalQt.Canvas` provides `DocumentCanvas`.
+void registerQuickTypes();
 }  // namespace xqt
 
 class DocumentCanvasItem: public QQuickItem {
     Q_OBJECT
-    QML_NAMED_ELEMENT(DocumentCanvas)
     /// The xqt::CanvasView to show (set from C++ through the application controller).
     Q_PROPERTY(QObject* view READ view WRITE setView NOTIFY viewChanged)
 public:
