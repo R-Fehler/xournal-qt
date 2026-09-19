@@ -29,6 +29,7 @@ class CanvasView;
 class DocumentSession;
 class TabManager;
 class PagesModel;
+class PageFilterModel;
 class SettingsModel;
 class SessionRecovery;
 }  // namespace xqt
@@ -39,6 +40,8 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* tabs READ tabsModel CONSTANT)
     /// Pages of the current tab (for the page sidebar).
     Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
+    /// The pages for the sidebar and the page grid, optionally only those with search hits.
+    Q_PROPERTY(QObject* filteredPages READ filteredPagesModel CONSTANT)
     Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
     Q_PROPERTY(int currentTab READ currentTab WRITE setCurrentTab NOTIFY documentChanged)
     Q_PROPERTY(QObject* view READ view NOTIFY documentChanged)
@@ -60,6 +63,8 @@ class AppController: public QObject {
     /// 1-based number of the current hit (0: none)
     Q_PROPERTY(int searchCurrent READ searchCurrent NOTIFY searchChanged)
     Q_PROPERTY(bool searchRunning READ searchRunning NOTIFY searchChanged)
+    /// Number of pages with search hits
+    Q_PROPERTY(int searchHitPageCount READ searchHitPageCount NOTIFY searchChanged)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -68,6 +73,7 @@ public:
 
     QObject* tabsModel() const;
     QObject* pagesModel() const;
+    QObject* filteredPagesModel() const;
     QObject* settingsModel() const;
     int currentTab() const;
     void setCurrentTab(int index);
@@ -90,6 +96,7 @@ public:
     int searchHitCount() const;
     int searchCurrent() const;
     bool searchRunning() const;
+    int searchHitPageCount() const;
 
     // --- start and recovery ---
     /// Start of the app: offers recovery after a crash (recoveryItems), else reopens the last tabs (setting), then
@@ -194,6 +201,7 @@ private:
     std::unique_ptr<Palette> colors;
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::PagesModel> pages;
+    std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::SettingsModel> settingsView;
     std::unique_ptr<xqt::SessionRecovery> recovery;  // after `tabs`: destroyed first
     bool recoveryPending = false;

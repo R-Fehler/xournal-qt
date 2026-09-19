@@ -36,7 +36,11 @@ public:
         /// Search hits on the page: list of rectangles relative to the page size (0..1)
         SearchHitsRole,
         /// Index of the current search hit in SearchHitsRole, or -1
-        CurrentSearchHitRole
+        CurrentSearchHitRole,
+        /// Number of search hits on the page
+        SearchHitCountRole,
+        /// 0-based page index (the row; stays right in filtered views)
+        PageIndexRole
     };
 
     explicit PagesModel(QObject* parent = nullptr);

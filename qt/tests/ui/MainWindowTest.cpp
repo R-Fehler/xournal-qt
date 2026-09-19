@@ -263,3 +263,38 @@ TEST_F(MainWindowTest, pageGridZoomsAndJumpsToAPage) {
     EXPECT_FALSE(gridPanel->isVisible());
     EXPECT_EQ(controller->pageNumber(), 5);
 }
+
+TEST_F(MainWindowTest, pageGridCanShowOnlyPagesWithHits) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    controller->setSearchQuery("p1");
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 3 && !controller->searchRunning(); }));
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    EXPECT_EQ(grid->property("count").toInt(), 11);
+
+    // The filter chip of the grid (the sidebar has one too: take the visible one inside the grid).
+    QQuickItem* chip = nullptr;
+    for (auto* c: find<QQuickItem>("pageGrid")->findChildren<QQuickItem*>("searchFilterChip")) {
+        if (c->isVisible()) {
+            chip = c;
+        }
+    }
+    ASSERT_NE(chip, nullptr);
+    const QPointF p = chip->mapToScene(QPointF(chip->width() / 2, chip->height() / 2));
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, p.toPoint());
+    wait(50);
+    EXPECT_EQ(grid->property("count").toInt(), 3);
+    auto* sidebarList = find<QQuickItem>("sidebarList");
+    ASSERT_NE(sidebarList, nullptr);
+    EXPECT_EQ(sidebarList->property("count").toInt(), 3) << "the sidebar shares the filter";
+
+    // The second page shown is page 10.
+    QQuickItem* cell = nullptr;
+    QMetaObject::invokeMethod(grid, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, 1));
+    ASSERT_NE(cell, nullptr);
+    const QPointF c = cell->mapToScene(QPointF(cell->width() / 2, cell->height() / 2));
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, c.toPoint());
+    wait(50);
+    EXPECT_EQ(controller->pageNumber(), 10);
+}

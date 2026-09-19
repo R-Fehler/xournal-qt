@@ -44,7 +44,8 @@ void PagesModel::setSession(DocumentSession* s) {
         }));
         connections.push_back(connect(&s->search(), &DocumentSearch::changed, this, [this] {
             if (rowCount() > 0) {
-                Q_EMIT dataChanged(index(0), index(rowCount() - 1), {SearchHitsRole, CurrentSearchHitRole});
+                Q_EMIT dataChanged(index(0), index(rowCount() - 1),
+                                   {SearchHitsRole, CurrentSearchHitRole, SearchHitCountRole});
             }
         }));
     }
@@ -91,6 +92,19 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             return QString("image://thumbnail/%1/%2/%3").arg(sessionId).arg(row).arg(revisions[row]);
         case CurrentRole:
             return index.row() == current;
+        case PageIndexRole:
+            return index.row();
+        case SearchHitCountRole: {
+            if (!session) {
+                return 0;
+            }
+            const auto& hits = session->search().hits();
+            auto [a, b] = std::equal_range(hits.begin(), hits.end(), DocumentSearch::Hit{row, {}},
+                                           [](const DocumentSearch::Hit& x, const DocumentSearch::Hit& y) {
+                                               return x.page < y.page;
+                                           });
+            return static_cast<int>(b - a);
+        }
         case SearchHitsRole:
         case CurrentSearchHitRole: {
             if (!session) {
@@ -120,7 +134,8 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
 QHash<int, QByteArray> PagesModel::roleNames() const {
     return {{PageNumberRole, "pageNumber"},     {AspectRole, "aspect"},
             {ThumbnailRole, "thumbnail"},       {CurrentRole, "current"},
-            {SearchHitsRole, "searchHits"},     {CurrentSearchHitRole, "currentSearchHit"}};
+            {SearchHitsRole, "searchHits"},     {CurrentSearchHitRole, "currentSearchHit"},
+            {SearchHitCountRole, "searchHitCount"}, {PageIndexRole, "pageIndex"}};
 }
 
 void PagesModel::markChanged(size_t page) {

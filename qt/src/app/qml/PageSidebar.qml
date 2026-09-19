@@ -1,4 +1,5 @@
 // Page sidebar: thumbnails of the current document; tap to go to a page, long-press or ⋮ for page operations.
+// While searching, pages with hits are framed and the list can be limited to them.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -9,28 +10,43 @@ Rectangle {
     id: sidebar
     color: "#eceef1"
 
+    SearchFilterChip {
+        id: filterChip
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: 8
+        visible: app.searchQuery !== ""
+    }
+
     ListView {
         id: list
-        anchors.fill: parent
+        objectName: "sidebarList"
+        anchors.top: filterChip.visible ? filterChip.bottom : parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.topMargin: 10
         anchors.bottomMargin: 10
         spacing: 14
         clip: true
-        model: app.pages
+        model: app.filteredPages
         boundsBehavior: Flickable.StopAtBounds
-        currentIndex: app.pages.currentPage
-        onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
+        // (count: re-evaluated when the filter changes)
+        currentIndex: (app.filteredPages.count, app.filteredPages.rowOf(app.pages.currentPage))
+        onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
         ScrollBar.vertical: ScrollBar {}
 
         delegate: Item {
             id: entry
-            required property int index
+            required property int pageIndex
             required property int pageNumber
             required property real aspect
             required property string thumbnail
             required property bool current
             required property var searchHits
             required property int currentSearchHit
+            required property int searchHitCount
             width: list.width
             height: frame.height + pageLabel.height + 4
 
@@ -40,8 +56,8 @@ Rectangle {
                 width: list.width - 36
                 height: width * entry.aspect
                 color: "white"
-                border.width: entry.current ? 3 : 1
-                border.color: entry.current ? Material.accentColor : "#b9bcc1"
+                border.width: entry.current || entry.searchHitCount > 0 ? 3 : 1
+                border.color: entry.current ? Material.accentColor : (entry.searchHitCount > 0 ? "#f9a825" : "#b9bcc1")
                 Image {
                     anchors.fill: parent
                     anchors.margins: frame.border.width
@@ -64,8 +80,9 @@ Rectangle {
                         color: index === entry.currentSearchHit ? "#ccff7800" : "#a0ffd200"
                     }
                 }
+                HitBadge { count: entry.searchHitCount; anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 4 }
                 TapHandler {
-                    onTapped: app.goToPage(entry.index)
+                    onTapped: app.goToPage(entry.pageIndex)
                     onLongPressed: pageMenu.popup()
                 }
                 ToolButton {
@@ -92,21 +109,25 @@ Rectangle {
 
             Menu {
                 id: pageMenu
-                MenuItem { text: qsTr("Insert page before"); onTriggered: app.insertPageBefore(entry.index) }
-                MenuItem { text: qsTr("Insert page after"); onTriggered: app.insertPageAfter(entry.index) }
-                MenuItem { text: qsTr("Duplicate page"); onTriggered: app.duplicatePage(entry.index) }
+                MenuItem { text: qsTr("Insert page before"); onTriggered: app.insertPageBefore(entry.pageIndex) }
+                MenuItem { text: qsTr("Insert page after"); onTriggered: app.insertPageAfter(entry.pageIndex) }
+                MenuItem { text: qsTr("Duplicate page"); onTriggered: app.duplicatePage(entry.pageIndex) }
                 MenuSeparator {}
-                MenuItem { text: qsTr("Move up"); enabled: entry.index > 0; onTriggered: app.movePageUp(entry.index) }
+                MenuItem {
+                    text: qsTr("Move up")
+                    enabled: entry.pageIndex > 0
+                    onTriggered: app.movePageUp(entry.pageIndex)
+                }
                 MenuItem {
                     text: qsTr("Move down")
-                    enabled: entry.index < list.count - 1
-                    onTriggered: app.movePageDown(entry.index)
+                    enabled: entry.pageIndex < app.pages.count - 1
+                    onTriggered: app.movePageDown(entry.pageIndex)
                 }
                 MenuSeparator {}
                 MenuItem {
                     text: qsTr("Delete page")
-                    enabled: list.count > 1
-                    onTriggered: app.deletePage(entry.index)
+                    enabled: app.pages.count > 1
+                    onTriggered: app.deletePage(entry.pageIndex)
                 }
             }
         }

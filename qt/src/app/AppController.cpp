@@ -1,6 +1,7 @@
 #include "AppController.h"
 
 #include <algorithm>
+#include <limits>
 
 #include <shared_mutex>
 
@@ -19,6 +20,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "shell/PageFilterModel.h"
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SettingsModel.h"
@@ -55,6 +57,13 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
 
     pages = std::make_unique<PagesModel>();
+    filteredPages = std::make_unique<PageFilterModel>(*pages);
+    // "Only pages with hits" ends with the search.
+    connect(this, &AppController::searchChanged, this, [this] {
+        if (searchQuery().isEmpty()) {
+            filteredPages->setOnlySearchHits(false);
+        }
+    });
     settingsView = std::make_unique<SettingsModel>(*app);
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
@@ -131,6 +140,20 @@ int AppController::searchHitCount() const {
 }
 int AppController::searchCurrent() const { return session() ? session()->search().currentHit() + 1 : 0; }
 bool AppController::searchRunning() const { return session() && session()->search().isRunning(); }
+int AppController::searchHitPageCount() const {
+    if (!session()) {
+        return 0;
+    }
+    int pages = 0;
+    size_t last = std::numeric_limits<size_t>::max();
+    for (const auto& h: session()->search().hits()) {  // ordered by page
+        if (h.page != last) {
+            ++pages;
+            last = h.page;
+        }
+    }
+    return pages;
+}
 void AppController::searchNext() {
     if (session()) {
         session()->search().next();
@@ -163,6 +186,7 @@ void AppController::openSearchResult(int index) {
 QObject* AppController::tabsModel() const { return tabs.get(); }
 QObject* AppController::pagesModel() const { return pages.get(); }
 QObject* AppController::settingsModel() const { return settingsView.get(); }
+QObject* AppController::filteredPagesModel() const { return filteredPages.get(); }
 int AppController::currentTab() const { return tabs->currentIndex(); }
 void AppController::setCurrentTab(int index) { tabs->setCurrentIndex(index); }
 QObject* AppController::view() const { return canvas(); }

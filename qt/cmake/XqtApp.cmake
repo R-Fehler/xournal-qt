@@ -24,6 +24,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageFilterModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageFilterModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.h
@@ -43,7 +45,9 @@ set(XQT_QML_FILES
     src/app/qml/SettingsPage.qml
     src/app/qml/TabOverview.qml
     src/app/qml/SearchBar.qml
-    src/app/qml/PageGrid.qml)
+    src/app/qml/PageGrid.qml
+    src/app/qml/HitBadge.qml
+    src/app/qml/SearchFilterChip.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})

@@ -21,8 +21,11 @@ Rectangle {
 
     function open() {
         visible = true
-        grid.currentIndex = app.pages.currentPage
-        grid.positionViewAtIndex(app.pages.currentPage, GridView.Center)
+        const row = app.filteredPages.rowOf(app.pages.currentPage)
+        if (row >= 0) {
+            grid.currentIndex = row
+            grid.positionViewAtIndex(row, GridView.Center)
+        }
         grid.forceActiveFocus()
     }
     function close() {
@@ -44,7 +47,8 @@ Rectangle {
         target: app
         enabled: pageGrid.visible
         function onSearchChanged() {
-            if (app.searchCurrent > 0) grid.positionViewAtIndex(app.pageNumber - 1, GridView.Contain)
+            const row = app.filteredPages.rowOf(app.pageNumber - 1)
+            if (app.searchCurrent > 0 && row >= 0) grid.positionViewAtIndex(row, GridView.Contain)
         }
     }
 
@@ -57,7 +61,7 @@ Rectangle {
         anchors.leftMargin: pageGrid.spacing / 2
         anchors.rightMargin: pageGrid.spacing / 2
         clip: true
-        model: app.pages
+        model: app.filteredPages
         keyNavigationEnabled: true
         cacheBuffer: height
         maximumFlickVelocity: 9000
@@ -68,9 +72,9 @@ Rectangle {
         footer: Item { height: 80 }  // not under the zoom controls
         ScrollBar.vertical: ScrollBar { minimumSize: 0.05 }
 
-        Keys.onReturnPressed: pageGrid.choose(currentIndex)
-        Keys.onEnterPressed: pageGrid.choose(currentIndex)
-        Keys.onSpacePressed: pageGrid.choose(currentIndex)
+        Keys.onReturnPressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
+        Keys.onEnterPressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
+        Keys.onSpacePressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
         Keys.onPressed: function(event) {
             if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal) {
                 pageGrid.setColumns(pageGrid.columns - 1)
@@ -84,12 +88,14 @@ Rectangle {
         delegate: Item {
             id: cell
             required property int index
+            required property int pageIndex
             required property int pageNumber
             required property real aspect
             required property string thumbnail
             required property bool current
             required property var searchHits
             required property int currentSearchHit
+            required property int searchHitCount
             width: grid.cellWidth
             height: grid.cellHeight
 
@@ -106,12 +112,14 @@ Rectangle {
                 width: Math.round(cell.frameW)
                 height: Math.round(cell.frameW * cell.aspect)
                 color: "white"
-                border.width: cell.current ? 3 : 0
-                border.color: Material.accentColor
+                // The current page, and pages with search hits
+                border.width: cell.current || cell.searchHitCount > 0 ? 3 : 0
+                border.color: cell.current ? Material.accentColor : "#f9a825"
 
                 // A small preview right away, a sharp one for big cells (loads on top of it).
                 Image {
                     anchors.fill: parent
+                    anchors.margins: frame.border.width
                     asynchronous: true
                     fillMode: Image.PreserveAspectFit
                     source: cell.thumbnail
@@ -120,6 +128,7 @@ Rectangle {
                 }
                 Image {
                     anchors.fill: parent
+                    anchors.margins: frame.border.width
                     visible: cell.frameW * cell.dpr > 180 && status === Image.Ready
                     asynchronous: true
                     fillMode: Image.PreserveAspectFit
@@ -144,23 +153,11 @@ Rectangle {
                         border.color: index === cell.currentSearchHit ? "#ff7800" : "#e0a800"
                     }
                 }
-                Rectangle {
-                    visible: cell.searchHits.length > 0
+                HitBadge {
+                    count: cell.searchHitCount
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.margins: 4
-                    width: hitCount.implicitWidth + 12
-                    height: 20
-                    radius: 10
-                    color: "#ffd200"
-                    Label {
-                        id: hitCount
-                        anchors.centerIn: parent
-                        text: cell.searchHits.length
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                        color: "#5a3d00"
-                    }
                 }
                 // Keyboard position
                 Rectangle {
@@ -183,7 +180,7 @@ Rectangle {
                 font.weight: cell.current ? Font.DemiBold : Font.Normal
             }
             TapHandler {
-                onTapped: pageGrid.choose(cell.index)
+                onTapped: pageGrid.choose(cell.pageIndex)
             }
         }
 
@@ -225,6 +222,10 @@ Rectangle {
         }
         RowLayout {
             spacing: 0
+            SearchFilterChip {
+                visible: app.searchQuery !== ""
+                Layout.rightMargin: 6
+            }
             ToolButton {
                 text: "−"; font.pixelSize: 22; implicitWidth: 44
                 enabled: pageGrid.columns < 12

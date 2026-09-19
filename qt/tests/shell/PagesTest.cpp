@@ -16,6 +16,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "shell/PageFilterModel.h"
 #include "shell/PagesModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
@@ -184,4 +185,33 @@ TEST(Pages, searchHitsPerPage) {
     EXPECT_EQ(m.data(m.index(9), PagesModel::CurrentSearchHitRole).toInt(), -1);
     c.searchNext();
     EXPECT_EQ(m.data(m.index(9), PagesModel::CurrentSearchHitRole).toInt(), 0);
+}
+
+TEST(Pages, filterShowsOnlyPagesWithHits) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    auto* filter = qobject_cast<PageFilterModel*>(c.filteredPagesModel());
+    ASSERT_NE(filter, nullptr);
+    EXPECT_EQ(filter->count(), 11);
+    DocumentSession* s = c.tabManager().currentSession();
+    QSignalSpy finished(&s->search(), &DocumentSearch::finished);
+    c.setSearchQuery("p1");
+    ASSERT_TRUE(finished.wait(3000));
+    EXPECT_EQ(c.searchHitPageCount(), 3);
+
+    filter->setOnlySearchHits(true);
+    ASSERT_EQ(filter->count(), 3);
+    EXPECT_EQ(filter->index(1, 0).data(PagesModel::PageIndexRole).toInt(), 9);
+    EXPECT_EQ(filter->rowOf(10), 2);
+    EXPECT_EQ(filter->rowOf(4), -1);
+
+    c.setSearchQuery("p5");  // new hits: filtered again
+    QSignalSpy finished2(&s->search(), &DocumentSearch::finished);
+    ASSERT_TRUE(finished2.wait(3000));
+    EXPECT_EQ(filter->count(), 1);
+    EXPECT_EQ(filter->index(0, 0).data(PagesModel::PageIndexRole).toInt(), 4);
+
+    c.clearSearch();  // the filter ends with the search
+    EXPECT_FALSE(filter->onlySearchHits());
+    EXPECT_EQ(filter->count(), 11);
 }

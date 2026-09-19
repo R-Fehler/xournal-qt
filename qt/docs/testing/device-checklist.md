@@ -73,6 +73,7 @@ cd build-qt
 - [ ] Grid button (or Ctrl+Alt+G): all pages as a grid; flinging with a finger scrolls with momentum through long documents.
 - [ ] Pinch apart / together: fewer, bigger / more, smaller previews per row; also −/+ and Ctrl+wheel.
 - [ ] Tap a page (finger or pen): the grid closes at that page.
-- [ ] With a search: hits are marked on the previews and in the sidebar (count badge); Enter in the search bar moves the grid along.
+- [ ] With a search: hits are marked on the previews and in the sidebar (count badge, orange page frame); Enter in the search bar moves the grid along.
+- [ ] "N pages with hits" (sidebar top, grid controls): only the pages with hits are shown in both; tapping one goes there; closing the search shows all pages again.
 
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.
