@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Xournal Qt
+GenericName=Handwritten notes and PDF annotation
+Comment=Take handwritten notes and annotate PDFs (Qt version of Xournal++)
+Keywords=tablet;pen;stylus;Wacom;PDF;annotation;markup;notes;handwriting;journal;library;
+Exec=xournal-qt %F
+Icon=xournal-qt
+Terminal=false
+StartupNotify=true
+StartupWMClass=xournal-qt
+MimeType=application/x-xopp;application/x-xojpp;application/pdf;
+Categories=Office;Qt;

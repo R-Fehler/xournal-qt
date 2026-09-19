@@ -40,13 +40,18 @@ fs::path AppContext::defaultResourceDir() {
     if (auto env = qEnvironmentVariable("XQT_RESOURCE_DIR"); !env.isEmpty()) {
         return fs::path(env.toStdString());
     }
+    // Installed: <prefix>/bin/xournal-qt and <prefix>/share/xournal-qt; else the build tree.
+    const auto appDir = fs::path(QCoreApplication::applicationDirPath().toStdString());
+    const fs::path installed = appDir.parent_path() / "share" / "xournal-qt";
+    if (std::error_code ec; fs::exists(installed / "pagetemplates.ini", ec)) {
+        return installed;
+    }
 #ifdef XQT_BUILD_RESOURCE_DIR
     if (fs::exists(fs::path(XQT_BUILD_RESOURCE_DIR) / "pagetemplates.ini")) {
         return fs::path(XQT_BUILD_RESOURCE_DIR);
     }
 #endif
-    const auto appDir = fs::path(QCoreApplication::applicationDirPath().toStdString());
-    return appDir.parent_path() / "share" / "xournal-qt";
+    return installed;
 }
 
 void AppContext::installQtUiThreadDispatcher() {

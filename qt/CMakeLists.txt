@@ -39,6 +39,7 @@ if(XQT_BUILD_CORE)
     endif()
     include(cmake/XqtSession.cmake)
     include(cmake/XqtApp.cmake)
+    include(cmake/XqtPackage.cmake)
 endif()
 
 if(XQT_BUILD_SPIKES)

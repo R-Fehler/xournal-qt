@@ -13,6 +13,7 @@
 
 #include <QCommandLineParser>
 #include <QApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QtQml/qqmlextensionplugin.h>
@@ -48,6 +49,9 @@ int main(int argc, char* argv[]) {
     // A QApplication (not only QGuiApplication): the platform theme (e.g. KDE Plasma) then provides its native,
     // resizable file dialogs for QtQuick.Dialogs instead of Qt's built-in QML fallback.
     QApplication qapp(argc, argv);
+    // The program icon (the desktop file gives it to the window when installed; this covers the build tree)
+    QGuiApplication::setWindowIcon(QIcon::fromTheme(
+            "xournal-qt", QIcon(QString::fromStdString((xqt::AppContext::defaultResourceDir() / "icons" / "xournal-qt.svg").string()))));
     // Like upstream initCAndCoutLocales(): numbers in the C locale for cairo, PDF export and the file format.
     setlocale(LC_NUMERIC, "C");
     xqt::AppContext::installQtUiThreadDispatcher();

@@ -5,6 +5,8 @@ file(GLOB XQT_UPSTREAM_ICONS "${XOJ_UPSTREAM_DIR}/ui/iconsLucide-light/hicolor/s
 file(COPY ${XQT_UPSTREAM_ICONS} DESTINATION "${XQT_BUILD_RESOURCE_DIR}/icons")
 file(GLOB XQT_OWN_ICONS CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/../resources/icons/*.svg")
 file(COPY ${XQT_OWN_ICONS} DESTINATION "${XQT_BUILD_RESOURCE_DIR}/icons")
+# The program icon (window icon when not installed)
+file(COPY "${CMAKE_CURRENT_LIST_DIR}/../packaging/xournal-qt.svg" DESTINATION "${XQT_BUILD_RESOURCE_DIR}/icons")
 
 # Qt Quick canvas item (library, so that tests can use it)
 add_library(xqt-quick STATIC

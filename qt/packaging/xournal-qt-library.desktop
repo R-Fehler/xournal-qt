@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+MimeType=inode/directory;
+Actions=openAsLibrary;
+X-KDE-Priority=TopLevel
+
+[Desktop Action openAsLibrary]
+Name=Open as Xournal Qt library
+Icon=xournal-qt
+Exec=xournal-qt %f
