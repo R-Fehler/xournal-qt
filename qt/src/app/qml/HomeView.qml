@@ -1,8 +1,9 @@
 // Home screen (shown when no document is open, or with the home tab): the library of this window and the recently
 // opened documents, as grids of first-page previews.
-//  - Library: folders (tap to enter, breadcrumbs to go back) or all documents at once; search in the text of all
-//    documents; new document, import (also by dropping files), new folder; rename, move (drag onto a folder or a
-//    breadcrumb, or "Move to"), move to trash. A .xopp and its PDF are one document.
+//  - Library: folders (tap to enter, breadcrumbs to go back) or all documents at once; search in folder names and
+//    the text and names of all documents; new document, import (files or whole folder trees, also by dropping them),
+//    new folder; rename, move (drag onto a folder or a breadcrumb, or "Move to"), move to trash. A .xopp and its PDF
+//    are one document.
 //  - Recent: documents opened lately that still exist; rename, remove from the list, copy / move into the library.
 //  - Several documents and folders can be selected (Ctrl / Shift + click, the circle on a card, or "Select" in the
 //    menu; then taps select more) and opened, copied, moved or trashed together.
@@ -42,6 +43,8 @@ Rectangle {
         const item = libraryGrid.itemAtIndex(index)
         if (!item) return
         if (item.isFolder) {
+            searchTyping.stop()
+            searchField.text = ""  // a folder found by the search: show it
             lib.searchQuery = ""
             lib.folder = lib.relativeFolder(item.path)
         } else if (home.searching) {
@@ -317,7 +320,7 @@ Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             x: parent.leftPadding
                             visible: parent.text === "" && parent.preeditText === ""
-                            text: qsTr("Search the library")
+                            text: qsTr("Search documents and folders")
                             color: "#8a8d91"
                         }
                         onTextEdited: home.typed()
@@ -361,8 +364,14 @@ Rectangle {
                 objectName: "importButton"
                 visible: home.page === 0 && app.library.available
                 iconName: "xqt-import"
-                tip: qsTr("Import PDFs and Xournal files (copies them into this folder)")
-                onClicked: importDialog.open()
+                tip: qsTr("Import PDFs and Xournal files, or a whole folder (copies them into this folder)")
+                onClicked: importMenu.popup()
+                Menu {
+                    id: importMenu
+                    objectName: "importMenu"
+                    MenuItem { text: qsTr("Import files…"); onTriggered: importDialog.open() }
+                    MenuItem { text: qsTr("Import a folder with its subfolders…"); onTriggered: importFolderDialog.open() }
+                }
             }
             IconButton {
                 objectName: "newFolderButton"
@@ -461,7 +470,7 @@ Rectangle {
             Label {
                 visible: home.searching || app.library.flat
                 Layout.leftMargin: 8
-                text: home.searching ? (libraryGrid.count === 1 ? qsTr("1 document found") : qsTr("%1 documents found").arg(libraryGrid.count))
+                text: home.searching ? (libraryGrid.count === 1 ? qsTr("1 result") : qsTr("%1 results").arg(libraryGrid.count))
                                      : qsTr("All documents in %1").arg(app.library.name)
                 font.pixelSize: 15
                 color: "#3c4043"
@@ -567,7 +576,10 @@ Rectangle {
                         highlighted: GridView.isCurrentItem && libraryGrid.activeFocus
                         dropTarget: libraryGrid.dropIndex === index
                         subtitle: {
-                            if (model.isFolder) return model.itemCount === 1 ? qsTr("1 item") : qsTr("%1 items").arg(model.itemCount)
+                            if (model.isFolder) {
+                                const items = model.itemCount === 1 ? qsTr("1 item") : qsTr("%1 items").arg(model.itemCount)
+                                return home.searching && model.location !== "" ? model.location + " · " + items : items
+                            }
                             const parts = []
                             if ((home.searching || app.library.flat) && model.location !== "") parts.push(model.location)
                             if (model.pageCount >= 0) parts.push(home.pagesText(model.pageCount))
@@ -621,7 +633,8 @@ Rectangle {
                         visible: !home.searching
                         Layout.alignment: Qt.AlignHCenter
                         Button { text: qsTr("New document"); highlighted: true; onClicked: newDocumentDialog.open() }
-                        Button { text: qsTr("Import…"); flat: true; onClicked: importDialog.open() }
+                        Button { text: qsTr("Import files…"); flat: true; onClicked: importDialog.open() }
+                        Button { text: qsTr("Import a folder…"); flat: true; onClicked: importFolderDialog.open() }
                     }
                 }
 
@@ -1073,6 +1086,11 @@ Rectangle {
         fileMode: FileDialog.OpenFiles
         nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("All files (*)")]
         onAccepted: app.library.importUrls(selectedFiles, app.library.flat || home.searching ? "" : app.library.folder)
+    }
+    FolderDialog {
+        id: importFolderDialog
+        title: qsTr("Import a folder (with its subfolders) into the library")
+        onAccepted: app.library.importUrls([selectedFolder], app.library.flat || home.searching ? "" : app.library.folder)
     }
 
     NewDocumentDialog { id: newDocumentDialog }

@@ -444,3 +444,48 @@ TEST_F(LibraryTest, recentFilesSelectionAndRemoval) {
     EXPECT_EQ(recent.data(recent.index(0), RecentFiles::NameRole).toString(), "b");
     EXPECT_TRUE(fs::exists(root / "a.pdf")) << "only removed from the list";
 }
+
+TEST_F(LibraryTest, importCopiesAWholeFolderTree) {
+    const fs::path lib = root / "lib", src = root / "src" / "Course";
+    fs::create_directories(lib);
+    makePdf(src / "Week 1" / "slides.pdf");
+    makePdf(src / "Week 2" / "Exercises" / "sheet.pdf");
+    makeAnnotation(src / "Week 2" / "Exercises" / "sheet.pdf", src / "Week 2" / "Exercises" / "sheet.xopp");
+    fs::create_directories(src / "Week 3");  // empty, kept
+    touch(src / "Week 1" / "readme.txt");    // not a document
+    makePdf(src / ".git" / "hidden.pdf");    // hidden folders stay behind
+
+    const auto r = DocumentFiles::import(src, lib);
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.error.empty()) << r.error;
+    EXPECT_EQ(r.documents, 2);
+    EXPECT_EQ(r.folder, lib / "Course");
+    EXPECT_TRUE(fs::exists(lib / "Course" / "Week 1" / "slides.pdf"));
+    EXPECT_EQ(backgroundOf(lib / "Course" / "Week 2" / "Exercises" / "sheet.xopp"),
+              lib / "Course" / "Week 2" / "Exercises" / "sheet.pdf");
+    EXPECT_TRUE(fs::is_directory(lib / "Course" / "Week 3"));
+    EXPECT_FALSE(fs::exists(lib / "Course" / "Week 1" / "readme.txt"));
+    EXPECT_FALSE(fs::exists(lib / "Course" / ".git"));
+    EXPECT_TRUE(fs::exists(src / "Week 2" / "Exercises" / "sheet.xopp")) << "a copy: the original stays";
+
+    // Again: next to the first copy
+    EXPECT_EQ(DocumentFiles::import(src, lib).folder, lib / "Course (2)");
+}
+
+TEST_F(LibraryTest, searchFindsFolderNames) {
+    makePdf(root / "Physics" / "sheet.pdf");
+    fs::create_directories(root / "Math" / "Physics Lab");
+    fs::create_directories(root / "Chemistry");
+    touch(root / "physics notes.xopp");
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    model.setSearchQuery("PHYS");
+    ASSERT_EQ(model.count(), 3) << "two folders, then the document with that name";
+    EXPECT_TRUE(model.data(model.index(0), LibraryModel::IsFolderRole).toBool());
+    EXPECT_TRUE(model.data(model.index(1), LibraryModel::IsFolderRole).toBool());
+    EXPECT_FALSE(model.data(model.index(2), LibraryModel::IsFolderRole).toBool());
+    const int lab = model.rowOf(QString::fromStdString((root / "Math" / "Physics Lab").string()));
+    ASSERT_GE(lab, 0);
+    EXPECT_EQ(model.data(model.index(lab), LibraryModel::LocationRole).toString(), "Math");
+}

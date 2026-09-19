@@ -59,6 +59,8 @@ struct Result {
     fs::path folder;
     /// Every file or folder that has a new path now (old, new): open tabs and recent files follow.
     std::vector<std::pair<fs::path, fs::path>> moved;
+    /// Import: documents copied (a folder: all documents in it and its subfolders)
+    int documents = 0;
 };
 
 /// A name that is not a file or folder name in `folder` yet: `stem`, "stem (2)", ... (for a document: no .xopp or
@@ -72,7 +74,9 @@ Result rename(const DocumentItem& item, const std::string& newName);
 /// Move a document into another folder.
 Result move(const DocumentItem& item, const fs::path& folder);
 /// Copy a document file into a folder (under a free name): a .xopp with the PDF it uses (stored as "<name>.pdf" next
-/// to it), a PDF with the .xopp next to it. A folder is copied with all documents in it.
+/// to it), a PDF with the .xopp next to it. A folder is copied with its whole folder structure and all documents in
+/// it (other files and hidden folders stay behind). Problems with single documents do not stop the rest: `ok` with
+/// the problems in `error`.
 Result import(const fs::path& file, const fs::path& folder);
 /// Move a document (all its files) to the trash.
 Result trash(const DocumentItem& item);

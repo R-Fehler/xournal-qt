@@ -205,7 +205,25 @@ void LibraryModel::rebuild() {
             r.modified = modifiedOf(item);
             return r;
         };
-        if (!query.trimmed().isEmpty()) {
+        auto folderRow = [](const fs::path& f) {
+            Row r;
+            r.isFolder = true;
+            r.path = f;
+            r.name = QString::fromStdString(f.filename().string());
+            r.modified = QFileInfo(qstr(f)).lastModified();
+            const auto inside = DocumentFiles::scan(f);
+            r.itemCount = static_cast<int>(inside.folders.size() + inside.items.size());
+            return r;
+        };
+        if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty()) {
+            // Folders whose name matches, then the documents (text and names)
+            for (const auto& f: DocumentFiles::foldersRecursive(lib->root())) {
+                if (QString::fromStdString(f.filename().string()).contains(q, Qt::CaseInsensitive)) {
+                    Row r = folderRow(f);
+                    r.hit.inName = true;
+                    newRows.push_back(std::move(r));
+                }
+            }
             for (auto& hit: idx->search(query)) {
                 const DocumentItem item = DocumentFiles::itemOf(hit.file);
                 if (item.valid()) {
@@ -223,14 +241,7 @@ void LibraryModel::rebuild() {
             } else {
                 const auto listing = DocumentFiles::scan(currentDir());
                 for (const auto& f: listing.folders) {
-                    Row r;
-                    r.isFolder = true;
-                    r.path = f;
-                    r.name = QString::fromStdString(f.filename().string());
-                    r.modified = QFileInfo(qstr(f)).lastModified();
-                    const auto inside = DocumentFiles::scan(f);
-                    r.itemCount = static_cast<int>(inside.folders.size() + inside.items.size());
-                    folderRows.push_back(std::move(r));
+                    folderRows.push_back(folderRow(f));
                 }
                 for (const auto& item: listing.items) {
                     docRows.push_back(itemRow(item));
@@ -439,9 +450,7 @@ void LibraryModel::copyInBackground(std::vector<fs::path> files, fs::path target
         QStringList errors;
         for (const auto& f: files) {
             const auto r = DocumentFiles::import(f, target);
-            if (r.ok) {
-                ++imported;
-            }
+            imported += r.documents;
             if (!r.error.empty()) {
                 errors << QString::fromStdString(r.error);
             }

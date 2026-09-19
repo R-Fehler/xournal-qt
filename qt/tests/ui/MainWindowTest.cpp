@@ -579,3 +579,21 @@ TEST_F(HomeScreenTest, shortLibrarySearchWaitsForEnter) {
     key(Qt::Key_Return);
     EXPECT_EQ(controller->libraryModel()->property("searchQuery").toString(), "le");
 }
+
+TEST_F(HomeScreenTest, searchFindsFoldersAndOpensThem) {
+    auto* field = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(field, nullptr);
+    field->forceActiveFocus();
+    type("physics");
+    wait(400);
+    ASSERT_EQ(controller->libraryModel()->property("searchQuery").toString(), "physics");
+    ASSERT_GE(gridCount(), 1);
+    auto* first = card(0);
+    ASSERT_NE(first, nullptr);
+    EXPECT_TRUE(first->property("isFolder").toBool());
+    click(first);
+    EXPECT_EQ(controller->libraryModel()->property("folder").toString(), "Physics");
+    EXPECT_EQ(controller->libraryModel()->property("searchQuery").toString(), "");
+    EXPECT_EQ(field->property("text").toString(), "");
+    EXPECT_EQ(gridCount(), 1);  // sheet.pdf
+}

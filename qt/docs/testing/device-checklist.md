@@ -130,7 +130,8 @@ cd build-qt
 - [ ] Rename a document with a PDF: both files are renamed and the document still opens with its PDF (also when it is open in a tab; the tab title follows).
 - [ ] New folder, enter it, breadcrumbs back; press and hold a card and drag it onto a folder or a breadcrumb: it moves there.
 - [ ] Select several cards (circle, Ctrl/Shift+click, or "Select" in the menu then taps): Open opens them all as tabs; Copy to… / Move to… with the folder dialog; Trash.
-- [ ] Library search: documents with the text or the name, hit count and snippet; tapping one opens it at the first hit.
+- [ ] Library search: folders with the name (tap: opens the folder), documents with the text or the name, hit count and snippet; tapping a document opens it at the first hit.
+- [ ] Import → "Import a folder with its subfolders…" (and dropping a folder): the whole folder tree appears in the library with its PDFs and .xopp files.
 - [ ] Recent tab: documents opened before; rename; select several and "Remove from list".
 - [ ] Closing the last tab shows the home screen; the library tab switches to it with documents open; Ctrl+Tab returns.
 - [ ] While a tool tip is shown (hover a tool button), the pen still writes on the canvas right away.

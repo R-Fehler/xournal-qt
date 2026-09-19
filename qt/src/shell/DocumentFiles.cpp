@@ -391,6 +391,41 @@ Result move(const DocumentItem& item, const fs::path& folder) {
     return relocate(item, folder, uniqueName(folder, item.name()), false);
 }
 
+namespace {
+/// A folder with its subfolders; `depth` against symbolic link loops.
+Result importFolder(const fs::path& dir, const fs::path& folder, int depth) {
+    Result r = createFolder(folder, uniqueName(folder, dir.filename().string()));
+    if (!r.ok) {
+        return r;
+    }
+    std::vector<std::string> errors;
+    const Listing l = scan(dir);
+    for (const auto& item: l.items) {
+        Result sub = relocate(item, r.folder, uniqueName(r.folder, item.name()), true);
+        if (sub.ok) {
+            ++r.documents;
+        } else {
+            errors.push_back(sub.error);  // go on with the others
+        }
+    }
+    for (const auto& sub: l.folders) {
+        if (depth >= 32) {
+            errors.push_back("\"" + sub.string() + "\" is nested too deep.");
+            continue;
+        }
+        Result s = importFolder(sub, r.folder, depth + 1);
+        r.documents += s.documents;
+        if (!s.error.empty()) {
+            errors.push_back(s.error);
+        }
+    }
+    for (const auto& e: errors) {
+        r.error += (r.error.empty() ? "" : "\n") + e;
+    }
+    return r;
+}
+}  // namespace
+
 Result import(const fs::path& file, const fs::path& folder) {
     if (!isDir(folder)) {
         return failure("The folder does not exist.");
@@ -400,28 +435,15 @@ Result import(const fs::path& file, const fs::path& folder) {
         if (isInside(fs::weakly_canonical(folder), fs::weakly_canonical(file))) {
             return failure("A folder cannot be imported into itself.");
         }
-        Result r = createFolder(folder, uniqueName(folder, file.filename().string()));
-        if (!r.ok) {
-            return r;
-        }
-        const Listing l = scan(file);
-        for (const auto& item: l.items) {
-            if (Result sub = import(item.main(), r.folder); !sub.ok) {
-                r.error = sub.error;  // go on with the others
-            }
-        }
-        for (const auto& sub: l.folders) {
-            if (Result s = import(sub, r.folder); !s.ok) {
-                r.error = s.error;
-            }
-        }
-        return r;
+        return importFolder(file, folder, 0);
     }
     const DocumentItem item = itemOf(file);
     if (!item.valid()) {
         return failure("\"" + file.filename().string() + "\" is not a PDF or Xournal document.");
     }
-    return relocate(item, folder, uniqueName(folder, item.name()), true);
+    Result r = relocate(item, folder, uniqueName(folder, item.name()), true);
+    r.documents = r.ok ? 1 : 0;
+    return r;
 }
 
 Result trash(const DocumentItem& item) {

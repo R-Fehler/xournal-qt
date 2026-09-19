@@ -2,7 +2,7 @@
  * xournal-qt: the library grid (QML list model) and its file operations.
  *
  * Rows are the subfolders and documents of the current folder, all documents of the library ("flat"), or the
- * documents that match the search. Changes on disk (also by other programs) are picked up by a file system watcher.
+ * search results: folders whose name matches, then documents whose text or name matches. Changes on disk (also by other programs) are picked up by a file system watcher.
  * Renaming and moving go through DocumentFiles (a .xopp and its PDF stay together); `onFilesChanged` lets the
  * controller update open tabs and the recent files.
  *
@@ -132,7 +132,8 @@ public:
     /// Move a document or folder into a folder (relative to the library).
     Q_INVOKABLE bool moveTo(int row, const QString& folder);
     Q_INVOKABLE bool trash(int row);
-    /// Copy documents (or folders of documents) into a folder of the library (relative; in the background).
+    /// Copy documents, or folders with their whole folder structure, into a folder of the library (relative; in the
+    /// background). `imported` tells the number of documents.
     Q_INVOKABLE void importUrls(const QList<QUrl>& urls, const QString& folder);
     /// All folders of the library: [{ folder, name, depth }], for "Move to".
     Q_INVOKABLE QVariantList folderList() const;

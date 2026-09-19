@@ -20,8 +20,9 @@ A **library** is a plain folder of documents that a window works in, like a work
   SaveHandler, so its PDF reference (relative to the `.xopp`) points to the new place. Open tabs and the recent list
   follow the new paths.
 - **Import / copy** copy a `.xopp` together with the PDF it uses. That PDF is stored as `name.pdf` next to the copy,
-  even if it came from somewhere else. A PDF brings the `.xopp` next to it along. A folder is copied with its
-  documents. A name that is taken becomes "name (2)".
+  even if it came from somewhere else. A PDF brings the `.xopp` next to it along. A folder is copied with its whole
+  folder structure (also empty subfolders) and all documents in it. Other files and hidden folders (`.git`, …) stay
+  behind. A name that is taken becomes "name (2)".
 - **Trash** moves the files (or the folder) to the desktop trash.
 
 Code: `qt/src/shell/DocumentFiles.*`.
@@ -41,9 +42,12 @@ Code: `qt/src/shell/Library.*` (library, search index), `Previews.*`, `LibraryMo
 - It is the first tab (library icon and name). It is shown when no document is open, and closing the last tab
   returns to it. Ctrl+Shift+L toggles it. Ctrl+Tab goes back to the document.
 - **Library**:
-  - views: folders with breadcrumbs, or all documents at once; sort by name or last modified; search
+  - views: folders with breadcrumbs, or all documents at once; sort by name or last modified
+  - search: folders whose name matches (tap one to open it), then documents whose name or text matches
   - New document: name, background, paper size, orientation. It is saved at once in the current folder.
-  - Import, New folder, dropping files or folders from the file manager (they are copied).
+  - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders
+    from the file manager. They are copied.
+  - New folder
 - **Recent**: the documents opened lately that still exist (the list is shared by all windows:
   `recent.json` in the config folder).
 - **On a card**:
