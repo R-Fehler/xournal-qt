@@ -101,6 +101,7 @@ TEST_F(RecoveryTest, journalRoundTrip) {
 TEST_F(RecoveryTest, everyUnsavedTabHasItsOwnAutosaveFile) {
     AppController c;
     c.newDocument();
+    c.newDocument();
     TabManager& tabs = c.tabManager();
     ASSERT_EQ(tabs.count(), 2);
     EXPECT_NE(tabs.session(0)->autosavePath(), tabs.session(1)->autosavePath());

@@ -76,6 +76,7 @@ void expectLayoutMatchesDocument(AppController& c) {
 
 TEST(Pages, modelFollowsPageOperations) {
     AppController c;
+    c.newDocument();
     PagesModel& m = pagesOf(c);
     EXPECT_EQ(m.rowCount(), 1);
     QSignalSpy count(&m, &PagesModel::countChanged);
@@ -109,6 +110,7 @@ TEST(Pages, modelFollowsPageOperations) {
 
 TEST(Pages, modelFollowsTheCurrentTab) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
     PagesModel& m = pagesOf(c);
     EXPECT_EQ(m.rowCount(), 2);
@@ -123,6 +125,7 @@ TEST(Pages, modelFollowsTheCurrentTab) {
 
 TEST(Pages, editsChangeTheThumbnailRevision) {
     AppController c;
+    c.newDocument();
     PagesModel& m = pagesOf(c);
     m.setRefreshDelay(10);
     const std::string before = thumbnailUrl(m, 0);
@@ -153,6 +156,7 @@ TEST(Pages, editsChangeTheThumbnailRevision) {
 
 TEST(Pages, thumbnailShowsThePage) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
     DocumentSession* s = c.tabManager().currentSession();
     const QImage img = ThumbnailProvider::render(*s, 0, 160);
@@ -172,6 +176,7 @@ TEST(Pages, thumbnailShowsThePage) {
 
 TEST(Pages, searchHitsPerPage) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
     PagesModel& m = pagesOf(c);
     DocumentSession* s = c.tabManager().currentSession();
@@ -193,6 +198,7 @@ TEST(Pages, searchHitsPerPage) {
 
 TEST(Pages, filterShowsOnlyPagesWithHits) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
     auto* filter = qobject_cast<PageFilterModel*>(c.filteredPagesModel());
     ASSERT_NE(filter, nullptr);
@@ -222,6 +228,7 @@ TEST(Pages, filterShowsOnlyPagesWithHits) {
 
 TEST(Pages, typicalAspectFollowsTheDocument) {
     AppController c;
+    c.newDocument();
     PagesModel& m = pagesOf(c);
     EXPECT_NEAR(m.typicalAspect(), 1.414, 0.01) << "A4 portrait";
     // Slides (16:9) with one portrait page in between: the grid cells follow the slides.
@@ -246,6 +253,7 @@ TEST(Pages, concurrentTextRenderingIsComplete) {
     }
     // A freshly loaded document, rendered from several threads at once from the start.
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
     DocumentSession* s = c.tabManager().currentSession();
     std::atomic<int> mismatches{0};
@@ -270,6 +278,7 @@ TEST(Pages, concurrentTextRenderingIsComplete) {
 
 TEST(Pages, selectionLikeAFileManager) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
     PagesModel& m = pagesOf(c);
     m.select(2);
@@ -290,6 +299,7 @@ TEST(Pages, selectionLikeAFileManager) {
 
 TEST(Pages, copyPasteDeleteMoveWithPageUndo) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
     PagesModel& m = pagesOf(c);
     DocumentSession* s = c.tabManager().currentSession();
@@ -328,6 +338,7 @@ TEST(Pages, copyPasteDeleteMoveWithPageUndo) {
 
 TEST(Pages, pdfPagesPastedIntoAnotherDocumentBecomeImages) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
     c.copyPages({1});
     c.pastePages(0);  // same document: still the PDF page

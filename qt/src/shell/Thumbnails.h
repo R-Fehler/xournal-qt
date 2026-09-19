@@ -15,6 +15,8 @@
 #include <QImage>
 #include <QQuickAsyncImageProvider>
 
+class Document;
+
 namespace xqt {
 
 class DocumentSession;
@@ -32,6 +34,8 @@ public:
 
     /// Renders one page `width` pixels wide (thread-safe; takes a shared document lock).
     static QImage render(DocumentSession& session, size_t page, int width);
+    /// Render a page of any document (e.g. one loaded only for a preview). Takes a shared lock.
+    static QImage renderDocument(Document& doc, size_t page, int width);
 };
 
 }  // namespace xqt

@@ -515,7 +515,8 @@ std::string DocumentSession::getDisplayName() const {
 
 bool DocumentSession::isModified() const { return undoRedo->isChanged() || pageUndo->isChanged(); }
 
-void DocumentSession::updatePreview() {
+void DocumentSession::updatePreview(Document& document) {
+    Document* doc = &document;
     // Port of SaveJob::updatePreview: 128 px preview of the first page stored in the file.
     const int previewSize = 128;
     xoj::util::CairoSurfaceSPtr crBuffer;
@@ -557,7 +558,7 @@ void DocumentSession::updatePreview() {
 
 auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     // Port of SaveJob::save
-    updatePreview();
+    updatePreview(*doc);
     SaveHandler h;
 
     doc->lock_shared();
@@ -602,6 +603,37 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     undoRedoChanged();
     Q_EMIT filePathChanged();
     return {true, {}};
+}
+
+auto DocumentSession::writeDocument(Document& doc, const fs::path& target) -> SaveResult {
+    updatePreview(doc);
+    doc.lock();
+    doc.setFilepath(target);  // an attached background PDF is written next to it
+    doc.unlock();
+    SaveHandler h;
+    doc.lock_shared();
+    h.prepareSave(&doc, target);
+    doc.unlock_shared();
+    h.saveTo(target);
+    if (!h.getErrorMessage().empty()) {
+        return {false, FS(_F("Save file error: {1}") % h.getErrorMessage())};
+    }
+    doc.lock();
+    h.updateDocumentInfo(&doc);
+    doc.unlock();
+    return {true, {}};
+}
+
+void DocumentSession::relocate(const fs::path& xopp, const fs::path& pdf) {
+    doc->lock();
+    if (!xopp.empty()) {
+        doc->setFilepath(xopp);
+    }
+    if (!pdf.empty()) {
+        doc->setPdfAttributes(pdf, doc->isAttachPdf());
+    }
+    doc->unlock();
+    Q_EMIT filePathChanged();
 }
 
 auto DocumentSession::save() -> SaveResult {

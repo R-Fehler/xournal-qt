@@ -27,12 +27,15 @@ class SettingsModel final: public QObject {
     Q_PROPERTY(int revision READ revision NOTIFY changed)
     Q_PROPERTY(QStringList pageBackgrounds READ pageBackgrounds CONSTANT)
     Q_PROPERTY(QStringList paperFormats READ paperFormats CONSTANT)
+    /// The pattern of each page background ("plain", "ruled", "graph", ...), for previews
+    Q_PROPERTY(QStringList pageBackgroundFormats READ pageBackgroundFormats CONSTANT)
 public:
     explicit SettingsModel(AppContext& app, QObject* parent = nullptr);
 
     int revision() const { return rev; }
     /// Names of the page backgrounds for new pages (upstream's page types: plain, lined, ruled, graph, ...).
     QStringList pageBackgrounds() const;
+    QStringList pageBackgroundFormats() const;
     QStringList paperFormats() const;
     /// All keys, for tests.
     QStringList keys() const;

@@ -34,6 +34,12 @@ class PageFilterModel;
 class PageClipboard;
 class SettingsModel;
 class SessionRecovery;
+class Library;
+class LibraryModel;
+class RecentFiles;
+namespace DocumentFiles {
+struct Result;
+}
 }  // namespace xqt
 class Palette;
 
@@ -45,6 +51,12 @@ class AppController: public QObject {
     /// The pages for the sidebar and the page grid, optionally only those with search hits.
     Q_PROPERTY(QObject* filteredPages READ filteredPagesModel CONSTANT)
     Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
+    /// The library of this window (a folder of documents) and the recently opened documents (home screen)
+    Q_PROPERTY(QObject* library READ libraryModel CONSTANT)
+    Q_PROPERTY(QObject* recent READ recentModel CONSTANT)
+    /// The home screen (library, recent documents) is shown instead of the current document; always when no
+    /// document is open.
+    Q_PROPERTY(bool homeVisible READ homeVisible WRITE setHomeVisible NOTIFY homeVisibleChanged)
     Q_PROPERTY(int currentTab READ currentTab WRITE setCurrentTab NOTIFY documentChanged)
     Q_PROPERTY(QObject* view READ view NOTIFY documentChanged)
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
@@ -98,6 +110,10 @@ public:
     QObject* pagesModel() const;
     QObject* filteredPagesModel() const;
     QObject* settingsModel() const;
+    QObject* libraryModel() const;
+    QObject* recentModel() const;
+    bool homeVisible() const;
+    void setHomeVisible(bool visible);
     int currentTab() const;
     void setCurrentTab(int index);
     QObject* view() const;
@@ -142,6 +158,26 @@ public:
     void setPairedPages(bool paired);
     int pairsOffset() const;
     void setPairsOffset(int offset);
+
+    // --- home: library and recent documents ---
+    /// The folder this window works in (main.cpp: the command line, else the default library). Tabs of this
+    /// library are restored at start; another library has its own window.
+    void setLibraryRoot(const fs::path& root);
+    /// The session journal of a library (so that the windows of two libraries do not share one).
+    static fs::path journalFileFor(const xqt::Library& library);
+    /// A new document with the page settings (background, paper size, orientation: settings "pageBackground",
+    /// "paperFormat", "landscape"). With a name and a library, it is saved at once in the library's current folder
+    /// as "<name>.xopp"; else it is a new unsaved document.
+    Q_INVOKABLE bool createDocument(const QString& name, bool inLibrary);
+    /// Open a document found by the library search, with the search active on its first hit.
+    Q_INVOKABLE bool openSearchHit(const QString& path, const QString& query);
+    /// The libraries in the standard folder: [{ name, path, current }]
+    Q_INVOKABLE QVariantList libraries() const;
+    /// Open a folder as library in a new window (another process: one library per window).
+    Q_INVOKABLE void openLibrary(const QUrl& folder);
+    /// New library in the standard folder, opened in a new window. False if the name is taken or invalid.
+    Q_INVOKABLE bool createLibrary(const QString& name);
+    Q_INVOKABLE void showInFileManager(const QString& path);
 
     // --- start and recovery ---
     /// Start of the app: offers recovery after a crash (recoveryItems), else reopens the last tabs (setting), then
@@ -261,6 +297,7 @@ public:
 
 Q_SIGNALS:
     void documentChanged();
+    void homeVisibleChanged();
     void titleChanged();
     void modifiedChanged();
     void undoRedoChanged();
@@ -291,6 +328,8 @@ Q_SIGNALS:
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// Files were renamed or moved (library, recent files): open documents and the recent list follow.
+    void filesChanged(const xqt::DocumentFiles::Result& result);
     void currentTabChanged();
     /// Reopens the tabs of a journal; `recovered`: tab index -> recovery file to load instead of the file.
     void reopenTabs(const std::vector<std::pair<fs::path, int>>& tabs, int current,
@@ -304,6 +343,10 @@ private:
     std::unique_ptr<xqt::PageClipboard> pageClipboard;
     std::vector<size_t> pageList(const QList<int>& pages) const;
     std::unique_ptr<xqt::SettingsModel> settingsView;
+    std::unique_ptr<xqt::LibraryModel> library;
+    std::unique_ptr<xqt::RecentFiles> recent;
+    bool home = true;
+    fs::path journalFile;
     std::unique_ptr<xqt::SessionRecovery> recovery;  // after `tabs`: destroyed first
     bool recoveryPending = false;
     QString pdfMode = "highlight";

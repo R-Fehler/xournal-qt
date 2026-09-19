@@ -122,4 +122,17 @@ cd build-qt
 - [ ] Page grid on touch: "Select", tap pages, then Copy / Cut / Paste / Duplicate / Delete in the bar.
 - [ ] Two-finger scrolling on the touchpad in the grid, sidebar and tab overview continues after lifting the fingers.
 
+## Library and home screen
+- [ ] `xournal-qt` without arguments: the home screen shows the library "Default" (folder created in Documents/Xournal_Libraries); `xournal-qt ~/some/folder` shows that folder as library, in its own window.
+- [ ] Drag PDFs and .xopp files from Dolphin onto the library: they are copied (a note says how many); dropped on a folder card they go into that folder.
+- [ ] Previews appear (first page, with annotations); "PDF ✎" marks annotated PDFs; a lone PDF shows up and opens for annotating; saving it creates the .xopp next to it and the card stays one item.
+- [ ] New document: name, background, paper, landscape: it opens and the file exists in the current folder.
+- [ ] Rename a document with a PDF: both files are renamed and the document still opens with its PDF (also when it is open in a tab; the tab title follows).
+- [ ] New folder, enter it, breadcrumbs back; press and hold a card and drag it onto a folder or a breadcrumb: it moves there.
+- [ ] Select several cards (circle, Ctrl/Shift+click, or "Select" in the menu then taps): Open opens them all as tabs; Copy to… / Move to… with the folder dialog; Trash.
+- [ ] Library search: documents with the text or the name, hit count and snippet; tapping one opens it at the first hit.
+- [ ] Recent tab: documents opened before; rename; select several and "Remove from list".
+- [ ] Closing the last tab shows the home screen; the library tab switches to it with documents open; Ctrl+Tab returns.
+- [ ] While a tool tip is shown (hover a tool button), the pen still writes on the canvas right away.
+
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

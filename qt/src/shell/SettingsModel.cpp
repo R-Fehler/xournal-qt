@@ -238,6 +238,14 @@ QStringList SettingsModel::pageBackgrounds() const {
     return names;
 }
 
+QStringList SettingsModel::pageBackgroundFormats() const {
+    QStringList formats;
+    for (const auto& info: app.getPageTypes()->getPageTypes()) {
+        formats << QString::fromStdString(PageTypeHandler::getStringForPageTypeFormat(info->page.format));
+    }
+    return formats;
+}
+
 QStringList SettingsModel::paperFormats() const {
     QStringList names;
     for (const auto& f: PAPER_FORMATS) {

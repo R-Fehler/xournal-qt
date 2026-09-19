@@ -70,6 +70,12 @@ public:
     SaveResult save();
     /// Save to a new path; the document takes this path ("Save as").
     SaveResult saveAs(fs::path target);
+    /// Write a document that is not open in a session (e.g. a library document being moved) to `target` (.xopp),
+    /// with a new preview; the document takes this path.
+    static SaveResult writeDocument(Document& doc, const fs::path& target);
+    /// The document's files were renamed or moved (library): its .xopp is now `xopp` / its background PDF `pdf`
+    /// (empty: unchanged).
+    void relocate(const fs::path& xopp, const fs::path& pdf);
     /// Write the autosave file if there are unsaved changes since the last autosave.
     SaveResult autosave();
 
@@ -170,7 +176,7 @@ private:
     void enableAutosave(bool enable);
     void updatePageActions();
     void setLastAutosaveFile(fs::path file);
-    void updatePreview();
+    static void updatePreview(Document& doc);
     SaveResult saveImpl(fs::path target);
 
     // UndoRedoListener

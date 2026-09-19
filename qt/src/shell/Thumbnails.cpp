@@ -80,7 +80,11 @@ quint64 ThumbnailProvider::idOf(const DocumentSession* session) {
 }
 
 QImage ThumbnailProvider::render(DocumentSession& session, size_t pageNo, int width) {
-    Document* doc = session.getDocument();
+    return renderDocument(*session.getDocument(), pageNo, width);
+}
+
+QImage ThumbnailProvider::renderDocument(Document& document, size_t pageNo, int width) {
+    Document* doc = &document;
     std::shared_lock lock(*doc);
     if (pageNo >= doc->getPageCount()) {
         return {};

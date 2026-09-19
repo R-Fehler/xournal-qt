@@ -230,7 +230,13 @@ QQuickItem* topmostItemAt(QQuickItem* item, QPointF scenePos) {
     std::stable_sort(children.begin(), children.end(), [](QQuickItem* a, QQuickItem* b) { return a->z() < b->z(); });
     for (auto it = children.crbegin(); it != children.crend(); ++it) {
         if ((*it)->isVisible() && (*it)->contains((*it)->mapFromScene(scenePos))) {
-            return topmostItemAt(*it, scenePos);
+            QQuickItem* top = topmostItemAt(*it, scenePos);
+            // The popup overlay covers the window while any popup is open; only its popups (and the dimmer of a
+            // modal one) are on top, not the overlay itself (e.g. a tool tip somewhere else).
+            if (top == *it && (*it)->inherits("QQuickOverlay")) {
+                continue;
+            }
+            return top;
         }
     }
     return item;

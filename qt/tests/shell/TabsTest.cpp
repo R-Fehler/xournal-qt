@@ -57,15 +57,28 @@ QString fixture(const char8_t* rel) {
 }
 }  // namespace
 
-TEST(Tabs, controllerStartsWithOneNewDocument) {
+TEST(Tabs, controllerStartsWithTheHomeScreen) {
     AppController c;
-    EXPECT_EQ(c.tabCount(), 1);
-    EXPECT_EQ(c.title(), "Untitled");
+    EXPECT_EQ(c.tabCount(), 0);
+    EXPECT_TRUE(c.homeVisible());
+    EXPECT_EQ(c.view(), nullptr);
     EXPECT_FALSE(c.modified());
+    c.newDocument();
+    EXPECT_EQ(c.tabCount(), 1);
+    EXPECT_FALSE(c.homeVisible());
+    EXPECT_EQ(c.title(), "Untitled");
+    c.setHomeVisible(true);  // the home tab; the document stays open behind it
+    EXPECT_TRUE(c.homeVisible());
+    c.nextTab();  // Ctrl+Tab: back to the document
+    EXPECT_FALSE(c.homeVisible());
+    c.closeTab(0);  // no document left: the home screen
+    EXPECT_EQ(c.tabCount(), 0);
+    EXPECT_TRUE(c.homeVisible());
 }
 
 TEST(Tabs, openingReplacesTheUntouchedNewDocument) {
     AppController c;
+    c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"test1.xoj")));
     EXPECT_EQ(c.tabCount(), 1) << "the empty start document should have been replaced";
     EXPECT_EQ(c.title(), "test1.xoj");
@@ -88,6 +101,7 @@ TEST(Tabs, openingAnOpenFileSwitchesToItsTab) {
 TEST(Tabs, tabsAreIndependentDocuments) {
     AppController c;
     c.newDocument();
+    c.newDocument();
     ASSERT_EQ(c.tabCount(), 2);
     scribble(*c.tabManager().session(1));
     EXPECT_TRUE(c.tabModified(1));
@@ -105,6 +119,7 @@ TEST(Tabs, closingTabs) {
     AppController c;
     c.newDocument();
     c.newDocument();
+    c.newDocument();
     ASSERT_EQ(c.tabCount(), 3);
     c.setCurrentTab(1);
     QSignalSpy docChanged(&c, &AppController::documentChanged);
@@ -114,9 +129,10 @@ TEST(Tabs, closingTabs) {
     EXPECT_GE(docChanged.count(), 1);
     c.closeTab(0);
     EXPECT_EQ(c.currentTab(), 0);
-    c.closeTab(0);  // the last tab: replaced by a new document
-    EXPECT_EQ(c.tabCount(), 1);
-    EXPECT_EQ(c.title(), "Untitled");
+    c.closeTab(0);  // the last tab: the home screen
+    EXPECT_EQ(c.tabCount(), 0);
+    EXPECT_TRUE(c.homeVisible());
+    EXPECT_EQ(c.title(), "");
 }
 
 TEST(Tabs, modelDataAndMoving) {
@@ -180,6 +196,7 @@ TEST(SingleInstanceTest, filesAreHandedToTheRunningInstance) {
 
 TEST(Tabs, pageLayoutAppliesToAllTabs) {
     AppController c;
+    c.newDocument();
     c.newDocument();
     ASSERT_EQ(c.tabCount(), 2);
     QSignalSpy changed(&c, &AppController::viewLayoutChanged);

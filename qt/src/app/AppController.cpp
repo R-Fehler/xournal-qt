@@ -5,8 +5,10 @@
 
 #include <shared_mutex>
 
+#include <QCoreApplication>
 #include <QFile>
 #include <QDesktopServices>
+#include <QProcess>
 #include <QFileInfo>
 #include <QFontDatabase>
 
@@ -27,7 +29,11 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "shell/DocumentFiles.h"
+#include "shell/Library.h"
+#include "shell/LibraryModel.h"
 #include "shell/PageClipboard.h"
+#include "shell/RecentFiles.h"
 #include "shell/PageFilterModel.h"
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
@@ -76,7 +82,16 @@ AppController::AppController(QObject* parent): QObject(parent) {
     settingsView = std::make_unique<SettingsModel>(*app);
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
-    newDocument();
+    connect(tabs.get(), &TabManager::countChanged, this, [this] {
+        if (tabs->count() == 0) {
+            setHomeVisible(true);  // no document: the home screen
+        }
+    });
+    library = std::make_unique<LibraryModel>();
+    library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
+    recent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
+    recent->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
+    journalFile = SessionRecovery::defaultJournalFile();
 }
 
 AppController::~AppController() {
@@ -409,9 +424,26 @@ void AppController::openSearchResult(int index) {
 QObject* AppController::tabsModel() const { return tabs.get(); }
 QObject* AppController::pagesModel() const { return pages.get(); }
 QObject* AppController::settingsModel() const { return settingsView.get(); }
+QObject* AppController::libraryModel() const { return library.get(); }
+QObject* AppController::recentModel() const { return recent.get(); }
+bool AppController::homeVisible() const { return home || tabs->count() == 0; }
+void AppController::setHomeVisible(bool visible) {
+    if (visible != home) {
+        home = visible;
+        if (home) {
+            recent->refresh();  // documents may have been deleted or moved meanwhile
+        }
+        Q_EMIT homeVisibleChanged();
+    }
+}
 QObject* AppController::filteredPagesModel() const { return filteredPages.get(); }
 int AppController::currentTab() const { return tabs->currentIndex(); }
-void AppController::setCurrentTab(int index) { tabs->setCurrentIndex(index); }
+void AppController::setCurrentTab(int index) {
+    tabs->setCurrentIndex(index);
+    if (tabs->session(index)) {
+        setHomeVisible(false);
+    }
+}
 QObject* AppController::view() const { return canvas(); }
 
 QString AppController::title() const {
@@ -464,10 +496,131 @@ int AppController::zoomPercent() const {
 int AppController::pageNumber() const { return session() ? static_cast<int>(session()->getCurrentPageNo()) + 1 : 0; }
 int AppController::pageCount() const { return canvas() ? static_cast<int>(canvas()->pageCount()) : 0; }
 
-void AppController::newDocument() { tabs->addTab(std::make_unique<DocumentSession>(*app)); }
+void AppController::newDocument() {
+    tabs->addTab(std::make_unique<DocumentSession>(*app));
+    setHomeVisible(false);
+}
+
+void AppController::setLibraryRoot(const fs::path& root) {
+    auto lib = std::make_unique<Library>(root);
+    journalFile = journalFileFor(*lib);
+    library->setLibrary(std::move(lib));
+}
+
+fs::path AppController::journalFileFor(const Library& lib) {
+    if (lib.isDefault()) {
+        return SessionRecovery::defaultJournalFile();
+    }
+    const fs::path file = SessionRecovery::defaultJournalFile().parent_path() / "sessions" / (lib.key() + ".json");
+    std::error_code ec;
+    fs::create_directories(file.parent_path(), ec);
+    return file;
+}
+
+bool AppController::createDocument(const QString& name, bool inLibrary) {
+    // The page template settings (background, size) are what the dialog changed.
+    auto s = std::make_unique<DocumentSession>(*app);
+    DocumentSession* created = s.get();
+    tabs->addTab(std::move(s));
+    setHomeVisible(false);
+    if (!inLibrary || !library->available()) {
+        return true;
+    }
+    const QString path = library->newDocumentPath(name);
+    auto r = created->saveAs(fs::path(path.toStdString()));
+    if (!r.ok) {
+        Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
+        return false;
+    }
+    recent->add(created->getFilePath());
+    library->refresh();
+    Q_EMIT titleChanged();
+    return true;
+}
+
+bool AppController::openSearchHit(const QString& path, const QString& query) {
+    if (!openPath(path)) {
+        return false;
+    }
+    if (session() && !query.trimmed().isEmpty()) {
+        session()->setCurrentPageNo(0);
+        session()->search().setQuery(query, true);  // shows the first hit
+    }
+    return true;
+}
+
+QVariantList AppController::libraries() const {
+    QVariantList list;
+    const fs::path current = library->library() ? library->library()->root() : fs::path();
+    std::error_code ec;
+    std::vector<fs::path> dirs;
+    for (auto it = fs::directory_iterator(Library::librariesFolder(), ec); !ec && it != fs::directory_iterator();
+         it.increment(ec)) {
+        if (it->is_directory() && it->path().filename().string().front() != '.') {
+            dirs.push_back(it->path());
+        }
+    }
+    if (!current.empty() && std::find(dirs.begin(), dirs.end(), current) == dirs.end()) {
+        dirs.push_back(current);  // a folder opened as library
+    }
+    std::sort(dirs.begin(), dirs.end());
+    for (const auto& d: dirs) {
+        list.append(QVariantMap{{"name", QString::fromStdString(d.filename().string())},
+                                {"path", QString::fromStdString(d.string())},
+                                {"current", Library(d).root() == current}});
+    }
+    return list;
+}
+
+void AppController::openLibrary(const QUrl& folder) {
+    const QString dir = folder.isLocalFile() ? folder.toLocalFile() : folder.toString();
+    if (library->library() && Library(fs::path(dir.toStdString())).root() == library->library()->root()) {
+        setHomeVisible(true);  // this one
+        return;
+    }
+    // One library per window: another process (it becomes the single instance of that library).
+    QProcess::startDetached(QCoreApplication::applicationFilePath(), {dir});
+}
+
+bool AppController::createLibrary(const QString& name) {
+    const std::string n = name.trimmed().toStdString();
+    if (!DocumentFiles::validName(n)) {
+        return false;
+    }
+    const fs::path dir = Library::librariesFolder() / n;
+    std::error_code ec;
+    if (fs::exists(dir, ec) || !fs::create_directories(dir, ec)) {
+        return false;
+    }
+    openLibrary(QUrl::fromLocalFile(QString::fromStdString(dir.string())));
+    return true;
+}
+
+void AppController::showInFileManager(const QString& path) {
+    const QFileInfo info(path);
+    QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? path : info.absolutePath()));
+}
+
+void AppController::filesChanged(const DocumentFiles::Result& r) {
+    for (const auto& [from, to]: r.moved) {
+        for (int i = 0; i < tabs->count(); ++i) {
+            DocumentSession* s = tabs->session(i);
+            const fs::path file = s->hasFilePath() ? s->getFilePath() : fs::path();
+            const fs::path pdf = s->getDocument()->getPdfFilepath();
+            const fs::path newFile = file.empty() ? file : DocumentFiles::remap(file, from, to);
+            const fs::path newPdf = pdf.empty() ? pdf : DocumentFiles::remap(pdf, from, to);
+            if (newFile != file || newPdf != pdf) {
+                s->relocate(newFile != file ? newFile : fs::path(), newPdf != pdf ? newPdf : fs::path());
+            }
+        }
+        recent->remap(from, to);
+    }
+    recent->refresh();
+    Q_EMIT titleChanged();
+}
 
 void AppController::startSession(const QStringList& files) {
-    recovery = std::make_unique<SessionRecovery>(*tabs, SessionRecovery::defaultJournalFile());
+    recovery = std::make_unique<SessionRecovery>(*tabs, journalFile);
     const auto& previous = recovery->previous();
     if (!recovery->candidates().empty()) {
         // Ask first (QML shows recoveryItems); the previous tabs are reopened by recover().
@@ -567,6 +720,9 @@ void AppController::reopenTabs(const std::vector<std::pair<fs::path, int>>& last
     if (currentTabAfter >= 0) {
         tabs->setCurrentIndex(currentTabAfter);
     }
+    if (tabs->count() > 0) {
+        setHomeVisible(false);
+    }
 }
 
 void AppController::openPaths(const QStringList& paths) {
@@ -583,22 +739,23 @@ void AppController::openUrls(const QList<QUrl>& urls) {
 }
 
 void AppController::closeTab(int index) {
-    tabs->closeTab(index);
-    if (tabs->count() == 0) {
-        newDocument();  // there is always a document to write on
-    }
+    tabs->closeTab(index);  // the last one: the home screen
 }
 
 void AppController::moveTab(int from, int to) { tabs->moveTab(from, to); }
 
 void AppController::nextTab() {
-    if (tabs->count() > 1) {
+    if (home && tabs->count() > 0) {
+        setHomeVisible(false);  // from the home screen to the document behind it
+    } else if (tabs->count() > 1) {
         tabs->setCurrentIndex((tabs->currentIndex() + 1) % tabs->count());
     }
 }
 
 void AppController::previousTab() {
-    if (tabs->count() > 1) {
+    if (home && tabs->count() > 0) {
+        setHomeVisible(false);
+    } else if (tabs->count() > 1) {
         tabs->setCurrentIndex((tabs->currentIndex() + tabs->count() - 1) % tabs->count());
     }
 }
@@ -626,6 +783,7 @@ bool AppController::openPath(const QString& path) {
     const fs::path file(path.toStdString());
     if (int existing = tabs->indexOfFile(file); existing >= 0) {
         tabs->setCurrentIndex(existing);  // already open: show it
+        setHomeVisible(false);
         return true;
     }
     auto result = DocumentSession::loadFile(file);
@@ -640,6 +798,8 @@ bool AppController::openPath(const QString& path) {
         tabs->closeTab(pristine);
     }
     app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
+    recent->add(file);
+    setHomeVisible(false);
     if (!result.missingPdf.empty() || result.attachedPdfMissing) {
         Q_EMIT message(tr("PDF background missing"),
                        tr("The background PDF \"%1\" could not be found. The annotations are shown without it.")
@@ -681,6 +841,8 @@ bool AppController::saveAs(const QUrl& url) {
         Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
     } else {
         app->getSettings()->setLastSavePath(target.parent_path());
+        recent->add(session()->getFilePath());
+        library->refresh();  // a new document in the library
     }
     Q_EMIT titleChanged();
     return r.ok;

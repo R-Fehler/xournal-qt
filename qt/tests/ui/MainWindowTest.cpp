@@ -3,6 +3,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <filesystem>
 #include <functional>
 #include <memory>
 
@@ -14,12 +15,15 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 
 #include "session/DocumentSession.h"
+#include "shell/LibraryModel.h"
 #include "shell/PagesModel.h"
+#include "shell/Previews.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
@@ -32,8 +36,10 @@ class MainWindowTest: public ::testing::Test {
 protected:
     void SetUp() override {
         controller = std::make_unique<AppController>();
+        prepareController();
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
+        engine->addImageProvider("preview", new xqt::PreviewProvider);
         engine->rootContext()->setContextProperty("app", controller.get());
         engine->loadFromModule("XournalQt", "Main");
         ASSERT_FALSE(engine->rootObjects().isEmpty());
@@ -83,6 +89,9 @@ protected:
         }
         wait(20);
     }
+
+    /// Before the window is loaded. Most tests are about a document (the app starts on the home screen).
+    virtual void prepareController() { controller->newDocument(); }
 
     std::unique_ptr<AppController> controller;
     std::unique_ptr<QQmlApplicationEngine> engine;
@@ -329,7 +338,12 @@ TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
     const double atLift = grid->property("contentY").toDouble();
     EXPECT_GT(atLift, start + 100) << "two-finger scrolling moves the grid";
     wheel(0, Qt::ScrollEnd);
-    wait(300);
+    // Momentum: the grid keeps moving (slower on a loaded machine, so wait for it a while)
+    QElapsedTimer t;
+    t.start();
+    while (grid->property("contentY").toDouble() <= atLift + 50 && t.elapsed() < 1500) {
+        wait(20);
+    }
     EXPECT_GT(grid->property("contentY").toDouble(), atLift + 50) << "no momentum after lifting the fingers";
 }
 
@@ -338,6 +352,18 @@ QQuickItem* itemAt(QQuickItem* view, int row) {
     QQuickItem* item = nullptr;
     QMetaObject::invokeMethod(view, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, item), Q_ARG(int, row));
     return item;
+}
+/// The visible items at the center of `target` (diagnostics).
+std::string itemsAt(QQuickWindow* window, QQuickItem* target) {
+    const QPointF p = target->mapToScene(QPointF(target->width() / 2, target->height() / 2));
+    std::string list;
+    for (QQuickItem* c: window->contentItem()->childItems()) {
+        if (c->isVisible() && c->contains(c->mapFromScene(p))) {
+            list += std::string(c->metaObject()->className()) + "(" + c->objectName().toStdString() +
+                    ", z " + std::to_string(c->z()) + ") ";
+        }
+    }
+    return list;
 }
 QPoint centerOf(QQuickItem* item) { return item->mapToScene(QPointF(item->width() / 2, item->height() / 3)).toPoint(); }
 }  // namespace
@@ -373,7 +399,7 @@ TEST_F(MainWindowTest, sidebarSelectCopyPasteDeleteWithPageUndo) {
     auto* canvas = find<QQuickItem>("canvas");
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
                       canvas->mapToScene(QPointF(canvas->width() / 2, canvas->height() / 2)).toPoint());
-    EXPECT_TRUE(canvas->hasActiveFocus());
+    EXPECT_TRUE(canvas->hasActiveFocus()) << "under the click: " << itemsAt(window, canvas);
     key(Qt::Key_Z, Qt::ControlModifier);
     EXPECT_EQ(controller->pageCount(), 13) << "no page undo from the canvas";
 }
@@ -410,4 +436,104 @@ TEST_F(MainWindowTest, pageGridDragAndDropMovesSelectedPages) {
 
     controller->undoPages();
     EXPECT_EQ(session->pageOrder(), original);
+}
+
+// --- the home screen: library and recent documents ---
+namespace {
+class HomeScreenTest: public MainWindowTest {
+protected:
+    void prepareController() override {
+        ASSERT_TRUE(tmp.isValid());
+        root = fs::path(tmp.path().toStdString());
+        const fs::path pdf = fs::path(GET_TESTFILE(u8"packaged_xopp/pdfBackground/old.xopp.bg.pdf"));
+        fs::create_directories(root / "Physics");
+        fs::copy_file(pdf, root / "Physics" / "sheet.pdf");
+        fs::copy_file(pdf, root / "lecture.pdf");
+        fs::copy_file(fs::path(GET_TESTFILE(u8"load/strokes.xopp")), root / "notes.xopp");
+        controller->setLibraryRoot(root);
+    }
+    QQuickItem* grid() const { return find<QQuickItem>("libraryGrid"); }
+    int gridCount() const { return grid()->property("count").toInt(); }
+    QQuickItem* card(int row) const { return itemAt(grid(), row); }
+    int rowOf(const char* name) const {
+        return qobject_cast<xqt::LibraryModel*>(controller->libraryModel())
+                ->rowOf(QString::fromStdString((root / name).string()));
+    }
+    void click(QQuickItem* item, Qt::KeyboardModifiers m = Qt::NoModifier) {
+        ASSERT_NE(item, nullptr);
+        QTest::mouseClick(window, Qt::LeftButton, m,
+                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
+        wait(50);
+    }
+    QTemporaryDir tmp;
+    fs::path root;
+};
+}  // namespace
+
+TEST_F(HomeScreenTest, startsOnTheLibraryAndOpensDocuments) {
+    EXPECT_EQ(controller->tabCount(), 0);
+    auto* home = find<QQuickItem>("homeView");
+    ASSERT_NE(home, nullptr);
+    EXPECT_TRUE(home->isVisible());
+    ASSERT_NE(grid(), nullptr);
+    ASSERT_EQ(gridCount(), 3);  // Physics, lecture, notes
+
+    click(card(rowOf("Physics")));  // into the folder
+    EXPECT_EQ(controller->libraryModel()->property("folder").toString(), "Physics");
+    EXPECT_EQ(gridCount(), 1);
+    key(Qt::Key_Backspace);  // up again
+    EXPECT_EQ(controller->libraryModel()->property("folder").toString(), "");
+    ASSERT_EQ(gridCount(), 3);
+
+    click(card(rowOf("notes.xopp")));  // opens it
+    EXPECT_EQ(controller->tabCount(), 1);
+    EXPECT_FALSE(controller->homeVisible());
+    EXPECT_FALSE(home->isVisible());
+    EXPECT_EQ(controller->title(), "notes.xopp");
+
+    click(find<QQuickItem>("homeTab"));  // back to the library; the document stays open
+    EXPECT_TRUE(home->isVisible());
+    EXPECT_EQ(controller->tabCount(), 1);
+    EXPECT_EQ(controller->recentModel()->property("count").toInt(), 1);
+}
+
+TEST_F(HomeScreenTest, severalDocumentsAreSelectedAndMovedIntoAFolder) {
+    ASSERT_EQ(gridCount(), 3);
+    click(card(rowOf("lecture.pdf")), Qt::ControlModifier);
+    click(card(rowOf("notes.xopp")), Qt::ControlModifier);
+    auto* bar = find<QQuickItem>("homeSelectionBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_TRUE(bar->isVisible());
+    EXPECT_EQ(controller->libraryModel()->property("selectionCount").toInt(), 2);
+    EXPECT_EQ(controller->tabCount(), 0) << "Ctrl+click selects, it does not open";
+
+    click(find<QQuickItem>("moveSelectedButton"));
+    QObject* dialog = find("transferDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    auto* folders = find<QQuickItem>("transferFolders");
+    ASSERT_NE(folders, nullptr);
+    wait(50);
+    ASSERT_EQ(folders->property("count").toInt(), 2);  // the library, Physics
+    click(itemAt(folders, 1));
+    EXPECT_TRUE(waitOpened(dialog, false));
+    EXPECT_TRUE(fs::exists(root / "Physics" / "lecture.pdf"));
+    EXPECT_TRUE(fs::exists(root / "Physics" / "notes.xopp"));
+    EXPECT_FALSE(fs::exists(root / "notes.xopp"));
+    EXPECT_EQ(gridCount(), 1);
+    EXPECT_FALSE(bar->isVisible());
+}
+
+TEST_F(HomeScreenTest, newDocumentIsSavedInTheLibrary) {
+    click(find<QQuickItem>("newDocumentButton"));
+    QObject* dialog = find("newDocumentDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    type("Week");
+    key(Qt::Key_Return);
+    EXPECT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(controller->tabCount(), 1);
+    EXPECT_FALSE(controller->homeVisible());
+    EXPECT_TRUE(fs::exists(root / "Week.xopp"));
+    EXPECT_EQ(controller->title(), "Week.xopp");
 }

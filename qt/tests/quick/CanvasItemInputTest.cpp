@@ -47,6 +47,8 @@ ApplicationWindow {
     background: Rectangle { color: "#404040" }
     property int clicks: 0
     property alias dialog: dialog
+    property alias tip: tip
+    ToolTip { id: tip; x: 10; y: 10; text: "a tool tip somewhere else" }
     DocumentCanvas { id: canvas; objectName: "canvas"; anchors.fill: parent }
     ScrollBar {
         id: vbar
@@ -222,6 +224,18 @@ TEST_F(CanvasItemInputTest, modalDialogBlocksCanvasInput) {
     mouseStroke(QPoint(50, 600), QPoint(200, 650));
     EXPECT_EQ(strokeCount(), 0u) << "the canvas received input while a modal dialog was open";
     EXPECT_EQ(window->property("clicks").toInt(), 0);
+}
+
+TEST_F(CanvasItemInputTest, openToolTipDoesNotBlockTheCanvas) {
+    // A (non-modal) tool tip makes the popup overlay visible over the whole window.
+    QObject* tip = window->property("tip").value<QObject*>();
+    ASSERT_NE(tip, nullptr);
+    QMetaObject::invokeMethod(tip, "open");
+    wait(100);
+    ASSERT_TRUE(tip->property("visible").toBool());
+    penStroke(QPointF(200, 150), QPointF(500, 200));
+    mouseStroke(QPoint(200, 300), QPoint(500, 350));
+    EXPECT_EQ(strokeCount(), 2u);
 }
 
 TEST_F(CanvasItemInputTest, scrollBarScrollsWithMouseAndPenWithoutDrawing) {

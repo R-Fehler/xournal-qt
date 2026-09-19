@@ -32,6 +32,17 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/GridSelection.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
@@ -56,7 +67,11 @@ set(XQT_QML_FILES
     src/app/qml/PageMenu.qml
     src/app/qml/PageKeys.qml
     src/app/qml/Snackbar.qml
-    src/app/qml/SelectionMark.qml)
+    src/app/qml/SelectionMark.qml
+    src/app/qml/HomeView.qml
+    src/app/qml/DocumentCard.qml
+    src/app/qml/NewDocumentDialog.qml
+    src/app/qml/BackgroundPreview.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
@@ -103,7 +118,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

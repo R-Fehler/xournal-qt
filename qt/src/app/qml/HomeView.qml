@@ -1,0 +1,1077 @@
+// Home screen (shown when no document is open, or with the home tab): the library of this window and the recently
+// opened documents, as grids of first-page previews.
+//  - Library: folders (tap to enter, breadcrumbs to go back) or all documents at once; search in the text of all
+//    documents; new document, import (also by dropping files), new folder; rename, move (drag onto a folder or a
+//    breadcrumb, or "Move to"), move to trash. A .xopp and its PDF are one document.
+//  - Recent: documents opened lately that still exist; rename, remove from the list, copy / move into the library.
+//  - Several documents and folders can be selected (Ctrl / Shift + click, the circle on a card, or "Select" in the
+//    menu; then taps select more) and opened, copied, moved or trashed together.
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Controls.Material
+import QtQuick.Dialogs
+import QtQuick.Layouts
+
+Rectangle {
+    id: home
+    objectName: "homeView"
+    color: "#eef0f3"
+    /// 0: library, 1: recent documents
+    property int page: app.library.available ? 0 : 1
+    readonly property var lib: app.library
+    readonly property bool searching: lib.searchQuery !== ""
+    /// "Open a file" (the window's file dialog)
+    signal openFileRequested()
+
+    function formatDate(d) {
+        if (!d || isNaN(d.getTime())) return ""
+        const now = new Date()
+        if (d.toDateString() === now.toDateString()) return qsTr("Today %1").arg(d.toLocaleTimeString(Qt.locale(), Locale.ShortFormat))
+        return d.toLocaleDateString(Qt.locale(), Locale.ShortFormat)
+    }
+    function pagesText(n) { return n < 0 ? "" : (n === 1 ? qsTr("1 page") : qsTr("%1 pages").arg(n)) }
+    function focusGrid() { (page === 0 ? libraryGrid : recentGrid).forceActiveFocus() }
+    function focusSearch() {
+        page = 0
+        searchField.forceActiveFocus()
+        searchField.selectAll()
+    }
+    onVisibleChanged: if (visible) focusGrid()
+    onPageChanged: focusGrid()
+    function openLibraryRow(index) {
+        const item = libraryGrid.itemAtIndex(index)
+        if (!item) return
+        if (item.isFolder) {
+            lib.searchQuery = ""
+            lib.folder = lib.relativeFolder(item.path)
+        } else if (home.searching) {
+            app.openSearchHit(item.path, lib.searchQuery)
+        } else {
+            app.openPath(item.path)
+        }
+    }
+    function openRecentRow(index) {
+        const item = recentGrid.itemAtIndex(index)
+        if (item) app.openPath(item.path)
+    }
+    readonly property var currentModel: page === 0 ? app.library : app.recent
+    readonly property int selectionCount: currentModel.selectionCount
+    /// A tap or click on a card: open it, or (Ctrl / Shift, or while selecting) select it.
+    function cardActivated(model, index, modifiers) {
+        if (modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) {
+            model.select(index, modifiers)
+        } else if (model.selectionCount > 0) {
+            model.toggleSelected(index)
+        } else if (model === app.library) {
+            openLibraryRow(index)
+        } else {
+            openRecentRow(index)
+        }
+    }
+    /// Open documents (folders among them are left out; a single folder is entered).
+    function openAll(paths, model) {
+        const docs = app.library.documentsIn(paths)
+        if (docs.length === 0 && paths.length === 1 && model === app.library) {
+            app.library.folder = app.library.relativeFolder(paths[0])
+        } else if (docs.length > 0) {
+            if (model === app.library && home.searching && docs.length === 1) app.openSearchHit(docs[0], lib.searchQuery)
+            else app.openPaths(docs)
+        }
+        model.clearSelection()
+    }
+    function countText(n) { return n === 1 ? qsTr("1 item") : qsTr("%1 items").arg(n) }
+    function askTransfer(paths, copy) {
+        transferDialog.paths = paths
+        transferDialog.copy = copy
+        transferDialog.open()
+    }
+    function askTrash(model, paths) {
+        home.menuModel = model
+        home.menuPaths = paths
+        trashDialog.open()
+    }
+    // Menu, rename and trash work on a row of the library or the recent list.
+    property var menuModel: null
+    property int menuRow: -1
+    property string menuName: ""
+    property string menuPath: ""
+    property bool menuFolder: false
+    /// What the menu applies to: the row, or all selected items if the row is one of them.
+    property var menuPaths: []
+    readonly property bool menuMany: menuPaths.length > 1
+    function showMenu(model, row, name, path, isFolder, item, x, y) {
+        menuModel = model; menuRow = row; menuName = name; menuPath = path; menuFolder = isFolder
+        menuPaths = model.pathsFor(row)
+        itemMenu.popup(item, x, y)
+    }
+
+    Connections {
+        target: app.library
+        function onError(text) { errorDialog.text = text; errorDialog.open() }
+        function onImported(count) {
+            if (count > 0) importedNote.show(count === 1 ? qsTr("1 document imported") : qsTr("%1 documents imported").arg(count), false)
+        }
+    }
+    Connections {
+        target: app.recent
+        function onError(text) { errorDialog.text = text; errorDialog.open() }
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        // --- while items are selected: what to do with them ---
+        Rectangle {
+            objectName: "homeSelectionBar"
+            visible: home.selectionCount > 0
+            Layout.fillWidth: true
+            Layout.leftMargin: 12
+            Layout.rightMargin: 12
+            Layout.topMargin: 10
+            Layout.preferredHeight: 48
+            radius: 24
+            color: "#e8eaf6"
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 4
+                anchors.rightMargin: 8
+                spacing: 2
+                IconButton { iconName: "xqt-close"; tip: qsTr("Clear the selection (Esc)"); onClicked: home.currentModel.clearSelection() }
+                Label {
+                    objectName: "selectionLabel"
+                    text: qsTr("%1 selected").arg(home.selectionCount)
+                    font.pixelSize: 16
+                    font.weight: Font.DemiBold
+                    color: "#283593"
+                    Layout.leftMargin: 4
+                }
+                Button { text: qsTr("Select all"); flat: true; onClicked: home.currentModel.selectAll() }
+                Item { Layout.fillWidth: true }
+                Button {
+                    text: qsTr("Open")
+                    flat: true
+                    icon.source: app.iconUrl("xopp-document-open")
+                    onClicked: home.openAll(home.currentModel.selectedPaths(), home.currentModel)
+                }
+                Button {
+                    objectName: "copySelectedButton"
+                    text: qsTr("Copy to…")
+                    flat: true
+                    enabled: app.library.available
+                    icon.source: app.iconUrl("xopp-edit-copy")
+                    onClicked: home.askTransfer(home.currentModel.selectedPaths(), true)
+                }
+                Button {
+                    objectName: "moveSelectedButton"
+                    text: qsTr("Move to…")
+                    flat: true
+                    enabled: app.library.available
+                    icon.source: app.iconUrl("xqt-folder-input")
+                    onClicked: home.askTransfer(home.currentModel.selectedPaths(), false)
+                }
+                Button {
+                    visible: home.page === 1
+                    text: qsTr("Remove from list")
+                    flat: true
+                    onClicked: app.recent.removePaths(app.recent.selectedPaths())
+                }
+                Button {
+                    text: qsTr("Trash…")
+                    flat: true
+                    icon.source: app.iconUrl("xqt-delete")
+                    onClicked: home.askTrash(home.currentModel, home.currentModel.selectedPaths())
+                }
+            }
+        }
+
+        // --- header: library / recent, search, actions ---
+        RowLayout {
+            visible: home.selectionCount === 0
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 8
+            Layout.topMargin: 10
+            spacing: 6
+
+            Rectangle {
+                radius: 22
+                color: "#e1e4e8"
+                implicitWidth: pageSwitch.implicitWidth + 8
+                implicitHeight: 44
+                Row {
+                    id: pageSwitch
+                    anchors.centerIn: parent
+                    spacing: 2
+                    Repeater {
+                        model: [
+                            { text: app.library.available ? app.library.name : qsTr("Library"), icon: "xqt-library", enabled: app.library.available },
+                            { text: qsTr("Recent"), icon: "xqt-history", enabled: true }
+                        ]
+                        delegate: AbstractButton {
+                            id: switchButton
+                            required property int index
+                            required property var modelData
+                            objectName: index === 0 ? "libraryPageButton" : "recentPageButton"
+                            enabled: modelData.enabled
+                            implicitHeight: 38
+                            implicitWidth: switchRow.implicitWidth + 28
+                            onClicked: home.page = index
+                            background: Rectangle {
+                                radius: 19
+                                color: home.page === switchButton.index ? "#ffffff" : "transparent"
+                            }
+                            contentItem: Item {
+                                RowLayout {
+                                    id: switchRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+                                    Image { source: app.iconUrl(switchButton.modelData.icon); sourceSize.width: 18; sourceSize.height: 18 }
+                                    Label {
+                                        text: switchButton.modelData.text
+                                        font.weight: home.page === switchButton.index ? Font.DemiBold : Font.Normal
+                                        color: switchButton.enabled ? "#202124" : "#9aa0a6"
+                                        elide: Text.ElideRight
+                                        Layout.maximumWidth: 220
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            IconButton {
+                objectName: "libraryMenuButton"
+                iconName: "xqt-chevron-down"
+                tip: qsTr("Libraries")
+                implicitWidth: 36
+                onClicked: libraryMenu.popup()
+                Menu {
+                    id: libraryMenu
+                    objectName: "libraryMenu"
+                    width: 300
+                    property var libraries: []
+                    onAboutToShow: libraries = app.libraries()
+                    Instantiator {
+                        id: libraryList
+                        model: libraryMenu.libraries
+                        delegate: MenuItem {
+                            required property var modelData
+                            text: modelData.name
+                            checkable: true
+                            checked: modelData.current
+                            onTriggered: app.openLibrary("file://" + modelData.path)
+                        }
+                        onObjectAdded: function(index, object) { libraryMenu.insertItem(index, object) }
+                        onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
+                    }
+                    MenuSeparator {}
+                    MenuItem { text: qsTr("New library…"); onTriggered: newLibraryDialog.open() }
+                    MenuItem { text: qsTr("Open a folder as library…"); onTriggered: openLibraryDialog.open() }
+                    MenuItem {
+                        text: qsTr("Show in file manager")
+                        enabled: app.library.available
+                        onTriggered: app.showInFileManager(app.library.rootPath)
+                    }
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            // Search in the whole library
+            Rectangle {
+                visible: home.page === 0 && app.library.available
+                Layout.preferredWidth: Math.min(380, home.width * 0.34)
+                Layout.preferredHeight: 44
+                radius: 22
+                color: "#ffffff"
+                border.width: searchField.activeFocus ? 2 : 1
+                border.color: searchField.activeFocus ? Material.accentColor : "#c9ccd1"
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 4
+                    Image { source: app.iconUrl("xqt-search"); sourceSize.width: 18; sourceSize.height: 18 }
+                    TextField {
+                        id: searchField
+                        objectName: "librarySearchField"
+                        Layout.fillWidth: true
+                        background: null
+                        selectByMouse: true
+                        Label {
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: parent.leftPadding
+                            visible: parent.text === "" && parent.preeditText === ""
+                            text: qsTr("Search the library")
+                            color: "#8a8d91"
+                        }
+                        onTextEdited: searchTyping.restart()
+                        Keys.onReturnPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
+                        Keys.onEnterPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
+                        Keys.onDownPressed: libraryGrid.forceActiveFocus()
+                        Keys.onEscapePressed: { text = ""; home.lib.searchQuery = ""; libraryGrid.forceActiveFocus() }
+                    }
+                    ToolButton {
+                        visible: searchField.text !== ""
+                        implicitWidth: 36; implicitHeight: 36
+                        icon.source: app.iconUrl("xqt-close")
+                        icon.color: "#3c4043"
+                        display: AbstractButton.IconOnly
+                        onClicked: { searchField.text = ""; searchTyping.stop(); home.lib.searchQuery = "" }
+                    }
+                }
+                Timer {
+                    id: searchTyping
+                    interval: 300
+                    onTriggered: home.lib.searchQuery = searchField.text
+                }
+            }
+
+            Item { Layout.fillWidth: true }
+
+            IconButton {
+                objectName: "newDocumentButton"
+                iconName: "xqt-file-plus"
+                tip: qsTr("New document")
+                onClicked: newDocumentDialog.open()
+            }
+            IconButton {
+                objectName: "importButton"
+                visible: home.page === 0 && app.library.available
+                iconName: "xqt-import"
+                tip: qsTr("Import PDFs and Xournal files (copies them into this folder)")
+                onClicked: importDialog.open()
+            }
+            IconButton {
+                objectName: "newFolderButton"
+                visible: home.page === 0 && app.library.available
+                enabled: !app.library.flat && !home.searching
+                iconName: "xqt-folder-plus"
+                tip: qsTr("New folder")
+                onClicked: { folderNameDialog.row = -1; folderNameDialog.open() }
+            }
+            IconButton {
+                objectName: "flatButton"
+                visible: home.page === 0 && app.library.available
+                iconName: app.library.flat ? "xqt-layout-grid" : "xqt-folder-tree"
+                tip: app.library.flat ? qsTr("All documents (show folders)") : qsTr("Folders (show all documents at once)")
+                checked: app.library.flat
+                onClicked: app.library.flat = !app.library.flat
+            }
+            IconButton {
+                visible: home.page === 0 && app.library.available
+                iconName: "xqt-sort"
+                tip: qsTr("Sort")
+                onClicked: sortMenu.popup()
+                Menu {
+                    id: sortMenu
+                    MenuItem { text: qsTr("By name"); checkable: true; checked: app.library.sortBy === "name"; onTriggered: app.library.sortBy = "name" }
+                    MenuItem { text: qsTr("Last modified first"); checkable: true; checked: app.library.sortBy === "modified"; onTriggered: app.library.sortBy = "modified" }
+                }
+            }
+            IconButton {
+                visible: home.page === 1
+                iconName: "xopp-document-open"
+                tip: qsTr("Open a file")
+                onClicked: home.openFileRequested()
+            }
+        }
+
+        // --- where we are in the library ---
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.preferredHeight: 44
+            visible: home.page === 0 && app.library.available
+            spacing: 2
+
+            IconButton {
+                objectName: "folderUpButton"
+                iconName: "xqt-arrow-up"
+                tip: qsTr("Up (Backspace)")
+                implicitWidth: 40; implicitHeight: 40
+                visible: !home.searching && !app.library.flat
+                enabled: app.library.folder !== ""
+                onClicked: app.library.goUp()
+            }
+            Row {
+                id: crumbRow
+                visible: !home.searching && !app.library.flat
+                spacing: 0
+                Repeater {
+                    model: app.library.breadcrumbs
+                    delegate: AbstractButton {
+                        id: crumb
+                        required property int index
+                        required property var modelData
+                        readonly property string folder: modelData.folder
+                        readonly property bool dropTarget: moveDrag.active && moveDrag.hasTarget && moveDrag.target === folder
+                        implicitHeight: 36
+                        implicitWidth: crumbLabel.implicitWidth + (index > 0 ? 34 : 18)
+                        onClicked: app.library.folder = folder
+                        background: Rectangle {
+                            radius: 8
+                            color: crumb.dropTarget ? "#c5cae9" : (crumb.hovered ? "#e1e4e8" : "transparent")
+                        }
+                        contentItem: Item {
+                            Image {
+                                visible: crumb.index > 0
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: 0
+                                source: app.iconUrl("xqt-chevron-right")
+                                sourceSize.width: 16; sourceSize.height: 16
+                                opacity: 0.6
+                            }
+                            Label {
+                                id: crumbLabel
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: crumb.index > 0 ? 24 : 9
+                                text: crumb.modelData.name
+                                font.pixelSize: 15
+                                font.weight: crumb.index === app.library.breadcrumbs.length - 1 ? Font.DemiBold : Font.Normal
+                                color: "#3c4043"
+                            }
+                        }
+                    }
+                }
+            }
+            Label {
+                visible: home.searching || app.library.flat
+                Layout.leftMargin: 8
+                text: home.searching ? (libraryGrid.count === 1 ? qsTr("1 document found") : qsTr("%1 documents found").arg(libraryGrid.count))
+                                     : qsTr("All documents in %1").arg(app.library.name)
+                font.pixelSize: 15
+                color: "#3c4043"
+            }
+            Item { Layout.fillWidth: true }
+            BusyIndicator {
+                visible: app.library.importing
+                running: visible
+                implicitWidth: 28; implicitHeight: 28
+            }
+            Label {
+                objectName: "indexStatus"
+                visible: app.library.indexing && app.library.indexTotal > 0
+                text: qsTr("Indexing for search %1/%2").arg(app.library.indexed).arg(app.library.indexTotal)
+                font.pixelSize: 12
+                color: "#6b6f75"
+            }
+        }
+
+        StackLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: home.page
+
+            // --- library ---
+            Item {
+                GridView {
+                    id: libraryGrid
+                    objectName: "libraryGrid"
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    clip: true
+                    model: app.library
+                    keyNavigationEnabled: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    readonly property int columns: Math.max(2, Math.floor(width / 210))
+                    property int dropIndex: -1
+                    cellWidth: Math.floor(width / columns)
+                    cellHeight: Math.round(cellWidth * 1.2 + 44)
+                    ScrollBar.vertical: ScrollBar {}
+                    TouchpadMomentum { flickable: libraryGrid }
+                    currentIndex: -1
+
+                    Keys.onPressed: function(event) {
+                        const item = libraryGrid.itemAtIndex(libraryGrid.currentIndex)
+                        if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) {
+                            app.library.selectAll()
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Escape && app.library.selectionCount > 0) {
+                            app.library.clearSelection()
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Delete && app.library.selectionCount > 0) {
+                            home.askTrash(app.library, app.library.selectedPaths())
+                            event.accepted = true
+                        } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && app.library.selectionCount > 0) {
+                            home.openAll(app.library.selectedPaths(), app.library)
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            home.openLibraryRow(libraryGrid.currentIndex)
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Space && item) {
+                            app.library.toggleSelected(item.index)
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Backspace && !home.searching) {
+                            app.library.goUp()
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_F2 && item) {
+                            home.menuModel = app.library; home.menuRow = item.index; home.menuName = item.name
+                            renameDialog.open()
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Delete && item) {
+                            home.askTrash(app.library, [item.path])
+                            event.accepted = true
+                        } else if (event.text.length === 1 && event.text.trim() !== "" && !(event.modifiers & Qt.ControlModifier)) {
+                            searchField.forceActiveFocus()  // typing searches
+                            searchField.text += event.text
+                            searchTyping.restart()
+                            event.accepted = true
+                        }
+                    }
+
+                    // (roles through `model`: required properties would shadow the card's own)
+                    delegate: DocumentCard {
+                        id: libCard
+                        required property int index
+                        required property var model
+                        name: model.name
+                        path: model.path
+                        isFolder: model.isFolder
+                        preview: model.preview
+                        hasPdf: model.hasPdf
+                        hasXopp: model.hasXopp
+                        hits: model.hits
+                        snippet: model.snippet
+                        itemCount: model.itemCount
+                        width: libraryGrid.cellWidth
+                        height: libraryGrid.cellHeight
+                        active: home.visible
+                        row: index
+                        dragOverlay: home.searching ? null : moveDrag
+                        selected: model.selected
+                        selectionMode: app.library.selectionCount > 0
+                        highlighted: GridView.isCurrentItem && libraryGrid.activeFocus
+                        dropTarget: libraryGrid.dropIndex === index
+                        subtitle: {
+                            if (model.isFolder) return model.itemCount === 1 ? qsTr("1 item") : qsTr("%1 items").arg(model.itemCount)
+                            const parts = []
+                            if ((home.searching || app.library.flat) && model.location !== "") parts.push(model.location)
+                            if (model.pageCount >= 0) parts.push(home.pagesText(model.pageCount))
+                            parts.push(home.formatDate(model.modified))
+                            return parts.join(" · ")
+                        }
+                        onActivated: function(modifiers) {
+                            libraryGrid.currentIndex = index
+                            libraryGrid.forceActiveFocus()
+                            home.cardActivated(app.library, index, modifiers)
+                        }
+                        onToggleRequested: app.library.toggleSelected(index)
+                        onMenuRequested: function(item, x, y) {
+                            libraryGrid.currentIndex = index
+                            home.showMenu(app.library, index, model.name, model.path, model.isFolder, item, x, y)
+                        }
+                    }
+                }
+
+                // Empty library / folder / search
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    visible: libraryGrid.count === 0 && app.library.available
+                    spacing: 10
+                    width: Math.min(parent.width - 40, 460)
+                    Image {
+                        Layout.alignment: Qt.AlignHCenter
+                        source: app.iconUrl(home.searching ? "xqt-search" : "xqt-library")
+                        sourceSize.width: 56; sourceSize.height: 56
+                        opacity: 0.5
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        font.pixelSize: 16
+                        color: "#5f6368"
+                        text: home.searching ? (app.library.indexing ? qsTr("Nothing found yet (still indexing)") : qsTr("Nothing found"))
+                              : app.library.folder !== "" ? qsTr("This folder is empty")
+                              : qsTr("Your library is empty")
+                    }
+                    Label {
+                        visible: !home.searching
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        color: "#80868b"
+                        text: qsTr("Drop PDFs and Xournal files here, import them, or create a new document.")
+                    }
+                    RowLayout {
+                        visible: !home.searching
+                        Layout.alignment: Qt.AlignHCenter
+                        Button { text: qsTr("New document"); highlighted: true; onClicked: newDocumentDialog.open() }
+                        Button { text: qsTr("Import…"); flat: true; onClicked: importDialog.open() }
+                    }
+                }
+
+                // Files dropped from the file manager are copied into the folder (or onto a folder tile).
+                DropArea {
+                    id: fileDrop
+                    objectName: "libraryDropArea"
+                    anchors.fill: parent
+                    keys: ["text/uri-list"]
+                    enabled: app.library.available
+                    property string targetFolder: app.library.folder
+                    function update(x, y) {
+                        const p = mapToItem(libraryGrid, x, y)
+                        const idx = libraryGrid.indexAt(libraryGrid.contentX + p.x, libraryGrid.contentY + p.y)
+                        const item = libraryGrid.itemAtIndex(idx)
+                        if (item && item.isFolder && !home.searching) {
+                            libraryGrid.dropIndex = idx
+                            targetFolder = app.library.relativeFolder(item.path)
+                        } else {
+                            libraryGrid.dropIndex = -1
+                            targetFolder = home.searching || app.library.flat ? "" : app.library.folder
+                        }
+                    }
+                    onEntered: function(drag) {
+                        drag.accepted = drag.hasUrls
+                        update(drag.x, drag.y)
+                    }
+                    onPositionChanged: function(drag) { update(drag.x, drag.y) }
+                    onExited: libraryGrid.dropIndex = -1
+                    onDropped: function(drop) {
+                        libraryGrid.dropIndex = -1
+                        if (drop.hasUrls) {
+                            app.library.importUrls(drop.urls, targetFolder)
+                            drop.accept(Qt.CopyAction)
+                        }
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        visible: fileDrop.containsDrag && libraryGrid.dropIndex < 0
+                        color: "#10283593"
+                        radius: 14
+                        border.width: 2
+                        border.color: Material.accentColor
+                        Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 24
+                            text: qsTr("Copy into %1").arg(fileDrop.targetFolder === "" ? app.library.name : fileDrop.targetFolder)
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
+                            color: Material.accentColor
+                        }
+                    }
+                }
+            }
+
+            // --- recent documents ---
+            Item {
+                GridView {
+                    id: recentGrid
+                    objectName: "recentGrid"
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    clip: true
+                    model: app.recent
+                    keyNavigationEnabled: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    readonly property int columns: Math.max(2, Math.floor(width / 210))
+                    cellWidth: Math.floor(width / columns)
+                    cellHeight: Math.round(cellWidth * 1.2 + 44)
+                    ScrollBar.vertical: ScrollBar {}
+                    TouchpadMomentum { flickable: recentGrid }
+                    currentIndex: -1
+                    Keys.onPressed: function(event) {
+                        const item = recentGrid.itemAtIndex(recentGrid.currentIndex)
+                        if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) {
+                            app.recent.selectAll()
+                        } else if (event.key === Qt.Key_Escape && app.recent.selectionCount > 0) {
+                            app.recent.clearSelection()
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (app.recent.selectionCount > 0) home.openAll(app.recent.selectedPaths(), app.recent)
+                            else home.openRecentRow(recentGrid.currentIndex)
+                        } else if (event.key === Qt.Key_Space && item) {
+                            app.recent.toggleSelected(item.index)
+                        } else if (event.key === Qt.Key_Delete && item) {
+                            home.askTrash(app.recent, app.recent.pathsFor(item.index))
+                        } else {
+                            return
+                        }
+                        event.accepted = true
+                    }
+
+                    delegate: DocumentCard {
+                        required property int index
+                        required property var model
+                        name: model.name
+                        path: model.path
+                        preview: model.preview
+                        hasPdf: model.hasPdf
+                        hasXopp: model.hasXopp
+                        width: recentGrid.cellWidth
+                        height: recentGrid.cellHeight
+                        active: home.visible
+                        row: index
+                        selected: model.selected
+                        selectionMode: app.recent.selectionCount > 0
+                        highlighted: GridView.isCurrentItem && recentGrid.activeFocus
+                        subtitle: home.formatDate(model.opened) + " · " + model.location
+                        onActivated: function(modifiers) {
+                            recentGrid.currentIndex = index
+                            recentGrid.forceActiveFocus()
+                            home.cardActivated(app.recent, index, modifiers)
+                        }
+                        onToggleRequested: app.recent.toggleSelected(index)
+                        onMenuRequested: function(item, x, y) {
+                            recentGrid.currentIndex = index
+                            home.showMenu(app.recent, index, model.name, model.path, false, item, x, y)
+                        }
+                    }
+                }
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    visible: recentGrid.count === 0
+                    spacing: 10
+                    Image {
+                        Layout.alignment: Qt.AlignHCenter
+                        source: app.iconUrl("xqt-history")
+                        sourceSize.width: 56; sourceSize.height: 56
+                        opacity: 0.5
+                    }
+                    Label {
+                        Layout.alignment: Qt.AlignHCenter
+                        font.pixelSize: 16
+                        color: "#5f6368"
+                        text: qsTr("Documents you open appear here")
+                    }
+                    RowLayout {
+                        Layout.alignment: Qt.AlignHCenter
+                        Button { text: qsTr("New document"); highlighted: true; onClicked: newDocumentDialog.open() }
+                        Button { text: qsTr("Open…"); flat: true; onClicked: home.openFileRequested() }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- moving documents and folders: drag onto a folder or a breadcrumb ---
+    Item {
+        id: moveDrag
+        anchors.fill: parent
+        z: 20
+        property bool active: false
+        property int row: -1
+        property string label
+        property bool isFolder: false
+        property int count: 1  // the dragged row and the other selected items
+        property point pos
+        property bool hasTarget: false
+        property string target: ""
+
+        function start(row, name, folder, p) {
+            moveDrag.row = row
+            label = name
+            isFolder = folder
+            count = app.library.pathsFor(row).length
+            active = true
+            moveTo(p)
+        }
+        function moveTo(p) {
+            pos = p
+            hasTarget = false
+            libraryGrid.dropIndex = -1
+            // A folder tile under the pointer
+            const g = mapToItem(libraryGrid, p.x, p.y)
+            const idx = libraryGrid.indexAt(libraryGrid.contentX + g.x, libraryGrid.contentY + g.y)
+            const item = libraryGrid.itemAtIndex(idx)
+            if (item && item.isFolder && idx !== row && !item.selected) {
+                libraryGrid.dropIndex = idx
+                target = app.library.relativeFolder(item.path)
+                hasTarget = true
+                return
+            }
+            // A breadcrumb (a folder above)
+            const c = mapToItem(crumbRow, p.x, p.y)
+            const crumb = crumbRow.childAt(c.x, c.y)
+            if (crumb && crumb.folder !== undefined && crumb.folder !== app.library.folder) {
+                target = crumb.folder
+                hasTarget = true
+            }
+        }
+        function finish() {
+            if (active && hasTarget) app.library.moveTo(row, target)
+            stop()
+        }
+        function stop() {
+            active = false
+            hasTarget = false
+            libraryGrid.dropIndex = -1
+        }
+
+        Rectangle {
+            visible: moveDrag.active
+            x: moveDrag.pos.x - width / 2
+            y: moveDrag.pos.y - height / 2
+            width: Math.min(220, dragLabel.implicitWidth + 56)
+            height: 44
+            radius: 22
+            color: "#ffffff"
+            border.width: 2
+            border.color: Material.accentColor
+            opacity: 0.95
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                Image { source: app.iconUrl(moveDrag.isFolder ? "xqt-folder" : "xqt-file-text"); sourceSize.width: 20; sourceSize.height: 20 }
+                Label {
+                    id: dragLabel
+                    text: moveDrag.count > 1 ? qsTr("%1 items").arg(moveDrag.count) : moveDrag.label
+                    elide: Text.ElideMiddle
+                    Layout.fillWidth: true
+                }
+            }
+        }
+    }
+
+    Menu {
+        id: itemMenu
+        objectName: "homeItemMenu"
+        MenuItem {
+            text: home.menuMany ? qsTr("Open %1").arg(home.countText(home.menuPaths.length))
+                                : home.menuFolder ? qsTr("Open folder") : qsTr("Open")
+            onTriggered: home.openAll(home.menuPaths, home.menuModel)
+        }
+        MenuItem {
+            objectName: "selectItem"
+            text: qsTr("Select")
+            visible: !home.menuMany && home.menuModel && home.menuModel.selectionCount === 0
+            height: visible ? implicitHeight : 0
+            onTriggered: home.menuModel.toggleSelected(home.menuRow)
+        }
+        MenuItem {
+            objectName: "renameItem"
+            text: qsTr("Rename…")
+            visible: !home.menuMany
+            height: visible ? implicitHeight : 0
+            onTriggered: renameDialog.open()
+        }
+        MenuItem {
+            objectName: "copyToItem"
+            text: qsTr("Copy to…")
+            enabled: app.library.available
+            onTriggered: home.askTransfer(home.menuPaths, true)
+        }
+        MenuItem {
+            objectName: "moveToItem"
+            text: qsTr("Move to…")
+            enabled: app.library.available
+            onTriggered: home.askTransfer(home.menuPaths, false)
+        }
+        MenuItem {
+            text: qsTr("Show in its folder")
+            visible: !home.menuMany && home.menuModel === app.library && (home.searching || app.library.flat) && !home.menuFolder
+            height: visible ? implicitHeight : 0
+            onTriggered: {
+                searchField.text = ""
+                app.library.searchQuery = ""
+                app.library.flat = false
+                app.library.folder = app.library.relativeFolder(home.menuPath.substring(0, home.menuPath.lastIndexOf("/")))
+            }
+        }
+        MenuItem {
+            text: qsTr("Show in file manager")
+            visible: !home.menuMany
+            height: visible ? implicitHeight : 0
+            onTriggered: app.showInFileManager(home.menuPath)
+        }
+        MenuSeparator {}
+        MenuItem {
+            text: qsTr("Remove from this list")
+            visible: home.menuModel === app.recent
+            height: visible ? implicitHeight : 0
+            onTriggered: app.recent.removePaths(home.menuPaths)
+        }
+        MenuItem { text: qsTr("Move to trash…"); onTriggered: home.askTrash(home.menuModel, home.menuPaths) }
+    }
+
+    Dialog {
+        id: renameDialog
+        objectName: "renameDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: home.menuFolder ? qsTr("Rename folder") : qsTr("Rename document")
+        width: Math.min(parent ? parent.width * 0.9 : 440, 440)
+        onAboutToShow: { renameField.text = home.menuName; renameField.selectAll(); renameField.forceActiveFocus() }
+        ColumnLayout {
+            width: renameDialog.availableWidth
+            TextField {
+                id: renameField
+                objectName: "renameField"
+                Layout.fillWidth: true
+                selectByMouse: true
+                Keys.onReturnPressed: renameDialog.accept()
+                Keys.onEnterPressed: renameDialog.accept()
+            }
+            Label {
+                visible: !home.menuFolder
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                font.pixelSize: 12
+                color: "#6b6f75"
+                text: qsTr("The Xournal file and its PDF are renamed together.")
+            }
+        }
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: if (renameField.text.trim() !== "" && home.menuModel) home.menuModel.rename(home.menuRow, renameField.text)
+    }
+
+    Dialog {
+        id: folderNameDialog
+        objectName: "folderNameDialog"
+        property int row: -1
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("New folder")
+        width: Math.min(parent ? parent.width * 0.9 : 440, 440)
+        onAboutToShow: { folderField.text = ""; folderField.forceActiveFocus() }
+        TextField {
+            id: folderField
+            objectName: "folderNameField"
+            width: folderNameDialog.availableWidth
+            placeholderText: qsTr("Folder name")
+            selectByMouse: true
+            Keys.onReturnPressed: folderNameDialog.accept()
+            Keys.onEnterPressed: folderNameDialog.accept()
+        }
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: if (folderField.text.trim() !== "") app.library.createFolder(folderField.text)
+    }
+
+    // Where to copy / move documents and folders: a folder of the library.
+    Dialog {
+        id: transferDialog
+        objectName: "transferDialog"
+        property var paths: []
+        property bool copy: false
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: (copy ? qsTr("Copy %1 to") : qsTr("Move %1 to"))
+                   .arg(paths.length === 1 ? "“" + paths[0].substring(paths[0].lastIndexOf("/") + 1) + "”" : home.countText(paths.length))
+        width: Math.min(parent ? parent.width * 0.9 : 460, 460)
+        height: Math.min(parent ? parent.height * 0.8 : 500, 520)
+        standardButtons: Dialog.Cancel
+        ListView {
+            objectName: "transferFolders"
+            anchors.fill: parent
+            clip: true
+            model: transferDialog.opened ? app.library.folderList() : []
+            ScrollBar.vertical: ScrollBar {}
+            delegate: ItemDelegate {
+                required property var modelData
+                width: ListView.view.width
+                leftPadding: 16 + modelData.depth * 20
+                text: modelData.name
+                icon.source: app.iconUrl(modelData.depth === 0 ? "xqt-library" : "xqt-folder")
+                icon.color: "#566d86"
+                onClicked: {
+                    app.library.transfer(transferDialog.paths, modelData.folder, transferDialog.copy)
+                    app.recent.clearSelection()
+                    transferDialog.close()
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: trashDialog
+        objectName: "trashDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Move to trash?")
+        width: Math.min(parent ? parent.width * 0.9 : 460, 460)
+        ColumnLayout {
+            width: trashDialog.availableWidth
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: home.menuPaths.length > 1
+                      ? qsTr("%1 go to the trash (documents with their PDFs, folders with everything in them).").arg(home.countText(home.menuPaths.length))
+                      : qsTr("“%1” goes to the trash (a document with its PDF, a folder with everything in it).")
+                            .arg(home.menuPaths.length === 1 ? home.menuPaths[0].substring(home.menuPaths[0].lastIndexOf("/") + 1) : "")
+            }
+        }
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            app.library.trashPaths(home.menuPaths)
+            if (home.menuModel === app.recent) app.recent.clearSelection()
+        }
+    }
+
+    Dialog {
+        id: newLibraryDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("New library")
+        width: Math.min(parent ? parent.width * 0.9 : 460, 460)
+        onAboutToShow: { libraryName.text = ""; libraryName.forceActiveFocus() }
+        ColumnLayout {
+            width: newLibraryDialog.availableWidth
+            TextField {
+                id: libraryName
+                Layout.fillWidth: true
+                placeholderText: qsTr("Name")
+                selectByMouse: true
+                Keys.onReturnPressed: newLibraryDialog.accept()
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                font.pixelSize: 12
+                color: "#6b6f75"
+                text: qsTr("A library is a folder in Documents/Xournal_Libraries. It opens in a new window.")
+            }
+        }
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            if (!app.createLibrary(libraryName.text)) {
+                errorDialog.text = qsTr("A library named “%1” cannot be created (the name is taken or not allowed).").arg(libraryName.text)
+                errorDialog.open()
+            }
+        }
+    }
+
+    FolderDialog {
+        id: openLibraryDialog
+        title: qsTr("Open a folder as library")
+        onAccepted: app.openLibrary(selectedFolder)
+    }
+
+    FileDialog {
+        id: importDialog
+        title: qsTr("Import into the library")
+        fileMode: FileDialog.OpenFiles
+        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("All files (*)")]
+        onAccepted: app.library.importUrls(selectedFiles, app.library.flat || home.searching ? "" : app.library.folder)
+    }
+
+    NewDocumentDialog { id: newDocumentDialog }
+
+    Dialog {
+        id: errorDialog
+        property alias text: errorLabel.text
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("That did not work")
+        width: Math.min(parent ? parent.width * 0.9 : 520, 520)
+        standardButtons: Dialog.Ok
+        Label { id: errorLabel; width: errorDialog.availableWidth; wrapMode: Text.Wrap }
+    }
+
+    Snackbar {
+        id: importedNote
+        z: 30
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 32
+    }
+}

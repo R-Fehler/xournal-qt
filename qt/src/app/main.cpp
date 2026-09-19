@@ -1,7 +1,11 @@
 /*
  * xournal-qt: application entry point.
  *
- *   xournal-qt [FILE.xopp | FILE.xoj | FILE.pdf]
+ *   xournal-qt [FOLDER] [FILE.xopp | FILE.xoj | FILE.pdf ...]
+ *
+ * A folder is opened as the library of the window (like "code ." opens a workspace); without one, the default
+ * library "<Documents>/Xournal_Libraries/Default" is used. Each library has its own window (process): files given
+ * to a second start go to the window of their library.
  *
  * @license GNU GPLv2 or later
  */
@@ -19,7 +23,13 @@
 #include <QDir>
 #include <QFileInfo>
 
+#include <optional>
+
+#include <unistd.h>
+
 #include "AppController.h"
+#include "shell/Library.h"
+#include "shell/Previews.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SingleInstance.h"
 #include "shell/Thumbnails.h"
@@ -44,19 +54,38 @@ int main(int argc, char* argv[]) {
     QCommandLineParser parser;
     parser.setApplicationDescription("Xournal Qt - note taking and PDF annotation");
     parser.addHelpOption();
-    parser.addPositionalArgument("file", "Document to open (.xopp, .xoj or .pdf)");
+    parser.addPositionalArgument("folder", "Folder to open as library (default: the standard library)", "[folder]");
+    parser.addPositionalArgument("file", "Documents to open (.xopp, .xoj or .pdf)", "[files...]");
     parser.process(qapp);
 
     QStringList files;
+    QString libraryDir;
     for (const QString& arg: parser.positionalArguments()) {
-        files << QFileInfo(arg).absoluteFilePath();
+        const QFileInfo info(arg);
+        if (info.isDir() && libraryDir.isEmpty()) {
+            libraryDir = info.absoluteFilePath();
+        } else {
+            files << info.absoluteFilePath();
+        }
     }
-    // One instance per user: a second start hands its files to the running window (as tabs) and exits.
+    const bool offscreen = QGuiApplication::platformName() == "offscreen";
+    // The library: the folder given, else the default one (created on first use). Off-screen runs (tests,
+    // screenshots) only get one when a folder is given.
+    std::optional<xqt::Library> library;
+    if (!libraryDir.isEmpty()) {
+        library.emplace(fs::path(libraryDir.toStdString()));
+    } else if (!offscreen) {
+        std::error_code ec;
+        fs::create_directories(xqt::Library::defaultRoot(), ec);
+        library.emplace(xqt::Library::defaultRoot());
+    }
+    // One instance per library: a second start hands its files to the running window (as tabs) and exits.
     // Off-screen runs (tests, screenshots) are always independent.
-    xqt::SingleInstance instance;
+    xqt::SingleInstance instance(library && !library->isDefault()
+                                         ? QString("xournal-qt-%1-%2").arg(getuid()).arg(QString::fromStdString(library->key()))
+                                         : QString());
     const bool independent = qEnvironmentVariableIsSet("XQT_NO_SINGLE_INSTANCE") ||
-                             qEnvironmentVariableIsSet("XQT_SCREENSHOT") ||
-                             QGuiApplication::platformName() == "offscreen";
+                             qEnvironmentVariableIsSet("XQT_SCREENSHOT") || offscreen;
     if (!independent) {
         if (instance.sendToRunningInstance(files)) {
             return 0;
@@ -67,6 +96,9 @@ int main(int argc, char* argv[]) {
     QQuickStyle::setStyle("Material");
     xqt::registerQuickTypes();
     AppController controller;
+    if (library) {
+        controller.setLibraryRoot(library->root());
+    }
     // Crash recovery and reopening the last tabs; not for off-screen runs (tests, screenshots).
     if (independent && QGuiApplication::platformName() == "offscreen") {
         for (const QString& f: files) {
@@ -80,6 +112,7 @@ int main(int argc, char* argv[]) {
 
     QQmlApplicationEngine engine;
     engine.addImageProvider("thumbnail", new xqt::ThumbnailProvider);  // the engine takes ownership
+    engine.addImageProvider("preview", new xqt::PreviewProvider);
     engine.rootContext()->setContextProperty("app", &controller);
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &qapp, [] { QCoreApplication::exit(1); },
@@ -95,12 +128,18 @@ int main(int argc, char* argv[]) {
                 QMetaObject::invokeMethod(&controller, action.toLatin1().constData());
             });
         }
-        // XQT_SCREENSHOT_SELECT=1,3,4 selects pages (sidebar, page grid).
+        // XQT_SCREENSHOT_SELECT=1,3,4 selects pages (sidebar, page grid), or library items on the home screen.
         if (const auto sel = qEnvironmentVariable("XQT_SCREENSHOT_SELECT"); !sel.isEmpty()) {
             QTimer::singleShot(200, &controller, [&controller, sel] {
                 QList<int> pages;
                 for (const QString& p: sel.split(',')) {
                     pages << p.toInt();
+                }
+                if (controller.homeVisible()) {  // library items
+                    for (int row: pages) {
+                        QMetaObject::invokeMethod(controller.libraryModel(), "toggleSelected", Q_ARG(int, row));
+                    }
+                    return;
                 }
                 QMetaObject::invokeMethod(controller.pagesModel(), "selectPages", Q_ARG(QList<int>, pages));
             });
@@ -108,6 +147,10 @@ int main(int argc, char* argv[]) {
         // XQT_SCREENSHOT_SEARCH=<text> searches all tabs (and shows the hits of the current one).
         if (const auto query = qEnvironmentVariable("XQT_SCREENSHOT_SEARCH"); !query.isEmpty()) {
             QTimer::singleShot(200, &controller, [&controller, query] {
+                if (controller.homeVisible()) {
+                    controller.libraryModel()->setProperty("searchQuery", query);  // the library search
+                    return;
+                }
                 controller.searchAllTabs(query);
                 controller.openSearchResult(controller.currentTab());
             });
