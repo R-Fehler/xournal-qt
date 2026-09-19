@@ -44,7 +44,8 @@
   - Search bar (Ctrl+F, search button): PDF text and text elements, per page as upstream's `SearchControl`; the whole document is searched incrementally on the UI thread. Hits are highlighted over the pages (current hit orange); Enter / Shift+Enter or the arrows step through them, starting at the current page.
   - Tab overview: "Search all documents" marks the documents with hits (count) and dims the others; opening one shows its search at the first hit from its current page.
 - **Page grid: done (awaiting on-device test).** Grid button (Ctrl+Alt+G): all pages of the document over the canvas with small gaps; fling through it, tap a page to go there; pinch / Ctrl+wheel / −+ change the number of columns (1–12). Search hits are marked on the previews (and in the sidebar), with a hit count per page; pages with hits get an orange frame, and "N pages with hits" (sidebar and grid) shows only those pages, to skim long PDFs.
-- **Next:** column layouts for the canvas (dual pages, N columns); then the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
+- **Column layouts: done (awaiting on-device test).** Layout button in the zoom pill: one page per row, two pages side by side, book (cover alone), or N columns (1–8). Upstream's settings (`viewColumns`, `showPairedPages`, `numPairsOffset`) and its layout rules (horizontal layout, fixed columns; column/row size from the largest page); pairs meet in the middle. Fit width covers the whole row. Not ported: vertical (column-first) and right-to-left/bottom-to-top layouts.
+- **Next:** the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
 
 ---
 

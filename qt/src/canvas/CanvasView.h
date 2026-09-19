@@ -88,6 +88,7 @@ Q_SIGNALS:
 private:
     void rebuildPages();
     void refreshLayout();
+    DocumentLayout::Config layoutConfig() const;
     void updateVisibility();
     void releaseFarBuffers();
     void updateRenderParams();

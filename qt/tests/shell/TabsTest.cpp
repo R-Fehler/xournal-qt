@@ -176,3 +176,20 @@ TEST(SingleInstanceTest, filesAreHandedToTheRunningInstance) {
     SingleInstance nobody(key + "-unused");
     EXPECT_FALSE(nobody.sendToRunningInstance({"/tmp/c.pdf"}, 200));
 }
+
+TEST(Tabs, pageLayoutAppliesToAllTabs) {
+    AppController c;
+    c.newDocument();
+    ASSERT_EQ(c.tabCount(), 2);
+    QSignalSpy changed(&c, &AppController::viewLayoutChanged);
+    c.setViewColumns(3);
+    EXPECT_EQ(c.viewColumns(), 3);
+    EXPECT_EQ(c.tabManager().view(0)->getLayout().columns(), 3u);
+    EXPECT_EQ(c.tabManager().view(1)->getLayout().columns(), 3u);
+    c.setPairedPages(true);  // pairs need an even column count
+    EXPECT_EQ(c.tabManager().view(0)->getLayout().columns(), 4u);
+    c.setPairedPages(false);
+    c.setViewColumns(1);
+    EXPECT_EQ(c.tabManager().view(1)->getLayout().columns(), 1u);
+    EXPECT_EQ(changed.count(), 4);
+}

@@ -65,6 +65,10 @@ class AppController: public QObject {
     Q_PROPERTY(bool searchRunning READ searchRunning NOTIFY searchChanged)
     /// Number of pages with search hits
     Q_PROPERTY(int searchHitPageCount READ searchHitPageCount NOTIFY searchChanged)
+    // Page layout of the canvas (upstream settings viewColumns, showPairedPages, numPairsOffset), for all tabs
+    Q_PROPERTY(int viewColumns READ viewColumns WRITE setViewColumns NOTIFY viewLayoutChanged)
+    Q_PROPERTY(bool pairedPages READ pairedPages WRITE setPairedPages NOTIFY viewLayoutChanged)
+    Q_PROPERTY(int pairsOffset READ pairsOffset WRITE setPairsOffset NOTIFY viewLayoutChanged)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -97,6 +101,12 @@ public:
     int searchCurrent() const;
     bool searchRunning() const;
     int searchHitPageCount() const;
+    int viewColumns() const;
+    void setViewColumns(int columns);
+    bool pairedPages() const;
+    void setPairedPages(bool paired);
+    int pairsOffset() const;
+    void setPairsOffset(int offset);
 
     // --- start and recovery ---
     /// Start of the app: offers recovery after a crash (recoveryItems), else reopens the last tabs (setting), then
@@ -188,6 +198,7 @@ Q_SIGNALS:
     void raiseRequested();
     void recoveryChanged();
     void searchChanged();
+    void viewLayoutChanged();
 
 private:
     xqt::DocumentSession* session() const;

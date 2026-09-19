@@ -43,6 +43,15 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
             [this](qulonglong page, QRectF rect) { viewController.scrollToPageRect(page, rect); });
     // Search hits are drawn by the canvas item over the pages.
     connect(&session.search(), &DocumentSearch::changed, this, &CanvasView::updateRequested);
+    // Column layout changed in the settings: lay out again, keep the current page in view.
+    connect(&session.getApp(), &AppContext::settingsChanged, this, [this] {
+        if (layoutConfig() != layout.getConfig()) {
+            const size_t page = this->session.getCurrentPageNo();
+            refreshLayout();
+            viewController.fitWidth();
+            viewController.scrollToPage(page);
+        }
+    });
 
     releaseTimer.setSingleShot(true);
     releaseTimer.setInterval(1000);
@@ -115,13 +124,20 @@ void CanvasView::rebuildPages() {
     refreshLayout();
 }
 
+DocumentLayout::Config CanvasView::layoutConfig() const {
+    // Upstream's view settings (viewColumns, showPairedPages, numPairsOffset).
+    const Settings* s = session.getSettings();
+    return {static_cast<size_t>(std::max(1, s->getViewColumns())), s->isShowPairedPages(),
+            static_cast<size_t>(std::max(0, s->getPairsOffset()))};
+}
+
 void CanvasView::refreshLayout() {
     std::vector<PageRef> refs;
     refs.reserve(pages.size());
     for (const auto& p: pages) {
         refs.push_back(p->getPage());
     }
-    layout.update(*session.getDocument(), refs);
+    layout.update(*session.getDocument(), refs, layoutConfig());
     viewController.layoutChanged();
     Q_EMIT pagesChanged();
 }

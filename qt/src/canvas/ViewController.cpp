@@ -100,16 +100,13 @@ void ViewController::setZoom(double zoom, QPointF viewAnchor) {
 }
 
 void ViewController::fitWidth() {
-    // Upstream ZoomControl fit-to-width: (viewport width) / (page width + 20)
-    double maxW = 0;
-    for (size_t i = 0; i < layout->pageCount(); ++i) {
-        maxW = std::max(maxW, layout->pageSize(i).width());
-    }
-    if (maxW <= 0 || view.isEmpty()) {
+    // Upstream ZoomControl fit-to-width: (viewport width) / (page width + 20), for all columns
+    const double fit = layout->fitWidthZoom(view.width());
+    if (fit <= 0 || view.isEmpty()) {
         return;
     }
     const Anchor a = anchorAt(QPointF(view.width() / 2, 0));
-    z = std::clamp(view.width() / (maxW + 20.0), minZoom(), maxZoom());
+    z = std::clamp(fit, minZoom(), maxZoom());
     placeAnchor(a, QPointF(view.width() / 2, 0));
     settleTimer.start();
     Q_EMIT zoomChanged();
@@ -163,6 +160,9 @@ void ViewController::scrollToPage(size_t page) {
         return;  // already (mostly) visible
     }
     scrollPos.setY(r.top() - DocumentLayout::PADDING);
+    if (r.left() < visible.left() || r.right() > visible.right()) {  // other column
+        scrollPos.setX(r.left() - DocumentLayout::PADDING);
+    }
     clamp();
     Q_EMIT changed();
 }

@@ -220,6 +220,59 @@ ApplicationWindow {
         }
         RowLayout {
             spacing: 0
+            IconButton {
+                objectName: "layoutButton"
+                iconName: "xqt-columns"
+                tip: qsTr("Page layout")
+                implicitWidth: 40; implicitHeight: 40
+                onClicked: layoutMenu.popup()
+                Menu {
+                    id: layoutMenu
+                    objectName: "layoutMenu"
+                    MenuItem {
+                        text: qsTr("One page per row")
+                        checkable: true
+                        checked: app.viewColumns === 1 && !app.pairedPages
+                        onTriggered: { app.pairedPages = false; app.viewColumns = 1 }
+                    }
+                    MenuItem {
+                        text: qsTr("Two pages side by side")
+                        checkable: true
+                        checked: app.pairedPages && app.pairsOffset === 0
+                        onTriggered: { app.viewColumns = 2; app.pairsOffset = 0; app.pairedPages = true }
+                    }
+                    MenuItem {
+                        text: qsTr("Book (cover page alone)")
+                        checkable: true
+                        checked: app.pairedPages && app.pairsOffset === 1
+                        onTriggered: { app.viewColumns = 2; app.pairsOffset = 1; app.pairedPages = true }
+                    }
+                    MenuSeparator {}
+                    // N columns
+                    RowLayout {
+                        width: parent ? parent.width : implicitWidth
+                        Label { text: qsTr("Columns"); Layout.leftMargin: 16; Layout.fillWidth: true }
+                        ToolButton {
+                            text: "−"; font.pixelSize: 20
+                            enabled: app.viewColumns > 1
+                            onClicked: { app.pairedPages = false; app.viewColumns = app.viewColumns - 1 }
+                        }
+                        Label {
+                            objectName: "columnsLabel"
+                            text: app.viewColumns
+                            font.weight: Font.DemiBold
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.minimumWidth: 20
+                        }
+                        ToolButton {
+                            text: "+"; font.pixelSize: 20
+                            enabled: app.viewColumns < 8
+                            onClicked: { app.pairedPages = false; app.viewColumns = app.viewColumns + 1 }
+                        }
+                    }
+                }
+            }
+            ToolSeparator {}
             Label { text: app.pageNumber + " / " + app.pageCount; color: "#505050"; Layout.rightMargin: 6 }
             ToolSeparator {}
             ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }

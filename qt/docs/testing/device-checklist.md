@@ -76,4 +76,9 @@ cd build-qt
 - [ ] With a search: hits are marked on the previews and in the sidebar (count badge, orange page frame); Enter in the search bar moves the grid along.
 - [ ] "N pages with hits" (sidebar top, grid controls): only the pages with hits are shown in both; tapping one goes there; closing the search shows all pages again.
 
+## Page layout
+- [ ] Layout button (zoom pill, left): "Two pages side by side" shows pairs, fitted to the width; "Book" puts page 1 alone on the right; "Columns" −/+ shows N pages per row.
+- [ ] Writing, erasing, scrolling, pinch zoom and the page counter work in every layout; strokes into the neighbour page continue there.
+- [ ] The layout is kept after a restart and applies to all tabs.
+
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

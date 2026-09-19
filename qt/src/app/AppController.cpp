@@ -140,6 +140,34 @@ int AppController::searchHitCount() const {
 }
 int AppController::searchCurrent() const { return session() ? session()->search().currentHit() + 1 : 0; }
 bool AppController::searchRunning() const { return session() && session()->search().isRunning(); }
+int AppController::viewColumns() const { return std::max(1, app->getSettings()->getViewColumns()); }
+bool AppController::pairedPages() const { return app->getSettings()->isShowPairedPages(); }
+int AppController::pairsOffset() const { return app->getSettings()->getPairsOffset(); }
+
+void AppController::setViewColumns(int columns) {
+    columns = std::clamp(columns, 1, 8);  // upstream's view menu offers 1..8
+    if (columns != viewColumns()) {
+        app->getSettings()->setViewColumns(columns);
+        Q_EMIT app->settingsChanged();  // the views lay out again
+        Q_EMIT viewLayoutChanged();
+    }
+}
+void AppController::setPairedPages(bool paired) {
+    if (paired != pairedPages()) {
+        app->getSettings()->setShowPairedPages(paired);
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+void AppController::setPairsOffset(int offset) {
+    offset = std::max(0, offset);
+    if (offset != pairsOffset()) {
+        app->getSettings()->setPairsOffset(offset);
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+
 int AppController::searchHitPageCount() const {
     if (!session()) {
         return 0;
