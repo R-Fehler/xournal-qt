@@ -163,3 +163,25 @@ TEST_F(DocumentSessionTest, loadErrorsAreReported) {
     EXPECT_FALSE(missing.document);
     EXPECT_FALSE(missing.error.empty());
 }
+
+TEST_F(DocumentSessionTest, saveSuggestionForAnnotatedPdfIsNextToThePdf) {
+    // Copy a PDF to a folder of its own, annotate it: "Save as" suggests lecture.xopp next to lecture.pdf.
+    const fs::path pdf = tmpPath("lecture.pdf");
+    fs::copy_file(fs::path(GET_TESTFILE(u8"cjk/测试.pdf")), pdf);
+    auto loaded = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    DocumentSession session(*app, std::move(loaded.document));
+    EXPECT_EQ(session.suggestSavePath(), tmpPath("lecture.xopp"));
+
+    // Once saved, the suggestion is the document's own path.
+    ASSERT_TRUE(session.saveAs(tmpPath("renamed.xopp")).ok);
+    EXPECT_EQ(session.suggestSavePath(), tmpPath("renamed.xopp"));
+}
+
+TEST_F(DocumentSessionTest, saveSuggestionForNewDocumentUsesTheLastSaveFolder) {
+    app->getSettings()->setLastSavePath(fs::path(tmp.path().toStdString()));
+    DocumentSession session(*app);
+    const fs::path suggestion = session.suggestSavePath();
+    EXPECT_EQ(suggestion.parent_path(), fs::path(tmp.path().toStdString()));
+    EXPECT_EQ(suggestion.extension(), ".xopp");
+}

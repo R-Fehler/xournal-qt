@@ -74,7 +74,11 @@ public:
     Q_INVOKABLE void zoomOut();
     Q_INVOKABLE void addPageAfterCurrent();
     Q_INVOKABLE QUrl iconUrl(const QString& name) const;
-    Q_INVOKABLE QUrl currentFolder() const;
+    /// Folder for the Open dialog: the current document's folder, else the last folder a file was opened from.
+    Q_INVOKABLE QUrl openFolder() const;
+    /// Suggestion for "Save as" (port of upstream Control::saveImpl): for an annotated PDF the .xopp next to the
+    /// PDF ("lecture.pdf" -> "lecture.xopp"), else the document's own path or the default name in the last folder.
+    Q_INVOKABLE QUrl suggestedSaveFile() const;
     /// Call before quitting: writes settings.
     Q_INVOKABLE void shutdown();
 

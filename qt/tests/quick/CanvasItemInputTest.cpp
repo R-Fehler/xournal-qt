@@ -44,7 +44,19 @@ ApplicationWindow {
     width: 800; height: 700; visible: true
     property int clicks: 0
     property alias dialog: dialog
-    DocumentCanvas { objectName: "canvas"; anchors.fill: parent }
+    DocumentCanvas { id: canvas; objectName: "canvas"; anchors.fill: parent }
+    ScrollBar {
+        id: vbar
+        objectName: "vbar"
+        orientation: Qt.Vertical
+        anchors.top: canvas.top; anchors.right: canvas.right; anchors.bottom: canvas.bottom
+        width: 20
+        visible: canvas.contentHeight > canvas.height + 1
+        policy: ScrollBar.AlwaysOn
+        size: canvas.contentHeight > 0 ? Math.min(1, canvas.height / canvas.contentHeight) : 1
+        position: canvas.contentHeight > 0 ? canvas.contentY / canvas.contentHeight : 0
+        onPositionChanged: if (pressed) canvas.scrollTo(canvas.contentX, position * canvas.contentHeight)
+    }
     Dialog {
         id: dialog
         modal: true
@@ -207,4 +219,42 @@ TEST_F(CanvasItemInputTest, modalDialogBlocksCanvasInput) {
     mouseStroke(QPoint(50, 600), QPoint(200, 650));
     EXPECT_EQ(strokeCount(), 0u) << "the canvas received input while a modal dialog was open";
     EXPECT_EQ(window->property("clicks").toInt(), 0);
+}
+
+TEST_F(CanvasItemInputTest, scrollBarScrollsWithMouseAndPenWithoutDrawing) {
+    for (int i = 0; i < 5; ++i) {
+        session->insertNewPage(1);
+    }
+    wait(100);
+    auto* vbar = window->findChild<QQuickItem*>("vbar");
+    ASSERT_NE(vbar, nullptr);
+    ASSERT_TRUE(vbar->isVisible()) << "the document should be scrollable";
+    auto contentY = [&] { return canvas->property("contentY").toDouble(); };
+
+    // Start at the top; the handle is then at the top of the bar. Drag it down with the mouse.
+    QMetaObject::invokeMethod(canvas, "scrollTo", Q_ARG(qreal, 0), Q_ARG(qreal, 0));
+    wait(50);
+    const double before = contentY();
+    ASSERT_DOUBLE_EQ(before, 0.0);
+    const QPointF handleTop = vbar->mapToScene(QPointF(vbar->width() / 2, 15));
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, handleTop.toPoint());
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, (handleTop + QPointF(0, i * 10)).toPoint());
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, (handleTop + QPointF(0, 100)).toPoint());
+    wait(50);
+    const double afterMouse = contentY();
+    EXPECT_GT(afterMouse, before + 50) << "dragging the scroll bar did not scroll";
+
+    // Same with the pen (Qt turns the unhandled tablet events into mouse events for the scroll bar).
+    const QPointF handle = vbar->mapToScene(QPointF(vbar->width() / 2, vbar->property("position").toDouble() *
+                                                                               vbar->height() + 15));
+    tablet(handle, Qt::LeftButton, 0.5);
+    for (int i = 1; i <= 10; ++i) {
+        tablet(handle + QPointF(0, i * 10), Qt::LeftButton, 0.5);
+    }
+    tablet(handle + QPointF(0, 100), Qt::NoButton, 0.0);
+    wait(50);
+    EXPECT_GT(contentY(), afterMouse + 50) << "dragging the scroll bar with the pen did not scroll";
+    EXPECT_EQ(strokeCount(), 0u) << "scroll bar drags drew on the canvas";
 }

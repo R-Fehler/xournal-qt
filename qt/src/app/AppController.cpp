@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include <shared_mutex>
+
 #include <QFileInfo>
 
 #include "control/ToolEnums.h"
@@ -140,6 +142,7 @@ bool AppController::openPath(const QString& path) {
         return false;
     }
     setSession(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+    app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
     if (!result.missingPdf.empty() || result.attachedPdfMissing) {
         Q_EMIT message(tr("PDF background missing"),
                        tr("The background PDF \"%1\" could not be found. The annotations are shown without it.")
@@ -175,9 +178,12 @@ bool AppController::saveAs(const QUrl& url) {
     if (!session) {
         return false;
     }
-    auto r = session->saveAs(fs::path(url.toLocalFile().toStdString()));
+    const fs::path target(url.toLocalFile().toStdString());
+    auto r = session->saveAs(target);
     if (!r.ok) {
         Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
+    } else {
+        app->getSettings()->setLastSavePath(target.parent_path());
     }
     Q_EMIT titleChanged();
     return r.ok;
@@ -252,9 +258,17 @@ QUrl AppController::iconUrl(const QString& name) const {
                                ".svg");
 }
 
-QUrl AppController::currentFolder() const {
+QUrl AppController::openFolder() const {
     if (session && session->hasFilePath()) {
         return QUrl::fromLocalFile(QString::fromStdString(session->getFilePath().parent_path().string()));
     }
-    return {};
+    const fs::path& last = app->getSettings()->getLastOpenPath();
+    return last.empty() ? QUrl() : QUrl::fromLocalFile(QString::fromStdString(last.string()));
+}
+
+QUrl AppController::suggestedSaveFile() const {
+    if (!session) {
+        return {};
+    }
+    return QUrl::fromLocalFile(QString::fromStdString(session->suggestSavePath().string()));
 }

@@ -111,6 +111,9 @@ void DocumentCanvasItem::setView(QObject* object) {
         input = std::make_unique<xqt::CanvasInput>(*canvasView);
         connect(canvasView, &xqt::CanvasView::updateRequested, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &QQuickItem::update);
+        connect(canvasView, &xqt::CanvasView::pagesChanged, this, &DocumentCanvasItem::viewportChanged);
+        connect(&canvasView->getViewController(), &xqt::ViewController::changed, this,
+                &DocumentCanvasItem::viewportChanged);
         connect(canvasView, &QObject::destroyed, this, [this] {
             input.reset();
             viewReplaced = true;
@@ -120,7 +123,30 @@ void DocumentCanvasItem::setView(QObject* object) {
         updateViewGeometry();
     }
     Q_EMIT viewChanged();
+    Q_EMIT viewportChanged();
     update();
+}
+
+qreal DocumentCanvasItem::contentWidth() const {
+    return canvasView ? canvasView->getLayout().contentSize(canvasView->getViewController().zoom()).width() : 0;
+}
+
+qreal DocumentCanvasItem::contentHeight() const {
+    return canvasView ? canvasView->getLayout().contentSize(canvasView->getViewController().zoom()).height() : 0;
+}
+
+qreal DocumentCanvasItem::contentX() const {
+    return canvasView ? canvasView->getViewController().scrollPosition().x() : 0;
+}
+
+qreal DocumentCanvasItem::contentY() const {
+    return canvasView ? canvasView->getViewController().scrollPosition().y() : 0;
+}
+
+void DocumentCanvasItem::scrollTo(qreal x, qreal y) {
+    if (canvasView) {
+        canvasView->getViewController().setScrollPosition(QPointF(x, y));
+    }
 }
 
 void DocumentCanvasItem::updateViewGeometry() {

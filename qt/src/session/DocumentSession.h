@@ -69,6 +69,11 @@ public:
     /// Write the autosave file if there are unsaved changes since the last autosave.
     SaveResult autosave();
 
+    /// Suggested target for "Save as" (port of upstream Control::saveImpl): the document's own path; for an
+    /// annotated PDF the .xopp next to the PDF ("lecture.pdf" -> "lecture.xopp"); else the default name
+    /// (Settings::getDefaultSaveName) in the last save folder.
+    fs::path suggestSavePath() const;
+
     bool hasFilePath() const;
     fs::path getFilePath() const;
     /// Title for the tab: file name, or "Untitled" / the PDF name for unsaved documents.

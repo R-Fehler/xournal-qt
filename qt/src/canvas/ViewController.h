@@ -44,6 +44,11 @@ public:
     QPointF viewToContent(QPointF v) const { return v - contentOrigin(); }
     QRectF visibleContentRect() const { return QRectF(viewToContent(QPointF(0, 0)), view); }
 
+    /// Content coordinate shown at the view's top-left corner (0 on an axis where the content is smaller).
+    QPointF scrollPosition() const;
+    /// Scroll so that the content coordinate `pos` is at the view's top-left corner (clamped).
+    void setScrollPosition(QPointF pos);
+
     void setZoom(double zoom, QPointF viewAnchor);
     void zoomBy(double factor, QPointF viewAnchor) { setZoom(z * factor, viewAnchor); }
     void fitWidth();

@@ -42,6 +42,19 @@ QPointF ViewController::contentOrigin() const {
     return QPointF(x, y);
 }
 
+QPointF ViewController::scrollPosition() const {
+    const QSizeF content = layout->contentSize(z);
+    return QPointF(content.width() < view.width() ? 0.0 : scrollPos.x(),
+                   content.height() < view.height() ? 0.0 : scrollPos.y());
+}
+
+void ViewController::setScrollPosition(QPointF pos) {
+    stopMomentum();
+    scrollPos = pos;
+    clamp();
+    Q_EMIT changed();
+}
+
 void ViewController::clamp() {
     const QSizeF content = layout->contentSize(z);
     scrollPos.setX(std::clamp(scrollPos.x(), 0.0, std::max(0.0, content.width() - view.width())));

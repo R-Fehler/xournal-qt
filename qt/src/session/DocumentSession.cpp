@@ -231,6 +231,17 @@ void DocumentSession::undoRedoPageChanged(PageRef) {}
 
 bool DocumentSession::hasFilePath() const { return !getFilePath().empty(); }
 
+fs::path DocumentSession::suggestSavePath() const {
+    Settings* settings = getSettings();
+    std::shared_lock lock(*doc);
+    fs::path suggested = doc->createSaveFoldername(settings->getLastSavePath());
+    suggested /= doc->createSaveFilename(Document::XOPP, settings->getDefaultSaveName());
+    if (suggested.extension() != ".xopp") {
+        suggested += ".xopp";
+    }
+    return suggested;
+}
+
 fs::path DocumentSession::getFilePath() const {
     std::shared_lock lock(*doc);
     return doc->getFilepath();

@@ -29,6 +29,11 @@ class DocumentCanvasItem: public QQuickItem {
     Q_OBJECT
     /// The xqt::CanvasView to show (set from C++ through the application controller).
     Q_PROPERTY(QObject* view READ view WRITE setView NOTIFY viewChanged)
+    /// Size of the scrollable content and the scroll position (for scroll bars), in logical pixels.
+    Q_PROPERTY(qreal contentWidth READ contentWidth NOTIFY viewportChanged)
+    Q_PROPERTY(qreal contentHeight READ contentHeight NOTIFY viewportChanged)
+    Q_PROPERTY(qreal contentX READ contentX NOTIFY viewportChanged)
+    Q_PROPERTY(qreal contentY READ contentY NOTIFY viewportChanged)
 public:
     explicit DocumentCanvasItem(QQuickItem* parent = nullptr);
     ~DocumentCanvasItem() override;
@@ -36,8 +41,16 @@ public:
     QObject* view() const;
     void setView(QObject* view);
 
+    qreal contentWidth() const;
+    qreal contentHeight() const;
+    qreal contentX() const;
+    qreal contentY() const;
+    /// Scroll so that the content position (x, y) is at the top-left corner.
+    Q_INVOKABLE void scrollTo(qreal x, qreal y);
+
 Q_SIGNALS:
     void viewChanged();
+    void viewportChanged();
 
 protected:
     QSGNode* updatePaintNode(QSGNode* old, UpdatePaintNodeData*) override;

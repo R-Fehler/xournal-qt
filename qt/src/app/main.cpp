@@ -8,7 +8,7 @@
 #include <clocale>
 
 #include <QCommandLineParser>
-#include <QGuiApplication>
+#include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -25,7 +25,9 @@ int main(int argc, char* argv[]) {
     QGuiApplication::setDesktopFileName("xournal-qt");
     QGuiApplication::setApplicationName("xournal-qt");
     QGuiApplication::setApplicationDisplayName("Xournal Qt");
-    QGuiApplication qapp(argc, argv);
+    // A QApplication (not only QGuiApplication): the platform theme (e.g. KDE Plasma) then provides its native,
+    // resizable file dialogs for QtQuick.Dialogs instead of Qt's built-in QML fallback.
+    QApplication qapp(argc, argv);
     // Like upstream initCAndCoutLocales(): numbers in the C locale for cairo, PDF export and the file format.
     setlocale(LC_NUMERIC, "C");
     xqt::AppContext::installQtUiThreadDispatcher();
@@ -62,7 +64,7 @@ int main(int argc, char* argv[]) {
                                QCoreApplication::quit();
                            });
     }
-    const int rc = QGuiApplication::exec();
+    const int rc = QApplication::exec();
     controller.shutdown();
     return rc;
 }
