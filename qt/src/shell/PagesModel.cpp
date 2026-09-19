@@ -155,6 +155,21 @@ QHash<int, QByteArray> PagesModel::roleNames() const {
             {SelectedRole, "selected"}};
 }
 
+QString PagesModel::thumbnailUrl(int page) const {
+    if (page < 0 || page >= rowCount()) {
+        return {};
+    }
+    return QString("image://thumbnail/%1/%2/%3").arg(sessionId).arg(page).arg(revisions[static_cast<size_t>(page)]);
+}
+
+qreal PagesModel::aspectOf(int page) const {
+    if (page < 0 || page >= rowCount() || sizes[static_cast<size_t>(page)].width() <= 0) {
+        return 1.414;
+    }
+    const QSizeF s = sizes[static_cast<size_t>(page)];
+    return s.height() / s.width();
+}
+
 void PagesModel::select(int page, int modifiers) {
     if (page < 0 || page >= rowCount()) {
         return;

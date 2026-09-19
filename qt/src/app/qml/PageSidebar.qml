@@ -11,14 +11,63 @@ import QtQuick.Window
 Rectangle {
     id: sidebar
     color: "#eceef1"
+    /// The table of contents instead of the pages
+    property bool showContents: false
+    signal contentsOverviewRequested()
 
-    SearchFilterChip {
-        id: filterChip
+    // Pages | Contents (when the document has a table of contents)
+    RowLayout {
+        id: switchRow
+        visible: app.outline.available
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.margins: 6
+        spacing: 2
+        Repeater {
+            model: [qsTr("Pages"), qsTr("Contents")]
+            delegate: AbstractButton {
+                id: switchButton
+                required property int index
+                required property string modelData
+                objectName: index === 0 ? "sidebarPagesButton" : "sidebarContentsButton"
+                Layout.fillWidth: true
+                implicitHeight: 32
+                readonly property bool active: (index === 1) === sidebar.showContents
+                onClicked: sidebar.showContents = index === 1
+                background: Rectangle { radius: 16; color: switchButton.active ? "#ffffff" : "transparent" }
+                contentItem: Label {
+                    text: switchButton.modelData
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    font.weight: switchButton.active ? Font.DemiBold : Font.Normal
+                }
+            }
+        }
+        IconButton {
+            iconName: "xqt-toc"
+            tip: qsTr("Contents overview with the pages (Ctrl+Alt+O)")
+            implicitWidth: 34; implicitHeight: 34
+            icon.width: 20; icon.height: 20
+            onClicked: sidebar.contentsOverviewRequested()
+        }
+    }
+    OutlineList {
+        visible: sidebar.showContents && app.outline.available
+        anchors.top: switchRow.bottom
+        anchors.topMargin: 4
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+    }
+
+    SearchFilterChip {
+        id: filterChip
+        anchors.top: switchRow.visible ? switchRow.bottom : parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
         anchors.margins: 8
-        visible: app.searchQuery !== ""
+        visible: app.searchQuery !== "" && !sidebar.showContents
     }
 
     PageKeys { id: pageKeys }
@@ -27,7 +76,8 @@ Rectangle {
     ListView {
         id: list
         objectName: "sidebarList"
-        anchors.top: filterChip.visible ? filterChip.bottom : parent.top
+        visible: !sidebar.showContents || !app.outline.available
+        anchors.top: filterChip.visible ? filterChip.bottom : (switchRow.visible ? switchRow.bottom : parent.top)
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right

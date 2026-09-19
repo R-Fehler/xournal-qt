@@ -7,6 +7,8 @@
 #include <thread>
 
 #include <QCoreApplication>
+#include <QTemporaryDir>
+#include <cairo-pdf.h>
 #include <QElapsedTimer>
 #include <QImage>
 #include <QSignalSpy>
@@ -21,6 +23,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/PageFilterModel.h"
+#include "shell/OutlineModel.h"
 #include "shell/PagesModel.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
@@ -401,4 +404,63 @@ TEST(Pages, insertPagesWithBackgroundSizeAndOrientation) {
     c.undoPages();
     EXPECT_EQ(doc->getPageCount(), 1u);
     EXPECT_FALSE(c.insertPages(0, 999, -1, false, 1)) << "no such background";
+}
+
+namespace {
+/// A 7-page PDF with an outline: cover (page 1), "Chapter 1" p.2 with "Section 1.1" p.3 and "Section 1.2" p.5,
+/// "Chapter 2" p.6.
+void makeOutlinePdf(const std::string& file) {
+    cairo_surface_t* s = cairo_pdf_surface_create(file.c_str(), 400, 500);
+    cairo_t* cr = cairo_create(s);
+    for (int p = 1; p <= 7; ++p) {
+        cairo_move_to(cr, 50, 50);
+        cairo_show_text(cr, ("page " + std::to_string(p)).c_str());
+        cairo_show_page(cr);
+    }
+    const int ch1 = cairo_pdf_surface_add_outline(s, CAIRO_PDF_OUTLINE_ROOT, "Chapter 1", "page=2", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+    cairo_pdf_surface_add_outline(s, ch1, "Section 1.1", "page=3", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+    cairo_pdf_surface_add_outline(s, ch1, "Section 1.2", "page=5", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+    cairo_pdf_surface_add_outline(s, CAIRO_PDF_OUTLINE_ROOT, "Chapter 2", "page=6", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+}  // namespace
+
+TEST(Pages, outlineWithPageRanges) {
+    QTemporaryDir tmp;
+    const std::string pdf = tmp.filePath("book.pdf").toStdString();
+    makeOutlinePdf(pdf);
+    AppController c;
+    ASSERT_TRUE(c.openPath(QString::fromStdString(pdf)));
+    auto* m = qobject_cast<OutlineModel*>(c.outlineModel());
+    ASSERT_NE(m, nullptr);
+    ASSERT_TRUE(m->available());
+    auto row = [&](int r) {
+        return std::tuple(m->data(m->index(r), OutlineModel::TitleRole).toString().toStdString(),
+                          m->data(m->index(r), OutlineModel::LevelRole).toInt(),
+                          m->data(m->index(r), OutlineModel::PageRole).toInt(),
+                          m->data(m->index(r), OutlineModel::PageEndRole).toInt());
+    };
+    ASSERT_EQ(m->count(), 5);
+    EXPECT_EQ(row(0), std::tuple(std::string("Beginning"), 0, 0, 1)) << "the cover before the first entry";
+    EXPECT_EQ(row(1), std::tuple(std::string("Chapter 1"), 0, 1, 2));
+    EXPECT_EQ(row(2), std::tuple(std::string("Section 1.1"), 1, 2, 4));
+    EXPECT_EQ(row(3), std::tuple(std::string("Section 1.2"), 1, 4, 5));
+    EXPECT_EQ(row(4), std::tuple(std::string("Chapter 2"), 0, 5, 7));
+
+    c.goToPage(3);
+    EXPECT_EQ(m->currentRow(), 2) << "page 4 is in section 1.1";
+
+    // A collapsed chapter has the pages of its sections
+    m->toggle(1);
+    ASSERT_EQ(m->count(), 3);
+    EXPECT_EQ(row(1), std::tuple(std::string("Chapter 1"), 0, 1, 5));
+    EXPECT_EQ(m->currentRow(), 1);
+    m->toggle(1);
+    EXPECT_EQ(m->count(), 5);
+
+    // Pages inserted before: the entries move along
+    c.insertPageBefore(0);
+    EXPECT_EQ(row(1), std::tuple(std::string("Chapter 1"), 0, 2, 3));
+    EXPECT_EQ(row(0), std::tuple(std::string("Beginning"), 0, 0, 2));
 }

@@ -34,6 +34,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
+#include "shell/OutlineModel.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
 #include "shell/PageFilterModel.h"
@@ -74,6 +75,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
 
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
+    outline = std::make_unique<OutlineModel>();
     pageClipboard = std::make_unique<PageClipboard>();
     // "Only pages with hits" ends with the search.
     connect(this, &AppController::searchChanged, this, [this] {
@@ -105,6 +107,7 @@ AppController::~AppController() {
         disconnect(c);
     }
     pages->setSession(nullptr);
+    outline->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
     tabs.reset();
 }
@@ -146,6 +149,7 @@ void AppController::currentTabChanged() {
                 connect(&s->search(), &DocumentSearch::finished, this, &AppController::searchChanged));
     }
     pages->setSession(session());
+    outline->setSession(session());
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
@@ -442,6 +446,7 @@ void AppController::setHomeVisible(bool visible) {
     }
 }
 QObject* AppController::filteredPagesModel() const { return filteredPages.get(); }
+QObject* AppController::outlineModel() const { return outline.get(); }
 int AppController::currentTab() const { return tabs->currentIndex(); }
 void AppController::setCurrentTab(int index) {
     tabs->setCurrentIndex(index);

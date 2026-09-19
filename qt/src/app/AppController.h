@@ -31,6 +31,7 @@ class DocumentSession;
 class TabManager;
 class PagesModel;
 class PageFilterModel;
+class OutlineModel;
 class PageClipboard;
 class SettingsModel;
 class SessionRecovery;
@@ -50,6 +51,8 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
     /// The pages for the sidebar and the page grid, optionally only those with search hits.
     Q_PROPERTY(QObject* filteredPages READ filteredPagesModel CONSTANT)
+    /// Table of contents of the current tab (PDF outline)
+    Q_PROPERTY(QObject* outline READ outlineModel CONSTANT)
     Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
     /// The library of this window (a folder of documents) and the recently opened documents (home screen)
     Q_PROPERTY(QObject* library READ libraryModel CONSTANT)
@@ -116,6 +119,7 @@ public:
     QObject* tabsModel() const;
     QObject* pagesModel() const;
     QObject* filteredPagesModel() const;
+    QObject* outlineModel() const;
     QObject* settingsModel() const;
     QObject* libraryModel() const;
     QObject* recentModel() const;
@@ -370,6 +374,7 @@ private:
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
+    std::unique_ptr<xqt::OutlineModel> outline;
     std::unique_ptr<xqt::PageClipboard> pageClipboard;
     std::vector<size_t> pageList(const QList<int>& pages) const;
     std::unique_ptr<xqt::SettingsModel> settingsView;

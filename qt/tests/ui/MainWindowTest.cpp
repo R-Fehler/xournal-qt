@@ -19,6 +19,7 @@
 #include <QTest>
 #include <QWheelEvent>
 #include <gtest/gtest.h>
+#include <cairo-pdf.h>
 
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
@@ -83,6 +84,27 @@ protected:
     void key(Qt::Key k, Qt::KeyboardModifiers m = Qt::NoModifier) {
         QTest::keyClick(window, k, m);
         wait(20);
+    }
+    /// Also items without a QObject parent (made by a Repeater): through the item tree.
+    QQuickItem* findItem(const char* name) const {
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
+            if (i->objectName() == name) {
+                return i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                if (QQuickItem* f = walk(c)) {
+                    return f;
+                }
+            }
+            return nullptr;
+        };
+        return walk(window->contentItem());
+    }
+    void click(QQuickItem* item, Qt::KeyboardModifiers m = Qt::NoModifier) {
+        ASSERT_NE(item, nullptr);
+        QTest::mouseClick(window, Qt::LeftButton, m,
+                          item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
+        wait(50);
     }
     /// Types text into the focused item (QTest::keyClicks is for widgets only).
     void type(const char* text) {
@@ -725,4 +747,55 @@ TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
     EXPECT_FALSE(window->property("fullScreenMode").toBool());
     EXPECT_TRUE(gridButton->isVisible());
     controller->selectTool("pen");
+}
+
+TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
+    // A 6-page PDF with an outline: "Chapter 1" p.1 (with "Section 1.1" p.3), "Chapter 2" p.5
+    QTemporaryDir tmp;
+    const std::string pdf = tmp.filePath("book.pdf").toStdString();
+    {
+        cairo_surface_t* s = cairo_pdf_surface_create(pdf.c_str(), 300, 400);
+        cairo_t* cr = cairo_create(s);
+        for (int p = 0; p < 6; ++p) {
+            cairo_show_page(cr);
+        }
+        const int ch1 = cairo_pdf_surface_add_outline(s, CAIRO_PDF_OUTLINE_ROOT, "Chapter 1", "page=1", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+        cairo_pdf_surface_add_outline(s, ch1, "Section 1.1", "page=3", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+        cairo_pdf_surface_add_outline(s, CAIRO_PDF_OUTLINE_ROOT, "Chapter 2", "page=5", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+        cairo_destroy(cr);
+        cairo_surface_destroy(s);
+    }
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(pdf)));
+    wait(100);
+
+    // Sidebar: Contents
+    click(findItem("sidebarContentsButton"));
+    auto* outlineList = find<QQuickItem>("outlineList");
+    ASSERT_NE(outlineList, nullptr);
+    EXPECT_TRUE(outlineList->isVisible());
+    ASSERT_EQ(outlineList->property("count").toInt(), 3);
+    click(itemAt(outlineList, 2));  // Chapter 2
+    EXPECT_EQ(controller->pageNumber(), 5);
+
+    // Overview: the pages of each heading; a page opens there
+    click(find<QQuickItem>("contentsButton"));
+    auto* overview = find<QQuickItem>("contentsOverview");
+    ASSERT_TRUE(overview->isVisible());
+    auto* list = find<QQuickItem>("contentsList");
+    wait(100);
+    QQuickItem* section = itemAt(list, 1);  // Section 1.1: pages 3, 4
+    ASSERT_NE(section, nullptr);
+    QQuickItem* strip = nullptr;
+    for (auto* c: section->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "contentsPages") {
+            strip = c;
+        }
+    }
+    ASSERT_NE(strip, nullptr);
+    EXPECT_EQ(strip->property("count").toInt(), 2);
+    QQuickItem* page4 = itemAt(strip, 1);
+    ASSERT_NE(page4, nullptr);
+    click(page4);
+    EXPECT_FALSE(overview->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 4);
 }

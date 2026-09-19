@@ -74,6 +74,10 @@ public:
     Q_INVOKABLE bool isSelected(int page) const;
     /// Selected pages in document order.
     Q_INVOKABLE QList<int> selectedPages() const;
+    /// Thumbnail image URL of a page (as the ThumbnailRole), e.g. for the contents overview.
+    Q_INVOKABLE QString thumbnailUrl(int page) const;
+    /// Height / width of a page.
+    Q_INVOKABLE qreal aspectOf(int page) const;
     int selectionCount() const;
 
     /// Milliseconds to collect content changes before thumbnails are refreshed.

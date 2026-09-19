@@ -39,6 +39,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.h
@@ -76,7 +78,9 @@ set(XQT_QML_FILES
     src/app/qml/BackgroundPreview.qml
     src/app/qml/HighlightColors.qml
     src/app/qml/BackgroundChooser.qml
-    src/app/qml/InsertPagesDialog.qml)
+    src/app/qml/InsertPagesDialog.qml
+    src/app/qml/ContentsOverview.qml
+    src/app/qml/OutlineList.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})

@@ -180,6 +180,13 @@ ApplicationWindow {
 
             IconButton { iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: sidebarShown; onClicked: sidebarShown = !sidebarShown }
             IconButton { objectName: "pageGridButton"; iconName: "xqt-pages-grid"; tip: qsTr("All pages (Ctrl+Alt+G)"); checked: pageGrid.visible; onClicked: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
+            IconButton {
+                objectName: "contentsButton"
+                iconName: "xqt-toc"
+                tip: qsTr("Contents with the pages of each chapter (Ctrl+Alt+O)")
+                checked: contentsOverview.visible
+                onClicked: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open()
+            }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
@@ -435,6 +442,7 @@ ApplicationWindow {
         anchors.left: win.toolbarPosition === "left" ? sideTools.right : parent.left
         width: 210
         visible: sidebarShown && !win.fullScreenMode
+        onContentsOverviewRequested: contentsOverview.open()
     }
 
     DocumentCanvas {
@@ -451,7 +459,7 @@ ApplicationWindow {
     // Page and zoom status, floating over the canvas.
     Pane {
         id: viewPill
-        visible: !pageGrid.visible && !win.fullScreenMode
+        visible: !pageGrid.visible && !contentsOverview.visible && !win.fullScreenMode
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: 28
@@ -539,6 +547,15 @@ ApplicationWindow {
         id: pageGrid
         objectName: "pageGrid"
         anchors.fill: canvas
+    }
+    ContentsOverview {
+        id: contentsOverview
+        anchors.fill: canvas
+        onVisibleChanged: if (visible && pageGrid.visible) pageGrid.close()
+    }
+    Connections {
+        target: pageGrid
+        function onVisibleChanged() { if (pageGrid.visible && contentsOverview.visible) contentsOverview.close() }
     }
 
     // Actions on the selected elements (select tools).
@@ -1029,6 +1046,7 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Back]; enabled: docKeys; onActivated: app.navigateBack() }
     Shortcut { sequences: [StandardKey.Forward]; enabled: docKeys; onActivated: app.navigateForward() }
     Shortcut { sequence: "Ctrl+Alt+G"; enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
+    Shortcut { sequence: "Ctrl+Alt+O"; enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
     Shortcut { sequences: [StandardKey.Find]; onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openBar() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
     Shortcut { sequences: [StandardKey.Copy]; enabled: docKeys; onActivated: app.copySelection() }
