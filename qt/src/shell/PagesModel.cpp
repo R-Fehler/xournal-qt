@@ -1,5 +1,7 @@
 #include "PagesModel.h"
 
+#include <algorithm>
+
 #include <shared_mutex>
 
 #include <QSizeF>
@@ -7,6 +9,7 @@
 #include "model/Document.h"
 #include "model/DocumentChangeType.h"
 #include "model/XojPage.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 
 #include "Thumbnails.h"
@@ -38,6 +41,11 @@ void PagesModel::setSession(DocumentSession* s) {
                                       [this](qulonglong page) { markChanged(page); }));
         connections.push_back(connect(s, &DocumentSession::currentPageChanged, this, [this](qulonglong page) {
             pageSelected(page);
+        }));
+        connections.push_back(connect(&s->search(), &DocumentSearch::changed, this, [this] {
+            if (rowCount() > 0) {
+                Q_EMIT dataChanged(index(0), index(rowCount() - 1), {SearchHitsRole, CurrentSearchHitRole});
+            }
         }));
     }
     reset();
@@ -83,14 +91,36 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             return QString("image://thumbnail/%1/%2/%3").arg(sessionId).arg(row).arg(revisions[row]);
         case CurrentRole:
             return index.row() == current;
+        case SearchHitsRole:
+        case CurrentSearchHitRole: {
+            if (!session) {
+                return role == SearchHitsRole ? QVariant(QVariantList()) : QVariant(-1);
+            }
+            const auto& search = session->search();
+            const auto& hits = search.hits();
+            auto it = std::lower_bound(hits.begin(), hits.end(), row,
+                                       [](const DocumentSearch::Hit& h, size_t p) { return h.page < p; });
+            QVariantList rects;
+            int currentOnPage = -1;
+            const QSizeF size = sizes[row];
+            for (; it != hits.end() && it->page == row; ++it) {
+                if (static_cast<int>(it - hits.begin()) == search.currentHit()) {
+                    currentOnPage = static_cast<int>(rects.size());
+                }
+                rects.append(QRectF(it->rect.x() / size.width(), it->rect.y() / size.height(),
+                                    it->rect.width() / size.width(), it->rect.height() / size.height()));
+            }
+            return role == SearchHitsRole ? QVariant(rects) : QVariant(currentOnPage);
+        }
         default:
             return {};
     }
 }
 
 QHash<int, QByteArray> PagesModel::roleNames() const {
-    return {{PageNumberRole, "pageNumber"}, {AspectRole, "aspect"}, {ThumbnailRole, "thumbnail"},
-            {CurrentRole, "current"}};
+    return {{PageNumberRole, "pageNumber"},     {AspectRole, "aspect"},
+            {ThumbnailRole, "thumbnail"},       {CurrentRole, "current"},
+            {SearchHitsRole, "searchHits"},     {CurrentSearchHitRole, "currentSearchHit"}};
 }
 
 void PagesModel::markChanged(size_t page) {

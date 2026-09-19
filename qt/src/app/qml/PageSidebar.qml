@@ -29,6 +29,8 @@ Rectangle {
             required property real aspect
             required property string thumbnail
             required property bool current
+            required property var searchHits
+            required property int currentSearchHit
             width: list.width
             height: frame.height + pageLabel.height + 4
 
@@ -49,6 +51,18 @@ Rectangle {
                     sourceSize.width: Math.round(width * Screen.devicePixelRatio)
                     fillMode: Image.PreserveAspectFit
                     smooth: true
+                }
+                Repeater {
+                    model: entry.searchHits
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+                        x: modelData.x * frame.width - 1
+                        y: modelData.y * frame.height - 1
+                        width: Math.max(3, modelData.width * frame.width + 2)
+                        height: Math.max(3, modelData.height * frame.height + 2)
+                        color: index === entry.currentSearchHit ? "#ccff7800" : "#a0ffd200"
+                    }
                 }
                 TapHandler {
                     onTapped: app.goToPage(entry.index)

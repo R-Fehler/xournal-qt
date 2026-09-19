@@ -114,6 +114,7 @@ ApplicationWindow {
             spacing: 2
 
             IconButton { iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: sidebarShown; onClicked: sidebarShown = !sidebarShown }
+            IconButton { objectName: "pageGridButton"; iconName: "xqt-pages-grid"; tip: qsTr("All pages (Ctrl+Alt+G)"); checked: pageGrid.visible; onClicked: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
             ToolSeparator {}
             IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
@@ -202,6 +203,7 @@ ApplicationWindow {
     // Page and zoom status, floating over the canvas.
     Pane {
         id: viewPill
+        visible: !pageGrid.visible
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: 28
@@ -232,6 +234,12 @@ ApplicationWindow {
         }
     }
 
+    PageGrid {
+        id: pageGrid
+        objectName: "pageGrid"
+        anchors.fill: canvas
+    }
+
     SearchBar {
         id: searchBar
         objectName: "searchBar"
@@ -248,7 +256,7 @@ ApplicationWindow {
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.bottomMargin: hbar.visible ? hbar.height : 0
-        visible: canvas.contentHeight > canvas.height + 1
+        visible: canvas.contentHeight > canvas.height + 1 && !pageGrid.visible
         policy: ScrollBar.AlwaysOn
         padding: 6
         minimumSize: 0.05
@@ -274,7 +282,7 @@ ApplicationWindow {
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: vbar.visible ? vbar.width : 0
-        visible: canvas.contentWidth > canvas.width + 1
+        visible: canvas.contentWidth > canvas.width + 1 && !pageGrid.visible
         policy: ScrollBar.AlwaysOn
         padding: 6
         minimumSize: 0.05
@@ -430,6 +438,7 @@ ApplicationWindow {
     }
     Shortcut { sequence: "Ctrl+Shift+E"; onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
     Shortcut { sequence: "Ctrl+,"; onActivated: settingsPage.open() }
+    Shortcut { sequence: "Ctrl+Alt+G"; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: [StandardKey.Find]; onActivated: searchBar.openBar() }
     Shortcut { sequences: [StandardKey.FindNext]; onActivated: app.searchNext() }
     Shortcut { sequences: [StandardKey.FindPrevious]; onActivated: app.searchPrevious() }

@@ -69,4 +69,10 @@ cd build-qt
 - [ ] Tab overview: typing searches all open documents; documents with hits get an orange frame and a hit count, others are dimmed; tapping one opens it at its first hit with the search bar showing.
 - [ ] Esc or × in the search bar clears the highlights.
 
+## Page grid
+- [ ] Grid button (or Ctrl+Alt+G): all pages as a grid; flinging with a finger scrolls with momentum through long documents.
+- [ ] Pinch apart / together: fewer, bigger / more, smaller previews per row; also −/+ and Ctrl+wheel.
+- [ ] Tap a page (finger or pen): the grid closes at that page.
+- [ ] With a search: hits are marked on the previews and in the sidebar (count badge); Enter in the search bar moves the grid along.
+
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

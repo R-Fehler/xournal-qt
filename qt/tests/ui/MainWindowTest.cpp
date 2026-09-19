@@ -234,3 +234,32 @@ TEST_F(MainWindowTest, tabOverviewSearchesAllDocuments) {
     EXPECT_TRUE(find<QQuickItem>("searchBar")->isVisible());
     EXPECT_EQ(controller->pageNumber(), 2) << "scrolled to the hit on page 2";
 }
+
+TEST_F(MainWindowTest, pageGridZoomsAndJumpsToAPage) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* gridPanel = find<QQuickItem>("pageGrid");
+    ASSERT_NE(gridPanel, nullptr);
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    ASSERT_TRUE(gridPanel->isVisible());
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    EXPECT_EQ(grid->property("count").toInt(), 11);
+
+    const int columns = gridPanel->property("columns").toInt();
+    ASSERT_GE(columns, 2);
+    key(Qt::Key_Plus);  // bigger previews: one column less
+    EXPECT_EQ(gridPanel->property("columns").toInt(), columns - 1);
+    key(Qt::Key_Minus);
+    key(Qt::Key_Minus);
+    EXPECT_EQ(gridPanel->property("columns").toInt(), columns + 1);
+
+    wait(50);
+    QQuickItem* cell = nullptr;
+    QMetaObject::invokeMethod(grid, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, 4));
+    ASSERT_NE(cell, nullptr);
+    const QPointF center = cell->mapToScene(QPointF(cell->width() / 2, cell->height() / 2));
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, center.toPoint());
+    wait(50);
+    EXPECT_FALSE(gridPanel->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 5);
+}

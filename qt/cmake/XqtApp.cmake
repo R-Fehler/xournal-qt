@@ -42,7 +42,8 @@ set(XQT_QML_FILES
     src/app/qml/PageSidebar.qml
     src/app/qml/SettingsPage.qml
     src/app/qml/TabOverview.qml
-    src/app/qml/SearchBar.qml)
+    src/app/qml/SearchBar.qml
+    src/app/qml/PageGrid.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})

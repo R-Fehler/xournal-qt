@@ -14,6 +14,7 @@
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/PagesModel.h"
 #include "shell/TabManager.h"
@@ -162,4 +163,25 @@ TEST(Pages, thumbnailShowsThePage) {
     }
     EXPECT_GT(dark, img.width() * img.height() / 20);
     EXPECT_TRUE(ThumbnailProvider::render(*s, 99, 160).isNull()) << "no page 99";
+}
+
+TEST(Pages, searchHitsPerPage) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    PagesModel& m = pagesOf(c);
+    DocumentSession* s = c.tabManager().currentSession();
+    QSignalSpy finished(&s->search(), &DocumentSearch::finished);
+    c.setSearchQuery("p1");
+    ASSERT_TRUE(finished.wait(3000));
+    auto hitsOf = [&](int row) { return m.data(m.index(row), PagesModel::SearchHitsRole).toList(); };
+    ASSERT_EQ(hitsOf(0).size(), 1);
+    EXPECT_EQ(hitsOf(1).size(), 0);
+    EXPECT_EQ(hitsOf(9).size(), 1);
+    const QRectF r = hitsOf(0)[0].toRectF();
+    EXPECT_GT(r.x(), 0);
+    EXPECT_LT(r.right(), 1) << "relative to the page size";
+    EXPECT_EQ(m.data(m.index(0), PagesModel::CurrentSearchHitRole).toInt(), 0);
+    EXPECT_EQ(m.data(m.index(9), PagesModel::CurrentSearchHitRole).toInt(), -1);
+    c.searchNext();
+    EXPECT_EQ(m.data(m.index(9), PagesModel::CurrentSearchHitRole).toInt(), 0);
 }

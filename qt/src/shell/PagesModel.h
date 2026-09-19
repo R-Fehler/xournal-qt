@@ -28,7 +28,16 @@ class PagesModel final: public QAbstractListModel, public DocumentListener {
     Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
     Q_PROPERTY(int currentPage READ currentPage NOTIFY currentPageChanged)
 public:
-    enum Roles { PageNumberRole = Qt::UserRole + 1, AspectRole, ThumbnailRole, CurrentRole };
+    enum Roles {
+        PageNumberRole = Qt::UserRole + 1,
+        AspectRole,
+        ThumbnailRole,
+        CurrentRole,
+        /// Search hits on the page: list of rectangles relative to the page size (0..1)
+        SearchHitsRole,
+        /// Index of the current search hit in SearchHitsRole, or -1
+        CurrentSearchHitRole
+    };
 
     explicit PagesModel(QObject* parent = nullptr);
     ~PagesModel() override;
