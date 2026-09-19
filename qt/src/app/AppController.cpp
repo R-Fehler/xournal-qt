@@ -73,6 +73,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+    loadCustomWidths();
 
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
@@ -553,7 +554,82 @@ void AppController::setDrawingType(const QString& name) {
 }
 
 QColor AppController::color() const { return toQColor(app->getToolHandler()->getColor()); }
-int AppController::size() const { return static_cast<int>(app->getToolHandler()->getSize()); }
+int AppController::size() const {
+    ToolHandler* th = app->getToolHandler();
+    return th->isCustomThicknessActive() ? 5 : static_cast<int>(th->getSize());
+}
+
+namespace {
+const char* const CUSTOM = "xournalQt";  // our settings (in upstream's settings file)
+/// The tools with an own width, and its default (points)
+constexpr std::array<std::pair<ToolType, double>, 3> CUSTOM_WIDTH_TOOLS{
+        {{TOOL_PEN, 8.5}, {TOOL_HIGHLIGHTER, 42.5}, {TOOL_ERASER, 28.35}}};  // 3, 15, 10 mm
+}  // namespace
+
+double AppController::customWidth() const {
+    ToolHandler* th = app->getToolHandler();
+    return th->getCustomThickness(th->getToolType());
+}
+
+void AppController::setCustomWidth(double points) {
+    ToolHandler* th = app->getToolHandler();
+    const ToolType type = th->getToolType();
+    if (th->getCustomThickness(type) <= 0) {
+        return;  // (no sizes)
+    }
+    th->setCustomThickness(type, std::clamp(points, 0.1, 150.0), true);
+    storeCustomWidths();
+    Q_EMIT toolChanged();
+}
+
+double AppController::sizeWidth(int s) const {
+    ToolHandler* th = app->getToolHandler();
+    const ToolType type = th->getToolType();
+    if (s == 5) {
+        return th->getCustomThickness(type);
+    }
+    const bool sized = std::any_of(CUSTOM_WIDTH_TOOLS.begin(), CUSTOM_WIDTH_TOOLS.end(),
+                                   [type](const auto& t) { return t.first == type; });
+    return sized && s >= 0 && s < 5 ? th->getToolThickness(type)[s] : 0;
+}
+
+void AppController::loadCustomWidths() {
+    ToolHandler* th = app->getToolHandler();
+    std::string stored;
+    app->getSettings()->getCustomElement(CUSTOM).getString("customWidths", stored);
+    std::map<std::string, std::pair<double, bool>> read;
+    for (const QString& entry: QString::fromStdString(stored).split(',', Qt::SkipEmptyParts)) {
+        QString value = entry.section('=', 1);
+        const bool active = value.endsWith('*');
+        bool ok = false;
+        const double width = value.remove('*').toDouble(&ok);
+        if (ok && width > 0) {
+            read[entry.section('=', 0, 0).trimmed().toStdString()] = {width, active};
+        }
+    }
+    for (const auto& [type, width]: CUSTOM_WIDTH_TOOLS) {
+        const auto it = read.find(std::string(toolTypeToString(type)));
+        if (it == read.end()) {
+            th->setCustomThickness(type, width, false);
+        } else {
+            th->setCustomThickness(type, it->second.first, it->second.second);
+        }
+    }
+}
+
+void AppController::storeCustomWidths() {
+    ToolHandler* th = app->getToolHandler();
+    QStringList entries;
+    for (const auto& [type, width]: CUSTOM_WIDTH_TOOLS) {
+        const bool active = th->isCustomThicknessActive(type);
+        entries << QString("%1=%2%3")
+                           .arg(QString::fromUtf8(toolTypeToString(type).data()))
+                           .arg(th->getCustomThickness(type))
+                           .arg(active ? "*" : "");
+    }
+    app->getSettings()->getCustomElement(CUSTOM).setString("customWidths", entries.join(',').toStdString());
+    app->getSettings()->customSettingsChanged();
+}
 
 QVariantList AppController::palette() const {
     QVariantList list;
@@ -562,10 +638,6 @@ QVariantList AppController::palette() const {
     }
     return list;
 }
-
-namespace {
-const char* const CUSTOM = "xournalQt";
-}  // namespace
 
 QVariantList AppController::defaultToolbarColors() const {
     // Upstream's palette (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow), not white
@@ -1107,7 +1179,14 @@ void AppController::setColor(const QColor& c) {
 }
 
 void AppController::setSize(int s) {
-    app->getToolHandler()->setSize(static_cast<ToolSize>(std::clamp(s, 0, 4)));
+    ToolHandler* th = app->getToolHandler();
+    const ToolType type = th->getToolType();
+    if (s == 5) {
+        th->setCustomThickness(type, th->getCustomThickness(type), true);
+    } else {
+        th->setSize(static_cast<ToolSize>(std::clamp(s, 0, 4)));
+    }
+    storeCustomWidths();
     Q_EMIT toolChanged();
 }
 

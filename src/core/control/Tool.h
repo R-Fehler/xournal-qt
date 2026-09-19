@@ -70,6 +70,9 @@ private:
     ToolType type;
 
     std::optional<std::array<double, toolSizes>> thickness;
+    /// xournal-qt: a width of its own besides the sizes (0: none), the tool's width while customThicknessActive
+    double customThickness = 0;
+    bool customThicknessActive = false;
 
     ToolCapabilities capabilities;
 

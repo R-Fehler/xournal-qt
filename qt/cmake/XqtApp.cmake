@@ -85,7 +85,8 @@ set(XQT_QML_FILES
     src/app/qml/InsertPagesDialog.qml
     src/app/qml/ContentsOverview.qml
     src/app/qml/OutlineList.qml
-    src/app/qml/TextFlowPanel.qml)
+    src/app/qml/TextFlowPanel.qml
+    src/app/qml/CustomWidthPopup.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})

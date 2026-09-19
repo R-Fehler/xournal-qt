@@ -320,6 +320,9 @@ auto ToolHandler::getTextJustify() const -> bool { return this->getTool(TOOL_TEX
 
 auto ToolHandler::getThickness() const -> double {
     Tool* tool = this->activeTool;
+    if (tool->customThicknessActive && tool->customThickness > 0) {
+        return tool->customThickness;
+    }
     if (tool->thickness) {
         return tool->thickness.value()[tool->getSize()];
     }
@@ -335,7 +338,41 @@ void ToolHandler::setSize(ToolSize size) {
 
     Tool* tool = this->toolbarSelectedTool;
     tool->setSize(clippedSize);
+    tool->customThicknessActive = false;
     this->stateChangeListener->toolSizeChanged();
+}
+
+void ToolHandler::setCustomThickness(ToolType type, double thickness, bool active) {
+    if (type < TOOL_PEN || type - TOOL_PEN >= static_cast<int>(tools.size()) || thickness <= 0) {
+        return;
+    }
+    Tool* tool = tools[type - TOOL_PEN].get();
+    if (!tool->thickness) {
+        return;  // (a tool without sizes)
+    }
+    tool->customThickness = thickness;
+    tool->customThicknessActive = active;
+    this->stateChangeListener->toolSizeChanged();
+}
+
+auto ToolHandler::getCustomThickness(ToolType type) const -> double {
+    if (type < TOOL_PEN || type - TOOL_PEN >= static_cast<int>(tools.size())) {
+        return 0;
+    }
+    return tools[type - TOOL_PEN]->customThickness;
+}
+
+auto ToolHandler::isCustomThicknessActive(ToolType type) const -> bool {
+    if (type < TOOL_PEN || type - TOOL_PEN >= static_cast<int>(tools.size())) {
+        return false;
+    }
+    const Tool* tool = tools[type - TOOL_PEN].get();
+    return tool->customThicknessActive && tool->customThickness > 0;
+}
+
+auto ToolHandler::isCustomThicknessActive(SelectedTool selectedTool) const -> bool {
+    const Tool* tool = getSelectedTool(selectedTool);
+    return tool->customThicknessActive && tool->customThickness > 0;
 }
 
 void ToolHandler::setButtonSize(ToolSize size, Button button) {

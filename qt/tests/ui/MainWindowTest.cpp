@@ -698,6 +698,31 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
 }
 
+TEST_F(MainWindowTest, fiveWidthsInTheToolBar) {
+    window->setWidth(1600);  // room for the whole tool bar
+    wait(100);
+    auto* fifth = findItem("customSizeButton");
+    ASSERT_NE(fifth, nullptr);
+    click(findItem("sizeButton4"));
+    EXPECT_EQ(controller->size(), 4) << "the fourth width (very thick)";
+
+    click(fifth);  // the fifth: the tool's own width
+    EXPECT_EQ(controller->size(), 5);
+    const double before = controller->customWidth();
+    EXPECT_GT(before, 0);
+
+    click(fifth);  // again: change it
+    auto* popup = find<QObject>("customWidthPopup");  // a Popup is no Item
+    ASSERT_NE(popup, nullptr);
+    EXPECT_TRUE(popup->property("visible").toBool());
+    click(findItem("customWidthMore"));
+    EXPECT_GT(controller->customWidth(), before);
+    click(findItem("customWidthLess"));
+    click(findItem("customWidthLess"));
+    EXPECT_LT(controller->customWidth(), before);
+    EXPECT_EQ(controller->size(), 5);
+}
+
 TEST_F(MainWindowTest, toolbarMovesToTheLeftOrRight) {
     auto* gridButton = find<QQuickItem>("contentsButton");  // a tool bar button
     auto* canvas = find<QQuickItem>("canvas");

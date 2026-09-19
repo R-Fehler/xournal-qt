@@ -10,6 +10,7 @@
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
+#include "control/ToolHandler.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Point.h"
@@ -259,4 +260,41 @@ TEST(ToolbarColors, orangeByDefaultAddRemoveReset) {
     c.setPdfHighlightColor(c.pdfHighlightColors().at(2).value<QColor>());
     EXPECT_EQ(c.pdfHighlightColor(), c.pdfHighlightColors().at(2).value<QColor>());
     c.setPdfHighlightColor(c.pdfHighlightColors().first().value<QColor>());
+}
+
+TEST(ToolSizes, fiveWidthsTheFifthAdjustableAndRemembered) {
+    {
+        AppController c;
+        c.selectTool("pen");
+        c.setSize(3);
+        ToolHandler* th = c.context().getToolHandler();
+        EXPECT_EQ(c.size(), 3);
+        const double thick = th->getThickness();
+        c.setSize(4);  // the fourth: very thick
+        EXPECT_EQ(c.size(), 4);
+        EXPECT_GT(th->getThickness(), thick);
+        EXPECT_DOUBLE_EQ(c.sizeWidth(4), th->getThickness());
+
+        // The fifth: a width of its own
+        c.setSize(5);
+        EXPECT_EQ(c.size(), 5);
+        EXPECT_DOUBLE_EQ(th->getThickness(), c.customWidth());
+        c.setCustomWidth(6.25);
+        EXPECT_EQ(c.size(), 5) << "setting the width chooses it";
+        EXPECT_DOUBLE_EQ(th->getThickness(), 6.25);
+
+        // Per tool, and a size switches back
+        c.selectTool("highlighter");
+        EXPECT_NE(c.customWidth(), 6.25);
+        EXPECT_NE(c.size(), 5) << "the highlighter keeps its own size";
+        c.selectTool("pen");
+        EXPECT_EQ(c.size(), 5);
+        c.setSize(2);
+        EXPECT_EQ(c.size(), 2);
+        EXPECT_NE(th->getThickness(), 6.25);
+    }
+    AppController again;  // the width is in the settings
+    again.selectTool("pen");
+    EXPECT_DOUBLE_EQ(again.customWidth(), 6.25);
+    EXPECT_EQ(again.size(), 2) << "the size that was chosen last";
 }

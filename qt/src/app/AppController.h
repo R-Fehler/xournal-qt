@@ -76,7 +76,10 @@ class AppController: public QObject {
     /// Upstream's drawing type of the tool: default (freehand), strokeRecognizer, line, rectangle, ellipse, arrow,
     /// doubleArrow, drawCoordinateSystem
     Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
+    /// 0 = very fine ... 4 = very thick (upstream ToolSize), 5 = the tool's own width (customWidth)
     Q_PROPERTY(int size READ size NOTIFY toolChanged)
+    /// The adjustable width of the tool (points; 0: the tool has no sizes). Setting it selects it (size 5).
+    Q_PROPERTY(double customWidth READ customWidth WRITE setCustomWidth NOTIFY toolChanged)
     Q_PROPERTY(QVariantList palette READ palette CONSTANT)
     /// The colors in the tool bar (user's choice; default: the first colors of the palette, with orange)
     Q_PROPERTY(QVariantList toolbarColors READ toolbarColors NOTIFY toolbarColorsChanged)
@@ -151,6 +154,9 @@ public:
     int size() const;
     QVariantList palette() const;
     QVariantList toolbarColors() const;
+    /// The tools' own widths and which are chosen (settings "customWidths": "pen=8.5*,highlighter=42.5,...")
+    void loadCustomWidths();
+    void storeCustomWidths();
     /// Upstream's palette without white
     QVariantList defaultToolbarColors() const;
     /// Add a color to the tool bar (not twice) / remove the color at `index` / back to the default colors.
@@ -324,8 +330,12 @@ public:
     /// "pen", "highlighter", "eraser", "hand"
     Q_INVOKABLE void selectTool(const QString& tool);
     Q_INVOKABLE void setColor(const QColor& color);
-    /// 0 = very fine ... 4 = very thick (upstream ToolSize)
+    /// 0 = very fine ... 4 = very thick (upstream ToolSize), 5 = the tool's own width
     Q_INVOKABLE void setSize(int size);
+    double customWidth() const;
+    void setCustomWidth(double points);
+    /// Width of a size of the tool (points)
+    Q_INVOKABLE double sizeWidth(int size) const;
 
     // --- misc ---
     Q_INVOKABLE QUrl iconUrl(const QString& name) const;

@@ -366,9 +366,10 @@ ApplicationWindow {
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             Repeater {
-                model: [ { size: 1, dot: 6 }, { size: 2, dot: 10 }, { size: 3, dot: 15 } ]
+                model: [ { size: 1, dot: 6 }, { size: 2, dot: 10 }, { size: 3, dot: 15 }, { size: 4, dot: 21 } ]
                 delegate: AbstractButton {
                     required property var modelData
+                    objectName: "sizeButton" + modelData.size
                     implicitWidth: 40
                     implicitHeight: 44
                     onClicked: app.setSize(modelData.size)
@@ -384,6 +385,43 @@ ApplicationWindow {
                             color: "#303030"
                         }
                     }
+                }
+            }
+            // The fifth width: the tool's own, adjustable (tap it again or press and hold)
+            AbstractButton {
+                id: customSizeButton
+                objectName: "customSizeButton"
+                implicitWidth: 40
+                implicitHeight: 44
+                enabled: app.customWidth > 0
+                opacity: enabled ? 1 : 0.4
+                // As big as the width compared to the very thick size
+                readonly property real dot: {
+                    const ref = app.tool, thick = app.sizeWidth(4)
+                    return thick > 0 ? Math.max(3, Math.min(26, Math.sqrt(app.customWidth / thick) * 21)) : 12
+                }
+                onClicked: app.size === 5 ? customSizePopup.open() : app.setSize(5)
+                onPressAndHold: { app.setSize(5); customSizePopup.open() }
+                ToolTip.visible: hovered && !customSizePopup.visible
+                ToolTip.text: qsTr("Own width (%1 mm): tap again or press and hold to change it").arg(customSizePopup.mmText)
+                ToolTip.delay: 600
+                contentItem: Item {
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 32; height: 32; radius: 6
+                        color: app.size === 5 ? "#e0e3f5" : "transparent"
+                    }
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: customSizeButton.dot; height: width; radius: width / 2
+                        color: "transparent"
+                        border.width: Math.min(width / 2, 2.5)
+                        border.color: "#303030"
+                    }
+                }
+                CustomWidthPopup {
+                    id: customSizePopup
+                    side: win.fullScreenMode ? "left" : win.toolbarPosition
                 }
             }
             Item { Layout.fillWidth: !win.verticalTools; Layout.fillHeight: win.verticalTools; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1 }

@@ -30,7 +30,8 @@ cd build-qt
 - [ ] Open a .xopp with a PDF background, and open a plain .pdf to annotate.
 - [ ] Save / save as; the file then opens in upstream Xournal++ and looks identical.
 - [ ] Closing or opening with unsaved changes asks first.
-- [ ] Colors and the three sizes apply to pen and highlighter.
+- [ ] Colors and the four sizes apply to pen and highlighter.
+- [ ] The fifth width (ring): tap it once to draw with it, tap it again (or press and hold) for the slider; − / + and the slider change the width live (mm, sample stroke); pen, highlighter and eraser each keep their own; it is still there after a restart.
 
 ## Tabs (M5a)
 - [ ] Open several files: each opens in its own tab; opening a file from the file manager while the app runs adds a tab to the running window.

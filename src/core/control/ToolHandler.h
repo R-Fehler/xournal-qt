@@ -199,6 +199,18 @@ public:
      */
     double getThickness() const;
 
+    /**
+     * xournal-qt: a width of its own for a tool with sizes, besides the five sizes. Activating it makes it the
+     * tool's width until setSize() picks one of the sizes again.
+     * @param thickness in points (> 0)
+     */
+    void setCustomThickness(ToolType type, double thickness, bool active);
+    /// The tool's custom width (0: none).
+    double getCustomThickness(ToolType type) const;
+    /// Whether the tool draws with its custom width.
+    bool isCustomThicknessActive(SelectedTool selectedTool = SelectedTool::active) const;
+    bool isCustomThicknessActive(ToolType type) const;
+
     void setLineStyle(const LineStyle& style);
 
     ToolSize getPenSize() const;
