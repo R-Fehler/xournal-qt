@@ -68,9 +68,8 @@ bool Library::isDefault() const { return rootDir == normalized(defaultRoot()); }
 std::string Library::key() const { return hashOf(rootDir.string(), 12).toStdString(); }
 
 fs::path Library::metaDir() const {
-    if (isTemporary()) {
-        return Util::getCacheSubfolder(fs::path("libraries") / key());  // Downloads stays as it is
-    }
+    // Every library keeps its index and previews in its own folder (also Downloads: starting is then as fast as
+    // anywhere else, and the data goes away with the folder). Only for folders that cannot be written: the cache.
     const fs::path dir = rootDir / DocumentFiles::META_DIR;
     std::error_code ec;
     if ((fs::is_directory(dir, ec) || fs::create_directories(dir, ec)) &&

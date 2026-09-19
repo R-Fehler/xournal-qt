@@ -686,6 +686,50 @@ TEST_F(LibraryTest, changesOfAttachedOrOtherPdfsAreNoticed) {
 }
 
 // Opt-in timing: XQT_BENCH_PDF=<a long PDF>
+// Starting with a big library (e.g. Downloads): everything is in the store, nothing is read again.
+TEST_F(LibraryTest, benchIndexStartup) {
+    if (!qEnvironmentVariableIsSet("XQT_BENCH_STARTUP")) {
+        GTEST_SKIP() << "set XQT_BENCH_STARTUP=<number of documents>";
+    }
+    const int count = std::max(1, qEnvironmentVariableIntValue("XQT_BENCH_STARTUP"));
+    if (const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF"); !pdf.isEmpty()) {
+        fs::copy_file(fs::path(pdf.toStdString()), root / "source.pdf");  // a real (big) PDF
+    } else {
+        makePdf(root / "source.pdf");
+    }
+    for (int i = 0; i < count; ++i) {
+        const fs::path pdf = root / ("paper" + std::to_string(i) + ".pdf");
+        fs::copy_file(root / "source.pdf", pdf);
+        makeAnnotation(pdf, root / ("paper" + std::to_string(i) + ".xopp"));
+    }
+    const fs::path dir = root / ".xournal_library" / "index";
+    QElapsedTimer t;
+    {
+        LibraryIndex first(root, dir);
+        t.start();
+        first.update(DocumentFiles::scanRecursive(root));
+        first.waitForDone();
+        std::cout << count << " documents, first indexing: " << t.elapsed() << " ms\n";
+    }
+    // Starting again: the stored index
+    LibraryIndex again(root, dir);
+    t.restart();
+    const auto items = DocumentFiles::scanRecursive(root);
+    const qint64 scanned = t.elapsed();
+    again.update(items);
+    again.waitForDone();
+    std::cout << "starting again: " << t.elapsed() << " ms (scanning the folder: " << scanned
+              << " ms), documents read again: " << again.documentsRead() << "\n";
+    std::cout << "index folder: " << [&] {
+        uintmax_t bytes = 0;
+        for (const auto& f: fs::directory_iterator(dir)) {
+            bytes += fs::file_size(f);
+        }
+        return bytes / 1024;
+    }() << " KiB\n";
+    EXPECT_EQ(again.documentsRead(), 0);
+}
+
 TEST_F(LibraryTest, benchIndexUpdates) {
     const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
     if (pdf.isEmpty()) {
@@ -759,9 +803,9 @@ TEST_F(LibraryTest, theDownloadsFolderIsATemporaryLibrary) {
     EXPECT_TRUE(Library(downloads).isTemporary());
     EXPECT_TRUE(Library(downloads / "papers").isTemporary());
     EXPECT_FALSE(Library(root / "lib").isTemporary());
-    EXPECT_NE(Library(downloads).metaDir().string().find("cache"), std::string::npos)
-            << "no .xournal_library in Downloads";
-    EXPECT_FALSE(fs::exists(downloads / ".xournal_library"));
+    // Its index and previews live in the folder, like every library's (fast when it is opened again)
+    EXPECT_EQ(Library(downloads).metaDir(), downloads / ".xournal_library");
+    EXPECT_TRUE(fs::exists(downloads / ".xournal_library"));
     LibraryModel model;
     EXPECT_TRUE(model.isTemporaryFolder(QString::fromStdString((downloads / "papers").string())));
     QFile::remove(config + "/user-dirs.dirs");

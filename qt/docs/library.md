@@ -8,8 +8,9 @@ A **library** is a plain folder of documents that a window works in, like a work
 - The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
   as library…". A window never shows two libraries.
-- The Downloads folder is offered there too, as a quick library: all downloaded papers at once. Its metadata
-  (previews, search index) goes to the cache, not into Downloads. A note in the library says that its files are
+- The Downloads folder is offered there too, as a quick library: all downloaded papers at once. Like every library
+  it keeps its metadata (previews, search index) in its own `.xournal_library/`, so opening it again is as fast as
+  any other library. A note in the library says that its files are
   short-lived, and importing or copying documents into it from elsewhere asks first.
 - "Copy to…" / "Move to…" can go into another library: the dialog has a library choice above the folders.
   Documents keep their PDF (the .xopp is rewritten), folders keep their subfolders; on another disk a moved folder
@@ -37,8 +38,8 @@ A **library** is a plain folder of documents that a window works in, like a work
 Code: `qt/src/shell/DocumentFiles.*`.
 
 ## `.xournal_library/`
-This folder is only a cache, and it can be deleted at any time. For folders that cannot be written, it lives in
-`~/.cache/xournal-qt/libraries/<hash>`.
+Every library has one, Downloads included. It is only a cache, and it can be deleted at any time. For folders that
+cannot be written, it lives in `~/.cache/xournal-qt/libraries/<hash>` instead.
 - `previews/<hash>.png`: the first page, 360 px wide, rendered like the page thumbnails. The file name comes from the
   path, sizes and modification times, so a changed document gets a new preview. Previews of documents outside a
   library (recent files) go to `~/.cache/xournal-qt/previews`.

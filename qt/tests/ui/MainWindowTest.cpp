@@ -343,8 +343,8 @@ TEST_F(MainWindowTest, pageGridCanShowOnlyPagesWithHits) {
 
 TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    for (int i = 0; i < 30; ++i) {
-        controller->addPageAfterCurrent();  // a long document
+    for (int i = 0; i < 80; ++i) {
+        controller->addPageAfterCurrent();  // a long document: room to keep scrolling
     }
     key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
     auto* grid = find<QQuickItem>("pageGridView");
@@ -367,6 +367,8 @@ TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
     }
     const double atLift = grid->property("contentY").toDouble();
     EXPECT_GT(atLift, start + 100) << "two-finger scrolling moves the grid";
+    const double end = grid->property("contentHeight").toDouble() - grid->height();
+    ASSERT_LT(atLift, end - 200) << "not at the end of the grid already";
     wheel(0, Qt::ScrollEnd);
     // Momentum: the grid keeps moving (slower on a loaded machine, so wait for it a while)
     QElapsedTimer t;
