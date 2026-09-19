@@ -1115,6 +1115,26 @@ ApplicationWindow {
         context: Qt.ApplicationShortcut
         onActivated: app.previousTab()
     }
+    // Four or five fingers on the touch screen: the pages of the document, all open documents
+    // (a touch pad reports such gestures to the desktop, not to us).
+    TouchGestures {
+        objectName: "touchGestures"
+        window: win
+        function togglePages() {
+            if (app.homeVisible) return
+            tabOverview.visible ? tabOverview.close() : (pageGrid.visible ? pageGrid.close() : pageGrid.open())
+        }
+        function toggleDocuments() {
+            pageGrid.visible ? pageGrid.close() : 0
+            tabOverview.visible ? tabOverview.close() : tabOverview.open()
+        }
+        onTapped: fingers => fingers >= 5 ? toggleDocuments() : togglePages()
+        onPinchedIn: fingers => fingers >= 5 ? toggleDocuments() : togglePages()  // "zoom out": step back
+        onPinchedOut: {
+            if (tabOverview.visible) tabOverview.close()
+            else if (pageGrid.visible) pageGrid.close()
+        }
+    }
     Shortcut { sequence: "Ctrl+Shift+E"; onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
     Shortcut { sequence: "Ctrl+,"; onActivated: settingsPage.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)

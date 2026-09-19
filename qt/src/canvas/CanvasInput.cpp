@@ -571,6 +571,16 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         }
     }
     touchSessionMaxPoints = std::max(touchSessionMaxPoints, static_cast<int>(touches.size()));
+    if (touchSessionMaxPoints >= 4 && !touchSessionIgnored) {
+        // Four fingers or more: a gesture of the window (the pages, all documents), the canvas keeps still.
+        if (pinching) {
+            vc.pinchEnd();
+            pinching = false;
+        }
+        panning = false;
+        touchSessionIgnored = true;
+        velocitySamples.clear();
+    }
 
     if (!touchSessionIgnored) {
         std::vector<QPointF> pts;

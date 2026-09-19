@@ -700,6 +700,56 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
 }
 
+TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {
+    static QPointingDevice* screen = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    auto* grid = find<QQuickItem>("pageGrid");
+    auto* overview = find<QObject>("tabOverview");  // a Popup is no Item
+    ASSERT_NE(grid, nullptr);
+    ASSERT_NE(overview, nullptr);
+    auto overviewShown = [&] { return overview->property("visible").toBool(); };
+    // Popups fade out, so give them a moment
+    auto until = [&](const std::function<bool()>& done) {
+        QElapsedTimer t;
+        t.start();
+        while (!done() && t.elapsed() < 1000) {
+            wait(20);
+        }
+    };
+    auto tap = [&](int fingers) {
+        {
+            auto down = QTest::touchEvent(window, screen);
+            for (int i = 0; i < fingers; ++i) {
+                down.press(i, QPoint(300 + i * 40, 300));
+            }
+        }
+        wait(30);
+        {
+            auto up = QTest::touchEvent(window, screen);
+            for (int i = 0; i < fingers; ++i) {
+                up.release(i, QPoint(300 + i * 40, 300));
+            }
+        }
+        wait(80);
+    };
+
+    tap(4);  // the pages of the document
+    EXPECT_TRUE(grid->isVisible());
+    tap(4);
+    until([&] { return !grid->isVisible(); });
+    EXPECT_FALSE(grid->isVisible()) << "the same gesture closes it again";
+
+    tap(5);  // all open documents
+    until([&] { return overviewShown(); });
+    EXPECT_TRUE(overviewShown());
+    tap(5);
+    until([&] { return !overviewShown(); });
+    EXPECT_FALSE(overviewShown());
+
+    tap(3);  // fewer fingers are for the canvas (undo / redo), not for the overviews
+    EXPECT_FALSE(grid->isVisible());
+    EXPECT_FALSE(overviewShown());
+}
+
 TEST_F(MainWindowTest, fiveWidthsInTheToolBar) {
     window->setWidth(1600);  // room for the whole tool bar
     wait(100);

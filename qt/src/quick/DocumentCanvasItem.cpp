@@ -1,5 +1,6 @@
 #include "DocumentCanvasItem.h"
 #include "TextFlowEditor.h"
+#include "TouchGestures.h"
 
 #include <algorithm>
 #include <cmath>
@@ -107,6 +108,7 @@ double snap(double v, double dpr) { return std::round(v * dpr) / dpr; }
 void xqt::registerQuickTypes() {
     qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas");
     qmlRegisterType<TextFlowEditor>("XournalQt.Canvas", 1, 0, "TextFlowEditor");
+    qmlRegisterType<TouchGestures>("XournalQt.Canvas", 1, 0, "TouchGestures");
 }
 
 DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
