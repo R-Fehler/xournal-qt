@@ -367,10 +367,14 @@ public:
     // --- windows (undocked documents) ---
     /// The controller of the main window (this one is a window of its own if it has one).
     AppController* mainWindow() const { return primary; }
+    /// The windows of undocked documents (of the main window).
+    const std::vector<AppController*>& documentWindows() const { return windows; }
     bool isSecondary() const { return primary != nullptr; }
     /// Makes the windows of undocked documents. Set once, from main().
     static void setWindowFactory(std::function<void(AppController*)> factory);
     /// Move the tab into a window of its own (a new one). Does nothing for the last tab of such a window.
+    /// Close every tab of this window (unsaved changes are the UI's business).
+    Q_INVOKABLE void closeAllTabs();
     Q_INVOKABLE void undockTab(int index);
     /// Move the tab back into the main window (and close this window if it was the last one).
     Q_INVOKABLE void dockTab(int index);
@@ -429,6 +433,7 @@ private:
     std::shared_ptr<xqt::AppContext> app;
     std::shared_ptr<Palette> colors;
     AppController* primary = nullptr;  ///< the main window's controller (nullptr: this is the main window)
+    bool windowGone = false;           ///< its window was closed (it is on its way out)
     std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::PagesModel> pages;
@@ -438,7 +443,8 @@ private:
     xqt::DocumentSession* flowSession = nullptr;
     int flowPage = -1;
     double flowOverflow = 0;
-    std::unique_ptr<xqt::PageClipboard> pageClipboard;
+    std::unique_ptr<xqt::PageClipboard> ownPageClipboard;
+    xqt::PageClipboard* pageClipboard = nullptr;  ///< the main window's: pages can be pasted into any window
     std::vector<size_t> pageList(const QList<int>& pages) const;
     // The main window owns these; the other windows use the same ones (one library and one list of recent files).
     std::unique_ptr<xqt::SettingsModel> ownSettingsView;

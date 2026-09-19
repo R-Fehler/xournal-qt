@@ -41,6 +41,17 @@ cd build-qt
 - [ ] Open several files: each opens in its own tab; opening a file from the file manager while the app runs adds a tab to the running window.
 - [ ] Switching tabs keeps each tab's zoom, scroll position and undo history.
 - [ ] Closing a tab with unsaved changes asks first; quitting asks for every modified tab.
+- [ ] A tap with one finger (or a middle click) on a tab only switches to it; only the × closes it.
+- [ ] The button beside the library tab opens all open documents; "Close all documents" there asks first and then closes them all (unsaved ones ask to be saved).
+
+## Windows of their own (undocked documents)
+- [ ] Right click (or press and hold) a tab → "Move to a window of its own": a second window opens with that document, the main window keeps the rest.
+- [ ] Dragging a tab off the strip (downwards) does the same.
+- [ ] The second window has no library tab; tools, colors, widths and settings are shared with the main window (changing a color changes it in both).
+- [ ] In the second window: "Move to the main window" (menu or dragging the tab off the strip) puts the document back and closes that window when it was its last one.
+- [ ] Close the second window with unsaved changes: it asks to save; whatever is left unsaved goes back to the main window instead of being lost.
+- [ ] Copy pages in one window and paste them in the other.
+- [ ] Kill the app (`kill -9`) with a changed document in the second window: after the restart it is offered for recovery (it comes back as a tab of the main window).
 
 ## Pages sidebar (M5b)
 - [ ] The sidebar (first tool bar button) shows the pages; the current page is highlighted and follows scrolling.

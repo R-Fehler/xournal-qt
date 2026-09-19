@@ -9,6 +9,9 @@ Rectangle {
     id: strip
     signal closeRequested(int index)
     signal overviewRequested()
+    /// The tab should get a window of its own (dragged off the strip), or go back to the main window.
+    signal undockRequested(int index)
+    signal dockRequested(int index)
     implicitHeight: 46
     color: "#dfe1e5"
 
@@ -17,10 +20,11 @@ Rectangle {
         anchors.leftMargin: 6
         spacing: 0
 
-        // The home screen (library, recent documents): always the first tab.
+        // The home screen (library, recent documents): always the first tab (not in a window of its own).
         AbstractButton {
             id: homeTab
             objectName: "homeTab"
+            visible: !app.secondaryWindow
             readonly property bool current: app.homeVisible
             Layout.fillHeight: true
             Layout.rightMargin: 4
@@ -105,10 +109,35 @@ Rectangle {
                 height: list.height
                 hoverEnabled: true
                 onClicked: app.currentTab = index
-                // Middle click closes, like in browsers.
                 TapHandler {
-                    acceptedButtons: Qt.MiddleButton
-                    onTapped: strip.closeRequested(tab.index)
+                    acceptedButtons: Qt.RightButton
+                    onTapped: tabMenu.popup()
+                }
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    onLongPressed: tabMenu.popup()
+                }
+                // Dragged off the strip: a window of its own
+                DragHandler {
+                    id: tabDrag
+                    target: null
+                    onActiveChanged: {
+                        if (!active && Math.abs(centroid.position.y - centroid.pressPosition.y) > 60) {
+                            app.secondaryWindow ? strip.dockRequested(tab.index) : strip.undockRequested(tab.index)
+                        }
+                    }
+                }
+                Menu {
+                    id: tabMenu
+                    objectName: "tabMenu"
+                    MenuItem {
+                        objectName: "undockTabItem"
+                        text: app.secondaryWindow ? qsTr("Move to the main window")
+                                                  : qsTr("Move to a window of its own")
+                        onTriggered: app.secondaryWindow ? strip.dockRequested(tab.index)
+                                                         : strip.undockRequested(tab.index)
+                    }
+                    MenuItem { text: qsTr("Close"); onTriggered: strip.closeRequested(tab.index) }
                 }
 
                 background: Item {

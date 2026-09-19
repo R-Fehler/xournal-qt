@@ -1,5 +1,6 @@
 #include "SessionRecovery.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <csignal>
@@ -65,6 +66,45 @@ SessionRecovery::~SessionRecovery() {
     for (int i = 0; i < tabs.count(); ++i) {
         unregisterSession(tabs.session(i));
     }
+    for (TabManager* other: otherWindows) {
+        for (int i = 0; i < other->count(); ++i) {
+            unregisterSession(other->session(i));
+        }
+    }
+}
+
+// A document that moved to a window of its own is still part of this session: it keeps its place in the journal and
+// its unsaved changes are written when the program crashes.
+void SessionRecovery::watch(TabManager& other) {
+    if (std::find(otherWindows.begin(), otherWindows.end(), &other) != otherWindows.end()) {
+        return;
+    }
+    otherWindows.push_back(&other);
+    connect(&other, &QObject::destroyed, this, [this, &other] {
+        otherWindows.erase(std::remove(otherWindows.begin(), otherWindows.end(), &other), otherWindows.end());
+        writeNow();
+    });
+    if (!running) {
+        return;
+    }
+    for (int i = 0; i < other.count(); ++i) {
+        registerSession(other.session(i));
+    }
+    connect(&other, &QAbstractItemModel::rowsInserted, this, [this, &other](const QModelIndex&, int first, int last) {
+        for (int i = first; i <= last; ++i) {
+            registerSession(other.session(i));
+        }
+        writeNow();
+    });
+    connect(&other, &QAbstractItemModel::rowsAboutToBeRemoved, this,
+            [this, &other](const QModelIndex&, int first, int last) {
+                for (int i = first; i <= last; ++i) {
+                    unregisterSession(other.session(i));
+                }
+            });
+    connect(&other, &QAbstractItemModel::rowsRemoved, this, &SessionRecovery::writeNow);
+    connect(&other, &QAbstractItemModel::dataChanged, this, &SessionRecovery::scheduleWrite);
+    writeNow();
 }
 
 fs::path SessionRecovery::defaultJournalFile() { return Util::getConfigFile("session.json"); }
@@ -139,10 +179,16 @@ SessionRecovery::Journal SessionRecovery::currentJournal() const {
     Journal j;
     j.pid = Util::getPid();
     j.current = std::max(0, tabs.currentIndex());
-    for (int i = 0; i < tabs.count(); ++i) {
-        const DocumentSession* s = tabs.session(i);
-        j.tabs.push_back({s->hasFilePath() ? s->getFilePath() : fs::path(), j.pid, s->serial(),
-                          static_cast<int>(s->getCurrentPageNo())});
+    auto add = [&j](const TabManager& list) {
+        for (int i = 0; i < list.count(); ++i) {
+            const DocumentSession* s = list.session(i);
+            j.tabs.push_back({s->hasFilePath() ? s->getFilePath() : fs::path(), j.pid, s->serial(),
+                              static_cast<int>(s->getCurrentPageNo())});
+        }
+    };
+    add(tabs);
+    for (const TabManager* other: otherWindows) {  // the documents in windows of their own (reopened as tabs)
+        add(*other);
     }
     return j;
 }

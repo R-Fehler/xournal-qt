@@ -136,15 +136,16 @@ std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
     if (index < 0 || index >= count()) {
         return nullptr;
     }
-    auto tab = std::make_unique<Tab>(std::move(tabs[static_cast<size_t>(index)]));
     // It reports to its new list from now on
-    DocumentSession* s = tab->session.get();
+    DocumentSession* s = tabs[static_cast<size_t>(index)].session.get();
     disconnect(s, nullptr, this, nullptr);
     disconnect(&s->search(), nullptr, this, nullptr);
-    tab->releaseTimer->stop();
-    tab->releaseTimer->disconnect();
+    tabs[static_cast<size_t>(index)].releaseTimer->stop();
+    tabs[static_cast<size_t>(index)].releaseTimer->disconnect();
 
+    std::unique_ptr<Tab> tab;
     beginRemoveRows(QModelIndex(), index, index);
+    tab = std::make_unique<Tab>(std::move(tabs[static_cast<size_t>(index)]));
     tabs.erase(tabs.begin() + index);
     endRemoveRows();
     Q_EMIT countChanged();

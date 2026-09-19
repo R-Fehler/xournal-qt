@@ -3,6 +3,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <csignal>
 #include <memory>
 
@@ -127,6 +128,28 @@ TEST_F(RecoveryTest, candidatesAreNewerThanTheDocument) {
     EXPECT_EQ(c[0].recoveryFile, emergency);
     EXPECT_TRUE(c[0].originalFile.empty());
     fs::remove(emergency);
+}
+
+TEST_F(RecoveryTest, documentsInAWindowOfTheirOwnStayInTheSession) {
+    const fs::path second = tmp.filePath("second.xopp").toStdString();
+    fs::copy_file(fixture(u8"packaged_xopp/pdfBackground/old.xopp"), second);
+    {
+        AppController a;
+        a.startSession({});
+        ASSERT_TRUE(a.openPath(QString::fromStdString(doc.string())));
+        ASSERT_TRUE(a.openPath(QString::fromStdString(second.string())));
+        a.undockTab(0);  // one document gets a window of its own
+        ASSERT_EQ(a.tabManager().count(), 1);
+        ASSERT_EQ(a.documentWindows().size(), 1u);
+        a.shutdown();
+    }
+    // Both are opened again (as tabs of the main window)
+    AppController b;
+    b.startSession({});
+    ASSERT_EQ(b.tabCount(), 2);
+    std::vector<fs::path> files{b.tabManager().session(0)->getFilePath(), b.tabManager().session(1)->getFilePath()};
+    EXPECT_NE(std::find(files.begin(), files.end(), doc), files.end());
+    EXPECT_NE(std::find(files.begin(), files.end(), second), files.end());
 }
 
 TEST_F(RecoveryTest, lastTabsAreReopenedAfterANormalExit) {

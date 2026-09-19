@@ -88,6 +88,16 @@ ApplicationWindow {
         app.currentTab = index
         withSavedChanges(function() { app.closeTab(app.currentTab) })
     }
+    // Close every document; unsaved changes are asked about one by one.
+    function closeAllTabs() {
+        const pending = app.modifiedTabs()
+        if (pending.length === 0) {
+            app.closeAllTabs()
+            return
+        }
+        app.currentTab = pending[0]
+        withSavedChanges(function() { app.closeTab(app.currentTab); closeAllTabs() })
+    }
     // Quitting: go through the tabs with unsaved changes one by one.
     function closeWindow() {
         const pending = app.modifiedTabs()
@@ -104,11 +114,19 @@ ApplicationWindow {
         if (!quitting && app.modifiedTabs().length > 0) {
             close.accepted = false
             closeWindow()
+            return
+        }
+        if (app.secondaryWindow) {
+            app.windowClosed()  // its documents (unsaved ones go back to the main window)
         }
     }
 
     Connections {
         target: app
+        function onCloseWindowRequested() {  // its last document moved to another window
+            win.quitting = true
+            win.close()
+        }
         function onRaiseRequested() {
             if (win.visibility === Window.Minimized) win.showNormal()
             win.raise()
@@ -122,6 +140,8 @@ ApplicationWindow {
         visible: !win.fullScreenMode
         onCloseRequested: function(index) { requestCloseTab(index) }
         onOverviewRequested: tabOverview.open()
+        onUndockRequested: function(index) { app.undockTab(index) }
+        onDockRequested: function(index) { app.dockTab(index) }
       }
       ToolBar {
         id: topTools
@@ -964,6 +984,26 @@ ApplicationWindow {
     Component.onCompleted: if (app.recoveryItems.length > 0) recoveryDialog.open()
 
     Dialog {
+        id: closeAllDialog
+        objectName: "closeAllDialog"
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(win.width * 0.8, 480)
+        title: qsTr("Close all documents?")
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        ColumnLayout {
+            width: closeAllDialog.availableWidth
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("%1 documents are open. Documents with unsaved changes ask before they close.")
+                        .arg(app.tabs.count)
+            }
+        }
+        onAccepted: { tabOverview.close(); closeAllTabs() }
+    }
+
+    Dialog {
         id: messageDialog
         anchors.centerIn: parent
         modal: true
@@ -1091,6 +1131,7 @@ ApplicationWindow {
         id: tabOverview
         objectName: "tabOverview"
         onCloseRequested: function(index) { requestCloseTab(index) }
+        onCloseAllRequested: app.tabs.count > 1 ? closeAllDialog.open() : closeAllTabs()
     }
 
     // Document shortcuts do nothing while the home screen is shown.

@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
+#include <QQmlComponent>
 #include <QQmlContext>
 #include <QtQml/qqmlextensionplugin.h>
 #include <QQuickStyle>
@@ -120,6 +121,22 @@ int main(int argc, char* argv[]) {
     engine.addImageProvider("preview", new xqt::PreviewProvider);
     engine.addImageProvider("hitpage", new xqt::HitPageProvider);
     engine.rootContext()->setContextProperty("app", &controller);
+    // Undocked documents get a window of their own: the same QML, with their own controller as "app".
+    AppController::setWindowFactory([&engine](AppController* window) {
+        auto* context = new QQmlContext(engine.rootContext(), window);
+        context->setContextProperty("app", window);
+        auto* component = new QQmlComponent(&engine, QStringLiteral("XournalQt"), QStringLiteral("Main"), window);
+        QObject* object = component->create(context);
+        if (!object) {
+            qWarning("Could not make a window: %s", qPrintable(component->errorString()));
+            return;
+        }
+        object->setParent(window);
+        if (auto* w = qobject_cast<QQuickWindow*>(object)) {
+            w->show();
+            w->requestActivate();
+        }
+    });
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &qapp, [] { QCoreApplication::exit(1); },
             Qt::QueuedConnection);
@@ -128,10 +145,17 @@ int main(int argc, char* argv[]) {
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
     // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).
     if (const auto shot = qEnvironmentVariable("XQT_SCREENSHOT"); !shot.isEmpty()) {
-        // XQT_SCREENSHOT_ACTION=<method> calls an AppController method without arguments (e.g. selectAllOnPage).
+        // XQT_SCREENSHOT_ACTION=<method> calls an AppController method without arguments (e.g. selectAllOnPage),
+        // "<method>:<number>" one with a number (e.g. undockTab:0).
         if (const auto action = qEnvironmentVariable("XQT_SCREENSHOT_ACTION"); !action.isEmpty()) {
             QTimer::singleShot(400, &controller, [&controller, action] {
-                QMetaObject::invokeMethod(&controller, action.toLatin1().constData());
+                const QString name = action.section(':', 0, 0);
+                if (action.contains(':')) {
+                    QMetaObject::invokeMethod(&controller, name.toLatin1().constData(),
+                                              Q_ARG(int, action.section(':', 1).toInt()));
+                } else {
+                    QMetaObject::invokeMethod(&controller, name.toLatin1().constData());
+                }
             });
         }
         // XQT_SCREENSHOT_SELECT=1,3,4 selects pages (sidebar, page grid), or library items on the home screen.

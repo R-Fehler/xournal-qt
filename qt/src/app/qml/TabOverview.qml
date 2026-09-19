@@ -10,6 +10,7 @@ import QtQuick.Layouts
 Popup {
     id: overview
     signal closeRequested(int index)
+    signal closeAllRequested()
 
     modal: true
     focus: true
@@ -134,6 +135,13 @@ Popup {
                 iconName: "xopp-document-new"
                 tip: qsTr("New document")
                 onClicked: { app.newDocument(); overview.close() }
+            }
+            IconButton {
+                objectName: "closeAllButton"
+                iconName: "xqt-close-all"
+                tip: qsTr("Close all documents")
+                enabled: grid.count > 0
+                onClicked: overview.closeAllRequested()
             }
             IconButton { iconName: "xqt-close"; tip: qsTr("Back"); onClicked: overview.close() }
         }

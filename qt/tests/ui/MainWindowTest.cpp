@@ -11,6 +11,9 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QQmlApplicationEngine>
+#include <QQmlComponent>
+#include <QPointer>
+#include <QSignalSpy>
 #include <QQmlContext>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -706,6 +709,92 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     const int columns = grid()->property("columns").toInt();
     click(find<QQuickItem>("zoomInButton"));
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
+}
+
+TEST_F(MainWindowTest, tabsCloseOnlyOnPurposeAndAllAtOnce) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    controller->newDocument();
+    wait(50);
+    ASSERT_EQ(controller->tabManager().count(), 2);
+
+    // A tap (or a middle click) on a tab only shows it; it must not close it
+    auto* tab = findItem("tabList");
+    ASSERT_NE(tab, nullptr);
+    QQuickItem* first = itemAt(tab, 0);
+    ASSERT_NE(first, nullptr);
+    QTest::mouseClick(window, Qt::MiddleButton, Qt::NoModifier,
+                      first->mapToScene(QPointF(first->width() / 2, first->height() / 2)).toPoint());
+    wait(50);
+    EXPECT_EQ(controller->tabManager().count(), 2) << "the middle button does not close tabs";
+    static QPointingDevice* screen = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    const QPoint p = first->mapToScene(QPointF(first->width() / 2, first->height() / 2)).toPoint();
+    { auto touch = QTest::touchEvent(window, screen); touch.press(0, p); }
+    wait(30);
+    { auto touch = QTest::touchEvent(window, screen); touch.release(0, p); }
+    wait(80);
+    EXPECT_EQ(controller->tabManager().count(), 2) << "a finger on a tab does not close it";
+    EXPECT_EQ(controller->currentTab(), 0) << "it shows that document";
+
+    // All at once, from the overview (more than one: it asks first)
+    auto* overview = find<QObject>("tabOverview");
+    QMetaObject::invokeMethod(overview, "open");
+    until([&] { return overview->property("visible").toBool(); });
+    click(findItem("closeAllButton"));
+    auto* dialog = find<QObject>("closeAllDialog");
+    ASSERT_NE(dialog, nullptr);
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_TRUE(dialog->property("visible").toBool()) << "it asks before closing several documents";
+    QMetaObject::invokeMethod(dialog, "accept");
+    until([&] { return controller->tabManager().count() == 0; });
+    EXPECT_EQ(controller->tabManager().count(), 0);
+    EXPECT_TRUE(controller->homeVisible()) << "no documents left: the home screen";
+}
+
+TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    controller->newDocument();
+    wait(50);
+    ASSERT_EQ(controller->tabManager().count(), 2);
+
+    // The windows are made like in main(): the same QML with the new controller as "app"
+    std::vector<QPointer<QQuickWindow>> made;
+    AppController::setWindowFactory([this, &made](AppController* w) {
+        auto* context = new QQmlContext(engine->rootContext(), w);
+        context->setContextProperty("app", w);
+        auto* component = new QQmlComponent(engine.get(), QStringLiteral("XournalQt"), QStringLiteral("Main"), w);
+        QObject* object = component->create(context);
+        if (!object) {
+            qWarning("%s", qPrintable(component->errorString()));
+            return;
+        }
+        object->setParent(w);
+        made.push_back(qobject_cast<QQuickWindow*>(object));
+    });
+
+    controller->undockTab(0);
+    wait(200);
+    ASSERT_EQ(made.size(), 1u);
+    ASSERT_NE(made[0], nullptr);
+    EXPECT_EQ(controller->tabManager().count(), 1) << "the document left the main window";
+    ASSERT_EQ(controller->documentWindows().size(), 1u);
+    AppController* second = controller->documentWindows().front();
+    EXPECT_EQ(second->tabManager().count(), 1);
+    // It shows documents only: no home tab
+    auto* homeTab = made[0]->findChild<QQuickItem*>("homeTab");
+    ASSERT_NE(homeTab, nullptr);
+    EXPECT_FALSE(homeTab->isVisible());
+    EXPECT_FALSE(second->homeVisible());
+
+    // Back to the main window: the second window asks to be closed
+    QSignalSpy closing(second, &AppController::closeWindowRequested);
+    second->dockTab(0);
+    wait(50);
+    EXPECT_EQ(controller->tabManager().count(), 2) << "the document is back in the main window";
+    EXPECT_EQ(closing.count(), 1);
+    wait(100);  // the window without documents closes itself, with its controller
+    EXPECT_TRUE(controller->documentWindows().empty());
+    EXPECT_TRUE(made[0].isNull()) << "the window is gone";
+    AppController::setWindowFactory({});
 }
 
 TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {

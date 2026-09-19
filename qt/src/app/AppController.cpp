@@ -78,7 +78,8 @@ AppController::AppController(QObject* parent): QObject(parent) {
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
-    pageClipboard = std::make_unique<PageClipboard>();
+    ownPageClipboard = std::make_unique<PageClipboard>();
+    pageClipboard = ownPageClipboard.get();
     // "Only pages with hits" ends with the search.
     connect(this, &AppController::searchChanged, this, [this] {
         if (searchQuery().isEmpty()) {
@@ -108,6 +109,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     settingsView = mainWindow.settingsView;
     library = mainWindow.library;
     recent = mainWindow.recent;
+    pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     pages = std::make_unique<PagesModel>();
@@ -137,7 +139,9 @@ void AppController::makeTabs() {
 }
 
 AppController::~AppController() {
-    xoj::compat::setMessageSink({});
+    if (!isSecondary()) {
+        xoj::compat::setMessageSink({});  // (the main window set it)
+    }
     for (auto& c: currentConnections) {
         disconnect(c);
     }
@@ -156,6 +160,12 @@ void AppController::setWindowFactory(std::function<void(AppController*)> factory
     windowFactory = std::move(factory);
 }
 
+void AppController::closeAllTabs() {
+    while (tabs->count() > 0) {
+        tabs->closeTab(tabs->count() - 1);
+    }
+}
+
 void AppController::undockTab(int index) {
     if (index < 0 || index >= tabs->count() || (isSecondary() && tabs->count() == 1)) {
         return;  // (the only document of its own window is undocked already)
@@ -168,6 +178,9 @@ void AppController::undockTab(int index) {
     auto* window = new AppController(*main, main);
     main->windows.push_back(window);
     window->tabManager().adoptTab(std::move(tab));
+    if (main->recovery) {
+        main->recovery->watch(window->tabManager());  // its changes survive a crash as well
+    }
     if (windowFactory) {
         windowFactory(window);
     }
@@ -185,9 +198,10 @@ void AppController::dockTab(int index) {
 }
 
 void AppController::windowClosed() {
-    if (!isSecondary()) {
-        return;
+    if (!isSecondary() || windowGone) {
+        return;  // (once: the window is gone and this controller with it)
     }
+    windowGone = true;
     // Documents with unsaved changes are not lost: they go back to the main window.
     for (int i = tabs->count() - 1; i >= 0; --i) {
         if (tabs->session(i) && tabs->session(i)->isModified()) {

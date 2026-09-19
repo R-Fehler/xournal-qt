@@ -234,6 +234,57 @@ TEST(Export, pdfExportAndSuggestedName) {
     EXPECT_TRUE(d.suggestedExportFile().toLocalFile().endsWith("export_annotated.pdf"));
 }
 
+TEST(Windows, aTabMovesToAWindowOfItsOwnAndBack) {
+    AppController c;
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    c.newDocument();
+    ASSERT_EQ(c.tabManager().count(), 2);
+    const QString first = c.tabManager().session(0)->getFilePath().string().c_str();
+
+    c.undockTab(0);
+    ASSERT_EQ(c.documentWindows().size(), 1u);
+    AppController* window = c.documentWindows().front();
+    EXPECT_TRUE(window->isSecondary());
+    EXPECT_EQ(window->mainWindow(), &c);
+    EXPECT_FALSE(window->homeVisible()) << "a window of its own shows documents only";
+    EXPECT_EQ(c.tabManager().count(), 1) << "the document left the main window";
+    ASSERT_EQ(window->tabManager().count(), 1);
+    EXPECT_EQ(QString(window->tabManager().session(0)->getFilePath().string().c_str()), first)
+            << "with its own session (undo history, zoom)";
+    EXPECT_EQ(&window->context(), &c.context()) << "the same settings, tools and rendering";
+
+    // The last document of such a window stays there
+    window->undockTab(0);
+    EXPECT_EQ(c.documentWindows().size(), 1u);
+    EXPECT_EQ(window->tabManager().count(), 1);
+
+    // Back to the main window: the window is left without documents
+    QSignalSpy closing(window, &AppController::closeWindowRequested);
+    window->dockTab(0);
+    EXPECT_EQ(c.tabManager().count(), 2);
+    EXPECT_EQ(window->tabManager().count(), 0);
+    EXPECT_EQ(closing.count(), 1);
+    window->windowClosed();
+    EXPECT_TRUE(c.documentWindows().empty());
+    QCoreApplication::processEvents();  // (the controller is deleted later)
+}
+
+TEST(Windows, closingAWindowKeepsDocumentsWithUnsavedChanges) {
+    AppController c;
+    c.newDocument();
+    c.newDocument();
+    ASSERT_EQ(c.tabManager().count(), 2);
+    c.undockTab(0);
+    AppController* window = c.documentWindows().front();
+    ASSERT_EQ(window->tabManager().count(), 1);
+    // A change nobody saved: it must not go away with the window
+    window->insertPages(0, 0, -1, false, 1);
+    ASSERT_TRUE(window->tabManager().session(0)->isModified());
+    window->windowClosed();
+    EXPECT_EQ(c.tabManager().count(), 2) << "the changed document went back to the main window";
+    QCoreApplication::processEvents();
+}
+
 TEST(ToolbarColors, orangeByDefaultAddRemoveReset) {
     AppController c;
     c.resetToolbarColors();

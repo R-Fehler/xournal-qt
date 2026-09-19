@@ -65,6 +65,8 @@ public:
     void start();
     /// Normal exit: the journal is marked clean (the tabs are reopened next time).
     void finish();
+    /// Also protect (and write down) the documents of another window; until that window is gone.
+    void watch(TabManager& other);
     /// Write the journal now (normally done shortly after each change).
     void writeNow();
 
@@ -87,6 +89,7 @@ private:
     void scheduleWrite();
 
     TabManager& tabs;
+    std::vector<TabManager*> otherWindows;  ///< undocked documents: they belong to this session too
     fs::path journalFile;
     std::optional<Journal> previousJournal;
     QTimer writeTimer;
