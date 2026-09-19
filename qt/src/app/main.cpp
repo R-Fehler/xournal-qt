@@ -162,9 +162,10 @@ int main(int argc, char* argv[]) {
             QTimer::singleShot(100, [&engine, &controller, set] {
                 const QString target = set.section('=', 0, 0);
                 const QString name = target.section('.', 0, 0);
-                QObject* o = name == "app" ? &controller : nullptr;  // "app.<property>": the controller
+                // "app.<property>": the controller, "window.<property>": the window
+                QObject* o = name == "app" ? &controller : nullptr;
                 if (auto* w = engine.rootObjects().value(0); w && !o) {
-                    o = w->findChild<QObject*>(name);
+                    o = name == "window" ? w : w->findChild<QObject*>(name);
                 }
                 if (o) {
                     o->setProperty(target.section('.', 1).toLatin1().constData(), set.section('=', 1));

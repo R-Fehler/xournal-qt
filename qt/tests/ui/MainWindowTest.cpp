@@ -693,3 +693,36 @@ TEST_F(MainWindowTest, toolbarMovesToTheLeftOrRight) {
     EXPECT_DOUBLE_EQ(canvas->width(), canvasWidthOnTop);
     EXPECT_EQ(controller->toolbarPosition(), "top");
 }
+
+TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
+    auto* square = find<QQuickItem>("quickToolSquare");
+    ASSERT_NE(square, nullptr);
+    EXPECT_FALSE(square->isVisible());
+    key(Qt::Key_F11);
+    EXPECT_TRUE(window->property("fullScreenMode").toBool());
+    EXPECT_TRUE(square->isVisible());
+    EXPECT_FALSE(find<QQuickItem>("sidebar")->isVisible());
+    auto* gridButton = find<QQuickItem>("pageGridButton");
+    EXPECT_FALSE(gridButton->isVisible()) << "the tools are hidden";
+
+    // Tap the square: all tools; choosing one closes them
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, square->mapToScene(QPointF(28, 28)).toPoint());
+    QObject* tools = find("quickTools");
+    ASSERT_TRUE(waitOpened(tools, true));
+    QQuickItem* eraser = nullptr;
+    for (auto* i: window->contentItem()->window()->findChildren<QQuickItem*>()) {
+        if (i->property("iconName").toString() == "xopp-tool-eraser" && i->isVisible()) {
+            eraser = i;
+        }
+    }
+    ASSERT_NE(eraser, nullptr);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                      eraser->mapToScene(QPointF(eraser->width() / 2, eraser->height() / 2)).toPoint());
+    EXPECT_EQ(controller->tool(), "eraser");
+    EXPECT_TRUE(waitOpened(tools, false));
+
+    key(Qt::Key_Escape);  // leaves full screen
+    EXPECT_FALSE(window->property("fullScreenMode").toBool());
+    EXPECT_TRUE(gridButton->isVisible());
+    controller->selectTool("pen");
+}
