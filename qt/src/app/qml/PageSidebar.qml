@@ -36,6 +36,7 @@ Rectangle {
         currentIndex: (app.filteredPages.count, app.filteredPages.rowOf(app.pages.currentPage))
         onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
         ScrollBar.vertical: ScrollBar {}
+        TouchpadMomentum { flickable: list }
 
         delegate: Item {
             id: entry

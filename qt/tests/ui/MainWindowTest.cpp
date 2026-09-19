@@ -15,6 +15,7 @@
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTest>
+#include <QWheelEvent>
 #include <gtest/gtest.h>
 
 #include "shell/SettingsModel.h"
@@ -297,4 +298,35 @@ TEST_F(MainWindowTest, pageGridCanShowOnlyPagesWithHits) {
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, c.toPoint());
     wait(50);
     EXPECT_EQ(controller->pageNumber(), 10);
+}
+
+TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    for (int i = 0; i < 30; ++i) {
+        controller->addPageAfterCurrent();  // a long document
+    }
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    wait(50);
+    static QPointingDevice touchpad("test touchpad", 2003, QInputDevice::DeviceType::TouchPad,
+                                    QPointingDevice::PointerType::Finger,
+                                    QInputDevice::Capability::Position | QInputDevice::Capability::Scroll, 2, 0);
+    const QPointF pos = grid->mapToScene(QPointF(grid->width() / 2, grid->height() / 2));
+    auto wheel = [&](int dy, Qt::ScrollPhase phase) {
+        QWheelEvent e(pos, window->mapToGlobal(pos), QPoint(0, dy), QPoint(0, dy * 4), Qt::NoButton, Qt::NoModifier,
+                      phase, false, Qt::MouseEventNotSynthesized, &touchpad);
+        QCoreApplication::sendEvent(window, &e);
+    };
+    const double start = grid->property("contentY").toDouble();
+    wheel(-20, Qt::ScrollBegin);
+    for (int i = 0; i < 8; ++i) {
+        wait(10);
+        wheel(-20, Qt::ScrollUpdate);
+    }
+    const double atLift = grid->property("contentY").toDouble();
+    EXPECT_GT(atLift, start + 100) << "two-finger scrolling moves the grid";
+    wheel(0, Qt::ScrollEnd);
+    wait(300);
+    EXPECT_GT(grid->property("contentY").toDouble(), atLift + 50) << "no momentum after lifting the fingers";
 }

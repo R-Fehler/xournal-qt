@@ -47,7 +47,8 @@ set(XQT_QML_FILES
     src/app/qml/SearchBar.qml
     src/app/qml/PageGrid.qml
     src/app/qml/HitBadge.qml
-    src/app/qml/SearchFilterChip.qml)
+    src/app/qml/SearchFilterChip.qml
+    src/app/qml/TouchpadMomentum.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})

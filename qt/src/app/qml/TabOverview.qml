@@ -130,6 +130,7 @@ Popup {
             cellWidth: Math.floor(width / columns)
             cellHeight: Math.round(cellWidth * 1.25)
             ScrollBar.vertical: ScrollBar {}
+            TouchpadMomentum { flickable: grid }
 
             Keys.onReturnPressed: overview.activate(currentIndex)
             Keys.onEnterPressed: overview.activate(currentIndex)

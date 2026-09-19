@@ -196,6 +196,7 @@ Rectangle {
                 if (cols !== pageGrid.columns) pageGrid.setColumns(cols)
             }
         }
+        TouchpadMomentum { flickable: grid }
         WheelHandler {
             acceptedModifiers: Qt.ControlModifier
             onWheel: function(event) {
