@@ -36,7 +36,9 @@
 #endif
 #endif
 
-#ifdef GHC_FILESYSTEM
+#if defined(XOJ_CONFIG_FOLDER_NAME)  // xournal-qt: own config/cache folders, independent of upstream Xournal++
+constexpr auto const* CONFIG_FOLDER_NAME = XOJ_CONFIG_FOLDER_NAME;
+#elif defined(GHC_FILESYSTEM)
 // Fix of ghc::filesystem bug (path::operator/=() won't support string_views)
 constexpr auto const* CONFIG_FOLDER_NAME = "xournalpp";
 #else

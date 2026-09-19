@@ -30,6 +30,7 @@ fi
 cmake -S qt -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build "$BUILD_DIR"
 if [[ -f "$BUILD_DIR/CTestTestfile.cmake" ]]; then
-    ctest --test-dir "$BUILD_DIR" --output-on-failure
+    # Upstream merges are the occasion for the full golden run (every fixture, several minutes).
+    ctest --test-dir "$BUILD_DIR" -C Full --output-on-failure
 fi
 echo "Upstream merge done. New merge base: $(git merge-base HEAD "$REF" | cut -c1-10)"

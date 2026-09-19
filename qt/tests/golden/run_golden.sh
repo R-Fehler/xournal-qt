@@ -8,13 +8,20 @@
 #
 # The fixtures are copied to the output directory first, so the tests never modify the source tree.
 #
+# Modes (GOLDEN_MODE):
+#   quick (default)  a few representative fixtures (strokes, text, images, PDF background, layers) at 72 dpi.
+#                    Meant for routine runs; takes a few seconds.
+#   full             every fixture in FIXTURES at GOLDEN_DPIS, including the big multi-page files. Takes minutes;
+#                    run it for upstream merges and milestone sign-off (ctest -C Full -L golden-full).
+#
 # Environment:
 #   QT_CLI              path to xournal-qt-cli                     (required)
 #   IMGDIFF             path to xoj-imgdiff                        (required)
 #   XOJ_UPSTREAM_BIN    upstream xournalpp built at the fork's merge base (default: ../xournalpp/build/xournalpp)
 #   FIXTURES            directory with .xopp/.xoj files            (default: <repo>/test/files)
 #   GOLDEN_OUT          output directory                           (default: ./golden-out)
-#   GOLDEN_DPIS         DPIs for the PNG comparison                (default: "72 150")
+#   GOLDEN_MODE         quick | full                               (default: quick)
+#   GOLDEN_DPIS         DPIs for the PNG comparison                (default: quick "72", full "72 150")
 #   GOLDEN_TOLERANCE    per-channel tolerance vs upstream          (default: 0)
 #   GOLDEN_RT_TOLERANCE per-channel tolerance for the round trip   (default: 1)
 #   GOLDEN_JOBS         parallel jobs                              (default: nproc)
@@ -27,7 +34,21 @@ IMGDIFF="${IMGDIFF:?set IMGDIFF}"
 UP_BIN="${XOJ_UPSTREAM_BIN:-$ROOT/../xournalpp/build/xournalpp}"
 FIXTURES_SRC="${FIXTURES:-$ROOT/test/files}"
 OUT="${GOLDEN_OUT:-$PWD/golden-out}"
-DPIS="${GOLDEN_DPIS:-72 150}"
+MODE="${GOLDEN_MODE:-quick}"
+if [[ "$MODE" == full ]]; then
+    DPIS="${GOLDEN_DPIS:-72 150}"
+else
+    DPIS="${GOLDEN_DPIS:-72}"
+fi
+# Representative small fixtures for the quick mode (paths relative to FIXTURES).
+QUICK_FIXTURES=(
+    test1.xoj                              # strokes (xoj format)
+    load/strokes.xopp                      # pressure strokes, line styles
+    load/text-fileversion-5.xopp           # text (pango)
+    load/image-fileversion-5.xopp          # images
+    load/layers.xopp                       # layers
+    packaged_xopp/pdfBackground/new.xopp   # attached PDF background (zip container)
+)
 TOL="${GOLDEN_TOLERANCE:-0}"
 RT_TOL="${GOLDEN_RT_TOLERANCE:-1}"
 JOBS="${GOLDEN_JOBS:-$(nproc)}"
@@ -40,9 +61,17 @@ HAVE_PDFTOPPM=1
 command -v pdftoppm >/dev/null || { HAVE_PDFTOPPM=0; echo "note: pdftoppm not found, PDF comparison disabled"; }
 
 rm -rf "$OUT"
-mkdir -p "$OUT/cases"
-cp -a "$FIXTURES_SRC" "$OUT/fixtures"
+mkdir -p "$OUT/cases" "$OUT/fixtures"
 FIXTURES="$OUT/fixtures"
+if [[ "$MODE" == full ]]; then
+    cp -a "$FIXTURES_SRC"/. "$FIXTURES"
+else
+    for rel in "${QUICK_FIXTURES[@]}"; do
+        mkdir -p "$FIXTURES/$(dirname "$rel")"
+        # Copy the fixture's whole directory: it may reference neighbouring files (PDF/image backgrounds).
+        cp -a "$FIXTURES_SRC/$(dirname "$rel")"/. "$FIXTURES/$(dirname "$rel")/" 2>/dev/null
+    done
+fi
 
 # Appends "ok|fail<TAB>description" to the case's result file.
 record() { printf '%s\t%s\n' "$1" "$2" >>"$RESULTS"; }
@@ -129,8 +158,15 @@ run_case() {
     fi
 }
 
-mapfile -d '' files < <(find "$FIXTURES" -type f \( -name '*.xopp' -o -name '*.xoj' \) -print0 | sort -z)
-echo "Golden tests: ${#files[@]} fixtures, DPIs [$DPIS], $JOBS jobs, upstream: $UP_BIN"
+if [[ "$MODE" == full ]]; then
+    mapfile -d '' files < <(find "$FIXTURES" -type f \( -name '*.xopp' -o -name '*.xoj' \) -print0 | sort -z)
+else
+    files=()
+    for rel in "${QUICK_FIXTURES[@]}"; do
+        files+=("$FIXTURES/$rel")
+    done
+fi
+echo "Golden tests ($MODE): ${#files[@]} fixtures, DPIs [$DPIS], $JOBS jobs, upstream: $UP_BIN"
 
 for f in "${files[@]}"; do
     while [[ $(jobs -rp | wc -l) -ge $JOBS ]]; do

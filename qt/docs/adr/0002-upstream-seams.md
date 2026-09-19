@@ -45,9 +45,9 @@ The Qt build defines `XOJ_NO_GTK=1`. The upstream GTK build is unaffected by the
   - `undo/*` and `control/layer/*` **are** compiled, unmodified, against the shadow interfaces.
 
 ## Verification
-- `qt/tests/golden/run_golden.sh` (ctest label `golden`): every fixture in `test/files`.
-  - `xournal-qt-cli` PNG export (72 and 150 dpi) and PDF export are pixel identical to upstream `xournalpp` built at the merge base.
-  - `.xopp` round trips keep the document structure.
+- `qt/tests/golden/run_golden.sh`: `xournal-qt-cli` PNG and PDF export are pixel identical to upstream `xournalpp` built at the merge base, and `.xopp` round trips keep the document structure.
+  - `golden-quick`, part of plain `ctest` (about 2 s): six representative fixtures (strokes, text, images, layers, attached PDF background) at 72 dpi.
+  - `golden-full`, opt-in (several minutes): every fixture in `test/files` at 72 and 150 dpi. Run `ctest -C Full -L golden-full` for upstream merges (done by `qt/tools/merge-upstream.sh`) and milestone sign-off.
 - `xoj-unit-tests`: the upstream unit tests (`test/unit_tests`, all suites except the GTK-only `ActionDatabaseTest`) run against the Qt-free core.
   - Also `qt/tests/unit/UndoRedoTest.cpp`: upstream undo actions and `UndoRedoHandler` driven through a test implementation of the shadow `Control`.
 - The upstream GTK build (`cmake -S . -B build-gtk`) must keep compiling with all seams applied.

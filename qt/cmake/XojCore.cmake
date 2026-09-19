@@ -60,6 +60,7 @@ target_include_directories(xoj-defaults INTERFACE
     "${XOJ_SRC}/core")
 target_compile_definitions(xoj-defaults INTERFACE
     XOJ_NO_GTK=1
+    XOJ_CONFIG_FOLDER_NAME="xournal-qt"
     G_LOG_DOMAIN="xopp"
     GLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_40)
 target_compile_options(xoj-defaults INTERFACE -Wall -Wreturn-type -Wuninitialized -Wunused-value -Wunused-variable)
@@ -90,9 +91,19 @@ target_link_libraries(xoj-imgdiff PRIVATE PkgConfig::XOJ_DEPS)
 set_target_properties(xoj-imgdiff PROPERTIES AUTOMOC OFF RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 enable_testing()
-add_test(NAME golden
+set(XQT_GOLDEN_ENV "QT_CLI=$<TARGET_FILE:xournal-qt-cli>;IMGDIFF=$<TARGET_FILE:xoj-imgdiff>")
+# Routine run (part of plain `ctest`): a few representative fixtures at 72 dpi, a few seconds.
+add_test(NAME golden-quick
     COMMAND "${CMAKE_CURRENT_LIST_DIR}/../tests/golden/run_golden.sh"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
-set_tests_properties(golden PROPERTIES
-    ENVIRONMENT "QT_CLI=$<TARGET_FILE:xournal-qt-cli>;IMGDIFF=$<TARGET_FILE:xoj-imgdiff>"
-    SKIP_RETURN_CODE 77 LABELS golden TIMEOUT 1800)
+set_tests_properties(golden-quick PROPERTIES
+    ENVIRONMENT "${XQT_GOLDEN_ENV};GOLDEN_MODE=quick;GOLDEN_OUT=${CMAKE_BINARY_DIR}/golden-out-quick"
+    SKIP_RETURN_CODE 77 LABELS golden TIMEOUT 120)
+# Full run (opt-in, several minutes): every fixture at 72 and 150 dpi. For upstream merges / milestone sign-off:
+#   ctest -C Full -L golden-full --output-on-failure
+add_test(NAME golden-full CONFIGURATIONS Full
+    COMMAND "${CMAKE_CURRENT_LIST_DIR}/../tests/golden/run_golden.sh"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+set_tests_properties(golden-full PROPERTIES
+    ENVIRONMENT "${XQT_GOLDEN_ENV};GOLDEN_MODE=full;GOLDEN_OUT=${CMAKE_BINARY_DIR}/golden-out-full"
+    SKIP_RETURN_CODE 77 LABELS golden-full TIMEOUT 3600)
