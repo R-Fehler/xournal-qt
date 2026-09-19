@@ -53,6 +53,9 @@ class AppController: public QObject {
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
     Q_PROPERTY(QString tool READ tool NOTIFY toolChanged)
     Q_PROPERTY(QColor color READ color NOTIFY toolChanged)
+    /// Upstream's drawing type of the tool: default (freehand), strokeRecognizer, line, rectangle, ellipse, arrow,
+    /// doubleArrow, drawCoordinateSystem
+    Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
     Q_PROPERTY(int size READ size NOTIFY toolChanged)
     Q_PROPERTY(QVariantList palette READ palette CONSTANT)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
@@ -94,6 +97,8 @@ public:
     bool canRedo() const;
     QString tool() const;
     QColor color() const;
+    QString drawingType() const;
+    void setDrawingType(const QString& type);
     int size() const;
     QVariantList palette() const;
     int zoomPercent() const;

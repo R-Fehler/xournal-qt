@@ -26,6 +26,8 @@
 #include "model/DocumentListener.h"
 #include "render/PageRaster.h"
 
+#include "control/zoom/ZoomControl.h"
+
 #include "DocumentLayout.h"
 #include "ViewController.h"
 
@@ -96,6 +98,7 @@ private:
     DocumentSession& session;
     RenderService& renderService;
     DocumentLayout layout;
+    ZoomControl zoomControl;  ///< upstream's zoom values for reused tools (from the view controller)
     ViewController viewController;
     std::unique_ptr<PdfCache> pdfCache;
     std::vector<std::unique_ptr<CanvasPage>> pages;

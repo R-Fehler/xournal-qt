@@ -49,7 +49,8 @@
   - Select pages in the sidebar and the page grid: Ctrl/Shift+click, "Select" mode for touch, Ctrl+A. Copy / cut / paste (Ctrl+C/X/V, also into another tab: PDF pages become image backgrounds there), duplicate (Ctrl+D), delete (Delete), move by press-and-hold drag and drop (several pages at once), page menu (right click, ⋮), action bar in the grid.
   - Page operations have their own undo stack (Ctrl+Z in the sidebar/grid, the grid's undo button, "Undo" in the note after an operation); Ctrl+Z on the canvas stays the annotation undo. The document is modified if either stack has changes.
   - Touchpad momentum in the page grid, sidebar and tab overview.
-- **Next:** the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
+- **M6a shapes: done (awaiting on-device test).** Shapes button: freehand, shape recognizer, line, rectangle, ellipse, arrow, double arrow, coordinate system — upstream's handlers (`RulerHandler`, `RectangleHandler`, ... and `ShapeRecognizer`) compiled unmodified; Shift/Ctrl modifiers as upstream. `ZoomControl` shadow for reused code.
+- **Next:** selection (lasso/rectangle, move/resize/rotate), text, image (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
 
 ---
 

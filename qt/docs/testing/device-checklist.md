@@ -82,6 +82,11 @@ cd build-qt
 - [ ] Writing, erasing, scrolling, pinch zoom and the page counter work in every layout; strokes into the neighbour page continue there.
 - [ ] The layout is kept after a restart and applies to all tabs.
 
+## Shapes
+- [ ] Shapes button: line, rectangle, ellipse, arrow, double arrow, coordinate system are drawn by dragging with the pen; Shift/Ctrl while dragging (keyboard) behave as in Xournal++ (square/circle, from the center).
+- [ ] "Recognize shapes": a hand-drawn rectangle, circle, triangle or line becomes straight after lifting the pen.
+- [ ] "Freehand" returns to normal writing.
+
 ## Page operations
 - [ ] Sidebar: Ctrl+click / Shift+click select pages (blue, check mark); a plain tap goes to the page.
 - [ ] Ctrl+C, then Ctrl+V: the pages are pasted after the selection; pasting into another tab works (PDF pages keep their look).

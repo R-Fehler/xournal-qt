@@ -11,6 +11,11 @@
 #include "control/settings/Settings.h"
 #include "control/tools/EraseHandler.h"
 #include "control/tools/InputHandler.h"
+#include "control/tools/ArrowHandler.h"
+#include "control/tools/CoordinateSystemHandler.h"
+#include "control/tools/EllipseHandler.h"
+#include "control/tools/RectangleHandler.h"
+#include "control/tools/RulerHandler.h"
 #include "control/tools/StrokeHandler.h"
 #include "gui/inputdevices/PositionInputData.h"
 #include "model/Document.h"
@@ -96,8 +101,28 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
             eraseViewsOf(this->overlayViews, this->inputHandler.get());
             this->inputHandler.reset();
         }
-        // xournal-qt: shape drawing types (ruler, rectangle, ...) are not ported yet: they draw freehand.
-        this->inputHandler = std::make_unique<StrokeHandler>(&control, getPage());
+        switch (h->getDrawingType()) {
+            case DRAWING_TYPE_LINE:
+                this->inputHandler = std::make_unique<RulerHandler>(&control, getPage());
+                break;
+            case DRAWING_TYPE_RECTANGLE:
+                this->inputHandler = std::make_unique<RectangleHandler>(&control, getPage());
+                break;
+            case DRAWING_TYPE_ELLIPSE:
+                this->inputHandler = std::make_unique<EllipseHandler>(&control, getPage());
+                break;
+            case DRAWING_TYPE_ARROW:
+                this->inputHandler = std::make_unique<ArrowHandler>(&control, getPage(), false);
+                break;
+            case DRAWING_TYPE_DOUBLE_ARROW:
+                this->inputHandler = std::make_unique<ArrowHandler>(&control, getPage(), true);
+                break;
+            case DRAWING_TYPE_COORDINATE_SYSTEM:
+                this->inputHandler = std::make_unique<CoordinateSystemHandler>(&control, getPage());
+                break;
+            default:  // freehand (with the shape recognizer if that drawing type is set)
+                this->inputHandler = std::make_unique<StrokeHandler>(&control, getPage());
+        }
         this->inputHandler->onButtonPressEvent(pos, zoom);
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
     } else if (h->getToolType() == TOOL_ERASER) {

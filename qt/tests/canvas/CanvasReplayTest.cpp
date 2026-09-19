@@ -323,3 +323,54 @@ TEST_F(CanvasReplayTest, restingHandStaysIgnoredAfterThePenLeaves) {
     touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, QPointF(400, 200));
     EXPECT_DOUBLE_EQ(view->getViewController().visibleContentRect().top(), before);
 }
+
+// Shape tools: upstream's shape handlers behind the pen (drawing type of the tool).
+TEST_F(CanvasReplayTest, shapesThroughUpstreamHandlers) {
+    ToolHandler* tools = app->getToolHandler();
+    auto lastStroke = [&]() -> const Stroke* {
+        const auto* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+        return dynamic_cast<const Stroke*>(layer->getElementsView().back());
+    };
+    struct Case {
+        DrawingType type;
+        size_t minPoints, maxPoints;
+    };
+    for (const Case& c: {Case{DRAWING_TYPE_LINE, 2, 2}, Case{DRAWING_TYPE_RECTANGLE, 5, 5}, Case{DRAWING_TYPE_ARROW, 5, 7},
+                         Case{DRAWING_TYPE_ELLIPSE, 20, 1000}, Case{DRAWING_TYPE_COORDINATE_SYSTEM, 3, 3}}) {
+        tools->setDrawingType(c.type);
+        const size_t before = elementCount(0);
+        drawLine(0, QPointF(100, 100), QPointF(300, 200));
+        processEvents();
+        ASSERT_EQ(elementCount(0), before + 1) << "drawing type " << c.type;
+        const Stroke* s = lastStroke();
+        ASSERT_NE(s, nullptr);
+        EXPECT_GE(s->getPointCount(), c.minPoints) << "drawing type " << c.type;
+        EXPECT_LE(s->getPointCount(), c.maxPoints) << "drawing type " << c.type;
+        const auto box = s->getBoundingBox();
+        EXPECT_NEAR(box.x + box.width / 2, 200, 15) << "drawing type " << c.type;
+    }
+    tools->setDrawingType(DRAWING_TYPE_DEFAULT);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(elementCount(0), 4u) << "each shape is one undo step";
+}
+
+TEST_F(CanvasReplayTest, shapeRecognizerStraightensARectangle) {
+    app->getToolHandler()->setDrawingType(DRAWING_TYPE_SHAPE_RECOGNIZER);
+    const std::vector<QPointF> corners{{100, 100}, {300, 102}, {302, 220}, {98, 218}, {100, 100}};
+    tablet(QEvent::TabletPress, viewPos(0, corners[0]), 0.5, Qt::LeftButton, Qt::LeftButton);
+    for (size_t k = 1; k < corners.size(); ++k) {
+        for (int i = 1; i <= 20; ++i) {
+            const double t = i / 20.0;
+            tablet(QEvent::TabletMove, viewPos(0, corners[k - 1] + (corners[k] - corners[k - 1]) * t), 0.5,
+                   Qt::NoButton, Qt::LeftButton);
+        }
+    }
+    tablet(QEvent::TabletRelease, viewPos(0, corners.back()), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    app->getToolHandler()->setDrawingType(DRAWING_TYPE_DEFAULT);
+    ASSERT_EQ(elementCount(0), 1u);
+    const auto* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+    const auto* s = dynamic_cast<const Stroke*>(layer->getElementsView().front());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->getPointCount(), 5u) << "recognized as a rectangle";
+}

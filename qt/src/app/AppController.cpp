@@ -366,18 +366,23 @@ bool AppController::canUndo() const { return session() && session()->getUndoRedo
 bool AppController::canRedo() const { return session() && session()->getUndoRedoHandler()->canRedo(); }
 
 QString AppController::tool() const {
-    switch (app->getToolHandler()->getToolType()) {
-        case TOOL_PEN:
-            return "pen";
-        case TOOL_HIGHLIGHTER:
-            return "highlighter";
-        case TOOL_ERASER:
-            return "eraser";
-        case TOOL_HAND:
-            return "hand";
-        default:
-            return "other";
+    // Upstream's tool names (pen, highlighter, eraser, hand, selectRect, selectRegion, text, image, ...).
+    return QString::fromUtf8(toolTypeToString(app->getToolHandler()->getToolType()).data());
+}
+
+QString AppController::drawingType() const {
+    return QString::fromUtf8(drawingTypeToString(app->getToolHandler()->getDrawingType()).data());
+}
+
+void AppController::setDrawingType(const QString& name) {
+    const DrawingType type = drawingTypeFromString(name.toStdString());
+    ToolHandler* th = app->getToolHandler();
+    if (th->getToolType() != TOOL_PEN && th->getToolType() != TOOL_HIGHLIGHTER) {
+        th->selectTool(TOOL_PEN);  // shapes are drawn with the pen (or the highlighter)
     }
+    th->setDrawingType(type == DRAWING_TYPE_DONT_CHANGE ? DRAWING_TYPE_DEFAULT : type);
+    th->fireToolChanged();
+    Q_EMIT toolChanged();
 }
 
 QColor AppController::color() const { return toQColor(app->getToolHandler()->getColor()); }
@@ -639,13 +644,9 @@ void AppController::redo() {
 }
 
 void AppController::selectTool(const QString& name) {
-    ToolType type = TOOL_PEN;
-    if (name == "highlighter") {
-        type = TOOL_HIGHLIGHTER;
-    } else if (name == "eraser") {
-        type = TOOL_ERASER;
-    } else if (name == "hand") {
-        type = TOOL_HAND;
+    ToolType type = toolTypeFromString(name.toStdString());
+    if (type == TOOL_NONE) {
+        type = TOOL_PEN;
     }
     ToolHandler* th = app->getToolHandler();
     th->selectTool(type);

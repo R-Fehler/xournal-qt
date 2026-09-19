@@ -25,12 +25,14 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     pdfCache = std::make_unique<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     registerListener(&session);
     session.setXournalView(this);
+    session.setZoomControl(&zoomControl);
     rebuildPages();
 
     connect(&viewController, &ViewController::zoomChanged, this, [this] {
         // Like upstream: while zooming, show the existing buffers scaled and render sharp only once the zoom is stable.
         renderService.blockRerenderZoom();
         updateRenderParams();
+        zoomControl.setZoom(viewController.zoom(), viewController.zoom100());
     });
     connect(&viewController, &ViewController::zoomSettled, this, [this] { updateVisibility(); });
     connect(&viewController, &ViewController::changed, this, [this] {
@@ -61,6 +63,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 
 CanvasView::~CanvasView() {
     session.setXournalView(nullptr);
+    session.setZoomControl(nullptr);
     unregisterListener();
     pages.clear();  // detaches and cancels the rasters
 }

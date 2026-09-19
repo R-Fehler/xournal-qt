@@ -127,6 +127,36 @@ ApplicationWindow {
             IconButton { iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
             IconButton { iconName: "xopp-tool-eraser"; tip: qsTr("Eraser"); checked: app.tool === "eraser"; onClicked: app.selectTool("eraser") }
             IconButton { iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
+            IconButton {
+                objectName: "shapeButton"
+                readonly property var icons: ({
+                    "line": "xopp-draw-line", "rectangle": "xopp-draw-rect", "ellipse": "xopp-draw-ellipse",
+                    "arrow": "xopp-draw-arrow", "doubleArrow": "xopp-draw-double-arrow",
+                    "drawCoordinateSystem": "xopp-draw-coordinate-system", "strokeRecognizer": "xopp-shape-recognizer"
+                })
+                iconName: icons[app.drawingType] || "xqt-shapes"
+                tip: qsTr("Shapes")
+                checked: (app.tool === "pen" || app.tool === "highlighter") && app.drawingType !== "default"
+                onClicked: shapeMenu.popup()
+                Menu {
+                    id: shapeMenu
+                    component ShapeItem: MenuItem {
+                        property string type
+                        checkable: true
+                        checked: app.drawingType === type
+                        onTriggered: app.drawingType = type
+                    }
+                    ShapeItem { text: qsTr("Freehand"); type: "default" }
+                    ShapeItem { text: qsTr("Recognize shapes (draw, then it straightens)"); type: "strokeRecognizer" }
+                    MenuSeparator {}
+                    ShapeItem { text: qsTr("Line"); type: "line" }
+                    ShapeItem { text: qsTr("Rectangle"); type: "rectangle" }
+                    ShapeItem { text: qsTr("Ellipse"); type: "ellipse" }
+                    ShapeItem { text: qsTr("Arrow"); type: "arrow" }
+                    ShapeItem { text: qsTr("Double arrow"); type: "doubleArrow" }
+                    ShapeItem { text: qsTr("Coordinate system"); type: "drawCoordinateSystem" }
+                }
+            }
             ToolSeparator {}
             Repeater {
                 model: app.palette.slice(0, 8)

@@ -22,6 +22,7 @@
 #include <QTimer>
 
 #include "control/Control.h"
+#include "control/zoom/ZoomControl.h"
 #include "undo/UndoRedoHandler.h"  // for UndoRedoListener
 
 #include "HeadlessViews.h"
@@ -101,6 +102,8 @@ public:
     // --- view side --------------------------------------------------------------------------------------------
     /// The view showing this session (nullptr: headless). Not owned.
     void setXournalView(XournalView* view);
+    /// Zoom values for reused upstream code, kept up to date by the view (nullptr: headless, zoom 1).
+    void setZoomControl(ZoomControl* zoom);
     /// Cursor implementation of the view (nullptr: headless). Not owned.
     void setCursor(XournalppCursor* cursor);
     void setCurrentPageNo(size_t page);
@@ -183,6 +186,8 @@ private:
     SessionWindow window;
     HeadlessXournalView headlessView;
     HeadlessCursor headlessCursor;
+    ZoomControl headlessZoom;
+    ZoomControl* zoomControl = &headlessZoom;
     XournalppCursor* cursor = &headlessCursor;
     SessionScrollHandler scrollHandler;
     size_t currentPage = 0;

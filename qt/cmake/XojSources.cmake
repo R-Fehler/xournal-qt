@@ -188,6 +188,17 @@ set(XOJ_TOOLS_SOURCES
     ${XOJ_SRC}/core/control/tools/StrokeStabilizer.cpp
     ${XOJ_SRC}/core/control/tools/SnapToGridInputHandler.cpp
     ${XOJ_SRC}/core/control/tools/EraseHandler.cpp
+    ${XOJ_SRC}/core/control/zoom/ZoomListener.cpp
+    ${XOJ_SRC}/core/control/tools/BaseShapeHandler.cpp
+    ${XOJ_SRC}/core/control/tools/RulerHandler.cpp
+    ${XOJ_SRC}/core/control/tools/RectangleHandler.cpp
+    ${XOJ_SRC}/core/control/tools/EllipseHandler.cpp
+    ${XOJ_SRC}/core/control/tools/ArrowHandler.cpp
+    ${XOJ_SRC}/core/control/tools/CoordinateSystemHandler.cpp
+    ${XOJ_SRC}/core/control/tools/SplineHandler.cpp
+    ${XOJ_SRC}/core/view/overlays/BaseShapeOrSplineToolView.cpp
+    ${XOJ_SRC}/core/view/overlays/ShapeToolView.cpp
+    ${XOJ_SRC}/core/view/overlays/SplineToolView.cpp
     ${XOJ_SRC}/core/view/overlays/BaseStrokeToolView.cpp
     ${XOJ_SRC}/core/view/overlays/StrokeToolView.cpp
     ${XOJ_SRC}/core/view/overlays/StrokeToolFilledView.cpp

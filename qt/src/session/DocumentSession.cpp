@@ -159,7 +159,7 @@ DocumentSession::~DocumentSession() {
 
 Settings* DocumentSession::getSettings() const { return app.getSettings(); }
 ToolHandler* DocumentSession::getToolHandler() const { return app.getToolHandler(); }
-ZoomControl* DocumentSession::getZoomControl() const { return nullptr; }  // provided by the canvas (M4)
+ZoomControl* DocumentSession::getZoomControl() const { return zoomControl; }
 Document* DocumentSession::getDocument() const { return doc.get(); }
 UndoRedoHandler* DocumentSession::getUndoRedoHandler() const { return undoRedo.get(); }
 MainWindow* DocumentSession::getWindow() const { return const_cast<SessionWindow*>(&window); }
@@ -197,6 +197,8 @@ void DocumentSession::setCopyCutEnabled(bool enabled) {
 void DocumentSession::setXournalView(XournalView* view) { window.view = view ? view : &headlessView; }
 
 void DocumentSession::setCursor(XournalppCursor* c) { cursor = c ? c : &headlessCursor; }
+
+void DocumentSession::setZoomControl(ZoomControl* z) { zoomControl = z ? z : &headlessZoom; }
 
 void DocumentSession::insertNewPage(size_t position, bool automatedInsertion) {
     // Port of PageBackgroundChangeController::insertNewPage (default branch: no page type chosen for new pages,
