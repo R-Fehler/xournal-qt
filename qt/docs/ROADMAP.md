@@ -67,6 +67,7 @@
   - Several items can be selected (Ctrl/Shift+click, the circle on a card, "Select" in the menu, Ctrl+A) and opened, copied, moved or trashed together; dragging a selected card moves all of them.
   - Library search: folder names, and the text of all documents (PDF text and text elements) from a background index in `.xournal_library/index`, plus names; hits with count and a text snippet; opening one shows the document search at the first hit.
   - Import of whole folder trees (Import → "Import a folder with its subfolders…", or dropping folders): the folder structure is kept, with its documents.
+  - Extended search: the pages with hits of each result (marked in the page images, drawn from kept documents and page images), tap one to open the document there with the search; grid zoom (− / +, Ctrl+wheel, pinch).
   - Fix on the way: a tool tip (any non-modal popup) no longer blocks pen and mouse input on the canvas.
 - **Search with short texts** (user report: a one-letter search in a large document could crash): texts shorter than 4 characters are searched on Enter or a tap on the search icon only (document, tab overview, library). A one-letter search in a 300-page PDF (207k hits) peaked at ~1 GB: the sidebar and page grid made one QML item per hit. Thumbnails now show at most 50 marks per page, spread over it (the count badge stays exact): ~260 MB.
 - **Tab strip with many tabs:** the tabs use the whole width before they scroll, and the + button stays at the right end (the list and the spacer used to share the room).

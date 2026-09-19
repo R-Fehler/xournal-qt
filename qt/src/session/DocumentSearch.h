@@ -19,6 +19,8 @@
 
 #include "model/DocumentListener.h"
 
+class Document;
+
 namespace xqt {
 
 class DocumentSession;
@@ -47,6 +49,10 @@ public:
     int currentHit() const { return current; }
     /// Increased with every change of the hits or the current hit (for views).
     quint64 revision() const { return rev; }
+
+    /// The hits on one page of a document (page points, reading order): PDF text and visible text elements. Takes a
+    /// shared document lock; usable on any thread for a document no session changes meanwhile.
+    static std::vector<QRectF> findOnPage(Document& doc, size_t page, const std::string& utf8);
 
     void next();
     void previous();

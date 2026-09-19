@@ -69,6 +69,10 @@ public:
         SnippetRole,
         ItemCountRole,     ///< folders: documents and folders in it
         SelectedRole,
+        /// Search: the pages with hits, [{ page, count, aspect }]
+        HitPageListRole,
+        /// Search: image URL of the pages with hits marked (append "/<page>")
+        HitPageBaseRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);

@@ -36,8 +36,14 @@ This folder is only a cache, and it can be deleted at any time. For folders that
 - `previews/<hash>.png`: the first page, 360 px wide, rendered like the page thumbnails. The file name comes from the
   path, sizes and modification times, so a changed document gets a new preview. Previews of documents outside a
   library (recent files) go to `~/.cache/xournal-qt/previews`.
-- `index/<hash>.json`: the text of every page (PDF text and text elements) for the library search. A background
-  thread builds it, one document at a time, and rebuilds it when a document changes.
+- `index/<hash>.json`: the text of every page (PDF text and text elements) and the page shapes, for the library
+  search. A background thread builds it, one document at a time, and rebuilds it when a document changes (or the
+  format changes).
+
+The pages with hits of the extended search are drawn on demand (`HitPages.*`): the last 12 documents used stay
+loaded, drawn pages stay in memory (up to 128 MB) without marks, and the marks are painted into the page image.
+Measured on a 300-page text PDF: 3–13 ms per page (13 ms with ~700 marks of a one-letter search), 1–2 ms when only
+the search changed.
 
 Code: `qt/src/shell/Library.*` (library, search index), `Previews.*`, `LibraryModel.*`, `RecentFiles.*`.
 
@@ -47,6 +53,10 @@ Code: `qt/src/shell/Library.*` (library, search index), `Previews.*`, `LibraryMo
 - **Library**:
   - views: folders with breadcrumbs, or all documents at once; sort by name or last modified
   - search: folders whose name matches (tap one to open it), then documents whose name or text matches
+  - extended search (the pages button next to the search field): each result also shows its pages with hits,
+    marked, in a row under the title (swipe or scroll sideways); tapping a page opens the document at that page
+    with the search active. The cells are taller; − / + (also Ctrl+wheel, pinch) make them smaller or bigger, in
+    both views. Texts shorter than 4 characters are searched on Enter.
   - New document: name, background, paper size, orientation. It is saved at once in the current folder.
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders
     from the file manager. They are copied.

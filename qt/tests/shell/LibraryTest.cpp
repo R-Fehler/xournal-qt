@@ -4,6 +4,7 @@
  * @license GNU GPLv2 or later
  */
 #include <fstream>
+#include <iostream>
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -15,6 +16,7 @@
 #include "model/Document.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
+#include "shell/HitPages.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/Previews.h"
@@ -488,4 +490,52 @@ TEST_F(LibraryTest, searchFindsFolderNames) {
     const int lab = model.rowOf(QString::fromStdString((root / "Math" / "Physics Lab").string()));
     ASSERT_GE(lab, 0);
     EXPECT_EQ(model.data(model.index(lab), LibraryModel::LocationRole).toString(), "Math");
+}
+
+TEST_F(LibraryTest, hitPagesAreMarkedAndKept) {
+    makePdf(root / "lecture.pdf");
+    HitPageProvider::clearCaches();
+    const int before = HitPageProvider::renderCount();
+    const QImage plain = HitPageProvider::render(root / "lecture.pdf", 1, "", 190);
+    ASSERT_FALSE(plain.isNull());
+    EXPECT_EQ(plain.width(), 192) << "widths in steps of 64";
+    const QImage marked = HitPageProvider::render(root / "lecture.pdf", 1, "page 2", 180);
+    EXPECT_EQ(HitPageProvider::renderCount(), before + 1) << "the second request only adds the marks";
+    ASSERT_EQ(marked.size(), plain.size());
+    EXPECT_NE(marked, plain) << "the hit is marked";
+    // Marks are yellow-ish: some pixel lost blue but not red
+    bool yellow = false;
+    for (int y = 0; y < marked.height() && !yellow; ++y) {
+        for (int x = 0; x < marked.width() && !yellow; ++x) {
+            const QColor c = marked.pixelColor(x, y), o = plain.pixelColor(x, y);
+            yellow = c != o && c.blue() < o.blue() && c.red() >= o.red() - 2;
+        }
+    }
+    EXPECT_TRUE(yellow);
+    EXPECT_TRUE(HitPageProvider::render(root / "lecture.pdf", 5, "x", 180).isNull()) << "no such page";
+    EXPECT_TRUE(HitPageProvider::baseUrl(DocumentFiles::itemOf(root / "lecture.pdf"), "page 2").startsWith("image://hitpage/"));
+}
+
+// Opt-in timing: XQT_BENCH_PDF=<a long PDF> XQT_BENCH_QUERY=<text>
+TEST_F(LibraryTest, benchHitPages) {
+    const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
+    if (pdf.isEmpty()) {
+        GTEST_SKIP() << "set XQT_BENCH_PDF";
+    }
+    const QString query = qEnvironmentVariable("XQT_BENCH_QUERY", "e");
+    HitPageProvider::clearCaches();
+    QElapsedTimer t;
+    t.start();
+    HitPageProvider::render(fs::path(pdf.toStdString()), 0, query, 256);
+    std::cout << "first page (load + draw + marks): " << t.elapsed() << " ms\n";
+    t.restart();
+    for (int p = 1; p <= 20; ++p) {
+        HitPageProvider::render(fs::path(pdf.toStdString()), p, query, 256);
+    }
+    std::cout << "20 more pages: " << t.elapsed() << " ms\n";
+    t.restart();
+    for (int p = 1; p <= 20; ++p) {
+        HitPageProvider::render(fs::path(pdf.toStdString()), p, query + "x", 256);
+    }
+    std::cout << "the same 20 pages, other search (marks only): " << t.elapsed() << " ms\n";
 }

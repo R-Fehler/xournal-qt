@@ -112,14 +112,14 @@ void DocumentSearch::step() {
     Q_EMIT finished();
 }
 
-void DocumentSearch::searchPage(size_t pageNo) {
+std::vector<QRectF> DocumentSearch::findOnPage(Document& document, size_t pageNo, const std::string& utf8) {
     // Port of SearchControl::search (the search of one page)
     std::vector<XojPdfRectangle> results;
-    Document* doc = session.getDocument();
+    Document* doc = &document;
     {
         std::shared_lock lock(*doc);
         if (pageNo >= doc->getPageCount()) {
-            return;
+            return {};
         }
         PageRef page = doc->getPage(pageNo);
         if (page->getBackgroundType().isPdfPage()) {
@@ -139,9 +139,18 @@ void DocumentSearch::searchPage(size_t pageNo) {
             }
         }
     }
-    std::vector<Hit> hits;
+    std::vector<QRectF> rects;
+    rects.reserve(results.size());
     for (const auto& r: results) {
-        hits.push_back({pageNo, QRectF(QPointF(r.x1, r.y1), QPointF(r.x2, r.y2)).normalized()});
+        rects.push_back(QRectF(QPointF(r.x1, r.y1), QPointF(r.x2, r.y2)).normalized());
+    }
+    return rects;
+}
+
+void DocumentSearch::searchPage(size_t pageNo) {
+    std::vector<Hit> hits;
+    for (const QRectF& r: findOnPage(*session.getDocument(), pageNo, utf8)) {
+        hits.push_back({pageNo, r});
     }
     // Reading order on the page (lines in 4 pt bands, then left to right).
     auto key = [](const Hit& h) { return std::pair{static_cast<long>(h.rect.top() / 4), h.rect.left()}; };

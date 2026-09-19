@@ -76,6 +76,11 @@ public:
     /// Wait until the background work is done (tests).
     void waitForDone();
 
+    struct PageHits {
+        int page = 0;        ///< 0-based
+        int count = 0;       ///< matches on the page
+        double aspect = 0;   ///< height / width of the page (0: unknown)
+    };
     struct Hit {
         fs::path file;       ///< the document's main file
         int count = 0;       ///< matches in the text
@@ -83,6 +88,7 @@ public:
         int firstPage = -1;  ///< first page with a match (0-based)
         bool inName = false;
         QString snippet;     ///< text around the first match
+        std::vector<PageHits> pageHits;  ///< the pages with matches, in order
     };
     /// Search the text and the names of all indexed documents (case-insensitive, whitespace-insensitive).
     std::vector<Hit> search(const QString& query) const;
@@ -91,6 +97,8 @@ public:
 
     /// The text of every page: the PDF text, then the text elements (upstream Text) of all layers.
     static QStringList extractText(Document& doc);
+    /// Format of the stored index files (older ones are indexed again).
+    static constexpr int FORMAT = 2;
     /// Whitespace runs to one space (the PDF text has line breaks where the page has them).
     static QString simplified(const QString& text);
 
@@ -104,6 +112,7 @@ private:
         QString name;
         fs::path file;
         QStringList pages;  ///< simplified text per page
+        std::vector<double> aspects;  ///< height / width per page
     };
     void run(std::vector<DocumentItem> items, quint64 generation);
     fs::path indexFile(const fs::path& file) const;

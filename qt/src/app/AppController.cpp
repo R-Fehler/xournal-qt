@@ -549,6 +549,25 @@ bool AppController::openSearchHit(const QString& path, const QString& query) {
     return true;
 }
 
+bool AppController::openSearchHitAt(const QString& path, const QString& query, int page) {
+    if (!openPath(path) || !session()) {
+        return false;
+    }
+    DocumentSession* s = session();
+    const size_t count = s->getDocument()->getPageCount();
+    const size_t p = std::min<size_t>(static_cast<size_t>(std::max(0, page)), count > 0 ? count - 1 : 0);
+    s->setCurrentPageNo(p);
+    s->getScrollHandler()->scrollToPage(p);  // right away; the hit follows when the search found it
+    if (!query.trimmed().isEmpty()) {
+        if (s->search().query() == query) {
+            s->search().jumpToFirstFromCurrentPage();
+        } else {
+            s->search().setQuery(query, true);  // current: the first hit from this page on
+        }
+    }
+    return true;
+}
+
 QVariantList AppController::libraries() const {
     QVariantList list;
     const fs::path current = library->library() ? library->library()->root() : fs::path();

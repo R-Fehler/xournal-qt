@@ -142,9 +142,12 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
         bool loaded = false;
         if (QFile f(QString::fromStdString(stored.string())); f.open(QIODevice::ReadOnly)) {
             const QJsonObject json = QJsonDocument::fromJson(f.readAll()).object();
-            if (json["stamp"].toString() == stamp && json["file"].toString() == rel) {
+            if (json["format"].toInt() == FORMAT && json["stamp"].toString() == stamp && json["file"].toString() == rel) {
                 for (const auto& page: json["pages"].toArray()) {
                     entry->pages << page.toString();
+                }
+                for (const auto& a: json["aspects"].toArray()) {
+                    entry->aspects.push_back(a.toDouble());
                 }
                 loaded = true;
             }
@@ -155,6 +158,11 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
                 for (const QString& text: extractText(*result.document)) {
                     entry->pages << simplified(text);
                 }
+                std::shared_lock lock(*result.document);
+                for (size_t i = 0; i < result.document->getPageCount(); ++i) {
+                    const PageRef p = result.document->getPage(i);
+                    entry->aspects.push_back(p->getWidth() > 0 ? p->getHeight() / p->getWidth() : 0);
+                }
             }
             std::error_code ec;
             fs::create_directories(indexDir, ec);
@@ -162,7 +170,15 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
             const fs::path tmp = fs::path(stored) += ".part";
             QFile out(QString::fromStdString(tmp.string()));
             if (out.open(QIODevice::WriteOnly)) {
-                QJsonObject json{{"file", rel}, {"stamp", stamp}, {"pages", QJsonArray::fromStringList(entry->pages)}};
+                QJsonArray aspects;
+                for (double a: entry->aspects) {
+                    aspects.append(a);
+                }
+                QJsonObject json{{"format", FORMAT},
+                                 {"file", rel},
+                                 {"stamp", stamp},
+                                 {"pages", QJsonArray::fromStringList(entry->pages)},
+                                 {"aspects", aspects}};
                 out.write(QJsonDocument(json).toJson(QJsonDocument::Compact));
                 out.close();
                 fs::rename(tmp, stored, ec);
@@ -236,6 +252,7 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
                 if (h.firstPage < 0) {
                     h.firstPage = p;
                 }
+                h.pageHits.push_back({p, n, p < static_cast<int>(e->aspects.size()) ? e->aspects[static_cast<size_t>(p)] : 0});
             }
         }
         if (h.count > 0 || h.inName) {

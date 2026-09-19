@@ -9,6 +9,7 @@
 #include <QPointer>
 #include <QThreadPool>
 
+#include "HitPages.h"
 #include "Previews.h"
 
 namespace xqt {
@@ -338,6 +339,16 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return r.itemCount;
         case SelectedRole:
             return selection.contains(r.path);
+        case HitPageListRole: {
+            QVariantList pages;
+            pages.reserve(static_cast<qsizetype>(r.hit.pageHits.size()));
+            for (const auto& h: r.hit.pageHits) {
+                pages.append(QVariantMap{{"page", h.page}, {"count", h.count}, {"aspect", h.aspect}});
+            }
+            return pages;
+        }
+        case HitPageBaseRole:
+            return r.isFolder || r.hit.pageHits.empty() ? QString() : HitPageProvider::baseUrl(r.item, query);
         default:
             return {};
     }
@@ -359,7 +370,9 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {NameMatchRole, "nameMatch"},
             {SnippetRole, "snippet"},
             {ItemCountRole, "itemCount"},
-            {SelectedRole, "selected"}};
+            {SelectedRole, "selected"},
+            {HitPageListRole, "hitPageList"},
+            {HitPageBaseRole, "hitPageBase"}};
 }
 
 void LibraryModel::applyResult(const DocumentFiles::Result& r) {

@@ -21,6 +21,24 @@ Rectangle {
     property int page: app.library.available ? 0 : 1
     readonly property var lib: app.library
     readonly property bool searching: lib.searchQuery !== ""
+    /// Extended search: each result shows its pages with hits (taller cells).
+    property bool extended: false
+    readonly property bool extendedView: extended && searching && page === 0
+    // Grid zoom: columns chosen with − / + (Ctrl+wheel, pinch); 0: from the width. Separate for the extended view.
+    property int columnsNormal: 0
+    property int columnsExtended: 0
+    function autoColumns(width, extendedCells) { return Math.max(extendedCells ? 1 : 2, Math.floor(width / (extendedCells ? 380 : 210))) }
+    function columnsFor(width, extendedCells) {
+        const chosen = extendedCells ? columnsExtended : columnsNormal
+        return chosen > 0 ? chosen : autoColumns(width, extendedCells)
+    }
+    /// −1: smaller cells (more columns), +1: bigger cells
+    function zoom(step) {
+        const grid = page === 0 ? libraryGrid : recentGrid
+        const n = Math.max(1, Math.min(12, grid.columns - step))
+        if (extendedView) columnsExtended = n
+        else columnsNormal = n
+    }
     /// "Open a file" (the window's file dialog)
     signal openFileRequested()
 
@@ -371,6 +389,14 @@ Rectangle {
                     onTriggered: home.lib.searchQuery = searchField.text
                 }
             }
+            IconButton {
+                objectName: "extendedSearchButton"
+                visible: home.page === 0 && app.library.available
+                iconName: "xqt-pages-grid"
+                tip: qsTr("Extended search: show the pages with hits of every result")
+                checked: home.extended
+                onClicked: home.extended = !home.extended
+            }
 
             Item { Layout.fillWidth: true }
 
@@ -425,6 +451,29 @@ Rectangle {
                 iconName: "xopp-document-open"
                 tip: qsTr("Open a file")
                 onClicked: home.openFileRequested()
+            }
+            ToolSeparator {}
+            ToolButton {
+                objectName: "zoomOutButton"
+                text: "−"
+                font.pixelSize: 22
+                implicitWidth: 40
+                enabled: (home.page === 0 ? libraryGrid : recentGrid).columns < 12
+                onClicked: home.zoom(-1)
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Smaller cells (Ctrl+wheel, pinch)")
+                ToolTip.delay: 600
+            }
+            ToolButton {
+                objectName: "zoomInButton"
+                text: "+"
+                font.pixelSize: 22
+                implicitWidth: 40
+                enabled: (home.page === 0 ? libraryGrid : recentGrid).columns > 1
+                onClicked: home.zoom(1)
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Bigger cells (Ctrl+wheel, pinch)")
+                ToolTip.delay: 600
             }
         }
 
@@ -526,12 +575,28 @@ Rectangle {
                     model: app.library
                     keyNavigationEnabled: true
                     boundsBehavior: Flickable.StopAtBounds
-                    readonly property int columns: Math.max(2, Math.floor(width / 210))
+                    readonly property int columns: home.columnsFor(width, home.extendedView)
                     property int dropIndex: -1
                     cellWidth: Math.floor(width / columns)
-                    cellHeight: Math.round(cellWidth * 1.2 + 44)
+                    // Extended search: a smaller first page, the row of pages with hits below the title.
+                    readonly property int stripHeight: home.extendedView ? Math.round(Math.max(120, cellWidth * 0.55)) : 0
+                    cellHeight: home.extendedView ? Math.round(cellWidth * 0.5 + 44 + stripHeight + 24)
+                                                  : Math.round(cellWidth * 1.2 + 44)
                     ScrollBar.vertical: ScrollBar {}
                     TouchpadMomentum { flickable: libraryGrid }
+                    WheelHandler {
+                        acceptedModifiers: Qt.ControlModifier
+                        onWheel: function(event) { home.zoom(event.angleDelta.y > 0 ? 1 : -1) }
+                    }
+                    PinchHandler {
+                        target: null
+                        property int startColumns: 2
+                        onActiveChanged: if (active) startColumns = libraryGrid.columns
+                        onActiveScaleChanged: {
+                            const n = Math.max(1, Math.min(12, Math.round(startColumns / activeScale)))
+                            if (n !== libraryGrid.columns) home.zoom(libraryGrid.columns - n)
+                        }
+                    }
                     currentIndex: -1
 
                     Keys.onPressed: function(event) {
@@ -586,6 +651,10 @@ Rectangle {
                         hits: model.hits
                         snippet: model.snippet
                         itemCount: model.itemCount
+                        hitPages: home.extendedView ? model.hitPageList : []
+                        hitPageBase: model.hitPageBase
+                        stripHeight: home.extendedView && !model.isFolder ? libraryGrid.stripHeight : 0
+                        onPageActivated: function(pageNo) { app.openSearchHitAt(model.path, home.lib.searchQuery, pageNo) }
                         width: libraryGrid.cellWidth
                         height: libraryGrid.cellHeight
                         active: home.visible
@@ -723,11 +792,15 @@ Rectangle {
                     model: app.recent
                     keyNavigationEnabled: true
                     boundsBehavior: Flickable.StopAtBounds
-                    readonly property int columns: Math.max(2, Math.floor(width / 210))
+                    readonly property int columns: home.columnsFor(width, false)
                     cellWidth: Math.floor(width / columns)
                     cellHeight: Math.round(cellWidth * 1.2 + 44)
                     ScrollBar.vertical: ScrollBar {}
                     TouchpadMomentum { flickable: recentGrid }
+                    WheelHandler {
+                        acceptedModifiers: Qt.ControlModifier
+                        onWheel: function(event) { home.zoom(event.angleDelta.y > 0 ? 1 : -1) }
+                    }
                     currentIndex: -1
                     Keys.onPressed: function(event) {
                         const item = recentGrid.itemAtIndex(recentGrid.currentIndex)

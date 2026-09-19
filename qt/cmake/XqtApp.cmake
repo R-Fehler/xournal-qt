@@ -39,6 +39,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.h

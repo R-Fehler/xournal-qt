@@ -171,6 +171,8 @@ public:
     Q_INVOKABLE bool createDocument(const QString& name, bool inLibrary);
     /// Open a document found by the library search, with the search active on its first hit.
     Q_INVOKABLE bool openSearchHit(const QString& path, const QString& query);
+    /// The same, at a page (0-based) with hits: its first hit is the current one.
+    Q_INVOKABLE bool openSearchHitAt(const QString& path, const QString& query, int page);
     /// The libraries in the standard folder: [{ name, path, current }]
     Q_INVOKABLE QVariantList libraries() const;
     /// Open a folder as library in a new window (another process: one library per window).

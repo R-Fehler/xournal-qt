@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include "session/DocumentSession.h"
+#include "shell/HitPages.h"
 #include "shell/LibraryModel.h"
 #include "shell/PagesModel.h"
 #include "shell/Previews.h"
@@ -40,6 +41,7 @@ protected:
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
         engine->addImageProvider("preview", new xqt::PreviewProvider);
+        engine->addImageProvider("hitpage", new xqt::HitPageProvider);
         engine->rootContext()->setContextProperty("app", controller.get());
         engine->loadFromModule("XournalQt", "Main");
         ASSERT_FALSE(engine->rootObjects().isEmpty());
@@ -619,4 +621,50 @@ TEST_F(HomeScreenTest, libraryMenuMarksThisLibraryWithoutToggles) {
     EXPECT_EQ(current, 1) << "this window's library is marked";
     EXPECT_TRUE(waitOpened(menu, false));
     EXPECT_TRUE(controller->homeVisible());
+}
+
+TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
+    auto* lib = controller->libraryModel();
+    QElapsedTimer t;
+    t.start();
+    while (lib->property("indexing").toBool() && t.elapsed() < 5000) {
+        wait(20);
+    }
+    click(find<QQuickItem>("extendedSearchButton"));
+    auto* field = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(field, nullptr);
+    field->forceActiveFocus();
+    type("page 2");
+    key(Qt::Key_Return);
+    wait(100);
+    const int row = rowOf("lecture.pdf");
+    ASSERT_GE(row, 0);
+    QQuickItem* lecture = card(row);
+    ASSERT_NE(lecture, nullptr);
+    QQuickItem* strip = nullptr;
+    for (auto* c: lecture->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "hitPageStrip") {
+            strip = c;
+        }
+    }
+    ASSERT_NE(strip, nullptr);
+    EXPECT_TRUE(strip->isVisible());
+    ASSERT_EQ(strip->property("count").toInt(), 1) << "page 2 has the hit";
+    wait(100);
+    QQuickItem* page = itemAt(strip, 0);
+    ASSERT_NE(page, nullptr);
+    EXPECT_GT(grid()->property("cellHeight").toDouble(), grid()->property("cellWidth").toDouble())
+            << "taller cells for the page row";
+
+    click(page);  // opens the document at that page, with the search
+    EXPECT_FALSE(controller->homeVisible());
+    EXPECT_EQ(controller->title(), "lecture.pdf");
+    EXPECT_EQ(controller->pageNumber(), 2);
+    EXPECT_EQ(controller->searchQuery(), "page 2");
+
+    // Zoom: fewer, bigger cells
+    click(find<QQuickItem>("homeTab"));
+    const int columns = grid()->property("columns").toInt();
+    click(find<QQuickItem>("zoomInButton"));
+    EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
 }

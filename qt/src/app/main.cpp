@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 #include "AppController.h"
+#include "shell/HitPages.h"
 #include "shell/Library.h"
 #include "shell/Previews.h"
 #include "shell/SessionRecovery.h"
@@ -113,6 +114,7 @@ int main(int argc, char* argv[]) {
     QQmlApplicationEngine engine;
     engine.addImageProvider("thumbnail", new xqt::ThumbnailProvider);  // the engine takes ownership
     engine.addImageProvider("preview", new xqt::PreviewProvider);
+    engine.addImageProvider("hitpage", new xqt::HitPageProvider);
     engine.rootContext()->setContextProperty("app", &controller);
     QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreationFailed, &qapp, [] { QCoreApplication::exit(1); },
@@ -153,6 +155,17 @@ int main(int argc, char* argv[]) {
                 }
                 controller.searchAllTabs(query);
                 controller.openSearchResult(controller.currentTab());
+            });
+        }
+        // XQT_SCREENSHOT_SET=<objectName>.<property>=<value> sets a property of a QML item (e.g. homeView.extended=true).
+        if (const auto set = qEnvironmentVariable("XQT_SCREENSHOT_SET"); !set.isEmpty()) {
+            QTimer::singleShot(100, [&engine, set] {
+                const QString target = set.section('=', 0, 0);
+                if (auto* w = engine.rootObjects().value(0)) {
+                    if (QObject* o = w->findChild<QObject*>(target.section('.', 0, 0))) {
+                        o->setProperty(target.section('.', 1).toLatin1().constData(), set.section('=', 1));
+                    }
+                }
             });
         }
         if (const auto popup = qEnvironmentVariable("XQT_SCREENSHOT_POPUP"); !popup.isEmpty()) {
