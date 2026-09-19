@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QtQml/qqmlextensionplugin.h>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QTimer>
@@ -23,6 +24,8 @@
 #include "shell/Thumbnails.h"
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
+
+Q_IMPORT_QML_PLUGIN(XournalQtPlugin)
 
 int main(int argc, char* argv[]) {
     // Deliver every pen/touch sample (upstream Xournal++ also disables event compression).
@@ -77,7 +80,17 @@ int main(int argc, char* argv[]) {
     engine.loadFromModule("XournalQt", "Main");
 
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
+    // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).
     if (const auto shot = qEnvironmentVariable("XQT_SCREENSHOT"); !shot.isEmpty()) {
+        if (const auto popup = qEnvironmentVariable("XQT_SCREENSHOT_POPUP"); !popup.isEmpty()) {
+            QTimer::singleShot(300, [&engine, popup] {
+                if (auto* w = engine.rootObjects().value(0)) {
+                    if (QObject* p = w->findChild<QObject*>(popup)) {
+                        QMetaObject::invokeMethod(p, "open");
+                    }
+                }
+            });
+        }
         QTimer::singleShot(qEnvironmentVariableIntValue("XQT_SCREENSHOT_DELAY_MS") > 0
                                    ? qEnvironmentVariableIntValue("XQT_SCREENSHOT_DELAY_MS")
                                    : 1500,

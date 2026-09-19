@@ -59,6 +59,8 @@ Q_SIGNALS:
     void toolPropertiesChanged();
     /// The color of the active tool changed while a selection exists: the active session should recolor it.
     void selectionColorChangeRequested();
+    /// Settings were changed from the settings screen (sessions re-read what they cache, e.g. autosave).
+    void settingsChanged();
 
 private:
     fs::path resourceDir;

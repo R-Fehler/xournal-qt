@@ -26,7 +26,7 @@
 namespace xqt {
 
 namespace {
-constexpr double PALM_TIMEOUT_MS = 1000.0;  // upstream HandRecognition default ("touch" timeout)
+constexpr int PALM_TIMEOUT_MS = 1000;  // upstream HandRecognition default ("touch" / "timeout" setting)
 constexpr double TAP_MAX_MS = 250.0;
 constexpr double TAP_SLOP_PX = 16.0;  // Krita's TOUCH_SLOP
 
@@ -425,7 +425,9 @@ bool CanvasInput::touchBlocked() const {
     if (proximityEverSeen && penInProximity) {
         return true;
     }
-    return monotonicMs() - lastPenEventMs < PALM_TIMEOUT_MS;
+    int timeoutMs = PALM_TIMEOUT_MS;
+    view.getSession().getSettings()->getCustomElement("touch").getInt("timeout", timeoutMs);
+    return monotonicMs() - lastPenEventMs < timeoutMs;
 }
 
 void CanvasInput::cancelTouchGesture() {
@@ -513,10 +515,13 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
             const double dist = std::hypot(pts[0].x() - pts[1].x(), pts[0].y() - pts[1].y());
             if (!pinching) {
                 vc.pinchBegin(centroid, dist);
+                pinchStartDistance = dist;
                 pinching = true;
             } else {
                 touchSessionTravel += std::hypot(centroid.x() - lastCentroid.x(), centroid.y() - lastCentroid.y());
-                vc.pinchUpdate(centroid, dist);
+                // Upstream's "zoom gestures" setting: without it, two fingers only pan.
+                const bool zoom = view.getSession().getSettings()->isZoomGesturesEnabled();
+                vc.pinchUpdate(centroid, zoom ? dist : pinchStartDistance);
             }
             lastCentroid = centroid;
             panning = false;

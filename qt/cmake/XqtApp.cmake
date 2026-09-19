@@ -3,6 +3,8 @@
 # Tool bar icons: upstream Xournal++'s Lucide icon theme.
 file(GLOB XQT_UPSTREAM_ICONS "${XOJ_UPSTREAM_DIR}/ui/iconsLucide-light/hicolor/scalable/actions/*.svg")
 file(COPY ${XQT_UPSTREAM_ICONS} DESTINATION "${XQT_BUILD_RESOURCE_DIR}/icons")
+file(GLOB XQT_OWN_ICONS CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/../resources/icons/*.svg")
+file(COPY ${XQT_OWN_ICONS} DESTINATION "${XQT_BUILD_RESOURCE_DIR}/icons")
 
 # Qt Quick canvas item (library, so that tests can use it)
 add_library(xqt-quick STATIC
@@ -22,30 +24,41 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::Quick xqt-canvas)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
 
+# The QML UI as a static QML module (XournalQt), used by the app and by the UI tests.
+set(XQT_QML_FILES
+    src/app/qml/Main.qml
+    src/app/qml/IconButton.qml
+    src/app/qml/TabStrip.qml
+    src/app/qml/PageSidebar.qml
+    src/app/qml/SettingsPage.qml
+    src/app/qml/TabOverview.qml)
+foreach(f ${XQT_QML_FILES})
+    get_filename_component(alias ${f} NAME)
+    set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
+endforeach()
+qt_add_library(xqt-ui STATIC)
+qt_add_qml_module(xqt-ui
+    URI XournalQt
+    VERSION 1.0
+    # Not next to the executables: a qmldir there would be found before the one in the resources.
+    OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml/XournalQt"
+    QML_FILES ${XQT_QML_FILES}
+)
+target_link_libraries(xqt-ui PRIVATE Qt6::Quick Qt6::QuickControls2)
+
 qt_add_executable(xournal-qt
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/main.cpp
 )
-set_source_files_properties(src/app/qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
-set_source_files_properties(src/app/qml/IconButton.qml PROPERTIES QT_RESOURCE_ALIAS IconButton.qml)
-set_source_files_properties(src/app/qml/TabStrip.qml PROPERTIES QT_RESOURCE_ALIAS TabStrip.qml)
-set_source_files_properties(src/app/qml/PageSidebar.qml PROPERTIES QT_RESOURCE_ALIAS PageSidebar.qml)
-qt_add_qml_module(xournal-qt
-    URI XournalQt
-    VERSION 1.0
-    QML_FILES
-        src/app/qml/Main.qml
-        src/app/qml/IconButton.qml
-        src/app/qml/TabStrip.qml
-        src/app/qml/PageSidebar.qml
-)
 target_include_directories(xournal-qt PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../src/app)
-target_link_libraries(xournal-qt PRIVATE Qt6::Widgets Qt6::Quick Qt6::QuickControls2 xqt-quick xqt-shell)
+target_link_libraries(xournal-qt PRIVATE Qt6::Widgets Qt6::Quick Qt6::QuickControls2 xqt-quick xqt-shell xqt-uiplugin)
 set_target_properties(xournal-qt PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 if(XQT_BUILD_TESTS)
@@ -57,10 +70,22 @@ if(XQT_BUILD_TESTS)
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+    # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
+    add_executable(xqt-ui-tests
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/main.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp)
+    target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
+        GTest::gtest)
+    target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
+    target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
+    gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

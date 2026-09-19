@@ -41,13 +41,22 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             return QString::fromStdString(s->getFilePath().string());
         case CurrentRole:
             return index.row() == current;
+        case ThumbnailRole:
+            // The tab's current page (for the tab overview), see ThumbnailProvider.
+            return QString("image://thumbnail/%1/%2/%3")
+                    .arg(ThumbnailProvider::idOf(s))
+                    .arg(s->getCurrentPageNo())
+                    .arg(tabs[static_cast<size_t>(index.row())].thumbnailRevision);
+        case PageCountRole:
+            return static_cast<int>(s->getDocument()->getPageCount());
         default:
             return {};
     }
 }
 
 QHash<int, QByteArray> TabManager::roleNames() const {
-    return {{TitleRole, "title"}, {ModifiedRole, "modified"}, {FilePathRole, "filePath"}, {CurrentRole, "current"}};
+    return {{TitleRole, "title"},         {ModifiedRole, "modified"},     {FilePathRole, "filePath"},
+            {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"}};
 }
 
 int TabManager::rowOf(const DocumentSession* s) const {
@@ -82,6 +91,15 @@ int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
     connect(s, &DocumentSession::modifiedChanged, this, [this, s] { tabDataChanged(s, {ModifiedRole}); });
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole}); });
+    ThumbnailProvider::registerSession(s);
+    auto thumbnailChanged = [this, s] {
+        if (const int row = rowOf(s); row >= 0) {
+            ++tabs[static_cast<size_t>(row)].thumbnailRevision;
+            tabDataChanged(s, {ThumbnailRole, PageCountRole});
+        }
+    };
+    connect(s, &DocumentSession::pageContentChanged, this, thumbnailChanged);
+    connect(s, &DocumentSession::currentPageChanged, this, thumbnailChanged);
 
     beginInsertRows(QModelIndex(), row, row);
     tabs.insert(tabs.begin() + row, std::move(tab));

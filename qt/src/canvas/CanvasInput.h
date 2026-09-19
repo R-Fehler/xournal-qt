@@ -119,6 +119,7 @@ private:
     double touchSessionStartMs = 0;
     double touchSessionTravel = 0;
     bool pinching = false;
+    double pinchStartDistance = 1;
     bool panning = false;
     QPointF lastCentroid;
     struct VelocitySample {

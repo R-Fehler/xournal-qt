@@ -46,4 +46,15 @@ cd build-qt
 - [ ] Page counter and zoom (−, %, +) in the pill at the bottom right; tapping the % fits the page width.
 - [ ] Portrait (narrow window): the tool bar can be swiped sideways to reach all tools.
 
+## Settings and tab overview (M5c)
+- [ ] Gear button: the settings sheet opens; every section scrolls with a finger; sliders and switches work with pen and finger.
+- [ ] Changing the pressure multiplier or the stabilizer changes the next stroke without restarting.
+- [ ] Side button set to "Hand": the side button scrolls instead of erasing. Set back to "Eraser".
+- [ ] Palm rejection timeout: with a long timeout, touch stays blocked for a moment after writing.
+- [ ] Pinch zoom off: two fingers only pan.
+- [ ] New pages: background/size/color from the settings are used by "add page".
+- [ ] After closing and restarting the app, the settings are kept.
+- [ ] Ctrl+Tab / Ctrl+Shift+Tab switch tabs.
+- [ ] Grid button (or Ctrl+Shift+E): all open documents as cards; tapping one switches to it; × closes it (asks if unsaved).
+
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.

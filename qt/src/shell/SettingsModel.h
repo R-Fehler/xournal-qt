@@ -1,0 +1,63 @@
+/*
+ * xournal-qt: the settings screen's view of upstream's Settings (the same settings.xml keys as Xournal++).
+ *
+ * QML reads and writes values by key: `settings.revision, settings.get("minimumPressure")` (the revision makes the
+ * binding re-evaluate after a change) and `settings.set("minimumPressure", v)`. Changes apply immediately; they
+ * are written to disk once when the screen closes (upstream's settings transaction), like upstream's dialog.
+ *
+ * @license GNU GPLv2 or later
+ */
+#pragma once
+
+#include <functional>
+#include <map>
+
+#include <QObject>
+#include <QStringList>
+#include <QVariant>
+
+class Settings;
+
+namespace xqt {
+
+class AppContext;
+
+class SettingsModel final: public QObject {
+    Q_OBJECT
+    Q_PROPERTY(int revision READ revision NOTIFY changed)
+    Q_PROPERTY(QStringList pageBackgrounds READ pageBackgrounds CONSTANT)
+    Q_PROPERTY(QStringList paperFormats READ paperFormats CONSTANT)
+public:
+    explicit SettingsModel(AppContext& app, QObject* parent = nullptr);
+
+    int revision() const { return rev; }
+    /// Names of the page backgrounds for new pages (upstream's page types: plain, lined, ruled, graph, ...).
+    QStringList pageBackgrounds() const;
+    QStringList paperFormats() const;
+    /// All keys, for tests.
+    QStringList keys() const;
+
+    Q_INVOKABLE QVariant get(const QString& key) const;
+    Q_INVOKABLE bool set(const QString& key, const QVariant& value);
+    /// The settings screen opened / closed: changes are saved once, at close.
+    Q_INVOKABLE void begin();
+    Q_INVOKABLE void end();
+
+Q_SIGNALS:
+    void changed();
+
+private:
+    struct Entry {
+        std::function<QVariant()> get;
+        std::function<void(const QVariant&)> set;
+    };
+    void add(const QString& key, std::function<QVariant()> get, std::function<void(const QVariant&)> set);
+
+    AppContext& app;
+    Settings& settings;
+    std::map<QString, Entry> entries;
+    int rev = 0;
+    bool open = false;
+};
+
+}  // namespace xqt

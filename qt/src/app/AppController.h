@@ -24,6 +24,7 @@ class CanvasView;
 class DocumentSession;
 class TabManager;
 class PagesModel;
+class SettingsModel;
 }  // namespace xqt
 class Palette;
 
@@ -32,6 +33,7 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* tabs READ tabsModel CONSTANT)
     /// Pages of the current tab (for the page sidebar).
     Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
+    Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
     Q_PROPERTY(int currentTab READ currentTab WRITE setCurrentTab NOTIFY documentChanged)
     Q_PROPERTY(QObject* view READ view NOTIFY documentChanged)
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
@@ -52,6 +54,7 @@ public:
 
     QObject* tabsModel() const;
     QObject* pagesModel() const;
+    QObject* settingsModel() const;
     int currentTab() const;
     void setCurrentTab(int index);
     QObject* view() const;
@@ -149,5 +152,6 @@ private:
     std::unique_ptr<Palette> colors;
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::PagesModel> pages;
+    std::unique_ptr<xqt::SettingsModel> settingsView;
     std::vector<QMetaObject::Connection> currentConnections;
 };

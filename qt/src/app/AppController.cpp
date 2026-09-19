@@ -19,6 +19,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "shell/PagesModel.h"
+#include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 
 using namespace xqt;
@@ -52,6 +53,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
 
     pages = std::make_unique<PagesModel>();
+    settingsView = std::make_unique<SettingsModel>(*app);
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     newDocument();
@@ -67,6 +69,7 @@ AppController::~AppController() {
 }
 
 void AppController::shutdown() {
+    settingsView->end();  // settings screen still open: save its changes
     for (int i = 0; i < tabs->count(); ++i) {
         tabs->session(i)->deleteAutosaveFile();
     }
@@ -108,6 +111,7 @@ void AppController::currentTabChanged() {
 
 QObject* AppController::tabsModel() const { return tabs.get(); }
 QObject* AppController::pagesModel() const { return pages.get(); }
+QObject* AppController::settingsModel() const { return settingsView.get(); }
 int AppController::currentTab() const { return tabs->currentIndex(); }
 void AppController::setCurrentTab(int index) { tabs->setCurrentIndex(index); }
 QObject* AppController::view() const { return canvas(); }

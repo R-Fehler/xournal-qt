@@ -29,7 +29,7 @@ class TabManager final: public QAbstractListModel {
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentIndexChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 public:
-    enum Roles { TitleRole = Qt::UserRole + 1, ModifiedRole, FilePathRole, CurrentRole };
+    enum Roles { TitleRole = Qt::UserRole + 1, ModifiedRole, FilePathRole, CurrentRole, ThumbnailRole, PageCountRole };
 
     explicit TabManager(AppContext& app, QObject* parent = nullptr);
     ~TabManager() override;
@@ -72,6 +72,7 @@ private:
         std::unique_ptr<DocumentSession> session;
         std::unique_ptr<CanvasView> view;
         std::unique_ptr<QTimer> releaseTimer;
+        quint64 thumbnailRevision = 0;  ///< increased when the current page or its content changed
     };
     int rowOf(const DocumentSession* s) const;
     void tabDataChanged(const DocumentSession* s, const QList<int>& roles);

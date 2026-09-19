@@ -31,7 +31,11 @@
   - Tap a thumbnail to go to the page; long-press or ⋮ for insert before/after, duplicate, move up/down, delete. All undoable through upstream's undo actions (ports of `Control::deletePage/duplicatePage/movePageTowards*`).
   - Page counter and zoom moved to a floating pill over the canvas; the tool bar scrolls sideways when the window is narrow.
   - Fixed on the way: canvas drawn at a stale position by Qt Quick's software backend (containers are transform nodes now); canvas input blocked by an `ApplicationWindow` background item (hit test follows z order); `DocumentListener::unregisterListener` is idempotent (seam, see ADR-0002).
-- **Next: M5c** settings screen, **M5d** crash recovery and session restore; then lasso selection, text, images, PDF export and search.
+- **M5c settings screen: done (awaiting on-device test).**
+  - Settings sheet (gear button, Ctrl+,) over upstream's `Settings`, same settings.xml keys: pressure (sensitivity, minimum, multiplier, guessing), side/barrel button tool, eraser mode, palm rejection timeout, pinch zoom on/off, stroke stabilizer (all upstream parameters), autosave, default file name, new page template (background, paper size, orientation, color, copy from current page). Changes apply live and are saved once when the sheet closes (upstream's settings transaction).
+  - `SettingsModel` (key/value access for QML), unit tests; `xqt-ui-tests` load the real `Main.qml` off-screen.
+- **Tab switching and overview: done (awaiting on-device test).** Ctrl+Tab / Ctrl+Shift+Tab (and Ctrl+PgDown/PgUp) cycle tabs; the grid button (Ctrl+Shift+E) shows all open documents as cards with their current page: tap to switch, × to close, keyboard navigation.
+- **Next:** M5d crash recovery and session restore; then the basic tools (selection, shapes, text, image), PDF links and text highlighting, PDF export and search; MuPDF on the `mupdf` branch.
 
 ---
 

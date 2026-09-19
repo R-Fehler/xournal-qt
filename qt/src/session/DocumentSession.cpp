@@ -115,6 +115,13 @@ void DocumentSession::init() {
         }
     });
     enableAutosave(app.getSettings()->isAutosaveEnabled());
+    connect(&app, &AppContext::settingsChanged, this, [this] {
+        const int minutes = std::max(1, this->app.getSettings()->getAutosaveTimeout());
+        if (this->app.getSettings()->isAutosaveEnabled() != autosaveTimer.isActive() ||
+            autosaveTimer.interval() != minutes * 60 * 1000) {
+            enableAutosave(this->app.getSettings()->isAutosaveEnabled());
+        }
+    });
     updatePageActions();
     firePageSelected(0);  // LayerController tracks the current page through the document events
 }

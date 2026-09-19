@@ -169,6 +169,9 @@ ApplicationWindow {
             }
             Item { Layout.fillWidth: true }
             IconButton { iconName: "xopp-page-add"; tip: qsTr("Add page after the current one"); onClicked: app.addPageAfterCurrent() }
+            ToolSeparator {}
+            IconButton { objectName: "overviewButton"; iconName: "xqt-tabs-grid"; tip: qsTr("All open documents (Ctrl+Shift+E)"); onClicked: tabOverview.open() }
+            IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
         }
         }
       }
@@ -345,6 +348,13 @@ ApplicationWindow {
         }
     }
 
+    SettingsPage { id: settingsPage; objectName: "settingsPage" }
+    TabOverview {
+        id: tabOverview
+        objectName: "tabOverview"
+        onCloseRequested: function(index) { requestCloseTab(index) }
+    }
+
     Shortcut { sequences: [StandardKey.Undo]; onActivated: app.undo() }
     Shortcut { sequences: [StandardKey.Redo, "Ctrl+Y"]; onActivated: app.redo() }
     Shortcut { sequences: [StandardKey.Save]; onActivated: saveOrAsk(null) }
@@ -352,8 +362,19 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Open]; onActivated: openDialog.open() }
     Shortcut { sequences: [StandardKey.New, StandardKey.AddTab]; onActivated: app.newDocument() }
     Shortcut { sequences: [StandardKey.Close]; onActivated: requestCloseTab(app.currentTab) }
-    Shortcut { sequences: [StandardKey.NextChild, "Ctrl+PgDown"]; onActivated: app.nextTab() }
-    Shortcut { sequences: [StandardKey.PreviousChild, "Ctrl+PgUp"]; onActivated: app.previousTab() }
+    // Tabs: Ctrl+Tab / Ctrl+Shift+Tab (Shift+Tab arrives as Backtab), like browsers; also Ctrl+PgDown / Ctrl+PgUp.
+    Shortcut {
+        sequences: ["Ctrl+Tab", "Ctrl+PgDown"]
+        context: Qt.ApplicationShortcut
+        onActivated: app.nextTab()
+    }
+    Shortcut {
+        sequences: ["Ctrl+Shift+Tab", "Ctrl+Backtab", "Ctrl+Shift+Backtab", "Ctrl+PgUp"]
+        context: Qt.ApplicationShortcut
+        onActivated: app.previousTab()
+    }
+    Shortcut { sequence: "Ctrl+Shift+E"; onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
+    Shortcut { sequence: "Ctrl+,"; onActivated: settingsPage.open() }
     Shortcut { sequences: [StandardKey.ZoomIn]; onActivated: app.zoomIn() }
     Shortcut { sequences: [StandardKey.ZoomOut]; onActivated: app.zoomOut() }
     Shortcut { sequence: "Ctrl+0"; onActivated: app.fitWidth() }
