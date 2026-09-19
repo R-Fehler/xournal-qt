@@ -11,7 +11,9 @@ file(COPY "${CMAKE_CURRENT_LIST_DIR}/../packaging/xournal-qt.svg" DESTINATION "$
 # Qt Quick canvas item (library, so that tests can use it)
 add_library(xqt-quick STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DocumentCanvasItem.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DocumentCanvasItem.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/DocumentCanvasItem.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TextFlowEditor.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TextFlowEditor.cpp)
 target_include_directories(xqt-quick PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src/quick)
 target_link_libraries(xqt-quick PUBLIC Qt6::Quick Qt6::Qml xqt-canvas)
 set_target_properties(xqt-quick PROPERTIES AUTOMOC ON)
@@ -82,7 +84,8 @@ set(XQT_QML_FILES
     src/app/qml/BackgroundChooser.qml
     src/app/qml/InsertPagesDialog.qml
     src/app/qml/ContentsOverview.qml
-    src/app/qml/OutlineList.qml)
+    src/app/qml/OutlineList.qml
+    src/app/qml/TextFlowPanel.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})

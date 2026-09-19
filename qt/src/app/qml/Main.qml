@@ -274,6 +274,13 @@ ApplicationWindow {
                     }
                 }
             }
+            IconButton {
+                objectName: "textModeButton"
+                iconName: "xqt-text-mode"
+                tip: qsTr("Text mode: type the page's text like in a word processor (Ctrl+Alt+E)")
+                checked: textFlowPanel.visible
+                onClicked: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open()
+            }
             IconButton { objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
             IconButton { objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
             IconButton { objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
@@ -555,6 +562,14 @@ ApplicationWindow {
         id: pageGrid
         objectName: "pageGrid"
         anchors.fill: canvas
+    }
+    TextFlowPanel {
+        id: textFlowPanel
+        anchors.top: canvas.top
+        anchors.bottom: canvas.bottom
+        anchors.right: canvas.right
+        width: Math.min(canvas.width * 0.5, 620)
+        z: 5
     }
     ContentsOverview {
         id: contentsOverview
@@ -1024,7 +1039,7 @@ ApplicationWindow {
     }
 
     // Document shortcuts do nothing while the home screen is shown.
-    readonly property bool docKeys: !app.homeVisible
+    readonly property bool docKeys: !app.homeVisible && !app.textFlowActive
     Shortcut { sequences: [StandardKey.Undo]; enabled: docKeys; onActivated: app.undo() }
     Shortcut { sequences: [StandardKey.Redo, "Ctrl+Y"]; enabled: docKeys; onActivated: app.redo() }
     Shortcut { sequences: [StandardKey.Save]; enabled: docKeys; onActivated: saveOrAsk(null) }
@@ -1055,6 +1070,7 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Forward]; enabled: docKeys; onActivated: app.navigateForward() }
     Shortcut { sequence: "Ctrl+Alt+G"; enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequence: "Ctrl+Alt+O"; enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
+    Shortcut { sequence: "Ctrl+Alt+E"; enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
     Shortcut { sequences: [StandardKey.Find]; onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openBar() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
     Shortcut { sequences: [StandardKey.Copy]; enabled: docKeys; onActivated: app.copySelection() }

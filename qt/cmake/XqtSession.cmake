@@ -38,6 +38,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextEditor.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextEditor.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.cpp
 )
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)
@@ -57,7 +59,8 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-canvas-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasReplayTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DocumentLayoutTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DocumentLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextFlowTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")

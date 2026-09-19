@@ -32,6 +32,7 @@ class TabManager;
 class PagesModel;
 class PageFilterModel;
 class OutlineModel;
+class TextFlowSession;
 class PageClipboard;
 class SettingsModel;
 class SessionRecovery;
@@ -82,6 +83,10 @@ class AppController: public QObject {
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
     Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
+    /// The text mode edits the typed text of a page (textFlowPage, 0-based); how far it goes below the page (points)
+    Q_PROPERTY(bool textFlowActive READ textFlowActive NOTIFY textFlowChanged)
+    Q_PROPERTY(int textFlowPage READ textFlowPage NOTIFY textFlowChanged)
+    Q_PROPERTY(double textFlowOverflow READ textFlowOverflow NOTIFY textFlowChanged)
     /// Where the tool bar is: "top", "left" or "right"
     Q_PROPERTY(QString toolbarPosition READ toolbarPosition WRITE setToolbarPosition NOTIFY toolbarPositionChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
@@ -154,6 +159,17 @@ public:
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
     QString toolbarPosition() const;
+    bool textFlowActive() const;
+    int textFlowPage() const { return flowPage; }
+    double textFlowOverflow() const { return flowOverflow; }
+    /// Text mode: start on the current page; returns its blocks (TextFlow::toVariant) for the editor.
+    Q_INVOKABLE QVariantList beginTextFlow();
+    /// The blocks as typed: the page follows.
+    Q_INVOKABLE void updateTextFlow(const QVariantList& blocks);
+    /// Done (keep: one undo step) or cancel.
+    Q_INVOKABLE void endTextFlow(bool keep);
+    /// The text font (text tool) for the editor.
+    Q_INVOKABLE QString textFlowFamily() const;
     void setToolbarPosition(const QString& position);
     int zoomPercent() const;
     int pageNumber() const;
@@ -356,6 +372,7 @@ Q_SIGNALS:
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
     void toolbarPositionChanged();
+    void textFlowChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 
@@ -375,6 +392,10 @@ private:
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::OutlineModel> outline;
+    std::unique_ptr<xqt::TextFlowSession> flow;
+    xqt::DocumentSession* flowSession = nullptr;
+    int flowPage = -1;
+    double flowOverflow = 0;
     std::unique_ptr<xqt::PageClipboard> pageClipboard;
     std::vector<size_t> pageList(const QList<int>& pages) const;
     std::unique_ptr<xqt::SettingsModel> settingsView;

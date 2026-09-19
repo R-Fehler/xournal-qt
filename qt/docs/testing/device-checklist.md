@@ -140,6 +140,14 @@ cd build-qt
 - [ ] Search one or two letters (document, tab overview, library): nothing happens while typing ("Enter ↵"); Enter or the search icon searches; a single letter in a long PDF stays responsive.
 - [ ] Open 20+ documents: the tabs fill the whole strip before it scrolls, the + stays at the right end.
 
+## Text mode
+- [ ] Text mode button (or Ctrl+Alt+E): type "# Title", Enter, a paragraph, "- item", Enter, "item", Enter, Enter, text: the page shows it at the top left while typing (heading big, bullets with hanging indent).
+- [ ] H1/H2/H3, lists, B, I, A−/A+, colors act on the paragraph at the cursor (or the selected ones); Tab / Shift+Tab change the list level.
+- [ ] Done; Ctrl+Z removes the whole text, Ctrl+Y brings it back; open the text mode again: the same paragraphs are in the editor.
+- [ ] Writing with the pen over the text: the ink is on top; the text tool edits single text boxes.
+- [ ] Save, open the file in Xournal++ (GTK): the same text (text boxes in a layer "Text").
+- [ ] A long text: the warning says it does not fit.
+
 ## Downloads and other libraries
 - [ ] Library menu (▾): "Downloads folder (quick library)" opens ~/Downloads in its own window, with a note that its files are short-lived; no .xournal_library folder appears in Downloads.
 - [ ] In the Downloads library: Import (files, folder) and dropping files ask "Import into Downloads?" first.

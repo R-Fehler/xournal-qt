@@ -35,6 +35,7 @@
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/OutlineModel.h"
+#include "TextFlow.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
 #include "shell/PageFilterModel.h"
@@ -106,6 +107,7 @@ AppController::~AppController() {
     for (auto& c: currentConnections) {
         disconnect(c);
     }
+    flow.reset();  // (before the sessions)
     pages->setSession(nullptr);
     outline->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
@@ -127,7 +129,73 @@ void AppController::shutdown() {
 DocumentSession* AppController::session() const { return tabs->currentSession(); }
 CanvasView* AppController::canvas() const { return tabs->currentView(); }
 
+bool AppController::textFlowActive() const { return flow && flow->active(); }
+
+QString AppController::textFlowFamily() const {
+    QString family = QString::fromStdString(app->getSettings()->getFont().getName());
+    // (a font name may have a style, e.g. "Sans Bold": the family only)
+    for (const char* style: {" Bold", " Italic", " Regular"}) {
+        family.remove(QLatin1String(style));
+    }
+    return family.trimmed().isEmpty() ? QStringLiteral("Sans") : family.trimmed();
+}
+
+QVariantList AppController::beginTextFlow() {
+    endTextFlow(true);
+    if (!session()) {
+        return {};
+    }
+    flowSession = session();
+    flow = std::make_unique<TextFlowSession>(*flowSession);
+    TextFlow::Style style;
+    style.family = textFlowFamily().toStdString();
+    style.bodySize = app->getSettings()->getFont().getSize();
+    flowPage = static_cast<int>(flowSession->getCurrentPageNo());
+    QVariantList list;
+    for (const auto& b: flow->begin(static_cast<size_t>(flowPage), style)) {
+        list.append(TextFlow::toVariant(b));
+    }
+    flowOverflow = 0;
+    Q_EMIT textFlowChanged();
+    return list;
+}
+
+void AppController::updateTextFlow(const QVariantList& blocks) {
+    if (!textFlowActive()) {
+        return;
+    }
+    std::vector<TextBlock> list;
+    for (const QVariant& v: blocks) {
+        list.push_back(TextFlow::fromVariant(v.toMap()));
+    }
+    const double overflow = flow->update(list);
+    if (overflow != flowOverflow) {
+        flowOverflow = overflow;
+        Q_EMIT textFlowChanged();
+    }
+}
+
+void AppController::endTextFlow(bool keep) {
+    if (!flow) {
+        return;
+    }
+    if (keep) {
+        flow->finish();
+    } else {
+        flow->cancel();
+    }
+    flow.reset();
+    flowSession = nullptr;
+    flowPage = -1;
+    flowOverflow = 0;
+    Q_EMIT textFlowChanged();
+    Q_EMIT undoRedoChanged();
+}
+
 void AppController::currentTabChanged() {
+    if (flow && flowSession != session()) {
+        endTextFlow(true);  // another document: the text mode ends (kept)
+    }
     // Follow the signals of the current tab only.
     for (auto& c: currentConnections) {
         disconnect(c);
@@ -866,6 +934,9 @@ void AppController::openUrls(const QList<QUrl>& urls) {
 }
 
 void AppController::closeTab(int index) {
+    if (flow && flowSession == tabs->session(index)) {
+        endTextFlow(true);
+    }
     tabs->closeTab(index);  // the last one: the home screen
 }
 

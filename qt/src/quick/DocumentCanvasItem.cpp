@@ -1,4 +1,5 @@
 #include "DocumentCanvasItem.h"
+#include "TextFlowEditor.h"
 
 #include <algorithm>
 #include <cmath>
@@ -103,7 +104,10 @@ QRect tileRect(int index, int cols, QSize pixelSize) {
 double snap(double v, double dpr) { return std::round(v * dpr) / dpr; }
 }  // namespace
 
-void xqt::registerQuickTypes() { qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas"); }
+void xqt::registerQuickTypes() {
+    qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas");
+    qmlRegisterType<TextFlowEditor>("XournalQt.Canvas", 1, 0, "TextFlowEditor");
+}
 
 DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     setFlag(ItemHasContents, true);

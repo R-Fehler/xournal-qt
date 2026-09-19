@@ -21,6 +21,10 @@
 #include <gtest/gtest.h>
 #include <cairo-pdf.h>
 
+#include "model/Document.h"
+#include "model/Layer.h"
+#include "model/Text.h"
+#include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
 #include "shell/LibraryModel.h"
@@ -32,6 +36,7 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "TextFlow.h"
 #include "config-test.h"
 
 namespace {
@@ -873,4 +878,64 @@ TEST_F(HomeScreenTest, movesToAnotherLibraryAndWarnsAboutDownloads) {
     EXPECT_TRUE(fs::exists(downloads / "notes.xopp"));
     EXPECT_FALSE(fs::exists(root / "notes.xopp"));
     QFile::remove(config + "/user-dirs.dirs");
+}
+
+TEST_F(MainWindowTest, textModeTypesThePageText) {
+    auto* panel = find<QQuickItem>("textFlowPanel");
+    ASSERT_NE(panel, nullptr);
+    click(find<QQuickItem>("textModeButton"));
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_TRUE(controller->textFlowActive());
+    auto* area = find<QQuickItem>("textFlowArea");
+    ASSERT_TRUE(area->hasActiveFocus());
+
+    type("# Lecture 5");
+    key(Qt::Key_Return);  // after a heading: a paragraph
+    type("Some text.");
+    key(Qt::Key_Return);
+    type("- first");
+    key(Qt::Key_Return);  // the list goes on
+    type("second");
+    key(Qt::Key_Return);
+    key(Qt::Key_Return);  // an empty item ends the list
+    type("After the list.");
+    wait(300);
+
+    // The page: Xournal++ text boxes in the layer "Text"
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::TextFlow::textLayer(page);
+    ASSERT_NE(layer, nullptr);
+    std::vector<std::string> texts;
+    for (const auto& e: layer->getElementsView()) {
+        if (e->getType() == ELEMENT_TEXT) {
+            texts.push_back(static_cast<const Text*>(e)->getText());
+        }
+    }
+    EXPECT_EQ(texts, (std::vector<std::string>{"Lecture 5", "Some text.", "•", "first", "•", "second", "After the list."}));
+    const auto blocks = xqt::TextFlow::read(page, xqt::TextFlow::Style{});
+    ASSERT_EQ(blocks.size(), 5u);
+    EXPECT_EQ(blocks[0].kind, xqt::TextBlock::Kind::Heading1);
+    EXPECT_EQ(blocks[2].kind, xqt::TextBlock::Kind::Bullet);
+    EXPECT_EQ(blocks[4].kind, xqt::TextBlock::Kind::Paragraph);
+    EXPECT_TRUE(controller->modified()) << "unsaved changes while typing";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    click(find<QQuickItem>("textFlowDone"));
+    EXPECT_FALSE(panel->isVisible());
+    EXPECT_FALSE(controller->textFlowActive());
+    controller->undo();  // one step for the whole text
+    EXPECT_TRUE(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).empty());
+    controller->redo();
+    EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
+
+    // Cancel restores the page
+    click(find<QQuickItem>("textModeButton"));
+    type("x");
+    wait(300);
+    click(find<QQuickItem>("textFlowCancel"));
+    EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
 }

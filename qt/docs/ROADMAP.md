@@ -78,7 +78,8 @@
   - Full screen (F11): only a small current-tool square (drag it; tap: all tools and colors) and the page / zoom pill.
   - Table of contents: Pages | Contents in the sidebar; contents overview (Ctrl+Alt+O) with level-styled headings and the pages of each section side by side. The page grid button moved into the page / zoom pill.
   - Program icon and a .deb (CPack as upstream; qt/packaging/README.md): desktop file for PDF/.xopp/.xoj, mime types, Dolphin "Open as Xournal Qt library" for folders.
-  - Text editing mode: compatibility assessed, design proposed, not built yet (waits for the user's decision).
+  - Text mode (Ctrl+Alt+E): type the page's text like in a word processor (headings, lists, per-paragraph bold / italic / size / color, markdown shortcuts), stored as Xournal++ text elements in a layer "Text" and read back; one undo step. See [text-mode.md](text-mode.md).
+  - Downloads folder as a quick library (import warning); Copy to / Move to another library.
 - **Search with short texts** (user report: a one-letter search in a large document could crash): texts shorter than 4 characters are searched on Enter or a tap on the search icon only (document, tab overview, library). A one-letter search in a 300-page PDF (207k hits) peaked at ~1 GB: the sidebar and page grid made one QML item per hit. Thumbnails now show at most 50 marks per page, spread over it (the count badge stays exact): ~260 MB.
 - **Tab strip with many tabs:** the tabs use the whole width before they scroll, and the + button stays at the right end (the list and the spacer used to share the room).
 
