@@ -20,6 +20,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "shell/SingleInstance.h"
+#include "shell/ShortcutsModel.h"
 #include "shell/TabManager.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
@@ -232,6 +233,26 @@ TEST(Export, pdfExportAndSuggestedName) {
     AppController d;
     ASSERT_TRUE(d.openPath(QString::fromStdString(fs::path(r.document->getPdfFilepath()).string())));
     EXPECT_TRUE(d.suggestedExportFile().toLocalFile().endsWith("export_annotated.pdf"));
+}
+
+TEST(Shortcuts, noKeysAreUsedTwice) {
+    // Two actions with the same keys make Qt report an ambiguous shortcut: then neither of them happens.
+    AppController c;
+    auto* shortcuts = qobject_cast<ShortcutsModel*>(c.shortcutsModel());
+    ASSERT_NE(shortcuts, nullptr);
+    std::map<QString, QString> owner;
+    for (int row = 0; row < shortcuts->rowCount(); ++row) {
+        const QString id = shortcuts->data(shortcuts->index(row), ShortcutsModel::IdRole).toString();
+        QStringList seen;
+        for (const QString& keys: shortcuts->keys(id)) {
+            EXPECT_FALSE(seen.contains(keys)) << id.toStdString() << " lists " << keys.toStdString() << " twice";
+            seen << keys;
+            const auto it = owner.find(keys);
+            EXPECT_EQ(it, owner.end()) << keys.toStdString() << " is used by " << id.toStdString() << " and "
+                                       << (it == owner.end() ? std::string() : it->second.toStdString());
+            owner[keys] = id;
+        }
+    }
 }
 
 TEST(SaveAs, suggestsTheDocumentsOwnFolderAndTheLibraryForNewOnes) {

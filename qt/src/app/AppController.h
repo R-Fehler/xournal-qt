@@ -104,6 +104,8 @@ class AppController: public QObject {
     Q_PROPERTY(double textFlowOverflow READ textFlowOverflow NOTIFY textFlowChanged)
     /// Where the tool bar is: "top", "left" or "right"
     Q_PROPERTY(QString toolbarPosition READ toolbarPosition WRITE setToolbarPosition NOTIFY toolbarPositionChanged)
+    /// The tool bar is put away (the small tool square of the full screen takes over)
+    Q_PROPERTY(bool toolbarHidden READ toolbarHidden WRITE setToolbarHidden NOTIFY toolbarPositionChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
@@ -183,6 +185,8 @@ public:
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
     QString toolbarPosition() const;
+    bool toolbarHidden() const;
+    void setToolbarHidden(bool hidden);
     bool textFlowActive() const;
     int textFlowPage() const { return flowPage; }
     double textFlowOverflow() const { return flowOverflow; }

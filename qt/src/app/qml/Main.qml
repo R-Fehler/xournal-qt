@@ -38,8 +38,10 @@ ApplicationWindow {
             else showNormal()
         }
     }
-    readonly property bool verticalTools: sideToolbar || fullScreenMode
-    readonly property int toolColumns: fullScreenMode ? 6 : 2
+    /// No tool bar: in full screen, or when it was put away - the small tool square takes over
+    readonly property bool noToolbar: fullScreenMode || app.toolbarHidden
+    readonly property bool verticalTools: sideToolbar || noToolbar
+    readonly property int toolColumns: noToolbar ? 6 : 2
     Connections {
         target: app
         function onHomeVisibleChanged() { if (app.homeVisible) win.fullScreenMode = false }
@@ -148,7 +150,7 @@ ApplicationWindow {
       ToolBar {
         id: topTools
         width: parent.width
-        visible: !app.homeVisible && !win.sideToolbar && !win.fullScreenMode
+        visible: !app.homeVisible && !win.sideToolbar && !win.noToolbar
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: 56
@@ -159,7 +161,7 @@ ApplicationWindow {
     Rectangle {
         id: sideTools
         objectName: "sideTools"
-        visible: !app.homeVisible && win.sideToolbar && !win.fullScreenMode
+        visible: !app.homeVisible && win.sideToolbar && !win.noToolbar
         width: visible ? 104 : 0
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -175,7 +177,7 @@ ApplicationWindow {
     }
     Item {
         id: toolArea
-        parent: win.fullScreenMode ? quickToolsHolder : (win.sideToolbar ? sideTools : topTools)
+        parent: win.noToolbar ? quickToolsHolder : (win.sideToolbar ? sideTools : topTools)
         anchors.fill: parent
         anchors.margins: win.verticalTools ? 4 : 0
         anchors.leftMargin: 6
@@ -475,6 +477,11 @@ ApplicationWindow {
                     MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Settings"); onTriggered: settingsPage.open() }
+                    MenuItem {
+                        objectName: "hideToolbarItem"
+                        text: app.toolbarHidden ? qsTr("Show the tool bar") : qsTr("Hide the tool bar")
+                        onTriggered: app.toolbarHidden = !app.toolbarHidden
+                    }
                     MenuItem {
                         objectName: "fullScreenItem"
                         text: win.fullScreenMode ? qsTr("Leave full screen (F11)") : qsTr("Full screen (F11)")
@@ -1105,7 +1112,7 @@ ApplicationWindow {
     Rectangle {
         id: quickToolSquare
         objectName: "quickToolSquare"
-        visible: win.fullScreenMode && !app.homeVisible
+        visible: win.noToolbar && !app.homeVisible
         z: 60
         x: 16
         y: 16
@@ -1215,13 +1222,13 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("home"); onActivated: app.homeVisible = !app.homeVisible || app.tabCount() === 0 }
     // Tabs: Ctrl+Tab / Ctrl+Shift+Tab (Shift+Tab arrives as Backtab), like browsers; also Ctrl+PgDown / Ctrl+PgUp.
     Shortcut {
+        // (window context: with a second window, an application shortcut would be there twice - "ambiguous",
+        // and then Qt does nothing at all)
         sequences: win.keysOf("nextTab")
-        context: Qt.ApplicationShortcut
         onActivated: app.nextTab()
     }
     Shortcut {
         sequences: win.keysOf("previousTab")
-        context: Qt.ApplicationShortcut
         onActivated: app.previousTab()
     }
     // Four or five fingers on the touch screen: the pages of the document, all open documents

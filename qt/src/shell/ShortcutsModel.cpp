@@ -44,7 +44,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"contents", tr("Contents overview"), pages, {"Ctrl+Alt+O"}},
 
             {"undo", tr("Undo"), edit, standard(QKeySequence::Undo)},
-            {"redo", tr("Redo"), edit, standard(QKeySequence::Redo) + QStringList{"Ctrl+Y"}},
+            {"redo", tr("Redo"), edit, standard(QKeySequence::Redo)},  // (Qt already has Ctrl+Y in there)
             {"copy", tr("Copy"), edit, standard(QKeySequence::Copy)},
             {"cut", tr("Cut"), edit, standard(QKeySequence::Cut)},
             {"paste", tr("Paste"), edit, standard(QKeySequence::Paste)},
@@ -66,6 +66,21 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"findNext", tr("Next hit"), search, standard(QKeySequence::FindNext)},
             {"findPrevious", tr("Previous hit"), search, standard(QKeySequence::FindPrevious)},
     };
+
+    // No keys twice: Qt calls a shortcut that two actions want "ambiguous" and then does nothing at all. The
+    // action that comes first in this list keeps the keys.
+    QStringList taken;
+    for (Action& action: actions) {
+        QStringList kept;
+        for (const QString& keys: action.defaults) {
+            const QString text = QKeySequence(keys, QKeySequence::PortableText).toString(QKeySequence::PortableText);
+            if (!text.isEmpty() && !taken.contains(text)) {
+                taken << text;
+                kept << text;
+            }
+        }
+        action.defaults = kept;
+    }
 
     std::string stored;
     settings.getCustomElement(CUSTOM).getString("shortcuts", stored);

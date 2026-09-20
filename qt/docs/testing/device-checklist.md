@@ -183,11 +183,13 @@ cd build-qt
 ## Shortcuts
 - [ ] F1 (or Ctrl+/) lists all shortcuts by group; Esc closes it.
 - [ ] "Change…" opens the settings at "Shortcuts": tapping a row asks for keys; pressing e.g. Ctrl+Alt+P for "Add a page" makes that key work at once and Ctrl+N stop working.
+- [ ] Ctrl+Shift+N (new document), Ctrl+Shift+E (all documents), Ctrl+Shift+L (library), Ctrl+Shift+S (save as) and Ctrl+Tab work - also with a second window open.
 - [ ] A key another action already uses is marked in red with its name; Backspace in the dialog removes a shortcut; "Default keys" puts everything back.
 - [ ] The chosen keys are still there after a restart.
 
 ## Tool bar, full screen, colors, pages
 - [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
+- [ ] ⋮ → "Hide the tool bar": the bar goes away and the small tool square appears (as in full screen); "Show the tool bar" brings it back, and it is still away after a restart.
 - [ ] F11: only the tool square and the page / zoom pill are left; drag the square; tap it: tools, colors, sizes; choosing one closes them; the pen works right away; Esc leaves full screen.
 - [ ] Colors: the Xournal++ palette without white (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow); "+" adds a color from the color dialog; press and hold a color: remove it; "Default colors".
 - [ ] Mark PDF text: the three highlight colors in the tool's menu and in the select bar; highlights come in the chosen color.

@@ -821,6 +821,20 @@ void AppController::setToolbarPosition(const QString& position) {
     }
 }
 
+bool AppController::toolbarHidden() const {
+    bool hidden = false;
+    app->getSettings()->getCustomElement(CUSTOM).getBool("toolbarHidden", hidden);
+    return hidden;
+}
+
+void AppController::setToolbarHidden(bool hidden) {
+    if (hidden != toolbarHidden()) {
+        app->getSettings()->getCustomElement(CUSTOM).setBool("toolbarHidden", hidden);
+        app->getSettings()->customSettingsChanged();
+        Q_EMIT toolbarPositionChanged();
+    }
+}
+
 QVariantList AppController::pdfHighlightColors() const {
     // Yellow (upstream's highlighter), green, pink
     return {QColor(0xff, 0xff, 0x00), QColor(0x7c, 0xfc, 0x3c), QColor(0xff, 0x80, 0xc0)};

@@ -1049,6 +1049,49 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
 }
 
+TEST_F(MainWindowTest, theToolBarCanBePutAway) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* tools = find<QQuickItem>("sideTools");
+    auto* square = find<QQuickItem>("quickToolSquare");  // the small tool square
+    auto* pen = find<QQuickItem>("contentsButton");  // a tool bar button
+    ASSERT_NE(pen, nullptr);
+    EXPECT_TRUE(pen->isVisible());
+
+    controller->setToolbarHidden(true);
+    wait(80);
+    EXPECT_FALSE(find<QQuickItem>("sideTools")->isVisible()) << "no bar at the side either";
+    ASSERT_NE(square, nullptr);
+    EXPECT_TRUE(square->isVisible()) << "the small tool square takes over";
+
+    controller->setToolbarHidden(false);
+    wait(80);
+    EXPECT_TRUE(pen->isVisible());
+    EXPECT_FALSE(square->isVisible());
+    (void)tools;
+}
+
+TEST_F(MainWindowTest, ctrlShiftShortcutsWork) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    const int tabs = controller->tabCount();
+    key(Qt::Key_N, Qt::ControlModifier | Qt::ShiftModifier);
+    wait(50);
+    EXPECT_EQ(controller->tabCount(), tabs + 1) << "Ctrl+Shift+N makes a document";
+
+    auto* overview = find<QObject>("tabOverview");
+    ASSERT_NE(overview, nullptr);
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    until([&] { return overview->property("visible").toBool(); });
+    EXPECT_TRUE(overview->property("visible").toBool()) << "Ctrl+Shift+E shows all documents";
+    QMetaObject::invokeMethod(overview, "close");
+    until([&] { return !overview->property("visible").toBool(); });
+
+    key(Qt::Key_L, Qt::ControlModifier | Qt::ShiftModifier);
+    wait(50);
+    EXPECT_TRUE(controller->homeVisible()) << "Ctrl+Shift+L shows the library";
+}
+
 TEST_F(MainWindowTest, shortcutSheetAndCustomKeys) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
