@@ -1038,6 +1038,20 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     controller->fitPage();
     wait(30);
     EXPECT_LE(controller->zoomPercent(), wide);
+    // A quick tap with a finger must switch the layout, not open the menu
+    auto* menuOnTouch = find<QObject>("layoutMenu");
+    ASSERT_NE(menuOnTouch, nullptr);
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    const QPoint onLayout = layout->mapToScene(QPointF(layout->width() / 2, layout->height() / 2)).toPoint();
+    const bool paired = controller->pairedPages();
+    { auto down = QTest::touchEvent(window, finger); down.press(0, onLayout); }
+    wait(30);
+    { auto up = QTest::touchEvent(window, finger); up.release(0, onLayout); }
+    wait(120);
+    EXPECT_NE(controller->pairedPages(), paired) << "a tap switches the layout";
+    EXPECT_FALSE(menuOnTouch->property("visible").toBool()) << "and opens no menu";
+    click(layout);  // back
+
     // Right click does what press and hold does
     auto* layoutMenu = find<QObject>("layoutMenu");
     ASSERT_NE(layoutMenu, nullptr);

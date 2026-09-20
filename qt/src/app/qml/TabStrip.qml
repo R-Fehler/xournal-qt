@@ -116,6 +116,7 @@ Rectangle {
                 onClicked: app.currentTab = index
                 TapHandler {
                     acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                     onTapped: function(point) { Popups.openAt(tabMenu, point.position) }
                 }
                 TapHandler {

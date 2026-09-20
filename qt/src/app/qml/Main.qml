@@ -229,6 +229,7 @@ ApplicationWindow {
                 onPressAndHold: fontPopup.open()
                 TapHandler {
                     acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                     onTapped: fontPopup.open()
                 }
                 Popup {
@@ -269,6 +270,7 @@ ApplicationWindow {
                 onPressAndHold: Popups.openAt(pdfTextMenu)
                 TapHandler {
                     acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                     onTapped: function(point) { Popups.openAt(pdfTextMenu, point.position) }
                 }
                 Menu {
@@ -359,6 +361,7 @@ ApplicationWindow {
                     onPressAndHold: Popups.openAt(swatchMenu)
                     TapHandler {
                         acceptedButtons: Qt.RightButton
+                        acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                         onTapped: function(point) { Popups.openAt(swatchMenu, point.position) }
                     }
                     contentItem: Item {
@@ -466,6 +469,7 @@ ApplicationWindow {
                 onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
                 TapHandler {
                     acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                     onTapped: insertPagesDialog.openAt(app.pageNumber)
                 }
             }
@@ -599,6 +603,7 @@ ApplicationWindow {
                 onPressAndHold: Popups.openAt(layoutMenu)
                 TapHandler {  // right click does what press and hold does
                     acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                     onTapped: function(point) { Popups.openAt(layoutMenu, point.position) }
                 }
                 Menu {
@@ -667,6 +672,7 @@ ApplicationWindow {
                 onPressAndHold: Popups.openAt(fitMenu)
                 TapHandler {
                     acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                     onTapped: function(point) { Popups.openAt(fitMenu, point.position) }
                 }
                 ToolTip.visible: hovered
