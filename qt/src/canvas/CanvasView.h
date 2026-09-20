@@ -128,6 +128,11 @@ public:
     std::optional<LinkTarget> linkAt(QPointF viewPos) const;
     /// A tap (finger, or pen/mouse with the hand or a select tool) at a view position: shows a link there.
     bool tapAt(QPointF viewPos);
+    /// Two taps in the same spot: zoom in on what was tapped (the column of text, if the page has columns), or,
+    /// when the page is zoomed in already, back to the whole page.
+    void doubleTapAt(QPointF viewPos);
+    /// The column of text around a point of a PDF page (nothing when the page has none there).
+    std::optional<QRectF> textColumnAt(size_t page, QPointF pagePoint) const;
 
     // --- PDF text (PDF text tools; port of upstream's PdfElemSelection use and PdfFloatingToolbox) ---
     enum class PdfTextMode { Highlight, Underline, Strikethrough, Select };

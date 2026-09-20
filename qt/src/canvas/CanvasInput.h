@@ -117,6 +117,9 @@ private:
     bool touchSessionIgnored = false;
     int touchSessionMaxPoints = 0;
     double touchSessionStartMs = 0;
+    // Two taps in the same spot zoom in (or back out). A tap that opened a PDF link is not the first of them.
+    double lastTapMs = 0;
+    QPointF lastTapPos;
     double touchSessionTravel = 0;
     QPointF touchSessionStartPos;
     QPointF pressViewPos;

@@ -441,6 +441,97 @@ std::optional<CanvasView::LinkTarget> CanvasView::linkAt(QPointF viewPos) const 
     return std::nullopt;
 }
 
+// The columns of a PDF page: the text lines are grouped by the gaps between them (a gap of at least a twentieth of
+// the page width separates two columns). Returns the one around the point.
+std::optional<QRectF> CanvasView::textColumnAt(size_t index, QPointF pagePoint) const {
+    Document* doc = session.getDocument();
+    XojPdfPageSPtr pdf;
+    double width = 0;
+    double height = 0;
+    {
+        std::shared_lock lock(*doc);
+        if (index >= doc->getPageCount()) {
+            return std::nullopt;
+        }
+        PageRef page = doc->getPage(index);
+        if (!page->getBackgroundType().isPdfPage()) {
+            return std::nullopt;
+        }
+        pdf = doc->getPdfPage(page->getPdfPageNr());
+        width = page->getWidth();
+        height = page->getHeight();
+    }
+    if (!pdf || width <= 0) {
+        return std::nullopt;
+    }
+    const auto lines = pdf->selectTextLines(XojPdfRectangle(0, 0, width, height), XojPdfPageSelectionStyle::Line);
+    if (lines.rects.size() < 4) {
+        return std::nullopt;  // hardly a text page
+    }
+    // Which parts of the width are covered by text at all
+    std::vector<std::pair<double, double>> spans;
+    for (const XojPdfRectangle& r: lines.rects) {
+        const double x1 = std::min(r.x1, r.x2);
+        const double x2 = std::max(r.x1, r.x2);
+        if (x2 - x1 > 1) {
+            spans.emplace_back(x1, x2);
+        }
+    }
+    std::sort(spans.begin(), spans.end());
+    const double gap = width / 20;
+    std::vector<std::pair<double, double>> columns;
+    for (const auto& [x1, x2]: spans) {
+        if (!columns.empty() && x1 <= columns.back().second + gap) {
+            columns.back().second = std::max(columns.back().second, x2);
+        } else {
+            columns.emplace_back(x1, x2);
+        }
+    }
+    if (columns.size() < 2) {
+        return std::nullopt;  // one block of text: nothing to pick out
+    }
+    for (const auto& [x1, x2]: columns) {
+        if (pagePoint.x() < x1 - gap || pagePoint.x() > x2 + gap) {
+            continue;
+        }
+        // The lines of this column give its top and bottom
+        double top = height;
+        double bottom = 0;
+        for (const XojPdfRectangle& r: lines.rects) {
+            const double cx = (r.x1 + r.x2) / 2;
+            if (cx >= x1 && cx <= x2) {
+                top = std::min({top, r.y1, r.y2});
+                bottom = std::max({bottom, r.y1, r.y2});
+            }
+        }
+        if (bottom > top) {
+            return QRectF(x1, top, x2 - x1, bottom - top);
+        }
+    }
+    return std::nullopt;
+}
+
+void CanvasView::doubleTapAt(QPointF viewPos) {
+    const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
+    if (!idx) {
+        return;
+    }
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    const QPointF onPage((viewPos.x() - pageRect.x()) / zoom, (viewPos.y() - pageRect.y()) / zoom);
+    // Zoomed in already: back to the whole page
+    if (pageRect.width() > viewController.viewSize().width() * 1.05) {
+        viewController.fitPage(*idx, true);
+        return;
+    }
+    if (const auto column = textColumnAt(*idx, onPage)) {
+        viewController.zoomToPageRect(*idx, QRectF(column->x(), std::max(0.0, onPage.y() - 40), column->width(),
+                                                   column->height()));
+        return;
+    }
+    viewController.fitWidth();
+}
+
 bool CanvasView::tapAt(QPointF viewPos) {
     if (auto link = linkAt(viewPos)) {
         Q_EMIT linkTapped(link->uri, link->page, link->viewRect);

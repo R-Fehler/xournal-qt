@@ -1197,7 +1197,8 @@ ApplicationWindow {
     Rectangle {
         id: quickToolSquare
         objectName: "quickToolSquare"
-        visible: win.noToolbar && !app.homeVisible
+        // Only in full screen: with the bar merely put away, the arrow strip brings it back at once
+        visible: win.fullScreenMode && !app.homeVisible
         z: 60
         x: 16
         y: 16

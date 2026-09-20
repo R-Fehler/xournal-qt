@@ -12,6 +12,9 @@
 #include <QElapsedTimer>
 #include <QPointingDevice>
 #include <QTabletEvent>
+#include <QTemporaryDir>
+
+#include <cairo-pdf.h>
 #include <QSignalSpy>
 #include <QGuiApplication>
 #include <QClipboard>
@@ -356,6 +359,39 @@ double fingerPan(CanvasInput& input, const QPointingDevice& screen, CanvasView& 
 }
 }  // namespace
 
+TEST_F(CanvasReplayTest, twoTapsZoomInAndOutAgain) {
+    auto& vc = view->getViewController();
+    vc.setViewSize(QSizeF(900, 600));
+    processEvents();
+    vc.fitWidth();
+    processEvents();
+    const double fitted = vc.zoom();
+
+    auto tap = [&](QPointF pos) {
+        touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, pos);
+        touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, pos);
+    };
+    // Two taps in the same spot: closer (the page has no PDF columns, so the width of the page)
+    tap(QPointF(400, 300));
+    tap(QPointF(402, 302));
+    processEvents();
+    EXPECT_GE(vc.zoom(), fitted) << "the second tap zooms";
+
+    // Zoomed in far: two taps go back to the whole page
+    vc.setZoom(fitted * 3, QPointF(450, 300));
+    processEvents();
+    tap(QPointF(400, 300));
+    tap(QPointF(402, 302));
+    processEvents();
+    EXPECT_LT(vc.zoom(), fitted * 3) << "and back out again";
+
+    // A single tap alone changes nothing
+    const double before = vc.zoom();
+    tap(QPointF(300, 200));
+    processEvents(400);
+    EXPECT_DOUBLE_EQ(vc.zoom(), before);
+}
+
 // Palm rejection with a pen that reports proximity: no long dead time after writing (pinch/pan right away), but
 // a hand that rests on the screen while the pen is near stays ignored.
 TEST_F(CanvasReplayTest, touchWorksRightAfterThePenLeaves) {
@@ -626,6 +662,57 @@ TEST_F(CanvasReplayTest, insertedImageIsSelectedAndFitsTheView) {
     session->getUndoRedoHandler()->undo();
     EXPECT_EQ(elementCount(0), 0u);
     EXPECT_FALSE(view->insertImage(QByteArray("not an image")));
+}
+
+TEST_F(CanvasReplayTest, aTwoColumnPageIsZoomedColumnByColumn) {
+    // A page with two columns of text
+    QTemporaryDir tmp;
+    const std::string pdf = tmp.filePath("columns.pdf").toStdString();
+    {
+        cairo_surface_t* surface = cairo_pdf_surface_create(pdf.c_str(), 600, 800);
+        cairo_t* cr = cairo_create(surface);
+        cairo_select_font_face(cr, "sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_set_font_size(cr, 11);
+        for (int line = 0; line < 30; ++line) {
+            const double y = 80 + line * 20;
+            cairo_move_to(cr, 60, y);
+            cairo_show_text(cr, "the left column of the page");
+            cairo_move_to(cr, 330, y);
+            cairo_show_text(cr, "the right column of it");
+        }
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+    }
+    input.reset();
+    view.reset();
+    auto loaded = DocumentSession::loadFile(fs::path(pdf));
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    view = std::make_unique<CanvasView>(*session);
+    view->getViewController().setViewSize(QSizeF(900, 1200));
+    input = std::make_unique<CanvasInput>(*view);
+    processEvents();
+
+    const auto left = view->textColumnAt(0, QPointF(120, 300));
+    ASSERT_TRUE(left.has_value()) << "the left column";
+    EXPECT_LT(left->width(), 300) << "not the whole page";
+    EXPECT_LT(left->right(), 320);
+    const auto right = view->textColumnAt(0, QPointF(420, 300));
+    ASSERT_TRUE(right.has_value());
+    EXPECT_GT(right->left(), 300);
+
+    // Two taps on the right column: it fills the view
+    auto& vc = view->getViewController();
+    vc.fitWidth();
+    processEvents();
+    const double fitted = vc.zoom();
+    const QPointF onRightColumn = viewPos(0, QPointF(420, 300));
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, onRightColumn);
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, onRightColumn);
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, onRightColumn + QPointF(2, 2));
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, onRightColumn + QPointF(2, 2));
+    processEvents();
+    EXPECT_GT(vc.zoom(), fitted * 1.3) << "the column is bigger than the page width";
 }
 
 // PDF text tools: select text of the background PDF and mark it (upstream's PdfElemSelection + marker strokes).

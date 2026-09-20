@@ -32,6 +32,8 @@ constexpr int PALM_TIMEOUT_MS = 1000;  // upstream HandRecognition default ("tou
 /// Pens that report proximity: touch works again this soon after the pen left.
 constexpr int PROXIMITY_GRACE_MS = 150;
 constexpr double TAP_MAX_MS = 250.0;
+constexpr double DOUBLE_TAP_MS = 350.0;    ///< the second tap comes this soon after the first
+constexpr double DOUBLE_TAP_PX = 60.0;     ///< ... and this close to it
 constexpr double TAP_SLOP_PX = 16.0;  // Krita's TOUCH_SLOP
 
 double monotonicMs() {
@@ -653,7 +655,17 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                     redo();
                 }
             } else if (duration <= TAP_MAX_MS && touchSessionTravel <= TAP_SLOP_PX && touchSessionMaxPoints == 1) {
-                view.tapAt(touchSessionStartPos);  // e.g. a PDF link
+                if (view.tapAt(touchSessionStartPos)) {
+                    lastTapMs = 0;  // it was a PDF link: never the first tap of a double tap
+                } else if (now - lastTapMs <= DOUBLE_TAP_MS &&
+                           std::hypot(touchSessionStartPos.x() - lastTapPos.x(),
+                                      touchSessionStartPos.y() - lastTapPos.y()) <= DOUBLE_TAP_PX) {
+                    view.doubleTapAt(touchSessionStartPos);
+                    lastTapMs = 0;
+                } else {
+                    lastTapMs = now;
+                    lastTapPos = touchSessionStartPos;
+                }
             } else if (velocitySamples.size() >= 2) {
                 const auto& a = velocitySamples.front();
                 const auto& b = velocitySamples.back();

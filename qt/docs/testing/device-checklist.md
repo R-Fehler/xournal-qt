@@ -21,6 +21,8 @@ cd build-qt
 - [ ] One finger: pan; flick: momentum.
 - [ ] Two fingers: pinch zoom anchored under the fingers. The page is sharp again about 0.3 s after the fingers stop.
 - [ ] Two-finger tap: undo. Three-finger tap: redo.
+- [ ] Two taps with one finger on a page zoom in on what was tapped; on a paper with columns the column under the finger fills the view. Two taps again (zoomed in) show the whole page.
+- [ ] A tap on a PDF link still follows the link and never zooms; a single tap alone changes nothing.
 - [ ] Four-finger tap (touch screen): all pages of the document; again: back. Five fingers: all open documents; again: back.
 - [ ] Four or five fingers pinched together ("zoom out") do the same; pinched apart they close the overview. The pages do not move while doing it.
 - [ ] (A touch pad cannot do it: KWin keeps three- and four-finger gestures for the desktop.)

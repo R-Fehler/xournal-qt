@@ -1093,7 +1093,7 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
     wait(80);
     EXPECT_FALSE(find<QQuickItem>("sideTools")->isVisible()) << "no bar at the side either";
     ASSERT_NE(square, nullptr);
-    EXPECT_TRUE(square->isVisible()) << "the small tool square takes over";
+    EXPECT_FALSE(square->isVisible()) << "the tool square is for full screen only";
 
     controller->setToolbarHidden(false);
     wait(80);

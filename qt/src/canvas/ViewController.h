@@ -56,6 +56,8 @@ public:
     void fitWidth();
     /// Zoom so that the page fills the height of the view, or the whole page fits (and scroll to it).
     void fitPage(size_t page, bool wholePage);
+    /// Zoom so that a part of a page (a column of text, say) fills the view, and show it.
+    void zoomToPageRect(size_t page, QRectF rectPt);
     void panBy(QPointF deltaView);
     void scrollToPage(size_t page);
     /// Make a rectangle of a page (in page points) visible, centred if it has to scroll (e.g. a search hit).
