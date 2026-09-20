@@ -976,14 +976,19 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     click(findItem("sidebarContentsButton"));
     auto* outlineList = find<QQuickItem>("outlineList");
     ASSERT_NE(outlineList, nullptr);
+    until([&] { return outlineList->isVisible() && outlineList->property("count").toInt() == 3; });
     EXPECT_TRUE(outlineList->isVisible());
     ASSERT_EQ(outlineList->property("count").toInt(), 3);
+    until([&] { return itemAt(outlineList, 2) != nullptr; });
     click(itemAt(outlineList, 2));  // Chapter 2
+    until([&] { return controller->pageNumber() == 5; });
     EXPECT_EQ(controller->pageNumber(), 5);
 
     // Overview: the pages of each heading; a page opens there
     click(find<QQuickItem>("contentsButton"));
     auto* overview = find<QQuickItem>("contentsOverview");
+    ASSERT_NE(overview, nullptr);
+    until([&] { return overview->isVisible(); });
     ASSERT_TRUE(overview->isVisible());
     auto* list = find<QQuickItem>("contentsList");
     until([&] { return itemAt(list, 1) != nullptr; });
@@ -1001,7 +1006,7 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     QQuickItem* page4 = itemAt(strip, 1);
     ASSERT_NE(page4, nullptr);
     click(page4);
-    until([&] { return !overview->isVisible(); });
+    until([&] { return !overview->isVisible() && controller->pageNumber() == 4; });
     EXPECT_FALSE(overview->isVisible());
     EXPECT_EQ(controller->pageNumber(), 4);
 }
@@ -1067,6 +1072,22 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
     auto* pen = find<QQuickItem>("contentsButton");  // a tool bar button
     ASSERT_NE(pen, nullptr);
     EXPECT_TRUE(pen->isVisible());
+
+    // The little tab at the end of the bar puts it away
+    auto* toggle = find<QQuickItem>("toolbarToggle");
+    auto* show = find<QQuickItem>("toolbarShow");
+    ASSERT_NE(toggle, nullptr);
+    ASSERT_NE(show, nullptr);
+    EXPECT_TRUE(toggle->isVisible());
+    EXPECT_FALSE(show->isVisible());
+    click(toggle);
+    until([&] { return controller->toolbarHidden(); });
+    EXPECT_TRUE(controller->toolbarHidden());
+    EXPECT_TRUE(show->isVisible()) << "a slim strip brings it back";
+    EXPECT_FALSE(toggle->isVisible());
+    click(show);
+    until([&] { return !controller->toolbarHidden(); });
+    EXPECT_FALSE(controller->toolbarHidden());
 
     controller->setToolbarHidden(true);
     wait(80);

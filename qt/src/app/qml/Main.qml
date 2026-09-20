@@ -1128,6 +1128,64 @@ ApplicationWindow {
         onOpenFileRequested: openDialog.open()
     }
 
+    // Putting the tool bar away and getting it back: a small tab at its end, and a slim strip while it is away.
+    Rectangle {
+        objectName: "toolbarToggle"
+        visible: !app.homeVisible && !win.fullScreenMode && !app.toolbarHidden
+        z: 58
+        width: win.sideToolbar ? 18 : 42
+        height: win.sideToolbar ? 42 : 18
+        radius: 6
+        color: "#ffffff"
+        border.width: 1
+        border.color: "#d5d8dc"
+        // At the end of the bar, a little into the pages
+        x: win.toolbarPosition === "left" ? sideTools.width - width / 2
+           : win.toolbarPosition === "right" ? parent.width - sideTools.width - width / 2
+           : parent.width - width - 18
+        y: win.sideToolbar ? Math.round(parent.height / 2) : -height / 2
+        Image {
+            anchors.centerIn: parent
+            source: app.iconUrl(win.sideToolbar
+                                ? (win.toolbarPosition === "left" ? "xqt-chevron-up" : "xqt-chevron-down")
+                                : "xqt-chevron-up")
+            sourceSize.width: 15
+            sourceSize.height: 15
+            rotation: win.sideToolbar ? (win.toolbarPosition === "left" ? -90 : 90) : 0
+        }
+        TapHandler { onTapped: app.toolbarHidden = true }
+        ToolTip.visible: hoverHandler.hovered
+        ToolTip.text: qsTr("Hide the tool bar")
+        ToolTip.delay: 600
+        HoverHandler { id: hoverHandler }
+    }
+    // While it is away: a slim strip at the top edge brings it back
+    Rectangle {
+        objectName: "toolbarShow"
+        visible: !app.homeVisible && !win.fullScreenMode && app.toolbarHidden
+        z: 58
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: 96
+        height: 16
+        radius: 8
+        color: "#f1f3f4"
+        border.width: 1
+        border.color: "#d5d8dc"
+        opacity: showHover.hovered ? 1 : 0.75
+        Image {
+            anchors.centerIn: parent
+            source: app.iconUrl("xqt-chevron-down")
+            sourceSize.width: 15
+            sourceSize.height: 15
+        }
+        TapHandler { onTapped: app.toolbarHidden = false }
+        HoverHandler { id: showHover }
+        ToolTip.visible: showHover.hovered
+        ToolTip.text: qsTr("Show the tool bar")
+        ToolTip.delay: 600
+    }
+
     // Without a tool bar and with an ink tool: colors, width and pen / highlighter at a side of the screen
     PenPill {}
     ColorDialog {

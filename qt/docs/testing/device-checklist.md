@@ -190,7 +190,8 @@ cd build-qt
 
 ## Tool bar, full screen, colors, pages
 - [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
-- [ ] ⋮ → "Hide the tool bar": the bar goes away and the small tool square appears (as in full screen); "Show the tool bar" brings it back, and it is still away after a restart.
+- [ ] The small tab with the arrow at the end of the tool bar puts it away (the small tool square appears, as in full screen); the slim strip at the top edge brings it back. ⋮ has both as well, and the choice survives a restart.
+- [ ] With the bar at the left or right: the tab sits at its inner edge and works the same.
 - [ ] Without a tool bar (hidden or full screen) and with pen or highlighter: a small pill at the side has the pen/highlighter switch, three colors, "+" for more (press and hold one to remove it) and a width knob.
 - [ ] The width knob: a tap takes the next width, holding it and sliding along the pill makes the line thicker or thinner while drawing stays possible afterwards.
 - [ ] Drag the pill to another side of the screen: it stays there, also after a restart.
