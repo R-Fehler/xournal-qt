@@ -1033,6 +1033,16 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     controller->fitPage();
     wait(30);
     EXPECT_LE(controller->zoomPercent(), wide);
+    // Right click does what press and hold does
+    auto* layoutMenu = find<QObject>("layoutMenu");
+    ASSERT_NE(layoutMenu, nullptr);
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
+                      layout->mapToScene(QPointF(layout->width() / 2, layout->height() / 2)).toPoint());
+    until([&] { return layoutMenu->property("visible").toBool(); });
+    EXPECT_TRUE(layoutMenu->property("visible").toBool()) << "the layout menu on right click";
+    QMetaObject::invokeMethod(layoutMenu, "close");
+    until([&] { return !layoutMenu->property("visible").toBool(); });
+
     // Press and hold offers the other fits, and the menu opens at its button (not at some stale mouse position)
     auto* zoomButton = find<QQuickItem>("zoomButton");
     ASSERT_NE(zoomButton, nullptr);

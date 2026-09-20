@@ -44,6 +44,7 @@ cd build-qt
 - [ ] Closing a tab with unsaved changes asks first; quitting asks for every modified tab.
 - [ ] A tap with one finger (or a middle click) on a tab only switches to it; only the × closes it.
 - [ ] Menus opened by a finger or pen (tab menu, layout and zoom in the pill, tool bar menus, library menus) appear at the button or at the finger, not at the last mouse position.
+- [ ] A right click does what press and hold does: layout and zoom in the pill, "add page", "mark PDF text" and the text tool.
 - [ ] A menu without a close button (layout, zoom, tab, tool bar) closes when the page is touched - and that touch draws nothing. A tool tip still does not block drawing.
 - [ ] The button beside the library tab opens all open documents; "Close all documents" there asks first and then closes them all (unsaved ones ask to be saved).
 

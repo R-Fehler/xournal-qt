@@ -227,6 +227,10 @@ ApplicationWindow {
                 checked: app.tool === "text"
                 onClicked: app.tool === "text" ? fontPopup.open() : app.selectTool("text")
                 onPressAndHold: fontPopup.open()
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: fontPopup.open()
+                }
                 Popup {
                     id: fontPopup
                     x: win.toolbarPosition === "left" ? parent.width : win.toolbarPosition === "right" ? -width : 0
@@ -263,6 +267,10 @@ ApplicationWindow {
                 checked: app.tool === "selectPdfTextLinear" || app.tool === "selectPdfTextRect"
                 onClicked: checked ? Popups.openAt(pdfTextMenu) : app.selectTool("selectPdfTextLinear")
                 onPressAndHold: Popups.openAt(pdfTextMenu)
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: function(point) { Popups.openAt(pdfTextMenu, point.position) }
+                }
                 Menu {
                     id: pdfTextMenu
                     objectName: "pdfTextMenu"
@@ -456,6 +464,10 @@ ApplicationWindow {
                 tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
                 onClicked: app.addPageAfterCurrent()
                 onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: insertPagesDialog.openAt(app.pageNumber)
+                }
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
@@ -585,6 +597,10 @@ ApplicationWindow {
                     }
                 }
                 onPressAndHold: Popups.openAt(layoutMenu)
+                TapHandler {  // right click does what press and hold does
+                    acceptedButtons: Qt.RightButton
+                    onTapped: function(point) { Popups.openAt(layoutMenu, point.position) }
+                }
                 Menu {
                     id: layoutMenu
                     objectName: "layoutMenu"
@@ -649,6 +665,10 @@ ApplicationWindow {
                 implicitWidth: 72
                 onClicked: app.fitWidth()
                 onPressAndHold: Popups.openAt(fitMenu)
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: function(point) { Popups.openAt(fitMenu, point.position) }
+                }
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Fit the width (press and hold: more)")
                 ToolTip.delay: 600
