@@ -42,6 +42,7 @@ cd build-qt
 - [ ] Switching tabs keeps each tab's zoom, scroll position and undo history.
 - [ ] Closing a tab with unsaved changes asks first; quitting asks for every modified tab.
 - [ ] A tap with one finger (or a middle click) on a tab only switches to it; only the × closes it.
+- [ ] Menus opened by a finger or pen (tab menu, layout and zoom in the pill, tool bar menus, library menus) appear at the button or at the finger, not at the last mouse position.
 - [ ] The button beside the library tab opens all open documents; "Close all documents" there asks first and then closes them all (unsaved ones ask to be saved).
 
 ## Windows of their own (undocked documents)

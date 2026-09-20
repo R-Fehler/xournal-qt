@@ -12,6 +12,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import "Popups.js" as Popups
 
 Rectangle {
     id: home
@@ -280,7 +281,7 @@ Rectangle {
                 iconName: "xqt-chevron-down"
                 tip: qsTr("Libraries")
                 implicitWidth: 36
-                onClicked: libraryMenu.popup()
+                onClicked: Popups.openAt(libraryMenu)
                 // The libraries: this window shows one (highlighted); another one opens in a new window.
                 Menu {
                     id: libraryMenu
@@ -421,7 +422,7 @@ Rectangle {
                 visible: home.page === 0 && app.library.available
                 iconName: "xqt-import"
                 tip: qsTr("Import PDFs and Xournal files, or a whole folder (copies them into this folder)")
-                onClicked: importMenu.popup()
+                onClicked: Popups.openAt(importMenu)
                 Menu {
                     id: importMenu
                     objectName: "importMenu"
@@ -449,7 +450,7 @@ Rectangle {
                 visible: home.page === 0 && app.library.available
                 iconName: "xqt-sort"
                 tip: qsTr("Sort")
-                onClicked: sortMenu.popup()
+                onClicked: Popups.openAt(sortMenu)
                 Menu {
                     id: sortMenu
                     MenuItem { text: qsTr("By name"); checkable: true; checked: app.library.sortBy === "name"; onTriggered: app.library.sortBy = "name" }

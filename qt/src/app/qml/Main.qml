@@ -6,6 +6,7 @@ import QtQuick.Dialogs
 import QtQuick.Layouts
 import XournalQt
 import XournalQt.Canvas
+import "Popups.js" as Popups
 
 ApplicationWindow {
     id: win
@@ -257,8 +258,8 @@ ApplicationWindow {
                 iconName: icons[app.pdfTextMode] || "xopp-select-pdf-text-ht"
                 tip: qsTr("Mark PDF text (drag over the text)")
                 checked: app.tool === "selectPdfTextLinear" || app.tool === "selectPdfTextRect"
-                onClicked: checked ? pdfTextMenu.popup() : app.selectTool("selectPdfTextLinear")
-                onPressAndHold: pdfTextMenu.popup()
+                onClicked: checked ? Popups.openAt(pdfTextMenu) : app.selectTool("selectPdfTextLinear")
+                onPressAndHold: Popups.openAt(pdfTextMenu)
                 Menu {
                     id: pdfTextMenu
                     objectName: "pdfTextMenu"
@@ -312,7 +313,7 @@ ApplicationWindow {
                 iconName: icons[app.drawingType] || "xqt-shapes"
                 tip: qsTr("Shapes")
                 checked: (app.tool === "pen" || app.tool === "highlighter") && app.drawingType !== "default"
-                onClicked: shapeMenu.popup()
+                onClicked: Popups.openAt(shapeMenu)
                 Menu {
                     id: shapeMenu
                     component ShapeItem: MenuItem {
@@ -344,10 +345,10 @@ ApplicationWindow {
                     implicitWidth: 40
                     implicitHeight: 44
                     onClicked: app.setColor(modelData)
-                    onPressAndHold: swatchMenu.popup()
+                    onPressAndHold: Popups.openAt(swatchMenu)
                     TapHandler {
                         acceptedButtons: Qt.RightButton
-                        onTapped: swatchMenu.popup()
+                        onTapped: function(point) { Popups.openAt(swatchMenu, point.position) }
                     }
                     contentItem: Item {
                         Rectangle {
@@ -451,7 +452,7 @@ ApplicationWindow {
                 iconName: "xopp-page-add"
                 tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
                 onClicked: app.addPageAfterCurrent()
-                onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
+                onPressAndHold: insertPagesDialog.Popups.openAt(app.pageNumber)
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
@@ -460,14 +461,14 @@ ApplicationWindow {
                 objectName: "moreButton"
                 iconName: "xqt-more"
                 tip: qsTr("More")
-                onClicked: moreMenu.popup()
+                onClicked: Popups.openAt(moreMenu)
                 Menu {
                     id: moreMenu
                     MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
-                    MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
+                    MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.Popups.openAt(app.pageNumber) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
                     MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
                     MenuSeparator {}
@@ -574,7 +575,7 @@ ApplicationWindow {
                         app.pairedPages = true
                     }
                 }
-                onPressAndHold: layoutMenu.popup()
+                onPressAndHold: Popups.openAt(layoutMenu)
                 Menu {
                     id: layoutMenu
                     objectName: "layoutMenu"
@@ -638,7 +639,7 @@ ApplicationWindow {
                 text: app.zoomPercent + " %"
                 implicitWidth: 72
                 onClicked: app.fitWidth()
-                onPressAndHold: fitMenu.popup()
+                onPressAndHold: Popups.openAt(fitMenu)
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Fit the width (press and hold: more)")
                 ToolTip.delay: 600
@@ -1148,7 +1149,7 @@ ApplicationWindow {
     InsertPagesDialog { id: insertPagesDialog }
     Connections {
         target: app
-        function onInsertPagesRequested(position) { insertPagesDialog.openAt(position) }
+        function onInsertPagesRequested(position) { insertPagesDialog.Popups.openAt(position) }
     }
 
     SettingsPage { id: settingsPage; objectName: "settingsPage" }

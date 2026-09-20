@@ -1003,7 +1003,20 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     controller->fitPage();
     wait(30);
     EXPECT_LE(controller->zoomPercent(), wide);
-    EXPECT_NE(find<QObject>("fitMenu"), nullptr) << "press and hold offers the other fits";
+    // Press and hold offers the other fits, and the menu opens at its button (not at some stale mouse position)
+    auto* zoomButton = find<QQuickItem>("zoomButton");
+    ASSERT_NE(zoomButton, nullptr);
+    const QPoint at = zoomButton->mapToScene(QPointF(zoomButton->width() / 2, zoomButton->height() / 2)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
+    wait(1000);  // (press and hold)
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at);
+    auto* fitMenu = find<QObject>("fitMenu");
+    ASSERT_NE(fitMenu, nullptr);
+    until([&] { return fitMenu->property("visible").toBool(); });
+    EXPECT_TRUE(fitMenu->property("visible").toBool());
+    // At its button: the pill sits at the bottom, so the menu flips above it (never at the window corner)
+    EXPECT_LT(fitMenu->property("y").toDouble(), 0);
+    EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
 }
 
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {

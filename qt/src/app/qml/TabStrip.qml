@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import "Popups.js" as Popups
 
 Rectangle {
     id: strip
@@ -111,11 +112,12 @@ Rectangle {
                 onClicked: app.currentTab = index
                 TapHandler {
                     acceptedButtons: Qt.RightButton
-                    onTapped: tabMenu.popup()
+                    onTapped: function(point) { Popups.openAt(tabMenu, point.position) }
                 }
                 TapHandler {
+                    id: tabLongPress
                     acceptedButtons: Qt.LeftButton
-                    onLongPressed: tabMenu.popup()
+                    onLongPressed: Popups.openAt(tabMenu, tabLongPress.point.position)
                 }
                 // Dragged off the strip: a window of its own
                 DragHandler {
