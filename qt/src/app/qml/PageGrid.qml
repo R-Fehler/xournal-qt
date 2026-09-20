@@ -75,7 +75,12 @@ Rectangle {
         cellHeight: Math.round((cellWidth - pageGrid.spacing) * app.pages.typicalAspect) + pageGrid.labelHeight
                     + pageGrid.spacing
         header: Item { height: pageGrid.spacing }
-        footer: Item { height: 80 }  // not under the zoom controls
+        // Add pages at the end, and room so the last row is not under the zoom controls
+        footer: Column {
+            width: grid.width
+            AppendPages { width: parent.width }
+            Item { width: 1; height: 80 }
+        }
         ScrollBar.vertical: ScrollBar { minimumSize: 0.05 }
 
         Keys.onReturnPressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)

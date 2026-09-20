@@ -92,6 +92,8 @@ Rectangle {
         onCurrentIndexChanged: if (currentIndex >= 0 && !pageDrag.active) positionViewAtIndex(currentIndex, ListView.Contain)
         ScrollBar.vertical: ScrollBar {}
         TouchpadMomentum { flickable: list }
+        // At the end: add pages
+        footer: AppendPages { width: list.width; visible: !app.homeVisible }
 
         Keys.onShortcutOverride: function(event) { event.accepted = pageKeys.isPageKey(event) }
         Keys.onPressed: function(event) {

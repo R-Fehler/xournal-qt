@@ -89,6 +89,7 @@ set(XQT_QML_FILES
     src/app/qml/OutlineList.qml
     src/app/qml/TextFlowPanel.qml
     src/app/qml/CustomWidthPopup.qml
+    src/app/qml/AppendPages.qml
     src/app/qml/Popups.js)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)

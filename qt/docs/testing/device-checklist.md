@@ -59,6 +59,7 @@ cd build-qt
 ## Pages sidebar (M5b)
 - [ ] The sidebar (first tool bar button) shows the pages; the current page is highlighted and follows scrolling.
 - [ ] Tap a thumbnail (finger or pen): the canvas jumps to that page.
+- [ ] At the end of the page sidebar and of the page grid: − N + and "Add pages" appends that many pages (like the current one; a PDF page is not copied), one undo step.
 - [ ] Long-press or ⋮ on a thumbnail: insert before/after, duplicate, move up/down, delete. Each can be undone.
 - [ ] After writing on a page, its thumbnail updates within about half a second, also after undo/redo.
 - [ ] PDF pages show their PDF content in the thumbnail.

@@ -1019,6 +1019,25 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
 }
 
+TEST_F(MainWindowTest, pagesAreAppendedFromTheSidebar) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    const int before = controller->pageCount();
+    auto* sidebarList = find<QQuickItem>("sidebarList");
+    ASSERT_NE(sidebarList, nullptr);
+    QMetaObject::invokeMethod(sidebarList, "positionViewAtEnd");
+    until([&] { return findItem("appendButton") != nullptr; });
+
+    click(findItem("appendMore"));
+    click(findItem("appendMore"));  // three pages
+    click(findItem("appendButton"));
+    wait(80);
+    EXPECT_EQ(controller->pageCount(), before + 3);
+    controller->undoPages();  // one step for all of them
+    wait(50);
+    EXPECT_EQ(controller->pageCount(), before);
+}
+
 TEST_F(MainWindowTest, aPressOnTheCanvasClosesAnOpenMenu) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
