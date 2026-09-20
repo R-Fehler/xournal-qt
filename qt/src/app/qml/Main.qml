@@ -1199,26 +1199,28 @@ ApplicationWindow {
 
     // Document shortcuts do nothing while the home screen is shown.
     readonly property bool docKeys: !app.homeVisible && !app.textFlowActive
-    Shortcut { sequences: [StandardKey.Undo]; enabled: docKeys; onActivated: app.undo() }
-    Shortcut { sequences: [StandardKey.Redo, "Ctrl+Y"]; enabled: docKeys; onActivated: app.redo() }
-    Shortcut { sequences: [StandardKey.Save]; enabled: docKeys; onActivated: saveOrAsk(null) }
-    Shortcut { sequences: [StandardKey.SaveAs]; enabled: docKeys; onActivated: openSaveDialog(null) }
-    Shortcut { sequences: [StandardKey.Open]; onActivated: openDialog.open() }
+    // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
+    function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
+    Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }
+    Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
+    Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: saveOrAsk(null) }
+    Shortcut { sequences: win.keysOf("saveAs"); enabled: docKeys; onActivated: openSaveDialog(null) }
+    Shortcut { sequences: win.keysOf("open"); onActivated: openDialog.open() }
     // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document
-    Shortcut { sequence: "Ctrl+N"; enabled: docKeys; onActivated: app.addPageAfterCurrent() }
-    Shortcut { sequences: ["Ctrl+Shift+N", StandardKey.AddTab]; onActivated: app.newDocument() }
-    Shortcut { sequence: "Ctrl+N"; enabled: app.homeVisible; onActivated: app.newDocument() }
-    Shortcut { sequences: [StandardKey.Close]; enabled: docKeys; onActivated: requestCloseTab(app.currentTab) }
+    Shortcut { sequences: win.keysOf("addPage"); enabled: docKeys; onActivated: app.addPageAfterCurrent() }
+    Shortcut { sequences: win.keysOf("newDocument"); onActivated: app.newDocument() }
+    Shortcut { sequences: win.keysOf("addPage"); enabled: app.homeVisible; onActivated: app.newDocument() }
+    Shortcut { sequences: win.keysOf("closeTab"); enabled: docKeys; onActivated: requestCloseTab(app.currentTab) }
     // The home screen (library)
-    Shortcut { sequences: ["Ctrl+Shift+L", "Alt+Home"]; onActivated: app.homeVisible = !app.homeVisible || app.tabCount() === 0 }
+    Shortcut { sequences: win.keysOf("home"); onActivated: app.homeVisible = !app.homeVisible || app.tabCount() === 0 }
     // Tabs: Ctrl+Tab / Ctrl+Shift+Tab (Shift+Tab arrives as Backtab), like browsers; also Ctrl+PgDown / Ctrl+PgUp.
     Shortcut {
-        sequences: ["Ctrl+Tab", "Ctrl+PgDown"]
+        sequences: win.keysOf("nextTab")
         context: Qt.ApplicationShortcut
         onActivated: app.nextTab()
     }
     Shortcut {
-        sequences: ["Ctrl+Shift+Tab", "Ctrl+Backtab", "Ctrl+Shift+Backtab", "Ctrl+PgUp"]
+        sequences: win.keysOf("previousTab")
         context: Qt.ApplicationShortcut
         onActivated: app.previousTab()
     }
@@ -1242,29 +1244,34 @@ ApplicationWindow {
             else if (pageGrid.visible) pageGrid.close()
         }
     }
-    Shortcut { sequence: "Ctrl+Shift+E"; onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
-    Shortcut { sequence: "Ctrl+,"; onActivated: settingsPage.open() }
+    Shortcut { sequences: win.keysOf("tabOverview"); onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
+    Shortcut { sequences: win.keysOf("settings"); onActivated: settingsPage.open() }
+    Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)
-    Shortcut { sequence: "F11"; enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
+    Shortcut { sequences: win.keysOf("fullScreen"); enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
     Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection; onActivated: win.fullScreenMode = false }
-    Shortcut { sequence: "Ctrl+E"; enabled: docKeys; onActivated: openExportDialog() }
-    Shortcut { sequences: [StandardKey.Back]; enabled: docKeys; onActivated: app.navigateBack() }
-    Shortcut { sequences: [StandardKey.Forward]; enabled: docKeys; onActivated: app.navigateForward() }
-    Shortcut { sequence: "Ctrl+Alt+G"; enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
-    Shortcut { sequence: "Ctrl+Alt+O"; enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
-    Shortcut { sequence: "Ctrl+Alt+E"; enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
-    Shortcut { sequences: [StandardKey.Find]; onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openBar() }
+    Shortcut { sequences: win.keysOf("export"); enabled: docKeys; onActivated: openExportDialog() }
+    Shortcut { sequences: win.keysOf("back"); enabled: docKeys; onActivated: app.navigateBack() }
+    Shortcut { sequences: win.keysOf("forward"); enabled: docKeys; onActivated: app.navigateForward() }
+    Shortcut { sequences: win.keysOf("pageGrid"); enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
+    Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
+    Shortcut { sequences: win.keysOf("textMode"); enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
+    Shortcut { sequences: win.keysOf("find"); onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openBar() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
-    Shortcut { sequences: [StandardKey.Copy]; enabled: docKeys; onActivated: app.copySelection() }
-    Shortcut { sequences: [StandardKey.Cut]; enabled: docKeys; onActivated: app.cutSelection() }
-    Shortcut { sequences: [StandardKey.Paste]; enabled: docKeys; onActivated: app.pasteElements() }
-    Shortcut { sequences: [StandardKey.Delete, "Backspace"]; enabled: docKeys && app.hasSelection; onActivated: app.deleteSelection() }
-    Shortcut { sequences: [StandardKey.SelectAll]; enabled: docKeys; onActivated: app.selectAllOnPage() }
+    Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }
+    Shortcut { sequences: win.keysOf("cut"); enabled: docKeys; onActivated: app.cutSelection() }
+    Shortcut { sequences: win.keysOf("paste"); enabled: docKeys; onActivated: app.pasteElements() }
+    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && app.hasSelection; onActivated: app.deleteSelection() }
+    Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
     Shortcut { sequence: "Escape"; enabled: docKeys && app.hasSelection; onActivated: app.clearSelection() }
-    Shortcut { sequences: [StandardKey.FindNext]; enabled: docKeys; onActivated: app.searchNext() }
-    Shortcut { sequences: [StandardKey.FindPrevious]; enabled: docKeys; onActivated: app.searchPrevious() }
-    Shortcut { sequences: [StandardKey.ZoomIn]; enabled: docKeys; onActivated: app.zoomIn() }
-    Shortcut { sequences: [StandardKey.ZoomOut]; enabled: docKeys; onActivated: app.zoomOut() }
-    Shortcut { sequence: "Ctrl+0"; enabled: docKeys; onActivated: app.fitWidth() }
-    Shortcut { sequences: [StandardKey.Quit]; onActivated: win.close() }
+    Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
+    Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
+    Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }
+    Shortcut { sequences: win.keysOf("zoomOut"); enabled: docKeys; onActivated: app.zoomOut() }
+    Shortcut { sequences: win.keysOf("fitWidth"); enabled: docKeys; onActivated: app.fitWidth() }
+    Shortcut { sequences: win.keysOf("quit"); onActivated: win.close() }
+    ShortcutSheet {
+        id: shortcutSheet
+        onChangeRequested: { settingsPage.open(); settingsPage.showShortcuts() }
+    }
 }

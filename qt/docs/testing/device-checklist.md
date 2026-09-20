@@ -180,6 +180,12 @@ cd build-qt
 - [ ] In the Downloads library: Import (files, folder) and dropping files ask "Import into Downloads?" first.
 - [ ] Menu of a card → Move to… / Copy to…: choose another library in the box at the top, then a folder: the document (with its PDF) or folder is there; moving into Downloads from another library asks first.
 
+## Shortcuts
+- [ ] F1 (or Ctrl+/) lists all shortcuts by group; Esc closes it.
+- [ ] "Change…" opens the settings at "Shortcuts": tapping a row asks for keys; pressing e.g. Ctrl+Alt+P for "Add a page" makes that key work at once and Ctrl+N stop working.
+- [ ] A key another action already uses is marked in red with its name; Backspace in the dialog removes a shortcut; "Default keys" puts everything back.
+- [ ] The chosen keys are still there after a restart.
+
 ## Tool bar, full screen, colors, pages
 - [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
 - [ ] F11: only the tool square and the page / zoom pill are left; drag the square; tap it: tools, colors, sizes; choosing one closes them; the pen works right away; Esc leaves full screen.

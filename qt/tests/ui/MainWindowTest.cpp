@@ -1049,6 +1049,47 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
 }
 
+TEST_F(MainWindowTest, shortcutSheetAndCustomKeys) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* shortcuts = controller->shortcutsModel();
+    ASSERT_NE(shortcuts, nullptr);
+
+    // F1 shows them all
+    key(Qt::Key_F1);
+    auto* sheet = find<QObject>("shortcutSheet");
+    ASSERT_NE(sheet, nullptr);
+    until([&] { return sheet->property("visible").toBool(); });
+    EXPECT_TRUE(sheet->property("visible").toBool());
+    QMetaObject::invokeMethod(sheet, "close");
+    until([&] { return !sheet->property("visible").toBool(); });  // (it is modal while it fades out)
+
+    // Another key for "add a page", and it works
+    bool changedKeys = false;
+    QStringList keys;
+    QMetaObject::invokeMethod(shortcuts, "setKeys", Q_RETURN_ARG(bool, changedKeys), Q_ARG(QString, "addPage"),
+                              Q_ARG(QString, "Ctrl+Alt+P"));
+    ASSERT_TRUE(changedKeys);
+    QMetaObject::invokeMethod(shortcuts, "keys", Q_RETURN_ARG(QStringList, keys), Q_ARG(QString, "addPage"));
+    EXPECT_EQ(keys, QStringList{"Ctrl+Alt+P"});
+    wait(50);
+    const int before = controller->pageCount();
+    key(Qt::Key_P, Qt::ControlModifier | Qt::AltModifier);
+    EXPECT_EQ(controller->pageCount(), before + 1) << "the new keys add a page";
+    key(Qt::Key_N, Qt::ControlModifier);
+    EXPECT_EQ(controller->pageCount(), before + 1) << "the old ones do not";
+
+    // A conflict is reported, and the defaults come back
+    QString conflict;
+    QMetaObject::invokeMethod(shortcuts, "conflict", Q_RETURN_ARG(QString, conflict), Q_ARG(QString, "addPage"),
+                              Q_ARG(QString, "Ctrl+S"));
+    EXPECT_FALSE(conflict.isEmpty()) << "Ctrl+S saves";
+    QMetaObject::invokeMethod(shortcuts, "resetAll");
+    wait(50);
+    key(Qt::Key_N, Qt::ControlModifier);
+    EXPECT_EQ(controller->pageCount(), before + 2) << "Ctrl+N again";
+}
+
 TEST_F(MainWindowTest, backgroundOfExistingPagesAndTheInsertDialog) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
     wait(50);

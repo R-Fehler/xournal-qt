@@ -37,6 +37,7 @@
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/LayersModel.h"
+#include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
 #include "TextFlow.h"
 #include "shell/PageClipboard.h"
@@ -92,6 +93,8 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     ownSettingsView = std::make_unique<SettingsModel>(*app);
     settingsView = ownSettingsView.get();
+    ownShortcuts = std::make_unique<ShortcutsModel>(*app->getSettings());
+    shortcuts = ownShortcuts.get();
     makeTabs();
     ownLibrary = std::make_unique<LibraryModel>();
     library = ownLibrary.get();
@@ -111,6 +114,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     app = mainWindow.app;
     colors = mainWindow.colors;
     settingsView = mainWindow.settingsView;
+    shortcuts = mainWindow.shortcuts;
     library = mainWindow.library;
     recent = mainWindow.recent;
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
@@ -623,6 +627,7 @@ void AppController::setHomeVisible(bool visible) {
 QObject* AppController::filteredPagesModel() const { return filteredPages.get(); }
 QObject* AppController::outlineModel() const { return outline.get(); }
 QObject* AppController::layersModel() const { return layers.get(); }
+QObject* AppController::shortcutsModel() const { return shortcuts; }
 int AppController::currentTab() const { return tabs->currentIndex(); }
 void AppController::setCurrentTab(int index) {
     tabs->setCurrentIndex(index);

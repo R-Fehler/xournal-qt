@@ -36,6 +36,7 @@ class TabManager;
 class PagesModel;
 class PageFilterModel;
 class LayersModel;
+class ShortcutsModel;
 class OutlineModel;
 class TextFlowSession;
 class PageClipboard;
@@ -63,6 +64,8 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* outline READ outlineModel CONSTANT)
     /// The layers of the current page
     Q_PROPERTY(QObject* layers READ layersModel CONSTANT)
+    /// The keyboard shortcuts (the same ones in every window)
+    Q_PROPERTY(QObject* shortcuts READ shortcutsModel CONSTANT)
     Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
     /// The library of this window (a folder of documents) and the recently opened documents (home screen)
     Q_PROPERTY(QObject* library READ libraryModel CONSTANT)
@@ -140,6 +143,7 @@ public:
     QObject* filteredPagesModel() const;
     QObject* outlineModel() const;
     QObject* layersModel() const;
+    QObject* shortcutsModel() const;
     QObject* settingsModel() const;
     QObject* libraryModel() const;
     QObject* recentModel() const;
@@ -457,6 +461,8 @@ private:
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::OutlineModel> outline;
     std::unique_ptr<xqt::LayersModel> layers;
+    std::unique_ptr<xqt::ShortcutsModel> ownShortcuts;
+    xqt::ShortcutsModel* shortcuts = nullptr;  ///< the main window's
     std::unique_ptr<xqt::TextFlowSession> flow;
     xqt::DocumentSession* flowSession = nullptr;
     int flowPage = -1;
