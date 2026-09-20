@@ -17,6 +17,7 @@
 #include "undo/DeleteUndoAction.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
+#include "util/TextLinks.h"
 
 namespace {
 /// Minimal per-document session: what a tab of the Qt app provides to reused upstream code.
@@ -102,4 +103,26 @@ TEST(QtUndoRedo, savedStateTracking) {
     EXPECT_TRUE(session.undoRedo->isChanged());
     session.undoRedo->redo();
     EXPECT_FALSE(session.undoRedo->isChanged());
+}
+
+// xournal-qt: web addresses inside a text (they are drawn as links and can be tapped)
+TEST(TextLinks, findsAddressesAndLeavesTheRest) {
+    using xoj::util::findLinks;
+    EXPECT_TRUE(findLinks("nothing to see here").empty());
+    EXPECT_TRUE(findLinks("write me at nowhere").empty());
+
+    const auto one = findLinks("see https://example.org/paper, page 3");
+    ASSERT_EQ(one.size(), 1u);
+    EXPECT_EQ(one[0].uri, "https://example.org/paper") << "the comma belongs to the sentence";
+
+    const auto bare = findLinks("www.xournalpp.github.io is the page");
+    ASSERT_EQ(bare.size(), 1u);
+    EXPECT_EQ(bare[0].uri, "https://www.xournalpp.github.io");
+    EXPECT_EQ(bare[0].start, 0u);
+
+    const auto several = findLinks("http://a.example/one\nand https://b.example/two.");
+    ASSERT_EQ(several.size(), 2u);
+    EXPECT_EQ(several[1].uri, "https://b.example/two");
+
+    EXPECT_TRUE(findLinks("nothttps://example.org").empty()) << "only at the start of a word";
 }

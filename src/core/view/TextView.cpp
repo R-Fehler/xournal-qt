@@ -7,6 +7,7 @@
 #include "util/Color.h"           // for cairo_set_source_rgbi
 #include "util/Matrix.h"          // for Matrix
 #include "util/StringUtils.h"     // for StringUtils
+#include "util/TextLinks.h"        // for findLinks
 #include "util/raii/CairoWrappers.h"
 #include "util/raii/GObjectSPtr.h"
 #include "view/View.h"            // for Context, OPACITY_NO_AUDIO, view
@@ -49,6 +50,23 @@ void TextView::draw(const Context& ctx) const {
     auto layout = initPango(ctx.cr, text);
     const std::string& content = text->getText();
     pango_layout_set_text(layout.get(), content.c_str(), static_cast<int>(content.length()));
+
+    // xournal-qt: web addresses in the text are underlined and coloured like links (the text itself stays plain)
+    if (const auto links = xoj::util::findLinks(content); !links.empty()) {
+        PangoAttrList* attributes = pango_attr_list_new();
+        for (const auto& link: links) {
+            PangoAttribute* underline = pango_attr_underline_new(PANGO_UNDERLINE_SINGLE);
+            underline->start_index = static_cast<guint>(link.start);
+            underline->end_index = static_cast<guint>(link.start + link.length);
+            pango_attr_list_insert(attributes, underline);
+            PangoAttribute* colour = pango_attr_foreground_new(0x1a1a, 0x5f5f, 0xd8d8);  // a link blue
+            colour->start_index = underline->start_index;
+            colour->end_index = underline->end_index;
+            pango_attr_list_insert(attributes, colour);
+        }
+        pango_layout_set_attributes(layout.get(), attributes);
+        pango_attr_list_unref(attributes);
+    }
 
     pango_cairo_show_layout(ctx.cr, layout.get());
 }

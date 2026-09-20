@@ -127,6 +127,7 @@ cd build-qt
 - [ ] Text tool: tap on a page, type (hardware keyboard and the on-screen keyboard, also accents), Enter for new lines; the text looks the same while and after editing.
 - [ ] Tap an existing text to edit it at the tapped place; arrows, Shift+arrows, dragging to select, Ctrl+C/X/V.
 - [ ] Tap outside or Esc ends; undo removes/restores; emptying a text removes it.
+- [ ] A text that contains a web address (pasted or typed) shows it underlined and blue; tapping it (hand or selection tool) opens the browser. Xournal++ shows the same text without the colour.
 - [ ] Text button again (or long press): font family and size, also for the text being edited.
 
 ## Images

@@ -39,6 +39,7 @@
 #include "control/tools/CursorSelectionType.h"
 #include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
+#include "util/TextLinks.h"
 #include "model/Document.h"
 #include "model/DocumentChangeType.h"
 #include "render/RenderService.h"
@@ -533,11 +534,75 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
 }
 
 bool CanvasView::tapAt(QPointF viewPos) {
+    // A web address in a text on the page comes first: it lies on top of the PDF
+    if (auto text = textLinkAt(viewPos)) {
+        Q_EMIT linkTapped(text->uri, -1, text->viewRect);
+        return true;
+    }
     if (auto link = linkAt(viewPos)) {
         Q_EMIT linkTapped(link->uri, link->page, link->viewRect);
         return true;
     }
     return false;
+}
+
+std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) const {
+    const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
+    if (!idx) {
+        return std::nullopt;
+    }
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    const QPointF onPage((viewPos.x() - pageRect.x()) / zoom, (viewPos.y() - pageRect.y()) / zoom);
+    Document* doc = session.getDocument();
+    std::shared_lock lock(*doc);
+    const PageRef page = doc->getPage(*idx);
+    if (!page) {
+        return std::nullopt;
+    }
+    for (const Layer* layer: page->getLayersView()) {
+        if (!layer->isVisible()) {
+            continue;
+        }
+        for (const Element* element: layer->getElementsView()) {
+            if (element->getType() != ELEMENT_TEXT) {
+                continue;
+            }
+            const auto* text = static_cast<const Text*>(element);
+            const auto& box = text->getBoundingBox();
+            if (onPage.x() < box.x || onPage.x() > box.x + box.width || onPage.y() < box.y ||
+                onPage.y() > box.y + box.height) {
+                continue;
+            }
+            const auto links = xoj::util::findLinks(text->getText());
+            if (links.empty()) {
+                continue;
+            }
+            // Which line was tapped: the links of that line come first (a text has one font and one size)
+            const auto lineCount = static_cast<size_t>(
+                    1 + std::count(text->getText().begin(), text->getText().end(), '\n'));
+            const double lineHeight = box.height / static_cast<double>(lineCount);
+            const auto line = static_cast<size_t>((onPage.y() - box.y) / std::max(1.0, lineHeight));
+            size_t newlines = 0;
+            for (const auto& link: links) {
+                const auto before = static_cast<size_t>(
+                        std::count(text->getText().begin(),
+                                   text->getText().begin() + static_cast<std::ptrdiff_t>(link.start), '\n'));
+                newlines = before;
+                if (before == line || links.size() == 1) {
+                    LinkTarget target;
+                    target.uri = QString::fromStdString(link.uri);
+                    target.pdfPage = -1;
+                    target.viewRect = QRectF(pageRect.x() + box.x * zoom,
+                                             pageRect.y() + (box.y + static_cast<double>(before) * lineHeight) * zoom,
+                                             box.width * zoom, lineHeight * zoom);
+                    return target;
+                }
+            }
+            (void)newlines;
+        }
+    }
+    return std::nullopt;
 }
 
 // --- PDF text ----------------------------------------------------------------------------------------------------

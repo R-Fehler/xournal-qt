@@ -35,6 +35,7 @@
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Stroke.h"
+#include "model/Font.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "render/RenderService.h"
@@ -358,6 +359,35 @@ double fingerPan(CanvasInput& input, const QPointingDevice& screen, CanvasView& 
     return vc.visibleContentRect().top() - before;
 }
 }  // namespace
+
+TEST_F(CanvasReplayTest, aWebAddressInATextIsALink) {
+    // A text with a link on the page
+    auto text = std::make_unique<Text>();
+    text->setText("see https://example.org/paper for the details");
+    text->setFont(XojFont("Sans", 12));
+    text->move(50, 100);
+    const Text* raw = text.get();
+    auto page = session->getDocument()->getPage(0);
+    session->getDocument()->lock();
+    page->getSelectedLayer()->addElement(std::move(text));
+    session->getDocument()->unlock();
+    processEvents();
+
+    const auto& box = raw->getBoundingBox();
+    const QPointF middle = viewPos(0, QPointF(box.x + box.width / 2, box.y + box.height / 2));
+    const auto link = view->textLinkAt(middle);
+    ASSERT_TRUE(link.has_value());
+    EXPECT_EQ(link->uri, QString("https://example.org/paper"));
+    EXPECT_EQ(link->page, -1) << "it leads out of the document";
+
+    // Tapping it reports the link instead of doing nothing
+    QSignalSpy tapped(view.get(), &CanvasView::linkTapped);
+    EXPECT_TRUE(view->tapAt(middle));
+    EXPECT_EQ(tapped.count(), 1);
+
+    // Somewhere else on the page there is no link
+    EXPECT_FALSE(view->textLinkAt(viewPos(0, QPointF(box.x + box.width + 80, box.y + 200))).has_value());
+}
 
 TEST_F(CanvasReplayTest, twoTapsZoomInAndOutAgain) {
     auto& vc = view->getViewController();

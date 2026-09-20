@@ -131,6 +131,8 @@ public:
     /// Two taps in the same spot: zoom in on what was tapped (the column of text, if the page has columns), or,
     /// when the page is zoomed in already, back to the whole page.
     void doubleTapAt(QPointF viewPos);
+    /// A web address in a text element under this point (nothing if there is none).
+    std::optional<LinkTarget> textLinkAt(QPointF viewPos) const;
     /// The column of text around a point of a PDF page (nothing when the page has none there).
     std::optional<QRectF> textColumnAt(size_t page, QPointF pagePoint) const;
 

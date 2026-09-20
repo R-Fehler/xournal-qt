@@ -28,6 +28,7 @@ set(XOJ_UTIL_SOURCES
     ${XOJ_SRC}/util/serializing/ObjectOutputStream.cpp
     ${XOJ_SRC}/util/Stacktrace.cpp
     ${XOJ_SRC}/util/StringUtils.cpp
+    ${XOJ_SRC}/util/TextLinks.cpp
     ${XOJ_SRC}/util/Util.cpp
     ${XOJ_SRC}/util/XojPreviewExtractor.cpp
     ${XOJ_SRC}/util/ZipInputStream.cpp
