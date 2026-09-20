@@ -14,6 +14,8 @@
 #include <QSignalSpy>
 #include <gtest/gtest.h>
 
+#include "model/Font.h"
+#include "model/Text.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/PageType.h"
@@ -79,6 +81,41 @@ void expectLayoutMatchesDocument(AppController& c) {
     }
 }
 }  // namespace
+
+TEST(PageLinks, followTheirPagesWhenPagesChange) {
+    AppController c;
+    c.newDocument();
+    for (int i = 0; i < 4; ++i) {
+        c.insertPageAfter(i);  // five pages
+    }
+    ASSERT_EQ(c.pageCount(), 5);
+
+    // A note on page 1 that points to page 4
+    auto* s = c.tabManager().currentSession();
+    Document* doc = s->getDocument();
+    auto text = std::make_unique<Text>();
+    text->setText("see #Page:4 for the rest");
+    text->setFont(XojFont("Sans", 12));
+    text->move(40, 40);
+    Text* raw = text.get();
+    doc->lock();
+    doc->getPage(0)->getSelectedLayer()->addElement(std::move(text));
+    doc->unlock();
+
+    // A page before it: the link counts on
+    c.insertPageAfter(0);
+    EXPECT_EQ(raw->getText(), "see #Page:5 for the rest");
+    c.undoPages();
+    EXPECT_EQ(raw->getText(), "see #Page:4 for the rest") << "and back";
+
+    // A page behind it does not touch it
+    c.insertPageAfter(4);
+    EXPECT_EQ(raw->getText(), "see #Page:4 for the rest");
+
+    // Deleting a page in front moves it up
+    c.deletePage(1);
+    EXPECT_EQ(raw->getText(), "see #Page:3 for the rest");
+}
 
 TEST(Layers, listAddRenameHideMoveAndRemove) {
     AppController c;

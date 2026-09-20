@@ -24,6 +24,10 @@ Menu {
         text: menu.pages.length > 1 ? qsTr("Print %1 pages…").arg(menu.pages.length) : qsTr("Print this page…")
         onTriggered: app.requestPrint(menu.pages)
     }
+    MenuItem {
+        text: qsTr("Copy a link to this page")
+        onTriggered: app.copyPageLink(menu.page)
+    }
     MenuItem { text: qsTr("Copy %1").arg(menu.what); onTriggered: app.copyPages(menu.pages) }
     MenuItem { text: qsTr("Cut %1").arg(menu.what); onTriggered: app.cutPages(menu.pages) }
     MenuItem {

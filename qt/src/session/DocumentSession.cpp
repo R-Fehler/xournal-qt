@@ -16,6 +16,8 @@
 #include "control/settings/Settings.h"
 #include "control/xojfile/LoadHandler.h"
 #include "control/xojfile/SaveHandler.h"
+#include "util/TextLinks.h"
+#include "model/Text.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/PageType.h"
@@ -123,6 +125,7 @@ void DocumentSession::init() {
     pageUndo->addUndoRedoListener(this);
     layerController = std::make_unique<LayerController>(this);
     layerController->registerListener(this);
+    pageLinkKeeper = std::make_unique<PageLinkKeeper>(*this);
 
     scrollHandler.indexOf = [this](const PageRef& page) { return doc->indexOf(page); };
     scrollHandler.onScrollToPage = [this](size_t page, XojPdfRectangle) {
@@ -260,7 +263,78 @@ std::vector<PageRef> DocumentSession::pageOrder() const {
     return pages;
 }
 
+// Every page that comes or goes fires an event - also when it happens through undo - so the links are kept right
+// in one place instead of in every operation.
+class DocumentSession::PageLinkKeeper final: public DocumentListener {
+public:
+    explicit PageLinkKeeper(DocumentSession& session): session(session) { registerListener(&session); }
+    void documentChanged(DocumentChangeType) override {}
+    void pageInserted(size_t page) override { session.shiftPageLinks(page, 1); }
+    void pageDeleted(size_t page) override { session.shiftPageLinks(page, -1); }
+
+private:
+    DocumentSession& session;
+};
+
+void DocumentSession::shiftPageLinks(size_t position, int delta) {
+    if (pageLinksPaused) {
+        return;  // applyPageOrder knows where every page went and does it exactly
+    }
+    const size_t count = doc->getPageCount();
+    // pageDeleted comes before the page is gone, pageInserted after it is there
+    const size_t oldCount = delta > 0 ? (count > 0 ? count - 1 : 0) : count;
+    std::vector<int> newPage(oldCount, 0);
+    for (size_t i = 0; i < oldCount; ++i) {
+        if (delta > 0) {
+            newPage[i] = static_cast<int>(i < position ? i + 1 : i + 2);
+        } else {
+            newPage[i] = i == position ? 0 : static_cast<int>(i < position ? i + 1 : i);
+        }
+    }
+    rewritePageLinks(newPage);
+}
+
+void DocumentSession::rewritePageLinks(const std::vector<int>& newPage) {
+    std::shared_lock lock(*doc);
+    for (size_t i = 0; i < doc->getPageCount(); ++i) {
+        const PageRef page = doc->getPage(i);
+        for (Layer* layer: page->getLayers()) {
+            for (const auto& element: layer->getElements()) {
+                if (element->getType() != ELEMENT_TEXT) {
+                    continue;
+                }
+                auto* text = static_cast<Text*>(element.get());
+                std::string content = text->getText();
+                if (content.find('#') != std::string::npos && xoj::util::renumberPageLinks(content, newPage)) {
+                    text->setText(std::move(content));
+                }
+            }
+        }
+    }
+}
+
+void DocumentSession::updatePageLinks(const std::vector<PageRef>& before, const std::vector<PageRef>& after) {
+    if (before.empty()) {
+        return;
+    }
+    // Where each page went: newPage[old] is the new number (0: it is gone, the link stays as it is)
+    std::vector<int> newPage(before.size(), 0);
+    for (size_t i = 0; i < before.size(); ++i) {
+        const auto it = std::find(after.begin(), after.end(), before[i]);
+        if (it != after.end()) {
+            newPage[i] = static_cast<int>(std::distance(after.begin(), it)) + 1;
+        }
+    }
+    if (std::equal(newPage.begin(), newPage.end(), before.begin(),
+                   [i = 0](int now, const PageRef&) mutable { return now == ++i; })) {
+        return;  // nothing moved
+    }
+    rewritePageLinks(newPage);
+}
+
 void DocumentSession::applyPageOrder(const std::vector<PageRef>& target, const std::vector<PageRef>& moved) {
+    const auto before = pageOrder();
+    pageLinksPaused = true;
     // Pages that go away or move are removed (last first), then the missing ones inserted at their place (first
     // first): the pages in between keep their order, so each insertion index is final. Events as in upstream's
     // InsertDeletePageUndoAction (first the event, then the deletion).
@@ -295,6 +369,8 @@ void DocumentSession::applyPageOrder(const std::vector<PageRef>& target, const s
             firstChange = std::min(firstChange, i);
         }
     }
+    pageLinksPaused = false;
+    updatePageLinks(before, target);
     getCursor()->updateCursor();
     const size_t count = doc->getPageCount();
     const size_t show = firstChange != npos ? firstChange : std::min(getCurrentPageNo(), count - 1);

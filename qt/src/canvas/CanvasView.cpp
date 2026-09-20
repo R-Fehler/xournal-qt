@@ -536,7 +536,7 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
 bool CanvasView::tapAt(QPointF viewPos) {
     // A web address in a text on the page comes first: it lies on top of the PDF
     if (auto text = textLinkAt(viewPos)) {
-        Q_EMIT linkTapped(text->uri, -1, text->viewRect);
+        Q_EMIT linkTapped(text->uri, text->page, text->viewRect);
         return true;
     }
     if (auto link = linkAt(viewPos)) {
@@ -593,6 +593,7 @@ std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) co
                     LinkTarget target;
                     target.uri = QString::fromStdString(link.uri);
                     target.pdfPage = -1;
+                    target.page = link.page > 0 ? link.page - 1 : -1;  // a page of this document
                     target.viewRect = QRectF(pageRect.x() + box.x * zoom,
                                              pageRect.y() + (box.y + static_cast<double>(before) * lineHeight) * zoom,
                                              box.width * zoom, lineHeight * zoom);

@@ -363,6 +363,8 @@ public:
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
     /// Ask the window for the background dialog for these pages (0-based).
     Q_INVOKABLE void requestPageBackground(const QVariantList& pages) { Q_EMIT pageBackgroundRequested(pages); }
+    /// Puts a link to a page ("#Page:12") into the clipboard: pasted into a text it becomes a tappable link.
+    Q_INVOKABLE void copyPageLink(int page);
     /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
     Q_INVOKABLE void requestPrint(const QVariantList& pages) { Q_EMIT printRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);

@@ -41,6 +41,20 @@ size_t endOfLink(const std::string& text, size_t from) {
     return end;
 }
 
+/// "#Page:12" at this place: how many bytes it is, and which page.
+std::pair<size_t, int> pageLinkAt(const std::string& text, size_t at) {
+    if (!startsWith(text, at, "#page:")) {
+        return {0, 0};
+    }
+    size_t end = at + 6;
+    int page = 0;
+    while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) {
+        page = page * 10 + (text[end] - '0');
+        ++end;
+    }
+    return page > 0 ? std::pair{end - at, page} : std::pair{size_t{0}, 0};
+}
+
 /// The start of a word: a link is only found at one.
 bool atWordStart(const std::string& text, size_t at) {
     if (at == 0) {
@@ -55,6 +69,11 @@ std::vector<TextLink> findLinks(const std::string& text) {
     std::vector<TextLink> links;
     for (size_t i = 0; i < text.size(); ++i) {
         if (!atWordStart(text, i)) {
+            continue;
+        }
+        if (const auto [length, page] = pageLinkAt(text, i); page > 0) {
+            links.push_back({i, length, std::string(), page});
+            i += length - 1;
             continue;
         }
         std::string scheme;
@@ -75,6 +94,34 @@ std::vector<TextLink> findLinks(const std::string& text) {
         i = end;
     }
     return links;
+}
+
+std::string pageLinkText(int page) { return "#Page:" + std::to_string(page); }
+
+bool renumberPageLinks(std::string& text, const std::vector<int>& newPage) {
+    const auto links = findLinks(text);
+    std::string result;
+    size_t at = 0;
+    bool changed = false;
+    for (const auto& link: links) {
+        if (link.page <= 0 || static_cast<size_t>(link.page) > newPage.size()) {
+            continue;
+        }
+        const int now = newPage[static_cast<size_t>(link.page) - 1];
+        if (now <= 0 || now == link.page) {
+            continue;
+        }
+        result.append(text, at, link.start - at);
+        result.append(pageLinkText(now));
+        at = link.start + link.length;
+        changed = true;
+    }
+    if (!changed) {
+        return false;
+    }
+    result.append(text, at, std::string::npos);
+    text = std::move(result);
+    return true;
 }
 
 }  // namespace xoj::util

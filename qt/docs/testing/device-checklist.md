@@ -128,6 +128,8 @@ cd build-qt
 - [ ] Tap an existing text to edit it at the tapped place; arrows, Shift+arrows, dragging to select, Ctrl+C/X/V.
 - [ ] Tap outside or Esc ends; undo removes/restores; emptying a text removes it.
 - [ ] A text that contains a web address (pasted or typed) shows it underlined and blue; tapping it (hand or selection tool) opens the browser. Xournal++ shows the same text without the colour.
+- [ ] ⋮ on a page → "Copy a link to this page" gives "#Page:N"; pasted into a text it is a link that jumps there.
+- [ ] Insert, delete or move pages in front of it: the number in the link follows; undo puts it back.
 - [ ] Text button again (or long press): font family and size, also for the text being edited.
 
 ## Images

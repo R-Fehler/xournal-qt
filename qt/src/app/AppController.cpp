@@ -10,7 +10,9 @@
 #include <QDesktopServices>
 #include <QProcess>
 #include <QFileInfo>
+#include <QClipboard>
 #include <QFontDatabase>
+#include <QGuiApplication>
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QTemporaryDir>
@@ -30,6 +32,7 @@
 #include "undo/PageBackgroundChangedUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/NamedColor.h"
+#include "util/TextLinks.h"
 #include "util/XojMsgBox.h"
 
 #include "CanvasView.h"
@@ -1730,6 +1733,12 @@ bool AppController::exportPdf(const QUrl& url) {
     }
     Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
     return true;
+}
+
+void AppController::copyPageLink(int page) {
+    const int number = page >= 0 ? page + 1 : pageNumber();
+    QGuiApplication::clipboard()->setText(QString::fromStdString(xoj::util::pageLinkText(number)));
+    Q_EMIT pageActionDone(tr("Link to page %1 copied").arg(number), false);
 }
 
 bool AppController::hasPdfBackground() const {

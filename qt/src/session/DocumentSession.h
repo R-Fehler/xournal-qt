@@ -156,6 +156,16 @@ public:
     std::vector<PageRef> pageOrder() const;
     /// Make the document's pages `target` (used by undo/redo of the above); `moved`: pages that change place.
     void applyPageOrder(const std::vector<PageRef>& target, const std::vector<PageRef>& moved);
+    /// xournal-qt: "#Page:12" links in the texts follow the pages when those are inserted, moved or deleted.
+    void updatePageLinks(const std::vector<PageRef>& before, const std::vector<PageRef>& after);
+    /// One page came (delta 1) or went (delta -1) at this place: the links behind it count on or back.
+    void shiftPageLinks(size_t position, int delta);
+    /// Hears every page that comes or goes (also through undo) and keeps the page links right.
+    class PageLinkKeeper;
+    std::unique_ptr<PageLinkKeeper> pageLinkKeeper;
+    bool pageLinksPaused = false;
+    /// newPage[old page - 1] is the new number (0: leave those links alone).
+    void rewritePageLinks(const std::vector<int>& newPage);
 
 Q_SIGNALS:
     void modifiedChanged(bool modified);

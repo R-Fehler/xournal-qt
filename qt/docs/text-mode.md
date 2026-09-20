@@ -38,3 +38,10 @@ Bold inside a sentence is not possible: formatting applies to the whole paragrap
 
 Code: `qt/src/canvas/TextFlow.*` (layout, reading back, the session with its undo step), `qt/src/quick/TextFlowEditor.*`
 (the editor's document), `qt/src/app/qml/TextFlowPanel.qml`.
+
+## Links in texts
+A text can contain web addresses (`https://…`, `www.…`, `mailto:…`) and links to a page of the same document,
+written `#Page:12`. Both are underlined and coloured, and a tap opens the address or goes to the page. ⋮ on a page
+copies such a link. When pages are inserted, moved or deleted, the numbers in the links follow (undo too), so a
+note that points at page 12 keeps pointing at the same page. Xournal++ shows this as the plain text it is - the
+file format does not change - so the links survive going back and forth.

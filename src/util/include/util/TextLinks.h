@@ -17,10 +17,18 @@ namespace xoj::util {
 struct TextLink {
     size_t start = 0;  ///< byte offset in the text
     size_t length = 0;
-    std::string uri;   ///< ready to open ("www.x.org" becomes "https://www.x.org")
+    std::string uri;   ///< ready to open ("www.x.org" becomes "https://www.x.org"); empty for a page link
+    int page = 0;      ///< a page of this document (1-based; 0: not a page link)
 };
 
-/// The links in a text, in the order they appear.
+/// The links in a text, in the order they appear: web addresses and "#Page:12" (a page of the document).
 std::vector<TextLink> findLinks(const std::string& text);
+
+/// Give the page links other numbers: newPage[oldPage - 1], where 0 leaves a link as it is. Returns true if the
+/// text changed (the pages of a document moved, so the links follow them).
+bool renumberPageLinks(std::string& text, const std::vector<int>& newPage);
+
+/// How a link to a page is written.
+std::string pageLinkText(int page);
 
 }  // namespace xoj::util
