@@ -453,7 +453,7 @@ ApplicationWindow {
                 iconName: "xopp-page-add"
                 tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
                 onClicked: app.addPageAfterCurrent()
-                onPressAndHold: insertPagesDialog.Popups.openAt(app.pageNumber)
+                onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
@@ -469,7 +469,8 @@ ApplicationWindow {
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
-                    MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.Popups.openAt(app.pageNumber) }
+                    MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
+                    MenuItem { text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
                     MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
                     MenuSeparator {}
@@ -1178,9 +1179,14 @@ ApplicationWindow {
     }
 
     InsertPagesDialog { id: insertPagesDialog }
+    BackgroundDialog { id: backgroundDialog }
     Connections {
         target: app
-        function onInsertPagesRequested(position) { insertPagesDialog.Popups.openAt(position) }
+        function onPageBackgroundRequested(pages) { backgroundDialog.openFor(pages) }
+    }
+    Connections {
+        target: app
+        function onInsertPagesRequested(position) { insertPagesDialog.openAt(position) }
     }
 
     SettingsPage { id: settingsPage; objectName: "settingsPage" }

@@ -185,6 +185,8 @@ cd build-qt
 - [ ] F11: only the tool square and the page / zoom pill are left; drag the square; tap it: tools, colors, sizes; choosing one closes them; the pen works right away; Esc leaves full screen.
 - [ ] Colors: the Xournal++ palette without white (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow); "+" adds a color from the color dialog; press and hold a color: remove it; "Default colors".
 - [ ] Mark PDF text: the three highlight colors in the tool's menu and in the select bar; highlights come in the chosen color.
+- [ ] ⋮ on a page (or ⋮ menu → "Background of this page…"): choosing graph paper changes that page (or every selected page), one Ctrl+Z in the sidebar puts it back.
+- [ ] On a page of an annotated PDF the dialog warns that the PDF page is replaced; what was drawn stays.
 - [ ] Press and hold "add page" (or ⋮ → Insert pages…): 3 graph pages, landscape, after this page; one undo in the sidebar removes them.
 
 ## Table of contents

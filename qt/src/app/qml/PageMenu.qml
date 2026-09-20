@@ -14,6 +14,12 @@ Menu {
         popup(item, x, y)
     }
 
+    MenuItem {
+        text: menu.pages.length > 1 ? qsTr("Background of %1 pages…").arg(menu.pages.length)
+                                    : qsTr("Background of this page…")
+        onTriggered: app.requestPageBackground(menu.pages)
+    }
+    MenuSeparator {}
     MenuItem { text: qsTr("Copy %1").arg(menu.what); onTriggered: app.copyPages(menu.pages) }
     MenuItem { text: qsTr("Cut %1").arg(menu.what); onTriggered: app.cutPages(menu.pages) }
     MenuItem {

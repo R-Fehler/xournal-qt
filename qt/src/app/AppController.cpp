@@ -23,6 +23,8 @@
 #include "model/Document.h"
 #include "model/XojPage.h"
 #include "control/pagetype/PageTypeHandler.h"
+#include "undo/GroupUndoAction.h"
+#include "undo/PageBackgroundChangedUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/NamedColor.h"
 #include "util/XojMsgBox.h"
@@ -1458,6 +1460,62 @@ bool AppController::insertPages(int position, int background, int paper, bool la
     s->setCurrentPageNo(at);
     s->getScrollHandler()->scrollToPage(at);
     Q_EMIT pageActionDone(count == 1 ? tr("Page inserted") : tr("%1 pages inserted").arg(count), true);
+    return true;
+}
+
+bool AppController::pagesHavePdfBackground(const QList<int>& pages) const {
+    DocumentSession* s = session();
+    if (!s) {
+        return false;
+    }
+    Document* doc = s->getDocument();
+    std::shared_lock lock(*doc);
+    for (size_t index: pageList(pages)) {
+        if (index < doc->getPageCount() && doc->getPage(index)->getBackgroundType().isPdfPage()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AppController::changePageBackground(const QList<int>& pages, int background) {
+    DocumentSession* s = session();
+    const auto& types = app->getPageTypes()->getPageTypes();
+    if (!s || background < 0 || background >= static_cast<int>(types.size())) {
+        return false;
+    }
+    const PageType& type = types[static_cast<size_t>(background)]->page;
+    const Color bgColor = app->getSettings()->getPageTemplateSettings().getBackgroundColor();
+    Document* doc = s->getDocument();
+    std::vector<size_t> changed;
+    auto group = std::make_unique<GroupUndoAction>();
+    {
+        doc->lock();
+        for (size_t index: pageList(pages)) {
+            PageRef page = index < doc->getPageCount() ? doc->getPage(index) : PageRef();
+            if (!page) {
+                continue;
+            }
+            // Port of PageBackgroundChangeController::commitPageTypeChange (patterns only: no PDF or image here)
+            group->addAction(std::make_unique<PageBackgroundChangedUndoAction>(
+                    page, page->getBackgroundType(), page->getPdfPageNr(), page->getBackgroundImage(),
+                    page->getWidth(), page->getHeight()));
+            page->setBackgroundType(type);
+            page->setBackgroundColor(bgColor);
+            changed.push_back(index);
+        }
+        doc->unlock();
+    }
+    if (changed.empty()) {
+        return false;
+    }
+    s->getPageUndoRedoHandler()->addUndoAction(std::move(group));
+    for (size_t index: changed) {
+        type.isSpecial() ? s->firePageSizeChanged(index) : s->firePageChanged(index);
+    }
+    Q_EMIT pageActionDone(changed.size() == 1 ? tr("Background changed")
+                                              : tr("Background of %1 pages changed").arg(changed.size()),
+                          true);
     return true;
 }
 

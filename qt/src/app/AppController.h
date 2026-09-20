@@ -333,10 +333,16 @@ public:
     /// in the settings' pageBackgrounds), paper `paper` (index in paperFormats; -1: the size of the current page),
     /// portrait or landscape. One step on the page undo stack.
     Q_INVOKABLE bool insertPages(int position, int background, int paper, bool landscape, int count = 1);
+    /// Give these pages another background (index in the settings' pageBackgrounds); one undo step.
+    Q_INVOKABLE bool changePageBackground(const QList<int>& pages, int background);
+    /// One of the pages shows a page of the PDF (changing the background takes that away).
+    Q_INVOKABLE bool pagesHavePdfBackground(const QList<int>& pages) const;
     /// The current page: { background (index in pageBackgrounds, -1: other), landscape }
     Q_INVOKABLE QVariantMap currentPageFormat() const;
     /// Ask the window for the "insert pages" dialog (page menu); position as for insertPages.
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
+    /// Ask the window for the background dialog for these pages (0-based).
+    Q_INVOKABLE void requestPageBackground(const QVariantList& pages) { Q_EMIT pageBackgroundRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);
     Q_INVOKABLE void insertPageAfter(int index);
     Q_INVOKABLE void duplicatePage(int index);
@@ -422,6 +428,7 @@ Q_SIGNALS:
     void copiedPagesChanged();
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
+    void pageBackgroundRequested(const QVariantList& pages);
     void toolbarPositionChanged();
     void textFlowChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.

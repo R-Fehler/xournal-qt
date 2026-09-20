@@ -27,6 +27,7 @@
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Text.h"
+#include "model/PageType.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
@@ -1046,6 +1047,45 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     // At its button: the pill sits at the bottom, so the menu flips above it (never at the window corner)
     EXPECT_LT(fitMenu->property("y").toDouble(), 0);
     EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
+}
+
+TEST_F(MainWindowTest, backgroundOfExistingPagesAndTheInsertDialog) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    wait(50);
+    auto backgroundOf = [&](int page) {
+        auto* s = controller->tabManager().currentSession();
+        return s->getDocument()->getPage(static_cast<size_t>(page))->getBackgroundType().format;
+    };
+    ASSERT_TRUE(controller->pagesHavePdfBackground({0})) << "the fixture annotates a PDF";
+
+    // The dialog warns before a PDF page is replaced
+    auto* dialog = find<QObject>("backgroundDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QVariant::fromValue(QVariantList{0})));
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_TRUE(dialog->property("overPdf").toBool());
+    auto* warning = find<QQuickItem>("pdfWarning");
+    ASSERT_NE(warning, nullptr);
+    EXPECT_TRUE(warning->isVisible());
+    QMetaObject::invokeMethod(dialog, "reject");
+    wait(50);
+    EXPECT_EQ(backgroundOf(0), PageTypeFormat::Pdf) << "cancelling changes nothing";
+
+    // Graph paper instead, and back with one undo
+    const int graph = controller->settingsModel()->property("pageBackgroundFormats").toStringList().indexOf("graph");
+    ASSERT_GE(graph, 0);
+    EXPECT_TRUE(controller->changePageBackground({0}, graph));
+    EXPECT_EQ(backgroundOf(0), PageTypeFormat::Graph);
+    controller->undoPages();
+    EXPECT_EQ(backgroundOf(0), PageTypeFormat::Pdf);
+
+    // The insert dialog still opens from the page menu (it is asked for through the controller)
+    auto* insert = find<QObject>("insertPagesDialog");
+    ASSERT_NE(insert, nullptr);
+    QMetaObject::invokeMethod(insert, "openAt", Q_ARG(QVariant, QVariant::fromValue(1)));
+    until([&] { return insert->property("visible").toBool(); });
+    EXPECT_TRUE(insert->property("visible").toBool());
+    QMetaObject::invokeMethod(insert, "reject");
 }
 
 TEST_F(MainWindowTest, layersInTheSidebar) {
