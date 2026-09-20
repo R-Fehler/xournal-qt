@@ -190,6 +190,9 @@ cd build-qt
 ## Tool bar, full screen, colors, pages
 - [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
 - [ ] ⋮ → "Hide the tool bar": the bar goes away and the small tool square appears (as in full screen); "Show the tool bar" brings it back, and it is still away after a restart.
+- [ ] Without a tool bar (hidden or full screen) and with pen or highlighter: a small pill at the side has the pen/highlighter switch, three colors, "+" for more (press and hold one to remove it) and a width knob.
+- [ ] The width knob: a tap takes the next width, holding it and sliding along the pill makes the line thicker or thinner while drawing stays possible afterwards.
+- [ ] Drag the pill to another side of the screen: it stays there, also after a restart.
 - [ ] F11: only the tool square and the page / zoom pill are left; drag the square; tap it: tools, colors, sizes; choosing one closes them; the pen works right away; Esc leaves full screen.
 - [ ] Colors: the Xournal++ palette without white (black, green, light blue, light green, blue, gray, red, magenta, orange, yellow); "+" adds a color from the color dialog; press and hold a color: remove it; "Default colors".
 - [ ] Mark PDF text: the three highlight colors in the tool's menu and in the select bar; highlights come in the chosen color.

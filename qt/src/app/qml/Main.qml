@@ -1108,6 +1108,13 @@ ApplicationWindow {
         onOpenFileRequested: openDialog.open()
     }
 
+    // Without a tool bar and with an ink tool: colors, width and pen / highlighter at a side of the screen
+    PenPill {}
+    ColorDialog {
+        id: pillColorDialog
+        onAccepted: app.addPenColor(selectedColor)
+    }
+
     // Full screen: the current tool in a small square (drag it anywhere); a tap offers all tools and colors.
     Rectangle {
         id: quickToolSquare

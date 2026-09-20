@@ -835,6 +835,85 @@ void AppController::setToolbarHidden(bool hidden) {
     }
 }
 
+QVariantList AppController::penColors() const {
+    std::string stored;
+    QVariantList list;
+    if (app->getSettings()->getCustomElement(CUSTOM).getString("penColors", stored)) {
+        for (const QString& name: QString::fromStdString(stored).split(',', Qt::SkipEmptyParts)) {
+            if (const QColor color(name.trimmed()); color.isValid()) {
+                list.append(color);
+            }
+        }
+        return list;
+    }
+    return {QColor(Qt::black), QColor(0xff, 0x00, 0x00), QColor(0x31, 0x71, 0xd8)};  // black, red, blue
+}
+
+namespace {
+void storePenColors(Settings* settings, const QVariantList& list) {
+    QStringList names;
+    for (const QVariant& c: list) {
+        names << c.value<QColor>().name();
+    }
+    settings->getCustomElement("xournalQt").setString("penColors", names.join(',').toStdString());
+    settings->customSettingsChanged();
+}
+}  // namespace
+
+void AppController::addPenColor(const QColor& color) {
+    QVariantList list = penColors();
+    for (const QVariant& c: list) {
+        if (c.value<QColor>().rgb() == color.rgb()) {
+            return;
+        }
+    }
+    list.append(QColor(color.rgb()));
+    storePenColors(app->getSettings(), list);
+    Q_EMIT penPillChanged();
+}
+
+void AppController::removePenColor(int index) {
+    QVariantList list = penColors();
+    if (index >= 0 && index < list.size() && list.size() > 1) {
+        list.removeAt(index);
+        storePenColors(app->getSettings(), list);
+        Q_EMIT penPillChanged();
+    }
+}
+
+void AppController::resetPenColors() {
+    app->getSettings()->getCustomElement(CUSTOM).setString("penColors", std::string());
+    app->getSettings()->customSettingsChanged();
+    Q_EMIT penPillChanged();
+}
+
+QString AppController::penPillSide() const {
+    std::string stored;
+    app->getSettings()->getCustomElement(CUSTOM).getString("penPillSide", stored);
+    return stored == "left" || stored == "top" || stored == "bottom" ? QString::fromStdString(stored)
+                                                                     : QStringLiteral("right");
+}
+
+void AppController::setPenPillSide(const QString& side) {
+    if (side != penPillSide() && (side == "left" || side == "right" || side == "top" || side == "bottom")) {
+        app->getSettings()->getCustomElement(CUSTOM).setString("penPillSide", side.toStdString());
+        app->getSettings()->customSettingsChanged();
+        Q_EMIT penPillChanged();
+    }
+}
+
+double AppController::penPillOffset() const {
+    double offset = 0.35;
+    app->getSettings()->getCustomElement(CUSTOM).getDouble("penPillOffset", offset);
+    return std::clamp(offset, 0.0, 1.0);
+}
+
+void AppController::setPenPillOffset(double offset) {
+    app->getSettings()->getCustomElement(CUSTOM).setDouble("penPillOffset", std::clamp(offset, 0.0, 1.0));
+    app->getSettings()->customSettingsChanged();
+    Q_EMIT penPillChanged();
+}
+
 QVariantList AppController::pdfHighlightColors() const {
     // Yellow (upstream's highlighter), green, pink
     return {QColor(0xff, 0xff, 0x00), QColor(0x7c, 0xfc, 0x3c), QColor(0xff, 0x80, 0xc0)};

@@ -1071,6 +1071,49 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
     (void)tools;
 }
 
+TEST_F(MainWindowTest, penPillWithoutAToolBar) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* pill = find<QQuickItem>("penPill");
+    ASSERT_NE(pill, nullptr);
+    EXPECT_FALSE(pill->isVisible()) << "the tool bar is there, no pill";
+
+    controller->setToolbarHidden(true);
+    controller->selectTool("pen");
+    wait(80);
+    EXPECT_TRUE(pill->isVisible());
+
+    // The colors of the pill
+    // (items a Repeater made have no QObject parent: through the item tree)
+    std::vector<QQuickItem*> colors;
+    std::function<void(QQuickItem*)> collect = [&](QQuickItem* item) {
+        for (QQuickItem* child: item->childItems()) {
+            if (child->objectName() == "penPillColor") {
+                colors.push_back(child);
+            }
+            collect(child);
+        }
+    };
+    collect(pill);
+    QQuickItem* second = colors.size() > 1 ? colors[1] : nullptr;
+    ASSERT_NE(second, nullptr) << "three colors to start with";
+    click(second);
+    EXPECT_EQ(controller->color(), QColor(0xff, 0x00, 0x00)) << "red";
+
+    // The width goes to the next one, the tool switches to the highlighter
+    const int size = controller->size();
+    click(findItem("penPillWidth"));
+    EXPECT_NE(controller->size(), size);
+    click(findItem("penPillTool"));
+    EXPECT_EQ(controller->tool(), "highlighter");
+    click(findItem("penPillTool"));
+    EXPECT_EQ(controller->tool(), "pen");
+
+    controller->setToolbarHidden(false);
+    wait(80);
+    EXPECT_FALSE(pill->isVisible());
+}
+
 TEST_F(MainWindowTest, ctrlShiftShortcutsWork) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

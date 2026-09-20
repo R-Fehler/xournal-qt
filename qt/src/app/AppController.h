@@ -106,6 +106,10 @@ class AppController: public QObject {
     Q_PROPERTY(QString toolbarPosition READ toolbarPosition WRITE setToolbarPosition NOTIFY toolbarPositionChanged)
     /// The tool bar is put away (the small tool square of the full screen takes over)
     Q_PROPERTY(bool toolbarHidden READ toolbarHidden WRITE setToolbarHidden NOTIFY toolbarPositionChanged)
+    /// The pen pill without a tool bar: its colors, which side of the screen it is on, and where along that side
+    Q_PROPERTY(QVariantList penColors READ penColors NOTIFY penPillChanged)
+    Q_PROPERTY(QString penPillSide READ penPillSide WRITE setPenPillSide NOTIFY penPillChanged)
+    Q_PROPERTY(double penPillOffset READ penPillOffset WRITE setPenPillOffset NOTIFY penPillChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
@@ -187,6 +191,14 @@ public:
     QString toolbarPosition() const;
     bool toolbarHidden() const;
     void setToolbarHidden(bool hidden);
+    QVariantList penColors() const;
+    Q_INVOKABLE void addPenColor(const QColor& color);
+    Q_INVOKABLE void removePenColor(int index);
+    Q_INVOKABLE void resetPenColors();
+    QString penPillSide() const;
+    void setPenPillSide(const QString& side);
+    double penPillOffset() const;
+    void setPenPillOffset(double offset);
     bool textFlowActive() const;
     int textFlowPage() const { return flowPage; }
     double textFlowOverflow() const { return flowOverflow; }
@@ -438,6 +450,7 @@ Q_SIGNALS:
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QVariantList& pages);
     void toolbarPositionChanged();
+    void penPillChanged();
     void textFlowChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);

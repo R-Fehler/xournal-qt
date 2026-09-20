@@ -95,6 +95,7 @@ set(XQT_QML_FILES
     src/app/qml/CustomWidthPopup.qml
     src/app/qml/AppendPages.qml
     src/app/qml/BackgroundDialog.qml
+    src/app/qml/PenPill.qml
     src/app/qml/ShortcutSheet.qml
     src/app/qml/LayerList.qml
     src/app/qml/Popups.js)
