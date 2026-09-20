@@ -109,7 +109,10 @@ public:
     bool copySelection();
     bool cutSelection();
     /// Paste elements from the clipboard as a new selection in the middle of the visible part of the current page.
-    bool pasteElements();
+    /// Paste what is in the clipboard. `viewPos`: where it goes (else the middle of the visible page).
+    bool pasteElements(std::optional<QPointF> viewPos = std::nullopt);
+    /// Text from the clipboard as a text element.
+    bool pasteText(const QString& content, std::optional<QPointF> viewPos = std::nullopt);
     /// Select everything on the active layer of the current page (Control::selectAllOnPage).
     void selectAllOnPage();
     /// Insert an image (file contents: PNG, JPEG, ...) on the current page, in the middle of its visible part and
@@ -183,6 +186,8 @@ Q_SIGNALS:
     void selectionChanged(bool hasSelection);
     /// Text editing started or ended (keyboard / input method for the canvas).
     void textEditingChanged(bool editing);
+    /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
+    void contextRequested(QPointF viewPos);
     /// A PDF link was tapped (the UI offers to follow it).
     void linkTapped(const QString& uri, int page, QRectF viewRect);
     void navigationChanged();

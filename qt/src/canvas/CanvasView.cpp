@@ -278,9 +278,58 @@ bool CanvasView::cutSelection() {
     return true;
 }
 
-bool CanvasView::pasteElements() {
+// Text from the clipboard: a text element where the user pasted it (or in the middle of the page)
+bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPos) {
+    const size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
+                                         .value_or(session.getCurrentPageNo())
+                               : session.getCurrentPageNo();
+    Document* doc = session.getDocument();
+    PageRef page;
+    Layer* layer = nullptr;
+    {
+        std::shared_lock lock(*doc);
+        if (pNr >= doc->getPageCount()) {
+            return false;
+        }
+        page = doc->getPage(pNr);
+        layer = page->getSelectedLayer();
+    }
+    if (!layer) {
+        return false;
+    }
+    const double zoom = viewController.zoom();
+    const QRectF pageRect = layout.pageRect(pNr, zoom);
+    QPointF onPage(72, 72);
+    if (viewPos) {
+        onPage = (viewController.viewToContent(*viewPos) - pageRect.topLeft()) / zoom;
+    } else {
+        const QRectF visible = pageRect.intersected(viewController.visibleContentRect());
+        onPage = ((visible.isEmpty() ? pageRect : visible).center() - pageRect.topLeft()) / zoom;
+    }
+    auto text = std::make_unique<Text>();
+    text->setText(content.toStdString());
+    text->setFont(session.getSettings()->getFont());
+    text->setColor(session.getToolHandler()->getColor());
+    text->move(std::max(0.0, onPage.x()), std::max(0.0, onPage.y()));
+    const Text* raw = text.get();
+    doc->lock();
+    layer->addElement(std::move(text));
+    doc->unlock();
+    session.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+    page->firePageChanged();
+    session.firePageChanged(pNr);
+    Q_EMIT updateRequested();
+    return true;
+}
+
+bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
     // Port of Control::clipboardPasteXournal
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    // Plain text from anywhere becomes a text element where it is pasted
+    if (mime && !mime->hasFormat(XOURNAL_MIME) && !mime->hasImage() && mime->hasText() &&
+        !mime->text().trimmed().isEmpty()) {
+        return pasteText(mime->text(), viewPos);
+    }
     if (mime && !mime->hasFormat(XOURNAL_MIME) && mime->hasImage()) {
         // An image copied elsewhere (browser, screenshot tool): insert it as an image element.
         QByteArray png;
@@ -338,14 +387,16 @@ bool CanvasView::pasteElements() {
         }
         session.getUndoRedoHandler()->addUndoAction(std::move(undo));
 
-        // Paste target: the middle of the visible part of the page (upstream XournalView::getPasteTarget).
+        // Paste target: where the user asked for it, else the middle of the visible part of the page (upstream
+        // XournalView::getPasteTarget).
         const double zoom = viewController.zoom();
         const QRectF pageRect = layout.pageRect(pNr, zoom);
         QRectF visible = pageRect.intersected(viewController.visibleContentRect());
         if (visible.isEmpty()) {
             visible = pageRect;
         }
-        const QPointF target = (visible.center() - pageRect.topLeft()) / zoom;
+        const QPointF target = viewPos ? (viewController.viewToContent(*viewPos) - pageRect.topLeft()) / zoom
+                                       : (visible.center() - pageRect.topLeft()) / zoom;
         const double x = std::max(0.0, target.x() - sel->getWidth() / 2);
         const double y = std::max(0.0, target.y() - sel->getHeight() / 2);
         sel->moveSelection(x - sel->getXOnView(), y - sel->getYOnView());

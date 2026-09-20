@@ -11,6 +11,7 @@
 #include <QProcess>
 #include <QFileInfo>
 #include <QClipboard>
+#include <QMimeData>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QPrintDialog>
@@ -343,6 +344,8 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
         currentConnections.push_back(
+                connect(v, &CanvasView::contextRequested, this, &AppController::contextRequested));
+        currentConnections.push_back(
                 connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
         currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
         currentConnections.push_back(
@@ -367,6 +370,11 @@ bool AppController::hasSelection() const { return canvas() && canvas()->getSelec
 bool AppController::copySelection() { return canvas() && canvas()->copySelection(); }
 bool AppController::cutSelection() { return canvas() && canvas()->cutSelection(); }
 bool AppController::pasteElements() { return canvas() && canvas()->pasteElements(); }
+bool AppController::pasteAt(qreal x, qreal y) { return canvas() && canvas()->pasteElements(QPointF(x, y)); }
+bool AppController::canPaste() const {
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal"));
+}
 void AppController::deleteSelection() {
     if (canvas()) {
         canvas()->deleteSelection();
@@ -1778,6 +1786,8 @@ void AppController::copyPageLink(int page) {
     QGuiApplication::clipboard()->setText(QString::fromStdString(xoj::util::pageLinkText(number)));
     Q_EMIT pageActionDone(tr("Link to page %1 copied").arg(number), false);
 }
+
+bool AppController::pdfTextIsSelected() const { return canvas() && canvas()->hasPdfTextSelection(); }
 
 bool AppController::hasPdfBackground() const {
     return session() && !session()->getDocument()->getPdfFilepath().empty();

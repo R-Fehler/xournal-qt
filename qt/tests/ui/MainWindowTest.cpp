@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
+#include <QClipboard>
 #include <QPointer>
 #include <QSignalSpy>
 #include <QQmlContext>
@@ -1258,6 +1259,41 @@ TEST_F(MainWindowTest, backgroundOfExistingPagesAndTheInsertDialog) {
     until([&] { return insert->property("visible").toBool(); });
     EXPECT_TRUE(insert->property("visible").toBool());
     QMetaObject::invokeMethod(insert, "reject");
+}
+
+TEST_F(MainWindowTest, rightClickOffersPasteWhereItWasClicked) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* pill = find<QObject>("contextPill");
+    ASSERT_NE(pill, nullptr);
+    EXPECT_FALSE(pill->property("visible").toBool());
+
+    // Something to paste
+    QGuiApplication::clipboard()->setText("pasted here");
+    auto* canvas = find<QQuickItem>("canvas");
+    const QPoint at = canvas->mapToScene(QPointF(canvas->width() / 2, canvas->height() * 0.3)).toPoint();
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, at);
+    until([&] { return pill->property("visible").toBool(); });
+    ASSERT_TRUE(pill->property("visible").toBool()) << "the pill appears where it was clicked";
+
+    auto elements = [&] {  // on any page and layer: the click may be on the first or the second page
+        auto* s = controller->tabManager().currentSession();
+        size_t count = 0;
+        for (size_t p = 0; p < s->getDocument()->getPageCount(); ++p) {
+            for (const Layer* layer: s->getDocument()->getPage(p)->getLayersView()) {
+                count += layer->getElementsView().size();
+            }
+        }
+        return count;
+    };
+    const size_t before = elements();
+    QQuickItem* pasteButton = findItem("contextPaste");
+    ASSERT_NE(pasteButton, nullptr);
+    QMetaObject::invokeMethod(pasteButton, "clicked");  // (a click in the overlay is unreliable off screen)
+    until([&] { return elements() > before; });
+    EXPECT_EQ(elements(), before + 1) << "the text went onto the page";
+    until([&] { return !pill->property("visible").toBool(); });
+    EXPECT_FALSE(pill->property("visible").toBool());
 }
 
 TEST_F(MainWindowTest, printingAsksWhatAndWhichPages) {

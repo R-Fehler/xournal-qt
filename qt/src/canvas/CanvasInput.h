@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <QObject>
+#include <QTimer>
 #include <QPointF>
 
 #include "gui/inputdevices/PositionInputData.h"
@@ -120,6 +121,9 @@ private:
     // Two taps in the same spot zoom in (or back out). A tap that opened a PDF link is not the first of them.
     double lastTapMs = 0;
     QPointF lastTapPos;
+    /// Holding one finger still shows what can be done here (like a right click)
+    QTimer longPressTimer;
+    bool longPressFired = false;
     double touchSessionTravel = 0;
     QPointF touchSessionStartPos;
     QPointF pressViewPos;

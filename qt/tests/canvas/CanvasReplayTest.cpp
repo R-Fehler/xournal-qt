@@ -360,6 +360,23 @@ double fingerPan(CanvasInput& input, const QPointingDevice& screen, CanvasView& 
 }
 }  // namespace
 
+TEST_F(CanvasReplayTest, pastedTextLandsWhereItWasPasted) {
+    QGuiApplication::clipboard()->setText("from somewhere else");
+    const QPointF where = viewPos(0, QPointF(120, 220));
+    ASSERT_TRUE(view->pasteElements(where));
+    processEvents();
+    const Text* pasted = nullptr;
+    for (const auto& element: session->getDocument()->getPage(0)->getSelectedLayer()->getElements()) {
+        if (element->getType() == ELEMENT_TEXT) {
+            pasted = static_cast<const Text*>(element.get());
+        }
+    }
+    ASSERT_NE(pasted, nullptr) << "the text is on the page";
+    EXPECT_EQ(pasted->getText(), "from somewhere else");
+    EXPECT_NEAR(pasted->getBoundingBox().x, 120, 3);
+    EXPECT_NEAR(pasted->getBoundingBox().y, 220, 3);
+}
+
 TEST_F(CanvasReplayTest, aWebAddressInATextIsALink) {
     // A text with a link on the page
     auto text = std::make_unique<Text>();

@@ -11,6 +11,8 @@
 #include <QWheelEvent>
 
 #include "control/ToolEnums.h"
+#include "control/settings/ButtonConfig.h"
+#include "control/settings/SettingsEnums.h"
 #include "control/ToolHandler.h"
 #include "control/settings/Settings.h"
 #include "control/tools/CursorSelectionType.h"
@@ -51,7 +53,15 @@ GdkModifierType toGdkModifiers(Qt::KeyboardModifiers m) {
 }
 }  // namespace
 
-CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), view(view) {}
+CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), view(view) {
+    // A finger held still: the same as a right click (the window then offers paste and the rest)
+    longPressTimer.setSingleShot(true);
+    longPressTimer.setInterval(500);
+    connect(&longPressTimer, &QTimer::timeout, this, [this] {
+        longPressFired = true;
+        Q_EMIT this->view.contextRequested(touchSessionStartPos);
+    });
+}
 
 // --- tablet --------------------------------------------------------------------------------------------------------
 
@@ -161,6 +171,12 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
         case QEvent::MouseButtonPress:
             if (deviceClassPressed) {
                 break;  // upstream MouseInputHandler: one button at a time
+            }
+            // The right button shows what can be done here, unless it was given a tool of its own
+            if (e->button() == Qt::RightButton &&
+                view.getSession().getSettings()->getButtonConfig(BUTTON_MOUSE_RIGHT)->getAction() == TOOL_NONE) {
+                Q_EMIT view.contextRequested(viewPos);
+                return true;
             }
             modifier2 = e->button() == Qt::MiddleButton;
             modifier3 = e->button() == Qt::RightButton;
@@ -555,6 +571,8 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
             touchSessionStartPos = sceneToView(e->points().first().scenePosition());
         }
         touchSessionTravel = 0;
+        longPressFired = false;
+        longPressTimer.start();
         velocitySamples.clear();
     }
 
@@ -573,6 +591,9 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         }
     }
     touchSessionMaxPoints = std::max(touchSessionMaxPoints, static_cast<int>(touches.size()));
+    if (touchSessionMaxPoints > 1 || touchSessionTravel > TAP_SLOP_PX) {
+        longPressTimer.stop();  // moved or a second finger: no long press
+    }
     if (touchSessionMaxPoints >= 4 && !touchSessionIgnored) {
         // Four fingers or more: a gesture of the window (the pages, all documents), the canvas keeps still.
         if (pinching) {
@@ -642,6 +663,13 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         panning = false;
     }
     if (touches.empty()) {
+        longPressTimer.stop();
+        if (longPressFired) {
+            longPressFired = false;
+            touchSessionIgnored = false;
+            velocitySamples.clear();
+            return true;  // the window took over
+        }
         if (!touchSessionIgnored) {
             if (pinching) {
                 vc.pinchEnd();

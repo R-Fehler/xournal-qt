@@ -190,6 +190,12 @@ cd build-qt
 - [ ] `xournal-qt-cli --pdf-dir=OUT a.xopp b.xopp` writes OUT/a.pdf and OUT/b.pdf and says how many worked; a missing file is counted and the others still come out.
 - [ ] `xournal-qt-cli FILE --create-pdf=OUT.pdf --export-range=2-5` writes those pages only.
 
+## Long press and right click on a page
+- [ ] Holding a finger still on the page (or a right click) shows a small pill there: Paste, Select all, Image…; it stays inside the window near the finger.
+- [ ] Paste puts text from anywhere (browser, terminal) on the page at that very place, images and copied elements as well; Ctrl+Z takes it back.
+- [ ] With something selected the pill also offers Copy, Cut and Delete; on selected PDF text only Copy (nothing that would change the PDF).
+- [ ] The long press does not draw and does not scroll the page.
+
 ## Chapters of a document without a PDF outline
 - [ ] ⋮ on a page (or the ⋮ menu) → "Start a chapter here…": name and level; a heading appears at the top left of the page and the sidebar shows Pages | Layers | Contents.
 - [ ] The contents list and the contents overview (Ctrl+Alt+O) show the chapters with their levels; tapping one goes to its page.

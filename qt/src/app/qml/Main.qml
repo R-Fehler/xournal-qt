@@ -1282,6 +1282,11 @@ ApplicationWindow {
     InsertPagesDialog { id: insertPagesDialog }
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
+    ContextPill { id: contextPill }
+    Connections {
+        target: app
+        function onContextRequested(viewPos) { contextPill.openAt(viewPos, app.pdfTextIsSelected) }
+    }
     Connections {
         target: app
         function onChapterRequested(page) { chapterDialog.openFor(page) }
