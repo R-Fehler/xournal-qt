@@ -301,6 +301,8 @@ private:
     /**
      * Draws an indicator where you can scale the selection
      */
+    /// xournal-qt: radius of the round handles (pixels)
+    double handleRadius() const;
     void drawAnchorRect(cairo_t* cr, double x, double y, double zoom);
 
     /**

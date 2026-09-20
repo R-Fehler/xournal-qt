@@ -1019,6 +1019,32 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
 }
 
+TEST_F(MainWindowTest, aPressOnTheCanvasClosesAnOpenMenu) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* layoutButton = find<QQuickItem>("layoutButton");
+    ASSERT_NE(layoutButton, nullptr);
+    const QPoint at =
+            layoutButton->mapToScene(QPointF(layoutButton->width() / 2, layoutButton->height() / 2)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
+    wait(1000);  // press and hold
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at);
+    auto* menu = find<QObject>("layoutMenu");
+    ASSERT_NE(menu, nullptr);
+    until([&] { return menu->property("visible").toBool(); });
+    ASSERT_TRUE(menu->property("visible").toBool());
+
+    auto elements = [&] {
+        auto* s = controller->tabManager().currentSession();
+        return s->getDocument()->getPage(0)->getSelectedLayer()->getElements().size();
+    };
+    const size_t before = elements();
+    click(find<QQuickItem>("canvas"));  // a menu without a close button: touching the page closes it
+    until([&] { return !menu->property("visible").toBool(); });
+    EXPECT_FALSE(menu->property("visible").toBool());
+    EXPECT_EQ(elements(), before) << "that press must not draw";
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

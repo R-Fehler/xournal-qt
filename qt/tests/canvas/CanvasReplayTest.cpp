@@ -226,6 +226,27 @@ TEST_F(CanvasReplayTest, highlighterAndWhiteout) {
     EXPECT_EQ(dynamic_cast<const Stroke*>(*it)->getToolType(), StrokeTool::ERASER);  // whiteout stroke
 }
 
+TEST_F(CanvasReplayTest, selectionHandlesAreBigEnoughForAFinger) {
+    drawLine(0, QPointF(100, 300), QPointF(400, 500));
+    drawLine(0, QPointF(120, 320), QPointF(380, 480));
+    processEvents();
+    view->selectAllOnPage();
+    EditSelection* sel = view->getSelection();
+    ASSERT_NE(sel, nullptr);
+    const double zoom = view->getViewController().zoom();
+    const double x1 = sel->getXOnView() * zoom;
+    const double y1 = sel->getYOnView() * zoom;
+
+    EXPECT_EQ(sel->getSelectionTypeForPos(x1, y1, zoom), CURSOR_SELECTION_TOP_LEFT);
+    // A finger never lands exactly on the corner
+    EXPECT_EQ(sel->getSelectionTypeForPos(x1 + 14, y1 + 14, zoom), CURSOR_SELECTION_TOP_LEFT)
+            << "the corner reacts around it, not only on the pixel";
+    EXPECT_EQ(sel->getSelectionTypeForPos(x1 - 14, y1 - 14, zoom), CURSOR_SELECTION_TOP_LEFT);
+    // The middle still moves the selection
+    EXPECT_EQ(sel->getSelectionTypeForPos(x1 + sel->getWidth() * zoom / 2, y1 + sel->getHeight() * zoom / 2, zoom),
+              CURSOR_SELECTION_MOVE);
+}
+
 TEST_F(CanvasReplayTest, sideButtonOfThePenErases) {
     ToolHandler* th = app->getToolHandler();
     EXPECT_EQ(th->getToolType(), TOOL_PEN);

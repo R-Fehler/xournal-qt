@@ -50,6 +50,10 @@ constexpr size_t MINPIXSIZE = 5;
 /// Padding for ui buttons
 constexpr int DELETE_PADDING = 20;
 constexpr int ROTATE_PADDING = 8;
+// xournal-qt: the handles are made for fingers - a wide area around each of them reacts, and they are drawn as
+// round knobs. A small selection keeps room in the middle for moving it, so the areas shrink with it.
+constexpr int TOUCH_HANDLE_RADIUS = 24;
+constexpr int TOUCH_BORDER_RADIUS = 13;
 
 /// Number of times to trigger edge pan timer per second
 constexpr unsigned int PAN_TIMER_RATE = 30;
@@ -970,8 +974,9 @@ auto EditSelection::getSelectionTypeForPos(double x, double y, double zoom) -> C
     cairo_matrix_transform_point(&this->cmatrix, &x, &y);
 
 
-    const int EDGE_PADDING = (this->btnWidth / 2) + 2;
-    const int BORDER_PADDING = (this->btnWidth / 2);
+    const int room = round_cast<int>(std::min(xmax - xmin, ymax - ymin) / 3);
+    const int EDGE_PADDING = std::max((this->btnWidth / 2) + 2, std::min(TOUCH_HANDLE_RADIUS, room));
+    const int BORDER_PADDING = std::max(this->btnWidth / 2, std::min(TOUCH_BORDER_RADIUS, room));
 
     if (x1 - EDGE_PADDING <= x && x <= x1 + EDGE_PADDING && y1 - EDGE_PADDING <= y && y <= y1 + EDGE_PADDING) {
         return CURSOR_SELECTION_TOP_LEFT;
@@ -1108,45 +1113,75 @@ void EditSelection::paint(cairo_t* cr, double zoom) {
     }
 }
 
+// xournal-qt: a red knob with a turning arrow
 void EditSelection::drawAnchorRotation(cairo_t* cr, double x, double y, double zoom) {
-    GdkRGBA selectionColor = view->getSelectionColor();
-    gdk_cairo_set_source_rgba(cr, &selectionColor);
-    cairo_rectangle(cr, x * zoom - (this->btnWidth / 2), y * zoom - (this->btnWidth / 2), this->btnWidth,
-                    this->btnWidth);
-    cairo_stroke_preserve(cr);
-    cairo_set_source_rgb(cr, 1, 0, 0);
-    cairo_fill(cr);
+    const double r = handleRadius();
+    cairo_save(cr);
+    cairo_new_path(cr);
+    cairo_arc(cr, x * zoom, y * zoom, r, 0, 2 * M_PI);
+    cairo_set_source_rgb(cr, 0.85, 0.11, 0.11);
+    cairo_fill_preserve(cr);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_set_line_width(cr, 2);
+    cairo_stroke(cr);
+    cairo_new_path(cr);
+    cairo_arc(cr, x * zoom, y * zoom, r * 0.45, -2.4, 1.6);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_set_line_width(cr, 2);
+    cairo_stroke(cr);
+    cairo_restore(cr);
 }
+
+double EditSelection::handleRadius() const { return std::max(12.0, static_cast<double>(this->btnWidth)); }
 
 /**
  * draws an idicator where you can scale the selection
  */
+// xournal-qt: a white knob with a coloured ring, big enough for a finger
 void EditSelection::drawAnchorRect(cairo_t* cr, double x, double y, double zoom) {
+    const double r = handleRadius();
     GdkRGBA selectionColor = view->getSelectionColor();
-    gdk_cairo_set_source_rgba(cr, &selectionColor);
-    cairo_rectangle(cr, x * zoom - (this->btnWidth / 2), y * zoom - (this->btnWidth / 2), this->btnWidth,
-                    this->btnWidth);
-    cairo_stroke_preserve(cr);
+    cairo_save(cr);
+    cairo_new_path(cr);
+    cairo_arc(cr, x * zoom, y * zoom, r + 1, 0, 2 * M_PI);
+    cairo_set_source_rgba(cr, 0, 0, 0, 0.25);  // a soft edge, also on white pages
+    cairo_set_line_width(cr, 2);
+    cairo_stroke(cr);
+    cairo_new_path(cr);
+    cairo_arc(cr, x * zoom, y * zoom, r, 0, 2 * M_PI);
     cairo_set_source_rgb(cr, 1, 1, 1);
-    cairo_fill(cr);
+    cairo_fill_preserve(cr);
+    gdk_cairo_set_source_rgba(cr, &selectionColor);
+    cairo_set_line_width(cr, 2.5);
+    cairo_stroke(cr);
+    cairo_restore(cr);
 }
 
 
 /**
  * draws an idicator where you can delete the selection
  */
+// xournal-qt: a white knob with a red cross
 void EditSelection::drawDeleteRect(cairo_t* cr, double x, double y, double zoom) const {
-    cairo_set_source_rgb(cr, 0, 0, 0);
-    cairo_rectangle(cr, x * zoom - (this->btnWidth / 2), y * zoom - (this->btnWidth / 2), this->btnWidth,
-                    this->btnWidth);
+    const double r = handleRadius();
+    const double cx = x * zoom;
+    const double cy = y * zoom;
+    cairo_save(cr);
+    cairo_new_path(cr);
+    cairo_arc(cr, cx, cy, r, 0, 2 * M_PI);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_fill_preserve(cr);
+    cairo_set_source_rgb(cr, 0.85, 0.11, 0.11);
+    cairo_set_line_width(cr, 2.5);
     cairo_stroke(cr);
-    cairo_set_source_rgb(cr, 1, 0, 0);
-    cairo_move_to(cr, x * zoom - (this->btnWidth / 2), y * zoom - (this->btnWidth / 2));
-    cairo_rel_move_to(cr, this->btnWidth, 0);
-    cairo_rel_line_to(cr, -this->btnWidth, this->btnWidth);
-    cairo_rel_move_to(cr, this->btnWidth, 0);
-    cairo_rel_line_to(cr, -this->btnWidth, -this->btnWidth);
+    const double a = r * 0.45;
+    cairo_move_to(cr, cx - a, cy - a);
+    cairo_line_to(cr, cx + a, cy + a);
+    cairo_move_to(cr, cx + a, cy - a);
+    cairo_line_to(cr, cx - a, cy + a);
+    cairo_set_line_width(cr, 2.5);
     cairo_stroke(cr);
+    cairo_restore(cr);
 }
 
 

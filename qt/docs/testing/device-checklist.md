@@ -34,6 +34,7 @@ cd build-qt
 - [ ] Open a .xopp with a PDF background, and open a plain .pdf to annotate.
 - [ ] Save / save as; the file then opens in upstream Xournal++ and looks identical.
 - [ ] Closing or opening with unsaved changes asks first.
+- [ ] Selection handles: round knobs, big enough for a finger; grabbing one a little beside it still resizes, the middle still moves. The red × removes the selection, the red knob at the right turns it.
 - [ ] Colors and the four sizes apply to pen and highlighter.
 - [ ] The fifth width (ring): tap it once to draw with it, tap it again (or press and hold) for the slider; − / + and the slider change the width live (mm, sample stroke); pen, highlighter and eraser each keep their own; it is still there after a restart.
 
@@ -43,6 +44,7 @@ cd build-qt
 - [ ] Closing a tab with unsaved changes asks first; quitting asks for every modified tab.
 - [ ] A tap with one finger (or a middle click) on a tab only switches to it; only the × closes it.
 - [ ] Menus opened by a finger or pen (tab menu, layout and zoom in the pill, tool bar menus, library menus) appear at the button or at the finger, not at the last mouse position.
+- [ ] A menu without a close button (layout, zoom, tab, tool bar) closes when the page is touched - and that touch draws nothing. A tool tip still does not block drawing.
 - [ ] The button beside the library tab opens all open documents; "Close all documents" there asks first and then closes them all (unsaved ones ask to be saved).
 
 ## Windows of their own (undocked documents)

@@ -247,12 +247,37 @@ QQuickItem* topmostItemAt(QQuickItem* item, QPointF scenePos) {
     }
     return item;
 }
+
+/// Is a menu open in this window - one that a press somewhere else closes? (Tool tips stay out of the way, they
+/// do not take presses.) Popups live in the window's overlay; a popup item belongs to its popup.
+bool menuIsOpen(QQuickWindow* window) {
+    constexpr int CLOSES_ON_PRESS_OUTSIDE = 0x01 | 0x02;  // QQuickPopup::CloseOnPressOutside(Parent)
+    if (!window) {
+        return false;
+    }
+    for (QQuickItem* child: window->contentItem()->childItems()) {
+        if (!child->inherits("QQuickOverlay")) {
+            continue;
+        }
+        for (QQuickItem* item: child->childItems()) {
+            QObject* popup = item->isVisible() ? item->parent() : nullptr;
+            if (popup && popup->inherits("QQuickPopup") && !popup->inherits("QQuickToolTip") &&
+                (popup->property("closePolicy").toInt() & CLOSES_ON_PRESS_OUTSIDE)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 }  // namespace
 
 bool DocumentCanvasItem::claims(QPointF scenePos) const {
     if (!isVisible() || !isEnabled() || !window() ||
         !QRectF(0, 0, width(), height()).contains(mapFromScene(scenePos))) {
         return false;
+    }
+    if (menuIsOpen(window())) {
+        return false;  // a menu is open: this press closes it (and draws nothing)
     }
     // Only take events the canvas would get anyway: not those for a dialog, popup or control on top of it.
     const QQuickItem* top = topmostItemAt(window()->contentItem(), scenePos);
