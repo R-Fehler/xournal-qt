@@ -43,6 +43,8 @@ public:
     ~OutlineModel() override;
 
     void setSession(DocumentSession* session);
+    /// Read the table of contents again (the outline of the PDF, else the chapters written in the document).
+    void rebuild();
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;
@@ -76,7 +78,6 @@ private:
         bool synthetic = false;  ///< "Beginning"
     };
     /// Read the outline of the document (keeps the expanded state if it is the same outline).
-    void rebuild();
     /// The document pages of the entries (after page changes).
     void updatePages();
     /// The visible entries and their page ranges.
@@ -84,7 +85,9 @@ private:
     void updateCurrent();
 
     DocumentSession* session = nullptr;
-    std::vector<Entry> all;       ///< document order (depth first)
+    std::vector<Entry> all;
+    QMetaObject::Connection contentConnection;
+    bool ownChapters = false;  ///< the chapters come from the document, not from a PDF outline       ///< document order (depth first)
     std::vector<size_t> visible;  ///< indices in `all`
     std::vector<int> ends;        ///< per visible row
     int current = -1;

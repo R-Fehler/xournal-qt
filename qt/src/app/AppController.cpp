@@ -26,9 +26,11 @@
 #include "control/settings/Settings.h"
 #include "gui/toolbarMenubar/model/ColorPalette.h"
 #include "model/Document.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "control/pagetype/PageTypeHandler.h"
 #include "undo/GroupUndoAction.h"
+#include "undo/InsertUndoAction.h"
 #include "undo/PageBackgroundChangedUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/NamedColor.h"
@@ -42,6 +44,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
+#include "shell/DocumentChapters.h"
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
@@ -1732,6 +1735,41 @@ bool AppController::exportPdf(const QUrl& url) {
         return false;
     }
     Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
+    return true;
+}
+
+bool AppController::addChapter(int page, const QString& title, int level) {
+    DocumentSession* s = session();
+    if (!s || title.trimmed().isEmpty()) {
+        return false;
+    }
+    Document* doc = s->getDocument();
+    const size_t index = static_cast<size_t>(std::clamp(page, 0, std::max(0, pageCount() - 1)));
+    auto text = std::make_unique<Text>();
+    text->setText(DocumentChapters::headingText(title.trimmed().toStdString(), level));
+    text->setFont(XojFont("Sans Bold", DocumentChapters::headingSize(level)));
+    text->setColor(Color(0, 0, 0));
+    text->move(TextFlow::MARGIN, TextFlow::MARGIN);
+    const Text* raw = text.get();
+    Layer* layer = nullptr;
+    PageRef pageRef;
+    {
+        doc->lock();
+        pageRef = doc->getPage(index);
+        layer = pageRef ? pageRef->getSelectedLayer() : nullptr;
+        if (layer) {
+            layer->addElement(std::move(text));
+        }
+        doc->unlock();
+    }
+    if (!layer) {
+        return false;
+    }
+    s->getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(pageRef, layer, raw));
+    pageRef->firePageChanged();
+    s->firePageChanged(index);
+    outline->rebuild();
+    Q_EMIT pageActionDone(tr("Chapter “%1” added").arg(title.trimmed()), false);
     return true;
 }
 

@@ -363,6 +363,10 @@ public:
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
     /// Ask the window for the background dialog for these pages (0-based).
     Q_INVOKABLE void requestPageBackground(const QVariantList& pages) { Q_EMIT pageBackgroundRequested(pages); }
+    /// Ask the window for the "new chapter" dialog on that page.
+    Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
+    /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.
+    Q_INVOKABLE bool addChapter(int page, const QString& title, int level);
     /// Puts a link to a page ("#Page:12") into the clipboard: pasted into a text it becomes a tappable link.
     Q_INVOKABLE void copyPageLink(int page);
     /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
@@ -459,6 +463,7 @@ Q_SIGNALS:
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QVariantList& pages);
     void printRequested(const QVariantList& pages);
+    void chapterRequested(int page);
     void toolbarPositionChanged();
     void penPillChanged();
     void textFlowChanged();

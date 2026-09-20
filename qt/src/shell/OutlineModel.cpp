@@ -6,6 +6,7 @@
 #include <shared_mutex>
 
 #include "model/Document.h"
+#include "DocumentChapters.h"
 #include "model/DocumentOutline.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
@@ -21,11 +22,18 @@ void OutlineModel::setSession(DocumentSession* s) {
         return;
     }
     disconnect(pageConnection);
+    disconnect(contentConnection);
     unregisterListener();
     session = s;
     if (session) {
         registerListener(session);
         pageConnection = connect(session, &DocumentSession::currentPageChanged, this, [this] { updateCurrent(); });
+        // Chapters that the document carries itself change with it (a heading written, undone, erased)
+        contentConnection = connect(session, &DocumentSession::pageContentChanged, this, [this](qulonglong) {
+            if (ownChapters || all.empty()) {
+                rebuild();
+            }
+        });
     }
     rebuild();
 }
@@ -48,6 +56,22 @@ void OutlineModel::rebuild() {
             }
         };
         walk(doc->getOutline(), 0);
+        if (next.empty()) {
+            // No table of contents in a PDF (or no PDF at all): the chapters written in the document itself
+            lock.unlock();
+            for (const auto& chapter: DocumentChapters::find(*doc)) {
+                Entry x;
+                x.title = QString::fromStdString(chapter.title);
+                x.level = chapter.level;
+                x.pdfPage = npos;
+                x.page = static_cast<int>(chapter.page);
+                x.expanded = true;
+                next.push_back(std::move(x));
+            }
+            ownChapters = !next.empty();
+        } else {
+            ownChapters = false;
+        }
     }
     // The same outline (e.g. after pages changed): keep what was collapsed.
     if (next.size() == all.size()) {
@@ -67,8 +91,8 @@ void OutlineModel::rebuild() {
 }
 
 void OutlineModel::updatePages() {
-    if (!session) {
-        return;
+    if (!session || ownChapters) {
+        return;  // the chapters of the document know their page already
     }
     Document* doc = session->getDocument();
     std::shared_lock lock(*doc);

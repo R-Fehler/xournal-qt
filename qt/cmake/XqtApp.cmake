@@ -49,6 +49,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ShortcutsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
@@ -95,6 +97,7 @@ set(XQT_QML_FILES
     src/app/qml/CustomWidthPopup.qml
     src/app/qml/AppendPages.qml
     src/app/qml/BackgroundDialog.qml
+    src/app/qml/ChapterDialog.qml
     src/app/qml/PenPill.qml
     src/app/qml/PrintDialog.qml
     src/app/qml/ShortcutSheet.qml

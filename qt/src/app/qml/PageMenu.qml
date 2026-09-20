@@ -25,6 +25,10 @@ Menu {
         onTriggered: app.requestPrint(menu.pages)
     }
     MenuItem {
+        text: qsTr("Start a chapter here…")
+        onTriggered: app.requestChapter(menu.page)
+    }
+    MenuItem {
         text: qsTr("Copy a link to this page")
         onTriggered: app.copyPageLink(menu.page)
     }

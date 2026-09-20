@@ -82,6 +82,39 @@ void expectLayoutMatchesDocument(AppController& c) {
 }
 }  // namespace
 
+TEST(Chapters, comeFromTheDocumentWhenNoPdfHasThem) {
+    AppController c;
+    c.newDocument();
+    c.insertPageAfter(0);
+    c.insertPageAfter(1);
+    auto* outline = qobject_cast<OutlineModel*>(c.outlineModel());
+    ASSERT_NE(outline, nullptr);
+    EXPECT_FALSE(outline->available()) << "an empty document has no contents";
+
+    EXPECT_TRUE(c.addChapter(0, "Beginnings", 0));
+    EXPECT_TRUE(c.addChapter(2, "The middle", 1));
+    EXPECT_TRUE(outline->available());
+    ASSERT_EQ(outline->count(), 2);
+    EXPECT_EQ(outline->data(outline->index(0), OutlineModel::TitleRole).toString(), "Beginnings");
+    EXPECT_EQ(outline->data(outline->index(0), OutlineModel::LevelRole).toInt(), 0);
+    EXPECT_EQ(outline->data(outline->index(0), OutlineModel::PageRole).toInt(), 0);
+    EXPECT_EQ(outline->data(outline->index(1), OutlineModel::TitleRole).toString(), "The middle");
+    EXPECT_EQ(outline->data(outline->index(1), OutlineModel::LevelRole).toInt(), 1);
+    EXPECT_EQ(outline->data(outline->index(1), OutlineModel::PageRole).toInt(), 2);
+
+    // It is in the document: the text of the heading says so, and undo takes it back
+    auto* s = c.tabManager().currentSession();
+    bool found = false;
+    for (const auto& element: s->getDocument()->getPage(0)->getSelectedLayer()->getElements()) {
+        if (element->getType() == ELEMENT_TEXT) {
+            found = static_cast<const Text*>(element.get())->getText() == "# Beginnings";
+        }
+    }
+    EXPECT_TRUE(found);
+    c.undo();
+    EXPECT_EQ(outline->count(), 1) << "undo takes the chapter back";
+}
+
 TEST(PageLinks, followTheirPagesWhenPagesChange) {
     AppController c;
     c.newDocument();

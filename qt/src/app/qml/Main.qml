@@ -486,6 +486,7 @@ ApplicationWindow {
                     MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
                     MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
+                    MenuItem { text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
                     MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
@@ -1280,6 +1281,11 @@ ApplicationWindow {
 
     InsertPagesDialog { id: insertPagesDialog }
     PrintDialog { id: printDialog }
+    ChapterDialog { id: chapterDialog }
+    Connections {
+        target: app
+        function onChapterRequested(page) { chapterDialog.openFor(page) }
+    }
     Connections {
         target: app
         function onPrintRequested(pages) { printDialog.openFor(pages) }

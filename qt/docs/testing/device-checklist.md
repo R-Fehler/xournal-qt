@@ -190,6 +190,12 @@ cd build-qt
 - [ ] `xournal-qt-cli --pdf-dir=OUT a.xopp b.xopp` writes OUT/a.pdf and OUT/b.pdf and says how many worked; a missing file is counted and the others still come out.
 - [ ] `xournal-qt-cli FILE --create-pdf=OUT.pdf --export-range=2-5` writes those pages only.
 
+## Chapters of a document without a PDF outline
+- [ ] ⋮ on a page (or the ⋮ menu) → "Start a chapter here…": name and level; a heading appears at the top left of the page and the sidebar shows Pages | Layers | Contents.
+- [ ] The contents list and the contents overview (Ctrl+Alt+O) show the chapters with their levels; tapping one goes to its page.
+- [ ] Headings written in the text mode (H1-H3) show up as chapters as well; a text that starts with "# " does too.
+- [ ] Ctrl+Z takes a chapter back; the file opened in Xournal++ shows the heading as ordinary text.
+
 ## Printing
 - [ ] Ctrl+P (or ⋮ → Print…): asks what (with everything written on it, or only the PDF of an annotated document) and which pages; then the system's print dialog with the printers.
 - [ ] "Print to file (PDF)" in that dialog writes the PDF where it was asked for.
