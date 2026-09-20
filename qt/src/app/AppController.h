@@ -302,6 +302,12 @@ public:
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
     Q_INVOKABLE void fitWidth();
+    /// The height of the current page fills the view, or the whole page fits into it.
+    Q_INVOKABLE void fitHeight();
+    Q_INVOKABLE void fitPage();
+    /// The current page has another size than the page before or after it (then fitting it alone helps).
+    Q_PROPERTY(bool currentPageDiffers READ currentPageDiffers NOTIFY pageChanged)
+    bool currentPageDiffers() const;
     Q_INVOKABLE void zoomIn();
     /// Zoom to this (around the middle of the view), e.g. back to what it was.
     Q_INVOKABLE void setZoomPercent(int percent);

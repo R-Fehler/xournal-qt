@@ -54,6 +54,8 @@ public:
     void setZoom(double zoom, QPointF viewAnchor);
     void zoomBy(double factor, QPointF viewAnchor) { setZoom(z * factor, viewAnchor); }
     void fitWidth();
+    /// Zoom so that the page fills the height of the view, or the whole page fits (and scroll to it).
+    void fitPage(size_t page, bool wholePage);
     void panBy(QPointF deltaView);
     void scrollToPage(size_t page);
     /// Make a rectangle of a page (in page points) visible, centred if it has to scroll (e.g. a search hit).

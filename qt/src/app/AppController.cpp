@@ -1295,6 +1295,34 @@ void AppController::fitWidth() {
     }
 }
 
+void AppController::fitHeight() {
+    if (canvas() && session()) {
+        canvas()->getViewController().fitPage(session()->getCurrentPageNo(), false);
+    }
+}
+
+void AppController::fitPage() {
+    if (canvas() && session()) {
+        canvas()->getViewController().fitPage(session()->getCurrentPageNo(), true);
+    }
+}
+
+bool AppController::currentPageDiffers() const {
+    if (!session()) {
+        return false;
+    }
+    Document* doc = session()->getDocument();
+    std::shared_lock lock(*doc);
+    const size_t count = doc->getPageCount();
+    const size_t current = std::min(session()->getCurrentPageNo(), count - 1);
+    if (count < 2) {
+        return false;
+    }
+    const PageRef page = doc->getPage(current);
+    const PageRef other = doc->getPage(current == 0 ? 1 : current - 1);
+    return page->getWidth() != other->getWidth() || page->getHeight() != other->getHeight();
+}
+
 void AppController::zoomIn() {
     if (canvas()) {
         auto& vc = canvas()->getViewController();
@@ -1543,5 +1571,11 @@ QUrl AppController::suggestedSaveFile() const {
     if (!session()) {
         return {};
     }
-    return QUrl::fromLocalFile(QString::fromStdString(session()->suggestSavePath().string()));
+    fs::path suggested = session()->suggestSavePath();
+    // A document that was never saved and does not annotate a PDF belongs in the library of this window. Upstream
+    // suggests the folder something was saved to last, which is shared by all libraries and windows.
+    if (!session()->hasFilePath() && session()->getDocument()->getPdfFilepath().empty() && library->available()) {
+        suggested = fs::path(library->rootPath().toStdString()) / suggested.filename();
+    }
+    return QUrl::fromLocalFile(QString::fromStdString(suggested.string()));
 }

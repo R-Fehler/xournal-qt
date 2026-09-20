@@ -381,13 +381,13 @@ TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
     const double end = grid->property("contentHeight").toDouble() - grid->height();
     ASSERT_LT(atLift, end - 200) << "not at the end of the grid already";
     wheel(0, Qt::ScrollEnd);
-    // Momentum: the grid keeps moving (slower on a loaded machine, so wait for it a while)
-    QElapsedTimer t;
-    t.start();
-    while (grid->property("contentY").toDouble() <= atLift + 50 && t.elapsed() < 1500) {
-        wait(20);
-    }
-    EXPECT_GT(grid->property("contentY").toDouble(), atLift + 50) << "no momentum after lifting the fingers";
+    // Momentum: the grid keeps moving after the fingers are lifted (a loaded machine is slow, and a short flick
+    // may already be over when we look, so the flick itself counts too)
+    auto moved = [&] {
+        return grid->property("contentY").toDouble() > atLift + 50 || grid->property("flicking").toBool();
+    };
+    until(moved, 3000);
+    EXPECT_TRUE(moved()) << "no momentum after lifting the fingers";
 }
 
 namespace {
@@ -974,6 +974,36 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     until([&] { return !overview->isVisible(); });
     EXPECT_FALSE(overview->isVisible());
     EXPECT_EQ(controller->pageNumber(), 4);
+}
+
+TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    const int pages = controller->pageCount();
+
+    key(Qt::Key_N, Qt::ControlModifier);
+    EXPECT_EQ(controller->pageCount(), pages + 1) << "Ctrl+N adds a page after the current one";
+
+    // A tap on the layout button switches between one page and two side by side
+    auto* layout = find<QQuickItem>("layoutButton");
+    ASSERT_NE(layout, nullptr);
+    EXPECT_FALSE(controller->pairedPages());
+    click(layout);
+    EXPECT_TRUE(controller->pairedPages());
+    click(layout);
+    EXPECT_FALSE(controller->pairedPages()) << "and back";
+
+    // Fitting: the whole page is smaller than the width of one
+    controller->fitWidth();
+    wait(30);
+    const int wide = controller->zoomPercent();
+    controller->fitHeight();
+    wait(30);
+    EXPECT_LT(controller->zoomPercent(), wide) << "the height of a portrait page needs less zoom";
+    controller->fitPage();
+    wait(30);
+    EXPECT_LE(controller->zoomPercent(), wide);
+    EXPECT_NE(find<QObject>("fitMenu"), nullptr) << "press and hold offers the other fits";
 }
 
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {

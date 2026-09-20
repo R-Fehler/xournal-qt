@@ -563,7 +563,18 @@ ApplicationWindow {
                 iconName: "xqt-columns"
                 tip: qsTr("Page layout")
                 implicitWidth: 40; implicitHeight: 40
-                onClicked: layoutMenu.popup()
+                // A tap switches between one page and two side by side; the rest is in the menu (press and hold)
+                onClicked: {
+                    if (app.pairedPages) {
+                        app.pairedPages = false
+                        app.viewColumns = 1
+                    } else {
+                        app.viewColumns = 2
+                        app.pairsOffset = 0
+                        app.pairedPages = true
+                    }
+                }
+                onPressAndHold: layoutMenu.popup()
                 Menu {
                     id: layoutMenu
                     objectName: "layoutMenu"
@@ -623,11 +634,25 @@ ApplicationWindow {
             ToolSeparator {}
             ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }
             ToolButton {
+                objectName: "zoomButton"
                 text: app.zoomPercent + " %"
                 implicitWidth: 72
                 onClicked: app.fitWidth()
+                onPressAndHold: fitMenu.popup()
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("Fit page width")
+                ToolTip.text: qsTr("Fit the width (press and hold: more)")
+                ToolTip.delay: 600
+                Menu {
+                    id: fitMenu
+                    objectName: "fitMenu"
+                    MenuItem { text: qsTr("Fit the width (Ctrl+0)"); onTriggered: app.fitWidth() }
+                    MenuItem { text: qsTr("Fit the height"); onTriggered: app.fitHeight() }
+                    MenuItem {
+                        objectName: "fitPageItem"
+                        text: app.currentPageDiffers ? qsTr("Fit this page (its size differs)") : qsTr("Fit the whole page")
+                        onTriggered: app.fitPage()
+                    }
+                }
             }
             ToolButton { text: "+"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomIn() }
         }
@@ -1141,7 +1166,10 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Save]; enabled: docKeys; onActivated: saveOrAsk(null) }
     Shortcut { sequences: [StandardKey.SaveAs]; enabled: docKeys; onActivated: openSaveDialog(null) }
     Shortcut { sequences: [StandardKey.Open]; onActivated: openDialog.open() }
-    Shortcut { sequences: [StandardKey.New, StandardKey.AddTab]; onActivated: app.newDocument() }
+    // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document
+    Shortcut { sequence: "Ctrl+N"; enabled: docKeys; onActivated: app.addPageAfterCurrent() }
+    Shortcut { sequences: ["Ctrl+Shift+N", StandardKey.AddTab]; onActivated: app.newDocument() }
+    Shortcut { sequence: "Ctrl+N"; enabled: app.homeVisible; onActivated: app.newDocument() }
     Shortcut { sequences: [StandardKey.Close]; enabled: docKeys; onActivated: requestCloseTab(app.currentTab) }
     // The home screen (library)
     Shortcut { sequences: ["Ctrl+Shift+L", "Alt+Home"]; onActivated: app.homeVisible = !app.homeVisible || app.tabCount() === 0 }

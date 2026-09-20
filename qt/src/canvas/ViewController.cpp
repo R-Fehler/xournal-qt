@@ -113,6 +113,26 @@ void ViewController::fitWidth() {
     Q_EMIT changed();
 }
 
+void ViewController::fitPage(size_t page, bool wholePage) {
+    if (view.isEmpty() || page >= layout->pageCount()) {
+        return;
+    }
+    const QSizeF size = layout->pageSize(page);
+    if (size.isEmpty()) {
+        return;
+    }
+    const double padding = 2 * DocumentLayout::PADDING;
+    double fit = (view.height() - padding) / size.height();
+    if (wholePage) {
+        fit = std::min(fit, (view.width() - padding) / size.width());
+    }
+    z = std::clamp(fit, minZoom(), maxZoom());
+    scrollToPage(page);
+    settleTimer.start();
+    Q_EMIT zoomChanged();
+    Q_EMIT changed();
+}
+
 void ViewController::panBy(QPointF delta) {
     scrollPos -= delta;
     clamp();

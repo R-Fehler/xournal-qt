@@ -234,6 +234,23 @@ TEST(Export, pdfExportAndSuggestedName) {
     EXPECT_TRUE(d.suggestedExportFile().toLocalFile().endsWith("export_annotated.pdf"));
 }
 
+TEST(SaveAs, suggestsTheDocumentsOwnFolderAndTheLibraryForNewOnes) {
+    QTemporaryDir tmp;
+    const fs::path lib = fs::path(tmp.path().toStdString()) / "Library";
+    fs::create_directories(lib);
+    AppController c;
+    c.setLibraryRoot(lib);
+    c.newDocument();
+    // Never saved: in this window's library (not wherever something was saved last)
+    EXPECT_EQ(fs::path(c.suggestedSaveFile().toLocalFile().toStdString()).parent_path(), lib);
+    EXPECT_EQ(fs::path(c.suggestedSaveFile().toLocalFile().toStdString()).extension(), ".xopp");
+
+    // A document that has a file: its own folder and name
+    ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
+    const fs::path opened = c.tabManager().currentSession()->getFilePath();
+    EXPECT_EQ(fs::path(c.suggestedSaveFile().toLocalFile().toStdString()), opened);
+}
+
 TEST(Windows, aTabMovesToAWindowOfItsOwnAndBack) {
     AppController c;
     ASSERT_TRUE(c.openPath(fixture(u8"load/pages.xopp")));
