@@ -7,6 +7,7 @@
  *   --resave=OUT.xopp      load a .xopp/.xoj and save it again (round-trip test)
  *   --dump                 print a structural summary of the document (pages, layers, elements)
  *   --bench-render=ZOOM    render every page at ZOOM and print timings
+ *   --pdf-dir=DIR          export every FILE as DIR/<name>.pdf (many documents in one go)
  *
  * @license GNU GPLv2 or later
  */
@@ -209,6 +210,7 @@ int main(int argc, char* argv[]) {
     std::cout.imbue(std::locale());
 
     gchar** optFilename = nullptr;
+    gchar* pdfDir = nullptr;
     gchar* pdfFilename = nullptr;
     gchar* imgFilename = nullptr;
     gchar* docFilename = nullptr;
@@ -255,6 +257,8 @@ int main(int argc, char* argv[]) {
                          "[xournal-qt] Load FILE and save it again as XOPPFILE", "XOPPFILE"},
             GOptionEntry{"dump", 0, 0, G_OPTION_ARG_NONE, &dump, "[xournal-qt] Print a structural summary of FILE",
                          nullptr},
+            GOptionEntry{"pdf-dir", 0, 0, G_OPTION_ARG_FILENAME, &pdfDir,
+                         "[xournal-qt] Export every FILE as PDF into DIR (batch)", "DIR"},
             GOptionEntry{"bench-render", 0, 0, G_OPTION_ARG_DOUBLE, &benchZoom,
                          "[xournal-qt] Time rendering every page of FILE at ZOOM", "ZOOM"},
             GOptionEntry{nullptr}};
@@ -279,6 +283,40 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     const fs::path input = Util::fromGFilename(*optFilename);
+    // Many documents in one go: DIR/<name>.pdf for each of them (the exit code counts the ones that failed)
+    if (pdfDir) {
+        const fs::path directory = Util::fromGFilename(pdfDir);
+        std::error_code ec;
+        fs::create_directories(directory, ec);
+        if (!fs::is_directory(directory, ec)) {
+            std::cerr << "Not a directory: " << directory.string() << std::endl;
+            return 1;
+        }
+        const ExportBackgroundType batchBg = exportNoBackground ? EXPORT_BACKGROUND_NONE :
+                                             exportNoRuling     ? EXPORT_BACKGROUND_UNRULED :
+                                                                  EXPORT_BACKGROUND_ALL;
+        int failed = 0;
+        int done = 0;
+        for (gchar** file = optFilename; *file; ++file) {
+            const fs::path one = Util::fromGFilename(*file);
+            fs::path target = directory / one.filename();
+            target.replace_extension(".pdf");
+            try {
+                if (exportPdf(one, target, exportRange, exportLayerRange, batchBg, progressiveMode,
+                              ExportBackend::fromString(exportPdfBackend)) != 0) {
+                    ++failed;
+                    continue;
+                }
+                ++done;
+                std::cout << one.filename().string() << " -> " << target.string() << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << one.string() << ": " << e.what() << std::endl;
+                ++failed;
+            }
+        }
+        std::cout << done << " exported, " << failed << " failed" << std::endl;
+        return failed == 0 ? 0 : -3;
+    }
     const ExportBackgroundType bg = exportNoBackground ? EXPORT_BACKGROUND_NONE :
                                     exportNoRuling     ? EXPORT_BACKGROUND_UNRULED :
                                                          EXPORT_BACKGROUND_ALL;
