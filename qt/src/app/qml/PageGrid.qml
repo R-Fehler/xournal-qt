@@ -275,6 +275,11 @@ Rectangle {
             ToolButton { text: qsTr("Paste"); enabled: app.copiedPages > 0; onClicked: app.pastePages(-1) }
             ToolButton { text: qsTr("Duplicate"); enabled: app.pages.selectionCount > 0; onClicked: app.duplicatePages(app.pages.selectedPages()) }
             ToolButton {
+                objectName: "printSelectedButton"
+                text: qsTr("Print")
+                onClicked: app.requestPrint(app.pages.selectionCount > 0 ? app.pages.selectedPages() : [])
+            }
+            ToolButton {
                 text: qsTr("Delete")
                 enabled: app.pages.selectionCount > 0 && app.pages.selectionCount < app.pages.count
                 onClicked: app.deletePages(app.pages.selectedPages())

@@ -363,6 +363,8 @@ public:
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
     /// Ask the window for the background dialog for these pages (0-based).
     Q_INVOKABLE void requestPageBackground(const QVariantList& pages) { Q_EMIT pageBackgroundRequested(pages); }
+    /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
+    Q_INVOKABLE void requestPrint(const QVariantList& pages) { Q_EMIT printRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);
     Q_INVOKABLE void insertPageAfter(int index);
     Q_INVOKABLE void duplicatePage(int index);
@@ -392,6 +394,11 @@ public:
     Q_INVOKABLE QUrl suggestedExportFile() const;
     /// Export the document as a PDF (upstream's exporter: background PDF pages, ink, text, images).
     Q_INVOKABLE bool exportPdf(const QUrl& file);
+    /// The document annotates a PDF (then printing can offer to print that PDF alone).
+    Q_INVOKABLE bool hasPdfBackground() const;
+    /// Print: makes a PDF (with what was written on it, or the background PDF alone) and hands it to the system's
+    /// print dialog. `range`: "" for everything, else e.g. "2-5" or "3".
+    Q_INVOKABLE bool printDocument(bool withAnnotations, const QString& range);
     /// Open an external link (from a PDF) in the browser / its application.
     Q_INVOKABLE void openLink(const QString& uri);
     /// Call before quitting: writes settings.
@@ -449,6 +456,7 @@ Q_SIGNALS:
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QVariantList& pages);
+    void printRequested(const QVariantList& pages);
     void toolbarPositionChanged();
     void penPillChanged();
     void textFlowChanged();

@@ -31,6 +31,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"save", tr("Save"), document, standard(QKeySequence::Save)},
             {"saveAs", tr("Save as…"), document, standard(QKeySequence::SaveAs)},
             {"export", tr("Export as PDF…"), document, {"Ctrl+E"}},
+            {"print", tr("Print…"), document, standard(QKeySequence::Print)},
             {"closeTab", tr("Close the document"), document, standard(QKeySequence::Close)},
             {"quit", tr("Quit"), document, standard(QKeySequence::Quit)},
             {"home", tr("Library and recent documents"), document, {"Ctrl+Shift+L", "Alt+Home"}},

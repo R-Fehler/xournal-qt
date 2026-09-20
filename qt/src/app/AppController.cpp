@@ -11,6 +11,9 @@
 #include <QProcess>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QPrintDialog>
+#include <QPrinter>
+#include <QTemporaryDir>
 
 #include "control/ToolEnums.h"
 #include "control/ExportHelper.h"
@@ -1726,6 +1729,78 @@ bool AppController::exportPdf(const QUrl& url) {
         return false;
     }
     Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
+    return true;
+}
+
+bool AppController::hasPdfBackground() const {
+    return session() && !session()->getDocument()->getPdfFilepath().empty();
+}
+
+bool AppController::printDocument(bool withAnnotations, const QString& range) {
+    DocumentSession* s = session();
+    if (!s) {
+        return false;
+    }
+    s->clearSelectionEndText();
+    // What is printed: the document as a PDF, or the PDF it annotates as it is
+    QTemporaryDir temporary;
+    if (!temporary.isValid()) {
+        Q_EMIT message(tr("Printing failed"), tr("No place for the file to print."), true);
+        return false;
+    }
+    temporary.setAutoRemove(false);  // (the printer reads it after we return)
+    const fs::path file = fs::path(temporary.filePath("print.pdf").toStdString());
+    const fs::path background = s->getDocument()->getPdfFilepath();
+    try {
+        if (!withAnnotations && !background.empty()) {
+            fs::copy_file(background, file, fs::copy_options::overwrite_existing);
+        } else {
+            const std::string pages = range.trimmed().toStdString();
+            ExportHelper::exportPdf(s->getDocument(), file, pages.empty() ? nullptr : pages.c_str(), nullptr,
+                                    EXPORT_BACKGROUND_ALL, false);
+        }
+    } catch (const std::exception& e) {
+        Q_EMIT message(tr("Printing failed"), QString::fromUtf8(e.what()), true);
+        return false;
+    }
+
+    // The system's print dialog: printer, copies, pages, duplex ...
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setDocName(title());
+    QPrintDialog dialog(&printer);
+    dialog.setOption(QAbstractPrintDialog::PrintToFile, true);
+    dialog.setOption(QAbstractPrintDialog::PrintPageRange, true);
+    if (dialog.exec() != QDialog::Accepted) {
+        return false;
+    }
+    if (!printer.outputFileName().isEmpty()) {  // "print to a file": our PDF is the result
+        QFile::remove(printer.outputFileName());
+        if (!QFile::copy(QString::fromStdString(file.string()), printer.outputFileName())) {
+            Q_EMIT message(tr("Printing failed"), tr("Could not write %1.").arg(printer.outputFileName()), true);
+            return false;
+        }
+        Q_EMIT pageActionDone(tr("Written to %1").arg(QFileInfo(printer.outputFileName()).fileName()), false);
+        return true;
+    }
+    // Send the PDF to the printer as it is (printing it ourselves would turn it into pixels)
+    QStringList arguments{"-d", printer.printerName(), "-n", QString::number(std::max(1, printer.copyCount()))};
+    if (printer.printRange() == QPrinter::PageRange && printer.fromPage() > 0) {
+        arguments << "-P" << QString("%1-%2").arg(printer.fromPage()).arg(printer.toPage());
+    }
+    if (printer.duplex() == QPrinter::DuplexLongSide) {
+        arguments << "-o" << "sides=two-sided-long-edge";
+    } else if (printer.duplex() == QPrinter::DuplexShortSide) {
+        arguments << "-o" << "sides=two-sided-short-edge";
+    }
+    if (printer.colorMode() == QPrinter::GrayScale) {
+        arguments << "-o" << "print-color-mode=monochrome";
+    }
+    arguments << QString::fromStdString(file.string());
+    if (!QProcess::startDetached("lp", arguments)) {
+        Q_EMIT message(tr("Printing failed"), tr("Could not hand the document to the printer (lp)."), true);
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("Sent to %1").arg(printer.printerName()), false);
     return true;
 }
 

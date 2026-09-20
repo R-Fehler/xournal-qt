@@ -183,6 +183,12 @@ cd build-qt
 - [ ] In the Downloads library: Import (files, folder) and dropping files ask "Import into Downloads?" first.
 - [ ] Menu of a card → Move to… / Copy to…: choose another library in the box at the top, then a folder: the document (with its PDF) or folder is there; moving into Downloads from another library asks first.
 
+## Printing
+- [ ] Ctrl+P (or ⋮ → Print…): asks what (with everything written on it, or only the PDF of an annotated document) and which pages; then the system's print dialog with the printers.
+- [ ] "Print to file (PDF)" in that dialog writes the PDF where it was asked for.
+- [ ] Select pages in the page overview → "Print": the dialog opens with exactly those pages (e.g. "1-3,5"); the same from ⋮ on a page.
+- [ ] What comes out has the annotations (or not, if that was chosen) and only the chosen pages.
+
 ## Shortcuts
 - [ ] F1 (or Ctrl+/) lists all shortcuts by group; Esc closes it.
 - [ ] "Change…" opens the settings at "Shortcuts": tapping a row asks for keys; pressing e.g. Ctrl+Alt+P for "Add a page" makes that key work at once and Ctrl+N stop working.

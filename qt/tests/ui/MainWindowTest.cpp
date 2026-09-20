@@ -1260,6 +1260,29 @@ TEST_F(MainWindowTest, backgroundOfExistingPagesAndTheInsertDialog) {
     QMetaObject::invokeMethod(insert, "reject");
 }
 
+TEST_F(MainWindowTest, printingAsksWhatAndWhichPages) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* dialog = find<QObject>("printDialog");
+    ASSERT_NE(dialog, nullptr);
+
+    // Ctrl+P asks first (printer and copies come from the system afterwards)
+    key(Qt::Key_P, Qt::ControlModifier);
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_TRUE(dialog->property("visible").toBool());
+    EXPECT_EQ(dialog->property("range").toString(), QString()) << "everything by default";
+    QMetaObject::invokeMethod(dialog, "reject");
+    until([&] { return !dialog->property("visible").toBool(); });
+
+    // Pages chosen in the overview come as a range
+    QMetaObject::invokeMethod(dialog, "openFor",
+                              Q_ARG(QVariant, QVariant::fromValue(QVariantList{0, 1, 2, 4})));
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_EQ(dialog->property("range").toString(), QString("1-3,5"));
+    QMetaObject::invokeMethod(dialog, "reject");
+    until([&] { return !dialog->property("visible").toBool(); });
+}
+
 TEST_F(MainWindowTest, layersInTheSidebar) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

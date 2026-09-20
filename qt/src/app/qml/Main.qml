@@ -485,6 +485,7 @@ ApplicationWindow {
                     id: moreMenu
                     MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
+                    MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
                     MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
@@ -1278,6 +1279,11 @@ ApplicationWindow {
     }
 
     InsertPagesDialog { id: insertPagesDialog }
+    PrintDialog { id: printDialog }
+    Connections {
+        target: app
+        function onPrintRequested(pages) { printDialog.openFor(pages) }
+    }
     BackgroundDialog { id: backgroundDialog }
     Connections {
         target: app
@@ -1350,6 +1356,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("fullScreen"); enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
     Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection; onActivated: win.fullScreenMode = false }
     Shortcut { sequences: win.keysOf("export"); enabled: docKeys; onActivated: openExportDialog() }
+    Shortcut { sequences: win.keysOf("print"); enabled: docKeys; onActivated: printDialog.open() }
     Shortcut { sequences: win.keysOf("back"); enabled: docKeys; onActivated: app.navigateBack() }
     Shortcut { sequences: win.keysOf("forward"); enabled: docKeys; onActivated: app.navigateForward() }
     Shortcut { sequences: win.keysOf("pageGrid"); enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
