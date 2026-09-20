@@ -23,6 +23,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/PageFilterModel.h"
+#include "shell/LayersModel.h"
 #include "shell/OutlineModel.h"
 #include "shell/PagesModel.h"
 #include "shell/SettingsModel.h"
@@ -78,6 +79,42 @@ void expectLayoutMatchesDocument(AppController& c) {
     }
 }
 }  // namespace
+
+TEST(Layers, listAddRenameHideMoveAndRemove) {
+    AppController c;
+    c.newDocument();
+    auto* m = qobject_cast<LayersModel*>(c.layersModel());
+    ASSERT_NE(m, nullptr);
+    // A new page: one layer and the background below it
+    ASSERT_EQ(m->rowCount(), 2);
+    EXPECT_EQ(m->data(m->index(1), LayersModel::IsBackgroundRole).toBool(), true);
+    EXPECT_EQ(m->currentRow(), 0);
+
+    m->addLayer(false);  // above the current one
+    ASSERT_EQ(m->rowCount(), 3);
+    EXPECT_EQ(m->currentRow(), 0) << "the new layer is on top and is drawn on";
+    m->rename(0, "Notes");
+    EXPECT_EQ(m->data(m->index(0), LayersModel::NameRole).toString(), "Notes");
+
+    m->setVisible(0, false);
+    EXPECT_FALSE(m->data(m->index(0), LayersModel::VisibleRole).toBool());
+    m->setVisible(0, true);
+    EXPECT_TRUE(m->data(m->index(0), LayersModel::VisibleRole).toBool());
+
+    m->moveDown(0);
+    EXPECT_EQ(m->data(m->index(1), LayersModel::NameRole).toString(), "Notes") << "one lower now";
+
+    m->remove(1);
+    EXPECT_EQ(m->rowCount(), 2);
+    c.undo();  // layer operations are undoable
+    EXPECT_EQ(m->rowCount(), 3);
+
+    // The layers of the page that is shown
+    c.insertPageAfter(0);
+    EXPECT_EQ(m->rowCount(), 2) << "the new page has one layer again";
+    c.goToPage(0);
+    EXPECT_EQ(m->rowCount(), 3);
+}
 
 TEST(Pages, modelFollowsPageOperations) {
     AppController c;

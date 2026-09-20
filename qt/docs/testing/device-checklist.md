@@ -56,6 +56,12 @@ cd build-qt
 - [ ] Copy pages in one window and paste them in the other.
 - [ ] Kill the app (`kill -9`) with a changed document in the second window: after the restart it is offered for recovery (it comes back as a tab of the main window).
 
+## Layers
+- [ ] Sidebar → Layers: the layers of the current page, top first, "Background" last; the current one is marked and drawing goes there.
+- [ ] "New layer" adds one above; tapping another layer draws on that one; the eye hides and shows a layer (the page follows at once).
+- [ ] ⋮: rename, duplicate, move up/down, merge into the one below, delete. Each of them can be undone with Ctrl+Z.
+- [ ] Switching pages shows the layers of that page; a document saved with several layers opens with them in Xournal++.
+
 ## Pages sidebar (M5b)
 - [ ] The sidebar (first tool bar button) shows the pages; the current page is highlighted and follows scrolling.
 - [ ] Tap a thumbnail (finger or pen): the canvas jumps to that page.

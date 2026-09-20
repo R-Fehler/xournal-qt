@@ -11,33 +11,37 @@ import QtQuick.Window
 Rectangle {
     id: sidebar
     color: "#eceef1"
-    /// The table of contents instead of the pages
-    property bool showContents: false
+    /// "pages", "layers" or "contents"
+    property string mode: "pages"
+    readonly property bool showContents: mode === "contents"
     signal contentsOverviewRequested()
+    onModeChanged: if (mode === "contents" && !app.outline.available) mode = "pages"
 
-    // Pages | Contents (when the document has a table of contents)
+    // Pages | Layers | Contents (the last one when the document has a table of contents)
     RowLayout {
         id: switchRow
-        visible: app.outline.available
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 6
         spacing: 2
         Repeater {
-            model: [qsTr("Pages"), qsTr("Contents")]
+            model: [{ key: "pages", text: qsTr("Pages") },
+                    { key: "layers", text: qsTr("Layers") },
+                    { key: "contents", text: qsTr("Contents") }]
             delegate: AbstractButton {
                 id: switchButton
                 required property int index
-                required property string modelData
-                objectName: index === 0 ? "sidebarPagesButton" : "sidebarContentsButton"
+                required property var modelData
+                objectName: "sidebar" + modelData.key.charAt(0).toUpperCase() + modelData.key.slice(1) + "Button"
+                visible: modelData.key !== "contents" || app.outline.available
                 Layout.fillWidth: true
                 implicitHeight: 32
-                readonly property bool active: (index === 1) === sidebar.showContents
-                onClicked: sidebar.showContents = index === 1
+                readonly property bool active: sidebar.mode === modelData.key
+                onClicked: sidebar.mode = modelData.key
                 background: Rectangle { radius: 16; color: switchButton.active ? "#ffffff" : "transparent" }
                 contentItem: Label {
-                    text: switchButton.modelData
+                    text: switchButton.modelData.text
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     font.weight: switchButton.active ? Font.DemiBold : Font.Normal
@@ -51,6 +55,14 @@ Rectangle {
             icon.width: 20; icon.height: 20
             onClicked: sidebar.contentsOverviewRequested()
         }
+    }
+    LayerList {
+        visible: sidebar.mode === "layers"
+        anchors.top: switchRow.bottom
+        anchors.topMargin: 4
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
     }
     OutlineList {
         visible: sidebar.showContents && app.outline.available
@@ -67,7 +79,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 8
-        visible: app.searchQuery !== "" && !sidebar.showContents
+        visible: app.searchQuery !== "" && sidebar.mode === "pages"
     }
 
     PageKeys { id: pageKeys }
@@ -76,7 +88,7 @@ Rectangle {
     ListView {
         id: list
         objectName: "sidebarList"
-        visible: !sidebar.showContents || !app.outline.available
+        visible: sidebar.mode === "pages"
         anchors.top: filterChip.visible ? filterChip.bottom : (switchRow.visible ? switchRow.bottom : parent.top)
         anchors.bottom: parent.bottom
         anchors.left: parent.left

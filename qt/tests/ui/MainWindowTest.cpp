@@ -1048,6 +1048,37 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
 }
 
+TEST_F(MainWindowTest, layersInTheSidebar) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    click(findItem("sidebarLayersButton"));
+    auto* list = findItem("layerList");
+    ASSERT_NE(list, nullptr);
+    until([&] { return list->property("count").toInt() > 0; });
+    EXPECT_EQ(list->property("count").toInt(), 2) << "one layer and the background";
+
+    click(findItem("addLayerButton"));
+    until([&] { return list->property("count").toInt() == 3; });
+    EXPECT_EQ(list->property("count").toInt(), 3);
+
+    // The eye of the top layer hides it
+    QQuickItem* first = itemAt(list, 0);
+    ASSERT_NE(first, nullptr);
+    QQuickItem* eye = nullptr;
+    for (auto* i: first->findChildren<QQuickItem*>()) {
+        if (i->objectName() == "layerVisibleButton") {
+            eye = i;
+        }
+    }
+    ASSERT_NE(eye, nullptr);
+    click(eye);
+    wait(50);
+    EXPECT_FALSE(first->property("layerVisible").toBool());
+    click(findItem("showAllLayersButton"));
+    wait(50);
+    EXPECT_TRUE(itemAt(list, 0)->property("layerVisible").toBool());
+}
+
 TEST_F(MainWindowTest, pagesAreAppendedFromTheSidebar) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

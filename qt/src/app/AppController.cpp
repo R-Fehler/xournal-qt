@@ -34,6 +34,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
+#include "shell/LayersModel.h"
 #include "shell/OutlineModel.h"
 #include "TextFlow.h"
 #include "shell/PageClipboard.h"
@@ -78,6 +79,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
+    layers = std::make_unique<LayersModel>();
     ownPageClipboard = std::make_unique<PageClipboard>();
     pageClipboard = ownPageClipboard.get();
     // "Only pages with hits" ends with the search.
@@ -115,6 +117,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
+    layers = std::make_unique<LayersModel>();
     connect(this, &AppController::searchChanged, this, [this] {
         if (searchQuery().isEmpty()) {
             filteredPages->setOnlySearchHits(false);
@@ -148,6 +151,7 @@ AppController::~AppController() {
     flow.reset();  // (before the sessions)
     pages->setSession(nullptr);
     outline->setSession(nullptr);
+    layers->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
     tabs.reset();
 }
@@ -318,6 +322,7 @@ void AppController::currentTabChanged() {
     }
     pages->setSession(session());
     outline->setSession(session());
+    layers->setSession(session());
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
@@ -615,6 +620,7 @@ void AppController::setHomeVisible(bool visible) {
 }
 QObject* AppController::filteredPagesModel() const { return filteredPages.get(); }
 QObject* AppController::outlineModel() const { return outline.get(); }
+QObject* AppController::layersModel() const { return layers.get(); }
 int AppController::currentTab() const { return tabs->currentIndex(); }
 void AppController::setCurrentTab(int index) {
     tabs->setCurrentIndex(index);
