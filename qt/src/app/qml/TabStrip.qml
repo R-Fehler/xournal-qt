@@ -9,6 +9,10 @@ import "Popups.js" as Popups
 Rectangle {
     id: strip
     signal closeRequested(int index)
+    /// While a tab is dragged off the strip: which one, and how far (the window shows what will happen)
+    property int dragIndex: -1
+    property real dragDistance: 0
+    readonly property real undockDistance: 60
     signal overviewRequested()
     /// The tab should get a window of its own (dragged off the strip), or go back to the main window.
     signal undockRequested(int index)
@@ -119,13 +123,30 @@ Rectangle {
                     acceptedButtons: Qt.LeftButton
                     onLongPressed: Popups.openAt(tabMenu, tabLongPress.point.position)
                 }
-                // Dragged off the strip: a window of its own
+                // Dragged off the strip: a window of its own. The tab follows the finger while it is held.
+                // In scene coordinates: the tab moves with the finger, so its own coordinates would not grow
+                readonly property real dragOffset: tabDrag.active ? tabDrag.centroid.scenePosition.y
+                                                                  - tabDrag.centroid.scenePressPosition.y : 0
+                property real lastDragOffset: 0  // where it was let go (the handler forgets it)
+                onDragOffsetChanged: if (tabDrag.active) {
+                    lastDragOffset = dragOffset
+                    strip.dragDistance = Math.abs(dragOffset)
+                }
+                transform: Translate { y: Math.max(0, tab.dragOffset) }
+                opacity: tabDrag.active ? 0.85 : 1
                 DragHandler {
                     id: tabDrag
                     target: null
                     onActiveChanged: {
-                        if (!active && Math.abs(centroid.position.y - centroid.pressPosition.y) > 60) {
-                            app.secondaryWindow ? strip.dockRequested(tab.index) : strip.undockRequested(tab.index)
+                        if (active) {
+                            strip.dragIndex = tab.index
+                        } else {
+                            strip.dragIndex = -1
+                            strip.dragDistance = 0
+                            if (Math.abs(tab.lastDragOffset) > strip.undockDistance) {
+                                app.secondaryWindow ? strip.dockRequested(tab.index)
+                                                    : strip.undockRequested(tab.index)
+                            }
                         }
                     }
                 }

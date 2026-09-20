@@ -750,6 +750,35 @@ TEST_F(MainWindowTest, tabsCloseOnlyOnPurposeAndAllAtOnce) {
     EXPECT_TRUE(controller->homeVisible()) << "no documents left: the home screen";
 }
 
+TEST_F(MainWindowTest, draggingATabOffTheStripSaysWhatHappens) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    controller->newDocument();
+    wait(50);
+    AppController::setWindowFactory({});  // no window is made in this test
+    auto* list = findItem("tabList");
+    ASSERT_NE(list, nullptr);
+    QQuickItem* tab = itemAt(list, 0);
+    ASSERT_NE(tab, nullptr);
+    auto* hint = find<QQuickItem>("tabDragHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->isVisible());
+
+    const QPoint start = tab->mapToScene(QPointF(tab->width() / 2, tab->height() / 2)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, start);
+    for (int dy = 10; dy <= 160; dy += 15) {
+        QTest::mouseMove(window, start + QPoint(0, dy));
+        wait(20);
+    }
+    EXPECT_TRUE(hint->isVisible()) << "the window says what letting go does";
+    EXPECT_TRUE(hint->property("willMove").toBool());
+
+    const int before = controller->tabManager().count();
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, start + QPoint(0, 160));
+    wait(100);
+    EXPECT_EQ(controller->tabManager().count(), before - 1) << "the document went to a window of its own";
+    EXPECT_FALSE(hint->isVisible());
+}
+
 TEST_F(MainWindowTest, aTabGetsAWindowOfItsOwn) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     controller->newDocument();

@@ -49,7 +49,7 @@ cd build-qt
 
 ## Windows of their own (undocked documents)
 - [ ] Right click (or press and hold) a tab → "Move to a window of its own": a second window opens with that document, the main window keeps the rest.
-- [ ] Dragging a tab off the strip (downwards) does the same.
+- [ ] Dragging a tab off the strip (downwards) does the same: the tab follows the finger and a hint at the top says what letting go will do (it lights up once far enough).
 - [ ] The second window has no library tab; tools, colors, widths and settings are shared with the main window (changing a color changes it in both).
 - [ ] In the second window: "Move to the main window" (menu or dragging the tab off the strip) puts the document back and closes that window when it was its last one.
 - [ ] Close the second window with unsaved changes: it asks to save; whatever is left unsaved goes back to the main window instead of being lost.
