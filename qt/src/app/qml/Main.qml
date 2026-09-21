@@ -1413,6 +1413,18 @@ ApplicationWindow {
     // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
     function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
     Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }
+    // The tools on single keys: only while the page is at hand (typing into a text or a field takes its keys first;
+    // the overviews and the settings search or edit what is typed)
+    readonly property bool toolKeys: docKeys && !pageGrid.visible && !contentsOverview.visible && !tabOverview.visible
+                                     && !settingsPage.visible
+    Shortcut { sequences: win.keysOf("toolPen"); enabled: toolKeys; onActivated: app.selectTool("pen") }
+    Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.selectTool("eraser") }
+    Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.selectTool("highlighter") }
+    Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: app.selectTool("text") }
+    Shortcut { sequences: win.keysOf("toolSelect"); enabled: toolKeys; onActivated: app.selectTool("selectRect") }
+    Shortcut { sequences: win.keysOf("toolLasso"); enabled: toolKeys; onActivated: app.selectTool("selectRegion") }
+    Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
+    Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
     Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: saveOrAsk(null) }
     Shortcut { sequences: win.keysOf("saveAs"); enabled: docKeys; onActivated: openSaveDialog(null) }

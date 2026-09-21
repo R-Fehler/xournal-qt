@@ -1848,6 +1848,35 @@ TEST_F(MainWindowTest, theEraserButtonOffersHowItErases) {
     EXPECT_EQ(controller->tool(), "eraser") << "choosing a kind takes the eraser";
 }
 
+// The tools on single keys, as in Xournal++: P pen, E eraser, H highlighter, T text, S select, L lasso, A hand. Not
+// while typing into a field, and not in the overviews (they search what is typed).
+TEST_F(MainWindowTest, singleKeysTakeTheTools) {
+    const std::vector<std::pair<Qt::Key, QString>> keys{{Qt::Key_E, "eraser"},      {Qt::Key_H, "highlighter"},
+                                                        {Qt::Key_T, "text"},        {Qt::Key_S, "selectRect"},
+                                                        {Qt::Key_L, "selectRegion"}, {Qt::Key_A, "hand"},
+                                                        {Qt::Key_P, "pen"}};
+    for (const auto& [k, tool]: keys) {
+        key(k);
+        EXPECT_EQ(controller->tool(), tool) << "key " << QKeySequence(k).toString().toStdString();
+    }
+
+    // Typing into the search bar: the letters are text there
+    key(Qt::Key_F, Qt::ControlModifier);
+    auto* field = find<QQuickItem>("searchField");
+    ASSERT_NE(field, nullptr);
+    until([&] { return field->hasActiveFocus(); });
+    key(Qt::Key_E);
+    EXPECT_EQ(controller->tool(), "pen") << "E typed into the search, not the eraser";
+    EXPECT_EQ(field->property("text").toString(), QStringLiteral("e"));
+    key(Qt::Key_Escape);
+
+    // In the page grid they do nothing to the tools
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    ASSERT_TRUE(find<QQuickItem>("pageGrid")->isVisible());
+    key(Qt::Key_H);
+    EXPECT_EQ(controller->tool(), "pen");
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

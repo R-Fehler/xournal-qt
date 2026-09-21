@@ -223,6 +223,9 @@ cd build-qt
 - [ ] What comes out has the annotations (or not, if that was chosen) and only the chosen pages.
 
 ## Shortcuts
+- [ ] Single keys take the tools: P pen, E eraser, H highlighter, T text, S select, L lasso, A hand, I insert an
+      image. Not while typing (a text on the page, the search bar, a dialog) and not in the page grid or the
+      overviews. F1 lists them under "Tools"; they can be changed like every shortcut.
 - [ ] F1 (or Ctrl+/) lists all shortcuts by group; Esc closes it.
 - [ ] "Change…" opens the settings at "Shortcuts": tapping a row asks for keys; pressing e.g. Ctrl+Alt+P for "Add a page" makes that key work at once and Ctrl+N stop working.
 - [ ] Ctrl+Shift+N (new document), Ctrl+Shift+E (all documents), Ctrl+Shift+L (library), Ctrl+Shift+S (save as) and Ctrl+Tab work - also with a second window open.

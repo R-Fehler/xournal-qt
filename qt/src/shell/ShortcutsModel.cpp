@@ -25,6 +25,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
     const QString edit = tr("Editing");
     const QString view = tr("View");
     const QString search = tr("Search");
+    const QString tools = tr("Tools");
     actions = {
             {"newDocument", tr("New document"), document, QStringList{"Ctrl+Shift+N"} + standard(QKeySequence::AddTab)},
             {"open", tr("Open…"), document, standard(QKeySequence::Open)},
@@ -62,6 +63,17 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"forward", tr("Forward"), view, standard(QKeySequence::Forward)},
             {"settings", tr("Settings"), view, {"Ctrl+,"}},
             {"shortcuts", tr("These shortcuts"), view, {"F1", "Ctrl+/"}},
+
+            // Single keys, like Xournal++'s tools (only while the page is at hand: not while typing, and not in the
+            // overviews, which search what is typed)
+            {"toolPen", tr("Pen"), tools, {"P"}},
+            {"toolEraser", tr("Eraser"), tools, {"E"}},
+            {"toolHighlighter", tr("Highlighter"), tools, {"H"}},
+            {"toolText", tr("Text"), tools, {"T"}},
+            {"toolSelect", tr("Select (rectangle)"), tools, {"S"}},
+            {"toolLasso", tr("Select (lasso)"), tools, {"L"}},
+            {"toolHand", tr("Hand (scroll)"), tools, {"A"}},
+            {"insertImage", tr("Insert an image…"), tools, {"I"}},
 
             {"find", tr("Search"), search, standard(QKeySequence::Find)},
             {"findNext", tr("Next hit"), search, standard(QKeySequence::FindNext)},
