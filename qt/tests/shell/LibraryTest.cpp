@@ -497,6 +497,39 @@ TEST_F(LibraryTest, searchFindsFolderNames) {
     EXPECT_EQ(model.data(model.index(lab), LibraryModel::LocationRole).toString(), "Math");
 }
 
+// The reduced search: names only - of documents, and of folders unless the flat list is shown - not the text in
+// the documents.
+TEST_F(LibraryTest, searchCanLookAtNamesOnly) {
+    touch(root / "Xournal diary.xopp");
+    makePdf(root / "lecture.pdf");  // its text has "xournal"
+    fs::create_directories(root / "Old" / "xournal things");
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    const auto names = [&] {
+        QStringList out;
+        for (int i = 0; i < model.count(); ++i) {
+            out << model.data(model.index(i), LibraryModel::NameRole).toString();
+        }
+        return out;
+    };
+
+    model.setSearchQuery("xournal");
+    EXPECT_EQ(model.count(), 3) << "the folder, the name, and the text: " << names().join(", ").toStdString();
+    EXPECT_TRUE(names().contains("lecture")) << "found in its text";
+
+    model.setNamesOnly(true);
+    EXPECT_EQ(names(), (QStringList{"xournal things", "Xournal diary"})) << "the folder and the name, not the text";
+    EXPECT_TRUE(model.data(model.index(0), LibraryModel::IsFolderRole).toBool());
+
+    model.setFlat(true);
+    EXPECT_EQ(names(), QStringList{"Xournal diary"}) << "the flat list shows no folders";
+
+    model.setNamesOnly(false);
+    model.setFlat(false);
+    EXPECT_EQ(model.count(), 3) << "the full search again";
+}
+
 TEST_F(LibraryTest, hitPagesAreMarkedAndKept) {
     makePdf(root / "lecture.pdf");
     HitPageProvider::clearCaches();

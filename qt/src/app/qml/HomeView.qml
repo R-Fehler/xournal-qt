@@ -385,6 +385,27 @@ Rectangle {
                         color: "#6b6f75"
                         font.pixelSize: 12
                     }
+                    // The reduced search: names only (of documents, and of folders unless the list is flat)
+                    ToolButton {
+                        id: namesOnly
+                        objectName: "searchNamesOnly"
+                        text: qsTr("Names")
+                        checkable: true
+                        checked: home.lib.namesOnly
+                        onToggled: home.lib.namesOnly = checked
+                        implicitHeight: 36
+                        font.pixelSize: 13
+                        font.weight: checked ? Font.DemiBold : Font.Normal
+                        Material.foreground: checked ? Material.accentColor : "#5f6368"
+                        ToolTip.visible: hovered
+                        ToolTip.text: checked ? qsTr("Searching names only - tap to search the text of the documents too")
+                                              : qsTr("Search names only: of documents, and of folders when they are shown")
+                        ToolTip.delay: 600
+                        background: Rectangle {
+                            radius: 10
+                            color: namesOnly.checked ? "#e0e3f5" : (namesOnly.pressed ? "#e8e8e8" : "transparent")
+                        }
+                    }
                     ToolButton {
                         visible: searchField.text !== ""
                         implicitWidth: 36; implicitHeight: 36

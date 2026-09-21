@@ -131,6 +131,16 @@ void LibraryModel::setFlat(bool flat) {
     }
 }
 
+void LibraryModel::setNamesOnly(bool namesOnly) {
+    if (namesOnly != onlyNames) {
+        onlyNames = namesOnly;
+        Q_EMIT namesOnlyChanged();
+        if (!query.isEmpty()) {
+            rebuild();
+        }
+    }
+}
+
 void LibraryModel::setSortBy(const QString& key) {
     if (key != sortKey && (key == "name" || key == "modified")) {
         sortKey = key;
@@ -220,7 +230,30 @@ void LibraryModel::rebuild() {
             r.itemCount = static_cast<int>(inside.folders.size() + inside.items.size());
             return r;
         };
-        if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty()) {
+        if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty() && onlyNames) {
+            // Names only: the folders (not in the flat list, which shows no folders), then the documents
+            if (!flatView) {
+                for (const auto& f: DocumentFiles::foldersRecursive(lib->root())) {
+                    if (LibraryIndex::simplified(QString::fromStdString(f.filename().string())).contains(q, Qt::CaseInsensitive)) {
+                        Row r = folderRow(f);
+                        r.hit.inName = true;
+                        newRows.push_back(std::move(r));
+                    }
+                }
+            }
+            std::vector<Row> docRows;
+            for (const auto& item: DocumentFiles::scanRecursive(lib->root())) {
+                Row r = itemRow(item);
+                if (LibraryIndex::simplified(r.name).contains(q, Qt::CaseInsensitive)) {
+                    r.hit.inName = true;
+                    docRows.push_back(std::move(r));
+                }
+            }
+            std::stable_sort(docRows.begin(), docRows.end(), [](const Row& a, const Row& b) {
+                return QString::localeAwareCompare(a.name, b.name) < 0;
+            });
+            std::move(docRows.begin(), docRows.end(), std::back_inserter(newRows));
+        } else if (!q.isEmpty()) {
             // Folders whose name matches, then the documents (text and names)
             for (const auto& f: DocumentFiles::foldersRecursive(lib->root())) {
                 if (QString::fromStdString(f.filename().string()).contains(q, Qt::CaseInsensitive)) {

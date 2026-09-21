@@ -163,6 +163,9 @@ cd build-qt
 - [ ] Two-finger scrolling on the touchpad in the grid, sidebar and tab overview continues after lifting the fingers.
 
 ## Library and home screen
+- [ ] "Names" beside the library search: on, only names are searched - of documents, and of folders in the folder
+      view (the flat list shows none); a document that has the word only in its text is not found. Off: the full
+      search again.
 - [ ] `xournal-qt` without arguments: the home screen shows the library "Default" (folder created in Documents/Xournal_Libraries); `xournal-qt ~/some/folder` shows that folder as library, in its own window.
 - [ ] Drag PDFs and .xopp files from Dolphin onto the library: they are copied (a note says how many); dropped on a folder card they go into that folder.
 - [ ] Previews appear (first page, with annotations); "PDF ✎" marks annotated PDFs; a lone PDF shows up and opens for annotating; saving it creates the .xopp next to it and the card stays one item.

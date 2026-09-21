@@ -42,6 +42,9 @@ class LibraryModel final: public QAbstractListModel {
     Q_PROPERTY(QVariantList breadcrumbs READ breadcrumbs NOTIFY folderChanged)
     /// All documents of the library in one grid, without folders
     Q_PROPERTY(bool flat READ flat WRITE setFlat NOTIFY flatChanged)
+    /// The search looks at names only: of the documents, and of the folders when they are shown (not in the flat
+    /// list) - not at what is written in the documents.
+    Q_PROPERTY(bool namesOnly READ namesOnly WRITE setNamesOnly NOTIFY namesOnlyChanged)
     /// "name" or "modified"
     Q_PROPERTY(QString sortBy READ sortBy WRITE setSortBy NOTIFY sortByChanged)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchChanged)
@@ -104,6 +107,8 @@ public:
     QVariantList breadcrumbs() const;
     bool flat() const { return flatView; }
     void setFlat(bool flat);
+    bool namesOnly() const { return onlyNames; }
+    void setNamesOnly(bool namesOnly);
     QString sortBy() const { return sortKey; }
     void setSortBy(const QString& key);
     QString searchQuery() const { return query; }
@@ -166,6 +171,7 @@ Q_SIGNALS:
     void libraryChanged();
     void folderChanged();
     void flatChanged();
+    void namesOnlyChanged();
     void sortByChanged();
     void searchChanged();
     void indexChanged();
@@ -204,6 +210,7 @@ private:
     std::vector<Row> rows;
     QString currentFolder;
     bool flatView = false;
+    bool onlyNames = false;
     QString sortKey = "name";
     QString query;
     int importJobs = 0;

@@ -735,6 +735,19 @@ TEST_F(HomeScreenTest, onlyVisibleCharactersStartTheLibrarySearch) {
     EXPECT_EQ(field->property("text").toString(), QStringLiteral("l")) << "a letter starts the search";
 }
 
+// "Names" next to the library search: the reduced search over names only.
+TEST_F(HomeScreenTest, theLibrarySearchCanBeLimitedToNames) {
+    auto* button = find<QQuickItem>("searchNamesOnly");
+    ASSERT_NE(button, nullptr);
+    QObject* library = controller->libraryModel();
+    EXPECT_FALSE(library->property("namesOnly").toBool());
+    click(button);
+    EXPECT_TRUE(library->property("namesOnly").toBool()) << "names only";
+    EXPECT_TRUE(button->property("checked").toBool());
+    click(button);
+    EXPECT_FALSE(library->property("namesOnly").toBool()) << "the full search again";
+}
+
 TEST_F(HomeScreenTest, shortLibrarySearchWaitsForEnter) {
     auto* field = find<QQuickItem>("librarySearchField");
     ASSERT_NE(field, nullptr);
