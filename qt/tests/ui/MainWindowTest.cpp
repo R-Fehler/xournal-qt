@@ -1816,6 +1816,38 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     EXPECT_TRUE(controller->pdfTextIsSelected()) << "and it is still the same selection";
 }
 
+// The eraser button: a tap takes the eraser, tapped again it offers how the eraser erases.
+TEST_F(MainWindowTest, theEraserButtonOffersHowItErases) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    auto* button = find<QQuickItem>("eraserButton");
+    ASSERT_NE(button, nullptr);
+    auto* menu = find<QObject>("eraserMenu");
+    ASSERT_NE(menu, nullptr);
+    click(button);
+    EXPECT_EQ(controller->tool(), "eraser");
+    EXPECT_FALSE(menu->property("visible").toBool()) << "the first tap only takes the eraser";
+    click(button);
+    until([&] { return menu->property("visible").toBool(); });
+    EXPECT_TRUE(menu->property("visible").toBool()) << "the second tap offers its kinds";
+    auto* whole = find<QObject>("eraserWholeStrokes");
+    ASSERT_NE(whole, nullptr);
+    QMetaObject::invokeMethod(whole, "triggered");
+    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("deleteStroke"));
+    EXPECT_TRUE(whole->property("checked").toBool());
+    QMetaObject::invokeMethod(menu, "close");
+    until([&] { return !menu->property("visible").toBool(); });
+
+    // The right mouse button opens it as well, with another tool in hand
+    controller->selectTool("pen");
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
+                      button->mapToScene(QPointF(button->width() / 2, button->height() / 2)).toPoint());
+    until([&] { return menu->property("visible").toBool(); });
+    EXPECT_TRUE(menu->property("visible").toBool()) << "right click";
+    QMetaObject::invokeMethod(find<QObject>("eraserStandard"), "triggered");
+    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("default"));
+    EXPECT_EQ(controller->tool(), "eraser") << "choosing a kind takes the eraser";
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

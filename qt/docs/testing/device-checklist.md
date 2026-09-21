@@ -230,6 +230,10 @@ cd build-qt
 - [ ] The chosen keys are still there after a restart.
 
 ## Tool bar, full screen, colors, pages
+- [ ] Eraser button: a tap takes the eraser; a second tap, holding it or a right click offers "Standard", "Whole
+      strokes", "Whiteout"; the chosen one is ticked and erases that way.
+- [ ] Shapes menu → "Snap to the grid" (off at first): on, moved selections and shape corners jump onto the
+      half-centimetre grid; off again, they follow the pen exactly.
 - [ ] ⋮ → Tool bar position → Left / Right: the tools in a column at that side (scrolls if the screen is too low); back to Top.
 - [ ] The small tab with the arrow at the end of the tool bar puts it away (the small tool square appears, as in full screen); the slim strip at the top edge brings it back. ⋮ has both as well, and the choice survives a restart.
 - [ ] With the bar at the left or right: the tab sits at its inner edge and works the same.

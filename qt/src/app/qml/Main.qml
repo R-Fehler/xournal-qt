@@ -218,7 +218,36 @@ ApplicationWindow {
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { iconName: "xopp-tool-pencil"; tip: qsTr("Pen"); checked: app.tool === "pen"; onClicked: app.selectTool("pen") }
             IconButton { iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
-            IconButton { iconName: "xopp-tool-eraser"; tip: qsTr("Eraser"); checked: app.tool === "eraser"; onClicked: app.selectTool("eraser") }
+            // The eraser: a tap takes it; tapped again, held or right-clicked, it offers how it erases
+            IconButton {
+                objectName: "eraserButton"
+                iconName: "xopp-tool-eraser"
+                tip: qsTr("Eraser (tap again or hold: how it erases)")
+                checked: app.tool === "eraser"
+                onClicked: checked ? Popups.openAt(eraserMenu) : app.selectTool("eraser")
+                onPressAndHold: Popups.openAt(eraserMenu)
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                    onTapped: function(point) { Popups.openAt(eraserMenu, point.position) }
+                }
+                Menu {
+                    id: eraserMenu
+                    objectName: "eraserMenu"
+                    component EraserItem: MenuItem {
+                        property string mode
+                        checkable: true
+                        checked: (app.settings.revision, app.settings.get("eraserMode")) === mode
+                        onTriggered: {
+                            app.settings.set("eraserMode", mode)
+                            app.selectTool("eraser")
+                        }
+                    }
+                    EraserItem { objectName: "eraserStandard"; text: qsTr("Standard (cuts strokes)"); mode: "default" }
+                    EraserItem { objectName: "eraserWholeStrokes"; text: qsTr("Whole strokes"); mode: "deleteStroke" }
+                    EraserItem { objectName: "eraserWhiteout"; text: qsTr("Whiteout (paints white)"); mode: "whiteout" }
+                }
+            }
             IconButton { iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
             IconButton {
                 objectName: "textButton"
