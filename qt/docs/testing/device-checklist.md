@@ -235,6 +235,12 @@ cd build-qt
 - [ ] On a page of an annotated PDF the dialog warns that the PDF page is replaced; what was drawn stays.
 - [ ] Press and hold "add page" (or ⋮ → Insert pages…): 3 graph pages, landscape, after this page; one undo in the sidebar removes them.
 
+## Pages in the overview and the sidebar
+- [ ] Page overview → "Select": tap several pages one after another - every tapped page gets the check mark and
+      they all stay selected, also when a tap rests a moment on the page.
+- [ ] Press and hold a page and let go without moving: it is only selected, no page moves (nothing to undo).
+- [ ] Press and hold a page and then move: the pages follow the finger and are dropped where the bar shows.
+
 ## PDF text selection
 - [ ] Hold a finger on PDF text: the word is selected with two knobs; the pill offers Copy and the marking colors.
 - [ ] Tap (or press with the pen) somewhere else on the page: the selection and its knobs are gone, and that press

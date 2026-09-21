@@ -321,6 +321,62 @@ TEST_F(MainWindowTest, pageGridZoomsAndJumpsToAPage) {
     EXPECT_EQ(controller->pageNumber(), 5);
 }
 
+// Tapping pages in the overview with a finger must select exactly the page that was tapped.
+TEST_F(MainWindowTest, tappingPagesInTheOverviewSelectsThem) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    auto* gridPanel = find<QQuickItem>("pageGrid");
+    ASSERT_NE(gridPanel, nullptr);
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    ASSERT_TRUE(gridPanel->isVisible());
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    gridPanel->setProperty("selectionMode", true);  // "Select" in the overview: taps select
+    wait(50);
+    auto* pagesModel = controller->property("pages").value<QObject*>();
+    ASSERT_NE(pagesModel, nullptr);
+    const auto isSelected = [&](int page) {
+        bool result = false;
+        QMetaObject::invokeMethod(pagesModel, "isSelected", Q_RETURN_ARG(bool, result), Q_ARG(int, page));
+        return result;
+    };
+    const auto cellCenter = [&](int index) {
+        QQuickItem* cell = nullptr;
+        QMetaObject::invokeMethod(grid, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, index));
+        return cell ? cell->mapToScene(QPointF(cell->width() / 2, cell->height() / 2)).toPoint() : QPoint();
+    };
+
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    for (int page: {0, 3, 7}) {
+        const QPoint at = cellCenter(page);
+        ASSERT_FALSE(at.isNull());
+        QTest::touchEvent(window, finger).press(1, at);
+        QTest::touchEvent(window, finger).release(1, at);
+        wait(60);
+        EXPECT_TRUE(isSelected(page)) << "tapped page " << page + 1;
+    }
+    EXPECT_EQ(pagesModel->property("selectionCount").toInt(), 3) << "and no others";
+
+    // A finger never holds perfectly still: a tap that slides a few pixels still selects that page
+    const QPoint at = cellCenter(5);
+    QTest::touchEvent(window, finger).press(1, at);
+    QTest::touchEvent(window, finger).move(1, at + QPoint(4, 5));
+    QTest::touchEvent(window, finger).release(1, at + QPoint(4, 5));
+    wait(60);
+    EXPECT_TRUE(isSelected(5)) << "a tap with a little movement still selects";
+    EXPECT_EQ(pagesModel->property("selectionCount").toInt(), 4);
+
+    // A slow tap (a finger easily rests longer than the press-and-hold time) must not throw the selection away:
+    // dragging pages only starts once the finger really moves.
+    const QPoint slow = cellCenter(9);
+    QTest::touchEvent(window, finger).press(1, slow);
+    wait(600);
+    QTest::touchEvent(window, finger).release(1, slow);
+    wait(80);
+    EXPECT_TRUE(isSelected(9)) << "the page that was held is selected";
+    EXPECT_EQ(pagesModel->property("selectionCount").toInt(), 5) << "the pages selected before stay selected";
+    EXPECT_FALSE(controller->canUndoPages()) << "holding a page still must not move any page";
+}
+
 TEST_F(MainWindowTest, pageGridCanShowOnlyPagesWithHits) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     controller->setSearchQuery("p1");
