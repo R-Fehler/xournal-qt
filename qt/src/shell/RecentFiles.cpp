@@ -10,6 +10,7 @@
 
 #include "util/PathUtil.h"
 
+#include "DocumentPlaces.h"
 #include "Previews.h"
 
 namespace xqt {
@@ -257,6 +258,8 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
             return !r.item.xopp.empty();
         case SelectedRole:
             return selection.contains(r.item.main());
+        case LastPageRole:
+            return DocumentPlaces::lastPage(DocumentPlaces::keyOf(r.item));
         default:
             return {};
     }
@@ -264,7 +267,7 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
 
 QHash<int, QByteArray> RecentFiles::roleNames() const {
     return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {PreviewRole, "preview"},
-            {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}};
+            {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}, {LastPageRole, "lastPage"}};
 }
 
 }  // namespace xqt

@@ -27,7 +27,9 @@ namespace {
 /// .xopp as well. A new document has no file yet: nothing to keep.
 void rememberPlace(const DocumentSession* s) {
     if (const fs::path file = s ? s->documentFile() : fs::path(); !file.empty()) {
-        DocumentPlaces::setLastPage(DocumentPlaces::keyOf(file), static_cast<int>(s->getCurrentPageNo()));
+        const fs::path key = DocumentPlaces::keyOf(file);
+        DocumentPlaces::setLastPage(key, static_cast<int>(s->getCurrentPageNo()));
+        DocumentPlaces::setRead(key);
     }
 }
 }  // namespace

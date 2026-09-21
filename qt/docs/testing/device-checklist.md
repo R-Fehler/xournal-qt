@@ -170,6 +170,9 @@ cd build-qt
 - [ ] "Last page" on the library (the same as "Open documents where they were left off" in Settings → Documents;
       off at first): a document closed at page 7 opens at page 7 again; off, it opens at its first page. Also after
       quitting the app.
+- [ ] A document opened and closed again shows on its card (library and recent) a blue tag at the bottom of its
+      preview: clock, when it was last read in the app, "p.N" of the page it was left at. Sort → "Last read first"
+      puts the documents read last in front (never read ones at the end).
 - [ ] The gear at the right end of the library opens the settings. At 1280 px width all buttons of that row are
       there (the search field gets narrower).
 - [ ] "Names" beside the library search: on, only names are searched - of documents, and of folders in the folder

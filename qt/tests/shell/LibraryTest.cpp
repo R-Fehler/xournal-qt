@@ -579,6 +579,40 @@ TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
     EXPECT_EQ(PreviewCache::cacheFile(lecture), firstName);
 }
 
+// The library sorts by when its documents were last read in the app, and shows when and at which page.
+TEST_F(LibraryTest, documentsAreSortedByWhenTheyWereLastRead) {
+    makePdf(root / "alpha.pdf");
+    makePdf(root / "beta.pdf");
+    touch(root / "gamma.xopp");
+    fs::create_directories(root / "Folder");
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    DocumentPlaces::setRead(root / "alpha.pdf", 1000);
+    DocumentPlaces::setLastPage(root / "alpha.pdf", 1);
+    DocumentPlaces::setRead(root / "gamma.xopp", 2000);
+    model.setSortBy("read");
+    EXPECT_EQ(model.sortBy(), "read");
+    auto names = [&] {
+        QStringList out;
+        for (int i = 0; i < model.count(); ++i) {
+            out << model.data(model.index(i), LibraryModel::NameRole).toString();
+        }
+        return out;
+    };
+    EXPECT_EQ(names(), (QStringList{"Folder", "gamma", "alpha", "beta"}))
+            << "folders first, then the last read; never read at the end";
+    const int alpha = model.rowOf(QString::fromStdString((root / "alpha.pdf").string()));
+    EXPECT_EQ(model.data(model.index(alpha), LibraryModel::LastReadRole).toDateTime().toSecsSinceEpoch(), 1000);
+    EXPECT_EQ(model.data(model.index(alpha), LibraryModel::LastPageRole).toInt(), 1);
+    const int beta = model.rowOf(QString::fromStdString((root / "beta.pdf").string()));
+    EXPECT_TRUE(model.data(model.index(beta), LibraryModel::LastReadRole).isNull()) << "never read";
+
+    // Read again: to the front once the library is shown again
+    DocumentPlaces::setRead(root / "beta.pdf", 3000);
+    model.placesChanged();
+    EXPECT_EQ(names(), (QStringList{"Folder", "beta", "gamma", "alpha"}));
+}
+
 TEST_F(LibraryTest, hitPagesAreMarkedAndKept) {
     makePdf(root / "lecture.pdf");
     HitPageProvider::clearCaches();

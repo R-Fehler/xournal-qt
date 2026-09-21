@@ -2,6 +2,8 @@
 
 #include "DocumentPlaces.h"
 
+#include <QDateTime>
+
 #include <algorithm>
 #include <set>
 
@@ -135,6 +137,14 @@ void LibraryModel::setFlat(bool flat) {
     }
 }
 
+void LibraryModel::placesChanged() {
+    if (sortKey == "read") {
+        rebuild();  // (the order may be another one now)
+    } else if (!rows.empty()) {
+        Q_EMIT dataChanged(index(0), index(static_cast<int>(rows.size()) - 1), {LastReadRole, LastPageRole});
+    }
+}
+
 void LibraryModel::setNamesOnly(bool namesOnly) {
     if (namesOnly != onlyNames) {
         onlyNames = namesOnly;
@@ -146,7 +156,7 @@ void LibraryModel::setNamesOnly(bool namesOnly) {
 }
 
 void LibraryModel::setSortBy(const QString& key) {
-    if (key != sortKey && (key == "name" || key == "modified")) {
+    if (key != sortKey && (key == "name" || key == "modified" || key == "read")) {
         sortKey = key;
         Q_EMIT sortByChanged();
         rebuild();
@@ -289,7 +299,24 @@ void LibraryModel::rebuild() {
                     docRows.push_back(itemRow(item));
                 }
             }
-            if (sortKey == "modified") {
+            if (sortKey == "read") {
+                // Last read in this app first; never read after them, by name; folders by name
+                std::vector<std::pair<qint64, Row>> keyed;
+                keyed.reserve(docRows.size());
+                for (auto& r: docRows) {
+                    keyed.emplace_back(DocumentPlaces::lastRead(DocumentPlaces::keyOf(r.item)), std::move(r));
+                }
+                std::stable_sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) {
+                    if (a.first != b.first) {
+                        return a.first > b.first;
+                    }
+                    return QString::localeAwareCompare(a.second.name, b.second.name) < 0;
+                });
+                docRows.clear();
+                for (auto& [read, r]: keyed) {
+                    docRows.push_back(std::move(r));
+                }
+            } else if (sortKey == "modified") {
                 auto newer = [](const Row& a, const Row& b) { return a.modified > b.modified; };
                 std::stable_sort(folderRows.begin(), folderRows.end(), newer);
                 std::stable_sort(docRows.begin(), docRows.end(), newer);
@@ -374,6 +401,15 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return r.hit.firstPage;
         case NameMatchRole:
             return r.hit.inName;
+        case LastReadRole: {
+            if (r.isFolder) {
+                return {};
+            }
+            const qint64 read = DocumentPlaces::lastRead(DocumentPlaces::keyOf(r.item));
+            return read < 0 ? QVariant() : QVariant(QDateTime::fromSecsSinceEpoch(read));
+        }
+        case LastPageRole:
+            return r.isFolder ? -1 : DocumentPlaces::lastPage(DocumentPlaces::keyOf(r.item));
         case SnippetRole:
             return r.hit.snippet;
         case ItemCountRole:
@@ -412,6 +448,8 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {SnippetRole, "snippet"},
             {ItemCountRole, "itemCount"},
             {SelectedRole, "selected"},
+            {LastReadRole, "lastRead"},
+            {LastPageRole, "lastPage"},
             {HitPageListRole, "hitPageList"},
             {HitPageBaseRole, "hitPageBase"}};
 }

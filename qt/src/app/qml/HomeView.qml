@@ -509,6 +509,7 @@ Rectangle {
                     id: sortMenu
                     MenuItem { text: qsTr("By name"); checkable: true; checked: app.library.sortBy === "name"; onTriggered: app.library.sortBy = "name" }
                     MenuItem { text: qsTr("Last modified first"); checkable: true; checked: app.library.sortBy === "modified"; onTriggered: app.library.sortBy = "modified" }
+                    MenuItem { objectName: "sortByRead"; text: qsTr("Last read first"); checkable: true; checked: app.library.sortBy === "read"; onTriggered: app.library.sortBy = "read" }
                 }
             }
             IconButton {
@@ -750,6 +751,8 @@ Rectangle {
                         isFolder: model.isFolder
                         preview: model.preview
                         hasPdf: model.hasPdf
+                        lastRead: model.lastRead ? home.formatDate(model.lastRead) : ""
+                        lastPage: model.lastPage
                         hasXopp: model.hasXopp
                         hits: model.hits
                         snippet: model.snippet
@@ -932,6 +935,8 @@ Rectangle {
                         path: model.path
                         preview: model.preview
                         hasPdf: model.hasPdf
+                        lastRead: home.formatDate(model.opened)
+                        lastPage: model.lastPage
                         hasXopp: model.hasXopp
                         width: recentGrid.cellWidth
                         height: recentGrid.cellHeight

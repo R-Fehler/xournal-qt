@@ -19,6 +19,9 @@ Item {
     property int itemCount: 0
     property bool hasPdf: false
     property bool hasXopp: false
+    /// When it was last read in this app (formatted; "": never) and at which page (0-based; -1: not known)
+    property string lastRead
+    property int lastPage: -1
     property int hits: 0
     property string snippet
     property bool highlighted: false
@@ -126,6 +129,36 @@ Item {
                     anchors.margins: 6
                     anchors.topMargin: card.hasPdf ? 26 : 6
                     count: card.hits
+                }
+                // Last read in this app, and at which page - a tag like "PDF", in the accent of "Last page"
+                Rectangle {
+                    objectName: "lastReadTag"
+                    visible: !card.isFolder && card.lastRead !== "" && card.snippet === ""
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 6
+                    radius: 4
+                    color: Material.accentColor
+                    width: readRow.implicitWidth + 8
+                    height: 16
+                    Row {
+                        id: readRow
+                        anchors.centerIn: parent
+                        spacing: 3
+                        Image {
+                            anchors.verticalCenter: parent.verticalCenter
+                            source: app.iconUrl("xqt-clock-light")
+                            sourceSize: Qt.size(10, 10)
+                        }
+                        Label {
+                            objectName: "lastReadText"
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: card.lastRead + (card.lastPage >= 0 ? " · " + qsTr("p.%1").arg(card.lastPage + 1) : "")
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: "#ffffff"
+                        }
+                    }
                 }
                 // Search: the text around the first match
                 Rectangle {

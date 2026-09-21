@@ -762,6 +762,48 @@ TEST_F(HomeScreenTest, theSettingsOpenFromTheLibrary) {
     EXPECT_TRUE(waitOpened(sheet, true));
 }
 
+// A document read in the app shows on its card when and at which page; "Last read first" sorts by that.
+TEST_F(HomeScreenTest, cardsShowWhenAndWhereADocumentWasLastRead) {
+    const QString lecture = QString::fromStdString((root / "lecture.pdf").string());
+    ASSERT_TRUE(controller->openPath(lecture));
+    controller->goToPage(1);
+    wait(50);
+    controller->closeTab(controller->currentTab());
+    controller->setHomeVisible(true);
+    wait(80);
+    const int row = rowOf("lecture.pdf");
+    ASSERT_GE(row, 0);
+    until([&] { return card(row) != nullptr; });
+    QQuickItem* tag = nullptr;
+    QQuickItem* text = nullptr;
+    for (auto* c: card(row)->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "lastReadTag") tag = c;
+        if (c->objectName() == "lastReadText") text = c;
+    }
+    ASSERT_NE(tag, nullptr);
+    ASSERT_NE(text, nullptr);
+    until([&] { return tag->isVisible(); });
+    EXPECT_TRUE(tag->isVisible()) << "read just now";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1000);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    EXPECT_TRUE(text->property("text").toString().endsWith("p.2")) << text->property("text").toString().toStdString();
+    QQuickItem* notesTag = nullptr;
+    for (auto* c: card(rowOf("notes.xopp"))->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "lastReadTag") notesTag = c;
+    }
+    ASSERT_NE(notesTag, nullptr);
+    EXPECT_FALSE(notesTag->isVisible()) << "never read in the app";
+
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setSortBy("read");
+    EXPECT_EQ(library->data(library->index(0), xqt::LibraryModel::IsFolderRole).toBool(), true) << "Physics";
+    EXPECT_EQ(library->data(library->index(1), xqt::LibraryModel::NameRole).toString(), "lecture")
+            << "the one read last comes first";
+    library->setSortBy("name");
+}
+
 TEST_F(HomeScreenTest, shortLibrarySearchWaitsForEnter) {
     auto* field = find<QQuickItem>("librarySearchField");
     ASSERT_NE(field, nullptr);

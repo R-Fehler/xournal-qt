@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include <QtGlobal>
+
 #include "filesystem.h"
 
 namespace xqt {
@@ -41,6 +43,10 @@ void setTitlePage(const fs::path& document, int page);
 /// The page the document was left at (-1: not known).
 int lastPage(const fs::path& document);
 void setLastPage(const fs::path& document, int page);
+/// When the document was last read in this app - opened or closed (seconds since 1970; -1: never).
+qint64 lastRead(const fs::path& document);
+/// It is read now (or at `when`, seconds since 1970).
+void setRead(const fs::path& document, qint64 when = -1);
 /// Files or folders renamed or moved (old, new): their entries follow.
 void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
 

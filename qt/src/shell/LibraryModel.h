@@ -74,6 +74,8 @@ public:
         SnippetRole,
         ItemCountRole,     ///< folders: documents and folders in it
         SelectedRole,
+        LastReadRole,      ///< when the document was last read in this app (null: never)
+        LastPageRole,      ///< the page it was left at (-1: not known)
         /// Search: the pages with hits, [{ page, count, aspect }]
         HitPageListRole,
         /// Search: image URL of the pages with hits marked (append "/<page>")
@@ -146,6 +148,8 @@ public:
 
     /// Scan the library again (after changes).
     Q_INVOKABLE void refresh();
+    /// Documents were read meanwhile (when, and at which page): shown anew, sorted anew if by that.
+    void placesChanged();
     Q_INVOKABLE void goUp();
     /// New folder in the current folder.
     Q_INVOKABLE bool createFolder(const QString& name);

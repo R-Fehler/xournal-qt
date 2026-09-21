@@ -692,6 +692,7 @@ void AppController::setHomeVisible(bool visible) {
         home = visible;
         if (home) {
             recent->refresh();  // documents may have been deleted or moved meanwhile
+            library->placesChanged();  // documents were read meanwhile: when, and to which page
         }
         Q_EMIT homeVisibleChanged();
     }
@@ -1355,6 +1356,7 @@ bool AppController::openPath(const QString& path) {
     }
     app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
     recent->add(file);
+    DocumentPlaces::setRead(DocumentPlaces::keyOf(file));
     // "Open documents where they were left off": at the page it was left at (setting, off by default)
     if (bool resume = false;
         app->getSettings()->getCustomElement("xournalQt").getBool("resumeAtLastPage", resume) && resume) {

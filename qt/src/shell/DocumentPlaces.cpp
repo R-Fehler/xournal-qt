@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <mutex>
 
+#include <QDateTime>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -68,15 +69,15 @@ std::pair<Store*, QString> find(State& s, const fs::path& document) {
     return {&s.outside, QString::fromStdString(document.lexically_normal().string())};
 }
 
-int get(const fs::path& document, const char* what, int fallback) {
+qint64 get(const fs::path& document, const char* what, qint64 fallback) {
     auto& s = state();
     std::lock_guard lock(s.mtx);
     auto [store, key] = find(s, document);
     const QJsonValue v = store->load().value(key).toObject().value(QLatin1String(what));
-    return v.isDouble() ? v.toInt() : fallback;
+    return v.isDouble() ? static_cast<qint64>(v.toDouble()) : fallback;
 }
 
-void set(const fs::path& document, const char* what, int value, int fallback) {
+void set(const fs::path& document, const char* what, qint64 value, qint64 fallback) {
     auto& s = state();
     std::lock_guard lock(s.mtx);
     auto [store, key] = find(s, document);
@@ -89,10 +90,10 @@ void set(const fs::path& document, const char* what, int value, int fallback) {
         }
         entry.remove(QLatin1String(what));
     } else {
-        if (old.isDouble() && old.toInt() == value) {
+        if (old.isDouble() && static_cast<qint64>(old.toDouble()) == value) {
             return;
         }
-        entry.insert(QLatin1String(what), value);
+        entry.insert(QLatin1String(what), static_cast<double>(value));
     }
     if (entry.isEmpty()) {
         entries.remove(key);
@@ -124,10 +125,14 @@ void setOutsideFile(const fs::path& file) {
     s.outsideSet = true;
 }
 
-int titlePage(const fs::path& document) { return get(document, "title", 0); }
+int titlePage(const fs::path& document) { return static_cast<int>(get(document, "title", 0)); }
 void setTitlePage(const fs::path& document, int page) { set(document, "title", std::max(0, page), 0); }
-int lastPage(const fs::path& document) { return get(document, "last", -1); }
+int lastPage(const fs::path& document) { return static_cast<int>(get(document, "last", -1)); }
 void setLastPage(const fs::path& document, int page) { set(document, "last", page, -1); }
+qint64 lastRead(const fs::path& document) { return get(document, "read", -1); }
+void setRead(const fs::path& document, qint64 when) {
+    set(document, "read", when >= 0 ? when : QDateTime::currentSecsSinceEpoch(), -1);
+}
 
 void moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
     for (const auto& [from, to]: moves) {

@@ -34,7 +34,8 @@ public:
         OpenedRole,
         HasPdfRole,
         HasXoppRole,
-        SelectedRole
+        SelectedRole,
+        LastPageRole  ///< the page the document was left at (-1: not known)
     };
     static constexpr int MAX_ENTRIES = 100;
 
