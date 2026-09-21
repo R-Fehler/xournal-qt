@@ -1,6 +1,6 @@
 // Without a tool bar (full screen, or the bar put away) and with pen or highlighter in hand: a small pill at a side
 // of the screen with the colors one draws with, the width and a pen / highlighter switch. Drag it to another side.
-// The width knob: a tap goes to the next width, holding it and sliding changes the width continuously.
+// The width knob: a tap goes to the next of the five widths of the tool bar (the fifth is the one set there).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -145,7 +145,7 @@ Rectangle {
             color: "#d5d8dc"
         }
 
-        // The width: a tap takes the next one, holding and sliding changes it
+        // The width: a tap takes the next of the five, after the fifth the first again
         AbstractButton {
             id: widthKnob
             objectName: "penPillWidth"
@@ -158,7 +158,7 @@ Rectangle {
             }
             onClicked: app.setSize(app.size >= 5 ? 1 : app.size + 1)
             ToolTip.visible: hovered
-            ToolTip.text: qsTr("Width (hold and slide to change it)")
+            ToolTip.text: qsTr("Width (tap for the next one)")
             ToolTip.delay: 600
             contentItem: Item {
                 Rectangle {
@@ -167,23 +167,6 @@ Rectangle {
                     color: app.color
                     border.width: 1
                     border.color: "#80000000"
-                }
-            }
-            DragHandler {
-                id: widthDrag
-                target: null
-                property real startWidth: 1
-                onActiveChanged: {
-                    if (active) {
-                        startWidth = app.size === 5 ? app.customWidth : app.sizeWidth(app.size)
-                    }
-                }
-                onCentroidChanged: {
-                    if (!active) return
-                    // Sliding along the pill: away from the start makes it thicker
-                    const moved = pill.vertical ? centroid.scenePressPosition.y - centroid.scenePosition.y
-                                                : centroid.scenePosition.x - centroid.scenePressPosition.x
-                    app.customWidth = Math.max(0.2, widthDrag.startWidth * Math.pow(1.02, moved))
                 }
             }
         }

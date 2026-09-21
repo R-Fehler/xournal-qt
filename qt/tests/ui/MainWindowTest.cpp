@@ -1216,10 +1216,14 @@ TEST_F(MainWindowTest, penPillWithoutAToolBar) {
     click(second);
     EXPECT_EQ(controller->color(), QColor(0xff, 0x00, 0x00)) << "red";
 
-    // The width goes to the next one, the tool switches to the highlighter
+    // The width goes through the five of the tool bar, one per tap, and starts over after the fifth
     const int size = controller->size();
     click(findItem("penPillWidth"));
-    EXPECT_NE(controller->size(), size);
+    EXPECT_EQ(controller->size(), size >= 5 ? 1 : size + 1);
+    for (int i = 0; i < 4; ++i) {
+        click(findItem("penPillWidth"));
+    }
+    EXPECT_EQ(controller->size(), size) << "five taps: round once";
     click(findItem("penPillTool"));
     EXPECT_EQ(controller->tool(), "highlighter");
     click(findItem("penPillTool"));
