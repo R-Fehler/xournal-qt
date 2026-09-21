@@ -38,6 +38,13 @@ AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderTh
         settings->getCustomElement("xournalQt").setBool("stylusButtonsSet", true);
         settings->customSettingsChanged();
     }
+    // Snapping to the grid is off (upstream: on; here it made moved selections jump). Once: the shapes menu and the
+    // settings switch it.
+    if (bool set = false; !settings->getCustomElement("xournalQt").getBool("snapGridSet", set) || !set) {
+        settings->setSnapGrid(false);
+        settings->getCustomElement("xournalQt").setBool("snapGridSet", true);
+        settings->customSettingsChanged();
+    }
     initButtonTools();
     renderService = std::make_unique<RenderService>(renderThreads);
 }

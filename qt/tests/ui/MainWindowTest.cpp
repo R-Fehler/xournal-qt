@@ -1670,6 +1670,18 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
         window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
     }
 
+    // Snapping to the grid: off at first, switched from the same menu
+    auto* snap = find<QObject>("snapGridItem");
+    ASSERT_NE(snap, nullptr);
+    auto* settingsModel = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    EXPECT_FALSE(snap->property("checked").toBool());
+    QMetaObject::invokeMethod(snap, "toggle");
+    QMetaObject::invokeMethod(snap, "triggered");
+    EXPECT_TRUE(settingsModel->get("snapGrid").toBool()) << "switched on from the shapes menu";
+    QMetaObject::invokeMethod(snap, "toggle");
+    QMetaObject::invokeMethod(snap, "triggered");
+    EXPECT_FALSE(settingsModel->get("snapGrid").toBool());
+
     // The compass instead, then away again
     auto* compass = find<QObject>("compassItem");
     ASSERT_NE(compass, nullptr);

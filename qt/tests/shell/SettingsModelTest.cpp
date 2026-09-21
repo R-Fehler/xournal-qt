@@ -123,3 +123,28 @@ TEST_F(SettingsModelTest, savedOnceWhenTheScreenCloses) {
     EXPECT_EQ(reloaded.getAutosaveTimeout(), 9);
     EXPECT_FALSE(reloaded.isZoomGesturesEnabled());
 }
+
+// Snapping to the grid is off: for a new setup, and once for settings saved before (where upstream's default had
+// switched it on). After that it stays as chosen.
+TEST_F(SettingsModelTest, snappingToTheGridIsOffUnlessChosen) {
+    Settings* s = app->getSettings();
+    EXPECT_FALSE(s->isSnapGrid()) << "a new setup";
+
+    // Settings saved by an earlier version: snapping on, and not yet turned off once
+    const std::string file = tmp.filePath("old.xml").toStdString();
+    {
+        Settings old{fs::path(file)};
+        old.load();
+        old.setSnapGrid(true);
+        old.save();
+    }
+    auto earlier = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(file), 1);
+    EXPECT_FALSE(earlier->getSettings()->isSnapGrid()) << "turned off once";
+
+    // Switched on again by choice: stays on
+    earlier->getSettings()->setSnapGrid(true);
+    earlier->getSettings()->save();
+    earlier.reset();
+    auto later = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(file), 1);
+    EXPECT_TRUE(later->getSettings()->isSnapGrid()) << "a choice is kept";
+}

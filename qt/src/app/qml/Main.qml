@@ -360,6 +360,16 @@ ApplicationWindow {
                         checked: app.geometryTool === "compass"
                         onTriggered: app.toggleCompass()
                     }
+                    MenuSeparator {}
+                    // Corners of shapes and moved selections jump onto the half-centimetre grid (upstream's tool bar
+                    // toggle; also in the settings)
+                    MenuItem {
+                        objectName: "snapGridItem"
+                        text: qsTr("Snap to the grid")
+                        checkable: true
+                        checked: (app.settings.revision, app.settings.get("snapGrid"))
+                        onTriggered: app.settings.set("snapGrid", checked)
+                    }
                 }
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
