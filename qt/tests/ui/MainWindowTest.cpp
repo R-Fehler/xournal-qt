@@ -1428,6 +1428,9 @@ TEST_F(MainWindowTest, layersInTheSidebar) {
     ASSERT_NE(eye, nullptr);
     click(eye);
     wait(50);
+    // The list makes its delegates again when the layers change, so `first` must not be used any more
+    first = itemAt(list, 0);
+    ASSERT_NE(first, nullptr);
     EXPECT_FALSE(first->property("layerVisible").toBool());
     click(findItem("showAllLayersButton"));
     wait(50);

@@ -248,6 +248,12 @@ cd build-qt
 - [ ] Copy from the pill: the text is in the clipboard, the knobs are gone and the canvas takes input as before
       (this used to freeze the canvas).
 
+## Selection with a finger
+- [ ] Select strokes or an image, then move the selection with a finger inside it: it follows; the page does not
+      scroll away under it.
+- [ ] Pull a corner or a side handle with a finger: the selection is resized; the round handle above it turns it.
+- [ ] A finger beside the selection scrolls as usual, and pen and mouse work as before.
+
 ## Setsquare and compass
 - [ ] Shapes tool → "Setsquare": the triangle with its scales lies in the middle of the page; drawing with the pen along its long edge gives a straight line, away from it a free line.
 - [ ] Drag inside the triangle with a finger or the pen: it moves along; two fingers on it turn it and make it bigger or smaller (the page keeps its zoom); two fingers next to it zoom as always.

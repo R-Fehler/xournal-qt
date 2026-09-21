@@ -415,6 +415,66 @@ TEST_F(CanvasReplayTest, aWebAddressInATextIsALink) {
     EXPECT_FALSE(view->textLinkAt(viewPos(0, QPointF(box.x + box.width + 80, box.y + 200))).has_value());
 }
 
+// The handles of a selection are made for fingers, so a finger must work them: inside it moves, a corner resizes,
+// and the page does not scroll away under it.
+TEST_F(CanvasReplayTest, aFingerMovesAndResizesTheSelection) {
+    auto& vc = view->getViewController();
+    vc.setViewSize(QSizeF(900, 1200));
+    processEvents();
+    drawLine(0, QPointF(100, 300), QPointF(400, 500));
+    drawLine(0, QPointF(120, 320), QPointF(380, 480));
+    processEvents();
+    view->selectAllOnPage();
+    ASSERT_NE(view->getSelection(), nullptr);
+    processEvents(1100);  // the palm rejection ignores touch for a second after the pen wrote
+    const double zoom = vc.zoom();
+    const double scrolled = vc.visibleContentRect().top();
+    const auto box = [&] {
+        EditSelection* s = view->getSelection();
+        return QRectF(s->getXOnView(), s->getYOnView(), s->getWidth(), s->getHeight());
+    };
+    const QRectF before = box();
+
+    // A finger in the middle of the selection takes it along
+    const QPointF middle = viewPos(0, before.center());
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, middle);
+    for (int i = 1; i <= 6; ++i) {
+        touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated,
+              middle + QPointF(10 * i, 5 * i));
+    }
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, middle + QPointF(60, 30));
+    processEvents();
+    ASSERT_NE(view->getSelection(), nullptr) << "it stays selected";
+    const QRectF moved = box();
+    EXPECT_NEAR(moved.x() - before.x(), 60 / zoom, 2) << "it followed the finger";
+    EXPECT_NEAR(moved.y() - before.y(), 30 / zoom, 2);
+    EXPECT_NEAR(moved.width(), before.width(), 0.5) << "moving does not resize it";
+    EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), scrolled) << "and the page did not scroll";
+
+    // A finger on the bottom right corner makes it bigger
+    const QPointF corner = viewPos(0, moved.bottomRight());
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, corner);
+    for (int i = 1; i <= 6; ++i) {
+        touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, corner + QPointF(15 * i, 0));
+    }
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, corner + QPointF(90, 0));
+    processEvents();
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_GT(box().width(), moved.width() + 10) << "the corner resized it";
+    EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), scrolled);
+
+    // Beside the selection the finger scrolls as before
+    const QPointF beside = viewPos(0, QPointF(box().right() + 120, box().bottom() + 200));
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, beside);
+    for (int i = 1; i <= 6; ++i) {
+        touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, beside - QPointF(0, 20 * i));
+    }
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, beside - QPointF(0, 120));
+    vc.stopMomentum();
+    processEvents();
+    EXPECT_GT(vc.visibleContentRect().top(), scrolled) << "a finger next to the selection scrolls";
+}
+
 TEST_F(CanvasReplayTest, theSetsquareGuidesTheStrokeAndCanBeMoved) {
     auto& geometry = view->geometryTool();
     EXPECT_FALSE(geometry.visible());

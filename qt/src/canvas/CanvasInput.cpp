@@ -544,6 +544,54 @@ bool CanvasInput::actionEnd(const Event& event) {
 
 // --- touch: navigation, gestures, palm rejection ------------------------------------------------------------------
 
+// --- a finger on a selection of elements: the handles are for fingers too, not only for pen and mouse ---
+
+bool CanvasInput::startTouchSelection(QPointF viewPos) {
+    EditSelection* selection = view.getSelection();
+    if (!selection) {
+        return false;
+    }
+    auto* page = static_cast<CanvasPage*>(selection->getView());
+    if (!page) {
+        return false;
+    }
+    Event ev;
+    ev.viewPos = viewPos;
+    ev.pressure = Point::NO_PRESSURE;
+    const PositionInputData pos = getInputDataRelativeToCurrentPage(page, ev);
+    const CursorSelectionType type = selection->getSelectionTypeForPos(pos.x, pos.y, view.getZoom());
+    if (!type) {
+        return false;  // beside the selection: the finger scrolls as usual
+    }
+    selection->mouseDown(type, pos.x, pos.y);
+    return true;
+}
+
+void CanvasInput::moveTouchSelection(QPointF viewPos) {
+    EditSelection* selection = view.getSelection();
+    if (!selection) {
+        touchSelection = false;
+        return;
+    }
+    auto* page = static_cast<CanvasPage*>(selection->getView());
+    if (!page || !selection->isMoving()) {
+        return;
+    }
+    Event ev;
+    ev.viewPos = viewPos;
+    ev.pressure = Point::NO_PRESSURE;
+    const PositionInputData pos = getInputDataRelativeToCurrentPage(page, ev);
+    selection->mouseMove(pos.x, pos.y, false);
+}
+
+void CanvasInput::endTouchSelection() {
+    if (EditSelection* selection = view.getSelection()) {
+        selection->mouseUp();
+    }
+    touchSelection = false;
+    touchSelectionId = -1;
+}
+
 bool CanvasInput::touchBlocked() const {
     if (deviceClassPressed && runningDeviceClass != DeviceClass::Mouse) {
         return true;
@@ -611,6 +659,11 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         touchSessionStartMs = now;
         if (!e->points().isEmpty()) {
             touchSessionStartPos = sceneToView(e->points().first().scenePosition());
+            // On a selection of elements (inside it or on one of its handles) the finger works it, it does not scroll
+            if (!touchSessionIgnored && startTouchSelection(touchSessionStartPos)) {
+                touchSelection = true;
+                touchSelectionId = e->points().first().id();
+            }
         }
         touchSessionTravel = 0;
         longPressFired = false;
@@ -647,7 +700,13 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         velocitySamples.clear();
     }
 
-    if (!touchSessionIgnored) {
+    if (touchSelection && !touchSessionIgnored) {
+        // The finger that started on the selection leads it; more fingers neither zoom nor scroll now
+        if (auto it = touches.find(touchSelectionId); it != touches.end()) {
+            moveTouchSelection(it->second.pos);
+        }
+        panning = false;
+    } else if (!touchSessionIgnored) {
         std::vector<QPointF> pts;
         QPointF centroid;
         for (const auto& [id, tp]: touches) {
@@ -722,6 +781,14 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
     }
     if (touches.size() != 1) {
         panning = false;
+    }
+    if (touches.empty() && touchSelection) {
+        endTouchSelection();
+        longPressTimer.stop();
+        longPressFired = false;
+        touchSessionIgnored = false;
+        velocitySamples.clear();
+        return true;  // no tap, no double tap, no fling: that session belonged to the selection
     }
     if (touches.empty()) {
         pinchingGeometryTool = false;

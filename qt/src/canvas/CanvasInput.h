@@ -129,6 +129,12 @@ private:
     /// The setsquare / compass is being dragged over the page
     bool draggingGeometryTool = false;
     QPointF lastGeometryPos;
+    /// A finger on a selection of elements moves, resizes or rotates it (instead of scrolling the page).
+    bool startTouchSelection(QPointF viewPos);
+    void moveTouchSelection(QPointF viewPos);
+    void endTouchSelection();
+    bool touchSelection = false;
+    int touchSelectionId = -1;
     /// Two fingers on the setsquare / compass turn and size it instead of zooming the page
     bool pinchingGeometryTool = false;
     double lastPinchAngle = 0;
