@@ -131,10 +131,13 @@ Rectangle {
                 Image {
                     anchors.fill: parent
                     anchors.margins: frame.border.width
+                    objectName: "sidebarThumbnail"
                     source: entry.thumbnail
                     asynchronous: true
                     cache: false
-                    sourceSize.width: Math.round(width * Screen.devicePixelRatio)
+                    // By the frame, not by this image: the frame's border is thicker on the current page, and a new
+                    // size would draw the page again - each page that is scrolled past blinked
+                    sourceSize.width: Math.round(frame.width * Screen.devicePixelRatio)
                     fillMode: Image.PreserveAspectFit
                     smooth: true
                 }

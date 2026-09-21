@@ -1589,6 +1589,33 @@ TEST_F(MainWindowTest, thePageMenuIsSmallAndWorksByIcons) {
     QMetaObject::invokeMethod(menu, "close");
 }
 
+// Scrolling through the document moves the highlight of the current page in the sidebar; that must not make its
+// thumbnails load again (they blinked: the thicker border of the current page changed the size they were drawn at).
+TEST_F(MainWindowTest, sidebarThumbnailsStayWhenTheCurrentPageChanges) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(100);
+    auto* list = find<QQuickItem>("sidebarList");
+    ASSERT_NE(list, nullptr);
+    until([&] { return itemAt(list, 1) != nullptr; });
+    QQuickItem* second = itemAt(list, 1);
+    ASSERT_NE(second, nullptr);
+    QQuickItem* image = nullptr;
+    for (auto* c: second->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "sidebarThumbnail") {
+            image = c;
+        }
+    }
+    ASSERT_NE(image, nullptr);
+    const QSize before = image->property("sourceSize").toSize();
+    QSignalSpy reloads(image, SIGNAL(sourceSizeChanged()));
+    controller->goToPage(1);  // the second page becomes the current one: its frame gets the thick border
+    wait(80);
+    controller->goToPage(0);
+    wait(80);
+    EXPECT_EQ(reloads.count(), 0) << "the thumbnail keeps its size, so it is not drawn again";
+    EXPECT_EQ(image->property("sourceSize").toSize(), before);
+}
+
 TEST_F(MainWindowTest, pagesAreAppendedFromTheSidebar) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
