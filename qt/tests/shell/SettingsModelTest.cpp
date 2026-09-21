@@ -61,6 +61,10 @@ TEST_F(SettingsModelTest, valuesReachUpstreamSettingsAndAreClamped) {
     EXPECT_EQ(s->getStabilizerAveragingMethod(), StrokeStabilizer::AveragingMethod::VELOCITY_GAUSSIAN);
     model->set("stabilizerAveraging", 7);  // invalid: ignored
     EXPECT_EQ(s->getStabilizerAveragingMethod(), StrokeStabilizer::AveragingMethod::VELOCITY_GAUSSIAN);
+    model->set("snapGrid", false);
+    EXPECT_FALSE(s->isSnapGrid());
+    model->set("snapGrid", true);
+    EXPECT_TRUE(s->isSnapGrid());
     model->set("palmRejectionTimeout", 600);
     int timeout = 0;
     s->getCustomElement("touch").getInt("timeout", timeout);

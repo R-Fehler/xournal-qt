@@ -187,6 +187,13 @@ Popup {
                             { text: qsTr("Whiteout"), value: "whiteout" }
                         ]
                     }
+                    SectionTitle { text: qsTr("Grid") }
+                    SwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }
+                    Hint {
+                        text: qsTr("Selections that are moved and the corners of shapes jump onto the nearest point "
+                                   + "of a half-centimetre grid when they come close to it (as in Xournal++). Hold Alt "
+                                   + "to do the opposite for a moment.")
+                    }
                     Item { Layout.preferredHeight: 16 }
                 }
             }

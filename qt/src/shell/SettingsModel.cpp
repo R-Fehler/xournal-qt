@@ -89,6 +89,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             }
         });
 
+    add("snapGrid", [&s] { return QVariant(s.isSnapGrid()); }, [&s](const QVariant& v) { s.setSnapGrid(v.toBool()); });
+
     // --- touch ---
     add("palmRejectionTimeout",
         [&s] {
