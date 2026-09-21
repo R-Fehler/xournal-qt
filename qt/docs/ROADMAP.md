@@ -259,6 +259,7 @@ CMake targets:
   - `PaperSize`: delete the GTK constructor.
   - `Element.h`: remove the stray gdk include.
   - `Image.cpp` and `view/background/ImageBackgroundView.cpp`: replace `gdk_cairo_set_source_pixbuf` with a small `pixbufToCairoSurface()` helper that needs only gdk-pixbuf.
+  - `Image.cpp`: an image that cannot be read freed its `GError` with `g_free` instead of `g_error_free`; with GLib's slice allocator (GLib < 2.76) that aborts the program. A fix for upstream as well.
   - `Compass`, `Setsquare` and `GeometryTool` are built (their views too); the GTK input handlers are replaced by `qt/src/canvas/GeometryToolLayer` with GTK-free shadow headers.
 - **pagetype:** `PageTypeHandler` takes an `fs::path` instead of `GladeSearchpath` and reports errors through `MessageSink`.
 - **view:** `View.h` and `Mask.h` include only cairo.
