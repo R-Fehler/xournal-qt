@@ -111,7 +111,7 @@ Popup {
             Layout.rightMargin: 12
             Material.background: "transparent"
             TabButton { text: qsTr("Pen"); width: implicitWidth }
-            TabButton { text: qsTr("Touch"); width: implicitWidth }
+            TabButton { objectName: "touchTab"; text: qsTr("Touch"); width: implicitWidth }
             TabButton { text: qsTr("Stabilizer"); width: implicitWidth }
             TabButton { text: qsTr("Documents"); width: implicitWidth }
             TabButton { text: qsTr("New pages"); width: implicitWidth }
@@ -200,13 +200,63 @@ Popup {
                     spacing: 10
                     SectionTitle { text: qsTr("Palm rejection") }
                     Hint {
-                        text: qsTr("Touch is ignored while the pen is near the screen (a hand resting on the screen "
-                                   + "while writing is ignored until it is lifted). For pens that do not report "
-                                   + "when they are near, touch is ignored for a while after the pen was used:")
+                        text: qsTr("Touch is ignored while the pen is near the screen, so a hand resting on it while "
+                                   + "writing does nothing (it stays ignored until it is lifted). Once the pen is away, "
+                                   + "touch works again after:")
                     }
                     SliderRow {
-                        key: "palmRejectionTimeout"; text: qsTr("Pens without proximity: ignore touch for")
-                        from: 0; to: 3000; stepSize: 100; decimals: 1; factor: 0.001; suffix: " s"
+                        key: "palmRejectionTimeout"; text: qsTr("Touch waits after the pen")
+                        from: 0; to: 2000; stepSize: 50; decimals: 2; factor: 0.001; suffix: " s"
+                    }
+                    Hint {
+                        text: qsTr("For a pen that never tells when it is near, the time counts from the last moment "
+                                   + "it was used.")
+                    }
+                    // Pens that tell how high they are: from which height on the pen counts as away
+                    SliderRow {
+                        objectName: "palmNearHeightRow"
+                        visible: app.penHover.reportsHeight
+                        key: "palmNearHeight"; text: qsTr("The pen counts as near up to")
+                        from: 5; to: 100; stepSize: 1; decimals: 0; suffix: " %"
+                    }
+                    RowLayout {
+                        visible: app.penHover.reportsHeight
+                        spacing: 12
+                        Label {
+                            Layout.preferredWidth: 220
+                            text: app.penHover.inProximity
+                                  ? qsTr("Your pen is at %1 % now").arg(Math.round(app.penHover.height * 100))
+                                  : qsTr("Your pen is away")
+                        }
+                        Button {
+                            objectName: "takePenHeight"
+                            text: takeHeight.running ? qsTr("Hold the pen there … %1").arg(takeHeight.left)
+                                                     : qsTr("Take the pen's height")
+                            enabled: !takeHeight.running
+                            onClicked: { takeHeight.left = 3; takeHeight.start() }
+                        }
+                        // Three seconds to lift the pen to the height that should count as away
+                        Timer {
+                            id: takeHeight
+                            property int left: 3
+                            interval: 1000
+                            repeat: true
+                            onTriggered: {
+                                if (--left > 0) return
+                                stop()
+                                if (app.penHover.inProximity)
+                                    sheet.s.set("palmNearHeight", Math.max(5, Math.round(app.penHover.height * 100)))
+                            }
+                        }
+                    }
+                    Hint {
+                        text: app.penHover.reportsHeight
+                              ? qsTr("100 %: as far up as the pen is noticed at all. Lower: above that height it "
+                                     + "counts as away, so a finger can scroll right after writing while the pen stays "
+                                     + "close. \"Take the pen's height\": tap it, then hold the pen where it should "
+                                     + "start to count as away.")
+                              : qsTr("Hover the pen over this page: if it tells how high it is above the screen, you can "
+                                     + "also choose here from which height on it counts as away.")
                     }
                     SectionTitle { text: qsTr("Gestures") }
                     SwitchRow { key: "zoomGestures"; text: qsTr("Pinch with two fingers to zoom") }

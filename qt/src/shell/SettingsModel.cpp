@@ -31,8 +31,11 @@ constexpr std::array<PaperFormat, 5> PAPER_FORMATS{{{"A5", 419.527559, 595.27559
                                                      {"Letter", 612, 792},
                                                      {"Legal", 612, 1008}}};
 
-/// Upstream's default ("touch" / "timeout" of HandRecognition), in milliseconds.
-constexpr int DEFAULT_PALM_TIMEOUT_MS = 1000;
+/// How long touch waits once the pen is away ("touch" / "timeout"), in milliseconds. Upstream waits a second; with a
+/// pen that tells when it is near, touch is ignored while it is anyway, so here it does not wait at all.
+constexpr int DEFAULT_PALM_TIMEOUT_MS = 0;
+/// Up to which height a pen that tells its height counts as near ("touch" / "nearHeight"), percent; 100: all of it.
+constexpr int DEFAULT_NEAR_HEIGHT_PERCENT = 100;
 }  // namespace
 
 QSizeF SettingsModel::paperSize(int index) {
@@ -95,6 +98,16 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         },
         [&s](const QVariant& v) {
             s.getCustomElement("touch").setInt("timeout", std::clamp(v.toInt(), 0, 5000));
+            s.customSettingsChanged();
+        });
+    add("palmNearHeight",
+        [&s] {
+            int percent = DEFAULT_NEAR_HEIGHT_PERCENT;
+            s.getCustomElement("touch").getInt("nearHeight", percent);
+            return QVariant(percent);
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("touch").setInt("nearHeight", std::clamp(v.toInt(), 1, 100));
             s.customSettingsChanged();
         });
     add("zoomGestures", [&s] { return QVariant(s.isZoomGesturesEnabled()); },

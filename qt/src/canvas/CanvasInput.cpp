@@ -1,5 +1,7 @@
 #include "CanvasInput.h"
 
+#include "PenHover.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -30,9 +32,13 @@
 namespace xqt {
 
 namespace {
-constexpr int PALM_TIMEOUT_MS = 1000;  // upstream HandRecognition default ("touch" / "timeout" setting)
+/// How long touch still waits once the pen is away ("touch" / "timeout" setting; upstream's HandRecognition waits a
+/// second, here nothing: with proximity, touch is ignored while the pen is near anyway)
+constexpr int PALM_TIMEOUT_MS = 0;
+/// Up to which height the pen counts as near ("touch" / "nearHeight", percent of what the pen can tell; 100: as far
+/// as it is noticed at all)
+constexpr int NEAR_HEIGHT_PERCENT = 100;
 /// Pens that report proximity: touch works again this soon after the pen left.
-constexpr int PROXIMITY_GRACE_MS = 150;
 constexpr double TAP_MAX_MS = 250.0;
 constexpr double DOUBLE_TAP_MS = 350.0;    ///< the second tap comes this soon after the first
 constexpr double DOUBLE_TAP_PX = 60.0;     ///< ... and this close to it
@@ -67,6 +73,10 @@ CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), vi
 
 bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
     lastPenEventMs = monotonicMs();
+    PenHover::instance().record(*e);
+    if (penNear()) {
+        lastNearMs = lastPenEventMs;
+    }
 
     Event ev;
     ev.deviceClass = e->pointerType() == QPointingDevice::PointerType::Eraser ? DeviceClass::Eraser : DeviceClass::Pen;
@@ -137,8 +147,15 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
 
 void CanvasInput::proximityEvent(bool entered) {
     proximityEverSeen = true;
-    penInProximity = entered;
     lastPenEventMs = monotonicMs();
+    if (penNear()) {
+        lastNearMs = lastPenEventMs;  // near until now (leaving) / from now on (coming)
+    }
+    penInProximity = entered;
+    PenHover::instance().setProximity(entered);
+    if (entered && penNear()) {
+        lastNearMs = lastPenEventMs;
+    }
     if (!entered) {
         // Upstream: leaving resets the barrel buttons. A stroke still running (lost release) ends here.
         modifier2 = modifier3 = false;
@@ -613,20 +630,31 @@ void CanvasInput::endTouchSelection() {
     touchSelectionId = -1;
 }
 
-bool CanvasInput::touchBlocked() const {
+bool CanvasInput::penNear() const {
     if (deviceClassPressed && runningDeviceClass != DeviceClass::Mouse) {
+        return true;  // writing
+    }
+    if (!penInProximity) {
+        return false;
+    }
+    // A pen that tells its height is near only up to the height chosen in the settings
+    int percent = NEAR_HEIGHT_PERCENT;
+    view.getSession().getSettings()->getCustomElement("touch").getInt("nearHeight", percent);
+    const PenHover& hover = PenHover::instance();
+    return percent >= 100 || !hover.reportsHeight() || hover.height() * 100 <= percent;
+}
+
+bool CanvasInput::touchBlocked() const {
+    // While the pen is near, touch is ignored (a hand resting on the screen while writing). Once it is away, touch
+    // waits the time set in the settings (none by default); pens that never tell whether they are near count from
+    // their last event instead.
+    if (penNear()) {
         return true;
     }
-    if (proximityEverSeen) {
-        // The pen tells when it is near: block touch while it is, and only a moment after it left. A touch that
-        // began while the pen was near (the resting palm) stays ignored for its whole duration anyway, so no long
-        // timeout is needed; it would only delay pinch zoom after writing.
-        return penInProximity || monotonicMs() - lastPenEventMs < PROXIMITY_GRACE_MS;
-    }
-    // Pens without proximity events: upstream's timeout after the last pen event.
-    int timeoutMs = PALM_TIMEOUT_MS;
-    view.getSession().getSettings()->getCustomElement("touch").getInt("timeout", timeoutMs);
-    return monotonicMs() - lastPenEventMs < timeoutMs;
+    int waitMs = PALM_TIMEOUT_MS;
+    view.getSession().getSettings()->getCustomElement("touch").getInt("timeout", waitMs);
+    const double since = proximityEverSeen ? lastNearMs : lastPenEventMs;
+    return monotonicMs() - since < waitMs;
 }
 
 void CanvasInput::cancelTouchGesture() {

@@ -51,6 +51,7 @@
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "PenHover.h"
 #include "config-test.h"
 #include "TextEditor.h"
 
@@ -69,6 +70,7 @@ protected:
         view->getViewController().setViewSize(QSizeF(900, 2400));
         input = std::make_unique<CanvasInput>(*view);
         app->getToolHandler()->selectTool(TOOL_PEN);
+        PenHover::instance().reset();  // (one for the whole application)
         processEvents();
     }
     void TearDown() override {
@@ -107,6 +109,15 @@ protected:
         e.setTimestamp(timestamp);
         timestamp += 5;
         input->mouseEvent(&e, pos);
+    }
+
+    /// The pen hovering at this place, at this height (0 on the screen, 1 as far up as it can tell).
+    void hover(QPointF pos, double height) {
+        QTabletEvent e(QEvent::TabletMove, &pen, pos, pos, 0.0, 0.f, 0.f, 0.f, 0.0,
+                       static_cast<float>(height * PenHover::MAX_Z), Qt::NoModifier, Qt::NoButton, Qt::NoButton);
+        e.setTimestamp(timestamp);
+        timestamp += 5;
+        input->tabletEvent(&e, pos);
     }
 
     /// A pressure stroke along a line (points in page coordinates), like a real pen at 200 Hz.
@@ -479,7 +490,6 @@ TEST_F(CanvasReplayTest, aFingerMovesAndResizesTheSelection) {
     processEvents();
     view->selectAllOnPage();
     ASSERT_NE(view->getSelection(), nullptr);
-    processEvents(1100);  // the palm rejection ignores touch for a second after the pen wrote
     const double zoom = vc.zoom();
     const double scrolled = vc.visibleContentRect().top();
     const auto box = [&] {
@@ -637,7 +647,6 @@ TEST_F(CanvasReplayTest, drawingOnTheSetsquareFollowsItsEdgesAndTwoFingersMoveIt
     processEvents();
 
     // Two fingers on it carry it along (without turning or sizing it)
-    processEvents(1100);  // the palm rejection ignores touch for a second after the pen wrote
     const double turned = geometry.rotation();
     const double high = geometry.height();
     const QPointF a = viewPos(0, middle + QPointF(-1 * CM, 1 * CM));
@@ -1029,7 +1038,6 @@ TEST_F(CanvasReplayTest, aThirdFingerOnTheSetsquareLeavesNoGhostBehind) {
 
 TEST_F(CanvasReplayTest, aQuickTwoFingerTurnOfTheSetsquareIsNotAnUndo) {
     drawLine(0, QPointF(80, 80), QPointF(200, 80));
-    processEvents(1100);  // the palm rejection ignores touch for a second after the pen wrote
     const size_t strokes = elementCount(0);
     SETSQUARE_UNDER_TWO_FINGERS();
     // Two fingers on the tool, a quick little turn, and up again - faster than a two-finger tap
@@ -1078,7 +1086,6 @@ TEST_F(CanvasReplayTest, theSetsquareOnlyGuidesOnItsOwnPage) {
     EXPECT_NEAR(line->getPoint(0).y, middle.y() + 6, 1) << "the setsquare lies on the first page";
 
     // Two fingers on that place of the second page zoom the page, they do not grab the setsquare
-    processEvents(1100);  // (palm rejection after the pen)
     const QPointF toolMiddle = geometry.middle();
     const double zoom = vc.zoom();
     const QPointF c = viewPos(1, middle + QPointF(0, 2 * CM));
@@ -1120,7 +1127,6 @@ TEST_F(CanvasReplayTest, heldToAStrokeTwoFingersSlideTheSetsquareAlongIt) {
         const QPointF centre(page->getWidth() / 2, page->getHeight() / 2);
         drawLine(0, centre + QPointF(-200, 0), centre + QPointF(200, 0));  // right through the setsquare's middle
     }
-    processEvents(1100);  // (palm rejection after the pen)
     SETSQUARE_UNDER_TWO_FINGERS();
     ASSERT_TRUE(geometry.holdToStroke());
     const double zoom = view->getViewController().zoom();
@@ -1222,8 +1228,71 @@ TEST_F(CanvasReplayTest, touchWorksRightAfterThePenLeaves) {
     input->proximityEvent(true);
     EXPECT_DOUBLE_EQ(fingerPan(*input, touchscreen, *view), 0.0) << "touch while the pen is near";
     input->proximityEvent(false);
-    processEvents(200);
-    EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "touch shortly after the pen left";
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "touch right after the pen left (no wait by default)";
+}
+
+// How long touch waits once the pen is away is a setting (none by default).
+TEST_F(CanvasReplayTest, touchWaitsAfterThePenAsLongAsTheSettingSays) {
+    for (int i = 0; i < 6; ++i) {
+        session->insertNewPage(1);
+    }
+    view->getViewController().setViewSize(QSizeF(900, 600));
+    processEvents();
+    app->getSettings()->getCustomElement("touch").setInt("timeout", 400);
+
+    input->proximityEvent(true);
+    input->proximityEvent(false);
+    EXPECT_DOUBLE_EQ(fingerPan(*input, touchscreen, *view), 0.0) << "right after the pen left: still waiting";
+    processEvents(450);
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "after the time set";
+}
+
+// A pen that never tells whether it is near: touch works right after it was used (by default), or after the time
+// set.
+TEST_F(CanvasReplayTest, aPenWithoutProximityDoesNotHoldUpTouch) {
+    for (int i = 0; i < 6; ++i) {
+        session->insertNewPage(1);
+    }
+    view->getViewController().setViewSize(QSizeF(900, 600));
+    processEvents();
+    drawLine(0, QPointF(100, 100), QPointF(200, 100));
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "right after writing";
+
+    app->getSettings()->getCustomElement("touch").setInt("timeout", 500);
+    drawLine(0, QPointF(100, 150), QPointF(200, 150));
+    EXPECT_DOUBLE_EQ(fingerPan(*input, touchscreen, *view), 0.0) << "with a time set: not right after writing";
+}
+
+// A pen that tells how high it is counts as near only up to the height set: a finger can scroll while it stays
+// close above the screen.
+TEST_F(CanvasReplayTest, aPenThatTellsItsHeightIsAwayAboveTheHeightSet) {
+    for (int i = 0; i < 6; ++i) {
+        session->insertNewPage(1);
+    }
+    view->getViewController().setViewSize(QSizeF(900, 600));
+    processEvents();
+    const QPointF over(600, 300);
+
+    input->proximityEvent(true);
+    hover(over, 0.5);
+    ASSERT_TRUE(PenHover::instance().reportsHeight());
+    EXPECT_NEAR(PenHover::instance().height(), 0.5, 0.001);
+    EXPECT_DOUBLE_EQ(fingerPan(*input, touchscreen, *view), 0.0) << "by default all of its range counts as near";
+
+    app->getSettings()->getCustomElement("touch").setInt("nearHeight", 30);
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "above 30 %: away, the finger scrolls";
+    hover(over, 0.2);
+    EXPECT_DOUBLE_EQ(fingerPan(*input, touchscreen, *view), 0.0) << "at 20 %: near, touch is ignored";
+    hover(over, 0.6);
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "lifted again: touch works at once";
+
+    // A pen that never tells its height (z stays 0 while hovering) is near all the way, whatever is set
+    PenHover::instance().reset();
+    input->proximityEvent(true);
+    hover(over, 0.0);
+    EXPECT_FALSE(PenHover::instance().reportsHeight());
+    EXPECT_DOUBLE_EQ(fingerPan(*input, touchscreen, *view), 0.0);
+    input->proximityEvent(false);
 }
 
 TEST_F(CanvasReplayTest, restingHandStaysIgnoredAfterThePenLeaves) {

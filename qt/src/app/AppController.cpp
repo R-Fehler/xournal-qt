@@ -39,6 +39,7 @@
 #include "util/XojMsgBox.h"
 
 #include "CanvasView.h"
+#include "PenHover.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
@@ -1453,6 +1454,8 @@ void AppController::setGeometryAngleSteps(bool steps) {
         Q_EMIT toolChanged();
     }
 }
+
+QObject* AppController::penHover() const { return &PenHover::instance(); }
 
 QString AppController::geometryTool() const {
     if (!canvas() || !canvas()->geometryTool().active()) {

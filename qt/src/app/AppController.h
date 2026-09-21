@@ -67,6 +67,9 @@ class AppController: public QObject {
     /// The keyboard shortcuts (the same ones in every window)
     Q_PROPERTY(QObject* shortcuts READ shortcutsModel CONSTANT)
     Q_PROPERTY(QObject* settings READ settingsModel CONSTANT)
+    /// How high the pen is above the screen, for pens that tell it (xqt::PenHover)
+    Q_PROPERTY(QObject* penHover READ penHover CONSTANT)
+    QObject* penHover() const;
     /// The library of this window (a folder of documents) and the recently opened documents (home screen)
     Q_PROPERTY(QObject* library READ libraryModel CONSTANT)
     Q_PROPERTY(QObject* recent READ recentModel CONSTANT)

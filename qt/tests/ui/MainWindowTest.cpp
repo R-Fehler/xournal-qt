@@ -21,6 +21,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTabletEvent>
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 #include <cairo-pdf.h>
@@ -31,6 +32,7 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "canvas/CanvasView.h"
+#include "canvas/PenHover.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
@@ -206,6 +208,38 @@ TEST_F(MainWindowTest, tabOverviewSwitchesAndCloses) {
     ASSERT_TRUE(waitOpened(overview, true));
     key(Qt::Key_A);
     EXPECT_EQ(search->property("text").toString(), QStringLiteral("a"));
+}
+
+// Palm rejection: touch does not wait after the pen by default; the height up to which the pen counts as near can
+// be chosen, but is only offered once the pen has told its height.
+TEST_F(MainWindowTest, penHeightIsOfferedOnceThePenTellsIt) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    EXPECT_EQ(settings->get("palmRejectionTimeout").toInt(), 0) << "no wait after the pen by default";
+    EXPECT_EQ(settings->get("palmNearHeight").toInt(), 100) << "all of the pen's range by default";
+    xqt::PenHover::instance().reset();
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("touchTab"));
+    auto* row = findItem("palmNearHeightRow");
+    ASSERT_NE(row, nullptr);
+    EXPECT_FALSE(row->isVisible()) << "a pen that has not told its height: not offered";
+
+    // The pen hovers at a quarter of its range
+    static QPointingDevice pen("test pen", 3001, QInputDevice::DeviceType::Stylus, QPointingDevice::PointerType::Pen,
+                               QInputDevice::Capability::Position | QInputDevice::Capability::ZPosition, 1, 3);
+    xqt::PenHover::instance().setProximity(true);
+    QTabletEvent hover(QEvent::TabletMove, &pen, QPointF(10, 10), QPointF(10, 10), 0.0, 0.f, 0.f, 0.f, 0.0,
+                       static_cast<float>(0.25 * xqt::PenHover::MAX_Z), Qt::NoModifier, Qt::NoButton, Qt::NoButton);
+    xqt::PenHover::instance().record(hover);
+    until([&] { return row->isVisible(); });
+    EXPECT_TRUE(row->isVisible()) << "offered now";
+    ASSERT_TRUE(settings->set("palmNearHeight", 40));
+    EXPECT_EQ(settings->get("palmNearHeight").toInt(), 40);
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    xqt::PenHover::instance().reset();
 }
 
 TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {

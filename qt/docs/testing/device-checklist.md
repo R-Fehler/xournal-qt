@@ -82,7 +82,13 @@ cd build-qt
 - [ ] Gear button: the settings sheet opens; every section scrolls with a finger; sliders and switches work with pen and finger.
 - [ ] Changing the pressure multiplier or the stabilizer changes the next stroke without restarting.
 - [ ] Settings → Pen: "Lower side button" / "Upper side button" set to "Hand": that button scrolls instead of erasing. Set back to "Eraser".
-- [ ] Palm rejection timeout: with a long timeout, touch stays blocked for a moment after writing.
+- [ ] Settings → Touch: "Touch waits after the pen" is 0.00 s: a finger scrolls the moment the pen is away (out of
+      range); a palm resting on the screen while writing still does nothing. With e.g. 0.5 s, touch stays blocked
+      that long after the pen left.
+- [ ] Hover the pen over the Touch settings: if it tells its height, "The pen counts as near up to" and "Your pen
+      is at … %" appear (else a hint says so). Set it to e.g. 30 %: with the pen held higher than that above the
+      screen, a finger scrolls right away. "Take the pen's height": tap it, hold the pen at the height that should
+      count as away for three seconds; the slider takes that height.
 - [ ] Pinch zoom off: two fingers only pan.
 - [ ] New pages: background/size/color from the settings are used by "add page".
 - [ ] After closing and restarting the app, the settings are kept.

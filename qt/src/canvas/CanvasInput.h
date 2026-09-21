@@ -109,6 +109,9 @@ private:
     bool penInProximity = false;
     bool proximityEverSeen = false;
     double lastPenEventMs = -1e9;
+    /// The last moment the pen was near (touching, or in proximity and not higher than the setting)
+    double lastNearMs = -1e9;
+    bool penNear() const;
     std::optional<QPointF> hover;
     bool hoverEraser = false;
 
