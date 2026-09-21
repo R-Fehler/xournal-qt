@@ -156,6 +156,8 @@ public:
     bool dragPdfSelection(QPointF viewPos, bool startEnd);
     /// The two ends of the selection in view coordinates (for the handles); empty when nothing is selected.
     QRectF pdfSelectionEnds() const;
+    /// Is this place (view coordinates) on the selected PDF text? (A press somewhere else unselects it.)
+    bool pdfTextSelectionContains(QPointF viewPos) const;
     /// The selected PDF text ("" if none).
     std::string selectedPdfText() const;
     /// The setsquare / compass on the canvas.

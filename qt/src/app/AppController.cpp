@@ -355,6 +355,12 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
+        // Whoever changes the selection (a press on the page, copying, marking, a page change): the knobs and the
+        // pill follow it.
+        currentConnections.push_back(
+                connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelectionChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionChanged));
         applyPdfTextMode();
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
@@ -369,6 +375,7 @@ void AppController::currentTabChanged() {
     Q_EMIT pageUndoChanged();
     Q_EMIT selectionChanged();
     Q_EMIT navigationChanged();
+    Q_EMIT pdfTextSelectionChanged();
 }
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
@@ -1824,14 +1831,14 @@ bool AppController::selectPdfTextAt(qreal x, qreal y) {
     const QPointF where(x, y);
     const bool again = canvas()->hasPdfTextSelection() && canvas()->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
     const bool selected = canvas()->selectPdfTextAt(where, again);
-    Q_EMIT pdfTextModeChanged();
+    Q_EMIT pdfTextSelectionChanged();
     return selected;
 }
 
 bool AppController::dragPdfSelection(qreal x, qreal y, bool startEnd) {
     const bool changed = canvas() && canvas()->dragPdfSelection(QPointF(x, y), startEnd);
     if (changed) {
-        Q_EMIT pdfTextModeChanged();
+        Q_EMIT pdfTextSelectionChanged();
     }
     return changed;
 }

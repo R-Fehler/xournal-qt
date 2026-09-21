@@ -10,12 +10,15 @@ Item {
     anchors.fill: canvas
     visible: app.pdfTextIsSelected
     z: 55
+    /// Only the knobs take presses; everything else goes to the canvas under them (see DocumentCanvasItem).
+    property bool inputTransparent: true
 
     /// Where the selection begins and ends (canvas coordinates); read again whenever it changes
     property rect ends: Qt.rect(0, 0, 0, 0)
     function refresh() { ends = app.pdfSelectionEnds() }
     Connections {
         target: app
+        function onPdfTextSelectionChanged() { handles.refresh() }
         function onPdfTextModeChanged() { handles.refresh() }
         function onZoomChanged() { handles.refresh() }
         function onPageChanged() { handles.refresh() }

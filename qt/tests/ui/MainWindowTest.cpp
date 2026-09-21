@@ -30,6 +30,8 @@
 #include "model/Text.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
+#include "canvas/CanvasView.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
 #include "shell/LibraryModel.h"
@@ -1416,6 +1418,67 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     EXPECT_EQ(controller->geometryTool(), QStringLiteral("compass"));
     QMetaObject::invokeMethod(compass, "triggered");
     EXPECT_TRUE(controller->geometryTool().isEmpty());
+}
+
+// Selected PDF text used to freeze the canvas: its knobs lie over the whole canvas, and after copying nothing
+// told the UI that nothing is selected any more, so the (still visible) overlay swallowed every press.
+TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    wait(100);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    ASSERT_NE(canvasItem, nullptr);
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto* handles = find<QQuickItem>("pdfTextHandles");
+    ASSERT_NE(handles, nullptr);
+    EXPECT_TRUE(handles->property("inputTransparent").toBool()) << "only its knobs take presses";
+
+    // Where a word of the PDF is (the search knows it)
+    auto* session = controller->tabManager().currentSession();
+    QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
+    session->search().setQuery("Test", false);
+    ASSERT_TRUE(searched.wait(3000));
+    ASSERT_FALSE(session->search().hits().empty());
+    const QRectF hit = session->search().hits().front().rect;
+    session->search().clear();
+    const QPointF onWord =
+            view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
+    const QPoint onWordInWindow = canvasItem->mapToScene(onWord).toPoint();
+
+    QSignalSpy changed(controller.get(), &AppController::pdfTextSelectionChanged);
+    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y())) << "the word under the finger";
+    until([&] { return handles->isVisible(); });
+    ASSERT_TRUE(controller->pdfTextIsSelected());
+    EXPECT_TRUE(handles->isVisible()) << "the knobs are shown";
+    EXPECT_GE(changed.count(), 1) << "the UI is told that something is selected";
+
+    // A press far from the text unselects it - the overlay of the knobs must not swallow that press
+    const auto elements = [&] {
+        return session->getDocument()->getPage(0)->getSelectedLayer()->getElements().size();
+    };
+    const size_t before = elements();
+    controller->selectTool("pen");
+    const QPoint far = onWordInWindow + QPoint(0, 260);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, far);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, far);
+    wait(50);
+    EXPECT_FALSE(controller->pdfTextIsSelected()) << "a press beside the text unselects it";
+    until([&] { return !handles->isVisible(); });
+    EXPECT_FALSE(handles->isVisible());
+    EXPECT_EQ(elements(), before) << "that press only unselects, it does not draw";
+
+    // Copying ends the selection as well, and the canvas draws again afterwards (it used to be frozen)
+    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
+    until([&] { return handles->isVisible(); });
+    EXPECT_TRUE(controller->copyPdfText());
+    EXPECT_FALSE(controller->pdfTextIsSelected());
+    until([&] { return !handles->isVisible(); });
+    EXPECT_FALSE(handles->isVisible()) << "nothing is selected: the knobs are gone";
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, far);
+    QTest::mouseMove(window, far + QPoint(40, 20));
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, far + QPoint(40, 20));
+    wait(50);
+    EXPECT_EQ(elements(), before + 1) << "the pen works again after copying the text";
 }
 
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {

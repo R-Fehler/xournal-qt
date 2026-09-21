@@ -235,6 +235,13 @@ cd build-qt
 - [ ] On a page of an annotated PDF the dialog warns that the PDF page is replaced; what was drawn stays.
 - [ ] Press and hold "add page" (or ⋮ → Insert pages…): 3 graph pages, landscape, after this page; one undo in the sidebar removes them.
 
+## PDF text selection
+- [ ] Hold a finger on PDF text: the word is selected with two knobs; the pill offers Copy and the marking colors.
+- [ ] Tap (or press with the pen) somewhere else on the page: the selection and its knobs are gone, and that press
+      does not draw. Everything works right away again: pen, scrolling, pinch zoom, tools.
+- [ ] Copy from the pill: the text is in the clipboard, the knobs are gone and the canvas takes input as before
+      (this used to freeze the canvas).
+
 ## Setsquare and compass
 - [ ] Shapes tool → "Setsquare": the triangle with its scales lies in the middle of the page; drawing with the pen along its long edge gives a straight line, away from it a free line.
 - [ ] Drag inside the triangle with a finger or the pen: it moves along; two fingers on it turn it and make it bigger or smaller (the page keeps its zoom); two fingers next to it zoom as always.

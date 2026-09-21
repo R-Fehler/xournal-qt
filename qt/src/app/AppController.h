@@ -359,7 +359,7 @@ public:
     /// Where the selection begins and ends, for the handles (an empty rect: nothing selected).
     Q_INVOKABLE QRectF pdfSelectionEnds() const;
     /// PDF text is selected right now (then only copying and marking it make sense).
-    Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextModeChanged)
+    Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextSelectionChanged)
     bool pdfTextIsSelected() const;
     Q_INVOKABLE void clearPdfTextSelection();
     /// Insert `count` new pages before `position` (0-based; page count: at the end): background `background` (index
@@ -477,6 +477,8 @@ Q_SIGNALS:
     /// PDF text was selected (select mode); rect in canvas coordinates.
     void pdfTextSelected(QRectF rect);
     void pdfTextSelectionCleared();
+    /// Something was selected or unselected: `pdfTextIsSelected` and the ends of the selection are different now.
+    void pdfTextSelectionChanged();
     /// A long press or right click on the canvas: the window shows the action pill there.
     void contextRequested(QPointF viewPos);
     /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.

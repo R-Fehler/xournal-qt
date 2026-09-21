@@ -723,6 +723,28 @@ std::string CanvasView::selectedPdfText() const {
     return pdfSelection && pdfSelection->isFinalized() ? pdfSelection->getSelectedText() : std::string();
 }
 
+bool CanvasView::pdfTextSelectionContains(QPointF viewPos) const {
+    if (!hasPdfTextSelection() || !pdfSelectionPage) {
+        return false;
+    }
+    const auto idx = indexOf(pdfSelectionPage);
+    if (!idx) {
+        return false;
+    }
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    constexpr double MARGIN = 6;  // a little around the letters, so the edge of a word still counts as on it
+    for (const XojPdfRectangle& r: pdfSelection->getSelectedTextRects()) {
+        const QRectF onPage(QPointF(std::min(r.x1, r.x2), std::min(r.y1, r.y2)),
+                            QPointF(std::max(r.x1, r.x2), std::max(r.y1, r.y2)));
+        const QRectF onView(pageRect.topLeft() + onPage.topLeft() * zoom, onPage.size() * zoom);
+        if (onView.adjusted(-MARGIN, -MARGIN, MARGIN, MARGIN).contains(viewPos)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 QRectF CanvasView::pdfSelectionEnds() const {
     if (!pdfSelection || !pdfSelectionPage) {
         return {};

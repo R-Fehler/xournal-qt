@@ -375,6 +375,14 @@ bool CanvasInput::actionStart(const Event& event) {
         }
     }
 
+    // Selected PDF text: a press somewhere else unselects it (a press on a knob never reaches the canvas).
+    if (view.hasPdfTextSelection() && !view.pdfTextSelectionContains(event.viewPos)) {
+        view.clearPdfTextSelection();
+        if (toolHandler->isDrawingTool()) {
+            return true;  // that press only unselects, as with a selection of elements
+        }
+    }
+
     // The setsquare or the compass: a press on it takes it along instead of drawing
     if (currentPage && view.geometryTool().visible()) {
         const QPointF onPage = pageCoordinates(*currentPage, event.viewPos);
@@ -737,7 +745,10 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                     redo();
                 }
             } else if (duration <= TAP_MAX_MS && touchSessionTravel <= TAP_SLOP_PX && touchSessionMaxPoints == 1) {
-                if (view.tapAt(touchSessionStartPos)) {
+                if (view.hasPdfTextSelection() && !view.pdfTextSelectionContains(touchSessionStartPos)) {
+                    view.clearPdfTextSelection();  // a tap beside the selected text unselects it and nothing else
+                    lastTapMs = 0;
+                } else if (view.tapAt(touchSessionStartPos)) {
                     lastTapMs = 0;  // it was a PDF link: never the first tap of a double tap
                 } else if (now - lastTapMs <= DOUBLE_TAP_MS &&
                            std::hypot(touchSessionStartPos.x() - lastTapPos.x(),

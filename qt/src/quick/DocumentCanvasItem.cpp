@@ -229,6 +229,8 @@ void DocumentCanvasItem::itemChange(ItemChange change, const ItemChangeData& val
 namespace {
 /// Deepest visible item at a scene position, following the stacking order (topmost first), like Qt Quick's
 /// delivery. Popups, dialogs and their modal dimmer live in the window's overlay, which is above the content.
+/// Items that only draw something over the canvas (the knobs of a PDF text selection and the like) say so with
+/// `inputTransparent: true`, and are looked through - as Qt does with them when it delivers a press.
 QQuickItem* topmostItemAt(QQuickItem* item, QPointF scenePos) {
     // Paint order: by z, then declaration order. (QQuickItem::childAt ignores z, and would e.g. find an
     // ApplicationWindow's background (z -1) on top of the content.)
@@ -239,7 +241,7 @@ QQuickItem* topmostItemAt(QQuickItem* item, QPointF scenePos) {
             QQuickItem* top = topmostItemAt(*it, scenePos);
             // The popup overlay covers the window while any popup is open; only its popups (and the dimmer of a
             // modal one) are on top, not the overlay itself (e.g. a tool tip somewhere else).
-            if (top == *it && (*it)->inherits("QQuickOverlay")) {
+            if (top == *it && ((*it)->inherits("QQuickOverlay") || (*it)->property("inputTransparent").toBool())) {
                 continue;
             }
             return top;

@@ -888,6 +888,15 @@ TEST_F(CanvasReplayTest, aLongPressSelectsTheWordOfThePdfAndTheHandlesWidenIt) {
     EXPECT_FALSE(word.isEmpty());
     EXPECT_TRUE(view->dragPdfSelection(ends.bottomRight() + QPointF(220, 0), false));
     EXPECT_GE(textOf().size(), word.size()) << "more than the word";
+
+    // A finger on the text itself keeps it (a second long press widens it); a tap beside it unselects
+    EXPECT_TRUE(view->pdfTextSelectionContains(onWord));
+    const QPointF besideTheText = onWord + QPointF(0, 260);
+    EXPECT_FALSE(view->pdfTextSelectionContains(besideTheText));
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, besideTheText);
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, besideTheText);
+    processEvents();
+    EXPECT_FALSE(view->hasPdfTextSelection()) << "a tap beside the selected text unselects it";
 }
 
 // PDF text tools: select text of the background PDF and mark it (upstream's PdfElemSelection + marker strokes).
