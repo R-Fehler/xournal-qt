@@ -344,6 +344,22 @@ ApplicationWindow {
                     ShapeItem { text: qsTr("Arrow"); type: "arrow" }
                     ShapeItem { text: qsTr("Double arrow"); type: "doubleArrow" }
                     ShapeItem { text: qsTr("Coordinate system"); type: "drawCoordinateSystem" }
+                    MenuSeparator {}
+                    // On the page itself, not a way of drawing: drag it where it is needed, draw along its edge
+                    MenuItem {
+                        objectName: "setsquareItem"
+                        text: qsTr("Setsquare (draw along its edge)")
+                        checkable: true
+                        checked: app.geometryTool === "setsquare"
+                        onTriggered: app.toggleSetsquare()
+                    }
+                    MenuItem {
+                        objectName: "compassItem"
+                        text: qsTr("Compass (draw circles around it)")
+                        checkable: true
+                        checked: app.geometryTool === "compass"
+                        onTriggered: app.toggleCompass()
+                    }
                 }
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }

@@ -235,6 +235,11 @@ cd build-qt
 - [ ] On a page of an annotated PDF the dialog warns that the PDF page is replaced; what was drawn stays.
 - [ ] Press and hold "add page" (or ⋮ → Insert pages…): 3 graph pages, landscape, after this page; one undo in the sidebar removes them.
 
+## Setsquare and compass
+- [ ] Shapes tool → "Setsquare": the triangle with its scales lies in the middle of the page; drawing with the pen along its long edge gives a straight line, away from it a free line.
+- [ ] Drag inside the triangle with a finger or the pen: it moves along; two fingers on it turn it and make it bigger or smaller (the page keeps its zoom); two fingers next to it zoom as always.
+- [ ] Shapes tool → "Compass": drawing around its middle at the distance of its radius gives a circular arc; the same entry again takes the tool away.
+
 ## Table of contents
 - [ ] A PDF with bookmarks (e.g. a book or thesis): sidebar "Contents": indented headings, current section highlighted, tap goes there, arrows collapse.
 - [ ] Contents overview (toolbar button or Ctrl+Alt+O): chapters big, sections smaller and indented, the pages of each section in a row (swipe sideways); tap a page: it opens there; "Chapters only"; − / +.

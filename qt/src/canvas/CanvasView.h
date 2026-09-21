@@ -36,6 +36,8 @@
 #include "ViewController.h"
 #include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
+#include "GeometryToolLayer.h"
+
 class EditSelection;
 class PdfCache;
 class PdfElemSelection;
@@ -156,6 +158,9 @@ public:
     QRectF pdfSelectionEnds() const;
     /// The selected PDF text ("" if none).
     std::string selectedPdfText() const;
+    /// The setsquare / compass on the canvas.
+    GeometryToolLayer& geometryTool() { return geometry; }
+    const GeometryToolLayer& geometryTool() const { return geometry; }
     void pdfTextPress(CanvasPage& page, double x, double y);
     void pdfTextMove(CanvasPage& page, double x, double y);
     void pdfTextRelease(CanvasPage& page);
@@ -229,6 +234,7 @@ private:
     QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
+    GeometryToolLayer geometry{*this};
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;
     PdfTextMode pdfTextMode = PdfTextMode::Highlight;

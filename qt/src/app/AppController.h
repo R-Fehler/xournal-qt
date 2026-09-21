@@ -394,6 +394,14 @@ public:
     // --- tools (shared by all tabs) ---
     /// "pen", "highlighter", "eraser", "hand"
     Q_INVOKABLE void selectTool(const QString& tool);
+    /// Put the setsquare ("setsquare") or the compass ("compass") on the page, or take it away again.
+    Q_INVOKABLE void toggleGeometryTool(const QString& which);
+    /// For the screenshot hook (it calls methods without arguments)
+    Q_INVOKABLE void toggleSetsquare() { toggleGeometryTool("setsquare"); }
+    Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
+    /// Which one lies on the page ("" if none).
+    Q_PROPERTY(QString geometryTool READ geometryTool NOTIFY toolChanged)
+    QString geometryTool() const;
     Q_INVOKABLE void setColor(const QColor& color);
     /// 0 = very fine ... 4 = very thick (upstream ToolSize), 5 = the tool's own width
     Q_INVOKABLE void setSize(int size);

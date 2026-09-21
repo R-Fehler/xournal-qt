@@ -1390,6 +1390,28 @@ void AppController::setFontSize(double size) { setFont(fontFamily(), size); }
 
 QStringList AppController::fontFamilies() const { return QFontDatabase::families(); }
 
+void AppController::toggleGeometryTool(const QString& which) {
+    if (!canvas()) {
+        return;
+    }
+    if (which == "setsquare") {
+        canvas()->geometryTool().toggle(GeometryToolType::SETSQUARE);
+    } else if (which == "compass") {
+        canvas()->geometryTool().toggle(GeometryToolType::COMPASS);
+    } else {
+        canvas()->geometryTool().hide();
+    }
+    Q_EMIT toolChanged();
+}
+
+QString AppController::geometryTool() const {
+    if (!canvas() || !canvas()->geometryTool().visible()) {
+        return {};
+    }
+    return canvas()->geometryTool().type() == GeometryToolType::SETSQUARE ? QStringLiteral("setsquare")
+                                                                          : QStringLiteral("compass");
+}
+
 void AppController::selectTool(const QString& name) {
     ToolType type = toolTypeFromString(name.toStdString());
     if (type == TOOL_NONE) {

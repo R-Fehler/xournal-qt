@@ -78,6 +78,8 @@ private:
     bool changeTool(const Event& event);
     void updateLastEvent(const Event& event);
     PositionInputData getInputDataRelativeToCurrentPage(CanvasPage* page, const Event& event) const;
+    /// A place on the canvas in the coordinates of a page (points).
+    QPointF pageCoordinates(CanvasPage& page, QPointF viewPos) const;
     double filterPressure(const PositionInputData& pos, CanvasPage* page);
     double inferPressureValue(const PositionInputData& pos, CanvasPage* page);
     void handleScrollEvent(const Event& event);
@@ -124,6 +126,13 @@ private:
     /// Holding one finger still shows what can be done here (like a right click)
     QTimer longPressTimer;
     bool longPressFired = false;
+    /// The setsquare / compass is being dragged over the page
+    bool draggingGeometryTool = false;
+    QPointF lastGeometryPos;
+    /// Two fingers on the setsquare / compass turn and size it instead of zooming the page
+    bool pinchingGeometryTool = false;
+    double lastPinchAngle = 0;
+    double lastPinchDistance = 1;
     double touchSessionTravel = 0;
     QPointF touchSessionStartPos;
     QPointF pressViewPos;

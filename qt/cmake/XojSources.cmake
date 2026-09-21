@@ -78,7 +78,10 @@ set(XOJ_CORE_SOURCES
     ${XOJ_SRC}/core/model/AudioContent.cpp
     ${XOJ_SRC}/core/model/BackgroundConfig.cpp
     ${XOJ_SRC}/core/model/BackgroundImage.cpp
+    ${XOJ_SRC}/core/model/Compass.cpp
     ${XOJ_SRC}/core/model/Document.cpp
+    ${XOJ_SRC}/core/model/GeometryTool.cpp
+    ${XOJ_SRC}/core/model/Setsquare.cpp
     ${XOJ_SRC}/core/model/DocumentHandler.cpp
     ${XOJ_SRC}/core/model/DocumentListener.cpp
     ${XOJ_SRC}/core/model/Element.cpp
@@ -190,6 +193,9 @@ set(XOJ_TOOLS_SOURCES
     ${XOJ_SRC}/core/control/tools/SnapToGridInputHandler.cpp
     ${XOJ_SRC}/core/control/tools/EraseHandler.cpp
     ${XOJ_SRC}/core/control/zoom/ZoomListener.cpp
+    ${XOJ_SRC}/core/view/CompassView.cpp
+    ${XOJ_SRC}/core/view/GeometryToolView.cpp
+    ${XOJ_SRC}/core/view/SetsquareView.cpp
     ${XOJ_SRC}/core/control/tools/BaseShapeHandler.cpp
     ${XOJ_SRC}/core/control/tools/RulerHandler.cpp
     ${XOJ_SRC}/core/control/tools/RectangleHandler.cpp

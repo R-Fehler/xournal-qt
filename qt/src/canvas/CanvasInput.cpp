@@ -247,6 +247,12 @@ void CanvasInput::updateLastEvent(const Event& event) {
     }
 }
 
+QPointF CanvasInput::pageCoordinates(CanvasPage& page, QPointF viewPos) const {
+    const double zoom = view.getViewController().zoom();
+    const QPointF topLeft = page.viewRect().topLeft();
+    return QPointF((viewPos.x() - topLeft.x()) / zoom, (viewPos.y() - topLeft.y()) / zoom);
+}
+
 PositionInputData CanvasInput::getInputDataRelativeToCurrentPage(CanvasPage* page, const Event& event) const {
     // Port of AbstractInputHandler::getInputDataRelativeToCurrentPage
     xoj_assert(page != nullptr);
@@ -261,6 +267,13 @@ PositionInputData CanvasInput::getInputDataRelativeToCurrentPage(CanvasPage* pag
     pos.state = event.state;
     pos.timestamp = event.timestamp;
     pos.deviceId = DeviceId(static_cast<const GdkDevice*>(event.device));
+    // Drawing while the setsquare or the compass is out: the line follows its edge
+    if (view.geometryTool().visible() && view.getSession().getToolHandler()->isDrawingTool()) {
+        const double zoom = view.getViewController().zoom();
+        const QPointF snapped = view.geometryTool().snap(QPointF(pos.x / zoom, pos.y / zoom));
+        pos.x = snapped.x() * zoom;
+        pos.y = snapped.y() * zoom;
+    }
     return pos;
 }
 
@@ -362,6 +375,16 @@ bool CanvasInput::actionStart(const Event& event) {
         }
     }
 
+    // The setsquare or the compass: a press on it takes it along instead of drawing
+    if (currentPage && view.geometryTool().visible()) {
+        const QPointF onPage = pageCoordinates(*currentPage, event.viewPos);
+        if (view.geometryTool().contains(onPage)) {
+            draggingGeometryTool = true;
+            lastGeometryPos = onPage;
+            return true;
+        }
+    }
+
     if (currentPage) {
         PositionInputData pos = this->getInputDataRelativeToCurrentPage(currentPage, event);
         if (pos.pressure != Point::NO_PRESSURE) {
@@ -380,6 +403,16 @@ bool CanvasInput::actionStart(const Event& event) {
 bool CanvasInput::actionMotion(const Event& event) {
     ToolHandler* toolHandler = view.getSession().getToolHandler();
     this->changeTool(event);
+
+    if (draggingGeometryTool) {
+        if (CanvasPage* page = view.pageAt(event.viewPos)) {
+            const QPointF onPage = pageCoordinates(*page, event.viewPos);
+            view.geometryTool().moveBy(onPage - lastGeometryPos);
+            lastGeometryPos = onPage;
+        }
+        this->updateLastEvent(event);
+        return true;
+    }
 
     if (toolHandler->getToolType() == TOOL_HAND) {
         if (this->deviceClassPressed) {
@@ -492,6 +525,7 @@ bool CanvasInput::actionEnd(const Event& event) {
         view.tapAt(event.viewPos);
     }
 
+    draggingGeometryTool = false;
     this->sequenceStartPage = nullptr;
     if (toolHandler->pointActiveToolToToolbarTool()) {
         toolHandler->fireToolChanged();
@@ -619,6 +653,25 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         }
         if (pts.size() >= 2) {
             const double dist = std::hypot(pts[0].x() - pts[1].x(), pts[0].y() - pts[1].y());
+            const double angle = std::atan2(pts[1].y() - pts[0].y(), pts[1].x() - pts[0].x());
+            // Two fingers on the setsquare or the compass turn and size it (the page stays as it is)
+            if (!pinching && !pinchingGeometryTool && view.geometryTool().visible()) {
+                if (CanvasPage* page = view.pageAt(centroid)) {
+                    if (view.geometryTool().contains(pageCoordinates(*page, centroid))) {
+                        pinchingGeometryTool = true;
+                        lastPinchAngle = angle;
+                        lastPinchDistance = std::max(1.0, dist);
+                    }
+                }
+            }
+            if (pinchingGeometryTool) {
+                view.geometryTool().turnAndSize(angle - lastPinchAngle, dist / std::max(1.0, lastPinchDistance));
+                lastPinchAngle = angle;
+                lastPinchDistance = std::max(1.0, dist);
+                lastCentroid = centroid;
+                panning = false;
+                return true;
+            }
             if (!pinching) {
                 vc.pinchBegin(centroid, dist);
                 pinchStartDistance = dist;
@@ -663,6 +716,7 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         panning = false;
     }
     if (touches.empty()) {
+        pinchingGeometryTool = false;
         longPressTimer.stop();
         if (longPressFired) {
             longPressFired = false;

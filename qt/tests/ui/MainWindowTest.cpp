@@ -1395,6 +1395,29 @@ TEST_F(MainWindowTest, aPressOnTheCanvasClosesAnOpenMenu) {
     EXPECT_EQ(elements(), before) << "that press must not draw";
 }
 
+// The setsquare and the compass sit in the shapes menu (they are not a way of drawing, they lie on the page).
+TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    click(find<QQuickItem>("shapeButton"));
+    auto* item = find<QObject>("setsquareItem");
+    ASSERT_NE(item, nullptr);
+    until([&] { return item->property("visible").toBool(); });
+    EXPECT_FALSE(item->property("checked").toBool());
+    QMetaObject::invokeMethod(item, "triggered");
+    until([&] { return controller->geometryTool() == QStringLiteral("setsquare"); });
+    EXPECT_EQ(controller->geometryTool(), QStringLiteral("setsquare"));
+    EXPECT_TRUE(item->property("checked").toBool()) << "the entry shows that it is out";
+
+    // The compass instead, then away again
+    auto* compass = find<QObject>("compassItem");
+    ASSERT_NE(compass, nullptr);
+    QMetaObject::invokeMethod(compass, "triggered");
+    EXPECT_EQ(controller->geometryTool(), QStringLiteral("compass"));
+    QMetaObject::invokeMethod(compass, "triggered");
+    EXPECT_TRUE(controller->geometryTool().isEmpty());
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

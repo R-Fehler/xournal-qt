@@ -346,6 +346,15 @@ void touch(CanvasInput& input, const QPointingDevice& screen, QEvent::Type type,
     input.touchEvent(&e, [](QPointF scene) { return scene; });
 }
 
+/// Two fingers at these places.
+void touch2(CanvasInput& input, const QPointingDevice& screen, QEvent::Type type, QEventPoint::State state,
+            QPointF a, QPointF b) {
+    QEventPoint p1(1, state, a, a);
+    QEventPoint p2(2, state, b, b);
+    QTouchEvent e(type, &screen, Qt::NoModifier, {p1, p2});
+    input.touchEvent(&e, [](QPointF scene) { return scene; });
+}
+
 /// One finger dragging upwards; returns how far the view scrolled.
 double fingerPan(CanvasInput& input, const QPointingDevice& screen, CanvasView& view) {
     auto& vc = view.getViewController();
@@ -404,6 +413,92 @@ TEST_F(CanvasReplayTest, aWebAddressInATextIsALink) {
 
     // Somewhere else on the page there is no link
     EXPECT_FALSE(view->textLinkAt(viewPos(0, QPointF(box.x + box.width + 80, box.y + 200))).has_value());
+}
+
+TEST_F(CanvasReplayTest, theSetsquareGuidesTheStrokeAndCanBeMoved) {
+    auto& geometry = view->geometryTool();
+    EXPECT_FALSE(geometry.visible());
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    ASSERT_TRUE(geometry.visible());
+    EXPECT_EQ(geometry.type(), GeometryToolType::SETSQUARE);
+
+    // Its long edge lies across the middle of the page: drawing near it follows it
+    auto page = session->getDocument()->getPage(0);
+    const QPointF middle(page->getWidth() / 2, page->getHeight() / 2);
+    const QPointF nearEdge = middle + QPointF(60, 6);
+    const QPointF snapped = geometry.snap(nearEdge);
+    EXPECT_NEAR(snapped.y(), middle.y(), 1) << "on the edge";
+    EXPECT_NEAR(snapped.x(), nearEdge.x(), 1) << "along it";
+
+    // Far away from it nothing is changed
+    const QPointF far = middle + QPointF(60, 300);
+    EXPECT_EQ(geometry.snap(far), far);
+
+    // It can be taken along, and the edge goes with it
+    EXPECT_TRUE(geometry.contains(middle + QPointF(0, 30)));
+    geometry.moveBy(QPointF(0, 100));
+    EXPECT_NEAR(geometry.snap(middle + QPointF(60, 106)).y(), middle.y() + 100, 1);
+
+    // Turning it by a quarter turn makes the edge upright
+    geometry.turnAndSize(M_PI / 2, 1.0);
+    const QPointF onUpright = geometry.snap(middle + QPointF(6, 100 + 60));
+    EXPECT_NEAR(onUpright.x(), middle.x(), 1);
+
+    // It is really drawn on the page (an overlay of the page, like the selection)
+    EXPECT_TRUE(view->getPage(0)->hasOverlays()) << "the setsquare is an overlay of the page";
+    processEvents(300);
+    const auto info = view->getPage(0)->bufferInfo();
+    const QImage withTool = view->getPage(0)->composeTile(QRect(QPoint(0, 0), info.pixelSize));
+    geometry.hide();
+    processEvents(300);
+    const QImage without = view->getPage(0)->composeTile(QRect(QPoint(0, 0), info.pixelSize));
+    EXPECT_NE(withTool, without) << "the page looks different with the setsquare on it";
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    processEvents(100);
+
+    // The compass instead: points near its circle land on it
+    geometry.toggle(GeometryToolType::COMPASS);
+    EXPECT_EQ(geometry.type(), GeometryToolType::COMPASS);
+    geometry.toggle(GeometryToolType::COMPASS);
+    EXPECT_FALSE(geometry.visible()) << "the same one again takes it away";
+}
+
+// Two fingers on the tool itself turn it and size it; the page keeps its zoom (elsewhere they zoom as always).
+TEST_F(CanvasReplayTest, twoFingersOnTheSetsquareTurnAndSizeIt) {
+    auto& vc = view->getViewController();
+    vc.setViewSize(QSizeF(900, 600));
+    processEvents();
+    auto& geometry = view->geometryTool();
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    ASSERT_TRUE(geometry.visible());
+    const double wasTurned = geometry.rotation();
+    const double wasHigh = geometry.height();
+    const double zoom = vc.zoom();
+
+    const auto page = session->getDocument()->getPage(0);
+    const QPointF middle(page->getWidth() / 2, page->getHeight() / 2);
+    auto onScreen = [&](QPointF onPage) { return view->getPage(0)->viewRect().topLeft() + onPage * vc.zoom(); };
+    ASSERT_TRUE(geometry.contains(middle + QPointF(0, 20))) << "the fingers go inside the triangle";
+
+    // Both inside it, then turned by a bit and moved apart
+    touch2(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, onScreen(middle + QPointF(-30, 20)),
+           onScreen(middle + QPointF(30, 20)));
+    touch2(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, onScreen(middle + QPointF(-40, 0)),
+           onScreen(middle + QPointF(40, 40)));
+    touch2(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, onScreen(middle + QPointF(-40, 0)),
+           onScreen(middle + QPointF(40, 40)));
+    EXPECT_GT(std::abs(geometry.rotation() - wasTurned), 0.1) << "it turned with the fingers";
+    EXPECT_GT(geometry.height(), wasHigh) << "and grew as they moved apart";
+    EXPECT_DOUBLE_EQ(vc.zoom(), zoom) << "the page itself is not zoomed";
+
+    // Away from the tool the same gesture zooms the page
+    touch2(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, QPointF(200, 500),
+           QPointF(260, 500));
+    touch2(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, QPointF(180, 500),
+           QPointF(300, 500));
+    touch2(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, QPointF(180, 500), QPointF(300, 500));
+    EXPECT_GT(vc.zoom(), zoom) << "the fingers zoom where the tool is not";
+    geometry.hide();
 }
 
 TEST_F(CanvasReplayTest, twoTapsZoomInAndOutAgain) {

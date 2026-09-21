@@ -259,7 +259,7 @@ CMake targets:
   - `PaperSize`: delete the GTK constructor.
   - `Element.h`: remove the stray gdk include.
   - `Image.cpp` and `view/background/ImageBackgroundView.cpp`: replace `gdk_cairo_set_source_pixbuf` with a small `pixbufToCairoSurface()` helper that needs only gdk-pixbuf.
-  - Leave out `Compass`, `Setsquare` and `GeometryTool` (out of scope).
+  - `Compass`, `Setsquare` and `GeometryTool` are built (their views too); the GTK input handlers are replaced by `qt/src/canvas/GeometryToolLayer` with GTK-free shadow headers.
 - **pagetype:** `PageTypeHandler` takes an `fs::path` instead of `GladeSearchpath` and reports errors through `MessageSink`.
 - **view:** `View.h` and `Mask.h` include only cairo.
 - **pdf:**
@@ -409,8 +409,8 @@ Reused without changes: `control/xojfile/*` (GMarkup parser, LoadHandler, SaveHa
 - Audio recording and playback. `AudioContent` is still kept when saving.
 - Lua plugins.
 - The LaTeX editor. TeX elements still render and round-trip.
-- Setsquare and compass.
-- Printing, toolbar customization, and translations (gettext `_()` stays in core; QML uses `qsTr`).
+- ~~Setsquare and compass~~ (done: the upstream model and views with Qt input in `GeometryToolLayer`).
+- ~~Printing~~ (done: PDF export through `QPrintDialog`). Toolbar customization stays out (the bar is fixed, only hiding it is offered), and translations (gettext `_()` stays in core; QML uses `qsTr`).
 - X11 OS-level touch-disable.
 - Shapes, ruler and recognition (M5).
 
