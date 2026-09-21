@@ -1406,6 +1406,7 @@ ApplicationWindow {
         objectName: "tabOverview"
         onCloseRequested: function(index) { requestCloseTab(index) }
         onCloseAllRequested: app.tabs.count > 1 ? closeAllDialog.open() : closeAllTabs()
+        onLibrarySearchRequested: win.searchLibrary()
     }
 
     // Document shortcuts do nothing while the home screen is shown.
@@ -1468,6 +1469,19 @@ ApplicationWindow {
         }
     }
     Shortcut { sequences: win.keysOf("tabOverview"); onActivated: tabOverview.visible ? tabOverview.close() : tabOverview.open() }
+    // Search: all open documents (in their overview), the whole library (on the home screen) - from anywhere
+    Shortcut {
+        sequences: win.keysOf("searchAllDocuments")
+        enabled: app.tabs.count > 0  // (a property: an invokable in a binding would not be read again)
+        onActivated: { pageGrid.close(); app.homeVisible = false; tabOverview.openSearch() }
+    }
+    function searchLibrary() {
+        tabOverview.close()
+        pageGrid.close()
+        app.homeVisible = true
+        Qt.callLater(homeView.focusSearch)  // (after the home screen is shown: it puts the focus on its grid)
+    }
+    Shortcut { sequences: win.keysOf("searchLibrary"); onActivated: win.searchLibrary() }
     Shortcut { sequences: win.keysOf("settings"); onActivated: settingsPage.open() }
     Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)

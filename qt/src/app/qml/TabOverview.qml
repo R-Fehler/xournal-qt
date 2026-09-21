@@ -11,6 +11,8 @@ Popup {
     id: overview
     signal closeRequested(int index)
     signal closeAllRequested()
+    /// Ctrl+Alt+F here: search the library instead (the window's shortcuts do not reach into this modal overview)
+    signal librarySearchRequested()
 
     modal: true
     focus: true
@@ -53,6 +55,30 @@ Popup {
         onTriggered: { pending = false; app.searchAllTabs(searchField.text) }
     }
     /// Short texts (fewer than 4 characters) are searched on Enter or the search icon only, not while typing.
+    /// The library search shortcut, pressed in here (the overview is modal: the window's shortcuts wait meanwhile)
+    signal librarySearchRequested()
+    Shortcut {
+        sequences: (app.shortcuts.revision, app.shortcuts.keys("searchLibrary"))
+        onActivated: overview.librarySearchRequested()
+    }
+
+    // The search shortcuts also while the overview is open (it is modal: the window's shortcuts are blocked)
+    Shortcut {
+        sequences: (app.shortcuts.revision, app.shortcuts.keys("searchAllDocuments"))
+        enabled: overview.visible
+        onActivated: overview.openSearch()
+    }
+    Shortcut {
+        sequences: (app.shortcuts.revision, app.shortcuts.keys("searchLibrary"))
+        enabled: overview.visible
+        onActivated: overview.librarySearchRequested()
+    }
+    /// Open with the cursor in the search over all documents
+    function openSearch() {
+        if (!visible) open()
+        searchField.forceActiveFocus()
+        searchField.selectAll()
+    }
     function typed() {
         searchTyping.pending = searchField.text.length > 0 && searchField.text.length < 4
         if (!searchTyping.pending) searchTyping.restart()

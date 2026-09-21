@@ -1877,6 +1877,31 @@ TEST_F(MainWindowTest, singleKeysTakeTheTools) {
     EXPECT_EQ(controller->tool(), "pen");
 }
 
+// Ctrl+Shift+F searches all open documents, Ctrl+Alt+F the library - from anywhere.
+TEST_F(MainWindowTest, searchShortcutsForAllDocumentsAndTheLibrary) {
+    controller->newDocument();
+    QObject* overview = find("tabOverview");
+    auto* overviewSearch = find<QQuickItem>("overviewSearchField");
+    ASSERT_NE(overviewSearch, nullptr);
+    key(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true)) << "the overview of all documents opens";
+    until([&] { return overviewSearch->hasActiveFocus(); });
+    EXPECT_TRUE(overviewSearch->hasActiveFocus()) << "with the cursor in its search";
+
+    key(Qt::Key_F, Qt::ControlModifier | Qt::AltModifier);
+    EXPECT_TRUE(waitOpened(overview, false)) << "the library search closes the overview";
+    auto* librarySearch = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(librarySearch, nullptr);
+    until([&] { return librarySearch->hasActiveFocus(); });
+    EXPECT_TRUE(controller->homeVisible()) << "the library is shown";
+    EXPECT_TRUE(librarySearch->hasActiveFocus()) << "with the cursor in its search";
+
+    // and back into a document the other shortcut works as well
+    key(Qt::Key_F, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    EXPECT_FALSE(controller->homeVisible());
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

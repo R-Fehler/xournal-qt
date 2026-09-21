@@ -76,6 +76,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"insertImage", tr("Insert an image…"), tools, {"I"}},
 
             {"find", tr("Search"), search, standard(QKeySequence::Find)},
+            {"searchAllDocuments", tr("Search all open documents"), search, {"Ctrl+Shift+F"}},
+            {"searchLibrary", tr("Search the library"), search, {"Ctrl+Alt+F"}},
             {"findNext", tr("Next hit"), search, standard(QKeySequence::FindNext)},
             {"findPrevious", tr("Previous hit"), search, standard(QKeySequence::FindPrevious)},
     };
