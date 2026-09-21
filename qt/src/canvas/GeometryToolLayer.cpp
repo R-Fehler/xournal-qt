@@ -5,6 +5,8 @@
 #include <limits>
 #include <shared_mutex>
 
+#include <QTimer>
+
 #include "model/Compass.h"
 #include "model/Document.h"
 #include "model/Element.h"
@@ -111,6 +113,7 @@ void GeometryToolLayer::toggle(GeometryToolType wanted) {
 
 void GeometryToolLayer::place(CanvasPage& page) {
     onPage = &page;
+    onDocumentPage = page.getPage();
     if (auto* setsquare = dynamic_cast<Setsquare*>(tool.get())) {
         page.addOverlayView(std::make_unique<xoj::view::SetsquareView>(setsquare, &page,
                                                                       view.getSession().getZoomControl()));
@@ -127,9 +130,102 @@ void GeometryToolLayer::remove() {
         onPage->removeOverlayViewsOf(tool.get());
     }
     onPage = nullptr;
+    onDocumentPage.reset();
     tool.reset();
     isMinimized = false;
+    inGesture = false;
     releaseStroke();
+}
+
+void GeometryToolLayer::pageGoing(const CanvasPage* page) {
+    if (onPage == page) {
+        onPage = nullptr;  // its view goes with the page
+    }
+}
+
+void GeometryToolLayer::allPagesGoing() { onPage = nullptr; }
+
+void GeometryToolLayer::pagesChanged() {
+    if (!tool || isMinimized || onPage) {
+        return;
+    }
+    if (const PageRef page = onDocumentPage.lock()) {
+        if (CanvasPage* canvasPage = view.canvasPageOf(page.get())) {
+            place(*canvasPage);  // the same page, shown anew: the tool on it again, where it lay
+            return;
+        }
+    }
+    // Its page is not shown. A page that is moved goes and comes back right after, so look again once this is
+    // over; if it is really gone, the tool is put aside (the pill shows it; a tap brings it onto the page one is at).
+    inGesture = false;
+    QTimer::singleShot(0, &view, [this] {
+        if (!tool || isMinimized || onPage) {
+            return;
+        }
+        isMinimized = true;
+        releaseStroke();
+        Q_EMIT view.geometryChanged();
+    });
+}
+
+void GeometryToolLayer::changed(bool resized) {
+    tool->notify(resized);  // a new size needs the tool drawn anew; turned or moved, its drawing is only placed
+    Q_EMIT view.updateRequested();
+}
+
+void GeometryToolLayer::beginGesture(QPointF centre, double angle, double distance) {
+    if (!tool) {
+        return;
+    }
+    gesture.centre = centre;
+    gesture.middle = middle();
+    gesture.rotation = tool->getRotation();
+    gesture.freeRotation = freeRotation;
+    gesture.height = tool->getHeight();
+    gesture.distance = std::max(1.0, distance);
+    gesture.lastAngle = angle;
+    gesture.twist = 0;
+    inGesture = true;
+}
+
+void GeometryToolLayer::moveGesture(QPointF centre, double angle, double distance) {
+    if (!tool || !inGesture) {
+        return;
+    }
+    // Turning: the small steps added up (atan2 jumps from +180 to -180 degrees), and only past the slop
+    gesture.twist += std::remainder(angle - gesture.lastAngle, 2 * M_PI);
+    gesture.lastAngle = angle;
+    const double turn =
+            std::abs(gesture.twist) <= TURN_SLOP ? 0.0 : gesture.twist - std::copysign(TURN_SLOP, gesture.twist);
+    freeRotation = gesture.freeRotation + turn;
+    const double rotation = steps ? std::round(freeRotation / ANGLE_STEP) * ANGLE_STEP : freeRotation;
+    const double turned = rotation - gesture.rotation;  // what it really turns by (in steps with the steps on)
+
+    // Sizing: only past the slop, and within its limits
+    const double spread = std::max(1.0, distance) / gesture.distance;
+    double size = 1;
+    if (spread > 1 + SIZE_SLOP) {
+        size = spread / (1 + SIZE_SLOP);
+    } else if (spread < 1 - SIZE_SLOP) {
+        size = spread / (1 - SIZE_SLOP);
+    }
+    const double height = std::clamp(gesture.height * size, MIN_HEIGHT_CM, MAX_HEIGHT_CM);
+    const double scale = height / gesture.height;
+
+    // Carrying: with the fingers; turned and sized around them - or, held to a stroke, along that
+    QPointF to;
+    if (!path.empty()) {
+        to = nearestOnPath(path, gesture.middle + (centre - gesture.centre)).first;
+    } else {
+        const QPointF d = (gesture.middle - gesture.centre) * scale;
+        to = centre + QPointF(d.x() * std::cos(turned) - d.y() * std::sin(turned),
+                              d.x() * std::sin(turned) + d.y() * std::cos(turned));
+    }
+    const bool resized = height != tool->getHeight();
+    tool->setRotation(rotation);
+    tool->setHeight(height);
+    tool->setOrigin({to.x(), to.y()});
+    changed(resized);
 }
 
 bool GeometryToolLayer::holdToStroke() {
@@ -176,8 +272,7 @@ bool GeometryToolLayer::holdToStroke() {
     pathPage = page.get();
     const QPointF on = nearestOnPath(path, middle).first;
     tool->setOrigin({on.x(), on.y()});
-    tool->notify(false);
-    Q_EMIT view.updateRequested();
+    changed(false);
     return true;
 }
 
@@ -196,6 +291,7 @@ void GeometryToolLayer::setMinimized(bool minimized) {
         }
         onPage = nullptr;
         isMinimized = true;
+        inGesture = false;
         Q_EMIT view.updateRequested();
         return;
     }
@@ -227,8 +323,7 @@ void GeometryToolLayer::setAngleSteps(bool on) {
     if (steps) {
         // Straight onto the nearest step
         tool->setRotation(std::round(freeRotation / ANGLE_STEP) * ANGLE_STEP);
-        tool->notify(true);
-        Q_EMIT view.updateRequested();
+        changed(false);
     }
 }
 
@@ -263,8 +358,7 @@ void GeometryToolLayer::moveBy(QPointF delta) {
         to = nearestOnPath(path, to).first;  // it slides along the stroke, its middle always on it
     }
     tool->setOrigin({to.x(), to.y()});
-    tool->notify(false);
-    Q_EMIT view.updateRequested();
+    changed(false);
 }
 
 void GeometryToolLayer::turnAndSize(double angle, double factor) {
@@ -275,16 +369,20 @@ void GeometryToolLayer::turnAndSize(double angle, double factor) {
         freeRotation += angle;
         tool->setRotation(steps ? std::round(freeRotation / ANGLE_STEP) * ANGLE_STEP : freeRotation);
     }
+    const double height = tool->getHeight();
     if (factor > 0 && std::abs(factor - 1) > 0.001) {
-        tool->setHeight(std::clamp(tool->getHeight() * factor, 2.0, 30.0));
+        tool->setHeight(std::clamp(height * factor, MIN_HEIGHT_CM, MAX_HEIGHT_CM));
     }
-    tool->notify(true);
-    Q_EMIT view.updateRequested();
+    changed(tool->getHeight() != height);
 }
 
 double GeometryToolLayer::rotation() const { return tool ? tool->getRotation() : 0; }
 
 double GeometryToolLayer::height() const { return tool ? tool->getHeight() : 0; }
+
+QPointF GeometryToolLayer::pageToTool(QPointF pagePoint) const { return tool ? toTool(*tool, pagePoint) : QPointF(); }
+
+QPointF GeometryToolLayer::toolToPage(QPointF toolPoint) const { return tool ? toPage(*tool, toolPoint) : QPointF(); }
 
 QPointF GeometryToolLayer::middle() const {
     if (!tool) {

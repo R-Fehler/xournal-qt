@@ -116,6 +116,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 }
 
 CanvasView::~CanvasView() {
+    geometry.hide();  // before its page goes
     endTextEditing();
     pdfSelection.reset();
     selection.reset();  // the selected elements go back into the document
@@ -169,7 +170,17 @@ void CanvasView::updateRenderParams() {
     renderDpr = dpr;
 }
 
+CanvasPage* CanvasView::canvasPageOf(const XojPage* page) const {
+    for (const auto& p: pages) {
+        if (p->getPage().get() == page) {
+            return p.get();
+        }
+    }
+    return nullptr;
+}
+
 void CanvasView::rebuildPages() {
+    geometry.allPagesGoing();
     pages.clear();
     Document* doc = session.getDocument();
     size_t n = 0;
@@ -182,6 +193,7 @@ void CanvasView::rebuildPages() {
         pages.push_back(std::make_unique<CanvasPage>(*this, doc->getPage(i)));
     }
     refreshLayout();
+    geometry.pagesChanged();
 }
 
 DocumentLayout::Config CanvasView::layoutConfig() const {
@@ -1258,13 +1270,16 @@ void CanvasView::pageInserted(size_t page) {
     pages.insert(pages.begin() + static_cast<std::ptrdiff_t>(std::min(page, pages.size())),
                  std::make_unique<CanvasPage>(*this, std::move(ref)));
     refreshLayout();
+    geometry.pagesChanged();  // a page moved elsewhere comes back as a new one
 }
 
 void CanvasView::pageDeleted(size_t page) {
     if (page < pages.size()) {
+        geometry.pageGoing(pages[page].get());
         pages.erase(pages.begin() + static_cast<std::ptrdiff_t>(page));
     }
     refreshLayout();
+    geometry.pagesChanged();
 }
 
 void CanvasView::pageSelected(size_t) {}

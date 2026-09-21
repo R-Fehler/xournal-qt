@@ -10,6 +10,8 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <functional>
+
 #include <QMouseEvent>
 #include <QPointingDevice>
 #include <QTabletEvent>
@@ -364,6 +366,46 @@ void touch2(CanvasInput& input, const QPointingDevice& screen, QEvent::Type type
     QEventPoint p2(2, state, b, b);
     QTouchEvent e(type, &screen, Qt::NoModifier, {p1, p2});
     input.touchEvent(&e, [](QPointF scene) { return scene; });
+}
+
+struct Finger {
+    int id;
+    QEventPoint::State state;
+    QPointF pos;
+};
+/// Any number of fingers in one event (view coordinates).
+void touchN(CanvasInput& input, const QPointingDevice& screen, QEvent::Type type, const std::vector<Finger>& fingers) {
+    QList<QEventPoint> points;
+    for (const Finger& f: fingers) {
+        points.append(QEventPoint(f.id, f.state, f.pos, f.pos));
+    }
+    QTouchEvent e(type, &screen, Qt::NoModifier, points);
+    input.touchEvent(&e, [](QPointF scene) { return scene; });
+}
+
+/// Where two fingers are at step `i` of `steps` (view coordinates).
+using FingerPath = std::function<std::pair<QPointF, QPointF>(int i, int steps)>;
+
+/// A two-finger gesture as a hand makes it: one finger lands, then the other; both move along `path`; then they
+/// are lifted one after the other.
+void twoFingerGesture(CanvasInput& input, const QPointingDevice& screen, const FingerPath& path, int steps = 12) {
+    using S = QEventPoint::State;
+    const auto [a0, b0] = path(0, steps);
+    touchN(input, screen, QEvent::TouchBegin, {{1, S::Pressed, a0}});
+    touchN(input, screen, QEvent::TouchUpdate, {{1, S::Stationary, a0}, {2, S::Pressed, b0}});
+    for (int i = 1; i <= steps; ++i) {
+        const auto [a, b] = path(i, steps);
+        touchN(input, screen, QEvent::TouchUpdate, {{1, S::Updated, a}, {2, S::Updated, b}});
+    }
+    const auto [a1, b1] = path(steps, steps);
+    touchN(input, screen, QEvent::TouchUpdate, {{1, S::Stationary, a1}, {2, S::Released, b1}});
+    touchN(input, screen, QEvent::TouchEnd, {{1, S::Released, a1}});
+}
+
+QPointF turned(QPointF p, QPointF around, double angle) {
+    const QPointF d = p - around;
+    return around + QPointF(d.x() * std::cos(angle) - d.y() * std::sin(angle),
+                            d.x() * std::sin(angle) + d.y() * std::cos(angle));
 }
 
 /// One finger dragging upwards; returns how far the view scrolled.
@@ -816,6 +858,323 @@ TEST_F(CanvasReplayTest, twoFingersOnTheSetsquareTurnAndSizeIt) {
     touch2(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, QPointF(180, 500), QPointF(300, 500));
     EXPECT_GT(vc.zoom(), zoom) << "the fingers zoom where the tool is not";
     geometry.hide();
+}
+
+// --- The setsquare in the hands of the user: carried, turned and sized with two fingers, dragged with the right
+// button, as the touch screen and the mouse send it. The setsquare lies in the middle of the first page; the fingers
+// go down on the triangle 2 cm below its long edge, 3 cm apart.
+namespace {
+struct OnTheSetsquare {
+    QPointF pageMiddle;   ///< of the finger pair, page coordinates
+    QPointF viewMiddle;   ///< the same on the screen
+    double spread = 0;    ///< half the distance of the fingers, screen pixels
+};
+}  // namespace
+
+#define SETSQUARE_UNDER_TWO_FINGERS()                                                                              \
+    auto& geometry = view->geometryTool();                                                                         \
+    geometry.toggle(GeometryToolType::SETSQUARE);                                                                  \
+    ASSERT_TRUE(geometry.visible());                                                                               \
+    const auto firstPage = session->getDocument()->getPage(0);                                                     \
+    const QPointF pageMiddle(firstPage->getWidth() / 2, firstPage->getHeight() / 2);                              \
+    OnTheSetsquare on;                                                                                             \
+    on.pageMiddle = pageMiddle + QPointF(0, 2 * CM);                                                               \
+    on.viewMiddle = viewPos(0, on.pageMiddle);                                                                     \
+    on.spread = 1.5 * CM * view->getViewController().zoom();                                                       \
+    ASSERT_TRUE(geometry.contains(on.pageMiddle))
+
+TEST_F(CanvasReplayTest, carryingTheSetsquareWithTwoFingersNeitherTurnsNorSizesIt) {
+    SETSQUARE_UNDER_TWO_FINGERS();
+    const double zoom = view->getViewController().zoom();
+    const QPointF middle = geometry.middle();
+    const double rotation = geometry.rotation();
+    const double height = geometry.height();
+    // Carried 80 px right and 50 down; fingers are never quite steady: their angle wobbles by a degree, their
+    // distance by 2 %
+    const QPointF by(80, 50);
+    twoFingerGesture(*input, touchscreen, [&](int i, int steps) {
+        const double wobble = (i % 2 ? 1.0 : -1.0) * M_PI / 180 * (i > 0);
+        const double spread = on.spread * (1 + (i % 2 ? 0.02 : -0.02) * (i > 0));
+        const QPointF c = on.viewMiddle + by * i / steps;
+        return std::pair{turned(c - QPointF(spread, 0), c, wobble), turned(c + QPointF(spread, 0), c, wobble)};
+    });
+    EXPECT_NEAR(geometry.middle().x(), middle.x() + by.x() / zoom, 0.5) << "it went along with the fingers";
+    EXPECT_NEAR(geometry.middle().y(), middle.y() + by.y() / zoom, 0.5);
+    EXPECT_DOUBLE_EQ(geometry.rotation(), rotation) << "a finger wobble does not turn it";
+    EXPECT_DOUBLE_EQ(geometry.height(), height) << "nor size it";
+}
+
+TEST_F(CanvasReplayTest, turningTheSetsquareWithTwoFingersTurnsItAroundThem) {
+    SETSQUARE_UNDER_TWO_FINGERS();
+    const double rotation = geometry.rotation();
+    const double height = geometry.height();
+    const QPointF underTheFingers = geometry.pageToTool(on.pageMiddle);
+    const double twist = 40 * M_PI / 180;
+    twoFingerGesture(
+            *input, touchscreen,
+            [&](int i, int steps) {
+                const double a = twist * i / steps;
+                return std::pair{turned(on.viewMiddle - QPointF(on.spread, 0), on.viewMiddle, a),
+                                 turned(on.viewMiddle + QPointF(on.spread, 0), on.viewMiddle, a)};
+            },
+            20);
+    EXPECT_NEAR(geometry.rotation() - rotation, twist - GeometryToolLayer::TURN_SLOP, 0.3 * M_PI / 180)
+            << "turned with the fingers (minus the little the fingers may turn without turning it)";
+    EXPECT_DOUBLE_EQ(geometry.height(), height) << "and not sized";
+    const QPointF nowThere = geometry.toolToPage(underTheFingers);
+    EXPECT_NEAR(nowThere.x(), on.pageMiddle.x(), 1) << "turned around the fingers: what was under them still is";
+    EXPECT_NEAR(nowThere.y(), on.pageMiddle.y(), 1);
+}
+
+TEST_F(CanvasReplayTest, spreadingTwoFingersSizesTheSetsquareAroundThem) {
+    SETSQUARE_UNDER_TWO_FINGERS();
+    const double rotation = geometry.rotation();
+    const double height = geometry.height();
+    const QPointF underTheFingers = geometry.pageToTool(on.pageMiddle);
+    twoFingerGesture(*input, touchscreen, [&](int i, int steps) {
+        const double spread = on.spread * (1 + 0.5 * i / steps);
+        return std::pair{on.viewMiddle - QPointF(spread, 0), on.viewMiddle + QPointF(spread, 0)};
+    });
+    EXPECT_NEAR(geometry.height(), height * 1.5 / (1 + GeometryToolLayer::SIZE_SLOP), 0.02 * height)
+            << "half as big again (minus the little the fingers may spread without sizing it)";
+    EXPECT_DOUBLE_EQ(geometry.rotation(), rotation) << "and not turned";
+    // What was under the fingers is still under them: the tool grew around them (the same spot of the bigger tool
+    // is that much farther from its middle, in centimetres)
+    const QPointF nowThere = geometry.toolToPage(underTheFingers * geometry.height() / height);
+    EXPECT_NEAR(nowThere.x(), on.pageMiddle.x(), 1);
+    EXPECT_NEAR(nowThere.y(), on.pageMiddle.y(), 1);
+}
+
+TEST_F(CanvasReplayTest, turningPastTheBackOfTheCircleDoesNotSpinTheSetsquare) {
+    SETSQUARE_UNDER_TWO_FINGERS();
+    using S = QEventPoint::State;
+    // The line from the first to the second finger points to the left (180 degrees) and turns on through it
+    const auto at = [&](double angle) {
+        return std::pair{turned(on.viewMiddle - QPointF(on.spread, 0), on.viewMiddle, angle),
+                         turned(on.viewMiddle + QPointF(on.spread, 0), on.viewMiddle, angle)};
+    };
+    const double start = 160 * M_PI / 180;
+    auto [a, b] = at(start);
+    // (The fingers are set down the other way round: the second finger left of the first)
+    touchN(*input, touchscreen, QEvent::TouchBegin, {{1, S::Pressed, b}, {2, S::Pressed, a}});
+    double last = geometry.rotation();
+    const double first = last;
+    for (int i = 1; i <= 20; ++i) {
+        std::tie(a, b) = at(start + 40 * M_PI / 180 * i / 20);
+        touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Updated, b}, {2, S::Updated, a}});
+        EXPECT_LT(std::abs(std::remainder(geometry.rotation() - last, 2 * M_PI)), 5 * M_PI / 180)
+                << "no sudden turn at step " << i;
+        last = geometry.rotation();
+    }
+    touchN(*input, touchscreen, QEvent::TouchEnd, {{1, S::Released, b}, {2, S::Released, a}});
+    EXPECT_NEAR(geometry.rotation() - first, 40 * M_PI / 180 - GeometryToolLayer::TURN_SLOP, 0.3 * M_PI / 180)
+            << "40 degrees, the same as anywhere else on the circle";
+}
+
+TEST_F(CanvasReplayTest, liftingOneOfTwoFingersNeitherScrollsNorMakesTheSetsquareJump) {
+    SETSQUARE_UNDER_TWO_FINGERS();
+    using S = QEventPoint::State;
+    auto& vc = view->getViewController();
+    const double zoom = vc.zoom();
+    QPointF a = on.viewMiddle - QPointF(on.spread, 0);
+    QPointF b = on.viewMiddle + QPointF(on.spread, 0);
+    touchN(*input, touchscreen, QEvent::TouchBegin, {{1, S::Pressed, a}, {2, S::Pressed, b}});
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Updated, a + QPointF(20, 0)}, {2, S::Updated, b + QPointF(20, 0)}});
+    a += QPointF(20, 0);
+    b += QPointF(20, 0);
+    const QPointF middle = geometry.middle();
+    const double rotation = geometry.rotation();
+    const double height = geometry.height();
+    const double scrolled = vc.visibleContentRect().top();
+
+    // The second finger goes up; the first one wanders on alone
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Stationary, a}, {2, S::Released, b}});
+    for (int i = 1; i <= 6; ++i) {
+        touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Updated, a + QPointF(0, 20 * i)}});
+    }
+    a += QPointF(0, 120);
+    EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), scrolled) << "the finger left over does not scroll the page";
+    EXPECT_EQ(geometry.middle(), middle) << "nor carry the setsquare";
+
+    // It comes down again somewhere else - far away and at another angle: nothing jumps
+    const QPointF c = a + QPointF(-60, 150);
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Stationary, a}, {3, S::Pressed, c}});
+    EXPECT_EQ(geometry.middle(), middle) << "no jump when the finger comes back";
+    EXPECT_DOUBLE_EQ(geometry.rotation(), rotation);
+    EXPECT_DOUBLE_EQ(geometry.height(), height);
+
+    // and from there both carry it on
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Updated, a + QPointF(30, 0)}, {3, S::Updated, c + QPointF(30, 0)}});
+    touchN(*input, touchscreen, QEvent::TouchEnd, {{1, S::Released, a + QPointF(30, 0)}, {3, S::Released, c + QPointF(30, 0)}});
+    EXPECT_NEAR(geometry.middle().x(), middle.x() + 30 / zoom, 0.5);
+    EXPECT_NEAR(geometry.middle().y(), middle.y(), 0.5);
+    EXPECT_NEAR(geometry.rotation(), rotation, 1e-9);
+}
+
+TEST_F(CanvasReplayTest, aThirdFingerOnTheSetsquareLeavesNoGhostBehind) {
+    SETSQUARE_UNDER_TWO_FINGERS();
+    using S = QEventPoint::State;
+    const QPointF a = on.viewMiddle - QPointF(on.spread, 0);
+    const QPointF b = on.viewMiddle + QPointF(on.spread, 0);
+    const QPointF c = on.viewMiddle + QPointF(0, 40);
+    touchN(*input, touchscreen, QEvent::TouchBegin, {{1, S::Pressed, a}, {2, S::Pressed, b}});
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Stationary, a}, {2, S::Stationary, b}, {3, S::Pressed, c}});
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Stationary, a}, {2, S::Stationary, b}, {3, S::Released, c}});
+    touchN(*input, touchscreen, QEvent::TouchEnd, {{1, S::Released, a}, {2, S::Released, b}});
+    geometry.hide();
+    // All fingers are up: the next finger is a new touch and scrolls the page as always
+    processEvents();
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 50) << "the touch before it has ended";
+}
+
+TEST_F(CanvasReplayTest, aQuickTwoFingerTurnOfTheSetsquareIsNotAnUndo) {
+    drawLine(0, QPointF(80, 80), QPointF(200, 80));
+    processEvents(1100);  // the palm rejection ignores touch for a second after the pen wrote
+    const size_t strokes = elementCount(0);
+    SETSQUARE_UNDER_TWO_FINGERS();
+    // Two fingers on the tool, a quick little turn, and up again - faster than a two-finger tap
+    twoFingerGesture(*input, touchscreen, [&](int i, int steps) {
+        const double a = 20 * M_PI / 180 * i / steps;
+        return std::pair{turned(on.viewMiddle - QPointF(on.spread, 0), on.viewMiddle, a),
+                         turned(on.viewMiddle + QPointF(on.spread, 0), on.viewMiddle, a)};
+    }, 3);
+    processEvents();
+    EXPECT_EQ(elementCount(0), strokes) << "handling the setsquare must not undo the last stroke";
+}
+
+TEST_F(CanvasReplayTest, theRightButtonDragsTheSetsquareAcrossThePages) {
+    auto& geometry = view->geometryTool();
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    const double zoom = view->getViewController().zoom();
+    const auto firstPage = session->getDocument()->getPage(0);
+    const QPointF grab = viewPos(0, QPointF(firstPage->getWidth() / 2, firstPage->getHeight() / 2 + 2 * CM));
+    const QPointF middle = geometry.middle();
+    // Down, over the gap between the pages and onto the second one
+    mouse(QEvent::MouseButtonPress, grab, Qt::RightButton, Qt::RightButton);
+    for (int i = 1; i <= 40; ++i) {
+        mouse(QEvent::MouseMove, grab + QPointF(0, 25 * i), Qt::NoButton, Qt::RightButton);
+        ASSERT_NEAR(geometry.middle().y(), middle.y() + 25 * i / zoom, 0.5) << "it follows the pointer, step " << i;
+    }
+    mouse(QEvent::MouseButtonRelease, grab + QPointF(0, 1000), Qt::RightButton, Qt::NoButton);
+    EXPECT_NEAR(geometry.middle().x(), middle.x(), 0.5);
+}
+
+TEST_F(CanvasReplayTest, theSetsquareOnlyGuidesOnItsOwnPage) {
+    auto& geometry = view->geometryTool();
+    auto& vc = view->getViewController();
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    const auto secondPage = session->getDocument()->getPage(1);
+    const QPointF middle(secondPage->getWidth() / 2, secondPage->getHeight() / 2);
+    // On the second page, where the setsquare would lie if it were on that one: a free line
+    drawLine(1, middle + QPointF(-60, 6), middle + QPointF(60, 6));
+    processEvents();
+    const Stroke* line = nullptr;
+    for (const Element* e: secondPage->getSelectedLayer()->getElementsView()) {
+        if (e->getType() == ELEMENT_STROKE) {
+            line = static_cast<const Stroke*>(e);
+        }
+    }
+    ASSERT_NE(line, nullptr);
+    EXPECT_NEAR(line->getPoint(0).y, middle.y() + 6, 1) << "the setsquare lies on the first page";
+
+    // Two fingers on that place of the second page zoom the page, they do not grab the setsquare
+    processEvents(1100);  // (palm rejection after the pen)
+    const QPointF toolMiddle = geometry.middle();
+    const double zoom = vc.zoom();
+    const QPointF c = viewPos(1, middle + QPointF(0, 2 * CM));
+    const double spread = 1.5 * CM * zoom;
+    twoFingerGesture(*input, touchscreen, [&](int i, int steps) {
+        const double s = spread * (1 + 0.6 * i / steps);
+        return std::pair{c - QPointF(s, 0), c + QPointF(s, 0)};
+    });
+    EXPECT_GT(vc.zoom(), zoom * 1.2) << "the page was zoomed";
+    EXPECT_EQ(geometry.middle(), toolMiddle) << "the setsquare stayed where it was";
+}
+
+TEST_F(CanvasReplayTest, withStepsTwoFingersTurnTheSetsquareStepByStepAroundThem) {
+    SETSQUARE_UNDER_TWO_FINGERS();
+    geometry.setAngleSteps(true);
+    const QPointF underTheFingers = geometry.pageToTool(on.pageMiddle);
+    double last = geometry.rotation();
+    const double twist = 40 * M_PI / 180;
+    twoFingerGesture(
+            *input, touchscreen,
+            [&](int i, int steps) {
+                // every position of the fingers: the tool stands on a step
+                EXPECT_NEAR(std::remainder(geometry.rotation(), GeometryToolLayer::ANGLE_STEP), 0, 1e-9);
+                last = geometry.rotation();
+                const double a = twist * i / steps;
+                return std::pair{turned(on.viewMiddle - QPointF(on.spread, 0), on.viewMiddle, a),
+                                 turned(on.viewMiddle + QPointF(on.spread, 0), on.viewMiddle, a)};
+            },
+            20);
+    EXPECT_NEAR(geometry.rotation(), 2 * GeometryToolLayer::ANGLE_STEP, 1e-9) << "37 degrees: the step of 30";
+    const QPointF nowThere = geometry.toolToPage(underTheFingers);
+    EXPECT_NEAR(nowThere.x(), on.pageMiddle.x(), 1) << "turned by its steps around the fingers";
+    EXPECT_NEAR(nowThere.y(), on.pageMiddle.y(), 1);
+}
+
+TEST_F(CanvasReplayTest, heldToAStrokeTwoFingersSlideTheSetsquareAlongIt) {
+    {
+        const auto page = session->getDocument()->getPage(0);
+        const QPointF centre(page->getWidth() / 2, page->getHeight() / 2);
+        drawLine(0, centre + QPointF(-200, 0), centre + QPointF(200, 0));  // right through the setsquare's middle
+    }
+    processEvents(1100);  // (palm rejection after the pen)
+    SETSQUARE_UNDER_TWO_FINGERS();
+    ASSERT_TRUE(geometry.holdToStroke());
+    const double zoom = view->getViewController().zoom();
+    const QPointF middle = geometry.middle();
+    // Carried to the lower right and turned a little: it slides right along the stroke and turns about its middle
+    twoFingerGesture(*input, touchscreen, [&](int i, int steps) {
+        const double a = 20 * M_PI / 180 * i / steps;
+        const QPointF c = on.viewMiddle + QPointF(90, 60) * i / steps;
+        return std::pair{turned(c - QPointF(on.spread, 0), c, a), turned(c + QPointF(on.spread, 0), c, a)};
+    });
+    EXPECT_NEAR(geometry.middle().x(), middle.x() + 90 / zoom, 1) << "along the stroke";
+    EXPECT_NEAR(geometry.middle().y(), middle.y(), 1) << "and not off it";
+    EXPECT_NEAR(geometry.rotation(), 20 * M_PI / 180 - GeometryToolLayer::TURN_SLOP, 0.3 * M_PI / 180);
+    EXPECT_TRUE(geometry.heldToStroke()) << "it holds on until the magnet is tapped again";
+}
+
+TEST_F(CanvasReplayTest, theSetsquareStaysOnItsPageWhenThePageMovesAndGoesAsideWhenItIsDeleted) {
+    auto& geometry = view->geometryTool();
+    session->insertNewPage(2);  // three pages
+    processEvents();
+    geometry.toggle(GeometryToolType::SETSQUARE);  // on the current page
+    ASSERT_NE(geometry.page(), nullptr);
+    const PageRef itsPage = geometry.page()->getPage();
+    const auto indexOfItsPage = [&] {
+        const auto order = session->pageOrder();
+        return static_cast<size_t>(std::find(order.begin(), order.end(), itsPage) - order.begin());
+    };
+    geometry.moveBy(QPointF(20, 30));
+    const QPointF middle = geometry.middle();
+
+    // Its page moves to the front: the setsquare goes with it, where it lay on it
+    ASSERT_NE(indexOfItsPage(), 0u);
+    ASSERT_TRUE(session->movePages({indexOfItsPage()}, 0));
+    processEvents();
+    ASSERT_EQ(indexOfItsPage(), 0u);
+    EXPECT_TRUE(geometry.visible()) << "still out";
+    ASSERT_NE(geometry.page(), nullptr);
+    EXPECT_EQ(geometry.page()->getPage(), itsPage) << "on the page it lay on";
+    EXPECT_EQ(geometry.middle(), middle);
+    EXPECT_TRUE(geometry.page()->hasOverlays()) << "and drawn there";
+    // It still guides the pen on that page
+    EXPECT_NEAR(geometry.snap(middle + QPointF(40, 5)).y(), middle.y(), 0.5);
+
+    // The page is deleted: the setsquare is put aside (its pill stays), and a tap brings it onto the current page
+    ASSERT_TRUE(session->deletePages({indexOfItsPage()}));
+    processEvents();
+    EXPECT_FALSE(geometry.visible());
+    EXPECT_TRUE(geometry.minimized()) << "put aside, not lost";
+    EXPECT_EQ(geometry.page(), nullptr);
+    geometry.setMinimized(false);
+    EXPECT_TRUE(geometry.visible());
+    ASSERT_NE(geometry.page(), nullptr);
+    EXPECT_NE(geometry.page()->getPage(), itsPage);
+    // (and the view goes with the setsquare out: nothing is left pointing at a page that is gone)
 }
 
 TEST_F(CanvasReplayTest, twoTapsZoomInAndOutAgain) {

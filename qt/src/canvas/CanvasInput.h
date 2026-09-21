@@ -136,9 +136,14 @@ private:
     bool touchSelection = false;
     int touchSelectionId = -1;
     /// Two fingers on the setsquare / compass turn and size it instead of zooming the page
-    bool pinchingGeometryTool = false;
-    double lastPinchAngle = 0;
-    double lastPinchDistance = 1;
+    /// A touch that went down with two fingers on the setsquare / compass: it belongs to the tool until the last
+    /// finger is up (no scrolling, zooming, tapping or undo meanwhile)
+    bool toolGesture = false;
+    /// The two fingers the tool follows; other ones (a finger lifted, another one down) start measuring anew
+    std::pair<int, int> toolGestureFingers{-1, -1};
+    /// The setsquare / compass under this place of the view (in the coordinates of its page)?
+    bool onGeometryTool(QPointF viewPos) const;
+    QPointF onGeometryPage(QPointF viewPos) const;
     double touchSessionTravel = 0;
     QPointF touchSessionStartPos;
     QPointF pressViewPos;

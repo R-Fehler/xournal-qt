@@ -353,6 +353,7 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
         currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
+        currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
         // Whoever changes the selection (a press on the page, copying, marking, a page change): the knobs and the

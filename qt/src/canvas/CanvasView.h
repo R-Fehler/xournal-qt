@@ -165,6 +165,8 @@ public:
     void scrollToPdfSelection();
     /// The selected PDF text ("" if none).
     std::string selectedPdfText() const;
+    /// The canvas page showing this page of the document (none: not shown).
+    CanvasPage* canvasPageOf(const XojPage* page) const;
     /// Draw the marks of the setsquare's scale onto its page, every `spacingCm`, with the pen's color and width (one
     /// step to undo). False when there is no setsquare out.
     bool drawGeometryMarks(double spacingCm);
@@ -222,6 +224,8 @@ Q_SIGNALS:
     /// PDF text was selected (Select mode): the UI offers marking / copying it; rect in view coordinates.
     void pdfTextSelected(QRectF viewRect);
     void pdfTextSelectionCleared();
+    /// The setsquare / compass changed on its own (e.g. put aside because its page went).
+    void geometryChanged();
 
 private:
     void rebuildPages();

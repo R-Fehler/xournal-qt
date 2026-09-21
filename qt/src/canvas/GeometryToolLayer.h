@@ -7,6 +7,10 @@
  * usual. Pen and left button always draw: on the tool and just around it the line follows the nearest edge - the
  * three edges of the setsquare, the circle of the compass - so it works like a real ruler.
  *
+ * It lies on one page of the document. The canvas makes its pages anew now and then (pages inserted, deleted or
+ * moved, a document read again, the view closed): it tells the layer before a page of its goes and after the pages
+ * changed, and the tool is put back onto the page it lies on - or aside, when that page is gone.
+ *
  * @license GNU GPLv2 or later
  */
 #pragma once
@@ -39,15 +43,33 @@ public:
     /// Take it away altogether.
     void hide();
     /// It is out and to be seen: drawn on its page, guiding the pen, moved by fingers.
-    bool visible() const { return tool != nullptr && !isMinimized; }
+    bool visible() const { return tool != nullptr && !isMinimized && onPage != nullptr; }
     /// It is out, maybe only minimized (put aside for a moment: not shown, not guiding, but where it was).
     bool active() const { return tool != nullptr; }
     bool minimized() const { return tool != nullptr && isMinimized; }
     /// Put it aside / bring it back on the current page, where it lay and as it was turned.
     void setMinimized(bool minimized);
     std::optional<GeometryToolType> type() const;
-    /// The page it lies on (none if it is not out).
+    /// The canvas page it lies on (none if it is not out, or put aside).
     CanvasPage* page() const { return onPage; }
+
+    // The canvas pages change under it (see above)
+    /// This canvas page goes (with the views on it).
+    void pageGoing(const CanvasPage* page);
+    /// All canvas pages go.
+    void allPagesGoing();
+    /// The canvas pages changed: onto its page again, or aside if the page is gone.
+    void pagesChanged();
+
+    /// Two fingers on it. `centre` is the middle between them (in the coordinates of the tool's page), `angle` and
+    /// `distance` those of the line from the one to the other (screen). Every step is measured from where the
+    /// fingers came down, so nothing adds up or drifts: the tool is carried with the fingers exactly, turns around
+    /// them and grows or shrinks around them - the turning and sizing only once the fingers clearly turn or spread
+    /// (TURN_SLOP, SIZE_SLOP), so that carrying it does not turn or size it a little. Held to a stroke, it slides
+    /// along that and turns around its middle.
+    void beginGesture(QPointF centre, double angle, double distance);
+    void moveGesture(QPointF centre, double angle, double distance);
+    void endGesture() { inGesture = false; }
 
     /// A point (page coordinates) is on the tool.
     bool contains(QPointF pagePoint) const;
@@ -70,6 +92,16 @@ public:
     double height() const;
     /// Where its middle is (the 0 of the setsquare's scale, the centre of the compass), page coordinates.
     QPointF middle() const;
+    /// A point of the page in the tool's own coordinates (centimetres from its middle), and back.
+    QPointF pageToTool(QPointF pagePoint) const;
+    QPointF toolToPage(QPointF toolPoint) const;
+    /// Two fingers have to turn this far (radians) / spread this much (share) before the tool turns / grows, so that
+    /// carrying it does not also turn or size it a little.
+    static constexpr double TURN_SLOP = 3 * M_PI / 180;
+    static constexpr double SIZE_SLOP = 0.06;
+    /// How small and how big it can be made (centimetres)
+    static constexpr double MIN_HEIGHT_CM = 2;
+    static constexpr double MAX_HEIGHT_CM = 30;
 
     /// Short lines at the marks of the setsquare's scale, every `spacingCm` along its long edge and on the outer side
     /// of it (whole centimetres a little longer), as page coordinates. None for the compass or when it is not out.
@@ -86,10 +118,25 @@ public:
 private:
     void place(CanvasPage& page);
     void remove();
+    /// Tell the tool's view where it is now (and draw the tool anew only when its size changed).
+    void changed(bool resized);
 
     CanvasView& view;
     std::unique_ptr<GeometryTool> tool;
     CanvasPage* onPage = nullptr;
+    /// The page of the document it lies on (outlives the canvas pages)
+    std::weak_ptr<XojPage> onDocumentPage;
+    struct Gesture {
+        QPointF centre;       ///< where the fingers' middle began
+        QPointF middle;       ///< where the tool's middle was then
+        double rotation = 0;  ///< how it was turned then (and freely, under the steps)
+        double freeRotation = 0;
+        double height = 0;
+        double distance = 1;  ///< of the fingers then
+        double lastAngle = 0;
+        double twist = 0;  ///< how far the fingers turned since (added up in small steps: no jump at +-180 degrees)
+    } gesture;
+    bool inGesture = false;
     bool isMinimized = false;
     /// The stroke it slides along (a copy of its points, page coordinates), and the page it is on
     std::vector<QPointF> path;

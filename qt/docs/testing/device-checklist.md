@@ -266,6 +266,14 @@ cd build-qt
 - [ ] The eraser end of the pen is not guided: it rubs out what lies under the tool, not only along its edge.
 - [ ] Two fingers on the tool carry it along, turn it and size it (the page keeps its zoom and place); one finger
       on it scrolls as everywhere else; two fingers next to it zoom as always.
+- [ ] Carrying it with two fingers does not turn or size it a little on the way; turning it keeps under the fingers
+      what was under them; it follows smoothly, also turned all the way around, and without lag.
+- [ ] Lift one of the two fingers and move the other: neither the page nor the tool moves. Put the finger back
+      anywhere: nothing jumps, and the two carry on.
+- [ ] A quick two-finger turn or push of the tool never undoes the last stroke.
+- [ ] Right mouse button on the tool, drag down onto the next page: it follows the pointer all the way.
+- [ ] Move the tool's page elsewhere in the sidebar: the tool stays on it. Delete that page: the tool is put aside
+      (small pill); tapping the pill brings it onto the page one is at. Close the tab with the tool out: no crash.
 - [ ] Right mouse button pressed on the tool and dragged: it moves along (no menu appears); beside the tool the
       right button offers the actions as before.
 - [ ] Shapes tool → "Compass": drawing anywhere on its disc gives an arc of its radius; the same entry again takes
