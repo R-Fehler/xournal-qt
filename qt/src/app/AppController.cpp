@@ -334,6 +334,12 @@ void AppController::currentTabChanged() {
                 connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::undoRedoChanged));
         currentConnections.push_back(
                 connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::pageUndoChanged));
+        // Undoing a page change says so: the page that changed may be far from the one in view
+        currentConnections.push_back(connect(s, &DocumentSession::pageActionUndone, this,
+                                             [this](const QString& text, bool undone) {
+                                                 Q_EMIT pageActionDone(
+                                                         (undone ? tr("Undone: %1") : tr("Redone: %1")).arg(text), false);
+                                             }));
         currentConnections.push_back(connect(s, &DocumentSession::filePathChanged, this, &AppController::titleChanged));
         currentConnections.push_back(
                 connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
@@ -1714,7 +1720,7 @@ bool AppController::changePageBackground(const QList<int>& pages, int background
     if (changed.empty()) {
         return false;
     }
-    s->getPageUndoRedoHandler()->addUndoAction(std::move(group));
+    s->addPageUndoAction(std::move(group));
     for (size_t index: changed) {
         type.isSpecial() ? s->firePageSizeChanged(index) : s->firePageChanged(index);
     }

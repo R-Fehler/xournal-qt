@@ -130,7 +130,7 @@ class AppController: public QObject {
     Q_PROPERTY(int pairsOffset READ pairsOffset WRITE setPairsOffset NOTIFY viewLayoutChanged)
     /// Elements are selected on the canvas (select tools).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
-    // Page operations (sidebar, page grid) have their own undo stack
+    // Page operations (sidebar, page grid) go onto the one undo stack of the document (these are the same as undo)
     Q_PROPERTY(bool canUndoPages READ canUndoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(bool canRedoPages READ canRedoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(int copiedPages READ copiedPages NOTIFY copiedPagesChanged)
@@ -373,7 +373,7 @@ public:
     Q_INVOKABLE void clearPdfTextSelection();
     /// Insert `count` new pages before `position` (0-based; page count: at the end): background `background` (index
     /// in the settings' pageBackgrounds), paper `paper` (index in paperFormats; -1: the size of the current page),
-    /// portrait or landscape. One step on the page undo stack.
+    /// portrait or landscape. One step to undo.
     Q_INVOKABLE bool insertPages(int position, int background, int paper, bool landscape, int count = 1);
     /// Give these pages another background (index in the settings' pageBackgrounds); one undo step.
     Q_INVOKABLE bool changePageBackground(const QList<int>& pages, int background);

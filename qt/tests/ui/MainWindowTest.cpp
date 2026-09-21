@@ -1969,6 +1969,38 @@ TEST_F(MainWindowTest, searchShortcutsForAllDocumentsAndTheLibrary) {
     EXPECT_FALSE(controller->homeVisible());
 }
 
+// One undo stack, as in upstream: Ctrl+N adds a page, Ctrl+Z on the page (or the undo button of the pill) takes it
+// away again, and a notice says what was undone - the page may be out of view.
+TEST_F(MainWindowTest, addingAPageIsUndoneLikeEverythingElse) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    const int pages = controller->pageCount();
+    auto* snackbar = find<QQuickItem>("snackbar");
+    auto* snackbarText = findItem("snackbarText");
+    ASSERT_NE(snackbar, nullptr);
+    ASSERT_NE(snackbarText, nullptr);
+
+    key(Qt::Key_N, Qt::ControlModifier);
+    ASSERT_EQ(controller->pageCount(), pages + 1) << "Ctrl+N adds a page";
+    EXPECT_TRUE(controller->canUndo()) << "the same undo as for writing";
+
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(controller->pageCount(), pages) << "Ctrl+Z takes it away";
+    until([&] { return snackbar->isVisible(); });
+    EXPECT_TRUE(snackbar->isVisible());
+    EXPECT_TRUE(snackbarText->property("text").toString().startsWith(QStringLiteral("Undone:")))
+            << snackbarText->property("text").toString().toStdString();
+
+    key(Qt::Key_Y, Qt::ControlModifier);
+    EXPECT_EQ(controller->pageCount(), pages + 1) << "and redo brings it back";
+    until([&] { return snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")); });
+    EXPECT_TRUE(snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")));
+
+    // The undo button of the pill as well
+    click(find<QQuickItem>("undoButton"));
+    EXPECT_EQ(controller->pageCount(), pages);
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

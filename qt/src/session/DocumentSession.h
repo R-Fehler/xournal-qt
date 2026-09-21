@@ -143,8 +143,10 @@ public:
     void movePageTowardsEnd();
 
     // --- several pages at once (sidebar / page grid selection) --------------------------------------------------
-    /// Undo stack of the page structure (insert, delete, move, paste); the annotations have getUndoRedoHandler().
-    UndoRedoHandler* getPageUndoRedoHandler() const { return pageUndo.get(); }
+    /// The undo stack that page changes go onto: the one of everything (as in upstream), see addPageUndoAction().
+    UndoRedoHandler* getPageUndoRedoHandler() const { return undoRedo.get(); }
+    /// A change of the page structure onto the undo stack; undoing or redoing it emits pageActionUndone.
+    void addPageUndoAction(UndoActionPtr action);
     /// Delete pages (indices). Not all of them: a document keeps at least one page. False if nothing was deleted.
     bool deletePages(std::vector<size_t> pages);
     /// Insert pages (not yet in the document) before `position`.
@@ -170,6 +172,8 @@ public:
 Q_SIGNALS:
     void modifiedChanged(bool modified);
     void undoRedoStateChanged();
+    /// A page change was undone (or redone): its text ("Insert page", ...).
+    void pageActionUndone(const QString& text, bool undone);
     void filePathChanged();
     void currentPageChanged(qulonglong page);
     /// Reused upstream code wants a page to be shown (e.g. after undoing a page deletion).
@@ -196,7 +200,6 @@ private:
     AppContext& app;
     std::unique_ptr<Document> doc;
     std::unique_ptr<UndoRedoHandler> undoRedo;
-    std::unique_ptr<UndoRedoHandler> pageUndo;
     std::unique_ptr<LayerController> layerController;
     SessionActions actions;
     SessionWindow window;

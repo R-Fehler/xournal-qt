@@ -1,6 +1,6 @@
 // Drag and drop of pages in the sidebar list or the page grid: a card with the number of pages follows the pointer,
 // a bar shows where they go, and the view scrolls near its edges. Dropping moves the selected pages there
-// (one step on the page undo stack).
+// (one step to undo).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

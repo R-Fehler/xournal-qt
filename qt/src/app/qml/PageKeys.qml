@@ -1,5 +1,5 @@
 // Keyboard page operations in the sidebar and the page grid (they have the focus after a page was clicked):
-// Ctrl+C/X/V/D, Delete, Ctrl+A, and Ctrl+Z / Ctrl+Y on the page undo stack.
+// Ctrl+C/X/V/D, Delete, Ctrl+A, and Ctrl+Z / Ctrl+Y (the one undo stack of the document).
 import QtQuick
 
 QtObject {

@@ -1,6 +1,6 @@
 // Page sidebar: thumbnails of the current document. Tap a page to go there; Ctrl/Shift+click to select pages;
 // press and hold to drag the selected pages to another place; right click or ⋮ for the page menu; Ctrl+C/X/V,
-// Delete and Ctrl+Z (page undo) with the keyboard. While searching, pages with hits are framed and the list can
+// Delete and Ctrl+Z (the one undo of the document) with the keyboard. While searching, pages with hits are framed and the list can
 // be limited to them.
 import QtQuick
 import QtQuick.Controls

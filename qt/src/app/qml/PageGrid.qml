@@ -1,7 +1,7 @@
 // Grid of all pages of the current document over the canvas: fling through the whole document, tap a page to go
 // there. Zoom (pinch, Ctrl+wheel, −/+) changes the number of columns: bigger previews, fewer per row.
 // Search hits are marked on the previews. Pages can be selected (Ctrl/Shift+click, or "Select" for touch), copied,
-// pasted, deleted and dragged to another place (press and hold), with their own undo (see PageKeys).
+// pasted, deleted and dragged to another place (press and hold), undone like everything else (see PageKeys).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material

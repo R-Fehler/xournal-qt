@@ -157,7 +157,11 @@ cd build-qt
 ## Page operations
 - [ ] Sidebar: Ctrl+click / Shift+click select pages (blue, check mark); a plain tap goes to the page.
 - [ ] Ctrl+C, then Ctrl+V: the pages are pasted after the selection; pasting into another tab works (PDF pages keep their look).
-- [ ] Delete removes the selected pages; the note at the bottom offers Undo; Ctrl+Z in the sidebar/grid undoes page changes only, Ctrl+Z after drawing undoes ink.
+- [ ] Delete removes the selected pages; the note at the bottom offers Undo. There is one undo for everything:
+      Ctrl+Z (on the page, in the sidebar or grid) and the undo button of the pill take back the last change,
+      ink or pages alike.
+- [ ] Ctrl+N adds a page; Ctrl+Z takes it away again and a note says "Undone: Insert page"; Ctrl+Y brings it back
+      ("Redone: …").
 - [ ] Press and hold a page, drag it (or the selection) to another place in the sidebar or the grid: a bar shows the drop place, the view scrolls at the edges.
 - [ ] Page grid on touch: "Select", tap pages, then Copy / Cut / Paste / Duplicate / Delete in the bar.
 - [ ] Two-finger scrolling on the touchpad in the grid, sidebar and tab overview continues after lifting the fingers.
