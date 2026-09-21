@@ -1214,6 +1214,7 @@ ApplicationWindow {
         z: 50
         visible: app.homeVisible
         onOpenFileRequested: openDialog.open()
+        onSettingsRequested: settingsPage.open()
     }
 
     // Putting the tool bar away and getting it back: a small tab at its end, and a slim strip while it is away.

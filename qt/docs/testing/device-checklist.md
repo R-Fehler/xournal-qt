@@ -167,8 +167,11 @@ cd build-qt
 - [ ] Two-finger scrolling on the touchpad in the grid, sidebar and tab overview continues after lifting the fingers.
 
 ## Library and home screen
-- [ ] "Open where I left off" on the library (also Settings → Documents; off at first): a document closed at page 7
-      opens at page 7 again; off, it opens at its first page. Also after quitting the app.
+- [ ] "Last page" on the library (the same as "Open documents where they were left off" in Settings → Documents;
+      off at first): a document closed at page 7 opens at page 7 again; off, it opens at its first page. Also after
+      quitting the app.
+- [ ] The gear at the right end of the library opens the settings. At 1280 px width all buttons of that row are
+      there (the search field gets narrower).
 - [ ] "Names" beside the library search: on, only names are searched - of documents, and of folders in the folder
       view (the flat list shows none); a document that has the word only in its text is not found. Off: the full
       search again.

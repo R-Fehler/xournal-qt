@@ -42,6 +42,7 @@ Rectangle {
     }
     /// "Open a file" (the window's file dialog)
     signal openFileRequested()
+    signal settingsRequested()
 
     function formatDate(d) {
         if (!d || isNaN(d.getTime())) return ""
@@ -338,7 +339,11 @@ Rectangle {
             // Search in the whole library
             Rectangle {
                 visible: home.page === 0 && app.library.available
-                Layout.preferredWidth: Math.min(380, home.width * 0.34)
+                // As wide as there is room for, up to 380 (the buttons of the row come first on a narrow screen)
+                Layout.fillWidth: true
+                Layout.minimumWidth: 180
+                Layout.maximumWidth: 380
+                Layout.preferredWidth: 380
                 Layout.preferredHeight: 44
                 radius: 22
                 color: "#ffffff"
@@ -368,6 +373,8 @@ Rectangle {
                         Label {
                             anchors.verticalCenter: parent.verticalCenter
                             x: parent.leftPadding
+                            width: parent.width - parent.leftPadding - parent.rightPadding  // (a narrow field: …)
+                            elide: Text.ElideRight
                             visible: parent.text === "" && parent.preeditText === ""
                             text: qsTr("Search documents and folders")
                             color: "#8a8d91"
@@ -432,16 +439,30 @@ Rectangle {
 
             Item { Layout.fillWidth: true }
 
-            // The same as in the settings: open a document at the page where it was left
-            Switch {
+            // The same as in the settings: open a document at the page where it was left (a small toggle)
+            ToolButton {
+                id: resume
                 objectName: "resumeSwitch"
-                text: qsTr("Open where I left off")
-                font.pixelSize: 13
+                text: qsTr("Last page")
+                icon.source: app.iconUrl("xqt-history")
+                icon.width: 18
+                icon.height: 18
+                checkable: true
                 checked: (app.settings.revision, app.settings.get("resumeAtLastPage"))
                 onToggled: app.settings.set("resumeAtLastPage", checked)
+                implicitHeight: 40
+                font.pixelSize: 13
+                font.weight: checked ? Font.DemiBold : Font.Normal
+                Material.foreground: checked ? Material.accentColor : "#5f6368"
+                icon.color: checked ? Material.accentColor : "#5f6368"
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("Documents open at the page they were left at (else at their first page)")
+                ToolTip.text: checked ? qsTr("Documents open where they were left off - tap: at their first page")
+                                      : qsTr("Open documents where they were left off")
                 ToolTip.delay: 600
+                background: Rectangle {
+                    radius: 10
+                    color: resume.checked ? "#e0e3f5" : (resume.pressed ? "#e8e8e8" : "transparent")
+                }
             }
 
             IconButton {
@@ -518,6 +539,14 @@ Rectangle {
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Bigger cells (Ctrl+wheel, pinch)")
                 ToolTip.delay: 600
+            }
+            ToolSeparator {}
+            // (the tool bar with its menu is not there while the library is shown)
+            IconButton {
+                objectName: "homeSettingsButton"
+                iconName: "xqt-settings"
+                tip: qsTr("Settings (Ctrl+,)")
+                onClicked: home.settingsRequested()
             }
         }
 

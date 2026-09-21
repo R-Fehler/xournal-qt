@@ -748,6 +748,20 @@ TEST_F(HomeScreenTest, theLibrarySearchCanBeLimitedToNames) {
     EXPECT_FALSE(library->property("namesOnly").toBool()) << "the full search again";
 }
 
+// The library has a button for the settings (no tool bar there, and not everybody has a keyboard at hand).
+TEST_F(HomeScreenTest, theSettingsOpenFromTheLibrary) {
+    auto* button = find<QQuickItem>("homeSettingsButton");
+    ASSERT_NE(button, nullptr);
+    QObject* sheet = find("settingsPage");
+    ASSERT_NE(sheet, nullptr);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(800);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(button);
+    EXPECT_TRUE(waitOpened(sheet, true));
+}
+
 TEST_F(HomeScreenTest, shortLibrarySearchWaitsForEnter) {
     auto* field = find<QQuickItem>("librarySearchField");
     ASSERT_NE(field, nullptr);
