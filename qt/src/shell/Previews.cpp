@@ -72,6 +72,13 @@ QImage PreviewCache::preview(const DocumentItem& item) {
     if (img.load(cached, "PNG")) {
         return img;
     }
+    // Only one document is read and drawn at a time: reading a document (upstream's loader and poppler) is not
+    // made for several threads, and two workers asked for the same preview would write the same file twice.
+    static std::mutex renderMutex;
+    std::lock_guard renderLock(renderMutex);
+    if (img.load(cached, "PNG")) {
+        return img;  // another worker made it while we waited
+    }
     auto loaded = DocumentSession::loadFile(item.main());
     if (!loaded.document || loaded.document->getPageCount() == 0) {
         return {};
@@ -118,6 +125,11 @@ void PreviewCache::prune(const std::vector<DocumentItem>& items) {
             fs::remove(it->path(), rec);
         }
     }
+}
+
+void PreviewProvider::shutdown() {
+    pool().clear();
+    pool().waitForDone();
 }
 
 QQuickImageResponse* PreviewProvider::requestImageResponse(const QString& id, const QSize& /*requestedSize*/) {

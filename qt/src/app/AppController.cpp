@@ -43,6 +43,8 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
+#include "shell/HitPages.h"
+#include "shell/Previews.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/DocumentChapters.h"
@@ -235,6 +237,9 @@ void AppController::windowClosed() {
 }
 
 void AppController::shutdown() {
+    // The image workers draw with Qt: they must be done before the application takes its plugins away
+    PreviewProvider::shutdown();
+    HitPageProvider::shutdown();
     settingsView->end();  // settings screen still open: save its changes
     if (recovery) {
         recovery->finish();  // a normal exit: reopen these tabs next time

@@ -38,6 +38,11 @@ public:
 
 class PreviewProvider final: public QQuickAsyncImageProvider {
 public:
+    /// Let the workers finish (and drop what is still waiting): they draw with Qt, which must not happen while
+    /// the application is going away.
+    static void shutdown();
+
+public:
     QQuickImageResponse* requestImageResponse(const QString& id, const QSize& requestedSize) override;
 };
 

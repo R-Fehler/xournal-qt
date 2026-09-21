@@ -25,6 +25,8 @@ namespace xqt {
 
 class HitPageProvider final: public QQuickAsyncImageProvider {
 public:
+    /// Let the workers finish before the application goes away (they draw with Qt).
+    static void shutdown();
     QQuickImageResponse* requestImageResponse(const QString& id, const QSize& requestedSize) override;
 
     /// URL of a document's pages for a search; append "/<page>" (0-based).

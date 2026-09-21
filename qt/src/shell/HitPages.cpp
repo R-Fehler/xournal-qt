@@ -133,6 +133,9 @@ QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& 
     std::lock_guard lock(cached->mtx);
     if (!cached->loaded) {
         cached->loaded = true;
+        // One document is read at a time: the loader (and poppler behind it) is not made for several threads.
+        static std::mutex loading;
+        std::lock_guard loadLock(loading);
         cached->doc = DocumentSession::loadFile(item.main()).document;
     }
     Document* doc = cached->doc.get();
@@ -177,6 +180,11 @@ QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& 
 void HitPageProvider::clearCaches() { caches().clear(); }
 
 int HitPageProvider::renderCount() { return caches().renders; }
+
+void HitPageProvider::shutdown() {
+    pool().clear();
+    pool().waitForDone();
+}
 
 QQuickImageResponse* HitPageProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
     auto* response = new HitPageResponse;

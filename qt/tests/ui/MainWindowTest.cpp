@@ -64,8 +64,8 @@ protected:
         wait(100);
     }
     void TearDown() override {
+        controller->shutdown();  // first the image workers, then the engine that owns their providers
         engine.reset();
-        controller->shutdown();
         controller.reset();
     }
 
