@@ -258,6 +258,7 @@ cd build-qt
 - [ ] Shapes tool → "Setsquare": the triangle with its scales lies in the middle of the page; drawing with the pen
       on it or along one of its three edges gives a straight line along the nearest edge, away from it a free line.
 - [ ] The pen and the left mouse button never push the tool around, they always draw.
+- [ ] The eraser end of the pen is not guided: it rubs out what lies under the tool, not only along its edge.
 - [ ] Two fingers on the tool carry it along, turn it and size it (the page keeps its zoom and place); one finger
       on it scrolls as everywhere else; two fingers next to it zoom as always.
 - [ ] Right mouse button pressed on the tool and dragged: it moves along (no menu appears); beside the tool the

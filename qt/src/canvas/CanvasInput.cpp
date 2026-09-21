@@ -281,8 +281,10 @@ PositionInputData CanvasInput::getInputDataRelativeToCurrentPage(CanvasPage* pag
     pos.state = event.state;
     pos.timestamp = event.timestamp;
     pos.deviceId = DeviceId(static_cast<const GdkDevice*>(event.device));
-    // Drawing while the setsquare or the compass is out: the line follows its edge
-    if (view.geometryTool().visible() && view.getSession().getToolHandler()->isDrawingTool()) {
+    // Drawing while the setsquare or the compass is out: the line follows its nearest edge. Only for the pen and
+    // the highlighter - the eraser must reach everything, also what lies under the tool.
+    const ToolType drawing = view.getSession().getToolHandler()->getToolType();
+    if (view.geometryTool().visible() && (drawing == TOOL_PEN || drawing == TOOL_HIGHLIGHTER)) {
         const double zoom = view.getViewController().zoom();
         const QPointF snapped = view.geometryTool().snap(QPointF(pos.x / zoom, pos.y / zoom));
         pos.x = snapped.x() * zoom;

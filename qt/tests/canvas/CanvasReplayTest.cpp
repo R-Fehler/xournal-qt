@@ -580,6 +580,20 @@ TEST_F(CanvasReplayTest, drawingOnTheSetsquareFollowsItsEdgesAndTwoFingersMoveIt
     }
     EXPECT_NEAR(geometry.snap(middle + QPointF(0, 20)).y(), middle.y(), 1) << "the tool did not move";
 
+    // The eraser is not guided: it must reach what lies under the tool, not only its edge
+    // below the apex of the triangle, so it is a free line, not one along an edge
+    drawLine(0, middle + QPointF(-2 * CM, 9 * CM), middle + QPointF(2 * CM, 9 * CM));
+    processEvents();
+    const size_t withFreeLine = elementCount(0);
+    ASSERT_EQ(withFreeLine, before + 2);
+    // The eraser end of the pen: it rubs out where it is held, it is not guided to an edge (erasing may also cut a
+    // stroke in two, so the number of elements only has to change)
+    drawLine(0, middle + QPointF(0, 9 * CM - 6), middle + QPointF(0, 9 * CM + 6), 10, &eraser);
+    processEvents();
+    EXPECT_NE(elementCount(0), withFreeLine) << "the eraser reaches what lies under the tool";
+    session->getUndoRedoHandler()->undo();  // the line back, so the next part starts clean
+    processEvents();
+
     // Two fingers on it carry it along (without turning or sizing it)
     processEvents(1100);  // the palm rejection ignores touch for a second after the pen wrote
     const double turned = geometry.rotation();
