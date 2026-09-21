@@ -1449,6 +1449,53 @@ TEST_F(MainWindowTest, layersInTheSidebar) {
     EXPECT_TRUE(itemAt(list, 0)->property("layerVisible").toBool());
 }
 
+// The menu of a page: the everyday actions are icons, so it stays small (it used to be a list of sixteen lines).
+TEST_F(MainWindowTest, thePageMenuIsSmallAndWorksByIcons) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(80);
+    auto* menu = find<QObject>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    menu->setProperty("page", 2);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("visible").toBool(); });
+    ASSERT_TRUE(menu->property("visible").toBool());
+    const double height = menu->property("height").toDouble();
+    EXPECT_GT(height, 100) << "it is there";
+    EXPECT_LT(height, 320) << "and less than half of a line for every action (sixteen of them once)";
+    EXPECT_LT(menu->property("width").toDouble(), 300) << "and not wide either";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(700);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    // The icons do the work of the lines
+    auto* paste = find<QQuickItem>("pageMenuPaste");
+    ASSERT_NE(paste, nullptr);
+    EXPECT_FALSE(paste->isEnabled()) << "nothing copied yet";
+    click(find<QQuickItem>("pageMenuCopy"));
+    until([&] { return !menu->property("visible").toBool(); });
+    EXPECT_EQ(controller->copiedPages(), 1) << "the page was copied and the menu closed";
+
+    // Moving the third page up puts it before the second one, as one page change to undo
+    const int pageCount = controller->pageCount();
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("visible").toBool(); });
+    auto* up = find<QQuickItem>("pageMenuUp");
+    ASSERT_NE(up, nullptr);
+    EXPECT_TRUE(up->isEnabled());
+    click(up);
+    wait(80);
+    EXPECT_TRUE(controller->canUndoPages()) << "the page moved";
+    EXPECT_EQ(controller->pageCount(), pageCount) << "and none was lost";
+
+    // On the first page there is nowhere to move it up to
+    menu->setProperty("page", 0);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("visible").toBool(); });
+    EXPECT_FALSE(find<QQuickItem>("pageMenuUp")->isEnabled());
+    QMetaObject::invokeMethod(menu, "close");
+}
+
 TEST_F(MainWindowTest, pagesAreAppendedFromTheSidebar) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

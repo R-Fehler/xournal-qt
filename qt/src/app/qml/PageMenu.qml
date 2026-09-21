@@ -1,68 +1,137 @@
-// Menu of a page in the sidebar or the page grid. It acts on the selection when the page is selected, else on the
-// page itself.
+// What can be done with a page, from the sidebar or the page grid: it acts on the selection when the page is
+// selected, else on the page itself. The everyday actions are a small grid of icons, every one with its tool tip,
+// so the whole thing stays short; only what an icon cannot tell is written out. Inserting somewhere else, or
+// several pages at once, is in the "Insert pages…" dialog (it asks where, how many, background and size).
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Material
+import QtQuick.Layouts
 
-Menu {
+Popup {
     id: menu
+    objectName: "pageMenu"
+    parent: Overlay.overlay
+    padding: 6
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
     property int page: 0
     readonly property var pages: app.pages.isSelected(page) ? app.pages.selectedPages() : [page]
     readonly property string what: pages.length > 1 ? qsTr("%1 pages").arg(pages.length) : qsTr("page")
+    readonly property int lastPage: pages[pages.length - 1]
 
+    /// Open it where the page was pressed (`x`, `y` in the coordinates of `item`), and keep it inside the window.
     function openFor(p, item, x, y) {
         page = p
-        popup(item, x, y)
+        const at = item.mapToItem(Overlay.overlay, x, y)
+        menu.x = Math.max(8, Math.min(at.x, Overlay.overlay.width - menu.width - 8))
+        menu.y = Math.max(8, Math.min(at.y, Overlay.overlay.height - menu.height - 8))
+        open()
     }
 
-    MenuItem {
-        text: menu.pages.length > 1 ? qsTr("Background of %1 pages…").arg(menu.pages.length)
-                                    : qsTr("Background of this page…")
-        onTriggered: app.requestPageBackground(menu.pages)
+    background: Rectangle {
+        radius: 12
+        color: "#ffffff"
+        border.width: 1
+        border.color: "#d5d8dc"
     }
-    MenuSeparator {}
-    MenuItem {
-        text: menu.pages.length > 1 ? qsTr("Print %1 pages…").arg(menu.pages.length) : qsTr("Print this page…")
-        onTriggered: app.requestPrint(menu.pages)
+
+    component PageAction: IconButton {
+        implicitWidth: 44
+        implicitHeight: 44
+        icon.width: 21
+        icon.height: 21
     }
-    MenuItem {
-        text: qsTr("Start a chapter here…")
-        onTriggered: app.requestChapter(menu.page)
+    component PageLine: ItemDelegate {
+        Layout.fillWidth: true
+        implicitHeight: 38
+        font.pixelSize: 14
     }
-    MenuItem {
-        text: qsTr("Copy a link to this page")
-        onTriggered: app.copyPageLink(menu.page)
-    }
-    MenuItem { text: qsTr("Copy %1").arg(menu.what); onTriggered: app.copyPages(menu.pages) }
-    MenuItem { text: qsTr("Cut %1").arg(menu.what); onTriggered: app.cutPages(menu.pages) }
-    MenuItem {
-        text: app.copiedPages > 1 ? qsTr("Paste %1 pages after").arg(app.copiedPages) : qsTr("Paste after")
-        enabled: app.copiedPages > 0
-        onTriggered: app.pastePages(menu.pages[menu.pages.length - 1] + 1)
-    }
-    MenuItem { text: qsTr("Duplicate %1").arg(menu.what); onTriggered: app.duplicatePages(menu.pages) }
-    MenuSeparator {}
-    MenuItem { text: qsTr("Insert page before"); onTriggered: app.insertPageBefore(menu.pages[0]) }
-    MenuItem { text: qsTr("Insert page after"); onTriggered: app.insertPageAfter(menu.pages[menu.pages.length - 1]) }
-    MenuItem {
-        objectName: "insertPagesItem"
-        text: qsTr("Insert pages… (background, size)")
-        onTriggered: app.requestInsertPages(menu.pages[menu.pages.length - 1] + 1)
-    }
-    MenuItem {
-        text: qsTr("Move up")
-        enabled: menu.pages[0] > 0
-        onTriggered: app.movePages(menu.pages, menu.pages[0] - 1)
-    }
-    MenuItem {
-        text: qsTr("Move down")
-        enabled: menu.pages[menu.pages.length - 1] < app.pages.count - 1
-        onTriggered: app.movePages(menu.pages, menu.pages[menu.pages.length - 1] + 2)
-    }
-    MenuSeparator {}
-    MenuItem { text: qsTr("Select all pages"); onTriggered: app.pages.selectAll() }
-    MenuItem {
-        text: qsTr("Delete %1").arg(menu.what)
-        enabled: menu.pages.length < app.pages.count
-        onTriggered: app.deletePages(menu.pages)
+
+    ColumnLayout {
+        spacing: 2
+        GridLayout {
+            columns: 5
+            columnSpacing: 0
+            rowSpacing: 0
+            Layout.alignment: Qt.AlignHCenter
+            PageAction {
+                objectName: "pageMenuCopy"
+                iconName: "xopp-edit-copy"
+                tip: qsTr("Copy %1").arg(menu.what)
+                onClicked: { app.copyPages(menu.pages); menu.close() }
+            }
+            PageAction {
+                iconName: "xopp-edit-cut"
+                tip: qsTr("Cut %1").arg(menu.what)
+                onClicked: { app.cutPages(menu.pages); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuPaste"
+                iconName: "xopp-edit-paste"
+                tip: app.copiedPages > 1 ? qsTr("Paste %1 pages after").arg(app.copiedPages) : qsTr("Paste after")
+                enabled: app.copiedPages > 0
+                onClicked: { app.pastePages(menu.lastPage + 1); menu.close() }
+            }
+            PageAction {
+                iconName: "xqt-duplicate"
+                tip: qsTr("Duplicate %1").arg(menu.what)
+                onClicked: { app.duplicatePages(menu.pages); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuDelete"
+                iconName: "xopp-page-delete"
+                tip: qsTr("Delete %1").arg(menu.what)
+                enabled: menu.pages.length < app.pages.count
+                onClicked: { app.deletePages(menu.pages); menu.close() }
+            }
+            PageAction {
+                iconName: "xopp-page-add"
+                tip: qsTr("Insert a page after this one")
+                onClicked: { app.insertPageAfter(menu.lastPage); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuUp"
+                iconName: "xqt-chevron-up"
+                tip: qsTr("Move %1 up").arg(menu.what)
+                enabled: menu.pages[0] > 0
+                onClicked: { app.movePages(menu.pages, menu.pages[0] - 1); menu.close() }
+            }
+            PageAction {
+                iconName: "xqt-chevron-down"
+                tip: qsTr("Move %1 down").arg(menu.what)
+                enabled: menu.lastPage < app.pages.count - 1
+                onClicked: { app.movePages(menu.pages, menu.lastPage + 2); menu.close() }
+            }
+            PageAction {
+                iconName: "xopp-document-print"
+                tip: menu.pages.length > 1 ? qsTr("Print %1 pages…").arg(menu.pages.length)
+                                           : qsTr("Print this page…")
+                onClicked: { app.requestPrint(menu.pages); menu.close() }
+            }
+            PageAction {
+                iconName: "xqt-link"
+                tip: qsTr("Copy a link to this page")
+                onClicked: { app.copyPageLink(menu.page); menu.close() }
+            }
+        }
+        Rectangle { Layout.fillWidth: true; height: 1; color: "#e2e5e9" }
+        PageLine {
+            text: menu.pages.length > 1 ? qsTr("Background of %1 pages…").arg(menu.pages.length)
+                                        : qsTr("Background of this page…")
+            onClicked: { app.requestPageBackground(menu.pages); menu.close() }
+        }
+        PageLine {
+            objectName: "insertPagesItem"
+            text: qsTr("Insert pages…")
+            onClicked: { app.requestInsertPages(menu.lastPage + 1); menu.close() }
+        }
+        PageLine {
+            text: qsTr("Start a chapter here…")
+            onClicked: { app.requestChapter(menu.page); menu.close() }
+        }
+        PageLine {
+            text: qsTr("Select all pages")
+            onClicked: { app.pages.selectAll(); menu.close() }
+        }
     }
 }

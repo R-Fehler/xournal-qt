@@ -69,7 +69,9 @@ cd build-qt
 - [ ] The sidebar (first tool bar button) shows the pages; the current page is highlighted and follows scrolling.
 - [ ] Tap a thumbnail (finger or pen): the canvas jumps to that page.
 - [ ] At the end of the page sidebar and of the page grid: − N + and "Add pages" appends that many pages (like the current one; a PDF page is not copied), one undo step.
-- [ ] Long-press or ⋮ on a thumbnail: insert before/after, duplicate, move up/down, delete. Each can be undone.
+- [ ] Long-press or ⋮ on a thumbnail: a small pill with ten icons (copy, cut, paste, duplicate, delete, add a page,
+      move up, move down, print, copy a link) over four lines (background, insert pages…, chapter, select all).
+      Holding a finger on an icon names it. Each action can be undone, and the pill closes after it.
 - [ ] After writing on a page, its thumbnail updates within about half a second, also after undo/redo.
 - [ ] PDF pages show their PDF content in the thumbnail.
 - [ ] Zoomed in, the page never draws over the sidebar.
@@ -128,7 +130,7 @@ cd build-qt
 - [ ] Tap an existing text to edit it at the tapped place; arrows, Shift+arrows, dragging to select, Ctrl+C/X/V.
 - [ ] Tap outside or Esc ends; undo removes/restores; emptying a text removes it.
 - [ ] A text that contains a web address (pasted or typed) shows it underlined and blue; tapping it (hand or selection tool) opens the browser. Xournal++ shows the same text without the colour.
-- [ ] ⋮ on a page → "Copy a link to this page" gives "#Page:N"; pasted into a text it is a link that jumps there.
+- [ ] ⋮ on a page → the link icon (the last one) gives "#Page:N"; pasted into a text it is a link that jumps there.
 - [ ] Insert, delete or move pages in front of it: the number in the link follows; undo puts it back.
 - [ ] Text button again (or long press): font family and size, also for the text being edited.
 
