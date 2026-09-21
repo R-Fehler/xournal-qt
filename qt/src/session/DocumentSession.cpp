@@ -157,6 +157,7 @@ void DocumentSession::init() {
     layerController = std::make_unique<LayerController>(this);
     layerController->registerListener(this);
     pageLinkKeeper = std::make_unique<PageLinkKeeper>(*this);
+    pageRevisionKeeper = std::make_unique<PageRevisionKeeper>(*this);
 
     scrollHandler.indexOf = [this](const PageRef& page) { return doc->indexOf(page); };
     scrollHandler.onScrollToPage = [this](size_t page, XojPdfRectangle) {
@@ -307,6 +308,64 @@ private:
     DocumentSession& session;
 };
 
+// The page revisions follow the same events: every change of a page, whichever way, comes by here.
+namespace {
+quint64 nextPageRevision = 1;
+}
+class DocumentSession::PageRevisionKeeper final: public DocumentListener {
+public:
+    explicit PageRevisionKeeper(DocumentSession& session): session(session) {
+        registerListener(&session);
+        rebuild();
+    }
+    void documentChanged(DocumentChangeType type) override {
+        if (type == DOCUMENT_CHANGE_CLEARED || type == DOCUMENT_CHANGE_COMPLETE) {
+            rebuild();
+            Q_EMIT session.pageRevisionsChanged();
+        }
+    }
+    void pageSizeChanged(size_t page) override { session.revisePage(page); }
+    void pageChanged(size_t page) override { session.revisePage(page); }
+    void pageInserted(size_t page) override {
+        if (page > revisions.size()) {
+            rebuild();
+        } else {
+            revisions.insert(revisions.begin() + static_cast<std::ptrdiff_t>(page), nextPageRevision++);
+        }
+        Q_EMIT session.pageRevisionsChanged();
+    }
+    void pageDeleted(size_t page) override {
+        // (before the page is gone)
+        if (page < revisions.size()) {
+            revisions.erase(revisions.begin() + static_cast<std::ptrdiff_t>(page));
+        }
+        Q_EMIT session.pageRevisionsChanged();
+    }
+    void rebuild() {
+        std::shared_lock lock(*session.getDocument());
+        revisions.resize(session.getDocument()->getPageCount());
+        for (auto& r: revisions) {
+            r = nextPageRevision++;
+        }
+    }
+    std::vector<quint64> revisions;
+
+private:
+    DocumentSession& session;
+};
+
+quint64 DocumentSession::pageRevision(size_t page) const {
+    const auto& revisions = pageRevisionKeeper->revisions;
+    return page < revisions.size() ? revisions[page] : 0;
+}
+
+void DocumentSession::revisePage(size_t page) {
+    if (auto& revisions = pageRevisionKeeper->revisions; page < revisions.size()) {
+        revisions[page] = nextPageRevision++;
+        Q_EMIT pageRevisionsChanged();
+    }
+}
+
 void DocumentSession::shiftPageLinks(size_t position, int delta) {
     if (pageLinksPaused) {
         return;  // applyPageOrder knows where every page went and does it exactly
@@ -326,21 +385,30 @@ void DocumentSession::shiftPageLinks(size_t position, int delta) {
 }
 
 void DocumentSession::rewritePageLinks(const std::vector<int>& newPage) {
-    std::shared_lock lock(*doc);
-    for (size_t i = 0; i < doc->getPageCount(); ++i) {
-        const PageRef page = doc->getPage(i);
-        for (Layer* layer: page->getLayers()) {
-            for (const auto& element: layer->getElements()) {
-                if (element->getType() != ELEMENT_TEXT) {
-                    continue;
-                }
-                auto* text = static_cast<Text*>(element.get());
-                std::string content = text->getText();
-                if (content.find('#') != std::string::npos && xoj::util::renumberPageLinks(content, newPage)) {
-                    text->setText(std::move(content));
+    std::vector<size_t> rewritten;
+    {
+        std::shared_lock lock(*doc);
+        for (size_t i = 0; i < doc->getPageCount(); ++i) {
+            const PageRef page = doc->getPage(i);
+            for (Layer* layer: page->getLayers()) {
+                for (const auto& element: layer->getElements()) {
+                    if (element->getType() != ELEMENT_TEXT) {
+                        continue;
+                    }
+                    auto* text = static_cast<Text*>(element.get());
+                    std::string content = text->getText();
+                    if (content.find('#') != std::string::npos && xoj::util::renumberPageLinks(content, newPage)) {
+                        text->setText(std::move(content));
+                        if (rewritten.empty() || rewritten.back() != i) {
+                            rewritten.push_back(i);
+                        }
+                    }
                 }
             }
         }
+    }
+    for (size_t i: rewritten) {
+        revisePage(i);  // the link text on it changed
     }
 }
 
@@ -505,6 +573,7 @@ void DocumentSession::undoRedoPageChanged(PageRef page) {
         index = doc->indexOf(page);
     }
     if (index != npos) {
+        revisePage(index);
         Q_EMIT pageContentChanged(index);
     }
 }

@@ -56,7 +56,6 @@ void PagesModel::setSession(DocumentSession* s) {
 void PagesModel::reset() {
     beginResetModel();
     sizes.clear();
-    revisions.clear();
     selected.clear();
     anchor = -1;
     changed.clear();
@@ -66,7 +65,6 @@ void PagesModel::reset() {
         for (size_t i = 0; i < doc->getPageCount(); ++i) {
             auto p = doc->getPage(i);
             sizes.emplace_back(p->getWidth(), p->getHeight());
-            revisions.push_back(nextRevision++);
             selected.push_back(0);
         }
         current = static_cast<int>(session->getCurrentPageNo());
@@ -95,7 +93,7 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
         case AspectRole:
             return sizes[row].width() > 0 ? sizes[row].height() / sizes[row].width() : 1.414;
         case ThumbnailRole:
-            return QString("image://thumbnail/%1/%2/%3").arg(sessionId).arg(row).arg(revisions[row]);
+            return thumbnailUrl(index.row());
         case CurrentRole:
             return index.row() == current;
         case PageIndexRole:
@@ -159,7 +157,10 @@ QString PagesModel::thumbnailUrl(int page) const {
     if (page < 0 || page >= rowCount()) {
         return {};
     }
-    return QString("image://thumbnail/%1/%2/%3").arg(sessionId).arg(page).arg(revisions[static_cast<size_t>(page)]);
+    return QString("image://thumbnail/%1/%2/%3")
+            .arg(sessionId)
+            .arg(page)
+            .arg(session ? session->pageRevision(static_cast<size_t>(page)) : 0);
 }
 
 qreal PagesModel::aspectOf(int page) const {
@@ -264,7 +265,7 @@ void PagesModel::updateTypicalAspect() {
 }
 
 void PagesModel::markChanged(size_t page) {
-    if (page < revisions.size()) {
+    if (page < sizes.size()) {
         changed.insert(page);
         refreshTimer.start();
     }
@@ -272,8 +273,7 @@ void PagesModel::markChanged(size_t page) {
 
 void PagesModel::flushChanges() {
     for (size_t page: changed) {
-        if (page < revisions.size()) {
-            revisions[page] = nextRevision++;
+        if (page < sizes.size()) {
             Q_EMIT dataChanged(index(static_cast<int>(page)), index(static_cast<int>(page)), {ThumbnailRole});
         }
     }
@@ -291,7 +291,6 @@ void PagesModel::pageSizeChanged(size_t page) {
         std::shared_lock lock(*session->getDocument());
         auto p = session->getDocument()->getPage(page);
         sizes[page] = QSizeF(p->getWidth(), p->getHeight());
-        revisions[page] = nextRevision++;
         Q_EMIT dataChanged(index(static_cast<int>(page)), index(static_cast<int>(page)), {AspectRole, ThumbnailRole});
         updateTypicalAspect();
     }
@@ -312,7 +311,6 @@ void PagesModel::pageInserted(size_t page) {
     }
     beginInsertRows(QModelIndex(), static_cast<int>(page), static_cast<int>(page));
     sizes.insert(sizes.begin() + static_cast<std::ptrdiff_t>(page), size);
-    revisions.insert(revisions.begin() + static_cast<std::ptrdiff_t>(page), nextRevision++);
     selected.insert(selected.begin() + static_cast<std::ptrdiff_t>(page), 0);
     if (anchor >= static_cast<int>(page)) {
         ++anchor;
@@ -331,7 +329,6 @@ void PagesModel::pageDeleted(size_t page) {
     }
     beginRemoveRows(QModelIndex(), static_cast<int>(page), static_cast<int>(page));
     sizes.erase(sizes.begin() + static_cast<std::ptrdiff_t>(page));
-    revisions.erase(revisions.begin() + static_cast<std::ptrdiff_t>(page));
     const bool wasSelected = selected[page];
     selected.erase(selected.begin() + static_cast<std::ptrdiff_t>(page));
     if (anchor == static_cast<int>(page)) {

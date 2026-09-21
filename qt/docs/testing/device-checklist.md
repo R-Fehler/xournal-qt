@@ -74,6 +74,11 @@ cd build-qt
       Holding a finger on an icon names it. Each action can be undone, and the pill closes after it.
 - [ ] After writing on a page, its thumbnail updates within about half a second, also after undo/redo.
 - [ ] PDF pages show their PDF content in the thumbnail.
+- [ ] Scroll the sidebar of a long PDF down and back up: the thumbnails seen before appear at once, without a blank
+      moment. The same after switching to another tab and back, and when opening the page grid or the tab overview
+      again.
+- [ ] Fling the sidebar quickly to the end: the pages at the end appear first, not after all pages in between.
+- [ ] Settings → Documents → Page previews: the memory slider (64–1024 MB, default 256) is kept after a restart.
 - [ ] Zoomed in, the page never draws over the sidebar.
 - [ ] Page counter and zoom (−, %, +) in the pill at the bottom right; tapping the % fits the page width.
 - [ ] Portrait (narrow window): the tool bar can be swiped sideways to reach all tools.

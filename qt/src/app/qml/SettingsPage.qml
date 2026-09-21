@@ -354,6 +354,11 @@ Popup {
                         key: "autosaveMinutes"; text: qsTr("Every")
                         from: 1; to: 30; stepSize: 1; decimals: 0; suffix: " min"
                     }
+                    SectionTitle { text: qsTr("Page previews") }
+                    SliderRow {
+                        key: "previewMemory"; text: qsTr("Memory for drawn page previews")
+                        from: 64; to: 1024; stepSize: 64; decimals: 0; suffix: " MB"
+                    }
                     SectionTitle { text: qsTr("File names") }
                     RowLayout {
                         Layout.fillWidth: true

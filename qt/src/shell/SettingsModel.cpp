@@ -16,6 +16,7 @@
 #include "control/settings/SettingsEnums.h"
 #include "control/tools/StrokeStabilizerEnum.h"
 #include "session/AppContext.h"
+#include "shell/Thumbnails.h"
 
 namespace xqt {
 
@@ -37,6 +38,16 @@ constexpr int DEFAULT_PALM_TIMEOUT_MS = 0;
 /// Up to which height a pen that tells its height counts as near ("touch" / "nearHeight"), percent; 100: all of it.
 constexpr int DEFAULT_NEAR_HEIGHT_PERCENT = 100;
 }  // namespace
+
+int SettingsModel::previewMemory(Settings& s) {
+    int mb = static_cast<int>(ThumbnailProvider::DEFAULT_CACHE_MB);
+    s.getCustomElement("xournalQt").getInt("previewMemory", mb);
+    return mb;
+}
+
+void SettingsModel::applyPreviewMemory(Settings& s) {
+    ThumbnailProvider::setCacheLimit(static_cast<qint64>(previewMemory(s)) * 1024 * 1024);
+}
 
 QSizeF SettingsModel::paperSize(int index) {
     if (index < 0 || index >= static_cast<int>(PAPER_FORMATS.size())) {
@@ -99,6 +110,12 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         [&s](const QVariant& v) {
             s.getCustomElement("xournalQt").setBool("resumeAtLastPage", v.toBool());
             s.customSettingsChanged();
+        });
+    add("previewMemory", [&s] { return QVariant(previewMemory(s)); },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setInt("previewMemory", std::clamp(v.toInt(), 64, 1024));
+            s.customSettingsChanged();
+            applyPreviewMemory(s);
         });
     add("snapGrid", [&s] { return QVariant(s.isSnapGrid()); }, [&s](const QVariant& v) { s.setSnapGrid(v.toBool()); });
 

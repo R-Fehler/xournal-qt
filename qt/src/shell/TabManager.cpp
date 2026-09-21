@@ -77,7 +77,7 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             return QString("image://thumbnail/%1/%2/%3")
                     .arg(ThumbnailProvider::idOf(s))
                     .arg(s->getCurrentPageNo())
-                    .arg(tabs[static_cast<size_t>(index.row())].thumbnailRevision);
+                    .arg(s->pageRevision(s->getCurrentPageNo()));
         case PageCountRole:
             return static_cast<int>(s->getDocument()->getPageCount());
         case SearchHitsRole:
@@ -107,7 +107,7 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
                         {"thumbnail", QString("image://thumbnail/%1/%2/%3")
                                               .arg(ThumbnailProvider::idOf(s))
                                               .arg(page)
-                                              .arg(tabs[static_cast<size_t>(index.row())].thumbnailRevision)},
+                                              .arg(s->pageRevision(page))},
                         {"rects", rects}});
                 it = end;
             }
@@ -163,13 +163,8 @@ void TabManager::listenTo(Tab& tab) {
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
     ThumbnailProvider::registerSession(s);
-    auto thumbnailChanged = [this, s] {
-        if (const int row = rowOf(s); row >= 0) {
-            ++tabs[static_cast<size_t>(row)].thumbnailRevision;
-            tabDataChanged(s, {ThumbnailRole, PageCountRole});
-        }
-    };
-    connect(s, &DocumentSession::pageContentChanged, this, thumbnailChanged);
+    auto thumbnailChanged = [this, s] { tabDataChanged(s, {ThumbnailRole, PageCountRole}); };
+    connect(s, &DocumentSession::pageRevisionsChanged, this, thumbnailChanged);
     auto searchChanged = [this, s] { tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole}); };
     connect(&s->search(), &DocumentSearch::changed, this, searchChanged);
     connect(&s->search(), &DocumentSearch::finished, this, searchChanged);

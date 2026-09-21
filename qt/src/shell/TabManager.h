@@ -55,7 +55,6 @@ public:
         std::unique_ptr<DocumentSession> session;
         std::unique_ptr<CanvasView> view;
         std::unique_ptr<QTimer> releaseTimer;
-        quint64 thumbnailRevision = 0;  ///< increased when the current page or its content changed
     };
 
     /// Adds a tab after the current one and makes it current. Returns its index.

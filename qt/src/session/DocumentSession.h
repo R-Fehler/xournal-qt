@@ -130,6 +130,9 @@ public:
     ScrollHandler* getScrollHandler() const override;
     PageRef getCurrentPage() override;
     size_t getCurrentPageNo() const override;
+    /// Changes whenever the page's picture does (its content, its size, a page coming or going before it):
+    /// thumbnails are named and kept by it. Unique in the process.
+    quint64 pageRevision(size_t page) const;
     XournalppCursor* getCursor() const override;
     PageTypeHandler* getPageTypes() const override;
     LayerController* getLayerController() const override;
@@ -168,6 +171,9 @@ public:
     /// Hears every page that comes or goes (also through undo) and keeps the page links right.
     class PageLinkKeeper;
     std::unique_ptr<PageLinkKeeper> pageLinkKeeper;
+    class PageRevisionKeeper;
+    std::unique_ptr<PageRevisionKeeper> pageRevisionKeeper;
+    void revisePage(size_t page);
     bool pageLinksPaused = false;
     /// newPage[old page - 1] is the new number (0: leave those links alone).
     void rewritePageLinks(const std::vector<int>& newPage);
@@ -185,6 +191,8 @@ Q_SIGNALS:
     void clearSelectionRequested();
     /// The content of a page changed through an undoable action (thumbnails should be updated).
     void pageContentChanged(qulonglong page);
+    /// A pageRevision() changed (or pages came or went).
+    void pageRevisionsChanged();
     /// Show this rectangle of a page (page points), e.g. a search hit.
     void scrollToRectRequested(qulonglong page, QRectF rect);
 

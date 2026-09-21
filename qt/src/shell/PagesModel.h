@@ -2,9 +2,10 @@
  * xournal-qt: the pages of the current tab, for the page sidebar.
  *
  * Follows the document events of the session it is attached to (pages inserted, deleted, changed, resized) and
- * the undoable edits (DocumentSession::pageContentChanged). Each page has a revision that is increased when its
- * content changed, so the thumbnail image URL changes and QML reloads it. Content changes are collected for a
- * moment first, so that writing does not re-render thumbnails continuously.
+ * the undoable edits (DocumentSession::pageContentChanged). The thumbnail image URL names the page's revision
+ * (DocumentSession::pageRevision), so it changes with the content and QML reloads it; a page that did not change
+ * keeps its URL, also when the tab is shown again (its kept image is shown, see ThumbnailProvider). Content changes
+ * are collected for a moment first, so that writing does not re-render thumbnails continuously.
  *
  * @license GNU GPLv2 or later
  */
@@ -107,8 +108,6 @@ private:
     QPointer<DocumentSession> session;
     quint64 sessionId = 0;
     std::vector<QSizeF> sizes;
-    std::vector<quint64> revisions;
-    quint64 nextRevision = 1;
     std::set<size_t> changed;
     QTimer refreshTimer;
     int current = 0;

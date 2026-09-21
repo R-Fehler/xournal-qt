@@ -34,6 +34,9 @@ public:
     explicit SettingsModel(AppContext& app, QObject* parent = nullptr);
     /// Portrait size (points) of the paper format at `index` of paperFormats (invalid: none).
     static QSizeF paperSize(int index);
+    /// Memory for kept page thumbnails (MB, setting "previewMemory"); applyPreviewMemory hands it to them.
+    static int previewMemory(Settings& settings);
+    static void applyPreviewMemory(Settings& settings);
 
     int revision() const { return rev; }
     /// Names of the page backgrounds for new pages (upstream's page types: plain, lined, ruled, graph, ...).

@@ -1,11 +1,15 @@
 #include "Thumbnails.h"
 
+#include <atomic>
 #include <condition_variable>
+#include <list>
 #include <map>
 #include <mutex>
 #include <shared_mutex>
+#include <unordered_map>
 
 #include <QRunnable>
+#include <QThread>
 #include <QThreadPool>
 
 #include <cairo.h>
@@ -37,9 +41,129 @@ public:
     QQuickTextureFactory* textureFactory() const override {
         return QQuickTextureFactory::textureFactoryForImage(image);
     }
+    /// QML does not want it any more (its item went away): it is not drawn
+    void cancel() override { cancelled = true; }
     QImage image;
+    std::atomic<bool> cancelled{false};
 };
+
+/// The drawn thumbnails of each page ("<session>/<page>"), of its latest revision only, by width; the least recently
+/// used go first.
+class Cache {
+public:
+    QImage find(const QString& page, const QString& revision, int width) {
+        std::lock_guard lock(mtx);
+        auto it = pages.find(page);
+        if (it == pages.end() || it->second.revision != revision) {
+            return {};
+        }
+        // That width, or scaled down from the smallest bigger one
+        auto w = it->second.widths.lower_bound(width);
+        if (w == it->second.widths.end()) {
+            return {};
+        }
+        lru.splice(lru.begin(), lru, w->second.used);
+        if (w->first == width) {
+            return w->second.image;
+        }
+        return w->second.image.scaledToWidth(width, Qt::SmoothTransformation);
+    }
+    void put(const QString& page, const QString& revision, int width, const QImage& image) {
+        if (image.isNull()) {
+            return;
+        }
+        std::lock_guard lock(mtx);
+        auto& slot = pages[page];
+        if (slot.revision != revision) {
+            dropWidths(slot);  // an older picture of the page
+            slot.revision = revision;
+        }
+        if (slot.widths.count(width)) {
+            return;
+        }
+        lru.push_front({page, width});
+        slot.widths.emplace(width, Entry{image, lru.begin()});
+        bytes += image.sizeInBytes();
+        shrink();
+    }
+    void dropSession(quint64 session) {
+        std::lock_guard lock(mtx);
+        const QString prefix = QString::number(session) + '/';
+        for (auto it = pages.begin(); it != pages.end();) {
+            if (it->first.startsWith(prefix)) {
+                dropWidths(it->second);
+                it = pages.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    void setLimit(qint64 l) {
+        std::lock_guard lock(mtx);
+        limit = std::max<qint64>(0, l);
+        shrink();
+    }
+    qint64 size() {
+        std::lock_guard lock(mtx);
+        return bytes;
+    }
+
+private:
+    using Use = std::list<std::pair<QString, int>>;  ///< page, width; front: used last
+    struct Entry {
+        QImage image;
+        Use::iterator used;
+    };
+    struct Slot {
+        QString revision;
+        std::map<int, Entry> widths;
+    };
+    void dropWidths(Slot& slot) {
+        for (auto& [w, e]: slot.widths) {
+            bytes -= e.image.sizeInBytes();
+            lru.erase(e.used);
+        }
+        slot.widths.clear();
+    }
+    void shrink() {
+        while (bytes > limit && !lru.empty()) {
+            const auto [page, width] = lru.back();
+            lru.pop_back();
+            auto it = pages.find(page);
+            auto w = it->second.widths.find(width);
+            bytes -= w->second.image.sizeInBytes();
+            it->second.widths.erase(w);
+            if (it->second.widths.empty()) {
+                pages.erase(it);
+            }
+        }
+    }
+    std::mutex mtx;
+    std::unordered_map<QString, Slot> pages;
+    Use lru;
+    qint64 bytes = 0;
+    qint64 limit = ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024;
+};
+Cache& cache() {
+    static Cache c;
+    return c;
+}
+std::atomic<int> renders{0};
+
+/// Workers of their own (not Qt's global pool, which others use too)
+QThreadPool& pool() {
+    static QThreadPool* p = [] {
+        auto* tp = new QThreadPool;
+        tp->setMaxThreadCount(std::max(1, std::min(4, QThread::idealThreadCount() - 1)));
+        return tp;
+    }();
+    return *p;
+}
 }  // namespace
+
+void ThumbnailProvider::setCacheLimit(qint64 bytes) { cache().setLimit(bytes); }
+qint64 ThumbnailProvider::cacheBytes() { return cache().size(); }
+int ThumbnailProvider::renderCount() { return renders.load(); }
 
 quint64 ThumbnailProvider::registerSession(DocumentSession* session) {
     auto& r = registry();
@@ -63,6 +187,7 @@ void ThumbnailProvider::unregisterSession(DocumentSession* session) {
             r.sessions.erase(it);
             r.idle.wait(lock, [&] { return r.busy[id] == 0; });
             r.busy.erase(id);
+            cache().dropSession(id);
             return;
         }
     }
@@ -80,6 +205,7 @@ quint64 ThumbnailProvider::idOf(const DocumentSession* session) {
 }
 
 QImage ThumbnailProvider::render(DocumentSession& session, size_t pageNo, int width) {
+    ++renders;
     return renderDocument(*session.getDocument(), pageNo, width);
 }
 
@@ -117,11 +243,21 @@ QImage ThumbnailProvider::renderDocument(Document& document, size_t pageNo, int 
 
 QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
     auto* response = new ThumbnailResponse;
-    // id: <session>/<page>/<revision>
+    // id: <session>/<page>/<revision>[/<only for QML: ask again>]
     const QStringList parts = id.split('/');
     const quint64 sessionId = parts.value(0).toULongLong();
     const size_t page = parts.value(1).toULongLong();
-    const int width = requestedSize.width() > 0 ? requestedSize.width() : 160;
+    const QString slot = parts.mid(0, 2).join('/');
+    const QString revision = parts.value(2);
+    const int asked = requestedSize.width() > 0 ? requestedSize.width() : 160;
+    const int width = (asked + WIDTH_STEP - 1) / WIDTH_STEP * WIDTH_STEP;
+
+    // Kept already (that width, or a bigger one to scale down): no drawing at all
+    if (QImage kept = cache().find(slot, revision, width); !kept.isNull()) {
+        response->image = std::move(kept);
+        QMetaObject::invokeMethod(response, &QQuickImageResponse::finished, Qt::QueuedConnection);
+        return response;
+    }
 
     auto& r = registry();
     DocumentSession* session = nullptr;
@@ -136,8 +272,14 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
         QMetaObject::invokeMethod(response, &QQuickImageResponse::finished, Qt::QueuedConnection);
         return response;
     }
-    QThreadPool::globalInstance()->start([response, session, sessionId, page, width] {
-        QImage img = render(*session, page, width);
+    // The one asked for last first: that is what is in view now
+    static std::atomic<int> order{0};
+    pool().start(QRunnable::create([response, session, sessionId, page, width, slot, revision] {
+        QImage img;
+        if (!response->cancelled) {  // (scrolled away meanwhile: not drawn)
+            img = render(*session, page, width);
+            cache().put(slot, revision, width, img);
+        }
         {
             auto& r = registry();
             std::lock_guard lock(r.mtx);
@@ -151,7 +293,7 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
                     Q_EMIT response->finished();
                 },
                 Qt::QueuedConnection);
-    });
+    }), ++order);
     return response;
 }
 
