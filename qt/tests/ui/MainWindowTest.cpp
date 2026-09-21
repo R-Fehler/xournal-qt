@@ -194,6 +194,18 @@ TEST_F(MainWindowTest, tabOverviewSwitchesAndCloses) {
     ASSERT_TRUE(waitOpened(overview, true));
     key(Qt::Key_Delete);
     EXPECT_EQ(controller->tabCount(), 2);
+
+    // Escape closes it, and types nothing into the search (its text is a control character)
+    auto* search = find<QQuickItem>("overviewSearchField");
+    ASSERT_NE(search, nullptr);
+    key(Qt::Key_Escape);
+    EXPECT_TRUE(waitOpened(overview, false)) << "Escape closes the overview";
+    EXPECT_EQ(search->property("text").toString(), QString());
+    // A letter still starts the search
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    key(Qt::Key_A);
+    EXPECT_EQ(search->property("text").toString(), QStringLiteral("a"));
 }
 
 TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {
@@ -671,6 +683,22 @@ TEST_F(MainWindowTest, shortSearchTextsWaitForEnter) {
     type("0 x");  // "p10 x": long enough
     wait(400);
     EXPECT_EQ(controller->searchQuery(), "p10 x");
+}
+
+// Typing on the library starts a search, but keys that only have a control character as their text do not type it.
+TEST_F(HomeScreenTest, onlyVisibleCharactersStartTheLibrarySearch) {
+    auto* grid = find<QQuickItem>("libraryGrid");
+    auto* field = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(grid, nullptr);
+    ASSERT_NE(field, nullptr);
+    grid->forceActiveFocus();
+    key(Qt::Key_Escape);
+    key(Qt::Key_Delete);
+    key(Qt::Key_Tab);
+    grid->forceActiveFocus();
+    EXPECT_EQ(field->property("text").toString(), QString()) << "no control characters in the search";
+    key(Qt::Key_L);
+    EXPECT_EQ(field->property("text").toString(), QStringLiteral("l")) << "a letter starts the search";
 }
 
 TEST_F(HomeScreenTest, shortLibrarySearchWaitsForEnter) {

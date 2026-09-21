@@ -668,8 +668,10 @@ Rectangle {
                         } else if (event.key === Qt.Key_Delete && item) {
                             home.askTrash(app.library, [item.path])
                             event.accepted = true
-                        } else if (event.text.length === 1 && event.text.trim() !== "" && !(event.modifiers & Qt.ControlModifier)) {
-                            searchField.forceActiveFocus()  // typing searches
+                        } else if (event.text.length === 1 && event.text.charCodeAt(0) > 32 && event.text.charCodeAt(0) !== 127
+                                   && !(event.modifiers & Qt.ControlModifier)) {
+                            // Typing searches - visible characters only (Escape, Backspace, Delete have a text too)
+                            searchField.forceActiveFocus()
                             searchField.text += event.text
                             home.typed()
                             event.accepted = true

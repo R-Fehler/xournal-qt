@@ -167,8 +167,10 @@ Popup {
             Keys.onSpacePressed: overview.activate(currentIndex)
             Keys.onDeletePressed: overview.closeRequested(currentIndex)
             Keys.onPressed: function(event) {
-                // Typing starts a search.
-                if (event.text.length === 1 && event.text.trim() !== "" && !(event.modifiers & Qt.ControlModifier)) {
+                // Typing starts a search - a visible character only: Escape, Backspace, Delete and Tab have a
+                // text of one (control) character too, and Escape is for closing the overview.
+                const c = event.text.length === 1 ? event.text.charCodeAt(0) : 0
+                if (c > 32 && c !== 127 && !(event.modifiers & Qt.ControlModifier)) {
                     searchField.forceActiveFocus()
                     searchField.text += event.text
                     overview.typed()
