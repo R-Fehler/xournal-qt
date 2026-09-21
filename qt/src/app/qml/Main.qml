@@ -794,12 +794,31 @@ ApplicationWindow {
         }
     }
 
-    // Selected PDF text (select mode): mark or copy it.
+    // Selected PDF text: mark or copy it. The pill sits at the text and goes along with it while scrolling; once
+    // the text is out of sight it waits at the top edge of the canvas and offers the way back to it.
     Pane {
         id: pdfTextBar
         objectName: "pdfTextBar"
-        visible: false
+        visible: app.pdfTextIsSelected && !pageGrid.visible && !contentsOverview.visible
         padding: 2
+        /// The selected text on the canvas; read again whenever the view moves
+        property rect box: Qt.rect(0, 0, 0, 0)
+        readonly property bool above: box.y + box.height < 8
+        readonly property bool below: box.y > canvas.height - 8
+        /// The text is not in view any more
+        readonly property bool away: (box.width !== 0 || box.height !== 0) && (above || below)
+        function refresh() {
+            box = app.pdfSelectionBox()
+            if (away) {
+                x = canvas.x + (canvas.width - width) / 2
+                y = canvas.y + 12
+                return
+            }
+            x = Math.max(canvas.x + 8, Math.min(canvas.x + box.x, canvas.x + canvas.width - width - 8))
+            y = canvas.y + box.y - height - 8 < canvas.y ? canvas.y + box.y + box.height + 8
+                                                         : canvas.y + box.y - height - 8
+        }
+        onVisibleChanged: if (visible) refresh()
         Material.foreground: "#303030"
         background: Rectangle {
             radius: height / 2
@@ -809,17 +828,24 @@ ApplicationWindow {
         }
         Connections {
             target: app
-            function onPdfTextSelected(rect) {
-                pdfTextBar.x = Math.max(canvas.x + 8, Math.min(canvas.x + rect.x, canvas.x + canvas.width - pdfTextBar.width - 8))
-                pdfTextBar.y = canvas.y + rect.y - pdfTextBar.height - 8 < canvas.y
-                        ? canvas.y + rect.y + rect.height + 8 : canvas.y + rect.y - pdfTextBar.height - 8
-                pdfTextBar.visible = true
-            }
-            function onPdfTextSelectionCleared() { pdfTextBar.visible = false }
-            function onDocumentChanged() { pdfTextBar.visible = false }
+            function onPdfTextSelectionChanged() { pdfTextBar.refresh() }
+            function onPdfTextSelected(rect) { pdfTextBar.refresh() }
+        }
+        Connections {
+            target: canvas
+            function onViewportChanged() { pdfTextBar.refresh() }
         }
         RowLayout {
             spacing: 0
+            // Only while the text is out of sight: back to it
+            IconButton {
+                objectName: "pdfBackToSelection"
+                iconName: pdfTextBar.above ? "xqt-chevron-up" : "xqt-chevron-down"
+                tip: qsTr("Back to the selected text")
+                visible: pdfTextBar.away
+                onClicked: app.showPdfSelection()
+            }
+            ToolSeparator { visible: pdfTextBar.away }
             IconButton { iconName: "xopp-select-pdf-text-ht"; tip: qsTr("Highlight"); onClicked: app.markPdfText("highlight") }
             HighlightColors { onPicked: app.markPdfText("highlight") }  // a color: highlight in it right away
             ToolSeparator {}

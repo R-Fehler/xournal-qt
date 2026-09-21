@@ -158,6 +158,11 @@ public:
     QRectF pdfSelectionEnds() const;
     /// Is this place (view coordinates) on the selected PDF text? (A press somewhere else unselects it.)
     bool pdfTextSelectionContains(QPointF viewPos) const;
+    /// All of the selected text in view coordinates (for the actions beside it); empty when nothing is selected.
+    /// It moves with the page, so it has to be read again whenever the view scrolls or zooms.
+    QRectF pdfSelectionBox() const;
+    /// Bring the selected text back into view (it may be far away after scrolling).
+    void scrollToPdfSelection();
     /// The selected PDF text ("" if none).
     std::string selectedPdfText() const;
     /// The setsquare / compass on the canvas.

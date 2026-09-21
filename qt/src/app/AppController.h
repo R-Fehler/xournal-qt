@@ -358,6 +358,10 @@ public:
     Q_INVOKABLE bool dragPdfSelection(qreal x, qreal y, bool startEnd);
     /// Where the selection begins and ends, for the handles (an empty rect: nothing selected).
     Q_INVOKABLE QRectF pdfSelectionEnds() const;
+    /// All of the selected text on the canvas, for the actions beside it (an empty rect: nothing selected).
+    Q_INVOKABLE QRectF pdfSelectionBox() const;
+    /// Scroll back to the selected text (it can be far away after scrolling).
+    Q_INVOKABLE void showPdfSelection();
     /// PDF text is selected right now (then only copying and marking it make sense).
     Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextSelectionChanged)
     bool pdfTextIsSelected() const;

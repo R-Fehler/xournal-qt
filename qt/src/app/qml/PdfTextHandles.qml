@@ -20,8 +20,12 @@ Item {
         target: app
         function onPdfTextSelectionChanged() { handles.refresh() }
         function onPdfTextModeChanged() { handles.refresh() }
-        function onZoomChanged() { handles.refresh() }
         function onPageChanged() { handles.refresh() }
+    }
+    // The knobs sit on the text, so they go along with it whenever the view scrolls or zooms
+    Connections {
+        target: canvas
+        function onViewportChanged() { handles.refresh() }
     }
     onVisibleChanged: if (visible) refresh()
 
@@ -33,7 +37,9 @@ Item {
         height: 44
         x: where.x - width / 2
         y: where.y - height / 2
-        visible: handles.ends.width !== 0 || handles.ends.height !== 0
+        // Nothing of it outside the canvas: scrolled away, the knobs are not shown (the action pill takes over)
+        visible: (handles.ends.width !== 0 || handles.ends.height !== 0) && where.y > -8 &&
+                 where.y < handles.height + 8 && where.x > -8 && where.x < handles.width + 8
         Rectangle {
             anchors.centerIn: parent
             width: 18; height: 18; radius: 9

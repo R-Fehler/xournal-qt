@@ -247,6 +247,9 @@ cd build-qt
       does not draw. Everything works right away again: pen, scrolling, pinch zoom, tools.
 - [ ] Copy from the pill: the text is in the clipboard, the knobs are gone and the canvas takes input as before
       (this used to freeze the canvas).
+- [ ] Scroll and zoom while text is selected: the knobs and the pill stay on the text and follow it.
+- [ ] Scroll on until the text is out of sight: the pill waits at the top edge of the canvas with an arrow (up or
+      down, whichever way the text lies); tapping it goes back to the text, still selected.
 
 ## Selection with a finger
 - [ ] Select strokes or an image, then move the selection with a finger inside it: it follows; the page does not

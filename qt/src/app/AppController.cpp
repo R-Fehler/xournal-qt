@@ -1845,6 +1845,14 @@ bool AppController::dragPdfSelection(qreal x, qreal y, bool startEnd) {
 
 QRectF AppController::pdfSelectionEnds() const { return canvas() ? canvas()->pdfSelectionEnds() : QRectF(); }
 
+QRectF AppController::pdfSelectionBox() const { return canvas() ? canvas()->pdfSelectionBox() : QRectF(); }
+
+void AppController::showPdfSelection() {
+    if (canvas()) {
+        canvas()->scrollToPdfSelection();
+    }
+}
+
 bool AppController::hasPdfBackground() const {
     return session() && !session()->getDocument()->getPdfFilepath().empty();
 }

@@ -1566,6 +1566,68 @@ TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {
     EXPECT_EQ(elements(), before + 1) << "the pen works again after copying the text";
 }
 
+// The knobs and the actions belong to the text, so they travel with the page. Once the text is scrolled out of
+// sight the pill waits at the top edge and takes the reader back to it.
+TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    wait(100);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto* bar = find<QQuickItem>("pdfTextBar");
+    auto* handles = find<QQuickItem>("pdfTextHandles");
+    ASSERT_NE(bar, nullptr);
+    ASSERT_NE(handles, nullptr);
+
+    // Select a word of the PDF (the search knows where one is)
+    auto* session = controller->tabManager().currentSession();
+    QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
+    session->search().setQuery("Test", false);
+    ASSERT_TRUE(searched.wait(3000));
+    ASSERT_FALSE(session->search().hits().empty());
+    const QRectF hit = session->search().hits().front().rect;
+    session->search().clear();
+    const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
+    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(bar->isVisible());
+    EXPECT_FALSE(bar->property("away").toBool()) << "the text is in view";
+    const double barY = bar->y();
+    const double textY = controller->pdfSelectionBox().y();
+
+    // Scrolling moves the text under the pill, so the pill goes along (a little, the word stays in view)
+    const double pan = std::max(10.0, std::min(40.0, textY - 20));
+    view->getViewController().panBy(QPointF(0, -pan));
+    wait(60);
+    EXPECT_NEAR(controller->pdfSelectionBox().y(), textY - pan, 2);
+    EXPECT_NEAR(bar->y(), barY - pan, 3) << "the actions stay at the text";
+    EXPECT_FALSE(bar->property("away").toBool()) << "still in view";
+
+    // Far away: the pill waits at the top of the canvas, the knobs are out of the way
+    controller->jumpToPage(controller->pageCount() - 1);
+    wait(80);
+    until([&] { return bar->property("away").toBool(); });
+    EXPECT_TRUE(bar->property("away").toBool()) << "the text is out of sight";
+    EXPECT_TRUE(bar->isVisible()) << "but the actions stay, the text is still selected";
+    EXPECT_LT(bar->y(), canvasItem->mapToScene(QPointF(0, 0)).y() + 40) << "at the top edge";
+    auto* back = find<QQuickItem>("pdfBackToSelection");
+    ASSERT_NE(back, nullptr);
+    EXPECT_TRUE(back->isVisible()) << "with the way back to the text";
+    for (auto* knob: handles->findChildren<QQuickItem*>()) {
+        EXPECT_FALSE(knob->isVisible() && knob->property("startEnd").isValid())
+                << "no knobs while the text is away";
+    }
+
+    // The way back brings it into view again
+    click(back);
+    until([&] { return !bar->property("away").toBool(); });
+    EXPECT_FALSE(bar->property("away").toBool());
+    const QRectF box = controller->pdfSelectionBox();
+    EXPECT_GE(box.y(), 0);
+    EXPECT_LE(box.y(), canvasItem->height());
+    EXPECT_TRUE(controller->pdfTextIsSelected()) << "and it is still the same selection";
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

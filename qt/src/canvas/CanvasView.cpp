@@ -723,6 +723,46 @@ std::string CanvasView::selectedPdfText() const {
     return pdfSelection && pdfSelection->isFinalized() ? pdfSelection->getSelectedText() : std::string();
 }
 
+/// The selected text in the coordinates of its page (points); empty when nothing is selected.
+static QRectF selectedTextOnPage(const PdfElemSelection* selection) {
+    QRectF box;
+    if (!selection) {
+        return box;
+    }
+    for (const XojPdfRectangle& r: selection->getSelectedTextRects()) {
+        box |= QRectF(QPointF(std::min(r.x1, r.x2), std::min(r.y1, r.y2)),
+                      QPointF(std::max(r.x1, r.x2), std::max(r.y1, r.y2)));
+    }
+    return box;
+}
+
+QRectF CanvasView::pdfSelectionBox() const {
+    if (!hasPdfTextSelection() || !pdfSelectionPage) {
+        return {};
+    }
+    const auto idx = indexOf(pdfSelectionPage);
+    const QRectF onPage = selectedTextOnPage(pdfSelection.get());
+    if (!idx || onPage.isNull()) {
+        return {};
+    }
+    const double zoom = viewController.zoom();
+    const QRectF pageRect = pageViewRect(*idx);
+    return QRectF(pageRect.topLeft() + onPage.topLeft() * zoom, onPage.size() * zoom);
+}
+
+void CanvasView::scrollToPdfSelection() {
+    if (!hasPdfTextSelection() || !pdfSelectionPage) {
+        return;
+    }
+    const auto idx = indexOf(pdfSelectionPage);
+    const QRectF onPage = selectedTextOnPage(pdfSelection.get());
+    if (!idx || onPage.isNull()) {
+        return;
+    }
+    // A little air around it, so it does not sit right at the edge
+    viewController.scrollToPageRect(*idx, onPage.adjusted(-20, -40, 20, 40));
+}
+
 bool CanvasView::pdfTextSelectionContains(QPointF viewPos) const {
     if (!hasPdfTextSelection() || !pdfSelectionPage) {
         return false;
