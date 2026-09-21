@@ -276,6 +276,10 @@ cd build-qt
       Moving it with two fingers (or the right mouse button) now slides it along that stroke - also along a curve -
       and never off it, so lengths can be read along the line. A second tap on the magnet lets go. On a page
       without ink it says so and stays free.
+- [ ] The ruler in the pill draws the marks of the setsquare's scale onto the page with the pen's color and width:
+      short lines on the paper beside the long edge, every centimetre (whole ones a little longer). "1 cm" next to
+      it switches to every half centimetre and back. One Ctrl+Z takes all marks of one tap away. Not offered for
+      the compass.
 - [ ] The setsquare icon in the pill puts the tool aside: it is gone from the page and does not guide the pen, the
       pill shrinks to the icon. A tap on it brings the tool back where it lay (on the page one is at now if that
       spot is on it). The Shapes entry takes tool and pill away altogether.

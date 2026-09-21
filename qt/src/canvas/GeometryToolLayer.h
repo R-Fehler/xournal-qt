@@ -71,6 +71,12 @@ public:
     /// Where its middle is (the 0 of the setsquare's scale, the centre of the compass), page coordinates.
     QPointF middle() const;
 
+    /// Short lines at the marks of the setsquare's scale, every `spacingCm` along its long edge and on the outer side
+    /// of it (whole centimetres a little longer), as page coordinates. None for the compass or when it is not out.
+    std::vector<std::pair<QPointF, QPointF>> marks(double spacingCm) const;
+    static constexpr double MARK_CM = 0.25;
+    static constexpr double WHOLE_MARK_CM = 0.4;
+
     /// Where a stroke point goes: along the edge of the setsquare, or on the circle of the compass. Returns the
     /// point itself when it is too far away from the tool to snap to it.
     QPointF snap(QPointF pagePoint) const;

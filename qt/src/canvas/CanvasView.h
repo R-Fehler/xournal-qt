@@ -165,6 +165,9 @@ public:
     void scrollToPdfSelection();
     /// The selected PDF text ("" if none).
     std::string selectedPdfText() const;
+    /// Draw the marks of the setsquare's scale onto its page, every `spacingCm`, with the pen's color and width (one
+    /// step to undo). False when there is no setsquare out.
+    bool drawGeometryMarks(double spacingCm);
     /// The setsquare / compass on the canvas.
     GeometryToolLayer& geometryTool() { return geometry; }
     const GeometryToolLayer& geometryTool() const { return geometry; }

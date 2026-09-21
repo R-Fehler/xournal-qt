@@ -1582,6 +1582,25 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     click(find<QQuickItem>("geometryHold"));
     EXPECT_FALSE(controller->geometryHeldToStroke()) << "a page without ink: nothing to hold on to";
 
+    // Its marks, every centimetre or every half
+    auto elements = [&] {
+        return controller->tabManager().currentSession()->getDocument()->getPage(0)->getSelectedLayer()
+                ->getElements().size();
+    };
+    const size_t before = elements();
+    click(find<QQuickItem>("geometryMarks"));
+    EXPECT_EQ(elements(), before + 17) << "a mark every centimetre along the edge";
+    click(find<QQuickItem>("geometryMarkSpacing"));
+    EXPECT_DOUBLE_EQ(controller->geometryMarkSpacing(), 0.5);
+    click(find<QQuickItem>("geometryMarks"));
+    EXPECT_EQ(elements(), before + 17 + 33) << "and every half centimetre";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        auto* v = qobject_cast<xqt::CanvasView*>(find<QQuickItem>("canvas")->property("view").value<QObject*>());
+        v->getViewController().panBy(QPointF(0, -420));
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
     // The compass instead, then away again
     auto* compass = find<QObject>("compassItem");
     ASSERT_NE(compass, nullptr);

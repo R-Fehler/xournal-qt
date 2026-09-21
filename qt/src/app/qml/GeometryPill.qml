@@ -76,5 +76,27 @@ Pane {
             checked: app.geometryAngleSteps
             onToggled: app.geometryAngleSteps = checked
         }
+        // The setsquare's marks drawn onto the page, and how far apart (a tap on the distance takes the other one)
+        ToolSeparator { visible: !pill.small && !pill.compass }
+        IconButton {
+            objectName: "geometryMarks"
+            visible: !pill.small && !pill.compass
+            iconName: "xqt-ruler"
+            implicitWidth: 44
+            implicitHeight: 44
+            icon.width: 22
+            icon.height: 22
+            tip: qsTr("Draw a mark every %1 along the edge").arg(spacing.text)
+            onClicked: app.drawGeometryMarks()
+        }
+        PillToggle {
+            id: spacing
+            objectName: "geometryMarkSpacing"
+            visible: !pill.small && !pill.compass
+            checkable: false
+            text: app.geometryMarkSpacing === 1 ? qsTr("1 cm") : qsTr("½ cm")
+            tip: qsTr("Distance of the marks (tap for the other one)")
+            onClicked: app.geometryMarkSpacing = app.geometryMarkSpacing === 1 ? 0.5 : 1
+        }
     }
 }

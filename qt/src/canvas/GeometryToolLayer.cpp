@@ -294,6 +294,24 @@ QPointF GeometryToolLayer::middle() const {
     return {m.x0, m.y0};
 }
 
+std::vector<std::pair<QPointF, QPointF>> GeometryToolLayer::marks(double spacingCm) const {
+    std::vector<std::pair<QPointF, QPointF>> lines;
+    if (!visible() || type() != GeometryToolType::SETSQUARE || spacingCm <= 0) {
+        return lines;
+    }
+    // Along the long edge (y = 0 in the tool's own coordinates, from -height to +height); the triangle lies at
+    // y > 0, so the marks go the other way, onto the paper beside it.
+    const double height = tool->getHeight();
+    const int first = static_cast<int>(std::ceil(-height / spacingCm - 1e-9));
+    const int last = static_cast<int>(std::floor(height / spacingCm + 1e-9));
+    for (int n = first; n <= last; ++n) {
+        const double x = n * spacingCm;
+        const bool whole = std::abs(x - std::round(x)) < 1e-6;
+        lines.emplace_back(toPage(*tool, QPointF(x, 0)), toPage(*tool, QPointF(x, whole ? -WHOLE_MARK_CM : -MARK_CM)));
+    }
+    return lines;
+}
+
 QPointF GeometryToolLayer::snap(QPointF pagePoint) const {
     if (!tool) {
         return pagePoint;

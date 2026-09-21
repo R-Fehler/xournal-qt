@@ -916,6 +916,51 @@ bool CanvasView::markPdfText(PdfTextMode mode) {
     return true;
 }
 
+bool CanvasView::drawGeometryMarks(double spacingCm) {
+    const auto lines = geometry.marks(spacingCm);
+    CanvasPage* page = geometry.page();
+    if (lines.empty() || !page) {
+        return false;
+    }
+    PageRef pageRef = page->getPage();
+    Layer* layer = pageRef->getSelectedLayer();
+    ToolHandler* th = session.getToolHandler();
+    const Tool& pen = th->getTool(TOOL_PEN);
+    const double width = th->isCustomThicknessActive(TOOL_PEN) && th->getCustomThickness(TOOL_PEN) > 0
+                                 ? th->getCustomThickness(TOOL_PEN)
+                                 : pen.getThickness(pen.getSize());
+    Range dirty;
+    std::vector<ElementPtr> strokes;
+    for (const auto& [from, to]: lines) {
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setColor(pen.getColor());
+        stroke->setToolType(StrokeTool::PEN);
+        stroke->setWidth(width);
+        stroke->addPoint(Point(from.x(), from.y(), -1));
+        stroke->addPoint(Point(to.x(), to.y(), -1));
+        dirty.addPoint(from.x() - width, from.y() - width);
+        dirty.addPoint(from.x() + width, from.y() + width);
+        dirty.addPoint(to.x() - width, to.y() - width);
+        dirty.addPoint(to.x() + width, to.y() + width);
+        strokes.push_back(std::move(stroke));
+    }
+    std::vector<const Element*> ptrs;
+    Document* doc = session.getDocument();
+    doc->lock();
+    for (auto&& st: strokes) {
+        ptrs.push_back(st.get());
+        layer->addElement(std::move(st));
+    }
+    doc->unlock();
+    pageRef->fireElementsChanged(ptrs, dirty);
+    auto undo = std::make_unique<GroupUndoAction>();
+    for (const Element* e: ptrs) {
+        undo->addAction(std::make_unique<InsertUndoAction>(pageRef, layer, e));
+    }
+    session.getUndoRedoHandler()->addUndoAction(std::move(undo));
+    return true;
+}
+
 bool CanvasView::copyPdfText() {
     if (!hasPdfTextSelection()) {
         return false;

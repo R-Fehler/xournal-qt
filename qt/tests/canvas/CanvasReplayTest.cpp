@@ -729,6 +729,58 @@ TEST_F(CanvasReplayTest, theSetsquareHoldsOnToTheNearestStroke) {
     geometry.hide();
 }
 
+// The marks of the setsquare's scale drawn onto the page with the pen: every centimetre (or half), on the paper
+// beside the long edge, as one step to undo.
+TEST_F(CanvasReplayTest, theSetsquareDrawsItsMarksOntoThePage) {
+    auto& geometry = view->geometryTool();
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    const auto page = session->getDocument()->getPage(0);
+    const QPointF middle(page->getWidth() / 2, page->getHeight() / 2);
+    const size_t before = elementCount(0);
+
+    // Every centimetre from -8 to 8: 17 marks, standing on the edge and pointing away from the triangle
+    ASSERT_TRUE(view->drawGeometryMarks(1.0));
+    ASSERT_EQ(elementCount(0), before + 17);
+    std::vector<const Stroke*> marks;
+    for (const Element* e: page->getSelectedLayer()->getElementsView()) {
+        if (e->getType() == ELEMENT_STROKE) {
+            marks.push_back(static_cast<const Stroke*>(e));
+        }
+    }
+    ASSERT_EQ(marks.size(), 17u);
+    for (size_t i = 0; i < marks.size(); ++i) {
+        const Point a = marks[i]->getPoint(0);
+        const Point b = marks[i]->getPoint(1);
+        EXPECT_NEAR(a.y, middle.y(), 0.01) << "on the edge";
+        EXPECT_NEAR(a.x, middle.x() + (static_cast<double>(i) - 8) * CM, 0.01) << "a centimetre apart";
+        EXPECT_NEAR(b.y, middle.y() - GeometryToolLayer::WHOLE_MARK_CM * CM, 0.01) << "outward, off the triangle";
+        EXPECT_NEAR(b.x, a.x, 0.01);
+    }
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(elementCount(0), before) << "one step to undo";
+
+    // Half centimetres: 33 marks, those between the centimetres shorter
+    ASSERT_TRUE(view->drawGeometryMarks(0.5));
+    EXPECT_EQ(elementCount(0), before + 33);
+    session->getUndoRedoHandler()->undo();
+    const auto lines = geometry.marks(0.5);
+    ASSERT_EQ(lines.size(), 33u);
+    EXPECT_NEAR(lines[1].first.y() - lines[1].second.y(), GeometryToolLayer::MARK_CM * CM, 0.01) << "a half one";
+    EXPECT_NEAR(lines[2].first.y() - lines[2].second.y(), GeometryToolLayer::WHOLE_MARK_CM * CM, 0.01);
+
+    // Turned by a quarter, the marks go along with the edge
+    geometry.turnAndSize(M_PI / 2, 1.0);
+    const auto turned = geometry.marks(1.0);
+    ASSERT_FALSE(turned.empty());
+    EXPECT_NEAR(turned[0].first.y(), turned[0].second.y(), 0.01) << "lying now";
+    EXPECT_NEAR(turned[0].first.x(), middle.x(), 0.01) << "on the upright edge";
+
+    // The compass has no scale to mark
+    geometry.toggle(GeometryToolType::COMPASS);
+    EXPECT_FALSE(view->drawGeometryMarks(1.0));
+    geometry.hide();
+}
+
 TEST_F(CanvasReplayTest, twoFingersOnTheSetsquareTurnAndSizeIt) {
     auto& vc = view->getViewController();
     vc.setViewSize(QSizeF(900, 600));

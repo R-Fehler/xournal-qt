@@ -414,6 +414,11 @@ public:
     Q_PROPERTY(bool geometryHeldToStroke READ geometryHeldToStroke WRITE setGeometryHeldToStroke NOTIFY toolChanged)
     bool geometryHeldToStroke() const;
     void setGeometryHeldToStroke(bool held);
+    /// Draw the marks of the setsquare's scale, every `geometryMarkSpacing` centimetres (1 or 0.5), with the pen.
+    Q_INVOKABLE bool drawGeometryMarks();
+    Q_PROPERTY(qreal geometryMarkSpacing READ geometryMarkSpacing WRITE setGeometryMarkSpacing NOTIFY toolChanged)
+    qreal geometryMarkSpacing() const { return markSpacing; }
+    void setGeometryMarkSpacing(qreal cm);
     /// Turning the setsquare / compass goes in steps of 15 degrees.
     Q_PROPERTY(bool geometryAngleSteps READ geometryAngleSteps WRITE setGeometryAngleSteps NOTIFY toolChanged)
     bool geometryAngleSteps() const;
@@ -514,6 +519,7 @@ Q_SIGNALS:
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    qreal markSpacing = 1.0;
     /// Files were renamed or moved (library, recent files): open documents and the recent list follow.
     void filesChanged(const xqt::DocumentFiles::Result& result);
     void currentTabChanged();

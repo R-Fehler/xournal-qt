@@ -1435,6 +1435,15 @@ void AppController::setGeometryHeldToStroke(bool held) {
     Q_EMIT toolChanged();
 }
 
+bool AppController::drawGeometryMarks() { return canvas() && canvas()->drawGeometryMarks(markSpacing); }
+
+void AppController::setGeometryMarkSpacing(qreal cm) {
+    if (cm > 0 && cm != markSpacing) {
+        markSpacing = cm;
+        Q_EMIT toolChanged();
+    }
+}
+
 bool AppController::geometryAngleSteps() const { return canvas() && canvas()->geometryTool().angleSteps(); }
 
 void AppController::setGeometryAngleSteps(bool steps) {
