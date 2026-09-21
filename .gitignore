@@ -63,3 +63,6 @@ Debug
 # Miscellaneous
 .DS_STORE
 *~
+
+# Screenshots and throwaway files from development
+/scratch/
