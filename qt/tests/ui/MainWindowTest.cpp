@@ -1559,6 +1559,27 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     EXPECT_EQ(controller->geometryTool(), QStringLiteral("setsquare"));
     EXPECT_TRUE(item->property("checked").toBool()) << "the entry shows that it is out";
 
+    // Its pill: the tool can be put aside and brought back, and turned in steps of 15 degrees
+    auto* pill = find<QQuickItem>("geometryPill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    EXPECT_TRUE(pill->isVisible()) << "the pill comes with the tool";
+    auto* steps = find<QQuickItem>("geometrySteps");
+    ASSERT_NE(steps, nullptr);
+    click(steps);
+    EXPECT_TRUE(controller->geometryAngleSteps());
+    const double wide = pill->width();
+    click(find<QQuickItem>("geometryToggle"));
+    EXPECT_TRUE(controller->geometryMinimized()) << "put aside";
+    EXPECT_EQ(controller->geometryTool(), QStringLiteral("setsquare")) << "but still switched on";
+    EXPECT_TRUE(pill->isVisible()) << "the pill stays";
+    until([&] { return pill->width() < wide; });
+    EXPECT_LT(pill->width(), wide) << "small, only the icon";
+    EXPECT_FALSE(steps->isVisible());
+    click(find<QQuickItem>("geometryToggle"));
+    EXPECT_FALSE(controller->geometryMinimized()) << "back again";
+    EXPECT_TRUE(controller->geometryAngleSteps()) << "with its steps";
+
     // The compass instead, then away again
     auto* compass = find<QObject>("compassItem");
     ASSERT_NE(compass, nullptr);
@@ -1566,6 +1587,8 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     EXPECT_EQ(controller->geometryTool(), QStringLiteral("compass"));
     QMetaObject::invokeMethod(compass, "triggered");
     EXPECT_TRUE(controller->geometryTool().isEmpty());
+    until([&] { return !pill->isVisible(); });
+    EXPECT_FALSE(pill->isVisible()) << "the Shapes entry takes tool and pill away";
 }
 
 // Selected PDF text used to freeze the canvas: its knobs lie over the whole canvas, and after copying nothing

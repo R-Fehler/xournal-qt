@@ -83,6 +83,8 @@ void GeometryToolLayer::toggle(GeometryToolType wanted) {
     } else {
         tool = std::make_unique<Compass>(Compass::INITIAL_HEIGHT, 0, width / 2, height / 2);
     }
+    isMinimized = false;
+    freeRotation = 0;
     place(*page);
 }
 
@@ -105,6 +107,50 @@ void GeometryToolLayer::remove() {
     }
     onPage = nullptr;
     tool.reset();
+    isMinimized = false;
+}
+
+void GeometryToolLayer::setMinimized(bool minimized) {
+    if (!tool || minimized == isMinimized) {
+        return;
+    }
+    if (minimized) {
+        if (onPage) {
+            onPage->removeOverlayViewsOf(tool.get());
+        }
+        onPage = nullptr;
+        isMinimized = true;
+        Q_EMIT view.updateRequested();
+        return;
+    }
+    // Back on the page one is at now (the one it lay on may be far away), where it lay if that is on this page
+    const size_t pageNo = view.getSession().getCurrentPageNo();
+    CanvasPage* page = view.pageCount() > pageNo ? view.getPage(pageNo) : nullptr;
+    if (!page) {
+        return;
+    }
+    if (const PageRef p = page->getPage()) {
+        const cairo_matrix_t m = tool->getMatrix();
+        if (m.x0 < 0 || m.y0 < 0 || m.x0 > p->getWidth() || m.y0 > p->getHeight()) {
+            tool->setOrigin({p->getWidth() / 2, p->getHeight() / 2});
+        }
+    }
+    isMinimized = false;
+    place(*page);
+}
+
+void GeometryToolLayer::setAngleSteps(bool on) {
+    steps = on;
+    if (!tool) {
+        return;
+    }
+    freeRotation = tool->getRotation();
+    if (steps) {
+        // Straight onto the nearest step
+        tool->setRotation(std::round(freeRotation / ANGLE_STEP) * ANGLE_STEP);
+        tool->notify(true);
+        Q_EMIT view.updateRequested();
+    }
 }
 
 void GeometryToolLayer::hide() {
@@ -143,7 +189,8 @@ void GeometryToolLayer::turnAndSize(double angle, double factor) {
         return;
     }
     if (angle != 0) {
-        tool->setRotation(tool->getRotation() + angle);
+        freeRotation += angle;
+        tool->setRotation(steps ? std::round(freeRotation / ANGLE_STEP) * ANGLE_STEP : freeRotation);
     }
     if (factor > 0 && std::abs(factor - 1) > 0.001) {
         tool->setHeight(std::clamp(tool->getHeight() * factor, 2.0, 30.0));

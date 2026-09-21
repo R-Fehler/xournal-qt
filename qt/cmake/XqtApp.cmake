@@ -101,6 +101,7 @@ set(XQT_QML_FILES
     src/app/qml/ContextPill.qml
     src/app/qml/PdfTextHandles.qml
     src/app/qml/PenPill.qml
+    src/app/qml/GeometryPill.qml
     src/app/qml/PrintDialog.qml
     src/app/qml/ShortcutSheet.qml
     src/app/qml/LayerList.qml

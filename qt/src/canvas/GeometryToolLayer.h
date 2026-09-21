@@ -11,6 +11,7 @@
  */
 #pragma once
 
+#include <cmath>
 #include <memory>
 #include <optional>
 
@@ -33,8 +34,15 @@ public:
 
     /// Put a setsquare or a compass on the current page (the same type again takes it away).
     void toggle(GeometryToolType type);
+    /// Take it away altogether.
     void hide();
-    bool visible() const { return tool != nullptr; }
+    /// It is out and to be seen: drawn on its page, guiding the pen, moved by fingers.
+    bool visible() const { return tool != nullptr && !isMinimized; }
+    /// It is out, maybe only minimized (put aside for a moment: not shown, not guiding, but where it was).
+    bool active() const { return tool != nullptr; }
+    bool minimized() const { return tool != nullptr && isMinimized; }
+    /// Put it aside / bring it back on the current page, where it lay and as it was turned.
+    void setMinimized(bool minimized);
     std::optional<GeometryToolType> type() const;
     /// The page it lies on (none if it is not out).
     CanvasPage* page() const { return onPage; }
@@ -45,6 +53,10 @@ public:
     void moveBy(QPointF delta);
     /// Turn it around its middle by this angle, and size it by this factor.
     void turnAndSize(double angle, double factor);
+    /// Turning goes in steps of 15 degrees (the fingers still turn freely underneath, the tool follows in steps).
+    void setAngleSteps(bool steps);
+    bool angleSteps() const { return steps; }
+    static constexpr double ANGLE_STEP = M_PI / 12;
     /// How it stands and how big it is (radians / centimetres); 0 when it is not out.
     double rotation() const;
     double height() const;
@@ -62,6 +74,10 @@ private:
     CanvasView& view;
     std::unique_ptr<GeometryTool> tool;
     CanvasPage* onPage = nullptr;
+    bool isMinimized = false;
+    bool steps = false;
+    /// Where the fingers have turned it to; with steps the tool shows the nearest step of it
+    double freeRotation = 0;
 };
 
 }  // namespace xqt

@@ -270,6 +270,11 @@ cd build-qt
       right button offers the actions as before.
 - [ ] Shapes tool → "Compass": drawing anywhere on its disc gives an arc of its radius; the same entry again takes
       the tool away.
+- [ ] With the tool out, a pill sits at the top right of the canvas. "15°" on: turning it with two fingers goes in
+      steps of 15 degrees (the fingers turn on freely, the tool follows step by step); off: freely again.
+- [ ] The setsquare icon in the pill puts the tool aside: it is gone from the page and does not guide the pen, the
+      pill shrinks to the icon. A tap on it brings the tool back where it lay (on the page one is at now if that
+      spot is on it). The Shapes entry takes tool and pill away altogether.
 
 ## Table of contents
 - [ ] A PDF with bookmarks (e.g. a book or thesis): sidebar "Contents": indented headings, current section highlighted, tap goes there, arrows collapse.

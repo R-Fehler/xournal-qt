@@ -1237,6 +1237,14 @@ ApplicationWindow {
 
     // Without a tool bar and with an ink tool: colors, width and pen / highlighter at a side of the screen
     PenPill {}
+    // The setsquare / compass: what it can do, and putting it aside for a moment
+    GeometryPill {
+        anchors.top: canvas.top
+        anchors.right: canvas.right
+        anchors.topMargin: 12
+        anchors.rightMargin: 20
+        z: 57
+    }
     ColorDialog {
         id: pillColorDialog
         onAccepted: app.addPenColor(selectedColor)

@@ -406,6 +406,14 @@ public:
     /// Which one lies on the page ("" if none).
     Q_PROPERTY(QString geometryTool READ geometryTool NOTIFY toolChanged)
     QString geometryTool() const;
+    /// The setsquare / compass is put aside for a moment (its pill stays, small; a tap brings it back).
+    Q_PROPERTY(bool geometryMinimized READ geometryMinimized WRITE setGeometryMinimized NOTIFY toolChanged)
+    bool geometryMinimized() const;
+    void setGeometryMinimized(bool minimized);
+    /// Turning the setsquare / compass goes in steps of 15 degrees.
+    Q_PROPERTY(bool geometryAngleSteps READ geometryAngleSteps WRITE setGeometryAngleSteps NOTIFY toolChanged)
+    bool geometryAngleSteps() const;
+    void setGeometryAngleSteps(bool steps);
     Q_INVOKABLE void setColor(const QColor& color);
     /// 0 = very fine ... 4 = very thick (upstream ToolSize), 5 = the tool's own width
     Q_INVOKABLE void setSize(int size);

@@ -639,6 +639,59 @@ TEST_F(CanvasReplayTest, drawingOnTheSetsquareFollowsItsEdgesAndTwoFingersMoveIt
     geometry.hide();
 }
 
+// Turning in steps of 15 degrees, and putting the tool aside for a moment without losing where it lay.
+TEST_F(CanvasReplayTest, theSetsquareTurnsInStepsAndCanBePutAside) {
+    auto& geometry = view->geometryTool();
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    ASSERT_TRUE(geometry.visible());
+    const double step = GeometryToolLayer::ANGLE_STEP;
+
+    // Freely turned by 20 degrees; switching the steps on puts it on 15
+    geometry.turnAndSize(20 * M_PI / 180, 1.0);
+    EXPECT_NEAR(geometry.rotation(), 20 * M_PI / 180, 1e-9);
+    geometry.setAngleSteps(true);
+    EXPECT_NEAR(geometry.rotation(), step, 1e-9) << "onto the nearest step";
+    // The fingers turn on underneath: a small turn stays on the step, past the middle it takes the next one
+    geometry.turnAndSize(1 * M_PI / 180, 1.0);
+    EXPECT_NEAR(geometry.rotation(), step, 1e-9) << "21 degrees: 15";
+    geometry.turnAndSize(3 * M_PI / 180, 1.0);
+    EXPECT_NEAR(geometry.rotation(), 2 * step, 1e-9) << "24 degrees: 30";
+    geometry.turnAndSize(-20 * M_PI / 180, 1.0);
+    EXPECT_NEAR(geometry.rotation(), 0, 1e-9) << "4 degrees: 0";
+    geometry.setAngleSteps(false);
+    geometry.turnAndSize(2 * M_PI / 180, 1.0);
+    EXPECT_NEAR(geometry.rotation(), 2 * M_PI / 180, 1e-9) << "without steps it turns freely again";
+
+    // Put aside: not on the page, not guiding the pen, but still out, and back where it was
+    const auto page = session->getDocument()->getPage(0);
+    const QPointF middle(page->getWidth() / 2, page->getHeight() / 2);
+    geometry.moveBy(QPointF(30, 40));
+    const double turned = geometry.rotation();
+    geometry.setMinimized(true);
+    EXPECT_FALSE(geometry.visible());
+    EXPECT_TRUE(geometry.active());
+    EXPECT_TRUE(geometry.minimized());
+    EXPECT_FALSE(view->getPage(0)->hasOverlays()) << "not drawn";
+    const size_t before = elementCount(0);
+    drawLine(0, middle + QPointF(-60, 45), middle + QPointF(60, 45));  // on the triangle, 5 pt off its edge
+    processEvents();
+    ASSERT_EQ(elementCount(0), before + 1);
+    const Stroke* last = nullptr;
+    for (const Element* e: page->getSelectedLayer()->getElementsView()) {
+        if (e->getType() == ELEMENT_STROKE) {
+            last = static_cast<const Stroke*>(e);
+        }
+    }
+    ASSERT_NE(last, nullptr);
+    EXPECT_NEAR(last->getPoint(0).y, middle.y() + 45, 1) << "put aside, it does not guide the pen";
+    geometry.setMinimized(false);
+    EXPECT_TRUE(geometry.visible());
+    EXPECT_NEAR(geometry.rotation(), turned, 1e-9) << "turned as before";
+    EXPECT_TRUE(view->getPage(0)->hasOverlays());
+    geometry.hide();
+    EXPECT_FALSE(geometry.active());
+}
+
 TEST_F(CanvasReplayTest, twoFingersOnTheSetsquareTurnAndSizeIt) {
     auto& vc = view->getViewController();
     vc.setViewSize(QSizeF(900, 600));

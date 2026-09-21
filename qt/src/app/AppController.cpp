@@ -376,6 +376,7 @@ void AppController::currentTabChanged() {
     Q_EMIT selectionChanged();
     Q_EMIT navigationChanged();
     Q_EMIT pdfTextSelectionChanged();
+    Q_EMIT toolChanged();  // the setsquare / compass of that tab
 }
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
@@ -1411,8 +1412,26 @@ void AppController::toggleGeometryTool(const QString& which) {
     Q_EMIT toolChanged();
 }
 
+bool AppController::geometryMinimized() const { return canvas() && canvas()->geometryTool().minimized(); }
+
+void AppController::setGeometryMinimized(bool minimized) {
+    if (canvas()) {
+        canvas()->geometryTool().setMinimized(minimized);
+        Q_EMIT toolChanged();
+    }
+}
+
+bool AppController::geometryAngleSteps() const { return canvas() && canvas()->geometryTool().angleSteps(); }
+
+void AppController::setGeometryAngleSteps(bool steps) {
+    if (canvas()) {
+        canvas()->geometryTool().setAngleSteps(steps);
+        Q_EMIT toolChanged();
+    }
+}
+
 QString AppController::geometryTool() const {
-    if (!canvas() || !canvas()->geometryTool().visible()) {
+    if (!canvas() || !canvas()->geometryTool().active()) {
         return {};
     }
     return canvas()->geometryTool().type() == GeometryToolType::SETSQUARE ? QStringLiteral("setsquare")
