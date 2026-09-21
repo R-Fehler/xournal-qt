@@ -47,7 +47,9 @@ public:
         /// 0-based page index (the row; stays right in filtered views)
         PageIndexRole,
         /// The page is selected (for page operations in the sidebar and the page grid)
-        SelectedRole
+        SelectedRole,
+        /// URL of the page's sketch, shown at once under the thumbnail (PageSketches); empty while it has none
+        SketchRole
     };
 
     static constexpr int MAX_THUMBNAIL_HITS = 50;

@@ -308,9 +308,10 @@ private:
     DocumentSession& session;
 };
 
-// The page revisions follow the same events: every change of a page, whichever way, comes by here.
+// The page revisions follow the same events: every change of a page, whichever way, comes by here. Workers (the
+// thumbnails) look pages up by revision, so the list has a lock of its own.
 namespace {
-quint64 nextPageRevision = 1;
+std::atomic<quint64> nextPageStamp{1};
 }
 class DocumentSession::PageRevisionKeeper final: public DocumentListener {
 public:
@@ -327,43 +328,90 @@ public:
     void pageSizeChanged(size_t page) override { session.revisePage(page); }
     void pageChanged(size_t page) override { session.revisePage(page); }
     void pageInserted(size_t page) override {
-        if (page > revisions.size()) {
+        PageRef ref;
+        {
+            std::shared_lock lock(*session.getDocument());
+            if (page < session.getDocument()->getPageCount()) {
+                ref = session.getDocument()->getPage(page);
+            }
+        }
+        {
+            std::lock_guard lock(mtx);
+            if (page <= stamps.size() && ref) {
+                stamps.insert(stamps.begin() + static_cast<std::ptrdiff_t>(page),
+                              PageStamp{nextPageStamp++, nextPageStamp++, ref});
+            }
+        }
+        if (stamps.size() != session.getDocument()->getPageCount()) {
             rebuild();
-        } else {
-            revisions.insert(revisions.begin() + static_cast<std::ptrdiff_t>(page), nextPageRevision++);
         }
         Q_EMIT session.pageRevisionsChanged();
     }
     void pageDeleted(size_t page) override {
         // (before the page is gone)
-        if (page < revisions.size()) {
-            revisions.erase(revisions.begin() + static_cast<std::ptrdiff_t>(page));
+        {
+            std::lock_guard lock(mtx);
+            if (page < stamps.size()) {
+                stamps.erase(stamps.begin() + static_cast<std::ptrdiff_t>(page));
+            }
         }
         Q_EMIT session.pageRevisionsChanged();
     }
     void rebuild() {
-        std::shared_lock lock(*session.getDocument());
-        revisions.resize(session.getDocument()->getPageCount());
-        for (auto& r: revisions) {
-            r = nextPageRevision++;
+        std::vector<PageStamp> fresh;
+        {
+            std::shared_lock lock(*session.getDocument());
+            for (size_t i = 0; i < session.getDocument()->getPageCount(); ++i) {
+                fresh.push_back(PageStamp{nextPageStamp++, nextPageStamp++, session.getDocument()->getPage(i)});
+            }
         }
+        std::lock_guard lock(mtx);
+        stamps = std::move(fresh);
     }
-    std::vector<quint64> revisions;
+    mutable std::mutex mtx;
+    std::vector<PageStamp> stamps;
 
 private:
     DocumentSession& session;
 };
 
 quint64 DocumentSession::pageRevision(size_t page) const {
-    const auto& revisions = pageRevisionKeeper->revisions;
-    return page < revisions.size() ? revisions[page] : 0;
+    std::lock_guard lock(pageRevisionKeeper->mtx);
+    const auto& stamps = pageRevisionKeeper->stamps;
+    return page < stamps.size() ? stamps[page].revision : 0;
+}
+
+quint64 DocumentSession::pageId(size_t page) const {
+    std::lock_guard lock(pageRevisionKeeper->mtx);
+    const auto& stamps = pageRevisionKeeper->stamps;
+    return page < stamps.size() ? stamps[page].id : 0;
+}
+
+std::vector<DocumentSession::PageStamp> DocumentSession::pageStamps() const {
+    std::lock_guard lock(pageRevisionKeeper->mtx);
+    return pageRevisionKeeper->stamps;
+}
+
+std::optional<DocumentSession::PageStamp> DocumentSession::pageOfRevision(quint64 revision) const {
+    std::lock_guard lock(pageRevisionKeeper->mtx);
+    for (const auto& s: pageRevisionKeeper->stamps) {
+        if (s.revision == revision) {
+            return s;
+        }
+    }
+    return std::nullopt;
 }
 
 void DocumentSession::revisePage(size_t page) {
-    if (auto& revisions = pageRevisionKeeper->revisions; page < revisions.size()) {
-        revisions[page] = nextPageRevision++;
-        Q_EMIT pageRevisionsChanged();
+    {
+        std::lock_guard lock(pageRevisionKeeper->mtx);
+        auto& stamps = pageRevisionKeeper->stamps;
+        if (page >= stamps.size()) {
+            return;
+        }
+        stamps[page].revision = nextPageStamp++;
     }
+    Q_EMIT pageRevisionsChanged();
 }
 
 void DocumentSession::shiftPageLinks(size_t position, int delta) {

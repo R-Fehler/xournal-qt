@@ -35,6 +35,7 @@
 #include "shell/Previews.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SingleInstance.h"
+#include "shell/PageSketches.h"
 #include "shell/Thumbnails.h"
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
@@ -118,6 +119,7 @@ int main(int argc, char* argv[]) {
 
     QQmlApplicationEngine engine;
     engine.addImageProvider("thumbnail", new xqt::ThumbnailProvider);  // the engine takes ownership
+    engine.addImageProvider("sketch", new xqt::SketchProvider);
     engine.addImageProvider("preview", new xqt::PreviewProvider);
     engine.addImageProvider("hitpage", new xqt::HitPageProvider);
     engine.rootContext()->setContextProperty("app", &controller);

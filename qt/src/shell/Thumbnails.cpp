@@ -18,6 +18,9 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "pdf/base/XojPdfPage.h"
+
+#include "PageSketches.h"
 #include "view/DocumentView.h"
 #include "view/background/BackgroundFlags.h"
 
@@ -47,19 +50,18 @@ public:
     std::atomic<bool> cancelled{false};
 };
 
-/// The drawn thumbnails of each page ("<session>/<page>"), of its latest revision only, by width; the least recently
-/// used go first.
+/// The drawn thumbnails of each page revision ("<session>/<revision>"), by width; the least recently used go first.
 class Cache {
 public:
-    QImage find(const QString& page, const QString& revision, int width) {
+    QImage find(const QString& key, int width) {
         std::lock_guard lock(mtx);
-        auto it = pages.find(page);
-        if (it == pages.end() || it->second.revision != revision) {
+        auto it = pages.find(key);
+        if (it == pages.end()) {
             return {};
         }
         // That width, or scaled down from the smallest bigger one
-        auto w = it->second.widths.lower_bound(width);
-        if (w == it->second.widths.end()) {
+        auto w = it->second.lower_bound(width);
+        if (w == it->second.end()) {
             return {};
         }
         lru.splice(lru.begin(), lru, w->second.used);
@@ -68,21 +70,27 @@ public:
         }
         return w->second.image.scaledToWidth(width, Qt::SmoothTransformation);
     }
-    void put(const QString& page, const QString& revision, int width, const QImage& image) {
+    /// The smallest one at least `width` wide, as it is (does not count as used)
+    QImage peek(const QString& key, int width) {
+        std::lock_guard lock(mtx);
+        auto it = pages.find(key);
+        if (it == pages.end()) {
+            return {};
+        }
+        auto w = it->second.lower_bound(width);
+        return w == it->second.end() ? QImage() : w->second.image;
+    }
+    void put(const QString& key, int width, const QImage& image) {
         if (image.isNull()) {
             return;
         }
         std::lock_guard lock(mtx);
-        auto& slot = pages[page];
-        if (slot.revision != revision) {
-            dropWidths(slot);  // an older picture of the page
-            slot.revision = revision;
-        }
-        if (slot.widths.count(width)) {
+        auto& widths = pages[key];
+        if (widths.count(width)) {
             return;
         }
-        lru.push_front({page, width});
-        slot.widths.emplace(width, Entry{image, lru.begin()});
+        lru.push_front({key, width});
+        widths.emplace(width, Entry{image, lru.begin()});
         bytes += image.sizeInBytes();
         shrink();
     }
@@ -91,7 +99,10 @@ public:
         const QString prefix = QString::number(session) + '/';
         for (auto it = pages.begin(); it != pages.end();) {
             if (it->first.startsWith(prefix)) {
-                dropWidths(it->second);
+                for (auto& [w, e]: it->second) {
+                    bytes -= e.image.sizeInBytes();
+                    lru.erase(e.used);
+                }
                 it = pages.erase(it);
             } else {
                 ++it;
@@ -109,40 +120,29 @@ public:
     }
 
 private:
-    using Use = std::list<std::pair<QString, int>>;  ///< page, width; front: used last
+    using Use = std::list<std::pair<QString, int>>;  ///< key, width; front: used last
     struct Entry {
         QImage image;
         Use::iterator used;
     };
-    struct Slot {
-        QString revision;
-        std::map<int, Entry> widths;
-    };
-    void dropWidths(Slot& slot) {
-        for (auto& [w, e]: slot.widths) {
-            bytes -= e.image.sizeInBytes();
-            lru.erase(e.used);
-        }
-        slot.widths.clear();
-    }
     void shrink() {
         while (bytes > limit && !lru.empty()) {
-            const auto [page, width] = lru.back();
+            const auto [key, width] = lru.back();
             lru.pop_back();
-            auto it = pages.find(page);
-            auto w = it->second.widths.find(width);
+            auto it = pages.find(key);
+            auto w = it->second.find(width);
             bytes -= w->second.image.sizeInBytes();
-            it->second.widths.erase(w);
-            if (it->second.widths.empty()) {
+            it->second.erase(w);
+            if (it->second.empty()) {
                 pages.erase(it);
             }
         }
     }
     std::mutex mtx;
-    std::unordered_map<QString, Slot> pages;
+    std::unordered_map<QString, std::map<int, Entry>> pages;
     Use lru;
     qint64 bytes = 0;
-    qint64 limit = ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024;
+    qint64 limit = ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024 * 3 / 4;
 };
 Cache& cache() {
     static Cache c;
@@ -161,7 +161,14 @@ QThreadPool& pool() {
 }
 }  // namespace
 
-void ThumbnailProvider::setCacheLimit(qint64 bytes) { cache().setLimit(bytes); }
+void ThumbnailProvider::setCacheLimit(qint64 bytes) {
+    cache().setLimit(bytes - bytes / 4);
+    PageSketches::instance().setBudget(bytes / 4);
+}
+
+QImage ThumbnailProvider::keptImage(quint64 session, quint64 revision, int width) {
+    return cache().peek(QString("%1/%2").arg(session).arg(revision), width);
+}
 qint64 ThumbnailProvider::cacheBytes() { return cache().size(); }
 int ThumbnailProvider::renderCount() { return renders.load(); }
 
@@ -175,6 +182,7 @@ quint64 ThumbnailProvider::registerSession(DocumentSession* session) {
     }
     const quint64 id = r.nextId++;
     r.sessions[id] = session;
+    PageSketches::instance().add(id, session);
     return id;
 }
 
@@ -187,7 +195,9 @@ void ThumbnailProvider::unregisterSession(DocumentSession* session) {
             r.sessions.erase(it);
             r.idle.wait(lock, [&] { return r.busy[id] == 0; });
             r.busy.erase(id);
+            lock.unlock();
             cache().dropSession(id);
+            PageSketches::instance().remove(id);
             return;
         }
     }
@@ -204,20 +214,53 @@ quint64 ThumbnailProvider::idOf(const DocumentSession* session) {
     return 0;
 }
 
+DocumentSession* ThumbnailProvider::acquireSession(quint64 id) {
+    auto& r = registry();
+    std::lock_guard lock(r.mtx);
+    auto it = r.sessions.find(id);
+    if (it == r.sessions.end()) {
+        return nullptr;
+    }
+    ++r.busy[id];
+    return it->second;
+}
+
+void ThumbnailProvider::releaseSession(quint64 id) {
+    auto& r = registry();
+    std::lock_guard lock(r.mtx);
+    --r.busy[id];
+    r.idle.notify_all();
+}
+
 QImage ThumbnailProvider::render(DocumentSession& session, size_t pageNo, int width) {
     ++renders;
     return renderDocument(*session.getDocument(), pageNo, width);
 }
 
 QImage ThumbnailProvider::renderDocument(Document& document, size_t pageNo, int width) {
-    Document* doc = &document;
-    std::shared_lock lock(*doc);
-    if (pageNo >= doc->getPageCount()) {
-        return {};
+    PageRef page;
+    {
+        std::shared_lock lock(document);
+        if (pageNo >= document.getPageCount()) {
+            return {};
+        }
+        page = document.getPage(pageNo);
     }
-    PageRef page = doc->getPage(pageNo);
-    const double zoom = width / page->getWidth();
-    QImage img(width, std::max(1, static_cast<int>(page->getHeight() * zoom)), QImage::Format_ARGB32_Premultiplied);
+    return renderPage(document, page, width);
+}
+
+QImage ThumbnailProvider::renderPage(Document& doc, const PageRef& page, int width, const XojPdfDocument* pdf) {
+    double zoom = 1;
+    XojPdfPageSPtr pdfPage;
+    QImage img;
+    {
+        std::shared_lock lock(doc);
+        zoom = width / page->getWidth();
+        img = QImage(width, std::max(1, static_cast<int>(page->getHeight() * zoom)), QImage::Format_ARGB32_Premultiplied);
+        if (page->getBackgroundType().isPdfPage()) {
+            pdfPage = pdf ? pdf->getPage(page->getPdfPageNr()) : doc.getPdfPage(page->getPdfPageNr());
+        }
+    }
     img.fill(Qt::white);
     cairo_surface_t* surface = cairo_image_surface_create_for_data(img.bits(), CAIRO_FORMAT_ARGB32, img.width(),
                                                                    img.height(), static_cast<int>(img.bytesPerLine()));
@@ -227,15 +270,18 @@ QImage ThumbnailProvider::renderDocument(Document& document, size_t pageNo, int 
     // Like upstream's SaveJob::updatePreview / PreviewJob: without a PdfCache, render the PDF background directly.
     xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
     if (page->getBackgroundType().isPdfPage()) {
-        if (auto pdfPage = doc->getPdfPage(page->getPdfPageNr())) {
-            pdfPage->render(cr);
+        if (pdfPage) {
+            pdfPage->render(cr);  // (the page keeps its PDF document)
         }
         flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
     } else {
         flags.forceBackgroundColor = xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR;
     }
-    DocumentView view;
-    view.drawPage(page, cr, true, flags);
+    {
+        std::shared_lock lock(doc);
+        DocumentView view;
+        view.drawPage(page, cr, true, flags);
+    }
     cairo_destroy(cr);
     cairo_surface_destroy(surface);
     return img;
@@ -247,13 +293,19 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
     const QStringList parts = id.split('/');
     const quint64 sessionId = parts.value(0).toULongLong();
     const size_t page = parts.value(1).toULongLong();
-    const QString slot = parts.mid(0, 2).join('/');
-    const QString revision = parts.value(2);
+    const quint64 revision = parts.value(2).toULongLong();
+    const QString key = QString("%1/%2").arg(sessionId).arg(revision);
     const int asked = requestedSize.width() > 0 ? requestedSize.width() : 160;
     const int width = (asked + WIDTH_STEP - 1) / WIDTH_STEP * WIDTH_STEP;
 
-    // Kept already (that width, or a bigger one to scale down): no drawing at all
-    if (QImage kept = cache().find(slot, revision, width); !kept.isNull()) {
+    // Kept already (that width, or a bigger one to scale down), or small enough for the sketch: no drawing at all
+    QImage kept = cache().find(key, width);
+    if (kept.isNull() && width <= PageSketches::instance().width()) {
+        if (QImage sketch = PageSketches::instance().imageOfRevision(sessionId, revision); sketch.width() >= width) {
+            kept = sketch.width() == width ? sketch : sketch.scaledToWidth(width, Qt::SmoothTransformation);
+        }
+    }
+    if (!kept.isNull()) {
         response->image = std::move(kept);
         QMetaObject::invokeMethod(response, &QQuickImageResponse::finished, Qt::QueuedConnection);
         return response;
@@ -274,11 +326,17 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
     }
     // The one asked for last first: that is what is in view now
     static std::atomic<int> order{0};
-    pool().start(QRunnable::create([response, session, sessionId, page, width, slot, revision] {
+    pool().start(QRunnable::create([response, session, sessionId, page, width, key, revision] {
         QImage img;
         if (!response->cancelled) {  // (scrolled away meanwhile: not drawn)
-            img = render(*session, page, width);
-            cache().put(slot, revision, width, img);
+            ++renders;
+            if (auto stamp = session->pageOfRevision(revision)) {
+                img = renderPage(*session->getDocument(), stamp->page, width);
+                cache().put(key, width, img);
+                PageSketches::instance().offer(sessionId, stamp->id, revision, img);
+            } else {
+                img = renderDocument(*session->getDocument(), page, width);  // (an outdated address: not kept)
+            }
         }
         {
             auto& r = registry();

@@ -82,6 +82,7 @@ Rectangle {
             Item { width: 1; height: 80 }
         }
         ScrollBar.vertical: ScrollBar { minimumSize: 0.05 }
+        property RaceWatch race: RaceWatch { flickable: grid }
 
         Keys.onReturnPressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
         Keys.onEnterPressed: if (currentItem) pageGrid.choose(currentItem.pageIndex)
@@ -110,6 +111,7 @@ Rectangle {
             required property int pageNumber
             required property real aspect
             required property string thumbnail
+            required property string sketch
             required property bool current
             required property var searchHits
             required property int currentSearchHit
@@ -135,26 +137,15 @@ Rectangle {
                 border.width: cell.current || cell.selected || cell.searchHitCount > 0 ? 3 : 0
                 border.color: cell.current || cell.selected ? Material.accentColor : "#f9a825"
 
-                // A small preview right away, a sharp one for big cells (loads on top of it).
-                Image {
+                // The sketch right away, the sharp one on top of it (small cells: from the sketch too)
+                PagePicture {
                     anchors.fill: parent
                     anchors.margins: frame.border.width
-                    asynchronous: true
-                    fillMode: Image.PreserveAspectFit
-                    source: cell.thumbnail
-                    sourceSize.width: 160
-                    smooth: true
-                }
-                Image {
-                    anchors.fill: parent
-                    anchors.margins: frame.border.width
-                    visible: cell.frameW * cell.dpr > 180 && status === Image.Ready
-                    asynchronous: true
-                    fillMode: Image.PreserveAspectFit
+                    sketch: cell.sketch
+                    thumbnail: cell.thumbnail
+                    racing: grid.race.racing
                     // In steps, so zooming does not render every size.
-                    source: cell.frameW * cell.dpr > 180 ? cell.thumbnail : ""
-                    sourceSize.width: Math.ceil(cell.frameW * cell.dpr / 128) * 128
-                    smooth: true
+                    sourceWidth: Math.ceil(cell.frameW * cell.dpr / 128) * 128
                 }
                 // Search hits
                 Repeater {

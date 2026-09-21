@@ -42,6 +42,7 @@
 #include "shell/Previews.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
+#include "shell/PageSketches.h"
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
@@ -56,6 +57,7 @@ protected:
         prepareController();
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
+        engine->addImageProvider("sketch", new xqt::SketchProvider);
         engine->addImageProvider("preview", new xqt::PreviewProvider);
         engine->addImageProvider("hitpage", new xqt::HitPageProvider);
         engine->rootContext()->setContextProperty("app", controller.get());
@@ -1662,6 +1664,51 @@ TEST_F(MainWindowTest, sidebarThumbnailsStayWhenTheCurrentPageChanges) {
     controller->goToPage(0);
     until([&] { return image->width() > frame->width() - 4; });
     EXPECT_TRUE(drawnAtFrameWidth());
+}
+
+// Flying through the sidebar shows every page at once as its sketch (drawn in advance); the sharp thumbnails are
+// asked for when it slows down.
+TEST_F(MainWindowTest, sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDown) {
+    auto& sketches = xqt::PageSketches::instance();
+    sketches.setDelays(0, 0);
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    until([&] { return sketches.idle(); }, 10000);
+    auto* list = find<QQuickItem>("sidebarList");
+    ASSERT_NE(list, nullptr);
+    auto parts = [](QQuickItem* entry) {
+        std::pair<QQuickItem*, QQuickItem*> p{nullptr, nullptr};  // sketch, sharp
+        for (auto* c: entry->findChildren<QQuickItem*>()) {
+            if (c->objectName() == "pageSketch") {
+                p.first = c;
+            } else if (c->objectName() == "pageSharp") {
+                p.second = c;
+            }
+        }
+        return p;
+    };
+    until([&] { return itemAt(list, 0) != nullptr; });
+    auto [sketch, sharp] = parts(itemAt(list, 0));
+    ASSERT_NE(sketch, nullptr);
+    ASSERT_NE(sharp, nullptr);
+    until([&] { return sketch->property("source").toUrl().toString().startsWith("image://sketch/"); });
+    EXPECT_TRUE(sketch->property("source").toUrl().toString().startsWith("image://sketch/"));
+    EXPECT_TRUE(sharp->property("source").toUrl().toString().startsWith("image://thumbnail/"));
+
+    // Racing to the end: the pages that come into view have their sketch only
+    auto* race = list->property("race").value<QObject*>();
+    ASSERT_NE(race, nullptr);
+    race->setProperty("racing", true);
+    const int last = controller->pageCount() - 1;
+    QMetaObject::invokeMethod(list, "positionViewAtIndex", Q_ARG(int, last), Q_ARG(int, 2 /* ListView.End */));
+    race->setProperty("racing", true);  // (the jump itself counts as racing, but the timer would calm it)
+    until([&] { return itemAt(list, last) != nullptr; });
+    auto [lastSketch, lastSharp] = parts(itemAt(list, last));
+    ASSERT_NE(lastSketch, nullptr);
+    EXPECT_TRUE(lastSketch->property("source").toUrl().toString().startsWith("image://sketch/"));
+    EXPECT_TRUE(lastSharp->property("source").toUrl().isEmpty()) << "no sharp one while racing";
+    race->setProperty("racing", false);
+    EXPECT_TRUE(lastSharp->property("source").toUrl().toString().startsWith("image://thumbnail/")) << "slowed down";
+    sketches.setDelays(400, 1500);
 }
 
 TEST_F(MainWindowTest, pagesAreAppendedFromTheSidebar) {

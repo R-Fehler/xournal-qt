@@ -96,6 +96,7 @@ Rectangle {
         onCurrentIndexChanged: if (currentIndex >= 0 && !pageDrag.active) positionViewAtIndex(currentIndex, ListView.Contain)
         ScrollBar.vertical: ScrollBar {}
         TouchpadMomentum { flickable: list }
+        property RaceWatch race: RaceWatch { flickable: list }
         // At the end: add pages
         footer: AppendPages { width: list.width; visible: !app.homeVisible }
 
@@ -111,6 +112,7 @@ Rectangle {
             required property int pageNumber
             required property real aspect
             required property string thumbnail
+            required property string sketch
             required property bool current
             required property bool selected
             required property var searchHits
@@ -128,18 +130,16 @@ Rectangle {
                 border.width: entry.current || entry.selected || entry.searchHitCount > 0 ? 3 : 1
                 border.color: entry.selected || entry.current ? Material.accentColor
                             : (entry.searchHitCount > 0 ? "#f9a825" : "#b9bcc1")
-                Image {
+                PagePicture {
                     anchors.fill: parent
                     anchors.margins: frame.border.width
                     objectName: "sidebarThumbnail"
-                    source: entry.thumbnail
-                    asynchronous: true
-                    cache: false
+                    sketch: entry.sketch
+                    thumbnail: entry.thumbnail
+                    racing: list.race.racing
                     // By the frame, not by this image: the frame's border is thicker on the current page, and a new
                     // size would draw the page again - each page that is scrolled past blinked
-                    sourceSize.width: Math.round(frame.width * Screen.devicePixelRatio)
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
+                    sourceWidth: Math.round(frame.width * Screen.devicePixelRatio)
                 }
                 Repeater {
                     model: entry.searchHits

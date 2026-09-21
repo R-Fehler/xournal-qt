@@ -251,6 +251,7 @@ Popup {
                 required property bool modified
                 required property bool current
                 required property string thumbnail
+                required property string sketch
                 required property int pageCount
                 required property int searchHits
                 required property bool searchRunning
@@ -281,7 +282,18 @@ Popup {
                             color: "#f4f5f7"
                             radius: 6
                             clip: true
+                            // The sketch at once (never blank), the sharp picture on top when it is loaded
                             Image {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                visible: cellPicture.status !== Image.Ready
+                                fillMode: Image.PreserveAspectFit
+                                source: cell.sketch
+                                cache: false
+                                smooth: true
+                            }
+                            Image {
+                                id: cellPicture
                                 anchors.fill: parent
                                 anchors.margins: 6
                                 fillMode: Image.PreserveAspectFit

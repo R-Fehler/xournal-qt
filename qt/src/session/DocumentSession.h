@@ -14,6 +14,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -130,9 +131,18 @@ public:
     ScrollHandler* getScrollHandler() const override;
     PageRef getCurrentPage() override;
     size_t getCurrentPageNo() const override;
-    /// Changes whenever the page's picture does (its content, its size, a page coming or going before it):
-    /// thumbnails are named and kept by it. Unique in the process.
+    /// Changes whenever the page's picture does (its content, its size): thumbnails are named and kept by it. It stays
+    /// with the page when pages before it come or go. Unique in the process, like the page's id (which stays when its
+    /// content changes). Any thread for pageStamps() and pageOfRevision().
+    struct PageStamp {
+        quint64 id = 0;
+        quint64 revision = 0;
+        PageRef page;
+    };
     quint64 pageRevision(size_t page) const;
+    quint64 pageId(size_t page) const;
+    std::vector<PageStamp> pageStamps() const;
+    std::optional<PageStamp> pageOfRevision(quint64 revision) const;
     XournalppCursor* getCursor() const override;
     PageTypeHandler* getPageTypes() const override;
     LayerController* getLayerController() const override;

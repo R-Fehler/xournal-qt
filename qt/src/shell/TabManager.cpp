@@ -11,6 +11,7 @@
 #include "DocumentFiles.h"
 #include "DocumentPlaces.h"
 #include "Previews.h"
+#include "PageSketches.h"
 #include "Thumbnails.h"
 #include "model/Document.h"
 #include "model/XojPage.h"
@@ -20,7 +21,15 @@
 
 namespace xqt {
 
-TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(parent), app(app) {}
+TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(parent), app(app) {
+    connect(&PageSketches::instance(), &PageSketches::changed, this, [this](qulonglong id) {
+        for (const auto& t: tabs) {
+            if (ThumbnailProvider::idOf(t.session.get()) == id) {
+                tabDataChanged(t.session.get(), {SketchRole});
+            }
+        }
+    });
+}
 
 namespace {
 /// Where a document was left, saved or not (to open it there again, if wanted - see DocumentPlaces); a PDF without a
@@ -80,6 +89,8 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
                     .arg(s->pageRevision(s->getCurrentPageNo()));
         case PageCountRole:
             return static_cast<int>(s->getDocument()->getPageCount());
+        case SketchRole:
+            return PageSketches::instance().url(ThumbnailProvider::idOf(s), s->pageId(s->getCurrentPageNo()));
         case SearchHitsRole:
             return static_cast<int>(s->search().hits().size());
         case SearchRunningRole:
@@ -121,7 +132,8 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
 QHash<int, QByteArray> TabManager::roleNames() const {
     return {{TitleRole, "title"},         {ModifiedRole, "modified"},     {FilePathRole, "filePath"},
             {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"},
-            {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}, {HitPagesRole, "hitPages"}};
+            {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}, {HitPagesRole, "hitPages"},
+            {SketchRole, "sketch"}};
 }
 
 int TabManager::rowOf(const DocumentSession* s) const {
@@ -163,7 +175,7 @@ void TabManager::listenTo(Tab& tab) {
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
     ThumbnailProvider::registerSession(s);
-    auto thumbnailChanged = [this, s] { tabDataChanged(s, {ThumbnailRole, PageCountRole}); };
+    auto thumbnailChanged = [this, s] { tabDataChanged(s, {ThumbnailRole, PageCountRole, SketchRole}); };
     connect(s, &DocumentSession::pageRevisionsChanged, this, thumbnailChanged);
     auto searchChanged = [this, s] { tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole}); };
     connect(&s->search(), &DocumentSearch::changed, this, searchChanged);

@@ -28,6 +28,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageSketches.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageSketches.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PagesModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageFilterModel.h
@@ -107,6 +109,8 @@ set(XQT_QML_FILES
     src/app/qml/PrintDialog.qml
     src/app/qml/ShortcutSheet.qml
     src/app/qml/LayerList.qml
+    src/app/qml/PagePicture.qml
+    src/app/qml/RaceWatch.qml
     src/app/qml/Popups.js)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)

@@ -13,6 +13,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 
+#include "PageSketches.h"
 #include "Thumbnails.h"
 
 namespace xqt {
@@ -21,6 +22,11 @@ PagesModel::PagesModel(QObject* parent): QAbstractListModel(parent) {
     refreshTimer.setSingleShot(true);
     refreshTimer.setInterval(400);
     connect(&refreshTimer, &QTimer::timeout, this, &PagesModel::flushChanges);
+    connect(&PageSketches::instance(), &PageSketches::changed, this, [this](qulonglong id) {
+        if (id == sessionId && rowCount() > 0) {
+            Q_EMIT dataChanged(index(0), index(rowCount() - 1), {SketchRole});
+        }
+    });
 }
 
 PagesModel::~PagesModel() { unregisterListener(); }
@@ -37,6 +43,7 @@ void PagesModel::setSession(DocumentSession* s) {
     session = s;
     sessionId = s ? ThumbnailProvider::registerSession(s) : 0;
     if (s) {
+        PageSketches::instance().focus(sessionId);  // shown here now: its pages are sketched first
         registerListener(s);
         connections.push_back(connect(s, &DocumentSession::pageContentChanged, this,
                                       [this](qulonglong page) { markChanged(page); }));
@@ -98,6 +105,8 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             return index.row() == current;
         case PageIndexRole:
             return index.row();
+        case SketchRole:
+            return session ? PageSketches::instance().url(sessionId, session->pageId(row)) : QString();
         case SelectedRole:
             return row < selected.size() && selected[row];
         case SearchHitCountRole: {
@@ -150,7 +159,7 @@ QHash<int, QByteArray> PagesModel::roleNames() const {
             {ThumbnailRole, "thumbnail"},       {CurrentRole, "current"},
             {SearchHitsRole, "searchHits"},     {CurrentSearchHitRole, "currentSearchHit"},
             {SearchHitCountRole, "searchHitCount"}, {PageIndexRole, "pageIndex"},
-            {SelectedRole, "selected"}};
+            {SelectedRole, "selected"},         {SketchRole, "sketch"}};
 }
 
 QString PagesModel::thumbnailUrl(int page) const {

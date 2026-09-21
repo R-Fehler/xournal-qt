@@ -37,7 +37,9 @@ public:
                  SearchHitsRole, SearchRunningRole,
                  /// The pages with search hits, for the extended search of the overview:
                  /// [{ page, count, aspect, thumbnail, rects: [normalized hit rects, at most 50] }]
-                 HitPagesRole };
+                 HitPagesRole,
+                 /// URL of the sketch of the current page (PageSketches), shown under the thumbnail; may be empty
+                 SketchRole };
 
     explicit TabManager(AppContext& app, QObject* parent = nullptr);
     ~TabManager() override;

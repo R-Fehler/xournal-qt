@@ -77,7 +77,11 @@ cd build-qt
 - [ ] Scroll the sidebar of a long PDF down and back up: the thumbnails seen before appear at once, without a blank
       moment. The same after switching to another tab and back, and when opening the page grid or the tab overview
       again.
-- [ ] Fling the sidebar quickly to the end: the pages at the end appear first, not after all pages in between.
+- [ ] Open a PDF with 100+ pages, wait ~10 s, then fling the sidebar (and drag its scroll bar) to the end: every page
+      shows at once as a small blurry preview, none is blank; where the list stops, the pages get sharp.
+- [ ] The same in the page grid (also zoomed out to many columns) and in the tab overview.
+- [ ] Right after opening a big PDF, scroll and write on the canvas: no stutter while the previews are prepared.
+- [ ] Write on a page: its preview in the sidebar never goes blank, it shows the old state until the new one is drawn.
 - [ ] Settings → Documents → Page previews: the memory slider (64–1024 MB, default 256) is kept after a restart.
 - [ ] Zoomed in, the page never draws over the sidebar.
 - [ ] Page counter and zoom (−, %, +) in the pill at the bottom right; tapping the % fits the page width.
