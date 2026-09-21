@@ -255,9 +255,15 @@ cd build-qt
 - [ ] A finger beside the selection scrolls as usual, and pen and mouse work as before.
 
 ## Setsquare and compass
-- [ ] Shapes tool → "Setsquare": the triangle with its scales lies in the middle of the page; drawing with the pen along its long edge gives a straight line, away from it a free line.
-- [ ] Drag inside the triangle with a finger or the pen: it moves along; two fingers on it turn it and make it bigger or smaller (the page keeps its zoom); two fingers next to it zoom as always.
-- [ ] Shapes tool → "Compass": drawing around its middle at the distance of its radius gives a circular arc; the same entry again takes the tool away.
+- [ ] Shapes tool → "Setsquare": the triangle with its scales lies in the middle of the page; drawing with the pen
+      on it or along one of its three edges gives a straight line along the nearest edge, away from it a free line.
+- [ ] The pen and the left mouse button never push the tool around, they always draw.
+- [ ] Two fingers on the tool carry it along, turn it and size it (the page keeps its zoom and place); one finger
+      on it scrolls as everywhere else; two fingers next to it zoom as always.
+- [ ] Right mouse button pressed on the tool and dragged: it moves along (no menu appears); beside the tool the
+      right button offers the actions as before.
+- [ ] Shapes tool → "Compass": drawing anywhere on its disc gives an arc of its radius; the same entry again takes
+      the tool away.
 
 ## Table of contents
 - [ ] A PDF with bookmarks (e.g. a book or thesis): sidebar "Contents": indented headings, current section highlighted, tap goes there, arrows collapse.

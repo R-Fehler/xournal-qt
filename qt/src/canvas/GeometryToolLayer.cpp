@@ -1,6 +1,8 @@
 #include "GeometryToolLayer.h"
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "model/Compass.h"
 #include "model/Setsquare.h"
@@ -15,6 +17,17 @@
 namespace xqt {
 
 namespace {
+/// The point on the line through a and b that is nearest to p, but not beyond its ends.
+QPointF onSegment(QPointF p, QPointF a, QPointF b) {
+    const QPointF along = b - a;
+    const double length = QPointF::dotProduct(along, along);
+    if (length < 1e-9) {
+        return a;
+    }
+    const double t = std::clamp(QPointF::dotProduct(p - a, along) / length, 0.0, 1.0);
+    return a + along * t;
+}
+
 /// The point in the coordinates of the tool (centimetres, the middle of the tool is the origin).
 QPointF toTool(const GeometryTool& tool, QPointF pagePoint) {
     cairo_matrix_t matrix = tool.getMatrix();
@@ -147,21 +160,35 @@ QPointF GeometryToolLayer::snap(QPointF pagePoint) const {
     if (!tool) {
         return pagePoint;
     }
+    // Everything here is in the tool's own coordinates: centimetres, its middle at the origin.
     const QPointF onTool = toTool(*tool, pagePoint);
+    const double height = tool->getHeight();
     if (type() == GeometryToolType::COMPASS) {
-        // Around the middle: the circle through the point, so a curve of that radius comes out
-        const double radius = tool->getHeight();
+        // Its edge is the circle of its radius: on the disc and just around it, the line follows that circle
         const double distance = std::hypot(onTool.x(), onTool.y());
-        if (std::abs(distance - radius) > SNAP_CM || distance < 0.05) {
+        if (distance > height + SNAP_CM || distance < 0.05) {
             return pagePoint;
         }
-        return toPage(*tool, QPointF(onTool.x() * radius / distance, onTool.y() * radius / distance));
+        return toPage(*tool, QPointF(onTool.x() * height / distance, onTool.y() * height / distance));
     }
-    // The setsquare: along its long edge (y = 0 in its own coordinates)
-    if (std::abs(onTool.y()) > SNAP_CM) {
-        return pagePoint;
+    // The setsquare: the nearest of its three edges - the long one and the two legs. Drawing on the triangle
+    // itself is what a real setsquare is for, so it counts as well, not only the strip around it.
+    const QPointF corners[3] = {QPointF(-height, 0), QPointF(height, 0), QPointF(0, height)};
+    QPointF nearest;
+    double distance = std::numeric_limits<double>::max();
+    for (int i = 0; i < 3; ++i) {
+        const QPointF p = onSegment(onTool, corners[i], corners[(i + 1) % 3]);
+        const double d = std::hypot(onTool.x() - p.x(), onTool.y() - p.y());
+        if (d < distance) {
+            distance = d;
+            nearest = p;
+        }
     }
-    return toPage(*tool, QPointF(onTool.x(), 0));
+    const bool inside = onTool.y() >= 0 && onTool.y() <= height && std::abs(onTool.x()) <= height - onTool.y();
+    if (!inside && distance > SNAP_CM) {
+        return pagePoint;  // far away from it: a free line
+    }
+    return toPage(*tool, nearest);
 }
 
 }  // namespace xqt

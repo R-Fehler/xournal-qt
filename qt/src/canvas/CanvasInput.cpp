@@ -175,6 +175,20 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
             // The right button shows what can be done here, unless it was given a tool of its own
             if (e->button() == Qt::RightButton &&
                 view.getSession().getSettings()->getButtonConfig(BUTTON_MOUSE_RIGHT)->getAction() == TOOL_NONE) {
+                // On the setsquare or the compass it drags the tool instead (with a mouse, what two fingers do)
+                if (view.geometryTool().visible()) {
+                    if (CanvasPage* page = view.pageAt(viewPos)) {
+                        const QPointF onPage = pageCoordinates(*page, viewPos);
+                        if (view.geometryTool().contains(onPage)) {
+                            modifier3 = true;
+                            deviceClassPressed = true;
+                            runningDeviceClass = DeviceClass::Mouse;
+                            draggingGeometryTool = true;
+                            lastGeometryPos = onPage;
+                            return true;
+                        }
+                    }
+                }
                 Q_EMIT view.contextRequested(viewPos);
                 return true;
             }
@@ -383,8 +397,9 @@ bool CanvasInput::actionStart(const Event& event) {
         }
     }
 
-    // The setsquare or the compass: a press on it takes it along instead of drawing
-    if (currentPage && view.geometryTool().visible()) {
+    // The setsquare or the compass: only a press with the right mouse button takes it along (like two fingers on
+    // it). Pen and left button draw, and the line follows the nearest edge of the tool.
+    if (currentPage && view.geometryTool().visible() && modifier3) {
         const QPointF onPage = pageCoordinates(*currentPage, event.viewPos);
         if (view.geometryTool().contains(onPage)) {
             draggingGeometryTool = true;
@@ -728,10 +743,14 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                         pinchingGeometryTool = true;
                         lastPinchAngle = angle;
                         lastPinchDistance = std::max(1.0, dist);
+                        lastCentroid = centroid;  // so the tool does not jump with the first move
                     }
                 }
             }
             if (pinchingGeometryTool) {
+                // The fingers carry it along, turn it and size it; the page itself stays where it is
+                const double zoom = view.getViewController().zoom();
+                view.geometryTool().moveBy((centroid - lastCentroid) / std::max(0.01, zoom));
                 view.geometryTool().turnAndSize(angle - lastPinchAngle, dist / std::max(1.0, lastPinchDistance));
                 lastPinchAngle = angle;
                 lastPinchDistance = std::max(1.0, dist);

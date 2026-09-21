@@ -10,6 +10,7 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QMouseEvent>
 #include <QPointingDevice>
 #include <QTabletEvent>
 #include <QTemporaryDir>
@@ -33,6 +34,7 @@
 #include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
 #include "model/Document.h"
+#include "model/GeometryTool.h"
 #include "model/Layer.h"
 #include "model/Stroke.h"
 #include "model/Font.h"
@@ -98,6 +100,13 @@ protected:
         input->tabletEvent(&e, pos);
     }
 
+    void mouse(QEvent::Type type, QPointF pos, Qt::MouseButton button, Qt::MouseButtons buttons) {
+        QMouseEvent e(type, pos, pos, button, buttons, Qt::NoModifier, &mousePointer);
+        e.setTimestamp(timestamp);
+        timestamp += 5;
+        input->mouseEvent(&e, pos);
+    }
+
     /// A pressure stroke along a line (points in page coordinates), like a real pen at 200 Hz.
     void drawLine(size_t page, QPointF from, QPointF to, int steps = 30, const QPointingDevice* device = nullptr) {
         tablet(QEvent::TabletPress, viewPos(page, from), 0.3, Qt::LeftButton, Qt::LeftButton, device);
@@ -130,6 +139,8 @@ protected:
                            QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3};
     QPointingDevice touchscreen{"test touchscreen", 1004, QInputDevice::DeviceType::TouchScreen,
                                 QPointingDevice::PointerType::Finger, QInputDevice::Capability::Position, 10, 0};
+    QPointingDevice mousePointer{"test mouse", 1005, QInputDevice::DeviceType::Mouse,
+                                 QPointingDevice::PointerType::Generic, QInputDevice::Capability::Position, 3, 3};
     QPointingDevice touchpad{"test touchpad", 1003, QInputDevice::DeviceType::TouchPad,
                              QPointingDevice::PointerType::Finger,
                              QInputDevice::Capability::Position | QInputDevice::Capability::Scroll, 2, 0};
@@ -516,14 +527,104 @@ TEST_F(CanvasReplayTest, theSetsquareGuidesTheStrokeAndCanBeMoved) {
     geometry.toggle(GeometryToolType::SETSQUARE);
     processEvents(100);
 
-    // The compass instead: points near its circle land on it
+    // The compass instead: its edge is the circle of its radius, and points on the disc are drawn on that circle
     geometry.toggle(GeometryToolType::COMPASS);
     EXPECT_EQ(geometry.type(), GeometryToolType::COMPASS);
+    const double radius = geometry.height();
+    const QPointF onCircle = geometry.snap(middle + QPointF(0.5 * CM, 0));  // well inside the disc
+    EXPECT_NEAR(std::hypot(onCircle.x() - middle.x(), onCircle.y() - middle.y()) / CM, radius, 0.1)
+            << "a circle of its radius comes out";
+    EXPECT_EQ(geometry.snap(middle + QPointF(0, (radius + 2) * CM)), middle + QPointF(0, (radius + 2) * CM))
+            << "far outside it nothing is snapped";
     geometry.toggle(GeometryToolType::COMPASS);
     EXPECT_FALSE(geometry.visible()) << "the same one again takes it away";
 }
 
 // Two fingers on the tool itself turn it and size it; the page keeps its zoom (elsewhere they zoom as always).
+// The tool is a ruler, not something the pen pushes around: drawing on it follows its nearest edge, and only two
+// fingers (or the right mouse button) move it. One finger scrolls the page as always.
+TEST_F(CanvasReplayTest, drawingOnTheSetsquareFollowsItsEdgesAndTwoFingersMoveIt) {
+    auto& vc = view->getViewController();
+    auto& geometry = view->geometryTool();
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    ASSERT_TRUE(geometry.visible());
+    const auto page = session->getDocument()->getPage(0);
+    const QPointF middle(page->getWidth() / 2, page->getHeight() / 2);
+
+    // In its own coordinates the triangle has the corners (-8, 0), (8, 0) and (0, 8) cm: a point on the triangle
+    // goes to the nearest of the three edges, not only to the long one.
+    const QPointF nearLongEdge = middle + QPointF(0, 1 * CM);
+    EXPECT_NEAR(geometry.snap(nearLongEdge).y(), middle.y(), 1) << "the long edge is nearest there";
+    const QPointF nearRightLeg = middle + QPointF(5 * CM, 2 * CM);
+    const QPointF onLeg = geometry.snap(nearRightLeg);
+    EXPECT_NEAR((onLeg.x() - middle.x()) / CM + (onLeg.y() - middle.y()) / CM, 8.0, 0.2)
+            << "on the leg from (8, 0) to (0, 8)";
+    EXPECT_NE(onLeg, nearRightLeg);
+
+    // A pen line drawn across the triangle comes out on the long edge, and the tool stays where it is
+    const size_t before = elementCount(0);
+    drawLine(0, middle + QPointF(-2 * CM, 0.6 * CM), middle + QPointF(2 * CM, 0.6 * CM));
+    processEvents();
+    ASSERT_EQ(elementCount(0), before + 1) << "the pen draws on the tool, it does not drag it";
+    const Stroke* stroke = nullptr;
+    for (const Layer* l: page->getLayersView()) {
+        for (const Element* e: l->getElementsView()) {
+            if (e->getType() == ELEMENT_STROKE) {
+                stroke = static_cast<const Stroke*>(e);
+            }
+        }
+    }
+    ASSERT_NE(stroke, nullptr);
+    for (const Point& p: stroke->getPointVector()) {
+        EXPECT_NEAR(p.y, middle.y(), 1.5) << "every point lies on the long edge";
+    }
+    EXPECT_NEAR(geometry.snap(middle + QPointF(0, 20)).y(), middle.y(), 1) << "the tool did not move";
+
+    // Two fingers on it carry it along (without turning or sizing it)
+    processEvents(1100);  // the palm rejection ignores touch for a second after the pen wrote
+    const double turned = geometry.rotation();
+    const double high = geometry.height();
+    const QPointF a = viewPos(0, middle + QPointF(-1 * CM, 1 * CM));
+    const QPointF b = viewPos(0, middle + QPointF(1 * CM, 1 * CM));
+    const QPointF by(40, 30);
+    touch2(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, a, b);
+    for (int i = 1; i <= 4; ++i) {
+        touch2(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, a + by * i / 4.0,
+               b + by * i / 4.0);
+    }
+    touch2(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, a + by, b + by);
+    processEvents();
+    const QPointF moved = middle + by / vc.zoom();
+    EXPECT_NEAR(geometry.snap(moved + QPointF(0, 20)).y(), moved.y(), 2) << "its edge came along with the fingers";
+    EXPECT_NEAR(geometry.rotation(), turned, 0.05) << "fingers that only slide do not turn it";
+    EXPECT_NEAR(geometry.height(), high, 0.2) << "and do not size it";
+
+    // One finger on it scrolls the page as everywhere else
+    const double scrolled = vc.visibleContentRect().top();
+    const QPointF onTool = viewPos(0, moved + QPointF(0, 2 * CM));
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, onTool);
+    for (int i = 1; i <= 6; ++i) {
+        touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, onTool - QPointF(0, 25 * i));
+    }
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, onTool - QPointF(0, 150));
+    vc.stopMomentum();
+    processEvents();
+    EXPECT_GT(vc.visibleContentRect().top(), scrolled) << "one finger scrolls, it does not move the tool";
+
+    // With a mouse the right button drags it (what two fingers do), and no menu is asked for there
+    QSignalSpy context(view.get(), &CanvasView::contextRequested);
+    const QPointF grab = viewPos(0, moved + QPointF(0, 2 * CM));
+    const QPointF onEdgeBefore = geometry.snap(moved + QPointF(0, 20));
+    mouse(QEvent::MouseButtonPress, grab, Qt::RightButton, Qt::RightButton);
+    mouse(QEvent::MouseMove, grab + QPointF(0, 50), Qt::NoButton, Qt::RightButton);
+    mouse(QEvent::MouseButtonRelease, grab + QPointF(0, 50), Qt::RightButton, Qt::NoButton);
+    processEvents();
+    EXPECT_NEAR(geometry.snap(moved + QPointF(0, 20 + 50 / vc.zoom())).y(), onEdgeBefore.y() + 50 / vc.zoom(), 2)
+            << "the right button took it along";
+    EXPECT_EQ(context.count(), 0) << "and offered no menu on the tool";
+    geometry.hide();
+}
+
 TEST_F(CanvasReplayTest, twoFingersOnTheSetsquareTurnAndSizeIt) {
     auto& vc = view->getViewController();
     vc.setViewSize(QSizeF(900, 600));

@@ -2,9 +2,10 @@
  * xournal-qt: the setsquare and the compass on the canvas.
  *
  * The tool itself (its geometry) and how it is drawn come from upstream (model/Setsquare, model/Compass and their
- * views). Moving, turning and sizing it is done here with Qt input instead of upstream's GTK handlers: dragging
- * inside it moves it, dragging outside turns it around its middle, and two fingers turn and size it. While it is
- * out, drawing near its edge follows that edge (a ruler), and around the compass a circle.
+ * views). Moving, turning and sizing it is done here with Qt input instead of upstream's GTK handlers: two fingers
+ * on it (or the right mouse button) carry it along, turn it and size it, while one finger scrolls the page as
+ * usual. Pen and left button always draw: on the tool and just around it the line follows the nearest edge - the
+ * three edges of the setsquare, the circle of the compass - so it works like a real ruler.
  *
  * @license GNU GPLv2 or later
  */
