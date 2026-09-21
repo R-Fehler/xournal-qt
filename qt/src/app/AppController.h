@@ -375,7 +375,7 @@ public:
     /// Ask the window for the "insert pages" dialog (page menu); position as for insertPages.
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
     /// Ask the window for the background dialog for these pages (0-based).
-    Q_INVOKABLE void requestPageBackground(const QVariantList& pages) { Q_EMIT pageBackgroundRequested(pages); }
+    Q_INVOKABLE void requestPageBackground(const QList<int>& pages) { Q_EMIT pageBackgroundRequested(pages); }
     /// Ask the window for the "new chapter" dialog on that page.
     Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
     /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.
@@ -383,7 +383,7 @@ public:
     /// Puts a link to a page ("#Page:12") into the clipboard: pasted into a text it becomes a tappable link.
     Q_INVOKABLE void copyPageLink(int page);
     /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
-    Q_INVOKABLE void requestPrint(const QVariantList& pages) { Q_EMIT printRequested(pages); }
+    Q_INVOKABLE void requestPrint(const QList<int>& pages) { Q_EMIT printRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);
     Q_INVOKABLE void insertPageAfter(int index);
     Q_INVOKABLE void duplicatePage(int index);
@@ -486,8 +486,8 @@ Q_SIGNALS:
     void copiedPagesChanged();
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
-    void pageBackgroundRequested(const QVariantList& pages);
-    void printRequested(const QVariantList& pages);
+    void pageBackgroundRequested(const QList<int>& pages);
+    void printRequested(const QList<int>& pages);
     void chapterRequested(int page);
     void toolbarPositionChanged();
     void penPillChanged();

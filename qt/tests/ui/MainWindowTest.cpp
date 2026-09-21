@@ -1319,6 +1319,32 @@ TEST_F(MainWindowTest, printingAsksWhatAndWhichPages) {
     EXPECT_EQ(dialog->property("range").toString(), QString("1-3,5"));
     QMetaObject::invokeMethod(dialog, "reject");
     until([&] { return !dialog->property("visible").toBool(); });
+
+    // The whole way of the "Print" button in the page overview: the pages selected there must arrive as page
+    // numbers in the dialog (they came through as "QVariant()1,QVariant()1" before).
+    click(find<QQuickItem>("pageGridButton"));
+    until([&] { return find<QQuickItem>("pageGrid")->isVisible(); });
+    auto* pagesModel = controller->property("pages").value<QObject*>();
+    ASSERT_NE(pagesModel, nullptr);
+    const QList<int> firstAndThird{0, 2};
+    QMetaObject::invokeMethod(pagesModel, "selectPages", Q_ARG(QList<int>, firstAndThird));
+    auto* printSelected = find<QQuickItem>("printSelectedButton");
+    ASSERT_NE(printSelected, nullptr);
+    until([&] { return printSelected->isVisible(); });
+    click(printSelected);
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_EQ(dialog->property("range").toString(), QString("1,3")) << "the pages that were chosen";
+    QMetaObject::invokeMethod(dialog, "reject");
+    until([&] { return !dialog->property("visible").toBool(); });
+
+    // Two pages next to each other: one range
+    const QList<int> lastTwo{3, 4};
+    QMetaObject::invokeMethod(pagesModel, "selectPages", Q_ARG(QList<int>, lastTwo));
+    click(printSelected);
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_EQ(dialog->property("range").toString(), QString("4-5"));
+    QMetaObject::invokeMethod(dialog, "reject");
+    until([&] { return !dialog->property("visible").toBool(); });
 }
 
 TEST_F(MainWindowTest, layersInTheSidebar) {

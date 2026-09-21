@@ -30,7 +30,7 @@ Dialog {
     }
     /// [0,1,2,4] -> "1-3,5"
     function rangeOf(list) {
-        const sorted = list.map(p => p + 1).sort((a, b) => a - b)
+        const sorted = list.map(p => Number(p) + 1).sort((a, b) => a - b)
         const parts = []
         let from = sorted[0], previous = sorted[0]
         for (let i = 1; i <= sorted.length; ++i) {
