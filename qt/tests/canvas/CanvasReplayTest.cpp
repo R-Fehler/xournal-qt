@@ -526,6 +526,19 @@ TEST_F(CanvasReplayTest, aFingerMovesAndResizesTheSelection) {
     EXPECT_GT(box().width(), moved.width() + 10) << "the corner resized it";
     EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), scrolled);
 
+    // Held still on it, or dragged slowly for longer than a long press takes: no menu (its pill has the actions)
+    QSignalSpy menu(view.get(), &CanvasView::contextRequested);
+    const QPointF held = viewPos(0, box().center());
+    touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, held);
+    processEvents(700);
+    for (int i = 1; i <= 5; ++i) {
+        touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, held + QPointF(0, 4 * i));
+        processEvents(150);
+    }
+    touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, held + QPointF(0, 20));
+    processEvents();
+    EXPECT_EQ(menu.count(), 0) << "no long-press menu on a selection";
+
     // Beside the selection the finger scrolls as before
     const QPointF beside = viewPos(0, QPointF(box().right() + 120, box().bottom() + 200));
     touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, beside);

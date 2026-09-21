@@ -721,7 +721,10 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         }
         touchSessionTravel = 0;
         longPressFired = false;
-        longPressTimer.start();
+        if (!touchSelection) {
+            // (On a selection a finger drags it, held still as well: its actions are in the selection's pill)
+            longPressTimer.start();
+        }
         velocitySamples.clear();
     }
 
