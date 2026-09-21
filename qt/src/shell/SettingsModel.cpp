@@ -89,6 +89,17 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             }
         });
 
+    // Open documents at the page they were left at (off: at their first page)
+    add("resumeAtLastPage",
+        [&s] {
+            bool resume = false;
+            s.getCustomElement("xournalQt").getBool("resumeAtLastPage", resume);
+            return QVariant(resume);
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setBool("resumeAtLastPage", v.toBool());
+            s.customSettingsChanged();
+        });
     add("snapGrid", [&s] { return QVariant(s.isSnapGrid()); }, [&s](const QVariant& v) { s.setSnapGrid(v.toBool()); });
 
     // --- touch ---

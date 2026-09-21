@@ -346,6 +346,7 @@ Popup {
                     spacing: 10
                     SectionTitle { text: qsTr("Start") }
                     SwitchRow { key: "restoreSession"; text: qsTr("Reopen the documents of the last session") }
+                    SwitchRow { key: "resumeAtLastPage"; text: qsTr("Open documents where they were left off") }
                     SectionTitle { text: qsTr("Autosave") }
                     SwitchRow { key: "autosaveEnabled"; text: qsTr("Save a backup of unsaved changes regularly") }
                     SliderRow {

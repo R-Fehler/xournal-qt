@@ -1361,6 +1361,17 @@ bool AppController::openPath(const QString& path) {
     }
     app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
     recent->add(file);
+    // "Open documents where they were left off": at the page it was left at (setting, off by default)
+    if (bool resume = false;
+        app->getSettings()->getCustomElement("xournalQt").getBool("resumeAtLastPage", resume) && resume) {
+        DocumentSession* s = tabs->currentSession();
+        const DocumentItem item = DocumentFiles::itemOf(file);
+        const int page = item.valid() ? DocumentPlaces::lastPage(item.main()) : -1;
+        if (s && page > 0 && static_cast<size_t>(page) < s->getDocument()->getPageCount()) {
+            s->setCurrentPageNo(static_cast<size_t>(page));
+            s->getScrollHandler()->scrollToPage(static_cast<size_t>(page));
+        }
+    }
     setHomeVisible(false);
     if (!result.missingPdf.empty() || result.attachedPdfMissing) {
         Q_EMIT message(tr("PDF background missing"),

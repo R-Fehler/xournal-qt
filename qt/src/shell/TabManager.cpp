@@ -22,9 +22,21 @@ namespace xqt {
 
 TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(parent), app(app) {}
 
+namespace {
+/// Where a saved document was left (to open it there again, if wanted - see DocumentPlaces)
+void rememberPlace(const DocumentSession* s) {
+    if (s && s->hasFilePath()) {
+        if (const DocumentItem item = DocumentFiles::itemOf(s->getFilePath()); item.valid()) {
+            DocumentPlaces::setLastPage(item.main(), static_cast<int>(s->getCurrentPageNo()));
+        }
+    }
+}
+}  // namespace
+
 TabManager::~TabManager() {
     beginResetModel();
     for (auto& t: tabs) {
+        rememberPlace(t.session.get());
         ThumbnailProvider::unregisterSession(t.session.get());
         t.view.reset();  // the view refers to the session
         t.session.reset();
@@ -216,6 +228,7 @@ void TabManager::closeTab(int index) {
         return;
     }
     const bool wasCurrent = index == current;
+    rememberPlace(tabs[static_cast<size_t>(index)].session.get());
     beginRemoveRows(QModelIndex(), index, index);
     Tab tab = std::move(tabs[static_cast<size_t>(index)]);
     tabs.erase(tabs.begin() + index);

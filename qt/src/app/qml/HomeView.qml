@@ -432,6 +432,18 @@ Rectangle {
 
             Item { Layout.fillWidth: true }
 
+            // The same as in the settings: open a document at the page where it was left
+            Switch {
+                objectName: "resumeSwitch"
+                text: qsTr("Open where I left off")
+                font.pixelSize: 13
+                checked: (app.settings.revision, app.settings.get("resumeAtLastPage"))
+                onToggled: app.settings.set("resumeAtLastPage", checked)
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Documents open at the page they were left at (else at their first page)")
+                ToolTip.delay: 600
+            }
+
             IconButton {
                 objectName: "newDocumentButton"
                 iconName: "xqt-file-plus"

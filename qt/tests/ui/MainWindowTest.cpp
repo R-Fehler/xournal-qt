@@ -2031,6 +2031,33 @@ TEST_F(MainWindowTest, theOverviewShowsTheStoredPreviewOnTheTitlePage) {
     controller->setTitlePage(0);  // (kept in the test's own cache, but tidy anyway)
 }
 
+// "Open where I left off" (off by default): a document opens at the page it was left at.
+TEST_F(MainWindowTest, documentsOpenWhereTheyWereLeftOffIfWanted) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    EXPECT_FALSE(settings->get("resumeAtLastPage").toBool()) << "off by default";
+    const QString file = fixturePath(u8"load/pages.xopp");
+    ASSERT_TRUE(controller->openPath(file));
+    controller->goToPage(5);
+    wait(50);
+    controller->closeTab(controller->currentTab());
+
+    ASSERT_TRUE(controller->openPath(file));
+    EXPECT_EQ(controller->pageNumber(), 1) << "off: at the first page";
+    controller->goToPage(5);
+    controller->closeTab(controller->currentTab());
+
+    // The switch on the library
+    controller->setHomeVisible(true);
+    auto* toggle = find<QQuickItem>("resumeSwitch");
+    ASSERT_NE(toggle, nullptr);
+    until([&] { return toggle->isVisible(); });
+    click(toggle);
+    EXPECT_TRUE(settings->get("resumeAtLastPage").toBool());
+    ASSERT_TRUE(controller->openPath(file));
+    EXPECT_EQ(controller->pageNumber(), 6) << "on: where it was left";
+    settings->set("resumeAtLastPage", false);
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");
