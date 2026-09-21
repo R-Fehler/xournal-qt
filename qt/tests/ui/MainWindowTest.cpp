@@ -1579,6 +1579,8 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     click(find<QQuickItem>("geometryToggle"));
     EXPECT_FALSE(controller->geometryMinimized()) << "back again";
     EXPECT_TRUE(controller->geometryAngleSteps()) << "with its steps";
+    click(find<QQuickItem>("geometryHold"));
+    EXPECT_FALSE(controller->geometryHeldToStroke()) << "a page without ink: nothing to hold on to";
 
     // The compass instead, then away again
     auto* compass = find<QObject>("compassItem");

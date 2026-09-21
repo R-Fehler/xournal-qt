@@ -14,6 +14,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include <QPointF>
 
@@ -21,6 +22,7 @@
 
 class Compass;
 class Setsquare;
+class XojPage;
 
 namespace xqt {
 
@@ -53,6 +55,12 @@ public:
     void moveBy(QPointF delta);
     /// Turn it around its middle by this angle, and size it by this factor.
     void turnAndSize(double angle, double factor);
+    /// Hold its middle (the 0 of the scale) on the ink stroke nearest to it: it jumps there, and from then on moving
+    /// it slides it along that stroke, so distances can be measured along it. False when the page has no stroke.
+    bool holdToStroke();
+    void releaseStroke();
+    bool heldToStroke() const { return !path.empty(); }
+
     /// Turning goes in steps of 15 degrees (the fingers still turn freely underneath, the tool follows in steps).
     void setAngleSteps(bool steps);
     bool angleSteps() const { return steps; }
@@ -60,6 +68,8 @@ public:
     /// How it stands and how big it is (radians / centimetres); 0 when it is not out.
     double rotation() const;
     double height() const;
+    /// Where its middle is (the 0 of the setsquare's scale, the centre of the compass), page coordinates.
+    QPointF middle() const;
 
     /// Where a stroke point goes: along the edge of the setsquare, or on the circle of the compass. Returns the
     /// point itself when it is too far away from the tool to snap to it.
@@ -75,6 +85,9 @@ private:
     std::unique_ptr<GeometryTool> tool;
     CanvasPage* onPage = nullptr;
     bool isMinimized = false;
+    /// The stroke it slides along (a copy of its points, page coordinates), and the page it is on
+    std::vector<QPointF> path;
+    const XojPage* pathPage = nullptr;
     bool steps = false;
     /// Where the fingers have turned it to; with steps the tool shows the nearest step of it
     double freeRotation = 0;

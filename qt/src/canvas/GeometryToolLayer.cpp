@@ -3,8 +3,13 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <shared_mutex>
 
 #include "model/Compass.h"
+#include "model/Document.h"
+#include "model/Element.h"
+#include "model/Layer.h"
+#include "model/Stroke.h"
 #include "model/Setsquare.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
@@ -26,6 +31,22 @@ QPointF onSegment(QPointF p, QPointF a, QPointF b) {
     }
     const double t = std::clamp(QPointF::dotProduct(p - a, along) / length, 0.0, 1.0);
     return a + along * t;
+}
+
+/// The point of a line of points nearest to p, and how far away it is.
+std::pair<QPointF, double> nearestOnPath(const std::vector<QPointF>& path, QPointF p) {
+    std::pair<QPointF, double> best{p, std::numeric_limits<double>::max()};
+    if (path.size() == 1) {
+        return {path.front(), std::hypot(p.x() - path.front().x(), p.y() - path.front().y())};
+    }
+    for (size_t i = 0; i + 1 < path.size(); ++i) {
+        const QPointF q = onSegment(p, path[i], path[i + 1]);
+        const double d = std::hypot(p.x() - q.x(), p.y() - q.y());
+        if (d < best.second) {
+            best = {q, d};
+        }
+    }
+    return best;
 }
 
 /// The point in the coordinates of the tool (centimetres, the middle of the tool is the origin).
@@ -108,6 +129,61 @@ void GeometryToolLayer::remove() {
     onPage = nullptr;
     tool.reset();
     isMinimized = false;
+    releaseStroke();
+}
+
+bool GeometryToolLayer::holdToStroke() {
+    if (!tool || !onPage) {
+        return false;
+    }
+    const PageRef page = onPage->getPage();
+    if (!page) {
+        return false;
+    }
+    const cairo_matrix_t m = tool->getMatrix();
+    const QPointF middle(m.x0, m.y0);
+    std::vector<QPointF> nearest;
+    double distance = std::numeric_limits<double>::max();
+    {
+        std::shared_lock lock(*view.getSession().getDocument());
+        for (const Layer* layer: page->getLayersView()) {
+            if (!layer->isVisible()) {
+                continue;
+            }
+            for (const Element* e: layer->getElementsView()) {
+                if (e->getType() != ELEMENT_STROKE) {
+                    continue;
+                }
+                std::vector<QPointF> points;
+                for (const Point& p: static_cast<const Stroke*>(e)->getPointVector()) {
+                    points.emplace_back(p.x, p.y);
+                }
+                if (points.empty()) {
+                    continue;
+                }
+                const double d = nearestOnPath(points, middle).second;
+                if (d < distance) {
+                    distance = d;
+                    nearest = std::move(points);
+                }
+            }
+        }
+    }
+    if (nearest.empty()) {
+        return false;  // no ink on this page
+    }
+    path = std::move(nearest);
+    pathPage = page.get();
+    const QPointF on = nearestOnPath(path, middle).first;
+    tool->setOrigin({on.x(), on.y()});
+    tool->notify(false);
+    Q_EMIT view.updateRequested();
+    return true;
+}
+
+void GeometryToolLayer::releaseStroke() {
+    path.clear();
+    pathPage = nullptr;
 }
 
 void GeometryToolLayer::setMinimized(bool minimized) {
@@ -136,6 +212,9 @@ void GeometryToolLayer::setMinimized(bool minimized) {
         }
     }
     isMinimized = false;
+    if (pathPage && page->getPage().get() != pathPage) {
+        releaseStroke();  // the stroke it held to is on another page
+    }
     place(*page);
 }
 
@@ -179,7 +258,11 @@ void GeometryToolLayer::moveBy(QPointF delta) {
         return;
     }
     cairo_matrix_t matrix = tool->getMatrix();
-    tool->setOrigin({matrix.x0 + delta.x(), matrix.y0 + delta.y()});
+    QPointF to(matrix.x0 + delta.x(), matrix.y0 + delta.y());
+    if (!path.empty()) {
+        to = nearestOnPath(path, to).first;  // it slides along the stroke, its middle always on it
+    }
+    tool->setOrigin({to.x(), to.y()});
     tool->notify(false);
     Q_EMIT view.updateRequested();
 }
@@ -202,6 +285,14 @@ void GeometryToolLayer::turnAndSize(double angle, double factor) {
 double GeometryToolLayer::rotation() const { return tool ? tool->getRotation() : 0; }
 
 double GeometryToolLayer::height() const { return tool ? tool->getHeight() : 0; }
+
+QPointF GeometryToolLayer::middle() const {
+    if (!tool) {
+        return {};
+    }
+    const cairo_matrix_t m = tool->getMatrix();
+    return {m.x0, m.y0};
+}
 
 QPointF GeometryToolLayer::snap(QPointF pagePoint) const {
     if (!tool) {

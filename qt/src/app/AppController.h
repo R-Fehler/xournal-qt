@@ -410,6 +410,10 @@ public:
     Q_PROPERTY(bool geometryMinimized READ geometryMinimized WRITE setGeometryMinimized NOTIFY toolChanged)
     bool geometryMinimized() const;
     void setGeometryMinimized(bool minimized);
+    /// The middle of the setsquare / compass holds on to the nearest ink stroke and slides along it.
+    Q_PROPERTY(bool geometryHeldToStroke READ geometryHeldToStroke WRITE setGeometryHeldToStroke NOTIFY toolChanged)
+    bool geometryHeldToStroke() const;
+    void setGeometryHeldToStroke(bool held);
     /// Turning the setsquare / compass goes in steps of 15 degrees.
     Q_PROPERTY(bool geometryAngleSteps READ geometryAngleSteps WRITE setGeometryAngleSteps NOTIFY toolChanged)
     bool geometryAngleSteps() const;

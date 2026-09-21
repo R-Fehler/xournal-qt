@@ -1421,6 +1421,20 @@ void AppController::setGeometryMinimized(bool minimized) {
     }
 }
 
+bool AppController::geometryHeldToStroke() const { return canvas() && canvas()->geometryTool().heldToStroke(); }
+
+void AppController::setGeometryHeldToStroke(bool held) {
+    if (!canvas()) {
+        return;
+    }
+    if (!held) {
+        canvas()->geometryTool().releaseStroke();
+    } else if (!canvas()->geometryTool().holdToStroke()) {
+        Q_EMIT pageActionDone(tr("There is no ink on this page to hold on to"), false);
+    }
+    Q_EMIT toolChanged();
+}
+
 bool AppController::geometryAngleSteps() const { return canvas() && canvas()->geometryTool().angleSteps(); }
 
 void AppController::setGeometryAngleSteps(bool steps) {

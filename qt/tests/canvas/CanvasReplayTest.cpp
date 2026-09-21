@@ -692,6 +692,43 @@ TEST_F(CanvasReplayTest, theSetsquareTurnsInStepsAndCanBePutAside) {
     EXPECT_FALSE(geometry.active());
 }
 
+// Held to a stroke, the middle of the setsquare (the 0 of its scale) stays on that stroke: moving it slides it along,
+// so lengths can be measured along the line. Only letting go frees it again.
+TEST_F(CanvasReplayTest, theSetsquareHoldsOnToTheNearestStroke) {
+    auto& geometry = view->geometryTool();
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    EXPECT_FALSE(geometry.holdToStroke()) << "no ink on the page yet";
+    EXPECT_FALSE(geometry.heldToStroke());
+    geometry.hide();
+
+    const auto page = session->getDocument()->getPage(0);
+    const QPointF middle(page->getWidth() / 2, page->getHeight() / 2);
+    drawLine(0, middle + QPointF(-150, 100), middle + QPointF(150, 100));  // a line below the middle
+    drawLine(0, middle + QPointF(-150, -250), middle + QPointF(150, -250));  // and one farther away
+    processEvents();
+
+    geometry.toggle(GeometryToolType::SETSQUARE);
+    ASSERT_TRUE(geometry.holdToStroke());
+    EXPECT_TRUE(geometry.heldToStroke());
+    EXPECT_NEAR(geometry.middle().x(), middle.x(), 1.5) << "straight onto the nearest stroke";
+    EXPECT_NEAR(geometry.middle().y(), middle.y() + 100, 1.5);
+
+    // Moving it (two fingers or the right button do that) slides it along the stroke
+    geometry.moveBy(QPointF(40, 30));
+    EXPECT_NEAR(geometry.middle().x(), middle.x() + 40, 1.5) << "along the stroke";
+    EXPECT_NEAR(geometry.middle().y(), middle.y() + 100, 1.5) << "and not off it";
+    geometry.moveBy(QPointF(500, -60));
+    EXPECT_NEAR(geometry.middle().x(), middle.x() + 150, 2) << "no farther than the stroke goes";
+    EXPECT_NEAR(geometry.middle().y(), middle.y() + 100, 1.5);
+
+    // Let go: it moves freely again
+    geometry.releaseStroke();
+    EXPECT_FALSE(geometry.heldToStroke());
+    geometry.moveBy(QPointF(0, 30));
+    EXPECT_NEAR(geometry.middle().y(), middle.y() + 130, 1.5);
+    geometry.hide();
+}
+
 TEST_F(CanvasReplayTest, twoFingersOnTheSetsquareTurnAndSizeIt) {
     auto& vc = view->getViewController();
     vc.setViewSize(QSizeF(900, 600));

@@ -55,6 +55,19 @@ Pane {
             onClicked: app.geometryMinimized = !pill.small
         }
         ToolSeparator { visible: !pill.small }
+        // Its middle holds on to the nearest ink stroke and slides along it (for measuring along a line)
+        IconButton {
+            objectName: "geometryHold"
+            visible: !pill.small
+            iconName: "xqt-magnet"
+            implicitWidth: 44
+            implicitHeight: 44
+            icon.width: 22
+            icon.height: 22
+            checked: app.geometryHeldToStroke
+            tip: checked ? qsTr("Let go of the stroke") : qsTr("Hold on to the nearest stroke (its middle on it)")
+            onClicked: app.geometryHeldToStroke = !app.geometryHeldToStroke
+        }
         PillToggle {
             objectName: "geometrySteps"
             visible: !pill.small

@@ -272,6 +272,10 @@ cd build-qt
       the tool away.
 - [ ] With the tool out, a pill sits at the top right of the canvas. "15°" on: turning it with two fingers goes in
       steps of 15 degrees (the fingers turn on freely, the tool follows step by step); off: freely again.
+- [ ] The magnet in the pill: the middle of the setsquare (the 0 of its scale) jumps onto the nearest ink stroke.
+      Moving it with two fingers (or the right mouse button) now slides it along that stroke - also along a curve -
+      and never off it, so lengths can be read along the line. A second tap on the magnet lets go. On a page
+      without ink it says so and stays free.
 - [ ] The setsquare icon in the pill puts the tool aside: it is gone from the page and does not guide the pen, the
       pill shrinks to the icon. A tap on it brings the tool back where it lay (on the page one is at now if that
       spot is on it). The Shapes entry takes tool and pill away altogether.
