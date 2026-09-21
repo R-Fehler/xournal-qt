@@ -54,14 +54,6 @@ Popup {
         interval: 300
         onTriggered: { pending = false; app.searchAllTabs(searchField.text) }
     }
-    /// Short texts (fewer than 4 characters) are searched on Enter or the search icon only, not while typing.
-    /// The library search shortcut, pressed in here (the overview is modal: the window's shortcuts wait meanwhile)
-    signal librarySearchRequested()
-    Shortcut {
-        sequences: (app.shortcuts.revision, app.shortcuts.keys("searchLibrary"))
-        onActivated: overview.librarySearchRequested()
-    }
-
     // The search shortcuts also while the overview is open (it is modal: the window's shortcuts are blocked)
     Shortcut {
         sequences: (app.shortcuts.revision, app.shortcuts.keys("searchAllDocuments"))
@@ -79,6 +71,7 @@ Popup {
         searchField.forceActiveFocus()
         searchField.selectAll()
     }
+    /// Short texts (fewer than 4 characters) are searched on Enter or the search icon only, not while typing.
     function typed() {
         searchTyping.pending = searchField.text.length > 0 && searchField.text.length < 4
         if (!searchTyping.pending) searchTyping.restart()
