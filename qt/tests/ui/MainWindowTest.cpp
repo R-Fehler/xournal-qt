@@ -1568,6 +1568,13 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     ASSERT_NE(steps, nullptr);
     click(steps);
     EXPECT_TRUE(controller->geometryAngleSteps());
+    EXPECT_TRUE(steps->property("checked").toBool());
+    // The button shows the setting also when it changes elsewhere (another tab has its own setsquare)
+    controller->setGeometryAngleSteps(false);
+    EXPECT_FALSE(steps->property("checked").toBool()) << "it follows the setting after it was tapped";
+    click(steps);
+    EXPECT_TRUE(controller->geometryAngleSteps());
+    EXPECT_TRUE(steps->property("checked").toBool());
     const double wide = pill->width();
     click(find<QQuickItem>("geometryToggle"));
     EXPECT_TRUE(controller->geometryMinimized()) << "put aside";
