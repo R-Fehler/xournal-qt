@@ -1147,7 +1147,13 @@ int CanvasView::getTotalPixelHeight() const {
     return static_cast<int>(layout.contentSize(viewController.zoom()).height());
 }
 xoj::util::Rectangle<double> CanvasView::getVisibleRect() {
-    const QRectF r = viewController.visibleContentRect();
+    // The part of the pages that is seen. Upstream's layout is never smaller than its window (it centres the pages
+    // inside), so its visible part never starts before 0. Ours holds only the pages: where they are narrower (or
+    // shorter) than the window, the margins beside them must not count. Otherwise the edge panning of a dragged
+    // selection takes the margin for a part of the layout scrolled out of view, and on every tick pushes the
+    // selection sideways by the width of the margin.
+    const QRectF content(QPointF(0, 0), layout.contentSize(viewController.zoom()));
+    const QRectF r = viewController.visibleContentRect().intersected(content);
     return {r.x(), r.y(), r.width(), r.height()};
 }
 void CanvasView::scrollRelative(double x, double y) {

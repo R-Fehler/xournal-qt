@@ -1183,6 +1183,61 @@ TEST_F(CanvasReplayTest, theSetsquareStaysOnItsPageWhenThePageMovesAndGoesAsideW
     // (and the view goes with the setsquare out: nothing is left pointing at a page that is gone)
 }
 
+// Dragging a selection on a page that is narrower than the window (grey margins left and right): it follows the
+// pointer and nothing else. Upstream's edge panning, which runs 30 times a second while a selection is dragged, took
+// the margin for a part of the page out of view and pushed the selection sideways by its width on every tick.
+TEST_F(CanvasReplayTest, aSelectionDraggedOnANarrowPageOnlyFollowsThePointer) {
+    auto& vc = view->getViewController();
+    vc.setViewSize(QSizeF(1600, 1200));
+    vc.setZoom(1.0, QPointF(0, 0));
+    processEvents();
+    ASSERT_GT(vc.contentOrigin().x(), 100) << "the page is centred, with margins left and right";
+    app->getSettings()->setSnapGrid(false);  // (snapping to the grid would move it onto grid points on purpose)
+    drawLine(0, QPointF(100, 300), QPointF(400, 400));
+    drawLine(0, QPointF(120, 320), QPointF(380, 380));
+    processEvents();
+    view->selectAllOnPage();
+    EditSelection* sel = view->getSelection();
+    ASSERT_NE(sel, nullptr);
+    const double x = sel->getXOnView();
+    const double y = sel->getYOnView();
+
+    // The mouse takes it by its middle and moves it straight down, slowly, as a hand does
+    const QPointF grab = viewPos(0, QPointF(x + sel->getWidth() / 2, y + sel->getHeight() / 2));
+    mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 20; ++i) {
+        mouse(QEvent::MouseMove, grab + QPointF(0, 5 * i), Qt::NoButton, Qt::LeftButton);
+        processEvents(40);  // the edge-pan timer ticks in between
+        ASSERT_NE(view->getSelection(), nullptr);
+        EXPECT_NEAR(view->getSelection()->getXOnView(), x, 0.5) << "no sideways jump at step " << i;
+    }
+    mouse(QEvent::MouseButtonRelease, grab + QPointF(0, 100), Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_NEAR(view->getSelection()->getXOnView(), x, 0.5);
+    EXPECT_NEAR(view->getSelection()->getYOnView(), y + 100, 1) << "down by what the mouse moved";
+
+    // The same across: the pages zoomed out so far that they are shorter than the window
+    vc.setZoom(0.3, QPointF(0, 0));
+    processEvents();
+    ASSERT_GT(vc.contentOrigin().y(), 50) << "margins above and below";
+    EditSelection* moved = view->getSelection();
+    const double x2 = moved->getXOnView();
+    const double y2 = moved->getYOnView();
+    const QPointF grab2 = viewPos(0, QPointF(x2 + moved->getWidth() / 2, y2 + moved->getHeight() / 2));
+    mouse(QEvent::MouseButtonPress, grab2, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 10; ++i) {
+        mouse(QEvent::MouseMove, grab2 + QPointF(3 * i, 0), Qt::NoButton, Qt::LeftButton);
+        processEvents(40);
+        ASSERT_NE(view->getSelection(), nullptr);
+        EXPECT_NEAR(view->getSelection()->getYOnView(), y2, 0.5) << "no jump up or down at step " << i;
+    }
+    mouse(QEvent::MouseButtonRelease, grab2 + QPointF(30, 0), Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_NEAR(view->getSelection()->getXOnView(), x2 + 30 / vc.zoom(), 1.5) << "across by what the mouse moved";
+}
+
 TEST_F(CanvasReplayTest, twoTapsZoomInAndOutAgain) {
     auto& vc = view->getViewController();
     vc.setViewSize(QSizeF(900, 600));
