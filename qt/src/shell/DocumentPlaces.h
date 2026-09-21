@@ -1,0 +1,37 @@
+/*
+ * xournal-qt: the pages of a document that matter besides its content - the title page (its preview in the library
+ * and in the overview of open documents; the first page unless chosen otherwise) and the page it was left at (to
+ * open it there again, if wanted).
+ *
+ * A .xopp has no place for them, so they are kept aside, in a small JSON file: for the documents of the library in
+ * its metadata folder (by their path in the library, so they follow the library when it is moved), for the others in
+ * the user's cache (by their whole path). Renaming and moving in the app take the entries along.
+ *
+ * Safe from any thread (previews are drawn by workers).
+ *
+ * @license GNU GPLv2 or later
+ */
+#pragma once
+
+#include <utility>
+#include <vector>
+
+#include "filesystem.h"
+
+namespace xqt::DocumentPlaces {
+
+/// The documents in `root` keep their pages in `file` (empty root: no library).
+void setLibrary(const fs::path& root, const fs::path& file);
+/// Where the documents outside the library keep theirs (default: the user's cache; tests use their own).
+void setOutsideFile(const fs::path& file);
+
+/// The title page (0-based; 0 unless chosen otherwise).
+int titlePage(const fs::path& document);
+void setTitlePage(const fs::path& document, int page);
+/// The page the document was left at (-1: not known).
+int lastPage(const fs::path& document);
+void setLastPage(const fs::path& document, int page);
+/// Files or folders renamed or moved (old, new): their entries follow.
+void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
+
+}  // namespace xqt::DocumentPlaces

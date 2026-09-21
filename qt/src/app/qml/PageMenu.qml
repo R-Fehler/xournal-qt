@@ -125,6 +125,14 @@ Popup {
             text: qsTr("Insert pages…")
             onClicked: { app.requestInsertPages(menu.lastPage + 1); menu.close() }
         }
+        // Its preview in the library and in the overview of open documents
+        PageLine {
+            objectName: "titlePageItem"
+            visible: app.titlePage >= 0
+            text: app.titlePage === menu.page ? qsTr("✓ The title page") : qsTr("Make it the title page")
+            enabled: app.titlePage !== menu.page
+            onClicked: { app.setTitlePage(menu.page); menu.close() }
+        }
         PageLine {
             text: qsTr("Start a chapter here…")
             onClicked: { app.requestChapter(menu.page); menu.close() }

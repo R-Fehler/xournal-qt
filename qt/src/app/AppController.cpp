@@ -44,6 +44,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
+#include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
 #include "shell/Previews.h"
 #include "shell/Library.h"
@@ -385,6 +386,7 @@ void AppController::currentTabChanged() {
     Q_EMIT navigationChanged();
     Q_EMIT pdfTextSelectionChanged();
     Q_EMIT toolChanged();  // the setsquare / compass of that tab
+    Q_EMIT titlePageChanged();
 }
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
@@ -655,6 +657,34 @@ void AppController::openSearchResultAt(int index, int page) {
             s->search().jumpToFirstFromCurrentPage();
         }
     }
+}
+
+int AppController::titlePage() const {
+    DocumentSession* s = session();
+    if (!s || !s->hasFilePath()) {
+        return -1;
+    }
+    const DocumentItem item = DocumentFiles::itemOf(s->getFilePath());
+    return item.valid() ? DocumentPlaces::titlePage(item.main()) : -1;
+}
+
+bool AppController::setTitlePage(int page) {
+    DocumentSession* s = session();
+    if (!s || !s->hasFilePath() || page < 0 || static_cast<size_t>(page) >= s->getDocument()->getPageCount()) {
+        return false;
+    }
+    const DocumentItem item = DocumentFiles::itemOf(s->getFilePath());
+    if (!item.valid()) {
+        return false;
+    }
+    DocumentPlaces::setTitlePage(item.main(), page);
+    // Its previews show that page now (they have new names, so they are drawn anew)
+    library->refresh();
+    recent->refresh();
+    tabs->thumbnailChanged(s);
+    Q_EMIT titlePageChanged();
+    Q_EMIT pageActionDone(tr("Page %1 is the title page now").arg(page + 1), false);
+    return true;
 }
 
 QObject* AppController::tabsModel() const { return tabs.get(); }

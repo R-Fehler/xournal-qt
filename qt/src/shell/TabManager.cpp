@@ -8,6 +8,9 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "DocumentFiles.h"
+#include "DocumentPlaces.h"
+#include "Previews.h"
 #include "Thumbnails.h"
 #include "model/Document.h"
 #include "model/XojPage.h"
@@ -48,7 +51,15 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
         case CurrentRole:
             return index.row() == current;
         case ThumbnailRole:
-            // The tab's current page (for the tab overview), see ThumbnailProvider.
+            // On its title page and saved as it is: the stored preview of the library (nothing to draw)
+            if (s->hasFilePath() && !s->isModified()) {
+                const DocumentItem item = DocumentFiles::itemOf(s->getFilePath());
+                if (item.valid() &&
+                    s->getCurrentPageNo() == static_cast<size_t>(DocumentPlaces::titlePage(item.main()))) {
+                    return PreviewCache::url(item);
+                }
+            }
+            // Else the tab's current page as it is now (for the tab overview), see ThumbnailProvider.
             return QString("image://thumbnail/%1/%2/%3")
                     .arg(ThumbnailProvider::idOf(s))
                     .arg(s->getCurrentPageNo())
@@ -134,9 +145,9 @@ void TabManager::listenTo(Tab& tab) {
             v->getPage(i)->deleteViewBuffer();
         }
     });
-    connect(s, &DocumentSession::modifiedChanged, this, [this, s] { tabDataChanged(s, {ModifiedRole}); });
+    connect(s, &DocumentSession::modifiedChanged, this, [this, s] { tabDataChanged(s, {ModifiedRole, ThumbnailRole}); });
     connect(s, &DocumentSession::filePathChanged, this,
-            [this, s] { tabDataChanged(s, {TitleRole, FilePathRole}); });
+            [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
     ThumbnailProvider::registerSession(s);
     auto thumbnailChanged = [this, s] {
         if (const int row = rowOf(s); row >= 0) {

@@ -21,6 +21,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
+#include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
@@ -528,6 +529,54 @@ TEST_F(LibraryTest, searchCanLookAtNamesOnly) {
     model.setNamesOnly(false);
     model.setFlat(false);
     EXPECT_EQ(model.count(), 3) << "the full search again";
+}
+
+// The title page and the page a document was left at are kept beside it: in the metadata of its library, by its
+// path there; they follow it when it is renamed or moved. The preview shows the title page.
+TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
+    makePdf(root / "Physics" / "sheet.pdf");
+    makePdf(root / "lecture.pdf");  // two pages: "xournal" / "Page 2"
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    const fs::path sheet = root / "Physics" / "sheet.pdf";
+    EXPECT_EQ(DocumentPlaces::titlePage(sheet), 0) << "the first page unless chosen";
+    EXPECT_EQ(DocumentPlaces::lastPage(sheet), -1) << "not known yet";
+
+    DocumentPlaces::setTitlePage(sheet, 1);
+    DocumentPlaces::setLastPage(sheet, 1);
+    EXPECT_EQ(DocumentPlaces::titlePage(sheet), 1);
+    EXPECT_EQ(DocumentPlaces::lastPage(sheet), 1);
+    QFile stored(QString::fromStdString((root / DocumentFiles::META_DIR / "pages.json").string()));
+    ASSERT_TRUE(stored.open(QIODevice::ReadOnly)) << "in the library's metadata";
+    const QByteArray json = stored.readAll();
+    EXPECT_TRUE(json.contains("Physics/sheet.pdf")) << "by its path in the library: " << json.toStdString();
+
+    // Renamed folder: the entry follows
+    DocumentPlaces::moved({{root / "Physics", root / "Science"}});
+    EXPECT_EQ(DocumentPlaces::titlePage(root / "Science" / "sheet.pdf"), 1);
+    EXPECT_EQ(DocumentPlaces::titlePage(sheet), 0) << "nothing left at the old place";
+
+    // Outside the library: kept elsewhere (here: in the test's folder)
+    QTemporaryDir other;  // (not in the library: that is the whole temporary folder of the test)
+    const fs::path outsideFile = fs::path(other.filePath("outside.json").toStdString());
+    DocumentPlaces::setOutsideFile(outsideFile);
+    const fs::path elsewhere = fs::path(other.filePath("elsewhere.xopp").toStdString());
+    DocumentPlaces::setTitlePage(elsewhere, 3);
+    EXPECT_EQ(DocumentPlaces::titlePage(elsewhere), 3);
+    EXPECT_TRUE(fs::exists(outsideFile));
+
+    // The preview shows the title page, under a name of its own; the first page keeps the name it always had
+    const DocumentItem lecture = DocumentFiles::itemOf(root / "lecture.pdf");
+    const fs::path firstName = PreviewCache::cacheFile(lecture);
+    const QImage first = PreviewCache::preview(lecture);
+    ASSERT_FALSE(first.isNull());
+    DocumentPlaces::setTitlePage(lecture.main(), 1);
+    EXPECT_NE(PreviewCache::cacheFile(lecture), firstName);
+    const QImage second = PreviewCache::preview(lecture);
+    ASSERT_FALSE(second.isNull());
+    EXPECT_NE(first, second) << "another page";
+    DocumentPlaces::setTitlePage(lecture.main(), 0);
+    EXPECT_EQ(PreviewCache::cacheFile(lecture), firstName);
 }
 
 TEST_F(LibraryTest, hitPagesAreMarkedAndKept) {

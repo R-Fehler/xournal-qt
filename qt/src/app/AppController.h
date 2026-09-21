@@ -307,6 +307,11 @@ public:
     Q_INVOKABLE void openSearchResult(int index);
     /// The same, at the first hit on or after `page` (a page of the extended search).
     Q_INVOKABLE void openSearchResultAt(int index, int page);
+    /// The title page of the current document (its preview in the library and the overview; 0-based, -1: the
+    /// document has no file yet, so there is nowhere to keep it).
+    Q_PROPERTY(int titlePage READ titlePage NOTIFY titlePageChanged)
+    int titlePage() const;
+    Q_INVOKABLE bool setTitlePage(int page);
 
     // --- tabs ---
     /// New empty document in a new tab.
@@ -505,6 +510,7 @@ Q_SIGNALS:
     void pdfTextSelectionCleared();
     /// Something was selected or unselected: `pdfTextIsSelected` and the ends of the selection are different now.
     void pdfTextSelectionChanged();
+    void titlePageChanged();
     /// A long press or right click on the canvas: the window shows the action pill there.
     void contextRequested(QPointF viewPos);
     /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.

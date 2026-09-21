@@ -233,6 +233,10 @@ cd build-qt
 - [ ] Single keys take the tools: P pen, E eraser, H highlighter, T text, S select, L lasso, A hand, I insert an
       image. Not while typing (a text on the page, the search bar, a dialog) and not in the page grid or the
       overviews. F1 lists them under "Tools"; they can be changed like every shortcut.
+- [ ] Overview of open documents: a saved document still on its title page shows at once, with the picture of the
+      library (nothing is drawn); one scrolled to another page or changed shows that page as it is now.
+- [ ] Long press / ⋮ on a page in the sidebar or the page grid → "Make it the title page": the library, the recent
+      documents and the overview show that page for the document from now on ("✓ The title page" in its menu).
 - [ ] Overview of open documents: the grid button beside the search shows under each document its pages with hits
       (marked); tapping one opens that document at that page. "Names" searches only the names of the open documents
       (the others are dimmed).

@@ -287,7 +287,11 @@ Popup {
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 cache: false
-                                source: overview.visible ? cell.thumbnail + "/" + overview.generation : ""
+                                // The stored preview of the library (on the title page, saved) is loaded as it is;
+                                // a drawn page gets the generation, so that it is drawn anew each time
+                                source: !overview.visible ? ""
+                                        : cell.thumbnail.startsWith("image://preview/") ? cell.thumbnail
+                                        : cell.thumbnail + "/" + overview.generation
                                 sourceSize.width: Math.round(width * Screen.devicePixelRatio)
                             }
                         }

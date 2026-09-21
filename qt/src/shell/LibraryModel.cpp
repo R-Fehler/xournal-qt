@@ -1,5 +1,7 @@
 #include "LibraryModel.h"
 
+#include "DocumentPlaces.h"
+
 #include <algorithm>
 #include <set>
 
@@ -51,6 +53,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     if (lib) {
         const fs::path meta = lib->metaDir();
         PreviewCache::setLibrary(lib->root(), meta / "previews");
+        DocumentPlaces::setLibrary(lib->root(), meta / "pages.json");
         idx = std::make_unique<LibraryIndex>(lib->root(), meta / "index");
         connect(idx.get(), &LibraryIndex::progress, this, [this] {
             Q_EMIT indexChanged();
@@ -65,6 +68,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
         connect(watcher.get(), &QFileSystemWatcher::directoryChanged, this, [this] { refreshTimer.start(); });
     } else {
         PreviewCache::setLibrary({}, {});
+        DocumentPlaces::setLibrary({}, {});
     }
     endResetModel();
     Q_EMIT libraryChanged();
@@ -415,6 +419,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
 void LibraryModel::filesMoved(const DocumentFiles::Result& r) {
     if (idx && !r.moved.empty()) {
         idx->moved(r.moved);
+        DocumentPlaces::moved(r.moved);
         refresh();
     }
 }
@@ -425,7 +430,8 @@ void LibraryModel::applyResult(const DocumentFiles::Result& r) {
         return;
     }
     if (idx) {
-        idx->moved(r.moved);  // before the refresh: the entries are not read again
+        idx->moved(r.moved);
+        DocumentPlaces::moved(r.moved);  // before the refresh: the entries are not read again
     }
     if (onFilesChanged) {
         onFilesChanged(r);
@@ -668,6 +674,7 @@ bool LibraryModel::transferTo(const QStringList& paths, const QString& folder, b
         }
         if (idx) {
             idx->moved(r.moved);
+        DocumentPlaces::moved(r.moved);
         }
         if (onFilesChanged) {
             onFilesChanged(r);

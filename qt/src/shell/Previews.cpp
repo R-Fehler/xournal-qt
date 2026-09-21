@@ -1,5 +1,7 @@
 #include "Previews.h"
 
+#include "DocumentPlaces.h"
+
 #include <mutex>
 #include <set>
 
@@ -52,8 +54,12 @@ void PreviewCache::setLibrary(const fs::path& root, const fs::path& dir) {
 
 fs::path PreviewCache::cacheFile(const DocumentItem& item) {
     const std::string main = item.main().string();
+    // The preview shows the title page; another one than the first is part of the name (the first keeps the names
+    // of the previews stored before there were title pages)
+    const int title = DocumentPlaces::titlePage(item.main());
+    const QByteArray titlePart = title > 0 ? QByteArray("\ntitle=") + QByteArray::number(title) : QByteArray();
     const QString name = QString::fromLatin1(
-            QCryptographicHash::hash(QByteArray::fromStdString(main) + '\n' + documentStamp(item).toUtf8(),
+            QCryptographicHash::hash(QByteArray::fromStdString(main) + '\n' + documentStamp(item).toUtf8() + titlePart,
                                      QCryptographicHash::Sha1)
                     .toHex()
                     .left(24));
@@ -83,7 +89,8 @@ QImage PreviewCache::preview(const DocumentItem& item) {
     if (!loaded.document || loaded.document->getPageCount() == 0) {
         return {};
     }
-    img = ThumbnailProvider::renderDocument(*loaded.document, 0, WIDTH);
+    const size_t title = static_cast<size_t>(DocumentPlaces::titlePage(item.main()));
+    img = ThumbnailProvider::renderDocument(*loaded.document, std::min(title, loaded.document->getPageCount() - 1), WIDTH);
     std::error_code ec;
     fs::create_directories(file.parent_path(), ec);
     // Written under another name first: a reader never sees half a file.
@@ -100,7 +107,11 @@ QString PreviewCache::url(const DocumentItem& item) {
                                     .toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals);
     // The stamp only makes the URL change with the files (QML caches images by URL).
     const QString stamp = QString::fromLatin1(
-            QCryptographicHash::hash(documentStamp(item).toUtf8(), QCryptographicHash::Md5).toHex().left(8));
+            QCryptographicHash::hash(documentStamp(item).toUtf8() + '\n' +
+                                             QByteArray::number(DocumentPlaces::titlePage(item.main())),
+                                     QCryptographicHash::Md5)
+                    .toHex()
+                    .left(8));
     return QStringLiteral("image://preview/") + QString::fromLatin1(path) + '/' + stamp;
 }
 

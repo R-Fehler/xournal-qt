@@ -81,6 +81,9 @@ public:
     /// Milliseconds a tab must be in the background before its page buffers are released.
     void setBackgroundReleaseDelay(int ms) { releaseDelayMs = ms; }
 
+    /// The picture of a tab may be another one now (its title page was chosen).
+    void thumbnailChanged(const DocumentSession* s) { tabDataChanged(s, {ThumbnailRole}); }
+
 Q_SIGNALS:
     void currentIndexChanged();
     void countChanged();

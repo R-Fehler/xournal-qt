@@ -1536,7 +1536,7 @@ TEST_F(MainWindowTest, thePageMenuIsSmallAndWorksByIcons) {
     ASSERT_NE(menu, nullptr);
     menu->setProperty("page", 2);
     QMetaObject::invokeMethod(menu, "open");
-    until([&] { return menu->property("visible").toBool(); });
+    until([&] { return menu->property("opened").toBool(); });  // (after its opening animation: then it stands still)
     ASSERT_TRUE(menu->property("visible").toBool());
     const double height = menu->property("height").toDouble();
     EXPECT_GT(height, 100) << "it is there";
@@ -1558,7 +1558,7 @@ TEST_F(MainWindowTest, thePageMenuIsSmallAndWorksByIcons) {
     // Moving the third page up puts it before the second one, as one page change to undo
     const int pageCount = controller->pageCount();
     QMetaObject::invokeMethod(menu, "open");
-    until([&] { return menu->property("visible").toBool(); });
+    until([&] { return menu->property("opened").toBool(); });  // (after its opening animation: then it stands still)
     auto* up = find<QQuickItem>("pageMenuUp");
     ASSERT_NE(up, nullptr);
     EXPECT_TRUE(up->isEnabled());
@@ -1570,7 +1570,7 @@ TEST_F(MainWindowTest, thePageMenuIsSmallAndWorksByIcons) {
     // On the first page there is nowhere to move it up to
     menu->setProperty("page", 0);
     QMetaObject::invokeMethod(menu, "open");
-    until([&] { return menu->property("visible").toBool(); });
+    until([&] { return menu->property("opened").toBool(); });  // (after its opening animation: then it stands still)
     EXPECT_FALSE(find<QQuickItem>("pageMenuUp")->isEnabled());
     QMetaObject::invokeMethod(menu, "close");
 }
@@ -1999,6 +1999,36 @@ TEST_F(MainWindowTest, addingAPageIsUndoneLikeEverythingElse) {
     // The undo button of the pill as well
     click(find<QQuickItem>("undoButton"));
     EXPECT_EQ(controller->pageCount(), pages);
+}
+
+// The overview of open documents shows the stored preview of a saved document that is on its title page (nothing to
+// draw), else the page it is on. The title page is chosen in the menu of a page.
+TEST_F(MainWindowTest, theOverviewShowsTheStoredPreviewOnTheTitlePage) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    auto picture = [&] { return tabs->index(controller->currentTab(), 0).data(xqt::TabManager::ThumbnailRole).toString(); };
+    EXPECT_EQ(controller->titlePage(), 0);
+    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on page 1, saved: the stored preview";
+
+    controller->goToPage(2);
+    wait(50);
+    EXPECT_TRUE(picture().startsWith("image://thumbnail/")) << "on another page: that page";
+
+    // Page 3 becomes the title page through the menu of the page
+    auto* menu = find<QObject>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    menu->setProperty("page", 2);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });  // (after its opening animation: then it stands still)
+    auto* item = find<QQuickItem>("titlePageItem");
+    ASSERT_NE(item, nullptr);
+    EXPECT_TRUE(item->isVisible());
+    click(item);
+    EXPECT_EQ(controller->titlePage(), 2);
+    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on its title page now";
+
+    controller->setTitlePage(0);  // (kept in the test's own cache, but tidy anyway)
 }
 
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
