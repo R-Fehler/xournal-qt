@@ -56,7 +56,7 @@ fs::path PreviewCache::cacheFile(const DocumentItem& item) {
     const std::string main = item.main().string();
     // The preview shows the title page; another one than the first is part of the name (the first keeps the names
     // of the previews stored before there were title pages)
-    const int title = DocumentPlaces::titlePage(item.main());
+    const int title = DocumentPlaces::titlePage(DocumentPlaces::keyOf(item));
     const QByteArray titlePart = title > 0 ? QByteArray("\ntitle=") + QByteArray::number(title) : QByteArray();
     const QString name = QString::fromLatin1(
             QCryptographicHash::hash(QByteArray::fromStdString(main) + '\n' + documentStamp(item).toUtf8() + titlePart,
@@ -89,7 +89,7 @@ QImage PreviewCache::preview(const DocumentItem& item) {
     if (!loaded.document || loaded.document->getPageCount() == 0) {
         return {};
     }
-    const size_t title = static_cast<size_t>(DocumentPlaces::titlePage(item.main()));
+    const size_t title = static_cast<size_t>(DocumentPlaces::titlePage(DocumentPlaces::keyOf(item)));
     img = ThumbnailProvider::renderDocument(*loaded.document, std::min(title, loaded.document->getPageCount() - 1), WIDTH);
     std::error_code ec;
     fs::create_directories(file.parent_path(), ec);
@@ -108,7 +108,7 @@ QString PreviewCache::url(const DocumentItem& item) {
     // The stamp only makes the URL change with the files (QML caches images by URL).
     const QString stamp = QString::fromLatin1(
             QCryptographicHash::hash(documentStamp(item).toUtf8() + '\n' +
-                                             QByteArray::number(DocumentPlaces::titlePage(item.main())),
+                                             QByteArray::number(DocumentPlaces::titlePage(DocumentPlaces::keyOf(item))),
                                      QCryptographicHash::Md5)
                     .toHex()
                     .left(8));

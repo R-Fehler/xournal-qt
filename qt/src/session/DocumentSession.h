@@ -86,6 +86,9 @@ public:
 
     bool hasFilePath() const;
     fs::path getFilePath() const;
+    /// The file the document is known by: its .xopp, or the PDF it annotates while it has no .xopp yet (empty: a new
+    /// document).
+    fs::path documentFile() const;
     /// Title for the tab: file name, or "Untitled" / the PDF name for unsaved documents.
     std::string getDisplayName() const;
     bool isModified() const;

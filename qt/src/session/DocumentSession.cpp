@@ -609,6 +609,12 @@ fs::path DocumentSession::getFilePath() const {
     return doc->getFilepath();
 }
 
+fs::path DocumentSession::documentFile() const {
+    std::shared_lock lock(*doc);
+    const fs::path file = doc->getFilepath();
+    return file.empty() ? doc->getPdfFilepath() : file;
+}
+
 std::string DocumentSession::getDisplayName() const {
     std::shared_lock lock(*doc);
     if (auto p = doc->getFilepath(); !p.empty()) {

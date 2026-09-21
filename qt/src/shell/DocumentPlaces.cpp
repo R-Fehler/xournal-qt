@@ -103,6 +103,13 @@ void set(const fs::path& document, const char* what, int value, int fallback) {
 }
 }  // namespace
 
+fs::path keyOf(const DocumentItem& item) { return item.pdf.empty() ? item.xopp : item.pdf; }
+
+fs::path keyOf(const fs::path& file) {
+    const DocumentItem item = DocumentFiles::itemOf(file);
+    return item.valid() ? keyOf(item) : file;
+}
+
 void setLibrary(const fs::path& root, const fs::path& file) {
     auto& s = state();
     std::lock_guard lock(s.mtx);

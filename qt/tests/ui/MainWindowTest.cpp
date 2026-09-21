@@ -2099,6 +2099,36 @@ TEST_F(MainWindowTest, documentsOpenWhereTheyWereLeftOffIfWanted) {
     settings->set("resumeAtLastPage", false);
 }
 
+// A PDF opened as it is (no .xopp beside it) gets all of it too: the stored preview in the overview, a title page,
+// and it opens again where it was left - also when it was closed without saving.
+TEST_F(MainWindowTest, aPdfWithoutXoppHasTitleAndLastPageToo) {
+    // (a copy under an ordinary name: "<name>.xopp.bg.pdf" is the attached PDF of a .xopp, not a document)
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    ASSERT_TRUE(QFile::copy(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp.bg.pdf"), pdf));
+    ASSERT_TRUE(controller->openPath(pdf));
+    wait(80);
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    auto picture = [&] { return tabs->index(controller->currentTab(), 0).data(xqt::TabManager::ThumbnailRole).toString(); };
+    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on its first page: the stored preview";
+    EXPECT_FALSE(controller->tabManager().currentSession()->hasFilePath()) << "(no .xopp: a PDF as it is)";
+    EXPECT_EQ(controller->titlePage(), 0) << "it has a title page";
+
+    ASSERT_TRUE(controller->setTitlePage(1));
+    controller->goToPage(1);
+    wait(50);
+    EXPECT_TRUE(picture().startsWith("image://preview/")) << "on its (new) title page";
+
+    // Left on the second page; closed without saving; opened again with "Last page" on
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    settings->set("resumeAtLastPage", true);
+    controller->closeTab(controller->currentTab());
+    ASSERT_TRUE(controller->openPath(pdf));
+    EXPECT_EQ(controller->pageNumber(), 2) << "where it was left";
+    settings->set("resumeAtLastPage", false);
+    controller->setTitlePage(0);
+}
+
 TEST_F(MainWindowTest, pageGridButtonIsInTheZoomPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     auto* button = find<QQuickItem>("pageGridButton");

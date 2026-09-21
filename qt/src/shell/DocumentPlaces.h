@@ -18,7 +18,17 @@
 
 #include "filesystem.h"
 
+namespace xqt {
+struct DocumentItem;
+}
+
 namespace xqt::DocumentPlaces {
+
+/// The file a document's entry is kept under: its PDF if it has one (so the entry stays when a .xopp is added to a
+/// PDF), else its .xopp. The functions below take this file.
+fs::path keyOf(const DocumentItem& item);
+/// The same for any file of a document (looks at the files beside it).
+fs::path keyOf(const fs::path& file);
 
 /// The documents in `root` keep their pages in `file` (empty root: no library).
 void setLibrary(const fs::path& root, const fs::path& file);

@@ -23,12 +23,11 @@ namespace xqt {
 TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(parent), app(app) {}
 
 namespace {
-/// Where a saved document was left (to open it there again, if wanted - see DocumentPlaces)
+/// Where a document was left, saved or not (to open it there again, if wanted - see DocumentPlaces); a PDF without a
+/// .xopp as well. A new document has no file yet: nothing to keep.
 void rememberPlace(const DocumentSession* s) {
-    if (s && s->hasFilePath()) {
-        if (const DocumentItem item = DocumentFiles::itemOf(s->getFilePath()); item.valid()) {
-            DocumentPlaces::setLastPage(item.main(), static_cast<int>(s->getCurrentPageNo()));
-        }
+    if (const fs::path file = s ? s->documentFile() : fs::path(); !file.empty()) {
+        DocumentPlaces::setLastPage(DocumentPlaces::keyOf(file), static_cast<int>(s->getCurrentPageNo()));
     }
 }
 }  // namespace
@@ -64,10 +63,11 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             return index.row() == current;
         case ThumbnailRole:
             // On its title page and saved as it is: the stored preview of the library (nothing to draw)
-            if (s->hasFilePath() && !s->isModified()) {
-                const DocumentItem item = DocumentFiles::itemOf(s->getFilePath());
-                if (item.valid() &&
-                    s->getCurrentPageNo() == static_cast<size_t>(DocumentPlaces::titlePage(item.main()))) {
+            // (also a PDF that has no .xopp yet)
+            if (const fs::path file = s->documentFile(); !file.empty() && !s->isModified()) {
+                const DocumentItem item = DocumentFiles::itemOf(file);
+                if (item.valid() && s->getCurrentPageNo() ==
+                                            static_cast<size_t>(DocumentPlaces::titlePage(DocumentPlaces::keyOf(item)))) {
                     return PreviewCache::url(item);
                 }
             }

@@ -661,23 +661,17 @@ void AppController::openSearchResultAt(int index, int page) {
 
 int AppController::titlePage() const {
     DocumentSession* s = session();
-    if (!s || !s->hasFilePath()) {
-        return -1;
-    }
-    const DocumentItem item = DocumentFiles::itemOf(s->getFilePath());
-    return item.valid() ? DocumentPlaces::titlePage(item.main()) : -1;
+    const fs::path file = s ? s->documentFile() : fs::path();  // (a PDF without a .xopp as well)
+    return file.empty() ? -1 : DocumentPlaces::titlePage(DocumentPlaces::keyOf(file));
 }
 
 bool AppController::setTitlePage(int page) {
     DocumentSession* s = session();
-    if (!s || !s->hasFilePath() || page < 0 || static_cast<size_t>(page) >= s->getDocument()->getPageCount()) {
+    const fs::path file = s ? s->documentFile() : fs::path();
+    if (file.empty() || page < 0 || static_cast<size_t>(page) >= s->getDocument()->getPageCount()) {
         return false;
     }
-    const DocumentItem item = DocumentFiles::itemOf(s->getFilePath());
-    if (!item.valid()) {
-        return false;
-    }
-    DocumentPlaces::setTitlePage(item.main(), page);
+    DocumentPlaces::setTitlePage(DocumentPlaces::keyOf(file), page);
     // Its previews show that page now (they have new names, so they are drawn anew)
     library->refresh();
     recent->refresh();
@@ -1365,8 +1359,7 @@ bool AppController::openPath(const QString& path) {
     if (bool resume = false;
         app->getSettings()->getCustomElement("xournalQt").getBool("resumeAtLastPage", resume) && resume) {
         DocumentSession* s = tabs->currentSession();
-        const DocumentItem item = DocumentFiles::itemOf(file);
-        const int page = item.valid() ? DocumentPlaces::lastPage(item.main()) : -1;
+        const int page = DocumentPlaces::lastPage(DocumentPlaces::keyOf(file));
         if (s && page > 0 && static_cast<size_t>(page) < s->getDocument()->getPageCount()) {
             s->setCurrentPageNo(static_cast<size_t>(page));
             s->getScrollHandler()->scrollToPage(static_cast<size_t>(page));
