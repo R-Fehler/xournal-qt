@@ -1891,6 +1891,60 @@ TEST_F(MainWindowTest, singleKeysTakeTheTools) {
 }
 
 // Ctrl+Shift+F searches all open documents, Ctrl+Alt+F the library - from anywhere.
+// The overview of open documents searches them like the library: extended, with the pages that have hits (tap one
+// to open the document there), and by name only.
+TEST_F(MainWindowTest, tabOverviewHasTheExtendedAndTheNameSearch) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    QObject* overview = find("tabOverview");
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    auto running = [&](int row) { return tabs->index(row, 0).data(xqt::TabManager::SearchRunningRole).toBool(); };
+
+    type("page");
+    key(Qt::Key_Return);
+    ASSERT_TRUE(waitFor([&] { return !running(0) && !running(1); }));
+    const QVariantList pages = tabs->index(1, 0).data(xqt::TabManager::HitPagesRole).toList();
+    ASSERT_FALSE(pages.isEmpty()) << "old.xopp has \"Page 2\"";
+    EXPECT_EQ(pages.first().toMap().value("page").toInt(), 1);
+    EXPECT_FALSE(pages.first().toMap().value("rects").toList().isEmpty()) << "with the places of the hits";
+
+    // Extended: the pages with hits under the document; one of them opens it right there
+    click(find<QQuickItem>("overviewExtendedButton"));
+    EXPECT_TRUE(overview->property("extendedView").toBool());
+    QQuickItem* hitPage = nullptr;
+    until([&] { return (hitPage = findItem("overviewHitPage")) != nullptr && hitPage->isVisible(); });
+    ASSERT_NE(hitPage, nullptr);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(hitPage);
+    ASSERT_TRUE(waitOpened(overview, false));
+    EXPECT_EQ(controller->currentTab(), 1);
+    EXPECT_EQ(controller->pageNumber(), 2) << "at the page with the hit";
+
+    // Names only: "pages" is in the name of the first document only, its text is not searched
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    click(find<QQuickItem>("overviewNamesOnly"));
+    EXPECT_TRUE(overview->property("namesOnly").toBool());
+    auto* field = find<QQuickItem>("overviewSearchField");
+    field->setProperty("text", QStringLiteral("pages"));
+    QMetaObject::invokeMethod(overview, "runSearch", Q_ARG(QVariant, QStringLiteral("pages")));
+    EXPECT_EQ(tabs->index(1, 0).data(xqt::TabManager::SearchHitsRole).toInt(), 0) << "no text search";
+    const auto nameMatches = [&](int row) {
+        QVariant matches;
+        QMetaObject::invokeMethod(overview, "nameMatches", Q_RETURN_ARG(QVariant, matches),
+                                  Q_ARG(QVariant, tabs->index(row, 0).data(xqt::TabManager::TitleRole)));
+        return matches.toBool();
+    };
+    EXPECT_TRUE(nameMatches(0)) << "pages.xopp";
+    EXPECT_FALSE(nameMatches(1)) << "old.xopp";
+    EXPECT_FALSE(overview->property("extendedView").toBool()) << "no pages to show for names";
+}
+
 TEST_F(MainWindowTest, searchShortcutsForAllDocumentsAndTheLibrary) {
     controller->newDocument();
     QObject* overview = find("tabOverview");

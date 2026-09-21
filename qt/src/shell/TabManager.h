@@ -31,8 +31,13 @@ class TabManager final: public QAbstractListModel {
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentIndexChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 public:
+    /// Hit marks on one page preview of the extended search (a one-letter search has hundreds)
+    static constexpr int MAX_PAGE_HITS = 50;
     enum Roles { TitleRole = Qt::UserRole + 1, ModifiedRole, FilePathRole, CurrentRole, ThumbnailRole, PageCountRole,
-                 SearchHitsRole, SearchRunningRole };
+                 SearchHitsRole, SearchRunningRole,
+                 /// The pages with search hits, for the extended search of the overview:
+                 /// [{ page, count, aspect, thumbnail, rects: [normalized hit rects, at most 50] }]
+                 HitPagesRole };
 
     explicit TabManager(AppContext& app, QObject* parent = nullptr);
     ~TabManager() override;

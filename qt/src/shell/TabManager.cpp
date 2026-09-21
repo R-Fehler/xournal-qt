@@ -1,11 +1,16 @@
 #include "TabManager.h"
 
+#include <algorithm>
+#include <shared_mutex>
+
 #include <QFileInfo>
+#include <QRectF>
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "Thumbnails.h"
 #include "model/Document.h"
+#include "model/XojPage.h"
 #include "undo/UndoRedoHandler.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
@@ -54,6 +59,35 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             return static_cast<int>(s->search().hits().size());
         case SearchRunningRole:
             return s->search().isRunning();
+        case HitPagesRole: {
+            // As the page grid marks them (PagesModel), grouped by page
+            QVariantList pages;
+            const auto& hits = s->search().hits();
+            Document* doc = s->getDocument();
+            std::shared_lock lock(*doc);
+            for (auto it = hits.begin(); it != hits.end();) {
+                const size_t page = it->page;
+                const auto end = std::find_if(it, hits.end(), [page](const DocumentSearch::Hit& h) { return h.page != page; });
+                const PageRef p = page < doc->getPageCount() ? doc->getPage(page) : PageRef();
+                const double w = p ? p->getWidth() : 1, h = p ? p->getHeight() : 1.414;
+                const auto step = std::max<std::ptrdiff_t>(1, ((end - it) + MAX_PAGE_HITS - 1) / MAX_PAGE_HITS);
+                QVariantList rects;
+                for (auto r = it; r < end; r += step) {
+                    rects.append(QRectF(r->rect.x() / w, r->rect.y() / h, r->rect.width() / w, r->rect.height() / h));
+                }
+                pages.append(QVariantMap{
+                        {"page", static_cast<int>(page)},
+                        {"count", static_cast<int>(end - it)},
+                        {"aspect", h / w},
+                        {"thumbnail", QString("image://thumbnail/%1/%2/%3")
+                                              .arg(ThumbnailProvider::idOf(s))
+                                              .arg(page)
+                                              .arg(tabs[static_cast<size_t>(index.row())].thumbnailRevision)},
+                        {"rects", rects}});
+                it = end;
+            }
+            return pages;
+        }
         default:
             return {};
     }
@@ -62,7 +96,7 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
 QHash<int, QByteArray> TabManager::roleNames() const {
     return {{TitleRole, "title"},         {ModifiedRole, "modified"},     {FilePathRole, "filePath"},
             {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"},
-            {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}};
+            {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}, {HitPagesRole, "hitPages"}};
 }
 
 int TabManager::rowOf(const DocumentSession* s) const {
@@ -111,7 +145,7 @@ void TabManager::listenTo(Tab& tab) {
         }
     };
     connect(s, &DocumentSession::pageContentChanged, this, thumbnailChanged);
-    auto searchChanged = [this, s] { tabDataChanged(s, {SearchHitsRole, SearchRunningRole}); };
+    auto searchChanged = [this, s] { tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole}); };
     connect(&s->search(), &DocumentSearch::changed, this, searchChanged);
     connect(&s->search(), &DocumentSearch::finished, this, searchChanged);
     connect(s, &DocumentSession::currentPageChanged, this, thumbnailChanged);

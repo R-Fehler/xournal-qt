@@ -229,6 +229,9 @@ cd build-qt
 - [ ] Single keys take the tools: P pen, E eraser, H highlighter, T text, S select, L lasso, A hand, I insert an
       image. Not while typing (a text on the page, the search bar, a dialog) and not in the page grid or the
       overviews. F1 lists them under "Tools"; they can be changed like every shortcut.
+- [ ] Overview of open documents: the grid button beside the search shows under each document its pages with hits
+      (marked); tapping one opens that document at that page. "Names" searches only the names of the open documents
+      (the others are dimmed).
 - [ ] Ctrl+Shift+F: the overview of all open documents opens with the cursor in its search. Ctrl+Alt+F (also from
       that overview): the library opens with the cursor in its search.
 - [ ] F1 (or Ctrl+/) lists all shortcuts by group; Esc closes it.

@@ -305,6 +305,8 @@ public:
     Q_INVOKABLE void searchAllTabs(const QString& query);
     /// Switch to a tab found by searchAllTabs and show its first hit from the current page on.
     Q_INVOKABLE void openSearchResult(int index);
+    /// The same, at the first hit on or after `page` (a page of the extended search).
+    Q_INVOKABLE void openSearchResultAt(int index, int page);
 
     // --- tabs ---
     /// New empty document in a new tab.

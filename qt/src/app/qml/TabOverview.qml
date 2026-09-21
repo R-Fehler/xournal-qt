@@ -38,13 +38,30 @@ Popup {
     exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 } }
 
     readonly property bool searching: searchField.text !== ""
+    /// Extended search: each document shows its pages with hits (as in the library)
+    property bool extended: false
+    /// The reduced search: the names of the open documents only, not their text
+    property bool namesOnly: false
+    readonly property bool extendedView: extended && searching && !namesOnly
+    onNamesOnlyChanged: runSearch(searchField.text)
+
+    /// Search the text of the open documents - or, names only, nothing (the names are compared right here)
+    function runSearch(text) { app.searchAllTabs(namesOnly ? "" : text) }
+    function nameMatches(title) {
+        return searching && title.toLowerCase().indexOf(searchField.text.trim().toLowerCase()) >= 0
+    }
 
     function activate(index) {
-        if (searching) {
+        if (searching && !namesOnly) {
             app.openSearchResult(index)
         } else {
             app.currentTab = index
         }
+        overview.close()
+    }
+    /// A page of the extended search: that document, at the first hit of that page
+    function activatePage(index, page) {
+        app.openSearchResultAt(index, page)
         overview.close()
     }
 
@@ -52,7 +69,7 @@ Popup {
         id: searchTyping
         property bool pending: false  // short text typed, waiting for Enter
         interval: 300
-        onTriggered: { pending = false; app.searchAllTabs(searchField.text) }
+        onTriggered: { pending = false; overview.runSearch(searchField.text) }
     }
     // The search shortcuts also while the overview is open (it is modal: the window's shortcuts are blocked)
     Shortcut {
@@ -110,7 +127,7 @@ Popup {
                         icon.source: app.iconUrl("xqt-search")
                         icon.color: "#3c4043"
                         display: AbstractButton.IconOnly
-                        onClicked: { searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs(searchField.text) }
+                        onClicked: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(searchField.text) }
                         ToolTip.visible: hovered
                         ToolTip.text: qsTr("Search (Enter)")
                         ToolTip.delay: 600
@@ -129,8 +146,8 @@ Popup {
                         }
                         selectByMouse: true
                         onTextEdited: overview.typed()
-                        Keys.onReturnPressed: { searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs(text); grid.forceActiveFocus() }
-                        Keys.onEnterPressed: { searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs(text); grid.forceActiveFocus() }
+                        Keys.onReturnPressed: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(text); grid.forceActiveFocus() }
+                        Keys.onEnterPressed: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(text); grid.forceActiveFocus() }
                         Keys.onDownPressed: grid.forceActiveFocus()
                     }
                     Label {
@@ -139,15 +156,43 @@ Popup {
                         color: "#6b6f75"
                         font.pixelSize: 12
                     }
+                    // The reduced search: names only (as in the library)
+                    ToolButton {
+                        id: namesOnlyButton
+                        objectName: "overviewNamesOnly"
+                        text: qsTr("Names")
+                        checkable: true
+                        checked: overview.namesOnly
+                        onToggled: overview.namesOnly = checked
+                        implicitHeight: 36
+                        font.pixelSize: 13
+                        font.weight: checked ? Font.DemiBold : Font.Normal
+                        Material.foreground: checked ? Material.accentColor : "#5f6368"
+                        ToolTip.visible: hovered
+                        ToolTip.text: checked ? qsTr("Searching the names only - tap to search the text too")
+                                              : qsTr("Search the names of the open documents only")
+                        ToolTip.delay: 600
+                        background: Rectangle {
+                            radius: 10
+                            color: namesOnlyButton.checked ? "#e0e3f5" : (namesOnlyButton.pressed ? "#e8e8e8" : "transparent")
+                        }
+                    }
                     ToolButton {
                         visible: searchField.text !== ""
                         implicitWidth: 36; implicitHeight: 36
                         icon.source: app.iconUrl("xqt-close")
                         icon.color: "#3c4043"
                         display: AbstractButton.IconOnly
-                        onClicked: { searchField.text = ""; searchTyping.stop(); searchTyping.pending = false; app.searchAllTabs("") }
+                        onClicked: { searchField.text = ""; searchTyping.stop(); searchTyping.pending = false; overview.runSearch("") }
                     }
                 }
+            }
+            IconButton {
+                objectName: "overviewExtendedButton"
+                iconName: "xqt-pages-grid"
+                tip: qsTr("Extended search: show the pages with hits of every document")
+                checked: overview.extended
+                onClicked: overview.extended = !overview.extended
             }
             Item { Layout.fillWidth: true }
             IconButton {
@@ -175,9 +220,11 @@ Popup {
             model: app.tabs
             keyNavigationEnabled: true
             boundsBehavior: Flickable.StopAtBounds
-            readonly property int columns: Math.max(1, Math.floor(width / 280))
+            readonly property int columns: Math.max(1, Math.floor(width / (overview.extendedView ? 380 : 280)))
             cellWidth: Math.floor(width / columns)
-            cellHeight: Math.round(cellWidth * 1.25)
+            readonly property int stripHeight: overview.extendedView ? Math.round(Math.max(120, cellWidth * 0.55)) : 0
+            cellHeight: overview.extendedView ? Math.round(cellWidth * 0.5 + 44 + stripHeight + 24)
+                                              : Math.round(cellWidth * 1.25)
             ScrollBar.vertical: ScrollBar {}
             TouchpadMomentum { flickable: grid }
 
@@ -207,12 +254,14 @@ Popup {
                 required property int pageCount
                 required property int searchHits
                 required property bool searchRunning
+                required property var hitPages
                 width: grid.cellWidth
                 height: grid.cellHeight
                 readonly property bool highlighted: GridView.isCurrentItem && grid.activeFocus
-                // Searching: documents without hits step back.
-                readonly property bool hit: overview.searching && searchHits > 0
-                opacity: overview.searching && searchHits === 0 && !searchRunning ? 0.45 : 1
+                // Searching: documents without hits step back (names only: those whose name does not match).
+                readonly property bool hit: overview.namesOnly ? overview.nameMatches(title)
+                                                               : overview.searching && searchHits > 0
+                opacity: overview.searching && !hit && (overview.namesOnly || !searchRunning) ? 0.45 : 1
 
                 Rectangle {
                     anchors.fill: parent
@@ -268,19 +317,98 @@ Popup {
                                 radius: 10
                                 implicitWidth: hitLabel.implicitWidth + 16
                                 implicitHeight: 22
-                                color: cell.searchHits > 0 ? "#fff3c4" : "#eceef1"
+                                color: cell.hit ? "#fff3c4" : "#eceef1"
                                 Label {
                                     id: hitLabel
                                     objectName: "hitLabel"
                                     anchors.centerIn: parent
                                     font.pixelSize: 12
-                                    font.weight: cell.searchHits > 0 ? Font.DemiBold : Font.Normal
-                                    color: cell.searchHits > 0 ? "#7a5200" : "#6b6f75"
-                                    text: cell.searchHits > 0
+                                    font.weight: cell.hit ? Font.DemiBold : Font.Normal
+                                    color: cell.hit ? "#7a5200" : "#6b6f75"
+                                    text: overview.namesOnly ? (cell.hit ? qsTr("In the name") : qsTr("No hits"))
+                                          : cell.searchHits > 0
                                           ? (cell.searchHits === 1 ? qsTr("1 hit") : qsTr("%1 hits").arg(cell.searchHits))
                                             + (cell.searchRunning ? "…" : "")
                                           : (cell.searchRunning ? qsTr("Searching…") : qsTr("No hits"))
                                 }
+                            }
+                        }
+                        // Extended search: the pages with hits (as in the library), marked as in the page grid
+                        ListView {
+                            id: strip
+                            objectName: "overviewHitPages"
+                            visible: grid.stripHeight > 0
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: grid.stripHeight
+                            orientation: ListView.Horizontal
+                            spacing: 6
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            model: grid.stripHeight > 0 ? cell.hitPages : []
+                            cacheBuffer: Math.max(0, width)
+                            ScrollBar.horizontal: ScrollBar { height: 6 }
+                            Label {
+                                anchors.centerIn: parent
+                                visible: strip.count === 0
+                                text: cell.searchRunning ? qsTr("Searching…") : qsTr("No hits")
+                                color: "#80868b"
+                            }
+                            delegate: AbstractButton {
+                                id: hitPage
+                                required property var modelData
+                                readonly property real thumbHeight: strip.height - 22
+                                objectName: "overviewHitPage"
+                                width: Math.max(24, Math.round(thumbHeight / (modelData.aspect > 0 ? modelData.aspect : 1.414)))
+                                height: strip.height
+                                onClicked: overview.activatePage(cell.index, modelData.page)
+                                contentItem: Item {
+                                    Rectangle {
+                                        id: paper
+                                        width: parent.width
+                                        height: hitPage.thumbHeight
+                                        color: "#ffffff"
+                                        border.width: hitPage.hovered ? 2 : 1
+                                        border.color: hitPage.hovered ? Material.accentColor : "#d5d8dc"
+                                        Image {
+                                            id: pageImage
+                                            anchors.fill: parent
+                                            anchors.margins: 1
+                                            asynchronous: true
+                                            cache: false
+                                            source: overview.visible ? hitPage.modelData.thumbnail + "/" + overview.generation : ""
+                                            sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                        }
+                                        Repeater {
+                                            model: hitPage.modelData.rects
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                x: 1 + modelData.x * (paper.width - 2) - 1
+                                                y: 1 + modelData.y * (paper.height - 2) - 1
+                                                width: Math.max(3, modelData.width * (paper.width - 2) + 2)
+                                                height: Math.max(3, modelData.height * (paper.height - 2) + 2)
+                                                radius: 1
+                                                color: "#80ffd200"
+                                                border.width: 1
+                                                border.color: "#e0a800"
+                                            }
+                                        }
+                                        HitBadge {
+                                            anchors.right: parent.right
+                                            anchors.top: parent.top
+                                            anchors.margins: 3
+                                            count: hitPage.modelData.count
+                                        }
+                                    }
+                                    Label {
+                                        anchors.top: paper.bottom
+                                        anchors.topMargin: 2
+                                        anchors.horizontalCenter: paper.horizontalCenter
+                                        text: hitPage.modelData.page + 1
+                                        font.pixelSize: 11
+                                        color: "#5f6368"
+                                    }
+                                }
+                                background: null
                             }
                         }
                     }

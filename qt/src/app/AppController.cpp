@@ -641,6 +641,16 @@ void AppController::openSearchResult(int index) {
     }
 }
 
+void AppController::openSearchResultAt(int index, int page) {
+    tabs->setCurrentIndex(index);
+    if (DocumentSession* s = session(); s && page >= 0 && static_cast<size_t>(page) < s->getDocument()->getPageCount()) {
+        s->setCurrentPageNo(static_cast<size_t>(page));
+        if (!s->search().query().isEmpty()) {
+            s->search().jumpToFirstFromCurrentPage();
+        }
+    }
+}
+
 QObject* AppController::tabsModel() const { return tabs.get(); }
 QObject* AppController::pagesModel() const { return pages.get(); }
 QObject* AppController::settingsModel() const { return settingsView; }
