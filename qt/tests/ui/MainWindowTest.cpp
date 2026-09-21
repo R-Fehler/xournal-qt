@@ -1606,14 +1606,20 @@ TEST_F(MainWindowTest, sidebarThumbnailsStayWhenTheCurrentPageChanges) {
         }
     }
     ASSERT_NE(image, nullptr);
-    const QSize before = image->property("sourceSize").toSize();
-    QSignalSpy reloads(image, SIGNAL(sourceSizeChanged()));
+    QQuickItem* frame = image->parentItem();
+    ASSERT_NE(frame, nullptr);
+    const qreal dpr = window->effectiveDevicePixelRatio();
+    const auto drawnAtFrameWidth = [&] {
+        return image->property("sourceSize").toSize().width() == qRound(frame->width() * dpr);
+    };
+    EXPECT_TRUE(drawnAtFrameWidth());
     controller->goToPage(1);  // the second page becomes the current one: its frame gets the thick border
-    wait(80);
+    until([&] { return image->width() < frame->width() - 4; });
+    ASSERT_LT(image->width(), frame->width() - 4) << "the image is narrower now (the thick border)";
+    EXPECT_TRUE(drawnAtFrameWidth()) << "but it is still drawn at the width of the frame: not drawn again";
     controller->goToPage(0);
-    wait(80);
-    EXPECT_EQ(reloads.count(), 0) << "the thumbnail keeps its size, so it is not drawn again";
-    EXPECT_EQ(image->property("sourceSize").toSize(), before);
+    until([&] { return image->width() > frame->width() - 4; });
+    EXPECT_TRUE(drawnAtFrameWidth());
 }
 
 TEST_F(MainWindowTest, pagesAreAppendedFromTheSidebar) {
