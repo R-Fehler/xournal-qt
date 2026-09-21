@@ -190,6 +190,12 @@ cd build-qt
 - [ ] `xournal-qt-cli --pdf-dir=OUT a.xopp b.xopp` writes OUT/a.pdf and OUT/b.pdf and says how many worked; a missing file is counted and the others still come out.
 - [ ] `xournal-qt-cli FILE --create-pdf=OUT.pdf --export-range=2-5` writes those pages only.
 
+## Selecting PDF text with a finger
+- [ ] Hold a finger on a word of a PDF (or right click it): the word is selected and two knobs appear at its ends.
+- [ ] Dragging a knob takes more or less text; letting go shows the pill with "Highlight", "Copy" and the rest.
+- [ ] Holding the same word again selects its whole line.
+- [ ] With the pen tools nothing changes: drawing over the text still marks it as before.
+
 ## Long press and right click on a page
 - [ ] Holding a finger still on the page (or a right click) shows a small pill there: Paste, Select all, Image…; it stays inside the window near the finger.
 - [ ] Paste puts text from anywhere (browser, terminal) on the page at that very place, images and copied elements as well; Ctrl+Z takes it back.

@@ -34,6 +34,7 @@
 
 #include "DocumentLayout.h"
 #include "ViewController.h"
+#include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
 class EditSelection;
 class PdfCache;
@@ -146,9 +147,21 @@ public:
     void setPdfHighlightColor(std::optional<Color> c) { pdfHighlightColor = c; }
     PdfTextMode getPdfTextMode() const { return pdfTextMode; }
     /// Input of the PDF text tools on a page (page coordinates, points).
+    /// Select the word of the PDF under this point (or its whole line), as a long press does on a phone.
+    /// Returns false when there is no PDF text there.
+    bool selectPdfTextAt(QPointF viewPos, bool wholeLine);
+    /// Drag one end of the PDF text selection to another place (the other end stays).
+    bool dragPdfSelection(QPointF viewPos, bool startEnd);
+    /// The two ends of the selection in view coordinates (for the handles); empty when nothing is selected.
+    QRectF pdfSelectionEnds() const;
+    /// The selected PDF text ("" if none).
+    std::string selectedPdfText() const;
     void pdfTextPress(CanvasPage& page, double x, double y);
     void pdfTextMove(CanvasPage& page, double x, double y);
     void pdfTextRelease(CanvasPage& page);
+    /// Finish a PDF text selection with this style (tells the UI about it, or marks it right away).
+    /// `mark`: with a marking tool the text is marked right away (the tools do that; a long press only selects).
+    bool finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle style, bool mark = true);
     /// The selected PDF text: mark it (strokes over the text, one undo step) / copy it / drop the selection.
     bool markPdfText(PdfTextMode mode);
     bool copyPdfText();

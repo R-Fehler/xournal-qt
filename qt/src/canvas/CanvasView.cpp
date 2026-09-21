@@ -674,6 +674,78 @@ void CanvasView::clearPdfTextSelection() {
     Q_EMIT updateRequested();
 }
 
+bool CanvasView::selectPdfTextAt(QPointF viewPos, bool wholeLine) {
+    const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
+    if (!idx || *idx >= pages.size()) {
+        return false;
+    }
+    CanvasPage& page = *pages[*idx];
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    const QPointF onPage((viewPos.x() - pageRect.x()) / zoom, (viewPos.y() - pageRect.y()) / zoom);
+    pdfTextPress(page, onPage.x(), onPage.y());
+    if (!pdfSelection) {
+        return false;
+    }
+    const auto style = wholeLine ? XojPdfPageSelectionStyle::Line : XojPdfPageSelectionStyle::Word;
+    pdfSelection->currentPos(onPage.x(), onPage.y(), style);
+    return finishPdfSelection(page, style, false);  // a long press selects, it does not mark
+}
+
+bool CanvasView::dragPdfSelection(QPointF viewPos, bool startEnd) {
+    if (!pdfSelection || !pdfSelectionPage) {
+        return false;
+    }
+    const auto idx = indexOf(pdfSelectionPage);
+    if (!idx) {
+        return false;
+    }
+    const QRectF ends = pdfSelectionEnds();
+    if (ends.isNull()) {
+        return false;
+    }
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    // The end that is not dragged stays where it is, the dragged one follows the finger
+    const QPointF anchorView = startEnd ? ends.bottomRight() : ends.topLeft();
+    const QPointF anchor((anchorView.x() - pageRect.x()) / zoom, (anchorView.y() - pageRect.y()) / zoom);
+    const QPointF head((viewPos.x() - pageRect.x()) / zoom, (viewPos.y() - pageRect.y()) / zoom);
+    CanvasPage& page = *pdfSelectionPage;
+    pdfTextPress(page, anchor.x(), anchor.y());
+    if (!pdfSelection) {
+        return false;
+    }
+    pdfSelection->currentPos(head.x(), head.y(), XojPdfPageSelectionStyle::Linear);
+    return finishPdfSelection(page, XojPdfPageSelectionStyle::Linear, false);
+}
+
+std::string CanvasView::selectedPdfText() const {
+    return pdfSelection && pdfSelection->isFinalized() ? pdfSelection->getSelectedText() : std::string();
+}
+
+QRectF CanvasView::pdfSelectionEnds() const {
+    if (!pdfSelection || !pdfSelectionPage) {
+        return {};
+    }
+    const auto& rects = pdfSelection->getSelectedTextRects();
+    if (rects.empty()) {
+        return {};
+    }
+    const auto idx = indexOf(pdfSelectionPage);
+    if (!idx) {
+        return {};
+    }
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    const XojPdfRectangle& first = rects.front();
+    const XojPdfRectangle& last = rects.back();
+    // topLeft: where the selection begins, bottomRight: where it ends (the handles sit there)
+    return QRectF(QPointF(pageRect.x() + std::min(first.x1, first.x2) * zoom,
+                          pageRect.y() + std::min(first.y1, first.y2) * zoom),
+                  QPointF(pageRect.x() + std::max(last.x1, last.x2) * zoom,
+                          pageRect.y() + std::max(last.y1, last.y2) * zoom));
+}
+
 void CanvasView::pdfTextPress(CanvasPage& page, double x, double y) {
     clearPdfTextSelection();
     if (page.getPage()->getPdfPageNr() == npos) {
@@ -696,18 +768,26 @@ void CanvasView::pdfTextRelease(CanvasPage& page) {
     if (!pdfSelection || pdfSelectionPage != &page || pdfSelection->isFinalized()) {
         return;
     }
-    const auto style = PdfElemSelection::selectionStyleForToolType(session.getToolHandler()->getToolType());
+    finishPdfSelection(page, PdfElemSelection::selectionStyleForToolType(session.getToolHandler()->getToolType()));
+}
+
+bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle style, bool mark) {
+    if (!pdfSelection || pdfSelectionPage != &page) {
+        return false;
+    }
+    {
     if (!pdfSelection->finalizeSelectionAndRepaint(style)) {
         clearPdfTextSelection();  // no text there
-        return;
+        return false;
+    }
     }
     // Like upstream: the selected text becomes the primary selection (middle click paste).
     if (QClipboard* cb = QGuiApplication::clipboard(); cb->supportsSelection()) {
         cb->setText(QString::fromStdString(pdfSelection->getSelectedText()), QClipboard::Selection);
     }
-    if (pdfTextMode != PdfTextMode::Select) {
-        markPdfText(pdfTextMode);  // marking right away: no extra tap
-        return;
+    if (mark && pdfTextMode != PdfTextMode::Select) {
+        markPdfText(pdfTextMode);  // the tool marks right away: no extra tap
+        return true;
     }
     // Where to show the actions: around the selected text.
     QRectF box;
@@ -717,6 +797,7 @@ void CanvasView::pdfTextRelease(CanvasPage& page) {
         box |= QRectF(QPointF(std::min(r.x1, r.x2), std::min(r.y1, r.y2)), QPointF(std::max(r.x1, r.x2), std::max(r.y1, r.y2)));
     }
     Q_EMIT pdfTextSelected(QRectF(pageRect.topLeft() + box.topLeft() * zoom, box.size() * zoom));
+    return true;
 }
 
 bool CanvasView::markPdfText(PdfTextMode mode) {

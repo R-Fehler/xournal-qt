@@ -352,6 +352,12 @@ public:
     /// The selected PDF text (select mode): mark it ("highlight", "underline", "strikethrough") or copy it.
     Q_INVOKABLE bool markPdfText(const QString& mode);
     Q_INVOKABLE bool copyPdfText();
+    /// Select the word of the PDF at this place on the canvas (again at the same word: its whole line).
+    Q_INVOKABLE bool selectPdfTextAt(qreal x, qreal y);
+    /// Drag one end of that selection (true: the beginning).
+    Q_INVOKABLE bool dragPdfSelection(qreal x, qreal y, bool startEnd);
+    /// Where the selection begins and ends, for the handles (an empty rect: nothing selected).
+    Q_INVOKABLE QRectF pdfSelectionEnds() const;
     /// PDF text is selected right now (then only copying and marking it make sense).
     Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextModeChanged)
     bool pdfTextIsSelected() const;

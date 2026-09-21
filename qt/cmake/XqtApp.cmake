@@ -99,6 +99,7 @@ set(XQT_QML_FILES
     src/app/qml/BackgroundDialog.qml
     src/app/qml/ChapterDialog.qml
     src/app/qml/ContextPill.qml
+    src/app/qml/PdfTextHandles.qml
     src/app/qml/PenPill.qml
     src/app/qml/PrintDialog.qml
     src/app/qml/ShortcutSheet.qml

@@ -762,6 +762,39 @@ TEST_F(CanvasReplayTest, aTwoColumnPageIsZoomedColumnByColumn) {
     EXPECT_GT(vc.zoom(), fitted * 1.3) << "the column is bigger than the page width";
 }
 
+TEST_F(CanvasReplayTest, aLongPressSelectsTheWordOfThePdfAndTheHandlesWidenIt) {
+    input.reset();
+    view.reset();
+    auto loaded = DocumentSession::loadFile(GET_TESTFILE(u8"packaged_xopp/pdfBackground/old.xopp"));
+    ASSERT_TRUE(loaded.document);
+    session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    view = std::make_unique<CanvasView>(*session);
+    view->getViewController().setViewSize(QSizeF(900, 1200));
+    input = std::make_unique<CanvasInput>(*view);
+    processEvents();
+
+    // Where "Test PDF" is on the first page
+    QSignalSpy searched(&session->search(), &DocumentSearch::finished);
+    session->search().setQuery("Test", false);
+    ASSERT_TRUE(searched.wait(3000));
+    ASSERT_FALSE(session->search().hits().empty());
+    const QRectF hit = session->search().hits().front().rect;
+    session->search().clear();
+
+    const QPointF onWord = viewPos(0, hit.center());
+    ASSERT_TRUE(view->selectPdfTextAt(onWord, false)) << "the word under the finger";
+    EXPECT_TRUE(view->hasPdfTextSelection());
+    const QRectF ends = view->pdfSelectionEnds();
+    EXPECT_FALSE(ends.isNull());
+
+    // Dragging the end further right takes more text with it
+    const auto textOf = [&] { return QString::fromStdString(view->selectedPdfText()); };
+    const QString word = textOf();
+    EXPECT_FALSE(word.isEmpty());
+    EXPECT_TRUE(view->dragPdfSelection(ends.bottomRight() + QPointF(220, 0), false));
+    EXPECT_GE(textOf().size(), word.size()) << "more than the word";
+}
+
 // PDF text tools: select text of the background PDF and mark it (upstream's PdfElemSelection + marker strokes).
 TEST_F(CanvasReplayTest, pdfTextIsHighlightedByDraggingOverIt) {
     // Use a document with a PDF background instead of the fixture's blank one.

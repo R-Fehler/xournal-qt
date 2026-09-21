@@ -1283,9 +1283,16 @@ ApplicationWindow {
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
     ContextPill { id: contextPill }
+    PdfTextHandles { }
     Connections {
         target: app
-        function onContextRequested(viewPos) { contextPill.openAt(viewPos, app.pdfTextIsSelected) }
+        // On PDF text a long press (or right click) selects the word; elsewhere it offers what can be done here
+        function onContextRequested(viewPos) {
+            if (app.selectPdfTextAt(viewPos.x, viewPos.y)) {
+                return
+            }
+            contextPill.openAt(viewPos, app.pdfTextIsSelected)
+        }
     }
     Connections {
         target: app

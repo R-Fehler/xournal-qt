@@ -1794,6 +1794,28 @@ void AppController::copyPageLink(int page) {
 
 bool AppController::pdfTextIsSelected() const { return canvas() && canvas()->hasPdfTextSelection(); }
 
+bool AppController::selectPdfTextAt(qreal x, qreal y) {
+    if (!canvas()) {
+        return false;
+    }
+    // The same word again: its whole line (like a phone widens the selection)
+    const QPointF where(x, y);
+    const bool again = canvas()->hasPdfTextSelection() && canvas()->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
+    const bool selected = canvas()->selectPdfTextAt(where, again);
+    Q_EMIT pdfTextModeChanged();
+    return selected;
+}
+
+bool AppController::dragPdfSelection(qreal x, qreal y, bool startEnd) {
+    const bool changed = canvas() && canvas()->dragPdfSelection(QPointF(x, y), startEnd);
+    if (changed) {
+        Q_EMIT pdfTextModeChanged();
+    }
+    return changed;
+}
+
+QRectF AppController::pdfSelectionEnds() const { return canvas() ? canvas()->pdfSelectionEnds() : QRectF(); }
+
 bool AppController::hasPdfBackground() const {
     return session() && !session()->getDocument()->getPdfFilepath().empty();
 }
