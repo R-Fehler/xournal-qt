@@ -9,6 +9,8 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 
+#include "MdBox.h"
+
 namespace xqt::DocumentChapters {
 
 namespace {
@@ -72,11 +74,29 @@ std::vector<Chapter> find(Document& document) {
             if (!layer->isVisible()) {
                 continue;
             }
+            const bool markdown = md::isMarkdownLayer(*layer);
             for (const Element* element: layer->getElementsView()) {
                 if (element->getType() != ELEMENT_TEXT) {
                     continue;
                 }
                 const auto* text = static_cast<const Text*>(element);
+                if (markdown) {
+                    // A Markdown box: its headings 1-3, where they are drawn
+                    const md::Document doc = md::parse(text->getText());
+                    const md::Layout& laid = md::cachedLayout(text->getText(), md::styleOf(*text));
+                    for (size_t i = 0; i < doc.root.children.size() && i < laid.blocks.size(); ++i) {
+                        const md::Block& b = doc.root.children[i];
+                        if (b.kind == md::BlockKind::Heading && b.level <= 3 && !md::plainText(b).empty()) {
+                            Chapter chapter;
+                            chapter.page = p;
+                            chapter.title = md::plainText(b);
+                            chapter.level = b.level - 1;
+                            onThisPage.emplace_back(text->getTransformation().shift.y + laid.blocks[i].top,
+                                                    std::move(chapter));
+                        }
+                    }
+                    continue;
+                }
                 Chapter chapter;
                 chapter.page = p;
                 std::string title;

@@ -335,12 +335,54 @@ ApplicationWindow {
                     }
                 }
             }
+            // Writing on the page with the keyboard: the text mode or Markdown (the one used last; hold for both)
             IconButton {
+                id: writeButton
                 objectName: "textModeButton"
-                iconName: "xqt-text-mode"
-                tip: qsTr("Text mode: type the page's text like in a word processor (Ctrl+Alt+E)")
-                checked: textFlowPanel.visible
-                onClicked: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open()
+                property bool markdownMode: false
+                iconName: markdownMode ? "xqt-markdown" : "xqt-text-mode"
+                tip: markdownMode ? qsTr("Markdown: write Markdown on the page, shown formatted (Ctrl+Alt+M). Hold for the text mode")
+                                  : qsTr("Text mode: type the page's text like in a word processor (Ctrl+Alt+E). Hold for Markdown")
+                checked: textFlowPanel.visible || markdownPanel.visible
+                onClicked: {
+                    if (textFlowPanel.visible) textFlowPanel.close(true)
+                    else if (markdownPanel.visible) markdownPanel.close(true)
+                    else if (markdownMode) markdownPanel.open()
+                    else textFlowPanel.open()
+                }
+                onPressAndHold: Popups.openAt(writeMenu)
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                    onTapped: function(point) { Popups.openAt(writeMenu, point.position) }
+                }
+                Menu {
+                    id: writeMenu
+                    objectName: "writeModeMenu"
+                    width: 340
+                    MenuItem {
+                        objectName: "textModeItem"
+                        text: qsTr("Text mode (like a word processor)")
+                        checkable: true
+                        checked: !writeButton.markdownMode
+                        onTriggered: textFlowPanel.open()
+                    }
+                    MenuItem {
+                        objectName: "markdownItem"
+                        text: qsTr("Markdown (shown formatted)")
+                        checkable: true
+                        checked: writeButton.markdownMode
+                        onTriggered: markdownPanel.open()
+                    }
+                }
+                Connections {
+                    target: textFlowPanel
+                    function onVisibleChanged() { if (textFlowPanel.visible) writeButton.markdownMode = false }
+                }
+                Connections {
+                    target: markdownPanel
+                    function onVisibleChanged() { if (markdownPanel.visible) writeButton.markdownMode = true }
+                }
             }
             IconButton { objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
             IconButton { objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
@@ -594,7 +636,8 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.right: textFlowPanel.visible ? textFlowPanel.left
-                                             : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
+                       : markdownPanel.visible ? markdownPanel.left
+                       : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible ? sidebar.right : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
@@ -792,6 +835,22 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
         width: visible ? Math.min(Math.max(360, win.width * 0.38), 600) : 0
+    }
+    // Markdown box: the same place
+    MarkdownPanel {
+        id: markdownPanel
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
+        width: visible ? Math.min(Math.max(360, win.width * 0.38), 600) : 0
+    }
+    Connections {
+        target: app
+        // The text tool tapped a Markdown box
+        function onMarkdownRequested(page) {
+            if (textFlowPanel.visible) textFlowPanel.close(true)
+            if (!markdownPanel.visible || app.markdownPage !== page) markdownPanel.open(page)
+        }
     }
     ContentsOverview {
         id: contentsOverview
@@ -1411,7 +1470,7 @@ ApplicationWindow {
     }
 
     // Document shortcuts do nothing while the home screen is shown.
-    readonly property bool docKeys: !app.homeVisible && !app.textFlowActive
+    readonly property bool docKeys: !app.homeVisible && !app.textFlowActive && !app.markdownActive
     // The keys come from the shortcut settings (app.shortcuts); reading its revision keeps the bindings fresh.
     function keysOf(id) { return (app.shortcuts.revision, app.shortcuts.keys(id)) }
     Shortcut { sequences: win.keysOf("undo"); enabled: docKeys; onActivated: app.undo() }
@@ -1495,6 +1554,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("pageGrid"); enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
     Shortcut { sequences: win.keysOf("textMode"); enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
+    Shortcut { sequences: win.keysOf("markdownMode"); enabled: !app.homeVisible; onActivated: markdownPanel.visible ? markdownPanel.close(true) : markdownPanel.open() }
     Shortcut { sequences: win.keysOf("find"); onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openBar() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
     Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }

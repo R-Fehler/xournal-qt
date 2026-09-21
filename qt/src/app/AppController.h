@@ -39,6 +39,7 @@ class LayersModel;
 class ShortcutsModel;
 class OutlineModel;
 class TextFlowSession;
+class MarkdownSession;
 class PageClipboard;
 class SettingsModel;
 class SessionRecovery;
@@ -105,6 +106,10 @@ class AppController: public QObject {
     Q_PROPERTY(bool textFlowActive READ textFlowActive NOTIFY textFlowChanged)
     Q_PROPERTY(int textFlowPage READ textFlowPage NOTIFY textFlowChanged)
     Q_PROPERTY(double textFlowOverflow READ textFlowOverflow NOTIFY textFlowChanged)
+    /// A Markdown box is being edited (markdownPage, 0-based); how far it goes below the page (points)
+    Q_PROPERTY(bool markdownActive READ markdownActive NOTIFY markdownChanged)
+    Q_PROPERTY(int markdownPage READ markdownPage NOTIFY markdownChanged)
+    Q_PROPERTY(double markdownOverflow READ markdownOverflow NOTIFY markdownChanged)
     /// Where the tool bar is: "top", "left" or "right"
     Q_PROPERTY(QString toolbarPosition READ toolbarPosition WRITE setToolbarPosition NOTIFY toolbarPositionChanged)
     /// The tool bar is put away (the small tool square of the full screen takes over)
@@ -213,6 +218,15 @@ public:
     Q_INVOKABLE void endTextFlow(bool keep);
     /// The text font (text tool) for the editor.
     Q_INVOKABLE QString textFlowFamily() const;
+    bool markdownActive() const;
+    int markdownPage() const { return mdPage; }
+    double markdownOverflow() const { return mdOverflow; }
+    /// Start editing the Markdown box of a page (-1: the current page; made when there is none). Returns its source.
+    Q_INVOKABLE QString beginMarkdown(int page = -1);
+    /// The source as typed: the page follows.
+    Q_INVOKABLE void updateMarkdown(const QString& source);
+    /// Done (keep: one undo step) or cancel.
+    Q_INVOKABLE void endMarkdown(bool keep);
     void setToolbarPosition(const QString& position);
     int zoomPercent() const;
     int pageNumber() const;
@@ -524,6 +538,9 @@ Q_SIGNALS:
     void toolbarPositionChanged();
     void penPillChanged();
     void textFlowChanged();
+    void markdownChanged();
+    /// The text tool tapped a Markdown box: the window opens its editor.
+    void markdownRequested(int page);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 
@@ -557,6 +574,10 @@ private:
     xqt::DocumentSession* flowSession = nullptr;
     int flowPage = -1;
     double flowOverflow = 0;
+    std::unique_ptr<xqt::MarkdownSession> markdown;
+    xqt::DocumentSession* mdSession = nullptr;
+    int mdPage = -1;
+    double mdOverflow = 0;
     std::unique_ptr<xqt::PageClipboard> ownPageClipboard;
     xqt::PageClipboard* pageClipboard = nullptr;  ///< the main window's: pages can be pasted into any window
     std::vector<size_t> pageList(const QList<int>& pages) const;

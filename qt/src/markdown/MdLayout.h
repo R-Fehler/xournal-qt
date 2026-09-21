@@ -12,6 +12,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,13 @@ struct Style {
     double width = 480;        ///< width of the box (points)
 };
 
+/// A link in the text of an item: its bytes in the Pango layout's text, and the index into Layout::links.
+struct LinkSpan {
+    int start = 0;
+    int end = 0;
+    int link = -1;
+};
+
 /// One thing to draw, in box coordinates (top left of the box at 0, 0).
 struct Item {
     enum class Kind { Text, Fill, Line };
@@ -42,6 +50,7 @@ struct Item {
     double width = 0;   ///< Line: the line goes from (x, y) to (x + width, y + height)
     double height = 0;
     xoj::util::GObjectSPtr<PangoLayout> layout;  ///< Text
+    std::vector<LinkSpan> links;                  ///< Text
     Color color;
     double lineWidth = 1;
     size_t block = 0;   ///< the top-level block it belongs to
@@ -56,7 +65,18 @@ struct Layout {
     };
     std::vector<Extent> blocks;
     double height = 0;  ///< of everything
+    std::vector<std::string> links;  ///< link targets (Document::links)
 };
+
+/// A link at a point (box coordinates): its target and where it is (box coordinates).
+struct LinkHit {
+    std::string target;
+    double x = 0;
+    double y = 0;
+    double width = 0;
+    double height = 0;
+};
+std::optional<LinkHit> linkAt(const Layout& layout, double x, double y);
 
 /// Heading size factor (relative to the body text), level 1–6.
 double headingScale(int level);

@@ -12,12 +12,14 @@
 #include "util/PathUtil.h"
 #include "util/Util.h"
 
+#include "MdBox.h"
 #include "config-dev.h"  // for SETTINGS_XML_FILE
 
 namespace xqt {
 
 AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderThreads):
         resourceDir(std::move(resourceDir)) {
+    md::installRenderer();  // Markdown boxes are drawn formatted (on the canvas, in thumbnails, exports, ...)
     searchPath.addSearchDirectory(this->resourceDir);
     if (settingsFile.empty()) {
         settingsFile = Util::getConfigFile(SETTINGS_XML_FILE);

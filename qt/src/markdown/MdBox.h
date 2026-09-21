@@ -1,0 +1,57 @@
+/*
+ * xournal-qt: Markdown boxes on pages.
+ *
+ * A box is an ordinary Xournal++ text element in a layer named "Markdown" (xoj::view::MARKDOWN_LAYER_NAME). Its text
+ * is the Markdown source, its font gives the family and size of the body text, its color the text color, its
+ * wrap width the width of the box, and its position the top left of the box. Xournal++ shows the source as it is
+ * (nothing is lost when the file goes back and forth); xournal-qt draws it formatted: drawText() is the renderer
+ * that upstream's LayerView calls for these texts (installRenderer()).
+ *
+ * @license GNU GPLv2 or later
+ */
+#pragma once
+
+#include <string>
+
+#include <cairo.h>
+
+#include "model/PageRef.h"
+#include "util/Rectangle.h"
+
+#include "MdLayout.h"
+
+class Layer;
+class Text;
+
+namespace xqt::md {
+
+/// Width of a box whose text has no wrap width (e.g. made in Xournal++).
+constexpr double DEFAULT_WIDTH = 480;
+
+/// The style a box's text element gives (font family and size, color, width).
+Style styleOf(const Text& text);
+
+/// The layout of a source. Cached per thread (the last boxes drawn there): valid until the next call on this thread.
+const Layout& cachedLayout(const std::string& source, const Style& style);
+
+/// Draw a box, in page coordinates (the renderer of upstream's LayerView, see MarkdownHook.h).
+void drawText(const Text& text, cairo_t* cr);
+
+/// All drawing of pages draws boxes formatted from now on (idempotent).
+void installRenderer();
+
+/// The height of a box's content (points).
+double contentHeight(const Text& text);
+/// Where a box's content is on its page (page coordinates).
+xoj::util::Rectangle<double> boxRect(const Text& text);
+/// The link drawn at a point of the page, if any (page coordinates).
+std::optional<LinkHit> linkAt(const Text& text, double x, double y);
+/// Whether a text is a box: in a Markdown layer.
+bool isMarkdownLayer(const Layer& layer);
+
+/// The page's Markdown layer (nullptr if none).
+Layer* markdownLayer(const PageRef& page);
+/// The box of a Markdown layer: its first text (nullptr if none).
+Text* boxOf(const Layer& layer);
+
+}  // namespace xqt::md

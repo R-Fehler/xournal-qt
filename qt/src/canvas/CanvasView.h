@@ -199,6 +199,8 @@ public:
     /// A tap with the text tool at a page position (points).
     void startText(CanvasPage& page, double x, double y);
     void endTextEditing();
+    /// Whether the Markdown box of a page is at a point (page coordinates).
+    bool markdownBoxAt(CanvasPage& page, double x, double y) const;
 
     // Layout (upstream gui/Layout, content pixels)
     XojPageView* getPageViewAt(int x, int y) const override;
@@ -218,6 +220,8 @@ Q_SIGNALS:
     void textEditingChanged(bool editing);
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
     void contextRequested(QPointF viewPos);
+    /// The text tool tapped the Markdown box of a page (0-based): the UI opens its editor.
+    void markdownRequested(int page);
     /// A PDF link was tapped (the UI offers to follow it).
     void linkTapped(const QString& uri, int page, QRectF viewRect);
     void navigationChanged();

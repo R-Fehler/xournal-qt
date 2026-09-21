@@ -329,6 +329,23 @@ cd build-qt
       pill shrinks to the icon. A tap on it brings the tool back where it lay (on the page one is at now if that
       spot is on it). The Shapes entry takes tool and pill away altogether.
 
+## Markdown boxes
+- [ ] Hold the text mode button (or right click): "Markdown"; or Ctrl+Alt+M. The editor opens beside the page; type
+      "# Notes", Enter, "- one", Enter (the list goes on), "two", Enter, Enter (the list ends), "Some **bold**": the
+      page shows it formatted while typing (heading with a line below, bullets, bold), at the top left margin.
+- [ ] The buttons: H1-H3 and the list / quote buttons change the line's mark; B, I, S, code, Link put marks around
+      the selection. Ctrl+B / I / E / K, Ctrl+1-3; Tab / Shift+Tab indent a list item.
+- [ ] Done; the button now shows the Markdown icon (a tap opens Markdown again). Ctrl+Z removes the whole text,
+      Ctrl+Y brings it back. Cancel puts the page back as it was.
+- [ ] Zoom in far: the text stays sharp. Thumbnail and PDF export show it formatted; in the exported PDF the text
+      can be selected.
+- [ ] Text tool: a tap on the box opens its Markdown (not a text box with the source). A tap on a link in the box
+      (text tool off) offers to open it; `[see](#Page:2)` goes to page 2.
+- [ ] Headings 1-3 of a box are chapters in the contents sidebar.
+- [ ] Save, open the file in Xournal++: the page shows the Markdown source as a text, nothing lost; saved there and
+      opened again here: formatted again.
+- [ ] Longer than the page: the editor says so (the next step flows it onto new pages).
+
 ## Table of contents
 - [ ] A PDF with bookmarks (e.g. a book or thesis): sidebar "Contents": indented headings, current section highlighted, tap goes there, arrows collapse.
 - [ ] Contents overview (toolbar button or Ctrl+Alt+O): chapters big, sections smaller and indented, the pages of each section in a row (swipe sideways); tap a page: it opens there; "Chapters only"; − / +.

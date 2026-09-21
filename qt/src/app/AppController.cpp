@@ -53,6 +53,8 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "MarkdownSession.h"
+#include "MdBox.h"
 #include "TextFlow.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
@@ -269,6 +271,7 @@ QString AppController::textFlowFamily() const {
 
 QVariantList AppController::beginTextFlow() {
     endTextFlow(true);
+    endMarkdown(true);
     if (!session()) {
         return {};
     }
@@ -319,9 +322,60 @@ void AppController::endTextFlow(bool keep) {
     Q_EMIT undoRedoChanged();
 }
 
+bool AppController::markdownActive() const { return markdown && markdown->active(); }
+
+QString AppController::beginMarkdown(int page) {
+    endMarkdown(true);
+    endTextFlow(true);
+    if (!session()) {
+        return {};
+    }
+    mdSession = session();
+    markdown = std::make_unique<MarkdownSession>(*mdSession);
+    md::Style style;
+    style.family = textFlowFamily().toStdString();
+    style.size = app->getSettings()->getFont().getSize();
+    mdPage = page >= 0 ? page : static_cast<int>(mdSession->getCurrentPageNo());
+    const QString source = QString::fromStdString(markdown->begin(static_cast<size_t>(mdPage), style));
+    mdOverflow = 0;
+    Q_EMIT markdownChanged();
+    return source;
+}
+
+void AppController::updateMarkdown(const QString& source) {
+    if (!markdownActive()) {
+        return;
+    }
+    const double overflow = markdown->update(source.toStdString());
+    if (overflow != mdOverflow) {
+        mdOverflow = overflow;
+        Q_EMIT markdownChanged();
+    }
+}
+
+void AppController::endMarkdown(bool keep) {
+    if (!markdown) {
+        return;
+    }
+    if (keep) {
+        markdown->finish();
+    } else {
+        markdown->cancel();
+    }
+    markdown.reset();
+    mdSession = nullptr;
+    mdPage = -1;
+    mdOverflow = 0;
+    Q_EMIT markdownChanged();
+    Q_EMIT undoRedoChanged();
+}
+
 void AppController::currentTabChanged() {
     if (flow && flowSession != session()) {
         endTextFlow(true);  // another document: the text mode ends (kept)
+    }
+    if (markdown && mdSession != session()) {
+        endMarkdown(true);  // another document: editing the box ends (kept)
     }
     // Follow the signals of the current tab only.
     for (auto& c: currentConnections) {
@@ -356,6 +410,8 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
+        currentConnections.push_back(
+                connect(v, &CanvasView::markdownRequested, this, &AppController::markdownRequested));
         currentConnections.push_back(
                 connect(v, &CanvasView::contextRequested, this, &AppController::contextRequested));
         currentConnections.push_back(
@@ -1295,6 +1351,9 @@ void AppController::openUrls(const QList<QUrl>& urls) {
 void AppController::closeTab(int index) {
     if (flow && flowSession == tabs->session(index)) {
         endTextFlow(true);
+    }
+    if (markdown && mdSession == tabs->session(index)) {
+        endMarkdown(true);
     }
     tabs->closeTab(index);  // the last one: the home screen
 }

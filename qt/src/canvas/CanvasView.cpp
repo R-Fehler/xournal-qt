@@ -45,6 +45,7 @@
 #include "render/RenderService.h"
 
 #include "CanvasPage.h"
+#include "MdBox.h"
 #include "TextEditor.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
@@ -627,11 +628,29 @@ std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) co
         if (!layer->isVisible()) {
             continue;
         }
+        const bool markdown = md::isMarkdownLayer(*layer);
         for (const Element* element: layer->getElementsView()) {
             if (element->getType() != ELEMENT_TEXT) {
                 continue;
             }
             const auto* text = static_cast<const Text*>(element);
+            if (markdown) {
+                // A Markdown box: the links of what is drawn (not of the source)
+                if (const auto hit = md::linkAt(*text, onPage.x(), onPage.y())) {
+                    LinkTarget target;
+                    target.pdfPage = -1;
+                    target.page = -1;
+                    target.uri = QString::fromStdString(hit->target);
+                    if (target.uri.startsWith(QLatin1String("#Page:"))) {  // a page of this document
+                        target.page = target.uri.mid(6).toInt() - 1;
+                        target.uri.clear();
+                    }
+                    target.viewRect = QRectF(pageRect.x() + hit->x * zoom, pageRect.y() + hit->y * zoom,
+                                             hit->width * zoom, hit->height * zoom);
+                    return target;
+                }
+                continue;
+            }
             const auto& box = text->getBoundingBox();
             if (onPage.x() < box.x || onPage.x() > box.x + box.width || onPage.y() < box.y ||
                 onPage.y() > box.y + box.height) {
@@ -1096,9 +1115,27 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         }
         endTextEditing();
     }
+    // A Markdown box is edited as Markdown (its text is the source)
+    if (markdownBoxAt(page, x, y)) {
+        if (const auto idx = indexOf(&page)) {
+            Q_EMIT markdownRequested(static_cast<int>(*idx));
+        }
+        return;
+    }
     textEditor = std::make_unique<TextEditor>(session, page, x, y);
     page.addOverlayView(textEditor->createView());
     Q_EMIT textEditingChanged(true);
+}
+
+bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
+    std::shared_lock lock(*session.getDocument());
+    const Layer* layer = md::markdownLayer(page.getPage());
+    const Text* box = layer && layer->isVisible() ? md::boxOf(*layer) : nullptr;
+    if (!box) {
+        return false;
+    }
+    const auto r = md::boxRect(*box);
+    return x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + std::max(r.height, 20.0);
 }
 
 void CanvasView::endTextEditing() {

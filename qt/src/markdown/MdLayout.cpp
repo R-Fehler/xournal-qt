@@ -70,11 +70,19 @@ double pangoHeight(PangoLayout* l) {
 }
 double baseline(PangoLayout* l) { return pango_layout_get_baseline(l) / static_cast<double>(PANGO_SCALE); }
 
+/// A laid out text and where its links are.
+struct Laid {
+    xoj::util::GObjectSPtr<PangoLayout> layout;
+    std::vector<LinkSpan> links;
+    PangoLayout* get() const { return layout.get(); }
+};
+
 class Layouter {
 public:
     explicit Layouter(const Style& style): st(style) {}
 
     Layout run(const Document& doc) {
+        out.links = doc.links;
         const auto& blocks = doc.root.children;
         out.blocks.resize(blocks.size());
         Ctx c;
@@ -110,7 +118,7 @@ private:
         atTop = false;
     }
 
-    xoj::util::GObjectSPtr<PangoLayout> text(const std::vector<Run>& runs, const TextOptions& o) {
+    Laid text(const std::vector<Run>& runs, const TextOptions& o) {
         xoj::util::GObjectSPtr<PangoLayout> l(pango_layout_new(context()), xoj::util::adopt);
         PangoFontDescription* d = pango_font_description_new();
         pango_font_description_set_family(d, (o.mono ? st.monoFamily : st.family).c_str());
@@ -126,11 +134,19 @@ private:
         pango_layout_set_alignment(l.get(), o.align);
 
         std::string s;
+        std::vector<LinkSpan> links;
         PangoAttrList* attrs = pango_attr_list_new();
         for (const Run& r: runs) {
             const size_t from = s.size();
             s += r.text;
             const size_t to = s.size();
+            if ((r.flags & Link) && r.link >= 0) {
+                if (!links.empty() && links.back().link == r.link && links.back().end == static_cast<int>(from)) {
+                    links.back().end = static_cast<int>(to);  // (a link with formatting inside: several runs)
+                } else {
+                    links.push_back({static_cast<int>(from), static_cast<int>(to), r.link});
+                }
+            }
             if (r.flags & Strong) {
                 insert(attrs, pango_attr_weight_new(PANGO_WEIGHT_BOLD), from, to);
             }
@@ -170,17 +186,18 @@ private:
         pango_layout_set_text(l.get(), s.c_str(), static_cast<int>(s.size()));
         pango_layout_set_attributes(l.get(), attrs);
         pango_attr_list_unref(attrs);
-        return l;
+        return {std::move(l), std::move(links)};
     }
 
-    void addText(xoj::util::GObjectSPtr<PangoLayout> l, double x, double atY, Color color) {
+    void addText(Laid l, double x, double atY, Color color) {
         Item it;
         it.kind = Item::Kind::Text;
         it.x = x;
         it.y = atY;
         it.width = pangoWidth(l.get());
         it.height = pangoHeight(l.get());
-        it.layout = std::move(l);
+        it.layout = std::move(l.layout);
+        it.links = std::move(l.links);
         it.color = color;
         it.block = top;
         out.items.push_back(std::move(it));
@@ -450,7 +467,7 @@ private:
         }
         const double start = y;
         for (const Row& r: rows) {
-            std::vector<xoj::util::GObjectSPtr<PangoLayout>> cells;
+            std::vector<Laid> cells;
             double h = 0;
             for (size_t i = 0; i < columns; ++i) {
                 static const std::vector<Run> none;
@@ -503,6 +520,41 @@ double headingScale(int level) {
 }
 
 Layout layout(const Document& doc, const Style& style) { return Layouter(style).run(doc); }
+
+std::optional<LinkHit> linkAt(const Layout& layout, double x, double y) {
+    for (const Item& it: layout.items) {
+        if (it.kind != Item::Kind::Text || it.links.empty() || x < it.x || y < it.y || x > it.x + it.width ||
+            y > it.y + it.height) {
+            continue;
+        }
+        int index = 0;
+        int trailing = 0;
+        if (!pango_layout_xy_to_index(it.layout.get(), static_cast<int>((x - it.x) * PANGO_SCALE),
+                                      static_cast<int>((y - it.y) * PANGO_SCALE), &index, &trailing)) {
+            continue;  // (beside the text of the line)
+        }
+        for (const LinkSpan& span: it.links) {
+            if (index >= span.start && index < span.end && span.link < static_cast<int>(layout.links.size())) {
+                PangoRectangle a;
+                PangoRectangle b;
+                pango_layout_index_to_pos(it.layout.get(), span.start, &a);
+                pango_layout_index_to_pos(it.layout.get(), std::max(span.start, span.end - 1), &b);
+                if (a.y != b.y) {  // (over several lines: the part on the tapped line)
+                    pango_layout_index_to_pos(it.layout.get(), index, &a);
+                    b = a;
+                }
+                LinkHit hit;
+                hit.target = layout.links[static_cast<size_t>(span.link)];
+                hit.x = it.x + a.x / static_cast<double>(PANGO_SCALE);
+                hit.y = it.y + a.y / static_cast<double>(PANGO_SCALE);
+                hit.width = (b.x + b.width - a.x) / static_cast<double>(PANGO_SCALE);
+                hit.height = a.height / static_cast<double>(PANGO_SCALE);
+                return hit;
+            }
+        }
+    }
+    return std::nullopt;
+}
 
 void draw(cairo_t* cr, const Layout& layout) {
     cairo_save(cr);

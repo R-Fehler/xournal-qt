@@ -32,6 +32,7 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "canvas/CanvasView.h"
+#include "markdown/MdBox.h"
 #include "canvas/PenHover.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
@@ -2247,6 +2248,75 @@ TEST_F(HomeScreenTest, movesToAnotherLibraryAndWarnsAboutDownloads) {
     EXPECT_TRUE(fs::exists(downloads / "notes.xopp"));
     EXPECT_FALSE(fs::exists(root / "notes.xopp"));
     QFile::remove(config + "/user-dirs.dirs");
+}
+
+// Markdown: written beside the page into a box (a text in the layer "Markdown"), opened again with the text tool.
+TEST_F(MainWindowTest, markdownBoxIsWrittenAndOpenedAgainWithTheTextTool) {
+    auto* panel = find<QQuickItem>("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    auto* markdownItem = find<QObject>("markdownItem");  // in the menu of the writing button
+    ASSERT_NE(markdownItem, nullptr);
+    QMetaObject::invokeMethod(markdownItem, "triggered");
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_TRUE(controller->markdownActive());
+    auto* area = find<QQuickItem>("markdownArea");
+    ASSERT_TRUE(area->hasActiveFocus());
+
+    type("# Notes");
+    key(Qt::Key_Return);
+    type("- one");
+    key(Qt::Key_Return);  // the list goes on
+    type("two");
+    key(Qt::Key_Return);
+    key(Qt::Key_Return);  // an empty item ends the list
+    type("Some ");
+    key(Qt::Key_B, Qt::ControlModifier);
+    type("bold");
+    wait(300);
+
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    const Text* box = xqt::md::boxOf(*layer);
+    ASSERT_NE(box, nullptr);
+    const std::string source = "# Notes\n- one\n- two\n\nSome **bold**";
+    EXPECT_EQ(box->getText(), source);
+    EXPECT_TRUE(controller->modified());
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(find<QQuickItem>("markdownDone"));
+    EXPECT_FALSE(panel->isVisible());
+    EXPECT_FALSE(controller->markdownActive());
+    EXPECT_TRUE(find<QQuickItem>("textModeButton")->property("markdownMode").toBool()) << "the button's mode now";
+
+    // The text tool on the box opens it again (not the text of the source in a text box)
+    controller->selectTool("text");
+    wait(200);  // (the zoom from before the panel comes back)
+    QSignalSpy requested(controller.get(), &AppController::markdownRequested);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    const auto r = xqt::md::boxRect(*xqt::md::boxOf(*layer));
+    view->getViewController().scrollToPageRect(0, QRectF(r.x, r.y, r.width, r.height));
+    wait(100);
+    const QPointF onBox = view->pageViewRect(0).topLeft() +
+                          QPointF(r.x + 20, r.y + r.height / 2) * view->getViewController().zoom();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(onBox).toPoint());
+    until([&] { return panel->isVisible(); });
+    EXPECT_EQ(requested.count(), 1) << "tool " << controller->tool().toStdString() << " at " << onBox.x() << ","
+                                    << onBox.y() << " box " << r.x << "," << r.y << " " << r.width << "x" << r.height;
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_EQ(area->property("text").toString().toStdString(), source);
+    click(find<QQuickItem>("markdownCancel"));
+    EXPECT_EQ(xqt::md::boxOf(*layer)->getText(), source);
+
+    // One undo step for the whole text
+    controller->undo();
+    EXPECT_EQ(xqt::md::boxOf(*layer), nullptr);
 }
 
 TEST_F(MainWindowTest, textModeTypesThePageText) {
