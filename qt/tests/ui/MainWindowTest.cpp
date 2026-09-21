@@ -1043,12 +1043,24 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     until([&] { return controller->pageNumber() == 5; });
     EXPECT_EQ(controller->pageNumber(), 5);
 
-    // Overview: the pages of each heading; a page opens there
-    click(find<QQuickItem>("contentsButton"));
+    // Overview: the pages of each heading; a page opens there. One button opens it, the one in the tool bar, and
+    // it shows whether the overview is open.
+    auto* contentsButton = find<QQuickItem>("contentsButton");
+    ASSERT_NE(contentsButton, nullptr);
+    EXPECT_FALSE(contentsButton->property("checked").toBool());
+    int tocButtonsInTheSidebar = 0;
+    for (auto* i: find<QQuickItem>("sidebar")->findChildren<QQuickItem*>()) {
+        if (i->property("iconName").toString() == QStringLiteral("xqt-toc")) {
+            ++tocButtonsInTheSidebar;
+        }
+    }
+    EXPECT_EQ(tocButtonsInTheSidebar, 0) << "not a second button for it beside the pages";
+    click(contentsButton);
     auto* overview = find<QQuickItem>("contentsOverview");
     ASSERT_NE(overview, nullptr);
     until([&] { return overview->isVisible(); });
     ASSERT_TRUE(overview->isVisible());
+    EXPECT_TRUE(contentsButton->property("checked").toBool()) << "the button shows that it is open";
     auto* list = find<QQuickItem>("contentsList");
     until([&] { return itemAt(list, 1) != nullptr; });
     QQuickItem* section = itemAt(list, 1);  // Section 1.1: pages 3, 4

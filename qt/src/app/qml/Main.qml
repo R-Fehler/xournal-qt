@@ -547,7 +547,6 @@ ApplicationWindow {
         anchors.left: win.toolbarPosition === "left" ? sideTools.right : parent.left
         width: 210
         visible: sidebarShown && !win.fullScreenMode
-        onContentsOverviewRequested: contentsOverview.open()
     }
 
     DocumentCanvas {

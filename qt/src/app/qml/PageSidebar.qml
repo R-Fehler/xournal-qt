@@ -14,7 +14,6 @@ Rectangle {
     /// "pages", "layers" or "contents"
     property string mode: "pages"
     readonly property bool showContents: mode === "contents"
-    signal contentsOverviewRequested()
     onModeChanged: if (mode === "contents" && !app.outline.available) mode = "pages"
 
     // Pages | Layers | Contents (the last one when the document has a table of contents)
@@ -47,13 +46,6 @@ Rectangle {
                     font.weight: switchButton.active ? Font.DemiBold : Font.Normal
                 }
             }
-        }
-        IconButton {
-            iconName: "xqt-toc"
-            tip: qsTr("Contents overview with the pages (Ctrl+Alt+O)")
-            implicitWidth: 34; implicitHeight: 34
-            icon.width: 20; icon.height: 20
-            onClicked: sidebar.contentsOverviewRequested()
         }
     }
     LayerList {
