@@ -356,7 +356,11 @@ cd build-qt
       dragging), also onto the next page; Delete; Ctrl+Z. After the selection the pen writes into its layer again.
 - [ ] Save, open the file in Xournal++: the page shows the Markdown source as a text, nothing lost; saved there and
       opened again here: formatted again.
-- [ ] Longer than the page: the editor says so (the next step flows it onto new pages).
+- [ ] Longer than the page: it flows onto new pages while typing (the title says "pages 1–3"); a heading at the
+      bottom of a page moves to the next page with its paragraph; a long code block continues on the next page
+      with its colors; a long table repeats its header. Deleting text: the pages added go again. Done, Ctrl+Z:
+      text and pages go in one step. Open the text on page 2 (text tool on it): the whole text. Save, open in
+      Xournal++: every page shows its part of the source.
 
 ## Table of contents
 - [ ] A PDF with bookmarks (e.g. a book or thesis): sidebar "Contents": indented headings, current section highlighted, tap goes there, arrows collapse.

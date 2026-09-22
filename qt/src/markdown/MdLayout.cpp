@@ -1,6 +1,7 @@
 #include "MdLayout.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <string>
 #include <utility>
 
@@ -78,6 +79,7 @@ double baseline(PangoLayout* l) { return pango_layout_get_baseline(l) / static_c
 struct Laid {
     xoj::util::GObjectSPtr<PangoLayout> layout;
     std::vector<LinkSpan> links;
+    std::vector<SourceMap> sources;
     PangoLayout* get() const { return layout.get(); }
 };
 
@@ -89,10 +91,12 @@ public:
         out.links = doc.links;
         const auto& blocks = doc.root.children;
         out.blocks.resize(blocks.size());
+        continuedListStart = continuationStart(doc);
         Ctx c;
         c.color = st.color;
         for (size_t i = 0; i < blocks.size(); ++i) {
             top = i;
+            current = {};
             const size_t first = out.items.size();
             block(blocks[i], 0, st.width, c);
             Layout::Extent e{y, y};
@@ -104,7 +108,9 @@ public:
                     e.bottom = std::max(e.bottom, it.y + std::max(it.height, 0.0));
                 }
             }
-            out.blocks[i] = e;
+            e.item = current.item;
+            e.parts = std::move(current.parts);
+            out.blocks[i] = std::move(e);
         }
         out.height = y;
         return std::move(out);
@@ -139,11 +145,13 @@ private:
 
         std::string s;
         std::vector<LinkSpan> links;
+        std::vector<SourceMap> sources;
         PangoAttrList* attrs = pango_attr_list_new();
         for (const Run& r: runs) {
             const size_t from = s.size();
             s += r.text;
             const size_t to = s.size();
+            sources.push_back({static_cast<int>(from), static_cast<int>(to - from), r.source, r.sourceLength, r.flags});
             if ((r.flags & Link) && r.link >= 0) {
                 if (!links.empty() && links.back().link == r.link && links.back().end == static_cast<int>(from)) {
                     links.back().end = static_cast<int>(to);  // (a link with formatting inside: several runs)
@@ -201,10 +209,11 @@ private:
         pango_layout_set_text(l.get(), s.c_str(), static_cast<int>(s.size()));
         pango_layout_set_attributes(l.get(), attrs);
         pango_attr_list_unref(attrs);
-        return {std::move(l), std::move(links)};
+        return {std::move(l), std::move(links), std::move(sources)};
     }
 
-    void addText(Laid l, double x, double atY, Color color) {
+    /// Returns its index.
+    size_t addText(Laid l, double x, double atY, Color color) {
         Item it;
         it.kind = Item::Kind::Text;
         it.x = x;
@@ -213,9 +222,11 @@ private:
         it.height = pangoHeight(l.get());
         it.layout = std::move(l.layout);
         it.links = std::move(l.links);
+        it.sources = std::move(l.sources);
         it.color = color;
         it.block = top;
         out.items.push_back(std::move(it));
+        return out.items.size() - 1;
     }
     void addFill(double x, double atY, double w, double h, Color color) {
         Item it;
@@ -285,7 +296,7 @@ private:
         open();
         auto l = text(b.runs, {st.size, false, false, w});
         const double h = pangoHeight(l.get());
-        addText(std::move(l), x, y, c.color);
+        mainItem(addText(std::move(l), x, y, c.color));
         y += h;
         margin(c.tight ? 0.15 * st.size : 0.75 * st.size);
     }
@@ -296,7 +307,7 @@ private:
         open();
         auto l = text(b.runs, {s, true, false, w, 1.15});
         const double h = pangoHeight(l.get());
-        addText(std::move(l), x, y, c.color);
+        mainItem(addText(std::move(l), x, y, c.color));
         y += h;
         if (b.level <= 2) {
             y += 0.25 * s;
@@ -330,7 +341,7 @@ private:
                       highlight(source, b.language.empty() ? b.info : b.language));
         const double h = pangoHeight(l.get());
         addFill(x, y, w, h + 2 * pad, CODE_BACKGROUND);
-        addText(std::move(l), x + pad, y + pad, st.color);
+        mainItem(addText(std::move(l), x + pad, y + pad, st.color));
         y += h + 2 * pad;
         margin(0.75 * st.size);
     }
@@ -344,9 +355,11 @@ private:
         inner.color = MUTED;
         inner.tight = false;
         const double indent = 1.1 * st.size;
+        ++nesting;
         for (const Block& child: b.children) {
             block(child, x + indent, w - indent, inner);
         }
+        --nesting;
         atTop = false;
         addLine(x + 0.3 * st.size, start, 0, y - start, RULE_COLOR, 2.5);
         margin(0.75 * st.size);
@@ -388,9 +401,12 @@ private:
             auto l = text({Run{widest}}, {st.size});
             gutter = std::max(gutter, pangoWidth(l.get()) + 0.5 * st.size);
         }
-        unsigned n = b.start;
+        unsigned n = ordered && nesting == 0 && continuedListStart > 0 && top == 1 ? continuedListStart : b.start;
+        const bool parts = nesting == 0;
+        ++nesting;
         for (const Block& item: b.children) {
             const size_t first = out.items.size();
+            const double itemTop = y;
             for (const Block& child: item.children) {
                 block(child, x + gutter, w - gutter, inner);
             }
@@ -419,7 +435,16 @@ private:
                 addText(std::move(l), right - mw, my, c.color);
             }
             ++n;
+            if (parts) {
+                Layout::Extent e{y, itemTop};
+                for (size_t k = first; k < out.items.size(); ++k) {
+                    e.top = std::min(e.top, out.items[k].y);
+                    e.bottom = std::max(e.bottom, out.items[k].y + std::max(out.items[k].height, 0.0));
+                }
+                current.parts.push_back(e);
+            }
         }
+        --nesting;
         atTop = false;
         margin(c.tight ? 0.15 * st.size : 0.75 * st.size);
     }
@@ -511,6 +536,9 @@ private:
                 cx += widths[i];
             }
             addLine(x, y, total, 0, RULE_COLOR, 0.75);
+            if (nesting == 0) {
+                current.parts.push_back({y, y + h + 2 * pad});
+            }
             y += h + 2 * pad;
         }
         addLine(x, y, total, 0, RULE_COLOR, 0.75);
@@ -524,8 +552,30 @@ private:
         margin(0.75 * st.size);
     }
 
+    void mainItem(size_t index) {
+        if (nesting == 0) {
+            current.item = static_cast<int>(index);
+        }
+    }
+
+    /// A page's slice that continues a numbered list: "<!-- xqt:cont list start=4 -->" (see MdPaginate).
+    static unsigned continuationStart(const Document& doc) {
+        if (doc.root.children.empty() || doc.root.children[0].kind != BlockKind::Html) {
+            return 0;
+        }
+        const std::string s = plainText(doc.root.children[0]);
+        const auto at = s.find("start=");
+        if (s.rfind("<!-- xqt:cont", 0) != 0 || at == std::string::npos) {
+            return 0;
+        }
+        return static_cast<unsigned>(std::strtoul(s.c_str() + at + 6, nullptr, 10));
+    }
+
     const Style& st;
     Layout out;
+    Layout::Extent current;  ///< item and parts of the top-level block being laid out
+    int nesting = 0;         ///< in a list or quote
+    unsigned continuedListStart = 0;
     size_t top = 0;
     double y = 0;
     double pending = 0;

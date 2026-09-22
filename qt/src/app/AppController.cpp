@@ -348,20 +348,29 @@ QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     const QString source = QString::fromStdString(
             at ? markdown->beginBox(static_cast<size_t>(mdPage), style, at->x(), at->y())
                : markdown->begin(static_cast<size_t>(mdPage), style));
+    mdPage = static_cast<int>(markdown->pageIndex());  // (the page's text: its first page)
+    mdLastPage = static_cast<int>(markdown->lastPageIndex());
     mdOverflow = 0;
     Q_EMIT markdownChanged();
     return source;
+}
+
+void AppController::markdownPagesChanged(double overflow) {
+    const int first = static_cast<int>(markdown->pageIndex());
+    const int lastPage = static_cast<int>(markdown->lastPageIndex());
+    if (overflow != mdOverflow || first != mdPage || lastPage != mdLastPage) {
+        mdOverflow = overflow;
+        mdPage = first;
+        mdLastPage = lastPage;
+        Q_EMIT markdownChanged();
+    }
 }
 
 void AppController::updateMarkdown(const QString& source) {
     if (!markdownActive()) {
         return;
     }
-    const double overflow = markdown->update(source.toStdString());
-    if (overflow != mdOverflow) {
-        mdOverflow = overflow;
-        Q_EMIT markdownChanged();
-    }
+    markdownPagesChanged(markdown->update(source.toStdString()));
 }
 
 void AppController::endMarkdown(bool keep) {
@@ -376,6 +385,7 @@ void AppController::endMarkdown(bool keep) {
     markdown.reset();
     mdSession = nullptr;
     mdPage = -1;
+    mdLastPage = -1;
     mdOverflow = 0;
     Q_EMIT markdownChanged();
     Q_EMIT undoRedoChanged();
@@ -1003,7 +1013,7 @@ bool AppController::markdownIsPageText() const { return !markdownActive() || mar
 
 void AppController::setMarkdownBoxSize(double size) {
     if (markdownActive()) {
-        mdOverflow = markdown->setFontSize(std::clamp(size, 4.0, 400.0));
+        markdownPagesChanged(markdown->setFontSize(std::clamp(size, 4.0, 400.0)));
     }
     setMarkdownFontSize(size);
     Q_EMIT markdownChanged();
@@ -1559,6 +1569,7 @@ void AppController::undo() {
         return;
     }
     session()->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
+    endMarkdown(true);                   // (as is the Markdown being written beside the page)
     if (canUndo()) {
         session()->getUndoRedoHandler()->undo();
     }
@@ -1569,6 +1580,7 @@ void AppController::redo() {
         return;
     }
     session()->clearSelectionEndText();
+    endMarkdown(true);
     if (canRedo()) {
         session()->getUndoRedoHandler()->redo();
     }

@@ -120,6 +120,8 @@ class AppController: public QObject {
     /// A Markdown box is being edited (markdownPage, 0-based); how far it goes below the page (points)
     Q_PROPERTY(bool markdownActive READ markdownActive NOTIFY markdownChanged)
     Q_PROPERTY(int markdownPage READ markdownPage NOTIFY markdownChanged)
+    /// The last page of the Markdown text being edited (the page's text flows over pages)
+    Q_PROPERTY(int markdownLastPage READ markdownLastPage NOTIFY markdownChanged)
     Q_PROPERTY(double markdownOverflow READ markdownOverflow NOTIFY markdownChanged)
     /// Where the tool bar is: "top", "left" or "right"
     Q_PROPERTY(QString toolbarPosition READ toolbarPosition WRITE setToolbarPosition NOTIFY toolbarPositionChanged)
@@ -244,6 +246,7 @@ public:
     /// The size of the Markdown text edited beside the page (also the size of new Markdown text from now on).
     Q_INVOKABLE void setMarkdownBoxSize(double size);
     int markdownPage() const { return mdPage; }
+    int markdownLastPage() const { return mdLastPage; }
     double markdownOverflow() const { return mdOverflow; }
     /// Start editing the Markdown box of a page (-1: the current page; made when there is none). Returns its source.
     Q_INVOKABLE QString beginMarkdown(int page = -1);
@@ -577,6 +580,8 @@ private:
     void applyMarkdownText();
     /// Editing beside the page: the page's text, or the text box at a point.
     QString startMarkdown(int page, std::optional<QPointF> at);
+    /// After a change of the Markdown being edited: its pages and how far it goes below one.
+    void markdownPagesChanged(double overflow);
     qreal markSpacing = 1.0;
     /// Files were renamed or moved (library, recent files): open documents and the recent list follow.
     void filesChanged(const xqt::DocumentFiles::Result& result);
@@ -607,6 +612,7 @@ private:
     std::unique_ptr<xqt::MarkdownSession> markdown;
     xqt::DocumentSession* mdSession = nullptr;
     int mdPage = -1;
+    int mdLastPage = -1;
     double mdOverflow = 0;
     std::unique_ptr<xqt::PageClipboard> ownPageClipboard;
     xqt::PageClipboard* pageClipboard = nullptr;  ///< the main window's: pages can be pasted into any window

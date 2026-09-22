@@ -16,7 +16,9 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPaginate.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPaginate.cpp)
 target_include_directories(xqt-markdown PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/markdown")
 target_link_libraries(xqt-markdown PUBLIC xoj-core PRIVATE xqt-md4c)
 
@@ -37,7 +39,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdLayoutTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdBoxTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdHighlightTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdHighlightTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPaginateTest.cpp)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
     set_target_properties(xqt-markdown-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
     gtest_discover_tests(xqt-markdown-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS markdown)

@@ -10,20 +10,24 @@
 #include "model/Font.h"
 #include "model/Layer.h"
 #include "model/MarkdownText.h"
+#include "model/PageType.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "undo/GroupUndoAction.h"
+#include "undo/InsertDeletePageUndoAction.h"
 #include "undo/UndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
 
 #include "MdBox.h"
+#include "MdPaginate.h"
 #include "TextFlow.h"
 
 namespace xqt {
 
 namespace {
-/// The box before / after an edit: the element in the layer and the other version (the same action undoes and
+/// A box before / after an edit: the element in the layer and the other version (the same action undoes and
 /// redoes: it swaps them). Either may be missing (a box made or emptied away).
 class MarkdownUndoAction final: public UndoAction {
 public:
@@ -68,6 +72,22 @@ private:
     Text* current;
     ElementPtr other;
 };
+
+/// The text of the page's own box (at its margins), empty if none.
+std::string pageTextOf(const PageRef& page) {
+    const Layer* layer = md::markdownLayer(page);
+    const Text* box = layer ? md::pageBoxOf(*layer, TextFlow::styleFor(page, TextFlow::Style{}).leftMargin,
+                                            TextFlow::MARGIN)
+                            : nullptr;
+    return box ? box->getText() : std::string();
+}
+
+/// Where the page's text goes on a page: its box (width) and how high it may go.
+md::Frame frameOf(const PageRef& page) {
+    const TextFlow::Style m = TextFlow::styleFor(page, TextFlow::Style{});
+    return {std::max(50.0, page->getWidth() - m.leftMargin - m.rightMargin),
+            std::max(50.0, page->getHeight() - 2 * TextFlow::MARGIN)};
+}
 }  // namespace
 
 MarkdownSession::MarkdownSession(DocumentSession& session, QObject* parent): QObject(parent), session(session) {}
@@ -78,18 +98,49 @@ MarkdownSession::~MarkdownSession() {
     }
 }
 
-size_t MarkdownSession::pageIndex() const {
-    if (!page) {
-        return npos;
-    }
+size_t MarkdownSession::indexOf(const PageRef& page) const {
     std::shared_lock lock(*session.getDocument());
     return session.getDocument()->indexOf(page);
 }
+
+size_t MarkdownSession::pageIndex() const { return active() ? indexOf(chain.front().page) : npos; }
+size_t MarkdownSession::lastPageIndex() const { return active() ? indexOf(chain.back().page) : npos; }
 
 std::string MarkdownSession::begin(size_t pageNo, const md::Style& s) { return start(pageNo, s, true, 0, 0); }
 
 std::string MarkdownSession::beginBox(size_t pageNo, const md::Style& s, double x, double y) {
     return start(pageNo, s, false, x, y);
+}
+
+MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, double y) {
+    Page p;
+    p.page = page;
+    p.x = x;
+    p.y = y;
+    {
+        std::shared_lock lock(*session.getDocument());
+        p.layer = md::markdownLayer(page);
+        p.selectedBefore = page->getSelectedLayerId();
+        if (p.layer) {
+            p.box = pageText ? md::pageBoxOf(*p.layer, x, y)
+                             : (p.layer->isVisible() ? md::boxAt(*p.layer, x, y) : nullptr);
+        }
+        if (p.box) {
+            p.original = p.box->cloneText();
+            p.x = p.box->getTransformation().shift.x;
+            p.y = p.box->getTransformation().shift.y;
+        }
+    }
+    if (!p.layer) {
+        // At the bottom: writing with the pen goes on top of the box, into the layer it went into before.
+        p.layer = new Layer();
+        p.layer->setName(std::string(xoj::markdown::LAYER_NAME));
+        session.getLayerController()->insertLayer(page, p.layer, 0);  // (locks the document)
+        std::unique_lock lock(*session.getDocument());
+        page->setSelectedLayerId(p.selectedBefore > 0 ? p.selectedBefore + 1 : 0);
+        p.createdLayer = true;
+    }
+    return p;
 }
 
 std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPage, double x, double y) {
@@ -100,165 +151,307 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
     Document* doc = session.getDocument();
     style = s;
     pageText = isPage;
-    std::string source;
+    undo = nullptr;
+    PageRef page;
     {
         std::shared_lock lock(*doc);
         if (pageNo >= doc->getPageCount()) {
             return {};
         }
         page = doc->getPage(pageNo);
-        layer = md::markdownLayer(page);
-        createdLayer = !layer;
-        selectedBefore = page->getSelectedLayerId();
-        const TextFlow::Style margins = TextFlow::styleFor(page, TextFlow::Style{});
-        if (pageText) {
-            // The page's box: from the top-left margin (beside the margin line of a ruled page) to the right margin
-            boxX = margins.leftMargin;
-            boxY = TextFlow::MARGIN;
-            style.width = std::max(50.0, page->getWidth() - margins.leftMargin - margins.rightMargin);
-            box = layer ? md::pageBoxOf(*layer, boxX, boxY) : nullptr;
+    }
+    if (!pageText) {
+        // A text box: the one drawn there, or a new one from there to the right margin (its first line around the
+        // point, as the text tool places texts)
+        Page p = pageOf(page, x, y);
+        if (p.box) {
+            style = md::styleOf(*p.box);
         } else {
-            // A text box: the one drawn there, or a new one from there to the right margin (its first line around
-            // the point, as the text tool places texts)
-            box = layer && layer->isVisible() ? md::boxAt(*layer, x, y) : nullptr;
-            boxX = x;
-            boxY = y - style.size * 0.75;
-            style.width = std::max(100.0, page->getWidth() - margins.rightMargin - x);
+            p.y = y - style.size * 0.75;
+            std::shared_lock lock(*doc);
+            style.width =
+                    std::max(100.0, page->getWidth() - TextFlow::styleFor(page, TextFlow::Style{}).rightMargin - p.x);
         }
-        original.reset();
-        if (box) {
-            source = box->getText();
-            style = md::styleOf(*box);
-            boxX = box->getTransformation().shift.x;
-            boxY = box->getTransformation().shift.y;
-            original = box->cloneText();
+        last = p.box ? p.box->getText() : std::string();
+        chain.push_back(std::move(p));
+        return last;
+    }
+    // The page's text, from the first page it flows over (pages whose text continues the page before)
+    std::vector<PageRef> pages;
+    {
+        std::shared_lock lock(*doc);
+        size_t first = pageNo;
+        while (first > 0 && md::continues(pageTextOf(doc->getPage(first)))) {
+            --first;
+        }
+        pages.push_back(doc->getPage(first));
+        for (size_t i = first + 1; i < doc->getPageCount() && md::continues(pageTextOf(doc->getPage(i))); ++i) {
+            pages.push_back(doc->getPage(i));
         }
     }
-    if (!layer) {
-        // At the bottom: writing with the pen goes on top of the box, into the layer it went into before.
-        layer = new Layer();
-        layer->setName(std::string(xoj::markdown::LAYER_NAME));
-        session.getLayerController()->insertLayer(page, layer, 0);  // (locks the document)
-        std::unique_lock lock(*doc);
-        page->setSelectedLayerId(selectedBefore > 0 ? selectedBefore + 1 : 0);
+    std::vector<std::string> slices;
+    for (const PageRef& p: pages) {
+        TextFlow::Style m;
+        {
+            std::shared_lock lock(*doc);
+            m = TextFlow::styleFor(p, TextFlow::Style{});
+        }
+        chain.push_back(pageOf(p, m.leftMargin, TextFlow::MARGIN));
+        slices.push_back(chain.back().box ? chain.back().box->getText() : std::string());
     }
-    last = source;
-    changed = false;
-    return source;
+    if (chain.front().box) {
+        style = md::styleOf(*chain.front().box);
+    }
+    last = md::join(slices);
+    return last;
 }
 
-void MarkdownSession::apply(const std::string& source) {
+void MarkdownSession::setBox(Page& p, const std::string& text) {
     Document* doc = session.getDocument();
-    if (!changed) {
-        // The undo step at the first change: the document is modified now (saving, autosave, the question when
-        // closing). Its "other" version is the box from before (none: undo takes the box away).
+    if (p.box && p.box->getText() == text && p.box->getFontSize() == style.size && p.box->getWrap() == style.width &&
+        p.box->getColor() == style.color) {
+        return;
+    }
+    if (!p.recorded) {
+        // The first change of this box: into the undo step, which is on the undo stack from the first change of
+        // the edit on (the document is modified: saving, autosave, the question when closing). Its other version
+        // is the box from before (none: undo takes the box away).
         std::unique_lock lock(*doc);
-        if (!box) {
+        if (!p.box) {
             auto t = std::make_unique<Text>();
-            t->setTransformation(xoj::util::Matrix::TRANSLATION(boxX, boxY));
-            box = t.get();
-            layer->addElement(std::move(t));
+            t->setTransformation(xoj::util::Matrix::TRANSLATION(p.x, p.y));
+            p.box = t.get();
+            p.layer->addElement(std::move(t));
         }
         lock.unlock();
-        session.getUndoRedoHandler()->addUndoAction(std::make_unique<MarkdownUndoAction>(
-                page, layer, box, original ? ElementPtr(original->clone()) : ElementPtr()));
-        changed = true;
+        auto action = std::make_unique<MarkdownUndoAction>(p.page, p.layer, p.box,
+                                                            p.original ? p.original->clone() : ElementPtr());
+        if (!undo) {
+            auto group = std::make_unique<GroupUndoAction>();
+            undo = group.get();
+            group->addAction(std::move(action));
+            session.getUndoRedoHandler()->addUndoAction(std::move(group));
+        } else {
+            undo->addAction(std::move(action));
+        }
+        p.recorded = true;
     }
     {
-        // Changed in place (the element stays the same, the undo step refers to it). An empty text is not drawn
+        // Changed in place (the element stays the same: the undo step refers to it). An empty text is not drawn
         // and not saved (upstream's SaveHandler leaves empty texts out).
         std::unique_lock lock(*doc);
-        box->setText(source);
-        box->setFont(XojFont(style.family, style.size));
-        box->setColor(style.color);
-        box->setWrap(style.width);
+        p.box->setText(text);
+        p.box->setFont(XojFont(style.family, style.size));
+        p.box->setColor(style.color);
+        p.box->setWrap(style.width);
     }
-    changedOnPage();
+    changedOnPage(p.page);
 }
 
-void MarkdownSession::changedOnPage() {
+void MarkdownSession::changedOnPage(const PageRef& page) {
     page->firePageChanged();
-    if (const size_t index = pageIndex(); index != npos) {
+    if (const size_t index = indexOf(page); index != npos) {
         session.firePageChanged(index);           // thumbnails
         Q_EMIT session.pageContentChanged(index);  // chapters (its headings)
     }
 }
 
-double MarkdownSession::overflow() const {
+PageRef MarkdownSession::addPageAfter(const PageRef& after) {
+    Document* doc = session.getDocument();
+    auto page = std::make_shared<XojPage>(after->getWidth(), after->getHeight());
+    size_t pos = 0;
+    {
+        std::unique_lock lock(*doc);
+        PageType type = after->getBackgroundType();
+        if (type.isPdfPage() || type.isImagePage()) {
+            type = PageType(PageTypeFormat::Plain);
+        }
+        page->setBackgroundType(type);
+        page->setBackgroundColor(after->getBackgroundColor());
+        pos = doc->indexOf(after) + 1;
+        doc->insertPage(page, pos);
+    }
+    session.firePageInserted(pos);
+    return page;
+}
+
+void MarkdownSession::removePage(const PageRef& page) {
+    const size_t pos = indexOf(page);
+    if (pos == npos) {
+        return;
+    }
+    session.firePageDeleted(pos);  // (first the event, then the page goes: as InsertDeletePageUndoAction)
+    std::unique_lock lock(*session.getDocument());
+    session.getDocument()->deletePage(pos);
+}
+
+double MarkdownSession::distribute(const std::string& source) {
+    Document* doc = session.getDocument();
+    const auto frame = [&](size_t i) {
+        std::shared_lock lock(*doc);
+        return frameOf(i < chain.size() ? chain[i].page : chain.back().page);  // (new pages are like the last one)
+    };
+    const md::Pagination pages = md::paginate(source, style, frame);
+    // More pages: added after the text's last page
+    while (chain.size() < pages.slices.size()) {
+        const PageRef page = addPageAfter(chain.back().page);
+        TextFlow::Style m;
+        {
+            std::shared_lock lock(*doc);
+            m = TextFlow::styleFor(page, TextFlow::Style{});
+        }
+        Page p = pageOf(page, m.leftMargin, TextFlow::MARGIN);
+        p.createdPage = true;
+        chain.push_back(std::move(p));
+    }
+    for (size_t i = 0; i < pages.slices.size(); ++i) {
+        style.width = frame(i).width;
+        setBox(chain[i], pages.slices[i]);
+    }
+    // Fewer: pages added by this edit go again, the others keep an empty box
+    while (chain.size() > pages.slices.size() && chain.back().createdPage) {
+        removePage(chain.back().page);
+        chain.pop_back();
+    }
+    for (size_t i = pages.slices.size(); i < chain.size(); ++i) {
+        if (chain[i].box && !chain[i].box->getText().empty()) {
+            setBox(chain[i], "");
+        }
+    }
+    return pages.overflow;
+}
+
+double MarkdownSession::overflow(const Page& p) const {
     std::shared_lock lock(*session.getDocument());
-    if (!box || box->getText().empty()) {
+    if (!p.box || p.box->getText().empty()) {
         return 0;
     }
-    const auto rect = md::boxRect(*box);
-    return std::max(0.0, rect.y + rect.height - (page->getHeight() - TextFlow::MARGIN));
+    const auto rect = md::boxRect(*p.box);
+    return std::max(0.0, rect.y + rect.height - (p.page->getHeight() - TextFlow::MARGIN));
 }
 
 double MarkdownSession::update(const std::string& source) {
     if (!active()) {
         return 0;
     }
+    if (pageText) {
+        if (source != last) {
+            last = source;
+            return distribute(source);
+        }
+        return md::paginate(source, style, [&](size_t i) {
+                   std::shared_lock lock(*session.getDocument());
+                   return frameOf(chain[std::min(i, chain.size() - 1)].page);
+               }).overflow;
+    }
     if (source != last) {
         last = source;
-        apply(source);
+        setBox(chain[0], source);
     }
-    return overflow();
+    return overflow(chain[0]);
 }
 
 double MarkdownSession::setFontSize(double size) {
     if (!active() || size <= 0 || size == style.size) {
-        return overflow();
+        return update(last);
     }
     style.size = size;
-    if (box || !last.empty()) {
-        apply(last);
+    if (pageText) {
+        return distribute(last);
     }
-    return overflow();
+    if (chain[0].box || !last.empty()) {
+        setBox(chain[0], last);
+    }
+    return overflow(chain[0]);
 }
 
 void MarkdownSession::finish() {
-    if (active()) {
-        end();  // (the undo step is there since the first change)
+    if (!active()) {
+        return;
     }
+    if (undo && pageText) {
+        // Pages at the end that only held a box that is empty now go (not the first page)
+        std::vector<std::pair<PageRef, size_t>> removed;
+        const auto onlyAnEmptyBox = [&](const Page& p) {
+            std::shared_lock lock(*session.getDocument());
+            if (p.box && !p.box->getText().empty()) {
+                return false;
+            }
+            if (p.page->getBackgroundType().isPdfPage() || p.page->getBackgroundType().isImagePage()) {
+                return false;
+            }
+            for (const Layer* l: p.page->getLayersView()) {
+                for (const Element* e: l->getElementsView()) {
+                    if (e != p.box) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+        while (chain.size() > 1 && !chain.back().createdPage && onlyAnEmptyBox(chain.back())) {
+            removed.emplace_back(chain.back().page, indexOf(chain.back().page));
+            removePage(chain.back().page);
+            chain.pop_back();
+        }
+        // Pages added and removed are in the undo step (after the boxes; undo goes in this order)
+        for (const Page& p: chain) {
+            if (p.createdPage) {
+                undo->addAction(std::make_unique<InsertDeletePageUndoAction>(p.page, indexOf(p.page), true));
+            }
+        }
+        for (auto it = removed.rbegin(); it != removed.rend(); ++it) {  // (put back from the front)
+            undo->addAction(std::make_unique<InsertDeletePageUndoAction>(it->first, it->second, false));
+        }
+    }
+    end();
 }
 
 void MarkdownSession::cancel() {
     if (!active()) {
         return;
     }
-    if (changed) {
-        // Back to the box from before (its undo step now swaps two equal boxes: no change)
-        std::unique_lock lock(*session.getDocument());
-        if (original) {
-            box->setText(original->getText());
-            box->setFont(original->getFont());
-            box->setColor(original->getColor());
-            box->setWrap(original->getWrap());
-        } else {
-            box->setText("");
+    // Pages added go; the boxes are as they were (the undo step now swaps equal boxes: no change)
+    while (!chain.empty() && chain.back().createdPage) {
+        removePage(chain.back().page);
+        chain.pop_back();
+    }
+    for (Page& p: chain) {
+        if (!p.recorded) {
+            continue;
         }
-        lock.unlock();
-        changedOnPage();
+        {
+            std::unique_lock lock(*session.getDocument());
+            if (p.original) {
+                p.box->setText(p.original->getText());
+                p.box->setFont(p.original->getFont());
+                p.box->setColor(p.original->getColor());
+                p.box->setWrap(p.original->getWrap());
+            } else {
+                p.box->setText("");
+            }
+        }
+        changedOnPage(p.page);
     }
     end();
 }
 
 void MarkdownSession::end() {
-    // A Markdown layer made for nothing goes again
-    if (createdLayer && layer->getElements().empty()) {
-        session.getLayerController()->removeLayer(page, layer);  // (locks the document)
-        {
-            std::unique_lock lock(*session.getDocument());
-            page->setSelectedLayerId(selectedBefore);
+    for (Page& p: chain) {
+        // A Markdown layer made for nothing goes again
+        if (p.createdLayer && p.layer->getElements().empty() && indexOf(p.page) != npos) {
+            session.getLayerController()->removeLayer(p.page, p.layer);  // (locks the document)
+            {
+                std::unique_lock lock(*session.getDocument());
+                p.page->setSelectedLayerId(p.selectedBefore);
+            }
+            delete p.layer;
+            p.page->firePageChanged();
         }
-        delete layer;
-        page->firePageChanged();
     }
-    page = nullptr;
-    layer = nullptr;
-    box = nullptr;
-    original.reset();
+    chain.clear();
+    undo = nullptr;
     last.clear();
-    changed = false;
 }
 
 }  // namespace xqt

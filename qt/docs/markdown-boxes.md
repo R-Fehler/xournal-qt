@@ -6,12 +6,35 @@ with GitHub's extensions (tables, strikethrough, task lists, bare web addresses)
 
 ## Two ways
 - **The page's Markdown text** is written in the editor beside the page, from the top-left margin to the right
-  margin. With the next step it flows onto new pages.
+  margin. It flows onto the next pages (see below).
 - **Markdown text boxes** go anywhere on a page. Turn on "Markdown" in the text tool's font menu (hold the text
   button, or tap it again), then tap where the text should go. With "Write Markdown beside the page" (on by
   default) a box is written in the editor beside the page like the page's text, and the page shows it formatted
   while typing. Off, a box is edited on the page like any text box: its source is shown while editing and it is
   drawn formatted afterwards. A tap on a box (text tool) edits it again, the same way.
+
+## Flowing onto pages
+The page's Markdown text goes on on the next pages when it is longer than the page: while typing, it is split onto
+the pages again, pages are added after them (the same size and background; after a PDF page a plain one), and the
+pages added go again when the text gets shorter. After editing, pages at the end that only held an emptied part of
+the text go as well (a page with anything else on it stays). The whole edit, pages included, is one undo step.
+Opening any of its pages (the text tool on the text, or the writing button there) edits the whole text.
+
+Every page holds a part that is a Markdown text of its own, so each page is drawn from its own box (and Xournal++
+shows each page's source). A page is split only where the rest reads the same on its own:
+- between blocks, and a heading goes with the block after it;
+- between the lines of a paragraph, not inside **bold**, a link and the like, with two lines on each page where
+  possible;
+- between the lines of a code block: the page closes the fence and the next page opens it again;
+- between the items of a list: a numbered list goes on with its numbers;
+- between the rows of a table: the next page repeats the header.
+
+A part that continues the page before starts with a comment, `<!-- xqt:cont … -->` (not shown), which says what was
+added for the page (a fence, a table header), so the parts give exactly the text again. A block that cannot be split
+and is higher than a page (a long quote, a big image) stays on its page and goes below its bottom margin; the editor
+says so.
+
+Code: `qt/src/markdown/MdPaginate.*`, `qt/src/canvas/MarkdownSession.*`.
 
 ## Moving
 Markdown text boxes (and the page's text) are selected and moved like everything else: a rectangle or a lasso
@@ -59,7 +82,6 @@ Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`)
 `qt/src/app/qml/MarkdownPanel.qml`. The parser is md4c (vendored, `qt/3rdparty/md4c`).
 
 ## Not yet
-- Text longer than the page does not yet flow onto new pages. The editor says how much is below the margin.
 - Images.
 - Editing directly on the page (live preview).
 - Flattening into Text mode.

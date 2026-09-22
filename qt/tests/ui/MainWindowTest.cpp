@@ -2537,6 +2537,36 @@ TEST_F(MainWindowTest, markdownTextBoxesAreWrittenBesideThePage) {
     EXPECT_EQ(xqt::md::boxAt(*layer, 155, 300), nullptr) << "one undo step for the box";
 }
 
+// The page's Markdown text flows onto new pages while it is written.
+TEST_F(MainWindowTest, markdownFlowsOntoNewPages) {
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* area = find<QQuickItem>("markdownArea");
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, QVariant(0)));
+    ASSERT_TRUE(panel->isVisible());
+    std::string text = "# A long text\n\n";
+    for (int i = 0; i < 30; ++i) {
+        text += "## Part " + std::to_string(i + 1) + "\n\n";
+        for (int j = 0; j < 4; ++j) {
+            text += "Some sentences of part " + std::to_string(i + 1) +
+                    ", long enough to take a few lines on the page, so that the parts need several pages.\n\n";
+        }
+    }
+    area->setProperty("text", QString::fromStdString(text));
+    until([&] { return controller->pageCount() > 1; }, 3000);
+    const int pages = controller->pageCount();
+    EXPECT_GE(pages, 3);
+    EXPECT_EQ(controller->markdownPage(), 0);
+    EXPECT_EQ(controller->markdownLastPage(), pages - 1);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        controller->setZoomPercent(30);
+        wait(2500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(find<QQuickItem>("markdownDone"));
+    controller->undo();
+    EXPECT_EQ(controller->pageCount(), 1) << "one undo step: text and pages";
+}
+
 TEST_F(MainWindowTest, textModeTypesThePageText) {
     auto* panel = find<QQuickItem>("textFlowPanel");
     ASSERT_NE(panel, nullptr);

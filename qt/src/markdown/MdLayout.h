@@ -41,6 +41,16 @@ struct LinkSpan {
     int link = -1;
 };
 
+/// Where the text of an item came from: bytes [start, start + length) of its Pango layout's text are a run with this
+/// source (NO_SOURCE: made up, e.g. a soft break) and formatting.
+struct SourceMap {
+    int start = 0;
+    int length = 0;
+    size_t source = NO_SOURCE;
+    size_t sourceLength = 0;
+    uint16_t flags = 0;
+};
+
 /// One thing to draw, in box coordinates (top left of the box at 0, 0).
 struct Item {
     enum class Kind { Text, Fill, Line };
@@ -51,6 +61,7 @@ struct Item {
     double height = 0;
     xoj::util::GObjectSPtr<PangoLayout> layout;  ///< Text
     std::vector<LinkSpan> links;                  ///< Text
+    std::vector<SourceMap> sources;               ///< Text
     Color color;
     double lineWidth = 1;
     size_t block = 0;   ///< the top-level block it belongs to
@@ -62,6 +73,8 @@ struct Layout {
     struct Extent {
         double top = 0;
         double bottom = 0;
+        int item = -1;              ///< the item with the text of a paragraph, heading or code block
+        std::vector<Extent> parts;  ///< the items of a list, the rows of a table (header included)
     };
     std::vector<Extent> blocks;
     double height = 0;  ///< of everything

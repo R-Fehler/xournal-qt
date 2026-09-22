@@ -114,8 +114,10 @@ Pane {
             Layout.topMargin: 4
             Label {
                 Layout.fillWidth: true
-                text: app.markdownIsPageText ? qsTr("Markdown on page %1").arg(app.markdownPage + 1)
-                                             : qsTr("Markdown text box on page %1").arg(app.markdownPage + 1)
+                text: !app.markdownIsPageText ? qsTr("Markdown text box on page %1").arg(app.markdownPage + 1)
+                      : app.markdownLastPage > app.markdownPage
+                        ? qsTr("Markdown on pages %1–%2").arg(app.markdownPage + 1).arg(app.markdownLastPage + 1)
+                        : qsTr("Markdown on page %1").arg(app.markdownPage + 1)
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }
@@ -204,7 +206,8 @@ Pane {
             wrapMode: Text.Wrap
             color: "#b3261e"
             font.pixelSize: 12
-            text: qsTr("The text is longer than the page (about %1 lines below the margin).")
+            text: (app.markdownIsPageText ? qsTr("A block is higher than a page (about %1 lines below the margin).")
+                                          : qsTr("The text is longer than the page (about %1 lines below the margin)."))
                     .arg(Math.max(1, Math.round(app.markdownOverflow / (app.markdownBoxSize * 1.25))))
         }
 

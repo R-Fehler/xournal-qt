@@ -10,6 +10,8 @@
 
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/AppContext.h"
@@ -20,6 +22,7 @@
 
 #include "MarkdownSession.h"
 #include "MdBox.h"
+#include "MdPaginate.h"
 #include "TextFlow.h"
 
 using namespace xqt;
@@ -91,7 +94,7 @@ TEST_F(MarkdownSessionTest, nothingWrittenLeavesNoLayer) {
     EXPECT_FALSE(session->getUndoRedoHandler()->canUndo());
 }
 
-TEST_F(MarkdownSessionTest, overflowIsReported) {
+TEST_F(MarkdownSessionTest, onlyABlockHigherThanAPageGoesBelowIt) {
     MarkdownSession edit(*session);
     edit.begin(0, style);
     EXPECT_EQ(edit.update("# Short\n\ntext"), 0);
@@ -99,7 +102,12 @@ TEST_F(MarkdownSessionTest, overflowIsReported) {
     for (int i = 0; i < 80; ++i) {
         many += "Paragraph " + std::to_string(i) + "\n\n";
     }
-    EXPECT_GT(edit.update(many), 100);
+    EXPECT_EQ(edit.update(many), 0) << "it flows onto the next pages";
+    std::string quote;  // one quote, higher than a page: it cannot be split
+    for (int i = 0; i < 80; ++i) {
+        quote += "> quoted paragraph " + std::to_string(i) + "\n>\n";
+    }
+    EXPECT_GT(edit.update(quote), 100);
     edit.finish();
 }
 
@@ -173,4 +181,119 @@ TEST_F(MarkdownSessionTest, textBoxesElsewhereAreNotThePagesText) {
     ASSERT_EQ(layer->getElements().size(), 1u);
     EXPECT_EQ(layer->getElements().front().get(), freeBox) << "undo took only the page's text away";
     EXPECT_EQ(md::boxAt(*layer, 310, 405), freeBox);
+}
+
+namespace {
+std::string longText(int paragraphs) {
+    std::string s = "# Long text\n\n";
+    for (int i = 0; i < paragraphs; ++i) {
+        s += "Paragraph " + std::to_string(i) +
+             ": enough words to fill a line or two of the page, so that the text needs more than one page.\n\n";
+    }
+    return s;
+}
+std::vector<std::string> pageTexts(Document& doc) {
+    std::vector<std::string> texts;
+    for (size_t i = 0; i < doc.getPageCount(); ++i) {
+        const Layer* layer = md::markdownLayer(doc.getPage(i));
+        const Text* box = layer ? md::boxOf(*layer) : nullptr;
+        texts.push_back(box ? box->getText() : std::string());
+    }
+    return texts;
+}
+}  // namespace
+
+TEST_F(MarkdownSessionTest, thePagesTextFlowsOntoNewPages) {
+    Document& doc = *session->getDocument();
+    ASSERT_EQ(doc.getPageCount(), 1u);
+    const std::string text = longText(40);
+    MarkdownSession edit(*session);
+    edit.begin(0, style);
+    EXPECT_EQ(edit.update(text), 0) << "nothing goes below a page";
+    const size_t pages = doc.getPageCount();
+    EXPECT_GE(pages, 3u);
+    EXPECT_EQ(edit.pageIndex(), 0u);
+    EXPECT_EQ(edit.lastPageIndex(), pages - 1);
+    const auto texts = pageTexts(doc);
+    EXPECT_EQ(md::join(texts), text) << "the pages hold the text";
+    for (size_t i = 1; i < texts.size(); ++i) {
+        EXPECT_TRUE(md::continues(texts[i])) << "page " << i;
+        EXPECT_NE(doc.getPage(i)->getSelectedLayer(), md::markdownLayer(doc.getPage(i))) << "the pen's layer";
+    }
+    // Shorter again: the pages added go again
+    edit.update(longText(2));
+    EXPECT_EQ(doc.getPageCount(), 1u);
+    edit.update(text);
+    EXPECT_EQ(doc.getPageCount(), pages);
+    edit.finish();
+
+    // One undo step: text and pages
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(doc.getPageCount(), 1u);
+    EXPECT_EQ(source(), "");
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(doc.getPageCount(), pages);
+    EXPECT_EQ(md::join(pageTexts(doc)), text);
+
+    // Opened on a later page: the whole text, from its first page
+    EXPECT_EQ(edit.begin(2, style), text);
+    EXPECT_EQ(edit.pageIndex(), 0u);
+    EXPECT_EQ(edit.lastPageIndex(), pages - 1);
+    edit.cancel();
+}
+
+TEST_F(MarkdownSessionTest, pagesThatOnlyHeldTheTextGoWhenItGetsShorter) {
+    Document& doc = *session->getDocument();
+    MarkdownSession edit(*session);
+    edit.begin(0, style);
+    edit.update(longText(40));
+    edit.finish();
+    const size_t pages = doc.getPageCount();
+    ASSERT_GE(pages, 3u);
+
+    // A stroke on the second page keeps that page
+    auto stroke = std::make_unique<Stroke>();
+    stroke->addPoint(Point(100, 500));
+    stroke->addPoint(Point(200, 520));
+    doc.getPage(1)->getSelectedLayer()->addElement(std::move(stroke));
+
+    edit.begin(0, style);
+    edit.update("# Short now\n");
+    EXPECT_EQ(doc.getPageCount(), pages) << "pages from before stay while typing (emptied)";
+    edit.finish();
+    EXPECT_EQ(doc.getPageCount(), 2u) << "the empty ones at the end went; the one with ink stays";
+    EXPECT_EQ(pageTexts(doc)[1], "");
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(doc.getPageCount(), pages);
+    EXPECT_EQ(md::join(pageTexts(doc)), longText(40));
+}
+
+TEST_F(MarkdownSessionTest, cancelTakesAddedPagesAway) {
+    Document& doc = *session->getDocument();
+    MarkdownSession edit(*session);
+    edit.begin(0, style);
+    edit.update(longText(40));
+    ASSERT_GT(doc.getPageCount(), 1u);
+    edit.cancel();
+    EXPECT_EQ(doc.getPageCount(), 1u);
+    EXPECT_EQ(source(), "");
+}
+
+TEST_F(MarkdownSessionTest, flowingTextIsSavedAndLoaded) {
+    const std::string text = longText(30) + "```cpp\n" + std::string(60 * 1, ' ') + "\n";  // (a code block at the end)
+    MarkdownSession edit(*session);
+    edit.begin(0, style);
+    edit.update(text);
+    edit.finish();
+    const size_t pages = session->getDocument()->getPageCount();
+    ASSERT_GE(pages, 2u);
+    const fs::path file = fs::path(tmp.filePath("flow.xopp").toStdString());
+    ASSERT_TRUE(session->saveAs(file).ok);
+    auto loaded = DocumentSession::loadFile(file);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    EXPECT_EQ(loaded.document->getPageCount(), pages);
+    DocumentSession other(*app, std::move(loaded.document));
+    MarkdownSession again(other);
+    EXPECT_EQ(again.begin(pages - 1, style), text) << "the same text, joined from the pages of the file";
+    again.cancel();
 }
