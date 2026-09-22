@@ -8,6 +8,8 @@
 
 #include "util/StringUtils.h"
 
+#include "MdHighlight.h"
+
 namespace xqt::md {
 
 namespace {
@@ -120,7 +122,7 @@ private:
         atTop = false;
     }
 
-    Laid text(const std::vector<Run>& runs, const TextOptions& o) {
+    Laid text(const std::vector<Run>& runs, const TextOptions& o, const std::vector<CodeSpan>& code = {}) {
         xoj::util::GObjectSPtr<PangoLayout> l(pango_layout_new(context()), xoj::util::adopt);
         PangoFontDescription* d = pango_font_description_new();
         pango_font_description_set_family(d, (o.mono ? st.monoFamily : st.family).c_str());
@@ -182,6 +184,17 @@ private:
             }
             if (r.flags & Math) {
                 insert(attrs, pango_attr_family_new("Serif"), from, to);
+                insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC), from, to);
+            }
+        }
+        for (const CodeSpan& c: code) {  // syntax highlighting
+            const auto from = static_cast<size_t>(c.start);
+            const auto to = static_cast<size_t>(c.start + c.length);
+            insert(attrs, pango_attr_foreground_new(u16(c.color.red), u16(c.color.green), u16(c.color.blue)), from, to);
+            if (c.bold) {
+                insert(attrs, pango_attr_weight_new(PANGO_WEIGHT_BOLD), from, to);
+            }
+            if (c.italic) {
                 insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC), from, to);
             }
         }
@@ -309,7 +322,12 @@ private:
             }
         }
         const double pad = 0.6 * st.size;
-        auto l = text(runs, {st.size * 0.88, false, true, w - 2 * pad, CODE_LINE_SPACING});
+        std::string source;
+        for (const Run& r: runs) {
+            source += r.text;
+        }
+        auto l = text(runs, {st.size * 0.88, false, true, w - 2 * pad, CODE_LINE_SPACING},
+                      highlight(source, b.language.empty() ? b.info : b.language));
         const double h = pangoHeight(l.get());
         addFill(x, y, w, h + 2 * pad, CODE_BACKGROUND);
         addText(std::move(l), x + pad, y + pad, st.color);

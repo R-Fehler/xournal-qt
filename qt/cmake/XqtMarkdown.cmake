@@ -14,9 +14,21 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdLayout.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdLayout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.cpp)
 target_include_directories(xqt-markdown PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/markdown")
 target_link_libraries(xqt-markdown PUBLIC xoj-core PRIVATE xqt-md4c)
+
+# Syntax highlighting of code blocks (optional; Debian / Ubuntu: libkf6syntaxhighlighting-dev)
+find_package(KF6SyntaxHighlighting QUIET)
+if(KF6SyntaxHighlighting_FOUND)
+    message(STATUS "Markdown code blocks: syntax highlighting with KSyntaxHighlighting ${KF6SyntaxHighlighting_VERSION}")
+    target_link_libraries(xqt-markdown PRIVATE KF6::SyntaxHighlighting)
+    target_compile_definitions(xqt-markdown PRIVATE XQT_HAVE_KSYNTAXHIGHLIGHTING)
+else()
+    message(STATUS "Markdown code blocks: no syntax highlighting (KF6SyntaxHighlighting not found)")
+endif()
 set_target_properties(xqt-markdown PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 
 if(XQT_BUILD_TESTS)
@@ -24,7 +36,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdLayoutTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdBoxTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdBoxTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdHighlightTest.cpp)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
     set_target_properties(xqt-markdown-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
     gtest_discover_tests(xqt-markdown-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS markdown)
