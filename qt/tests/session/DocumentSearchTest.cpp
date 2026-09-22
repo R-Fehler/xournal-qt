@@ -5,7 +5,9 @@
  */
 #include <memory>
 
+#include <QElapsedTimer>
 #include <QSignalSpy>
+#include <iostream>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -125,4 +127,28 @@ TEST_F(DocumentSearchTest, editsAreSearchedAgain) {
     ASSERT_TRUE(finished.wait(3000));
     EXPECT_EQ(s->search().hits().size(), 4u);
     EXPECT_EQ(s->search().hits()[1].page, 3u);
+}
+
+// XQT_BENCH_PDF=<pdf>: how long searching all its pages takes (poppler reads the text of every page)
+TEST_F(DocumentSearchTest, benchSearch) {
+    const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
+    if (pdf.isEmpty()) {
+        GTEST_SKIP() << "set XQT_BENCH_PDF";
+    }
+    auto r = DocumentSession::loadFile(fs::path(pdf.toStdString()));
+    ASSERT_TRUE(r.document) << r.error;
+    DocumentSession s(*app, std::move(r.document));
+    for (const QString& query: {QStringLiteral("the"), QStringLiteral("xyzzy")}) {
+        QElapsedTimer t;
+        t.start();
+        QSignalSpy finished(&s.search(), &DocumentSearch::finished);
+        QSignalSpy changed(&s.search(), &DocumentSearch::changed);
+        s.search().setQuery(query);
+        if (s.search().isRunning()) {
+            ASSERT_TRUE(finished.wait(120000));
+        }
+        std::cout << "\"" << query.toStdString() << "\" in " << s.getDocument()->getPageCount() << " pages: "
+                  << t.elapsed() << " ms, " << s.search().hits().size() << " hits, " << changed.count()
+                  << " updates of the views\n";
+    }
 }
