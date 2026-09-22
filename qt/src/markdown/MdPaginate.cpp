@@ -377,7 +377,8 @@ private:
 /// "start=N" of a continuation marker (0: none).
 unsigned startOf(std::string_view markerLine) {
     const auto at = markerLine.find("start=");
-    return at == std::string_view::npos ? 0 : static_cast<unsigned>(std::strtoul(markerLine.data() + at + 6, nullptr, 10));
+    return at == std::string_view::npos ? 0
+                                        : static_cast<unsigned>(std::strtoul(markerLine.data() + at + 6, nullptr, 10));
 }
 
 bool blankText(std::string_view s) { return s.find_first_not_of(" \t\r\n") == std::string_view::npos; }

@@ -134,7 +134,8 @@ TEST(MdPaginate, numberedListsGoOnWithTheirNumbers) {
     const Layout l = layout(parse(second), s);
     bool numbered = false;
     for (const Item& it: l.items) {
-        if (it.kind == Item::Kind::Text && std::string(pango_layout_get_text(it.layout.get())) == std::to_string(n) + ".") {
+        if (it.kind == Item::Kind::Text &&
+            std::string(pango_layout_get_text(it.layout.get())) == std::to_string(n) + ".") {
             numbered = true;
         }
     }
