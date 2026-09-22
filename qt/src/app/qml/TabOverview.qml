@@ -295,9 +295,9 @@ Popup {
                                 anchors.margins: 6
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
-                                // Kept by QML: the URL changes when the page does (its revision), so the picture
-                                // stays while the overview is open and is there at once when it opens again
-                                source: cell.thumbnail
+                                // Only while the overview is open (the cards of many tabs would keep their pictures
+                                // in memory); when it opens again the card shows its sketch until this is loaded
+                                source: overview.visible ? cell.thumbnail : ""
                                 sourceSize.width: Math.round(width * Screen.devicePixelRatio)
                             }
                         }
