@@ -53,10 +53,19 @@ void LayersModel::rebuild() {
             next.push_back(std::move(background));
         }
     }
-    beginResetModel();
-    entries = std::move(next);
-    endResetModel();
-    Q_EMIT changed();
+    // Only when the layers really changed: resetting the model makes QML build all its delegates again (7 ms), and
+    // this is called twice for every change of the current page (scrolling through a document).
+    if (next != entries) {
+        if (next.size() == entries.size()) {
+            entries = std::move(next);
+            Q_EMIT dataChanged(index(0), index(rowCount() - 1));
+        } else {
+            beginResetModel();
+            entries = std::move(next);
+            endResetModel();
+        }
+    }
+    Q_EMIT changed();  // the selected layer may be another one now
 }
 
 int LayersModel::rowCount(const QModelIndex& parent) const {

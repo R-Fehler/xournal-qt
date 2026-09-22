@@ -89,6 +89,7 @@ TEST(Chapters, comeFromTheDocumentWhenNoPdfHasThem) {
     c.insertPageAfter(1);
     auto* outline = qobject_cast<OutlineModel*>(c.outlineModel());
     ASSERT_NE(outline, nullptr);
+    outline->setRebuildDelay(10);  // (chapters written are read again once the writing paused)
     EXPECT_FALSE(outline->available()) << "an empty document has no contents";
 
     EXPECT_TRUE(c.addChapter(0, "Beginnings", 0));
@@ -112,6 +113,7 @@ TEST(Chapters, comeFromTheDocumentWhenNoPdfHasThem) {
     }
     EXPECT_TRUE(found);
     c.undo();
+    processEvents(40);
     EXPECT_EQ(outline->count(), 1) << "undo takes the chapter back";
 }
 
@@ -148,6 +150,34 @@ TEST(PageLinks, followTheirPagesWhenPagesChange) {
     // Deleting a page in front moves it up
     c.deletePage(1);
     EXPECT_EQ(raw->getText(), "see #Page:3 for the rest");
+}
+
+// Scrolling through a document changes the current page all the time. The layers of the new page are read again, but
+// the model must only be reset when they really differ: a reset makes QML build all its rows again (7 ms), which made
+// scrolling with the mouse on the scroll bar stutter.
+TEST(Layers, goingToAnotherPageDoesNotResetTheModel) {
+    AppController c;
+    c.newDocument();
+    c.insertPageAfter(0);
+    auto* m = qobject_cast<LayersModel*>(c.layersModel());
+    ASSERT_NE(m, nullptr);
+    ASSERT_EQ(m->rowCount(), 2);
+    DocumentSession* s = c.tabManager().currentSession();
+    s->setCurrentPageNo(0);  // (the inserted page is the current one)
+    QSignalSpy reset(m, &QAbstractItemModel::modelAboutToBeReset);
+    QSignalSpy changed(m, &LayersModel::changed);
+
+    s->setCurrentPageNo(1);
+    EXPECT_EQ(reset.count(), 0) << "the same layers: nothing to build again";
+    EXPECT_GE(changed.count(), 1) << "but the selected layer may be another one";
+    s->setCurrentPageNo(0);
+    EXPECT_EQ(reset.count(), 0);
+
+    m->addLayer(false);  // another layer: the rows do change
+    EXPECT_GE(reset.count(), 1);
+    EXPECT_EQ(m->rowCount(), 3);
+    s->setCurrentPageNo(1);
+    EXPECT_EQ(m->rowCount(), 2) << "that page has one layer";
 }
 
 TEST(Layers, listAddRenameHideMoveAndRemove) {

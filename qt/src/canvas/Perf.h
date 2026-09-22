@@ -42,7 +42,7 @@ public:
         Previews,
         CounterCount
     };
-    enum Timing { HitTest, VisibilityTime, SyncTime, TimingCount };
+    enum Timing { HitTest, VisibilityTime, CurrentPageTime, SyncTime, TimingCount };
 
     /// XQT_PERF=1
     static bool on();

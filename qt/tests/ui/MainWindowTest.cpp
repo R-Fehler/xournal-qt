@@ -2142,6 +2142,45 @@ TEST_F(MainWindowTest, tabOverviewHitPicturesStayWhenMoreHitsCome) {
     EXPECT_EQ(picture->property("status").toInt(), 1) << "there at once, not loaded again";
 }
 
+// XQT_BENCH_SCROLL=1: what one scroll change costs (the visible pages, the current page, the models, the sidebar
+// that follows) - with the page sidebar shown and without it.
+TEST_F(MainWindowTest, benchScrollCost) {
+    if (!qEnvironmentVariableIsSet("XQT_BENCH_SCROLL")) {
+        GTEST_SKIP() << "set XQT_BENCH_SCROLL=1";
+    }
+    auto& sketches = xqt::PageSketches::instance();
+    sketches.setDelays(0, 0);
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    controller->insertPages(11, 0, -1, false, 30);  // 41 pages
+    until([&] { return sketches.idle(); }, 30000);
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    view->setVisibilityDelay(0);  // (measure every change)
+    xqt::CanvasMemory::instance().planNow();
+    wait(2000);
+    for (const bool sidebar: {true, false}) {
+        window->setProperty("sidebarShown", sidebar);
+        wait(300);
+        const quint64 before = view->visibilityUpdates();
+        QElapsedTimer t;
+        t.start();
+        qint64 worst = 0;
+        double y = 0;
+        for (int i = 0; i < 40; ++i) {  // (as if the scroll bar were dragged)
+            y += 700;
+            QElapsedTimer step;
+            step.start();
+            view->getViewController().setScrollPosition(QPointF(0, y));
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+            worst = std::max(worst, step.elapsed());
+        }
+        const quint64 updates = view->visibilityUpdates() - before;
+        std::cout << (sidebar ? "with the sidebar" : "without the sidebar") << ": " << t.elapsed() << " ms for "
+                  << updates << " scroll changes (" << (updates ? t.elapsed() / static_cast<qint64>(updates) : 0)
+                  << " ms each, worst step " << worst << " ms)\n";
+    }
+    sketches.setDelays(400, 1500);
+}
+
 // The overview of open documents searches them like the library: extended, with the pages that have hits (tap one
 // to open the document there), and by name only.
 TEST_F(MainWindowTest, tabOverviewHasTheExtendedAndTheNameSearch) {

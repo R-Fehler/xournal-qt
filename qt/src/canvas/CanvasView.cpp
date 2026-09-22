@@ -1185,7 +1185,7 @@ void CanvasView::refreshLayout() {
 }
 
 void CanvasView::viewChanged() {
-    constexpr int EVERY_MS = 8;  // (about one frame)
+    const int EVERY_MS = visibilityDelay;  // (about one frame)
     // A jump (to a page, a fit, a new size) right away; plain scrolling and zooming send more changes than there are
     // frames, and looking at the visible pages tells the models and moves the sidebar along.
     if (viewController.takeJumped() || !sinceVisibility.isValid() || sinceVisibility.elapsed() >= EVERY_MS) {
@@ -1223,8 +1223,12 @@ void CanvasView::updateVisibility() {
             mostVisible = i;
         }
     }
-    // Upstream Layout::updateVisibility: the most visible page becomes the current one.
-    session.setCurrentPageNo(mostVisible);
+    // Upstream Layout::updateVisibility: the most visible page becomes the current one (this tells the models, and
+    // the page sidebar follows).
+    {
+        const PerfScope measure(Perf::CurrentPageTime);
+        session.setCurrentPageNo(mostVisible);
+    }
     if (shown) {
         CanvasMemory::instance().used(this);  // (plans what to keep and render in advance once this pauses)
     }

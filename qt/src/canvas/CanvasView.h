@@ -91,6 +91,8 @@ public:
     qint64 trimTo(qint64 allowed);
     /// How often the visible pages were looked at (tests: scroll changes are collected)
     quint64 visibilityUpdates() const { return visibilityCount; }
+    /// How long scroll changes are collected before the visible pages are looked at (ms; tests)
+    void setVisibilityDelay(int ms) { visibilityDelay = ms; }
     /// Pages from `first` to `last` keep their buffers (the window of the last planCache; tests)
     std::pair<size_t, size_t> cacheWindow() const { return window; }
 
@@ -286,6 +288,7 @@ private:
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     std::pair<size_t, size_t> window{1, 0};
+    int visibilityDelay = 8;
     QElapsedTimer sinceVisibility;
     QTimer visibilityTimer;
     /// Visibility updates so far (tests)

@@ -87,6 +87,9 @@ private:
         bool visible = true;
         size_t id = 0;  ///< 0: background
         int elements = 0;
+        bool operator==(const Entry& o) const {
+            return name == o.name && visible == o.visible && id == o.id && elements == o.elements;
+        }
     };
     DocumentSession* session = nullptr;
     std::vector<Entry> entries;

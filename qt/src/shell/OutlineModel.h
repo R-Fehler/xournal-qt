@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <QAbstractListModel>
+#include <QTimer>
 #include <QString>
 
 #include "model/DocumentListener.h"
@@ -30,6 +31,8 @@ class OutlineModel final: public QAbstractListModel, public DocumentListener {
     /// The visible entry the current page belongs to (-1: none)
     Q_PROPERTY(int currentRow READ currentRow NOTIFY currentRowChanged)
 public:
+    /// How long content changes are collected before the chapters are read again (ms; tests)
+    void setRebuildDelay(int ms) { rebuildTimer.setInterval(ms); }
     enum Roles {
         TitleRole = Qt::UserRole + 1,
         LevelRole,        ///< 0: top level
@@ -84,6 +87,7 @@ private:
     void relayout();
     void updateCurrent();
 
+    QTimer rebuildTimer;  ///< content changes (writing) are collected: a rebuild reads the pages
     DocumentSession* session = nullptr;
     std::vector<Entry> all;
     QMetaObject::Connection contentConnection;

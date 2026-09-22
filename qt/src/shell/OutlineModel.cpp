@@ -13,7 +13,11 @@
 
 namespace xqt {
 
-OutlineModel::OutlineModel(QObject* parent): QAbstractListModel(parent) {}
+OutlineModel::OutlineModel(QObject* parent): QAbstractListModel(parent) {
+    rebuildTimer.setSingleShot(true);
+    rebuildTimer.setInterval(300);
+    connect(&rebuildTimer, &QTimer::timeout, this, &OutlineModel::rebuild);
+}
 
 OutlineModel::~OutlineModel() { setSession(nullptr); }
 
@@ -31,7 +35,7 @@ void OutlineModel::setSession(DocumentSession* s) {
         // Chapters that the document carries itself change with it (a heading written, undone, erased)
         contentConnection = connect(session, &DocumentSession::pageContentChanged, this, [this](qulonglong) {
             if (ownChapters || all.empty()) {
-                rebuild();
+                rebuildTimer.start();  // once the writing paused
             }
         });
     }
