@@ -24,10 +24,7 @@ Popup {
     height: parent ? parent.height : 600
     padding: 0
     closePolicy: Popup.CloseOnEscape
-    // Thumbnails are rendered again each time the overview opens (their URLs change with this counter).
-    property int generation: 0
     onAboutToShow: {
-        generation++
         grid.currentIndex = app.currentTab
         grid.forceActiveFocus()
     }
@@ -298,12 +295,9 @@ Popup {
                                 anchors.margins: 6
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
-                                cache: false
-                                // The stored preview of the library (on the title page, saved) is loaded as it is;
-                                // a drawn page gets the generation, so that it is drawn anew each time
-                                source: !overview.visible ? ""
-                                        : cell.thumbnail.startsWith("image://preview/") ? cell.thumbnail
-                                        : cell.thumbnail + "/" + overview.generation
+                                // Kept by QML: the URL changes when the page does (its revision), so the picture
+                                // stays while the overview is open and is there at once when it opens again
+                                source: cell.thumbnail
                                 sourceSize.width: Math.round(width * Screen.devicePixelRatio)
                             }
                         }
@@ -387,11 +381,13 @@ Popup {
                                         border.color: hitPage.hovered ? Material.accentColor : "#d5d8dc"
                                         Image {
                                             id: pageImage
+                                            objectName: "overviewHitPagePicture"
                                             anchors.fill: parent
                                             anchors.margins: 1
                                             asynchronous: true
-                                            cache: false
-                                            source: overview.visible ? hitPage.modelData.thumbnail + "/" + overview.generation : ""
+                                            // Kept by QML (as in the library): finding another hit rebuilds this
+                                            // list, and the pictures must not blink away
+                                            source: hitPage.modelData.thumbnail
                                             sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
                                         }
                                         Repeater {

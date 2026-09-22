@@ -11,9 +11,8 @@
 #pragma once
 
 #include <memory>
+#include <set>
 #include <vector>
-
-#include <QTimer>
 
 #include <QAbstractListModel>
 #include <QTimer>
@@ -95,8 +94,14 @@ private:
     void tabDataChanged(const DocumentSession* s, const QList<int>& roles);
     void backgroundChanged(int oldCurrent);
 
+    /// Hits found while a search runs are told in one go now and then (rebuilding the list of pages with hits
+    /// makes the overview build its previews again).
+    void searchChanged(const DocumentSession* s, bool finished);
+
     AppContext& app;
     std::vector<Tab> tabs;
+    QTimer searchRefresh;
+    std::set<const DocumentSession*> searchPending;
     int current = -1;
 };
 

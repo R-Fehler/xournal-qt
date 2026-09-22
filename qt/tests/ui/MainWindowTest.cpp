@@ -2106,6 +2106,42 @@ TEST_F(MainWindowTest, singleKeysTakeTheTools) {
 }
 
 // Ctrl+Shift+F searches all open documents, Ctrl+Alt+F the library - from anywhere.
+// While a search runs, every hit found rebuilds the list of pages with hits. Their pictures must stay (QML keeps
+// them by their URL), not blink away and be asked for again.
+TEST_F(MainWindowTest, tabOverviewHitPicturesStayWhenMoreHitsCome) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    QObject* overview = find("tabOverview");
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    auto running = [&](int row) { return tabs->index(row, 0).data(xqt::TabManager::SearchRunningRole).toBool(); };
+    type("page");
+    key(Qt::Key_Return);
+    ASSERT_TRUE(waitFor([&] { return !running(0) && !running(1); }));
+    if (!overview->property("extendedView").toBool()) {
+        click(find<QQuickItem>("overviewExtendedButton"));
+    }
+    QQuickItem* picture = nullptr;
+    until([&] { return (picture = findItem("overviewHitPagePicture")) != nullptr && picture->isVisible(); }, 5000);
+    ASSERT_NE(picture, nullptr);
+    const QString source = picture->property("source").toUrl().toString();
+    EXPECT_TRUE(source.startsWith("image://thumbnail/")) << source.toStdString();
+    EXPECT_TRUE(picture->property("cache").toBool()) << "kept by QML: every hit builds the list again";
+    EXPECT_EQ(source.mid(QString("image://thumbnail/").size()).count('/'), 2)
+            << "the page and its revision only, nothing that changes while the overview is open: " << source.toStdString();
+    until([&] { return picture->property("status").toInt() == 1 /* Image.Ready */; });
+    ASSERT_EQ(picture->property("status").toInt(), 1);
+
+    // As if another hit came: the list is built again
+    key(Qt::Key_Return);
+    wait(300);
+    picture = findItem("overviewHitPagePicture");
+    ASSERT_NE(picture, nullptr);
+    EXPECT_EQ(picture->property("source").toUrl().toString(), source) << "the same page: the same URL";
+    EXPECT_EQ(picture->property("status").toInt(), 1) << "there at once, not loaded again";
+}
+
 // The overview of open documents searches them like the library: extended, with the pages that have hits (tap one
 // to open the document there), and by name only.
 TEST_F(MainWindowTest, tabOverviewHasTheExtendedAndTheNameSearch) {

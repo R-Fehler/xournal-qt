@@ -21,7 +21,26 @@
 
 namespace xqt {
 
+void TabManager::searchChanged(const DocumentSession* s, bool finished) {
+    if (finished) {
+        searchPending.erase(s);
+        tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole});
+        return;
+    }
+    searchPending.insert(s);
+    if (!searchRefresh.isActive()) {
+        searchRefresh.start();
+    }
+}
+
 TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(parent), app(app) {
+    searchRefresh.setSingleShot(true);
+    searchRefresh.setInterval(150);
+    connect(&searchRefresh, &QTimer::timeout, this, [this] {
+        for (const DocumentSession* s: std::exchange(searchPending, {})) {
+            tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole});
+        }
+    });
     connect(&PageSketches::instance(), &PageSketches::changed, this, [this](qulonglong id) {
         for (const auto& t: tabs) {
             if (ThumbnailProvider::idOf(t.session.get()) == id) {
@@ -45,6 +64,8 @@ void rememberPlace(const DocumentSession* s) {
 }  // namespace
 
 TabManager::~TabManager() {
+    searchRefresh.stop();
+    searchPending.clear();
     beginResetModel();
     for (auto& t: tabs) {
         rememberPlace(t.session.get());
@@ -169,9 +190,8 @@ void TabManager::listenTo(Tab& tab) {
     tab.view->setPreviewSource([id, s](size_t page) { return PageSketches::instance().preview(id, s->pageId(page)); });
     auto thumbnailChanged = [this, s] { tabDataChanged(s, {ThumbnailRole, PageCountRole, SketchRole}); };
     connect(s, &DocumentSession::pageRevisionsChanged, this, thumbnailChanged);
-    auto searchChanged = [this, s] { tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole}); };
-    connect(&s->search(), &DocumentSearch::changed, this, searchChanged);
-    connect(&s->search(), &DocumentSearch::finished, this, searchChanged);
+    connect(&s->search(), &DocumentSearch::changed, this, [this, s] { searchChanged(s, false); });
+    connect(&s->search(), &DocumentSearch::finished, this, [this, s] { searchChanged(s, true); });
     connect(s, &DocumentSession::currentPageChanged, this, thumbnailChanged);
 }
 
@@ -198,6 +218,7 @@ std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
     DocumentSession* s = tabs[static_cast<size_t>(index)].session.get();
     disconnect(s, nullptr, this, nullptr);
     disconnect(&s->search(), nullptr, this, nullptr);
+    searchPending.erase(s);
 
     std::unique_ptr<Tab> tab;
     beginRemoveRows(QModelIndex(), index, index);
@@ -228,6 +249,7 @@ void TabManager::closeTab(int index) {
     }
     const bool wasCurrent = index == current;
     rememberPlace(tabs[static_cast<size_t>(index)].session.get());
+    searchPending.erase(tabs[static_cast<size_t>(index)].session.get());
     beginRemoveRows(QModelIndex(), index, index);
     Tab tab = std::move(tabs[static_cast<size_t>(index)]);
     tabs.erase(tabs.begin() + index);
