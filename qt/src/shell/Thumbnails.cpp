@@ -298,9 +298,10 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
     const int asked = requestedSize.width() > 0 ? requestedSize.width() : 160;
     const int width = (asked + WIDTH_STEP - 1) / WIDTH_STEP * WIDTH_STEP;
 
-    // Kept already (that width, or a bigger one to scale down), or small enough for the sketch: no drawing at all
+    // Kept already (that width, or a bigger one to scale down), or small enough for the page's preview or sketch: no
+    // drawing at all
     QImage kept = cache().find(key, width);
-    if (kept.isNull() && width <= PageSketches::instance().width()) {
+    if (kept.isNull() && width <= std::max(PageSketches::instance().previewWidth(), PageSketches::instance().width())) {
         if (QImage sketch = PageSketches::instance().imageOfRevision(sessionId, revision); sketch.width() >= width) {
             kept = sketch.width() == width ? sketch : sketch.scaledToWidth(width, Qt::SmoothTransformation);
         }

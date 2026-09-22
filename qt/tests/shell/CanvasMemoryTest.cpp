@@ -74,7 +74,7 @@ TEST_F(CanvasMemoryTest, theCurrentDocumentRendersAheadMoreThanBehind) {
     AppController c;
     CanvasView* view = openPages(c, 20);
     view->setShown(true);
-    CanvasMemory::instance().setLimit(pageBytes(view) * 12);  // the only document: all of it
+    CanvasMemory::instance().setLimit(pageBytes(view) * 12);  // the only document: all of it (but for previews)
     CanvasMemory::instance().planNow();
     settle(c);
 
@@ -98,7 +98,8 @@ TEST_F(CanvasMemoryTest, atTheStartTheRestGoesToThePagesAfter) {
     CanvasMemory::instance().planNow();
     settle(c);
     EXPECT_EQ(view->cacheWindow().first, 0u);
-    EXPECT_GE(renderedCount(view), 11u) << "no pages before: all goes to those after";
+    const auto fit = static_cast<size_t>(CanvasMemory::instance().pagesLimit() / pageBytes(view));  // (10)
+    EXPECT_GE(renderedCount(view), fit) << "no pages before: all goes to those after";
 }
 
 TEST_F(CanvasMemoryTest, theCurrentDocumentTakes70PercentWhenOthersAreOpen) {
@@ -111,8 +112,9 @@ TEST_F(CanvasMemoryTest, theCurrentDocumentTakes70PercentWhenOthersAreOpen) {
     CanvasMemory::instance().setLimit(limit);
     CanvasMemory::instance().planNow();
     settle(c);
-    EXPECT_LE(view->bufferBytes(), limit * 7 / 10);
-    EXPECT_GE(view->bufferBytes(), limit * 7 / 10 - 2 * pageBytes(view));
+    const qint64 pages = CanvasMemory::instance().pagesLimit();  // (a tenth is for previews)
+    EXPECT_LE(view->bufferBytes(), pages * 7 / 10);
+    EXPECT_GE(view->bufferBytes(), pages * 7 / 10 - 2 * pageBytes(view));
 }
 
 TEST_F(CanvasMemoryTest, theDocumentUsedLongestAgoGivesUpItsPagesFirst) {
@@ -121,7 +123,7 @@ TEST_F(CanvasMemoryTest, theDocumentUsedLongestAgoGivesUpItsPagesFirst) {
     CanvasView* b = openPages(c, 20);
     CanvasView* cView = openPages(c, 20);
     const qint64 page = pageBytes(a);
-    CanvasMemory::instance().setLimit(page * 30);  // the current one: 21 pages
+    CanvasMemory::instance().setLimit(page * 30);  // pages: 27; the current one: 18
     for (CanvasView* v: {a, b, cView}) {
         v->setShown(true);  // (as if switched to in turn)
         CanvasMemory::instance().planNow();

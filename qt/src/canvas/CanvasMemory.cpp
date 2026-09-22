@@ -35,6 +35,7 @@ CanvasMemory::CanvasMemory(): max(defaultLimit()) {
 void CanvasMemory::setLimit(qint64 bytes) {
     max = std::max<qint64>(0, bytes);
     planTimer.start(0);
+    Q_EMIT limitChanged();
 }
 
 void CanvasMemory::add(CanvasView* view) {
@@ -76,8 +77,9 @@ void CanvasMemory::plan() {
     }
     std::vector<View> order = views;
     std::stable_sort(order.begin(), order.end(), [](const View& a, const View& b) { return a.used > b.used; });
-    const auto share = static_cast<qint64>(static_cast<double>(max) * (order.size() > 1 ? CURRENT_SHARE : 1.0));
-    qint64 left = max - order.front().view->planCache(share);
+    const qint64 pages = pagesLimit();
+    const auto share = static_cast<qint64>(static_cast<double>(pages) * (order.size() > 1 ? CURRENT_SHARE : 1.0));
+    qint64 left = pages - order.front().view->planCache(share);
     for (size_t i = 1; i < order.size(); ++i) {
         left -= order[i].view->trimTo(std::max<qint64>(0, left));
     }

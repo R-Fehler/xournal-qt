@@ -26,6 +26,7 @@ TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(par
         for (const auto& t: tabs) {
             if (ThumbnailProvider::idOf(t.session.get()) == id) {
                 tabDataChanged(t.session.get(), {SketchRole});
+                t.view->previewsChanged();
             }
         }
     });
@@ -163,7 +164,9 @@ void TabManager::listenTo(Tab& tab) {
     connect(s, &DocumentSession::modifiedChanged, this, [this, s] { tabDataChanged(s, {ModifiedRole, ThumbnailRole}); });
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
-    ThumbnailProvider::registerSession(s);
+    const quint64 id = ThumbnailProvider::registerSession(s);
+    // Pages not rendered yet show their preview on the canvas
+    tab.view->setPreviewSource([id, s](size_t page) { return PageSketches::instance().preview(id, s->pageId(page)); });
     auto thumbnailChanged = [this, s] { tabDataChanged(s, {ThumbnailRole, PageCountRole, SketchRole}); };
     connect(s, &DocumentSession::pageRevisionsChanged, this, thumbnailChanged);
     auto searchChanged = [this, s] { tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole}); };

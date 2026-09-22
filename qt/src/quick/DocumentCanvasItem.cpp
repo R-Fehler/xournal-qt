@@ -62,12 +62,43 @@ public:
         tiles.clear();
         cols = rows = 0;
     }
+    /// The page's preview (drawn in advance) over the whole page, until it is rendered; null image: none
+    void showPreview(QQuickWindow* window, const QImage& image, QSizeF size) {
+        if (image.isNull()) {
+            hidePreview();
+            return;
+        }
+        if (!preview) {
+            preview = new TileNode;
+            preview->setFiltering(QSGTexture::Linear);
+        }
+        if (previewKey != image.cacheKey()) {
+            QSGTexture* previous = preview->texture();
+            preview->setTexture(window->createTextureFromImage(image, QQuickWindow::TextureIsOpaque));
+            delete previous;
+            previewKey = image.cacheKey();
+        }
+        preview->setRect(QRectF(QPointF(0, 0), size));
+        if (!preview->parent()) {
+            insertChildNodeBefore(preview, searchRoot);  // (with its texture: the software renderer needs one)
+        }
+    }
+    void hidePreview() {
+        if (preview) {
+            removeChildNode(preview);
+            delete preview;
+            preview = nullptr;
+            previewKey = 0;
+        }
+    }
     QSGSimpleRectNode* shadow;
     QSGSimpleRectNode* placeholder;
     QSGTransformNode* searchRoot;
     quint64 searchRevision = ~quint64(0);
     double searchScale = 0;
     std::vector<TileNode*> tiles;
+    TileNode* preview = nullptr;
+    qint64 previewKey = 0;
     int cols = 0, rows = 0;
     double bufferZoom = 0;
     double dpiScale = 0;
@@ -542,6 +573,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     const auto [first, last] = canvasView->visiblePages();
 
     std::unordered_map<const xqt::CanvasPage*, PageNode*> keep;
+    int previews = 0;
     for (size_t i = first; i <= last && i < canvasView->pageCount(); ++i) {
         xqt::CanvasPage* page = canvasView->getPage(i);
         PageNode* node = nullptr;
@@ -573,8 +605,12 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             node->setMatrix(m);
             node->placeholder->setRect(QRectF(QPointF(0, 0), r.size()));
             node->shadow->setRect(QRectF(QPointF(2, 2), r.size()));
+            // Not rendered yet: its preview (drawn in advance, never in front of the page), else white
+            node->showPreview(window(), canvasView->preview(i), r.size());
+            previews += node->preview != nullptr;
             continue;
         }
+        node->hidePreview();
         const double scale = zoom / info.zoom;
         m.scale(static_cast<float>(scale), static_cast<float>(scale));
         node->setMatrix(m);
@@ -637,6 +673,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         delete node;
     }
     root->pages = std::move(keep);
+    shownPreviews = previews;
     updateSelectionNode(root, zoom, dpr);
 
     if (auto h = input ? input->hoverPosition() : std::nullopt) {

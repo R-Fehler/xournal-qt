@@ -15,7 +15,8 @@
  *    from a bigger one that is kept instead of being drawn;
  *  - the thumbnail asked for last is drawn first (what is in view now), and one that is not wanted any more (it was
  *    scrolled away) is not drawn at all;
- *  - a small one comes from the page's sketch (PageSketches), and every drawn one gives the page its sketch.
+ *  - one up to the width of the page's preview comes from it (PageSketches), and every drawn one gives the page its
+ *    sketch (and preview).
  * The memory for page previews is shared: three quarters for these, one quarter for the sketches.
  *
  * @license GNU GPLv2 or later

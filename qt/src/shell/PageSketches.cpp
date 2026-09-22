@@ -12,6 +12,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 
+#include "CanvasMemory.h"
 #include "Thumbnails.h"
 
 namespace xqt {
@@ -38,7 +39,59 @@ PageSketches& PageSketches::instance() {
     return *sketches;
 }
 
-PageSketches::PageSketches(): budget(ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024 / 4) {
+// --- Tier (under mtx) ------------------------------------------------------------------------------------------------
+
+auto PageSketches::Tier::find(quint64 session, quint64 pageId) const -> const Picture* {
+    if (auto s = pictures.find(session); s != pictures.end()) {
+        if (auto it = s->second.find(pageId); it != s->second.end()) {
+            return &it->second;
+        }
+    }
+    return nullptr;
+}
+
+void PageSketches::Tier::put(quint64 session, quint64 pageId, quint64 revision, QImage image) {
+    auto s = pictures.find(session);
+    if (s == pictures.end()) {
+        return;  // closed
+    }
+    Picture& picture = s->second[pageId];
+    used -= picture.image.sizeInBytes();
+    picture = Picture{revision, std::move(image)};
+    used += picture.image.sizeInBytes();
+}
+
+void PageSketches::Tier::dropSession(quint64 session) {
+    if (auto it = pictures.find(session); it != pictures.end()) {
+        for (const auto& [page, picture]: it->second) {
+            used -= picture.image.sizeInBytes();
+        }
+        pictures.erase(it);
+    }
+}
+
+void PageSketches::Tier::keepOnly(quint64 session, const std::set<quint64>& keep) {
+    auto s = pictures.find(session);
+    if (s == pictures.end()) {
+        return;
+    }
+    for (auto it = s->second.begin(); it != s->second.end();) {
+        if (!keep.count(it->first)) {  // a page that is gone, or beyond the budget
+            used -= it->second.image.sizeInBytes();
+            it = s->second.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+// --- PageSketches ----------------------------------------------------------------------------------------------------
+
+PageSketches::PageSketches() {
+    sketches.budget = ThumbnailProvider::DEFAULT_CACHE_MB * 1024 * 1024 / 4;
+    sketches.level = WIDTHS[0];
+    previews.budget = CanvasMemory::instance().previewBudget();
+    previews.level = PREVIEW_WIDTHS[0];
     planTimer.setSingleShot(true);
     connect(&planTimer, &QTimer::timeout, this, &PageSketches::plan);
     editTimer.setSingleShot(true);
@@ -51,6 +104,8 @@ PageSketches::PageSketches(): budget(ThumbnailProvider::DEFAULT_CACHE_MB * 1024 
             Q_EMIT changed(id);
         }
     });
+    // The previews take a part of the memory for rendered pages
+    connect(&CanvasMemory::instance(), &CanvasMemory::limitChanged, this, [this] { planSoon(shownDelay); });
 }
 
 PageSketches::~PageSketches() = default;
@@ -64,9 +119,10 @@ void PageSketches::add(quint64 id, DocumentSession* session) {
     sessions.push_back(Session{id, session, 0});
     {
         std::lock_guard lock(mtx);
-        sketches[id];  // (sharp thumbnails give sketches from now on)
+        sketches.pictures[id];  // (sharp thumbnails give pictures from now on)
+        previews.pictures[id];
     }
-    // Edited pages are sketched again when the edits paused (drawing does not keep the worker busy)
+    // Edited pages are drawn again when the edits paused (drawing does not keep the workers busy)
     connect(session, &DocumentSession::pageRevisionsChanged, this, [this] { editTimer.start(); });
     // (outwards from where the reader is now)
     connect(session, &DocumentSession::currentPageChanged, this, [this] { planSoon(shownDelay); });
@@ -85,15 +141,11 @@ void PageSketches::remove(quint64 id) {
     }
     {
         std::lock_guard lock(mtx);
-        if (auto it = sketches.find(id); it != sketches.end()) {
-            for (const auto& [page, sketch]: it->second) {
-                used -= sketch.image.sizeInBytes();
-            }
-            sketches.erase(it);
-        }
+        sketches.dropSession(id);
+        previews.dropSession(id);
         pdfCopies.erase(id);
     }
-    planSoon(shownDelay);  // the others may get sharper sketches now
+    planSoon(shownDelay);  // the others may get bigger pictures now
 }
 
 void PageSketches::focus(quint64 id) {
@@ -150,55 +202,62 @@ void PageSketches::plan() {
         documents.emplace_back(s->id, std::move(pages));
     }
 
-    // The width: the biggest at which all pages fit
-    const qint64 b = budget;
-    int w = WIDTHS.back();
-    for (int candidate: WIDTHS) {
-        qint64 total = 0;
-        for (const auto& [id, pages]: documents) {
-            for (const Page& p: pages) {
-                total += bytesAt(candidate, p.aspect);
+    // The widths: the biggest at which all pages fit
+    auto levelFor = [&](const auto& widths, qint64 budget) {
+        for (int candidate: widths) {
+            qint64 total = 0;
+            for (const auto& [id, pages]: documents) {
+                for (const Page& p: pages) {
+                    total += bytesAt(candidate, p.aspect);
+                }
+            }
+            if (total <= budget) {
+                return candidate;
             }
         }
-        if (total <= b) {
-            w = candidate;
-            break;
-        }
-    }
-    level = w;
+        return widths.back();
+    };
+    previews.budget = CanvasMemory::instance().previewBudget();
+    const qint64 sb = sketches.budget, pb = previews.budget;
+    const int sl = levelFor(WIDTHS, sb), pl = levelFor(PREVIEW_WIDTHS, pb);
+    sketches.level = sl;
+    previews.level = pl;
 
-    // Who gets a sketch: in that order, while the budget lasts; the others lose theirs
-    std::vector<Job> missing, outdated;
-    qint64 planned = 0;
+    // Who gets pictures: in that order, while the budget lasts; the others lose theirs
+    std::vector<Job> missingSketch, missingPreview, outdated;
+    qint64 plannedS = 0, plannedP = 0;
     {
         std::lock_guard lock(mtx);
         for (const auto& [id, pages]: documents) {
-            auto& mine = sketches[id];
-            std::set<quint64> keep;
+            std::set<quint64> keepS, keepP;
             for (const Page& p: pages) {
-                planned += bytesAt(w, p.aspect);
-                if (planned > b) {
-                    break;
+                const bool wantS = (plannedS += bytesAt(sl, p.aspect)) <= sb;
+                const bool wantP = (plannedP += bytesAt(pl, p.aspect)) <= pb;
+                if (wantS) {
+                    keepS.insert(p.id);
                 }
-                keep.insert(p.id);
-                auto it = mine.find(p.id);
-                if (it == mine.end()) {
-                    missing.push_back(Job{id, p.id, p.revision});
-                } else if (it->second.revision != p.revision || it->second.image.width() != w) {
-                    outdated.push_back(Job{id, p.id, p.revision});
+                if (wantP) {
+                    keepP.insert(p.id);
+                }
+                const Picture* s = sketches.find(id, p.id);
+                const Picture* v = previews.find(id, p.id);
+                const bool sOk = s && s->revision == p.revision && s->image.width() == sl;
+                const bool pOk = v && v->revision == p.revision && v->image.width() == pl;
+                const Job job{id, p.id, p.revision, wantP};
+                if (wantS && !s) {
+                    missingSketch.push_back(job);
+                } else if (wantP && !v) {
+                    missingPreview.push_back(job);
+                } else if ((wantS && !sOk) || (wantP && !pOk)) {
+                    outdated.push_back(job);
                 }
             }
-            for (auto it = mine.begin(); it != mine.end();) {
-                if (!keep.count(it->first)) {  // a page that is gone, or beyond the budget
-                    used -= it->second.image.sizeInBytes();
-                    it = mine.erase(it);
-                } else {
-                    ++it;
-                }
-            }
+            sketches.keepOnly(id, keepS);
+            previews.keepOnly(id, keepP);
         }
     }
-    jobs.assign(missing.begin(), missing.end());
+    jobs.assign(missingSketch.begin(), missingSketch.end());
+    jobs.insert(jobs.end(), missingPreview.begin(), missingPreview.end());
     jobs.insert(jobs.end(), outdated.begin(), outdated.end());
     next();
 }
@@ -207,21 +266,25 @@ void PageSketches::next() {
     while (running < WORKERS && !jobs.empty()) {
         const Job job = jobs.front();
         jobs.pop_front();
-        const int w = level;
-        QImage from;  // its sketch of this revision, if bigger
+        const int sl = sketches.level, pl = previews.level;
+        const int target = job.preview ? pl : sl;
+        QImage from;  // a picture of this revision at least as big
         {
             std::lock_guard lock(mtx);
-            auto s = sketches.find(job.session);
-            if (s == sketches.end()) {
+            if (!sketches.pictures.count(job.session)) {
                 continue;  // closed
             }
-            if (auto it = s->second.find(job.pageId); it != s->second.end() && it->second.revision == job.revision) {
-                if (it->second.image.width() == w) {
-                    continue;  // made from a sharp thumbnail meanwhile
-                }
-                if (it->second.image.width() > w) {
-                    from = it->second.image;
-                }
+            const Picture* s = sketches.find(job.session, job.pageId);
+            const Picture* v = previews.find(job.session, job.pageId);
+            const bool sOk = s && s->revision == job.revision && s->image.width() == sl;
+            const bool pOk = v && v->revision == job.revision && v->image.width() == pl;
+            if (sOk && (!job.preview || pOk)) {
+                continue;  // made from a sharp thumbnail meanwhile
+            }
+            if (v && v->revision == job.revision && v->image.width() >= target) {
+                from = v->image;
+            } else if (s && s->revision == job.revision && s->image.width() >= target) {
+                from = s->image;
             }
         }
         DocumentSession* session = ThumbnailProvider::acquireSession(job.session);
@@ -239,20 +302,21 @@ void PageSketches::next() {
             }
         }
         ++running;
-        sketchPool(WORKERS).start(QRunnable::create([this, job, w, session, from, pdfPath, pdfPages] {
-            QImage img;
-            if (!from.isNull()) {
-                img = from.scaledToWidth(w, Qt::SmoothTransformation);
-            } else if (QImage kept = ThumbnailProvider::keptImage(job.session, job.revision, w); !kept.isNull()) {
-                img = kept.scaledToWidth(w, Qt::SmoothTransformation);
-            } else if (auto stamp = session->pageOfRevision(job.revision)) {  // (else changed meanwhile)
-                auto pdf = takePdf(job.session, pdfPath, pdfPages);
-                img = ThumbnailProvider::renderPage(*session->getDocument(), stamp->page, w, pdf.get());
-                givePdf(job.session, pdfPath, std::move(pdf));
-                ++draws;
+        sketchPool(WORKERS).start(QRunnable::create([this, job, target, session, from, pdfPath, pdfPages] {
+            QImage img = from;
+            if (img.isNull()) {
+                img = ThumbnailProvider::keptImage(job.session, job.revision, target);
+            }
+            if (img.isNull()) {
+                if (auto stamp = session->pageOfRevision(job.revision)) {  // (else changed meanwhile)
+                    auto pdf = takePdf(job.session, pdfPath, pdfPages);
+                    img = ThumbnailProvider::renderPage(*session->getDocument(), stamp->page, target, pdf.get());
+                    givePdf(job.session, pdfPath, std::move(pdf));
+                    ++draws;
+                }
             }
             if (!img.isNull()) {
-                store(job.session, job.pageId, job.revision, img);
+                store(job.session, job.pageId, job.revision, img, job.preview);
             }
             ThumbnailProvider::releaseSession(job.session);
             QMetaObject::invokeMethod(
@@ -262,7 +326,7 @@ void PageSketches::next() {
                         next();
                         if (!running && jobs.empty()) {
                             std::lock_guard lock(mtx);
-                            pdfCopies.clear();  // all sketched: the instances are not needed any more
+                            pdfCopies.clear();  // all drawn: the instances are not needed any more
                         }
                     },
                     Qt::QueuedConnection);
@@ -306,18 +370,19 @@ void PageSketches::givePdf(quint64 session, const fs::path& path, std::unique_pt
     }
 }
 
-void PageSketches::store(quint64 session, quint64 pageId, quint64 revision, const QImage& image) {
-    QImage small = image.format() == QImage::Format_RGB16 ? image : image.convertToFormat(QImage::Format_RGB16);
+void PageSketches::store(quint64 session, quint64 pageId, quint64 revision, const QImage& image, bool preview) {
+    auto scaled = [&image](int width) {
+        QImage img = image.width() == width ? image : image.scaledToWidth(width, Qt::SmoothTransformation);
+        return img.format() == QImage::Format_RGB16 ? img : img.convertToFormat(QImage::Format_RGB16);
+    };
+    QImage p = preview ? scaled(previews.level) : QImage();
+    QImage s = scaled(sketches.level);
     {
         std::lock_guard lock(mtx);
-        auto s = sketches.find(session);
-        if (s == sketches.end()) {
-            return;
+        if (preview) {
+            previews.put(session, pageId, revision, std::move(p));
         }
-        Sketch& sketch = s->second[pageId];
-        used -= sketch.image.sizeInBytes();
-        sketch = Sketch{revision, std::move(small)};
-        used += sketch.image.sizeInBytes();
+        sketches.put(session, pageId, revision, std::move(s));
     }
     QMetaObject::invokeMethod(this, [this, session] { announce(session); }, Qt::QueuedConnection);
 }
@@ -330,53 +395,60 @@ void PageSketches::announce(quint64 session) {
 }
 
 void PageSketches::offer(quint64 session, quint64 pageId, quint64 revision, const QImage& sharp) {
-    const int w = level;
-    if (sharp.isNull() || sharp.width() < w) {
+    const int sl = sketches.level, pl = previews.level;
+    if (sharp.isNull() || sharp.width() < sl) {
         return;
     }
+    const double aspect = double(sharp.height()) / sharp.width();
+    bool preview = false;
     {
         std::lock_guard lock(mtx);
-        auto s = sketches.find(session);
-        if (s == sketches.end()) {
+        if (!sketches.pictures.count(session)) {
             return;
         }
-        auto it = s->second.find(pageId);
-        if (it != s->second.end() && it->second.revision == revision && it->second.image.width() == w) {
-            return;  // has it
+        const Picture* s = sketches.find(session, pageId);
+        const Picture* v = previews.find(session, pageId);
+        const bool needS = !(s && s->revision == revision && s->image.width() == sl);
+        preview = sharp.width() >= pl && !(v && v->revision == revision && v->image.width() == pl) &&
+                  (v || previews.used + bytesAt(pl, aspect) <= previews.budget);
+        if (!needS && !preview) {
+            return;  // has them
         }
-        if (it == s->second.end() && used + bytesAt(w, double(sharp.height()) / sharp.width()) > budget) {
+        if (!s && sketches.used + bytesAt(sl, aspect) > sketches.budget) {
             return;  // (the plan decides who gets one then)
         }
     }
-    store(session, pageId, revision, sharp.scaledToWidth(w, Qt::SmoothTransformation));
+    store(session, pageId, revision, sharp, preview);
 }
 
 QString PageSketches::url(quint64 session, quint64 pageId) const {
     std::lock_guard lock(mtx);
-    if (auto s = sketches.find(session); s != sketches.end()) {
-        if (auto it = s->second.find(pageId); it != s->second.end()) {
-            return QString("image://sketch/%1/%2/%3").arg(session).arg(pageId).arg(it->second.revision);
-        }
+    if (const Picture* s = sketches.find(session, pageId)) {
+        return QString("image://sketch/%1/%2/%3").arg(session).arg(pageId).arg(s->revision);
     }
     return {};
 }
 
 QImage PageSketches::image(quint64 session, quint64 pageId) const {
     std::lock_guard lock(mtx);
-    if (auto s = sketches.find(session); s != sketches.end()) {
-        if (auto it = s->second.find(pageId); it != s->second.end()) {
-            return it->second.image;
-        }
-    }
-    return {};
+    const Picture* s = sketches.find(session, pageId);
+    return s ? s->image : QImage();
+}
+
+QImage PageSketches::preview(quint64 session, quint64 pageId) const {
+    std::lock_guard lock(mtx);
+    const Picture* v = previews.find(session, pageId);
+    return v ? v->image : QImage();
 }
 
 QImage PageSketches::imageOfRevision(quint64 session, quint64 revision) const {
     std::lock_guard lock(mtx);
-    if (auto s = sketches.find(session); s != sketches.end()) {
-        for (const auto& [page, sketch]: s->second) {
-            if (sketch.revision == revision) {
-                return sketch.image;
+    for (const Tier* tier: {&previews, &sketches}) {
+        if (auto s = tier->pictures.find(session); s != tier->pictures.end()) {
+            for (const auto& [page, picture]: s->second) {
+                if (picture.revision == revision) {
+                    return picture.image;
+                }
             }
         }
     }
@@ -384,13 +456,18 @@ QImage PageSketches::imageOfRevision(quint64 session, quint64 revision) const {
 }
 
 void PageSketches::setBudget(qint64 bytes) {
-    budget = std::max<qint64>(0, bytes);
+    sketches.budget = std::max<qint64>(0, bytes);
     planSoon(shownDelay);
 }
 
 qint64 PageSketches::bytes() const {
     std::lock_guard lock(mtx);
-    return used;
+    return sketches.used;
+}
+
+qint64 PageSketches::previewBytes() const {
+    std::lock_guard lock(mtx);
+    return previews.used;
 }
 
 bool PageSketches::idle() const {

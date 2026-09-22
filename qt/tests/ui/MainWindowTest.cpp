@@ -33,7 +33,10 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "canvas/CanvasView.h"
+#include "canvas/CanvasPage.h"
 #include "canvas/PenHover.h"
+#include "render/RenderService.h"
+#include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
@@ -1710,6 +1713,37 @@ TEST_F(MainWindowTest, sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDow
     EXPECT_TRUE(lastSharp->property("source").toUrl().isEmpty()) << "no sharp one while racing";
     race->setProperty("racing", false);
     EXPECT_TRUE(lastSharp->property("source").toUrl().toString().startsWith("image://thumbnail/")) << "slowed down";
+    sketches.setDelays(400, 1500);
+}
+
+// A page that is not rendered yet shows its preview (drawn in advance) on the canvas, not a white page.
+TEST_F(MainWindowTest, theCanvasShowsThePreviewUntilThePageIsRendered) {
+    auto& sketches = xqt::PageSketches::instance();
+    sketches.setDelays(0, 0);
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    until([&] { return sketches.idle(); }, 10000);
+    auto* canvas = findItem("canvas");
+    ASSERT_NE(canvas, nullptr);
+    auto* render = controller->context().getRenderService();
+    render->blockRerenderZoom(std::chrono::milliseconds(60000));  // (as if rendering took long)
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    const size_t target = 6;
+    view->getPage(target)->deleteViewBuffer();
+    controller->goToPage(static_cast<int>(target));
+    int shown = 0;
+    until([&] {
+        QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
+        return shown > 0;
+    });
+    EXPECT_GE(shown, 1) << "the preview instead of a white page";
+    render->blockRerenderZoom(std::chrono::milliseconds(0));
+    until([&] { return view->getPage(target)->bufferInfo().valid; }, 5000);
+    ASSERT_TRUE(view->getPage(target)->bufferInfo().valid);
+    until([&] {
+        QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
+        return shown == 0;
+    });
+    EXPECT_EQ(shown, 0) << "rendered: the page itself";
     sketches.setDelays(400, 1500);
 }
 

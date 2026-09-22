@@ -14,12 +14,14 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <unordered_set>
 #include <vector>
 
+#include <QImage>
 #include <QObject>
 #include <QPointF>
 #include <QRectF>
@@ -88,6 +90,13 @@ public:
     qint64 trimTo(qint64 allowed);
     /// Pages from `first` to `last` keep their buffers (the window of the last planCache; tests)
     std::pair<size_t, size_t> cacheWindow() const { return window; }
+
+    /// A small picture of a page drawn in advance (PageSketches), shown until the page is rendered; null: none.
+    /// Nothing is rendered for it: a page is rendered sharp straight away.
+    void setPreviewSource(std::function<QImage(size_t page)> source) { previewSource = std::move(source); }
+    QImage preview(size_t page) const { return previewSource ? previewSource(page) : QImage(); }
+    /// Previews came: pages without a buffer show them
+    void previewsChanged() { Q_EMIT updateRequested(); }
 
     // --- XournalView (shadow) ---------------------------------------------------------------------------------
     size_t getCurrentPage() const override;
@@ -271,6 +280,7 @@ private:
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     std::pair<size_t, size_t> window{1, 0};
+    std::function<QImage(size_t)> previewSource;
     double dpr = 1.0;
     std::atomic<double> renderZoom{1.0};
     std::atomic<double> renderDpr{1.0};

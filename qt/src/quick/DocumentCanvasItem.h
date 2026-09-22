@@ -12,6 +12,7 @@
  */
 #pragma once
 
+#include <atomic>
 #include <memory>
 
 #include <QPointer>
@@ -47,6 +48,8 @@ public:
     qreal contentY() const;
     /// Scroll so that the content position (x, y) is at the top-left corner.
     Q_INVOKABLE void scrollTo(qreal x, qreal y);
+    /// Pages the last frame showed by their preview (not rendered yet; tests)
+    Q_INVOKABLE int previewsShown() const { return shownPreviews; }
 
 Q_SIGNALS:
     void viewChanged();
@@ -78,4 +81,5 @@ private:
     bool mouseGrab = false;
     bool touchSessionOwned = false;
     bool viewReplaced = false;
+    std::atomic<int> shownPreviews{0};
 };

@@ -45,6 +45,8 @@ cd build-qt
 - [ ] Switching tabs keeps each tab's zoom, scroll position and undo history.
 - [ ] Open a big, slow PDF, read a page and wait a few seconds: then scrolling forward (and a bit back) shows the
       pages at once, sharp, without rendering. More pages ahead are ready than behind.
+- [ ] Open a big, slow PDF, wait ~10 s, then jump far (grid, sidebar or scroll bar): the page shows at once as a blurry
+      preview (never white) and turns sharp when it is rendered.
 - [ ] While pages are being rendered ahead (right after opening or after zooming), scrolling and writing stay smooth
       and a page jumped to far away is not slower than before.
 - [ ] Settings → Documents → Memory: "Rendered pages of the open documents" defaults to a quarter of the RAM and

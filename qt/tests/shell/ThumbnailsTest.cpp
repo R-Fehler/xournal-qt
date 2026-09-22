@@ -22,6 +22,8 @@
 #include "pdf/base/XojPdfDocument.h"
 #include "session/DocumentSession.h"
 #include "shell/PageSketches.h"
+#include "CanvasMemory.h"
+#include "CanvasView.h"
 #include "shell/PagesModel.h"
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
@@ -296,6 +298,48 @@ TEST_F(Sketches, closingADocumentForgetsItsSketches) {
     c.closeTab(c.tabManager().currentIndex());
     processEvents(20);
     EXPECT_LT(PageSketches::instance().bytes(), before);
+}
+
+// --- previews: bigger pictures of all pages, for the canvas and for thumbnails ---
+
+TEST_F(Sketches, pagesAreDrawnOnceForTheirPreviewAndSketch) {
+    AppController c;
+    openPages(c);
+    const int drawn = PageSketches::instance().drawCount();
+    ASSERT_TRUE(sketched());
+    DocumentSession* s = c.tabManager().currentSession();
+    const quint64 id = ThumbnailProvider::idOf(s);
+    const int pages = pagesOf(c).rowCount();
+    for (int p = 0; p < pages; ++p) {
+        EXPECT_EQ(PageSketches::instance().preview(id, s->pageId(static_cast<size_t>(p))).width(), 768) << "page " << p + 1;
+        EXPECT_EQ(PageSketches::instance().image(id, s->pageId(static_cast<size_t>(p))).width(), 128) << "page " << p + 1;
+    }
+    EXPECT_EQ(PageSketches::instance().drawCount() - drawn, pages) << "the sketch is scaled from the preview";
+    EXPECT_FALSE(c.tabManager().currentView()->preview(3).isNull()) << "the canvas shows them until it rendered";
+}
+
+TEST_F(Sketches, thumbnailsUpToThePreviewWidthAreNotDrawn) {
+    AppController c;
+    openPages(c);
+    ASSERT_TRUE(sketched());
+    const int drawn = ThumbnailProvider::renderCount();
+    EXPECT_EQ(request(urlOf(c, 4), 360).width(), 384);
+    EXPECT_EQ(request(urlOf(c, 5), 700).width(), 704);
+    EXPECT_EQ(ThumbnailProvider::renderCount(), drawn) << "scaled from the previews";
+    request(urlOf(c, 5), 1000);
+    EXPECT_EQ(ThumbnailProvider::renderCount(), drawn + 1) << "bigger than the preview: drawn";
+}
+
+TEST_F(Sketches, previewsGetSmallerWhenTheMemoryForPagesIsShort) {
+    AppController c;
+    openPages(c);
+    const qint64 pages = pagesOf(c).rowCount();
+    // A tenth of it for previews: room for all pages at 384 px (~ 417 kB), not at 512 (~ 741 kB)
+    CanvasMemory::instance().setLimit(pages * 600000 * 10);
+    ASSERT_TRUE(sketched());
+    EXPECT_EQ(PageSketches::instance().previewWidth(), 384);
+    EXPECT_LE(PageSketches::instance().previewBytes(), pages * 600000);
+    CanvasMemory::instance().setLimit(CanvasMemory::defaultLimit());
 }
 
 // XQT_BENCH_PDF=<big pdf>: how long sketching all its pages takes, and whether edits (the document lock) or the UI
