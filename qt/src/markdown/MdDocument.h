@@ -30,6 +30,7 @@ enum RunFlag : uint16_t {
     Image = 1 << 6,  ///< alt text of an image
     Math = 1 << 7,
     Html = 1 << 8,   ///< raw inline HTML (shown as it is)
+    Marker = 1 << 9, ///< Markdown marks shown while editing (the source of the block being edited)
 };
 
 struct Run {
@@ -92,6 +93,14 @@ struct Document {
 
 /// Parse a Markdown text (UTF-8). Never fails: anything is some Markdown.
 Document parse(std::string_view source);
+
+/// Where a top-level block is in the source: whole lines, [begin, end). What matters most is where each block begins
+/// (splitting pages, editing): the lines between two blocks (blank lines) are after the end of the one before.
+struct BlockSpan {
+    size_t begin = 0;  ///< the start of its first line
+    size_t end = 0;    ///< the start of the line after its last one
+};
+std::vector<BlockSpan> topLevelSpans(std::string_view source, const Document& doc);
 
 /// The text of the runs, joined (as shown).
 std::string plainText(const Block& block);

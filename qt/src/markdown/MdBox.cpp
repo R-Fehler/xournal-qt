@@ -33,7 +33,7 @@ Style styleOf(const Text& text) {
     return s;
 }
 
-const Layout& cachedLayout(const std::string& source, const Style& style) {
+const Layout& cachedLayout(const std::string& source, const Style& style, size_t active) {
     struct Entry {
         std::string key;
         Layout layout;
@@ -48,14 +48,14 @@ const Layout& cachedLayout(const std::string& source, const Style& style) {
     key += style.family;
     key += '\x1f';
     key += std::to_string(style.size) + '/' + std::to_string(uint32_t(style.color)) + '/' +
-           std::to_string(style.width);
+           std::to_string(style.width) + '@' + std::to_string(active);
     for (auto it = cache.begin(); it != cache.end(); ++it) {
         if (it->key == key) {
             cache.splice(cache.begin(), cache, it);
             return cache.front().layout;
         }
     }
-    cache.push_front({std::move(key), layout(parse(source), style)});
+    cache.push_front({std::move(key), layout(parse(source), style, source, active)});
     if (cache.size() > SIZE) {
         cache.pop_back();
     }

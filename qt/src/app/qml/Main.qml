@@ -294,11 +294,11 @@ ApplicationWindow {
                             checked: app.textMarkdown
                             onToggled: app.textMarkdown = checked
                         }
-                        // Markdown text boxes: written beside the page (the page shows them formatted while typing),
-                        // or on the page (the source while editing)
+                        // Markdown: written on the page (formatted while typing, the block with the cursor showing its
+                        // Markdown), or its source beside the page
                         Switch {
                             objectName: "markdownInPanelSwitch"
-                            text: qsTr("Write Markdown beside the page")
+                            text: qsTr("Write Markdown beside the page (its source)")
                             checked: app.markdownInPanel
                             onToggled: app.markdownInPanel = checked
                         }
@@ -1576,7 +1576,17 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("pageGrid"); enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
     Shortcut { sequences: win.keysOf("textMode"); enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
-    Shortcut { sequences: win.keysOf("markdownMode"); enabled: !app.homeVisible; onActivated: markdownPanel.visible ? markdownPanel.close(true) : markdownPanel.open() }
+    Shortcut {
+        // (Markdown written on the page: its source beside the page)
+        sequences: win.keysOf("markdownMode"); enabled: !app.homeVisible
+        onActivated: {
+            if (markdownPanel.visible) { markdownPanel.close(true); return }
+            const onPage = app.takeMarkdownFromPage()
+            if (onPage.page === undefined) markdownPanel.open()
+            else if (onPage.pageText) markdownPanel.open(onPage.page)
+            else markdownPanel.openBox(onPage.page, onPage.x, onPage.y)
+        }
+    }
     Shortcut { sequences: win.keysOf("find"); onActivated: app.homeVisible ? homeView.focusSearch() : searchBar.openBar() }
     // Selected elements (the page sidebar and grid handle these keys themselves when they have the focus)
     Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }

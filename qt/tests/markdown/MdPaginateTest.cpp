@@ -3,6 +3,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
+#include <cstdlib>
+#include <iostream>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -201,4 +204,115 @@ TEST(MdPaginate, joinedAgainAlwaysTheSameText) {
             EXPECT_EQ(paginate(join(p.slices), style(), frame).slices, p.slices) << "document " << doc;
         }
     }
+}
+
+// Each page knows what of the text it holds: its slice is its prefix, that part of the text, and lines closing it.
+TEST(MdPaginate, partsSayWhatOfTheTextAPageHolds) {
+    std::string text = "# Parts\n\n" + paragraphs(6) + "```cpp\n";
+    for (int i = 0; i < 30; ++i) {
+        text += "int x" + std::to_string(i) + " = " + std::to_string(i) + ";\n";
+    }
+    text += "```\n\n| a | b |\n|---|---|\n";
+    for (int i = 0; i < 20; ++i) {
+        text += "| " + std::to_string(i) + " | x |\n";
+    }
+    const auto p = paginate(text, style(), small);
+    ASSERT_EQ(p.parts.size(), p.slices.size());
+    std::vector<Part> joined;
+    ASSERT_EQ(join(p.slices, &joined), text);
+    ASSERT_EQ(joined.size(), p.parts.size());
+    size_t at = 0;
+    for (size_t i = 0; i < p.parts.size(); ++i) {
+        const Part& part = p.parts[i];
+        EXPECT_EQ(part.begin, at) << "page " << i;
+        EXPECT_EQ(p.slices[i].substr(part.prefix, part.end - part.begin),
+                  text.substr(part.begin, part.end - part.begin))
+                << "page " << i;
+        EXPECT_EQ(joined[i].begin, part.begin) << "page " << i;
+        EXPECT_EQ(joined[i].end, part.end) << "page " << i;
+        EXPECT_EQ(joined[i].prefix, part.prefix) << "page " << i;
+        at = part.end;
+    }
+    EXPECT_EQ(at, text.size());
+}
+
+// Opt-in (XQT_BENCH=1): how long splitting a long text takes (once per key while writing on the page).
+TEST(MdPaginate, benchLongText) {
+    if (!std::getenv("XQT_BENCH")) {
+        GTEST_SKIP() << "set XQT_BENCH";
+    }
+    std::string text;
+    for (int i = 0; i < 20; ++i) {
+        text += "## Section " + std::to_string(i) + "\n\n" + paragraphs(6);
+    }
+    const auto frame = [](size_t) { return Frame{480, 730}; };
+    const auto start = std::chrono::steady_clock::now();
+    Pagination p;
+    for (int i = 0; i < 5; ++i) {
+        p = paginate(text + std::to_string(i), style(), frame);
+    }
+    const auto ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+    std::cout << p.slices.size() << " pages, " << text.size() << " bytes: " << ms / 5 << " ms per split" << std::endl;
+
+    {
+        const auto a = std::chrono::steady_clock::now();
+        const Document d = parse(text);
+        const auto b = std::chrono::steady_clock::now();
+        Style s = style();
+        s.width = 480;
+        const Layout l = layout(d, s);
+        const auto c = std::chrono::steady_clock::now();
+        std::cout << "parse " << std::chrono::duration_cast<std::chrono::microseconds>(b - a).count() << " us, layout "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(c - b).count() << " us (" << l.items.size()
+                  << " items)" << std::endl;
+    }
+    // Typing on the second page: only the pages around the change again
+    const std::string base = text + "0";
+    Pagination before = paginate(base, style(), frame);
+    const size_t at = before.parts[1].begin + 200;
+    const auto t0 = std::chrono::steady_clock::now();
+    std::string typed = base;
+    for (int i = 0; i < 20; ++i) {
+        std::string next = typed;
+        next.insert(at + static_cast<size_t>(i), "x");
+        Pagination after = paginate(next, style(), frame, &before, &typed);
+        before = std::move(after);
+        typed = std::move(next);
+    }
+    const auto typing =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count();
+    std::cout << "typing: " << typing / 20 / 1000.0 << " ms per key" << std::endl;
+}
+
+// Splitting again after a change gives the same pages as splitting all (only the pages around it are split).
+TEST(MdPaginate, splittingAfterAChangeIsTheSameAsSplittingAll) {
+    std::string text = "# Changes\n\n" + paragraphs(30) + "```\ncode\n```\n\n" + paragraphs(10);
+    const auto frame = small;
+    Pagination before = paginate(text, style(), frame);
+    ASSERT_GE(before.slices.size(), 5u);
+    const std::vector<std::pair<size_t, std::string>> edits = {
+            {before.parts[2].begin + 5, "inserted words "},            // on the third page
+            {before.parts[1].begin, "# A new heading\n\n"},          // at the start of a page
+            {before.parts[3].end - 1, "\n\n" + paragraphs(4)},        // a lot more
+            {0, "x"},                                                  // at the very start
+    };
+    for (const auto& [at, what]: edits) {
+        std::string changed = text;
+        changed.insert(std::min(at, changed.size()), what);
+        const Pagination incremental = paginate(changed, style(), frame, &before, &text);
+        const Pagination all = paginate(changed, style(), frame);
+        EXPECT_EQ(incremental.slices, all.slices) << "inserted at " << at;
+        ASSERT_EQ(incremental.parts.size(), all.parts.size());
+        for (size_t i = 0; i < all.parts.size(); ++i) {
+            EXPECT_EQ(incremental.parts[i].begin, all.parts[i].begin);
+            EXPECT_EQ(incremental.parts[i].end, all.parts[i].end);
+        }
+        before = incremental;
+        text = changed;
+    }
+    // And a deletion
+    std::string shorter = text;
+    shorter.erase(before.parts[1].begin, before.parts[3].begin - before.parts[1].begin);
+    EXPECT_EQ(paginate(shorter, style(), frame, &before, &text).slices, paginate(shorter, style(), frame).slices);
 }

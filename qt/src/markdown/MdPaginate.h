@@ -38,16 +38,30 @@ struct Frame {
     double height = 700;
 };
 
+/// What of the text a page holds: its slice is `prefix` bytes (the continuation lines), then text[begin, end),
+/// then lines closing it (a fence).
+struct Part {
+    size_t begin = 0;
+    size_t end = 0;
+    size_t prefix = 0;
+    double overflow = 0;  ///< how far a block that could not be split goes below this page
+};
+
 struct Pagination {
     std::vector<std::string> slices;  ///< one per page, each a Markdown text of its own
+    std::vector<Part> parts;          ///< what of the text each slice holds
     double overflow = 0;              ///< how far blocks that could not be split go below their page (the most)
 };
 
 /// Split a Markdown text into pages. `frame(i)`: the box of page i (style.width is not used).
-Pagination paginate(const std::string& source, Style style, const std::function<Frame(size_t)>& frame);
+/// `before` / `beforeSource`: the pages of the text before a change (the same style and pages): only the pages from
+/// the one before the change on are split again, until a page starts where it did before (moved by the change).
+/// While typing, that is one or two pages instead of all.
+Pagination paginate(const std::string& source, Style style, const std::function<Frame(size_t)>& frame,
+                    const Pagination* before = nullptr, const std::string* beforeSource = nullptr);
 
-/// The text again from the slices of consecutive pages.
-std::string join(const std::vector<std::string>& slices);
+/// The text again from the slices of consecutive pages (with what of it each holds, if `parts` is given).
+std::string join(const std::vector<std::string>& slices, std::vector<Part>* parts = nullptr);
 
 /// Whether a slice continues the slice of the page before.
 bool continues(std::string_view slice);

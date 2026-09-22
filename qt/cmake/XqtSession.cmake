@@ -46,6 +46,9 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasTextInput.h
 )
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)

@@ -29,6 +29,7 @@
 #include "model/PageRef.h"
 
 #include "MdLayout.h"
+#include "MdPaginate.h"
 
 class GroupUndoAction;
 class Text;
@@ -66,6 +67,19 @@ public:
     /// Back to the text as it was (pages added go again).
     void cancel();
 
+    /// The text being edited, and what of it each page holds (the page's text: a part per page, in order).
+    struct PagePart {
+        PageRef page;
+        Text* box = nullptr;  ///< nullptr: none yet (a new text box before its first change)
+        double x = 0;         ///< the box's top left
+        double y = 0;
+        md::Part part;        ///< the box's text is part.prefix bytes, then text()[part.begin, part.end), ...
+    };
+    const std::string& text() const { return last; }
+    std::vector<PagePart> parts() const;
+    /// The style of a new box (its font, size and color).
+    const md::Style& boxStyle() const { return style; }
+
 private:
     /// A page of the text and its box.
     struct Page {
@@ -100,6 +114,9 @@ private:
     std::vector<Page> chain;
     md::Style style;
     std::string last;
+    std::vector<md::Part> ranges;     ///< what of the text each page of `chain` holds
+    md::Pagination split;             ///< the last split onto the pages, of the text `splitText` (typing: splits again
+    std::string splitText;            ///< from there, only the pages around the change)
     GroupUndoAction* undo = nullptr;  ///< the edit's undo step (on the undo stack since the first change)
     bool pageText = true;
 };

@@ -79,6 +79,11 @@ struct Layout {
     std::vector<Extent> blocks;
     double height = 0;  ///< of everything
     std::vector<std::string> links;  ///< link targets (Document::links)
+    /// Editing (layout with `active`): the block being edited is laid out as its source, source[rawBegin, rawEnd),
+    /// in this item (its text is exactly that source).
+    int rawItem = -1;
+    size_t rawBegin = NO_SOURCE;
+    size_t rawEnd = NO_SOURCE;
 };
 
 /// A link at a point (box coordinates): its target and where it is (box coordinates).
@@ -104,7 +109,9 @@ std::vector<Rect> findText(const Layout& layout, const std::string& search);
 /// Heading size factor (relative to the body text), level 1–6.
 double headingScale(int level);
 
-Layout layout(const Document& doc, const Style& style);
+/// `source` / `active` (editing): the top-level block with the source offset `active` (or the blank lines after it)
+/// is laid out as its source, its Markdown marks shown dimmed (as Typora and Obsidian's live preview do).
+Layout layout(const Document& doc, const Style& style, std::string_view source = {}, size_t active = NO_SOURCE);
 
 /// Draw at the current origin (the box's top left). The current source color is not kept.
 void draw(cairo_t* cr, const Layout& layout);

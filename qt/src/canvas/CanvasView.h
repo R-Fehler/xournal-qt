@@ -49,6 +49,8 @@ namespace xqt {
 class CanvasPage;
 class DocumentSession;
 class TextEditor;
+class MarkdownEditor;
+class CanvasTextInput;
 class RenderService;
 
 class CanvasView final: public QObject, public XournalView, public Layout, public RasterHost, public DocumentListener {
@@ -198,6 +200,12 @@ public:
 
     // --- text tool (port of XojPageView::startText / XournalView::endTextAllPages): one editor per view ---
     TextEditor* getTextEditor() const { return textEditor.get(); }
+    MarkdownEditor* getMarkdownEditor() const { return markdownEditor.get(); }
+    /// The text being typed on the canvas: a text box or Markdown (nullptr: none).
+    CanvasTextInput* getTextInput() const;
+    /// Write Markdown on the page (formatted while typing): the page's text, or the text box at (x, y) (a new one
+    /// there if none).
+    void startMarkdown(size_t page, bool pageText, double x, double y);
     /// A tap with the text tool at a page position (points).
     void startText(CanvasPage& page, double x, double y);
     void endTextEditing();
@@ -274,6 +282,7 @@ private:
     QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
+    std::unique_ptr<MarkdownEditor> markdownEditor;
     struct MarkdownSelection {
         const EditSelection* selection = nullptr;
         /// The pages whose selected layer is their Markdown layer for now, with the layer selected before, and

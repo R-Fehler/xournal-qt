@@ -6,132 +6,15 @@
 
 #include <pango/pango.h>
 
+#include "MdText.h"
+
 namespace xqt::md {
 
 namespace {
+using namespace text;
 
 constexpr size_t MAX_PAGES = 1000;
 constexpr uint16_t INLINE_SPANS = Strong | Emphasis | Strike | Code | Link | Underline | Image | Math;
-
-// --- lines of a text ---------------------------------------------------------------------------------------------
-size_t lineStart(std::string_view s, size_t pos) {
-    if (pos == 0) {
-        return 0;
-    }
-    const size_t i = s.rfind('\n', std::min(pos, s.size()) - 1);
-    return i == std::string_view::npos ? 0 : i + 1;
-}
-/// The start of the line after the one `pos` is in.
-size_t nextLine(std::string_view s, size_t pos) {
-    const size_t i = s.find('\n', pos);
-    return i == std::string_view::npos ? s.size() : i + 1;
-}
-std::string_view lineAt(std::string_view s, size_t start) {
-    const size_t end = s.find('\n', start);
-    return s.substr(start, (end == std::string_view::npos ? s.size() : end) - start);
-}
-bool blank(std::string_view line) { return line.find_first_not_of(" \t\r") == std::string_view::npos; }
-std::string_view afterIndent(std::string_view line) {
-    size_t i = 0;
-    while (i < line.size() && i < 3 && line[i] == ' ') {
-        ++i;
-    }
-    return line.substr(i);
-}
-/// The fence of a fenced code block's opening line ("```", "~~~~"); empty if it is none.
-std::string fenceOf(std::string_view line) {
-    line = afterIndent(line);
-    if (line.empty() || (line[0] != '`' && line[0] != '~')) {
-        return {};
-    }
-    const size_t n = line.find_first_not_of(line[0]);
-    const size_t count = n == std::string_view::npos ? line.size() : n;
-    return count >= 3 ? std::string(count, line[0]) : std::string();
-}
-bool closesFence(std::string_view line, const std::string& fence) {
-    line = afterIndent(line);
-    if (fence.empty() || line.size() < fence.size() || line[0] != fence[0]) {
-        return false;
-    }
-    const size_t n = line.find_first_not_of(fence[0]);
-    return n == std::string_view::npos ? line.size() >= fence.size() : n >= fence.size() && blank(line.substr(n));
-}
-bool setextUnderline(std::string_view line) {
-    line = afterIndent(line);
-    if (line.empty() || (line[0] != '=' && line[0] != '-')) {
-        return false;
-    }
-    const size_t n = line.find_first_not_of(line[0]);
-    return n == std::string_view::npos || blank(line.substr(n));
-}
-/// Whether a line would start a block other than a paragraph (a paragraph must not continue with it on a page).
-bool startsBlock(std::string_view line) {
-    const std::string_view s = afterIndent(line);
-    if (s.empty()) {
-        return true;
-    }
-    const char c = s[0];
-    if (c == '#' || c == '>' || c == '<' || c == '|' || c == '`' || c == '~' || c == '=' || c == '\t') {
-        return true;
-    }
-    if ((c == '-' || c == '*' || c == '+') && (s.size() == 1 || s[1] == ' ' || s[1] == c)) {
-        return true;
-    }
-    if (c >= '0' && c <= '9') {
-        const size_t n = s.find_first_not_of("0123456789");
-        return n != std::string_view::npos && n <= 9 && (s[n] == '.' || s[n] == ')');
-    }
-    return line.size() >= 4 && line.substr(0, 4) == "    ";  // (indented code)
-}
-
-// --- where the top-level blocks are in the source ----------------------------------------------------------------
-struct Span {
-    size_t begin = 0;  ///< the start of its first line
-    size_t end = 0;    ///< the start of the line after its last one
-};
-
-/// Source ranges (whole lines) of the top-level blocks. What matters for splitting is where each block begins; the
-/// lines between two blocks (blank lines) stay with the block before.
-std::vector<Span> topLevelSpans(std::string_view src, const Document& doc) {
-    std::vector<Span> spans;
-    size_t prevEnd = 0;
-    for (const Block& b: doc.root.children) {
-        size_t first = 0;
-        if (b.textBegin != NO_SOURCE && b.textBegin >= prevEnd) {
-            first = lineStart(src, b.textBegin);
-            if (b.kind == BlockKind::CodeBlock && b.fenced && first > prevEnd) {
-                first = lineStart(src, first - 1);  // the fence before the code
-            }
-        } else {
-            first = prevEnd;  // (no text, e.g. a rule: its first line that is not blank)
-            while (first < src.size() && blank(lineAt(src, first))) {
-                first = nextLine(src, first);
-            }
-        }
-        first = std::max(first, prevEnd);
-        size_t end = 0;
-        if (b.kind == BlockKind::CodeBlock && b.fenced) {
-            const std::string fence = fenceOf(lineAt(src, first));
-            end = src.size();
-            for (size_t l = nextLine(src, first); l < src.size(); l = nextLine(src, l)) {
-                if (closesFence(lineAt(src, l), fence)) {
-                    end = nextLine(src, l);
-                    break;
-                }
-            }
-        } else if (b.textEnd != NO_SOURCE && b.textEnd > first) {
-            end = nextLine(src, b.textEnd - 1);
-            if (b.kind == BlockKind::Heading && end < src.size() && setextUnderline(lineAt(src, end))) {
-                end = nextLine(src, end);
-            }
-        } else {
-            end = nextLine(src, first);
-        }
-        spans.push_back({first, std::max(end, first)});
-        prevEnd = spans.back().end;
-    }
-    return spans;
-}
 
 std::string marker(const std::string& kind) { return std::string(CONTINUATION) + " " + kind + " -->\n"; }
 
@@ -371,7 +254,7 @@ private:
     double height;
     unsigned listStart;
     double codePadding;
-    std::vector<Span> spans;
+    std::vector<BlockSpan> spans;
 };
 
 /// "start=N" of a continuation marker (0: none).
@@ -387,30 +270,106 @@ bool blankText(std::string_view s) { return s.find_first_not_of(" \t\r\n") == st
 
 bool continues(std::string_view slice) { return slice.substr(0, CONTINUATION.size()) == CONTINUATION; }
 
-Pagination paginate(const std::string& source, Style style, const std::function<Frame(size_t)>& frame) {
+Pagination paginate(const std::string& source, Style style, const std::function<Frame(size_t)>& frame,
+                    const Pagination* before, const std::string* beforeSource) {
     Pagination out;
     size_t pos = 0;      // where the rest of the text starts in the source
     std::string prefix;  // the lines the next page starts with (marker, fence, table header)
-    for (size_t page = 0;; ++page) {
+    size_t page = 0;
+    // After a change: the pages before the one with the change are as they were (its first block could go back onto
+    // the page before: from that one on); the text after the change is the text from before, moved by `delta`
+    const bool incremental = before && beforeSource && !before->parts.empty();
+    size_t changeEnd = 0;  // (in the new text)
+    std::ptrdiff_t delta = 0;
+    if (incremental) {
+        const std::string& old = *beforeSource;
+        size_t common = 0;
+        while (common < old.size() && common < source.size() && old[common] == source[common]) {
+            ++common;
+        }
+        size_t suffix = 0;
+        while (suffix < old.size() - common && suffix < source.size() - common &&
+               old[old.size() - 1 - suffix] == source[source.size() - 1 - suffix]) {
+            ++suffix;
+        }
+        changeEnd = source.size() - suffix;
+        delta = static_cast<std::ptrdiff_t>(source.size()) - static_cast<std::ptrdiff_t>(old.size());
+        size_t start = 0;
+        while (start + 1 < before->parts.size() && before->parts[start + 1].begin <= common) {
+            ++start;
+        }
+        start = start > 0 ? start - 1 : 0;
+        for (size_t i = 0; i < start; ++i) {
+            out.slices.push_back(before->slices[i]);
+            out.parts.push_back(before->parts[i]);
+            out.overflow = std::max(out.overflow, before->parts[i].overflow);
+        }
+        page = start;
+        pos = before->parts[start].begin;
+        prefix = before->slices[start].substr(0, before->parts[start].prefix);
+    }
+    for (;; ++page) {
+        // After the change, a page that starts where one did before (with the same lines): the rest is as it was
+        if (incremental && page < before->parts.size() && page > 0 && pos >= changeEnd && pos > 0 &&
+            before->parts[page].begin == static_cast<size_t>(static_cast<std::ptrdiff_t>(pos) - delta) &&
+            before->parts[page].prefix == prefix.size() &&
+            before->slices[page].compare(0, prefix.size(), prefix) == 0) {
+            for (size_t i = page; i < before->parts.size(); ++i) {
+                Part p = before->parts[i];
+                p.begin = static_cast<size_t>(static_cast<std::ptrdiff_t>(p.begin) + delta);
+                p.end = static_cast<size_t>(static_cast<std::ptrdiff_t>(p.end) + delta);
+                out.slices.push_back(before->slices[i]);
+                out.parts.push_back(p);
+                out.overflow = std::max(out.overflow, p.overflow);
+            }
+            break;
+        }
         const Frame f = frame(page);
         style.width = f.width;
         const std::string rest = prefix + source.substr(pos);
-        const Document doc = parse(rest);
-        const Layout lay = layout(doc, style);
-        if (lay.height <= f.height + 0.01 || page + 1 >= MAX_PAGES) {
+        // Only the blocks that can be on the page (and a few more): as many as the first ones say, more if needed
+        const Document all = parse(rest);
+        const auto spans = topLevelSpans(rest, all);
+        size_t blocks = std::min<size_t>(spans.size(), 12);
+        std::string laidOut;
+        Document some;
+        Layout lay;
+        bool whole = false;
+        for (;;) {
+            whole = blocks >= spans.size();
+            if (whole) {
+                laidOut = rest;
+                lay = layout(all, style);
+            } else {
+                laidOut = rest.substr(0, spans[blocks].begin);
+                some = parse(laidOut);
+                lay = layout(some, style);
+            }
+            if (whole || lay.height > f.height + 0.01) {
+                break;
+            }
+            blocks = std::max(blocks + 4, static_cast<size_t>(static_cast<double>(blocks) * f.height /
+                                                              std::max(lay.height, 1.0) * 1.3));
+        }
+        const Document& doc = whole ? all : some;
+        if ((whole && lay.height <= f.height + 0.01) || page + 1 >= MAX_PAGES) {
+            const double overflow = std::max(0.0, lay.height - f.height);
             out.slices.push_back(rest);
-            out.overflow = std::max(out.overflow, lay.height - f.height);
+            out.parts.push_back({pos, source.size(), prefix.size(), overflow});
+            out.overflow = std::max(out.overflow, overflow);
             break;
         }
         const Split split =
-                Splitter(rest, prefix.size(), doc, lay, f.height, startOf(lineAt(prefix, 0)), style.size).find();
+                Splitter(laidOut, prefix.size(), doc, lay, f.height, startOf(lineAt(prefix, 0)), style.size).find();
         out.overflow = std::max(out.overflow, split.overflow);
         const size_t next = pos + (split.at - prefix.size());
         if (next >= source.size() || blankText(std::string_view(source).substr(next))) {
             out.slices.push_back(rest);  // (only blank lines would be left for the next page)
+            out.parts.push_back({pos, source.size(), prefix.size(), split.overflow});
             break;
         }
         out.slices.push_back(rest.substr(0, split.at) + split.close);
+        out.parts.push_back({pos, next, prefix.size(), split.overflow});
         pos = next;
         prefix = split.next;
     }
@@ -420,10 +379,15 @@ Pagination paginate(const std::string& source, Style style, const std::function<
     return out;
 }
 
-std::string join(const std::vector<std::string>& slices) {
+std::string join(const std::vector<std::string>& slices, std::vector<Part>* parts) {
     std::string out;
+    if (parts) {
+        parts->clear();
+    }
     for (size_t i = 0; i < slices.size(); ++i) {
         std::string_view s = slices[i];
+        const size_t sliceSize = s.size();
+        size_t removedAtEnd = 0;  // (a closing fence of the slice before)
         if (i > 0 && continues(s)) {
             const std::string_view first = lineAt(s, 0);
             s.remove_prefix(nextLine(s, 0));
@@ -433,6 +397,7 @@ std::string join(const std::vector<std::string>& slices) {
                 // The fence that closed the page before and the fence that opened this one were added
                 const size_t last = out.empty() ? 0 : lineStart(out, out.size() - 1);
                 if (!out.empty() && out.back() == '\n' && !fenceOf(lineAt(out, last)).empty()) {
+                    removedAtEnd = out.size() - last;
                     out.erase(last);
                 }
                 s.remove_prefix(nextLine(s, 0));
@@ -440,6 +405,12 @@ std::string join(const std::vector<std::string>& slices) {
                 s.remove_prefix(nextLine(s, 0));  // the header and its delimiter row
                 s.remove_prefix(nextLine(s, 0));
             }
+        }
+        if (parts) {
+            if (!parts->empty()) {
+                parts->back().end -= removedAtEnd;
+            }
+            parts->push_back({out.size(), out.size() + s.size(), sliceSize - s.size()});
         }
         out += s;
     }

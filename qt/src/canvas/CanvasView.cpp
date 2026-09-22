@@ -47,6 +47,7 @@
 #include "render/RenderService.h"
 
 #include "CanvasPage.h"
+#include "MarkdownEditor.h"
 #include "MdBox.h"
 #include "TextEditor.h"
 #include "TextFlow.h"
@@ -99,7 +100,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     // Another tool ends the text editing (upstream: ToolHandler listener).
     connect(&session.getApp(), &AppContext::activeToolChanged, this, [this] {
-        if (textEditor && this->session.getToolHandler()->getToolType() != TOOL_TEXT) {
+        if ((textEditor || markdownEditor) && this->session.getToolHandler()->getToolType() != TOOL_TEXT) {
             endTextEditing();
         }
     });
@@ -1121,32 +1122,40 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         }
         endTextEditing();
     }
-    // The page's Markdown text is edited in the editor beside the page; Markdown text boxes too (or on the page)
-    if (markdownBoxAt(page, x, y)) {
-        if (const auto idx = indexOf(&page)) {
-            Q_EMIT markdownRequested(static_cast<int>(*idx));
-        }
-        return;
-    }
-    if (markdownInPanel) {
-        bool onBox = false;
-        bool onText = false;
-        {
-            std::shared_lock lock(*session.getDocument());
-            const PageRef p = page.getPage();
-            const Layer* mdLayer = md::markdownLayer(p);
-            onBox = mdLayer && mdLayer->isVisible() && md::boxAt(*mdLayer, x, y);
-            for (const Element* e: p->getSelectedLayer()->getElementsView()) {
-                onText = onText || (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y));
-            }
-        }
-        // (an ordinary text there is edited as it is)
-        if (onBox || (markdownText && !onText)) {
-            if (const auto idx = indexOf(&page)) {
-                Q_EMIT markdownBoxRequested(static_cast<int>(*idx), x, y);
-            }
+    if (markdownEditor) {
+        if (markdownEditor->tap(page, x, y)) {  // (on the text being written, also on its other pages)
             return;
         }
+        endTextEditing();
+    }
+    const auto idx = indexOf(&page);
+    if (!idx) {
+        return;
+    }
+    // Markdown: the page's text and text boxes, written on the page (formatted while typing) or beside it
+    const bool onPageText = markdownBoxAt(page, x, y);
+    bool onBox = false;
+    bool onText = false;
+    {
+        std::shared_lock lock(*session.getDocument());
+        const PageRef p = page.getPage();
+        const Layer* mdLayer = md::markdownLayer(p);
+        onBox = mdLayer && mdLayer->isVisible() && md::boxAt(*mdLayer, x, y);
+        for (const Element* e: p->getSelectedLayer()->getElementsView()) {
+            onText = onText || (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y));
+        }
+    }
+    if (onPageText || onBox || (markdownText && !onText)) {  // (an ordinary text there is edited as it is)
+        if (markdownInPanel) {
+            if (onPageText) {
+                Q_EMIT markdownRequested(static_cast<int>(*idx));
+            } else {
+                Q_EMIT markdownBoxRequested(static_cast<int>(*idx), x, y);
+            }
+        } else {
+            startMarkdown(*idx, onPageText, x, y);
+        }
+        return;
     }
     TextEditor::NewText how;
     how.markdown = markdownText;
@@ -1167,6 +1176,22 @@ bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     return box && box == md::boxAt(*layer, x, y);
 }
 
+void CanvasView::startMarkdown(size_t pageNo, bool pageText, double x, double y) {
+    endTextEditing();
+    md::Style style;
+    // The text tool's font (the family: its name may have a style, e.g. "Sans Bold") and color, the Markdown size
+    PangoFontDescription* d = pango_font_description_from_string(session.getSettings()->getFont().getName().c_str());
+    if (const char* family = pango_font_description_get_family(d); family && *family) {
+        style.family = family;
+    }
+    pango_font_description_free(d);
+    style.size = markdownTextSize;
+    style.color = pageText ? Color(0, 0, 0) : session.getToolHandler()->getColor();
+    markdownEditor = std::make_unique<MarkdownEditor>(*this, session, pageNo, pageText, x, y, style);
+    Q_EMIT textEditingChanged(true);
+    Q_EMIT updateRequested();
+}
+
 void CanvasView::setMarkdownText(bool markdown, double size, bool inPanel) {
     markdownText = markdown;
     markdownTextSize = size;
@@ -1174,6 +1199,12 @@ void CanvasView::setMarkdownText(bool markdown, double size, bool inPanel) {
 }
 
 void CanvasView::endTextEditing() {
+    if (markdownEditor) {
+        auto editor = std::move(markdownEditor);  // (null while it finishes: finishing may end text editing again)
+        editor.reset();                           // finishes (one undo step)
+        Q_EMIT textEditingChanged(false);
+        Q_EMIT updateRequested();
+    }
     if (!textEditor) {
         return;
     }
@@ -1182,6 +1213,13 @@ void CanvasView::endTextEditing() {
     textEditor.reset();  // finishes (undo action)
     Q_EMIT textEditingChanged(false);
     Q_EMIT updateRequested();
+}
+
+CanvasTextInput* CanvasView::getTextInput() const {
+    if (textEditor) {
+        return textEditor.get();
+    }
+    return markdownEditor.get();
 }
 
 double CanvasView::getZoom() const { return viewController.zoom(); }

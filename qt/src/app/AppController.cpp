@@ -53,6 +53,7 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "MarkdownEditor.h"
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "TextFlow.h"
@@ -328,6 +329,16 @@ bool AppController::markdownActive() const { return markdown && markdown->active
 QString AppController::beginMarkdown(int page) { return startMarkdown(page, std::nullopt); }
 
 QString AppController::beginMarkdownBox(int page, double x, double y) { return startMarkdown(page, QPointF(x, y)); }
+
+QVariantMap AppController::takeMarkdownFromPage() {
+    CanvasView* v = canvas();
+    if (!v || !v->getMarkdownEditor()) {
+        return {};
+    }
+    const MarkdownEditor::Target t = v->getMarkdownEditor()->target();
+    v->endTextEditing();
+    return {{"page", static_cast<int>(t.page)}, {"pageText", t.pageText}, {"x", t.x}, {"y", t.y}};
+}
 
 QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     endMarkdown(true);
@@ -995,7 +1006,7 @@ void AppController::setMarkdownFontSize(double size) {
 double AppController::markdownBoxSize() const { return markdownActive() ? markdown->fontSize() : markdownFontSize(); }
 
 bool AppController::markdownInPanel() const {
-    bool on = true;
+    bool on = false;  // (written on the page, formatted while typing)
     app->getSettings()->getCustomElement(CUSTOM).getBool("markdownInPanel", on);
     return on;
 }

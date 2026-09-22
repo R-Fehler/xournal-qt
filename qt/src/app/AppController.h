@@ -96,7 +96,8 @@ class AppController: public QObject {
     Q_PROPERTY(double markdownFontSize READ markdownFontSize WRITE setMarkdownFontSize NOTIFY fontChanged)
     /// Font size of the Markdown text edited beside the page
     Q_PROPERTY(double markdownBoxSize READ markdownBoxSize NOTIFY markdownChanged)
-    /// Markdown text boxes are edited beside the page (the page shows them formatted while typing), else on the page
+    /// Markdown is written beside the page (its source; the page shows it formatted while typing), else on the page
+    /// (formatted while typing, the block with the cursor showing its Markdown)
     Q_PROPERTY(bool markdownInPanel READ markdownInPanel WRITE setMarkdownInPanel NOTIFY fontChanged)
     /// The Markdown text edited beside the page is the page's text (else a text box)
     Q_PROPERTY(bool markdownIsPageText READ markdownIsPageText NOTIFY markdownChanged)
@@ -243,6 +244,9 @@ public:
     /// Start editing the Markdown text box drawn at a point of a page (page coordinates), or a new one there, beside
     /// the page. Returns its source.
     Q_INVOKABLE QString beginMarkdownBox(int page, double x, double y);
+    /// Markdown being written on the page ends there, to be opened beside the page: {page, pageText, x, y} (empty if
+    /// none is written on the page).
+    Q_INVOKABLE QVariantMap takeMarkdownFromPage();
     /// The size of the Markdown text edited beside the page (also the size of new Markdown text from now on).
     Q_INVOKABLE void setMarkdownBoxSize(double size);
     int markdownPage() const { return mdPage; }

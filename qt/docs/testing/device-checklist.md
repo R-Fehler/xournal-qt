@@ -352,6 +352,13 @@ cd build-qt
 - [ ] Text tool, Markdown on, "Write Markdown beside the page" on: tap anywhere: the editor opens ("Markdown text box
       on page …"); the page shows the box formatted while typing, where it was tapped. Done; a tap on it opens it
       again; Ctrl+Z removes it in one step. Off: written on the page (the source while editing).
+- [ ] Writing on the page (the default; font menu: "Write Markdown beside the page" off): tap the page's Markdown
+      text or a Markdown box with the text tool: the cursor is where tapped; type "# Title", Enter, "Some **bold**":
+      the heading is drawn big at once, the line being typed shows "**" grey around bold "bold". Tap the heading:
+      it shows its "# " and the line before is drawn formatted. Arrows, Up / Down over the lines as drawn, Shift to
+      select, Ctrl+B around a word, Ctrl+Z / Ctrl+Shift+Z, Enter in a list (next item; on an empty item it ends),
+      Tab / Shift+Tab. Escape: done; Ctrl+Z removes it all. Long page text: it flows onto new pages while typing and
+      the view follows the cursor. Ctrl+Alt+M: the same text beside the page. The on-screen keyboard types into it.
 - [ ] Select (rectangle or lasso) around a Markdown box: the frame is the drawn box; drag it (formatted while
       dragging), also onto the next page; Delete; Ctrl+Z. After the selection the pen writes into its layer again.
 - [ ] Save, open the file in Xournal++: the page shows the Markdown source as a text, nothing lost; saved there and

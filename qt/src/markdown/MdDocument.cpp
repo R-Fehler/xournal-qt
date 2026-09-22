@@ -6,6 +6,8 @@
 
 #include "md4c.h"
 
+#include "MdText.h"
+
 namespace xqt::md {
 
 namespace {
@@ -344,6 +346,48 @@ Document parse(std::string_view source) {
     };
     md_parse(source.data(), static_cast<MD_SIZE>(source.size()), &parser, &builder);
     return builder.take();
+}
+
+std::vector<BlockSpan> topLevelSpans(std::string_view src, const Document& doc) {
+    using namespace text;
+    std::vector<BlockSpan> spans;
+    size_t prevEnd = 0;
+    for (const Block& b: doc.root.children) {
+        size_t first = 0;
+        if (b.textBegin != NO_SOURCE && b.textBegin >= prevEnd) {
+            first = lineStart(src, b.textBegin);
+            if (b.kind == BlockKind::CodeBlock && b.fenced && first > prevEnd) {
+                first = lineStart(src, first - 1);  // the fence before the code
+            }
+        } else {
+            first = prevEnd;  // (no text, e.g. a rule: its first line that is not blank)
+            while (first < src.size() && blank(lineAt(src, first))) {
+                first = nextLine(src, first);
+            }
+        }
+        first = std::max(first, prevEnd);
+        size_t end = 0;
+        if (b.kind == BlockKind::CodeBlock && b.fenced) {
+            const std::string fence = fenceOf(lineAt(src, first));
+            end = src.size();
+            for (size_t l = nextLine(src, first); l < src.size(); l = nextLine(src, l)) {
+                if (closesFence(lineAt(src, l), fence)) {
+                    end = nextLine(src, l);
+                    break;
+                }
+            }
+        } else if (b.textEnd != NO_SOURCE && b.textEnd > first) {
+            end = nextLine(src, b.textEnd - 1);
+            if (b.kind == BlockKind::Heading && end < src.size() && setextUnderline(lineAt(src, end))) {
+                end = nextLine(src, end);
+            }
+        } else {
+            end = nextLine(src, first);
+        }
+        spans.push_back({first, std::max(end, first)});
+        prevEnd = spans.back().end;
+    }
+    return spans;
 }
 
 std::string plainText(const Block& block) {

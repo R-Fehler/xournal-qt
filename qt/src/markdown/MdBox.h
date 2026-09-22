@@ -32,8 +32,9 @@ constexpr double DEFAULT_WIDTH = 480;
 /// The style a box's text element gives (font family and size, color, width).
 Style styleOf(const Text& text);
 
-/// The layout of a source. Cached per thread (the last boxes drawn there): valid until the next call on this thread.
-const Layout& cachedLayout(const std::string& source, const Style& style);
+/// The layout of a source (`active`: while editing, the source offset of the cursor, see layout()). Cached per thread
+/// (the last boxes drawn there): valid until the next call on this thread.
+const Layout& cachedLayout(const std::string& source, const Style& style, size_t active = NO_SOURCE);
 
 /// Draw a box, in page coordinates (the renderer of upstream's TextView, see model/MarkdownText.h).
 void drawText(const Text& text, cairo_t* cr);

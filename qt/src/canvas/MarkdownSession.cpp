@@ -174,6 +174,7 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
         }
         last = p.box ? p.box->getText() : std::string();
         chain.push_back(std::move(p));
+        ranges = {{0, last.size(), 0}};
         return last;
     }
     // The page's text, from the first page it flows over (pages whose text continues the page before)
@@ -202,7 +203,7 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
     if (chain.front().box) {
         style = md::styleOf(*chain.front().box);
     }
-    last = md::join(slices);
+    last = md::join(slices, &ranges);
     return last;
 }
 
@@ -291,7 +292,9 @@ double MarkdownSession::distribute(const std::string& source) {
         std::shared_lock lock(*doc);
         return frameOf(i < chain.size() ? chain[i].page : chain.back().page);  // (new pages are like the last one)
     };
-    const md::Pagination pages = md::paginate(source, style, frame);
+    const md::Pagination pages =
+            md::paginate(source, style, frame, split.parts.empty() ? nullptr : &split, &splitText);
+    ranges = pages.parts;
     // More pages: added after the text's last page
     while (chain.size() < pages.slices.size()) {
         const PageRef page = addPageAfter(chain.back().page);
@@ -318,6 +321,8 @@ double MarkdownSession::distribute(const std::string& source) {
             setBox(chain[i], "");
         }
     }
+    split = pages;
+    splitText = source;
     return pages.overflow;
 }
 
@@ -346,9 +351,18 @@ double MarkdownSession::update(const std::string& source) {
     }
     if (source != last) {
         last = source;
+        ranges = {{0, last.size(), 0}};
         setBox(chain[0], source);
     }
     return overflow(chain[0]);
+}
+
+std::vector<MarkdownSession::PagePart> MarkdownSession::parts() const {
+    std::vector<PagePart> out;
+    for (size_t i = 0; i < chain.size() && i < ranges.size(); ++i) {
+        out.push_back({chain[i].page, chain[i].box, chain[i].x, chain[i].y, ranges[i]});
+    }
+    return out;
 }
 
 double MarkdownSession::setFontSize(double size) {
@@ -357,6 +371,7 @@ double MarkdownSession::setFontSize(double size) {
     }
     style.size = size;
     if (pageText) {
+        split = {};  // (other sizes: all pages again)
         return distribute(last);
     }
     if (chain[0].box || !last.empty()) {
@@ -450,6 +465,9 @@ void MarkdownSession::end() {
         }
     }
     chain.clear();
+    ranges.clear();
+    split = {};
+    splitText.clear();
     undo = nullptr;
     last.clear();
 }

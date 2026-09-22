@@ -4,14 +4,32 @@ Write Markdown onto a page. The page shows it formatted as you type: headings, *
 `code`, links, lists (nested, numbered, task lists), quotes, code blocks, tables and rules. The dialect is CommonMark
 with GitHub's extensions (tables, strikethrough, task lists, bare web addresses) and `[[wiki links]]`.
 
-## Two ways
-- **The page's Markdown text** is written in the editor beside the page, from the top-left margin to the right
-  margin. It flows onto the next pages (see below).
+## Two kinds of Markdown text, two ways of writing
+- **The page's Markdown text** starts at the top-left margin and goes to the right margin. It flows onto the next
+  pages (see below). The writing button's "Markdown" (or Ctrl+Alt+M) opens it beside the page. With the text tool,
+  a tap on it writes it on the page.
 - **Markdown text boxes** go anywhere on a page. Turn on "Markdown" in the text tool's font menu (hold the text
-  button, or tap it again), then tap where the text should go. With "Write Markdown beside the page" (on by
-  default) a box is written in the editor beside the page like the page's text, and the page shows it formatted
-  while typing. Off, a box is edited on the page like any text box: its source is shown while editing and it is
-  drawn formatted afterwards. A tap on a box (text tool) edits it again, the same way.
+  button, or tap it again), then tap where the text should go. A tap on a box (text tool) edits it again.
+
+Writing:
+- **On the page** (the default): as in Typora or Obsidian's live preview. The text is shown formatted while it is
+  typed, and the block with the cursor shows its Markdown with the marks dimmed. A heading keeps its size and bold
+  stays bold, so `**` around a bold word is grey. Taps put the cursor where they are, in the text as drawn, and a
+  drag selects. The page's text flows over its pages while it is written, and the cursor goes with it.
+  - Keys:
+    - Enter starts a new paragraph. In a list it starts the next item; on an empty item the list ends. In code it
+      starts a new line.
+    - Shift+Enter continues the paragraph on a new line.
+    - Moving: the arrows (with Ctrl, by words; Up and Down go by the lines as drawn), Home and End (with Ctrl, the
+      whole text). Shift selects.
+    - Editing: Backspace and Delete, Ctrl+A / C / X / V.
+    - Formatting: Ctrl+B / I / E / K (bold, italic, code, link), Ctrl+1 / 2 / 3 / 0 (headings), Tab and Shift+Tab
+      (list levels).
+  - Ctrl+Z / Ctrl+Shift+Z undo and redo in the text being written; once it is done, the whole edit is one undo step.
+  - Escape (or a tap elsewhere) is done.
+  - Ctrl+Alt+M opens the same text beside the page.
+- **Beside the page** (the text tool's font menu: "Write Markdown beside the page"): the source in an editor beside
+  the page, and the page shows it formatted while typing.
 
 ## Flowing onto pages
 The page's Markdown text goes on on the next pages when it is longer than the page: while typing, it is split onto
@@ -78,11 +96,10 @@ drawn (canvas, thumbnails, previews, PDF export) through small seams in upstream
 The drawing is vector (Pango / Cairo, as upstream's texts). In the PDF the text stays text. The layout does not
 depend on the zoom, so lines break at the same places on the canvas, in the thumbnails and in the PDF.
 
-Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`), `qt/src/canvas/MarkdownSession.*`,
-`qt/src/app/qml/MarkdownPanel.qml`. The parser is md4c (vendored, `qt/3rdparty/md4c`).
+Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`), `qt/src/canvas/MarkdownSession.*`
+(editing, pages), `qt/src/canvas/MarkdownEditor.*` (on the page), `qt/src/app/qml/MarkdownPanel.qml` (beside it). The parser is md4c (vendored, `qt/3rdparty/md4c`).
 
 ## Not yet
 - Images.
-- Editing directly on the page (live preview).
 - Flattening into Text mode.
 - Math.

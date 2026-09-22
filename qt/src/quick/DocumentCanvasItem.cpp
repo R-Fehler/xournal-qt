@@ -391,8 +391,8 @@ void DocumentCanvasItem::releaseResources() { viewReplaced = true; }
 
 bool DocumentCanvasItem::event(QEvent* e) {
     // While editing text, typing keys belong to the editor, not to the window's shortcuts (Ctrl+C, Delete, ...).
-    if (e->type() == QEvent::ShortcutOverride && canvasView && canvasView->getTextEditor() &&
-        xqt::TextEditor::wantsKey(static_cast<QKeyEvent*>(e))) {
+    if (e->type() == QEvent::ShortcutOverride && canvasView && canvasView->getTextInput() &&
+        canvasView->getTextInput()->wantsKeyEvent(static_cast<QKeyEvent*>(e))) {
         e->accept();
         return true;
     }
@@ -400,7 +400,7 @@ bool DocumentCanvasItem::event(QEvent* e) {
 }
 
 void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
-    xqt::TextEditor* editor = canvasView ? canvasView->getTextEditor() : nullptr;
+    xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr;
     bool finish = false;
     if (editor && editor->keyPressed(e, finish)) {
         if (finish) {
@@ -416,7 +416,7 @@ void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
 }
 
 void DocumentCanvasItem::inputMethodEvent(QInputMethodEvent* e) {
-    if (xqt::TextEditor* editor = canvasView ? canvasView->getTextEditor() : nullptr) {
+    if (xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr) {
         editor->inputMethodEvent(e);
         e->accept();
         return;
@@ -425,7 +425,7 @@ void DocumentCanvasItem::inputMethodEvent(QInputMethodEvent* e) {
 }
 
 QVariant DocumentCanvasItem::inputMethodQuery(Qt::InputMethodQuery query) const {
-    xqt::TextEditor* editor = canvasView ? canvasView->getTextEditor() : nullptr;
+    xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr;
     if (!editor) {
         return query == Qt::ImEnabled ? QVariant(false) : QQuickItem::inputMethodQuery(query);
     }

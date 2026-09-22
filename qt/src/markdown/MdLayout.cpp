@@ -10,6 +10,7 @@
 #include "util/StringUtils.h"
 
 #include "MdHighlight.h"
+#include "MdText.h"
 
 namespace xqt::md {
 
@@ -21,6 +22,7 @@ constexpr Color INLINE_CODE_BACKGROUND(0xeb, 0xed, 0xf0);
 constexpr Color RULE_COLOR(0xd0, 0xd7, 0xde);
 constexpr Color MUTED(0x57, 0x60, 0x6a);
 constexpr Color TABLE_HEADER_BACKGROUND(0xf6, 0xf8, 0xfa);
+constexpr Color MARKER(0x9a, 0xa0, 0xa6);
 
 constexpr double LINE_SPACING = 1.25;
 constexpr double CODE_LINE_SPACING = 1.15;
@@ -85,7 +87,7 @@ struct Laid {
 
 class Layouter {
 public:
-    explicit Layouter(const Style& style): st(style) {}
+    Layouter(const Style& style, std::string_view source, size_t active): st(style), source(source), active(active) {}
 
     Layout run(const Document& doc) {
         out.links = doc.links;
@@ -94,11 +96,35 @@ public:
         continuedListStart = continuationStart(doc);
         Ctx c;
         c.color = st.color;
+        // Editing: the block with the cursor (or the blank lines after it) is laid out as its source
+        size_t rawBlockIndex = blocks.size();
+        size_t rawEnd = source.size();
+        if (active != NO_SOURCE) {
+            const auto spans = topLevelSpans(source, doc);
+            for (size_t i = 0; i < spans.size(); ++i) {
+                if (spans[i].begin <= active || i == 0) {
+                    rawBlockIndex = i;
+                    rawEnd = i + 1 < spans.size() ? spans[i + 1].begin : source.size();
+                }
+            }
+            if (blocks.empty()) {
+                rawBlock(nullptr, 0, source.size(), c);  // (an empty text: a line for the cursor)
+            } else {
+                rawSpan = spans[rawBlockIndex];
+                if (rawBlockIndex == 0) {
+                    rawSpan.begin = 0;  // (blank lines before the first block are its)
+                }
+            }
+        }
         for (size_t i = 0; i < blocks.size(); ++i) {
             top = i;
             current = {};
             const size_t first = out.items.size();
-            block(blocks[i], 0, st.width, c);
+            if (i == rawBlockIndex) {
+                rawBlock(&blocks[i], rawSpan.begin, rawEnd, c);
+            } else {
+                block(blocks[i], 0, st.width, c);
+            }
             Layout::Extent e{y, y};
             if (out.items.size() > first) {
                 e = {out.items[first].y, out.items[first].y};
@@ -193,6 +219,10 @@ private:
             if (r.flags & Math) {
                 insert(attrs, pango_attr_family_new("Serif"), from, to);
                 insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC), from, to);
+            }
+            if (r.flags & Marker) {
+                insert(attrs, pango_attr_foreground_new(u16(MARKER.red), u16(MARKER.green), u16(MARKER.blue)), from,
+                       to);
             }
         }
         for (const CodeSpan& c: code) {  // syntax highlighting
@@ -571,7 +601,112 @@ private:
         return static_cast<unsigned>(std::strtoul(s.c_str() + at + 6, nullptr, 10));
     }
 
+    /// The block with the cursor, as its source: the text of its runs keeps its formatting, the marks between them
+    /// are dimmed. Its item's text is exactly source[begin, end) (without a last line break, unless the cursor is
+    /// after it), so a place in it is a place in the source.
+    void rawBlock(const Block* b, size_t begin, size_t end, const Ctx& c) {
+        using namespace text;
+        std::string raw(source.substr(begin, end - begin));
+        if (!raw.empty() && raw.back() == '\n' && active < end) {
+            raw.pop_back();
+        }
+        const size_t rawEnd = begin + raw.size();
+        std::vector<const Run*> content;
+        if (b) {
+            collectRuns(*b, begin, rawEnd, content);
+        }
+        std::sort(content.begin(), content.end(), [](const Run* a, const Run* z) { return a->source < z->source; });
+        std::vector<Run> runs;
+        size_t pos = begin;
+        const auto marks = [&](size_t to) {
+            if (to > pos) {
+                Run m;
+                m.text = raw.substr(pos - begin, to - pos);
+                m.flags = Marker;
+                m.source = pos;
+                m.sourceLength = to - pos;
+                runs.push_back(std::move(m));
+                pos = to;
+            }
+        };
+        for (const Run* r: content) {
+            if (r->source < pos) {
+                continue;
+            }
+            marks(r->source);
+            runs.push_back(*r);
+            pos = r->source + r->sourceLength;
+        }
+        marks(rawEnd);
+        if (runs.empty()) {
+            Run empty;
+            empty.source = begin;
+            runs.push_back(empty);
+        }
+
+        const BlockKind kind = b ? b->kind : BlockKind::Paragraph;
+        TextOptions o{st.size, false, false, st.width};
+        std::vector<CodeSpan> code;
+        double pad = 0;
+        if (kind == BlockKind::Heading) {
+            o = {st.size * headingScale(b->level), true, false, st.width, 1.15};
+        } else if (kind == BlockKind::CodeBlock || kind == BlockKind::Table || kind == BlockKind::Html) {
+            pad = kind == BlockKind::CodeBlock ? 0.6 * st.size : 0;
+            o = {st.size * 0.88, false, true, st.width - 2 * pad, CODE_LINE_SPACING};
+            if (kind == BlockKind::CodeBlock && b->fenced) {
+                // Highlighted as when drawn: the lines between the fences
+                const size_t from = nextLine(source, begin);
+                const std::string fence = fenceOf(lineAt(source, begin));
+                size_t to = from;
+                while (to < rawEnd && !closesFence(lineAt(source, to), fence)) {
+                    to = nextLine(source, to);
+                }
+                to = std::min(to, rawEnd);
+                if (from < to) {
+                    for (CodeSpan s: highlight(std::string(source.substr(from, to - from)),
+                                               b->language.empty() ? b->info : b->language)) {
+                        s.start += static_cast<int>(from - begin);
+                        code.push_back(s);
+                    }
+                }
+            }
+        }
+        margin(kind == BlockKind::Heading ? o.size * 0.8 : 0.75 * st.size);
+        open();
+        auto l = text(runs, o, code);
+        const double h = pangoHeight(l.get());
+        size_t index = 0;
+        if (pad > 0) {
+            addFill(0, y, st.width, h + 2 * pad, CODE_BACKGROUND);
+            index = addText(std::move(l), pad, y + pad, c.color);
+        } else {
+            index = addText(std::move(l), 0, y, c.color);
+        }
+        y += h + 2 * pad;
+        mainItem(index);
+        out.rawItem = static_cast<int>(index);
+        out.rawBegin = begin;
+        out.rawEnd = rawEnd;
+        margin(kind == BlockKind::Heading ? o.size * 0.45 : 0.75 * st.size);
+    }
+
+    static void collectRuns(const Block& b, size_t from, size_t to, std::vector<const Run*>& out) {
+        for (const Run& r: b.runs) {
+            // (only text that is the source as it is: not made-up breaks, not entities)
+            if (r.source != NO_SOURCE && r.sourceLength == r.text.size() && r.source >= from &&
+                r.source + r.sourceLength <= to && r.sourceLength > 0) {
+                out.push_back(&r);
+            }
+        }
+        for (const Block& child: b.children) {
+            collectRuns(child, from, to, out);
+        }
+    }
+
     const Style& st;
+    std::string_view source;
+    size_t active;
+    BlockSpan rawSpan;
     Layout out;
     Layout::Extent current;  ///< item and parts of the top-level block being laid out
     int nesting = 0;         ///< in a list or quote
@@ -589,7 +724,9 @@ double headingScale(int level) {
     return scales[std::clamp(level, 1, 6) - 1];
 }
 
-Layout layout(const Document& doc, const Style& style) { return Layouter(style).run(doc); }
+Layout layout(const Document& doc, const Style& style, std::string_view source, size_t active) {
+    return Layouter(style, source, active).run(doc);
+}
 
 std::optional<LinkHit> linkAt(const Layout& layout, double x, double y) {
     for (const Item& it: layout.items) {

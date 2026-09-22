@@ -274,8 +274,8 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
         this->selector->currentPos(x, y);
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextMove(*this, x, y);
-    } else if (TextEditor* editor = view.getTextEditor(); editor && &editor->getPage() == this &&
-                                                            h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
+    } else if (CanvasTextInput* editor = view.getTextInput(); editor && &editor->getPage() == this &&
+                                                                h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
         editor->mouseMoved(x, y);  // drag: select text
     } else if (h->getToolType() == TOOL_ERASER && h->getEraserType() != ERASER_TYPE_WHITEOUT && this->inEraser) {
         this->eraser->erase(x, y);
