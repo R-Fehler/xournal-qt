@@ -135,11 +135,13 @@ void DocumentCanvasItem::setView(QObject* object) {
     }
     if (canvasView) {
         disconnect(canvasView, nullptr, this, nullptr);
+        canvasView->setShown(false);
     }
     input.reset();
     canvasView = v;
     viewReplaced = true;
     if (canvasView) {
+        canvasView->setShown(true);
         input = std::make_unique<xqt::CanvasInput>(*canvasView);
         connect(canvasView, &xqt::CanvasView::updateRequested, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &QQuickItem::update);

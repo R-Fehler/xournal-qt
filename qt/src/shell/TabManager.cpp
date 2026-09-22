@@ -160,17 +160,6 @@ int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
 
 void TabManager::listenTo(Tab& tab) {
     DocumentSession* s = tab.session.get();
-    CanvasView* v = tab.view.get();
-    if (!tab.releaseTimer) {
-        tab.releaseTimer = std::make_unique<QTimer>();
-        tab.releaseTimer->setSingleShot(true);
-    }
-    tab.releaseTimer->disconnect();
-    connect(tab.releaseTimer.get(), &QTimer::timeout, this, [v] {
-        for (size_t i = 0; i < v->pageCount(); ++i) {
-            v->getPage(i)->deleteViewBuffer();
-        }
-    });
     connect(s, &DocumentSession::modifiedChanged, this, [this, s] { tabDataChanged(s, {ModifiedRole, ThumbnailRole}); });
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
@@ -206,8 +195,6 @@ std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
     DocumentSession* s = tabs[static_cast<size_t>(index)].session.get();
     disconnect(s, nullptr, this, nullptr);
     disconnect(&s->search(), nullptr, this, nullptr);
-    tabs[static_cast<size_t>(index)].releaseTimer->stop();
-    tabs[static_cast<size_t>(index)].releaseTimer->disconnect();
 
     std::unique_ptr<Tab> tab;
     beginRemoveRows(QModelIndex(), index, index);
@@ -292,12 +279,11 @@ void TabManager::setCurrentIndex(int index) {
 }
 
 void TabManager::backgroundChanged(int oldCurrent) {
+    // (what the tab in the background keeps of its rendered pages: CanvasMemory)
     if (oldCurrent >= 0 && oldCurrent < count() && oldCurrent != current) {
-        tabs[static_cast<size_t>(oldCurrent)].releaseTimer->start(releaseDelayMs);
         Q_EMIT dataChanged(index(oldCurrent), index(oldCurrent), {CurrentRole});
     }
     if (current >= 0) {
-        tabs[static_cast<size_t>(current)].releaseTimer->stop();
         Q_EMIT dataChanged(index(current), index(current), {CurrentRole});
     }
 }

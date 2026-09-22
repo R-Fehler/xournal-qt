@@ -18,6 +18,8 @@
 #include <gtest/gtest.h>
 
 #include "model/Document.h"
+#include "model/XojPage.h"
+#include "pdf/base/XojPdfDocument.h"
 #include "session/DocumentSession.h"
 #include "shell/PageSketches.h"
 #include "shell/PagesModel.h"
@@ -338,4 +340,37 @@ TEST_F(Sketches, benchBigPdf) {
               << maxLockWait / 1000.0 << " ms; longest UI gap " << maxGap << " ms; "
               << PageSketches::instance().bytes() / 1024 << " kB; longest PDF draw of the canvas meanwhile "
               << maxCanvasDraw << " ms\n";
+}
+
+// XQT_BENCH_PDF=<pdf>: what drawing a page costs at different widths (poppler: parsing and decoding are paid at any
+// size), each width with a fresh instance of the PDF.
+TEST_F(Sketches, benchWidths) {
+    const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
+    if (pdf.isEmpty()) {
+        GTEST_SKIP() << "set XQT_BENCH_PDF";
+    }
+    QTemporaryDir dir;
+    const QString copy = dir.filePath("bench.pdf");
+    ASSERT_TRUE(QFile::copy(pdf, copy));
+    PageSketches::instance().setDelays(600000, 600000);
+    AppController c;
+    ASSERT_TRUE(c.openPath(copy));
+    Document* doc = c.tabManager().currentSession()->getDocument();
+    const size_t pages = std::min<size_t>(doc->getPageCount(), 40);
+    for (int width: {128, 512, 1024, 2400}) {
+        XojPdfDocument own;
+        GError* error = nullptr;
+        ASSERT_TRUE(own.load(copy.toStdString(), "", &error));
+        qint64 total = 0, worst = 0;
+        for (size_t p = 0; p < pages; ++p) {
+            PageRef page = doc->getPage(p);
+            QElapsedTimer t;
+            t.start();
+            ThumbnailProvider::renderPage(*doc, page, width, &own);
+            total += t.elapsed();
+            worst = std::max(worst, t.elapsed());
+        }
+        std::cout << width << " px: " << total / static_cast<qint64>(pages) << " ms per page, worst " << worst
+                  << " ms\n";
+    }
 }

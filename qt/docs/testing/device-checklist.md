@@ -43,6 +43,13 @@ cd build-qt
 ## Tabs (M5a)
 - [ ] Open several files: each opens in its own tab; opening a file from the file manager while the app runs adds a tab to the running window.
 - [ ] Switching tabs keeps each tab's zoom, scroll position and undo history.
+- [ ] Open a big, slow PDF, read a page and wait a few seconds: then scrolling forward (and a bit back) shows the
+      pages at once, sharp, without rendering. More pages ahead are ready than behind.
+- [ ] While pages are being rendered ahead (right after opening or after zooming), scrolling and writing stay smooth
+      and a page jumped to far away is not slower than before.
+- [ ] Settings → Documents → Memory: "Rendered pages of the open documents" defaults to a quarter of the RAM and
+      goes up to a third. Switch between two big documents: the one just left still shows its pages at once when you
+      come back (unless the memory was needed for the other one).
 - [ ] Closing a tab with unsaved changes asks first; quitting asks for every modified tab.
 - [ ] A tap with one finger (or a middle click) on a tab only switches to it; only the × closes it.
 - [ ] Menus opened by a finger or pen (tab menu, layout and zoom in the pill, tool bar menus, library menus) appear at the button or at the finger, not at the last mouse position.

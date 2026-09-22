@@ -36,7 +36,7 @@ public:
     TestHost(Document* doc, Settings* settings, RasterParams params):
             doc(doc), cache(std::make_unique<PdfCache>(doc->getPdfDocument(), settings)), params(params) {}
     Document* rasterDocument() const override { return doc; }
-    PdfCache* rasterPdfCache() const override { return cache.get(); }
+    PdfCache* rasterPdfCache(bool) const override { return cache.get(); }
     RasterParams rasterParams() const override { return params; }
     void rasterUpdated(PageRaster*, std::optional<xoj::util::Rectangle<double>> area) override {
         ++updates;

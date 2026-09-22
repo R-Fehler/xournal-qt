@@ -8,6 +8,7 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QBuffer>
+#include <QThreadPool>
 
 #include "control/PdfCache.h"
 #include "model/LineStyle.h"
@@ -44,6 +45,9 @@
 #include "model/DocumentChangeType.h"
 #include "render/RenderService.h"
 
+#include "pdf/base/XojPdfDocument.h"
+
+#include "CanvasMemory.h"
 #include "CanvasPage.h"
 #include "TextEditor.h"
 #include "session/AppContext.h"
@@ -62,7 +66,9 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         session(session),
         renderService(*session.getApp().getRenderService()),
         viewController(&layout) {
-    pdfCache = std::make_unique<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
+    pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
+    // (the rendered pages are kept by CanvasMemory: the PDF cache only serves edits of the visible ones)
+    pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
     registerListener(&session);
     session.setXournalView(this);
     session.setZoomControl(&zoomControl);
@@ -109,13 +115,12 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         }
     });
 
-    releaseTimer.setSingleShot(true);
-    releaseTimer.setInterval(1000);
-    connect(&releaseTimer, &QTimer::timeout, this, &CanvasView::releaseFarBuffers);
     updateRenderParams();
+    CanvasMemory::instance().add(this);
 }
 
 CanvasView::~CanvasView() {
+    CanvasMemory::instance().remove(this);
     geometry.hide();  // before its page goes
     endTextEditing();
     pdfSelection.reset();
@@ -1186,7 +1191,7 @@ void CanvasView::updateVisibility() {
         // Render visible pages that have no buffer or a buffer at another zoom/resolution (the render service defers
         // this while a zoom gesture is running).
         if (!info.valid || info.zoom != zoom || info.dpiScale != dpr) {
-            page->rerenderPage();
+            page->getRaster().ensureRendered(false);
         }
         const QRectF inter = layout.pageRect(i, zoom).intersected(visible);
         if (const double area = inter.width() * inter.height(); area > bestArea) {
@@ -1196,21 +1201,143 @@ void CanvasView::updateVisibility() {
     }
     // Upstream Layout::updateVisibility: the most visible page becomes the current one.
     session.setCurrentPageNo(mostVisible);
-    releaseTimer.start();
+    if (shown) {
+        CanvasMemory::instance().used(this);  // (plans what to keep and render in advance once this pauses)
+    }
 }
 
-void CanvasView::releaseFarBuffers() {
-    // Upstream XournalView::cleanupBufferCache: keep the visible pages plus a preload window.
-    const auto [first, last] = visiblePages();
-    const size_t before = session.getSettings()->getPreloadPagesBefore();
-    const size_t after = session.getSettings()->getPreloadPagesAfter();
-    const size_t keepFrom = first > before ? first - before : 0;
-    const size_t keepTo = last + after;
-    for (size_t i = 0; i < pages.size(); ++i) {
-        if (i < keepFrom || i > keepTo) {
+// --- memory ----------------------------------------------------------------------------------------------------------
+
+void CanvasView::setShown(bool value) {
+    shown = value;
+    if (shown) {
+        CanvasMemory::instance().used(this);
+    }
+}
+
+qint64 CanvasView::bufferBytes() const {
+    qint64 sum = 0;
+    for (const auto& p: pages) {
+        if (const auto info = p->bufferInfo(); info.valid) {
+            sum += static_cast<qint64>(info.pixelSize.width()) * info.pixelSize.height() * 4;
+        }
+    }
+    return sum;
+}
+
+qint64 CanvasView::pageBytes(size_t index) const {
+    const QRectF r = layout.pageRect(index, viewController.zoom());
+    const qint64 atZoom = static_cast<qint64>(std::ceil(r.width() * dpr)) * static_cast<qint64>(std::ceil(r.height() * dpr)) * 4;
+    const auto info = pages[index]->bufferInfo();
+    return info.valid ? std::max(atZoom, static_cast<qint64>(info.pixelSize.width()) * info.pixelSize.height() * 4)
+                      : atZoom;
+}
+
+qint64 CanvasView::planCache(qint64 share) {
+    const size_t n = pages.size();
+    if (n == 0) {
+        window = {1, 0};
+        return 0;
+    }
+    auto [first, last] = visiblePages();
+    if (first > last || last >= n) {
+        first = last = std::min(session.getCurrentPageNo(), n - 1);
+    }
+    qint64 planned = 0;
+    for (size_t i = first; i <= last; ++i) {
+        planned += pageBytes(i);  // (the visible pages always stay)
+    }
+    // Of the rest: 35 % before, 65 % after; where one side has no more pages, the other gets the rest
+    const qint64 rest = std::max<qint64>(0, share - planned);
+    qint64 beforeBudget = static_cast<qint64>(static_cast<double>(rest) * CanvasMemory::BEFORE_SHARE);
+    qint64 afterBudget = rest - beforeBudget;
+    size_t from = first, to = last;
+    qint64 before = 0, after = 0;
+    auto growAfter = [&] {
+        while (to + 1 < n && after + pageBytes(to + 1) <= afterBudget) {
+            after += pageBytes(++to);
+        }
+    };
+    auto growBefore = [&] {
+        while (from > 0 && before + pageBytes(from - 1) <= beforeBudget) {
+            before += pageBytes(--from);
+        }
+    };
+    growAfter();
+    growBefore();
+    if (to + 1 == n) {
+        beforeBudget = rest - after;
+        growBefore();
+    } else if (from == 0) {
+        afterBudget = rest - before;
+        growAfter();
+    }
+    window = {from, to};
+    for (size_t i = 0; i < n; ++i) {
+        if (i < from || i > to) {
             pages[i]->deleteViewBuffer();
         }
     }
+    // The PDF cache: the visible pages (edits re-render parts of them)
+    std::unordered_set<size_t> visiblePdf;
+    for (size_t i = first; i <= last; ++i) {
+        if (pages[i]->getPage()->getBackgroundType().isPdfPage()) {
+            visiblePdf.insert(pages[i]->getPage()->getPdfPageNr());
+        }
+    }
+    evictPdfCache(std::move(visiblePdf));
+
+    // In advance: nearest first, the two sides in the proportion of their parts
+    renderService.dropQueued(RenderService::Priority::Preload);
+    const double zoom = viewController.zoom();
+    const auto current = static_cast<std::ptrdiff_t>(session.getCurrentPageNo());
+    size_t a = last + 1;
+    auto b = static_cast<std::ptrdiff_t>(first) - 1;
+    qint64 doneAfter = 0, doneBefore = 0;
+    const auto start = static_cast<std::ptrdiff_t>(from);
+    while (a <= to || b >= start) {
+        const bool takeAfter =
+                b < start || (a <= to && static_cast<double>(doneAfter) * CanvasMemory::BEFORE_SHARE <=
+                                                 static_cast<double>(doneBefore) * (1 - CanvasMemory::BEFORE_SHARE));
+        const size_t i = takeAfter ? a++ : static_cast<size_t>(b--);
+        (takeAfter ? doneAfter : doneBefore) += pageBytes(i);
+        const auto info = pages[i]->bufferInfo();
+        const bool near = std::abs(static_cast<std::ptrdiff_t>(i) - current) <= CanvasMemory::NEAR_PAGES;
+        if (!info.valid || (near && (info.zoom != zoom || info.dpiScale != dpr))) {
+            pages[i]->getRaster().ensureRendered(true);
+        }
+    }
+    return planned + before + after;
+}
+
+void CanvasView::evictPdfCache(std::unordered_set<size_t> keep) {
+    QThreadPool::globalInstance()->start([cache = pdfCache, keep = std::move(keep)] { cache->evictAllExcept(keep); });
+}
+
+qint64 CanvasView::trimTo(qint64 allowed) {
+    evictPdfCache({});
+    const auto [first, last] = visiblePages();
+    const auto current = static_cast<std::ptrdiff_t>(session.getCurrentPageNo());
+    qint64 held = 0;
+    std::vector<std::pair<std::ptrdiff_t, size_t>> farthestFirst;  // distance, page
+    for (size_t i = 0; i < pages.size(); ++i) {
+        if (const auto info = pages[i]->bufferInfo(); info.valid) {
+            held += static_cast<qint64>(info.pixelSize.width()) * info.pixelSize.height() * 4;
+            if (!(shown && i >= first && i <= last)) {  // (shown in another window: its visible pages stay)
+                farthestFirst.emplace_back(std::abs(static_cast<std::ptrdiff_t>(i) - current), i);
+            }
+        }
+    }
+    std::sort(farthestFirst.begin(), farthestFirst.end(), std::greater<>());
+    for (const auto& [distance, i]: farthestFirst) {
+        if (held <= allowed) {
+            break;
+        }
+        const auto info = pages[i]->bufferInfo();
+        held -= static_cast<qint64>(info.pixelSize.width()) * info.pixelSize.height() * 4;
+        pages[i]->deleteViewBuffer();
+    }
+    return held;
 }
 
 // --- XournalView ---------------------------------------------------------------------------------------------------
@@ -1223,8 +1350,51 @@ void CanvasView::layerChanged(size_t page) {
     }
 }
 
+PdfCache* CanvasView::rasterPdfCache(bool background) const {
+    if (!background) {
+        return pdfCache.get();
+    }
+    std::lock_guard lock(backgroundPdfMutex);
+    if (!backgroundPdfLoaded) {
+        backgroundPdfLoaded = true;
+        fs::path path;
+        size_t count = 0;
+        {
+            Document* doc = session.getDocument();
+            std::shared_lock docLock(*doc);
+            count = doc->getPdfPageCount();
+            if (count > 0) {
+                path = doc->getPdfFilepath();
+            }
+        }
+        if (!path.empty()) {
+            XojPdfDocument own;
+            GError* error = nullptr;
+            // (not loadable, e.g. with a password, or changed on disk: the document's own instance)
+            if (own.load(path, "", &error) && own.getPageCount() == count) {
+                backgroundPdfCache = std::make_unique<PdfCache>(own, nullptr);  // (keeps nothing: size 0)
+            }
+            if (error) {
+                g_error_free(error);
+            }
+        }
+    }
+    return backgroundPdfCache ? backgroundPdfCache.get() : pdfCache.get();
+}
+
 void CanvasView::recreatePdfCache() {
-    pdfCache = std::make_unique<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
+    // The old ones may still be in use by a render: they go with the view (empty)
+    evictPdfCache({});
+    retiredPdfCaches.push_back(std::move(pdfCache));
+    {
+        std::lock_guard lock(backgroundPdfMutex);
+        if (backgroundPdfCache) {
+            retiredPdfCaches.push_back(std::move(backgroundPdfCache));
+        }
+        backgroundPdfLoaded = false;
+    }
+    pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
+    pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
     for (auto& p: pages) {
         p->rerenderPage();
     }

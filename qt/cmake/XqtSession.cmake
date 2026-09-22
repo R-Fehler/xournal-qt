@@ -34,6 +34,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasView.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasView.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasMemory.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasMemory.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/GeometryToolLayer.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/GeometryToolLayer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.h

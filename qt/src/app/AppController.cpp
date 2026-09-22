@@ -93,6 +93,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     loadCustomWidths();
     SettingsModel::applyPreviewMemory(*app->getSettings());
+    SettingsModel::applyCanvasMemory(*app->getSettings());
 
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);

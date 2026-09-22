@@ -9,6 +9,7 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <iostream>
 #include <QFile>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
@@ -1697,10 +1698,11 @@ TEST_F(MainWindowTest, sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDow
     // Racing to the end: the pages that come into view have their sketch only
     auto* race = list->property("race").value<QObject*>();
     ASSERT_NE(race, nullptr);
+    // (it calms down 150 ms after the last move: not while this test is slow under load)
+    race->property("calm").value<QObject*>()->setProperty("interval", 60000);
     race->setProperty("racing", true);
     const int last = controller->pageCount() - 1;
     QMetaObject::invokeMethod(list, "positionViewAtIndex", Q_ARG(int, last), Q_ARG(int, 2 /* ListView.End */));
-    race->setProperty("racing", true);  // (the jump itself counts as racing, but the timer would calm it)
     until([&] { return itemAt(list, last) != nullptr; });
     auto [lastSketch, lastSharp] = parts(itemAt(list, last));
     ASSERT_NE(lastSketch, nullptr);

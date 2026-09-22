@@ -153,22 +153,6 @@ TEST(Tabs, modelDataAndMoving) {
     EXPECT_EQ(tabs.data(tabs.index(1), TabManager::TitleRole).toString(), "test1.xoj");
 }
 
-TEST(Tabs, backgroundTabsReleaseTheirPageBuffers) {
-    AppController c;
-    ASSERT_TRUE(c.openPath(fixture(u8"test1.xoj")));
-    TabManager& tabs = c.tabManager();
-    tabs.setBackgroundReleaseDelay(50);
-    CanvasView* first = tabs.view(0);
-    first->getViewController().setViewSize(QSizeF(800, 1000));
-    processEvents(100);
-    c.context().getRenderService()->waitForIdle();
-    processEvents(50);
-    ASSERT_TRUE(first->getPage(0)->bufferInfo().valid) << "visible page of the current tab should be rendered";
-    c.newDocument();  // first tab goes to the background
-    processEvents(200);
-    EXPECT_FALSE(first->getPage(0)->bufferInfo().valid) << "background tab kept its buffers";
-}
-
 TEST(SingleInstanceTest, filesAreHandedToTheRunningInstance) {
     const QString key = QString("xqt-test-%1").arg(QCoreApplication::applicationPid());
     SingleInstance primary(key);

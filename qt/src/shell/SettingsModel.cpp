@@ -18,6 +18,8 @@
 #include "session/AppContext.h"
 #include "shell/Thumbnails.h"
 
+#include "CanvasMemory.h"
+
 namespace xqt {
 
 namespace {
@@ -44,6 +46,19 @@ int SettingsModel::previewMemory(Settings& s) {
     s.getCustomElement("xournalQt").getInt("previewMemory", mb);
     return mb;
 }
+
+int SettingsModel::canvasMemory(Settings& s) {
+    int mb = 0;  // (not set: follows the machine)
+    s.getCustomElement("xournalQt").getInt("canvasMemory", mb);
+    const int maxMb = static_cast<int>(CanvasMemory::maxLimit() / (1024 * 1024));
+    return mb > 0 ? std::min(mb, maxMb) : static_cast<int>(CanvasMemory::defaultLimit() / (1024 * 1024));
+}
+
+void SettingsModel::applyCanvasMemory(Settings& s) {
+    CanvasMemory::instance().setLimit(static_cast<qint64>(canvasMemory(s)) * 1024 * 1024);
+}
+
+int SettingsModel::systemMemory() const { return static_cast<int>(CanvasMemory::systemMemory() / (1024 * 1024)); }
 
 void SettingsModel::applyPreviewMemory(Settings& s) {
     ThumbnailProvider::setCacheLimit(static_cast<qint64>(previewMemory(s)) * 1024 * 1024);
@@ -110,6 +125,13 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         [&s](const QVariant& v) {
             s.getCustomElement("xournalQt").setBool("resumeAtLastPage", v.toBool());
             s.customSettingsChanged();
+        });
+    add("canvasMemory", [&s] { return QVariant(canvasMemory(s)); },
+        [&s](const QVariant& v) {
+            const int maxMb = static_cast<int>(CanvasMemory::maxLimit() / (1024 * 1024));
+            s.getCustomElement("xournalQt").setInt("canvasMemory", std::clamp(v.toInt(), std::min(256, maxMb), maxMb));
+            s.customSettingsChanged();
+            applyCanvasMemory(s);
         });
     add("previewMemory", [&s] { return QVariant(previewMemory(s)); },
         [&s](const QVariant& v) {

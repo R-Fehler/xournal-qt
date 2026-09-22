@@ -5,9 +5,9 @@
  *  - owns one CanvasPage per document page, the page layout and the view controller (zoom/scroll);
  *  - implements the shadow XournalView interface (what reused upstream code reaches via control->getWindow()) and
  *    DocumentListener (pages inserted, deleted, resized, changed);
- *  - is the RasterHost of the page rasters (document, PDF cache, render zoom) and keeps the rendered buffers in
- *    line with the visible area: visible pages are rendered at the current zoom (after zoom gestures settle, like
- *    upstream), buffers of pages far outside the viewport are released (upstream's preload window).
+ *  - is the RasterHost of the page rasters (document, PDF cache, render zoom): visible pages are rendered at the
+ *    current zoom (after zoom gestures settle, like upstream); which other pages keep their buffers and which are
+ *    rendered in advance is planned by CanvasMemory (planCache, trimTo).
  *
  * @license GNU GPLv2 or later
  */
@@ -15,7 +15,9 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 #include <QObject>
@@ -72,6 +74,21 @@ public:
     void setDevicePixelRatio(double dpr);
     double devicePixelRatio() const { return dpr; }
 
+    // --- memory (CanvasMemory) --------------------------------------------------------------------------------
+    /// Shown in a window (DocumentCanvasItem): scrolling in it makes it the current view of CanvasMemory.
+    void setShown(bool shown);
+    bool isShown() const { return shown; }
+    /// Bytes of the rendered page buffers
+    qint64 bufferBytes() const;
+    /// The current view: keep the visible pages and, within `share` bytes, 35 % before and 65 % after them; render
+    /// those in advance; release the others. Returns the bytes planned.
+    qint64 planCache(qint64 share);
+    /// A view in the background: release the pages farthest from its current page until it holds at most
+    /// `allowed` bytes. Returns what it holds then.
+    qint64 trimTo(qint64 allowed);
+    /// Pages from `first` to `last` keep their buffers (the window of the last planCache; tests)
+    std::pair<size_t, size_t> cacheWindow() const { return window; }
+
     // --- XournalView (shadow) ---------------------------------------------------------------------------------
     size_t getCurrentPage() const override;
     void layerChanged(size_t page) override;
@@ -79,7 +96,7 @@ public:
 
     // --- RasterHost (rasterParams is called from render threads) -----------------------------------------------
     Document* rasterDocument() const override;
-    PdfCache* rasterPdfCache() const override { return pdfCache.get(); }
+    PdfCache* rasterPdfCache(bool background) const override;
     RasterParams rasterParams() const override;
     void rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rectangle<double>> area) override;
 
@@ -232,20 +249,31 @@ private:
     void refreshLayout();
     DocumentLayout::Config layoutConfig() const;
     void updateVisibility();
-    void releaseFarBuffers();
     void updateRenderParams();
+    /// What a buffer of the page at the current zoom takes (bytes), or what its buffer takes if that is more
+    qint64 pageBytes(size_t index) const;
 
     DocumentSession& session;
     RenderService& renderService;
     DocumentLayout layout;
     ZoomControl zoomControl;  ///< upstream's zoom values for reused tools (from the view controller)
     ViewController viewController;
-    std::unique_ptr<PdfCache> pdfCache;
+    /// (shared: its entries are evicted by a worker, which may still run when the view goes)
+    std::shared_ptr<PdfCache> pdfCache;
+    /// Evict the PDF cache but for these PDF pages, on a worker (it waits for a running PDF render)
+    void evictPdfCache(std::unordered_set<size_t> keep);
+    /// For pages rendered in advance: an instance of the PDF of their own (loaded on first use, by a worker)
+    mutable std::mutex backgroundPdfMutex;
+    mutable std::unique_ptr<PdfCache> backgroundPdfCache;
+    mutable bool backgroundPdfLoaded = false;
+    /// Replaced PDF caches: a render may still use them (they go with the view)
+    std::vector<std::shared_ptr<PdfCache>> retiredPdfCaches;
     std::vector<std::unique_ptr<CanvasPage>> pages;
+    bool shown = false;
+    std::pair<size_t, size_t> window{1, 0};
     double dpr = 1.0;
     std::atomic<double> renderZoom{1.0};
     std::atomic<double> renderDpr{1.0};
-    QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
     GeometryToolLayer geometry{*this};

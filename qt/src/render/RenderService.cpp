@@ -2,17 +2,32 @@
 
 #include <algorithm>
 
+#ifdef __linux__
+#include <pthread.h>
+#include <sched.h>
+#endif
+
 #include "PageRaster.h"
 
 namespace xqt {
 
-RenderService::RenderService(int threads) {
+RenderService::RenderService(int threads, int background) {
     if (threads <= 0) {
         threads = std::max(1, static_cast<int>(std::thread::hardware_concurrency()) - 1);
     }
-    workers.reserve(static_cast<size_t>(threads));
+    workers.reserve(static_cast<size_t>(threads + background));
     for (int i = 0; i < threads; ++i) {
-        workers.emplace_back([this] { workerLoop(); });
+        workers.emplace_back([this] { workerLoop(false); });
+    }
+    for (int i = 0; i < background; ++i) {
+        workers.emplace_back([this] {
+#ifdef __linux__
+            sched_param param{};
+            param.sched_priority = 0;
+            pthread_setschedparam(pthread_self(), SCHED_IDLE, &param);  // (only when a core is idle)
+#endif
+            workerLoop(true);
+        });
     }
 }
 
@@ -53,7 +68,7 @@ void RenderService::schedule(const std::shared_ptr<PageRaster>& raster, Priority
         queued.insert(raster.get());
         queues[p].push_back(raster);
     }
-    wakeWorkers.notify_one();
+    wakeWorkers.notify_all();  // (a worker of the right kind)
 }
 
 void RenderService::cancel(const PageRaster* raster) {
@@ -64,6 +79,20 @@ void RenderService::cancel(const PageRaster* raster) {
         }
     }
     idle.wait(lock, [&] { return !running.count(raster); });
+}
+
+void RenderService::dropQueued(Priority priority) {
+    std::lock_guard lock(mtx);
+    auto& q = queues[static_cast<size_t>(priority)];
+    for (const auto& r: q) {
+        queued.erase(r.get());
+    }
+    q.clear();
+}
+
+bool RenderService::hasWork(Priority priority) {
+    std::lock_guard lock(mtx);
+    return !queues[static_cast<size_t>(priority)].empty() || (priority != Priority::Visible && runningBackground > 0);
 }
 
 void RenderService::blockRerenderZoom(std::chrono::milliseconds delay) {
@@ -81,7 +110,7 @@ void RenderService::waitForIdle() {
     });
 }
 
-void RenderService::workerLoop() {
+void RenderService::workerLoop(bool background) {
     std::unique_lock lock(mtx);
     while (!stopping) {
         if (const auto now = std::chrono::steady_clock::now(); now < blockedUntil) {
@@ -89,7 +118,9 @@ void RenderService::workerLoop() {
             continue;
         }
         std::shared_ptr<PageRaster> job;
-        for (auto& q: queues) {
+        // Visible workers: the visible pages; background workers: the others
+        for (size_t p = background ? 1 : 0; p < (background ? std::size(queues) : 1); ++p) {
+            auto& q = queues[p];
             auto it = std::find_if(q.begin(), q.end(), [&](const auto& r) { return !running.count(r.get()); });
             if (it != q.end()) {
                 job = std::move(*it);
@@ -104,13 +135,15 @@ void RenderService::workerLoop() {
         const PageRaster* raw = job.get();
         queued.erase(raw);
         running.insert(raw);
+        runningBackground += background;
 
         lock.unlock();
-        job->run();
+        job->run(background);
         job.reset();
         lock.lock();
 
         running.erase(raw);
+        runningBackground -= background;
         idle.notify_all();
         wakeWorkers.notify_all();  // a job for this raster may have been skipped while it was running
     }

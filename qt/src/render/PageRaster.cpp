@@ -35,6 +35,33 @@ void PageRaster::rerenderPage(bool sizeChanged) {
     schedule();
 }
 
+void PageRaster::ensureRendered(bool inAdvance) {
+    // UI thread: `host` is only written on the UI thread (detach). Not under hostMutex: a render holds it.
+    if (!host) {
+        return;
+    }
+    const RasterParams params = host->rasterParams();
+    {
+        std::lock_guard lock(drawingMutex);
+        if (buffer.isInitialized()) {
+            double scale = 1;
+            cairo_surface_get_device_scale(cairo_get_target(buffer.get()), &scale, &scale);
+            if (buffer.getZoom() == params.zoom && scale == params.dpiScale) {
+                return;
+            }
+        }
+    }
+    {
+        std::lock_guard lock(repaintRectMutex);
+        if (!this->rerenderComplete && rendering && rendering->zoom == params.zoom &&
+            rendering->dpiScale == params.dpiScale) {
+            return;  // being rendered so
+        }
+        this->rerenderComplete = true;
+    }
+    service->schedule(shared_from_this(), inAdvance ? RenderService::Priority::Preload : RenderService::Priority::Visible);
+}
+
 void PageRaster::rerenderRect(double x, double y, double width, double height) {
     auto rect = Rectangle<double>{x, y, width, height};
     {
@@ -79,9 +106,9 @@ auto PageRaster::createMask(const Range& range, const RasterParams& params) cons
     return mask;
 }
 
-void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&) const {
+void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool background) const {
     Document* doc = host->rasterDocument();
-    PdfCache* pdfCache = host->rasterPdfCache();
+    PdfCache* pdfCache = host->rasterPdfCache(background);
 
     DocumentView localView;
     localView.setMarkAudioStroke(host->rasterMarkAudioStrokes());
@@ -124,7 +151,7 @@ void PageRaster::rerenderRectangle(const Rectangle<double>& rect, const RasterPa
     maskRange.addPadding(RENDER_PADDING);
     xoj::view::Mask newMask = createMask(maskRange, params);
 
-    renderToBuffer(newMask.get(), params);
+    renderToBuffer(newMask.get(), params, false);
 
     std::lock_guard lock(this->drawingMutex);
     if (!this->buffer.isInitialized()) {
@@ -133,7 +160,7 @@ void PageRaster::rerenderRectangle(const Rectangle<double>& rect, const RasterPa
     newMask.paintTo(this->buffer.get());
 }
 
-void PageRaster::run() {
+void PageRaster::run(bool background) {
     std::lock_guard hostLock(hostMutex);
     if (!host) {
         return;
@@ -148,14 +175,21 @@ void PageRaster::run() {
         complete = std::exchange(this->rerenderComplete, false);
         resized = std::exchange(this->sizeChanged, false);
         rects = std::exchange(this->rerenderRects, {});
+        if (complete) {
+            rendering = params;
+        }
     }
 
     if (complete) {
         xoj::view::Mask newMask = createMask(Range(0, 0, page->getWidth(), page->getHeight()), params);
-        renderToBuffer(newMask.get(), params);
+        renderToBuffer(newMask.get(), params, background);
         {
             std::lock_guard lock(this->drawingMutex);
             std::swap(this->buffer, newMask);
+        }
+        {
+            std::lock_guard lock(repaintRectMutex);
+            rendering.reset();
         }
         (void)resized;  // the host repaints the whole page in both cases
         notifyUpdated(std::nullopt);

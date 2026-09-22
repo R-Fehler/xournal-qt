@@ -52,11 +52,10 @@ public:
     int currentIndex() const { return current; }
     void setCurrentIndex(int index);
 
-    /// One open document: its session, the view showing it, when to release its rendered pages.
+    /// One open document: its session and the view showing it.
     struct Tab {
         std::unique_ptr<DocumentSession> session;
         std::unique_ptr<CanvasView> view;
-        std::unique_ptr<QTimer> releaseTimer;
     };
 
     /// Adds a tab after the current one and makes it current. Returns its index.
@@ -79,9 +78,6 @@ public:
     DocumentSession* currentSession() const { return session(current); }
     CanvasView* currentView() const { return view(current); }
 
-    /// Milliseconds a tab must be in the background before its page buffers are released.
-    void setBackgroundReleaseDelay(int ms) { releaseDelayMs = ms; }
-
     /// The picture of a tab may be another one now (its title page was chosen).
     void thumbnailChanged(const DocumentSession* s) { tabDataChanged(s, {ThumbnailRole}); }
 
@@ -102,7 +98,6 @@ private:
     AppContext& app;
     std::vector<Tab> tabs;
     int current = -1;
-    int releaseDelayMs = 30000;
 };
 
 }  // namespace xqt

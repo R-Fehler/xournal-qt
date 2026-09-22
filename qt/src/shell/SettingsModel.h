@@ -30,6 +30,8 @@ class SettingsModel final: public QObject {
     Q_PROPERTY(QStringList paperFormats READ paperFormats CONSTANT)
     /// The pattern of each page background ("plain", "ruled", "graph", ...), for previews
     Q_PROPERTY(QStringList pageBackgroundFormats READ pageBackgroundFormats CONSTANT)
+    /// Physical memory in MB (the memory for canvas pages may be set up to a third of it)
+    Q_PROPERTY(int systemMemory READ systemMemory CONSTANT)
 public:
     explicit SettingsModel(AppContext& app, QObject* parent = nullptr);
     /// Portrait size (points) of the paper format at `index` of paperFormats (invalid: none).
@@ -37,6 +39,10 @@ public:
     /// Memory for kept page thumbnails (MB, setting "previewMemory"); applyPreviewMemory hands it to them.
     static int previewMemory(Settings& settings);
     static void applyPreviewMemory(Settings& settings);
+    /// Memory for rendered canvas pages (MB, setting "canvasMemory"; default a quarter of the RAM, at most a third)
+    static int canvasMemory(Settings& settings);
+    static void applyCanvasMemory(Settings& settings);
+    int systemMemory() const;
 
     int revision() const { return rev; }
     /// Names of the page backgrounds for new pages (upstream's page types: plain, lined, ruled, graph, ...).

@@ -354,9 +354,23 @@ Popup {
                         key: "autosaveMinutes"; text: qsTr("Every")
                         from: 1; to: 30; stepSize: 1; decimals: 0; suffix: " min"
                     }
-                    SectionTitle { text: qsTr("Page previews") }
+                    SectionTitle { text: qsTr("Memory") }
                     SliderRow {
-                        key: "previewMemory"; text: qsTr("Memory for drawn page previews")
+                        key: "canvasMemory"; text: qsTr("Rendered pages of the open documents")
+                        // Up to a third of the memory of this computer (default: a quarter)
+                        from: 256; to: Math.max(512, Math.floor(sheet.s.systemMemory / 3 / 128) * 128)
+                        stepSize: 128; decimals: 0; suffix: " MB"
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        opacity: 0.7
+                        font.pixelSize: 13
+                        text: qsTr("Pages are drawn ahead and kept: scrolling shows them at once and needs no "
+                                   + "drawing again. The document in use may take 70 % of it while others are open.")
+                    }
+                    SliderRow {
+                        key: "previewMemory"; text: qsTr("Page previews (sidebar, overviews)")
                         from: 64; to: 1024; stepSize: 64; decimals: 0; suffix: " MB"
                     }
                     SectionTitle { text: qsTr("File names") }

@@ -161,7 +161,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CanvasMemoryTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")
