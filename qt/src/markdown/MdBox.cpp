@@ -92,6 +92,16 @@ std::optional<LinkHit> linkAt(const Text& text, double x, double y) {
     return hit;
 }
 
+std::vector<Rect> findText(const Text& text, const std::string& search) {
+    const auto& shift = text.getTransformation().shift;
+    auto found = findText(cachedLayout(text.getText(), styleOf(text)), search);
+    for (Rect& r: found) {
+        r.x += shift.x;
+        r.y += shift.y;
+    }
+    return found;
+}
+
 bool isMarkdownLayer(const Layer& layer) {
     return layer.hasName() && layer.getName() == xoj::view::MARKDOWN_LAYER_NAME;
 }

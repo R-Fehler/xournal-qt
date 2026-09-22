@@ -78,6 +78,16 @@ struct LinkHit {
 };
 std::optional<LinkHit> linkAt(const Layout& layout, double x, double y);
 
+/// Where a text is shown (case-insensitive; box coordinates): one rectangle per match, from its first to its last
+/// character (as upstream's Text::findText).
+struct Rect {
+    double x = 0;
+    double y = 0;
+    double width = 0;
+    double height = 0;
+};
+std::vector<Rect> findText(const Layout& layout, const std::string& search);
+
 /// Heading size factor (relative to the body text), level 1–6.
 double headingScale(int level);
 

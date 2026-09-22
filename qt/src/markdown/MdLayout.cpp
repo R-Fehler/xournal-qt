@@ -6,6 +6,8 @@
 
 #include <pango/pangocairo.h>
 
+#include "util/StringUtils.h"
+
 namespace xqt::md {
 
 namespace {
@@ -554,6 +556,32 @@ std::optional<LinkHit> linkAt(const Layout& layout, double x, double y) {
         }
     }
     return std::nullopt;
+}
+
+std::vector<Rect> findText(const Layout& layout, const std::string& search) {
+    std::vector<Rect> found;
+    if (search.empty()) {
+        return found;
+    }
+    const std::string pattern = StringUtils::toLowerCase(search);
+    for (const Item& it: layout.items) {
+        if (it.kind != Item::Kind::Text) {
+            continue;
+        }
+        const std::string text = StringUtils::toLowerCase(pango_layout_get_text(it.layout.get()));
+        for (size_t pos = text.find(pattern); pos != std::string::npos; pos = text.find(pattern, pos + 1)) {
+            PangoRectangle a;
+            PangoRectangle b;
+            pango_layout_index_to_pos(it.layout.get(), static_cast<int>(pos), &a);
+            pango_layout_index_to_pos(it.layout.get(), static_cast<int>(pos + pattern.size() - 1), &b);
+            const double x1 = it.x + a.x / static_cast<double>(PANGO_SCALE);
+            const double y1 = it.y + a.y / static_cast<double>(PANGO_SCALE);
+            const double x2 = it.x + (b.x + b.width) / static_cast<double>(PANGO_SCALE);
+            const double y2 = it.y + (b.y + b.height) / static_cast<double>(PANGO_SCALE);
+            found.push_back({std::min(x1, x2), std::min(y1, y2), std::abs(x2 - x1), std::abs(y2 - y1)});
+        }
+    }
+    return found;
 }
 
 void draw(cairo_t* cr, const Layout& layout) {

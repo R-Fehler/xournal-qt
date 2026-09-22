@@ -18,6 +18,9 @@
 #include "session/DocumentSession.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
+#include "util/Matrix.h"
+
+#include "MdBox.h"
 
 #include "config-test.h"
 
@@ -125,4 +128,33 @@ TEST_F(DocumentSearchTest, editsAreSearchedAgain) {
     ASSERT_TRUE(finished.wait(3000));
     EXPECT_EQ(s->search().hits().size(), 4u);
     EXPECT_EQ(s->search().hits()[1].page, 3u);
+}
+
+// A Markdown box: the hit is where the word is drawn, not where it is in the source
+TEST_F(DocumentSearchTest, hitsInMarkdownBoxesAreWhereTheTextIsDrawn) {
+    DocumentSession s(*app);
+    const PageRef page = s.getDocument()->getPage(0);
+    auto* layer = new Layer();
+    layer->setName("Markdown");
+    auto box = std::make_unique<Text>();
+    box->setText("# A heading\n\nthe **needle** in the text");
+    box->setWrap(400);
+    box->setTransformation(xoj::util::Matrix::TRANSLATION(60, 80));
+    const Text* raw = box.get();
+    layer->addElement(std::move(box));
+    s.getDocument()->lock();
+    page->getLayers().insert(page->getLayers().begin(), layer);  // (the page owns it)
+    s.getDocument()->unlock();
+
+    search(s, "needle");
+    ASSERT_EQ(s.search().hits().size(), 1u);
+    const QRectF hit = s.search().hits()[0].rect;
+    const auto drawn = md::findText(*raw, "needle");
+    ASSERT_EQ(drawn.size(), 1u);
+    EXPECT_NEAR(hit.x(), drawn[0].x, 0.01);
+    EXPECT_NEAR(hit.y(), drawn[0].y, 0.01);
+    const auto inSource = raw->findText("needle");
+    ASSERT_EQ(inSource.size(), 1u);
+    EXPECT_GT(std::abs(hit.x() - inSource[0].x1), 5) << "\"the \" is drawn before it, not \"the **\"";
+    EXPECT_GT(hit.y(), 80 + 20) << "below the heading";
 }
