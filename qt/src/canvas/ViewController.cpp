@@ -21,6 +21,7 @@ ViewController::ViewController(const DocumentLayout* layout, QObject* parent): Q
 }
 
 void ViewController::setViewSize(QSizeF size) {
+    jumped = true;
     if (size.isEmpty()) {
         return;
     }
@@ -100,6 +101,7 @@ void ViewController::setZoom(double zoom, QPointF viewAnchor) {
 }
 
 void ViewController::fitWidth() {
+    jumped = true;
     // Upstream ZoomControl fit-to-width: (viewport width) / (page width + 20), for all columns
     const double fit = layout->fitWidthZoom(view.width());
     if (fit <= 0 || view.isEmpty()) {
@@ -114,6 +116,7 @@ void ViewController::fitWidth() {
 }
 
 void ViewController::fitPage(size_t page, bool wholePage) {
+    jumped = true;
     if (view.isEmpty() || page >= layout->pageCount()) {
         return;
     }
@@ -134,6 +137,7 @@ void ViewController::fitPage(size_t page, bool wholePage) {
 }
 
 void ViewController::zoomToPageRect(size_t page, QRectF rectPt) {
+    jumped = true;
     if (view.isEmpty() || page >= layout->pageCount() || rectPt.isEmpty()) {
         return;
     }
@@ -156,6 +160,7 @@ void ViewController::panBy(QPointF delta) {
 }
 
 void ViewController::scrollToPageRect(size_t page, QRectF rectPt) {
+    jumped = true;
     if (page >= layout->pageCount()) {
         return;
     }
@@ -181,6 +186,7 @@ void ViewController::scrollToPageRect(size_t page, QRectF rectPt) {
 }
 
 void ViewController::scrollToPage(size_t page) {
+    jumped = true;
     if (page >= layout->pageCount()) {
         return;
     }
@@ -258,6 +264,7 @@ void ViewController::stepMomentum() {
 }
 
 void ViewController::layoutChanged() {
+    jumped = true;
     clamp();
     Q_EMIT changed();
 }

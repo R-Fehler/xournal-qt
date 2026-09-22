@@ -144,7 +144,10 @@ TEST_F(CanvasMemoryTest, afterZoomingOnlyNearPagesAreRenderedAgainInAdvance) {
     CanvasMemory::instance().planNow();
     settle(c);
     ASSERT_EQ(renderedCount(view), view->pageCount());
-    const double before = view->getPage(0)->bufferInfo().zoom;
+    std::vector<double> before;
+    for (size_t p = 0; p < view->pageCount(); ++p) {
+        before.push_back(view->getPage(p)->bufferInfo().zoom);
+    }
 
     view->getViewController().setZoom(view->getViewController().zoom() * 0.9, QPointF(400, 500));
     processEvents(350);  // (renders wait until the zoom is stable)
@@ -152,15 +155,32 @@ TEST_F(CanvasMemoryTest, afterZoomingOnlyNearPagesAreRenderedAgainInAdvance) {
     settle(c);
     const double now = view->getViewController().zoom();
     const auto current = static_cast<std::ptrdiff_t>(c.tabManager().currentSession()->getCurrentPageNo());
-    for (size_t i = 0; i < view->pageCount(); ++i) {
-        const auto info = view->getPage(i)->bufferInfo();
-        ASSERT_TRUE(info.valid) << "page " << i + 1 << " is kept (shown scaled)";
-        if (std::abs(static_cast<std::ptrdiff_t>(i) - current) <= CanvasMemory::NEAR_PAGES) {
-            EXPECT_DOUBLE_EQ(info.zoom, now) << "page " << i + 1;
-        } else if (std::abs(static_cast<std::ptrdiff_t>(i) - current) > CanvasMemory::NEAR_PAGES + 3) {
-            EXPECT_DOUBLE_EQ(info.zoom, before) << "page " << i + 1 << ": when it comes near";
+    int kept = 0;
+    for (size_t p = 0; p < view->pageCount(); ++p) {
+        const auto info = view->getPage(p)->bufferInfo();
+        ASSERT_TRUE(info.valid) << "page " << p + 1 << " is kept (shown scaled)";
+        const auto distance = std::abs(static_cast<std::ptrdiff_t>(p) - current);
+        if (distance <= CanvasMemory::NEAR_PAGES) {
+            EXPECT_DOUBLE_EQ(info.zoom, now) << "page " << p + 1 << " is near";
+        } else if (distance > CanvasMemory::NEAR_PAGES + 3) {
+            EXPECT_DOUBLE_EQ(info.zoom, before[p]) << "page " << p + 1 << ": again when it comes near";
+            ++kept;
         }
     }
+    EXPECT_GT(kept, 10) << "the far pages keep what they have";
+}
+
+TEST_F(CanvasMemoryTest, scrollChangesAreCollected) {
+    AppController c;
+    CanvasView* view = openPages(c, 0);
+    const quint64 before = view->visibilityUpdates();
+    for (int i = 1; i <= 50; ++i) {  // (a dragged scroll bar sends more moves than there are frames)
+        view->getViewController().setScrollPosition(QPointF(0, i * 30));
+    }
+    const quint64 atOnce = view->visibilityUpdates() - before;
+    EXPECT_LE(atOnce, 3u) << "the visible pages are not looked at for every scroll change";
+    processEvents(40);
+    EXPECT_GT(view->visibilityUpdates() - before, atOnce) << "but where it stopped, they are";
 }
 
 TEST_F(CanvasMemoryTest, theLimitIsASetting) {

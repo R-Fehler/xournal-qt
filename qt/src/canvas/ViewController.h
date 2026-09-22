@@ -39,6 +39,13 @@ public:
 
     QSizeF viewSize() const { return view; }
     void setViewSize(QSizeF size);
+    /// Whether the last change was a jump (to a page, a fit, a new size) and not plain scrolling or zooming: those
+    /// are looked at right away, the continuous ones only every few milliseconds (CanvasView::viewChanged).
+    bool takeJumped() {
+        const bool was = jumped;
+        jumped = false;
+        return was;
+    }
 
     /// View position of the content origin (includes the centering of content smaller than the view).
     QPointF contentOrigin() const;
@@ -81,6 +88,7 @@ Q_SIGNALS:
     void zoomSettled();
 
 private:
+    bool jumped = false;  ///< the last change went somewhere (not plain scrolling or zooming)
     struct Anchor {
         size_t page = 0;
         QPointF pagePoint;  ///< in points, may lie outside the page

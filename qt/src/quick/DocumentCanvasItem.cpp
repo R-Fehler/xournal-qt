@@ -29,6 +29,7 @@
 #include "control/tools/EditSelection.h"
 #include "CanvasInput.h"
 #include "CanvasPage.h"
+#include "Perf.h"
 #include "CanvasView.h"
 #include "TextEditor.h"
 #include "session/DocumentSearch.h"
@@ -78,6 +79,7 @@ public:
         }
 
         if (previewKey != image.cacheKey()) {
+            xqt::Perf::add(xqt::Perf::Previews);
             QSGTexture* previous = preview->texture();
             preview->setTexture(window->createTextureFromImage(image, QQuickWindow::TextureIsOpaque));
             delete previous;
@@ -314,6 +316,7 @@ bool menuIsOpen(QQuickWindow* window) {
 }  // namespace
 
 bool DocumentCanvasItem::claims(QPointF scenePos) const {
+    const xqt::PerfScope measure(xqt::Perf::HitTest);
     if (!isVisible() || !isEnabled() || !window() ||
         !QRectF(0, 0, width(), height()).contains(mapFromScene(scenePos))) {
         return false;
@@ -352,6 +355,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
         case QEvent::TabletMove:
         case QEvent::TabletRelease: {
             auto* t = static_cast<QTabletEvent*>(e);
+            xqt::Perf::add(xqt::Perf::PenEvents);
             if (!penGrab && !claims(t->position())) {
                 return false;  // unaccepted: Qt synthesizes mouse events for the QML controls
             }
@@ -370,6 +374,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
         case QEvent::TouchEnd:
         case QEvent::TouchCancel: {
             auto* t = static_cast<QTouchEvent*>(e);
+            xqt::Perf::add(xqt::Perf::TouchEvents);
             if (e->type() == QEvent::TouchBegin) {
                 touchSessionOwned = !t->points().isEmpty() && claims(t->points().first().scenePosition());
                 if (touchSessionOwned) {
@@ -390,8 +395,16 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
         case QEvent::MouseButtonRelease:
         case QEvent::MouseMove: {
             auto* m = static_cast<QMouseEvent*>(e);
+            xqt::Perf::add(xqt::Perf::MouseEvents);
+            // Without the hit test of the item under the pointer: moving without a button never draws, and a drag
+            // that began elsewhere (a scroll bar) stays there - the mouse sends more moves than there are frames.
+            if (!mouseGrab && (m->buttons() == Qt::NoButton ? e->type() == QEvent::MouseMove : mouseElsewhere)) {
+                return false;
+            }
             const bool inside = claims(m->scenePosition());
-            if (!mouseGrab && (!inside || (e->type() == QEvent::MouseMove && m->buttons() == Qt::NoButton))) {
+            xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
+            if (!mouseGrab && !inside) {
+                mouseElsewhere = m->buttons() != Qt::NoButton;
                 return false;
             }
             if (e->type() == QEvent::MouseButtonPress) {
@@ -399,6 +412,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 takeKeyboardFocus();
             } else if (e->type() == QEvent::MouseButtonRelease && m->buttons() == Qt::NoButton) {
                 mouseGrab = false;
+                mouseElsewhere = false;
             }
             input->mouseEvent(m, mapFromScene(m->scenePosition()));
             m->accept();
@@ -557,6 +571,8 @@ void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, d
 }
 
 QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*) {
+    xqt::Perf::add(xqt::Perf::Frames);
+    const xqt::PerfScope measure(xqt::Perf::SyncTime);
     auto* root = static_cast<CanvasRootNode*>(old);
     if (!root) {
         root = new CanvasRootNode;
@@ -691,6 +707,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             tile->setTexture(window()->createTextureFromImage(img, QQuickWindow::TextureIsOpaque));
             delete previous;
             node->composed[static_cast<size_t>(t)] = true;
+            xqt::Perf::add(xqt::Perf::Tiles);
             if (!tile->parent()) {
                 node->insertChildNodeBefore(tile, node->searchRoot);
             }

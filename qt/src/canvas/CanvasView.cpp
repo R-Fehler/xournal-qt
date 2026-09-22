@@ -49,6 +49,7 @@
 
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
+#include "Perf.h"
 #include "TextEditor.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
@@ -82,8 +83,14 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     connect(&viewController, &ViewController::zoomSettled, this, [this] { updateVisibility(); });
     connect(&viewController, &ViewController::changed, this, [this] {
-        updateVisibility();
+        Perf::add(Perf::Scrolls);
+        viewChanged();
         Q_EMIT updateRequested();
+    });
+    visibilityTimer.setSingleShot(true);
+    connect(&visibilityTimer, &QTimer::timeout, this, [this] {
+        sinceVisibility.restart();
+        updateVisibility();
     });
     connect(&session, &DocumentSession::scrollToPageRequested, this,
             [this](qulonglong page) { viewController.scrollToPage(page); });
@@ -1009,7 +1016,8 @@ bool CanvasView::restorePlace(const NavPoint& place) {
     }
     const double zoom = viewController.zoom();
     viewController.setScrollPosition(layout.pageRect(*idx, zoom).topLeft() + place.offset * zoom);
-    return true;  // (the most visible page becomes the current one, see updateVisibility)
+    updateVisibility();  // a jump: the most visible page becomes the current one right away
+    return true;
 }
 
 void CanvasView::jumpToPage(size_t page) {
@@ -1176,10 +1184,26 @@ void CanvasView::refreshLayout() {
     Q_EMIT pagesChanged();
 }
 
+void CanvasView::viewChanged() {
+    constexpr int EVERY_MS = 8;  // (about one frame)
+    // A jump (to a page, a fit, a new size) right away; plain scrolling and zooming send more changes than there are
+    // frames, and looking at the visible pages tells the models and moves the sidebar along.
+    if (viewController.takeJumped() || !sinceVisibility.isValid() || sinceVisibility.elapsed() >= EVERY_MS) {
+        sinceVisibility.restart();
+        visibilityTimer.stop();
+        updateVisibility();
+    } else if (!visibilityTimer.isActive()) {
+        visibilityTimer.start(EVERY_MS - static_cast<int>(sinceVisibility.elapsed()));
+    }
+}
+
 void CanvasView::updateVisibility() {
     if (pages.empty()) {
         return;
     }
+    ++visibilityCount;
+    Perf::add(Perf::Visibility);
+    const PerfScope measure(Perf::VisibilityTime);
     const auto [first, last] = visiblePages();
     const double zoom = viewController.zoom();
     size_t mostVisible = session.getCurrentPageNo();

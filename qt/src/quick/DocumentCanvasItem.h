@@ -89,6 +89,7 @@ private:
     bool mouseGrab = false;
     bool touchSessionOwned = false;
     bool viewReplaced = false;
+    bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
     std::atomic<int> shownPreviews{0};
     std::atomic<int> mostTiles{0};
     std::atomic<int> previewFrames{0};
