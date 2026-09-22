@@ -28,6 +28,8 @@
 #include "util/Color.h"
 #include "gui/XournalView.h"
 #include "model/DocumentListener.h"
+#include "model/Layer.h"
+#include "model/PageRef.h"
 #include "render/PageRaster.h"
 
 #include "control/zoom/ZoomControl.h"
@@ -204,6 +206,20 @@ public:
     /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts.
     void setMarkdownText(bool markdown, double size);
 
+    // --- selections of Markdown texts ------------------------------------------------------------------------------
+    // Markdown texts are in the page's layer "Markdown", which is not the selected layer (the pen writes into
+    // another one). A selection of them is made in that layer; it is the selected layer only while the selection
+    // exists, also on pages the selection is moved to (the selection is dropped into the selected layer there).
+    /// Select the page's Markdown layer for a selection of its texts. Returns the layer selected before (nothing:
+    /// the page has no visible Markdown layer, or it is selected already).
+    std::optional<Layer::Index> selectMarkdownLayer(const PageRef& page);
+    /// Select a layer again (a selection of Markdown texts did not come about).
+    void restoreSelectedLayer(const PageRef& page, Layer::Index layer);
+    /// Whether the layer (1-based) of the page is its Markdown layer.
+    bool isMarkdownLayer(const PageRef& page, Layer::Index layer) const;
+    /// The selection just set is of Markdown texts from `page`, whose selected layer was `before`.
+    void markdownSelectionMade(const PageRef& page, Layer::Index before);
+
     // Layout (upstream gui/Layout, content pixels)
     XojPageView* getPageViewAt(int x, int y) const override;
     int getTotalPixelWidth() const override;
@@ -254,6 +270,19 @@ private:
     QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
+    struct MarkdownSelection {
+        const EditSelection* selection = nullptr;
+        /// The pages whose selected layer is their Markdown layer for now, with the layer selected before, and
+        /// whether the Markdown layer was made for this (made for nothing: removed again).
+        struct Page {
+            PageRef page;
+            Layer::Index before = 0;
+            Layer* created = nullptr;
+        };
+        std::vector<Page> pages;
+    };
+    std::optional<MarkdownSelection> markdownSelection;
+    void endMarkdownSelection();
     bool markdownText = false;       ///< the text tool makes Markdown text boxes
     double markdownTextSize = 10;    ///< of this font size
     GeometryToolLayer geometry{*this};

@@ -36,11 +36,13 @@
 #include "undo/DeleteUndoAction.h"
 #include "model/Stroke.h"
 #include "control/ToolHandler.h"
+#include "control/layer/LayerController.h"
 #include "control/tools/CursorSelectionType.h"
 #include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
 #include "util/TextLinks.h"
 #include "model/Document.h"
+#include "model/MarkdownText.h"
 #include "model/DocumentChangeType.h"
 #include "render/RenderService.h"
 
@@ -209,7 +211,11 @@ DocumentLayout::Config CanvasView::layoutConfig() const {
 
 void CanvasView::clearSelection() {
     // Deleting the EditSelection puts the elements back into their layer.
+    const bool ofMarkdown = selection && markdownSelection && markdownSelection->selection == selection.get();
     selection.reset();
+    if (ofMarkdown) {
+        endMarkdownSelection();
+    }
     session.getCursor()->setMouseSelectionType(CURSOR_SELECTION_NONE);
     session.getToolHandler()->setSelectionEditTools(false, false, false, false);
     ++selectionRev;
@@ -1333,6 +1339,97 @@ void CanvasView::pageDeleted(size_t page) {
     geometry.pagesChanged();
 }
 
-void CanvasView::pageSelected(size_t) {}
+void CanvasView::pageSelected(size_t pageNo) {
+    // A selection of Markdown texts moved to another page is dropped into that page's Markdown layer (made if
+    // needed): it is its selected layer for now.
+    if (!selection || !markdownSelection || markdownSelection->selection != selection.get()) {
+        return;
+    }
+    Document* doc = session.getDocument();
+    PageRef page;
+    {
+        std::shared_lock lock(*doc);
+        page = doc->getPage(pageNo);
+    }
+    if (!page || std::any_of(markdownSelection->pages.begin(), markdownSelection->pages.end(),
+                             [&](const auto& p) { return p.page == page; })) {
+        return;
+    }
+    MarkdownSelection::Page entry;
+    entry.page = page;
+    Layer* layer = nullptr;
+    {
+        std::shared_lock lock(*doc);
+        layer = md::markdownLayer(page);
+        entry.before = page->getSelectedLayerId();
+    }
+    if (!layer) {
+        layer = new Layer();
+        layer->setName(std::string(xoj::markdown::LAYER_NAME));
+        session.getLayerController()->insertLayer(page, layer, 0);  // (locks the document)
+        entry.created = layer;
+        entry.before = entry.before > 0 ? entry.before + 1 : 0;
+    }
+    {
+        std::unique_lock lock(*doc);
+        const auto& layers = page->getLayers();
+        page->setSelectedLayerId(static_cast<Layer::Index>(
+                std::distance(layers.begin(), std::find(layers.begin(), layers.end(), layer)) + 1));
+    }
+    markdownSelection->pages.push_back(entry);
+}
+
+std::optional<Layer::Index> CanvasView::selectMarkdownLayer(const PageRef& page) {
+    std::unique_lock lock(*session.getDocument());
+    const Layer* layer = md::markdownLayer(page);
+    if (!layer || !layer->isVisible() || page->getSelectedLayer() == layer) {
+        return std::nullopt;
+    }
+    const Layer::Index before = page->getSelectedLayerId();
+    const auto& layers = page->getLayers();
+    page->setSelectedLayerId(static_cast<Layer::Index>(
+            std::distance(layers.begin(), std::find(layers.begin(), layers.end(), layer)) + 1));
+    return before;
+}
+
+void CanvasView::restoreSelectedLayer(const PageRef& page, Layer::Index layer) {
+    {
+        std::unique_lock lock(*session.getDocument());
+        page->setSelectedLayerId(layer);
+    }
+    session.getLayerController()->fireRebuildLayerMenu();  // (the layer list shows the selected layer)
+}
+
+bool CanvasView::isMarkdownLayer(const PageRef& page, Layer::Index layer) const {
+    std::shared_lock lock(*session.getDocument());
+    const auto& layers = page->getLayers();
+    return layer >= 1 && layer <= layers.size() && md::isMarkdownLayer(*layers[layer - 1]);
+}
+
+void CanvasView::markdownSelectionMade(const PageRef& page, Layer::Index before) {
+    if (!selection || isMarkdownLayer(page, before)) {
+        return;
+    }
+    markdownSelection = MarkdownSelection{selection.get(), {{page, before, nullptr}}};
+}
+
+void CanvasView::endMarkdownSelection() {
+    auto ended = std::move(markdownSelection);
+    markdownSelection.reset();
+    if (!ended) {
+        return;
+    }
+    for (const auto& p: ended->pages) {
+        Layer::Index before = p.before;
+        if (p.created && p.created->getElements().empty()) {  // made for a move that went elsewhere
+            session.getLayerController()->removeLayer(p.page, p.created);  // (locks the document)
+            delete p.created;
+            before = before > 0 ? before - 1 : 0;
+        }
+        std::unique_lock lock(*session.getDocument());
+        p.page->setSelectedLayerId(std::min<Layer::Index>(before, p.page->getLayerCount()));
+    }
+    session.getLayerController()->fireRebuildLayerMenu();  // (the layer list shows the selected layer)
+}
 
 }  // namespace xqt

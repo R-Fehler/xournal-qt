@@ -11,6 +11,13 @@ with GitHub's extensions (tables, strikethrough, task lists, bare web addresses)
   button, or tap it again), then tap where the text should go. A box is edited on the page like any text box: the
   source is shown while editing, and it is drawn formatted afterwards. A tap on a box edits it again.
 
+## Moving
+Markdown text boxes (and the page's text) are selected and moved like everything else: a rectangle or a lasso
+around them, or a tap with the object select tool, when nothing of the selected layer is there. Then they can be
+moved (also to another page: they go into that page's Markdown layer), deleted, copied or cut. The selection is
+the box as it is drawn. While they are selected, the layer "Markdown" is the selected layer; when the selection
+ends, the layer selected before is again (the pen writes where it did).
+
 ## Size
 The body text is drawn at the text's font size: the size Xournal++ shows the source in is the size it is drawn at.
 Headings, code and the rest scale from it. New Markdown text gets the Markdown size, which is 60 % of the text font

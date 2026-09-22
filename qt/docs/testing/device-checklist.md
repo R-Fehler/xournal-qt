@@ -349,6 +349,8 @@ cd build-qt
 - [ ] Text tool, hold its button: switch "Markdown" on; the size there is the Markdown size. Tap anywhere, type
       "Some **bold**", Esc: drawn formatted where it was tapped. Tap it: the source again, on the page. Markdown off:
       ordinary text boxes again. The pen still writes into its layer.
+- [ ] Select (rectangle or lasso) around a Markdown box: the frame is the drawn box; drag it (formatted while
+      dragging), also onto the next page; Delete; Ctrl+Z. After the selection the pen writes into its layer again.
 - [ ] Save, open the file in Xournal++: the page shows the Markdown source as a text, nothing lost; saved there and
       opened again here: formatted again.
 - [ ] Longer than the page: the editor says so (the next step flows it onto new pages).

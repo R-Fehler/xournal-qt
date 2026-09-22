@@ -2385,6 +2385,94 @@ TEST_F(MainWindowTest, markdownTextBoxesAnywhereWithTheTextTool) {
     EXPECT_TRUE(plain);
 }
 
+// Markdown text boxes are selected (rectangle, lasso, tap) and moved like other elements: in their layer
+// "Markdown", which is the selected layer only while they are selected.
+TEST_F(MainWindowTest, markdownTextBoxesAreSelectedAndMoved) {
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 150, 350, 300));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    const auto drag = [&](QPoint from, QPoint to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 10; ++i) {
+            QTest::mouseMove(window, from + (to - from) * i / 10);
+            wait(10);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(50);
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(150, 200));
+    wait(50);
+    type("# Moved box");
+    key(Qt::Key_Escape);
+
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    Text* box = xqt::md::boxAt(*layer, 155, 200);
+    ASSERT_NE(box, nullptr);
+    ASSERT_TRUE(box->isMarkdown());
+    const auto before = box->getBoundingBox();
+    const Layer* penLayer = page->getSelectedLayer();
+    ASSERT_NE(penLayer, layer);
+
+    // A rectangle around it selects it
+    controller->selectTool("selectRect");
+    drag(pagePoint(before.x - 10, before.y - 10), pagePoint(before.x + before.width + 10, before.y + before.height + 10));
+    ASSERT_TRUE(controller->hasSelection());
+    EXPECT_EQ(page->getSelectedLayer(), layer) << "while it is selected";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    // Dragged by (40, 60) points
+    const QPoint inside = pagePoint(before.x + before.width / 2, before.y + before.height / 2);
+    drag(inside, pagePoint(before.x + before.width / 2 + 40, before.y + before.height / 2 + 60));
+    // A tap elsewhere ends the selection (with any tool: it only deselects)
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(420, 430));
+    wait(50);
+    EXPECT_FALSE(controller->hasSelection());
+    EXPECT_EQ(page->getSelectedLayer(), penLayer) << "the pen writes into its layer again";
+    ASSERT_EQ(layer->getElements().size(), 1u);
+    const auto* moved = static_cast<const Text*>(layer->getElements().front().get());
+    EXPECT_TRUE(moved->isMarkdown()) << "still a Markdown text, in its layer";
+    EXPECT_NEAR(moved->getBoundingBox().x, before.x + 40, 3);
+    EXPECT_NEAR(moved->getBoundingBox().y, before.y + 60, 3);
+    EXPECT_NEAR(moved->getBoundingBox().width, before.width, 0.5) << "the drawn box moved as a whole";
+
+    // A lasso around it, then Delete; undo brings it back
+    controller->selectTool("selectRegion");
+    const auto b = moved->getBoundingBox();
+    const QPoint a = pagePoint(b.x - 15, b.y - 15);
+    const QPoint c = pagePoint(b.x + b.width + 15, b.y + b.height + 15);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (const QPoint& p: {QPoint(c.x(), a.y()), c, QPoint(a.x(), c.y()), a}) {
+        for (int i = 1; i <= 5; ++i) {
+            QTest::mouseMove(window, p);
+            wait(5);
+        }
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a);
+    wait(50);
+    ASSERT_TRUE(controller->hasSelection());
+    controller->deleteSelection();
+    EXPECT_TRUE(layer->getElements().empty());
+    EXPECT_EQ(page->getSelectedLayer(), penLayer);
+    controller->undo();
+    EXPECT_EQ(layer->getElements().size(), 1u);
+}
+
 TEST_F(MainWindowTest, textModeTypesThePageText) {
     auto* panel = find<QQuickItem>("textFlowPanel");
     ASSERT_NE(panel, nullptr);
