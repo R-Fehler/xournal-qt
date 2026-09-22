@@ -175,6 +175,20 @@ Pane {
                 onClicked: panel.insertBlock("| Column | Column |\n|--------|--------|\n| | |\n")
             }
             MdButton { text: "―"; tip: qsTr("Horizontal rule (---)"); onClicked: panel.insertBlock("---\n") }
+            ToolSeparator {}
+            // The size of the text (the text's font size: the drawing follows)
+            RowLayout {
+                height: 40
+                Label { text: qsTr("Size"); color: "#5f6368" }
+                SpinBox {
+                    objectName: "markdownSize"
+                    from: 4; to: 72
+                    value: Math.round(app.markdownBoxSize)
+                    editable: true
+                    focusPolicy: Qt.NoFocus
+                    onValueModified: { app.setMarkdownBoxSize(value); area.forceActiveFocus() }
+                }
+            }
         }
 
         // The text does not fit on the page
@@ -188,7 +202,7 @@ Pane {
             color: "#b3261e"
             font.pixelSize: 12
             text: qsTr("The text is longer than the page (about %1 lines below the margin).")
-                    .arg(Math.max(1, Math.round(app.markdownOverflow / (app.fontSize * 1.25))))
+                    .arg(Math.max(1, Math.round(app.markdownOverflow / (app.markdownBoxSize * 1.25))))
         }
 
         ScrollView {

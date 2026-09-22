@@ -47,6 +47,7 @@
 #include "CanvasPage.h"
 #include "MdBox.h"
 #include "TextEditor.h"
+#include "TextFlow.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
@@ -1115,27 +1116,35 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         }
         endTextEditing();
     }
-    // A Markdown box is edited as Markdown (its text is the source)
+    // The page's Markdown text is edited in the editor beside the page; Markdown text boxes on the page
     if (markdownBoxAt(page, x, y)) {
         if (const auto idx = indexOf(&page)) {
             Q_EMIT markdownRequested(static_cast<int>(*idx));
         }
         return;
     }
-    textEditor = std::make_unique<TextEditor>(session, page, x, y);
+    TextEditor::NewText how;
+    how.markdown = markdownText;
+    how.markdownSize = markdownTextSize;
+    textEditor = std::make_unique<TextEditor>(session, page, x, y, how);
     page.addOverlayView(textEditor->createView());
     Q_EMIT textEditingChanged(true);
 }
 
 bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     std::shared_lock lock(*session.getDocument());
-    const Layer* layer = md::markdownLayer(page.getPage());
-    const Text* box = layer && layer->isVisible() ? md::boxOf(*layer) : nullptr;
-    if (!box) {
+    const PageRef p = page.getPage();
+    const Layer* layer = md::markdownLayer(p);
+    if (!layer || !layer->isVisible()) {
         return false;
     }
-    const auto r = md::boxRect(*box);
-    return x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + std::max(r.height, 20.0);
+    const Text* box = md::pageBoxOf(*layer, TextFlow::styleFor(p, TextFlow::Style{}).leftMargin, TextFlow::MARGIN);
+    return box && box == md::boxAt(*layer, x, y);
+}
+
+void CanvasView::setMarkdownText(bool markdown, double size) {
+    markdownText = markdown;
+    markdownTextSize = size;
 }
 
 void CanvasView::endTextEditing() {

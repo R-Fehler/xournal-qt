@@ -115,6 +115,35 @@ Layer* markdownLayer(const PageRef& page) {
     return nullptr;
 }
 
+Text* pageBoxOf(const Layer& layer, double x, double y) {
+    for (const auto& e: layer.getElementsView()) {
+        if (e->getType() == ELEMENT_TEXT) {
+            const auto& at = static_cast<const Text*>(e)->getTransformation().shift;
+            if (std::abs(at.x - x) < 0.5 && std::abs(at.y - y) < 0.5) {
+                return const_cast<Text*>(static_cast<const Text*>(e));
+            }
+        }
+    }
+    return nullptr;
+}
+
+Text* boxAt(const Layer& layer, double x, double y) {
+    Text* found = nullptr;
+    for (const auto& e: layer.getElementsView()) {
+        if (e->getType() == ELEMENT_TEXT) {
+            const auto* t = static_cast<const Text*>(e);
+            const auto r = boxRect(*t);
+            // (at least a line high: an empty box can be tapped as well)
+            if (x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + std::max(r.height, t->getFontSize() * 1.5)) {
+                found = const_cast<Text*>(t);  // (the last one is on top)
+            }
+        }
+    }
+    return found;
+}
+
+double defaultFontSize(double textFontSize) { return std::max(4.0, std::round(textFontSize * 0.6)); }
+
 Text* boxOf(const Layer& layer) {
     for (const auto& e: layer.getElementsView()) {
         if (e->getType() == ELEMENT_TEXT) {

@@ -34,6 +34,7 @@
 #include "canvas/CanvasView.h"
 #include "markdown/MdBox.h"
 #include "canvas/PenHover.h"
+#include "canvas/TextEditor.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
@@ -2317,6 +2318,71 @@ TEST_F(MainWindowTest, markdownBoxIsWrittenAndOpenedAgainWithTheTextTool) {
     // One undo step for the whole text
     controller->undo();
     EXPECT_EQ(xqt::md::boxOf(*layer), nullptr);
+}
+
+// Markdown text boxes: the text tool with "Markdown" places them anywhere; edited on the page (the source is shown
+// while editing), drawn formatted.
+TEST_F(MainWindowTest, markdownTextBoxesAnywhereWithTheTextTool) {
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(200, 300, 200, 300));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 300));
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    EXPECT_TRUE(view->getTextEditor()->isMarkdown());
+    type("Some **bold**");
+    key(Qt::Key_Escape);
+    EXPECT_EQ(view->getTextEditor(), nullptr);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    const Text* box = xqt::md::boxAt(*layer, 205, 300);
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->getText(), "Some **bold**");
+    EXPECT_EQ(box->getFontSize(), 10) << "the size of Markdown text";
+    EXPECT_GT(box->getWrap(), 100) << "as wide as there is room";
+    EXPECT_NE(page->getSelectedLayer(), layer) << "the pen still writes into its layer";
+
+    // A tap on it edits it on the page (it is not the page's text, which opens beside the page)
+    QSignalSpy requested(controller.get(), &AppController::markdownRequested);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(210, 300));
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    EXPECT_TRUE(view->getTextEditor()->isMarkdown());
+    EXPECT_EQ(view->getTextEditor()->text(), "Some **bold**");
+    EXPECT_EQ(requested.count(), 0);
+    key(Qt::Key_Escape);
+
+    // Markdown off: ordinary texts again
+    controller->setTextMarkdown(false);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 500));
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    EXPECT_FALSE(view->getTextEditor()->isMarkdown());
+    type("plain");
+    key(Qt::Key_Escape);
+    EXPECT_EQ(layer->getElements().size(), 1u);
+    bool plain = false;
+    for (const auto& e: page->getSelectedLayer()->getElements()) {
+        plain = plain || (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e.get())->getText() == "plain");
+    }
+    EXPECT_TRUE(plain);
 }
 
 TEST_F(MainWindowTest, textModeTypesThePageText) {

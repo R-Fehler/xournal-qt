@@ -89,6 +89,12 @@ class AppController: public QObject {
     /// Font of the text tool (upstream's settings font)
     Q_PROPERTY(QString fontFamily READ fontFamily WRITE setFontFamily NOTIFY fontChanged)
     Q_PROPERTY(double fontSize READ fontSize WRITE setFontSize NOTIFY fontChanged)
+    /// The text tool makes Markdown text boxes (drawn formatted) instead of ordinary texts
+    Q_PROPERTY(bool textMarkdown READ textMarkdown WRITE setTextMarkdown NOTIFY fontChanged)
+    /// Font size of new Markdown text (default: 60 % of the text font's size)
+    Q_PROPERTY(double markdownFontSize READ markdownFontSize WRITE setMarkdownFontSize NOTIFY fontChanged)
+    /// Font size of the Markdown text edited beside the page
+    Q_PROPERTY(double markdownBoxSize READ markdownBoxSize NOTIFY markdownChanged)
     /// Upstream's drawing type of the tool: default (freehand), strokeRecognizer, line, rectangle, ellipse, arrow,
     /// doubleArrow, drawCoordinateSystem
     Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
@@ -219,6 +225,13 @@ public:
     /// The text font (text tool) for the editor.
     Q_INVOKABLE QString textFlowFamily() const;
     bool markdownActive() const;
+    bool textMarkdown() const;
+    void setTextMarkdown(bool markdown);
+    double markdownFontSize() const;
+    void setMarkdownFontSize(double size);
+    double markdownBoxSize() const;
+    /// The size of the Markdown text edited beside the page (also the size of new Markdown text from now on).
+    Q_INVOKABLE void setMarkdownBoxSize(double size);
     int markdownPage() const { return mdPage; }
     double markdownOverflow() const { return mdOverflow; }
     /// Start editing the Markdown box of a page (-1: the current page; made when there is none). Returns its source.
@@ -547,6 +560,8 @@ Q_SIGNALS:
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
+    void applyMarkdownText();
     qreal markSpacing = 1.0;
     /// Files were renamed or moved (library, recent files): open documents and the recent list follow.
     void filesChanged(const xqt::DocumentFiles::Result& result);

@@ -324,6 +324,7 @@ void AppController::endTextFlow(bool keep) {
 
 bool AppController::markdownActive() const { return markdown && markdown->active(); }
 
+
 QString AppController::beginMarkdown(int page) {
     endMarkdown(true);
     endTextFlow(true);
@@ -334,7 +335,7 @@ QString AppController::beginMarkdown(int page) {
     markdown = std::make_unique<MarkdownSession>(*mdSession);
     md::Style style;
     style.family = textFlowFamily().toStdString();
-    style.size = app->getSettings()->getFont().getSize();
+    style.size = markdownFontSize();
     mdPage = page >= 0 ? page : static_cast<int>(mdSession->getCurrentPageNo());
     const QString source = QString::fromStdString(markdown->begin(static_cast<size_t>(mdPage), style));
     mdOverflow = 0;
@@ -427,6 +428,7 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionChanged));
         applyPdfTextMode();
+        applyMarkdownText();
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
     }
@@ -935,6 +937,54 @@ void AppController::removeToolbarColor(int index) {
 }
 
 void AppController::resetToolbarColors() { storeToolbarColors(defaultToolbarColors()); }
+
+bool AppController::textMarkdown() const {
+    bool on = false;
+    app->getSettings()->getCustomElement(CUSTOM).getBool("textMarkdown", on);
+    return on;
+}
+
+void AppController::setTextMarkdown(bool on) {
+    if (on != textMarkdown()) {
+        app->getSettings()->getCustomElement(CUSTOM).setBool("textMarkdown", on);
+        app->getSettings()->customSettingsChanged();
+        applyMarkdownText();
+        Q_EMIT fontChanged();
+    }
+}
+
+double AppController::markdownFontSize() const {
+    double size = 0;
+    app->getSettings()->getCustomElement(CUSTOM).getDouble("markdownFontSize", size);
+    return size > 0 ? size : md::defaultFontSize(fontSize());
+}
+
+void AppController::setMarkdownFontSize(double size) {
+    size = std::clamp(size, 4.0, 400.0);
+    app->getSettings()->getCustomElement(CUSTOM).setDouble("markdownFontSize", size);
+    app->getSettings()->customSettingsChanged();
+    if (canvas() && canvas()->getTextEditor() && canvas()->getTextEditor()->isMarkdown()) {
+        canvas()->getTextEditor()->setFont(XojFont(fontFamily().toStdString(), size));  // the text being edited
+    }
+    applyMarkdownText();
+    Q_EMIT fontChanged();
+}
+
+double AppController::markdownBoxSize() const { return markdownActive() ? markdown->fontSize() : markdownFontSize(); }
+
+void AppController::setMarkdownBoxSize(double size) {
+    if (markdownActive()) {
+        mdOverflow = markdown->setFontSize(std::clamp(size, 4.0, 400.0));
+    }
+    setMarkdownFontSize(size);
+    Q_EMIT markdownChanged();
+}
+
+void AppController::applyMarkdownText() {
+    if (CanvasView* v = canvas()) {
+        v->setMarkdownText(textMarkdown(), markdownFontSize());
+    }
+}
 
 QString AppController::toolbarPosition() const {
     std::string stored;
@@ -1502,7 +1552,9 @@ void AppController::setFont(const QString& family, double size) {
     XojFont font(family.toStdString(), std::clamp(size, 4.0, 400.0));
     app->getSettings()->setFont(font);
     if (canvas() && canvas()->getTextEditor()) {
-        canvas()->getTextEditor()->setFont(font);  // the text being edited follows
+        auto* editor = canvas()->getTextEditor();
+        // The text being edited follows (a Markdown text keeps its own size, see markdownFontSize)
+        editor->setFont(editor->isMarkdown() ? XojFont(font.getName(), editor->fontSize()) : font);
     }
     Q_EMIT fontChanged();
 }

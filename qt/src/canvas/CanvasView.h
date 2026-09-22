@@ -199,8 +199,10 @@ public:
     /// A tap with the text tool at a page position (points).
     void startText(CanvasPage& page, double x, double y);
     void endTextEditing();
-    /// Whether the Markdown box of a page is at a point (page coordinates).
+    /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
+    /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts.
+    void setMarkdownText(bool markdown, double size);
 
     // Layout (upstream gui/Layout, content pixels)
     XojPageView* getPageViewAt(int x, int y) const override;
@@ -252,6 +254,8 @@ private:
     QTimer releaseTimer;
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
+    bool markdownText = false;       ///< the text tool makes Markdown text boxes
+    double markdownTextSize = 10;    ///< of this font size
     GeometryToolLayer geometry{*this};
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;

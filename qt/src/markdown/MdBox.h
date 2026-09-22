@@ -55,5 +55,12 @@ bool isMarkdownLayer(const Layer& layer);
 Layer* markdownLayer(const PageRef& page);
 /// The box of a Markdown layer: its first text (nullptr if none).
 Text* boxOf(const Layer& layer);
+/// The page's Markdown text: the box whose top left is at (x, y), the page's margins (nullptr if none).
+Text* pageBoxOf(const Layer& layer, double x, double y);
+/// The box drawn at a point of the page (the topmost; nullptr if none).
+Text* boxAt(const Layer& layer, double x, double y);
+
+/// The size of new Markdown text, from the size of the text font: smaller, as Markdown has headings.
+double defaultFontSize(double textFontSize);
 
 }  // namespace xqt::md

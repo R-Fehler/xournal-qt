@@ -15,6 +15,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
+#include "util/Matrix.h"
 #include "view/MarkdownHook.h"
 
 #include "MarkdownSession.h"
@@ -125,4 +126,51 @@ TEST_F(MarkdownSessionTest, savedAsAnOrdinaryTextAndLoaded) {
     EXPECT_NEAR(box->getWrap(), p->getWidth() - margins.leftMargin - margins.rightMargin, 0.01)
             << "the width is the wrap width";
     EXPECT_EQ(md::styleOf(*box).family, style.family);
+}
+
+TEST_F(MarkdownSessionTest, fontSizeIsTheTextsAndTheDrawingFollows) {
+    md::Style small = style;
+    small.size = 9;
+    MarkdownSession edit(*session);
+    edit.begin(0, small);
+    edit.update("# Title\n\nSome text that is long enough to wrap at least once at this width, and a bit more.");
+    const Text* box = md::boxOf(*md::markdownLayer(page()));
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->getFontSize(), 9) << "the source has the size the text is drawn at";
+    const double before = md::contentHeight(*box);
+    edit.setFontSize(14);
+    EXPECT_EQ(edit.fontSize(), 14);
+    EXPECT_EQ(box->getFontSize(), 14);
+    EXPECT_GT(md::contentHeight(*box), before * 1.3);
+    edit.finish();
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(source(), "") << "size and text: one step";
+}
+
+TEST_F(MarkdownSessionTest, textBoxesElsewhereAreNotThePagesText) {
+    // A Markdown text box placed with the text tool (not at the margins)
+    Layer* layer = new Layer();
+    layer->setName("Markdown");
+    auto free = std::make_unique<Text>();
+    free->setText("a **box** elsewhere");
+    free->setWrap(200);
+    free->setTransformation(xoj::util::Matrix::TRANSLATION(300, 400));
+    const Text* freeBox = free.get();
+    layer->addElement(std::move(free));
+    session->getDocument()->lock();
+    page()->getLayers().insert(page()->getLayers().begin(), layer);
+    session->getDocument()->unlock();
+
+    MarkdownSession edit(*session);
+    EXPECT_EQ(edit.begin(0, style), "") << "the page has no Markdown text of its own yet";
+    edit.update("# Page text");
+    edit.finish();
+    EXPECT_EQ(freeBox->getText(), "a **box** elsewhere");
+    EXPECT_EQ(layer->getElements().size(), 2u);
+    EXPECT_EQ(edit.begin(0, style), "# Page text");
+    edit.cancel();
+    session->getUndoRedoHandler()->undo();
+    ASSERT_EQ(layer->getElements().size(), 1u);
+    EXPECT_EQ(layer->getElements().front().get(), freeBox) << "undo took only the page's text away";
+    EXPECT_EQ(md::boxAt(*layer, 310, 405), freeBox);
 }

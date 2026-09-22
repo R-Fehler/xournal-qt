@@ -23,11 +23,12 @@
 namespace xqt {
 
 namespace {
-/// The texts of the Markdown layer before / after an edit (the same action undoes and redoes: it swaps).
+/// The box before / after an edit: the element in the layer and the other version (the same action undoes and
+/// redoes: it swaps them). Either may be missing (a box made or emptied away).
 class MarkdownUndoAction final: public UndoAction {
 public:
-    MarkdownUndoAction(const PageRef& p, Layer* layer, std::vector<ElementPtr> other):
-            UndoAction("MarkdownUndoAction"), layer(layer), other(std::move(other)) {
+    MarkdownUndoAction(const PageRef& p, Layer* layer, Text* current, ElementPtr other):
+            UndoAction("MarkdownUndoAction"), layer(layer), current(current), other(std::move(other)) {
         this->page = p;
     }
     bool undo(Control* control) override {
@@ -44,25 +45,28 @@ private:
     void swap(Control* control) {
         Document* doc = control->getDocument();
         doc->lock();
-        auto& elements = layer->getElements();
-        std::vector<ElementPtr> texts;
-        for (auto it = elements.begin(); it != elements.end();) {
-            if ((*it)->getType() == ELEMENT_TEXT) {
-                texts.push_back(std::move(*it));
-                it = elements.erase(it);
+        ElementPtr removed;
+        Element::Index index = Element::InvalidIndex;
+        if (current && layer->indexOf(current) != Element::InvalidIndex) {
+            auto [e, i] = layer->removeElement(current);
+            removed = std::move(e);
+            index = i;
+        }
+        current = static_cast<Text*>(other.get());
+        if (other) {
+            if (index == Element::InvalidIndex) {
+                layer->addElement(std::move(other));
             } else {
-                ++it;
+                layer->insertElement(std::move(other), index);
             }
         }
-        for (auto& e: other) {
-            elements.push_back(std::move(e));
-        }
-        other = std::move(texts);
+        other = std::move(removed);
         doc->unlock();
         page->firePageChanged();
     }
     Layer* layer;
-    std::vector<ElementPtr> other;
+    Text* current;
+    ElementPtr other;
 };
 }  // namespace
 
@@ -99,16 +103,17 @@ std::string MarkdownSession::begin(size_t pageNo, const md::Style& s) {
         layer = md::markdownLayer(page);
         createdLayer = !layer;
         selectedBefore = page->getSelectedLayerId();
-        // A new box: from the top-left margin (beside the margin line of a ruled page) to the right margin
+        // The page's box: from the top-left margin (beside the margin line of a ruled page) to the right margin
         const TextFlow::Style margins = TextFlow::styleFor(page, TextFlow::Style{});
         boxX = margins.leftMargin;
         boxY = TextFlow::MARGIN;
         style.width = std::max(50.0, page->getWidth() - margins.leftMargin - margins.rightMargin);
-        if (const Text* box = layer ? md::boxOf(*layer) : nullptr) {
+        box = layer ? md::pageBoxOf(*layer, boxX, boxY) : nullptr;
+        original.reset();
+        if (box) {
             source = box->getText();
             style = md::styleOf(*box);
-            boxX = box->getTransformation().shift.x;
-            boxY = box->getTransformation().shift.y;
+            original = box->cloneText();
         }
     }
     if (!layer) {
@@ -119,40 +124,41 @@ std::string MarkdownSession::begin(size_t pageNo, const md::Style& s) {
         std::unique_lock lock(*doc);
         page->setSelectedLayerId(selectedBefore > 0 ? selectedBefore + 1 : 0);
     }
-    {
-        std::shared_lock lock(*doc);
-        original.clear();
-        for (const auto& e: layer->getElementsView()) {
-            if (e->getType() == ELEMENT_TEXT) {
-                original.push_back(e->clone());
-            }
-        }
-    }
     last = source;
     changed = false;
     return source;
 }
 
-std::unique_ptr<Text> MarkdownSession::makeBox(const std::string& source) const {
-    auto t = std::make_unique<Text>();
-    t->setText(source);
-    t->setFont(XojFont(style.family, style.size));
-    t->setColor(style.color);
-    t->setWrap(style.width);
-    t->setTransformation(xoj::util::Matrix::TRANSLATION(boxX, boxY));
-    return t;
+void MarkdownSession::apply(const std::string& source) {
+    Document* doc = session.getDocument();
+    if (!changed) {
+        // The undo step at the first change: the document is modified now (saving, autosave, the question when
+        // closing). Its "other" version is the box from before (none: undo takes the box away).
+        std::unique_lock lock(*doc);
+        if (!box) {
+            auto t = std::make_unique<Text>();
+            t->setTransformation(xoj::util::Matrix::TRANSLATION(boxX, boxY));
+            box = t.get();
+            layer->addElement(std::move(t));
+        }
+        lock.unlock();
+        session.getUndoRedoHandler()->addUndoAction(std::make_unique<MarkdownUndoAction>(
+                page, layer, box, original ? ElementPtr(original->clone()) : ElementPtr()));
+        changed = true;
+    }
+    {
+        // Changed in place (the element stays the same, the undo step refers to it). An empty text is not drawn
+        // and not saved (upstream's SaveHandler leaves empty texts out).
+        std::unique_lock lock(*doc);
+        box->setText(source);
+        box->setFont(XojFont(style.family, style.size));
+        box->setColor(style.color);
+        box->setWrap(style.width);
+    }
+    changedOnPage();
 }
 
-void MarkdownSession::replaceBox(std::vector<ElementPtr> elements) {
-    Document* doc = session.getDocument();
-    {
-        std::unique_lock lock(*doc);
-        auto& all = layer->getElements();
-        std::erase_if(all, [](const ElementPtr& e) { return e->getType() == ELEMENT_TEXT; });
-        for (auto& e: elements) {
-            all.push_back(std::move(e));
-        }
-    }
+void MarkdownSession::changedOnPage() {
     page->firePageChanged();
     if (const size_t index = pageIndex(); index != npos) {
         session.firePageChanged(index);           // thumbnails
@@ -162,8 +168,7 @@ void MarkdownSession::replaceBox(std::vector<ElementPtr> elements) {
 
 double MarkdownSession::overflow() const {
     std::shared_lock lock(*session.getDocument());
-    const Text* box = md::boxOf(*layer);
-    if (!box) {
+    if (!box || box->getText().empty()) {
         return 0;
     }
     const auto rect = md::boxRect(*box);
@@ -175,23 +180,19 @@ double MarkdownSession::update(const std::string& source) {
         return 0;
     }
     if (source != last) {
-        if (!changed) {
-            // The undo step at the first change: the document is modified now (saving, autosave, the question
-            // when closing). It swaps whatever box the page has then with the box from before.
-            std::vector<ElementPtr> before;
-            for (const auto& e: original) {
-                before.push_back(e->clone());
-            }
-            session.getUndoRedoHandler()->addUndoAction(
-                    std::make_unique<MarkdownUndoAction>(page, layer, std::move(before)));
-        }
-        changed = true;
         last = source;
-        std::vector<ElementPtr> box;
-        if (!source.empty()) {
-            box.push_back(makeBox(source));
-        }
-        replaceBox(std::move(box));
+        apply(source);
+    }
+    return overflow();
+}
+
+double MarkdownSession::setFontSize(double size) {
+    if (!active() || size <= 0 || size == style.size) {
+        return overflow();
+    }
+    style.size = size;
+    if (box || !last.empty()) {
+        apply(last);
     }
     return overflow();
 }
@@ -207,7 +208,18 @@ void MarkdownSession::cancel() {
         return;
     }
     if (changed) {
-        replaceBox(std::move(original));  // (its undo step now swaps the same box: no change)
+        // Back to the box from before (its undo step now swaps two equal boxes: no change)
+        std::unique_lock lock(*session.getDocument());
+        if (original) {
+            box->setText(original->getText());
+            box->setFont(original->getFont());
+            box->setColor(original->getColor());
+            box->setWrap(original->getWrap());
+        } else {
+            box->setText("");
+        }
+        lock.unlock();
+        changedOnPage();
     }
     end();
 }
@@ -225,7 +237,8 @@ void MarkdownSession::end() {
     }
     page = nullptr;
     layer = nullptr;
-    original.clear();
+    box = nullptr;
+    original.reset();
     last.clear();
     changed = false;
 }

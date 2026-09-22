@@ -252,7 +252,8 @@ ApplicationWindow {
             IconButton {
                 objectName: "textButton"
                 iconName: "xopp-tool-text"
-                tip: qsTr("Text (tap to write; tap a text to edit it)")
+                tip: app.textMarkdown ? qsTr("Markdown text (tap to write; tap a text to edit it; hold for the font)")
+                                      : qsTr("Text (tap to write; tap a text to edit it)")
                 checked: app.tool === "text"
                 onClicked: app.tool === "text" ? fontPopup.open() : app.selectTool("text")
                 onPressAndHold: fontPopup.open()
@@ -277,13 +278,21 @@ ApplicationWindow {
                             onActivated: app.fontFamily = currentText
                         }
                         RowLayout {
-                            Label { text: qsTr("Size"); Layout.fillWidth: true }
+                            Label { text: app.textMarkdown ? qsTr("Size of Markdown text") : qsTr("Size"); Layout.fillWidth: true }
                             SpinBox {
+                                objectName: "fontSizeBox"
                                 from: 4; to: 200
-                                value: Math.round(app.fontSize)
+                                value: Math.round(app.textMarkdown ? app.markdownFontSize : app.fontSize)
                                 editable: true
-                                onValueModified: app.fontSize = value
+                                onValueModified: app.textMarkdown ? app.markdownFontSize = value : app.fontSize = value
                             }
+                        }
+                        // New text boxes are Markdown: shown formatted (the source while editing)
+                        Switch {
+                            objectName: "textMarkdownSwitch"
+                            text: qsTr("Markdown (shown formatted)")
+                            checked: app.textMarkdown
+                            onToggled: app.textMarkdown = checked
                         }
                     }
                 }

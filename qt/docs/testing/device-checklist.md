@@ -342,6 +342,13 @@ cd build-qt
 - [ ] Text tool: a tap on the box opens its Markdown (not a text box with the source). A tap on a link in the box
       (text tool off) offers to open it; `[see](#Page:2)` goes to page 2.
 - [ ] Headings 1-3 of a box are chapters in the contents sidebar.
+- [ ] Search (Ctrl+F) for a word of a box: the mark is on the drawn word (not somewhere in between).
+- [ ] A code block with ```` ```python ```` (or cpp, js, bash): keywords, strings and comments in colors.
+- [ ] Size: "Size" in the editor changes the text (and the size of new Markdown text); new text starts at 60 % of
+      the text font (16 pt: 10).
+- [ ] Text tool, hold its button: switch "Markdown" on; the size there is the Markdown size. Tap anywhere, type
+      "Some **bold**", Esc: drawn formatted where it was tapped. Tap it: the source again, on the page. Markdown off:
+      ordinary text boxes again. The pen still writes into its layer.
 - [ ] Save, open the file in Xournal++: the page shows the Markdown source as a text, nothing lost; saved there and
       opened again here: formatted again.
 - [ ] Longer than the page: the editor says so (the next step flows it onto new pages).
