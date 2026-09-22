@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <shared_mutex>
 
+#include <QCryptographicHash>
+#include <QFile>
 #include <QRunnable>
 #include <QThread>
 #include <QThreadPool>
@@ -11,8 +13,13 @@
 #include "pdf/base/XojPdfDocument.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "util/PathUtil.h"
 
 #include "CanvasMemory.h"
+#include "DocumentFiles.h"
+#include "DocumentPlaces.h"
+#include "Library.h"
+#include "Previews.h"
 #include "Thumbnails.h"
 
 namespace xqt {
@@ -27,6 +34,48 @@ QThreadPool& sketchPool(int workers) {
         return tp;
     }();
     return *p;
+}
+
+/// Folder of the stored previews of a document as its files are now (empty: not saved)
+fs::path folderOf(DocumentSession& session) {
+    const fs::path file = session.documentFile();
+    if (file.empty()) {
+        return {};
+    }
+    fs::path pdf;
+    {
+        Document* doc = session.getDocument();
+        std::shared_lock lock(*doc);
+        if (doc->getPdfPageCount() > 0) {
+            pdf = doc->getPdfFilepath();  // (also one that is not next to it)
+        }
+    }
+    const QByteArray key = QByteArray::fromStdString(file.string()) + '\n' +
+                           documentStamp(DocumentFiles::itemOf(file)).toUtf8() + '\n' +
+                           QByteArray::fromStdString(pdf.string()) + '|' + fileStamp(pdf).toUtf8();
+    const QString name =
+            QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha1).toHex().left(24));
+    return Util::getCacheSubfolder("pages") / name.toStdString();
+}
+
+QImage readPage(const fs::path& file) {
+    QImage img;
+    std::error_code ec;
+    if (!file.empty() && fs::exists(file, ec)) {
+        img.load(QString::fromStdString(file.string()), "JPG");
+    }
+    return img;
+}
+
+void writePage(const fs::path& file, const QImage& image) {
+    std::error_code ec;
+    fs::create_directories(file.parent_path(), ec);
+    // Written under another name first: a reader never sees half a file.
+    const QString path = QString::fromStdString(file.string());
+    if (image.convertToFormat(QImage::Format_RGB888).save(path + ".part", "JPG", 85)) {
+        QFile::remove(path);
+        QFile::rename(path + ".part", path);
+    }
 }
 
 qint64 bytesAt(int width, double aspect) {
@@ -126,7 +175,139 @@ void PageSketches::add(quint64 id, DocumentSession* session) {
     connect(session, &DocumentSession::pageRevisionsChanged, this, [this] { editTimer.start(); });
     // (outwards from where the reader is now)
     connect(session, &DocumentSession::currentPageChanged, this, [this] { planSoon(shownDelay); });
+    // As saved again (saved, or undone back): its pages go to disk
+    connect(session, &DocumentSession::modifiedChanged, this, [this, id](bool modified) {
+        if (!modified) {
+            capture(id);
+        }
+    });
+    connect(session, &DocumentSession::filePathChanged, this, [this, id] { capture(id); });
+    capture(id);
+    seedTitlePage(id);
     planSoon(shownDelay);
+}
+
+void PageSketches::capture(quint64 id) {
+    DocumentSession* s = nullptr;
+    for (const auto& e: sessions) {
+        if (e.id == id) {
+            s = e.session;
+        }
+    }
+    if (!s || s->isModified()) {
+        return;  // (the pages as saved are those captured before)
+    }
+    Disk disk;
+    disk.folder = folderOf(*s);
+    if (!disk.folder.empty()) {
+        const auto stamps = s->pageStamps();
+        for (size_t i = 0; i < stamps.size(); ++i) {
+            disk.saved[stamps[i].id] = {stamps[i].revision, i};
+        }
+        std::error_code ec;
+        if (fs::exists(disk.folder, ec)) {
+            fs::last_write_time(disk.folder, fs::file_time_type::clock::now(), ec);  // (used now: kept longer)
+        }
+    }
+    {
+        std::lock_guard lock(mtx);
+        if (auto old = disks.find(id); old != disks.end() && old->second.folder == disk.folder) {
+            disk.stored = std::move(old->second.stored);  // (the same files: e.g. undone back to as saved)
+        }
+        disks[id] = std::move(disk);
+    }
+    planSoon(shownDelay);
+}
+
+void PageSketches::seedTitlePage(quint64 id) {
+    DocumentSession* s = nullptr;
+    for (const auto& e: sessions) {
+        if (e.id == id) {
+            s = e.session;
+        }
+    }
+    if (!s || s->isModified() || s->documentFile().empty()) {
+        return;
+    }
+    const DocumentItem item = DocumentFiles::itemOf(s->documentFile());
+    const size_t pages = s->getDocument()->getPageCount();
+    if (!item.valid() || pages == 0) {
+        return;
+    }
+    const auto title = std::min(static_cast<size_t>(std::max(0, DocumentPlaces::titlePage(DocumentPlaces::keyOf(item)))),
+                                pages - 1);
+    const quint64 pageId = s->pageId(title);
+    {
+        std::lock_guard lock(mtx);
+        if (previews.find(id, pageId)) {
+            return;
+        }
+    }
+    QImage img;
+    std::error_code ec;
+    const fs::path png = PreviewCache::cacheFile(item);
+    if (fs::exists(png, ec) && img.load(QString::fromStdString(png.string()), "PNG")) {
+        // (smaller than a preview: it is drawn later, the canvas shows this one meanwhile)
+        store(id, pageId, s->pageRevision(title), img, true);
+    }
+}
+
+fs::path PageSketches::diskFile(quint64 session, quint64 pageId, quint64 revision) const {
+    auto d = disks.find(session);
+    if (d == disks.end() || d->second.folder.empty()) {
+        return {};
+    }
+    auto it = d->second.saved.find(pageId);
+    if (it == d->second.saved.end() || it->second.first != revision) {
+        return {};  // changed since
+    }
+    return d->second.folder / (std::to_string(it->second.second) + ".jpg");
+}
+
+void PageSketches::markStored(quint64 session, quint64 pageId) {
+    std::lock_guard lock(mtx);
+    if (auto d = disks.find(session); d != disks.end()) {
+        if (auto it = d->second.saved.find(pageId); it != d->second.saved.end()) {
+            d->second.stored.insert(it->second.second);
+        }
+    }
+}
+
+fs::path PageSketches::diskFolder(quint64 session) const {
+    std::lock_guard lock(mtx);
+    auto d = disks.find(session);
+    return d == disks.end() ? fs::path() : d->second.folder;
+}
+
+void PageSketches::trimDisk(qint64 bytes) {
+    struct Folder {
+        fs::path path;
+        fs::file_time_type used;
+        qint64 size = 0;
+    };
+    std::vector<Folder> folders;
+    qint64 total = 0;
+    std::error_code ec;
+    const fs::path root = Util::getCacheSubfolder("pages");
+    for (auto it = fs::directory_iterator(root, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        if (!it->is_directory(ec)) {
+            continue;
+        }
+        Folder f{it->path(), fs::last_write_time(it->path(), ec)};
+        for (auto p = fs::directory_iterator(it->path(), ec); !ec && p != fs::directory_iterator(); p.increment(ec)) {
+            f.size += static_cast<qint64>(p->file_size(ec));
+        }
+        total += f.size;
+        folders.push_back(std::move(f));
+    }
+    std::sort(folders.begin(), folders.end(), [](const Folder& a, const Folder& b) { return a.used < b.used; });
+    for (const Folder& f: folders) {
+        if (total <= bytes) {
+            break;
+        }
+        fs::remove_all(f.path, ec);
+        total -= f.size;
+    }
 }
 
 void PageSketches::remove(quint64 id) {
@@ -144,6 +325,7 @@ void PageSketches::remove(quint64 id) {
         sketches.dropSession(id);
         previews.dropSession(id);
         pdfCopies.erase(id);
+        disks.erase(id);
     }
     planSoon(shownDelay);  // the others may get bigger pictures now
 }
@@ -223,8 +405,14 @@ void PageSketches::plan() {
     sketches.level = sl;
     previews.level = pl;
 
+    // Once after the start: the stored previews used longest ago go
+    static bool trimmed = false;
+    if (!std::exchange(trimmed, true)) {
+        QThreadPool::globalInstance()->start([] { trimDisk(DISK_LIMIT); });
+    }
+
     // Who gets pictures: in that order, while the budget lasts; the others lose theirs
-    std::vector<Job> missingSketch, missingPreview, outdated;
+    std::vector<Job> missingSketch, missingPreview, outdated, toStore;
     qint64 plannedS = 0, plannedP = 0;
     {
         std::lock_guard lock(mtx);
@@ -250,6 +438,12 @@ void PageSketches::plan() {
                     missingPreview.push_back(job);
                 } else if ((wantS && !sOk) || (wantP && !pOk)) {
                     outdated.push_back(job);
+                } else if (pOk && !diskFile(id, p.id, p.revision).empty()) {
+                    // As saved, with its preview: on disk for the next opening (unless it is there)
+                    const auto& d = disks.at(id);
+                    if (!d.stored.count(d.saved.at(p.id).second)) {
+                        toStore.push_back(Job{id, p.id, p.revision, true, true});
+                    }
                 }
             }
             sketches.keepOnly(id, keepS);
@@ -259,6 +453,7 @@ void PageSketches::plan() {
     jobs.assign(missingSketch.begin(), missingSketch.end());
     jobs.insert(jobs.end(), missingPreview.begin(), missingPreview.end());
     jobs.insert(jobs.end(), outdated.begin(), outdated.end());
+    jobs.insert(jobs.end(), toStore.begin(), toStore.end());
     next();
 }
 
@@ -269,10 +464,36 @@ void PageSketches::next() {
         const int sl = sketches.level, pl = previews.level;
         const int target = job.preview ? pl : sl;
         QImage from;  // a picture of this revision at least as big
+        fs::path file;  // its stored preview (the page is as saved)
+        bool stored = false;
         {
             std::lock_guard lock(mtx);
             if (!sketches.pictures.count(job.session)) {
                 continue;  // closed
+            }
+            file = diskFile(job.session, job.pageId, job.revision);
+            if (!file.empty()) {
+                const auto& d = disks.at(job.session);
+                stored = d.stored.count(d.saved.at(job.pageId).second) > 0;
+            }
+            if (job.write) {
+                const Picture* v = previews.find(job.session, job.pageId);
+                if (file.empty() || stored || !v || v->revision != job.revision) {
+                    continue;
+                }
+                ++running;
+                QThreadPool::globalInstance()->start([this, job, file, image = v->image] {
+                    writePage(file, image);
+                    markStored(job.session, job.pageId);
+                    QMetaObject::invokeMethod(
+                            this,
+                            [this] {
+                                --running;
+                                next();
+                            },
+                            Qt::QueuedConnection);
+                });
+                continue;
             }
             const Picture* s = sketches.find(job.session, job.pageId);
             const Picture* v = previews.find(job.session, job.pageId);
@@ -302,10 +523,16 @@ void PageSketches::next() {
             }
         }
         ++running;
-        sketchPool(WORKERS).start(QRunnable::create([this, job, target, session, from, pdfPath, pdfPages] {
+        sketchPool(WORKERS).start(QRunnable::create([this, job, target, session, from, pdfPath, pdfPages, file, stored] {
             QImage img = from;
             if (img.isNull()) {
                 img = ThumbnailProvider::keptImage(job.session, job.revision, target);
+            }
+            bool fromDisk = false;
+            if (img.isNull() && !file.empty()) {
+                img = readPage(file);  // (stored at the opening before)
+                fromDisk = !img.isNull();
+                reads += fromDisk;
             }
             if (img.isNull()) {
                 if (auto stamp = session->pageOfRevision(job.revision)) {  // (else changed meanwhile)
@@ -317,6 +544,12 @@ void PageSketches::next() {
             }
             if (!img.isNull()) {
                 store(job.session, job.pageId, job.revision, img, job.preview);
+                if (fromDisk) {
+                    markStored(job.session, job.pageId);
+                } else if (!file.empty() && !stored && job.preview && img.width() >= target) {
+                    writePage(file, img.width() == target ? img : img.scaledToWidth(target, Qt::SmoothTransformation));
+                    markStored(job.session, job.pageId);
+                }
             }
             ThumbnailProvider::releaseSession(job.session);
             QMetaObject::invokeMethod(
@@ -371,8 +604,8 @@ void PageSketches::givePdf(quint64 session, const fs::path& path, std::unique_pt
 }
 
 void PageSketches::store(quint64 session, quint64 pageId, quint64 revision, const QImage& image, bool preview) {
-    auto scaled = [&image](int width) {
-        QImage img = image.width() == width ? image : image.scaledToWidth(width, Qt::SmoothTransformation);
+    auto scaled = [&image](int width) {  // (never bigger: a smaller one is drawn later)
+        QImage img = image.width() <= width ? image : image.scaledToWidth(width, Qt::SmoothTransformation);
         return img.format() == QImage::Format_RGB16 ? img : img.convertToFormat(QImage::Format_RGB16);
     };
     QImage p = preview ? scaled(previews.level) : QImage();

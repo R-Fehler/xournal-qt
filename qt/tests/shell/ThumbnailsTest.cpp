@@ -10,6 +10,7 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QTemporaryDir>
+#include <QUrl>
 #include <QElapsedTimer>
 #include <QImage>
 #include <QQuickImageResponse>
@@ -18,6 +19,12 @@
 #include <gtest/gtest.h>
 
 #include "model/Document.h"
+#include "model/Layer.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
+#include "undo/InsertUndoAction.h"
+#include "undo/UndoRedoHandler.h"
+#include "util/PathUtil.h"
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfDocument.h"
 #include "session/DocumentSession.h"
@@ -305,7 +312,7 @@ TEST_F(Sketches, closingADocumentForgetsItsSketches) {
 TEST_F(Sketches, pagesAreDrawnOnceForTheirPreviewAndSketch) {
     AppController c;
     openPages(c);
-    const int drawn = PageSketches::instance().drawCount();
+    const int drawn = PageSketches::instance().drawCount(), read = PageSketches::instance().readCount();
     ASSERT_TRUE(sketched());
     DocumentSession* s = c.tabManager().currentSession();
     const quint64 id = ThumbnailProvider::idOf(s);
@@ -314,7 +321,8 @@ TEST_F(Sketches, pagesAreDrawnOnceForTheirPreviewAndSketch) {
         EXPECT_EQ(PageSketches::instance().preview(id, s->pageId(static_cast<size_t>(p))).width(), 768) << "page " << p + 1;
         EXPECT_EQ(PageSketches::instance().image(id, s->pageId(static_cast<size_t>(p))).width(), 128) << "page " << p + 1;
     }
-    EXPECT_EQ(PageSketches::instance().drawCount() - drawn, pages) << "the sketch is scaled from the preview";
+    EXPECT_EQ(PageSketches::instance().drawCount() - drawn + PageSketches::instance().readCount() - read, pages)
+            << "each page drawn (or read) once: the sketch is scaled from the preview";
     EXPECT_FALSE(c.tabManager().currentView()->preview(3).isNull()) << "the canvas shows them until it rendered";
 }
 
@@ -340,6 +348,117 @@ TEST_F(Sketches, previewsGetSmallerWhenTheMemoryForPagesIsShort) {
     EXPECT_EQ(PageSketches::instance().previewWidth(), 384);
     EXPECT_LE(PageSketches::instance().previewBytes(), pages * 600000);
     CanvasMemory::instance().setLimit(CanvasMemory::defaultLimit());
+}
+
+// --- stored previews: the next opening reads them instead of drawing ---
+
+namespace {
+size_t storedFiles(const fs::path& folder) {
+    size_t n = 0;
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(folder, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        n += it->path().extension() == ".jpg";
+    }
+    return n;
+}
+
+QByteArray contentOf(const fs::path& file) {
+    QFile f(QString::fromStdString(file.string()));
+    return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+}
+
+void scribble(DocumentSession& s) {
+    auto page = s.getDocument()->getPage(0);
+    auto stroke = std::make_unique<Stroke>();
+    stroke->setWidth(4);
+    stroke->addPoint(Point(10, 10, 1));
+    stroke->addPoint(Point(500, 700, 1));
+    const Stroke* raw = stroke.get();
+    Layer* layer = page->getSelectedLayer();
+    s.getDocument()->lock();
+    layer->addElement(std::move(stroke));
+    s.getDocument()->unlock();
+    s.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+}
+}  // namespace
+
+TEST_F(Sketches, previewsAreStoredForTheNextOpening) {
+    fs::path folder;
+    int pages = 0;
+    {
+        AppController c;
+        openPages(c);
+        ASSERT_TRUE(sketched());
+        folder = PageSketches::instance().diskFolder(ThumbnailProvider::idOf(c.tabManager().currentSession()));
+        pages = pagesOf(c).rowCount();
+        ASSERT_FALSE(folder.empty());
+        EXPECT_EQ(storedFiles(folder), static_cast<size_t>(pages));
+    }
+    AppController c;
+    const int drawn = PageSketches::instance().drawCount(), read = PageSketches::instance().readCount();
+    openPages(c);
+    ASSERT_TRUE(sketched());
+    EXPECT_EQ(PageSketches::instance().drawCount(), drawn) << "nothing drawn";
+    EXPECT_EQ(PageSketches::instance().readCount() - read, pages) << "all read";
+    DocumentSession* s = c.tabManager().currentSession();
+    EXPECT_EQ(PageSketches::instance().preview(ThumbnailProvider::idOf(s), s->pageId(3)).width(), 768);
+}
+
+TEST_F(Sketches, changedPagesAreStoredOnceTheDocumentIsSaved) {
+    QTemporaryDir dir;
+    AppController c;
+    c.newDocument();
+    c.insertPages(1, 0, -1, false, 3);
+    DocumentSession* s = c.tabManager().currentSession();
+    const QString path = dir.filePath("doc.xopp");
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(path)));
+    ASSERT_TRUE(sketched());
+    const quint64 id = ThumbnailProvider::idOf(s);
+    const fs::path saved = PageSketches::instance().diskFolder(id);
+    ASSERT_FALSE(saved.empty());
+    EXPECT_EQ(storedFiles(saved), 4u);
+    const QByteArray before = contentOf(saved / "0.jpg");
+
+    scribble(*s);
+    ASSERT_TRUE(sketched());
+    EXPECT_EQ(contentOf(saved / "0.jpg"), before) << "changed, not saved: the stored page stays as in the file";
+
+    processEvents(20);  // (a new modification time)
+    ASSERT_TRUE(c.save());
+    ASSERT_TRUE(sketched());
+    const fs::path now = PageSketches::instance().diskFolder(id);
+    EXPECT_NE(now, saved) << "the file changed: another folder";
+    EXPECT_EQ(storedFiles(now), 4u);
+    EXPECT_NE(contentOf(now / "0.jpg"), before) << "the page as saved now";
+}
+
+TEST_F(Sketches, theStoredPreviewsUsedLongestAgoGoFirst) {
+    const fs::path root = Util::getCacheSubfolder("pages");
+    std::error_code ec;
+    qint64 others = 0;  // (stored by other tests, newer)
+    for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator();
+         it.increment(ec)) {
+        if (it->is_regular_file(ec)) {
+            others += static_cast<qint64>(it->file_size(ec));
+        }
+    }
+    const auto now = fs::file_time_type::clock::now();
+    for (int i = 0; i < 3; ++i) {
+        const fs::path folder = root / ("test-" + std::to_string(i));
+        fs::create_directories(folder, ec);
+        QFile f(QString::fromStdString((folder / "0.jpg").string()));
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly));
+        f.write(QByteArray(100000, 'x'));
+        f.close();
+        fs::last_write_time(folder, now - std::chrono::hours(10 - i), ec);  // test-0 used longest ago
+    }
+    PageSketches::trimDisk(others + 150000);  // room for one of the three
+    EXPECT_FALSE(fs::exists(root / "test-0", ec));
+    EXPECT_FALSE(fs::exists(root / "test-1", ec));
+    EXPECT_TRUE(fs::exists(root / "test-2", ec)) << "used last";
+    for (int i = 0; i < 3; ++i) {
+        fs::remove_all(root / ("test-" + std::to_string(i)), ec);
+    }
 }
 
 // XQT_BENCH_PDF=<big pdf>: how long sketching all its pages takes, and whether edits (the document lock) or the UI
@@ -384,6 +503,35 @@ TEST_F(Sketches, benchBigPdf) {
               << maxLockWait / 1000.0 << " ms; longest UI gap " << maxGap << " ms; "
               << PageSketches::instance().bytes() / 1024 << " kB; longest PDF draw of the canvas meanwhile "
               << maxCanvasDraw << " ms\n";
+}
+
+// XQT_BENCH_PDF=<big pdf>: opening it a second time reads the stored previews
+TEST_F(Sketches, benchReopen) {
+    const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
+    if (pdf.isEmpty()) {
+        GTEST_SKIP() << "set XQT_BENCH_PDF";
+    }
+    QTemporaryDir dir;
+    const QString copy = dir.filePath("bench.pdf");
+    ASSERT_TRUE(QFile::copy(pdf, copy));
+    for (const char* opening: {"first opening (drawn)", "second opening (read)"}) {
+        AppController c;
+        const int drawn = PageSketches::instance().drawCount(), read = PageSketches::instance().readCount();
+        QElapsedTimer t;
+        t.start();
+        ASSERT_TRUE(c.openPath(copy));
+        ASSERT_TRUE(sketched());
+        std::cout << opening << ": all " << c.tabManager().currentSession()->getDocument()->getPageCount()
+                  << " pages in " << t.elapsed() << " ms (" << PageSketches::instance().drawCount() - drawn
+                  << " drawn, " << PageSketches::instance().readCount() - read << " read)\n";
+        qint64 bytes = 0;
+        std::error_code ec;
+        const fs::path folder = PageSketches::instance().diskFolder(ThumbnailProvider::idOf(c.tabManager().currentSession()));
+        for (auto it = fs::directory_iterator(folder, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+            bytes += static_cast<qint64>(it->file_size(ec));
+        }
+        std::cout << "  stored: " << bytes / 1024 << " kB\n";
+    }
 }
 
 // XQT_BENCH_PDF=<pdf>: what drawing a page costs at different widths (poppler: parsing and decoding are paid at any

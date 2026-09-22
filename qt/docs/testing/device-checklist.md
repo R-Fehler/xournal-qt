@@ -47,6 +47,10 @@ cd build-qt
       pages at once, sharp, without rendering. More pages ahead are ready than behind.
 - [ ] Open a big, slow PDF, wait ~10 s, then jump far (grid, sidebar or scroll bar): the page shows at once as a blurry
       preview (never white) and turns sharp when it is rendered.
+- [ ] Close that PDF and open it again: the sidebar, the grid and far jumps show all pages at once (previews stored on
+      disk, ~70 kB per page in ~/.cache/xournal-qt/pages). Write on a page, save, reopen: that page shows as saved.
+- [ ] A library document opened for the first time shows its title page at once (the library's preview) while it
+      renders.
 - [ ] While pages are being rendered ahead (right after opening or after zooming), scrolling and writing stay smooth
       and a page jumped to far away is not slower than before.
 - [ ] Settings → Documents → Memory: "Rendered pages of the open documents" defaults to a quarter of the RAM and

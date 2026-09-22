@@ -16,6 +16,11 @@
  *    window), then the others in the order they were shown; in a document the current page first, then outwards;
  *  - from a bigger picture of the page if there is one (scaled down), else drawn;
  *  - a changed page keeps its old pictures until the new ones are there; they are drawn again once the edits paused.
+ * On disk: the previews of pages as they are in the document's file are stored (JPEG, in the user's cache, a folder
+ * per document named by its files' sizes and times), so the next opening reads them instead of drawing: a document
+ * opened before shows all its pages at once. Pages as saved are known from the opening, a saving, or an undo back to
+ * the saved state; changed pages are not stored. The folders used longest ago go first beyond 1 GB. The title page
+ * of a library document gets the library's stored preview right away (before anything is drawn or read).
  * Memory, with 16 bits per pixel: the sketches take a quarter of the memory for page previews (setBudget), the
  * previews a tenth of the memory for rendered pages (CanvasMemory::previewBudget). Each size is the biggest at which
  * all pages of all open documents fit; if even the smallest does not fit, the documents shown last get theirs.
@@ -82,6 +87,13 @@ public:
     int drawCount() const { return draws; }
     /// How long to wait after a document was opened or shown, and after its last edit (ms)
     void setDelays(int shown, int edited);
+    /// Pages read from disk so far (tests)
+    int readCount() const { return reads; }
+    /// Folder of the stored previews of a session's document (empty: none, e.g. not saved or changed; tests)
+    fs::path diskFolder(quint64 session) const;
+    /// Delete the stored previews used longest ago beyond `bytes` (any thread; runs once after the start with 1 GB)
+    static void trimDisk(qint64 bytes);
+    static constexpr qint64 DISK_LIMIT = qint64(1024) * 1024 * 1024;
 
 Q_SIGNALS:
     /// Pictures of the session were added or replaced (collected for a moment).
@@ -116,7 +128,22 @@ private:
         quint64 pageId = 0;
         quint64 revision = 0;
         bool preview = false;  ///< the page gets a preview too
+        bool write = false;    ///< only store its preview on disk
     };
+    /// A session's document as it is on disk: its folder of stored previews, the pages as saved (page id ->
+    /// revision and place in the file) and the places stored or read already
+    struct Disk {
+        fs::path folder;
+        std::unordered_map<quint64, std::pair<quint64, size_t>> saved;
+        std::set<size_t> stored;
+    };
+    /// The document is as saved (opened, saved, undone back): remember its pages as they are (GUI thread)
+    void capture(quint64 id);
+    /// The library's stored preview of the title page, until the page is drawn (GUI thread)
+    void seedTitlePage(quint64 id);
+    /// File of a page's stored preview if the page is as saved (under mtx; empty: not)
+    fs::path diskFile(quint64 session, quint64 pageId, quint64 revision) const;
+    void markStored(quint64 session, quint64 pageId);
     static constexpr int WORKERS = 2;
     /// A PDF instance of the session's document for a worker (loaded if none is spare; null: use the document's)
     std::unique_ptr<XojPdfDocument> takePdf(quint64 session, const fs::path& path, size_t pages);
@@ -133,6 +160,8 @@ private:
     Tier sketches;
     Tier previews;
     std::atomic<int> draws{0};
+    std::atomic<int> reads{0};
+    std::map<quint64, Disk> disks;
     struct PdfCopies {
         fs::path path;
         std::vector<std::unique_ptr<XojPdfDocument>> spare;
