@@ -36,6 +36,9 @@
 
 namespace {
 constexpr int TILE = 256;
+/// Tiles composed and uploaded in one frame (about 0.26 MB each)
+constexpr int TILES_WHILE_MOVING = 12;
+constexpr int TILES_WHEN_STILL = 64;
 
 class TileNode final: public QSGSimpleTextureNode {
 public:
@@ -60,6 +63,7 @@ public:
             delete t;
         }
         tiles.clear();
+        composed.clear();
         cols = rows = 0;
     }
     /// The page's preview (drawn in advance) over the whole page, until it is rendered; null image: none
@@ -72,6 +76,7 @@ public:
             preview = new TileNode;
             preview->setFiltering(QSGTexture::Linear);
         }
+
         if (previewKey != image.cacheKey()) {
             QSGTexture* previous = preview->texture();
             preview->setTexture(window->createTextureFromImage(image, QQuickWindow::TextureIsOpaque));
@@ -80,7 +85,8 @@ public:
         }
         preview->setRect(QRectF(QPointF(0, 0), size));
         if (!preview->parent()) {
-            insertChildNodeBefore(preview, searchRoot);  // (with its texture: the software renderer needs one)
+            // With its texture (the software renderer needs one), and under the tiles
+            insertChildNodeAfter(preview, placeholder);
         }
     }
     void hidePreview() {
@@ -91,6 +97,7 @@ public:
             previewKey = 0;
         }
     }
+    std::vector<bool> composed;  ///< tiles that have their picture (the others are not in the scene graph)
     QSGSimpleRectNode* shadow;
     QSGSimpleRectNode* placeholder;
     QSGTransformNode* searchRoot;
@@ -572,8 +579,18 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
     const auto [first, last] = canvasView->visiblePages();
 
+    // Composing and uploading tiles is what a scroll pays for: while the view moves, only a few per frame (the rest
+    // of a page shows its preview and follows in the next frames), when it stands still more.
+    const QPointF scroll = canvasView->getViewController().scrollPosition();
+    const bool moving = (scroll - lastScroll).manhattanLength() > 2 || zoom != lastZoom;
+    lastScroll = scroll;
+    lastZoom = zoom;
+    int tileBudget = moving ? TILES_WHILE_MOVING : TILES_WHEN_STILL;
+    const int budgetOfTheFrame = tileBudget;
+    const QRectF viewport = QRectF(0, 0, width(), height()).adjusted(-TILE, -TILE, TILE, TILE);
+    bool more = false;  // tiles left for the next frame
+
     std::unordered_map<const xqt::CanvasPage*, PageNode*> keep;
-    int previews = 0;
     for (size_t i = first; i <= last && i < canvasView->pageCount(); ++i) {
         xqt::CanvasPage* page = canvasView->getPage(i);
         PageNode* node = nullptr;
@@ -607,10 +624,8 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             node->shadow->setRect(QRectF(QPointF(2, 2), r.size()));
             // Not rendered yet: its preview (drawn in advance, never in front of the page), else white
             node->showPreview(window(), canvasView->preview(i), r.size());
-            previews += node->preview != nullptr;
             continue;
         }
-        node->hidePreview();
         const double scale = zoom / info.zoom;
         m.scale(static_cast<float>(scale), static_cast<float>(scale));
         node->setMatrix(m);
@@ -621,7 +636,6 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
 
         const bool rebuild = fresh || node->bufferZoom != info.zoom || node->dpiScale != info.dpiScale ||
                              node->pixelSize != info.pixelSize;
-        std::vector<int> toCompose;
         if (rebuild) {
             node->clearTiles();
             node->cols = (info.pixelSize.width() + TILE - 1) / TILE;
@@ -636,35 +650,56 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
                 tile->setRect(QRectF(px.x() / info.dpiScale, px.y() / info.dpiScale, px.width() / info.dpiScale,
                                      px.height() / info.dpiScale));
                 node->tiles.push_back(tile);
-                toCompose.push_back(t);
             }
+            node->composed.assign(node->tiles.size(), false);
         } else if (all) {
-            for (int t = 0; t < node->cols * node->rows; ++t) {
-                toCompose.push_back(t);
-            }
+            node->composed.assign(node->tiles.size(), false);
         } else {
             for (const QRect& d: dirty) {
                 const int x0 = d.left() / TILE, x1 = d.right() / TILE, y0 = d.top() / TILE, y1 = d.bottom() / TILE;
                 for (int y = y0; y <= y1; ++y) {
                     for (int x = x0; x <= x1; ++x) {
                         const int t = y * node->cols + x;
-                        if (t >= 0 && t < static_cast<int>(node->tiles.size()) &&
-                            std::find(toCompose.begin(), toCompose.end(), t) == toCompose.end()) {
-                            toCompose.push_back(t);
+                        if (t >= 0 && t < static_cast<int>(node->composed.size())) {
+                            node->composed[static_cast<size_t>(t)] = false;
                         }
                     }
                 }
             }
         }
-        for (int t: toCompose) {
+        // Only the tiles that are in view, and only as many as this frame allows: a page is a few dozen tiles (about
+        // 30 MB), and a fast scroll passes many pages. What is not composed yet shows the page's preview.
+        int missing = 0;
+        for (int t = 0; t < static_cast<int>(node->tiles.size()); ++t) {
+            if (node->composed[static_cast<size_t>(t)]) {
+                continue;
+            }
+            const QRect px = tileRect(t, node->cols, info.pixelSize);
+            const QRectF inItem(r.x() + px.x() / info.dpiScale * scale, r.y() + px.y() / info.dpiScale * scale,
+                                px.width() / info.dpiScale * scale, px.height() / info.dpiScale * scale);
+            if (!inItem.intersects(viewport)) {
+                continue;  // (composed when it comes into view)
+            }
+            if (tileBudget <= 0) {
+                ++missing;
+                continue;
+            }
+            --tileBudget;
             TileNode* tile = node->tiles[static_cast<size_t>(t)];
-            const QImage img = page->composeTile(tileRect(t, node->cols, info.pixelSize));
+            const QImage img = page->composeTile(px);
             QSGTexture* previous = tile->texture();
             tile->setTexture(window()->createTextureFromImage(img, QQuickWindow::TextureIsOpaque));
             delete previous;
+            node->composed[static_cast<size_t>(t)] = true;
             if (!tile->parent()) {
                 node->insertChildNodeBefore(tile, node->searchRoot);
             }
+        }
+        if (missing > 0) {
+            node->showPreview(window(), canvasView->preview(i), bufferLogical);
+            more = true;
+        } else {
+            node->hidePreview();
         }
     }
     // Pages that scrolled out of view: free their textures.
@@ -672,8 +707,17 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         root->pagesRoot->removeChildNode(node);
         delete node;
     }
+    mostTiles = std::max(mostTiles.load(), budgetOfTheFrame - tileBudget);
+    int previews = 0;  // pages shown by their preview, whole or in part (tests)
+    for (const auto& [page, node]: keep) {
+        previews += node->preview != nullptr;
+    }
     root->pages = std::move(keep);
     shownPreviews = previews;
+    previewFrames += previews > 0;
+    if (more) {  // the next frame composes further tiles
+        QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
+    }
     updateSelectionNode(root, zoom, dpr);
 
     if (auto h = input ? input->hoverPosition() : std::nullopt) {

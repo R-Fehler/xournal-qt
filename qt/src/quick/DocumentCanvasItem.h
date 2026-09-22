@@ -15,6 +15,7 @@
 #include <atomic>
 #include <memory>
 
+#include <QPointF>
 #include <QPointer>
 #include <QQuickItem>
 
@@ -48,8 +49,15 @@ public:
     qreal contentY() const;
     /// Scroll so that the content position (x, y) is at the top-left corner.
     Q_INVOKABLE void scrollTo(qreal x, qreal y);
-    /// Pages the last frame showed by their preview (not rendered yet; tests)
+    /// Pages the last frame showed by their preview, whole or in part (tests)
     Q_INVOKABLE int previewsShown() const { return shownPreviews; }
+    /// Most tiles composed and uploaded in one frame so far, and frames that showed a preview (tests)
+    Q_INVOKABLE int mostTilesInAFrame() const { return mostTiles; }
+    Q_INVOKABLE int framesWithPreviews() const { return previewFrames; }
+    Q_INVOKABLE void forgetTileCount() {
+        mostTiles = 0;
+        previewFrames = 0;
+    }
 
 Q_SIGNALS:
     void viewChanged();
@@ -82,4 +90,8 @@ private:
     bool touchSessionOwned = false;
     bool viewReplaced = false;
     std::atomic<int> shownPreviews{0};
+    std::atomic<int> mostTiles{0};
+    std::atomic<int> previewFrames{0};
+    QPointF lastScroll;  ///< of the last frame (scene graph thread): whether the view is moving
+    double lastZoom = 0;
 };

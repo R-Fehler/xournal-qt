@@ -51,6 +51,8 @@ cd build-qt
       disk, ~70 kB per page in ~/.cache/xournal-qt/pages). Write on a page, save, reopen: that page shows as saved.
 - [ ] A library document opened for the first time shows its title page at once (the library's preview) while it
       renders.
+- [ ] Drag the scroll bar of a big PDF quickly with the mouse and with a finger: the canvas follows without freezing;
+      pages show their preview for a moment and turn sharp where the scrolling stops.
 - [ ] While pages are being rendered ahead (right after opening or after zooming), scrolling and writing stay smooth
       and a page jumped to far away is not slower than before.
 - [ ] Settings → Documents → Memory: "Rendered pages of the open documents" defaults to a quarter of the RAM and

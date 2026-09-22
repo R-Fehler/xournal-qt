@@ -33,6 +33,7 @@
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "canvas/CanvasView.h"
+#include "canvas/CanvasMemory.h"
 #include "canvas/CanvasPage.h"
 #include "canvas/PenHover.h"
 #include "render/RenderService.h"
@@ -1744,6 +1745,48 @@ TEST_F(MainWindowTest, theCanvasShowsThePreviewUntilThePageIsRendered) {
         return shown == 0;
     });
     EXPECT_EQ(shown, 0) << "rendered: the page itself";
+    sketches.setDelays(400, 1500);
+}
+
+// Scrolling fast must not compose and upload whole pages in one frame (that froze the canvas): only the tiles in
+// view, a few per frame, with the page's preview under what is not composed yet.
+TEST_F(MainWindowTest, fastScrollingComposesFewTilesPerFrameAndShowsPreviews) {
+    auto& sketches = xqt::PageSketches::instance();
+    sketches.setDelays(0, 0);
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    until([&] { return sketches.idle(); }, 10000);
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    xqt::CanvasMemory::instance().planNow();
+    until([&] { return view->getPage(view->pageCount() - 1)->bufferInfo().valid; }, 10000);
+    auto* canvas = findItem("canvas");
+    ASSERT_NE(canvas, nullptr);
+    // Zoomed in, a page is many tiles (as on a big screen)
+    view->getViewController().setZoom(3.0, QPointF(100, 100));
+    wait(400);  // (renders wait until the zoom is stable)
+    xqt::CanvasMemory::instance().planNow();
+    until(
+            [&] {
+                for (size_t p = 0; p < view->pageCount(); ++p) {
+                    if (view->getPage(p)->bufferInfo().zoom != 3.0) {
+                        return false;
+                    }
+                }
+                return true;
+            },
+            20000);
+    ASSERT_DOUBLE_EQ(view->getPage(view->pageCount() - 1)->bufferInfo().zoom, 3.0);
+    wait(100);
+    QMetaObject::invokeMethod(canvas, "forgetTileCount");
+
+    int previews = 0, tiles = 0;
+    for (int page = 1; page < controller->pageCount(); ++page) {  // (as if the scroll bar were dragged)
+        controller->goToPage(page);
+        wait(16);
+    }
+    QMetaObject::invokeMethod(canvas, "mostTilesInAFrame", Q_RETURN_ARG(int, tiles));
+    QMetaObject::invokeMethod(canvas, "framesWithPreviews", Q_RETURN_ARG(int, previews));
+    EXPECT_LE(tiles, 64) << "never a whole page (about 120 tiles) at once";
+    EXPECT_GT(previews, 0) << "the pages scrolled past show their preview while their tiles are missing";
     sketches.setDelays(400, 1500);
 }
 
