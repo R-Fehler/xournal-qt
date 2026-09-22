@@ -9,13 +9,13 @@
 #include "model/Document.h"
 #include "model/Font.h"
 #include "model/Layer.h"
+#include "model/MarkdownText.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
-#include "view/MarkdownHook.h"
 
 #include "MdBox.h"
 #include "TextFlow.h"
@@ -119,7 +119,7 @@ std::string MarkdownSession::begin(size_t pageNo, const md::Style& s) {
     if (!layer) {
         // At the bottom: writing with the pen goes on top of the box, into the layer it went into before.
         layer = new Layer();
-        layer->setName(std::string(xoj::view::MARKDOWN_LAYER_NAME));
+        layer->setName(std::string(xoj::markdown::LAYER_NAME));
         session.getLayerController()->insertLayer(page, layer, 0);  // (locks the document)
         std::unique_lock lock(*doc);
         page->setSelectedLayerId(selectedBefore > 0 ? selectedBefore + 1 : 0);

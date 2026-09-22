@@ -74,13 +74,12 @@ std::vector<Chapter> find(Document& document) {
             if (!layer->isVisible()) {
                 continue;
             }
-            const bool markdown = md::isMarkdownLayer(*layer);
             for (const Element* element: layer->getElementsView()) {
                 if (element->getType() != ELEMENT_TEXT) {
                     continue;
                 }
                 const auto* text = static_cast<const Text*>(element);
-                if (markdown) {
+                if (text->isMarkdown()) {
                     // A Markdown box: its headings 1-3, where they are drawn
                     const md::Document doc = md::parse(text->getText());
                     const md::Layout& laid = md::cachedLayout(text->getText(), md::styleOf(*text));

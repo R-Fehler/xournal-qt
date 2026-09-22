@@ -41,7 +41,7 @@ the pen goes on top of it, into the layer it went into before.
 - **Position:** the top left of the box.
 
 Xournal++ shows the source as plain text and keeps it unchanged. xournal-qt draws it formatted everywhere a page is
-drawn (canvas, thumbnails, previews, PDF export) through a small seam in upstream's `LayerView` (ADR-0002).
+drawn (canvas, thumbnails, previews, PDF export) through small seams in upstream's `Text`, `Layer` and `TextView`: a text in a Markdown layer knows it is one, is drawn formatted and is as big as it is drawn (ADR-0002).
 
 The drawing is vector (Pango / Cairo, as upstream's texts). In the PDF the text stays text. The layout does not
 depend on the zoom, so lines break at the same places on the canvas, in the thumbnails and in the PDF.

@@ -12,7 +12,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "util/Matrix.h"
-#include "view/MarkdownHook.h"
+#include "model/MarkdownText.h"
 
 namespace xqt::md {
 
@@ -69,7 +69,16 @@ void drawText(const Text& text, cairo_t* cr) {
     cairo_restore(cr);
 }
 
-void installRenderer() { xoj::view::markdownTextRenderer.store(&drawText, std::memory_order_release); }
+xoj::markdown::Size drawnSize(const Text& text) {
+    const Style s = styleOf(text);
+    // (at least a line high: an empty box can be tapped as well)
+    return {s.width, std::max(cachedLayout(text.getText(), s).height, s.size * 1.25)};
+}
+
+void installRenderer() {
+    xoj::markdown::sizer.store(&drawnSize, std::memory_order_release);
+    xoj::markdown::renderer.store(&drawText, std::memory_order_release);
+}
 
 double contentHeight(const Text& text) { return cachedLayout(text.getText(), styleOf(text)).height; }
 
@@ -103,7 +112,7 @@ std::vector<Rect> findText(const Text& text, const std::string& search) {
 }
 
 bool isMarkdownLayer(const Layer& layer) {
-    return layer.hasName() && layer.getName() == xoj::view::MARKDOWN_LAYER_NAME;
+    return layer.hasName() && xoj::markdown::isMarkdownLayerName(layer.getName());
 }
 
 Layer* markdownLayer(const PageRef& page) {

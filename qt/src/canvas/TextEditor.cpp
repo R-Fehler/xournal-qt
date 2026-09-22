@@ -13,10 +13,12 @@
 #include <pango/pangocairo.h>
 
 #include "control/ToolHandler.h"
+#include "control/layer/LayerController.h"
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/Font.h"
 #include "model/Layer.h"
+#include "model/MarkdownText.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "undo/DeleteUndoAction.h"
@@ -32,9 +34,7 @@
 #include "CanvasPage.h"
 #include "MdBox.h"
 #include "TextFlow.h"
-#include "control/layer/LayerController.h"
 #include "session/DocumentSession.h"
-#include "view/MarkdownHook.h"
 
 namespace xqt {
 
@@ -88,6 +88,7 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
         if (existing) {
             original = existing;
             textElement = existing->cloneText();
+            textElement->setMarkdown(false);  // xournal-qt: the source is edited (the layer makes it Markdown again)
             existing->setInEditing(true);  // the renderer skips it; this editor draws the copy
             content = QString::fromStdString(existing->getText());
         }
@@ -134,7 +135,7 @@ void TextEditor::useMarkdownLayer() {
     }
     selectedBefore = pageRef->getSelectedLayerId();
     layer = new Layer();
-    layer->setName(std::string(xoj::view::MARKDOWN_LAYER_NAME));
+    layer->setName(std::string(xoj::markdown::LAYER_NAME));
     session.getLayerController()->insertLayer(pageRef, layer, 0);  // (locks the document)
     std::unique_lock lock(*session.getDocument());
     pageRef->setSelectedLayerId(selectedBefore > 0 ? selectedBefore + 1 : 0);

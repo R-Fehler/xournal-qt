@@ -16,7 +16,7 @@
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
-#include "view/MarkdownHook.h"
+#include "model/MarkdownText.h"
 
 #include "MarkdownSession.h"
 #include "MdBox.h"

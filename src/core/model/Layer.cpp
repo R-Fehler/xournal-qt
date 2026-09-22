@@ -9,6 +9,8 @@
 
 #include "model/Element.h"  // for Element, Element::Index, Element::Inval...
 #include "model/ElementInsertionPosition.h"
+#include "model/MarkdownText.h"  // xournal-qt: Markdown texts
+#include "model/Text.h"
 #include "util/Assert.h"      // for xoj_assert
 #include "util/Stacktrace.h"  // for Stacktrace
 #include "util/safe_casts.h"
@@ -38,7 +40,15 @@ void Layer::addElement(ElementPtr e) {
         return;
     }
 
+    markdownFlag(e.get());
     this->elements.emplace_back(std::move(e));
+}
+
+// xournal-qt: a text is a Markdown text while it is in a layer named "Markdown" (see model/MarkdownText.h)
+void Layer::markdownFlag(Element* e) const {
+    if (e->getType() == ELEMENT_TEXT) {
+        static_cast<Text*>(e)->setMarkdown(this->name && xoj::markdown::isMarkdownLayerName(*this->name));
+    }
 }
 
 void Layer::insertElement(ElementPtr e, Element::Index pos) {
@@ -47,6 +57,8 @@ void Layer::insertElement(ElementPtr e, Element::Index pos) {
         Stacktrace::printStacktrace();
         return;
     }
+
+    markdownFlag(e.get());  // xournal-qt
 
     // prevent crash, even if this never should happen,
     // but there was a bug before which cause this error
@@ -142,4 +154,9 @@ auto Layer::hasName() const -> bool { return name.has_value(); }
 
 auto Layer::getName() const -> std::string { return name.value_or(""); }
 
-void Layer::setName(const std::string& newName) { this->name = newName; }
+void Layer::setName(const std::string& newName) {
+    this->name = newName;
+    for (auto& e: this->elements) {
+        markdownFlag(e.get());  // xournal-qt: renamed to or from "Markdown"
+    }
+}

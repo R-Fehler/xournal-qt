@@ -7,10 +7,8 @@
 
 #include "model/Element.h"  // for Element
 #include "model/Layer.h"    // for Layer
-#include "model/Text.h"     // for Text
 
 #include "DebugShowRepaintBounds.h"  // for IF_DEBUG_REPAINT
-#include "MarkdownHook.h"            // xournal-qt: for markdownTextRenderer
 #include "View.h"                    // for Context, ElementView
 
 using namespace xoj::view;
@@ -29,19 +27,7 @@ void LayerView::draw(const Context& ctx) const {
     double maxY;
     cairo_clip_extents(ctx.cr, &minX, &minY, &maxX, &maxY);
 
-    // xournal-qt: the texts of a Markdown layer are drawn formatted by the frontend's renderer (MarkdownHook.h).
-    // Their bounding box is the one of the source, not of what is drawn: they are not culled.
-    const MarkdownTextRenderer markdown = markdownTextRenderer.load(std::memory_order_acquire);
-    const bool markdownLayer = markdown && layer->hasName() && layer->getName() == MARKDOWN_LAYER_NAME;
-
     for (auto const& e: layer->getElementsView()) {
-        if (markdownLayer && e->getType() == ELEMENT_TEXT) {
-            const auto* text = static_cast<const Text*>(e);
-            if (!text->isInEditing()) {
-                markdown(*text, ctx.cr);
-            }
-            continue;
-        }
 
         IF_DEBUG_REPAINT({
             auto cr = ctx.cr;

@@ -1,7 +1,7 @@
 /*
  * xournal-qt: Markdown boxes on pages.
  *
- * A box is an ordinary Xournal++ text element in a layer named "Markdown" (xoj::view::MARKDOWN_LAYER_NAME). Its text
+ * A box is an ordinary Xournal++ text element in a layer named "Markdown" (see src/core/model/MarkdownText.h). Its text
  * is the Markdown source, its font gives the family and size of the body text, its color the text color, its
  * wrap width the width of the box, and its position the top left of the box. Xournal++ shows the source as it is
  * (nothing is lost when the file goes back and forth); xournal-qt draws it formatted: drawText() is the renderer
@@ -15,6 +15,7 @@
 
 #include <cairo.h>
 
+#include "model/MarkdownText.h"
 #include "model/PageRef.h"
 #include "util/Rectangle.h"
 
@@ -34,10 +35,12 @@ Style styleOf(const Text& text);
 /// The layout of a source. Cached per thread (the last boxes drawn there): valid until the next call on this thread.
 const Layout& cachedLayout(const std::string& source, const Style& style);
 
-/// Draw a box, in page coordinates (the renderer of upstream's LayerView, see MarkdownHook.h).
+/// Draw a box, in page coordinates (the renderer of upstream's TextView, see model/MarkdownText.h).
 void drawText(const Text& text, cairo_t* cr);
+/// How big a box is drawn (its bounding box, see model/MarkdownText.h).
+xoj::markdown::Size drawnSize(const Text& text);
 
-/// All drawing of pages draws boxes formatted from now on (idempotent).
+/// Markdown texts are drawn formatted, and are as big as they are drawn, from now on (idempotent).
 void installRenderer();
 
 /// The height of a box's content (points).

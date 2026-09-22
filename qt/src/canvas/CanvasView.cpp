@@ -629,13 +629,12 @@ std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) co
         if (!layer->isVisible()) {
             continue;
         }
-        const bool markdown = md::isMarkdownLayer(*layer);
         for (const Element* element: layer->getElementsView()) {
             if (element->getType() != ELEMENT_TEXT) {
                 continue;
             }
             const auto* text = static_cast<const Text*>(element);
-            if (markdown) {
+            if (text->isMarkdown()) {
                 // A Markdown box: the links of what is drawn (not of the source)
                 if (const auto hit = md::linkAt(*text, onPage.x(), onPage.y())) {
                     LinkTarget target;

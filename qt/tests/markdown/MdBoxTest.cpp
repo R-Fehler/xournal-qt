@@ -1,5 +1,5 @@
 /*
- * xournal-qt: Markdown boxes drawn through upstream's LayerView (the seam in MarkdownHook.h).
+ * xournal-qt: Markdown texts drawn and sized through upstream's views (the seam in model/MarkdownText.h).
  *
  * @license GNU GPLv2 or later
  */
@@ -15,7 +15,7 @@
 #include "model/XojPage.h"
 #include "util/Matrix.h"
 #include "view/LayerView.h"
-#include "view/MarkdownHook.h"
+#include "model/MarkdownText.h"
 #include "view/View.h"
 
 #include "MdBox.h"
@@ -89,7 +89,7 @@ TEST_F(MdBoxTest, styleComesFromTheText) {
 
 TEST_F(MdBoxTest, markdownLayerIsDrawnFormatted) {
     Layer markdown;
-    markdown.setName(std::string(xoj::view::MARKDOWN_LAYER_NAME));
+    markdown.setName(std::string(xoj::markdown::LAYER_NAME));
     markdown.addElement(makeBox("# Big heading"));
     Layer plain;
     plain.addElement(makeBox("# Big heading"));
@@ -102,21 +102,34 @@ TEST_F(MdBoxTest, markdownLayerIsDrawnFormatted) {
     EXPECT_GT(formatted.bottom - formatted.top, 1.8 * (raw.bottom - raw.top));
 
     // Without a renderer (upstream Xournal++): the source as it is
-    xoj::view::markdownTextRenderer.store(nullptr);
+    xoj::markdown::renderer.store(nullptr);
+    xoj::markdown::sizer.store(nullptr);
+    markdown.getElements().front()->move(0, 0);  // (sizes again)
     const Ink upstream = drawLayer(markdown);
     EXPECT_EQ(upstream.top, raw.top);
     EXPECT_EQ(upstream.bottom, raw.bottom);
 }
 
-TEST_F(MdBoxTest, notCulledByTheBoundingBoxOfTheSource) {
+TEST_F(MdBoxTest, theBoundingBoxIsWhatIsDrawn) {
     // The source is 3 short lines; drawn, the paragraph "B" is further down (below a heading 1 and its spacing)
     Layer markdown;
-    markdown.setName(std::string(xoj::view::MARKDOWN_LAYER_NAME));
+    markdown.setName(std::string(xoj::markdown::LAYER_NAME));
     auto box = makeBox("# A\n\nB", 50, 40);
-    const auto rect = boxRect(*box);
+    EXPECT_FALSE(box->isMarkdown()) << "not in a Markdown layer yet";
     const double sourceBottom = box->getBoundingBox().y + box->getBoundingBox().height;
+    const auto rect = boxRect(*box);
     ASSERT_GT(rect.y + rect.height, sourceBottom + 5) << "drawn further down than the source";
+    Text* inLayer = box.get();
     markdown.addElement(std::move(box));
+    EXPECT_TRUE(inLayer->isMarkdown()) << "the layer makes it one";
+    const auto bounds = inLayer->getBoundingBox();
+    EXPECT_NEAR(bounds.x, rect.x, 0.01);
+    EXPECT_NEAR(bounds.y, rect.y, 0.01);
+    EXPECT_NEAR(bounds.width, rect.width, 0.01);
+    EXPECT_NEAR(bounds.height, rect.height, 0.01) << "selection, hit tests and repaints use the drawn box";
+    markdown.setName("Other");
+    EXPECT_FALSE(inLayer->isMarkdown()) << "renamed: an ordinary text again";
+    markdown.setName(std::string(xoj::markdown::LAYER_NAME));
 
     // A tile below the source's box, where "B" is drawn
     const xoj::util::Rectangle<double> tile(0, sourceBottom + 1, 500, rect.y + rect.height - sourceBottom);
@@ -127,7 +140,7 @@ TEST_F(MdBoxTest, boxRectAndLayerLookup) {
     auto page = std::make_shared<XojPage>(595.0, 842.0);
     EXPECT_EQ(markdownLayer(page), nullptr);
     auto* layer = new Layer();
-    layer->setName(std::string(xoj::view::MARKDOWN_LAYER_NAME));
+    layer->setName(std::string(xoj::markdown::LAYER_NAME));
     page->getLayers().push_back(layer);  // (the page owns it)
     EXPECT_EQ(markdownLayer(page), layer);
     EXPECT_EQ(boxOf(*layer), nullptr);

@@ -3,6 +3,7 @@
 #include <algorithm>  // for max
 #include <cstddef>    // for size_t
 
+#include "model/MarkdownText.h"   // xournal-qt: for renderer
 #include "model/Text.h"           // for Text
 #include "util/Color.h"           // for cairo_set_source_rgbi
 #include "util/Matrix.h"          // for Matrix
@@ -32,6 +33,14 @@ void TextView::draw(const Context& ctx) const {
     if (text->isInEditing()) {
         // The drawing is handled by gui/TextEditor
         return;
+    }
+
+    // xournal-qt: a Markdown text is drawn formatted by the frontend's renderer (model/MarkdownText.h)
+    if (text->isMarkdown()) {
+        if (auto renderer = xoj::markdown::renderer.load(std::memory_order_acquire)) {
+            renderer(*text, ctx.cr);
+            return;
+        }
     }
 
     xoj::util::CairoSaveGuard saveGuard(ctx.cr);
