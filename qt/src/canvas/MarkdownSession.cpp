@@ -86,13 +86,20 @@ size_t MarkdownSession::pageIndex() const {
     return session.getDocument()->indexOf(page);
 }
 
-std::string MarkdownSession::begin(size_t pageNo, const md::Style& s) {
+std::string MarkdownSession::begin(size_t pageNo, const md::Style& s) { return start(pageNo, s, true, 0, 0); }
+
+std::string MarkdownSession::beginBox(size_t pageNo, const md::Style& s, double x, double y) {
+    return start(pageNo, s, false, x, y);
+}
+
+std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPage, double x, double y) {
     if (active()) {
         finish();
     }
     session.clearSelectionEndText();
     Document* doc = session.getDocument();
     style = s;
+    pageText = isPage;
     std::string source;
     {
         std::shared_lock lock(*doc);
@@ -103,16 +110,27 @@ std::string MarkdownSession::begin(size_t pageNo, const md::Style& s) {
         layer = md::markdownLayer(page);
         createdLayer = !layer;
         selectedBefore = page->getSelectedLayerId();
-        // The page's box: from the top-left margin (beside the margin line of a ruled page) to the right margin
         const TextFlow::Style margins = TextFlow::styleFor(page, TextFlow::Style{});
-        boxX = margins.leftMargin;
-        boxY = TextFlow::MARGIN;
-        style.width = std::max(50.0, page->getWidth() - margins.leftMargin - margins.rightMargin);
-        box = layer ? md::pageBoxOf(*layer, boxX, boxY) : nullptr;
+        if (pageText) {
+            // The page's box: from the top-left margin (beside the margin line of a ruled page) to the right margin
+            boxX = margins.leftMargin;
+            boxY = TextFlow::MARGIN;
+            style.width = std::max(50.0, page->getWidth() - margins.leftMargin - margins.rightMargin);
+            box = layer ? md::pageBoxOf(*layer, boxX, boxY) : nullptr;
+        } else {
+            // A text box: the one drawn there, or a new one from there to the right margin (its first line around
+            // the point, as the text tool places texts)
+            box = layer && layer->isVisible() ? md::boxAt(*layer, x, y) : nullptr;
+            boxX = x;
+            boxY = y - style.size * 0.75;
+            style.width = std::max(100.0, page->getWidth() - margins.rightMargin - x);
+        }
         original.reset();
         if (box) {
             source = box->getText();
             style = md::styleOf(*box);
+            boxX = box->getTransformation().shift.x;
+            boxY = box->getTransformation().shift.y;
             original = box->cloneText();
         }
     }

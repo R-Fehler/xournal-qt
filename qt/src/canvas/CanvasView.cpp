@@ -1121,12 +1121,32 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         }
         endTextEditing();
     }
-    // The page's Markdown text is edited in the editor beside the page; Markdown text boxes on the page
+    // The page's Markdown text is edited in the editor beside the page; Markdown text boxes too (or on the page)
     if (markdownBoxAt(page, x, y)) {
         if (const auto idx = indexOf(&page)) {
             Q_EMIT markdownRequested(static_cast<int>(*idx));
         }
         return;
+    }
+    if (markdownInPanel) {
+        bool onBox = false;
+        bool onText = false;
+        {
+            std::shared_lock lock(*session.getDocument());
+            const PageRef p = page.getPage();
+            const Layer* mdLayer = md::markdownLayer(p);
+            onBox = mdLayer && mdLayer->isVisible() && md::boxAt(*mdLayer, x, y);
+            for (const Element* e: p->getSelectedLayer()->getElementsView()) {
+                onText = onText || (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y));
+            }
+        }
+        // (an ordinary text there is edited as it is)
+        if (onBox || (markdownText && !onText)) {
+            if (const auto idx = indexOf(&page)) {
+                Q_EMIT markdownBoxRequested(static_cast<int>(*idx), x, y);
+            }
+            return;
+        }
     }
     TextEditor::NewText how;
     how.markdown = markdownText;
@@ -1147,9 +1167,10 @@ bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     return box && box == md::boxAt(*layer, x, y);
 }
 
-void CanvasView::setMarkdownText(bool markdown, double size) {
+void CanvasView::setMarkdownText(bool markdown, double size, bool inPanel) {
     markdownText = markdown;
     markdownTextSize = size;
+    markdownInPanel = inPanel;
 }
 
 void CanvasView::endTextEditing() {

@@ -325,7 +325,11 @@ void AppController::endTextFlow(bool keep) {
 bool AppController::markdownActive() const { return markdown && markdown->active(); }
 
 
-QString AppController::beginMarkdown(int page) {
+QString AppController::beginMarkdown(int page) { return startMarkdown(page, std::nullopt); }
+
+QString AppController::beginMarkdownBox(int page, double x, double y) { return startMarkdown(page, QPointF(x, y)); }
+
+QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     endMarkdown(true);
     endTextFlow(true);
     if (!session()) {
@@ -336,8 +340,14 @@ QString AppController::beginMarkdown(int page) {
     md::Style style;
     style.family = textFlowFamily().toStdString();
     style.size = markdownFontSize();
+    style.color = app->getToolHandler()->getColor();
+    if (!at) {
+        style.color = Color(0, 0, 0);  // (the page's text: black, as the text mode)
+    }
     mdPage = page >= 0 ? page : static_cast<int>(mdSession->getCurrentPageNo());
-    const QString source = QString::fromStdString(markdown->begin(static_cast<size_t>(mdPage), style));
+    const QString source = QString::fromStdString(
+            at ? markdown->beginBox(static_cast<size_t>(mdPage), style, at->x(), at->y())
+               : markdown->begin(static_cast<size_t>(mdPage), style));
     mdOverflow = 0;
     Q_EMIT markdownChanged();
     return source;
@@ -413,6 +423,8 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
         currentConnections.push_back(
                 connect(v, &CanvasView::markdownRequested, this, &AppController::markdownRequested));
+        currentConnections.push_back(
+                connect(v, &CanvasView::markdownBoxRequested, this, &AppController::markdownBoxRequested));
         currentConnections.push_back(
                 connect(v, &CanvasView::contextRequested, this, &AppController::contextRequested));
         currentConnections.push_back(
@@ -972,6 +984,23 @@ void AppController::setMarkdownFontSize(double size) {
 
 double AppController::markdownBoxSize() const { return markdownActive() ? markdown->fontSize() : markdownFontSize(); }
 
+bool AppController::markdownInPanel() const {
+    bool on = true;
+    app->getSettings()->getCustomElement(CUSTOM).getBool("markdownInPanel", on);
+    return on;
+}
+
+void AppController::setMarkdownInPanel(bool on) {
+    if (on != markdownInPanel()) {
+        app->getSettings()->getCustomElement(CUSTOM).setBool("markdownInPanel", on);
+        app->getSettings()->customSettingsChanged();
+        applyMarkdownText();
+        Q_EMIT fontChanged();
+    }
+}
+
+bool AppController::markdownIsPageText() const { return !markdownActive() || markdown->isPageText(); }
+
 void AppController::setMarkdownBoxSize(double size) {
     if (markdownActive()) {
         mdOverflow = markdown->setFontSize(std::clamp(size, 4.0, 400.0));
@@ -982,7 +1011,7 @@ void AppController::setMarkdownBoxSize(double size) {
 
 void AppController::applyMarkdownText() {
     if (CanvasView* v = canvas()) {
-        v->setMarkdownText(textMarkdown(), markdownFontSize());
+        v->setMarkdownText(textMarkdown(), markdownFontSize(), markdownInPanel());
     }
 }
 

@@ -287,12 +287,20 @@ ApplicationWindow {
                                 onValueModified: app.textMarkdown ? app.markdownFontSize = value : app.fontSize = value
                             }
                         }
-                        // New text boxes are Markdown: shown formatted (the source while editing)
+                        // New text boxes are Markdown: shown formatted
                         Switch {
                             objectName: "textMarkdownSwitch"
                             text: qsTr("Markdown (shown formatted)")
                             checked: app.textMarkdown
                             onToggled: app.textMarkdown = checked
+                        }
+                        // Markdown text boxes: written beside the page (the page shows them formatted while typing),
+                        // or on the page (the source while editing)
+                        Switch {
+                            objectName: "markdownInPanelSwitch"
+                            text: qsTr("Write Markdown beside the page")
+                            checked: app.markdownInPanel
+                            onToggled: app.markdownInPanel = checked
                         }
                     }
                 }
@@ -858,7 +866,12 @@ ApplicationWindow {
         // The text tool tapped a Markdown box
         function onMarkdownRequested(page) {
             if (textFlowPanel.visible) textFlowPanel.close(true)
-            if (!markdownPanel.visible || app.markdownPage !== page) markdownPanel.open(page)
+            if (!markdownPanel.visible || app.markdownPage !== page || !app.markdownIsPageText) markdownPanel.open(page)
+        }
+        // A Markdown text box (or a place for a new one)
+        function onMarkdownBoxRequested(page, x, y) {
+            if (textFlowPanel.visible) textFlowPanel.close(true)
+            markdownPanel.openBox(page, x, y)
         }
     }
     ContentsOverview {

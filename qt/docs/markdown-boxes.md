@@ -8,8 +8,10 @@ with GitHub's extensions (tables, strikethrough, task lists, bare web addresses)
 - **The page's Markdown text** is written in the editor beside the page, from the top-left margin to the right
   margin. With the next step it flows onto new pages.
 - **Markdown text boxes** go anywhere on a page. Turn on "Markdown" in the text tool's font menu (hold the text
-  button, or tap it again), then tap where the text should go. A box is edited on the page like any text box: the
-  source is shown while editing, and it is drawn formatted afterwards. A tap on a box edits it again.
+  button, or tap it again), then tap where the text should go. With "Write Markdown beside the page" (on by
+  default) a box is written in the editor beside the page like the page's text, and the page shows it formatted
+  while typing. Off, a box is edited on the page like any text box: its source is shown while editing and it is
+  drawn formatted afterwards. A tap on a box (text tool) edits it again, the same way.
 
 ## Moving
 Markdown text boxes (and the page's text) are selected and moved like everything else: a rectangle or a lasso

@@ -10,6 +10,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -95,6 +96,10 @@ class AppController: public QObject {
     Q_PROPERTY(double markdownFontSize READ markdownFontSize WRITE setMarkdownFontSize NOTIFY fontChanged)
     /// Font size of the Markdown text edited beside the page
     Q_PROPERTY(double markdownBoxSize READ markdownBoxSize NOTIFY markdownChanged)
+    /// Markdown text boxes are edited beside the page (the page shows them formatted while typing), else on the page
+    Q_PROPERTY(bool markdownInPanel READ markdownInPanel WRITE setMarkdownInPanel NOTIFY fontChanged)
+    /// The Markdown text edited beside the page is the page's text (else a text box)
+    Q_PROPERTY(bool markdownIsPageText READ markdownIsPageText NOTIFY markdownChanged)
     /// Upstream's drawing type of the tool: default (freehand), strokeRecognizer, line, rectangle, ellipse, arrow,
     /// doubleArrow, drawCoordinateSystem
     Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
@@ -230,6 +235,12 @@ public:
     double markdownFontSize() const;
     void setMarkdownFontSize(double size);
     double markdownBoxSize() const;
+    bool markdownInPanel() const;
+    void setMarkdownInPanel(bool inPanel);
+    bool markdownIsPageText() const;
+    /// Start editing the Markdown text box drawn at a point of a page (page coordinates), or a new one there, beside
+    /// the page. Returns its source.
+    Q_INVOKABLE QString beginMarkdownBox(int page, double x, double y);
     /// The size of the Markdown text edited beside the page (also the size of new Markdown text from now on).
     Q_INVOKABLE void setMarkdownBoxSize(double size);
     int markdownPage() const { return mdPage; }
@@ -554,6 +565,8 @@ Q_SIGNALS:
     void markdownChanged();
     /// The text tool tapped a Markdown box: the window opens its editor.
     void markdownRequested(int page);
+    /// The text tool tapped a Markdown text box, or a place for a new one: the window opens its editor.
+    void markdownBoxRequested(int page, double x, double y);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 
@@ -562,6 +575,8 @@ private:
     xqt::CanvasView* canvas() const;
     /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
     void applyMarkdownText();
+    /// Editing beside the page: the page's text, or the text box at a point.
+    QString startMarkdown(int page, std::optional<QPointF> at);
     qreal markSpacing = 1.0;
     /// Files were renamed or moved (library, recent files): open documents and the recent list follow.
     void filesChanged(const xqt::DocumentFiles::Result& result);

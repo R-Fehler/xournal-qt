@@ -1,6 +1,6 @@
-// Markdown box: write Markdown for a page, beside the pages (right). The page shows it formatted as you type (the
-// box is a Xournal++ text in a layer "Markdown": Xournal++ shows the source). The buttons insert Markdown; Enter
-// continues a list. Done keeps it (one undo step), Cancel restores the page.
+// Markdown: write the Markdown of a page, or of a Markdown text box on it, beside the pages (right). The page shows
+// it formatted as you type (a box is a Xournal++ text in a layer "Markdown": Xournal++ shows the source). The buttons
+// insert Markdown; Enter continues a list. Done keeps it (one undo step), Cancel restores the page.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -17,10 +17,12 @@ Pane {
     }
 
     property int zoomBefore: 100
-    function open(page) {
-        const source = app.beginMarkdown(page === undefined ? -1 : page)
+    function open(page) { start(app.beginMarkdown(page === undefined ? -1 : page)) }
+    /// The Markdown text box at a point of a page (page coordinates), or a new one there.
+    function openBox(page, x, y) { start(app.beginMarkdownBox(page, x, y)) }
+    function start(source) {
+        if (!visible) zoomBefore = app.zoomPercent
         area.text = source
-        zoomBefore = app.zoomPercent
         visible = true
         Qt.callLater(app.fitWidth)  // the whole page beside the panel
         area.cursorPosition = area.length
@@ -112,7 +114,8 @@ Pane {
             Layout.topMargin: 4
             Label {
                 Layout.fillWidth: true
-                text: qsTr("Markdown on page %1").arg(app.markdownPage + 1)
+                text: app.markdownIsPageText ? qsTr("Markdown on page %1").arg(app.markdownPage + 1)
+                                             : qsTr("Markdown text box on page %1").arg(app.markdownPage + 1)
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }

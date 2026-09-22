@@ -1,10 +1,11 @@
 /*
  * xournal-qt: editing the Markdown text of a page (see qt/src/markdown/MdBox.h), in the editor beside the page.
  *
- * The page's Markdown text is the box at the top-left margin in the layer "Markdown" (other boxes in that layer are
- * text boxes placed with the text tool; they are edited on the page). A new box goes into a layer "Markdown" at the
- * bottom of the page (ink written with the pen goes on top of it, into the layer it went into before), from the
- * top-left margin to the right margin. Its text is the Markdown source: Xournal++ shows the source, xournal-qt
+ * The page's Markdown text is the box at the top-left margin in the layer "Markdown"; other boxes in that layer are
+ * text boxes placed with the text tool. Both can be edited here (beginBox: a text box, or a new one at a point).
+ * A new box goes into a layer "Markdown" at the bottom of the page (ink written with the pen goes on top of it, into
+ * the layer it went into before); the page's text from the top-left margin to the right margin, a text box from its
+ * point to the right margin. Its text is the Markdown source: Xournal++ shows the source, xournal-qt
  * draws it formatted. The box changes while typing; the edit is one undo step (as TextFlowSession).
  *
  * @license GNU GPLv2 or later
@@ -37,6 +38,11 @@ public:
 
     /// Start editing the Markdown text of a page (a new box gets `style`'s font, size and color). Returns its source.
     std::string begin(size_t page, const md::Style& style);
+    /// Start editing the Markdown text box drawn at a point of the page, or a new one there (made at the first
+    /// change). Returns its source.
+    std::string beginBox(size_t page, const md::Style& style, double x, double y);
+    /// The page's text (not a text box) is edited.
+    bool isPageText() const { return pageText; }
     bool active() const { return static_cast<bool>(page); }
     size_t pageIndex() const;
     /// Replace the source. Returns how far the content goes below the bottom margin (points; 0: it fits).
@@ -50,6 +56,8 @@ public:
     void cancel();
 
 private:
+    /// The page's text, or the text box drawn at (x, y) (a new one there if none).
+    std::string start(size_t page, const md::Style& style, bool pageText, double x, double y);
     /// The box in the layer, changed in place (made at the first change if there is none).
     void apply(const std::string& source);
     void changedOnPage();
@@ -68,6 +76,7 @@ private:
     std::unique_ptr<Text> original;    ///< a copy of the box at the start (nullptr: there was none)
     std::string last;
     bool changed = false;
+    bool pageText = true;
 };
 
 }  // namespace xqt

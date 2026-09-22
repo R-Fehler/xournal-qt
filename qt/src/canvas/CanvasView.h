@@ -203,8 +203,9 @@ public:
     void endTextEditing();
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
-    /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts.
-    void setMarkdownText(bool markdown, double size);
+    /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text
+    /// boxes are edited in the editor beside the page (markdownBoxRequested), else on the page (their source).
+    void setMarkdownText(bool markdown, double size, bool inPanel);
 
     // --- selections of Markdown texts ------------------------------------------------------------------------------
     // Markdown texts are in the page's layer "Markdown", which is not the selected layer (the pen writes into
@@ -240,6 +241,9 @@ Q_SIGNALS:
     void contextRequested(QPointF viewPos);
     /// The text tool tapped the Markdown box of a page (0-based): the UI opens its editor.
     void markdownRequested(int page);
+    /// The text tool tapped a Markdown text box, or a place for a new one (page coordinates), to be edited beside
+    /// the page.
+    void markdownBoxRequested(int page, double x, double y);
     /// A PDF link was tapped (the UI offers to follow it).
     void linkTapped(const QString& uri, int page, QRectF viewRect);
     void navigationChanged();
@@ -285,6 +289,7 @@ private:
     void endMarkdownSelection();
     bool markdownText = false;       ///< the text tool makes Markdown text boxes
     double markdownTextSize = 10;    ///< of this font size
+    bool markdownInPanel = true;     ///< Markdown text boxes are edited beside the page
     GeometryToolLayer geometry{*this};
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;
