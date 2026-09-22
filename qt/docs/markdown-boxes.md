@@ -78,6 +78,8 @@ the editor beside the page ("Size", which also changes the text being edited).
 - A tap on a link opens it; `[text](#Page:12)` goes to page 12 of the document.
 - Headings 1-3 are chapters in the contents.
 - The search finds text in boxes and marks it where it is drawn.
+- A tap on a task's check box switches it (`- [ ]` / `- [x]`): with the text tool, the hand, a select tool or a
+  finger, also while writing on the page. One undo step (while writing: in the text being written).
 - Code blocks with a language (```` ```python ````, `cpp`, `js`, `bash`, ...) are syntax highlighted (Kate's
   highlighter, KSyntaxHighlighting; optional at build time).
 

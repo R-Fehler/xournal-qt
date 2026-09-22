@@ -132,3 +132,22 @@ TEST(MdLayout, PdfKeepsTheTextAsText) {
     EXPECT_NE(s.find("Title"), std::string::npos) << s;
     EXPECT_NE(s.find("Hello bold world."), std::string::npos) << s;
 }
+
+TEST(MdLayout, checkBoxesKnowTheirMarks) {
+    const std::string src = "Tasks:\n\n- [ ] open\n- [x] done\n- no task\n";
+    Style s;
+    s.width = 400;
+    const Layout l = layout(parse(src), s);
+    ASSERT_EQ(l.checkBoxes.size(), 2u);
+    EXPECT_EQ(src[l.checkBoxes[0].mark], ' ');
+    EXPECT_FALSE(l.checkBoxes[0].checked);
+    EXPECT_EQ(src[l.checkBoxes[1].mark], 'x');
+    EXPECT_TRUE(l.checkBoxes[1].checked);
+    const auto& b = l.checkBoxes[0];
+    const auto hit = checkBoxAt(l, b.x + b.size / 2, b.y + b.size / 2);
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_EQ(hit->mark, b.mark);
+    EXPECT_FALSE(checkBoxAt(l, b.x + 100, b.y + b.size / 2).has_value()) << "on the text: no";
+    EXPECT_EQ(toggledTask(src, b.mark), "Tasks:\n\n- [x] open\n- [x] done\n- no task\n");
+    EXPECT_EQ(toggledTask(src, l.checkBoxes[1].mark), "Tasks:\n\n- [ ] open\n- [ ] done\n- no task\n");
+}

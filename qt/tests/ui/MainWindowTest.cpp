@@ -2673,6 +2673,76 @@ TEST_F(MainWindowTest, markdownWrittenOnThePageFlowsOntoPages) {
     EXPECT_EQ(controller->pageCount(), 1);
 }
 
+// A tap on a task's check box switches it: with the hand tool (or a finger), and while writing on the page.
+TEST_F(MainWindowTest, markdownCheckBoxesAreTapped) {
+    controller->setMarkdownInPanel(false);
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 250, 350, 250));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(150, 300));
+    wait(50);
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    type("- [ ] milk");
+    key(Qt::Key_Return);
+    key(Qt::Key_Return);  // (the list ends)
+    type("Shopping");
+    key(Qt::Key_Escape);
+
+    auto* session = controller->tabManager().currentSession();
+    Layer* layer = xqt::md::markdownLayer(session->getDocument()->getPage(0));
+    ASSERT_NE(layer, nullptr);
+    const auto box = [&] { return xqt::md::boxOf(*layer); };
+    ASSERT_NE(box(), nullptr);
+    const std::string before = box()->getText();
+    ASSERT_EQ(before, "- [ ] milk\n\nShopping") << "Enter on an empty item: the list ends, a paragraph follows";
+    const auto checkBox = [&](size_t active) {
+        const auto& l = xqt::md::cachedLayout(box()->getText(), xqt::md::styleOf(*box()), active);
+        EXPECT_EQ(l.checkBoxes.size(), 1u) << box()->getText();
+        if (l.checkBoxes.empty()) {
+            return QPoint();
+        }
+        const auto& at = box()->getTransformation().shift;
+        const auto& b = l.checkBoxes.front();
+        return pagePoint(at.x + b.x + b.size / 2, at.y + b.y + b.size / 2);
+    };
+
+    // The hand tool: switched, one undo step
+    controller->selectTool("hand");
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, checkBox(xqt::md::NO_SOURCE));
+    wait(50);
+    EXPECT_NE(box()->getText().find("- [x] milk"), std::string::npos) << box()->getText();
+    controller->undo();
+    EXPECT_EQ(box()->getText(), before);
+
+    // While writing on the page (the cursor in the paragraph after the list)
+    controller->selectTool("text");
+    const auto r = xqt::md::boxRect(*box());
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(r.x + r.width - 5, r.y + r.height - 3));
+    wait(50);
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    const size_t cursor = editor->cursorPosition();
+    ASSERT_GT(cursor, before.find("Shopping")) << "in the paragraph";
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, checkBox(cursor));
+    wait(50);
+    EXPECT_EQ(view->getMarkdownEditor(), editor) << "still writing";
+    EXPECT_NE(editor->text().find("- [x] milk"), std::string::npos) << editor->text();
+    EXPECT_EQ(editor->cursorPosition(), cursor) << "the cursor stays";
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(editor->text(), before) << "undone in the text being written";
+    key(Qt::Key_Escape);
+}
+
 TEST_F(MainWindowTest, textModeTypesThePageText) {
     auto* panel = find<QQuickItem>("textFlowPanel");
     ASSERT_NE(panel, nullptr);

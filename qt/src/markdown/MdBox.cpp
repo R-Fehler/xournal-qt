@@ -101,6 +101,14 @@ std::optional<LinkHit> linkAt(const Text& text, double x, double y) {
     return hit;
 }
 
+std::optional<size_t> checkBoxAt(const Text& text, double x, double y) {
+    const auto& shift = text.getTransformation().shift;
+    if (const auto box = checkBoxAt(cachedLayout(text.getText(), styleOf(text)), x - shift.x, y - shift.y)) {
+        return box->mark;
+    }
+    return std::nullopt;
+}
+
 std::vector<Rect> findText(const Text& text, const std::string& search) {
     const auto& shift = text.getTransformation().shift;
     auto found = findText(cachedLayout(text.getText(), styleOf(text)), search);

@@ -456,7 +456,9 @@ private:
             const double base = firstText ? firstText->y + baseline(firstText->layout.get()) : y - 0.25 * st.size;
             const double right = x + gutter - 0.45 * st.size;  // markers end here
             if (item.task) {
-                checkbox(right - 0.8 * st.size, base + 0.1 * st.size - 0.8 * st.size, 0.8 * st.size, item.checked);
+                const double size = 0.8 * st.size;
+                checkbox(right - size, base + 0.1 * st.size - size, size, item.checked);
+                out.checkBoxes.push_back({right - size, base + 0.1 * st.size - size, size, item.taskMark, item.checked});
             } else {
                 const std::string marker = ordered ? std::to_string(n) + b.mark : bullet(c.depth);
                 auto l = text({Run{marker}}, {st.size});
@@ -761,6 +763,25 @@ std::optional<LinkHit> linkAt(const Layout& layout, double x, double y) {
         }
     }
     return std::nullopt;
+}
+
+std::optional<Layout::CheckBox> checkBoxAt(const Layout& layout, double x, double y) {
+    for (const Layout::CheckBox& box: layout.checkBoxes) {
+        const double around = box.size * 0.4;  // (a finger is not a pin)
+        if (box.mark != NO_SOURCE && x >= box.x - around && x <= box.x + box.size + around && y >= box.y - around &&
+            y <= box.y + box.size + around) {
+            return box;
+        }
+    }
+    return std::nullopt;
+}
+
+std::string toggledTask(const std::string& source, size_t mark) {
+    std::string out = source;
+    if (mark < out.size()) {
+        out[mark] = out[mark] == ' ' ? 'x' : ' ';
+    }
+    return out;
 }
 
 std::vector<Rect> findText(const Layout& layout, const std::string& search) {

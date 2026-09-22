@@ -359,6 +359,8 @@ cd build-qt
       select, Ctrl+B around a word, Ctrl+Z / Ctrl+Shift+Z, Enter in a list (next item; on an empty item it ends),
       Tab / Shift+Tab. Escape: done; Ctrl+Z removes it all. Long page text: it flows onto new pages while typing and
       the view follows the cursor. Ctrl+Alt+M: the same text beside the page. The on-screen keyboard types into it.
+- [ ] Task list "- [ ] milk": a tap on its box (hand tool, finger, or the text tool) ticks it, again unticks it;
+      Ctrl+Z. While writing on the page (cursor in another paragraph): a tap on the box ticks it, the cursor stays.
 - [ ] Select (rectangle or lasso) around a Markdown box: the frame is the drawn box; drag it (formatted while
       dragging), also onto the next page; Delete; Ctrl+Z. After the selection the pen writes into its layer again.
 - [ ] Save, open the file in Xournal++: the page shows the Markdown source as a text, nothing lost; saved there and

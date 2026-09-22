@@ -84,6 +84,15 @@ struct Layout {
     int rawItem = -1;
     size_t rawBegin = NO_SOURCE;
     size_t rawEnd = NO_SOURCE;
+    /// The check boxes of task lists: where they are drawn (box coordinates) and their mark in the source.
+    struct CheckBox {
+        double x = 0;
+        double y = 0;
+        double size = 0;
+        size_t mark = NO_SOURCE;
+        bool checked = false;
+    };
+    std::vector<CheckBox> checkBoxes;
 };
 
 /// A link at a point (box coordinates): its target and where it is (box coordinates).
@@ -95,6 +104,10 @@ struct LinkHit {
     double height = 0;
 };
 std::optional<LinkHit> linkAt(const Layout& layout, double x, double y);
+/// The check box at a point (box coordinates; a little around it counts), if any.
+std::optional<Layout::CheckBox> checkBoxAt(const Layout& layout, double x, double y);
+/// The text with a task's mark switched: "[ ]" <-> "[x]" (`mark`: the offset of the " " / "x").
+std::string toggledTask(const std::string& source, size_t mark);
 
 /// Where a text is shown (case-insensitive; box coordinates): one rectangle per match, from its first to its last
 /// character (as upstream's Text::findText).

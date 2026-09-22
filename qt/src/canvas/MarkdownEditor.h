@@ -52,6 +52,8 @@ public:
     bool contains(double x, double y) const override;
     /// A press on a page (page coordinates): on the text, the cursor goes there (true); elsewhere nothing (false).
     bool tap(CanvasPage& page, double x, double y);
+    /// A press on a check box of the text being written (page coordinates): it is switched (the cursor stays).
+    bool toggleCheckBox(CanvasPage& page, double x, double y);
     void mousePressed(double x, double y) override;
     void mouseMoved(double x, double y) override;
     bool keyPressed(const QKeyEvent* e, bool& finish) override;

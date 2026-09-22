@@ -71,6 +71,7 @@ struct Block {
     unsigned start = 1;       ///< first number of an ordered list
     bool task = false;        ///< a list item with [ ] / [x]
     bool checked = false;
+    size_t taskMark = NO_SOURCE;  ///< the source offset of its mark (the " " or "x" between the brackets)
     // code blocks
     std::string info;         ///< the fence's info string
     std::string language;     ///< its first word

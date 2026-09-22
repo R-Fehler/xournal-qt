@@ -117,6 +117,9 @@ public:
                 b.kind = BlockKind::ListItem;
                 b.task = d->is_task;
                 b.checked = d->is_task && (d->task_mark == 'x' || d->task_mark == 'X');
+                if (d->is_task) {
+                    b.taskMark = d->task_mark_offset;
+                }
                 break;
             }
             case MD_BLOCK_HR:

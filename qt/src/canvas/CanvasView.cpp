@@ -32,6 +32,7 @@
 #include "model/Image.h"
 #include "model/Text.h"
 #include "gui/XournalppCursor.h"
+#include "undo/TextBoxUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "undo/DeleteUndoAction.h"
 #include "model/Stroke.h"
@@ -605,7 +606,61 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
     viewController.fitWidth();
 }
 
+bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
+    Document* doc = session.getDocument();
+    const PageRef p = page.getPage();
+    Layer* layer = nullptr;
+    const Text* hit = nullptr;
+    std::optional<size_t> mark;
+    {
+        std::shared_lock lock(*doc);
+        layer = md::markdownLayer(p);
+        if (!layer || !layer->isVisible()) {
+            return false;
+        }
+        for (const Element* e: layer->getElementsView()) {
+            const auto* text = static_cast<const Text*>(e);
+            if (e->getType() == ELEMENT_TEXT && !text->isInEditing()) {
+                if (const auto m = md::checkBoxAt(*text, x, y)) {
+                    hit = text;
+                    mark = m;
+                }
+            }
+        }
+    }
+    if (!hit) {
+        return false;
+    }
+    // The box again with the task switched (the same length: pages and other boxes stay as they are)
+    auto switched = hit->cloneText();
+    switched->setText(md::toggledTask(hit->getText(), *mark));
+    Text* now = switched.get();
+    ElementPtr before;
+    {
+        std::unique_lock lock(*doc);
+        auto [old, index] = layer->removeElement(hit);
+        before = std::move(old);
+        layer->insertElement(std::move(switched), index);
+    }
+    session.getUndoRedoHandler()->addUndoAction(std::make_unique<TextBoxUndoAction>(p, layer, now, std::move(before)));
+    p->firePageChanged();
+    if (const auto idx = indexOf(&page)) {
+        session.firePageChanged(*idx);
+    }
+    return true;
+}
+
 bool CanvasView::tapAt(QPointF viewPos) {
+    // A task's check box in a Markdown text: switched
+    if (CanvasPage* page = pageAt(viewPos)) {
+        if (const auto idx = indexOf(page)) {
+            const QRectF r = pageViewRect(*idx);
+            const double zoom = viewController.zoom();
+            if (toggleMarkdownCheckBox(*page, (viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom)) {
+                return true;
+            }
+        }
+    }
     // A web address in a text on the page comes first: it lies on top of the PDF
     if (auto text = textLinkAt(viewPos)) {
         Q_EMIT linkTapped(text->uri, text->page, text->viewRect);
@@ -1123,13 +1178,14 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         endTextEditing();
     }
     if (markdownEditor) {
-        if (markdownEditor->tap(page, x, y)) {  // (on the text being written, also on its other pages)
+        // (on the text being written, also on its other pages: a check box, or the cursor goes there)
+        if (markdownEditor->toggleCheckBox(page, x, y) || markdownEditor->tap(page, x, y)) {
             return;
         }
         endTextEditing();
     }
     const auto idx = indexOf(&page);
-    if (!idx) {
+    if (!idx || toggleMarkdownCheckBox(page, x, y)) {
         return;
     }
     // Markdown: the page's text and text boxes, written on the page (formatted while typing) or beside it

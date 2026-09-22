@@ -211,6 +211,8 @@ public:
     void endTextEditing();
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
+    /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
+    bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
     /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text
     /// boxes are edited in the editor beside the page (markdownBoxRequested), else on the page (their source).
     void setMarkdownText(bool markdown, double size, bool inPanel);

@@ -492,7 +492,34 @@ bool MarkdownEditor::tap(CanvasPage& onPage, double x, double y) {
     return false;
 }
 
-void MarkdownEditor::mousePressed(double x, double y) { tap(*page, x, y); }
+bool MarkdownEditor::toggleCheckBox(CanvasPage& onPage, double x, double y) {
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (view.canvasPageOf(parts[i].page.get()) != &onPage) {
+            continue;
+        }
+        const QPointF o = originOf(i);
+        const auto box = md::checkBoxAt(layoutOf(i), x - o.x(), y - o.y());
+        if (!box || box->mark < parts[i].part.prefix) {
+            continue;
+        }
+        const size_t mark = sourceOf(i, box->mark);
+        const size_t keepCaret = caret;
+        const size_t keepAnchor = anchor;
+        preedit.clear();
+        edit(mark, mark + 1, md::toggledTask(md.text(), mark).substr(mark, 1));
+        caret = keepCaret;  // (the same length: the cursor stays where it was)
+        anchor = keepAnchor;
+        changed(false);
+        return true;
+    }
+    return false;
+}
+
+void MarkdownEditor::mousePressed(double x, double y) {
+    if (!toggleCheckBox(*page, x, y)) {
+        tap(*page, x, y);
+    }
+}
 
 void MarkdownEditor::mouseMoved(double x, double y) {
     if (page) {
@@ -588,7 +615,7 @@ void MarkdownEditor::newLine(bool soft) {
     if (!mark.empty() && mark[0] != '#' && !soft) {
         std::string rest = line.substr(m[0].length());
         if (rest.find_first_not_of(" \t") == std::string::npos && from == lineEnd(t, from)) {
-            edit(ls, from, "");  // an empty item: the list (or the quote) ends
+            edit(ls, from, "\n");  // an empty item: the list (or the quote) ends; what follows is a paragraph
             return;
         }
         std::string next = mark;
