@@ -4,7 +4,7 @@ This repository is a **git fork of [Xournal++](https://github.com/xournalpp/xour
 It adds a new Qt 6 frontend: Qt Quick UI, several documents in tabs, tablet-first input, and Wayland-first support.
 The frontend reuses Xournal++'s tested core: the document model, `.xopp`/`.xoj` I/O, cairo rendering, undo, and the tools.
 
-[![xournal-qt](https://github.com/R-Fehler/xournal-qt/actions/workflows/xqt-build.yml/badge.svg?branch=main)](https://github.com/R-Fehler/xournal-qt/actions/workflows/xqt-build.yml)
+[![xournal-qt](https://github.com/R-Fehler/xournal-qt/actions/workflows/xqt-build.yml/badge.svg?branch=master-qt)](https://github.com/R-Fehler/xournal-qt/actions/workflows/xqt-build.yml)
 
 All new code lives in [`qt/`](qt/). Build it with:
 
@@ -18,6 +18,19 @@ ctest --test-dir build-qt -j8
 Packages and how a release is made: [`qt/docs/releasing.md`](qt/docs/releasing.md). Linux only so far.
 
 Everything else in the tree is upstream Xournal++. The upstream GTK build (root `CMakeLists.txt`) is left untouched.
+
+## Branches
+
+| Branch | What it is |
+| --- | --- |
+| `master` | Upstream Xournal++, nothing of the fork. Kept in step with `upstream/master` so a merge is a normal merge and a patch can go back upstream from a clean branch. |
+| `master-qt` | The fork: everything under `qt/` and the few seams in `src/`. The default branch here, what the CI builds, and what a release is tagged from. |
+
+```sh
+git remote add upstream https://github.com/xournalpp/xournalpp.git   # once
+git fetch upstream && git checkout master && git merge --ff-only upstream/master && git push origin master
+git checkout master-qt && git merge master   # upstream into the fork, as often as possible
+```
 
 ## Fork rules
 

@@ -4,7 +4,7 @@
 
 | Workflow | When | What |
 | --- | --- | --- |
-| `.github/workflows/xqt-build.yml` | every push and pull request to `main` | builds in a Debian 13 container (Qt 6.8) and runs all tests |
+| `.github/workflows/xqt-build.yml` | every push and pull request to `master-qt` | builds in a Debian 13 container (Qt 6.8) and runs all tests |
 | `.github/workflows/xqt-release.yml` | a tag `v1.2.3`, or started by hand | builds, tests, packages, and opens a **draft** release with the packages |
 
 The upstream Xournal++ workflows in the same folder stay dormant here: they only run for pull requests to `master`
@@ -15,14 +15,14 @@ in a container; `qt/scripts/linux-deps.sh` installs the packages (the same scrip
 
 ## Cutting a release
 
-1. Everything green on `main`, and the device checklist walked through (`qt/docs/testing/device-checklist.md`).
+1. Everything green on `master-qt`, and the device checklist walked through (`qt/docs/testing/device-checklist.md`).
 2. Set the version in `qt/CMakeLists.txt` (`project(xournal-qt VERSION x.y.z ...)`). The release job refuses a tag
    that says something else.
 3. Write `qt/docs/release-notes/x.y.z.md` (the draft takes it as its text; without it GitHub writes a list of commits).
 4. Commit, then tag and push:
    ```sh
    git tag -a vx.y.z -m "xournal-qt x.y.z"
-   git push origin main vx.y.z
+   git push origin master-qt vx.y.z
    ```
 5. Watch the run. It produces:
    - `xournal-qt_x.y.z_amd64_neon-jammy.deb` — built on Ubuntu 22.04 with KDE neon's packages (Qt 6.7). For KDE

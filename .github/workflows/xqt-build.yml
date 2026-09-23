@@ -1,11 +1,12 @@
 # xournal-qt (the Qt 6 frontend of this fork): build it and run its tests.
-# The upstream GTK workflows in this folder only run for pull requests to "master" and in the upstream repository, so
-# they stay out of the way here.
+# The fork's work lives on "master-qt"; "master" follows upstream Xournal++ so that upstream can be merged and this
+# stays a normal fork. The upstream GTK workflows in this folder only run for pull requests to "master" and in the upstream
+# repository, so they stay out of the way here.
 name: xournal-qt
 
 on:
   push:
-    branches: [main]
+    branches: [master-qt]
     paths:
       - 'qt/**'
       - 'src/**'
@@ -13,7 +14,7 @@ on:
       - 'cmake/**'
       - '.github/workflows/xqt-build.yml'
   pull_request:
-    branches: [main]
+    branches: [master-qt]
   workflow_dispatch:
 
 concurrency:
