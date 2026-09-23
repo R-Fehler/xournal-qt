@@ -5,11 +5,22 @@
  */
 #include <fstream>
 #include <iostream>
+#include <array>
+#include <map>
+#include <random>
+
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <QCoreApplication>
+#include <QCborArray>
 #include <QElapsedTimer>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QUrl>
 #include <gtest/gtest.h>
 
@@ -24,6 +35,7 @@
 #include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
 #include "shell/Library.h"
+#include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
 #include "shell/Previews.h"
 #include "shell/RecentFiles.h"
@@ -63,12 +75,47 @@ fs::path backgroundOf(const fs::path& xopp) {
     return loaded.document->getPdfFilepath();
 }
 
+/// A one-page PDF with `word` on it.
+void makeWordPdf(const fs::path& p, const char* word) {
+    fs::create_directories(p.parent_path());
+    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 24);
+    cairo_move_to(cr, 72, 100);
+    cairo_show_text(cr, word);
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+/// Add a text element to a page of a .xopp and save it.
+void addText(const fs::path& xopp, size_t page, const char* text) {
+    auto loaded = DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(loaded.document);
+    auto t = std::make_unique<Text>();
+    t->setText(text);
+    t->move(100, 100);
+    loaded.document->getPage(page)->getSelectedLayer()->addElement(std::move(t));
+    ASSERT_TRUE(DocumentSession::writeDocument(*loaded.document, xopp).ok);
+}
+
 std::vector<std::string> names(const std::vector<DocumentItem>& items) {
     std::vector<std::string> n;
     for (const auto& i: items) {
         n.push_back(i.name());
     }
     return n;
+}
+
+/// The keys of a pack in a folder's cache (sorted).
+QStringList packKeys(const fs::path& folder, const QString& pack, int format = LibraryIndex::FORMAT) {
+    QStringList keys;
+    if (auto entries = Packs::read(folder / DocumentFiles::META_DIR, pack, format)) {
+        for (auto it = entries->cbegin(); it != entries->cend(); ++it) {
+            keys << it.key().toString();
+        }
+    }
+    keys.sort();
+    return keys;
 }
 
 void waitFor(const std::function<bool()>& cond, int ms = 5000) {
@@ -242,7 +289,7 @@ TEST_F(LibraryTest, indexFindsTextAndNames) {
     makePdf(root / "lecture.pdf");
     makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
     fs::copy_file(fixture(u8"load/pages.xopp"), root / "Page 2 notes.xopp");  // text elements "p1".."p10"
-    LibraryIndex index(root, root / ".xournal_library" / "index");
+    LibraryIndex index(root);
     index.update(DocumentFiles::scanRecursive(root));
     index.waitForDone();
     EXPECT_FALSE(index.busy());
@@ -261,35 +308,82 @@ TEST_F(LibraryTest, indexFindsTextAndNames) {
     EXPECT_EQ(index.pageCount(root / "lecture.xopp"), 2);
 
     // Stored: another index reads it back
-    LibraryIndex again(root, root / ".xournal_library" / "index");
+    index.flush();
+    LibraryIndex again(root);
     again.update(DocumentFiles::scanRecursive(root));
     again.waitForDone();
     EXPECT_EQ(again.search("p7").size(), 1u);
+    EXPECT_EQ(again.documentsRead(), 0);
     // Removed documents are dropped
     fs::remove(root / "Page 2 notes.xopp");
     again.update(DocumentFiles::scanRecursive(root));
     again.waitForDone();
     EXPECT_TRUE(again.search("p7").empty());
-    size_t files = 0;
-    for ([[maybe_unused]] const auto& e: fs::directory_iterator(root / ".xournal_library" / "index")) {
-        ++files;
-    }
-    EXPECT_EQ(files, 1u);
+    again.flush();
+    EXPECT_EQ(packKeys(root, LibraryIndex::NOTES_PACK), QStringList{"lecture.xopp"});
 }
 
 TEST_F(LibraryTest, previewsAreRenderedOnceAndStoredInTheLibrary) {
     makePdf(root / "lecture.pdf");
-    PreviewCache::setLibrary(root, root / ".xournal_library" / "previews");
+    PreviewCache::setLibrary(CacheLocation(root));
     const DocumentItem item = DocumentFiles::itemOf(root / "lecture.pdf");
+    EXPECT_TRUE(PreviewCache::stored(item).isNull()) << "not made yet";
     const QImage img = PreviewCache::preview(item);
     EXPECT_EQ(img.width(), PreviewCache::WIDTH);
     EXPECT_GT(img.height(), 0);
-    EXPECT_TRUE(fs::exists(PreviewCache::cacheFile(item)));
-    EXPECT_EQ(PreviewCache::cacheFile(item).parent_path(), root / ".xournal_library" / "previews");
     EXPECT_TRUE(PreviewCache::url(item).startsWith("image://preview/"));
+    PreviewCache::flush();
+    EXPECT_EQ(packKeys(root, PreviewCache::PACK, PreviewCache::FORMAT), QStringList{"lecture.pdf"})
+            << "in the pack of its folder";
+    // Stored: read back (not drawn again)
+    PreviewCache::setLibrary(CacheLocation(root));
+    EXPECT_EQ(PreviewCache::stored(item).size(), img.size());
     PreviewCache::prune({});
-    EXPECT_FALSE(fs::exists(PreviewCache::cacheFile(item)));
-    PreviewCache::setLibrary({}, {});
+    PreviewCache::flush();
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR / "previews.pack"));
+    PreviewCache::setLibrary({});
+}
+
+TEST_F(LibraryTest, previewsOfAFolderAreOnePackReadWhenFirstWanted) {
+    makePdf(root / "Physics" / "a.pdf");
+    makePdf(root / "Physics" / "b.pdf");
+    makeWordPdf(root / "Physics" / "c.pdf", "zebra");
+    makePdf(root / "top.pdf");
+    PreviewCache::setLibrary(CacheLocation(root));
+    PreviewCache::setWriteDelays(50, 500);
+    for (const auto& item: DocumentFiles::scanRecursive(root)) {
+        ASSERT_FALSE(PreviewCache::preview(item).isNull());
+    }
+    waitFor([&] { return fs::exists(root / "Physics" / DocumentFiles::META_DIR / "previews.pack"); });
+    PreviewCache::flush();
+    EXPECT_EQ(packKeys(root / "Physics", PreviewCache::PACK, PreviewCache::FORMAT),
+              (QStringList{"a.pdf", "b.pdf", "c.pdf"}));
+    EXPECT_EQ(packKeys(root, PreviewCache::PACK, PreviewCache::FORMAT), QStringList{"top.pdf"});
+
+    // Read once per folder
+    PreviewCache::setLibrary(CacheLocation(root));
+    const int reads = PreviewCache::packsRead();
+    const QImage a = PreviewCache::stored(DocumentFiles::itemOf(root / "Physics" / "a.pdf"));
+    const QImage c = PreviewCache::stored(DocumentFiles::itemOf(root / "Physics" / "c.pdf"));
+    EXPECT_FALSE(a.isNull());
+    EXPECT_NE(a, c);
+    EXPECT_EQ(PreviewCache::packsRead(), reads + 1);
+
+    // A changed document: its new preview takes the place of the old one
+    fs::remove(root / "Physics" / "a.pdf");
+    makeWordPdf(root / "Physics" / "a.pdf", "giraffe");
+    const DocumentItem changed = DocumentFiles::itemOf(root / "Physics" / "a.pdf");
+    EXPECT_TRUE(PreviewCache::stored(changed).isNull()) << "the stored one is of the old file";
+    EXPECT_NE(PreviewCache::preview(changed), a);
+    // Renamed in the app: the preview goes along
+    fs::rename(root / "Physics" / "b.pdf", root / "b.pdf");
+    PreviewCache::moved({{root / "Physics" / "b.pdf", root / "b.pdf"}});
+    EXPECT_FALSE(PreviewCache::stored(DocumentFiles::itemOf(root / "b.pdf")).isNull());
+    PreviewCache::flush();
+    EXPECT_EQ(packKeys(root / "Physics", PreviewCache::PACK, PreviewCache::FORMAT), (QStringList{"a.pdf", "c.pdf"}));
+    EXPECT_EQ(packKeys(root, PreviewCache::PACK, PreviewCache::FORMAT), (QStringList{"b.pdf", "top.pdf"}));
+    PreviewCache::setWriteDelays(WriteScheduler::QUIET_MS, WriteScheduler::MAX_DELAY_MS);
+    PreviewCache::setLibrary({});
 }
 
 TEST_F(LibraryTest, recentFilesShowExistingDocumentsOnce) {
@@ -531,9 +625,9 @@ TEST_F(LibraryTest, searchCanLookAtNamesOnly) {
     EXPECT_EQ(model.count(), 3) << "the full search again";
 }
 
-// The title page and the page a document was left at are kept beside it: in the metadata of its library, by its
-// path there; they follow it when it is renamed or moved. The preview shows the title page.
-TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
+// The title page and the page a document was left at are kept beside it: for its library in the config folder, by
+// its path in the library; they follow it when it is renamed or moved. The preview shows the title page.
+TEST_F(LibraryTest, titleAndLastPagesAreKeptPerLibraryInTheConfig) {
     makePdf(root / "Physics" / "sheet.pdf");
     makePdf(root / "lecture.pdf");  // two pages: "xournal" / "Page 2"
     LibraryModel model;
@@ -546,8 +640,10 @@ TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
     DocumentPlaces::setLastPage(sheet, 1);
     EXPECT_EQ(DocumentPlaces::titlePage(sheet), 1);
     EXPECT_EQ(DocumentPlaces::lastPage(sheet), 1);
-    QFile stored(QString::fromStdString((root / DocumentFiles::META_DIR / "pages.json").string()));
-    ASSERT_TRUE(stored.open(QIODevice::ReadOnly)) << "in the library's metadata";
+    QFile stored(QString::fromStdString((Library(root).configDir() / "pages.json").string()));
+    ASSERT_TRUE(stored.open(QIODevice::ReadOnly)) << "in the config folder";
+    EXPECT_NE(Library(root).configDir().string().find("libraries"), std::string::npos);
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR / "pages.json")) << "not in the cache";
     const QByteArray json = stored.readAll();
     EXPECT_TRUE(json.contains("Physics/sheet.pdf")) << "by its path in the library: " << json.toStdString();
 
@@ -565,18 +661,52 @@ TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
     EXPECT_EQ(DocumentPlaces::titlePage(elsewhere), 3);
     EXPECT_TRUE(fs::exists(outsideFile));
 
-    // The preview shows the title page, under a name of its own; the first page keeps the name it always had
+    // The preview shows the title page (a new URL: QML shows it anew); the first page keeps the URL it always had
     const DocumentItem lecture = DocumentFiles::itemOf(root / "lecture.pdf");
-    const fs::path firstName = PreviewCache::cacheFile(lecture);
+    const QString firstUrl = PreviewCache::url(lecture);
     const QImage first = PreviewCache::preview(lecture);
     ASSERT_FALSE(first.isNull());
     DocumentPlaces::setTitlePage(lecture.main(), 1);
-    EXPECT_NE(PreviewCache::cacheFile(lecture), firstName);
+    EXPECT_NE(PreviewCache::url(lecture), firstUrl);
+    EXPECT_TRUE(PreviewCache::stored(lecture).isNull()) << "the stored one shows another page";
     const QImage second = PreviewCache::preview(lecture);
     ASSERT_FALSE(second.isNull());
     EXPECT_NE(first, second) << "another page";
     DocumentPlaces::setTitlePage(lecture.main(), 0);
-    EXPECT_EQ(PreviewCache::cacheFile(lecture), firstName);
+    EXPECT_EQ(PreviewCache::url(lecture), firstUrl);
+}
+
+// Reading positions are not cache: removing the cache folders keeps them. Those kept in the cache folder before are
+// taken over.
+TEST_F(LibraryTest, readingPositionsSurviveRemovingTheCache) {
+    makePdf(root / "Physics" / "sheet.pdf");
+    makePdf(root / "lecture.pdf");
+    {
+        LibraryModel model;
+        model.setLibrary(std::make_unique<Library>(root));
+        DocumentPlaces::setLastPage(root / "Physics" / "sheet.pdf", 1);
+        model.searchIndex()->waitForDone();
+    }
+    for (const fs::path& f: {root, root / "Physics"}) {
+        fs::remove_all(f / DocumentFiles::META_DIR);
+    }
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    EXPECT_EQ(DocumentPlaces::lastPage(root / "Physics" / "sheet.pdf"), 1);
+
+    // A library whose positions were in its cache folder: taken over
+    const fs::path other = root / "Other";
+    makePdf(other / "old.pdf");
+    touch(other / DocumentFiles::META_DIR / "pages.json");
+    {
+        QFile old(QString::fromStdString((other / DocumentFiles::META_DIR / "pages.json").string()));
+        ASSERT_TRUE(old.open(QIODevice::WriteOnly));
+        old.write(R"({"old.pdf":{"last":1,"title":1}})");
+    }
+    model.setLibrary(std::make_unique<Library>(other));
+    EXPECT_EQ(DocumentPlaces::lastPage(other / "old.pdf"), 1);
+    EXPECT_EQ(DocumentPlaces::titlePage(other / "old.pdf"), 1);
+    EXPECT_TRUE(fs::exists(Library(other).configDir() / "pages.json"));
 }
 
 // The library sorts by when its documents were last read in the app, and shows when and at which page.
@@ -661,36 +791,11 @@ TEST_F(LibraryTest, benchHitPages) {
     std::cout << "the same 20 pages, other search (marks only): " << t.elapsed() << " ms\n";
 }
 
-namespace {
-/// A one-page PDF with `word` on it.
-void makeWordPdf(const fs::path& p, const char* word) {
-    fs::create_directories(p.parent_path());
-    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
-    cairo_t* cr = cairo_create(s);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 24);
-    cairo_move_to(cr, 72, 100);
-    cairo_show_text(cr, word);
-    cairo_destroy(cr);
-    cairo_surface_destroy(s);
-}
-/// Add a text element to a page of a .xopp and save it.
-void addText(const fs::path& xopp, size_t page, const char* text) {
-    auto loaded = DocumentSession::loadFile(xopp);
-    ASSERT_TRUE(loaded.document);
-    auto t = std::make_unique<Text>();
-    t->setText(text);
-    t->move(100, 100);
-    loaded.document->getPage(page)->getSelectedLayer()->addElement(std::move(t));
-    ASSERT_TRUE(DocumentSession::writeDocument(*loaded.document, xopp).ok);
-}
-}  // namespace
 
 TEST_F(LibraryTest, onlyTheXoppIsReadAgainWhenAnnotationsChange) {
     makePdf(root / "lecture.pdf");
     makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
-    const fs::path dir = root / ".xournal_library" / "index";
-    LibraryIndex index(root, dir);
+    LibraryIndex index(root);
     index.update(DocumentFiles::scanRecursive(root));
     index.waitForDone();
     ASSERT_EQ(index.documentsRead(), 1);
@@ -710,7 +815,8 @@ TEST_F(LibraryTest, onlyTheXoppIsReadAgainWhenAnnotationsChange) {
     index.update(DocumentFiles::scanRecursive(root));
     index.waitForDone();
     EXPECT_EQ(index.documentsRead(), 2);
-    LibraryIndex again(root, dir);
+    index.flush();
+    LibraryIndex again(root);
     again.update(DocumentFiles::scanRecursive(root));
     again.waitForDone();
     EXPECT_EQ(again.documentsRead(), 0);
@@ -757,11 +863,12 @@ TEST_F(LibraryTest, renamedAndMovedDocumentsKeepTheirIndex) {
                                             "the folder move reads nothing";
     EXPECT_EQ(index->search("xournal").size(), 2u);
 
-    size_t files = 0;
-    for ([[maybe_unused]] const auto& e: fs::directory_iterator(root / ".xournal_library" / "index")) {
-        ++files;
-    }
-    EXPECT_EQ(files, 2u) << "the index files moved along";
+    index->flush();
+    EXPECT_EQ(packKeys(root / "Semester" / "Archive", LibraryIndex::NOTES_PACK),
+              (QStringList{"Week 1.xopp", "old.pdf"}))
+            << "the entries moved along";
+    EXPECT_TRUE(packKeys(root / "Semester" / "Archive", LibraryIndex::PDF_TEXT_PACK).contains("Week 1.xopp"));
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack")) << "no documents left at the top";
 
     // Renamed by another program: the PDF text is taken over (same file: size and time), only the .xopp is read
     const int pdfPages = index->pdfPagesRead();
@@ -783,7 +890,7 @@ TEST_F(LibraryTest, changesOfAttachedOrOtherPdfsAreNoticed) {
     makePdf(script);
     makeAnnotation(script, root / "notes.xopp");
 
-    LibraryIndex index(root, root / ".xournal_library" / "index");
+    LibraryIndex index(root);
     index.update(DocumentFiles::scanRecursive(root));
     index.waitForDone();
     ASSERT_EQ(index.search("xournal").size(), 2u);
@@ -799,6 +906,385 @@ TEST_F(LibraryTest, changesOfAttachedOrOtherPdfsAreNoticed) {
     ASSERT_EQ(index.search("giraffe").size(), 1u);
     EXPECT_EQ(index.search("giraffe")[0].file, root / "notes.xopp");
     EXPECT_TRUE(index.search("xournal").empty());
+}
+
+// --- the index in per-folder packs ---
+
+namespace {
+/// A library with documents at the top and in two levels of folders, and a folder without documents.
+void makeFolders(const fs::path& root) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    makePdf(root / "Physics" / "sheet.pdf");
+    fs::copy_file(fixture(u8"load/pages.xopp"), root / "Physics" / "notes.xopp");  // text elements "p1".."p10"
+    makeWordPdf(root / "Physics" / "Mechanics" / "forces.pdf", "zebra");
+    fs::create_directories(root / "Empty");
+}
+struct FileState {
+    uintmax_t size;
+    fs::file_time_type time;
+};
+std::map<fs::path, FileState> snapshot(const std::vector<fs::path>& files) {
+    std::map<fs::path, FileState> s;
+    for (const auto& f: files) {
+        std::error_code ec;
+        s[f] = {fs::file_size(f, ec), fs::last_write_time(f, ec)};
+    }
+    return s;
+}
+/// Bytes and files written between two snapshots (new or changed files).
+std::pair<uintmax_t, int> written(const std::map<fs::path, FileState>& before, const std::map<fs::path, FileState>& after) {
+    uintmax_t bytes = 0;
+    int files = 0;
+    for (const auto& [f, st]: after) {
+        auto it = before.find(f);
+        if (it == before.end() || it->second.size != st.size || it->second.time != st.time) {
+            bytes += st.size;
+            ++files;
+        }
+    }
+    return {bytes, files};
+}
+fs::file_time_type anHourAgo() { return fs::file_time_type::clock::now() - std::chrono::hours(1); }
+}  // namespace
+
+TEST_F(LibraryTest, eachFolderKeepsTheIndexOfItsOwnDocuments) {
+    makeFolders(root);
+    {
+        LibraryIndex index(root);
+        index.update(DocumentFiles::scanRecursive(root));
+        index.waitForDone();
+    }  // (written when closed)
+    EXPECT_EQ(packKeys(root, LibraryIndex::NOTES_PACK), QStringList{"lecture.xopp"});
+    EXPECT_EQ(packKeys(root / "Physics", LibraryIndex::NOTES_PACK), (QStringList{"notes.xopp", "sheet.pdf"}));
+    EXPECT_EQ(packKeys(root / "Physics", LibraryIndex::PDF_TEXT_PACK), QStringList{"sheet.pdf"})
+            << "only documents with PDF pages have PDF text";
+    EXPECT_EQ(packKeys(root / "Physics" / "Mechanics", LibraryIndex::NOTES_PACK), QStringList{"forces.pdf"});
+    EXPECT_FALSE(fs::exists(root / "Empty" / DocumentFiles::META_DIR)) << "no documents, no cache folder";
+    // Nothing else in the cache folders
+    for (const fs::path& f: {root, root / "Physics", root / "Physics" / "Mechanics"}) {
+        for (const auto& e: fs::directory_iterator(f / DocumentFiles::META_DIR)) {
+            const std::string name = e.path().filename().string();
+            EXPECT_TRUE(name == "notes.pack" || name == "pdf-text.pack") << name;
+        }
+    }
+
+    // A subfolder opened as a library of its own: its packs are there, nothing is read
+    LibraryIndex physics(root / "Physics");
+    physics.update(DocumentFiles::scanRecursive(root / "Physics"));
+    physics.waitForDone();
+    EXPECT_EQ(physics.documentsRead(), 0);
+    EXPECT_EQ(physics.search("zebra").size(), 1u);
+    EXPECT_EQ(physics.search("p7").size(), 1u);
+    EXPECT_TRUE(physics.search("lecture").empty());
+}
+
+TEST_F(LibraryTest, anEditedXoppWritesOnlyTheNotesOfItsFolder) {
+    makeFolders(root);
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.flush();
+    std::vector<fs::path> packs;
+    for (const auto& e: fs::recursive_directory_iterator(root)) {
+        if (e.path().extension() == ".pack") {
+            packs.push_back(e.path());
+            fs::last_write_time(e.path(), anHourAgo());
+        }
+    }
+    ASSERT_EQ(packs.size(), 6u) << "notes and PDF text in three folders";
+    const auto before = snapshot(packs);
+    const int writes = index.packsWritten();
+
+    addText(root / "Physics" / "notes.xopp", 0, "unicorn");
+    index.update(DocumentFiles::scanRecursive(root));
+    index.flush();
+    EXPECT_EQ(index.search("unicorn").size(), 1u);
+    EXPECT_EQ(index.packsWritten(), writes + 1);
+    const auto after = snapshot(packs);
+    for (const auto& f: packs) {
+        const bool changed = after.at(f).time != before.at(f).time;
+        EXPECT_EQ(changed, f == root / "Physics" / DocumentFiles::META_DIR / "notes.pack") << f;
+    }
+}
+
+TEST_F(LibraryTest, packsAreWrittenAWhileAfterTheLastChange) {
+    makeFolders(root);
+    LibraryIndex index(root);
+    index.setWriteDelays(100, 1000);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack")) << "not yet";
+    waitFor([&] { return index.packsWritten() >= 6; });
+    EXPECT_TRUE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack"));
+    waitFor([] { return false; }, 150);
+    EXPECT_EQ(index.packsWritten(), 6) << "each pack once";
+}
+
+TEST_F(LibraryTest, foldersAndDocumentsMovedByAnotherProgramKeepTheirIndex) {
+    makeFolders(root);
+    fs::copy_file(fixture(u8"load/pages.xopp"), root / "loose.xopp");
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.flush();
+    const int read = index.documentsRead();
+
+    // A folder renamed, a document moved into another folder (as a file manager does it: size and time stay)
+    fs::rename(root / "Physics", root / "Science");
+    fs::rename(root / "loose.xopp", root / "Science" / "Mechanics" / "loose.xopp");
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    EXPECT_EQ(index.documentsRead(), read) << "nothing is read again";
+    ASSERT_EQ(index.search("zebra").size(), 1u);
+    EXPECT_EQ(index.search("zebra")[0].file, root / "Science" / "Mechanics" / "forces.pdf");
+    const auto p7 = index.search("p7");
+    ASSERT_EQ(p7.size(), 2u);
+    index.flush();
+    EXPECT_EQ(packKeys(root / "Science" / "Mechanics", LibraryIndex::NOTES_PACK),
+              (QStringList{"forces.pdf", "loose.xopp"}));
+    EXPECT_EQ(packKeys(root, LibraryIndex::NOTES_PACK), QStringList{"lecture.xopp"}) << "gone from the top";
+
+    // The same from the stored packs, in a new index
+    LibraryIndex again(root);
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.documentsRead(), 0);
+}
+
+TEST_F(LibraryTest, theLastDocumentGoneTakesItsCacheFolderAlong) {
+    makeFolders(root);
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.flush();
+    const fs::path mechanics = root / "Physics" / "Mechanics" / DocumentFiles::META_DIR;
+    const fs::path physics = root / "Physics" / DocumentFiles::META_DIR;
+    ASSERT_TRUE(fs::exists(mechanics));
+    touch(physics / "mine.txt");  // not the app's
+
+    fs::remove(root / "Physics" / "Mechanics" / "forces.pdf");
+    fs::remove(root / "Physics" / "sheet.pdf");
+    fs::remove(root / "Physics" / "notes.xopp");
+    index.update(DocumentFiles::scanRecursive(root));
+    index.flush();
+    EXPECT_FALSE(fs::exists(mechanics));
+    EXPECT_TRUE(fs::exists(physics / "mine.txt")) << "a cache folder with other files stays";
+    EXPECT_FALSE(fs::exists(physics / "notes.pack"));
+    EXPECT_TRUE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack"));
+}
+
+TEST_F(LibraryTest, packsOfAnotherFormatAreReadAgain) {
+    makeFolders(root);
+    {
+        LibraryIndex index(root);
+        index.update(DocumentFiles::scanRecursive(root));
+        index.waitForDone();
+    }
+    ASSERT_TRUE(Packs::write(root / "Physics" / DocumentFiles::META_DIR, LibraryIndex::NOTES_PACK,
+                             LibraryIndex::FORMAT + 1, {{QStringLiteral("notes.xopp"), 1}}, true));
+    LibraryIndex again(root);
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.documentsRead(), 2) << "the two documents of that folder";
+    EXPECT_EQ(again.search("p7").size(), 1u);
+}
+
+// --- where the cache is kept, and removing it (the settings) ---
+
+TEST_F(LibraryTest, theCacheMovesToTheAppCacheAndBack) {
+    makeFolders(root);
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->flush();
+    const DocumentItem sheet = DocumentFiles::itemOf(root / "Physics" / "sheet.pdf");
+    ASSERT_FALSE(PreviewCache::preview(sheet).isNull());
+    PreviewCache::flush();
+    EXPECT_FALSE(model.cacheInAppCache()) << "in the folders by default";
+    const fs::path app = Library(root).cacheLocation().appCacheDir();
+    EXPECT_EQ(model.appCachePath().toStdString(), app.string());
+
+    model.setCacheInAppCache(true);
+    EXPECT_TRUE(model.cacheInAppCache());
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::AppCache) << "kept as a setting of the library";
+    for (const fs::path& f: {root, root / "Physics", root / "Physics" / "Mechanics"}) {
+        EXPECT_FALSE(fs::exists(f / DocumentFiles::META_DIR)) << f;
+    }
+    EXPECT_TRUE(fs::exists(app / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_TRUE(fs::exists(app / "Physics" / DocumentFiles::META_DIR / "previews.pack"));
+    model.searchIndex()->waitForDone();
+    EXPECT_EQ(model.searchIndex()->documentsRead(), 0) << "moved, not made anew";
+    EXPECT_EQ(model.searchIndex()->search("zebra").size(), 1u);
+    EXPECT_FALSE(PreviewCache::stored(sheet).isNull());
+    // New entries go there too
+    fs::copy_file(fixture(u8"load/pages.xopp"), root / "Physics" / "Mechanics" / "more.xopp");
+    model.refresh();
+    model.searchIndex()->flush();
+    EXPECT_EQ(Packs::read(app / "Physics" / "Mechanics" / DocumentFiles::META_DIR, LibraryIndex::NOTES_PACK,
+                          LibraryIndex::FORMAT)
+                      ->size(),
+              2);
+    EXPECT_FALSE(fs::exists(root / "Physics" / "Mechanics" / DocumentFiles::META_DIR));
+
+    model.setCacheInAppCache(false);
+    EXPECT_TRUE(fs::exists(root / "Physics" / "Mechanics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_FALSE(fs::exists(app)) << "nothing left in the app cache";
+    model.searchIndex()->waitForDone();
+    EXPECT_EQ(model.searchIndex()->documentsRead(), 0);
+    model.setLibrary(nullptr);
+}
+
+// In the app cache, a folder moved by another program leaves its cache behind: its documents are found again by
+// name, size and time, and the old place is cleaned up.
+TEST_F(LibraryTest, inTheAppCacheDocumentsMovedByAnotherProgramAreFoundAgain) {
+    makeFolders(root);
+    Library(root).setCacheMode(CacheLocation::Mode::AppCache);
+    const CacheLocation where = Library(root).cacheLocation();
+    const fs::path app = where.appCacheDir();
+    {
+        LibraryIndex index(root, where);
+        index.update(DocumentFiles::scanRecursive(root));
+        index.waitForDone();
+    }
+    ASSERT_TRUE(fs::exists(app / "Physics" / "Mechanics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_FALSE(fs::exists(root / "Physics" / DocumentFiles::META_DIR)) << "nothing in the library's folders";
+
+    fs::rename(root / "Physics", root / "Science");
+    LibraryIndex index(root, where);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.flush();
+    EXPECT_EQ(index.documentsRead(), 0) << "found again by name, size and time";
+    EXPECT_EQ(index.search("zebra").size(), 1u);
+    EXPECT_TRUE(fs::exists(app / "Science" / "Mechanics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_FALSE(fs::exists(app / "Physics")) << "the old place is cleaned up";
+    Library(root).setCacheMode(CacheLocation::Mode::Folders);
+}
+
+TEST_F(LibraryTest, removingTheCacheLeavesOtherFilesAndTheReadingPositions) {
+    makeFolders(root);
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->flush();
+    DocumentPlaces::setLastPage(root / "Physics" / "sheet.pdf", 1);
+    touch(root / "Physics" / DocumentFiles::META_DIR / "mine.txt");
+    EXPECT_LT(model.cacheBytes(), 0) << "not counted yet";
+    model.measureCache();
+    waitFor([&] { return model.cacheBytes() >= 0; });
+    EXPECT_GT(model.cacheBytes(), 200);
+    EXPECT_EQ(model.cacheFiles(), 6) << "notes and PDF text of three folders (not mine.txt)";
+
+    EXPECT_EQ(model.removeCaches(), static_cast<qint64>(model.cacheBytes()));
+    EXPECT_TRUE(model.cacheRemoved());
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR));
+    EXPECT_FALSE(fs::exists(root / "Physics" / "Mechanics" / DocumentFiles::META_DIR));
+    EXPECT_TRUE(fs::exists(root / "Physics" / DocumentFiles::META_DIR / "mine.txt")) << "not the app's";
+    EXPECT_FALSE(fs::exists(root / "Physics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_EQ(model.cacheBytes(), 0);
+    EXPECT_EQ(DocumentPlaces::lastPage(root / "Physics" / "sheet.pdf"), 1) << "not cache";
+
+    // Nothing is made again until the library is opened again
+    model.refresh();
+    ASSERT_FALSE(PreviewCache::preview(DocumentFiles::itemOf(root / "lecture.pdf")).isNull());
+    PreviewCache::flush();
+    waitFor([] { return false; }, 100);
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR));
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->flush();
+    EXPECT_TRUE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack"));
+
+    // In the app cache, too
+    model.setCacheInAppCache(true);
+    const fs::path app = Library(root).cacheLocation().appCacheDir();
+    ASSERT_TRUE(fs::exists(app / DocumentFiles::META_DIR / "notes.pack"));
+    model.removeCaches();
+    EXPECT_FALSE(fs::exists(app));
+    model.setLibrary(nullptr);
+}
+
+// --- the cache of the layout before the packs ---
+
+namespace {
+/// An index entry as it was stored before the packs ("index/<hash>.json", format 3, paths relative to the
+/// library), with made-up PDF text per page.
+void writeOldEntry(const fs::path& root, const DocumentItem& item, const QStringList& pdfText, int number) {
+    const auto rel = [&](const fs::path& p) { return QString::fromStdString(p.lexically_relative(root).string()); };
+    QJsonObject text;
+    QJsonArray pages;
+    for (int i = 0; i < pdfText.size(); ++i) {
+        text[QString::number(i)] = pdfText[i];
+        pages.append(QJsonObject{{"pdf", i}, {"text", ""}, {"aspect", 1.414}});
+    }
+    const QJsonObject json{{"format", 3},
+                           {"file", rel(item.main())},
+                           {"name", QString::fromStdString(item.name())},
+                           {"xoppStamp", item.xopp.empty() ? QString() : fileStamp(item.xopp)},
+                           {"pdf", rel(item.pdf)},
+                           {"pdfStamp", fileStamp(item.pdf)},
+                           {"pdfText", text},
+                           {"pages", pages}};
+    const fs::path file = root / DocumentFiles::META_DIR / "index" / (std::to_string(1000000 + number) + "abcdef00.json");
+    fs::create_directories(file.parent_path());
+    QFile f(QString::fromStdString(file.string()));
+    ASSERT_TRUE(f.open(QIODevice::WriteOnly));
+    f.write(QJsonDocument(json).toJson(QJsonDocument::Compact));
+}
+}  // namespace
+
+TEST_F(LibraryTest, anOldCacheIsConvertedWithoutReadingAnythingAgain) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    makePdf(root / "Physics" / "sheet.pdf");
+    makePdf(root / "Physics" / "changed.pdf");
+    const fs::path old = root / DocumentFiles::META_DIR;
+    // The old cache: index entries (one of a document changed since, one of a document that is gone), previews,
+    // reading positions, and a file that is not the app's
+    const DocumentItem lecture = DocumentFiles::itemOf(root / "lecture.xopp");
+    const DocumentItem sheet = DocumentFiles::itemOf(root / "Physics" / "sheet.pdf");
+    const DocumentItem changed = DocumentFiles::itemOf(root / "Physics" / "changed.pdf");
+    writeOldEntry(root, lecture, {"oldtext alpha", "oldtext beta"}, 1);
+    writeOldEntry(root, sheet, {"oldtext gamma", ""}, 2);
+    writeOldEntry(root, changed, {"oldtext delta", ""}, 3);
+    touch(root / "gone.pdf");
+    writeOldEntry(root, DocumentItem{{}, root / "gone.pdf"}, {"oldtext epsilon"}, 4);
+    fs::remove(root / "gone.pdf");
+    fs::resize_file(root / "Physics" / "changed.pdf", fs::file_size(root / "Physics" / "changed.pdf") + 1);
+    QImage red(PreviewCache::WIDTH, 20, QImage::Format_RGB32);
+    red.fill(Qt::red);
+    fs::create_directories(old / "previews");
+    ASSERT_TRUE(red.save(QString::fromStdString((old / "previews" / PreviewCache::outsideFile(sheet).filename()).string())));
+    {
+        QFile pages(QString::fromStdString((old / "pages.json").string()));
+        ASSERT_TRUE(pages.open(QIODevice::WriteOnly));
+        pages.write(R"({"Physics/sheet.pdf":{"last":1}})");
+    }
+    touch(old / "mine.txt");
+
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    LibraryIndex* index = model.searchIndex();
+    index->waitForDone();
+    EXPECT_EQ(index->oldLayoutsConverted(), 1);
+    EXPECT_EQ(index->documentsRead(), 1) << "only the document changed since";
+    EXPECT_EQ(index->pdfPagesRead(), 2);
+    auto hits = index->search("oldtext");
+    ASSERT_EQ(hits.size(), 2u) << "the converted text (not read from the PDF)";
+    EXPECT_EQ(index->search("oldtext beta").size(), 1u);
+    EXPECT_EQ(PreviewCache::stored(sheet), red) << "the old preview";
+    EXPECT_EQ(DocumentPlaces::lastPage(root / "Physics" / "sheet.pdf"), 1);
+
+    // The old files are gone, nothing else
+    EXPECT_FALSE(fs::exists(old / "index"));
+    EXPECT_FALSE(fs::exists(old / "previews"));
+    EXPECT_FALSE(fs::exists(old / "pages.json"));
+    EXPECT_TRUE(fs::exists(old / "mine.txt"));
+    EXPECT_EQ(packKeys(root, LibraryIndex::NOTES_PACK), QStringList{"lecture.xopp"});
+    EXPECT_EQ(packKeys(root / "Physics", LibraryIndex::NOTES_PACK), (QStringList{"changed.pdf", "sheet.pdf"}));
+    EXPECT_EQ(packKeys(root / "Physics", PreviewCache::PACK, PreviewCache::FORMAT), QStringList{"sheet.pdf"});
+
+    // Opened again: nothing to convert, nothing to read
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    EXPECT_EQ(model.searchIndex()->oldLayoutsConverted(), 0);
+    EXPECT_EQ(model.searchIndex()->documentsRead(), 0);
+    EXPECT_EQ(model.searchIndex()->search("oldtext").size(), 2u);
+    model.setLibrary(nullptr);
 }
 
 // Opt-in timing: XQT_BENCH_PDF=<a long PDF>
@@ -818,17 +1304,17 @@ TEST_F(LibraryTest, benchIndexStartup) {
         fs::copy_file(root / "source.pdf", pdf);
         makeAnnotation(pdf, root / ("paper" + std::to_string(i) + ".xopp"));
     }
-    const fs::path dir = root / ".xournal_library" / "index";
+    const fs::path dir = root / DocumentFiles::META_DIR;
     QElapsedTimer t;
     {
-        LibraryIndex first(root, dir);
+        LibraryIndex first(root);
         t.start();
         first.update(DocumentFiles::scanRecursive(root));
         first.waitForDone();
         std::cout << count << " documents, first indexing: " << t.elapsed() << " ms\n";
     }
     // Starting again: the stored index
-    LibraryIndex again(root, dir);
+    LibraryIndex again(root);
     t.restart();
     const auto items = DocumentFiles::scanRecursive(root);
     const qint64 scanned = t.elapsed();
@@ -853,7 +1339,7 @@ TEST_F(LibraryTest, benchIndexUpdates) {
     }
     fs::copy_file(fs::path(pdf.toStdString()), root / "long.pdf");
     makeAnnotation(root / "long.pdf", root / "long.xopp");
-    LibraryIndex index(root, root / ".xournal_library" / "index");
+    LibraryIndex index(root);
     QElapsedTimer t;
     t.start();
     index.update(DocumentFiles::scanRecursive(root));
@@ -919,10 +1405,311 @@ TEST_F(LibraryTest, theDownloadsFolderIsATemporaryLibrary) {
     EXPECT_TRUE(Library(downloads).isTemporary());
     EXPECT_TRUE(Library(downloads / "papers").isTemporary());
     EXPECT_FALSE(Library(root / "lib").isTemporary());
-    // Its index and previews live in the folder, like every library's (fast when it is opened again)
-    EXPECT_EQ(Library(downloads).metaDir(), downloads / ".xournal_library");
-    EXPECT_TRUE(fs::exists(downloads / ".xournal_library"));
+    // Its index and previews live in its folders, like every library's (fast when it is opened again)
+    EXPECT_EQ(CacheLocation(Library(downloads).root()).dirOf(downloads / "papers"),
+              downloads / "papers" / ".xournal_library");
     LibraryModel model;
     EXPECT_TRUE(model.isTemporaryFolder(QString::fromStdString((downloads / "papers").string())));
     QFile::remove(config + "/user-dirs.dirs");
+}
+
+// --- the library cache on a generated library -------------------------------------------------------------------
+namespace {
+/// Deterministic pseudo-words, frequent ones more often (roughly like real text, which compresses about 4:1).
+class Words {
+public:
+    explicit Words(unsigned seed): rng(seed) {
+        static const char* syllables[] = {"ka", "lo", "mi", "ne", "tur", "sen", "ra", "vo", "pel", "di", "ag",
+                                          "on", "sti", "ber", "ul", "fa", "ze", "tro", "qui", "man"};
+        std::mt19937 vocab(7);
+        for (int i = 0; i < 3000; ++i) {
+            std::string w;
+            const int n = 1 + static_cast<int>(vocab() % 4);
+            for (int s = 0; s < n; ++s) {
+                w += syllables[vocab() % 20];
+            }
+            vocabulary.push_back(w);
+        }
+    }
+    std::string next() {
+        const double u = std::uniform_real_distribution<double>(0, 1)(rng);
+        return vocabulary[static_cast<size_t>(u * u * u * static_cast<double>(vocabulary.size() - 1))];
+    }
+    std::string line(size_t chars) {
+        std::string s;
+        while (s.size() < chars) {
+            s += next() + ' ';
+        }
+        return s;
+    }
+
+private:
+    std::mt19937 rng;
+    std::vector<std::string> vocabulary;
+};
+
+/// A PDF with `pages` pages full of text (about 6 kB of text per page).
+void makeTextPdf(const fs::path& p, int pages, unsigned seed) {
+    fs::create_directories(p.parent_path());
+    Words words(seed);
+    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 7);
+    for (int page = 0; page < pages; ++page) {
+        for (int line = 0; line < 70; ++line) {
+            cairo_move_to(cr, 30, 40 + line * 11);
+            cairo_show_text(cr, words.line(95).c_str());
+        }
+        cairo_show_page(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+
+/// ~30 folders with 10 small documents each (lone notes, lone PDFs, pairs), and three long text PDFs.
+void makeLibrary(const fs::path& root) {
+    unsigned seed = 1;
+    std::vector<fs::path> folders;
+    for (int s = 1; s <= 6; ++s) {
+        const fs::path semester = root / ("Semester " + std::to_string(s));
+        folders.push_back(semester);
+        for (int c = 1; c <= 4; ++c) {
+            folders.push_back(semester / ("Course " + std::to_string(c)));
+        }
+    }
+    for (const fs::path& folder: folders) {
+        for (int i = 0; i < 4; ++i) {
+            const fs::path xopp = folder / ("notes " + std::to_string(i) + ".xopp");
+            fs::create_directories(folder);
+            fs::copy_file(fixture(u8"load/pages.xopp"), xopp);
+            addText(xopp, 0, Words(++seed).line(300).c_str());
+        }
+        for (int i = 0; i < 3; ++i) {
+            makeTextPdf(folder / ("paper " + std::to_string(i) + ".pdf"), 3, ++seed);
+        }
+        for (int i = 0; i < 3; ++i) {
+            const fs::path pdf = folder / ("lecture " + std::to_string(i) + ".pdf");
+            makeTextPdf(pdf, 4, ++seed);
+            makeAnnotation(pdf, folder / ("lecture " + std::to_string(i) + ".xopp"));
+        }
+    }
+    makeTextPdf(root / "book.pdf", 250, ++seed);  // over 1 MB of text
+    makeTextPdf(folders[1] / "script.pdf", 120, ++seed);
+    makeTextPdf(folders[7] / "reader.pdf", 150, ++seed);
+}
+
+/// Every file of the library's cache (the dot folders, and the app cache folder `appCache` if given).
+std::vector<fs::path> cacheFiles(const fs::path& root, const fs::path& appCache = {}) {
+    std::vector<fs::path> files;
+    for (const fs::path& base: {root, appCache}) {
+        std::error_code ec;
+        if (base.empty() || !fs::exists(base, ec)) {
+            continue;
+        }
+        for (auto it = fs::recursive_directory_iterator(base, ec); !ec && it != fs::recursive_directory_iterator();
+             it.increment(ec)) {
+            const std::string path = it->path().string();
+            if (it->is_regular_file() &&
+                (base == appCache || path.find(std::string("/") + DocumentFiles::META_DIR + "/") != std::string::npos)) {
+                files.push_back(it->path());
+            }
+        }
+    }
+    return files;
+}
+
+/// Drop the files from the page cache (fdatasync first), so the next read comes from the disk.
+void dropFromPageCache(const std::vector<fs::path>& files) {
+    for (const auto& f: files) {
+        const int fd = ::open(f.c_str(), O_RDONLY);
+        if (fd >= 0) {
+            ::fdatasync(fd);
+            ::posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
+            ::close(fd);
+        }
+    }
+}
+
+}  // namespace
+
+// Opt-in: XQT_BENCH_LIBRARY=<a folder on disk> (the test's temporary folder is often in memory, where a cold start
+// cannot be measured). Generates a library there (~300 small documents in 30 folders and three long PDFs, removed
+// afterwards) and measures its cache: opening with a cold and a warm page cache, what is written after one .xopp was
+// edited, and the size and number of files.
+TEST_F(LibraryTest, benchLibraryCache) {
+    if (!qEnvironmentVariableIsSet("XQT_BENCH_LIBRARY")) {
+        GTEST_SKIP() << "set XQT_BENCH_LIBRARY=<folder on disk>";
+    }
+    QTemporaryDir onDisk(qEnvironmentVariable("XQT_BENCH_LIBRARY") + "/xqt-bench-XXXXXX");
+    ASSERT_TRUE(onDisk.isValid());
+    const fs::path root = fs::path(onDisk.path().toStdString());
+    QElapsedTimer t;
+    t.start();
+    makeLibrary(root);
+    const auto items = DocumentFiles::scanRecursive(root);
+    std::cout << items.size() << " documents generated in " << t.elapsed() << " ms\n";
+
+    // The cache as the app keeps it: packs in each folder
+    const fs::path meta = root / DocumentFiles::META_DIR;
+    const fs::path appCache;
+    auto openIndex = [&] { return std::make_unique<LibraryIndex>(root); };
+    auto flushIndex = [&](LibraryIndex& index) { index.flush(); };
+    auto flushPreviews = [&] { PreviewCache::flush(); };
+    PreviewCache::setLibrary(CacheLocation(root));
+    DocumentPlaces::setLibrary(root, Library(root).placesFile());
+
+    {
+        auto index = openIndex();
+        t.restart();
+        index->update(items);
+        index->waitForDone();
+        flushIndex(*index);
+        std::cout << "first indexing: " << t.elapsed() << " ms (" << index->pdfPagesRead() << " PDF pages)\n";
+    }
+    t.restart();
+    for (const auto& item: items) {
+        PreviewCache::preview(item);
+    }
+    flushPreviews();
+    std::cout << "previews: " << t.elapsed() << " ms\n";
+
+    auto open = [&](bool cold) {
+        if (cold) {
+            dropFromPageCache(cacheFiles(root, appCache));
+        }
+        auto index = openIndex();
+        QElapsedTimer timer;
+        timer.start();
+        index->update(DocumentFiles::scanRecursive(root));
+        index->waitForDone();
+        const qint64 ms = timer.elapsed();
+        EXPECT_EQ(index->documentsRead(), 0);
+        EXPECT_EQ(index->search("book").size(), 1u);
+        return ms;
+    };
+    std::cout << "open, cold page cache: " << open(true) << " ms, again: " << open(true) << " ms\n";
+    open(false);
+    std::cout << "open, warm: " << open(false) << " ms, " << open(false) << " ms\n";
+
+    auto files = cacheFiles(root, appCache);
+    uintmax_t bytes = 0, biggest = 0;
+    for (const auto& f: files) {
+        bytes += fs::file_size(f);
+        biggest = std::max(biggest, fs::file_size(f));
+    }
+    std::cout << "cache: " << bytes / 1024 << " KiB in " << files.size() << " files (biggest " << biggest / 1024
+              << " KiB)\n";
+
+    // One .xopp edited: what is written (the index; then also its new preview)
+    const fs::path edited = root / "Semester 3" / "Course 2" / "notes 1.xopp";
+    auto index = openIndex();
+    index->update(DocumentFiles::scanRecursive(root));
+    index->waitForDone();
+    const auto before = snapshot(cacheFiles(root, appCache));
+    QThread::msleep(20);  // (a new modification time)
+    addText(edited, 2, "unicorn");
+    index->update(DocumentFiles::scanRecursive(root));
+    index->waitForDone();
+    flushIndex(*index);
+    auto [indexBytes, indexFiles] = written(before, snapshot(cacheFiles(root, appCache)));
+    std::cout << "after editing one .xopp, the index wrote " << indexBytes / 1024.0 << " KiB in " << indexFiles
+              << " files\n";
+    PreviewCache::preview(DocumentFiles::itemOf(edited));
+    flushPreviews();
+    auto [allBytes, allFiles] = written(before, snapshot(cacheFiles(root, appCache)));
+    std::cout << "with its new preview: " << allBytes / 1024.0 << " KiB in " << allFiles << " files\n";
+    EXPECT_EQ(index->search("unicorn").size(), 1u);
+    index.reset();
+
+    // The same cache in the layout before the packs (as earlier builds wrote it: a JSON file per document, a PNG
+    // per preview, all in the root's cache folder), made from the packs
+    std::map<fs::path, std::array<QCborMap, 3>> packs;  // notes, PDF text, previews of each folder
+    int n = 0;
+    uintmax_t bookJson = 0;
+    for (const auto& item: DocumentFiles::scanRecursive(root)) {
+        const fs::path folder = item.folder();
+        if (!packs.count(folder)) {
+            const fs::path dir = folder / DocumentFiles::META_DIR;
+            packs[folder] = {Packs::read(dir, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT).value_or(QCborMap()),
+                             Packs::read(dir, LibraryIndex::PDF_TEXT_PACK, LibraryIndex::FORMAT).value_or(QCborMap()),
+                             Packs::read(dir, PreviewCache::PACK, PreviewCache::FORMAT).value_or(QCborMap())};
+        }
+        const auto& [notes, texts, previews] = packs[folder];
+        const QString name = QString::fromStdString(item.main().filename().string());
+        const QCborMap e = notes.value(name).toMap();
+        const QCborMap pdfPages = texts.value(name).toMap().value(QStringLiteral("pages")).toMap();
+        QJsonObject pdfText;
+        for (auto it = pdfPages.cbegin(); it != pdfPages.cend(); ++it) {
+            pdfText[QString::number(it.key().toInteger())] = it.value().toString();
+        }
+        QJsonArray pages;
+        const QCborArray pdfNr = e.value(QStringLiteral("pdfPages")).toArray();
+        for (qsizetype i = 0; i < pdfNr.size(); ++i) {
+            pages.append(QJsonObject{{"pdf", pdfNr[i].toInteger()},
+                                     {"text", e.value(QStringLiteral("text")).toArray()[i].toString()},
+                                     {"aspect", e.value(QStringLiteral("aspects")).toArray()[i].toDouble()}});
+        }
+        const fs::path pdf = e.value(QStringLiteral("pdf")).toString().isEmpty()
+                                     ? fs::path()
+                                     : (folder / e.value(QStringLiteral("pdf")).toString().toStdString()).lexically_normal();
+        const QJsonObject json{{"format", 3},
+                               {"file", QString::fromStdString(item.main().lexically_relative(root).string())},
+                               {"name", e.value(QStringLiteral("name")).toString()},
+                               {"xoppStamp", e.value(QStringLiteral("xopp")).toString()},
+                               {"pdf", QString::fromStdString(pdf.empty() ? "" : pdf.lexically_relative(root).string())},
+                               {"pdfStamp", e.value(QStringLiteral("pdfStamp")).toString()},
+                               {"pdfText", pdfText},
+                               {"pages", pages}};
+        const fs::path file = meta / "index" / (std::to_string(++n) + ".json");
+        fs::create_directories(file.parent_path());
+        QFile out(QString::fromStdString(file.string()));
+        ASSERT_TRUE(out.open(QIODevice::WriteOnly));
+        out.write(QJsonDocument(json).toJson(QJsonDocument::Compact));
+        out.close();
+        if (item.main().filename() == "book.pdf") {
+            bookJson = fs::file_size(file);
+        }
+        if (const QByteArray png = previews.value(name).toMap().value(QStringLiteral("png")).toByteArray(); !png.isEmpty()) {
+            fs::create_directories(meta / "previews");
+            QFile p(QString::fromStdString((meta / "previews" / PreviewCache::outsideFile(item).filename()).string()));
+            ASSERT_TRUE(p.open(QIODevice::WriteOnly));
+            p.write(png);
+        }
+    }
+    uintmax_t newBytes = 0, oldBytes = 0, bookPack = 0;
+    int newFiles = 0, oldFiles = 0;
+    for (const auto& f: cacheFiles(root)) {
+        const bool old = f.parent_path().filename() == "index" || f.parent_path().filename() == "previews";
+        (old ? oldBytes : newBytes) += fs::file_size(f);
+        ++(old ? oldFiles : newFiles);
+        if (f.parent_path() == meta && f.filename().string().rfind("pdf-text-", 0) == 0) {
+            bookPack = fs::file_size(f);  // (the only entry with a file of its own)
+        }
+    }
+    std::cout << "the same cache: old layout " << oldBytes / 1024 << " KiB in " << oldFiles << " files, packs "
+              << newBytes / 1024 << " KiB in " << newFiles << " files\n";
+    std::cout << "PDF text of the 250-page PDF: JSON " << bookJson / 1024 << " KiB, CBOR + zlib " << bookPack / 1024
+              << " KiB\n";
+    // Only the old layout left: converted when the library is opened
+    for (const auto& f: cacheFiles(root)) {
+        if (f.extension() == ".pack") {
+            fs::remove(f);
+        }
+    }
+    PreviewCache::setLibrary({});
+    dropFromPageCache(cacheFiles(root));
+    t.restart();
+    {
+        LibraryModel model;
+        model.setLibrary(std::make_unique<Library>(root));
+        model.searchIndex()->waitForDone();
+        std::cout << "converting the old layout and opening: " << t.elapsed() << " ms, documents read: "
+                  << model.searchIndex()->documentsRead() << "\n";
+        EXPECT_EQ(model.searchIndex()->oldLayoutsConverted(), 1);
+        EXPECT_EQ(model.searchIndex()->documentsRead(), 0);
+        model.setLibrary(nullptr);
+    }
+    EXPECT_FALSE(fs::exists(meta / "index"));
+    DocumentPlaces::setLibrary({}, {});
 }

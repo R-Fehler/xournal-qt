@@ -466,3 +466,44 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] Maximized, F11 (or the full-screen button), then Escape: back to maximized, not the small default size. The
       same by "Leave full screen" in the tool square.
 - [ ] Made smaller (not maximized), full screen, Escape: back to that size.
+
+## Per-folder library cache (qt/library-index)
+Try these on a **copy** of a library, or on a new one. Opening the real OneDrive library with this build changes its
+cache on disk (and, once the whole block is in, converts the old one), which OneDrive then syncs.
+- [ ] Open a library with documents in several folders and wait until the search finds text in them. Each folder
+      with documents now has a hidden `.xournal_library/` with `notes.pack` (and `pdf-text.pack` where there are
+      PDFs); folders without documents have none. Close and open the library again: the search works at once and
+      nothing is indexed again (no progress shown).
+- [ ] Write a text element into a `.xopp` and save it. A few seconds later only that folder's `notes.pack` has a new
+      time (`ls -la --time-style=full-iso <folder>/.xournal_library`); `pdf-text.pack` and the other folders' packs
+      keep theirs. The new text is found.
+- [ ] In the file manager, rename a folder of the library and move a document into another folder. Back in the app:
+      both are found by their text right away, nothing is indexed again.
+- [ ] Open a subfolder as a library of its own ("Open a folder as library…"): its search works at once.
+- [ ] Trash all documents of a folder in the app: its `.xournal_library/` goes too.
+- [ ] A folder with many documents: the cards show their previews (drawn once); each folder's `.xournal_library/`
+      gets one `previews.pack` instead of a PNG per document. Close and open the app: the previews are there at
+      once, nothing is drawn again. Choose another title page of a document: its card shows that page.
+- [ ] Rename a PDF in the app: its card keeps its preview (not drawn again).
+- [ ] Reading positions: open a document at some page, close it, close the app. `~/.config/xournal-qt/libraries/`
+      has a folder for the library with `pages.json`. Delete every `.xournal_library/` of the (copied) library by
+      hand and open it again: the cards still show when and at which page each document was read.
+- [ ] Converting an old cache: make a copy of a library that was used with an older build (its root has
+      `.xournal_library/index/`, `previews/`, `pages.json`) and open the copy. **Opening the real OneDrive library
+      converts it for good** (the old files are removed and OneDrive syncs that). After a few seconds: `index/`,
+      `previews/` and `pages.json` are gone from the root's `.xournal_library/`, each folder has its packs, no
+      progress of indexing was shown (nothing read again), the search finds text at once, the cards show their
+      previews without drawing them again, and the cards still show when and at which page documents were read.
+      Note how long the conversion took for a big library (the packs appear one folder after the other).
+- [ ] Settings → Storage (on the copied library): it shows what the cache takes ("It takes … in … files"). Switch on
+      "Keep the cache in the app's cache folder": the `.xournal_library/` folders disappear from the library's
+      folders and appear under `~/.cache/xournal-qt/libraries/<key>/…`; the search and the previews still work at
+      once (nothing is indexed or drawn again). Close and open the app: still on. Switch it off: the folders are back
+      in the library, the app-cache folder of the library is gone.
+- [ ] With the cache in the app cache folder, close the app, rename a folder of the library in the file manager and
+      open the library again: its documents are found by their text at once, nothing is indexed again; the folder's
+      old place under `~/.cache/xournal-qt/libraries/<key>/` is gone.
+- [ ] Settings → Storage → "Remove all cache folders of this library…": the dialog says the app closes. With an unsaved
+      document open, it first asks to save it. After OK: no `.xournal_library/` left in the library (a file of your
+      own put into one beforehand stays, with its folder), and the app is closed. Open the library again: the cache
+      is built again, the cards still show where you were in each document.

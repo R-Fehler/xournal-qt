@@ -1549,7 +1549,11 @@ ApplicationWindow {
         function onInsertPagesRequested(position) { insertPagesDialog.openAt(position) }
     }
 
-    SettingsPage { id: settingsPage; objectName: "settingsPage" }
+    SettingsPage {
+        id: settingsPage
+        objectName: "settingsPage"
+        onQuitRequested: win.closeWindow()  // (asks about unsaved documents first)
+    }
     TabOverview {
         id: tabOverview
         objectName: "tabOverview"
