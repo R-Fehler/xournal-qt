@@ -171,6 +171,30 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - Listing and indexing could land before the `.md` editor, with a hit opening the file read-only in the
     Markdown renderer.
   - Other text files (`.txt`, `.org`) could follow the same path later.
+- [ ] **File type filter in the library** (decided 2026-09-23): a "Show" button next to the sort button opens a
+  popup with toggles. The same filter applies to search results.
+
+  | Toggle | Default | What it shows |
+  | --- | --- | --- |
+  | Notes (`.xopp`, `.xoj`) | on | |
+  | PDFs | on | Sub-toggle "only PDFs with notes": only PDFs that have an `.xopp` next to them |
+  | Markdown (`.md`) | on | Hides a vault's notes when you only want your documents |
+  | Images (`.png`, `.jpg`, `.heic`, ...) | on? | Photos of whiteboards and scans. Preview, and "annotate": a new `.xopp` with the image as its page background (upstream supports image backgrounds) |
+  | Text and code (`.txt`, `.tex`, `.py`, ...) | off | Plain-text preview. Indexed only below a size limit |
+  | All other files | off | Office files and the like: a generic icon, "Open with the system app" and "Show in file manager" |
+- [?] **What the app does with other files** (proposal):
+  - It edits only what it renders well, which is `.md` and plain `.txt`, through the Markdown editor in plain mode.
+  - Code and LaTeX get a read-only preview and "Open with…", but no editor. A code editor in a notes app keeps
+    growing and never catches up with a real one.
+  - "Open with the system app" is `QDesktopServices::openUrl`: `xdg-open` on Linux, `open` on macOS,
+    `ShellExecute` on Windows, an intent on Android.
+  - "Show in file manager" needs one call per platform: `org.freedesktop.FileManager1.ShowItems` over D-Bus,
+    `explorer /select,` on Windows, `open -R` on macOS. Android has none, so the entry is hidden there.
+  - Later, desktop only: "Annotate as PDF" for Office files, through `soffice --headless --convert-to pdf` when
+    LibreOffice is installed. The result becomes a PDF + `.xopp` pair.
+  - Later, with MuPDF: EPUB and CBZ as documents, since MuPDF lays them out as pages.
+  - A `.tex` file and its compiled `.pdf` could be paired like `.xopp` and `.pdf`: one card, with the source a
+    tap away.
 - [?] **Vaults** (Obsidian, Zettlr, foam): open a vault folder as a library; resolve `[[wikilinks]]` and
   Markdown links by file name; backlinks later.
 
