@@ -414,3 +414,8 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
       Each time the page goes sharp about a third of a second after the fingers stop and never turns into a grey
       page; zoomed out to 3–4 pages in view, all of them come back sharp too. Pages that were only blurry (their
       preview) while flying through the document get sharp once the view stands still.
+- [ ] Pinch in and lift the fingers: the page goes sharp right away (no third of a second wait); Ctrl+wheel still
+      waits a moment after the last notch. With `XQT_PERF=1`, the log's `sharp N after a/b ms` shows how long the
+      pages in view waited for their render; note the numbers for a big PDF zoomed in and out.
+- [ ] Right after opening a big PDF (previews being drawn, sidebar open), zoom and scroll: the page in view gets
+      sharp first; the sidebar thumbnails and the previews follow after it.

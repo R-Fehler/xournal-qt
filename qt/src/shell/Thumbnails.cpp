@@ -19,6 +19,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "pdf/base/XojPdfPage.h"
+#include "render/RenderService.h"
 
 #include "PageSketches.h"
 #include "view/DocumentView.h"
@@ -329,6 +330,11 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
     static std::atomic<int> order{0};
     pool().start(QRunnable::create([response, session, sessionId, page, width, key, revision] {
         QImage img;
+        if (!response->cancelled) {
+            // The pages in view on the canvas first (a thumbnail draws with the document's PDF instance, which
+            // renders one page at a time)
+            RenderService::waitForVisiblePages(std::chrono::milliseconds(500));
+        }
         if (!response->cancelled) {  // (scrolled away meanwhile: not drawn)
             ++renders;
             if (auto stamp = session->pageOfRevision(revision)) {

@@ -229,7 +229,15 @@ void ViewController::pinchUpdate(QPointF centroid, double distance) {
     Q_EMIT changed();
 }
 
-void ViewController::pinchEnd() { settleTimer.start(); }
+void ViewController::pinchEnd() { zoomGestureEnded(); }
+
+void ViewController::zoomGestureEnded() {
+    // (a Ctrl+wheel has no end: its zoom is stable once it did not change for a while)
+    if (settleTimer.isActive()) {
+        settleTimer.stop();
+        Q_EMIT zoomSettled();
+    }
+}
 
 void ViewController::fling(QPointF v) {
     if (std::hypot(v.x(), v.y()) < MIN_VELOCITY * 4) {

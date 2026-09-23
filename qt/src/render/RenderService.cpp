@@ -11,6 +11,45 @@
 
 namespace xqt {
 
+namespace {
+/// Render services with visible work (all of the application: waitForVisiblePages may be called from anywhere)
+struct VisibleWork {
+    std::mutex mtx;
+    std::condition_variable done;
+    int busy = 0;
+};
+VisibleWork& visibleWork() {
+    static auto* work = new VisibleWork;  // (never destroyed: workers of other pools may ask until the end)
+    return *work;
+}
+}  // namespace
+
+bool RenderService::visiblePagesBusy() {
+    auto& w = visibleWork();
+    std::lock_guard lock(w.mtx);
+    return w.busy > 0;
+}
+
+void RenderService::waitForVisiblePages(std::chrono::milliseconds limit) {
+    auto& w = visibleWork();
+    std::unique_lock lock(w.mtx);
+    w.done.wait_for(lock, limit, [&] { return w.busy == 0; });
+}
+
+void RenderService::publishVisible() {
+    const bool busy = !stopping && (!queues[0].empty() || runningVisible > 0);
+    if (busy == publishedBusy) {
+        return;
+    }
+    publishedBusy = busy;
+    auto& w = visibleWork();
+    std::lock_guard lock(w.mtx);
+    w.busy += busy ? 1 : -1;
+    if (w.busy == 0) {
+        w.done.notify_all();
+    }
+}
+
 RenderService::RenderService(int threads, int background) {
     if (threads <= 0) {
         threads = std::max(1, static_cast<int>(std::thread::hardware_concurrency()) - 1);
@@ -39,6 +78,7 @@ RenderService::~RenderService() {
             q.clear();
         }
         queued.clear();
+        publishVisible();
     }
     wakeWorkers.notify_all();
     for (auto& t: workers) {
@@ -63,10 +103,12 @@ void RenderService::schedule(const std::shared_ptr<PageRaster>& raster, Priority
                     break;
                 }
             }
+            publishVisible();
             return;
         }
         queued.insert(raster.get());
         queues[p].push_back(raster);
+        publishVisible();
     }
     wakeWorkers.notify_all();  // (a worker of the right kind)
 }
@@ -77,6 +119,8 @@ void RenderService::cancel(const PageRaster* raster) {
         for (auto& q: queues) {
             q.erase(std::remove_if(q.begin(), q.end(), [&](const auto& r) { return r.get() == raster; }), q.end());
         }
+        publishVisible();
+        wakeWorkers.notify_all();  // (background workers may have waited for this visible page)
     }
     idle.wait(lock, [&] { return !running.count(raster); });
 }
@@ -88,6 +132,7 @@ void RenderService::dropQueued(Priority priority) {
         queued.erase(r.get());
     }
     q.clear();
+    publishVisible();
 }
 
 bool RenderService::hasWork(Priority priority) {
@@ -99,6 +144,14 @@ void RenderService::blockRerenderZoom(std::chrono::milliseconds delay) {
     {
         std::lock_guard lock(mtx);
         blockedUntil = std::chrono::steady_clock::now() + delay;
+    }
+    wakeWorkers.notify_all();
+}
+
+void RenderService::unblockRerenderZoom() {
+    {
+        std::lock_guard lock(mtx);
+        blockedUntil = {};
     }
     wakeWorkers.notify_all();
 }
@@ -115,6 +168,12 @@ void RenderService::workerLoop(bool background) {
     while (!stopping) {
         if (const auto now = std::chrono::steady_clock::now(); now < blockedUntil) {
             wakeWorkers.wait_until(lock, blockedUntil);
+            continue;
+        }
+        if (background && (!queues[0].empty() || runningVisible > 0)) {
+            // The visible pages first: nothing new in the background meanwhile (a background worker that renders a
+            // page which became visible finishes it; its visible job waits for it)
+            wakeWorkers.wait(lock);
             continue;
         }
         std::shared_ptr<PageRaster> job;
@@ -136,6 +195,8 @@ void RenderService::workerLoop(bool background) {
         queued.erase(raw);
         running.insert(raw);
         runningBackground += background;
+        runningVisible += !background;
+        publishVisible();
 
         lock.unlock();
         job->run(background);
@@ -144,6 +205,8 @@ void RenderService::workerLoop(bool background) {
 
         running.erase(raw);
         runningBackground -= background;
+        runningVisible -= !background;
+        publishVisible();
         idle.notify_all();
         wakeWorkers.notify_all();  // a job for this raster may have been skipped while it was running
     }

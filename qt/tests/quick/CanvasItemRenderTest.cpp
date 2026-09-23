@@ -177,3 +177,28 @@ TEST_F(CanvasItemRenderTest, visiblePagesShowTheirRenderAfterZooming) {
                                       << (shows == Shows::Nothing ? "nothing" : "its preview");
     }
 }
+
+// When the fingers of a pinch are lifted the zoom is stable: the page is rendered at once, not after the 300 ms a
+// Ctrl+wheel zoom waits (it has no end).
+TEST_F(CanvasItemRenderTest, aPinchThatEndedIsRenderedWithoutTheZoomWait) {
+    ViewController& vc = view->getViewController();
+    const QPointF center(canvas->width() / 2, canvas->height() / 2);
+    vc.pinchBegin(center, 100);
+    for (int step = 1; step <= 5; ++step) {
+        vc.pinchUpdate(center, 100 + step * 12);
+        run(16);
+    }
+    const double zoom = vc.zoom();
+    vc.pinchEnd();
+    QElapsedTimer t;
+    t.start();
+    auto sharp = [&] {
+        const auto info = view->getPage(session->getCurrentPageNo())->bufferInfo();
+        return info.valid && info.zoom == zoom;
+    };
+    while (!sharp() && t.elapsed() < 2000) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 2);
+    }
+    EXPECT_TRUE(sharp());
+    EXPECT_LT(t.elapsed(), 200) << "the render waited for the zoom to be stable after the pinch had ended";
+}

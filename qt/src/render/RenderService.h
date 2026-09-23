@@ -6,8 +6,11 @@
  * - priorities: visible pages before preloaded ones before thumbnails. Visible pages have workers of their own; the
  *   others (pages rendered in advance) go to two background workers at idle priority (Linux: SCHED_IDLE), which only
  *   run when a core has nothing else to do, so they neither delay the visible pages nor keep a busy laptop busier;
+ * - the visible pages first: while one is queued or being rendered, the background workers start nothing new, and
+ *   the other workers of the application (page previews, thumbnails) can wait for them (waitForVisiblePages);
  * - blockRerenderZoom(): like upstream Scheduler::blockRerenderZoom, full re-renders wait until the zoom has been
- *   stable for 300 ms, so that pinch/zoom gestures only scale the existing buffers.
+ *   stable for 300 ms, so that pinch/zoom gestures only scale the existing buffers. unblockRerenderZoom(): the
+ *   gesture ended (fingers lifted), no need to wait.
  * Qt-free: completion notifications go through Util::execInUiThread.
  *
  * @license GNU GPLv2 or later
@@ -46,6 +49,13 @@ public:
     bool hasWork(Priority priority);
     /// Defer rendering until the zoom did not change for `delay` (default 300 ms, like upstream).
     void blockRerenderZoom(std::chrono::milliseconds delay = std::chrono::milliseconds(300));
+    /// The zoom is stable now (a pinch ended): render right away.
+    void unblockRerenderZoom();
+    /// Visible pages are queued or being rendered (by any render service of the application)
+    static bool visiblePagesBusy();
+    /// Wait until no visible page is queued or being rendered, at most `limit` (any thread; work that is not for the
+    /// page in view waits so; returns right away when there is none).
+    static void waitForVisiblePages(std::chrono::milliseconds limit);
     /// Block until the queue is empty and no job is running (tests, shutdown, export).
     void waitForIdle();
 
@@ -53,6 +63,8 @@ public:
 
 private:
     void workerLoop(bool background);
+    /// Tell visiblePagesBusy() whether this service has visible work (under mtx)
+    void publishVisible();
 
     std::mutex mtx;
     std::condition_variable wakeWorkers;
@@ -61,6 +73,8 @@ private:
     std::unordered_set<const PageRaster*> queued;
     std::unordered_set<const PageRaster*> running;
     int runningBackground = 0;
+    int runningVisible = 0;
+    bool publishedBusy = false;
     std::chrono::steady_clock::time_point blockedUntil{};
     bool stopping = false;
     std::vector<std::thread> workers;

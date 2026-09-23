@@ -72,7 +72,10 @@ public:
 
     void pinchBegin(QPointF centroid, double distance);
     void pinchUpdate(QPointF centroid, double distance);
+    /// The fingers are lifted: the zoom is stable now (zoomSettled right away, not after the delay).
     void pinchEnd();
+    /// A zoom gesture ended (a pinch, a touchpad pinch): the zoom is stable now.
+    void zoomGestureEnded();
 
     void fling(QPointF velocityPxPerMs);
     void stopMomentum();
@@ -84,7 +87,7 @@ Q_SIGNALS:
     void changed();
     /// Emitted after every zoom change (the render service defers re-renders for a while).
     void zoomChanged();
-    /// ~300 ms after the last zoom change (upstream: Scheduler::blockRerenderZoom).
+    /// ~300 ms after the last zoom change (upstream: Scheduler::blockRerenderZoom), or when a zoom gesture ended.
     void zoomSettled();
 
 private:

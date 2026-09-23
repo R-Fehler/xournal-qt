@@ -11,6 +11,7 @@
 
 #include "model/Document.h"
 #include "pdf/base/XojPdfDocument.h"
+#include "render/RenderService.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "util/PathUtil.h"
@@ -143,6 +144,9 @@ PageSketches::PageSketches() {
     previews.level = PREVIEW_WIDTHS[0];
     planTimer.setSingleShot(true);
     connect(&planTimer, &QTimer::timeout, this, &PageSketches::plan);
+    visibleTimer.setSingleShot(true);
+    visibleTimer.setInterval(25);
+    connect(&visibleTimer, &QTimer::timeout, this, &PageSketches::next);
     editTimer.setSingleShot(true);
     editTimer.setInterval(1500);
     connect(&editTimer, &QTimer::timeout, this, [this] { planSoon(0); });
@@ -458,6 +462,11 @@ void PageSketches::plan() {
 }
 
 void PageSketches::next() {
+    if (!jobs.empty() && RenderService::visiblePagesBusy()) {
+        // The pages in view are being rendered: they go first (they are what the reader waits for)
+        visibleTimer.start();
+        return;
+    }
     while (running < WORKERS && !jobs.empty()) {
         const Job job = jobs.front();
         jobs.pop_front();

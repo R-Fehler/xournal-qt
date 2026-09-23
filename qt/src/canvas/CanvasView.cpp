@@ -8,6 +8,7 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QBuffer>
+#include <QDateTime>
 #include <QThreadPool>
 
 #include "control/PdfCache.h"
@@ -87,7 +88,10 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         updateRenderParams();
         zoomControl.setZoom(viewController.zoom(), viewController.zoom100());
     });
-    connect(&viewController, &ViewController::zoomSettled, this, [this] { updateVisibility(); });
+    connect(&viewController, &ViewController::zoomSettled, this, [this] {
+        renderService.unblockRerenderZoom();  // (a pinch ended: no need to wait longer)
+        updateVisibility();
+    });
     connect(&viewController, &ViewController::changed, this, [this] {
         Perf::add(Perf::Scrolls);
         viewChanged();
@@ -199,6 +203,7 @@ CanvasPage* CanvasView::canvasPageOf(const XojPage* page) const {
 
 void CanvasView::rebuildPages() {
     geometry.allPagesGoing();
+    sharpWanted.clear();
     pages.clear();
     Document* doc = session.getDocument();
     size_t n = 0;
@@ -1376,17 +1381,29 @@ void CanvasView::updateVisibility() {
     double bestArea = -1;
     const QRectF visible = viewController.visibleContentRect();
     for (size_t i = first; i <= last && i < pages.size(); ++i) {
-        CanvasPage* page = pages[i].get();
-        const auto info = page->bufferInfo();
-        // Render visible pages that have no buffer or a buffer at another zoom/resolution (the render service defers
-        // this while a zoom gesture is running).
-        if (!info.valid || info.zoom != zoom || info.dpiScale != dpr) {
-            page->getRaster().ensureRendered(false);
-        }
         const QRectF inter = layout.pageRect(i, zoom).intersected(visible);
         if (const double area = inter.width() * inter.height(); area > bestArea) {
             bestArea = area;
             mostVisible = i;
+        }
+    }
+    // Render visible pages that have no buffer or a buffer at another zoom/resolution (the render service defers
+    // this while a zoom gesture is running), the one the reader looks at first.
+    auto render = [&](size_t i) {
+        CanvasPage* page = pages[i].get();
+        if (const auto info = page->bufferInfo(); !info.valid || info.zoom != zoom || info.dpiScale != dpr) {
+            page->getRaster().ensureRendered(false);
+            if (Perf::on()) {
+                sharpWanted[page] = QDateTime::currentMSecsSinceEpoch();  // (the last request counts)
+            }
+        }
+    };
+    if (mostVisible >= first && mostVisible <= last && mostVisible < pages.size()) {
+        render(mostVisible);
+    }
+    for (size_t i = first; i <= last && i < pages.size(); ++i) {
+        if (i != mostVisible) {
+            render(i);
         }
     }
     // Upstream Layout::updateVisibility: the most visible page becomes the current one (this tells the models, and
@@ -1604,6 +1621,13 @@ void CanvasView::rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rect
     for (auto& p: pages) {
         if (&p->getRaster() == raster) {
             p->rasterUpdated(area);
+            if (auto it = sharpWanted.find(p.get()); it != sharpWanted.end() && !area) {
+                // XQT_PERF: how long a page in view waited for its render at the zoom it is shown at
+                if (const auto info = p->bufferInfo(); info.valid && info.zoom == viewController.zoom()) {
+                    Perf::took(Perf::SharpTime, (QDateTime::currentMSecsSinceEpoch() - it->second) * 1000);
+                    sharpWanted.erase(it);
+                }
+            }
             return;
         }
     }
@@ -1646,6 +1670,7 @@ void CanvasView::pageInserted(size_t page) {
 void CanvasView::pageDeleted(size_t page) {
     if (page < pages.size()) {
         geometry.pageGoing(pages[page].get());
+        sharpWanted.erase(pages[page].get());
         pages.erase(pages.begin() + static_cast<std::ptrdiff_t>(page));
     }
     refreshLayout();
