@@ -203,15 +203,15 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [?] **Vaults** (Obsidian, Zettlr, foam): open a vault folder as a library; resolve `[[wikilinks]]` and
   Markdown links by file name; backlinks later.
 
-### Platform research (a written comparison only; nothing to build yet)
-- [?] **Platform-native libraries behind our interfaces.** Candidates:
-  - PDFKit and PencilKit input (keeping our stroke model) on iOS and macOS;
-  - Windows Ink on the Surface;
-  - handwriting-recognition SDKs on iOS, Windows and Android.
-
-  For each: where it would plug in (input, the PDF backend `XojPdfDocumentInterface`, a recognizer
-  interface), what it gains, and the cost of keeping it up.
-- [?] **PDF engines compared:** poppler+cairo (today), MuPDF (AGPL, fast, writes PDFs), pdfium (BSD, used by
-  Chrome and Android, can write annotations) and PDFKit. Compare feel, speed, and writing annotations like
-  Drawboard or Xodo. This also decides the backlog item "searchable text in pasted PDF pages" and the hybrid
-  PDF in the vision.
+### Platform research
+Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF
+engines, with a recommendation and cheap experiments to decide.
+- [?] **Pasted PDF pages stay searchable, with qpdf now.** The research found that qpdf (already linked,
+  Apache-2.0, used by upstream's `QPdfExport`) can write a merged `name.pages.pdf`: option 1 of the ROADMAP
+  backlog item, still upstream-compatible, with no need to wait for MuPDF. Start with the qpdf page-merge spike
+  from the research.
+- [?] **Experiments before the engine decision:**
+  - a render benchmark of poppler, MuPDF and pdfium;
+  - a `/Ink` + `/AP` round trip through Acrobat, Xodo, Drawboard and Preview;
+  - whether an embedded `.xopp` survives saves in other apps;
+  - pen latency on the Surface and the iPad.
