@@ -459,3 +459,10 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] Write on the page (the text tool on the text), the cursor in a paragraph with `**bold**` in it; open the search
       and search a word after the bold one: its box is on the word as shown with its `**`. Press Escape: after a
       moment the box moves onto the word as formatted.
+
+## Window state (qt/window-state)
+- [ ] The app opens maximized (also a window made by undocking a tab). Making it smaller with the desktop's tiling
+      works as usual.
+- [ ] Maximized, F11 (or the full-screen button), then Escape: back to maximized, not the small default size. The
+      same by "Leave full screen" in the tool square.
+- [ ] Made smaller (not maximized), full screen, Escape: back to that size.
