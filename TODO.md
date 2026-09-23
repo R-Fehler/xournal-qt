@@ -21,9 +21,11 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 2. **Library track**, in this order, because each step builds on the one before:
    1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache):
       `qt/library-index`, started 2026-09-24 (worktree `../xournal_qt-library-index`);
-   2. `.md` files and images in the library and its index, with snippet cards in the extended search;
-   3. the "Show" file type filter and the handling of other files;
-   4. fuzzy search behind its toggle.
+   2. `qt/document-search`: a live text index for open documents (see below). It builds on the entry model from
+      `qt/library-index` and changes `DocumentSearch`, which `qt/markdown-fixes` also touches;
+   3. `.md` files and images in the library and its index, with snippet cards in the extended search;
+   4. the "Show" file type filter and the handling of other files;
+   5. fuzzy search behind its toggle.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
    branches are open.
 4. **The `.md` editor:** `.md` documents, images in `<name>.assets/`, math, vaults. It is the biggest design
@@ -61,6 +63,23 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 
 ## To decide (elaborate before building)
 
+- [ ] **Live text index for open documents** (`qt/document-search`; the author asked for it on 2026-09-24).
+  - Why: search in an open document is much slower than library search. `DocumentSearch` calls poppler's
+    `findText` on every page for every query (`DocumentSearch.cpp:128`), on the UI thread, restarting on each
+    keystroke. Poppler rebuilds each page's text layout on every call and shares one lock per PDF with rendering.
+  - How:
+    - Seed the index on open from the library index entry when it is up to date; otherwise extract the text once
+      in the background, at idle priority, after the pages in view.
+    - Keep it current from document events, unsaved edits included: when text elements or Markdown change, refresh
+      that page; when pages are inserted, deleted or moved, move their entries (page revisions); undo and redo go
+      through the same events.
+    - Search in two steps: a string scan finds the pages and hit counts, in milliseconds, for the count, sidebar,
+      grid and "pages with hits". Hit rectangles are computed only for the pages in view or jumped to, current page
+      first, and kept per page.
+    - On save, hand the entry to the library index so it does not re-read the `.xopp`.
+  - Risk: the scan and the rectangles must match text the same way (case, whitespace, hyphenation); otherwise
+    counts and boxes differ. The fallback is word boxes per page, which cost more memory.
+  - Measure: the time to the first hit and to all counts on pgfmanual (1,300 pages), before and after.
 - [?] **Recent libraries, and libraries anywhere.** Keep a list of recently opened library folders on the home
   screen. "Open a folder as library…" already exists, so this is small.
   *Proposal:* yes. Also add "New library…" with a free location instead of only under `Xournal_Libraries`.
