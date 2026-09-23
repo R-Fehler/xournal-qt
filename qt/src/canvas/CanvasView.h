@@ -297,6 +297,8 @@ Q_SIGNALS:
 
 private:
     void rebuildPages();
+    /// Drop the queued renders of all pages and wait for the running ones (the pages go)
+    void cancelRenders();
     void refreshLayout();
     DocumentLayout::Config layoutConfig() const;
     void updateVisibility();

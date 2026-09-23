@@ -137,6 +137,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
 }
 
 CanvasView::~CanvasView() {
+    cancelRenders();  // (first: the workers start nothing of this view while it is taken down)
     CanvasMemory::instance().remove(this);
     geometry.hide();  // before its page goes
     endTextEditing();
@@ -201,9 +202,18 @@ CanvasPage* CanvasView::canvasPageOf(const XojPage* page) const {
     return nullptr;
 }
 
+void CanvasView::cancelRenders() {
+    std::unordered_set<const PageRaster*> rasters;
+    for (const auto& p: pages) {
+        rasters.insert(&p->getRaster());
+    }
+    renderService.cancel(rasters);
+}
+
 void CanvasView::rebuildPages() {
     geometry.allPagesGoing();
     sharpWanted.clear();
+    cancelRenders();
     pages.clear();
     Document* doc = session.getDocument();
     size_t n = 0;

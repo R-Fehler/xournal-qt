@@ -419,3 +419,6 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
       pages in view waited for their render; note the numbers for a big PDF zoomed in and out.
 - [ ] Right after opening a big PDF (previews being drawn, sidebar open), zoom and scroll: the page in view gets
       sharp first; the sidebar thumbnails and the previews follow after it.
+- [ ] A big PDF with the sidebar or the page grid open (many thumbnails asked for), zoomed in: close its tab, then
+      close the app with such a tab open. Both happen at once (at most the page being drawn is waited for); before,
+      the window froze for seconds.

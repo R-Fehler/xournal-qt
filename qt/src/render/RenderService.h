@@ -43,6 +43,9 @@ public:
     void schedule(const std::shared_ptr<PageRaster>& raster, Priority priority = Priority::Visible);
     /// Remove queued jobs of this raster and wait until it is not running any more.
     void cancel(const PageRaster* raster);
+    /// The same for many rasters at once (a view goes): their queued jobs go first, so that no worker starts one of
+    /// them while the others are waited for; then only the running ones are waited for.
+    void cancel(const std::unordered_set<const PageRaster*>& rasters);
     /// Forget the queued jobs of this priority (a new plan of what to render in advance follows).
     void dropQueued(Priority priority);
     /// Queued or running jobs of this priority (tests)

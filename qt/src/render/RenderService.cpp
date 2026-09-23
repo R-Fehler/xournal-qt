@@ -125,6 +125,26 @@ void RenderService::cancel(const PageRaster* raster) {
     idle.wait(lock, [&] { return !running.count(raster); });
 }
 
+void RenderService::cancel(const std::unordered_set<const PageRaster*>& rasters) {
+    std::unique_lock lock(mtx);
+    for (auto& q: queues) {
+        q.erase(std::remove_if(q.begin(), q.end(),
+                               [&](const auto& r) {
+                                   if (rasters.count(r.get())) {
+                                       queued.erase(r.get());
+                                       return true;
+                                   }
+                                   return false;
+                               }),
+                q.end());
+    }
+    publishVisible();
+    wakeWorkers.notify_all();  // (background workers may have waited for visible pages that are gone now)
+    idle.wait(lock, [&] {
+        return std::none_of(running.begin(), running.end(), [&](const PageRaster* r) { return rasters.count(r) > 0; });
+    });
+}
+
 void RenderService::dropQueued(Priority priority) {
     std::lock_guard lock(mtx);
     auto& q = queues[static_cast<size_t>(priority)];

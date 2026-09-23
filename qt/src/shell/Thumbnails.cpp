@@ -313,29 +313,27 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
         return response;
     }
 
-    auto& r = registry();
-    DocumentSession* session = nullptr;
     {
+        auto& r = registry();
         std::lock_guard lock(r.mtx);
-        if (auto it = r.sessions.find(sessionId); it != r.sessions.end()) {
-            session = it->second;
-            ++r.busy[sessionId];
+        if (!r.sessions.count(sessionId)) {
+            QMetaObject::invokeMethod(response, &QQuickImageResponse::finished, Qt::QueuedConnection);
+            return response;
         }
-    }
-    if (!session) {
-        QMetaObject::invokeMethod(response, &QQuickImageResponse::finished, Qt::QueuedConnection);
-        return response;
     }
     // The one asked for last first: that is what is in view now
     static std::atomic<int> order{0};
-    pool().start(QRunnable::create([response, session, sessionId, page, width, key, revision] {
+    pool().start(QRunnable::create([response, sessionId, page, width, key, revision] {
         QImage img;
         if (!response->cancelled) {
             // The pages in view on the canvas first (a thumbnail draws with the document's PDF instance, which
             // renders one page at a time)
             RenderService::waitForVisiblePages(std::chrono::milliseconds(500));
         }
-        if (!response->cancelled) {  // (scrolled away meanwhile: not drawn)
+        // The session only now, and only if its document is still open: closing it waits for the thumbnails being
+        // drawn, not for those still queued
+        DocumentSession* session = response->cancelled ? nullptr : acquireSession(sessionId);
+        if (session) {  // (else scrolled away or closed meanwhile: not drawn)
             ++renders;
             if (auto stamp = session->pageOfRevision(revision)) {
                 img = renderPage(*session->getDocument(), stamp->page, width);
@@ -344,12 +342,7 @@ QQuickImageResponse* ThumbnailProvider::requestImageResponse(const QString& id, 
             } else {
                 img = renderDocument(*session->getDocument(), page, width);  // (an outdated address: not kept)
             }
-        }
-        {
-            auto& r = registry();
-            std::lock_guard lock(r.mtx);
-            --r.busy[sessionId];
-            r.idle.notify_all();
+            releaseSession(sessionId);
         }
         QMetaObject::invokeMethod(
                 response,

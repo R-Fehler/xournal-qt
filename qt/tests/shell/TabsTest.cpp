@@ -3,12 +3,16 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <iostream>
+
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
+
+#include <cairo-pdf.h>
 
 #include "control/ToolHandler.h"
 #include "model/Document.h"
@@ -22,10 +26,14 @@
 #include "shell/SingleInstance.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/TabManager.h"
+#include "shell/Thumbnails.h"
+
+#include <QQuickImageResponse>
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "AppController.h"
+#include "CanvasMemory.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "config-test.h"
@@ -370,4 +378,124 @@ TEST(ToolSizes, fiveWidthsTheFifthAdjustableAndRemembered) {
     again.selectTool("pen");
     EXPECT_DOUBLE_EQ(again.customWidth(), 6.25);
     EXPECT_EQ(again.size(), 2) << "the size that was chosen last";
+}
+
+namespace {
+/// A PDF whose pages take a while to draw (many curves)
+void makeHeavyPdf(const std::string& path, int pages, int curves) {
+    cairo_surface_t* s = cairo_pdf_surface_create(path.c_str(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    unsigned seed = 7;
+    auto rnd = [&seed](double max) {
+        seed = seed * 1103515245u + 12345u;
+        return static_cast<double>((seed >> 8) % 10000) / 10000.0 * max;
+    };
+    for (int p = 0; p < pages; ++p) {
+        for (int i = 0; i < curves; ++i) {
+            cairo_move_to(cr, rnd(595), rnd(842));
+            cairo_curve_to(cr, rnd(595), rnd(842), rnd(595), rnd(842), rnd(595), rnd(842));
+            cairo_set_source_rgba(cr, rnd(1), rnd(1), rnd(1), 0.5);
+            cairo_set_line_width(cr, 0.5 + rnd(2));
+            cairo_stroke(cr);
+        }
+        cairo_show_page(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+}  // namespace
+
+// Regression test: closing a tab of a big PDF froze the window until work queued for it was done: the thumbnails
+// asked for (the sidebar, the page grid) were all drawn first, and the pages queued for rendering in advance were
+// rendered one after the other while the pages were taken down. Closing waits only for what is running.
+TEST(Tabs, closingATabDoesNotWaitForQueuedWork) {
+    QTemporaryDir tmp;
+    const std::string pdf = tmp.filePath("heavy.pdf").toStdString();
+    QElapsedTimer made;
+    made.start();
+    makeHeavyPdf(pdf, 40, 150);
+    AppController c;
+    ASSERT_TRUE(c.openPath(QString::fromStdString(pdf)));
+    CanvasView* view = c.tabManager().currentView();
+    view->setDevicePixelRatio(2);
+    view->getViewController().setViewSize(QSizeF(1100, 1600));
+    view->setShown(true);
+    processEvents(50);
+    QElapsedTimer one;
+    one.start();
+    DocumentSession* s = c.tabManager().currentSession();
+    ThumbnailProvider::render(*s, 5, 1024);
+    const qint64 oneMs = std::max<qint64>(one.elapsed(), 1);
+    std::cout << "PDF made in " << made.elapsed() << " ms, a thumbnail drawn in " << oneMs << " ms\n";
+
+    // The sidebar asks for the thumbnails of all pages (bigger than the previews: they are drawn)
+    ThumbnailProvider provider;
+    const quint64 id = ThumbnailProvider::idOf(s);
+    std::vector<QQuickImageResponse*> responses;
+    int finished = 0;
+    for (size_t p = 0; p < s->getDocument()->getPageCount(); ++p) {
+        responses.push_back(provider.requestImageResponse(
+                QString("%1/%2/%3").arg(id).arg(p).arg(s->pageRevision(p)), QSize(1024, 1448)));
+        QObject::connect(responses.back(), &QQuickImageResponse::finished, [&finished] { ++finished; });
+    }
+    // and the canvas plans the pages to render in advance
+    CanvasMemory::instance().planNow();
+    ASSERT_TRUE(c.context().getRenderService()->hasWork(RenderService::Priority::Preload));
+    const int drawnBefore = ThumbnailProvider::renderCount();
+
+    QElapsedTimer t;
+    t.start();
+    c.closeTab(c.currentTab());
+    const qint64 closeMs = t.elapsed();
+    const int drawnWhileClosing = ThumbnailProvider::renderCount() - drawnBefore;
+    std::cout << "closed in " << closeMs << " ms, " << drawnWhileClosing << " thumbnails drawn meanwhile\n";
+    EXPECT_LE(drawnWhileClosing, 4) << "only those being drawn (one per worker) may finish";
+    EXPECT_LT(closeMs, 6 * oneMs + 200) << "closing waited for queued work";
+    QElapsedTimer rest;  // (a response goes when it has finished, as in QML)
+    rest.start();
+    while (finished < static_cast<int>(responses.size()) && rest.elapsed() < 30000) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    for (auto* r: responses) {
+        delete r;
+    }
+}
+
+// XQT_BENCH_PDF=<big pdf>: how long closing its tab takes while previews, thumbnails and pages in advance are busy
+TEST(Tabs, benchClosingABigPdf) {
+    const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
+    if (pdf.isEmpty()) {
+        GTEST_SKIP() << "set XQT_BENCH_PDF";
+    }
+    QTemporaryDir dir;
+    const QString copy = dir.filePath("bench.pdf");
+    ASSERT_TRUE(QFile::copy(pdf, copy));
+    AppController c;
+    for (int round = 0; round < 3; ++round) {
+        ASSERT_TRUE(c.openPath(copy));
+        CanvasView* view = c.tabManager().currentView();
+        view->setDevicePixelRatio(2);
+        view->getViewController().setViewSize(QSizeF(1100, 1600));
+        view->setShown(true);
+        view->getViewController().scrollToPage(view->pageCount() / 2);
+        DocumentSession* s = c.tabManager().currentSession();
+        ThumbnailProvider provider;
+        const quint64 id = ThumbnailProvider::idOf(s);
+        std::vector<QQuickImageResponse*> responses;
+        int finished = 0;
+        for (size_t p = view->pageCount() / 2; p < view->pageCount() / 2 + 60; ++p) {
+            responses.push_back(provider.requestImageResponse(
+                    QString("%1/%2/%3").arg(id).arg(p).arg(s->pageRevision(p)), QSize(1024, 1448)));
+            QObject::connect(responses.back(), &QQuickImageResponse::finished, [&finished] { ++finished; });
+        }
+        processEvents(round * 700 + 400);  // (rendering, drawing previews and thumbnails meanwhile)
+        QElapsedTimer t;
+        t.start();
+        c.closeTab(c.currentTab());
+        std::cout << "closed after " << round * 700 + 400 << " ms of work in " << t.elapsed() << " ms\n";
+        while (finished < static_cast<int>(responses.size())) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+        qDeleteAll(responses);
+    }
 }
