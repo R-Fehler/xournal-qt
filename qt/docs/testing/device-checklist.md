@@ -408,3 +408,9 @@ cd build-qt
 - [ ] `sudo apt install ./build-deb/packages/xournal-qt_0.1.0_amd64.deb`: Xournal Qt in the application menu with its icon; PDFs and .xopp files offer "Open with Xournal Qt"; right click on a folder in Dolphin: "Open as Xournal Qt library" opens it in its own window.
 
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.
+
+## Rendering while zooming and closing (qt/render-visible)
+- [ ] A big PDF (or a long .xopp), one page in view: pinch in by steps and stop each time; Ctrl+wheel in and out.
+      Each time the page goes sharp about a third of a second after the fingers stop and never turns into a grey
+      page; zoomed out to 3–4 pages in view, all of them come back sharp too. Pages that were only blurry (their
+      preview) while flying through the document get sharp once the view stands still.

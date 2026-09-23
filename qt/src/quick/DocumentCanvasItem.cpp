@@ -60,7 +60,11 @@ public:
     }
     void clearTiles() {
         for (auto* t: tiles) {
-            removeChildNode(t);
+            // Only the composed tiles are in the scene graph. Removing a node that is not a child is not checked in a
+            // release build of Qt and empties this node's list of children (the page, its tiles and preview vanish).
+            if (t->parent() == this) {
+                removeChildNode(t);
+            }
             delete t;
         }
         tiles.clear();
