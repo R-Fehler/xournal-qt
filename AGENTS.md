@@ -52,7 +52,9 @@ The machine is a slow 2-in-1, so every build and test run costs real time.
 
 - The tasks are in [TODO.md](TODO.md), grouped into **blocks**. A block is one branch `qt/<block>` in its own
   worktree `../xournal_qt-<block>`, with its own `build-qt`. The build uses ccache when it is installed, with
-  the workspace as its base directory, so a new worktree reuses the objects the other checkouts already compiled.
+  the workspace as its base directory, so a new worktree reuses the objects the other checkouts already compiled. This needs ccache 4.7 or newer:
+  older versions put the object path in the key, and CMake names upstream `src/` objects after the worktree's
+  absolute path. Ubuntu 22.04 ships 4.5; 4.14 is installed in `~/.local/bin`.
 - Feature blocks are usually done by subagents. The main session works on architecture and integration, merging
   blocks into `master-qt`.
 - Run at most two worktree builds at a time; the machine has 8 threads and 16 GB.

@@ -17,7 +17,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 `qt/render-visible` and `qt/ui-polish` are merged (2026-09-24, see ROADMAP).
 
-1. **Bugs and polish:** `qt/markdown-fixes` (`qt/render-visible` and `qt/ui-polish` are done).
+1. **Bugs and polish:** `qt/markdown-fixes`, started 2026-09-24 (`qt/render-visible` and `qt/ui-polish` are done).
 2. **Library track**, in this order, because each step builds on the one before:
    1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache);
    2. `.md` files and images in the library and its index, with snippet cards in the extended search;
@@ -35,11 +35,11 @@ is built.
 
 ### `qt/markdown-fixes`
 Area: `qt/src/markdown`, the Markdown editor in `qt/src/canvas`, `DocumentSearch`. Tests: `-L markdown`.
-- [ ] **A code block at the end of the text misbehaves in live rendering.** For example
+- [~] **A code block at the end of the text misbehaves in live rendering.** For example
   `` ```py\n code\n #stuff ``` `` as the last thing in a box. The grey block background keeps being drawn, and
   text typed after Enter stays invisible until more text is typed or the source sidebar is toggled once.
   Probably the incremental re-layout does not handle an open or just-closed fence at the end.
-- [ ] **Search boxes sit at the wrong place in rendered Markdown.** They are where the plain text would be in
+- [~] **Search boxes sit at the wrong place in rendered Markdown.** They are where the plain text would be in
   a normal Xournal text box, not on the rendered words. The search must map hits through the Markdown
   layout.
 
