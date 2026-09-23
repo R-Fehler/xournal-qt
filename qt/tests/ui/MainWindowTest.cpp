@@ -8,6 +8,9 @@
 #include <memory>
 
 #include <QCoreApplication>
+#include <cmath>
+
+#include <QDir>
 #include <QElapsedTimer>
 #include <iostream>
 #include <QFile>
@@ -595,6 +598,162 @@ TEST_F(MainWindowTest, pageGridDragAndDropMovesSelectedPages) {
 
     controller->undoPages();
     EXPECT_EQ(session->pageOrder(), original);
+}
+
+// XQT_SHOTS=<folder>: writes the pictures for the README (off-screen, so no display is needed).
+//   XQT_SHOTS=/tmp/shots ./xqt-ui-tests --gtest_filter='*shot*'
+namespace {
+bool wantShots() { return qEnvironmentVariableIsSet("XQT_SHOTS"); }
+
+void saveShot(QQuickWindow* window, const char* name) {
+    const QString folder = qEnvironmentVariable("XQT_SHOTS");
+    QDir().mkpath(folder);
+    const QImage picture = window->grabWindow();
+    ASSERT_FALSE(picture.isNull());
+    ASSERT_TRUE(picture.save(folder + '/' + QLatin1String(name) + ".png"));
+    std::cerr << "shot " << name << ": " << picture.width() << "x" << picture.height() << "\n";
+}
+/// No tool tip over the tool bar in the picture: the pointer leaves the buttons and comes to rest on the page
+void restPointer(QQuickWindow* window) {
+    for (const QPoint& p: {QPoint(window->width() / 2, 300), QPoint(window->width() / 2, window->height() - 60),
+                           QPoint(window->width() / 2, window->height() - 30)}) {
+        QTest::mouseMove(window, p);
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    }
+}
+
+/// A curve as a hand draws it, from `origin` to the right
+void drawCurve(QQuickWindow* window, QPoint origin, int width, int height, double turns) {
+    auto at = [&](double t) {
+        return origin + QPoint(static_cast<int>(t * width),
+                               static_cast<int>(-std::sin(t * turns * 2 * M_PI) * height / 2 * (1 - 0.6 * t)));
+    };
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at(0));
+    for (int i = 1; i <= 60; ++i) {
+        QTest::mouseMove(window, at(static_cast<double>(i) / 60));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at(1));
+}
+}  // namespace
+
+// A page of notes: Markdown written on the page, a curve drawn by hand, the pages beside it.
+TEST_F(MainWindowTest, shotOfTheCanvas) {
+    if (!wantShots()) {
+        GTEST_SKIP() << "set XQT_SHOTS";
+    }
+    window->resize(1280, 820);
+    restPointer(window);  // (no tool tip of a hovered button in the picture)
+    wait(200);
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setProperty("sidebarShown", true);
+    controller->goToPage(7);  // squared paper
+    wait(600);
+
+    // The note where the page is seen, and the curve under it
+    auto* panel = find<QQuickItem>("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    QMetaObject::invokeMethod(panel, "openBox", Q_ARG(QVariant, 7), Q_ARG(QVariant, 60.0), Q_ARG(QVariant, 300.0));
+    wait(200);
+    find<QQuickItem>("markdownArea")
+            ->setProperty("text", QStringLiteral("## Damped oscillation\n\n"
+                                                 "Measured on the shaker at 12 Hz. The envelope follows `exp(-t/tau)`, "
+                                                 "with tau about 0.8 s.\n\n"
+                                                 "- [x] set up the sensor\n- [ ] repeat it with the heavier mass\n"));
+    wait(500);
+    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, true));
+    wait(1200);  // (closing puts the zoom back to what it was before it opened)
+    controller->goToPage(7);
+    wait(600);
+
+    auto* canvas = findItem("canvas");
+    ASSERT_NE(canvas, nullptr);
+    const QPoint origin = canvas->mapToScene(QPointF(canvas->width() * 0.32, canvas->height() * 0.42)).toPoint();
+    drawCurve(window, origin, 430, 150, 2.5);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, origin - QPoint(30, 0));  // the axis
+    QTest::mouseMove(window, origin + QPoint(460, 0));
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, origin + QPoint(460, 0));
+    restPointer(window);
+    wait(900);  // (the thumbnails of the pages follow)
+    saveShot(window, "canvas");
+}
+
+// Markdown written on a page, with its source beside it.
+TEST_F(MainWindowTest, shotOfMarkdown) {
+    if (!wantShots()) {
+        GTEST_SKIP() << "set XQT_SHOTS";
+    }
+    window->resize(1280, 820);
+    restPointer(window);  // (no tool tip of a hovered button in the picture)
+    wait(200);
+    controller->newDocument();
+    while (controller->tabCount() > 1) {
+        controller->closeTab(0);
+    }
+    window->setProperty("sidebarShown", false);
+    auto* panel = find<QQuickItem>("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, 0));
+    wait(200);
+    find<QQuickItem>("markdownArea")->setProperty("text", QStringLiteral(
+            "# Seminar, week 3\n\n"
+            "Wave equation, **separation of variables**. The ansatz `u(x,t) = X(x)T(t)` gives two problems that are\n"
+            "each of one variable.\n\n"
+            "## To do\n\n"
+            "- [x] read chapter 4\n"
+            "- [ ] exercise 4.2 (the boundary conditions!)\n"
+            "- [ ] ask about the third eigenvalue\n\n"
+            "> The eigenvalues are what the boundary asks for, not what the equation gives.\n\n"
+            "```python\n"
+            "def modes(n, L):\n"
+            "    return [k * pi / L for k in range(1, n + 1)]\n"
+            "```\n\n"
+            "| mode | n | note |\n| --- | --- | --- |\n| fundamental | 1 | drawn below |\n| first | 2 | node in the middle |\n"));
+    restPointer(window);
+    wait(900);
+    saveShot(window, "markdown");
+    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, true));
+}
+
+// All pages of a document at once.
+TEST_F(MainWindowTest, shotOfThePageGrid) {
+    if (!wantShots()) {
+        GTEST_SKIP() << "set XQT_SHOTS";
+    }
+    window->resize(1280, 820);
+    restPointer(window);  // (no tool tip of a hovered button in the picture)
+    wait(200);
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(400);
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    restPointer(window);
+    wait(1200);
+    saveShot(window, "page-grid");
+}
+
+// The open documents, and the search over all of them with the pages that have hits.
+TEST_F(MainWindowTest, shotOfTheOverview) {
+    if (!wantShots()) {
+        GTEST_SKIP() << "set XQT_SHOTS";
+    }
+    window->resize(1280, 820);
+    restPointer(window);  // (no tool tip of a hovered button in the picture)
+    wait(200);
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/strokes.xopp")));
+    wait(600);
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    QObject* overview = find("tabOverview");
+    ASSERT_TRUE(waitOpened(overview, true));
+    type("page");
+    key(Qt::Key_Return);
+    wait(800);
+    if (!overview->property("extendedView").toBool()) {
+        click(find<QQuickItem>("overviewExtendedButton"));
+    }
+    restPointer(window);
+    wait(1200);
+    saveShot(window, "overview");
 }
 
 // --- the home screen: library and recent documents ---

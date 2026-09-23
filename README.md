@@ -1,3 +1,83 @@
+<img src="qt/docs/screenshots/icon.png" align="left" width="96" height="96" alt="">
+
+# xournal-qt
+
+**Handwritten notes and PDF annotation on a pen tablet — a Qt 6 fork of [Xournal++](https://github.com/xournalpp/xournalpp).**
+Same documents, same proven core, a new interface built for a pen in one hand and a finger in the other.
+
+<br clear="left">
+
+<img src="qt/docs/screenshots/canvas.png" width="900" alt="A page of notes: a curve drawn by hand and a Markdown note under it, the pages of the document beside them">
+
+Its files *are* Xournal++ files. A document written here opens in Xournal++, and one written there opens here: the
+document model, the `.xopp` file format, the cairo rendering, the undo stack and the tools are upstream's, unchanged.
+What is new is everything around them — see [FORK.md](FORK.md) for how the two live in one tree.
+
+## What it adds to Xournal++
+
+| | |
+| --- | --- |
+| **Tabs and an overview** | Several documents at once, an overview of them all, and a tab can be dragged into a window of its own. |
+| **A library** | Your folders of documents with previews, and a search over the text of every document in them (not only the open one). |
+| **Markdown on the page** | Write Markdown on a page and see it formatted as you type. It flows onto the next pages, its headings become chapters, and it is stored as ordinary Xournal++ text. |
+| **Pen, finger and mouse told apart** | The pen writes while your hand rests on the screen, a finger scrolls and zooms, the side buttons erase. Tuned on a convertible under Wayland. |
+| **Pages at a glance** | A page sidebar and a zoomable grid of all pages, with copy, move, insert, delete and drag and drop. |
+| **Made to keep up** | Pages are rendered ahead of where you read and kept in memory (you set the limit), every page has a preview drawn in the background, and previews are stored for the next opening. Flying through a 500-page PDF shows pages that turn sharp where you stop, not blanks. |
+| **Built for touch** | Big handles, a movable tool pill in full screen, popups where your finger is, gestures for the overviews. |
+
+Not there yet: audio recording, the plugin console and the LaTeX tool of Xournal++, and Windows and macOS builds
+(the fork is Linux only so far).
+
+## What that makes possible
+
+- **Follow a lecture on one device.** The slides as a PDF in one tab, your own notes in another, both in the library.
+  Write on the slides, jump between the two with Ctrl+Tab, and find that one word later with the search over all
+  open documents.
+- **Keep a lab or reading notebook that is still text.** Type the parts that are text as Markdown — headings, task
+  lists, tables, code — and draw the rest by hand on the same page. The headings become the table of contents.
+- **Work through a thick PDF.** Open it, scroll or fling; the pages are already rendered. The page grid shows
+  everything at once, the search marks its hits on the page pictures, and the document opens where you left it.
+- **Keep your notes where your files are.** No import, no hidden database: a library is a folder.
+
+<img src="qt/docs/screenshots/markdown.png" width="900" alt="Markdown written beside the page and shown formatted on it">
+
+## A library is just a folder
+
+Point it at a folder and that folder is a library. The documents in it are the files you already have; subfolders are
+its shelves. Nothing is imported, copied or hidden away, and the folder stays yours to move, sync or back up with
+whatever you already use.
+
+- The libraries it offers by default live in **`~/Documents/Xournal_Libraries/`** (`Default` is the one it starts
+  with). Your Downloads folder is offered as a quick library too.
+- **Any folder can be opened as a library** — from the home screen, from the command line
+  (`xournal-qt ~/some/folder`), or from Dolphin's "Open as Xournal Qt library".
+- Each library keeps its own notes about itself in **`.xournal_library/`** inside it: the search index, the page
+  previews, and which page of a document is its title page and where you stopped reading. It is a cache, not your
+  data — delete it and it is built again the next time, and the documents are untouched.
+
+<img src="qt/docs/screenshots/overview.png" width="900" alt="The overview of the open documents with a search over all of them, showing the pages that have hits">
+
+## Trying it
+
+Linux, Qt 6.5 or newer. Packages of a release and which one fits which system:
+[qt/docs/releasing.md](qt/docs/releasing.md). From source:
+
+```sh
+qt/scripts/linux-deps.sh                                          # Debian / Ubuntu: what the build needs
+cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build-qt
+./build-qt/xournal-qt
+```
+
+More: [what it can do and where it is going](qt/docs/ROADMAP.md) · [Markdown boxes](qt/docs/markdown-boxes.md) ·
+[the library](qt/docs/library.md) · [text mode](qt/docs/text-mode.md) · [how the fork is kept](FORK.md)
+
+<img src="qt/docs/screenshots/page-grid.png" width="900" alt="All pages of a document as a grid">
+
+---
+
+*Everything below is the README of upstream Xournal++, whose core this fork builds on.*
+
 # <img src="ui/pixmaps/com.github.xournalpp.xournalpp.svg" align="left" width="100" height="100">  <br> Xournal++
 
 
