@@ -14,6 +14,19 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
+# ccache, when installed. base_dir is the folder that holds the checkout, so worktrees next to it
+# (../xournal_qt-<block>, see ../AGENTS.md) share cache hits. nohashdir: debug info may then name
+# another worktree's build folder, which only matters to a debugger.
+option(XQT_USE_CCACHE "Compile through ccache when it is installed" ON)
+find_program(XQT_CCACHE ccache)
+if(XQT_USE_CCACHE AND XQT_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH _xqt_checkout)
+    cmake_path(GET _xqt_checkout PARENT_PATH _xqt_workspace)
+    set(_xqt_launcher ${CMAKE_COMMAND} -E env CCACHE_BASEDIR=${_xqt_workspace} CCACHE_NOHASHDIR=1 ${XQT_CCACHE})
+    set(CMAKE_C_COMPILER_LAUNCHER ${_xqt_launcher})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${_xqt_launcher})
+endif()
+
 # Absolute path of the upstream Xournal++ sources inside this fork.
 set(XOJ_UPSTREAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE INTERNAL "")
 
