@@ -5,11 +5,17 @@
  */
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <random>
+
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QUrl>
 #include <gtest/gtest.h>
 
@@ -925,4 +931,240 @@ TEST_F(LibraryTest, theDownloadsFolderIsATemporaryLibrary) {
     LibraryModel model;
     EXPECT_TRUE(model.isTemporaryFolder(QString::fromStdString((downloads / "papers").string())));
     QFile::remove(config + "/user-dirs.dirs");
+}
+
+// --- the library cache on a generated library -------------------------------------------------------------------
+namespace {
+/// Deterministic pseudo-words, frequent ones more often (roughly like real text, which compresses about 4:1).
+class Words {
+public:
+    explicit Words(unsigned seed): rng(seed) {
+        static const char* syllables[] = {"ka", "lo", "mi", "ne", "tur", "sen", "ra", "vo", "pel", "di", "ag",
+                                          "on", "sti", "ber", "ul", "fa", "ze", "tro", "qui", "man"};
+        std::mt19937 vocab(7);
+        for (int i = 0; i < 3000; ++i) {
+            std::string w;
+            const int n = 1 + static_cast<int>(vocab() % 4);
+            for (int s = 0; s < n; ++s) {
+                w += syllables[vocab() % 20];
+            }
+            vocabulary.push_back(w);
+        }
+    }
+    std::string next() {
+        const double u = std::uniform_real_distribution<double>(0, 1)(rng);
+        return vocabulary[static_cast<size_t>(u * u * u * static_cast<double>(vocabulary.size() - 1))];
+    }
+    std::string line(size_t chars) {
+        std::string s;
+        while (s.size() < chars) {
+            s += next() + ' ';
+        }
+        return s;
+    }
+
+private:
+    std::mt19937 rng;
+    std::vector<std::string> vocabulary;
+};
+
+/// A PDF with `pages` pages full of text (about 6 kB of text per page).
+void makeTextPdf(const fs::path& p, int pages, unsigned seed) {
+    fs::create_directories(p.parent_path());
+    Words words(seed);
+    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 7);
+    for (int page = 0; page < pages; ++page) {
+        for (int line = 0; line < 70; ++line) {
+            cairo_move_to(cr, 30, 40 + line * 11);
+            cairo_show_text(cr, words.line(95).c_str());
+        }
+        cairo_show_page(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+
+/// ~30 folders with 10 small documents each (lone notes, lone PDFs, pairs), and three long text PDFs.
+void makeLibrary(const fs::path& root) {
+    unsigned seed = 1;
+    std::vector<fs::path> folders;
+    for (int s = 1; s <= 6; ++s) {
+        const fs::path semester = root / ("Semester " + std::to_string(s));
+        folders.push_back(semester);
+        for (int c = 1; c <= 4; ++c) {
+            folders.push_back(semester / ("Course " + std::to_string(c)));
+        }
+    }
+    for (const fs::path& folder: folders) {
+        for (int i = 0; i < 4; ++i) {
+            const fs::path xopp = folder / ("notes " + std::to_string(i) + ".xopp");
+            fs::create_directories(folder);
+            fs::copy_file(fixture(u8"load/pages.xopp"), xopp);
+            addText(xopp, 0, Words(++seed).line(300).c_str());
+        }
+        for (int i = 0; i < 3; ++i) {
+            makeTextPdf(folder / ("paper " + std::to_string(i) + ".pdf"), 3, ++seed);
+        }
+        for (int i = 0; i < 3; ++i) {
+            const fs::path pdf = folder / ("lecture " + std::to_string(i) + ".pdf");
+            makeTextPdf(pdf, 4, ++seed);
+            makeAnnotation(pdf, folder / ("lecture " + std::to_string(i) + ".xopp"));
+        }
+    }
+    makeTextPdf(root / "book.pdf", 250, ++seed);  // over 1 MB of text
+    makeTextPdf(folders[1] / "script.pdf", 120, ++seed);
+    makeTextPdf(folders[7] / "reader.pdf", 150, ++seed);
+}
+
+/// Every file of the library's cache (the dot folders, and the app cache folder `appCache` if given).
+std::vector<fs::path> cacheFiles(const fs::path& root, const fs::path& appCache = {}) {
+    std::vector<fs::path> files;
+    for (const fs::path& base: {root, appCache}) {
+        std::error_code ec;
+        if (base.empty() || !fs::exists(base, ec)) {
+            continue;
+        }
+        for (auto it = fs::recursive_directory_iterator(base, ec); !ec && it != fs::recursive_directory_iterator();
+             it.increment(ec)) {
+            const std::string path = it->path().string();
+            if (it->is_regular_file() &&
+                (base == appCache || path.find(std::string("/") + DocumentFiles::META_DIR + "/") != std::string::npos)) {
+                files.push_back(it->path());
+            }
+        }
+    }
+    return files;
+}
+
+/// Drop the files from the page cache (fdatasync first), so the next read comes from the disk.
+void dropFromPageCache(const std::vector<fs::path>& files) {
+    for (const auto& f: files) {
+        const int fd = ::open(f.c_str(), O_RDONLY);
+        if (fd >= 0) {
+            ::fdatasync(fd);
+            ::posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
+            ::close(fd);
+        }
+    }
+}
+
+struct FileState {
+    uintmax_t size;
+    fs::file_time_type time;
+};
+std::map<fs::path, FileState> snapshot(const std::vector<fs::path>& files) {
+    std::map<fs::path, FileState> s;
+    for (const auto& f: files) {
+        std::error_code ec;
+        s[f] = {fs::file_size(f, ec), fs::last_write_time(f, ec)};
+    }
+    return s;
+}
+/// Bytes and files written between two snapshots (new or changed files).
+std::pair<uintmax_t, int> written(const std::map<fs::path, FileState>& before, const std::map<fs::path, FileState>& after) {
+    uintmax_t bytes = 0;
+    int files = 0;
+    for (const auto& [f, st]: after) {
+        auto it = before.find(f);
+        if (it == before.end() || it->second.size != st.size || it->second.time != st.time) {
+            bytes += st.size;
+            ++files;
+        }
+    }
+    return {bytes, files};
+}
+}  // namespace
+
+// Opt-in: XQT_BENCH_LIBRARY=<a folder on disk> (the test's temporary folder is often in memory, where a cold start
+// cannot be measured). Generates a library there (~300 small documents in 30 folders and three long PDFs, removed
+// afterwards) and measures its cache: opening with a cold and a warm page cache, what is written after one .xopp was
+// edited, and the size and number of files.
+TEST_F(LibraryTest, benchLibraryCache) {
+    if (!qEnvironmentVariableIsSet("XQT_BENCH_LIBRARY")) {
+        GTEST_SKIP() << "set XQT_BENCH_LIBRARY=<folder on disk>";
+    }
+    QTemporaryDir onDisk(qEnvironmentVariable("XQT_BENCH_LIBRARY") + "/xqt-bench-XXXXXX");
+    ASSERT_TRUE(onDisk.isValid());
+    const fs::path root = fs::path(onDisk.path().toStdString());
+    QElapsedTimer t;
+    t.start();
+    makeLibrary(root);
+    const auto items = DocumentFiles::scanRecursive(root);
+    std::cout << items.size() << " documents generated in " << t.elapsed() << " ms\n";
+
+    // The cache as the app keeps it (old layout: one folder at the root)
+    const fs::path meta = root / DocumentFiles::META_DIR;
+    const fs::path appCache;
+    auto openIndex = [&] { return std::make_unique<LibraryIndex>(root, meta / "index"); };
+    auto flushIndex = [&](LibraryIndex&) {};
+    auto flushPreviews = [&] {};
+    PreviewCache::setLibrary(root, meta / "previews");
+    DocumentPlaces::setLibrary(root, meta / "pages.json");
+
+    {
+        auto index = openIndex();
+        t.restart();
+        index->update(items);
+        index->waitForDone();
+        flushIndex(*index);
+        std::cout << "first indexing: " << t.elapsed() << " ms (" << index->pdfPagesRead() << " PDF pages)\n";
+    }
+    t.restart();
+    for (const auto& item: items) {
+        PreviewCache::preview(item);
+    }
+    flushPreviews();
+    std::cout << "previews: " << t.elapsed() << " ms\n";
+
+    auto open = [&](bool cold) {
+        if (cold) {
+            dropFromPageCache(cacheFiles(root, appCache));
+        }
+        auto index = openIndex();
+        QElapsedTimer timer;
+        timer.start();
+        index->update(DocumentFiles::scanRecursive(root));
+        index->waitForDone();
+        const qint64 ms = timer.elapsed();
+        EXPECT_EQ(index->documentsRead(), 0);
+        EXPECT_EQ(index->search("book").size(), 1u);
+        return ms;
+    };
+    std::cout << "open, cold page cache: " << open(true) << " ms, again: " << open(true) << " ms\n";
+    open(false);
+    std::cout << "open, warm: " << open(false) << " ms, " << open(false) << " ms\n";
+
+    auto files = cacheFiles(root, appCache);
+    uintmax_t bytes = 0, biggest = 0;
+    for (const auto& f: files) {
+        bytes += fs::file_size(f);
+        biggest = std::max(biggest, fs::file_size(f));
+    }
+    std::cout << "cache: " << bytes / 1024 << " KiB in " << files.size() << " files (biggest " << biggest / 1024
+              << " KiB)\n";
+
+    // One .xopp edited: what is written (the index; then also its new preview)
+    const fs::path edited = root / "Semester 3" / "Course 2" / "notes 1.xopp";
+    auto index = openIndex();
+    index->update(DocumentFiles::scanRecursive(root));
+    index->waitForDone();
+    const auto before = snapshot(cacheFiles(root, appCache));
+    QThread::msleep(20);  // (a new modification time)
+    addText(edited, 2, "unicorn");
+    index->update(DocumentFiles::scanRecursive(root));
+    index->waitForDone();
+    flushIndex(*index);
+    auto [indexBytes, indexFiles] = written(before, snapshot(cacheFiles(root, appCache)));
+    std::cout << "after editing one .xopp, the index wrote " << indexBytes / 1024.0 << " KiB in " << indexFiles
+              << " files\n";
+    PreviewCache::preview(DocumentFiles::itemOf(edited));
+    flushPreviews();
+    auto [allBytes, allFiles] = written(before, snapshot(cacheFiles(root, appCache)));
+    std::cout << "with its new preview: " << allBytes / 1024.0 << " KiB in " << allFiles << " files\n";
+    EXPECT_EQ(index->search("unicorn").size(), 1u);
+    PreviewCache::setLibrary({}, {});
+    DocumentPlaces::setLibrary({}, {});
 }
