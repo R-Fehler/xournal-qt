@@ -17,7 +17,13 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 `qt/render-visible` and `qt/ui-polish` are merged (2026-09-24, see ROADMAP).
 
-1. **Bugs and polish:** `qt/markdown-fixes`, started 2026-09-24 (`qt/render-visible` and `qt/ui-polish` are done).
+1. **Bugs and polish:** done (`qt/render-visible`, `qt/ui-polish`, `qt/markdown-fixes`; see ROADMAP).
+1b. **PDF writing with qpdf, high priority (the author, 2026-09-24):**
+   1. `qt/pdf-pages`: pasted PDF pages stay searchable. Started 2026-09-24 (worktree `../xournal_qt-pdf-pages`).
+   2. `qt/hybrid-pdf`: right after it. Design draft: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md), with three
+      points for the author to confirm.
+   - Experiment `qt/mupdf`, started 2026-09-24: a MuPDF backend next to poppler, measured, with a short pdfium
+     check. Findings go to `qt/docs/pdf-engine-experiment.md`.
 2. **Library track**, in this order, because each step builds on the one before:
    1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache):
       `qt/library-index`, started 2026-09-24 (worktree `../xournal_qt-library-index`);
@@ -206,12 +212,14 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF
 engines, with a recommendation and cheap experiments to decide.
-- [?] **Pasted PDF pages stay searchable, with qpdf now.** The research found that qpdf (already linked,
-  Apache-2.0, used by upstream's `QPdfExport`) can write a merged `name.pages.pdf`: option 1 of the ROADMAP
-  backlog item, still upstream-compatible, with no need to wait for MuPDF. Start with the qpdf page-merge spike
-  from the research.
+- [~] **Pasted PDF pages stay searchable, with qpdf** (`qt/pdf-pages`). Decided 2026-09-24:
+  - one merged PDF per document at most;
+  - a hidden `.name.pages.pdf` when the document already has a PDF, or a plain `name.pdf` (paired) when it had
+    none;
+  - compacted on save;
+  - a note on paste, like the undo note.
 - [?] **Experiments before the engine decision:**
-  - a render benchmark of poppler, MuPDF and pdfium;
+  - a render benchmark of poppler, MuPDF and pdfium (running: `qt/mupdf`);
   - a `/Ink` + `/AP` round trip through Acrobat, Xodo, Drawboard and Preview;
   - whether an embedded `.xopp` survives saves in other apps;
   - pen latency on the Surface and the iPad.
