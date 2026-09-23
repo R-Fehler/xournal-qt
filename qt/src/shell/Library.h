@@ -103,6 +103,16 @@ public:
     void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
     /// Write the changed packs now (else a few seconds after the last change, and when the index is closed).
     void flush();
+
+    /// The cache folder has files of the layout before the packs ("index/", "previews/", "pages.json").
+    static bool hasOldLayout(const fs::path& dir);
+    /// Convert them, in the background before the next update: the index entries (one JSON file per document)
+    /// and the previews (PNG files) go into the packs of the documents' folders, nothing is read again. Once the
+    /// packs are written, the old files are removed ("index/", "previews/", "pages.json" - which the library
+    /// took over into the config folder when it was opened -, nothing else).
+    void convertOldLayout(const fs::path& dir);
+    /// Old caches converted so far (tests).
+    int oldLayoutsConverted() const { return conversions.load(); }
     /// How long writes wait for more changes (tests; default: WriteScheduler's).
     void setWriteDelays(int quietMs, int maxDelayMs);
     const CacheLocation& location() const { return where; }
@@ -181,7 +191,9 @@ private:
     void erase(const fs::path& file);
     /// An entry of a file that is gone, with this name and the same files (moved by another program).
     EntryPtr movedHere(const DocumentItem& item, std::multimap<std::string, EntryPtr>& orphans, bool& collected);
-    void writeChanged();
+    /// Returns whether everything could be written.
+    bool writeChanged();
+    void convert(const fs::path& dir);
     QCborMap notesOf(const Entry& e) const;
     std::shared_ptr<Entry> entryOf(const fs::path& folder, const QString& name, const QCborMap& notes,
                                    const QCborValue& text) const;
@@ -198,7 +210,7 @@ private:
     std::atomic<quint64> generation{0};
     std::atomic<bool> running{false};
     std::atomic<int> doneCount{0}, totalCount{0};
-    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0};
+    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0};
 };
 
 }  // namespace xqt

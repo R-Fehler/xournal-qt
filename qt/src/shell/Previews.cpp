@@ -209,7 +209,7 @@ void store(const DocumentItem& item, const QString& stamp, const QByteArray& png
     changed(s);
 }
 
-void writeChanged() {
+bool writeChanged() {
     auto& s = state();
     std::lock_guard writeLock(s.writeMtx);
     struct Job {
@@ -221,7 +221,7 @@ void writeChanged() {
     {
         std::lock_guard lock(s.mtx);
         if (s.discarded) {
-            return;
+            return false;
         }
         location = s.location;
         for (auto& [folder, f]: s.folders) {
@@ -231,6 +231,7 @@ void writeChanged() {
             }
         }
     }
+    bool ok = true;
     for (const Job& job: jobs) {
         QCborMap pack;
         std::error_code ec;
@@ -244,10 +245,12 @@ void writeChanged() {
             Packs::remove(dir, PreviewCache::PACK);
             fs::remove(dir, ec);  // (only if nothing else is in it)
         } else {
-            Packs::write(dir, PreviewCache::PACK, PreviewCache::FORMAT, pack, false);  // (PNG: compressed already)
+            // (PNG: compressed already)
+            ok = Packs::write(dir, PreviewCache::PACK, PreviewCache::FORMAT, pack, false) && ok;
         }
         ++s.writes;
     }
+    return ok;
 }
 
 /// The file name under which previews were stored as PNG files: from the path, the files and the title page (the
@@ -454,13 +457,37 @@ void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves
     }
 }
 
-void PreviewCache::flush() {
+bool PreviewCache::flush() {
     auto& s = state();
     writer().waitForDone();
     if (s.scheduler && QThread::currentThread() == s.scheduler->thread()) {
         s.scheduler->cancel();
     }
-    writeChanged();
+    return writeChanged();
+}
+
+int PreviewCache::convertOldFiles(const fs::path& dir, const std::vector<DocumentItem>& items) {
+    std::error_code ec;
+    if (!fs::is_directory(dir, ec)) {
+        return 0;
+    }
+    int count = 0;
+    for (const auto& item: items) {
+        const fs::path png = dir / (pngName(item).toStdString() + ".png");
+        if (!inLibrary(item) || !fs::exists(png, ec) || !ensureLoaded(item.folder(), true)) {
+            continue;
+        }
+        const QString stamp = stampOf(item);
+        if (!lookup(item, stamp).isEmpty()) {
+            continue;  // (made since)
+        }
+        QFile f(QString::fromStdString(png.string()));
+        if (f.open(QIODevice::ReadOnly)) {
+            store(item, stamp, f.readAll());
+            ++count;
+        }
+    }
+    return count;
 }
 
 void PreviewCache::discard() {

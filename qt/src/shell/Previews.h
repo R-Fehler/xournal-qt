@@ -46,8 +46,11 @@ public:
     static void prune(const std::vector<DocumentItem>& items);
     /// Files and folders renamed or moved by the app (old, new): their previews follow.
     static void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
-    /// Write the changed packs now (else a few seconds after the last change).
-    static void flush();
+    /// Write the changed packs now (else a few seconds after the last change). Returns whether all could be written.
+    static bool flush();
+    /// Previews stored as PNG files in `dir` (the layout before the packs, named like outsideFile()) that belong
+    /// to these documents as they are now: into the packs of their folders (written later). Returns how many.
+    static int convertOldFiles(const fs::path& dir, const std::vector<DocumentItem>& items);
     /// Forget what is not written yet and write nothing until the next setLibrary() (the cache is being removed).
     static void discard();
     static void setWriteDelays(int quietMs, int maxDelayMs);

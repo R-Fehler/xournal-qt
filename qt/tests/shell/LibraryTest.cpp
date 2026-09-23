@@ -13,6 +13,9 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QThread>
@@ -1080,6 +1083,95 @@ TEST_F(LibraryTest, packsOfAnotherFormatAreReadAgain) {
     again.waitForDone();
     EXPECT_EQ(again.documentsRead(), 2) << "the two documents of that folder";
     EXPECT_EQ(again.search("p7").size(), 1u);
+}
+
+// --- the cache of the layout before the packs ---
+
+namespace {
+/// An index entry as it was stored before the packs ("index/<hash>.json", format 3, paths relative to the
+/// library), with made-up PDF text per page.
+void writeOldEntry(const fs::path& root, const DocumentItem& item, const QStringList& pdfText, int number) {
+    const auto rel = [&](const fs::path& p) { return QString::fromStdString(p.lexically_relative(root).string()); };
+    QJsonObject text;
+    QJsonArray pages;
+    for (int i = 0; i < pdfText.size(); ++i) {
+        text[QString::number(i)] = pdfText[i];
+        pages.append(QJsonObject{{"pdf", i}, {"text", ""}, {"aspect", 1.414}});
+    }
+    const QJsonObject json{{"format", 3},
+                           {"file", rel(item.main())},
+                           {"name", QString::fromStdString(item.name())},
+                           {"xoppStamp", item.xopp.empty() ? QString() : fileStamp(item.xopp)},
+                           {"pdf", rel(item.pdf)},
+                           {"pdfStamp", fileStamp(item.pdf)},
+                           {"pdfText", text},
+                           {"pages", pages}};
+    const fs::path file = root / DocumentFiles::META_DIR / "index" / (std::to_string(1000000 + number) + "abcdef00.json");
+    fs::create_directories(file.parent_path());
+    QFile f(QString::fromStdString(file.string()));
+    ASSERT_TRUE(f.open(QIODevice::WriteOnly));
+    f.write(QJsonDocument(json).toJson(QJsonDocument::Compact));
+}
+}  // namespace
+
+TEST_F(LibraryTest, anOldCacheIsConvertedWithoutReadingAnythingAgain) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    makePdf(root / "Physics" / "sheet.pdf");
+    makePdf(root / "Physics" / "changed.pdf");
+    const fs::path old = root / DocumentFiles::META_DIR;
+    // The old cache: index entries (one of a document changed since, one of a document that is gone), previews,
+    // reading positions, and a file that is not the app's
+    const DocumentItem lecture = DocumentFiles::itemOf(root / "lecture.xopp");
+    const DocumentItem sheet = DocumentFiles::itemOf(root / "Physics" / "sheet.pdf");
+    const DocumentItem changed = DocumentFiles::itemOf(root / "Physics" / "changed.pdf");
+    writeOldEntry(root, lecture, {"oldtext alpha", "oldtext beta"}, 1);
+    writeOldEntry(root, sheet, {"oldtext gamma", ""}, 2);
+    writeOldEntry(root, changed, {"oldtext delta", ""}, 3);
+    touch(root / "gone.pdf");
+    writeOldEntry(root, DocumentItem{{}, root / "gone.pdf"}, {"oldtext epsilon"}, 4);
+    fs::remove(root / "gone.pdf");
+    fs::resize_file(root / "Physics" / "changed.pdf", fs::file_size(root / "Physics" / "changed.pdf") + 1);
+    QImage red(PreviewCache::WIDTH, 20, QImage::Format_RGB32);
+    red.fill(Qt::red);
+    fs::create_directories(old / "previews");
+    ASSERT_TRUE(red.save(QString::fromStdString((old / "previews" / PreviewCache::outsideFile(sheet).filename()).string())));
+    {
+        QFile pages(QString::fromStdString((old / "pages.json").string()));
+        ASSERT_TRUE(pages.open(QIODevice::WriteOnly));
+        pages.write(R"({"Physics/sheet.pdf":{"last":1}})");
+    }
+    touch(old / "mine.txt");
+
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    LibraryIndex* index = model.searchIndex();
+    index->waitForDone();
+    EXPECT_EQ(index->oldLayoutsConverted(), 1);
+    EXPECT_EQ(index->documentsRead(), 1) << "only the document changed since";
+    EXPECT_EQ(index->pdfPagesRead(), 2);
+    auto hits = index->search("oldtext");
+    ASSERT_EQ(hits.size(), 2u) << "the converted text (not read from the PDF)";
+    EXPECT_EQ(index->search("oldtext beta").size(), 1u);
+    EXPECT_EQ(PreviewCache::stored(sheet), red) << "the old preview";
+    EXPECT_EQ(DocumentPlaces::lastPage(root / "Physics" / "sheet.pdf"), 1);
+
+    // The old files are gone, nothing else
+    EXPECT_FALSE(fs::exists(old / "index"));
+    EXPECT_FALSE(fs::exists(old / "previews"));
+    EXPECT_FALSE(fs::exists(old / "pages.json"));
+    EXPECT_TRUE(fs::exists(old / "mine.txt"));
+    EXPECT_EQ(packKeys(root, LibraryIndex::NOTES_PACK), QStringList{"lecture.xopp"});
+    EXPECT_EQ(packKeys(root / "Physics", LibraryIndex::NOTES_PACK), (QStringList{"changed.pdf", "sheet.pdf"}));
+    EXPECT_EQ(packKeys(root / "Physics", PreviewCache::PACK, PreviewCache::FORMAT), QStringList{"sheet.pdf"});
+
+    // Opened again: nothing to convert, nothing to read
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    EXPECT_EQ(model.searchIndex()->oldLayoutsConverted(), 0);
+    EXPECT_EQ(model.searchIndex()->documentsRead(), 0);
+    EXPECT_EQ(model.searchIndex()->search("oldtext").size(), 2u);
+    model.setLibrary(nullptr);
 }
 
 // Opt-in timing: XQT_BENCH_PDF=<a long PDF>

@@ -61,6 +61,13 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
         PreviewCache::setLibrary(where);
         DocumentPlaces::setLibrary(lib->root(), lib->placesFile());
         idx = std::make_unique<LibraryIndex>(lib->root(), where);
+        // A cache of the layout before the packs (in the library, or in the app cache for a library that could
+        // not be written): converted first
+        for (const fs::path& old: {where.inFolder(lib->root()), where.appCacheDir()}) {
+            if (LibraryIndex::hasOldLayout(old)) {
+                idx->convertOldLayout(old);
+            }
+        }
         connect(idx.get(), &LibraryIndex::progress, this, [this] {
             Q_EMIT indexChanged();
             if (!query.isEmpty() && !searchTimer.isActive()) {

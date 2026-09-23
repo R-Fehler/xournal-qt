@@ -73,6 +73,13 @@ document's path in the library: renaming and moving in the app take them along, 
 keeps them. The `pages.json` of a library's `.xournal_library/` from before is taken over the first time. (A library
 folder moved or renamed outside the app gets another key and starts without them.)
 
+**The layout before the packs** (until 2026-09: everything in the root's `.xournal_library/`: `index/` with one JSON
+file per document, `previews/` with one PNG per document, `pages.json`) is converted when such a library is opened,
+in the background before indexing: the entries and previews go into the packs of their folders (nothing is read
+again; entries of documents changed since are read as usual), the reading positions into the config folder. Only
+when all packs are written are `index/`, `previews/` and `pages.json` removed, nothing else. A read-only library's old
+cache in `~/.cache/xournal-qt/libraries/<key>/` is converted the same way.
+
 **The search index** is what the library search searches. A background thread keeps it up to date, one document at
 a time:
 - nothing changed (the `.xopp` and the PDF it uses have their size and time): nothing is read;

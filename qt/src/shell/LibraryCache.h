@@ -98,6 +98,8 @@ bool removeIfOnlyOurs(const fs::path& dir);
 qint64 removeOurs(const fs::path& dir);
 /// Bytes of our files (packs and the old layout) in a cache folder.
 qint64 sizeOf(const fs::path& dir);
+/// Remove the files of the old layout ("index/*.json", "previews/*.png", "pages.json"), nothing else.
+void removeOldLayout(const fs::path& dir);
 
 }  // namespace Packs
 

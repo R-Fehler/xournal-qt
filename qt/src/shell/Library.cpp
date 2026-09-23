@@ -5,6 +5,9 @@
 #include <shared_mutex>
 
 #include <QCborArray>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QFile>
@@ -20,6 +23,8 @@
 #include "pdf/base/XojPdfPage.h"
 #include "session/DocumentSession.h"
 #include "util/PathUtil.h"
+
+#include "Previews.h"
 
 namespace xqt {
 
@@ -311,7 +316,7 @@ void LibraryIndex::erase(const fs::path& file) {
     }
 }
 
-void LibraryIndex::writeChanged() {
+bool LibraryIndex::writeChanged() {
     std::lock_guard writeLock(writeMtx);
     struct Job {
         fs::path folder;
@@ -335,6 +340,7 @@ void LibraryIndex::writeChanged() {
             }
         }
     }
+    bool ok = true;
     for (const Job& job: jobs) {
         const fs::path dir = where.dirOf(job.folder);
         if (job.docs.empty()) {
@@ -350,7 +356,7 @@ void LibraryIndex::writeChanged() {
             for (const auto& e: job.docs) {
                 notes.insert(qstr(e->file.filename()), notesOf(*e));
             }
-            Packs::write(dir, NOTES_PACK, FORMAT, notes, true);
+            ok = Packs::write(dir, NOTES_PACK, FORMAT, notes, true) && ok;
             ++packWrites;
         }
         if (job.text) {
@@ -360,9 +366,83 @@ void LibraryIndex::writeChanged() {
                     text.insert(qstr(e->file.filename()), pdfTextOf(e->pdfStamp, e->pdfText));
                 }
             }
-            Packs::write(dir, PDF_TEXT_PACK, FORMAT, text, true, &job.changedText);
+            ok = Packs::write(dir, PDF_TEXT_PACK, FORMAT, text, true, &job.changedText) && ok;
             ++packWrites;
         }
+    }
+    return ok;
+}
+
+// --- the layout before the packs
+
+bool LibraryIndex::hasOldLayout(const fs::path& dir) {
+    std::error_code ec;
+    return !dir.empty() && (fs::is_directory(dir / "index", ec) || fs::is_directory(dir / "previews", ec) ||
+                            fs::exists(dir / "pages.json", ec));
+}
+
+void LibraryIndex::convertOldLayout(const fs::path& dir) {
+    pool->start([this, dir] { convert(dir); });
+}
+
+void LibraryIndex::convert(const fs::path& dir) {
+    // The index: "index/<hash>.json" per document, format 3, paths relative to the library
+    std::map<fs::path, std::vector<EntryPtr>> byFolder;
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(dir / "index", ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        if (it->path().extension() != ".json") {
+            continue;
+        }
+        QFile f(qstr(it->path()));
+        if (!f.open(QIODevice::ReadOnly)) {
+            continue;
+        }
+        const QJsonObject json = QJsonDocument::fromJson(f.readAll()).object();
+        const fs::path rel = toPath(json["file"].toString());
+        if (json["format"].toInt() != 3 || rel.empty() || rel.is_absolute()) {
+            continue;  // (another format: read again, as it would have been)
+        }
+        const fs::path file = (rootDir / rel).lexically_normal();
+        if (std::error_code fec; !fs::exists(file, fec) || !where.contains(file)) {
+            continue;
+        }
+        auto e = std::make_shared<Entry>();
+        e->file = file;
+        const std::string ext = file.extension().string();
+        e->kind = ext == ".xopp" || ext == ".xoj" ? QStringLiteral("xopp") : QStringLiteral("pdf");
+        e->name = json["name"].toString();
+        e->xoppStamp = json["xoppStamp"].toString();
+        const fs::path pdf = toPath(json["pdf"].toString());
+        e->pdf = pdf.empty() || pdf.is_absolute() ? pdf : (rootDir / pdf).lexically_normal();
+        e->pdfStamp = json["pdfStamp"].toString();
+        const QJsonObject pdfText = json["pdfText"].toObject();
+        for (auto t = pdfText.begin(); t != pdfText.end(); ++t) {
+            e->pdfText[t.key().toInt()] = t.value().toString();
+        }
+        for (const auto& page: json["pages"].toArray()) {
+            const QJsonObject o = page.toObject();
+            e->pdfPage.push_back(o["pdf"].toInt(-1));
+            e->elementText << o["text"].toString();
+            e->aspects.push_back(o["aspect"].toDouble());
+        }
+        byFolder[file.parent_path()].push_back(std::move(e));
+    }
+    for (const auto& [folder, entries]: byFolder) {
+        load(folder);
+        std::lock_guard lock(mtx);
+        for (const auto& e: entries) {
+            if (!find(e->file)) {  // (packs written since win)
+                put(e);
+            }
+        }
+    }
+    // The previews: "previews/<hash>.png", named by the document's path and files
+    PreviewCache::convertOldFiles(dir / "previews", DocumentFiles::scanRecursive(rootDir));
+    // Written: the old files go (only those)
+    const bool written = writeChanged();
+    if (PreviewCache::flush() && written) {
+        Packs::removeOldLayout(dir);
+        ++conversions;
     }
 }
 

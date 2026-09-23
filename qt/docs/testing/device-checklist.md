@@ -465,3 +465,10 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Reading positions: open a document at some page, close it, close the app. `~/.config/xournal-qt/libraries/`
       has a folder for the library with `pages.json`. Delete every `.xournal_library/` of the (copied) library by
       hand and open it again: the cards still show when and at which page each document was read.
+- [ ] Converting an old cache: make a copy of a library that was used with an older build (its root has
+      `.xournal_library/index/`, `previews/`, `pages.json`) and open the copy. **Opening the real OneDrive library
+      converts it for good** (the old files are removed and OneDrive syncs that). After a few seconds: `index/`,
+      `previews/` and `pages.json` are gone from the root's `.xournal_library/`, each folder has its packs, no
+      progress of indexing was shown (nothing read again), the search finds text at once, the cards show their
+      previews without drawing them again, and the cards still show when and at which page documents were read.
+      Note how long the conversion took for a big library (the packs appear one folder after the other).

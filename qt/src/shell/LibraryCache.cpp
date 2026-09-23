@@ -289,6 +289,23 @@ qint64 removeOurs(const fs::path& dir) {
     return bytes;
 }
 
+void removeOldLayout(const fs::path& dir) {
+    std::error_code ec;
+    for (const char* sub: {"index", "previews"}) {
+        for (auto it = fs::directory_iterator(dir / sub, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+            if (isOldFile(it->path()) && !it->is_directory()) {
+                std::error_code rec;
+                fs::remove(it->path(), rec);
+            }
+        }
+        ec.clear();
+        fs::remove(dir / sub, ec);  // (only when empty)
+    }
+    for (const char* file: {"pages.json", "pages.json.part"}) {
+        fs::remove(dir / file, ec);
+    }
+}
+
 qint64 sizeOf(const fs::path& dir) {
     qint64 bytes = 0;
     forOurs(dir, true, [&](const fs::path& f) {
