@@ -458,3 +458,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       both are found by their text right away, nothing is indexed again.
 - [ ] Open a subfolder as a library of its own ("Open a folder as library…"): its search works at once.
 - [ ] Trash all documents of a folder in the app: its `.xournal_library/` goes too.
+- [ ] A folder with many documents: the cards show their previews (drawn once); each folder's `.xournal_library/`
+      gets one `previews.pack` instead of a PNG per document. Close and open the app: the previews are there at
+      once, nothing is drawn again. Choose another title page of a document: its card shows that page.
+- [ ] Rename a PDF in the app: its card keeps its preview (not drawn again).

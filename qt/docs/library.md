@@ -54,6 +54,12 @@ A cache folder holds a few **packs**, one file each, split by how often they cha
 - `pdf-text.pack`: per document, the text of the PDF pages it shows, tied to the PDF's size and time. Big; written
   only when a PDF changed or a document came or went. A document with over 1 MB of PDF text gets a file of its own,
   `pdf-text-<hash>.pack`, written only when that text changes.
+- `previews.pack`: the first-page previews (PNG, 360 px wide, drawn like the page thumbnails, of the title page),
+  each with the size and time of the document's files and its title page, so a changed document gets a new
+  preview. Not compressed again (PNG is). A folder's pack is read when its first card is shown and kept in memory
+  (up to 48 MB of previews; the folders used least recently go first); new previews are written a few seconds
+  later. Renamed or moved in the app, a document takes its preview along. Previews of documents outside a library
+  (recent files) are PNG files in `~/.cache/xournal-qt/previews`.
 
 A pack is CBOR (Qt's `QCborValue`) compressed with zlib, behind a header with a format number: a pack of another
 format is read anew. It is always written whole, under another name first (`QSaveFile`), never changed in place:
@@ -61,8 +67,7 @@ sync clients upload whole files anyway, and neither the app nor a sync client ev
 are written in the background a few seconds after the last change (at the latest 30 s after the first one), and
 when the library is closed.
 
-The first-page previews and the reading positions are still in the root's `.xournal_library/` (`previews/`,
-`pages.json`), as before.
+The reading positions are still in the root's `.xournal_library/pages.json`, as before.
 
 **The search index** is what the library search searches. A background thread keeps it up to date, one document at
 a time:

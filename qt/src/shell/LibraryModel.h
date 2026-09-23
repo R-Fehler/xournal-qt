@@ -202,6 +202,8 @@ private:
     void updateSearch();
     void watchFolders(const std::vector<fs::path>& folders);
     void applyResult(const DocumentFiles::Result& r);
+    /// Files moved by the app: the index, the reading places and the previews follow.
+    void followMoves(const std::vector<std::pair<fs::path, fs::path>>& moves);
     void setRows(std::vector<Row> newRows);
     void copyInBackground(std::vector<fs::path> files, fs::path target);
     void selectionUpdated();

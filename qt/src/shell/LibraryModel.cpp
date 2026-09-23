@@ -42,7 +42,11 @@ LibraryModel::LibraryModel(QObject* parent): QAbstractListModel(parent) {
     connect(&searchTimer, &QTimer::timeout, this, &LibraryModel::updateSearch);
 }
 
-LibraryModel::~LibraryModel() = default;
+LibraryModel::~LibraryModel() {
+    if (lib) {
+        PreviewCache::setLibrary({});  // (writes what is not written yet)
+    }
+}
 
 void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     beginResetModel();
@@ -54,9 +58,10 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     query.clear();
     if (lib) {
         const fs::path meta = lib->metaDir();
-        PreviewCache::setLibrary(lib->root(), meta / "previews");
+        const CacheLocation where(lib->root());
+        PreviewCache::setLibrary(where);
         DocumentPlaces::setLibrary(lib->root(), meta / "pages.json");
-        idx = std::make_unique<LibraryIndex>(lib->root());
+        idx = std::make_unique<LibraryIndex>(lib->root(), where);
         connect(idx.get(), &LibraryIndex::progress, this, [this] {
             Q_EMIT indexChanged();
             if (!query.isEmpty() && !searchTimer.isActive()) {
@@ -69,7 +74,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
         watcher = std::make_unique<QFileSystemWatcher>();
         connect(watcher.get(), &QFileSystemWatcher::directoryChanged, this, [this] { refreshTimer.start(); });
     } else {
-        PreviewCache::setLibrary({}, {});
+        PreviewCache::setLibrary({});
         DocumentPlaces::setLibrary({}, {});
     }
     endResetModel();
@@ -456,9 +461,16 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
 
 void LibraryModel::filesMoved(const DocumentFiles::Result& r) {
     if (idx && !r.moved.empty()) {
-        idx->moved(r.moved);
-        DocumentPlaces::moved(r.moved);
+        followMoves(r.moved);
         refresh();
+    }
+}
+
+void LibraryModel::followMoves(const std::vector<std::pair<fs::path, fs::path>>& moves) {
+    if (idx && !moves.empty()) {
+        idx->moved(moves);
+        DocumentPlaces::moved(moves);  // before the refresh: the entries are not read again
+        PreviewCache::moved(moves);
     }
 }
 
@@ -467,10 +479,7 @@ void LibraryModel::applyResult(const DocumentFiles::Result& r) {
         Q_EMIT error(QString::fromStdString(r.error));
         return;
     }
-    if (idx) {
-        idx->moved(r.moved);
-        DocumentPlaces::moved(r.moved);  // before the refresh: the entries are not read again
-    }
+    followMoves(r.moved);
     if (onFilesChanged) {
         onFilesChanged(r);
     }
@@ -710,10 +719,7 @@ bool LibraryModel::transferTo(const QStringList& paths, const QString& folder, b
             errors << QString::fromStdString(r.error);
             continue;
         }
-        if (idx) {
-            idx->moved(r.moved);
-        DocumentPlaces::moved(r.moved);
-        }
+        followMoves(r.moved);
         if (onFilesChanged) {
             onFilesChanged(r);
         }
