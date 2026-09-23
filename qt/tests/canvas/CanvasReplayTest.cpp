@@ -1299,6 +1299,94 @@ TEST_F(CanvasReplayTest, touchWorksRightAfterThePenLeaves) {
     EXPECT_GT(fingerPan(*input, touchscreen, *view), 100) << "touch right after the pen left (no wait by default)";
 }
 
+// The pen held still on the page (pen, highlighter or hand in hand): what can be done here, as a finger held still
+// or a right click (the window offers paste there). The dot it began does not stay. A pen that moved first, or moves
+// a little more than it shakes, is writing: nothing is offered however long it then rests.
+TEST_F(CanvasReplayTest, aPenHeldStillOffersWhatCanBeDoneHere) {
+    QSignalSpy context(view.get(), &CanvasView::contextRequested);
+    const QPointF at = viewPos(0, QPointF(200, 200));
+    const std::string lastUndo = session->getUndoRedoHandler()->undoDescription();  // (the second page)
+    auto hold = [&](QPointF where, int ms) {
+        // A hand never holds perfectly still: a pixel or two to and fro, at the pen's rate
+        for (int t = 0; t < ms; t += 50) {
+            tablet(QEvent::TabletMove, where + QPointF((t / 50) % 2 ? 1.5 : -1.0, (t / 50) % 3 ? 1.0 : 0.0), 0.4,
+                   Qt::NoButton, Qt::LeftButton);
+            processEvents(50);
+        }
+    };
+
+    tablet(QEvent::TabletPress, at, 0.4, Qt::LeftButton, Qt::LeftButton);
+    hold(at, 700);
+    ASSERT_EQ(context.count(), 1) << "held still: what can be done here";
+    EXPECT_LT(QLineF(context.first().first().toPointF(), at).length(), 3) << "where the pen is";
+    // Moving on after that does not draw (the pen was not writing), until it is lifted
+    for (int i = 1; i <= 10; ++i) {
+        tablet(QEvent::TabletMove, at + QPointF(10 * i, 5 * i), 0.4, Qt::NoButton, Qt::LeftButton);
+    }
+    tablet(QEvent::TabletRelease, at + QPointF(100, 50), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(elementCount(0), 0u) << "the dot the long press began is gone, and nothing was drawn after it";
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), lastUndo) << "nothing new to undo";
+    EXPECT_EQ(context.count(), 1);
+
+    // The next stroke is written as usual
+    drawLine(0, QPointF(100, 300), QPointF(300, 320));
+    processEvents();
+    EXPECT_EQ(elementCount(0), 1u);
+
+    // Writing, then resting on the page while thinking: no menu, the stroke stays
+    const QPointF from = viewPos(0, QPointF(100, 400));
+    tablet(QEvent::TabletPress, from, 0.4, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 10; ++i) {
+        tablet(QEvent::TabletMove, from + QPointF(8 * i, 0), 0.5, Qt::NoButton, Qt::LeftButton);
+    }
+    hold(from + QPointF(80, 0), 700);
+    tablet(QEvent::TabletRelease, from + QPointF(80, 0), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(context.count(), 1) << "a pen resting after writing is still writing";
+    EXPECT_EQ(elementCount(0), 2u);
+
+    // A slow short stroke (more than the pen shakes) is writing too, however long it takes
+    const QPointF slow = viewPos(0, QPointF(100, 500));
+    tablet(QEvent::TabletPress, slow, 0.4, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 8; ++i) {
+        tablet(QEvent::TabletMove, slow + QPointF(2.0 * i, 0), 0.4, Qt::NoButton, Qt::LeftButton);
+        processEvents(100);
+    }
+    tablet(QEvent::TabletRelease, slow + QPointF(16, 0), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(context.count(), 1) << "a slow stroke is no long press";
+    EXPECT_EQ(elementCount(0), 3u);
+
+    // The highlighter as well; the eraser held still just erases (nothing is offered)
+    app->getToolHandler()->selectTool(TOOL_HIGHLIGHTER);
+    tablet(QEvent::TabletPress, at, 0.4, Qt::LeftButton, Qt::LeftButton);
+    hold(at, 700);
+    tablet(QEvent::TabletRelease, at, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(context.count(), 2) << "the highlighter held still";
+    EXPECT_EQ(elementCount(0), 3u) << "and its dot is gone too";
+    app->getToolHandler()->selectTool(TOOL_ERASER);
+    tablet(QEvent::TabletPress, at, 0.4, Qt::LeftButton, Qt::LeftButton);
+    hold(at, 700);
+    tablet(QEvent::TabletRelease, at, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(context.count(), 2) << "not for the eraser";
+
+    // The hand: held still, the same (and the page does not move after it)
+    app->getToolHandler()->selectTool(TOOL_HAND);
+    const QRectF visible = view->getViewController().visibleContentRect();
+    tablet(QEvent::TabletPress, at, 0.4, Qt::LeftButton, Qt::LeftButton);
+    hold(at, 700);
+    tablet(QEvent::TabletMove, at + QPointF(0, -60), 0.4, Qt::NoButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, at + QPointF(0, -60), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(context.count(), 3) << "the hand held still";
+    EXPECT_NEAR(view->getViewController().visibleContentRect().top(), visible.top(), 4)
+            << "no scrolling after it (only the shake before it)";
+    app->getToolHandler()->selectTool(TOOL_PEN);
+}
+
 // How long touch waits once the pen is away is a setting (none by default).
 TEST_F(CanvasReplayTest, touchWaitsAfterThePenAsLongAsTheSettingSays) {
     for (int i = 0; i < 6; ++i) {

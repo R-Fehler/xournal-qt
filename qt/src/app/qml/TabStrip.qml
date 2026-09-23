@@ -85,6 +85,32 @@ Rectangle {
             Layout.alignment: Qt.AlignVCenter
             onClicked: strip.overviewRequested()
         }
+        // The previous / next document, like Ctrl+PgUp / Ctrl+PgDown (round the ends); only with more than one
+        IconButton {
+            objectName: "previousTabButton"
+            visible: app.tabs.count > 1
+            iconName: "xqt-chevron-left"
+            tip: qsTr("Previous document (Ctrl+PgUp)")
+            implicitWidth: 38
+            implicitHeight: 38
+            icon.width: 22
+            icon.height: 22
+            Layout.alignment: Qt.AlignVCenter
+            onClicked: app.previousTab()
+        }
+        IconButton {
+            objectName: "nextTabButton"
+            visible: app.tabs.count > 1
+            iconName: "xqt-chevron-right"
+            tip: qsTr("Next document (Ctrl+PgDown)")
+            implicitWidth: 38
+            implicitHeight: 38
+            icon.width: 22
+            icon.height: 22
+            Layout.rightMargin: 4
+            Layout.alignment: Qt.AlignVCenter
+            onClicked: app.nextTab()
+        }
         ListView {
             id: list
             objectName: "tabList"

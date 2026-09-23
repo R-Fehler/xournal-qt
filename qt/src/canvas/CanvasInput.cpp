@@ -43,6 +43,11 @@ constexpr double TAP_MAX_MS = 250.0;
 constexpr double DOUBLE_TAP_MS = 350.0;    ///< the second tap comes this soon after the first
 constexpr double DOUBLE_TAP_PX = 60.0;     ///< ... and this close to it
 constexpr double TAP_SLOP_PX = 16.0;  // Krita's TOUCH_SLOP
+/// A pen held down counts as held still while it stays this close to where it went down (a hand shakes a little;
+/// a pen is more precise than a finger, and a short slow stroke must stay a stroke)
+constexpr double PEN_HOLD_SLOP_PX = 6.0;
+/// How long a finger or the pen is held still for what can be done here
+constexpr int LONG_PRESS_MS = 500;
 
 double monotonicMs() {
     using namespace std::chrono;
@@ -62,11 +67,47 @@ GdkModifierType toGdkModifiers(Qt::KeyboardModifiers m) {
 CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), view(view) {
     // A finger held still: the same as a right click (the window then offers paste and the rest)
     longPressTimer.setSingleShot(true);
-    longPressTimer.setInterval(500);
+    longPressTimer.setInterval(LONG_PRESS_MS);
     connect(&longPressTimer, &QTimer::timeout, this, [this] {
         longPressFired = true;
         Q_EMIT this->view.contextRequested(touchSessionStartPos);
     });
+    // The pen held still with the pen or highlighter: the same
+    penHoldTimer.setSingleShot(true);
+    penHoldTimer.setInterval(LONG_PRESS_MS);
+    connect(&penHoldTimer, &QTimer::timeout, this, [this] { penHeld(); });
+}
+
+void CanvasInput::startPenHold(const Event& event) {
+    penHoldFired = false;
+    penHoldTimer.stop();
+    // Only with the pen or highlighter (the press began a stroke) or the hand; not on a selection, which the pen
+    // moves then, nor on the setsquare or the compass being dragged
+    if (event.deviceClass != DeviceClass::Pen || !inputRunning || draggingGeometryTool || view.getSelection() ||
+        !penHoldTool()) {
+        return;
+    }
+    penHoldPos = event.viewPos;
+    penHoldTimer.start();
+}
+
+bool CanvasInput::penHoldTool() const {
+    const ToolType tool = view.getSession().getToolHandler()->getToolType();
+    return tool == TOOL_PEN || tool == TOOL_HIGHLIGHTER || tool == TOOL_HAND;
+}
+
+void CanvasInput::penHeld() {
+    if (!deviceClassPressed || runningDeviceClass != DeviceClass::Pen || !inputRunning || !penHoldTool()) {
+        return;
+    }
+    // Take back the dot the pen began: it was a long press, not writing (no element, nothing to undo)
+    if (sequenceStartPage && lastEvent) {
+        sequenceStartPage->onSequenceCancelEvent(DeviceId(static_cast<const GdkDevice*>(lastEvent->device)));
+    }
+    sequenceStartPage = nullptr;
+    inputRunning = false;
+    penHoldFired = true;
+    Q_EMIT view.contextRequested(penHoldPos);
 }
 
 // --- tablet --------------------------------------------------------------------------------------------------------
@@ -89,6 +130,7 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
     // xournal-qt: some pens switch the tool (e.g. the side button selects the eraser tool) through a proximity
     // change, possibly while the tip is down. Finish the running action of the previous tool first.
     if (inputRunning && runningDeviceClass && *runningDeviceClass != ev.deviceClass && lastEvent) {
+        penHoldTimer.stop();
         actionEnd(*lastEvent);
         deviceClassPressed = false;
         runningDeviceClass.reset();
@@ -105,10 +147,12 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
                 deviceClassPressed = true;
                 runningDeviceClass = ev.deviceClass;
                 actionStart(ev);
+                startPenHold(ev);
             } else if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton) {
                 // Port of StylusInputHandler: a barrel button press changes the tool; during a stroke, the stroke
                 // ends and a new one starts with the button's tool.
                 (e->button() == Qt::MiddleButton ? modifier2 : modifier3) = true;
+                penHoldTimer.stop();
                 if (inputRunning) {
                     actionEnd(ev);
                     actionStart(ev);
@@ -118,19 +162,35 @@ bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
             }
             break;
         case QEvent::TabletMove:
+            if (penHoldFired) {
+                break;  // held still: the window offers what can be done here; nothing more until the pen is lifted
+            }
+            if (penHoldTimer.isActive() && std::hypot(viewPos.x() - penHoldPos.x(), viewPos.y() - penHoldPos.y()) >
+                                                   PEN_HOLD_SLOP_PX) {
+                penHoldTimer.stop();  // it moved: writing (also when it rests later)
+            }
             if (deviceClassPressed) {
                 actionMotion(ev);
             }
             break;
         case QEvent::TabletRelease:
             if (e->button() == Qt::LeftButton) {
-                if (deviceClassPressed) {
+                penHoldTimer.stop();
+                if (penHoldFired) {
+                    // The stroke was taken back when the long press was noticed: only the tool goes back (a barrel
+                    // button may have lent another one)
+                    penHoldFired = false;
+                    if (ToolHandler* h = view.getSession().getToolHandler(); h->pointActiveToolToToolbarTool()) {
+                        h->fireToolChanged();
+                    }
+                } else if (deviceClassPressed) {
                     actionEnd(ev);
                 }
                 deviceClassPressed = false;
                 runningDeviceClass.reset();
             } else if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton) {
                 (e->button() == Qt::MiddleButton ? modifier2 : modifier3) = false;
+                penHoldTimer.stop();
                 if (inputRunning) {
                     actionEnd(ev);
                     actionStart(ev);
@@ -159,6 +219,8 @@ void CanvasInput::proximityEvent(bool entered) {
     if (!entered) {
         // Upstream: leaving resets the barrel buttons. A stroke still running (lost release) ends here.
         modifier2 = modifier3 = false;
+        penHoldTimer.stop();
+        penHoldFired = false;
         if (inputRunning && lastEvent) {
             actionEnd(*lastEvent);
         }

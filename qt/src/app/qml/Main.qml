@@ -589,6 +589,14 @@ ApplicationWindow {
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
+            // Full screen (F11). Not inside full screen itself: the tools there end with "Leave full screen"
+            IconButton {
+                objectName: "fullScreenButton"
+                visible: !win.fullScreenMode
+                iconName: "xopp-fullscreen"
+                tip: qsTr("Full screen (F11)")
+                onClicked: win.fullScreenMode = true
+            }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
             IconButton {
                 objectName: "moreButton"
@@ -937,7 +945,16 @@ ApplicationWindow {
             y = canvas.y + box.y - height - 8 < canvas.y ? canvas.y + box.y + box.height + 8
                                                          : canvas.y + box.y - height - 8
         }
-        onVisibleChanged: if (visible) refresh()
+        onVisibleChanged: if (visible) refresh(); else pasteOffered = false
+        /// Selected by a long press (finger or pen): paste at that place is offered too, as the long press does
+        /// everywhere else (only if there is something to paste)
+        property bool pasteOffered: false
+        property point pasteAt: Qt.point(0, 0)
+        function offerPaste(viewPos) {
+            pasteAt = viewPos
+            pasteOffered = app.canPaste()
+            Qt.callLater(refresh)  // (wider now)
+        }
         Material.foreground: "#303030"
         background: Rectangle {
             radius: height / 2
@@ -971,6 +988,18 @@ ApplicationWindow {
             IconButton { iconName: "xqt-underline"; tip: qsTr("Underline"); onClicked: app.markPdfText("underline") }
             IconButton { iconName: "xqt-strikethrough"; tip: qsTr("Strike through"); onClicked: app.markPdfText("strikethrough") }
             IconButton { iconName: "xopp-edit-copy"; tip: qsTr("Copy text"); onClicked: app.copyPdfText() }
+            ToolSeparator { visible: pdfTextBar.pasteOffered }
+            IconButton {
+                objectName: "pdfTextPaste"
+                iconName: "xopp-edit-paste"
+                tip: qsTr("Paste here")
+                visible: pdfTextBar.pasteOffered
+                onClicked: {
+                    const at = pdfTextBar.pasteAt
+                    app.clearPdfTextSelection()  // it was about pasting, not about the text
+                    app.pasteAt(at.x, at.y)
+                }
+            }
         }
     }
 
@@ -1072,6 +1101,8 @@ ApplicationWindow {
         orientation: Qt.Vertical
         anchors.top: canvas.top
         anchors.right: canvas.right
+        // (beside the strip that brings a right tool bar back, not under it)
+        anchors.rightMargin: toolbarShow.visible && toolbarShow.side === "right" ? toolbarShow.width : 0
         anchors.bottom: canvas.bottom
         anchors.bottomMargin: hbar.visible ? hbar.height : 0
         visible: canvas.contentHeight > canvas.height + 1 && !pageGrid.visible
@@ -1314,14 +1345,12 @@ ApplicationWindow {
            : win.toolbarPosition === "right" ? parent.width - sideTools.width - width / 2
            : parent.width - width - 18
         y: win.sideToolbar ? Math.round(parent.height / 2) : -height / 2
-        Image {
+        Image {  // towards the bar it puts away: up, left or right
             anchors.centerIn: parent
-            source: app.iconUrl(win.sideToolbar
-                                ? (win.toolbarPosition === "left" ? "xqt-chevron-up" : "xqt-chevron-down")
-                                : "xqt-chevron-up")
+            source: app.iconUrl("xqt-chevron-up")
             sourceSize.width: 15
             sourceSize.height: 15
-            rotation: win.sideToolbar ? (win.toolbarPosition === "left" ? -90 : 90) : 0
+            rotation: win.toolbarPosition === "left" ? -90 : win.toolbarPosition === "right" ? 90 : 0
         }
         TapHandler { onTapped: app.toolbarHidden = true }
         ToolTip.visible: hoverHandler.hovered
@@ -1329,25 +1358,28 @@ ApplicationWindow {
         ToolTip.delay: 600
         HoverHandler { id: hoverHandler }
     }
-    // While it is away: a slim strip at the top edge brings it back
+    // While it is away: a slim strip at the edge where it was (top, left or right) brings it back
     Rectangle {
+        id: toolbarShow
         objectName: "toolbarShow"
         visible: !app.homeVisible && !win.fullScreenMode && app.toolbarHidden
-        z: 58
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: 96
-        height: 16
+        readonly property string side: win.sideToolbar ? win.toolbarPosition : "top"
+        z: 60  // over the edge of the pen pill, which sits at the right edge by default
+        width: side === "top" ? 96 : 16
+        height: side === "top" ? 16 : 96
+        x: side === "left" ? 0 : side === "right" ? parent.width - width : Math.round((parent.width - width) / 2)
+        y: side === "top" ? 0 : Math.round((parent.height - height) / 2)
         radius: 8
         color: "#f1f3f4"
         border.width: 1
         border.color: "#d5d8dc"
         opacity: showHover.hovered ? 1 : 0.75
-        Image {
+        Image {  // where the bar comes in from: down from the top, into the pages from a side
             anchors.centerIn: parent
             source: app.iconUrl("xqt-chevron-down")
             sourceSize.width: 15
             sourceSize.height: 15
+            rotation: toolbarShow.side === "left" ? -90 : toolbarShow.side === "right" ? 90 : 0
         }
         TapHandler { onTapped: app.toolbarHidden = false }
         HoverHandler { id: showHover }
@@ -1456,9 +1488,11 @@ ApplicationWindow {
     PdfTextHandles { }
     Connections {
         target: app
-        // On PDF text a long press (or right click) selects the word; elsewhere it offers what can be done here
+        // On PDF text a long press (or right click) selects the word, and its actions offer paste as well; elsewhere
+        // it offers what can be done here
         function onContextRequested(viewPos) {
             if (app.selectPdfTextAt(viewPos.x, viewPos.y)) {
+                pdfTextBar.offerPaste(viewPos)
                 return
             }
             contextPill.openAt(viewPos, app.pdfTextIsSelected)

@@ -174,6 +174,37 @@ TEST_F(MainWindowTest, ctrlTabSwitchesTabs) {
     EXPECT_EQ(controller->currentTab(), 1);
 }
 
+// Beside the overview button: the previous and the next document, like Ctrl+PgUp / Ctrl+PgDown (round the ends)
+TEST_F(MainWindowTest, arrowsBesideTheOverviewSwitchTabs) {
+    auto* previous = findItem("previousTabButton");
+    auto* next = findItem("nextTabButton");
+    auto* overview = findItem("overviewButton");
+    ASSERT_NE(previous, nullptr);
+    ASSERT_NE(next, nullptr);
+    ASSERT_NE(overview, nullptr);
+    ASSERT_EQ(controller->tabCount(), 1);
+    EXPECT_FALSE(previous->isVisible()) << "one document: nothing to switch to";
+    EXPECT_FALSE(next->isVisible());
+
+    controller->newDocument();
+    controller->newDocument();
+    wait(50);
+    ASSERT_EQ(controller->tabCount(), 3);
+    ASSERT_EQ(controller->currentTab(), 2);
+    EXPECT_TRUE(previous->isVisible());
+    EXPECT_TRUE(next->isVisible());
+    const auto sceneX = [](QQuickItem* i) { return i->mapToScene(QPointF(0, 0)).x(); };
+    EXPECT_LT(std::abs(sceneX(next) - sceneX(overview)), 120) << "next to the overview button";
+    EXPECT_LT(sceneX(previous), sceneX(next)) << "previous on the left";
+
+    click(next);
+    EXPECT_EQ(controller->currentTab(), 0) << "past the last one: the first, as Ctrl+PgDown";
+    click(previous);
+    EXPECT_EQ(controller->currentTab(), 2) << "before the first one: the last, as Ctrl+PgUp";
+    click(previous);
+    EXPECT_EQ(controller->currentTab(), 1);
+}
+
 TEST_F(MainWindowTest, tabOverviewSwitchesAndCloses) {
     controller->newDocument();
     controller->newDocument();
@@ -1312,6 +1343,46 @@ TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
     controller->selectTool("pen");
 }
 
+// Full screen from a button in the tool bar, and back out with the finger alone (no F11, no Escape)
+TEST_F(MainWindowTest, fullScreenButtonAndBackByTouch) {
+    window->setWidth(2000);  // room for the whole tool bar (it scrolls in a narrower window)
+    wait(100);
+    auto* button = findItem("fullScreenButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_TRUE(button->isVisible());
+    ASSERT_LT(button->mapToScene(QPointF(button->width(), 0)).x(), window->width()) << "in sight";
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    const auto tap = [&](QQuickItem* item) {
+        const QPoint at = item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
+        QTest::touchEvent(window, finger).press(1, at);
+        QTest::touchEvent(window, finger).release(1, at);
+        wait(80);
+    };
+    tap(button);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    ASSERT_TRUE(window->property("fullScreenMode").toBool()) << "the button goes full screen";
+
+    // The way back: the tool square, then "Leave full screen"
+    auto* square = find<QQuickItem>("quickToolSquare");
+    ASSERT_NE(square, nullptr);
+    ASSERT_TRUE(square->isVisible());
+    tap(square);
+    QObject* tools = find("quickTools");
+    ASSERT_TRUE(waitOpened(tools, true));
+    EXPECT_FALSE(button->isVisible()) << "not twice: the tools offer \"Leave full screen\" right below";
+    auto* leave = findItem("leaveFullScreenButton");
+    if (!leave) {
+        leave = find<QQuickItem>("leaveFullScreenButton");
+    }
+    ASSERT_NE(leave, nullptr);
+    ASSERT_TRUE(leave->isVisible());
+    tap(leave);
+    until([&] { return !window->property("fullScreenMode").toBool(); });
+    EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "left full screen by touch";
+    until([&] { return button->isVisible(); });
+    EXPECT_TRUE(button->isVisible()) << "back in the tool bar";
+}
+
 TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     // A 6-page PDF with an outline: "Chapter 1" p.1 (with "Section 1.1" p.3), "Chapter 2" p.5
     QTemporaryDir tmp;
@@ -1485,6 +1556,80 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
     EXPECT_TRUE(pen->isVisible());
     EXPECT_FALSE(square->isVisible());
     (void)tools;
+}
+
+// Docked at a side, the little tab points towards the bar it puts away, and the strip that brings the bar back is at
+// that side, pointing into the pages (where the bar will come from).
+TEST_F(MainWindowTest, theToolBarTabAndStripFollowTheDockSide) {
+    auto* toggle = find<QQuickItem>("toolbarToggle");
+    auto* show = find<QQuickItem>("toolbarShow");
+    ASSERT_NE(toggle, nullptr);
+    ASSERT_NE(show, nullptr);
+    // Where the chevron on it points, from the icon and its rotation (clockwise, y down)
+    auto pointsTo = [](QQuickItem* item) -> std::string {
+        QQuickItem* arrow = nullptr;
+        for (QQuickItem* c: item->childItems()) {
+            if (c->property("source").isValid()) {
+                arrow = c;
+            }
+        }
+        if (!arrow) {
+            return "no arrow";
+        }
+        const QString source = arrow->property("source").toUrl().toString();
+        QPointF d = source.contains("chevron-up")      ? QPointF(0, -1)
+                    : source.contains("chevron-down")  ? QPointF(0, 1)
+                    : source.contains("chevron-right") ? QPointF(1, 0)
+                    : source.contains("chevron-left")  ? QPointF(-1, 0)
+                                                       : QPointF();
+        const double a = arrow->rotation() * M_PI / 180.0;
+        const QPointF r(d.x() * std::cos(a) - d.y() * std::sin(a), d.x() * std::sin(a) + d.y() * std::cos(a));
+        if (r.y() < -0.5) return "up";
+        if (r.y() > 0.5) return "down";
+        if (r.x() < -0.5) return "left";
+        if (r.x() > 0.5) return "right";
+        return "nowhere";
+    };
+    QQuickItem* area = show->parentItem();  // the window below the tab strip
+    ASSERT_NE(area, nullptr);
+    const double w = area->width();
+    const double h = area->height();
+    struct Case {
+        const char* position;
+        const char* hideArrow;  // towards the bar
+        const char* showArrow;  // from the bar into the pages
+    };
+    for (const Case c: {Case{"top", "up", "down"}, Case{"left", "left", "right"}, Case{"right", "right", "left"}}) {
+        SCOPED_TRACE(c.position);
+        controller->setToolbarHidden(false);
+        controller->setToolbarPosition(c.position);
+        wait(60);
+        ASSERT_TRUE(toggle->isVisible());
+        EXPECT_EQ(pointsTo(toggle), c.hideArrow) << "the tab points towards the bar it puts away";
+
+        controller->setToolbarHidden(true);
+        wait(60);
+        ASSERT_TRUE(show->isVisible());
+        EXPECT_EQ(pointsTo(show), c.showArrow) << "the strip points to where the bar comes in";
+        const QRectF strip(show->mapToItem(area, QPointF(0, 0)), show->size());
+        if (std::string(c.position) == "top") {
+            EXPECT_NEAR(strip.top(), 0, 1) << "at the top edge";
+            EXPECT_GT(strip.width(), strip.height()) << "lying along the top edge";
+        } else {
+            EXPECT_GT(strip.height(), strip.width()) << "standing along the side";
+            EXPECT_GT(strip.top(), h / 4) << "about the middle of the side, not at the top";
+            EXPECT_LT(strip.bottom(), h * 3 / 4);
+            if (std::string(c.position) == "left") {
+                EXPECT_NEAR(strip.left(), 0, 1) << "at the left edge";
+            } else {
+                EXPECT_NEAR(strip.right(), w, 1) << "at the right edge";
+            }
+        }
+        click(show);
+        until([&] { return !controller->toolbarHidden(); });
+        EXPECT_FALSE(controller->toolbarHidden()) << "a tap on the strip brings the bar back";
+    }
+    controller->setToolbarPosition("top");
 }
 
 TEST_F(MainWindowTest, penPillWithoutAToolBar) {
@@ -2204,6 +2349,104 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     EXPECT_GE(box.y(), 0);
     EXPECT_LE(box.y(), canvasItem->height());
     EXPECT_TRUE(controller->pdfTextIsSelected()) << "and it is still the same selection";
+}
+
+// A long press on the text of a PDF selects its word; the actions for that text then offer paste as well (at the
+// place pressed), so paste is always at hand with a long press, with the finger and with the pen.
+TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    wait(100);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto* bar = find<QQuickItem>("pdfTextBar");
+    ASSERT_NE(bar, nullptr);
+    auto* session = controller->tabManager().currentSession();
+    QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
+    session->search().setQuery("Test", false);
+    ASSERT_TRUE(searched.wait(3000));
+    ASSERT_FALSE(session->search().hits().empty());
+    const QRectF hit = session->search().hits().front().rect;
+    session->search().clear();
+    const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
+    const QPoint onWordInWindow = canvasItem->mapToScene(onWord).toPoint();
+    const auto elements = [&] {
+        size_t n = 0;
+        for (const Layer* l: session->getDocument()->getPage(0)->getLayersView()) {
+            n += l->getElementsView().size();
+        }
+        return n;
+    };
+    const size_t before = elements();
+
+    // A finger held on the word
+    QGuiApplication::clipboard()->setText("pasted on the text");
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    QTest::touchEvent(window, finger).press(1, onWordInWindow);
+    wait(800);
+    QTest::touchEvent(window, finger).release(1, onWordInWindow);
+    wait(50);
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(controller->pdfTextIsSelected()) << "the word is selected";
+    ASSERT_TRUE(bar->isVisible()) << "with its actions";
+    QQuickItem* paste = findItem("pdfTextPaste");
+    ASSERT_NE(paste, nullptr);
+    EXPECT_TRUE(paste->isVisible()) << "paste is among them";
+    QMetaObject::invokeMethod(paste, "clicked");  // (a click in the overlay is unreliable off screen)
+    until([&] { return elements() > before; });
+    EXPECT_EQ(elements(), before + 1) << "the text went onto the page";
+    const auto* pasted = session->getDocument()->getPage(0)->getSelectedLayer()->getElementsView().back();
+    const auto& box = pasted->getBoundingBox();
+    EXPECT_TRUE(QRectF(box.x, box.y, box.width, box.height).adjusted(-40, -40, 40, 40).contains(hit.center()))
+            << "where the finger was";
+    until([&] { return !controller->pdfTextIsSelected(); });
+    EXPECT_FALSE(controller->pdfTextIsSelected()) << "pasting ends the text selection";
+    controller->clearSelection();
+    wait(50);
+
+    // Nothing to paste: not offered
+    QGuiApplication::clipboard()->clear();
+    ASSERT_FALSE(controller->canPaste());
+    QTest::touchEvent(window, finger).press(1, onWordInWindow);
+    wait(800);
+    QTest::touchEvent(window, finger).release(1, onWordInWindow);
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(bar->isVisible());
+    EXPECT_FALSE(paste->isVisible()) << "an empty clipboard: no paste";
+    controller->clearPdfTextSelection();
+    until([&] { return !bar->isVisible(); });
+
+    // A text selected by dragging over it with the text tool (not a long press): no paste either, there is no place
+    // pressed to paste at
+    QGuiApplication::clipboard()->setText("pasted again");
+    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
+    until([&] { return bar->isVisible(); });
+    EXPECT_FALSE(paste->isVisible());
+    controller->clearPdfTextSelection();
+    until([&] { return !bar->isVisible(); });
+
+    // The pen held still on the word, with the pen in hand: the same, and the dot it began does not stay
+    controller->selectTool("pen");
+    static QPointingDevice pen("ui test pen", 3002, QInputDevice::DeviceType::Stylus,
+                               QPointingDevice::PointerType::Pen,
+                               QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3);
+    const auto tablet = [&](QEvent::Type type, Qt::MouseButton button, Qt::MouseButtons buttons, double pressure) {
+        const QPointF at(onWordInWindow);
+        QTabletEvent e(type, &pen, at, window->mapToGlobal(at), pressure, 0.f, 0.f, 0.f, 0.0, 0.f, Qt::NoModifier,
+                       button, buttons);
+        QCoreApplication::sendEvent(window, &e);
+    };
+    const size_t withPasted = elements();
+    tablet(QEvent::TabletPress, Qt::LeftButton, Qt::LeftButton, 0.4);
+    wait(800);
+    tablet(QEvent::TabletRelease, Qt::LeftButton, Qt::NoButton, 0.0);
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(controller->pdfTextIsSelected()) << "the pen held on the word selects it";
+    EXPECT_TRUE(paste->isVisible()) << "and paste is offered";
+    EXPECT_EQ(elements(), withPasted) << "no dot left by the pen";
+    controller->clearPdfTextSelection();
+    wait(50);
+    xqt::PenHover::instance().reset();
 }
 
 // The eraser button: a tap takes the eraser, tapped again it offers how the eraser erases.
