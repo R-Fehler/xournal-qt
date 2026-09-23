@@ -14,6 +14,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HeadlessViews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.h
@@ -62,7 +64,8 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-session-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSessionTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSearchTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSearchTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp)
     target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
