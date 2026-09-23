@@ -600,15 +600,16 @@ int AppController::pastePages(int position) {
     QString note = n == 1 ? tr("Page pasted") : tr("%1 pages pasted").arg(n);
     if (!keptIn.empty()) {
         // Once per paste: where the PDF pages went (a new file next to the document)
-        const QString where = QString::fromStdString(keptIn.filename().string());
-        if (MergedPdf::inCache(keptIn)) {
+        const fs::path place = session()->mergedPdfPlace();  // (in the cache until it is saved)
+        const QString where = QString::fromStdString(place.filename().string());
+        if (place.empty()) {
             note = n == 1 ? tr("Page pasted. Its PDF text stays searchable: it is saved next to the document.")
                           : tr("%1 pages pasted. Their PDF text stays searchable: they are saved next to the document.")
                                     .arg(n);
         } else {
-            note = n == 1 ? tr("Page pasted. Its PDF text stays searchable: it is kept in %1 next to the document.")
+            note = n == 1 ? tr("Page pasted. Its PDF text stays searchable: it is saved in %1 next to the document.")
                                     .arg(where)
-                          : tr("%1 pages pasted. Their PDF text stays searchable: they are kept in %2 next to the "
+                          : tr("%1 pages pasted. Their PDF text stays searchable: they are saved in %2 next to the "
                                "document.")
                                     .arg(n)
                                     .arg(where);
@@ -1413,6 +1414,15 @@ void AppController::recover(bool accept) {
     // The recovered content is in the tabs now (unsaved), or was discarded.
     for (const auto& c: candidates) {
         std::error_code ec;
+        if (!accept) {
+            // With it goes a merged PDF of pasted pages in the cache that it used (never saved anywhere else)
+            if (auto r = DocumentSession::loadFile(c.recoveryFile); r.document) {
+                if (const fs::path pdf = r.document->getPdfFilepath(); MergedPdf::inCache(pdf)) {
+                    r.document.reset();
+                    fs::remove(pdf, ec);
+                }
+            }
+        }
         fs::remove(c.recoveryFile, ec);
     }
     recoveryPending = false;

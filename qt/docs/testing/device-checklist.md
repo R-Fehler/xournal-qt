@@ -511,7 +511,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 ## Pasted PDF pages stay searchable (qt/pdf-pages)
 - [ ] Open a lecture PDF with its `.xopp` (a document of the library) and another PDF with text. In the other PDF,
       copy a page (sidebar or page grid, Ctrl+C), go to the lecture and paste it (Ctrl+V). The note says the page
-      was pasted and that its PDF pages are kept in `.lecture.pages.pdf` next to the document; it is readable and
+      was pasted and that its PDF pages are saved in `.lecture.pages.pdf` next to the document; it is readable and
       wraps in a narrow window. The pasted page looks as in the other PDF (sharp at any zoom, not a picture).
 - [ ] Search (Ctrl+F) a word of the pasted page: it is found, marked on the page, in the sidebar and in the page grid.
       Mark PDF text on the pasted page (select, copy text, highlight): works as on the lecture's own pages.
@@ -534,3 +534,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       library search (also the extended search with pages) finds a word of a pasted page. Move it to the trash: the
       trash has `.lecture.pages.pdf` with it.
 - [ ] Rename the lecture while it is open with a pasted page not saved yet, then save: the pages stay right.
+- [ ] Paste a page from another PDF into a saved lecture: no `.lecture.pages.pdf` appears next to it (hidden files
+      shown) until you save. Close it without saving: nothing new next to it, and nothing left in
+      `~/.cache/xournal-qt/pasted-pages`.

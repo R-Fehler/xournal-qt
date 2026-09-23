@@ -118,6 +118,8 @@ public:
     /// The page numbers in the background PDF stay valid while this does not change (a save dropped unused pages
     /// of the merged PDF and renumbered the pages).
     quint64 pdfNumbering() const;
+    /// Where the merged PDF (in the cache until then) goes when the document is saved (empty: not saved yet, or none).
+    fs::path mergedPdfPlace() const;
     /// The PDF the document annotates for the user: its background PDF, or while the merged PDF of a document that
     /// was never saved is in the cache, the PDF it was made from (empty if none).
     fs::path annotatedPdf() const;
@@ -226,6 +228,8 @@ private:
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
     SaveResult saveImpl(fs::path target);
+    /// Write the .xopp (the file only).
+    SaveResult writeXopp(const fs::path& target);
 
     // UndoRedoListener
     void undoRedoChanged() override;

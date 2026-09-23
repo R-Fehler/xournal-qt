@@ -45,13 +45,19 @@ the document uses as its background from then on. Their text stays searchable an
   the lecture's pages followed by the pasted ones. `lecture.pdf` itself is never changed.
 - A document that had no PDF: the merged PDF is `lecture.pdf` next to it, so the library pairs the two as one
   document; if that name is taken by another PDF, the hidden `.lecture.pages.pdf`.
-- A document never saved: in the cache (`~/.cache/xournal-qt/pasted-pages`) until its first save puts it next to
-  the `.xopp` by the rules above. Closed without saving, it is removed.
+- Nothing is written next to the document before it is saved: pasted pages go into a merged PDF in the cache
+  (`~/.cache/xournal-qt/pasted-pages`), and saving puts it next to the `.xopp` by the rules above. Closed without
+  saving, the document leaves nothing next to it, and the cache copy is removed (also for a document recovered
+  after a crash, and when the recovery is declined).
 - Every later paste, from any PDF, goes into the same file; the same copied pages pasted again are not added twice.
   Pages pasted within the same document keep referring to its own PDF pages.
 - Saving drops the PDF pages no page shows any more (deleted pasted pages, deleted pages) and renumbers the pages;
   nothing is written when nothing changed. Pages that come back through undo get their PDF pages back (kept in
   memory). "Save as" gives the new name its own copy.
+- A save that renumbers the merged PDF the saved `.xopp` refers to writes it as `.<name>.next.pdf` first, writes the
+  `.xopp` referring to that, gives the PDF its name (a second link to the same file, renamed over the old one),
+  writes the `.xopp` again and removes the other name. A crash at any point leaves a `.xopp` with a PDF that
+  matches it; the next save tidies up.
 - A merged PDF carries a mark (`/XournalQtPages` in its document information), so a user's own PDF is never
   rewritten. All writes go to a hidden `.….part` file first, which is then renamed over the target.
 - The note after pasting says where the pages are kept.

@@ -758,6 +758,8 @@ fs::path DocumentSession::annotatedPdf() const { return pdfPages->annotatedPdf()
 
 quint64 DocumentSession::pdfNumbering() const { return pdfPages->numbering(); }
 
+fs::path DocumentSession::mergedPdfPlace() const { return pdfPages->placeFor(getFilePath()); }
+
 std::string DocumentSession::getDisplayName() const {
     std::shared_lock lock(*doc);
     if (auto p = doc->getFilepath(); !p.empty()) {
@@ -814,9 +816,42 @@ void DocumentSession::updatePreview(Document& document) {
 }
 
 auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
-    // Port of SaveJob::save
     Util::safeReplaceExtension(target, "xopp");
-    pdfPages->beforeSave(target);  // xournal-qt: the merged PDF of pasted PDF pages goes next to it, compacted
+    // xournal-qt: the merged PDF of pasted PDF pages goes next to it, compacted. A renumbered one that replaces the
+    // file the saved .xopp refers to is written under another name first: the .xopp is written referring to that,
+    // then the PDF gets its name and the .xopp is written again. A crash at any point leaves a matching pair.
+    pdfPages->beforeSave(target);
+    auto stop = [](int step) { return PdfPageKeeper::stopSaveAt && PdfPageKeeper::stopSaveAt(step); };
+    if (stop(1)) {
+        return {false, "stopped (test)"};
+    }
+    SaveResult r = writeXopp(target);
+    if (r.ok && pdfPages->hasStaged()) {
+        if (stop(2)) {
+            return {false, "stopped (test)"};
+        }
+        pdfPages->commitStaged();
+        if (stop(3)) {
+            return {false, "stopped (test)"};
+        }
+        r = writeXopp(target);
+    }
+    if (!r.ok) {
+        return r;
+    }
+    if (stop(4)) {
+        return {false, "stopped (test)"};
+    }
+    pdfPages->finishStaged();  // (the file under the other name: no .xopp refers to it now)
+    // Port of Control::resetSavedStatus
+    undoRedo->documentSaved();
+    undoRedoChanged();
+    Q_EMIT filePathChanged();
+    return {true, {}};
+}
+
+auto DocumentSession::writeXopp(const fs::path& target) -> SaveResult {
+    // Port of SaveJob::save
     updatePreview(*doc);
     SaveHandler h;
 
@@ -854,11 +889,6 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     } else {
         doc->setCreateBackupOnSave(true);
     }
-
-    // Port of Control::resetSavedStatus
-    undoRedo->documentSaved();
-    undoRedoChanged();
-    Q_EMIT filePathChanged();
     return {true, {}};
 }
 

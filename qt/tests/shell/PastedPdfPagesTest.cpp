@@ -25,6 +25,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "session/MergedPdf.h"
+#include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/TabManager.h"
@@ -115,6 +116,7 @@ TEST_F(PastedPdfPages, stayPdfPagesWithTheirTextInAHiddenSidecar) {
     const PageRef pasted = s.getDocument()->getPage(1);
     ASSERT_TRUE(pasted->getBackgroundType().isPdfPage()) << "a PDF page, not an image";
     EXPECT_EQ(pasted->getPdfPageNr(), 3u) << "after the three pages of the lecture";
+    ASSERT_TRUE(c.save());
     EXPECT_EQ(backgroundOf(s), root / ".lecture.pages.pdf");
     EXPECT_TRUE(fs::exists(root / ".lecture.pages.pdf"));
     EXPECT_EQ(bytesOf(root / "lecture.pdf"), original) << "the lecture's PDF is never changed";
@@ -163,7 +165,7 @@ TEST_F(PastedPdfPages, withinTheSamePdfTheyReferToItsPages) {
     c.tabManager().setCurrentIndex(0);
     ASSERT_EQ(&current(c), &s);
     ASSERT_EQ(c.pastePages(0), 1);
-    ASSERT_EQ(backgroundOf(s), root / ".lecture.pages.pdf");
+    ASSERT_TRUE(MergedPdf::inCache(backgroundOf(s)));
     c.copyPages({4});  // "lecturethree": pastedalpha, lecturethree, lectureone, lecturetwo, lecturethree
     ASSERT_EQ(c.pastePages(0), 1);
     EXPECT_EQ(s.getDocument()->getPage(0)->getPdfPageNr(), 2u);
@@ -178,6 +180,7 @@ TEST_F(PastedPdfPages, aDocumentWithoutPdfGetsItsOwnPairedPdf) {
     newSaved(c, root / "notes.xopp");
     DocumentSession& s = current(c);
     ASSERT_EQ(c.pastePages(1), 2);
+    ASSERT_TRUE(c.save());
     EXPECT_EQ(backgroundOf(s), root / "notes.pdf");
     EXPECT_EQ(MergedPdf::kindOf(root / "notes.pdf"), MergedPdf::Kind::Own);
     EXPECT_EQ(DocumentFiles::itemOf(root / "notes.xopp").pdf, root / "notes.pdf") << "one document in the library";
@@ -189,9 +192,60 @@ TEST_F(PastedPdfPages, aDocumentWithoutPdfGetsItsOwnPairedPdf) {
     const std::string busy = bytesOf(root / "busy.pdf");
     newSaved(c, root / "busy.xopp");
     ASSERT_EQ(c.pastePages(0), 2);
+    ASSERT_TRUE(c.save());
     EXPECT_EQ(backgroundOf(current(c)), root / ".busy.pages.pdf");
     EXPECT_EQ(bytesOf(root / "busy.pdf"), busy);
     EXPECT_TRUE(pageHasText(current(c), 0, "pastedalpha"));
+}
+
+// Nothing is written next to a saved document before it is saved: closed without saving, it leaves no file.
+TEST_F(PastedPdfPages, aSavedDocumentGetsNoFileBeforeItIsSaved) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    newSaved(c, root / "notes.xopp");
+    const auto before = pdfsIn(root);
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& lecture = current(c);
+    QSignalSpy notes(&c, &AppController::pageActionDone);
+    ASSERT_EQ(c.pastePages(1), 1);
+    EXPECT_TRUE(pageHasText(lecture, 1, "pastedbeta"));
+    const fs::path cached = backgroundOf(lecture);
+    EXPECT_TRUE(MergedPdf::inCache(cached)) << cached;
+    ASSERT_EQ(notes.count(), 1);
+    EXPECT_TRUE(notes.first().at(0).toString().contains(".lecture.pages.pdf")) << "where it will be";
+    c.tabManager().setCurrentIndex(0);
+    ASSERT_EQ(c.pastePages(1), 1);  // into notes.xopp (no PDF)
+    const fs::path cachedNotes = backgroundOf(current(c));
+    EXPECT_TRUE(MergedPdf::inCache(cachedNotes));
+    EXPECT_EQ(pdfsIn(root), before) << "no .lecture.pages.pdf, no notes.pdf yet";
+
+    // Closed without saving: nothing is left, neither next to them nor in the cache
+    c.closeTab(0);
+    c.closeTab(c.tabManager().count() - 1);
+    EXPECT_EQ(pdfsIn(root), before);
+    EXPECT_FALSE(fs::exists(cached));
+    EXPECT_FALSE(fs::exists(cachedNotes));
+}
+
+// A document reopened after a crash may use a merged PDF of the cache: it goes when the document is closed.
+TEST_F(PastedPdfPages, theCachedPdfOfARecoveredDocumentGoesWhenItIsClosed) {
+    std::string copied;
+    ASSERT_TRUE(MergedPdf::extract(root / "other.pdf", {0}, copied).ok);
+    const fs::path cached = MergedPdf::cacheFolder() / "1-1-1.pdf";  // (of a process that is gone)
+    ASSERT_TRUE(MergedPdf::append({}, copied, cached, MergedPdf::Kind::Own).ok);
+    {
+        auto loaded = DocumentSession::loadFile(cached);
+        ASSERT_TRUE(loaded.document);
+        ASSERT_TRUE(DocumentSession::writeDocument(*loaded.document, root / "recovered.xopp").ok);
+    }
+    AppController c;
+    ASSERT_TRUE(open(c, root / "recovered.xopp"));
+    EXPECT_TRUE(fs::equivalent(backgroundOf(current(c)), cached));
+    EXPECT_TRUE(pageHasText(current(c), 0, "pastedalpha"));
+    c.closeTab(c.currentTab());
+    EXPECT_FALSE(fs::exists(cached));
 }
 
 TEST_F(PastedPdfPages, severalPastesFromSeveralPdfsGoIntoOneFile) {
@@ -200,6 +254,7 @@ TEST_F(PastedPdfPages, severalPastesFromSeveralPdfsGoIntoOneFile) {
     AppController c;
     ASSERT_TRUE(open(c, root / "lecture.xopp"));
     DocumentSession& s = current(c);
+    const auto cachedBefore = pdfsIn(MergedPdf::cacheFolder());
     ASSERT_TRUE(open(c, root / "other.pdf"));
     c.copyPages({0});
     c.tabManager().setCurrentIndex(0);
@@ -210,6 +265,9 @@ TEST_F(PastedPdfPages, severalPastesFromSeveralPdfsGoIntoOneFile) {
     c.tabManager().setCurrentIndex(0);
     ASSERT_EQ(c.pastePages(5), 1);
 
+    EXPECT_EQ(pdfsIn(MergedPdf::cacheFolder()).size(), cachedBefore.size() + 1) << "one merged PDF until saved";
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(pdfsIn(MergedPdf::cacheFolder()), cachedBefore);
     auto expected = before;
     expected.push_back(".lecture.pages.pdf");
     std::sort(expected.begin(), expected.end());
@@ -468,4 +526,41 @@ TEST_F(PastedPdfPages, travelWithTheirDocumentInTheLibrary) {
     EXPECT_TRUE(fs::exists(root / "Other library" / ".renamed.pages.pdf"));
     EXPECT_TRUE(fs::exists(root / "Week 1" / ".renamed.pages.pdf")) << "the original keeps its file";
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "Other library" / "renamed.xopp", WORDS), shown);
+}
+
+// A save that renumbers the merged PDF the saved .xopp refers to writes it under another name first; stopped at any
+// step (as if the app crashed there), the files on disk still show the document as it was or as it is now.
+TEST_F(PastedPdfPages, aSaveStoppedAtAnyStepLeavesAMatchingPair) {
+    const std::vector<std::string> before{"lectureone", "pastedalpha", "pastedbeta", "lecturetwo", "lecturethree"};
+    const std::vector<std::string> after{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"};
+    for (int step = 1; step <= 4; ++step) {
+        SCOPED_TRACE("stopped before step " + std::to_string(step));
+        fs::remove(root / "lecture.xopp");
+        fs::remove(root / ".lecture.pages.pdf");
+        annotate(root / "lecture.pdf", root / "lecture.xopp");
+        {
+            AppController c;
+            ASSERT_TRUE(open(c, root / "other.pdf"));
+            c.copyPages({0, 1});
+            ASSERT_TRUE(open(c, root / "lecture.xopp"));
+            ASSERT_EQ(c.pastePages(1), 2);
+            ASSERT_TRUE(c.save());
+            ASSERT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS), before);
+
+            ASSERT_TRUE(c.deletePages({1}));  // pastedalpha: the merged PDF loses a page in the middle
+            PdfPageKeeper::stopSaveAt = [step](int at) { return at == step; };
+            EXPECT_FALSE(c.save());
+            PdfPageKeeper::stopSaveAt = nullptr;
+            const auto words = wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS);
+            EXPECT_TRUE(words == before || words == after) << ::testing::PrintToString(words);
+            EXPECT_EQ(words, step == 1 ? before : after);
+        }
+        // Opened again and saved: the right pages, one merged PDF, nothing left over
+        AppController c;
+        ASSERT_TRUE(open(c, root / "lecture.xopp"));
+        ASSERT_TRUE(c.save());
+        EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS), step == 1 ? before : after);
+        EXPECT_EQ(backgroundOf(current(c)), root / ".lecture.pages.pdf");
+        EXPECT_EQ(pdfsIn(root), (std::vector<std::string>{".lecture.pages.pdf", "lecture.pdf", "other.pdf", "third.pdf"}));
+    }
 }

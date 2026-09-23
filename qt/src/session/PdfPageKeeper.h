@@ -4,7 +4,8 @@
  * Pasted PDF pages from another PDF are appended to the document's merged PDF, which becomes its background. Its
  * page numbers only grow between saves, so every page (also one held by undo) keeps its number.
  *
- * Saving puts the merged PDF next to the .xopp (from the cache, or from another .xopp after "Save as") and drops the
+ * Pasting writes into a merged PDF in the cache, never next to the document. Saving puts it next to the .xopp
+ * (from the cache, or from another .xopp after "Save as") and drops the
  * PDF pages no page of the document uses any more: the pages are renumbered then. Pages that may come back through
  * undo or redo are renumbered with them; if their PDF page was dropped, it is kept in memory and added again when
  * the page comes back. So is the PDF page of a page whose background was changed, if the change is undone.
@@ -13,6 +14,7 @@
  */
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <set>
 #include <string>
@@ -47,6 +49,16 @@ public:
     /// Before the document is written to `target`: the merged PDF goes next to it, without the PDF pages that are not
     /// used any more (see above). Problems are logged; the document stays as it is then.
     void beforeSave(const fs::path& target);
+    /// beforeSave wrote a renumbered PDF under another name, and the .xopp was written referring to it: now it gets
+    /// its name (the .xopp is written again then, and finishStaged() removes the other name).
+    bool hasStaged() const { return !stagedAs.empty(); }
+    void commitStaged();
+    void finishStaged();
+    /// Where the merged PDF goes when the document is saved as `xopp` (empty: it has none).
+    fs::path placeFor(const fs::path& xopp);
+    /// Tests: a save stops before this step (1: the PDF is written, 2: the .xopp refers to it under its other name,
+    /// 3: the PDF has its name, 4: the .xopp refers to that) when this returns true, as if it crashed there.
+    static std::function<bool(int)> stopSaveAt;
     /// Page numbers of the background PDF stay valid while this does not change (a save dropped PDF pages).
     quint64 numbering() const { return numberingNo; }
     /// Remove the merged PDFs this keeper wrote into the cache (the document is closed without being saved; also
@@ -87,6 +99,9 @@ private:
     MergedPdf::Kind knownKind = MergedPdf::Kind::None;
     int cacheFiles = 0;
     std::set<fs::path> createdInCache;
+    fs::path grownFrom;    ///< the merged PDF in the cache is this file with pages added (same numbers)
+    fs::path stagedAs;     ///< the name the staged PDF gets (commitStaged)
+    fs::path leftStaging;  ///< the staged file, removed when the .xopp no longer refers to it
     std::unordered_map<const XojPage*, Tracked> tracked;
     quint64 numberingNo = 0;
 };
