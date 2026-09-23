@@ -15,7 +15,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 ## Order of work (2026-09-23)
 
-Started 2026-09-23: `qt/render-visible` and `qt/ui-polish` (worktrees `../xournal_qt-render-visible`, `../xournal_qt-ui-polish`).
+Started 2026-09-23: `qt/render-visible` (worktree `../xournal_qt-render-visible`). `qt/ui-polish` is merged (see ROADMAP).
 
 1. **Bugs and polish:** `qt/render-visible` and `qt/ui-polish` in parallel, then `qt/markdown-fixes`.
 2. **Library track**, in this order, because each step builds on the one before:
@@ -62,18 +62,6 @@ Area: `qt/src/markdown`, the Markdown editor in `qt/src/canvas`, `DocumentSearch
 - [ ] **Search boxes sit at the wrong place in rendered Markdown.** They are where the plain text would be in
   a normal Xournal text box, not on the rendered words. The search must map hits through the Markdown
   layout.
-
-### `qt/ui-polish`
-Area: `qt/src/app/qml`, a bit of `CanvasInput`. Mostly QML, so builds are cheap. Tests: `-L ui`, `-L quick`.
-- [~] **Tab bar: previous/next arrow buttons**, for example next to the overview button.
-- [~] **Full-screen button in the tool bar.** F11 full screen already exists; it only needs a button.
-- [~] **Tool bar docked left or right:**
-  - the thin "show tool bar" strip stays at the top instead of moving to the dock side;
-  - the hide button's arrow points into the canvas instead of towards the tool bar.
-- [~] **Paste pill on a long press, with the pen and with a finger.** With a drawing tool selected, a long
-  press on the canvas should show the copy/paste pill at the bottom of the canvas. The same goes for a finger,
-  including over text. Today a long press on text only selects it and shows the text marking pill, so the
-  only way to paste is Ctrl+V.
 
 ---
 

@@ -85,6 +85,15 @@
   - Downloads folder as a quick library (import warning); Copy to / Move to another library.
 - **Search with short texts** (user report: a one-letter search in a large document could crash): texts shorter than 4 characters are searched on Enter or a tap on the search icon only (document, tab overview, library). A one-letter search in a 300-page PDF (207k hits) peaked at ~1 GB: the sidebar and page grid made one QML item per hit. Thumbnails now show at most 50 marks per page, spread over it (the count badge stays exact): ~260 MB.
 - **Tab strip with many tabs:** the tabs use the whole width before they scroll, and the + button stays at the right end (the list and the spacer used to share the room).
+- **UI polish, `qt/ui-polish` (2026-09-24, awaiting on-device test):**
+  - Tab strip: ‹ › buttons beside the overview button switch documents, like Ctrl+PgUp/PgDn.
+  - A full-screen button in the tool bar.
+  - A tool bar docked left or right: its hide arrow and "show tool bar" strip follow the dock side.
+  - A long press offers paste:
+    - With the pen, highlighter or hand tool: the pen held within 6 px for 500 ms. The dot it began is taken
+      back, with no undo step.
+    - On PDF text, with a finger or the pen: the word is still selected, and the text pill gains "Paste here".
+    - To watch on the device: a pause before writing may trigger it.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
