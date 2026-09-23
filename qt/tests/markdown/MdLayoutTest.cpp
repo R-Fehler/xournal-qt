@@ -191,3 +191,58 @@ TEST(MdLayout, writingAfterACodeBlockAtTheEnd) {
     ASSERT_GE(after.rawItem, 0);
     EXPECT_DOUBLE_EQ(after.items[static_cast<size_t>(after.rawItem)].y, raw.y) << "the text goes where the cursor was";
 }
+
+// A text found over a line break (the paragraph wraps inside it) is marked on each line where it is drawn: one
+// rectangle per line, not one from its start on the first line to its end on the next (which covers other words).
+TEST(MdLayout, foundTextOverALineBreakIsMarkedOnEachLine) {
+    const std::string src = "Before words alpha beta after words.";
+    const Layout wide = lay(src, 2000);
+    ASSERT_EQ(findText(wide, "alpha beta").size(), 1u);
+    // As narrow as to break between "alpha" and "beta"
+    const Rect alpha = findText(wide, "alpha")[0];
+    const Layout l = lay(src, alpha.x + alpha.width + 3);
+    const auto found = findText(l, "alpha beta");
+    const auto a = findText(l, "alpha");
+    const auto b = findText(l, "beta");
+    ASSERT_EQ(a.size(), 1u);
+    ASSERT_EQ(b.size(), 1u);
+    ASSERT_GT(b[0].y, a[0].y + 1) << "on the next line";
+    ASSERT_EQ(found.size(), 2u) << "one rectangle per line";
+    EXPECT_NEAR(found[0].x, a[0].x, 0.01);
+    EXPECT_NEAR(found[0].y, a[0].y, 0.01);
+    EXPECT_NEAR(found[0].height, a[0].height, 0.01);
+    EXPECT_GE(found[0].x + found[0].width, a[0].x + a[0].width - 0.01);  // (and the space after it)
+    EXPECT_NEAR(found[1].x, b[0].x, 0.01);
+    EXPECT_NEAR(found[1].y, b[0].y, 0.01);
+    EXPECT_NEAR(found[1].width, b[0].width, 0.01);
+    EXPECT_NEAR(found[1].height, b[0].height, 0.01);
+}
+
+// A range of the source is marked where it is drawn: the same places the search finds for its words, in a heading,
+// emphasis, a list, inline code and a code block; the marks around them are not drawn and have no place.
+TEST(MdLayout, sourceRangesAreWhereTheyAreDrawn) {
+    const std::string src = "# A needle heading\n\nSome **strong needle** and `needle` code.\n\n- one\n- a needle item\n\n"
+                            "```py\nx = 1  # needle in code\n```\n";
+    const Layout l = lay(src, 300);
+    const auto found = findText(l, "needle");
+    std::vector<Rect> mapped;
+    for (size_t p = src.find("needle"); p != std::string::npos; p = src.find("needle", p + 1)) {
+        const auto r = sourceRects(l, p, p + 6);
+        ASSERT_EQ(r.size(), 1u) << "at " << p;
+        mapped.push_back(r[0]);
+    }
+    ASSERT_EQ(mapped.size(), found.size());
+    for (const Rect& m: mapped) {
+        bool same = false;
+        for (const Rect& f: found) {
+            same = same || (std::abs(m.x - f.x) < 0.01 && std::abs(m.y - f.y) < 0.01 &&
+                            std::abs(m.width - f.width) < 0.01 && std::abs(m.height - f.height) < 0.01);
+        }
+        EXPECT_TRUE(same) << "at " << m.x << ", " << m.y;
+    }
+    EXPECT_TRUE(sourceRects(l, src.find("**"), src.find("**") + 2).empty()) << "a mark is not drawn";
+    const size_t strong = src.find("**strong");
+    const auto word = sourceRects(l, strong, strong + 8);  // "**strong": the mark and the word
+    ASSERT_EQ(word.size(), 1u);
+    EXPECT_NEAR(word[0].x, findText(l, "strong")[0].x, 0.01) << "only the word";
+}

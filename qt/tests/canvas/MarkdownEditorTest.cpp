@@ -14,6 +14,7 @@
 #include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QPainter>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -21,11 +22,13 @@
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
+#include "MdBox.h"
 #include "TextFlow.h"
 
 using namespace xqt;
@@ -178,4 +181,48 @@ TEST_F(MarkdownEditorTest, writingAfterACodeBlockAtTheEndIsShownAtOnce) {
         }
     }
     EXPECT_GT(ink, 20) << "the typed word is drawn before the cursor";
+}
+
+// While the text is written on the page, the block with the cursor is drawn as its source (marks shown): the search
+// marks a word there where it is drawn, and where the formatted text is drawn again once the cursor has left.
+TEST_F(MarkdownEditorTest, searchHitsFollowTheTextAsItIsDrawnWhileWriting) {
+    MarkdownEditor& editor = start();
+    type("# Title\nSome **strong** needle");
+    const auto m = TextFlow::styleFor(session->getDocument()->getPage(0), TextFlow::Style{});
+    const auto hitOf = [&] {
+        QSignalSpy finished(&session->search(), &DocumentSearch::finished);
+        if (session->search().query() != "needle") {
+            session->search().setQuery("needle", false);
+        }
+        EXPECT_TRUE(finished.wait(3000));
+        EXPECT_EQ(session->search().hits().size(), 1u);
+        return session->search().hits().empty() ? QRectF() : session->search().hits()[0].rect;
+    };
+    // The paragraph with the cursor: its source, "Some **strong** needle", is drawn
+    const std::string& text = editor.text();
+    const md::Layout& drawn = md::cachedLayout(text, md::styleOf(*md::pageBoxOf(*md::markdownLayer(
+                                                              session->getDocument()->getPage(0)), m.leftMargin,
+                                                              TextFlow::MARGIN)),
+                                               text.size());
+    ASSERT_GE(drawn.rawItem, 0);
+    const md::Item& raw = drawn.items[static_cast<size_t>(drawn.rawItem)];
+    PangoRectangle first;
+    pango_layout_index_to_pos(raw.layout.get(), static_cast<int>(text.find("needle") - drawn.rawBegin), &first);
+    const QRectF hit = hitOf();
+    EXPECT_NEAR(hit.x(), m.leftMargin + raw.x + first.x / double(PANGO_SCALE), 0.5)
+            << "on the word as it is drawn while writing (after \"**strong**\")";
+    EXPECT_NEAR(hit.y(), TextFlow::MARGIN + raw.y + first.y / double(PANGO_SCALE), 0.5);
+
+    // Done: drawn formatted, and the hit goes there
+    view->endTextEditing();
+    const auto formatted = md::findText(*md::pageBoxOf(*md::markdownLayer(session->getDocument()->getPage(0)),
+                                                        m.leftMargin, TextFlow::MARGIN),
+                                        "needle");
+    ASSERT_EQ(formatted.size(), 1u);
+    EXPECT_LT(formatted[0].x, hit.x() - 5) << "(\"strong \" is drawn before it, not \"**strong** \")";
+    QSignalSpy finished(&session->search(), &DocumentSearch::finished);
+    ASSERT_TRUE(finished.wait(3000)) << "searched again";
+    ASSERT_EQ(session->search().hits().size(), 1u);
+    EXPECT_NEAR(session->search().hits()[0].rect.x(), formatted[0].x, 0.01);
+    EXPECT_NEAR(session->search().hits()[0].rect.y(), formatted[0].y, 0.01);
 }

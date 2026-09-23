@@ -451,3 +451,11 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
       line), the cursor is below it, outside the grey. Type a word: it appears at once where the cursor was, and the
       cursor moves with every letter; Enter and another word as well. No need to type more or open the source beside
       the page.
+- [ ] A document with the page's Markdown text flowing over two pages: a heading, **bold** and *italic* words, a
+      list, inline `code` and a code block, and a word that appears in each of them and on the second page. Search
+      (Ctrl+F) that word: every yellow box sits on the formatted word (the big heading word, the word after hidden
+      `**`, the list item right of its bullet, the grey code), on both pages, in the sidebar and in the page grid too.
+      Search two words that the paragraph breaks between lines: two boxes, one on each line (not one big box).
+- [ ] Write on the page (the text tool on the text), the cursor in a paragraph with `**bold**` in it; open the search
+      and search a word after the bold one: its box is on the word as shown with its `**`. Press Escape: after a
+      moment the box moves onto the word as formatted.

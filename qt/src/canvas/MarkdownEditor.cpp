@@ -100,17 +100,20 @@ MarkdownEditor::~MarkdownEditor() {
     }
     const PageRef edited = editing ? parts[std::min(current, parts.size() - 1)].page : nullptr;
     if (editing) {
+        md::setWritingCursor(*editing, md::NO_SOURCE);
         std::unique_lock lock(*session.getDocument());
         editing->setInEditing(false);
     }
     md.finish();  // (one undo step)
     if (edited) {
         edited->firePageChanged();  // (drawn by the renderer again)
+        drawnAsWrittenChanged(edited);
     }
 }
 
 void MarkdownEditor::cancel() {
     if (editing) {
+        md::setWritingCursor(*editing, md::NO_SOURCE);
         std::unique_lock lock(*session.getDocument());
         editing->setInEditing(false);
     }
@@ -348,11 +351,23 @@ void MarkdownEditor::paint(cairo_t* cr) const {
 
 // --- changes -----------------------------------------------------------------------------------------------------
 
+void MarkdownEditor::drawnAsWrittenChanged(const PageRef& p) {
+    size_t index = npos;
+    {
+        std::shared_lock lock(*session.getDocument());
+        index = session.getDocument()->indexOf(p);
+    }
+    if (index != npos) {
+        Q_EMIT session.pageContentChanged(index);  // (the search marks what is drawn)
+    }
+}
+
 void MarkdownEditor::setCurrent(size_t part) {
     part = std::min(part, parts.size() - 1);
     Text* box = parts[part].box;
     if (box != editing) {
         if (editing) {
+            md::setWritingCursor(*editing, md::NO_SOURCE);
             {
                 std::unique_lock lock(*session.getDocument());
                 editing->setInEditing(false);
@@ -360,9 +375,11 @@ void MarkdownEditor::setCurrent(size_t part) {
             for (const Part& p: parts) {
                 if (p.box == editing) {
                     p.page->firePageChanged();  // (drawn by the renderer again)
+                    drawnAsWrittenChanged(p.page);
                 }
             }
         }
+        rawBegin = md::NO_SOURCE;
         if (box) {
             {
                 std::unique_lock lock(*session.getDocument());
@@ -396,6 +413,16 @@ void MarkdownEditor::changed(bool textChanged) {
         return;
     }
     setCurrent(partOf(caret));
+    if (editing) {
+        // The block with the cursor is drawn as its source: the search marks what is drawn (searched again when
+        // another block is drawn as source; a change of the text is searched again anyway)
+        md::setWritingCursor(*editing, localOf(current, caret));
+        const size_t block = layoutOf(current).rawBegin;
+        if (block != rawBegin) {
+            rawBegin = block;
+            drawnAsWrittenChanged(parts[current].page);
+        }
+    }
     // Repaint where the box was and is; show the cursor
     const QRectF now = boxRect(current).adjusted(-FRAME_MARGIN * 2, -FRAME_MARGIN * 2, FRAME_MARGIN * 2,
                                                   FRAME_MARGIN * 2);

@@ -4,7 +4,9 @@
  * @license GNU GPLv2 or later
  */
 #include <memory>
+#include <set>
 
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -15,6 +17,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/AppContext.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
@@ -296,4 +299,115 @@ TEST_F(MarkdownSessionTest, flowingTextIsSavedAndLoaded) {
     MarkdownSession again(other);
     EXPECT_EQ(again.begin(pages - 1, style), text) << "the same text, joined from the pages of the file";
     again.cancel();
+}
+
+namespace {
+/// Where the characters [from, to) of a laid out text are drawn (box coordinates): one rectangle per line, from
+/// Pango's extents of each character.
+std::vector<QRectF> glyphRects(const md::Item& it, int from, int to) {
+    std::vector<QRectF> out;
+    PangoLayoutIter* iter = pango_layout_get_iter(it.layout.get());
+    const PangoLayoutLine* line = nullptr;
+    do {
+        const int index = pango_layout_iter_get_index(iter);
+        if (index < from || index >= to) {
+            continue;
+        }
+        PangoRectangle r;
+        pango_layout_iter_get_char_extents(iter, &r);
+        const QRectF g(it.x + r.x / double(PANGO_SCALE), it.y + r.y / double(PANGO_SCALE), r.width / double(PANGO_SCALE),
+                       r.height / double(PANGO_SCALE));
+        if (pango_layout_iter_get_line_readonly(iter) != line || out.empty()) {
+            out.push_back(g);
+            line = pango_layout_iter_get_line_readonly(iter);
+        } else {
+            out.back() = out.back().united(g);
+        }
+    } while (pango_layout_iter_next_char(iter));
+    pango_layout_iter_free(iter);
+    return out;
+}
+
+/// Where a (lower case, ASCII) word is drawn on each page of a document: its Markdown boxes' layouts (page points).
+std::vector<std::pair<size_t, QRectF>> drawnWords(Document& doc, const std::string& word) {
+    std::vector<std::pair<size_t, QRectF>> out;
+    for (size_t p = 0; p < doc.getPageCount(); ++p) {
+        const Layer* layer = md::markdownLayer(doc.getPage(p));
+        if (!layer) {
+            continue;
+        }
+        for (const auto* e: layer->getElementsView()) {
+            const auto* box = static_cast<const Text*>(e);
+            const auto& at = box->getTransformation().shift;
+            const md::Layout& laid = md::cachedLayout(box->getText(), md::styleOf(*box));
+            for (const md::Item& it: laid.items) {
+                if (it.kind != md::Item::Kind::Text) {
+                    continue;
+                }
+                const std::string t = pango_layout_get_text(it.layout.get());
+                for (size_t i = t.find(word); i != std::string::npos; i = t.find(word, i + 1)) {
+                    for (const QRectF& r: glyphRects(it, int(i), int(i + word.size()))) {
+                        out.emplace_back(p, r.translated(at.x, at.y));
+                    }
+                }
+            }
+        }
+    }
+    return out;
+}
+
+void searchFor(DocumentSession& s, const QString& text) {
+    QSignalSpy finished(&s.search(), &DocumentSearch::finished);
+    s.search().setQuery(text, false);
+    if (s.search().isRunning()) {
+        ASSERT_TRUE(finished.wait(5000));
+    }
+}
+
+/// Every hit covers a drawn word and every drawn word has its hit.
+void expectHitsOnDrawnWords(DocumentSession& s, const std::string& word, size_t pages) {
+    const auto drawn = drawnWords(*s.getDocument(), word);
+    searchFor(s, QString::fromStdString(word));
+    const auto& hits = s.search().hits();
+    ASSERT_EQ(hits.size(), drawn.size());
+    std::set<size_t> onPages;
+    for (const auto& [page, rect]: drawn) {
+        bool found = false;
+        for (const auto& h: hits) {
+            found = found || (h.page == page && std::abs(h.rect.x() - rect.x()) < 0.5 &&
+                              std::abs(h.rect.y() - rect.y()) < 0.5 && std::abs(h.rect.width() - rect.width()) < 0.5 &&
+                              std::abs(h.rect.height() - rect.height()) < 0.5);
+        }
+        EXPECT_TRUE(found) << "\"" << word << "\" drawn on page " << page << " at " << rect.x() << ", " << rect.y()
+                           << " (" << rect.width() << " x " << rect.height() << ") has no hit there";
+        onPages.insert(page);
+    }
+    EXPECT_EQ(onPages.size(), pages) << "on every page of the text";
+}
+}  // namespace
+
+// The search marks a word where it is drawn in the page's Markdown text: in a heading (bigger), in emphasis, in a
+// list, in code, and on the page the text flows onto; also after saving and loading.
+TEST_F(MarkdownSessionTest, searchHitsAreOnTheDrawnWords) {
+    std::string src = "# A needle in the heading\n\nSome *emphasised needle* and `needle` code.\n\n"
+                      "- one\n- a needle in a list\n\n```py\nx = 1  # needle in code\n```\n\n";
+    for (int i = 0; i < 60; ++i) {
+        src += "Filler paragraph " + std::to_string(i) + " with a few words to fill the page.\n\n";
+    }
+    src += "## The last needle\n\nAnd one more needle on the last page.\n";
+    {
+        MarkdownSession edit(*session);
+        edit.begin(0, style);
+        edit.update(src);
+        edit.finish();
+    }
+    ASSERT_GE(session->getDocument()->getPageCount(), 2u) << "the text flows onto a second page";
+    expectHitsOnDrawnWords(*session, "needle", 2);
+
+    const fs::path file = fs::path(tmp.filePath("needles.xopp").toStdString());
+    ASSERT_TRUE(session->saveAs(file).ok);
+    auto loaded = DocumentSession::loadFile(file);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    DocumentSession again(*app, std::move(loaded.document));
+    expectHitsOnDrawnWords(again, "needle", 2);
 }

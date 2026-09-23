@@ -52,8 +52,12 @@ xoj::util::Rectangle<double> boxRect(const Text& text);
 std::optional<LinkHit> linkAt(const Text& text, double x, double y);
 /// The check box of a task drawn at a point of the page (page coordinates): its mark's offset in the box's text.
 std::optional<size_t> checkBoxAt(const Text& text, double x, double y);
-/// Where a text is shown in a box (case-insensitive; page coordinates).
+/// Where a text is shown in a box (case-insensitive; page coordinates): as the box is drawn, also while it is written
+/// on the page (see setWritingCursor).
 std::vector<Rect> findText(const Text& text, const std::string& search);
+/// A box written on the page is drawn with the block of the cursor as its source (layout() with `active`): the
+/// cursor's offset in the box's text, NO_SOURCE when it is not written any more. Any thread may read it.
+void setWritingCursor(const Text& text, size_t active);
 /// Whether a text is a box: in a Markdown layer.
 bool isMarkdownLayer(const Layer& layer);
 
