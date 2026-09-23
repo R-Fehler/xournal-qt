@@ -391,7 +391,9 @@ bool LibraryIndex::writeChanged() {
             for (const QString& pack: {NOTES_PACK, PDF_TEXT_PACK, QStringLiteral("previews")}) {
                 Packs::remove(dir, pack);
             }
-            Packs::removeIfOnlyOurs(dir);
+            if (Packs::removeIfOnlyOurs(dir)) {
+                removeEmptyMirrors(dir.parent_path());
+            }
             continue;
         }
         if (job.notes) {
@@ -414,6 +416,16 @@ bool LibraryIndex::writeChanged() {
         }
     }
     return ok;
+}
+
+void LibraryIndex::removeEmptyMirrors(fs::path dir) const {
+    // Only folders in the library's folder in the app cache, not that folder itself
+    const fs::path app = where.appCacheDir();
+    std::error_code ec;
+    while (dir != app && DocumentFiles::remap(dir, app, "/") != dir && fs::is_empty(dir, ec) && !ec) {
+        fs::remove(dir, ec);
+        dir = dir.parent_path();
+    }
 }
 
 // --- the layout before the packs
@@ -606,6 +618,18 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
         for (const auto& f: DocumentFiles::foldersRecursive(rootDir)) {
             dirs.insert(f);
         }
+        // In the app cache also those of folders that are gone (moved or renamed by another program: their
+        // documents are found again elsewhere by name, size and time)
+        std::error_code ec;
+        const fs::path app = where.appCacheDir();
+        for (auto it = fs::recursive_directory_iterator(app, ec); !ec && it != fs::recursive_directory_iterator();
+             it.increment(ec)) {
+            if (it->is_directory() && it->path().filename() == DocumentFiles::META_DIR) {
+                const fs::path rel = it->path().parent_path().lexically_relative(app);
+                dirs.insert(rel.empty() || rel == "." ? rootDir : (rootDir / rel).lexically_normal());
+                it.disable_recursion_pending();
+            }
+        }
     }
     for (const fs::path& dir: dirs) {
         if (generation != gen) {
@@ -698,6 +722,7 @@ void LibraryIndex::applyMoves(const std::vector<std::pair<fs::path, fs::path>>& 
                     fs::create_directories(newMirror.parent_path(), ec);
                     fs::rename(oldMirror, newMirror, ec);
                 }
+                removeEmptyMirrors(oldMirror.parent_path());
             }
             std::lock_guard lock(mtx);
             std::vector<fs::path> moved;

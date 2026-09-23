@@ -1131,6 +1131,32 @@ TEST_F(LibraryTest, theCacheMovesToTheAppCacheAndBack) {
     model.setLibrary(nullptr);
 }
 
+// In the app cache, a folder moved by another program leaves its cache behind: its documents are found again by
+// name, size and time, and the old place is cleaned up.
+TEST_F(LibraryTest, inTheAppCacheDocumentsMovedByAnotherProgramAreFoundAgain) {
+    makeFolders(root);
+    Library(root).setCacheMode(CacheLocation::Mode::AppCache);
+    const CacheLocation where = Library(root).cacheLocation();
+    const fs::path app = where.appCacheDir();
+    {
+        LibraryIndex index(root, where);
+        index.update(DocumentFiles::scanRecursive(root));
+        index.waitForDone();
+    }
+    ASSERT_TRUE(fs::exists(app / "Physics" / "Mechanics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_FALSE(fs::exists(root / "Physics" / DocumentFiles::META_DIR)) << "nothing in the library's folders";
+
+    fs::rename(root / "Physics", root / "Science");
+    LibraryIndex index(root, where);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.flush();
+    EXPECT_EQ(index.documentsRead(), 0) << "found again by name, size and time";
+    EXPECT_EQ(index.search("zebra").size(), 1u);
+    EXPECT_TRUE(fs::exists(app / "Science" / "Mechanics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_FALSE(fs::exists(app / "Physics")) << "the old place is cleaned up";
+    Library(root).setCacheMode(CacheLocation::Mode::Folders);
+}
+
 TEST_F(LibraryTest, removingTheCacheLeavesOtherFilesAndTheReadingPositions) {
     makeFolders(root);
     LibraryModel model;

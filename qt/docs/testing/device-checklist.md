@@ -477,6 +477,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       folders and appear under `~/.cache/xournal-qt/libraries/<key>/…`; the search and the previews still work at
       once (nothing is indexed or drawn again). Close and open the app: still on. Switch it off: the folders are back
       in the library, the app-cache folder of the library is gone.
+- [ ] With the cache in the app cache folder, close the app, rename a folder of the library in the file manager and
+      open the library again: its documents are found by their text at once, nothing is indexed again; the folder's
+      old place under `~/.cache/xournal-qt/libraries/<key>/` is gone.
 - [ ] Settings → Storage → "Remove all cache folders of this library…": the dialog says the app closes. With an unsaved
       document open, it first asks to save it. After OK: no `.xournal_library/` left in the library (a file of your
       own put into one beforehand stays, with its folder), and the app is closed. Open the library again: the cache

@@ -200,6 +200,8 @@ private:
     EntryPtr movedHere(const DocumentItem& item, std::multimap<std::string, EntryPtr>& orphans, bool& collected);
     /// Returns whether everything could be written.
     bool writeChanged();
+    /// Remove `dir` and its parents while they are empty folders in the library's folder in the app cache.
+    void removeEmptyMirrors(fs::path dir) const;
     void convert(const fs::path& dir);
     QCborMap notesOf(const Entry& e) const;
     std::shared_ptr<Entry> entryOf(const fs::path& folder, const QString& name, const QCborMap& notes,
