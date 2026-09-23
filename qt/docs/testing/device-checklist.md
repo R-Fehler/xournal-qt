@@ -408,3 +408,10 @@ cd build-qt
 - [ ] `sudo apt install ./build-deb/packages/xournal-qt_0.1.0_amd64.deb`: Xournal Qt in the application menu with its icon; PDFs and .xopp files offer "Open with Xournal Qt"; right click on a folder in Dolphin: "Open as Xournal Qt library" opens it in its own window.
 
 Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen recording.
+
+## Tab arrows, full-screen button, docked tool bar, pen paste pill (qt/ui-polish)
+- [ ] ⋮ → Tool bar position → Left: the little tab at the bar's edge points left (towards the bar). Tap it: the bar
+      goes, a slim strip stands at the middle of the left edge with its arrow pointing right; tap it: the bar is back.
+      The same with Right (tab points right, strip at the right edge pointing left; the scroll bar sits beside the
+      strip, not under it) and Top (tab points up, strip at the top pointing down). With the pen, the pen pill at
+      the right edge does not cover the strip.

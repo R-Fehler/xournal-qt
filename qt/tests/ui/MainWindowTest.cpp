@@ -1487,6 +1487,80 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
     (void)tools;
 }
 
+// Docked at a side, the little tab points towards the bar it puts away, and the strip that brings the bar back is at
+// that side, pointing into the pages (where the bar will come from).
+TEST_F(MainWindowTest, theToolBarTabAndStripFollowTheDockSide) {
+    auto* toggle = find<QQuickItem>("toolbarToggle");
+    auto* show = find<QQuickItem>("toolbarShow");
+    ASSERT_NE(toggle, nullptr);
+    ASSERT_NE(show, nullptr);
+    // Where the chevron on it points, from the icon and its rotation (clockwise, y down)
+    auto pointsTo = [](QQuickItem* item) -> std::string {
+        QQuickItem* arrow = nullptr;
+        for (QQuickItem* c: item->childItems()) {
+            if (c->property("source").isValid()) {
+                arrow = c;
+            }
+        }
+        if (!arrow) {
+            return "no arrow";
+        }
+        const QString source = arrow->property("source").toUrl().toString();
+        QPointF d = source.contains("chevron-up")      ? QPointF(0, -1)
+                    : source.contains("chevron-down")  ? QPointF(0, 1)
+                    : source.contains("chevron-right") ? QPointF(1, 0)
+                    : source.contains("chevron-left")  ? QPointF(-1, 0)
+                                                       : QPointF();
+        const double a = arrow->rotation() * M_PI / 180.0;
+        const QPointF r(d.x() * std::cos(a) - d.y() * std::sin(a), d.x() * std::sin(a) + d.y() * std::cos(a));
+        if (r.y() < -0.5) return "up";
+        if (r.y() > 0.5) return "down";
+        if (r.x() < -0.5) return "left";
+        if (r.x() > 0.5) return "right";
+        return "nowhere";
+    };
+    QQuickItem* area = show->parentItem();  // the window below the tab strip
+    ASSERT_NE(area, nullptr);
+    const double w = area->width();
+    const double h = area->height();
+    struct Case {
+        const char* position;
+        const char* hideArrow;  // towards the bar
+        const char* showArrow;  // from the bar into the pages
+    };
+    for (const Case c: {Case{"top", "up", "down"}, Case{"left", "left", "right"}, Case{"right", "right", "left"}}) {
+        SCOPED_TRACE(c.position);
+        controller->setToolbarHidden(false);
+        controller->setToolbarPosition(c.position);
+        wait(60);
+        ASSERT_TRUE(toggle->isVisible());
+        EXPECT_EQ(pointsTo(toggle), c.hideArrow) << "the tab points towards the bar it puts away";
+
+        controller->setToolbarHidden(true);
+        wait(60);
+        ASSERT_TRUE(show->isVisible());
+        EXPECT_EQ(pointsTo(show), c.showArrow) << "the strip points to where the bar comes in";
+        const QRectF strip(show->mapToItem(area, QPointF(0, 0)), show->size());
+        if (std::string(c.position) == "top") {
+            EXPECT_NEAR(strip.top(), 0, 1) << "at the top edge";
+            EXPECT_GT(strip.width(), strip.height()) << "lying along the top edge";
+        } else {
+            EXPECT_GT(strip.height(), strip.width()) << "standing along the side";
+            EXPECT_GT(strip.top(), h / 4) << "about the middle of the side, not at the top";
+            EXPECT_LT(strip.bottom(), h * 3 / 4);
+            if (std::string(c.position) == "left") {
+                EXPECT_NEAR(strip.left(), 0, 1) << "at the left edge";
+            } else {
+                EXPECT_NEAR(strip.right(), w, 1) << "at the right edge";
+            }
+        }
+        click(show);
+        until([&] { return !controller->toolbarHidden(); });
+        EXPECT_FALSE(controller->toolbarHidden()) << "a tap on the strip brings the bar back";
+    }
+    controller->setToolbarPosition("top");
+}
+
 TEST_F(MainWindowTest, penPillWithoutAToolBar) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
