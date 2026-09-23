@@ -8,15 +8,22 @@ possible. `master` follows upstream, **`master-qt` is the fork's branch** and th
 
 ```sh
 cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo   # once
-cmake --build build-qt -j8
-ctest --test-dir build-qt -j8            # 441 tests, about a minute - run it before every commit
-ctest --test-dir build-qt -j8 -L shell   # labels: unit session canvas markdown quick shell ui golden
+cmake --build build-qt -j8 --target <the test binary you need>
+ctest --test-dir build-qt -j8 -L markdown   # labels: unit session canvas markdown quick shell ui golden
+ctest --test-dir build-qt -j8               # full suite (441 tests): at integration only, not per commit
 ```
+
+The machine is a slow 2-in-1, so every build and test run costs real time.
+- Build only the targets you need.
+- Run only the test labels, or `-R` filters, for the code you changed.
+- The full suite runs when a block is merged into `master-qt`, or when the author asks. The author runs the long
+  suites and tests the app by hand at the end.
+- Don't rebuild or retest after edits to docs or QML text alone.
 
 `qt/scripts/linux-deps.sh` installs what the build needs (Debian, Ubuntu, KDE neon). Qt 6.5 or newer (`find_package(Qt6 6.5)`).
 
-- `build-qt` is for the tests. `build-release` is the build the author tries on the device: rebuild it after a
-  feature (`cmake --build build-release -j8`), and do not leave it broken.
+- `build-qt` is for the tests. `build-release` is the build the author tries on the device. Rebuild it after
+  integrating into `master-qt` (`cmake --build build-release -j8`), and do not leave it broken.
 - Tests run off-screen and use temporary config and cache folders (see each `tests/*/main.cpp`). They must never
   write into `test/files` (upstream's fixtures) or into the author's real configuration.
 - Some tests are benchmarks that skip unless an environment variable is set (`XQT_BENCH_PDF=<file>`, `XQT_BENCH_SCROLL`).
@@ -31,11 +38,26 @@ ctest --test-dir build-qt -j8 -L shell   # labels: unit session canvas markdown 
    [qt/docs/adr/0002-upstream-seams.md](qt/docs/adr/0002-upstream-seams.md). Everything else belongs under `qt/`.
 2. **The author's data is not yours.** Never touch `~/.config/xournalpp`, `~/.config/xournal-qt` or their documents.
 3. **Ask before anything leaves the machine**: pushing, tagging, publishing a release, building the `.deb`.
-4. **One feature, one commit**, with the tests green, the device checklist updated
-   ([qt/docs/testing/device-checklist.md](qt/docs/testing/device-checklist.md)) and a short plain report afterwards -
-   not a batch of features at the end. Commit messages are plain prose: what was wrong, what changed, why.
+4. **One feature, one commit.** Before committing:
+   - the tests you ran for it pass;
+   - the device checklist ([qt/docs/testing/device-checklist.md](qt/docs/testing/device-checklist.md)) is
+     updated;
+   - a short plain report follows, one per feature, not a batch at the end.
+
+   Commit messages are plain prose: what was wrong, what changed, why.
 5. **A bug gets a failing test first.** Show it fails for the stated reason, then fix it.
 6. Keep the routine test run **under a minute**. Long suites go behind a label or an environment variable.
+
+## How work is organised
+
+- The tasks are in [TODO.md](TODO.md), grouped into **blocks**. A block is one branch `qt/<block>` in its own
+  worktree `../xournal_qt-<block>`, with its own `build-qt`. The build uses ccache when it is installed, with
+  the workspace as its base directory, so a new worktree reuses the objects the other checkouts already compiled.
+- Feature blocks are usually done by subagents. The main session works on architecture and integration, merging
+  blocks into `master-qt`.
+- Run at most two worktree builds at a time; the machine has 8 threads and 16 GB.
+- [VISION.md](VISION.md) holds the author's goals. Read it before planning. Don't add anything the author did not
+  say.
 
 ## Where things are
 
@@ -66,7 +88,7 @@ ctest --test-dir build-qt -j8 -L shell   # labels: unit session canvas markdown 
 
 ## Documents to read when they matter
 
-[FORK.md](FORK.md) (branches, fork rules) · [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md) (what exists, what is planned,
+[VISION.md](VISION.md) (goals) · [TODO.md](TODO.md) (open tasks) · [FORK.md](FORK.md) (branches, fork rules) · [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md) (what exists, what is planned,
 what was measured) · [qt/docs/adr/](qt/docs/adr/) (why the fork is built this way) ·
 [qt/docs/markdown-boxes.md](qt/docs/markdown-boxes.md) · [qt/docs/library.md](qt/docs/library.md) ·
 [qt/docs/releasing.md](qt/docs/releasing.md) (CI, packages, the known flaky test)
