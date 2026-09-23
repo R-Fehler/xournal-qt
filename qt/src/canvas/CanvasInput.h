@@ -129,6 +129,15 @@ private:
     /// Holding one finger still shows what can be done here (like a right click)
     QTimer longPressTimer;
     bool longPressFired = false;
+    /// The same for the pen with the pen, highlighter or hand in hand: pressed and held still (it may shake a little)
+    /// for the time of a long press. The dot it began is taken back, and the pen does nothing more until it is
+    /// lifted. A pen that moved further first is writing: resting afterwards is not a long press.
+    QTimer penHoldTimer;
+    bool penHoldFired = false;
+    QPointF penHoldPos;
+    bool penHoldTool() const;
+    void startPenHold(const Event& event);
+    void penHeld();
     /// The setsquare / compass is being dragged over the page
     bool draggingGeometryTool = false;
     QPointF lastGeometryPos;

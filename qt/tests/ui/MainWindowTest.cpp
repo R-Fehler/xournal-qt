@@ -2351,6 +2351,104 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     EXPECT_TRUE(controller->pdfTextIsSelected()) << "and it is still the same selection";
 }
 
+// A long press on the text of a PDF selects its word; the actions for that text then offer paste as well (at the
+// place pressed), so paste is always at hand with a long press, with the finger and with the pen.
+TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    wait(100);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto* bar = find<QQuickItem>("pdfTextBar");
+    ASSERT_NE(bar, nullptr);
+    auto* session = controller->tabManager().currentSession();
+    QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
+    session->search().setQuery("Test", false);
+    ASSERT_TRUE(searched.wait(3000));
+    ASSERT_FALSE(session->search().hits().empty());
+    const QRectF hit = session->search().hits().front().rect;
+    session->search().clear();
+    const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
+    const QPoint onWordInWindow = canvasItem->mapToScene(onWord).toPoint();
+    const auto elements = [&] {
+        size_t n = 0;
+        for (const Layer* l: session->getDocument()->getPage(0)->getLayersView()) {
+            n += l->getElementsView().size();
+        }
+        return n;
+    };
+    const size_t before = elements();
+
+    // A finger held on the word
+    QGuiApplication::clipboard()->setText("pasted on the text");
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    QTest::touchEvent(window, finger).press(1, onWordInWindow);
+    wait(800);
+    QTest::touchEvent(window, finger).release(1, onWordInWindow);
+    wait(50);
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(controller->pdfTextIsSelected()) << "the word is selected";
+    ASSERT_TRUE(bar->isVisible()) << "with its actions";
+    QQuickItem* paste = findItem("pdfTextPaste");
+    ASSERT_NE(paste, nullptr);
+    EXPECT_TRUE(paste->isVisible()) << "paste is among them";
+    QMetaObject::invokeMethod(paste, "clicked");  // (a click in the overlay is unreliable off screen)
+    until([&] { return elements() > before; });
+    EXPECT_EQ(elements(), before + 1) << "the text went onto the page";
+    const auto* pasted = session->getDocument()->getPage(0)->getSelectedLayer()->getElementsView().back();
+    const auto& box = pasted->getBoundingBox();
+    EXPECT_TRUE(QRectF(box.x, box.y, box.width, box.height).adjusted(-40, -40, 40, 40).contains(hit.center()))
+            << "where the finger was";
+    until([&] { return !controller->pdfTextIsSelected(); });
+    EXPECT_FALSE(controller->pdfTextIsSelected()) << "pasting ends the text selection";
+    controller->clearSelection();
+    wait(50);
+
+    // Nothing to paste: not offered
+    QGuiApplication::clipboard()->clear();
+    ASSERT_FALSE(controller->canPaste());
+    QTest::touchEvent(window, finger).press(1, onWordInWindow);
+    wait(800);
+    QTest::touchEvent(window, finger).release(1, onWordInWindow);
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(bar->isVisible());
+    EXPECT_FALSE(paste->isVisible()) << "an empty clipboard: no paste";
+    controller->clearPdfTextSelection();
+    until([&] { return !bar->isVisible(); });
+
+    // A text selected by dragging over it with the text tool (not a long press): no paste either, there is no place
+    // pressed to paste at
+    QGuiApplication::clipboard()->setText("pasted again");
+    ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
+    until([&] { return bar->isVisible(); });
+    EXPECT_FALSE(paste->isVisible());
+    controller->clearPdfTextSelection();
+    until([&] { return !bar->isVisible(); });
+
+    // The pen held still on the word, with the pen in hand: the same, and the dot it began does not stay
+    controller->selectTool("pen");
+    static QPointingDevice pen("ui test pen", 3002, QInputDevice::DeviceType::Stylus,
+                               QPointingDevice::PointerType::Pen,
+                               QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3);
+    const auto tablet = [&](QEvent::Type type, Qt::MouseButton button, Qt::MouseButtons buttons, double pressure) {
+        const QPointF at(onWordInWindow);
+        QTabletEvent e(type, &pen, at, window->mapToGlobal(at), pressure, 0.f, 0.f, 0.f, 0.0, 0.f, Qt::NoModifier,
+                       button, buttons);
+        QCoreApplication::sendEvent(window, &e);
+    };
+    const size_t withPasted = elements();
+    tablet(QEvent::TabletPress, Qt::LeftButton, Qt::LeftButton, 0.4);
+    wait(800);
+    tablet(QEvent::TabletRelease, Qt::LeftButton, Qt::NoButton, 0.0);
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(controller->pdfTextIsSelected()) << "the pen held on the word selects it";
+    EXPECT_TRUE(paste->isVisible()) << "and paste is offered";
+    EXPECT_EQ(elements(), withPasted) << "no dot left by the pen";
+    controller->clearPdfTextSelection();
+    wait(50);
+    xqt::PenHover::instance().reset();
+}
+
 // The eraser button: a tap takes the eraser, tapped again it offers how the eraser erases.
 TEST_F(MainWindowTest, theEraserButtonOffersHowItErases) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());

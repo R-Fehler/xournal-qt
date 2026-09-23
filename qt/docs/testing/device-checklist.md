@@ -421,3 +421,11 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] Tool bar (top, left and right): the full-screen button (four arrows) beside Search / Settings goes full
       screen. Back out by finger only: tap the small tool square, then "Leave full screen" at the bottom of its
       tools. The button is not repeated in those tools. F11 and Esc still work.
+- [ ] Copy something (a text in another app, or elements with Ctrl+C). Pen tool, hold the pen still on an empty spot
+      of the page for about half a second: the pill (Paste, Select all, Image…) appears there, the dot the pen began
+      disappears, moving the pen before lifting draws nothing. Paste puts it at that spot. The same with the
+      highlighter and the hand. Writing normally, pausing on the page mid-word, putting dots (i, full stops) and
+      short slow strokes: no pill, nothing lost. The eraser held still only erases.
+- [ ] A PDF with text: hold a finger (then the pen) on a word: the word is selected and its pill (highlight,
+      underline, copy…) also has Paste at the end; Paste unselects the text and puts the clipboard where you held.
+      With an empty clipboard there is no Paste. Text selected by dragging with the PDF text tool: no Paste.

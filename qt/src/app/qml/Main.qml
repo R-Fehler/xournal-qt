@@ -945,7 +945,16 @@ ApplicationWindow {
             y = canvas.y + box.y - height - 8 < canvas.y ? canvas.y + box.y + box.height + 8
                                                          : canvas.y + box.y - height - 8
         }
-        onVisibleChanged: if (visible) refresh()
+        onVisibleChanged: if (visible) refresh(); else pasteOffered = false
+        /// Selected by a long press (finger or pen): paste at that place is offered too, as the long press does
+        /// everywhere else (only if there is something to paste)
+        property bool pasteOffered: false
+        property point pasteAt: Qt.point(0, 0)
+        function offerPaste(viewPos) {
+            pasteAt = viewPos
+            pasteOffered = app.canPaste()
+            Qt.callLater(refresh)  // (wider now)
+        }
         Material.foreground: "#303030"
         background: Rectangle {
             radius: height / 2
@@ -979,6 +988,18 @@ ApplicationWindow {
             IconButton { iconName: "xqt-underline"; tip: qsTr("Underline"); onClicked: app.markPdfText("underline") }
             IconButton { iconName: "xqt-strikethrough"; tip: qsTr("Strike through"); onClicked: app.markPdfText("strikethrough") }
             IconButton { iconName: "xopp-edit-copy"; tip: qsTr("Copy text"); onClicked: app.copyPdfText() }
+            ToolSeparator { visible: pdfTextBar.pasteOffered }
+            IconButton {
+                objectName: "pdfTextPaste"
+                iconName: "xopp-edit-paste"
+                tip: qsTr("Paste here")
+                visible: pdfTextBar.pasteOffered
+                onClicked: {
+                    const at = pdfTextBar.pasteAt
+                    app.clearPdfTextSelection()  // it was about pasting, not about the text
+                    app.pasteAt(at.x, at.y)
+                }
+            }
         }
     }
 
@@ -1467,9 +1488,11 @@ ApplicationWindow {
     PdfTextHandles { }
     Connections {
         target: app
-        // On PDF text a long press (or right click) selects the word; elsewhere it offers what can be done here
+        // On PDF text a long press (or right click) selects the word, and its actions offer paste as well; elsewhere
+        // it offers what can be done here
         function onContextRequested(viewPos) {
             if (app.selectPdfTextAt(viewPos.x, viewPos.y)) {
+                pdfTextBar.offerPaste(viewPos)
                 return
             }
             contextPill.openAt(viewPos, app.pdfTextIsSelected)
