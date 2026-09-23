@@ -94,6 +94,24 @@
       back, with no undo step.
     - On PDF text, with a finger or the pen: the word is still selected, and the text pill gains "Paste here".
     - To watch on the device: a pause before writing may trigger it.
+- **Rendering what is on screen, `qt/render-visible` (2026-09-24, awaiting on-device test):**
+  - **Grey pages after zooming.** `PageNode::clearTiles()` removed tiles that were never in the scene graph. In a
+    release build of Qt this empties the page node's child list, taking the page, its tiles and its preview with it.
+    Now only tiles that are children are removed. This is probably also why pages stayed blurry; that link is
+    inferred, not reproduced.
+  - **Pages in view first.**
+    - Background render workers start nothing new while a visible page is queued or rendering.
+    - Previews and thumbnails wait for the pages in view (thumbnails for at most 500 ms).
+    - A pinch that ends lifts the 300 ms zoom block at once.
+    - The most visible page is queued first.
+    - `XQT_PERF` logs `sharp N after avg/worst ms`.
+    - Measured on pgfmanual, time until sharp after the last zoom step: pinch in 538 → 264 ms; Ctrl+wheel in
+      616 → 524 ms; Ctrl+wheel out 669 → 530 ms.
+    - Not done: splitting a page into tiles across threads. Poppler draws one page per PDF instance at a time.
+  - **Fast tab close.** Queued thumbnails no longer count as busy, and a view cancels all its queued renders at once
+    (`RenderService::cancel` for a set). It waits only for the renders already running.
+    - Closing a 1,300-page PDF: 5.4–6.4 s → 0.2–0.4 s.
+    - Remaining: the one render each worker is running, and freeing the PDF instances.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

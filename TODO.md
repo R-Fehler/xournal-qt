@@ -15,9 +15,9 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 ## Order of work (2026-09-23)
 
-Started 2026-09-23: `qt/render-visible` (worktree `../xournal_qt-render-visible`). `qt/ui-polish` is merged (see ROADMAP).
+`qt/render-visible` and `qt/ui-polish` are merged (2026-09-24, see ROADMAP).
 
-1. **Bugs and polish:** `qt/render-visible` and `qt/ui-polish` in parallel, then `qt/markdown-fixes`.
+1. **Bugs and polish:** `qt/markdown-fixes` (`qt/render-visible` and `qt/ui-polish` are done).
 2. **Library track**, in this order, because each step builds on the one before:
    1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache);
    2. `.md` files and images in the library and its index, with snippet cards in the extended search;
@@ -32,26 +32,6 @@ Blocks for tracks 2–4 get their `qt/...` names when they are planned. Research
 is built.
 
 ## Ready: bug and polish blocks
-
-### `qt/render-visible`: rendering what is on screen (highest priority)
-Area: `qt/src/render` (RenderService, PageRaster), `qt/src/canvas` (CanvasView, CanvasMemory),
-`qt/src/quick` (DocumentCanvasItem), `qt/src/shell` (PageSketches). Tests: `-L canvas`, `-L quick`.
-
-These bugs probably share a cause, so fix them in one worktree:
-- [~] **Zoom shows grey pages.** When zooming reaches a level that needs a new render, the 1–4 pages in view
-  stop showing the GPU-scaled picture and show a grey page instead. Pages at the edge or outside the view are
-  fine. It recovers after zooming and scrolling around. Easy to reproduce.
-  *Suspect:* the old texture of a visible page is dropped or invalidated before the new render arrives, maybe
-  by the zoom block or by CanvasMemory eviction.
-- [~] **The current page sometimes stays blurry**, at preview resolution, and never gets its sharp render.
-  Probably the same cause (a missed or cancelled sharp request).
-- [~] **Render the visible page first once scrolling stops.** Raise its priority, preempt background and preview
-  jobs, and maybe split the visible page into tiles across several threads. Measure with `XQT_PERF=1` before
-  and after.
-- [~] **Closing the app or a tab can freeze the UI** for a long time on big PDFs. Find what the UI thread waits
-  for: render or preview workers that do not stop, preview or index files written on close, or poppler's
-  per-document mutex. Fix: cancel queued work, wait only for the job that is running, and write to disk off
-  the UI thread (or skip what can be rebuilt).
 
 ### `qt/markdown-fixes`
 Area: `qt/src/markdown`, the Markdown editor in `qt/src/canvas`, `DocumentSearch`. Tests: `-L markdown`.
