@@ -24,8 +24,14 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
    - Experiment `qt/mupdf`, started 2026-09-24: a MuPDF backend next to poppler, measured, with a short pdfium
      check. Findings go to `qt/docs/pdf-engine-experiment.md`.
 2. **Library track**, in this order, because each step builds on the one before:
-   1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache):
-      `qt/library-index`, started 2026-09-24 (worktree `../xournal_qt-library-index`);
+   1. ~~the per-folder index format~~ `qt/library-index`: merged 2026-09-24 (see ROADMAP). Follow-ups:
+      - [?] **Previews: in the folders or always in the app cache?** A pack is rewritten whole, so a new preview
+        rewrites its folder's `previews.pack`: about 0.6 MB uploaded per changed document on the Uni library. The
+        index is expensive to rebuild (PDF text) and worth syncing; a preview is one page render.
+        *Proposal:* keep the index in the folders and put previews always in the app cache.
+      - [ ] Reading positions are keyed by the library's path, so a library folder renamed or moved outside the
+        app starts without them. Match them by file name, size and time like the index, or keep a copy in the
+        root's dot folder that the clean-up leaves alone.
    2. `qt/document-search`: a live text index for open documents (see below). It builds on the entry model from
       `qt/library-index` and changes `DocumentSearch`, which `qt/markdown-fixes` also touches;
    3. `.md` files and images in the library and its index, with snippet cards in the extended search;

@@ -122,6 +122,23 @@
     - While writing on the page, hits follow the block shown as source, and are searched again when writing ends.
     - New `md::textRects` and `md::sourceRects` turn a text range into drawn rectangles, for the `.md` snippet cards.
   - The reported "boxes where the plain text would be" did not reproduce; it needs steps if it is still seen.
+- **Window state, `qt/window-state` (2026-09-24, awaiting on-device test):**
+  - The app opens maximized.
+  - Leaving full screen goes back to the state before: maximized, or the size the user chose. The window follows
+    its state all the time, and asks for maximized once more if the compositor gives back the unmaximized size.
+- **Per-folder library cache, `qt/library-index` (2026-09-24, awaiting on-device test).** See
+  [library.md](library.md).
+  - Each folder has its own `.xournal_library/` with `notes.pack`, `pdf-text.pack` and `previews.pack` (CBOR +
+    zlib, written whole and atomically, debounced), keyed by file name. An entry of 1 MB or more gets its own file.
+  - Opening a library merges the packs of all its folders. A subfolder opened as a library reads only its own
+    folders.
+  - Reading positions are in the config (`~/.config/xournal-qt/libraries/<key>/pages.json`).
+  - The old layout is converted in the background; its files are deleted only after the conversion succeeds.
+  - Settings → Storage: the cache size, the choice "keep the cache in the app's cache folder", and "Remove all
+    cache folders of this library", which then closes the app.
+  - Measured on a generated library of 303 documents in 30 folders: 17.6 MB in 606 files → 11.9 MB in 94 files;
+    the PDF text is 3.5× smaller; cold open 54–75 → 37–39 ms; editing one `.xopp` writes only its folder's
+    `notes.pack` (1 KB).
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

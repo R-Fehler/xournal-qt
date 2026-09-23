@@ -37,7 +37,9 @@ The machine is a slow 2-in-1, so every build and test run costs real time.
    unavoidable, keep it tiny, mark it with a `xournal-qt:` comment, and list the file in
    [qt/docs/adr/0002-upstream-seams.md](qt/docs/adr/0002-upstream-seams.md). Everything else belongs under `qt/`.
 2. **The author's data is not yours.** Never touch `~/.config/xournalpp`, `~/.config/xournal-qt` or their documents.
-3. **Ask before anything leaves the machine**: pushing, tagging, publishing a release, building the `.deb`.
+3. **Ask before anything leaves the machine**: pushing (branches or tags), publishing a release, building the `.deb`.
+   Local milestone tags are wanted: every block merged into `master-qt` gets an annotated tag
+   `ms/<date>-<block>` on its merge commit, with a one-line summary (`git tag -l 'ms/*' -n1` lists them).
 4. **One feature, one commit.** Before committing:
    - the tests you ran for it pass;
    - the device checklist ([qt/docs/testing/device-checklist.md](qt/docs/testing/device-checklist.md)) is
