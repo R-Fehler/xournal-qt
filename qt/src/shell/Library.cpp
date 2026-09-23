@@ -135,7 +135,9 @@ QString fileStamp(const fs::path& file) {
 
 QString documentStamp(const DocumentItem& item) {
     QString stamp;
-    for (const fs::path& f: {item.xopp, item.pdf, item.xopp.empty() ? fs::path() : DocumentFiles::attachmentOf(item.xopp)}) {
+    const fs::path none;
+    for (const fs::path& f: {item.xopp, item.pdf, item.xopp.empty() ? none : DocumentFiles::attachmentOf(item.xopp),
+                             item.xopp.empty() ? none : DocumentFiles::pagesOf(item.xopp)}) {
         if (!f.empty()) {
             stamp += fileStamp(f) + ';';
         }

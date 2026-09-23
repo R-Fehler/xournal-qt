@@ -81,7 +81,7 @@ private:
 };
 
 /// A string that changes when one of the document's files changes (size, modification time): the .xopp, the PDF next
-/// to it, an attached PDF.
+/// to it, an attached PDF, the merged PDF of pasted pages (".name.pages.pdf").
 QString documentStamp(const DocumentItem& item);
 /// Size and modification time of one file ("" if it does not exist).
 QString fileStamp(const fs::path& file);

@@ -35,6 +35,7 @@ class LayerController;
 namespace xqt {
 
 class DocumentSearch;
+class PdfPageKeeper;
 
 class AppContext;
 
@@ -108,6 +109,20 @@ public:
     void markRecovered(const fs::path& original);
     /// Remove the last autosave file (after closing the document without losing data).
     void deleteAutosaveFile();
+
+    // --- PDF pages from other PDFs (MergedPdf.h) ----------------------------------------------------------------
+    /// Add PDF pages from another PDF (a PDF in memory) to the document's merged background PDF, which is made from
+    /// its own PDF the first time and becomes its background. Returns the number of the first of them in it, or npos
+    /// if that failed (`error`). The numbers of the other pages stay.
+    size_t addPdfPages(const std::string& pdf, std::string& error);
+    /// The page numbers in the background PDF stay valid while this does not change (a save dropped unused pages
+    /// of the merged PDF and renumbered the pages).
+    quint64 pdfNumbering() const;
+    /// Where the merged PDF (in the cache until then) goes when the document is saved (empty: not saved yet, or none).
+    fs::path mergedPdfPlace() const;
+    /// The PDF the document annotates for the user: its background PDF, or while the merged PDF of a document that
+    /// was never saved is in the cache, the PDF it was made from (empty if none).
+    fs::path annotatedPdf() const;
 
     // --- view side --------------------------------------------------------------------------------------------
     /// The view showing this session (nullptr: headless). Not owned.
@@ -213,6 +228,8 @@ private:
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
     SaveResult saveImpl(fs::path target);
+    /// Write the .xopp (the file only).
+    SaveResult writeXopp(const fs::path& target);
 
     // UndoRedoListener
     void undoRedoChanged() override;
@@ -236,6 +253,7 @@ private:
     QTimer autosaveTimer;
     fs::path lastAutosaveFile;
     quint64 serialNo = 0;
+    std::unique_ptr<PdfPageKeeper> pdfPages;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };
 

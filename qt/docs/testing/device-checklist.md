@@ -507,3 +507,33 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       document open, it first asks to save it. After OK: no `.xournal_library/` left in the library (a file of your
       own put into one beforehand stays, with its folder), and the app is closed. Open the library again: the cache
       is built again, the cards still show where you were in each document.
+
+## Pasted PDF pages stay searchable (qt/pdf-pages)
+- [ ] Open a lecture PDF with its `.xopp` (a document of the library) and another PDF with text. In the other PDF,
+      copy a page (sidebar or page grid, Ctrl+C), go to the lecture and paste it (Ctrl+V). The note says the page
+      was pasted and that its PDF pages are saved in `.lecture.pages.pdf` next to the document; it is readable and
+      wraps in a narrow window. The pasted page looks as in the other PDF (sharp at any zoom, not a picture).
+- [ ] Search (Ctrl+F) a word of the pasted page: it is found, marked on the page, in the sidebar and in the page grid.
+      Mark PDF text on the pasted page (select, copy text, highlight): works as on the lecture's own pages.
+- [ ] The lecture's own PDF (`lecture.pdf`) is unchanged: same size and date in the file manager.
+- [ ] Paste pages from two more PDFs, and the same page twice: the folder has one `.lecture.pages.pdf` (show hidden
+      files), no other new files. Undo the pastes and redo them: the pages come and go as before.
+- [ ] A document without PDF (a new document, saved): paste a PDF page. A `name.pdf` appears next to the `.xopp`,
+      and the library still shows one card for the document.
+- [ ] A new document, never saved: paste a PDF page. It shows and its text is found; the note says the pages are
+      saved next to the document. The tab is still "Untitled".
+- [ ] The new document with the pasted page: save it into the library. `name.pdf` appears next to it (or the hidden
+      `.name.pages.pdf` if that name is taken); close and reopen it: the page shows and its text is found.
+- [ ] A lecture with pasted pages: delete a pasted page and a page of the lecture, save. `.lecture.pages.pdf` gets
+      smaller (file manager, hidden files shown); the document still shows the right pages, also after reopening,
+      and in Xournal++ (upstream) if it is installed. Undo the two deletions: both pages come back with their PDF
+      text; save again.
+- [ ] Save without changes: `.lecture.pages.pdf` keeps its date (not written again).
+- [ ] In the library, the lecture with pasted pages is one card (no `.lecture.pages.pdf` card). Rename it, move it
+      into a folder, copy it to another library, open each: the pasted pages show and their text is found. The
+      library search (also the extended search with pages) finds a word of a pasted page. Move it to the trash: the
+      trash has `.lecture.pages.pdf` with it.
+- [ ] Rename the lecture while it is open with a pasted page not saved yet, then save: the pages stay right.
+- [ ] Paste a page from another PDF into a saved lecture: no `.lecture.pages.pdf` appears next to it (hidden files
+      shown) until you save. Close it without saving: nothing new next to it, and nothing left in
+      `~/.cache/xournal-qt/pasted-pages`.

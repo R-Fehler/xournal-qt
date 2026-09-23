@@ -17,14 +17,20 @@ Rectangle {
     visible: false
     radius: 8
     color: "#323232"
-    implicitHeight: 48
+    implicitHeight: Math.max(48, row.implicitHeight + 16)
     implicitWidth: row.implicitWidth + 32
 
     RowLayout {
         id: row
         anchors.centerIn: parent
         spacing: 16
-        Label { objectName: "snackbarText"; text: bar.text; color: "#ffffff" }
+        Label {
+            objectName: "snackbarText"
+            text: bar.text
+            color: "#ffffff"
+            wrapMode: Text.Wrap  // (a longer note, e.g. where pasted PDF pages are kept)
+            Layout.maximumWidth: bar.parent ? Math.max(200, bar.parent.width - 160) : 560
+        }
         Button {
             objectName: "snackbarUndo"
             visible: bar.undoable
@@ -39,7 +45,7 @@ Rectangle {
     }
     Timer {
         id: hideTimer
-        interval: 5000
+        interval: bar.text.length > 60 ? 9000 : 5000  // time to read a longer note
         onTriggered: bar.visible = false
     }
 }

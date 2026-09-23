@@ -11,6 +11,7 @@
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
+#include <cairo-pdf.h>
 #include <gtest/gtest.h>
 
 #include "model/Document.h"
@@ -18,7 +19,9 @@
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/MergedPdf.h"
 #include "shell/SessionRecovery.h"
 #include "shell/TabManager.h"
 #include "undo/InsertUndoAction.h"
@@ -254,4 +257,74 @@ TEST_F(RecoveryTest, fatalSignalSavesModifiedDocuments) {
     auto r = DocumentSession::loadFile(fs::path(dir.filePath(saved[0]).toStdString()));
     ASSERT_TRUE(r.document);
     QFile::remove(dir.filePath(saved[0]));
+}
+
+namespace {
+/// A one-page PDF with a word on it, as text.
+void makeWordPdf(const fs::path& p, const char* word) {
+    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    cairo_set_font_size(cr, 24);
+    cairo_move_to(cr, 72, 100);
+    cairo_show_text(cr, word);
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+
+/// A run that pasted a PDF page into `doc` and crashed: the merged PDF of the pasted page is left in the cache.
+fs::path crashAfterPasting(const fs::path& doc, const fs::path& other) {
+    fs::path cached;
+    fs::path kept = fs::path(other).replace_extension(".kept");
+    {
+        AppController a;
+        a.startSession({});
+        EXPECT_TRUE(a.openPath(QString::fromStdString(other.string())));
+        a.copyPages({0});
+        EXPECT_TRUE(a.openPath(QString::fromStdString(doc.string())));
+        EXPECT_EQ(a.pastePages(0), 1);
+        cached = a.tabManager().currentSession()->getDocument()->getPdfFilepath();
+        EXPECT_TRUE(MergedPdf::inCache(cached));
+        EXPECT_EQ(SessionRecovery::emergencySaveAll(), 1);
+        fs::copy_file(cached, kept);  // (a crash does not close the tabs, which would remove it)
+    }
+    fs::rename(kept, cached);
+    return cached;
+}
+}  // namespace
+
+// A page pasted from another PDF before a crash is recovered with its PDF text; the merged PDF in the cache goes when
+// the recovered document is closed without saving, or when the recovery is declined.
+TEST_F(RecoveryTest, pastedPdfPagesAreRecoveredAndTheirCachedPdfCleanedUp) {
+    const fs::path other = fs::path(tmp.filePath("other.pdf").toStdString());
+    makeWordPdf(other, "pastedalpha");
+    fs::path cached = crashAfterPasting(doc, other);
+    markJournalCrashed();
+    {
+        AppController b;
+        b.startSession({});
+        ASSERT_EQ(b.recoveryItems().size(), 1);
+        b.recover(true);
+        DocumentSession* recovered = nullptr;
+        for (int i = 0; i < b.tabCount(); ++i) {
+            if (b.tabManager().session(i)->getFilePath() == doc) {
+                recovered = b.tabManager().session(i);
+            }
+        }
+        ASSERT_NE(recovered, nullptr);
+        EXPECT_FALSE(DocumentSearch::findOnPage(*recovered->getDocument(), 0, "pastedalpha").empty());
+        EXPECT_TRUE(fs::exists(cached));
+        for (int i = b.tabCount() - 1; i >= 0; --i) {
+            b.closeTab(i);
+        }
+        EXPECT_FALSE(fs::exists(cached)) << "closed without saving";
+    }
+    fs::remove(SessionRecovery::defaultJournalFile());
+
+    cached = crashAfterPasting(doc, other);
+    markJournalCrashed();
+    AppController c;
+    c.startSession({});
+    ASSERT_EQ(c.recoveryItems().size(), 1);
+    c.recover(false);
+    EXPECT_FALSE(fs::exists(cached)) << "the recovery was declined";
 }
