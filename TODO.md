@@ -13,10 +13,25 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 ---
 
-## Ready: bug and polish blocks
+## Order of work (2026-09-23)
 
-Order (2026-09-23): `qt/render-visible` and `qt/ui-polish` first, in parallel. Then `qt/markdown-fixes`.
 Nothing is started yet; the author says when implementation begins.
+
+1. **Bugs and polish:** `qt/render-visible` and `qt/ui-polish` in parallel, then `qt/markdown-fixes`.
+2. **Library track**, in this order, because each step builds on the one before:
+   1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache);
+   2. `.md` files and images in the library and its index, with snippet cards in the extended search;
+   3. the "Show" file type filter and the handling of other files;
+   4. fuzzy search behind its toggle.
+3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
+   branches are open.
+4. **The `.md` editor:** `.md` documents, images in `<name>.assets/`, math, vaults. It is the biggest design
+   task and builds on the library already listing and indexing `.md` files.
+
+Blocks for tracks 2–4 get their `qt/...` names when they are planned. Research for each happens right before it
+is built.
+
+## Ready: bug and polish blocks
 
 ### `qt/render-visible`: rendering what is on screen (highest priority)
 Area: `qt/src/render` (RenderService, PageRaster), `qt/src/canvas` (CanvasView, CanvasMemory),

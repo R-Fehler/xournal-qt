@@ -24,6 +24,10 @@ Qt 6 / Qt Quick frontend: tabs, libraries of documents, and touch-first controls
 - Any folder can be a library, not only the ones under `~/Documents/Xournal_Libraries`.
 - Opening big libraries and their subfolders is instant, and moving folders stays cheap.
 - Search the whole library quickly, fuzzy like fzf, with optional logical operators.
+- A library holds more than notes and PDFs: Markdown and images too, and optionally every file in the folder.
+  Files the app cannot handle open in the system's app.
+- The cache stays small and out of the way: one hidden folder per folder, easy to remove, or kept in the app's
+  cache so synced folders stay clean.
 
 ### Markdown as a first-class document
 - Markdown boxes inside `.xopp` pages (exists) and plain `.md` files as documents of their own.
