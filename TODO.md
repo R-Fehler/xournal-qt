@@ -95,9 +95,23 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     - Entries are named by a hash of the path, so a folder moved outside the app loses its entries. The PDF text
       is taken over only when an old entry with the same size and time still exists.
   - *Proposal from these numbers:*
-    - **One pack per folder**, not one file per document. Each folder gets a single index file for the documents
-      directly in it, keyed by file name, and compressed: PDF text shrinks to roughly a quarter. Previews for
-      that folder go into a single file too.
+    - **Decided (2026-09-23): one hidden dot folder per folder** (`.xournal_library/`), holding the cache of only
+      the documents directly in that folder, never those of subfolders. It is a folder rather than a file because
+      later features may need more hidden files. Folders without documents get none.
+    - **A few packs per dot folder**, not one file per document. Entries are keyed by file name and compressed,
+      so the PDF text shrinks to roughly a quarter. The packs are split by how often they change:
+      - `pdf-text`: PDF text, keyed by the PDF's size and time. This is the big part and changes only when a PDF
+        does.
+      - `notes`: per page, the text elements, Markdown and shape of each `.xopp`. It is small and changes on
+        every save.
+      - `previews`: the first-page images.
+      - An entry over about 1 MB (a huge PDF's text) gets a file of its own in the dot folder, so it is not
+        rewritten along with its neighbours.
+    - **Writes:** a changed pack is rewritten whole, atomically (`QSaveFile`), by the background indexer,
+      debounced (a few seconds after the last change, and on close).
+      - Partial in-place writes and SQLite are out for synced folders: sync clients upload whole files anyway,
+        and torn files or conflict copies of a journal are worse than a small rewrite.
+      - SQLite would be fine for the app-cache mode, if that ever pays off.
     - 292 folders then mean about 600 files instead of 4,459, which cloud sync handles far better. A folder moved
       by any program keeps its index.
     - Opening a parent folder reads and merges the packs of its subfolders, and a subfolder opens as a library
