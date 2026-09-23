@@ -15,7 +15,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 ## Order of work (2026-09-23)
 
-Nothing is started yet; the author says when implementation begins.
+Started 2026-09-23: `qt/render-visible` and `qt/ui-polish` (worktrees `../xournal_qt-render-visible`, `../xournal_qt-ui-polish`).
 
 1. **Bugs and polish:** `qt/render-visible` and `qt/ui-polish` in parallel, then `qt/markdown-fixes`.
 2. **Library track**, in this order, because each step builds on the one before:
@@ -38,17 +38,17 @@ Area: `qt/src/render` (RenderService, PageRaster), `qt/src/canvas` (CanvasView, 
 `qt/src/quick` (DocumentCanvasItem), `qt/src/shell` (PageSketches). Tests: `-L canvas`, `-L quick`.
 
 These bugs probably share a cause, so fix them in one worktree:
-- [ ] **Zoom shows grey pages.** When zooming reaches a level that needs a new render, the 1–4 pages in view
+- [~] **Zoom shows grey pages.** When zooming reaches a level that needs a new render, the 1–4 pages in view
   stop showing the GPU-scaled picture and show a grey page instead. Pages at the edge or outside the view are
   fine. It recovers after zooming and scrolling around. Easy to reproduce.
   *Suspect:* the old texture of a visible page is dropped or invalidated before the new render arrives, maybe
   by the zoom block or by CanvasMemory eviction.
-- [ ] **The current page sometimes stays blurry**, at preview resolution, and never gets its sharp render.
+- [~] **The current page sometimes stays blurry**, at preview resolution, and never gets its sharp render.
   Probably the same cause (a missed or cancelled sharp request).
-- [ ] **Render the visible page first once scrolling stops.** Raise its priority, preempt background and preview
+- [~] **Render the visible page first once scrolling stops.** Raise its priority, preempt background and preview
   jobs, and maybe split the visible page into tiles across several threads. Measure with `XQT_PERF=1` before
   and after.
-- [ ] **Closing the app or a tab can freeze the UI** for a long time on big PDFs. Find what the UI thread waits
+- [~] **Closing the app or a tab can freeze the UI** for a long time on big PDFs. Find what the UI thread waits
   for: render or preview workers that do not stop, preview or index files written on close, or poppler's
   per-document mutex. Fix: cancel queued work, wait only for the job that is running, and write to disk off
   the UI thread (or skip what can be rebuilt).
@@ -65,12 +65,12 @@ Area: `qt/src/markdown`, the Markdown editor in `qt/src/canvas`, `DocumentSearch
 
 ### `qt/ui-polish`
 Area: `qt/src/app/qml`, a bit of `CanvasInput`. Mostly QML, so builds are cheap. Tests: `-L ui`, `-L quick`.
-- [ ] **Tab bar: previous/next arrow buttons**, for example next to the overview button.
-- [ ] **Full-screen button in the tool bar.** F11 full screen already exists; it only needs a button.
-- [ ] **Tool bar docked left or right:**
+- [~] **Tab bar: previous/next arrow buttons**, for example next to the overview button.
+- [~] **Full-screen button in the tool bar.** F11 full screen already exists; it only needs a button.
+- [~] **Tool bar docked left or right:**
   - the thin "show tool bar" strip stays at the top instead of moving to the dock side;
   - the hide button's arrow points into the canvas instead of towards the tool bar.
-- [ ] **Paste pill on a long press with the pen.** With the pen (or another drawing tool) selected, a long
+- [~] **Paste pill on a long press with the pen.** With the pen (or another drawing tool) selected, a long
   press on the canvas should show the copy/paste pill at the bottom of the canvas, as it does elsewhere.
 
 ---
