@@ -25,7 +25,7 @@ fi
 
 # Without these there is no build at all
 $SUDO apt-get install -y --no-install-recommends \
-    build-essential cmake ninja-build pkg-config git \
+    build-essential cmake ninja-build pkg-config git file \
     qt6-base-dev qt6-base-private-dev qt6-declarative-dev libxkbcommon-dev \
     libglib2.0-dev libcairo2-dev libpango1.0-dev libpoppler-glib-dev libgdk-pixbuf-2.0-dev \
     libxml2-dev libzip-dev zlib1g-dev libqpdf-dev

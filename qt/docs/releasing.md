@@ -32,6 +32,10 @@ in a container; `qt/scripts/linux-deps.sh` installs the packages (the same scrip
      so the job may not produce it (`continue-on-error`); the release does not wait for it.
 6. Install a package and try it, then write the notes and publish the draft on GitHub.
 
+Every job also keeps what it built as an artifact of the run (the "Artifacts" box at the bottom of the run's page,
+a zip). That is where a package is when a job after it did not manage; the draft gets whatever was packaged, even
+when one of the jobs failed.
+
 A build without a tag: start the workflow by hand ("Run workflow"); it uses the version from `qt/CMakeLists.txt`.
 
 ## Known flaky test

@@ -106,7 +106,8 @@ jobs:
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
           export QML_SOURCES_PATHS="$PWD/qt/src/app/qml"
           export QMAKE="$(command -v qmake6 || command -v qmake)"  # how the Qt plugin finds Qt
-          export VERSION="${GITHUB_REF_NAME#v}"
+          version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
+          case "$GITHUB_REF_NAME" in v*) export VERSION="${GITHUB_REF_NAME#v}" ;; *) export VERSION="$version" ;; esac
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
               -d AppDir/usr/share/applications/xournal-qt.desktop \
               -i AppDir/usr/share/icons/hicolor/scalable/apps/xournal-qt.svg
@@ -120,11 +121,14 @@ jobs:
 
   draft:
     name: Draft release
-    needs: [packages]
+    needs: [packages, appimage]
+    # Also when one of them did not manage: what was packaged still goes into the draft.
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           pattern: package-*
           merge-multiple: true
@@ -134,7 +138,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ls -l artifacts
+          ls -l artifacts || true
+          if [ -z "$(ls -A artifacts 2>/dev/null)" ]; then
+              echo "::error::nothing was packaged - look at the jobs above"
+              exit 1
+          fi
           version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
           tag="${GITHUB_REF_NAME}"
           case "$tag" in v*) ;; *) tag="v${version}" ;; esac   # started by hand: the version of the project
