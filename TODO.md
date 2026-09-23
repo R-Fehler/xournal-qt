@@ -147,6 +147,16 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [?] **Math:** MicroTeX, in Markdown boxes, the `.md` editor and the full-page Markdown mode.
 - [?] **Mermaid:** optional; it needs a JavaScript engine or a renderer written from scratch. Until then, show
   the source as a code block.
+- [?] **`.md` files in the library and its search index.** Today the library only knows `.xopp`, `.xoj` and `.pdf`
+  (`qt/src/shell/DocumentFiles.cpp`).
+  - `.md` files get entries in the folder's `notes` pack. The text is read through md4c, so the syntax is not
+    indexed. Headings are kept for snippets and for jumping to a hit, and links and wikilinks are kept for
+    backlinks later.
+  - Indexing is cheap: the file is plain text, so there is no PDF step.
+  - A hit points to a heading or line, since `.md` has no pages until the paginated view exists.
+  - Listing and indexing could land before the `.md` editor, with a hit opening the file read-only in the
+    Markdown renderer.
+  - Other text files (`.txt`, `.org`) could follow the same path later.
 - [?] **Vaults** (Obsidian, Zettlr, foam): open a vault folder as a library; resolve `[[wikilinks]]` and
   Markdown links by file name; backlinks later.
 
