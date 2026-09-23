@@ -474,3 +474,10 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
       and the library still shows one card for the document.
 - [ ] A new document, never saved: paste a PDF page. It shows and its text is found; the note says the pages are
       saved next to the document. The tab is still "Untitled".
+- [ ] The new document with the pasted page: save it into the library. `name.pdf` appears next to it (or the hidden
+      `.name.pages.pdf` if that name is taken); close and reopen it: the page shows and its text is found.
+- [ ] A lecture with pasted pages: delete a pasted page and a page of the lecture, save. `.lecture.pages.pdf` gets
+      smaller (file manager, hidden files shown); the document still shows the right pages, also after reopening,
+      and in Xournal++ (upstream) if it is installed. Undo the two deletions: both pages come back with their PDF
+      text; save again.
+- [ ] Save without changes: `.lecture.pages.pdf` keeps its date (not written again).

@@ -115,6 +115,9 @@ public:
     /// its own PDF the first time and becomes its background. Returns the number of the first of them in it, or npos
     /// if that failed (`error`). The numbers of the other pages stay.
     size_t addPdfPages(const std::string& pdf, std::string& error);
+    /// The page numbers in the background PDF stay valid while this does not change (a save dropped unused pages
+    /// of the merged PDF and renumbered the pages).
+    quint64 pdfNumbering() const;
     /// The PDF the document annotates for the user: its background PDF, or while the merged PDF of a document that
     /// was never saved is in the cache, the PDF it was made from (empty if none).
     fs::path annotatedPdf() const;

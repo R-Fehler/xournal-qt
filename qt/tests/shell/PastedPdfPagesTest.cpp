@@ -17,6 +17,7 @@
 #include <cairo-pdf.h>
 #include <gtest/gtest.h>
 
+#include "control/xojfile/LoadHandler.h"
 #include "model/Document.h"
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfDocument.h"
@@ -247,4 +248,158 @@ TEST_F(PastedPdfPages, aDocumentNeverSavedKeepsThemInTheCache) {
     const fs::path cached = backgroundOf(annotated);
     c.closeTab(c.currentTab());
     EXPECT_FALSE(fs::exists(cached));
+}
+
+namespace {
+/// The word each page of a saved .xopp shows from its PDF, loaded with upstream's loader (as Xournal++ opens it).
+std::vector<std::string> wordsAsUpstreamLoadsThem(const fs::path& xopp, const std::vector<std::string>& words) {
+    LoadHandler handler;
+    auto doc = handler.loadDocument(xopp);
+    EXPECT_TRUE(doc) << xopp;
+    EXPECT_TRUE(handler.getMissingPdfFilename().empty());
+    std::vector<std::string> out;
+    for (size_t i = 0; doc && i < doc->getPageCount(); ++i) {
+        std::string found;
+        const PageRef page = doc->getPage(i);
+        if (page->getBackgroundType().isPdfPage()) {
+            if (auto pdf = doc->getPdfPage(page->getPdfPageNr())) {
+                for (const auto& w: words) {
+                    if (!pdf->findText(w).empty()) {
+                        found = w;
+                        break;
+                    }
+                }
+            }
+        }
+        out.push_back(found);
+    }
+    return out;
+}
+
+const std::vector<std::string> WORDS{"lectureone", "lecturetwo", "lecturethree", "pastedalpha", "pastedbeta",
+                                     "pastedgamma"};
+
+size_t pdfPagesOf(const fs::path& pdf) {
+    XojPdfDocument d;
+    GError* e = nullptr;
+    const bool ok = d.load(pdf, "", &e);
+    if (e) {
+        g_error_free(e);
+    }
+    return ok ? d.getPageCount() : 0;
+}
+}  // namespace
+
+TEST_F(PastedPdfPages, savingDropsThePdfPagesNoLongerUsed) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    const std::string original = bytesOf(root / "lecture.pdf");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({0, 1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    ASSERT_EQ(c.pastePages(3), 2);  // lectureone, lecturetwo, lecturethree, pastedalpha, pastedbeta
+    ASSERT_TRUE(c.save());
+    const fs::path merged = root / ".lecture.pages.pdf";
+    EXPECT_EQ(pdfPagesOf(merged), 5u);
+    const auto time = fs::last_write_time(merged);
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(fs::last_write_time(merged), time) << "nothing changed: not written again";
+
+    ASSERT_TRUE(c.deletePages({3}));  // pastedalpha
+    ASSERT_TRUE(c.deletePages({1}));  // lecturetwo
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(pdfPagesOf(merged), 3u) << "only the pages that are used";
+    EXPECT_EQ(s.getDocument()->getPdfPageCount(), 3u);
+    EXPECT_EQ(s.getDocument()->getPage(2)->getPdfPageNr(), 2u) << "renumbered";
+    EXPECT_TRUE(pageHasText(s, 0, "lectureone"));
+    EXPECT_TRUE(pageHasText(s, 1, "lecturethree"));
+    EXPECT_TRUE(pageHasText(s, 2, "pastedbeta"));
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "lecturethree", "pastedbeta"}))
+            << "the saved .xopp opens in Xournal++ with the right pages";
+    EXPECT_EQ(bytesOf(root / "lecture.pdf"), original);
+
+    // The deleted pages come back with undo, with their PDF pages (kept in memory when they were dropped)
+    c.undoPages();
+    EXPECT_TRUE(pageHasText(s, 1, "lecturetwo"));
+    c.undoPages();
+    EXPECT_TRUE(pageHasText(s, 0, "lectureone"));
+    EXPECT_TRUE(pageHasText(s, 3, "pastedalpha"));
+    EXPECT_TRUE(pageHasText(s, 4, "pastedbeta"));
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "lecturetwo", "lecturethree", "pastedalpha", "pastedbeta"}));
+    EXPECT_EQ(pdfPagesOf(merged), 5u);
+}
+
+TEST_F(PastedPdfPages, anUndoneBackgroundChangeShowsItsPdfPageAfterASave) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({0});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    ASSERT_EQ(c.pastePages(3), 1);
+    c.copyPages({2});
+    ASSERT_EQ(c.pastePages(3), 1);  // lectureone, lecturetwo, lecturethree, lecturethree, pastedalpha
+    // A pattern on the first, the second "lecturethree" and the pasted page: their PDF pages are not shown now
+    ASSERT_TRUE(c.changePageBackground({0, 3, 4}, 0));
+    ASSERT_FALSE(s.getDocument()->getPage(4)->getBackgroundType().isPdfPage());
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(s.getDocument()->getPdfPageCount(), 2u) << "lecturetwo and lecturethree";
+    c.undoPages();  // (the undo sets the numbers the pages had before the save)
+    EXPECT_TRUE(pageHasText(s, 0, "lectureone"));
+    EXPECT_TRUE(pageHasText(s, 1, "lecturetwo"));
+    EXPECT_TRUE(pageHasText(s, 2, "lecturethree"));
+    EXPECT_TRUE(pageHasText(s, 3, "lecturethree"));
+    EXPECT_TRUE(pageHasText(s, 4, "pastedalpha"));
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "lecturetwo", "lecturethree", "lecturethree", "pastedalpha"}));
+}
+
+TEST_F(PastedPdfPages, theFirstSavePutsThemNextToTheDocument) {
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    c.newDocument();
+    ASSERT_EQ(c.pastePages(1), 1);
+    const fs::path cached = backgroundOf(current(c));
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "fresh.xopp").string()))));
+    EXPECT_EQ(backgroundOf(current(c)), root / "fresh.pdf") << "a document without PDF: its own, paired";
+    EXPECT_FALSE(fs::exists(cached)) << "moved out of the cache";
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "fresh.xopp", WORDS), (std::vector<std::string>{"", "pastedbeta"}));
+
+    // A PDF annotated without .xopp yet: its pages and the pasted ones go into the hidden sidecar
+    const std::string original = bytesOf(root / "lecture.pdf");
+    ASSERT_TRUE(open(c, root / "lecture.pdf"));
+    ASSERT_EQ(c.pastePages(1), 1);
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "lecture.xopp").string()))));
+    EXPECT_EQ(backgroundOf(current(c)), root / ".lecture.pages.pdf");
+    EXPECT_EQ(bytesOf(root / "lecture.pdf"), original);
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"}));
+
+    // "Save as" another name: it gets its own copy, the first one keeps its file
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "copy.xopp").string()))));
+    EXPECT_EQ(backgroundOf(current(c)), root / ".copy.pages.pdf");
+    EXPECT_TRUE(fs::exists(root / ".lecture.pages.pdf"));
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "copy.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"}));
+}
+
+TEST_F(PastedPdfPages, copiedPagesStayRightWhenASaveRenumbers) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({0});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    ASSERT_EQ(c.pastePages(3), 1);  // lectureone, lecturetwo, lecturethree, pastedalpha
+    c.copyPages({3});
+    ASSERT_TRUE(c.deletePages({0}));
+    ASSERT_TRUE(c.save());  // pastedalpha: 3 -> 2
+    ASSERT_EQ(c.pastePages(0), 1);
+    EXPECT_TRUE(pageHasText(s, 0, "pastedalpha"));
 }

@@ -86,6 +86,7 @@ void PageClipboard::copy(DocumentSession& session, const std::vector<size_t>& in
         merged = {};
         pdfFile = doc.getPdfFilepath();
         sourceSession = session.serial();
+        sourceNumbering = session.pdfNumbering();
         for (size_t i: indices) {
             if (i >= doc.getPageCount()) {
                 continue;
@@ -122,9 +123,11 @@ std::vector<PageRef> PageClipboard::pagesFor(DocumentSession& target, fs::path* 
         std::shared_lock lock(doc);
         targetPdf = doc.getPdfFilepath();
     }
-    // The same PDF: the pages refer to the same page numbers. In the source document itself they stay valid (its
-    // merged PDF only grows while it is open); another document must use the same file, unchanged since the copy.
-    const bool samePdf = (target.serial() == sourceSession && !pdfFile.empty()) ||
+    // The same PDF: the pages refer to the same page numbers. In the source document itself they stay valid until a
+    // save drops PDF pages (its merged PDF only grows before); another document must use the same file, unchanged
+    // since the copy.
+    const bool samePdf = (target.serial() == sourceSession && target.pdfNumbering() == sourceNumbering &&
+                          !pdfFile.empty()) ||
                          (!pdfFile.empty() && targetPdf == pdfFile && stampOf(pdfFile) == pdfStamp);
     size_t first = npos;
     if (!samePdf && !pdfData.empty()) {

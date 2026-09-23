@@ -44,6 +44,7 @@ private:
     fs::path pdfFile;                       ///< the PDF of the source document
     std::string pdfStamp;                   ///< its size and time when copied
     quint64 sourceSession = 0;              ///< the source document (DocumentSession::serial)
+    quint64 sourceNumbering = 0;            ///< its DocumentSession::pdfNumbering
     std::string pdfData;                    ///< the PDF pages of the copied pages, as a PDF
     std::vector<size_t> pdfIndex;           ///< per page: its page in pdfData, or npos
     /// The last paste of these PDF pages into a document: pasted again, the pages are already in its PDF.

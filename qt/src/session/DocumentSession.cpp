@@ -756,6 +756,8 @@ size_t DocumentSession::addPdfPages(const std::string& pdf, std::string& error) 
 
 fs::path DocumentSession::annotatedPdf() const { return pdfPages->annotatedPdf(); }
 
+quint64 DocumentSession::pdfNumbering() const { return pdfPages->numbering(); }
+
 std::string DocumentSession::getDisplayName() const {
     std::shared_lock lock(*doc);
     if (auto p = doc->getFilepath(); !p.empty()) {
@@ -813,11 +815,12 @@ void DocumentSession::updatePreview(Document& document) {
 
 auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     // Port of SaveJob::save
+    Util::safeReplaceExtension(target, "xopp");
+    pdfPages->beforeSave(target);  // xournal-qt: the merged PDF of pasted PDF pages goes next to it, compacted
     updatePreview(*doc);
     SaveHandler h;
 
     doc->lock_shared();
-    Util::safeReplaceExtension(target, "xopp");
     h.prepareSave(doc.get(), target);
     doc->unlock_shared();
 

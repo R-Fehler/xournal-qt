@@ -1,12 +1,15 @@
 #include "PdfPageKeeper.h"
 
+#include <algorithm>
 #include <mutex>
 #include <shared_mutex>
 #include <system_error>
+#include <unordered_set>
 
 #include <glib.h>
 
 #include "model/Document.h"
+#include "model/XojPage.h"
 #include "pdf/base/XojPdfDocument.h"
 #include "util/PathUtil.h"
 #include "util/Util.h"
@@ -26,9 +29,32 @@ std::string stampOf(const fs::path& p) {
     const auto time = fs::last_write_time(p, ec);
     return std::to_string(size) + ":" + std::to_string(time.time_since_epoch().count());
 }
+
+bool isPdf(const PageRef& p) { return p->getBackgroundType().isPdfPage(); }
+
+bool contains(const std::vector<size_t>& v, size_t x) { return std::find(v.begin(), v.end(), x) != v.end(); }
+
+/// Copy a file to `target` through a temporary file next to it.
+bool copyAtomically(const fs::path& from, const fs::path& target, std::string& error) {
+    const fs::path tmp = target.parent_path() / ("." + target.filename().string() + ".part");
+    std::error_code ec;
+    fs::copy_file(from, tmp, fs::copy_options::overwrite_existing, ec);
+    if (!ec) {
+        fs::rename(tmp, target, ec);
+    }
+    if (ec) {
+        error = ec.message();
+        fs::remove(tmp, ec);
+        return false;
+    }
+    return true;
+}
 }  // namespace
 
-PdfPageKeeper::PdfPageKeeper(DocumentSession& session): session(session) { registerListener(&session); }
+PdfPageKeeper::PdfPageKeeper(DocumentSession& session): session(session) {
+    registerListener(&session);
+    trackAll();
+}
 
 PdfPageKeeper::~PdfPageKeeper() { discardCached(); }
 
@@ -136,6 +162,264 @@ void PdfPageKeeper::discardCached() {
         fs::remove(f, ec);
     }
     createdInCache.clear();
+}
+
+// --- the pages ------------------------------------------------------------------------------------------------------
+
+auto PdfPageKeeper::track(const PageRef& page) -> Tracked& {
+    auto it = tracked.find(page.get());
+    if (it != tracked.end() && it->second.page.lock() == page) {
+        return it->second;
+    }
+    Tracked t;
+    t.page = page;
+    t.last = isPdf(page) ? page->getPdfPageNr() : npos;
+    return tracked[page.get()] = std::move(t);
+}
+
+void PdfPageKeeper::trackAll() {
+    Document* doc = session.getDocument();
+    std::vector<PageRef> pages;
+    {
+        std::shared_lock lock(*doc);
+        for (size_t i = 0; i < doc->getPageCount(); ++i) {
+            pages.push_back(doc->getPage(i));
+        }
+    }
+    for (auto it = tracked.begin(); it != tracked.end();) {  // (the ones that are gone for good)
+        it = it->second.page.expired() ? tracked.erase(it) : std::next(it);
+    }
+    for (const auto& p: pages) {
+        track(p);
+    }
+}
+
+void PdfPageKeeper::documentChanged(DocumentChangeType type) {
+    if (type == DOCUMENT_CHANGE_CLEARED || type == DOCUMENT_CHANGE_COMPLETE) {
+        trackAll();
+    }
+}
+
+void PdfPageKeeper::pageInserted(size_t index) {
+    PageRef page;
+    {
+        std::shared_lock lock(*session.getDocument());
+        if (index >= session.getDocument()->getPageCount()) {
+            return;
+        }
+        page = session.getDocument()->getPage(index);
+    }
+    Tracked& t = track(page);
+    if (t.limbo && isPdf(page)) {
+        restore(t.limbo);  // (before the views hear of the page: they come after this listener)
+    } else if (isPdf(page)) {
+        t.last = page->getPdfPageNr();
+    }
+}
+
+void PdfPageKeeper::pageChanged(size_t index) {
+    PageRef page;
+    {
+        std::shared_lock lock(*session.getDocument());
+        if (index >= session.getDocument()->getPageCount()) {
+            return;
+        }
+        page = session.getDocument()->getPage(index);
+    }
+    if (!isPdf(page)) {
+        return;
+    }
+    Tracked& t = track(page);
+    const size_t nr = page->getPdfPageNr();
+    if (nr == t.last && !t.limbo) {
+        return;  // (every edit of a page comes by here)
+    }
+    // An undone background change sets the number the page had then: before a save renumbered it
+    if (t.limbo && (nr == t.last || contains(t.aliases, nr))) {
+        restore(t.limbo);
+    } else if (contains(t.aliases, nr)) {
+        std::unique_lock lock(*session.getDocument());
+        page->setBackgroundPdfPageNr(t.last);
+    } else {
+        t.last = nr;
+        return;
+    }
+    session.firePageChanged(index);  // (drawn with the number it came with)
+}
+
+void PdfPageKeeper::restore(std::shared_ptr<Limbo> limbo) {  // (a copy: the pages' own are reset here)
+    std::string error;
+    const size_t first = add(limbo->pdf, error);
+    if (first == npos) {
+        g_warning("Could not add the PDF pages of pages that came back: %s", error.c_str());
+    }
+    std::unique_lock lock(*session.getDocument());
+    for (auto& [ptr, t]: tracked) {
+        if (t.limbo != limbo) {
+            continue;
+        }
+        t.limbo.reset();  // (also when that failed: the pages show no PDF page then, it is not tried again)
+        const PageRef p = t.page.lock();
+        if (!p || first == npos) {
+            continue;
+        }
+        if (t.last != npos) {
+            t.aliases.push_back(t.last);
+        }
+        t.last = first + t.limboIndex;
+        if (isPdf(p)) {
+            p->setBackgroundPdfPageNr(t.last);
+        }
+    }
+}
+
+// --- saving ---------------------------------------------------------------------------------------------------------
+
+void PdfPageKeeper::beforeSave(const fs::path& target) {
+    Document* doc = session.getDocument();
+    fs::path bg;
+    size_t count = 0;
+    std::vector<size_t> used;  // the PDF pages the document shows
+    {
+        std::shared_lock lock(*doc);
+        bg = doc->getPdfFilepath();
+        count = doc->getPdfPageCount();
+        for (size_t i = 0; i < doc->getPageCount(); ++i) {
+            if (const PageRef p = doc->getPage(i); isPdf(p) && p->getPdfPageNr() < count) {
+                used.push_back(p->getPdfPageNr());
+            }
+        }
+    }
+    std::sort(used.begin(), used.end());
+    used.erase(std::unique(used.begin(), used.end()), used.end());
+    if (bg.empty() || count == 0 || used.empty()) {
+        return;  // (no PDF page left: the merged PDF stays as it is, the .xopp does not refer to it)
+    }
+    const MergedPdf::Kind kind = kindOf(bg);
+    if (kind == MergedPdf::Kind::None) {
+        return;  // the user's PDF: never written
+    }
+    fs::path place;
+    std::error_code ec;
+    if (bg == MergedPdf::sidecarOf(target) || bg == MergedPdf::pairOf(target)) {
+        place = bg;
+    } else if (kind == MergedPdf::Kind::Own && !fs::exists(MergedPdf::pairOf(target), ec)) {
+        place = MergedPdf::pairOf(target);
+    } else {
+        place = MergedPdf::sidecarOf(target);
+    }
+    const bool compact = used.size() < count;
+    if (!compact && place == bg) {
+        return;  // nothing changed
+    }
+
+    std::unordered_map<size_t, size_t> renumber;  // old -> new
+    std::shared_ptr<Limbo> limbo;
+    std::vector<size_t> dropped;  // PDF pages of pages that may come back (undo, redo), in `limbo`
+    if (compact) {
+        trackAll();
+        for (auto& [ptr, t]: tracked) {
+            const PageRef p = t.page.lock();
+            if (!p || t.limbo) {
+                continue;
+            }
+            const size_t n = isPdf(p) ? p->getPdfPageNr() : t.last;
+            if (n != npos && n < count && !std::binary_search(used.begin(), used.end(), n)) {
+                dropped.push_back(n);
+            }
+        }
+        std::sort(dropped.begin(), dropped.end());
+        dropped.erase(std::unique(dropped.begin(), dropped.end()), dropped.end());
+        if (!dropped.empty()) {
+            limbo = std::make_shared<Limbo>();
+            if (const auto r = MergedPdf::extract(bg, dropped, limbo->pdf); !r.ok) {
+                g_warning("Could not keep the PDF pages of undone pages: %s", r.error.c_str());
+                used.insert(used.end(), dropped.begin(), dropped.end());  // they stay in the file then
+                std::sort(used.begin(), used.end());
+                dropped.clear();
+                limbo.reset();
+            }
+        }
+        for (size_t k = 0; k < used.size(); ++k) {
+            renumber[used[k]] = k;
+        }
+    }
+    std::string error;
+    if (compact && used.size() < count) {
+        if (const auto r = MergedPdf::keepOnly(bg, used, place); !r.ok) {
+            g_warning("Could not write the PDF pages of the document: %s", r.error.c_str());
+            return;
+        }
+    } else if (place != bg) {
+        renumber.clear();
+        if (!copyAtomically(bg, place, error)) {
+            g_warning("Could not write the PDF pages of the document: %s", error.c_str());
+            return;
+        }
+    } else {
+        return;
+    }
+    {
+        XojPdfDocument probe;  // (before the pages are renumbered: it must load)
+        GError* e = nullptr;
+        const bool ok = probe.load(place, "", &e);
+        if (e) {
+            g_warning("Could not load the PDF pages of the document: %s", e->message);
+            g_error_free(e);
+        }
+        if (!ok) {
+            return;
+        }
+    }
+
+    std::vector<size_t> changed;  // pages of the document with another number now
+    if (!renumber.empty()) {
+        std::unordered_set<const XojPage*> moved;
+        std::unique_lock lock(*doc);
+        for (auto& [ptr, t]: tracked) {
+            const PageRef p = t.page.lock();
+            if (!p || t.limbo) {
+                continue;
+            }
+            const size_t n = isPdf(p) ? p->getPdfPageNr() : t.last;
+            if (n == npos || n >= count) {
+                continue;
+            }
+            if (auto it = renumber.find(n); it != renumber.end()) {
+                if (it->second != n) {
+                    t.aliases.push_back(n);
+                    moved.insert(p.get());
+                }
+                t.last = it->second;
+                if (isPdf(p)) {
+                    p->setBackgroundPdfPageNr(it->second);
+                }
+            } else if (limbo) {
+                t.limbo = limbo;
+                t.limboIndex = static_cast<size_t>(std::lower_bound(dropped.begin(), dropped.end(), n) - dropped.begin());
+            }
+        }
+        for (size_t i = 0; i < doc->getPageCount(); ++i) {
+            if (moved.count(doc->getPage(i).get())) {
+                changed.push_back(i);
+            }
+        }
+        ++numberingNo;
+    }
+    if (!doc->readPdf(place, /*initPages=*/false, /*attachToDocument=*/false)) {
+        g_warning("Could not load the PDF pages of the document: %s", doc->getLastErrorMsg().c_str());
+    }
+    for (size_t i: changed) {
+        session.revisePage(i);  // (drawn with the old PDF meanwhile, maybe)
+    }
+    if (MergedPdf::inCache(bg) && place != bg) {
+        fs::remove(bg, ec);  // moved next to the document
+        createdInCache.erase(bg);
+        madeFrom.clear();
+    }
+    knownPath = place;
+    knownStamp = stampOf(place);
+    knownKind = kind;
 }
 
 }  // namespace xqt
