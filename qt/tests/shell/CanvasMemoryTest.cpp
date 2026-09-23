@@ -8,12 +8,15 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QTemporaryDir>
+#include <cmath>
+#include <functional>
 #include <iostream>
 #include <gtest/gtest.h>
 
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "shell/PageSketches.h"
 #include "shell/SettingsModel.h"
 #include "shell/TabManager.h"
 
@@ -238,4 +241,110 @@ TEST_F(CanvasMemoryTest, benchJumps) {
                   << " MB kept\n";
         view->setShown(false);
     }
+}
+
+// XQT_BENCH_PDF=<pdf>: how soon the pages in view are sharp once a zoom stops: Ctrl+wheel in, a pinch in (the
+// fingers are lifted at the end), Ctrl+wheel out to several pages; a screen of 1100 x 1600 at 2x. The time counts
+// from the last zoom step, so after a Ctrl+wheel it includes the 300 ms the renders wait for the zoom to be stable.
+// XQT_BENCH_QUIET=1: no page previews and nothing rendered in advance (what the other work costs the visible pages).
+TEST_F(CanvasMemoryTest, benchZoomSettle) {
+    const QString pdf = qEnvironmentVariable("XQT_BENCH_PDF");
+    if (pdf.isEmpty()) {
+        GTEST_SKIP() << "set XQT_BENCH_PDF";
+    }
+    QTemporaryDir dir;
+    const QString copy = dir.filePath("bench.pdf");
+    ASSERT_TRUE(QFile::copy(pdf, copy));
+    const bool quiet = qEnvironmentVariableIsSet("XQT_BENCH_QUIET");
+    if (quiet) {
+        PageSketches::instance().setDelays(1000000000, 1000000000);
+    }
+    AppController c;
+    ASSERT_TRUE(c.openPath(copy));
+    CanvasView* view = c.tabManager().currentView();
+    if (quiet) {
+        CanvasMemory::instance().setLimit(1);
+    }
+    view->setDevicePixelRatio(2);
+    ViewController& vc = view->getViewController();
+    vc.setViewSize(QSizeF(1100, 1600));
+    vc.fitWidth();
+    view->setShown(true);
+    processEvents(400);
+    const size_t n = view->pageCount();
+    auto sharp = [&](size_t page) {
+        const auto info = view->getPage(page)->bufferInfo();
+        return info.valid && info.zoom == vc.zoom();
+    };
+    const QPointF center(550, 800);
+    struct Motion {
+        const char* name;
+        std::function<void()> run;
+        qint64 current = 0, all = 0, worst = 0;
+        int count = 0;
+    };
+    std::vector<Motion> motions;
+    motions.push_back({"Ctrl+wheel in", [&] {
+                           for (int step = 0; step < 6; ++step) {
+                               vc.setZoom(vc.zoom() * 1.1, center);
+                               processEvents(16);
+                           }
+                       }});
+    motions.push_back({"pinch in", [&] {
+                           vc.pinchBegin(center, 200);
+                           for (int step = 1; step <= 6; ++step) {
+                               vc.pinchUpdate(center, 200 * std::pow(1.1, step));
+                               processEvents(16);
+                           }
+                           vc.pinchEnd();
+                       }});
+    motions.push_back({"Ctrl+wheel out", [&] {
+                           for (int step = 0; step < 6; ++step) {
+                               vc.setZoom(vc.zoom() * 0.8, center);
+                               processEvents(16);
+                           }
+                       }});
+    for (size_t target: {size_t(10), n / 3, n / 2, 2 * n / 3, size_t(40)}) {
+        for (Motion& motion: motions) {
+            vc.fitWidth();
+            vc.scrollToPage(target);
+            processEvents(1500);  // (reading a moment: pages are rendered in advance, previews drawn meanwhile)
+            motion.run();
+            QElapsedTimer t;
+            t.start();
+            const size_t current = c.tabManager().currentSession()->getCurrentPageNo();
+            qint64 currentMs = -1;
+            auto allSharp = [&] {
+                const auto [first, last] = view->visiblePages();
+                for (size_t i = first; i <= last; ++i) {
+                    if (!sharp(i)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            while (!allSharp() && t.elapsed() < 20000) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 1);
+                if (currentMs < 0 && sharp(current)) {
+                    currentMs = t.elapsed();
+                }
+            }
+            const qint64 allMs = t.elapsed();
+            if (currentMs < 0) {
+                currentMs = allMs;
+            }
+            const auto [first, last] = view->visiblePages();
+            std::cout << "  page " << target + 1 << " " << motion.name << " (" << last - first + 1
+                      << " in view): current page sharp after " << currentMs << " ms, all after " << allMs << " ms\n";
+            motion.current += currentMs;
+            motion.all += allMs;
+            motion.worst = std::max(motion.worst, allMs);
+            ++motion.count;
+        }
+    }
+    for (const Motion& m: motions) {
+        std::cout << m.name << ": current page sharp after " << m.current / m.count << " ms on average, all pages "
+                  << "in view after " << m.all / m.count << " ms, worst " << m.worst << " ms\n";
+    }
+    view->setShown(false);
 }

@@ -1041,6 +1041,8 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
 bool CanvasInput::nativeGestureEvent(QNativeGestureEvent* e, QPointF viewPos) {
     if (e->gestureType() == Qt::ZoomNativeGesture) {
         view.getViewController().zoomBy(1.0 + e->value(), viewPos);
+    } else if (e->gestureType() == Qt::EndNativeGesture) {
+        view.getViewController().zoomGestureEnded();  // (the fingers left the touchpad)
     }
     return true;
 }

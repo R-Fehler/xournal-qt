@@ -60,25 +60,30 @@ void Perf::report() {
         double average;
         double worst;
     } ms[TimingCount];
+    qint64 sharp = 0;  // pages in view rendered at their zoom
     for (int i = 0; i < TimingCount; ++i) {
         const qint64 sum = times[i].sum.exchange(0), count = times[i].count.exchange(0);
         ms[i] = {count > 0 ? static_cast<double>(sum) / static_cast<double>(count) / 1000.0 : 0.0,
                  static_cast<double>(times[i].worst.exchange(0)) / 1000.0};
+        if (i == SharpTime) {
+            sharp = count;
+        }
     }
-    if (total == 0) {
+    if (total + sharp == 0) {
         return;  // nothing happened
     }
     std::fprintf(stderr,
                  "xqt-perf 1.0 s: input mouse %lld (claimed %lld, hit test %.2f/%.2f ms) touch %lld pen %lld | "
                  "scroll %lld -> visibility %lld (%.2f/%.2f ms, of it the current page %.2f/%.2f ms) | frames %lld "
-                 "sync %.2f/%.2f ms | tiles %lld previews %lld\n",
+                 "sync %.2f/%.2f ms | tiles %lld previews %lld | sharp %lld after %.0f/%.0f ms\n",
                  static_cast<long long>(values[MouseEvents]), static_cast<long long>(values[MouseClaimed]),
                  ms[HitTest].average, ms[HitTest].worst, static_cast<long long>(values[TouchEvents]),
                  static_cast<long long>(values[PenEvents]), static_cast<long long>(values[Scrolls]),
                  static_cast<long long>(values[Visibility]), ms[VisibilityTime].average, ms[VisibilityTime].worst,
                  ms[CurrentPageTime].average, ms[CurrentPageTime].worst, static_cast<long long>(values[Frames]),
                  ms[SyncTime].average, ms[SyncTime].worst,
-                 static_cast<long long>(values[Tiles]), static_cast<long long>(values[Previews]));
+                 static_cast<long long>(values[Tiles]), static_cast<long long>(values[Previews]),
+                 static_cast<long long>(sharp), ms[SharpTime].average, ms[SharpTime].worst);
     std::fflush(stderr);
 }
 

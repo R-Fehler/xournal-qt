@@ -429,3 +429,17 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] A PDF with text: hold a finger (then the pen) on a word: the word is selected and its pill (highlight,
       underline, copy…) also has Paste at the end; Paste unselects the text and puts the clipboard where you held.
       With an empty clipboard there is no Paste. Text selected by dragging with the PDF text tool: no Paste.
+
+## Rendering while zooming and closing (qt/render-visible)
+- [ ] A big PDF (or a long .xopp), one page in view: pinch in by steps and stop each time; Ctrl+wheel in and out.
+      Each time the page goes sharp about a third of a second after the fingers stop and never turns into a grey
+      page; zoomed out to 3–4 pages in view, all of them come back sharp too. Pages that were only blurry (their
+      preview) while flying through the document get sharp once the view stands still.
+- [ ] Pinch in and lift the fingers: the page goes sharp right away (no third of a second wait); Ctrl+wheel still
+      waits a moment after the last notch. With `XQT_PERF=1`, the log's `sharp N after a/b ms` shows how long the
+      pages in view waited for their render; note the numbers for a big PDF zoomed in and out.
+- [ ] Right after opening a big PDF (previews being drawn, sidebar open), zoom and scroll: the page in view gets
+      sharp first; the sidebar thumbnails and the previews follow after it.
+- [ ] A big PDF with the sidebar or the page grid open (many thumbnails asked for), zoomed in: close its tab, then
+      close the app with such a tab open. Both happen at once (at most the page being drawn is waited for); before,
+      the window froze for seconds.

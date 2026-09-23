@@ -9,7 +9,8 @@
  * Poppler costs nearly the same at any width (parsing, decoding images), so a page is drawn once at the preview width
  * and its sketch is scaled from that. Nothing is ever drawn in front of the canvas or of a sharp thumbnail.
  *
- * Pages are drawn by two low-priority workers, so the canvas and the sharp thumbnails go first. Each draws the PDF
+ * Pages are drawn by two low-priority workers, so the canvas and the sharp thumbnails go first; nothing new is
+ * started while the canvas renders the pages in view (RenderService::visiblePagesBusy). Each draws the PDF
  * with an instance of its own (poppler draws one page of an instance at a time: the canvas does not wait for them),
  * kept while there is something to draw. What comes first:
  *  - pages without a sketch, then pages without a preview, then outdated ones; the document shown last first (in any
@@ -175,6 +176,7 @@ private:
     int running = 0;  ///< jobs the workers are on
     QTimer planTimer;
     QTimer editTimer;
+    QTimer visibleTimer;  ///< the pages in view are being rendered: look again soon
     QTimer announceTimer;
     std::set<quint64> announced;
     int shownDelay = 400;

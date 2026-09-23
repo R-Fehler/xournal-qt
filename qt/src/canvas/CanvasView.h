@@ -18,6 +18,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -296,6 +297,8 @@ Q_SIGNALS:
 
 private:
     void rebuildPages();
+    /// Drop the queued renders of all pages and wait for the running ones (the pages go)
+    void cancelRenders();
     void refreshLayout();
     DocumentLayout::Config layoutConfig() const;
     void updateVisibility();
@@ -330,6 +333,8 @@ private:
     /// Visibility updates so far (tests)
     quint64 visibilityCount = 0;
     std::function<QImage(size_t)> previewSource;
+    /// XQT_PERF: pages in view waiting for their render at the current zoom, since when (ms since the epoch)
+    std::unordered_map<const CanvasPage*, qint64> sharpWanted;
     double dpr = 1.0;
     std::atomic<double> renderZoom{1.0};
     std::atomic<double> renderDpr{1.0};

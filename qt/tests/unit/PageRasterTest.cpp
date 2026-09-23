@@ -5,6 +5,10 @@
  * @license GNU GPLv2 or later
  */
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -228,4 +232,64 @@ TEST(PageRaster, concurrentEditsAndRendersStayConsistent) {
     auto reference = referenceRender(loaded.doc.get(), &settings, page, host.params);
     EXPECT_EQ(compareWithRaster(*raster, reference), 0) << "final buffer differs after concurrent edits";
     raster->detach();
+}
+
+namespace {
+/// A host whose renders wait at their start until they are let go, and which notes when a worker started one
+class GateHost: public TestHost {
+public:
+    using TestHost::TestHost;
+    RasterParams rasterParams() const override {
+        if (std::this_thread::get_id() != ui) {  // (the UI thread asks too, when it schedules)
+            started = true;
+            std::unique_lock lock(m);
+            cv.wait(lock, [&] { return open; });
+        }
+        return params;
+    }
+    void letGo() {
+        {
+            std::lock_guard lock(m);
+            open = true;
+        }
+        cv.notify_all();
+    }
+    const std::thread::id ui = std::this_thread::get_id();
+    mutable std::atomic<bool> started{false};
+    mutable std::mutex m;
+    mutable std::condition_variable cv;
+    bool open = false;
+};
+}  // namespace
+
+TEST(RenderService, pagesInAdvanceWaitForTheVisiblePages) {
+    Settings settings(fs::path{});
+    auto loaded = load(u8"test1.xoj");
+    ASSERT_TRUE(loaded.doc);
+    GateHost visibleHost(loaded.doc.get(), &settings, RasterParams{1.0, 1.0});
+    GateHost aheadHost(loaded.doc.get(), &settings, RasterParams{1.0, 1.0});
+    aheadHost.letGo();
+    RenderService service(1, 1);
+    auto visible = std::make_shared<PageRaster>(&visibleHost, &service, loaded.doc->getPage(0));
+    auto ahead = std::make_shared<PageRaster>(&aheadHost, &service, loaded.doc->getPage(0));
+    EXPECT_FALSE(RenderService::visiblePagesBusy());
+
+    visible->ensureRendered(false);
+    ahead->ensureRendered(true);
+    for (int i = 0; i < 100 && !visibleHost.started; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    ASSERT_TRUE(visibleHost.started);
+    EXPECT_TRUE(RenderService::visiblePagesBusy()) << "others (previews, thumbnails) can see it";
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    EXPECT_FALSE(aheadHost.started) << "a page in advance was started while a visible one was rendered";
+
+    visibleHost.letGo();
+    RenderService::waitForVisiblePages(std::chrono::milliseconds(2000));
+    EXPECT_FALSE(RenderService::visiblePagesBusy());
+    service.waitForIdle();
+    EXPECT_TRUE(aheadHost.started) << "then it is rendered";
+    pumpUiThread();
+    visible->detach();
+    ahead->detach();
 }
