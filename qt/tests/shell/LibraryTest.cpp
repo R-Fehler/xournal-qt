@@ -620,9 +620,9 @@ TEST_F(LibraryTest, searchCanLookAtNamesOnly) {
     EXPECT_EQ(model.count(), 3) << "the full search again";
 }
 
-// The title page and the page a document was left at are kept beside it: in the metadata of its library, by its
-// path there; they follow it when it is renamed or moved. The preview shows the title page.
-TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
+// The title page and the page a document was left at are kept beside it: for its library in the config folder, by
+// its path in the library; they follow it when it is renamed or moved. The preview shows the title page.
+TEST_F(LibraryTest, titleAndLastPagesAreKeptPerLibraryInTheConfig) {
     makePdf(root / "Physics" / "sheet.pdf");
     makePdf(root / "lecture.pdf");  // two pages: "xournal" / "Page 2"
     LibraryModel model;
@@ -635,8 +635,10 @@ TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
     DocumentPlaces::setLastPage(sheet, 1);
     EXPECT_EQ(DocumentPlaces::titlePage(sheet), 1);
     EXPECT_EQ(DocumentPlaces::lastPage(sheet), 1);
-    QFile stored(QString::fromStdString((root / DocumentFiles::META_DIR / "pages.json").string()));
-    ASSERT_TRUE(stored.open(QIODevice::ReadOnly)) << "in the library's metadata";
+    QFile stored(QString::fromStdString((Library(root).configDir() / "pages.json").string()));
+    ASSERT_TRUE(stored.open(QIODevice::ReadOnly)) << "in the config folder";
+    EXPECT_NE(Library(root).configDir().string().find("libraries"), std::string::npos);
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR / "pages.json")) << "not in the cache";
     const QByteArray json = stored.readAll();
     EXPECT_TRUE(json.contains("Physics/sheet.pdf")) << "by its path in the library: " << json.toStdString();
 
@@ -667,6 +669,39 @@ TEST_F(LibraryTest, titleAndLastPagesAreKeptInTheLibrary) {
     EXPECT_NE(first, second) << "another page";
     DocumentPlaces::setTitlePage(lecture.main(), 0);
     EXPECT_EQ(PreviewCache::url(lecture), firstUrl);
+}
+
+// Reading positions are not cache: removing the cache folders keeps them. Those kept in the cache folder before are
+// taken over.
+TEST_F(LibraryTest, readingPositionsSurviveRemovingTheCache) {
+    makePdf(root / "Physics" / "sheet.pdf");
+    makePdf(root / "lecture.pdf");
+    {
+        LibraryModel model;
+        model.setLibrary(std::make_unique<Library>(root));
+        DocumentPlaces::setLastPage(root / "Physics" / "sheet.pdf", 1);
+        model.searchIndex()->waitForDone();
+    }
+    for (const fs::path& f: {root, root / "Physics"}) {
+        fs::remove_all(f / DocumentFiles::META_DIR);
+    }
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    EXPECT_EQ(DocumentPlaces::lastPage(root / "Physics" / "sheet.pdf"), 1);
+
+    // A library whose positions were in its cache folder: taken over
+    const fs::path other = root / "Other";
+    makePdf(other / "old.pdf");
+    touch(other / DocumentFiles::META_DIR / "pages.json");
+    {
+        QFile old(QString::fromStdString((other / DocumentFiles::META_DIR / "pages.json").string()));
+        ASSERT_TRUE(old.open(QIODevice::WriteOnly));
+        old.write(R"({"old.pdf":{"last":1,"title":1}})");
+    }
+    model.setLibrary(std::make_unique<Library>(other));
+    EXPECT_EQ(DocumentPlaces::lastPage(other / "old.pdf"), 1);
+    EXPECT_EQ(DocumentPlaces::titlePage(other / "old.pdf"), 1);
+    EXPECT_TRUE(fs::exists(Library(other).configDir() / "pages.json"));
 }
 
 // The library sorts by when its documents were last read in the app, and shows when and at which page.
@@ -1165,9 +1200,9 @@ TEST_F(LibraryTest, theDownloadsFolderIsATemporaryLibrary) {
     EXPECT_TRUE(Library(downloads).isTemporary());
     EXPECT_TRUE(Library(downloads / "papers").isTemporary());
     EXPECT_FALSE(Library(root / "lib").isTemporary());
-    // Its index and previews live in the folder, like every library's (fast when it is opened again)
-    EXPECT_EQ(Library(downloads).metaDir(), downloads / ".xournal_library");
-    EXPECT_TRUE(fs::exists(downloads / ".xournal_library"));
+    // Its index and previews live in its folders, like every library's (fast when it is opened again)
+    EXPECT_EQ(CacheLocation(Library(downloads).root()).dirOf(downloads / "papers"),
+              downloads / "papers" / ".xournal_library");
     LibraryModel model;
     EXPECT_TRUE(model.isTemporaryFolder(QString::fromStdString((downloads / "papers").string())));
     QFile::remove(config + "/user-dirs.dirs");

@@ -67,7 +67,11 @@ sync clients upload whole files anyway, and neither the app nor a sync client ev
 are written in the background a few seconds after the last change (at the latest 30 s after the first one), and
 when the library is closed.
 
-The reading positions are still in the root's `.xournal_library/pages.json`, as before.
+**Reading positions are not cache.** The title page and the page each document was left at (and when it was last
+read) are kept in the config folder, `~/.config/xournal-qt/libraries/<key of the library>/pages.json`, by the
+document's path in the library: renaming and moving in the app take them along, and removing the cache folders
+keeps them. The `pages.json` of a library's `.xournal_library/` from before is taken over the first time. (A library
+folder moved or renamed outside the app gets another key and starts without them.)
 
 **The search index** is what the library search searches. A background thread keeps it up to date, one document at
 a time:

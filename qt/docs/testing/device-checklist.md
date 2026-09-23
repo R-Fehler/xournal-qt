@@ -462,3 +462,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       gets one `previews.pack` instead of a PNG per document. Close and open the app: the previews are there at
       once, nothing is drawn again. Choose another title page of a document: its card shows that page.
 - [ ] Rename a PDF in the app: its card keeps its preview (not drawn again).
+- [ ] Reading positions: open a document at some page, close it, close the app. `~/.config/xournal-qt/libraries/`
+      has a folder for the library with `pages.json`. Delete every `.xournal_library/` of the (copied) library by
+      hand and open it again: the cards still show when and at which page each document was read.

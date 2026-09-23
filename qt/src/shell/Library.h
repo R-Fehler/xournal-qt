@@ -60,8 +60,12 @@ public:
     bool isTemporary() const;
     /// Short hash of the root (one instance and one session journal per library).
     std::string key() const;
-    /// The metadata folder (created when needed). For folders that cannot be written: in the user's cache.
-    fs::path metaDir() const;
+    /// The library's own state in the config folder, "~/.config/xournal-qt/libraries/<key>/" (created when
+    /// needed): what is not a cache and must survive cleaning it, e.g. the reading positions.
+    fs::path configDir() const;
+    /// The reading positions (DocumentPlaces) of its documents. The ones kept in the library's
+    /// ".xournal_library/pages.json" before are taken over the first time.
+    fs::path placesFile() const;
     /// The file or folder is in the library.
     bool contains(const fs::path& p) const;
     /// Path relative to the root ("" for the root itself).

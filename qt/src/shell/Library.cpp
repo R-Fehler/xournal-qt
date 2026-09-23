@@ -65,16 +65,23 @@ bool Library::isDefault() const { return rootDir == normalized(defaultRoot()); }
 
 std::string Library::key() const { return hashOf(rootDir.string(), 12).toStdString(); }
 
-fs::path Library::metaDir() const {
-    // Every library keeps its index and previews in its own folder (also Downloads: starting is then as fast as
-    // anywhere else, and the data goes away with the folder). Only for folders that cannot be written: the cache.
-    const fs::path dir = rootDir / DocumentFiles::META_DIR;
+fs::path Library::configDir() const { return Util::getConfigSubfolder(fs::path("libraries") / key()); }
+
+fs::path Library::placesFile() const {
+    const fs::path file = configDir() / "pages.json";
     std::error_code ec;
-    if ((fs::is_directory(dir, ec) || fs::create_directories(dir, ec)) &&
-        QFileInfo(QString::fromStdString(dir.string())).isWritable()) {
-        return dir;
+    if (!fs::exists(file, ec)) {
+        // Kept in the library's cache folder before (lost when it was removed): taken over, once. The old file
+        // goes when the old cache is converted.
+        for (const fs::path& old: {rootDir / DocumentFiles::META_DIR / "pages.json",
+                                   CacheLocation(rootDir).appCacheDir() / "pages.json"}) {
+            if (fs::exists(old, ec)) {
+                fs::copy_file(old, file, ec);
+                break;
+            }
+        }
     }
-    return Util::getCacheSubfolder(fs::path("libraries") / key());
+    return file;
 }
 
 bool Library::contains(const fs::path& p) const { return DocumentFiles::remap(p, rootDir, "/") != p; }
