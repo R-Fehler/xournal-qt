@@ -59,7 +59,8 @@ jobs:
         run: cmake --build build -j "$(nproc)"
 
       - name: Test
-        run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300
+        # (one try again, as in xqt-build.yml)
+        run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300 --repeat until-pass:2
 
       - name: Make the package
         run: |

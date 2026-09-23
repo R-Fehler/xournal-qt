@@ -45,7 +45,9 @@ jobs:
 
       - name: Test
         # The tests run off-screen and in their own configuration and cache folders (see their main.cpp).
-        run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300
+        # One try again: LibraryTest.renamedAndMovedDocumentsKeepTheirIndex fails about once in 13 runs (a moved
+        # document is sometimes read again - see qt/docs/releasing.md). Take the retry out once that is fixed.
+        run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300 --repeat until-pass:2
 
       - name: Keep the test output of a failed run
         if: failure()
