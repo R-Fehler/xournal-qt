@@ -481,3 +481,8 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
       and in Xournal++ (upstream) if it is installed. Undo the two deletions: both pages come back with their PDF
       text; save again.
 - [ ] Save without changes: `.lecture.pages.pdf` keeps its date (not written again).
+- [ ] In the library, the lecture with pasted pages is one card (no `.lecture.pages.pdf` card). Rename it, move it
+      into a folder, copy it to another library, open each: the pasted pages show and their text is found. The
+      library search (also the extended search with pages) finds a word of a pasted page. Move it to the trash: the
+      trash has `.lecture.pages.pdf` with it.
+- [ ] Rename the lecture while it is open with a pasted page not saved yet, then save: the pages stay right.

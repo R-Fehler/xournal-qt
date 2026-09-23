@@ -24,6 +24,8 @@ A **library** is a plain folder of documents that a window works in, like a work
   lone PDF is one document too. Older `name.pdf.xopp` files pair with `name.pdf`.
 - These files are never shown:
   - `name.xopp.bg.pdf`, an attached PDF. It belongs to its `.xopp` and travels with it.
+  - `.name.pages.pdf`, the merged PDF of a `.xopp` with PDF pages pasted from other PDFs (below). It belongs to its
+    `.xopp` and travels with it.
   - hidden files: autosaves, `.xournal_library`
   - backups (`~`)
 - **Rename / move** rename or move both files. The `.xopp` is loaded and written again with upstream's LoadHandler and
@@ -35,7 +37,26 @@ A **library** is a plain folder of documents that a window works in, like a work
   behind. A name that is taken becomes "name (2)".
 - **Trash** moves the files (or the folder) to the desktop trash.
 
-Code: `qt/src/shell/DocumentFiles.*`.
+### PDF pages pasted from another PDF
+A `.xopp` has one background PDF, and its pages refer to page numbers in it (that is the format, and it stays
+openable by Xournal++). PDF pages pasted from another PDF therefore go into one **merged PDF** per document, which
+the document uses as its background from then on. Their text stays searchable and selectable.
+- A document that annotates a PDF (`lecture.xopp` + `lecture.pdf`): the hidden `.lecture.pages.pdf` next to it, with
+  the lecture's pages followed by the pasted ones. `lecture.pdf` itself is never changed.
+- A document that had no PDF: the merged PDF is `lecture.pdf` next to it, so the library pairs the two as one
+  document; if that name is taken by another PDF, the hidden `.lecture.pages.pdf`.
+- A document never saved: in the cache (`~/.cache/xournal-qt/pasted-pages`) until its first save puts it next to
+  the `.xopp` by the rules above. Closed without saving, it is removed.
+- Every later paste, from any PDF, goes into the same file; the same copied pages pasted again are not added twice.
+  Pages pasted within the same document keep referring to its own PDF pages.
+- Saving drops the PDF pages no page shows any more (deleted pasted pages, deleted pages) and renumbers the pages;
+  nothing is written when nothing changed. Pages that come back through undo get their PDF pages back (kept in
+  memory). "Save as" gives the new name its own copy.
+- A merged PDF carries a mark (`/XournalQtPages` in its document information), so a user's own PDF is never
+  rewritten. All writes go to a hidden `.….part` file first, which is then renamed over the target.
+- The note after pasting says where the pages are kept.
+
+Code: `qt/src/shell/DocumentFiles.*`; the merged PDF: `qt/src/session/MergedPdf.*` (qpdf), `PdfPageKeeper.*`.
 
 ## `.xournal_library/`
 Every library has one, Downloads included. It is only a cache, and it can be deleted at any time. For folders that

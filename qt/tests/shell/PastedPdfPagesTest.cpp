@@ -25,6 +25,7 @@
 #include "session/DocumentSession.h"
 #include "session/MergedPdf.h"
 #include "shell/DocumentFiles.h"
+#include "shell/Library.h"
 #include "shell/TabManager.h"
 
 #include "AppController.h"
@@ -402,4 +403,61 @@ TEST_F(PastedPdfPages, copiedPagesStayRightWhenASaveRenumbers) {
     ASSERT_TRUE(c.save());  // pastedalpha: 3 -> 2
     ASSERT_EQ(c.pastePages(0), 1);
     EXPECT_TRUE(pageHasText(s, 0, "pastedalpha"));
+}
+
+// The library shows the document as one card; renaming, moving, copying and trashing take ".name.pages.pdf" along,
+// and the search index reads the pasted pages' text through the .xopp's reference.
+TEST_F(PastedPdfPages, travelWithTheirDocumentInTheLibrary) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    {
+        AppController c;
+        ASSERT_TRUE(open(c, root / "other.pdf"));
+        c.copyPages({1});
+        ASSERT_TRUE(open(c, root / "lecture.xopp"));
+        ASSERT_EQ(c.pastePages(1), 1);
+        ASSERT_TRUE(c.save());
+    }
+    const std::vector<std::string> shown{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"};
+    ASSERT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS), shown);
+    fs::remove(root / "other.pdf");
+    fs::remove(root / "third.pdf");
+    const auto listing = DocumentFiles::scan(root);
+    ASSERT_EQ(listing.items.size(), 1u) << "one card";
+    EXPECT_EQ(listing.items[0], (DocumentItem{root / "lecture.xopp", root / "lecture.pdf"}));
+    EXPECT_EQ(DocumentFiles::filesOf(listing.items[0]),
+              (std::vector<fs::path>{root / "lecture.xopp", root / ".lecture.pages.pdf", root / "lecture.pdf"}))
+            << "what goes to the trash";
+
+    // The search index finds the pasted page's text
+    {
+        LibraryIndex index(root, root / ".xournal_library" / "index");
+        index.update(DocumentFiles::scanRecursive(root));
+        index.waitForDone();
+        const auto hits = index.search("pastedbeta");
+        ASSERT_EQ(hits.size(), 1u);
+        EXPECT_EQ(hits[0].file, root / "lecture.xopp");
+        EXPECT_EQ(hits[0].firstPage, 1);
+    }
+
+    auto r = DocumentFiles::rename(listing.items[0], "renamed");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(fs::exists(root / ".renamed.pages.pdf"));
+    EXPECT_FALSE(fs::exists(root / ".lecture.pages.pdf"));
+    EXPECT_NE(std::find(r.moved.begin(), r.moved.end(), std::make_pair(root / ".lecture.pages.pdf", root / ".renamed.pages.pdf")),
+              r.moved.end()) << "an open tab follows";
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "renamed.xopp", WORDS), shown);
+
+    fs::create_directories(root / "Week 1");
+    r = DocumentFiles::move(r.item, root / "Week 1");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(fs::exists(root / "Week 1" / ".renamed.pages.pdf"));
+    EXPECT_FALSE(fs::exists(root / ".renamed.pages.pdf"));
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "Week 1" / "renamed.xopp", WORDS), shown);
+
+    fs::create_directories(root / "Other library");
+    const auto copied = DocumentFiles::import(root / "Week 1" / "renamed.xopp", root / "Other library");
+    ASSERT_TRUE(copied.ok) << copied.error;
+    EXPECT_TRUE(fs::exists(root / "Other library" / ".renamed.pages.pdf"));
+    EXPECT_TRUE(fs::exists(root / "Week 1" / ".renamed.pages.pdf")) << "the original keeps its file";
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "Other library" / "renamed.xopp", WORDS), shown);
 }

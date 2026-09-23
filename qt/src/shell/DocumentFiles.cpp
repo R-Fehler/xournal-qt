@@ -11,6 +11,7 @@
 
 #include "model/Document.h"
 #include "session/DocumentSession.h"
+#include "session/MergedPdf.h"
 
 namespace xqt {
 
@@ -133,7 +134,11 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
             doc = std::move(loaded.document);
             std::error_code ec;
             const bool refExists = fs::exists(ref, ec);
-            if (!item.pdf.empty() && (!refExists || fs::equivalent(ref, item.pdf, ec))) {
+            const fs::path pages = DocumentFiles::pagesOf(item.xopp);
+            if (refExists && fileExists(pages) && fs::equivalent(ref, pages, ec)) {
+                // Its merged PDF with pasted pages: it goes along (below), under the new name
+                doc->setPdfAttributes(DocumentFiles::pagesOf(folder / (name + item.xopp.extension().string())), false);
+            } else if (!item.pdf.empty() && (!refExists || fs::equivalent(ref, item.pdf, ec))) {
                 // Its own PDF (or a lost reference, repaired with the PDF next to it): it goes along.
                 doc->setPdfAttributes(newPdf, false);
             } else if (copy && refExists) {
@@ -177,6 +182,20 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
             rollback.transferred(att, newAtt, copy);
             if (!copy) {
                 r.moved.emplace_back(att, newAtt);
+            }
+        }
+        if (const fs::path pages = DocumentFiles::pagesOf(item.xopp); fileExists(pages)) {
+            const fs::path newPages = DocumentFiles::pagesOf(newXopp);
+            if (fileExists(newPages)) {
+                std::error_code ec;
+                fs::remove(newPages, ec);  // left behind by a document of that name that is gone (the name is free)
+            }
+            if (!transfer(pages, newPages, copy, error)) {
+                return failure(error);
+            }
+            rollback.transferred(pages, newPages, copy);
+            if (!copy) {
+                r.moved.emplace_back(pages, newPages);  // (an open document follows)
             }
         }
     }
@@ -223,6 +242,20 @@ fs::path attachmentOf(const fs::path& xopp) {
     p.replace_extension();
     p += ".xopp.bg.pdf";
     return p;
+}
+
+fs::path pagesOf(const fs::path& xopp) { return MergedPdf::sidecarOf(xopp); }
+
+std::vector<fs::path> filesOf(const DocumentItem& item) {
+    std::vector<fs::path> files;
+    const fs::path none;
+    for (const fs::path& f: {item.xopp, item.xopp.empty() ? none : attachmentOf(item.xopp),
+                             item.xopp.empty() ? none : pagesOf(item.xopp), item.pdf}) {
+        if (!f.empty() && fileExists(f)) {
+            files.push_back(f);
+        }
+    }
+    return files;
 }
 
 Listing scan(const fs::path& dir) {
@@ -450,8 +483,8 @@ Result trash(const DocumentItem& item) {
     if (!item.valid()) {
         return failure("The document does not exist.");
     }
-    for (const fs::path& f: {item.xopp, item.xopp.empty() ? fs::path() : attachmentOf(item.xopp), item.pdf}) {
-        if (!f.empty() && fileExists(f) && !QFile::moveToTrash(QString::fromStdString(f.string()))) {
+    for (const fs::path& f: filesOf(item)) {
+        if (!QFile::moveToTrash(QString::fromStdString(f.string()))) {
             return failure("Could not move \"" + f.filename().string() + "\" to the trash.");
         }
     }
