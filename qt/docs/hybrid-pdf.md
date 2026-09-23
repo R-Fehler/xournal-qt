@@ -1,7 +1,6 @@
 # Hybrid PDF: design draft
 
-Status: **draft, 2026-09-24**. The author decided to build it right after `qt/pdf-pages`. The points under
-"To confirm" need the author; the rest is the proposed design. Background: [VISION.md](../../VISION.md) ("PDF as
+Status: **design agreed 2026-09-24**; built as `qt/hybrid-pdf` right after `qt/pdf-pages`. Background: [VISION.md](../../VISION.md) ("PDF as
 the document") and [platform-research.md](platform-research.md) (qpdf can write everything needed).
 
 ## Goal
@@ -58,9 +57,9 @@ A hybrid PDF is a normal PDF with four additions:
 
 ## How it appears in the app
 
-- **"Save as hybrid PDF…"** for any document. A PDF annotated in the app can be saved into itself, but only after
-  a one-time question: "Save the notes into lecture.pdf? Other PDF apps will show them; the original PDF is
-  kept as lecture.original.pdf". See "To confirm".
+- **"Save as hybrid PDF…"** for any document. For an annotated PDF it suggests `lecture.notes.pdf`, or
+  `lecture.pdf` itself when the setting "Save notes into the PDF itself" is on; the original is then kept once as
+  `lecture.original.pdf`.
 - **Export plain `.xopp` for Xournal++**: once (menu), or automatically on each save (a setting per document or
   library). That writes `name.xopp` plus the clean base as `name.pdf` (or the hidden sidecar rules of
   `qt/pdf-pages`).
@@ -83,15 +82,14 @@ A hybrid PDF is a normal PDF with four additions:
 - **Many annotations:** one annotation per layer per page, not per stroke, keeps viewers fast. Other apps then see
   a layer as one annotation, which is fine for viewing and coarse for editing there.
 
-## To confirm (the author)
+## Decided (the author, 2026-09-24)
 
-1. **Where the notes of an annotated PDF go:** write into the PDF itself (keeping `name.original.pdf`), or always
-   save as a new file (`name.notes.pdf`) and leave the original alone? Proposal: a new file by default, with
-   "into the PDF itself" as an option.
-2. **Default format for new notes:** `.xopp` as today, or hybrid PDF? Proposal: `.xopp` stays the default until the
-   round trip works in the viewers the author uses.
-3. **One annotation per layer per page:** is that fine, or should other apps see each stroke separately? Per stroke
-   is heavier for viewers.
+1. **Notes of an annotated PDF go to a new file** (`name.notes.pdf`) by default; the original PDF is left alone.
+   A setting "Save notes into the PDF itself" (off by default) writes into the original instead, keeping
+   `name.original.pdf` once. It is for people who work like in Xodo or Drawboard. Turning it on shows a one-time
+   explanation.
+2. **New notes stay `.xopp` by default** until the round trip works in the author's viewers.
+3. **One annotation per layer per page.**
 
 ## Build plan (`qt/hybrid-pdf`, after `qt/pdf-pages`)
 

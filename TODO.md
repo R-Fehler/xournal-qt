@@ -20,8 +20,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 1. **Bugs and polish:** done (`qt/render-visible`, `qt/ui-polish`, `qt/markdown-fixes`; see ROADMAP).
 1b. **PDF writing with qpdf, high priority (the author, 2026-09-24):**
    1. `qt/pdf-pages`: pasted PDF pages stay searchable. Started 2026-09-24 (worktree `../xournal_qt-pdf-pages`).
-   2. `qt/hybrid-pdf`: right after it. Design draft: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md), with three
-      points for the author to confirm.
+   2. `qt/hybrid-pdf`: right after it. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
    - Experiment `qt/mupdf`, started 2026-09-24: a MuPDF backend next to poppler, measured, with a short pdfium
      check. Findings go to `qt/docs/pdf-engine-experiment.md`.
 2. **Library track**, in this order, because each step builds on the one before:
