@@ -1,5 +1,6 @@
-// Settings: a large modal sheet with sections (pen, touch, stabilizer, documents, new pages). The values are
-// upstream Xournal++'s settings (settings.xml keys); they apply immediately and are saved when the sheet closes.
+// Settings: a large modal sheet with sections (pen, touch, stabilizer, documents, new pages, storage, shortcuts).
+// The values are upstream Xournal++'s settings (settings.xml keys); they apply immediately and are saved when the
+// sheet closes. "Storage" is about the cache of the library of this window (a setting of the library).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -18,6 +19,14 @@ Popup {
     onClosed: app.settings.end()
 
     readonly property var s: app.settings
+    /// The cache was removed: the window closes (so the app does not build it again at once)
+    signal quitRequested()
+
+    function sizeText(bytes) {
+        if (bytes >= 1024 * 1024)
+            return qsTr("%1 MB").arg((bytes / 1024 / 1024).toFixed(1))
+        return qsTr("%1 kB").arg(bytes > 0 ? Math.max(1, Math.round(bytes / 1024)) : 0)
+    }
 
     background: Rectangle { color: "#fafafa"; radius: 14 }
 
@@ -115,6 +124,7 @@ Popup {
             TabButton { text: qsTr("Stabilizer"); width: implicitWidth }
             TabButton { text: qsTr("Documents"); width: implicitWidth }
             TabButton { text: qsTr("New pages"); width: implicitWidth }
+            TabButton { objectName: "storageTab"; text: qsTr("Storage"); width: implicitWidth }
             TabButton { objectName: "shortcutsTab"; text: qsTr("Shortcuts"); width: implicitWidth }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: "#e0e0e0" }
@@ -446,6 +456,74 @@ Popup {
                 }
             }
 
+            // --- Storage: the cache of this library ---
+            ScrollView {
+                contentWidth: availableWidth
+                onVisibleChanged: if (visible && app.library.available) app.library.measureCache()
+                ColumnLayout {
+                    width: parent.width - 48
+                    x: 24
+                    spacing: 10
+                    SectionTitle { text: qsTr("Cache of this library") }
+                    Hint {
+                        text: app.library.available
+                              ? qsTr("“%1” keeps the previews of its documents and its search index in a hidden folder "
+                                     + ".xournal_library in each folder with documents, or in the app's cache folder. "
+                                     + "It only makes the app faster: it can be removed at any time and is built again "
+                                     + "when needed.").arg(app.library.name)
+                              : qsTr("No library is open in this window.")
+                    }
+                    Label {
+                        objectName: "cacheSizeLabel"
+                        visible: app.library.available
+                        text: app.library.cacheBytes < 0
+                              ? qsTr("Counting …")
+                              : qsTr("It takes %1 in %2 files.").arg(sheet.sizeText(app.library.cacheBytes))
+                                                                  .arg(app.library.cacheFiles)
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: app.library.available
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Keep the cache in the app's cache folder, not in the library's folders")
+                        }
+                        Switch {
+                            objectName: "cacheInAppSwitch"
+                            enabled: !app.library.cacheRemoved
+                            checked: app.library.cacheInAppCache
+                            onToggled: app.library.cacheInAppCache = checked
+                        }
+                    }
+                    Hint {
+                        visible: app.library.available
+                        text: qsTr("Recommended for folders that are synced (OneDrive, Dropbox, Nextcloud …): the "
+                                   + "library's folders then stay free of the app's files, and nothing of it is "
+                                   + "uploaded. Switching moves the cache. The app's cache folder of this library: %1")
+                              .arg(app.library.appCachePath)
+                    }
+                    SectionTitle { text: qsTr("Clean up"); visible: app.library.available }
+                    Hint {
+                        visible: app.library.available
+                        text: qsTr("Remove all cache folders of this library, e.g. to zip the library and send it. "
+                                   + "Where you were in each document is kept.")
+                    }
+                    Button {
+                        objectName: "removeCachesButton"
+                        visible: app.library.available
+                        enabled: !app.library.cacheRemoved
+                        text: qsTr("Remove all cache folders of this library …")
+                        onClicked: removeCaches.open()
+                    }
+                    Hint {
+                        visible: app.library.cacheRemoved
+                        text: qsTr("Removed. They are built again the next time the library is opened.")
+                    }
+                    Item { Layout.preferredHeight: 16 }
+                }
+            }
+
             // --- Shortcuts ---
             ColumnLayout {
                 spacing: 0
@@ -527,6 +605,50 @@ Popup {
                     }
                 }
             }
+        }
+    }
+
+    // Removing the cache folders: says what happens (the app closes afterwards)
+    Dialog {
+        id: removeCaches
+        objectName: "removeCachesDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, parent ? parent.width - 32 : 480)
+        title: qsTr("Remove the cache folders?")
+        ColumnLayout {
+            width: removeCaches.availableWidth
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("All .xournal_library folders of “%1” are removed, and its cache in the app's cache "
+                           + "folder (%2). Only files the app wrote are removed; where you were in each document is "
+                           + "kept.").arg(app.library.name).arg(sheet.sizeText(Math.max(0, app.library.cacheBytes)))
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("The app closes afterwards, so it does not build them again right away (for example while "
+                           + "you zip the library to send it). The next time the library is opened, they are built "
+                           + "again.")
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "removeCachesConfirm"
+                text: qsTr("Remove and close the app")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: qsTr("Cancel")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+        onAccepted: {
+            app.library.removeCaches()
+            sheet.close()
+            sheet.quitRequested()
         }
     }
 

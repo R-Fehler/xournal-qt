@@ -56,6 +56,16 @@ class LibraryModel final: public QAbstractListModel {
     Q_PROPERTY(bool importing READ importing NOTIFY importingChanged)
     /// Selected documents and folders (several can be opened, copied, moved, trashed at once)
     Q_PROPERTY(int selectionCount READ selectionCount NOTIFY selectionChanged)
+    /// The library keeps its cache in the app's cache folder, not in hidden folders in its folders (a setting of
+    /// the library; changing it moves the cache)
+    Q_PROPERTY(bool cacheInAppCache READ cacheInAppCache WRITE setCacheInAppCache NOTIFY cacheChanged)
+    /// Its folder in the app's cache
+    Q_PROPERTY(QString appCachePath READ appCachePath NOTIFY cacheChanged)
+    /// What its cache takes on disk (-1: not counted yet, see measureCache()), and in how many files
+    Q_PROPERTY(double cacheBytes READ cacheBytes NOTIFY cacheChanged)
+    Q_PROPERTY(int cacheFiles READ cacheFiles NOTIFY cacheChanged)
+    /// Its cache was removed: nothing is cached any more until the library is opened again
+    Q_PROPERTY(bool cacheRemoved READ cacheRemoved NOTIFY cacheChanged)
 public:
     enum Roles {
         NameRole = Qt::UserRole + 1,
@@ -121,6 +131,19 @@ public:
     int count() const { return static_cast<int>(rows.size()); }
     bool importing() const { return importJobs > 0; }
     int selectionCount() const { return static_cast<int>(selection.paths.size()); }
+    bool cacheInAppCache() const;
+    void setCacheInAppCache(bool inAppCache);
+    QString appCachePath() const;
+    double cacheBytes() const { return static_cast<double>(cacheUsage.bytes); }
+    int cacheFiles() const { return cacheUsage.files; }
+    bool cacheRemoved() const { return cachesRemoved; }
+    /// Count what the cache takes (in the background; cacheChanged when done).
+    Q_INVOKABLE void measureCache();
+    /// Remove every cache folder of the library (only the files the app recognises as its own) and its folder in
+    /// the app cache. The reading positions stay (they are in the config folder). Nothing is cached or indexed any
+    /// more until the library is opened again: the app closes after this, so it does not build them again at once.
+    /// Returns the bytes removed.
+    Q_INVOKABLE qint64 removeCaches();
 
     // --- selection ---
     /// A click with modifiers: alone selects only this row, Ctrl toggles it, Shift selects a range.
@@ -182,6 +205,7 @@ Q_SIGNALS:
     void countChanged();
     void importingChanged();
     void selectionChanged();
+    void cacheChanged();
     void error(const QString& text);
     /// An import finished: `count` documents were added.
     void imported(int count);
@@ -197,6 +221,10 @@ private:
         LibraryIndex::Hit hit;
     };
     fs::path currentDir() const;
+    /// The index and the previews, where the library keeps its cache.
+    void openCache();
+    /// The library and all its folders.
+    std::vector<fs::path> allFolders() const;
     fs::path dirOf(const QString& relative) const;
     void rebuild();
     void updateSearch();
@@ -221,6 +249,9 @@ private:
     QString query;
     int importJobs = 0;
     GridSelection selection;
+    CacheFolders::Usage cacheUsage{-1, 0};
+    quint64 cacheCounts = 0;  ///< (only the last count counts)
+    bool cachesRemoved = false;
 };
 
 }  // namespace xqt

@@ -63,6 +63,11 @@ public:
     /// The library's own state in the config folder, "~/.config/xournal-qt/libraries/<key>/" (created when
     /// needed): what is not a cache and must survive cleaning it, e.g. the reading positions.
     fs::path configDir() const;
+    /// Where the library keeps its cache: in its folders (the default) or in the app's cache folder (for folders
+    /// that sync clients upload). A setting of the library, kept in its config folder.
+    CacheLocation::Mode cacheMode() const;
+    void setCacheMode(CacheLocation::Mode mode) const;
+    CacheLocation cacheLocation() const { return CacheLocation(rootDir, cacheMode()); }
     /// The reading positions (DocumentPlaces) of its documents. The ones kept in the library's
     /// ".xournal_library/pages.json" before are taken over the first time.
     fs::path placesFile() const;
@@ -103,6 +108,8 @@ public:
     void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
     /// Write the changed packs now (else a few seconds after the last change, and when the index is closed).
     void flush();
+    /// Stop: forget what is not written yet, and write or index nothing any more (its cache is being removed).
+    void discard();
 
     /// The cache folder has files of the layout before the packs ("index/", "previews/", "pages.json").
     static bool hasOldLayout(const fs::path& dir);
@@ -209,6 +216,7 @@ private:
     bool firstRun = true;                ///< (the worker's) the stored packs of all folders are read once
     std::atomic<quint64> generation{0};
     std::atomic<bool> running{false};
+    std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
     std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0};
 };

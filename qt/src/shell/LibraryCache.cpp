@@ -306,17 +306,110 @@ void removeOldLayout(const fs::path& dir) {
     }
 }
 
-qint64 sizeOf(const fs::path& dir) {
+qint64 sizeOf(const fs::path& dir, int* files) {
     qint64 bytes = 0;
     forOurs(dir, true, [&](const fs::path& f) {
         std::error_code ec;
         const auto size = fs::file_size(f, ec);
         bytes += ec ? 0 : static_cast<qint64>(size);
+        if (files) {
+            ++*files;
+        }
     });
     return bytes;
 }
 
 }  // namespace Packs
+
+// --- CacheFolders ---------------------------------------------------------------------------------------------
+
+namespace CacheFolders {
+
+namespace {
+/// Remove the empty folders in `dir` (and `dir` itself if it ends up empty).
+void removeEmptyFolders(const fs::path& dir) {
+    std::error_code ec;
+    if (!fs::is_directory(dir, ec) || fs::is_symlink(dir, ec)) {
+        return;
+    }
+    for (auto it = fs::directory_iterator(dir, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        if (it->is_directory() && !it->is_symlink()) {
+            removeEmptyFolders(it->path());
+        }
+    }
+    fs::remove(dir, ec);  // (only when empty)
+}
+}  // namespace
+
+Usage usage(const CacheLocation& location, const std::vector<fs::path>& folders) {
+    Usage u;
+    for (const fs::path& folder: folders) {
+        u.bytes += Packs::sizeOf(location.inFolder(folder), &u.files);
+    }
+    std::error_code ec;
+    for (auto it = fs::recursive_directory_iterator(location.appCacheDir(), ec);
+         !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_regular_file()) {
+            std::error_code sec;
+            u.bytes += static_cast<qint64>(it->file_size(sec));
+            ++u.files;
+        }
+    }
+    return u;
+}
+
+void move(const CacheLocation& from, const CacheLocation& to, const std::vector<fs::path>& folders) {
+    for (const fs::path& folder: folders) {
+        const fs::path target = to.dirOf(folder);
+        for (const fs::path& source: {from.inFolder(folder), from.mirrorOf(folder)}) {
+            std::error_code ec;
+            if (source.empty() || source == target || !fs::is_directory(source, ec)) {
+                continue;
+            }
+            for (auto it = fs::directory_iterator(source, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+                if (!it->is_regular_file() || !Packs::isOurs(QString::fromStdString(it->path().filename().string()))) {
+                    continue;
+                }
+                std::error_code mec;
+                fs::create_directories(target, mec);
+                const fs::path dest = target / it->path().filename();
+                fs::rename(it->path(), dest, mec);
+                if (mec) {  // (another disk)
+                    mec.clear();
+                    if (fs::copy_file(it->path(), dest, fs::copy_options::overwrite_existing, mec)) {
+                        fs::remove(it->path(), mec);
+                    }
+                }
+            }
+            Packs::removeIfOnlyOurs(source);
+        }
+    }
+    removeEmptyFolders(from.appCacheDir());
+}
+
+qint64 removeAll(const CacheLocation& location, const std::vector<fs::path>& folders) {
+    qint64 bytes = 0;
+    for (const fs::path& folder: folders) {
+        bytes += Packs::removeOurs(location.inFolder(folder));
+    }
+    // The library's folder in the app cache: its mirrors, and the old layout at its top
+    std::vector<fs::path> dirs{location.appCacheDir()};
+    std::error_code ec;
+    for (auto it = fs::recursive_directory_iterator(location.appCacheDir(), ec);
+         !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_directory() && it->path().filename() == DocumentFiles::META_DIR) {
+            dirs.push_back(it->path());
+            it.disable_recursion_pending();
+        }
+    }
+    for (const fs::path& dir: dirs) {
+        bytes += Packs::removeOurs(dir);
+    }
+    removeEmptyFolders(location.appCacheDir());
+    return bytes;
+}
+
+}  // namespace CacheFolders
 
 // --- WriteScheduler -------------------------------------------------------------------------------------------
 

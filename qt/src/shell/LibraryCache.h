@@ -24,6 +24,7 @@
 #include <functional>
 #include <optional>
 #include <set>
+#include <vector>
 
 #include <QCborMap>
 #include <QObject>
@@ -96,12 +97,31 @@ bool removeIfOnlyOurs(const fs::path& dir);
 /// Remove our files (packs and the old layout) from the cache folder, and the folder if nothing else is left.
 /// Returns the bytes removed.
 qint64 removeOurs(const fs::path& dir);
-/// Bytes of our files (packs and the old layout) in a cache folder.
-qint64 sizeOf(const fs::path& dir);
+/// Bytes of our files (packs and the old layout) in a cache folder; `files` counts them.
+qint64 sizeOf(const fs::path& dir, int* files = nullptr);
 /// Remove the files of the old layout ("index/*.json", "previews/*.png", "pages.json"), nothing else.
 void removeOldLayout(const fs::path& dir);
 
 }  // namespace Packs
+
+/// The cache folders of a whole library at once (the settings: size, cache location, clean-up).
+namespace CacheFolders {
+
+struct Usage {
+    qint64 bytes = 0;
+    int files = 0;
+};
+/// What the cache of these folders (the library and all its folders) takes: their cache folders in the folders
+/// and everything in the library's folder in the app cache.
+Usage usage(const CacheLocation& location, const std::vector<fs::path>& folders);
+/// Move the packs of these folders from where `from` keeps them to where `to` does (the library's cache location
+/// was changed). Cache folders left without files are removed.
+void move(const CacheLocation& from, const CacheLocation& to, const std::vector<fs::path>& folders);
+/// Remove the cache of these folders: their ".xournal_library" folders (only the files the app recognises as its
+/// own; a folder with other files stays) and the library's folder in the app cache. Returns the bytes removed.
+qint64 removeAll(const CacheLocation& location, const std::vector<fs::path>& folders);
+
+}  // namespace CacheFolders
 
 /// Calls `write` (on the thread it lives on) a while after the last call of changed(), at the latest `maxDelay`
 /// after the first one.

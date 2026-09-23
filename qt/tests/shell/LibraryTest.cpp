@@ -1085,6 +1085,91 @@ TEST_F(LibraryTest, packsOfAnotherFormatAreReadAgain) {
     EXPECT_EQ(again.search("p7").size(), 1u);
 }
 
+// --- where the cache is kept, and removing it (the settings) ---
+
+TEST_F(LibraryTest, theCacheMovesToTheAppCacheAndBack) {
+    makeFolders(root);
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->flush();
+    const DocumentItem sheet = DocumentFiles::itemOf(root / "Physics" / "sheet.pdf");
+    ASSERT_FALSE(PreviewCache::preview(sheet).isNull());
+    PreviewCache::flush();
+    EXPECT_FALSE(model.cacheInAppCache()) << "in the folders by default";
+    const fs::path app = Library(root).cacheLocation().appCacheDir();
+    EXPECT_EQ(model.appCachePath().toStdString(), app.string());
+
+    model.setCacheInAppCache(true);
+    EXPECT_TRUE(model.cacheInAppCache());
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::AppCache) << "kept as a setting of the library";
+    for (const fs::path& f: {root, root / "Physics", root / "Physics" / "Mechanics"}) {
+        EXPECT_FALSE(fs::exists(f / DocumentFiles::META_DIR)) << f;
+    }
+    EXPECT_TRUE(fs::exists(app / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_TRUE(fs::exists(app / "Physics" / DocumentFiles::META_DIR / "previews.pack"));
+    model.searchIndex()->waitForDone();
+    EXPECT_EQ(model.searchIndex()->documentsRead(), 0) << "moved, not made anew";
+    EXPECT_EQ(model.searchIndex()->search("zebra").size(), 1u);
+    EXPECT_FALSE(PreviewCache::stored(sheet).isNull());
+    // New entries go there too
+    fs::copy_file(fixture(u8"load/pages.xopp"), root / "Physics" / "Mechanics" / "more.xopp");
+    model.refresh();
+    model.searchIndex()->flush();
+    EXPECT_EQ(Packs::read(app / "Physics" / "Mechanics" / DocumentFiles::META_DIR, LibraryIndex::NOTES_PACK,
+                          LibraryIndex::FORMAT)
+                      ->size(),
+              2);
+    EXPECT_FALSE(fs::exists(root / "Physics" / "Mechanics" / DocumentFiles::META_DIR));
+
+    model.setCacheInAppCache(false);
+    EXPECT_TRUE(fs::exists(root / "Physics" / "Mechanics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_FALSE(fs::exists(app)) << "nothing left in the app cache";
+    model.searchIndex()->waitForDone();
+    EXPECT_EQ(model.searchIndex()->documentsRead(), 0);
+    model.setLibrary(nullptr);
+}
+
+TEST_F(LibraryTest, removingTheCacheLeavesOtherFilesAndTheReadingPositions) {
+    makeFolders(root);
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->flush();
+    DocumentPlaces::setLastPage(root / "Physics" / "sheet.pdf", 1);
+    touch(root / "Physics" / DocumentFiles::META_DIR / "mine.txt");
+    EXPECT_LT(model.cacheBytes(), 0) << "not counted yet";
+    model.measureCache();
+    waitFor([&] { return model.cacheBytes() >= 0; });
+    EXPECT_GT(model.cacheBytes(), 200);
+    EXPECT_EQ(model.cacheFiles(), 6) << "notes and PDF text of three folders (not mine.txt)";
+
+    EXPECT_EQ(model.removeCaches(), static_cast<qint64>(model.cacheBytes()));
+    EXPECT_TRUE(model.cacheRemoved());
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR));
+    EXPECT_FALSE(fs::exists(root / "Physics" / "Mechanics" / DocumentFiles::META_DIR));
+    EXPECT_TRUE(fs::exists(root / "Physics" / DocumentFiles::META_DIR / "mine.txt")) << "not the app's";
+    EXPECT_FALSE(fs::exists(root / "Physics" / DocumentFiles::META_DIR / "notes.pack"));
+    EXPECT_EQ(model.cacheBytes(), 0);
+    EXPECT_EQ(DocumentPlaces::lastPage(root / "Physics" / "sheet.pdf"), 1) << "not cache";
+
+    // Nothing is made again until the library is opened again
+    model.refresh();
+    ASSERT_FALSE(PreviewCache::preview(DocumentFiles::itemOf(root / "lecture.pdf")).isNull());
+    PreviewCache::flush();
+    waitFor([] { return false; }, 100);
+    EXPECT_FALSE(fs::exists(root / DocumentFiles::META_DIR));
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->flush();
+    EXPECT_TRUE(fs::exists(root / DocumentFiles::META_DIR / "notes.pack"));
+
+    // In the app cache, too
+    model.setCacheInAppCache(true);
+    const fs::path app = Library(root).cacheLocation().appCacheDir();
+    ASSERT_TRUE(fs::exists(app / DocumentFiles::META_DIR / "notes.pack"));
+    model.removeCaches();
+    EXPECT_FALSE(fs::exists(app));
+    model.setLibrary(nullptr);
+}
+
 // --- the cache of the layout before the packs ---
 
 namespace {

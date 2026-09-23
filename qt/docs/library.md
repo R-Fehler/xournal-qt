@@ -43,8 +43,25 @@ The cache only speeds things up and can be deleted at any time. Each folder with
 folder without documents gets none, and when its last document goes, the folder goes too (unless something other
 than the app's files is in it). Opening a library reads the caches of all its folders and merges them; a subfolder
 opened as a library of its own finds its caches already there. Entries are keyed by file name, so a folder moved or
-renamed by any program keeps its cache. Folders that cannot be written keep theirs in the app cache,
-`~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/`.
+renamed by any program keeps its cache.
+
+**Where the cache is kept** is a setting of each library (Settings → Storage), stored next to the library's other
+state in `~/.config/xournal-qt/libraries/<key of the library>/library.json`:
+- in the folders (the default): the hidden `.xournal_library/` in each folder;
+- in the app cache (recommended for folders that sync clients upload): the same cache folders under
+  `~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/`, so the library's
+  folders get no files of the app. Documents moved by another program are found again by name, size and time.
+  (A subfolder opened as a library of its own has its own setting and cache there.)
+
+Switching moves the packs from one place to the other. Folders that cannot be written keep their cache in the app
+cache in either mode.
+
+**Clean-up** (Settings → Storage) shows what the cache of the library takes (bytes and files). "Remove all cache
+folders of this library…" explains, then removes every `.xournal_library/` below the library (only the files the app
+recognises as its own; a folder with other files in it stays) and the library's folder in the app cache, and closes
+the window (asking about unsaved documents first), so the app does not build the cache again right away, e.g. while
+the library is zipped to be sent. Until the library is opened again nothing is cached or indexed. The reading
+positions are kept.
 
 A cache folder holds a few **packs**, one file each, split by how often they change:
 - `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`), name, the size and time of its `.xopp`, the

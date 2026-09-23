@@ -13,6 +13,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMetaObject>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QThreadPool>
 
@@ -71,6 +72,31 @@ bool Library::isDefault() const { return rootDir == normalized(defaultRoot()); }
 std::string Library::key() const { return hashOf(rootDir.string(), 12).toStdString(); }
 
 fs::path Library::configDir() const { return Util::getConfigSubfolder(fs::path("libraries") / key()); }
+
+namespace {
+QJsonObject settingsOf(const fs::path& file) {
+    QFile f(QString::fromStdString(file.string()));
+    return f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+}
+}  // namespace
+
+CacheLocation::Mode Library::cacheMode() const {
+    return settingsOf(configDir() / "library.json").value("cache").toString() == QLatin1String("app")
+                   ? CacheLocation::Mode::AppCache
+                   : CacheLocation::Mode::Folders;
+}
+
+void Library::setCacheMode(CacheLocation::Mode mode) const {
+    const fs::path file = configDir() / "library.json";
+    QJsonObject settings = settingsOf(file);
+    settings["root"] = QString::fromStdString(rootDir.string());  // (for people looking at the folder)
+    settings["cache"] = mode == CacheLocation::Mode::AppCache ? "app" : "folders";
+    QSaveFile f(QString::fromStdString(file.string()));
+    if (f.open(QIODevice::WriteOnly)) {
+        f.write(QJsonDocument(settings).toJson());
+        f.commit();
+    }
+}
 
 fs::path Library::placesFile() const {
     const fs::path file = configDir() / "pages.json";
@@ -157,7 +183,21 @@ void LibraryIndex::flush() {
 
 void LibraryIndex::setWriteDelays(int quietMs, int maxDelayMs) { scheduler->setDelays(quietMs, maxDelayMs); }
 
+void LibraryIndex::discard() {
+    discarded = true;
+    ++generation;  // stops a running update
+    pool->waitForDone();
+    writer->waitForDone();
+    scheduler->cancel();
+    std::lock_guard lock(mtx);
+    folders.clear();
+    running = false;
+}
+
 void LibraryIndex::update(std::vector<DocumentItem> items) {
+    if (discarded) {
+        return;
+    }
     const quint64 gen = ++generation;
     running = true;
     doneCount = 0;
@@ -167,7 +207,7 @@ void LibraryIndex::update(std::vector<DocumentItem> items) {
 }
 
 void LibraryIndex::moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
-    if (!moves.empty()) {
+    if (!moves.empty() && !discarded) {
         pool->start([this, moves] { applyMoves(moves); });
     }
 }
@@ -318,6 +358,9 @@ void LibraryIndex::erase(const fs::path& file) {
 
 bool LibraryIndex::writeChanged() {
     std::lock_guard writeLock(writeMtx);
+    if (discarded) {
+        return true;
+    }
     struct Job {
         fs::path folder;
         std::vector<EntryPtr> docs;
