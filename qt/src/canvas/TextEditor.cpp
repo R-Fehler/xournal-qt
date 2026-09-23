@@ -13,10 +13,12 @@
 #include <pango/pangocairo.h>
 
 #include "control/ToolHandler.h"
+#include "control/layer/LayerController.h"
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/Font.h"
 #include "model/Layer.h"
+#include "model/MarkdownText.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "undo/DeleteUndoAction.h"
@@ -30,6 +32,8 @@
 #include "view/overlays/OverlayView.h"
 
 #include "CanvasPage.h"
+#include "MdBox.h"
+#include "TextFlow.h"
 #include "session/DocumentSession.h"
 
 namespace xqt {
@@ -57,21 +61,34 @@ xoj::util::GObjectSPtr<PangoLayout> layoutFor(const Text& text, const QByteArray
 }
 }  // namespace
 
-TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, double y):
+TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, double y, const NewText& how):
         session(session), page(page), pageRef(page.getPage()) {
     // Port of TextEditor::initializeEditionAt
     Text* existing = nullptr;
     {
         std::shared_lock lock(*session.getDocument());
-        for (auto&& e: pageRef->getSelectedLayer()->getElements()) {
-            if (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y)) {
-                existing = dynamic_cast<Text*>(e.get());
-                break;
+        // xournal-qt: a Markdown text drawn here (where it is drawn, not where its source would be)
+        Layer* mdLayer = md::markdownLayer(pageRef);
+        if (mdLayer && mdLayer->isVisible()) {
+            existing = md::boxAt(*mdLayer, x, y);
+        }
+        if (existing) {
+            layer = mdLayer;
+            markdown = true;
+        } else {
+            layer = pageRef->getSelectedLayer();
+            markdown = how.markdown || md::isMarkdownLayer(*layer);
+            for (auto&& e: layer->getElements()) {
+                if (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y)) {
+                    existing = dynamic_cast<Text*>(e.get());
+                    break;
+                }
             }
         }
         if (existing) {
             original = existing;
             textElement = existing->cloneText();
+            textElement->setMarkdown(false);  // xournal-qt: the source is edited (the layer makes it Markdown again)
             existing->setInEditing(true);  // the renderer skips it; this editor draws the copy
             content = QString::fromStdString(existing->getText());
         }
@@ -81,13 +98,27 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
         textElement = std::make_unique<Text>();
         textElement->setColor(h->getColor());
         textElement->setFont(session.getSettings()->getFont());
+        if (markdown) {
+            // A Markdown text box: its own size, and as wide as there is room (up to the right margin)
+            textElement->setFont(XojFont(session.getSettings()->getFont().getName(), how.markdownSize));
+            double right = TextFlow::MARGIN;
+            {
+                std::shared_lock lock(*session.getDocument());
+                right = TextFlow::styleFor(pageRef, TextFlow::Style{}).rightMargin;
+            }
+            textElement->setWrap(std::max(100.0, pageRef->getWidth() - right - x));
+        } else {
+            textElement->setAlignment(h->getTextAlignment());
+            textElement->setJustify(h->getTextJustify());
+        }
         textElement->setTransformation(
                 xoj::util::Matrix::TRANSLATION(x, y - textElement->getBoundingBox().height / 2));
-        textElement->setAlignment(h->getTextAlignment());
-        textElement->setJustify(h->getTextJustify());
+        if (markdown && !md::isMarkdownLayer(*layer)) {
+            useMarkdownLayer();
+        }
     } else {
-        const auto box = existing->getBoundingBox();
-        page.rerenderRect(box.x, box.y, box.width, box.height);
+        // (a Markdown text is drawn larger than its source: all of it)
+        page.rerenderRect(0, 0, pageRef->getWidth(), pageRef->getHeight());
         mousePressed(x, y);
     }
     lastArea = area();
@@ -95,6 +126,23 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
 }
 
 TextEditor::~TextEditor() { finalize(); }
+
+void TextEditor::useMarkdownLayer() {
+    // The page's layer "Markdown", made if needed: at the bottom (ink goes on top, into the layer it went into)
+    layer = md::markdownLayer(pageRef);
+    if (layer) {
+        return;
+    }
+    selectedBefore = pageRef->getSelectedLayerId();
+    layer = new Layer();
+    layer->setName(std::string(xoj::markdown::LAYER_NAME));
+    session.getLayerController()->insertLayer(pageRef, layer, 0);  // (locks the document)
+    std::unique_lock lock(*session.getDocument());
+    pageRef->setSelectedLayerId(selectedBefore > 0 ? selectedBefore + 1 : 0);
+    createdLayer = true;
+}
+
+double TextEditor::fontSize() const { return textElement->getFontSize(); }
 
 std::unique_ptr<xoj::view::OverlayView> TextEditor::createView() {
     return std::make_unique<TextEditorView>(this, &page);
@@ -489,6 +537,22 @@ void TextEditor::paint(cairo_t* cr) const {
 }
 
 void TextEditor::finalize() {
+    finalizeText();
+    if (markdown) {
+        // A Markdown layer made for nothing goes again
+        if (createdLayer && layer->getElements().empty()) {
+            session.getLayerController()->removeLayer(pageRef, layer);  // (locks the document)
+            {
+                std::unique_lock lock(*session.getDocument());
+                pageRef->setSelectedLayerId(selectedBefore);
+            }
+            delete layer;
+        }
+        pageRef->firePageChanged();  // (drawn formatted again: larger than its source)
+    }
+}
+
+void TextEditor::finalizeText() {
     // Port of TextEditor::finalizeEdition
     preedit.clear();
     Document* doc = session.getDocument();
@@ -498,7 +562,6 @@ void TextEditor::finalize() {
         if (original) {  // an emptied text is deleted
             auto action = std::make_unique<DeleteUndoAction>(pageRef, true);
             doc->lock();
-            Layer* layer = pageRef->getSelectedLayer();
             auto [orig, index] = layer->removeElement(original);
             doc->unlock();
             if (orig) {
@@ -524,7 +587,6 @@ void TextEditor::finalize() {
             return;
         }
         doc->lock();
-        Layer* layer = pageRef->getSelectedLayer();
         auto [orig, index] = layer->removeElement(original);
         Text* ptr = textElement.get();
         layer->addElement(std::move(textElement));
@@ -541,7 +603,6 @@ void TextEditor::finalize() {
     } else {
         Text* ptr = textElement.get();
         doc->lock();
-        Layer* layer = pageRef->getSelectedLayer();
         layer->addElement(std::move(textElement));
         doc->unlock();
         pageRef->fireElementChanged(ptr);

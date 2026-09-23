@@ -54,6 +54,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
              standard(QKeySequence::Delete) + QStringList{"Backspace"}},
             {"selectAll", tr("Select everything on the page"), edit, standard(QKeySequence::SelectAll)},
             {"textMode", tr("Text mode"), edit, {"Ctrl+Alt+E"}},
+            {"markdownMode", tr("Markdown box"), edit, {"Ctrl+Alt+M"}},
 
             {"zoomIn", tr("Zoom in"), view, standard(QKeySequence::ZoomIn)},
             {"zoomOut", tr("Zoom out"), view, standard(QKeySequence::ZoomOut)},

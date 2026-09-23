@@ -53,6 +53,9 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "MarkdownEditor.h"
+#include "MarkdownSession.h"
+#include "MdBox.h"
 #include "TextFlow.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
@@ -271,6 +274,7 @@ QString AppController::textFlowFamily() const {
 
 QVariantList AppController::beginTextFlow() {
     endTextFlow(true);
+    endMarkdown(true);
     if (!session()) {
         return {};
     }
@@ -321,9 +325,91 @@ void AppController::endTextFlow(bool keep) {
     Q_EMIT undoRedoChanged();
 }
 
+bool AppController::markdownActive() const { return markdown && markdown->active(); }
+
+
+QString AppController::beginMarkdown(int page) { return startMarkdown(page, std::nullopt); }
+
+QString AppController::beginMarkdownBox(int page, double x, double y) { return startMarkdown(page, QPointF(x, y)); }
+
+QVariantMap AppController::takeMarkdownFromPage() {
+    CanvasView* v = canvas();
+    if (!v || !v->getMarkdownEditor()) {
+        return {};
+    }
+    const MarkdownEditor::Target t = v->getMarkdownEditor()->target();
+    v->endTextEditing();
+    return {{"page", static_cast<int>(t.page)}, {"pageText", t.pageText}, {"x", t.x}, {"y", t.y}};
+}
+
+QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
+    endMarkdown(true);
+    endTextFlow(true);
+    if (!session()) {
+        return {};
+    }
+    mdSession = session();
+    markdown = std::make_unique<MarkdownSession>(*mdSession);
+    md::Style style;
+    style.family = textFlowFamily().toStdString();
+    style.size = markdownFontSize();
+    style.color = app->getToolHandler()->getColor();
+    if (!at) {
+        style.color = Color(0, 0, 0);  // (the page's text: black, as the text mode)
+    }
+    mdPage = page >= 0 ? page : static_cast<int>(mdSession->getCurrentPageNo());
+    const QString source = QString::fromStdString(
+            at ? markdown->beginBox(static_cast<size_t>(mdPage), style, at->x(), at->y())
+               : markdown->begin(static_cast<size_t>(mdPage), style));
+    mdPage = static_cast<int>(markdown->pageIndex());  // (the page's text: its first page)
+    mdLastPage = static_cast<int>(markdown->lastPageIndex());
+    mdOverflow = 0;
+    Q_EMIT markdownChanged();
+    return source;
+}
+
+void AppController::markdownPagesChanged(double overflow) {
+    const int first = static_cast<int>(markdown->pageIndex());
+    const int lastPage = static_cast<int>(markdown->lastPageIndex());
+    if (overflow != mdOverflow || first != mdPage || lastPage != mdLastPage) {
+        mdOverflow = overflow;
+        mdPage = first;
+        mdLastPage = lastPage;
+        Q_EMIT markdownChanged();
+    }
+}
+
+void AppController::updateMarkdown(const QString& source) {
+    if (!markdownActive()) {
+        return;
+    }
+    markdownPagesChanged(markdown->update(source.toStdString()));
+}
+
+void AppController::endMarkdown(bool keep) {
+    if (!markdown) {
+        return;
+    }
+    if (keep) {
+        markdown->finish();
+    } else {
+        markdown->cancel();
+    }
+    markdown.reset();
+    mdSession = nullptr;
+    mdPage = -1;
+    mdLastPage = -1;
+    mdOverflow = 0;
+    Q_EMIT markdownChanged();
+    Q_EMIT undoRedoChanged();
+}
+
 void AppController::currentTabChanged() {
     if (flow && flowSession != session()) {
         endTextFlow(true);  // another document: the text mode ends (kept)
+    }
+    if (markdown && mdSession != session()) {
+        endMarkdown(true);  // another document: editing the box ends (kept)
     }
     // Follow the signals of the current tab only.
     for (auto& c: currentConnections) {
@@ -359,6 +445,10 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
         currentConnections.push_back(
+                connect(v, &CanvasView::markdownRequested, this, &AppController::markdownRequested));
+        currentConnections.push_back(
+                connect(v, &CanvasView::markdownBoxRequested, this, &AppController::markdownBoxRequested));
+        currentConnections.push_back(
                 connect(v, &CanvasView::contextRequested, this, &AppController::contextRequested));
         currentConnections.push_back(
                 connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
@@ -373,6 +463,7 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionChanged));
         applyPdfTextMode();
+        applyMarkdownText();
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
     }
@@ -882,6 +973,71 @@ void AppController::removeToolbarColor(int index) {
 
 void AppController::resetToolbarColors() { storeToolbarColors(defaultToolbarColors()); }
 
+bool AppController::textMarkdown() const {
+    bool on = false;
+    app->getSettings()->getCustomElement(CUSTOM).getBool("textMarkdown", on);
+    return on;
+}
+
+void AppController::setTextMarkdown(bool on) {
+    if (on != textMarkdown()) {
+        app->getSettings()->getCustomElement(CUSTOM).setBool("textMarkdown", on);
+        app->getSettings()->customSettingsChanged();
+        applyMarkdownText();
+        Q_EMIT fontChanged();
+    }
+}
+
+double AppController::markdownFontSize() const {
+    double size = 0;
+    app->getSettings()->getCustomElement(CUSTOM).getDouble("markdownFontSize", size);
+    return size > 0 ? size : md::defaultFontSize(fontSize());
+}
+
+void AppController::setMarkdownFontSize(double size) {
+    size = std::clamp(size, 4.0, 400.0);
+    app->getSettings()->getCustomElement(CUSTOM).setDouble("markdownFontSize", size);
+    app->getSettings()->customSettingsChanged();
+    if (canvas() && canvas()->getTextEditor() && canvas()->getTextEditor()->isMarkdown()) {
+        canvas()->getTextEditor()->setFont(XojFont(fontFamily().toStdString(), size));  // the text being edited
+    }
+    applyMarkdownText();
+    Q_EMIT fontChanged();
+}
+
+double AppController::markdownBoxSize() const { return markdownActive() ? markdown->fontSize() : markdownFontSize(); }
+
+bool AppController::markdownInPanel() const {
+    bool on = false;  // (written on the page, formatted while typing)
+    app->getSettings()->getCustomElement(CUSTOM).getBool("markdownInPanel", on);
+    return on;
+}
+
+void AppController::setMarkdownInPanel(bool on) {
+    if (on != markdownInPanel()) {
+        app->getSettings()->getCustomElement(CUSTOM).setBool("markdownInPanel", on);
+        app->getSettings()->customSettingsChanged();
+        applyMarkdownText();
+        Q_EMIT fontChanged();
+    }
+}
+
+bool AppController::markdownIsPageText() const { return !markdownActive() || markdown->isPageText(); }
+
+void AppController::setMarkdownBoxSize(double size) {
+    if (markdownActive()) {
+        markdownPagesChanged(markdown->setFontSize(std::clamp(size, 4.0, 400.0)));
+    }
+    setMarkdownFontSize(size);
+    Q_EMIT markdownChanged();
+}
+
+void AppController::applyMarkdownText() {
+    if (CanvasView* v = canvas()) {
+        v->setMarkdownText(textMarkdown(), markdownFontSize(), markdownInPanel());
+    }
+}
+
 QString AppController::toolbarPosition() const {
     std::string stored;
     app->getSettings()->getCustomElement(CUSTOM).getString("toolbarPosition", stored);
@@ -1298,6 +1454,9 @@ void AppController::closeTab(int index) {
     if (flow && flowSession == tabs->session(index)) {
         endTextFlow(true);
     }
+    if (markdown && mdSession == tabs->session(index)) {
+        endMarkdown(true);
+    }
     tabs->closeTab(index);  // the last one: the home screen
 }
 
@@ -1423,6 +1582,7 @@ void AppController::undo() {
         return;
     }
     session()->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
+    endMarkdown(true);                   // (as is the Markdown being written beside the page)
     if (canUndo()) {
         session()->getUndoRedoHandler()->undo();
     }
@@ -1433,6 +1593,7 @@ void AppController::redo() {
         return;
     }
     session()->clearSelectionEndText();
+    endMarkdown(true);
     if (canRedo()) {
         session()->getUndoRedoHandler()->redo();
     }
@@ -1445,7 +1606,9 @@ void AppController::setFont(const QString& family, double size) {
     XojFont font(family.toStdString(), std::clamp(size, 4.0, 400.0));
     app->getSettings()->setFont(font);
     if (canvas() && canvas()->getTextEditor()) {
-        canvas()->getTextEditor()->setFont(font);  // the text being edited follows
+        auto* editor = canvas()->getTextEditor();
+        // The text being edited follows (a Markdown text keeps its own size, see markdownFontSize)
+        editor->setFont(editor->isMarkdown() ? XojFont(font.getName(), editor->fontSize()) : font);
     }
     Q_EMIT fontChanged();
 }

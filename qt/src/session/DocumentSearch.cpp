@@ -11,6 +11,7 @@
 #include "model/XojPage.h"
 
 #include "DocumentSession.h"
+#include "MdBox.h"
 
 namespace xqt {
 
@@ -132,7 +133,12 @@ std::vector<QRectF> DocumentSearch::findOnPage(Document& document, size_t pageNo
                 continue;
             }
             for (auto&& e: l->getElementsView()) {
-                if (e->getType() == ELEMENT_TEXT) {
+                if (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e)->isMarkdown()) {
+                    // A Markdown box: where the text is drawn (not where it is in the source)
+                    for (const md::Rect& r: md::findText(*static_cast<const Text*>(e), utf8)) {
+                        results.push_back(XojPdfRectangle(r.x, r.y, r.x + r.width, r.y + r.height));
+                    }
+                } else if (e->getType() == ELEMENT_TEXT) {
                     const auto r = static_cast<const Text*>(e)->findText(utf8);
                     results.insert(results.end(), r.begin(), r.end());
                 }

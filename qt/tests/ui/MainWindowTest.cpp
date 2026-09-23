@@ -35,7 +35,10 @@
 #include "canvas/CanvasView.h"
 #include "canvas/CanvasMemory.h"
 #include "canvas/CanvasPage.h"
+#include "markdown/MdBox.h"
 #include "canvas/PenHover.h"
+#include "canvas/MarkdownEditor.h"
+#include "canvas/TextEditor.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
@@ -2448,6 +2451,497 @@ TEST_F(HomeScreenTest, movesToAnotherLibraryAndWarnsAboutDownloads) {
     EXPECT_TRUE(fs::exists(downloads / "notes.xopp"));
     EXPECT_FALSE(fs::exists(root / "notes.xopp"));
     QFile::remove(config + "/user-dirs.dirs");
+}
+
+// Markdown: written beside the page into a box (a text in the layer "Markdown"), opened again with the text tool.
+TEST_F(MainWindowTest, markdownBoxIsWrittenAndOpenedAgainWithTheTextTool) {
+    controller->setMarkdownInPanel(true);  // (the text tool opens it beside the page)
+    auto* panel = find<QQuickItem>("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    auto* markdownItem = find<QObject>("markdownItem");  // in the menu of the writing button
+    ASSERT_NE(markdownItem, nullptr);
+    QMetaObject::invokeMethod(markdownItem, "triggered");
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_TRUE(controller->markdownActive());
+    auto* area = find<QQuickItem>("markdownArea");
+    ASSERT_TRUE(area->hasActiveFocus());
+
+    type("# Notes");
+    key(Qt::Key_Return);
+    type("- one");
+    key(Qt::Key_Return);  // the list goes on
+    type("two");
+    key(Qt::Key_Return);
+    key(Qt::Key_Return);  // an empty item ends the list
+    type("Some ");
+    key(Qt::Key_B, Qt::ControlModifier);
+    type("bold");
+    wait(300);
+
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    const Text* box = xqt::md::boxOf(*layer);
+    ASSERT_NE(box, nullptr);
+    const std::string source = "# Notes\n- one\n- two\n\nSome **bold**";
+    EXPECT_EQ(box->getText(), source);
+    EXPECT_TRUE(controller->modified());
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(find<QQuickItem>("markdownDone"));
+    EXPECT_FALSE(panel->isVisible());
+    EXPECT_FALSE(controller->markdownActive());
+    EXPECT_TRUE(find<QQuickItem>("textModeButton")->property("markdownMode").toBool()) << "the button's mode now";
+
+    // The text tool on the box opens it again (not the text of the source in a text box)
+    controller->selectTool("text");
+    wait(200);  // (the zoom from before the panel comes back)
+    QSignalSpy requested(controller.get(), &AppController::markdownRequested);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    const auto r = xqt::md::boxRect(*xqt::md::boxOf(*layer));
+    view->getViewController().scrollToPageRect(0, QRectF(r.x, r.y, r.width, r.height));
+    wait(100);
+    const QPointF onBox = view->pageViewRect(0).topLeft() +
+                          QPointF(r.x + 20, r.y + r.height / 2) * view->getViewController().zoom();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(onBox).toPoint());
+    until([&] { return panel->isVisible(); });
+    EXPECT_EQ(requested.count(), 1) << "tool " << controller->tool().toStdString() << " at " << onBox.x() << ","
+                                    << onBox.y() << " box " << r.x << "," << r.y << " " << r.width << "x" << r.height;
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_EQ(area->property("text").toString().toStdString(), source);
+    click(find<QQuickItem>("markdownCancel"));
+    EXPECT_EQ(xqt::md::boxOf(*layer)->getText(), source);
+
+    // One undo step for the whole text
+    controller->undo();
+    EXPECT_EQ(xqt::md::boxOf(*layer), nullptr);
+}
+
+// Markdown text boxes: the text tool with "Markdown" places them anywhere; edited on the page (the source is shown
+// while editing), drawn formatted.
+TEST_F(MainWindowTest, markdownTextBoxesAnywhereWithTheTextTool) {
+    controller->setMarkdownInPanel(false);  // (written on the page)
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(200, 300, 200, 300));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 300));
+    wait(50);
+    ASSERT_NE(view->getMarkdownEditor(), nullptr) << "written on the page";
+    type("Some **bold**");
+    key(Qt::Key_Escape);
+    EXPECT_EQ(view->getMarkdownEditor(), nullptr);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    const Text* box = xqt::md::boxAt(*layer, 205, 300);
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->getText(), "Some **bold**");
+    EXPECT_EQ(box->getFontSize(), 10) << "the size of Markdown text";
+    EXPECT_GT(box->getWrap(), 100) << "as wide as there is room";
+    EXPECT_NE(page->getSelectedLayer(), layer) << "the pen still writes into its layer";
+
+    // A tap on it edits it on the page again
+    QSignalSpy requested(controller.get(), &AppController::markdownRequested);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(210, 300));
+    wait(50);
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_EQ(view->getMarkdownEditor()->text(), "Some **bold**");
+    EXPECT_EQ(requested.count(), 0);
+    key(Qt::Key_Escape);
+
+    // Markdown off: ordinary texts again
+    controller->setTextMarkdown(false);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 500));
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr) << "an ordinary text box";
+    EXPECT_FALSE(view->getTextEditor()->isMarkdown());
+    type("plain");
+    key(Qt::Key_Escape);
+    EXPECT_EQ(layer->getElements().size(), 1u);
+    bool plain = false;
+    for (const auto& e: page->getSelectedLayer()->getElements()) {
+        plain = plain || (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e.get())->getText() == "plain");
+    }
+    EXPECT_TRUE(plain);
+}
+
+// Markdown text boxes are selected (rectangle, lasso, tap) and moved like other elements: in their layer
+// "Markdown", which is the selected layer only while they are selected.
+TEST_F(MainWindowTest, markdownTextBoxesAreSelectedAndMoved) {
+    controller->setMarkdownInPanel(false);  // (written on the page)
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 150, 350, 300));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    const auto drag = [&](QPoint from, QPoint to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 10; ++i) {
+            QTest::mouseMove(window, from + (to - from) * i / 10);
+            wait(10);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(50);
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(150, 200));
+    wait(50);
+    type("# Moved box");
+    key(Qt::Key_Escape);
+
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    Text* box = xqt::md::boxAt(*layer, 155, 200);
+    ASSERT_NE(box, nullptr);
+    ASSERT_TRUE(box->isMarkdown());
+    const auto before = box->getBoundingBox();
+    const Layer* penLayer = page->getSelectedLayer();
+    ASSERT_NE(penLayer, layer);
+
+    // A rectangle around it selects it
+    controller->selectTool("selectRect");
+    drag(pagePoint(before.x - 10, before.y - 10), pagePoint(before.x + before.width + 10, before.y + before.height + 10));
+    ASSERT_TRUE(controller->hasSelection());
+    EXPECT_EQ(page->getSelectedLayer(), layer) << "while it is selected";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    // Dragged by (40, 60) points
+    const QPoint inside = pagePoint(before.x + before.width / 2, before.y + before.height / 2);
+    drag(inside, pagePoint(before.x + before.width / 2 + 40, before.y + before.height / 2 + 60));
+    // A tap elsewhere ends the selection (with any tool: it only deselects)
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(420, 430));
+    wait(50);
+    EXPECT_FALSE(controller->hasSelection());
+    EXPECT_EQ(page->getSelectedLayer(), penLayer) << "the pen writes into its layer again";
+    ASSERT_EQ(layer->getElements().size(), 1u);
+    const auto* moved = static_cast<const Text*>(layer->getElements().front().get());
+    EXPECT_TRUE(moved->isMarkdown()) << "still a Markdown text, in its layer";
+    EXPECT_NEAR(moved->getBoundingBox().x, before.x + 40, 3);
+    EXPECT_NEAR(moved->getBoundingBox().y, before.y + 60, 3);
+    EXPECT_NEAR(moved->getBoundingBox().width, before.width, 0.5) << "the drawn box moved as a whole";
+
+    // A lasso around it, then Delete; undo brings it back
+    controller->selectTool("selectRegion");
+    const auto b = moved->getBoundingBox();
+    const QPoint a = pagePoint(b.x - 15, b.y - 15);
+    const QPoint c = pagePoint(b.x + b.width + 15, b.y + b.height + 15);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (const QPoint& p: {QPoint(c.x(), a.y()), c, QPoint(a.x(), c.y()), a}) {
+        for (int i = 1; i <= 5; ++i) {
+            QTest::mouseMove(window, p);
+            wait(5);
+        }
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a);
+    wait(50);
+    ASSERT_TRUE(controller->hasSelection());
+    controller->deleteSelection();
+    EXPECT_TRUE(layer->getElements().empty());
+    EXPECT_EQ(page->getSelectedLayer(), penLayer);
+    controller->undo();
+    EXPECT_EQ(layer->getElements().size(), 1u);
+}
+
+// Markdown text boxes written beside the page: the page shows them formatted while typing.
+TEST_F(MainWindowTest, markdownTextBoxesAreWrittenBesideThePage) {
+    controller->setMarkdownInPanel(true);
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* area = find<QQuickItem>("markdownArea");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 250, 350, 200));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(150, 300));
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_FALSE(controller->markdownIsPageText()) << "a text box, not the page's text";
+    EXPECT_EQ(view->getTextEditor(), nullptr) << "not edited on the page";
+    ASSERT_TRUE(area->hasActiveFocus());
+    type("## Box");
+    key(Qt::Key_Return);
+    type("- one");
+    wait(300);
+
+    // Live on the page, where it was tapped
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    const Text* box = xqt::md::boxAt(*layer, 155, 300);
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->getText(), "## Box\n- one");
+    EXPECT_TRUE(box->isMarkdown());
+    EXPECT_NEAR(box->getTransformation().shift.x, 150, 1);  // (where it was tapped, to the pixel)
+    EXPECT_EQ(box->getFontSize(), 10);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(find<QQuickItem>("markdownDone"));
+    EXPECT_FALSE(panel->isVisible());
+
+    // A tap on it opens it again; the page's own text is another one
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(160, 300));
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_EQ(area->property("text").toString().toStdString(), "## Box\n- one");
+    click(find<QQuickItem>("markdownCancel"));
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, QVariant(0)));
+    EXPECT_TRUE(controller->markdownIsPageText());
+    EXPECT_EQ(area->property("text").toString(), QString()) << "the page has no text of its own yet";
+    click(find<QQuickItem>("markdownCancel"));
+
+    controller->undo();
+    EXPECT_EQ(xqt::md::boxAt(*layer, 155, 300), nullptr) << "one undo step for the box";
+}
+
+// The page's Markdown text flows onto new pages while it is written.
+TEST_F(MainWindowTest, markdownFlowsOntoNewPages) {
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* area = find<QQuickItem>("markdownArea");
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, QVariant(0)));
+    ASSERT_TRUE(panel->isVisible());
+    std::string text = "# A long text\n\n";
+    for (int i = 0; i < 30; ++i) {
+        text += "## Part " + std::to_string(i + 1) + "\n\n";
+        for (int j = 0; j < 4; ++j) {
+            text += "Some sentences of part " + std::to_string(i + 1) +
+                    ", long enough to take a few lines on the page, so that the parts need several pages.\n\n";
+        }
+    }
+    area->setProperty("text", QString::fromStdString(text));
+    until([&] { return controller->pageCount() > 1; }, 3000);
+    const int pages = controller->pageCount();
+    EXPECT_GE(pages, 3);
+    EXPECT_EQ(controller->markdownPage(), 0);
+    EXPECT_EQ(controller->markdownLastPage(), pages - 1);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        controller->setZoomPercent(30);
+        wait(2500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(find<QQuickItem>("markdownDone"));
+    controller->undo();
+    EXPECT_EQ(controller->pageCount(), 1) << "one undo step: text and pages";
+}
+
+// Markdown written on the page, as in Typora: formatted while typing, the block with the cursor shows its Markdown.
+TEST_F(MainWindowTest, markdownIsWrittenOnThePage) {
+    controller->setMarkdownInPanel(false);
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 250, 350, 250));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(150, 300));
+    wait(50);
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    EXPECT_FALSE(find<QQuickItem>("markdownPanel")->isVisible()) << "not beside the page";
+    type("# Title");
+    key(Qt::Key_Return);  // a new paragraph
+    type("Some **bold** text");
+    EXPECT_EQ(editor->text(), "# Title\n\nSome **bold** text");
+
+    auto* session = controller->tabManager().currentSession();
+    PageRef page = session->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    Text* box = xqt::md::boxOf(*layer);
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->getText(), editor->text()) << "the page has it while typing";
+    EXPECT_TRUE(box->isInEditing()) << "drawn by the editor while it is written";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    // Keys: the line's start, words, undo in the text being written
+    key(Qt::Key_Home);
+    EXPECT_EQ(editor->cursorPosition(), 9u) << "the start of the line";
+    key(Qt::Key_Right, Qt::ControlModifier);
+    EXPECT_EQ(editor->cursorPosition(), 13u) << "after \"Some\"";
+    key(Qt::Key_End);
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(editor->text(), "# Title\n\nSome **bold** ") << "the last word";
+    key(Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+    EXPECT_EQ(editor->text(), "# Title\n\nSome **bold** text");
+
+    // A tap on the heading puts the cursor there
+    const auto r = xqt::md::boxRect(*box);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(r.x + 1, r.y + 4));
+    wait(50);
+    EXPECT_EQ(view->getMarkdownEditor(), editor) << "still writing";
+    EXPECT_LE(editor->cursorPosition(), 7u) << "in the heading";
+
+    // Bold with Ctrl+B around a selection
+    key(Qt::Key_End);
+    key(Qt::Key_Left, Qt::ShiftModifier | Qt::ControlModifier);
+    key(Qt::Key_B, Qt::ControlModifier);
+    EXPECT_EQ(editor->text(), "# **Title**\n\nSome **bold** text");
+
+    // Ctrl+Alt+M: the same text, its source beside the page
+    key(Qt::Key_M, Qt::ControlModifier | Qt::AltModifier);
+    auto* panel = find<QQuickItem>("markdownPanel");
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_EQ(view->getMarkdownEditor(), nullptr) << "not on the page any more";
+    EXPECT_EQ(find<QQuickItem>("markdownArea")->property("text").toString().toStdString(),
+              "# **Title**\n\nSome **bold** text");
+    click(find<QQuickItem>("markdownDone"));
+    box = xqt::md::boxOf(*layer);
+    ASSERT_NE(box, nullptr);
+    EXPECT_FALSE(box->isInEditing());
+    controller->undo();
+    EXPECT_EQ(xqt::md::boxOf(*layer), nullptr) << "one undo step for all of it";
+}
+
+// The page's text written on the page flows onto the next pages; the cursor goes with it.
+TEST_F(MainWindowTest, markdownWrittenOnThePageFlowsOntoPages) {
+    controller->setMarkdownInPanel(false);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->startMarkdown(0, true, 100, 100);  // (the writing button's page text, on the page)
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    std::string text;
+    for (int i = 0; i < 60; ++i) {
+        text += "Paragraph " + std::to_string(i) + " with enough words to take a line or two of the page.\n\n";
+    }
+    QGuiApplication::clipboard()->setText(QString::fromStdString(text));
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(editor->text(), text);
+    ASSERT_GE(controller->pageCount(), 2);
+    EXPECT_EQ(view->indexOf(&editor->getPage()), std::optional<size_t>(controller->pageCount() - 1))
+            << "the cursor (at the end) is on the last page";
+    key(Qt::Key_Home, Qt::ControlModifier);
+    EXPECT_EQ(view->indexOf(&editor->getPage()), std::optional<size_t>(0)) << "back on the first page";
+    key(Qt::Key_Escape);
+    controller->undo();
+    EXPECT_EQ(controller->pageCount(), 1);
+}
+
+// A tap on a task's check box switches it: with the hand tool (or a finger), and while writing on the page.
+TEST_F(MainWindowTest, markdownCheckBoxesAreTapped) {
+    controller->setMarkdownInPanel(false);
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(10);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 250, 350, 250));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(150, 300));
+    wait(50);
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    type("- [ ] milk");
+    key(Qt::Key_Return);
+    key(Qt::Key_Return);  // (the list ends)
+    type("Shopping");
+    key(Qt::Key_Escape);
+
+    auto* session = controller->tabManager().currentSession();
+    Layer* layer = xqt::md::markdownLayer(session->getDocument()->getPage(0));
+    ASSERT_NE(layer, nullptr);
+    const auto box = [&] { return xqt::md::boxOf(*layer); };
+    ASSERT_NE(box(), nullptr);
+    const std::string before = box()->getText();
+    ASSERT_EQ(before, "- [ ] milk\n\nShopping") << "Enter on an empty item: the list ends, a paragraph follows";
+    const auto checkBox = [&](size_t active) {
+        const auto& l = xqt::md::cachedLayout(box()->getText(), xqt::md::styleOf(*box()), active);
+        EXPECT_EQ(l.checkBoxes.size(), 1u) << box()->getText();
+        if (l.checkBoxes.empty()) {
+            return QPoint();
+        }
+        const auto& at = box()->getTransformation().shift;
+        const auto& b = l.checkBoxes.front();
+        return pagePoint(at.x + b.x + b.size / 2, at.y + b.y + b.size / 2);
+    };
+
+    // The hand tool: switched, one undo step
+    controller->selectTool("hand");
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, checkBox(xqt::md::NO_SOURCE));
+    wait(50);
+    EXPECT_NE(box()->getText().find("- [x] milk"), std::string::npos) << box()->getText();
+    controller->undo();
+    EXPECT_EQ(box()->getText(), before);
+
+    // While writing on the page (the cursor in the paragraph after the list)
+    controller->selectTool("text");
+    const auto r = xqt::md::boxRect(*box());
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(r.x + r.width - 5, r.y + r.height - 3));
+    wait(50);
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    const size_t cursor = editor->cursorPosition();
+    ASSERT_GT(cursor, before.find("Shopping")) << "in the paragraph";
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, checkBox(cursor));
+    wait(50);
+    EXPECT_EQ(view->getMarkdownEditor(), editor) << "still writing";
+    EXPECT_NE(editor->text().find("- [x] milk"), std::string::npos) << editor->text();
+    EXPECT_EQ(editor->cursorPosition(), cursor) << "the cursor stays";
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(editor->text(), before) << "undone in the text being written";
+    key(Qt::Key_Escape);
 }
 
 TEST_F(MainWindowTest, textModeTypesThePageText) {

@@ -357,6 +357,48 @@ cd build-qt
       pill shrinks to the icon. A tap on it brings the tool back where it lay (on the page one is at now if that
       spot is on it). The Shapes entry takes tool and pill away altogether.
 
+## Markdown boxes
+- [ ] Hold the text mode button (or right click): "Markdown"; or Ctrl+Alt+M. The editor opens beside the page; type
+      "# Notes", Enter, "- one", Enter (the list goes on), "two", Enter, Enter (the list ends), "Some **bold**": the
+      page shows it formatted while typing (heading with a line below, bullets, bold), at the top left margin.
+- [ ] The buttons: H1-H3 and the list / quote buttons change the line's mark; B, I, S, code, Link put marks around
+      the selection. Ctrl+B / I / E / K, Ctrl+1-3; Tab / Shift+Tab indent a list item.
+- [ ] Done; the button now shows the Markdown icon (a tap opens Markdown again). Ctrl+Z removes the whole text,
+      Ctrl+Y brings it back. Cancel puts the page back as it was.
+- [ ] Zoom in far: the text stays sharp. Thumbnail and PDF export show it formatted; in the exported PDF the text
+      can be selected.
+- [ ] Text tool: a tap on the box opens its Markdown (not a text box with the source). A tap on a link in the box
+      (text tool off) offers to open it; `[see](#Page:2)` goes to page 2.
+- [ ] Headings 1-3 of a box are chapters in the contents sidebar.
+- [ ] Search (Ctrl+F) for a word of a box: the mark is on the drawn word (not somewhere in between).
+- [ ] A code block with ```` ```python ```` (or cpp, js, bash): keywords, strings and comments in colors.
+- [ ] Size: "Size" in the editor changes the text (and the size of new Markdown text); new text starts at 60 % of
+      the text font (16 pt: 10).
+- [ ] Text tool, hold its button: switch "Markdown" on; the size there is the Markdown size. Tap anywhere, type
+      "Some **bold**", Esc: drawn formatted where it was tapped. Tap it: the source again, on the page. Markdown off:
+      ordinary text boxes again. The pen still writes into its layer.
+- [ ] Text tool, Markdown on, "Write Markdown beside the page" on: tap anywhere: the editor opens ("Markdown text box
+      on page …"); the page shows the box formatted while typing, where it was tapped. Done; a tap on it opens it
+      again; Ctrl+Z removes it in one step. Off: written on the page (the source while editing).
+- [ ] Writing on the page (the default; font menu: "Write Markdown beside the page" off): tap the page's Markdown
+      text or a Markdown box with the text tool: the cursor is where tapped; type "# Title", Enter, "Some **bold**":
+      the heading is drawn big at once, the line being typed shows "**" grey around bold "bold". Tap the heading:
+      it shows its "# " and the line before is drawn formatted. Arrows, Up / Down over the lines as drawn, Shift to
+      select, Ctrl+B around a word, Ctrl+Z / Ctrl+Shift+Z, Enter in a list (next item; on an empty item it ends),
+      Tab / Shift+Tab. Escape: done; Ctrl+Z removes it all. Long page text: it flows onto new pages while typing and
+      the view follows the cursor. Ctrl+Alt+M: the same text beside the page. The on-screen keyboard types into it.
+- [ ] Task list "- [ ] milk": a tap on its box (hand tool, finger, or the text tool) ticks it, again unticks it;
+      Ctrl+Z. While writing on the page (cursor in another paragraph): a tap on the box ticks it, the cursor stays.
+- [ ] Select (rectangle or lasso) around a Markdown box: the frame is the drawn box; drag it (formatted while
+      dragging), also onto the next page; Delete; Ctrl+Z. After the selection the pen writes into its layer again.
+- [ ] Save, open the file in Xournal++: the page shows the Markdown source as a text, nothing lost; saved there and
+      opened again here: formatted again.
+- [ ] Longer than the page: it flows onto new pages while typing (the title says "pages 1–3"); a heading at the
+      bottom of a page moves to the next page with its paragraph; a long code block continues on the next page
+      with its colors; a long table repeats its header. Deleting text: the pages added go again. Done, Ctrl+Z:
+      text and pages go in one step. Open the text on page 2 (text tool on it): the whole text. Save, open in
+      Xournal++: every page shows its part of the source.
+
 ## Table of contents
 - [ ] A PDF with bookmarks (e.g. a book or thesis): sidebar "Contents": indented headings, current section highlighted, tap goes there, arrows collapse.
 - [ ] Contents overview (toolbar button or Ctrl+Alt+O): chapters big, sections smaller and indented, the pages of each section in a row (swipe sideways); tap a page: it opens there; "Chapters only"; − / +.

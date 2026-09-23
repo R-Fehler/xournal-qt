@@ -33,6 +33,8 @@
 #include "util/Color.h"
 #include "gui/XournalView.h"
 #include "model/DocumentListener.h"
+#include "model/Layer.h"
+#include "model/PageRef.h"
 #include "render/PageRaster.h"
 
 #include "control/zoom/ZoomControl.h"
@@ -52,6 +54,8 @@ namespace xqt {
 class CanvasPage;
 class DocumentSession;
 class TextEditor;
+class MarkdownEditor;
+class CanvasTextInput;
 class RenderService;
 
 class CanvasView final: public QObject, public XournalView, public Layout, public RasterHost, public DocumentListener {
@@ -227,9 +231,36 @@ public:
 
     // --- text tool (port of XojPageView::startText / XournalView::endTextAllPages): one editor per view ---
     TextEditor* getTextEditor() const { return textEditor.get(); }
+    MarkdownEditor* getMarkdownEditor() const { return markdownEditor.get(); }
+    /// The text being typed on the canvas: a text box or Markdown (nullptr: none).
+    CanvasTextInput* getTextInput() const;
+    /// Write Markdown on the page (formatted while typing): the page's text, or the text box at (x, y) (a new one
+    /// there if none).
+    void startMarkdown(size_t page, bool pageText, double x, double y);
     /// A tap with the text tool at a page position (points).
     void startText(CanvasPage& page, double x, double y);
     void endTextEditing();
+    /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
+    bool markdownBoxAt(CanvasPage& page, double x, double y) const;
+    /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
+    bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
+    /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text
+    /// boxes are edited in the editor beside the page (markdownBoxRequested), else on the page (their source).
+    void setMarkdownText(bool markdown, double size, bool inPanel);
+
+    // --- selections of Markdown texts ------------------------------------------------------------------------------
+    // Markdown texts are in the page's layer "Markdown", which is not the selected layer (the pen writes into
+    // another one). A selection of them is made in that layer; it is the selected layer only while the selection
+    // exists, also on pages the selection is moved to (the selection is dropped into the selected layer there).
+    /// Select the page's Markdown layer for a selection of its texts. Returns the layer selected before (nothing:
+    /// the page has no visible Markdown layer, or it is selected already).
+    std::optional<Layer::Index> selectMarkdownLayer(const PageRef& page);
+    /// Select a layer again (a selection of Markdown texts did not come about).
+    void restoreSelectedLayer(const PageRef& page, Layer::Index layer);
+    /// Whether the layer (1-based) of the page is its Markdown layer.
+    bool isMarkdownLayer(const PageRef& page, Layer::Index layer) const;
+    /// The selection just set is of Markdown texts from `page`, whose selected layer was `before`.
+    void markdownSelectionMade(const PageRef& page, Layer::Index before);
 
     // Layout (upstream gui/Layout, content pixels)
     XojPageView* getPageViewAt(int x, int y) const override;
@@ -249,6 +280,11 @@ Q_SIGNALS:
     void textEditingChanged(bool editing);
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
     void contextRequested(QPointF viewPos);
+    /// The text tool tapped the Markdown box of a page (0-based): the UI opens its editor.
+    void markdownRequested(int page);
+    /// The text tool tapped a Markdown text box, or a place for a new one (page coordinates), to be edited beside
+    /// the page.
+    void markdownBoxRequested(int page, double x, double y);
     /// A PDF link was tapped (the UI offers to follow it).
     void linkTapped(const QString& uri, int page, QRectF viewRect);
     void navigationChanged();
@@ -299,6 +335,23 @@ private:
     std::atomic<double> renderDpr{1.0};
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
+    std::unique_ptr<MarkdownEditor> markdownEditor;
+    struct MarkdownSelection {
+        const EditSelection* selection = nullptr;
+        /// The pages whose selected layer is their Markdown layer for now, with the layer selected before, and
+        /// whether the Markdown layer was made for this (made for nothing: removed again).
+        struct Page {
+            PageRef page;
+            Layer::Index before = 0;
+            Layer* created = nullptr;
+        };
+        std::vector<Page> pages;
+    };
+    std::optional<MarkdownSelection> markdownSelection;
+    void endMarkdownSelection();
+    bool markdownText = false;       ///< the text tool makes Markdown text boxes
+    double markdownTextSize = 10;    ///< of this font size
+    bool markdownInPanel = true;     ///< Markdown text boxes are edited beside the page
     GeometryToolLayer geometry{*this};
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;

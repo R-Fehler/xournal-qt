@@ -46,6 +46,10 @@ public:
     void setText(std::string text);
 
     void setInEditing(bool inEditing);
+    /// xournal-qt: a Markdown text (in a layer "Markdown", see model/MarkdownText.h): drawn formatted and as big as
+    /// it is drawn when a renderer is registered. Not saved: it comes from the layer.
+    bool isMarkdown() const { return markdown; }
+    void setMarkdown(bool markdown);
     bool isInEditing() const;
 
     xoj::util::GObjectSPtr<PangoLayout> createPangoLayout() const;
@@ -102,4 +106,5 @@ private:
     bool justify = false;  ///< Stretch whitespaces to make all complete lines have the same width
 
     bool inEditing = false;
+    bool markdown = false;  ///< xournal-qt
 };

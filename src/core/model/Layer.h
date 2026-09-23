@@ -118,6 +118,9 @@ public:
     void setName(const std::string& newName);
 
 private:
+    /// xournal-qt: a text knows whether it is in a Markdown layer (model/MarkdownText.h).
+    void markdownFlag(Element* e) const;
+
     std::vector<ElementPtr> elements;
 
     bool visible = true;

@@ -117,6 +117,25 @@ TEST(Chapters, comeFromTheDocumentWhenNoPdfHasThem) {
     EXPECT_EQ(outline->count(), 1) << "undo takes the chapter back";
 }
 
+TEST(Chapters, comeFromTheHeadingsOfMarkdownBoxes) {
+    AppController c;
+    c.newDocument();
+    auto* outline = qobject_cast<OutlineModel*>(c.outlineModel());
+    ASSERT_NE(outline, nullptr);
+    outline->setRebuildDelay(10);  // (the chapters are read again once the writing paused)
+    c.beginMarkdown(0);
+    c.updateMarkdown("# Intro\n\nSome text.\n\n## Details\n\n### Deeper\n\n#### Too deep for the contents\n");
+    c.endMarkdown(true);
+    processEvents(40);
+    ASSERT_EQ(outline->count(), 3);
+    EXPECT_EQ(outline->data(outline->index(0), OutlineModel::TitleRole).toString(), "Intro");
+    EXPECT_EQ(outline->data(outline->index(0), OutlineModel::LevelRole).toInt(), 0);
+    EXPECT_EQ(outline->data(outline->index(1), OutlineModel::TitleRole).toString(), "Details");
+    EXPECT_EQ(outline->data(outline->index(1), OutlineModel::LevelRole).toInt(), 1);
+    EXPECT_EQ(outline->data(outline->index(2), OutlineModel::TitleRole).toString(), "Deeper");
+    EXPECT_EQ(outline->data(outline->index(2), OutlineModel::LevelRole).toInt(), 2);
+}
+
 TEST(PageLinks, followTheirPagesWhenPagesChange) {
     AppController c;
     c.newDocument();

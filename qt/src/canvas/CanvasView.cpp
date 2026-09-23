@@ -33,15 +33,18 @@
 #include "model/Image.h"
 #include "model/Text.h"
 #include "gui/XournalppCursor.h"
+#include "undo/TextBoxUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "undo/DeleteUndoAction.h"
 #include "model/Stroke.h"
 #include "control/ToolHandler.h"
+#include "control/layer/LayerController.h"
 #include "control/tools/CursorSelectionType.h"
 #include "control/tools/EditSelection.h"
 #include "control/settings/Settings.h"
 #include "util/TextLinks.h"
 #include "model/Document.h"
+#include "model/MarkdownText.h"
 #include "model/DocumentChangeType.h"
 #include "render/RenderService.h"
 
@@ -49,8 +52,11 @@
 
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
+#include "MarkdownEditor.h"
+#include "MdBox.h"
 #include "Perf.h"
 #include "TextEditor.h"
+#include "TextFlow.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
@@ -108,7 +114,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     // Another tool ends the text editing (upstream: ToolHandler listener).
     connect(&session.getApp(), &AppContext::activeToolChanged, this, [this] {
-        if (textEditor && this->session.getToolHandler()->getToolType() != TOOL_TEXT) {
+        if ((textEditor || markdownEditor) && this->session.getToolHandler()->getToolType() != TOOL_TEXT) {
             endTextEditing();
         }
     });
@@ -219,7 +225,11 @@ DocumentLayout::Config CanvasView::layoutConfig() const {
 
 void CanvasView::clearSelection() {
     // Deleting the EditSelection puts the elements back into their layer.
+    const bool ofMarkdown = selection && markdownSelection && markdownSelection->selection == selection.get();
     selection.reset();
+    if (ofMarkdown) {
+        endMarkdownSelection();
+    }
     session.getCursor()->setMouseSelectionType(CURSOR_SELECTION_NONE);
     session.getToolHandler()->setSelectionEditTools(false, false, false, false);
     ++selectionRev;
@@ -608,7 +618,61 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
     viewController.fitWidth();
 }
 
+bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
+    Document* doc = session.getDocument();
+    const PageRef p = page.getPage();
+    Layer* layer = nullptr;
+    const Text* hit = nullptr;
+    std::optional<size_t> mark;
+    {
+        std::shared_lock lock(*doc);
+        layer = md::markdownLayer(p);
+        if (!layer || !layer->isVisible()) {
+            return false;
+        }
+        for (const Element* e: layer->getElementsView()) {
+            const auto* text = static_cast<const Text*>(e);
+            if (e->getType() == ELEMENT_TEXT && !text->isInEditing()) {
+                if (const auto m = md::checkBoxAt(*text, x, y)) {
+                    hit = text;
+                    mark = m;
+                }
+            }
+        }
+    }
+    if (!hit) {
+        return false;
+    }
+    // The box again with the task switched (the same length: pages and other boxes stay as they are)
+    auto switched = hit->cloneText();
+    switched->setText(md::toggledTask(hit->getText(), *mark));
+    Text* now = switched.get();
+    ElementPtr before;
+    {
+        std::unique_lock lock(*doc);
+        auto [old, index] = layer->removeElement(hit);
+        before = std::move(old);
+        layer->insertElement(std::move(switched), index);
+    }
+    session.getUndoRedoHandler()->addUndoAction(std::make_unique<TextBoxUndoAction>(p, layer, now, std::move(before)));
+    p->firePageChanged();
+    if (const auto idx = indexOf(&page)) {
+        session.firePageChanged(*idx);
+    }
+    return true;
+}
+
 bool CanvasView::tapAt(QPointF viewPos) {
+    // A task's check box in a Markdown text: switched
+    if (CanvasPage* page = pageAt(viewPos)) {
+        if (const auto idx = indexOf(page)) {
+            const QRectF r = pageViewRect(*idx);
+            const double zoom = viewController.zoom();
+            if (toggleMarkdownCheckBox(*page, (viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom)) {
+                return true;
+            }
+        }
+    }
     // A web address in a text on the page comes first: it lies on top of the PDF
     if (auto text = textLinkAt(viewPos)) {
         Q_EMIT linkTapped(text->uri, text->page, text->viewRect);
@@ -644,6 +708,23 @@ std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) co
                 continue;
             }
             const auto* text = static_cast<const Text*>(element);
+            if (text->isMarkdown()) {
+                // A Markdown box: the links of what is drawn (not of the source)
+                if (const auto hit = md::linkAt(*text, onPage.x(), onPage.y())) {
+                    LinkTarget target;
+                    target.pdfPage = -1;
+                    target.page = -1;
+                    target.uri = QString::fromStdString(hit->target);
+                    if (target.uri.startsWith(QLatin1String("#Page:"))) {  // a page of this document
+                        target.page = target.uri.mid(6).toInt() - 1;
+                        target.uri.clear();
+                    }
+                    target.viewRect = QRectF(pageRect.x() + hit->x * zoom, pageRect.y() + hit->y * zoom,
+                                             hit->width * zoom, hit->height * zoom);
+                    return target;
+                }
+                continue;
+            }
             const auto& box = text->getBoundingBox();
             if (onPage.x() < box.x || onPage.x() > box.x + box.width || onPage.y() < box.y ||
                 onPage.y() > box.y + box.height) {
@@ -1109,12 +1190,90 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
         }
         endTextEditing();
     }
-    textEditor = std::make_unique<TextEditor>(session, page, x, y);
+    if (markdownEditor) {
+        // (on the text being written, also on its other pages: a check box, or the cursor goes there)
+        if (markdownEditor->toggleCheckBox(page, x, y) || markdownEditor->tap(page, x, y)) {
+            return;
+        }
+        endTextEditing();
+    }
+    const auto idx = indexOf(&page);
+    if (!idx || toggleMarkdownCheckBox(page, x, y)) {
+        return;
+    }
+    // Markdown: the page's text and text boxes, written on the page (formatted while typing) or beside it
+    const bool onPageText = markdownBoxAt(page, x, y);
+    bool onBox = false;
+    bool onText = false;
+    {
+        std::shared_lock lock(*session.getDocument());
+        const PageRef p = page.getPage();
+        const Layer* mdLayer = md::markdownLayer(p);
+        onBox = mdLayer && mdLayer->isVisible() && md::boxAt(*mdLayer, x, y);
+        for (const Element* e: p->getSelectedLayer()->getElementsView()) {
+            onText = onText || (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y));
+        }
+    }
+    if (onPageText || onBox || (markdownText && !onText)) {  // (an ordinary text there is edited as it is)
+        if (markdownInPanel) {
+            if (onPageText) {
+                Q_EMIT markdownRequested(static_cast<int>(*idx));
+            } else {
+                Q_EMIT markdownBoxRequested(static_cast<int>(*idx), x, y);
+            }
+        } else {
+            startMarkdown(*idx, onPageText, x, y);
+        }
+        return;
+    }
+    TextEditor::NewText how;
+    how.markdown = markdownText;
+    how.markdownSize = markdownTextSize;
+    textEditor = std::make_unique<TextEditor>(session, page, x, y, how);
     page.addOverlayView(textEditor->createView());
     Q_EMIT textEditingChanged(true);
 }
 
+bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
+    std::shared_lock lock(*session.getDocument());
+    const PageRef p = page.getPage();
+    const Layer* layer = md::markdownLayer(p);
+    if (!layer || !layer->isVisible()) {
+        return false;
+    }
+    const Text* box = md::pageBoxOf(*layer, TextFlow::styleFor(p, TextFlow::Style{}).leftMargin, TextFlow::MARGIN);
+    return box && box == md::boxAt(*layer, x, y);
+}
+
+void CanvasView::startMarkdown(size_t pageNo, bool pageText, double x, double y) {
+    endTextEditing();
+    md::Style style;
+    // The text tool's font (the family: its name may have a style, e.g. "Sans Bold") and color, the Markdown size
+    PangoFontDescription* d = pango_font_description_from_string(session.getSettings()->getFont().getName().c_str());
+    if (const char* family = pango_font_description_get_family(d); family && *family) {
+        style.family = family;
+    }
+    pango_font_description_free(d);
+    style.size = markdownTextSize;
+    style.color = pageText ? Color(0, 0, 0) : session.getToolHandler()->getColor();
+    markdownEditor = std::make_unique<MarkdownEditor>(*this, session, pageNo, pageText, x, y, style);
+    Q_EMIT textEditingChanged(true);
+    Q_EMIT updateRequested();
+}
+
+void CanvasView::setMarkdownText(bool markdown, double size, bool inPanel) {
+    markdownText = markdown;
+    markdownTextSize = size;
+    markdownInPanel = inPanel;
+}
+
 void CanvasView::endTextEditing() {
+    if (markdownEditor) {
+        auto editor = std::move(markdownEditor);  // (null while it finishes: finishing may end text editing again)
+        editor.reset();                           // finishes (one undo step)
+        Q_EMIT textEditingChanged(false);
+        Q_EMIT updateRequested();
+    }
     if (!textEditor) {
         return;
     }
@@ -1123,6 +1282,13 @@ void CanvasView::endTextEditing() {
     textEditor.reset();  // finishes (undo action)
     Q_EMIT textEditingChanged(false);
     Q_EMIT updateRequested();
+}
+
+CanvasTextInput* CanvasView::getTextInput() const {
+    if (textEditor) {
+        return textEditor.get();
+    }
+    return markdownEditor.get();
 }
 
 double CanvasView::getZoom() const { return viewController.zoom(); }
@@ -1486,6 +1652,97 @@ void CanvasView::pageDeleted(size_t page) {
     geometry.pagesChanged();
 }
 
-void CanvasView::pageSelected(size_t) {}
+void CanvasView::pageSelected(size_t pageNo) {
+    // A selection of Markdown texts moved to another page is dropped into that page's Markdown layer (made if
+    // needed): it is its selected layer for now.
+    if (!selection || !markdownSelection || markdownSelection->selection != selection.get()) {
+        return;
+    }
+    Document* doc = session.getDocument();
+    PageRef page;
+    {
+        std::shared_lock lock(*doc);
+        page = doc->getPage(pageNo);
+    }
+    if (!page || std::any_of(markdownSelection->pages.begin(), markdownSelection->pages.end(),
+                             [&](const auto& p) { return p.page == page; })) {
+        return;
+    }
+    MarkdownSelection::Page entry;
+    entry.page = page;
+    Layer* layer = nullptr;
+    {
+        std::shared_lock lock(*doc);
+        layer = md::markdownLayer(page);
+        entry.before = page->getSelectedLayerId();
+    }
+    if (!layer) {
+        layer = new Layer();
+        layer->setName(std::string(xoj::markdown::LAYER_NAME));
+        session.getLayerController()->insertLayer(page, layer, 0);  // (locks the document)
+        entry.created = layer;
+        entry.before = entry.before > 0 ? entry.before + 1 : 0;
+    }
+    {
+        std::unique_lock lock(*doc);
+        const auto& layers = page->getLayers();
+        page->setSelectedLayerId(static_cast<Layer::Index>(
+                std::distance(layers.begin(), std::find(layers.begin(), layers.end(), layer)) + 1));
+    }
+    markdownSelection->pages.push_back(entry);
+}
+
+std::optional<Layer::Index> CanvasView::selectMarkdownLayer(const PageRef& page) {
+    std::unique_lock lock(*session.getDocument());
+    const Layer* layer = md::markdownLayer(page);
+    if (!layer || !layer->isVisible() || page->getSelectedLayer() == layer) {
+        return std::nullopt;
+    }
+    const Layer::Index before = page->getSelectedLayerId();
+    const auto& layers = page->getLayers();
+    page->setSelectedLayerId(static_cast<Layer::Index>(
+            std::distance(layers.begin(), std::find(layers.begin(), layers.end(), layer)) + 1));
+    return before;
+}
+
+void CanvasView::restoreSelectedLayer(const PageRef& page, Layer::Index layer) {
+    {
+        std::unique_lock lock(*session.getDocument());
+        page->setSelectedLayerId(layer);
+    }
+    session.getLayerController()->fireRebuildLayerMenu();  // (the layer list shows the selected layer)
+}
+
+bool CanvasView::isMarkdownLayer(const PageRef& page, Layer::Index layer) const {
+    std::shared_lock lock(*session.getDocument());
+    const auto& layers = page->getLayers();
+    return layer >= 1 && layer <= layers.size() && md::isMarkdownLayer(*layers[layer - 1]);
+}
+
+void CanvasView::markdownSelectionMade(const PageRef& page, Layer::Index before) {
+    if (!selection || isMarkdownLayer(page, before)) {
+        return;
+    }
+    markdownSelection = MarkdownSelection{selection.get(), {{page, before, nullptr}}};
+}
+
+void CanvasView::endMarkdownSelection() {
+    auto ended = std::move(markdownSelection);
+    markdownSelection.reset();
+    if (!ended) {
+        return;
+    }
+    for (const auto& p: ended->pages) {
+        Layer::Index before = p.before;
+        if (p.created && p.created->getElements().empty()) {  // made for a move that went elsewhere
+            session.getLayerController()->removeLayer(p.page, p.created);  // (locks the document)
+            delete p.created;
+            before = before > 0 ? before - 1 : 0;
+        }
+        std::unique_lock lock(*session.getDocument());
+        p.page->setSelectedLayerId(std::min<Layer::Index>(before, p.page->getLayerCount()));
+    }
+    session.getLayerController()->fireRebuildLayerMenu();  // (the layer list shows the selected layer)
+}
 
 }  // namespace xqt

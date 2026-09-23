@@ -3,7 +3,8 @@
  *
  * They come from the document itself, so nothing is stored beside it and Xournal++ keeps everything:
  *  - a text that begins with "# ", "## " or "### " (the level is the number of marks), and
- *  - the headings of the text mode (bold, 24 / 18 / 15 pt).
+ *  - the headings of the text mode (bold, 24 / 18 / 15 pt), and
+ *  - the headings 1-3 of Markdown boxes.
  * The contents sidebar and the contents overview show them when the document has no PDF table of contents.
  *
  * @license GNU GPLv2 or later

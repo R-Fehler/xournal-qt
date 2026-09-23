@@ -9,6 +9,7 @@
 #include "model/AudioContent.h"  // for AudioContent
 #include "model/Element.h"        // for ELEMENT_TEXT, Eleme...
 #include "model/Font.h"           // for XojFont
+#include "model/MarkdownText.h"   // xournal-qt: for sizer
 #include "pdf/base/XojPdfPage.h"  // for XojPdfRectangle
 #include "util/Rectangle.h"       // for Rectangle
 #include "util/Stacktrace.h"      // for Stacktrace
@@ -36,6 +37,7 @@ auto Text::cloneText() const -> std::unique_ptr<Text> {
     text->font = this->font;
     text->text = this->text;
     text->inEditing = this->inEditing;
+    text->markdown = this->markdown;
     text->wrapWidth = this->wrapWidth;
     text->align = this->align;
     text->justify = this->justify;
@@ -97,7 +99,25 @@ Text::Boxes Text::computeBoxesForLayout(PangoLayout* layout, double wrapWidth) {
     return res;
 }
 
+void Text::setMarkdown(bool m) {
+    if (m != this->markdown) {
+        this->markdown = m;
+        this->sizeCalculated = false;
+    }
+}
+
 void Text::calcSize() const {
+    // xournal-qt: a Markdown text is as big as it is drawn
+    if (xoj::markdown::Sizer sizer = this->markdown ? xoj::markdown::sizer.load(std::memory_order_acquire) : nullptr) {
+        const xoj::markdown::Size s = sizer(*this);
+        this->naturalSize = {s.width, s.height};
+        this->effectiveBounds = xoj::util::Rectangle<double>{0, 0, s.width, s.height};
+        const auto& matrix = this->getTransformation();
+        this->boundingBox = matrix * this->effectiveBounds;
+        this->snappedBounds = matrix * xoj::util::Rectangle<double>{{0, 0}, this->naturalSize};
+        this->sizeCalculated = true;
+        return;
+    }
     auto layout = createPangoLayout();
     pango_layout_set_text(layout.get(), this->text.c_str(), static_cast<int>(this->text.length()));
 

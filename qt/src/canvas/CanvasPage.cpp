@@ -36,6 +36,7 @@
 #include "view/overlays/OverlayView.h"
 
 #include "CanvasView.h"
+#include "MdBox.h"
 #include "TextEditor.h"
 #include "render/RenderService.h"
 #include "session/DocumentSession.h"
@@ -191,6 +192,7 @@ bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggreg
         }
         return minDistance != ACTION_RADIUS;
     };
+    std::optional<Layer::Index> markdownBefore;  // xournal-qt: a Markdown text (see CanvasView::selectMarkdownLayer)
     {
         std::shared_lock lock(*ctrl.getDocument());
         if (multiLayer && !aggregate) {
@@ -198,13 +200,22 @@ bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggreg
             size_t layerNo = layers.size();
             for (auto l = layers.rbegin(); l != layers.rend(); l++, layerNo--) {
                 if (checkLayer(*l)) {
+                    const auto found = as_unsigned(std::distance(l, layers.rend()));
+                    if (md::isMarkdownLayer(**l)) {
+                        markdownBefore = page->getSelectedLayerId();
+                    }
                     lock.unlock();
-                    ctrl.getLayerController()->switchToLay(as_unsigned(std::distance(l, layers.rend())));
+                    ctrl.getLayerController()->switchToLay(found);
                     break;
                 }
             }
-        } else {
-            checkLayer(page->getSelectedLayer());
+        } else if (!checkLayer(page->getSelectedLayer()) && !aggregate) {
+            // Nothing in the selected layer: a Markdown text
+            const Layer* mdLayer = md::markdownLayer(page);
+            if (mdLayer && mdLayer->isVisible() && mdLayer != page->getSelectedLayer() && checkLayer(mdLayer)) {
+                lock.unlock();
+                markdownBefore = view.selectMarkdownLayer(page);
+            }
         }
     }
     if (!match) {
@@ -216,6 +227,9 @@ bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggreg
     } else {
         auto sel = SelectionFactory::createFromElementOnActiveLayer(&ctrl, page, this, match, matchIndex);
         view.setSelection(sel.release());
+        if (markdownBefore) {
+            view.markdownSelectionMade(page, *markdownBefore);
+        }
     }
     repaintPage();
     return true;
@@ -260,8 +274,8 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
         this->selector->currentPos(x, y);
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextMove(*this, x, y);
-    } else if (TextEditor* editor = view.getTextEditor(); editor && &editor->getPage() == this &&
-                                                            h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
+    } else if (CanvasTextInput* editor = view.getTextInput(); editor && &editor->getPage() == this &&
+                                                                h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
         editor->mouseMoved(x, y);  // drag: select text
     } else if (h->getToolType() == TOOL_ERASER && h->getEraserType() != ERASER_TYPE_WHITEOUT && this->inEraser) {
         this->eraser->erase(x, y);
@@ -295,7 +309,21 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
     if (this->selector) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)
         const bool aggregate = pos.isShiftDown() && view.getSelection();
-        const size_t layerOfFinalizedSel = this->selector->finalize(this->page, aggregate, control.getDocument());
+        size_t layerOfFinalizedSel = this->selector->finalize(this->page, aggregate, control.getDocument());
+        // xournal-qt: nothing in the selected layer: Markdown texts (in the page's layer "Markdown")
+        std::optional<Layer::Index> markdownBefore;
+        if (!layerOfFinalizedSel && !aggregate && !selector->userTapped(getZoom())) {
+            markdownBefore = view.selectMarkdownLayer(this->page);
+            if (markdownBefore) {
+                layerOfFinalizedSel = this->selector->finalize(this->page, true, control.getDocument());
+                if (!layerOfFinalizedSel) {
+                    view.restoreSelectedLayer(this->page, *markdownBefore);
+                    markdownBefore.reset();
+                }
+            }
+        } else if (layerOfFinalizedSel && !aggregate && view.isMarkdownLayer(this->page, layerOfFinalizedSel)) {
+            markdownBefore = this->page->getSelectedLayerId();  // (a multi-layer selector found Markdown texts)
+        }
         if (layerOfFinalizedSel) {
             if (aggregate) {
                 auto sel = selector->releaseElements();
@@ -307,6 +335,9 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
                 view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, page, this,
                                                                                     selector->releaseElements())
                                           .release());
+                if (markdownBefore) {
+                    view.markdownSelectionMade(this->page, *markdownBefore);
+                }
             }
         } else if (const double zoom = getZoom(); selector->userTapped(zoom)) {
             selectObjectAt(pos.x / zoom, pos.y / zoom, this->selector->isMultiLayerSelection(), aggregate);

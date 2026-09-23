@@ -11,6 +11,8 @@
  */
 #pragma once
 
+#include "model/Layer.h"
+
 #include <memory>
 #include <optional>
 
@@ -21,6 +23,8 @@
 #include <cairo.h>
 
 #include "model/OverlayBase.h"
+
+#include "CanvasTextInput.h"
 #include "model/PageRef.h"
 #include "util/Rectangle.h"
 
@@ -38,34 +42,48 @@ namespace xqt {
 class CanvasPage;
 class DocumentSession;
 
-class TextEditor final: public OverlayBase {
+/// How the text tool makes a new text.
+struct NewTextOptions {
+    /// A Markdown text (a text box in the page's layer "Markdown", drawn formatted when not being edited): with
+    /// this font size, as wide as there is room up to the right margin.
+    bool markdown = false;
+    double markdownSize = 10;
+};
+
+class TextEditor final: public CanvasTextInput {
 public:
-    /// Start editing at a page position (points): the text there, or a new one.
-    TextEditor(DocumentSession& session, CanvasPage& page, double x, double y);
+    using NewText = NewTextOptions;
+    /// Start editing at a page position (points): the text there (a Markdown text drawn there, or a text of the
+    /// selected layer), or a new one.
+    TextEditor(DocumentSession& session, CanvasPage& page, double x, double y, const NewText& how = {});
     /// Finishes the edition (undo action; an empty text is removed).
     ~TextEditor() override;
 
-    CanvasPage& getPage() const { return page; }
+    CanvasPage& getPage() const override { return page; }
     /// The view drawing the text being edited, for the page's overlays.
     std::unique_ptr<xoj::view::OverlayView> createView();
 
     /// The point (page coordinates) is on the edited text box (upstream isEventInEditor).
-    bool contains(double x, double y) const;
-    void mousePressed(double x, double y);
-    void mouseMoved(double x, double y);
+    bool contains(double x, double y) const override;
+    void mousePressed(double x, double y) override;
+    void mouseMoved(double x, double y) override;
 
     /// Returns false if the key is not for the editor. `finish` is set for Escape.
-    bool keyPressed(const QKeyEvent* e, bool& finish);
+    bool keyPressed(const QKeyEvent* e, bool& finish) override;
     /// Whether the editor wants this key instead of an application shortcut.
     static bool wantsKey(const QKeyEvent* e);
-    void inputMethodEvent(const QInputMethodEvent* e);
+    bool wantsKeyEvent(const QKeyEvent* e) const override { return wantsKey(e); }
+    void inputMethodEvent(const QInputMethodEvent* e) override;
     /// `cursorRect`: the cursor in page coordinates.
-    QVariant inputMethodQuery(Qt::InputMethodQuery query) const;
-    QRectF cursorRectOnPage() const;
+    QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
+    QRectF cursorRectOnPage() const override;
 
     void setFont(const XojFont& font);
     void setColor(uint32_t argb);
     const QString& text() const { return content; }
+    /// A Markdown text is edited (its source).
+    bool isMarkdown() const { return markdown; }
+    double fontSize() const;
 
     /// Draws the text, the selection, the preedit text and the cursor (page coordinates).
     void paint(cairo_t* cr) const;
@@ -85,10 +103,16 @@ private:
     int toUtf8(int qIndex) const;
     int fromUtf8(int byteIndex) const;
     void finalize();
+    void finalizeText();
+    void useMarkdownLayer();
 
     DocumentSession& session;
     CanvasPage& page;
     PageRef pageRef;
+    Layer* layer = nullptr;             ///< where the text is / goes
+    bool markdown = false;
+    bool createdLayer = false;          ///< the Markdown layer was made for this text
+    Layer::Index selectedBefore = 0;
     std::unique_ptr<Text> textElement;  ///< the copy being edited
     Text* original = nullptr;           ///< the element in the layer (nullptr: new text)
     QString content;
