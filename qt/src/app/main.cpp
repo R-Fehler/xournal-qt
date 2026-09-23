@@ -125,6 +125,7 @@ int main(int argc, char* argv[]) {
     engine.addImageProvider("preview", new xqt::PreviewProvider);
     engine.addImageProvider("hitpage", new xqt::HitPageProvider);
     engine.rootContext()->setContextProperty("app", &controller);
+    AppController::setStartMaximized(true);
     // Undocked documents get a window of their own: the same QML, with their own controller as "app".
     AppController::setWindowFactory([&engine](AppController* window) {
         auto* context = new QQmlContext(engine.rootContext(), window);

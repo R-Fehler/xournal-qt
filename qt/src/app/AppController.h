@@ -57,6 +57,8 @@ class AppController: public QObject {
     Q_OBJECT
     /// A window of its own for undocked documents: no home screen, it closes with its last tab.
     Q_PROPERTY(bool secondaryWindow READ isSecondary CONSTANT)
+    /// Windows open maximized (set by main(); the tests keep their fixed window size)
+    Q_PROPERTY(bool startMaximized READ startMaximized CONSTANT)
     Q_PROPERTY(QObject* tabs READ tabsModel CONSTANT)
     /// Pages of the current tab (for the page sidebar).
     Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
@@ -518,6 +520,9 @@ public:
     bool isSecondary() const { return primary != nullptr; }
     /// Makes the windows of undocked documents. Set once, from main().
     static void setWindowFactory(std::function<void(AppController*)> factory);
+    /// Open windows maximized (people make them smaller with the tiling of their desktop). Set once, from main().
+    static void setStartMaximized(bool on);
+    bool startMaximized() const;
     /// Move the tab into a window of its own (a new one). Does nothing for the last tab of such a window.
     /// Close every tab of this window (unsaved changes are the UI's business).
     Q_INVOKABLE void closeAllTabs();
