@@ -459,3 +459,18 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] Write on the page (the text tool on the text), the cursor in a paragraph with `**bold**` in it; open the search
       and search a word after the bold one: its box is on the word as shown with its `**`. Press Escape: after a
       moment the box moves onto the word as formatted.
+
+## Pasted PDF pages stay searchable (qt/pdf-pages)
+- [ ] Open a lecture PDF with its `.xopp` (a document of the library) and another PDF with text. In the other PDF,
+      copy a page (sidebar or page grid, Ctrl+C), go to the lecture and paste it (Ctrl+V). The note says the page
+      was pasted and that its PDF pages are kept in `.lecture.pages.pdf` next to the document; it is readable and
+      wraps in a narrow window. The pasted page looks as in the other PDF (sharp at any zoom, not a picture).
+- [ ] Search (Ctrl+F) a word of the pasted page: it is found, marked on the page, in the sidebar and in the page grid.
+      Mark PDF text on the pasted page (select, copy text, highlight): works as on the lecture's own pages.
+- [ ] The lecture's own PDF (`lecture.pdf`) is unchanged: same size and date in the file manager.
+- [ ] Paste pages from two more PDFs, and the same page twice: the folder has one `.lecture.pages.pdf` (show hidden
+      files), no other new files. Undo the pastes and redo them: the pages come and go as before.
+- [ ] A document without PDF (a new document, saved): paste a PDF page. A `name.pdf` appears next to the `.xopp`,
+      and the library still shows one card for the document.
+- [ ] A new document, never saved: paste a PDF page. It shows and its text is found; the note says the pages are
+      saved next to the document. The tab is still "Untitled".

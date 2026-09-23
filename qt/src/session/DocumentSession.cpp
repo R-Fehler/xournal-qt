@@ -38,7 +38,9 @@
 
 #include "AppContext.h"
 #include "DocumentSearch.h"
+#include "MergedPdf.h"
 #include "PageOrderUndoAction.h"
+#include "PdfPageKeeper.h"
 #include "config.h"  // for FILE_FORMAT_VERSION
 
 namespace xqt {
@@ -158,6 +160,7 @@ void DocumentSession::init() {
     layerController->registerListener(this);
     pageLinkKeeper = std::make_unique<PageLinkKeeper>(*this);
     pageRevisionKeeper = std::make_unique<PageRevisionKeeper>(*this);
+    pdfPages = std::make_unique<PdfPageKeeper>(*this);  // (after the revisions: it hears pages that come after them)
 
     scrollHandler.indexOf = [this](const PageRef& page) { return doc->indexOf(page); };
     scrollHandler.onScrollToPage = [this](size_t page, XojPdfRectangle) {
@@ -712,6 +715,24 @@ bool DocumentSession::hasFilePath() const { return !getFilePath().empty(); }
 
 fs::path DocumentSession::suggestSavePath() const {
     Settings* settings = getSettings();
+    fs::path background;
+    {
+        std::shared_lock lock(*doc);
+        background = doc->getPdfFilepath();
+    }
+    if (!hasFilePath() && MergedPdf::inCache(background)) {
+        // The merged PDF of pasted pages is no place to save: as for the PDF it was made from, or a new document
+        Document shown(&detachedHandler());
+        if (const fs::path pdf = annotatedPdf(); !pdf.empty()) {
+            shown.setPdfAttributes(pdf, false);
+        }
+        fs::path suggested = shown.createSaveFoldername(settings->getLastSavePath());
+        suggested /= shown.createSaveFilename(Document::XOPP, settings->getDefaultSaveName());
+        if (suggested.extension() != ".xopp") {
+            suggested += ".xopp";
+        }
+        return suggested;
+    }
     std::shared_lock lock(*doc);
     fs::path suggested = doc->createSaveFoldername(settings->getLastSavePath());
     suggested /= doc->createSaveFilename(Document::XOPP, settings->getDefaultSaveName());
@@ -727,17 +748,21 @@ fs::path DocumentSession::getFilePath() const {
 }
 
 fs::path DocumentSession::documentFile() const {
-    std::shared_lock lock(*doc);
-    const fs::path file = doc->getFilepath();
-    return file.empty() ? doc->getPdfFilepath() : file;
+    const fs::path file = getFilePath();
+    return file.empty() ? annotatedPdf() : file;
 }
+
+size_t DocumentSession::addPdfPages(const std::string& pdf, std::string& error) { return pdfPages->add(pdf, error); }
+
+fs::path DocumentSession::annotatedPdf() const { return pdfPages->annotatedPdf(); }
 
 std::string DocumentSession::getDisplayName() const {
     std::shared_lock lock(*doc);
     if (auto p = doc->getFilepath(); !p.empty()) {
         return p.filename().u8string().empty() ? std::string() : char_cast(p.filename().u8string().c_str());
     }
-    if (auto pdf = doc->getPdfFilepath(); !pdf.empty()) {
+    lock.unlock();
+    if (auto pdf = annotatedPdf(); !pdf.empty()) {
         return char_cast(pdf.filename().u8string().c_str());
     }
     return _("Untitled");

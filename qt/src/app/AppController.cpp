@@ -57,6 +57,7 @@
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "TextFlow.h"
+#include "session/MergedPdf.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
 #include "shell/PageFilterModel.h"
@@ -564,7 +565,7 @@ void AppController::copyPages(const QList<int>& list) {
         return;
     }
     const auto indices = pageList(list);
-    pageClipboard->copy(*session()->getDocument(), indices);
+    pageClipboard->copy(*session(), indices);
     Q_EMIT copiedPagesChanged();
     Q_EMIT pageActionDone(indices.size() == 1 ? tr("Page copied") : tr("%1 pages copied").arg(indices.size()), false);
 }
@@ -582,7 +583,8 @@ int AppController::pastePages(int position) {
         const QList<int> sel = pages->selectedPages();
         position = (sel.isEmpty() ? static_cast<int>(session()->getCurrentPageNo()) : sel.last()) + 1;
     }
-    auto copies = pageClipboard->pagesFor(*session()->getDocument());
+    fs::path keptIn;  // PDF pages from another PDF: the document's merged PDF
+    auto copies = pageClipboard->pagesFor(*session(), &keptIn);
     const int n = static_cast<int>(copies.size());
     session()->insertPages(copies, static_cast<size_t>(position));
     QList<int> pasted;
@@ -590,7 +592,15 @@ int AppController::pastePages(int position) {
         pasted.append(position + i);
     }
     pages->selectPages(pasted);
-    Q_EMIT pageActionDone(n == 1 ? tr("Page pasted") : tr("%1 pages pasted").arg(n), true);
+    QString note = n == 1 ? tr("Page pasted") : tr("%1 pages pasted").arg(n);
+    if (!keptIn.empty()) {
+        // Once per paste: where the PDF pages went (a new file next to the document)
+        note = MergedPdf::inCache(keptIn)
+                       ? tr("%1. Its PDF text stays searchable: the PDF pages are saved next to the document.").arg(note)
+                       : tr("%1. Its PDF text stays searchable: the PDF pages are kept in %2 next to the document.")
+                                 .arg(note, QString::fromStdString(keptIn.filename().string()));
+    }
+    Q_EMIT pageActionDone(note, true);
     return n;
 }
 
@@ -646,8 +656,8 @@ void AppController::duplicatePages(const QList<int>& list) {
     }
     const auto indices = pageList(list);
     PageClipboard copies;  // (not the user's clipboard)
-    copies.copy(*session()->getDocument(), indices);
-    auto newPages = copies.pagesFor(*session()->getDocument());
+    copies.copy(*session(), indices, /*withPdf=*/false);
+    auto newPages = copies.pagesFor(*session());
     const size_t position = indices.back() + 1;
     session()->insertPages(newPages, position);
     QList<int> added;
@@ -2030,7 +2040,7 @@ QUrl AppController::suggestedExportFile() const {
     if (session()->hasFilePath()) {
         target = session()->getFilePath();
         target.replace_extension(".pdf");
-    } else if (const fs::path pdf = session()->getDocument()->getPdfFilepath(); !pdf.empty()) {
+    } else if (const fs::path pdf = session()->annotatedPdf(); !pdf.empty()) {
         target = pdf.parent_path() / (pdf.stem().string() + "_annotated.pdf");  // never the background PDF itself
     } else {
         target = session()->suggestSavePath();
@@ -2211,7 +2221,7 @@ QUrl AppController::suggestedSaveFile() const {
     fs::path suggested = session()->suggestSavePath();
     // A document that was never saved and does not annotate a PDF belongs in the library of this window. Upstream
     // suggests the folder something was saved to last, which is shared by all libraries and windows.
-    if (!session()->hasFilePath() && session()->getDocument()->getPdfFilepath().empty() && library->available()) {
+    if (!session()->hasFilePath() && session()->annotatedPdf().empty() && library->available()) {
         suggested = fs::path(library->rootPath().toStdString()) / suggested.filename();
     }
     return QUrl::fromLocalFile(QString::fromStdString(suggested.string()));

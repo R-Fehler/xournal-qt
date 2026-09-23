@@ -16,6 +16,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfPageKeeper.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfPageKeeper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HeadlessViews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.h

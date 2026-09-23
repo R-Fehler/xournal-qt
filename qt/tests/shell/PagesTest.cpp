@@ -510,7 +510,7 @@ TEST(Pages, copyPasteDeleteMoveWithPageUndo) {
     EXPECT_TRUE(c.canRedoPages());
 }
 
-TEST(Pages, pdfPagesPastedIntoAnotherDocumentBecomeImages) {
+TEST(Pages, pdfPagesPastedIntoAnotherDocumentStayPdfPages) {
     AppController c;
     c.newDocument();
     ASSERT_TRUE(c.openPath(fixture(u8"packaged_xopp/pdfBackground/old.xopp")));
@@ -524,9 +524,9 @@ TEST(Pages, pdfPagesPastedIntoAnotherDocumentBecomeImages) {
     ASSERT_EQ(c.pastePages(1), 1);
     DocumentSession* other = c.tabManager().currentSession();
     auto page = other->getDocument()->getPage(1);
-    EXPECT_TRUE(page->getBackgroundType().isImagePage());
-    EXPECT_FALSE(page->getBackgroundImage().isEmpty());
-    // The image shows the PDF page (the thumbnail has the dark shapes of the test PDF).
+    EXPECT_TRUE(page->getBackgroundType().isPdfPage()) << "a PDF page of the new document's merged PDF";
+    EXPECT_EQ(other->getDocument()->getPdfPageCount(), 1u);
+    // It shows the PDF page (the thumbnail has the dark shapes of the test PDF).
     const QImage thumb = ThumbnailProvider::render(*other, 1, 120);
     int dark = 0;
     for (int y = 0; y < thumb.height(); ++y) {

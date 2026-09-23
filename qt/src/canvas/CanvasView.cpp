@@ -1649,6 +1649,9 @@ void CanvasView::documentChanged(DocumentChangeType type) {
     if (type == DOCUMENT_CHANGE_CLEARED || type == DOCUMENT_CHANGE_COMPLETE) {
         recreatePdfCache();
         rebuildPages();
+    } else if (type == DOCUMENT_CHANGE_PDF_BOOKMARKS) {
+        // Another background PDF was loaded (pasted PDF pages joined the merged PDF): the caches hold the old one
+        recreatePdfCache();
     }
 }
 
