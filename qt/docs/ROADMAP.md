@@ -139,6 +139,19 @@
   - Measured on a generated library of 303 documents in 30 folders: 17.6 MB in 606 files → 11.9 MB in 94 files;
     the PDF text is 3.5× smaller; cold open 54–75 → 37–39 ms; editing one `.xopp` writes only its folder's
     `notes.pack` (1 KB).
+- **Pasted PDF pages stay PDF pages, `qt/pdf-pages` (2026-09-24, awaiting on-device test).** qpdf-based
+  `MergedPdf` and `PdfPageKeeper`.
+  - A page pasted from another PDF is a real PDF page, with searchable and selectable text. It goes into one merged
+    PDF per document: a hidden `.name.pages.pdf` when the document annotates a PDF (the original is never
+    modified), or `name.pdf` when it had none.
+  - Until the document is saved, the merged PDF lives in the cache. On save it is moved next to the `.xopp`, and
+    pages no longer used are dropped. A renumbering save goes in steps, so a crash at any point leaves a matching
+    pair.
+  - A note on paste says where the pages are kept. The library carries the sidecar along on rename, move, copy
+    and trash.
+  - Measured: a 56-page lecture with 3 pasted pages gives a 453 KiB sidecar against the 393 KiB original.
+    Pasting into a 117 MB scan takes about 0.2 s per paste, on the UI thread.
+  - Resolves the backlog item "Searchable text in pages pasted from another PDF" (option 1).
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
