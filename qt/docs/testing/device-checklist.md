@@ -418,3 +418,6 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] One document open: no arrows beside the "all open documents" button. Open three: ‹ and › appear right of
       it; › goes to the next document and from the last one to the first (like Ctrl+PgDown), ‹ the other way. On
       the home screen, either arrow goes back to the document behind it (like the shortcut). Touch sized with a finger.
+- [ ] Tool bar (top, left and right): the full-screen button (four arrows) beside Search / Settings goes full
+      screen. Back out by finger only: tap the small tool square, then "Leave full screen" at the bottom of its
+      tools. The button is not repeated in those tools. F11 and Esc still work.

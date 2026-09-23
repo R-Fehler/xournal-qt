@@ -1343,6 +1343,46 @@ TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
     controller->selectTool("pen");
 }
 
+// Full screen from a button in the tool bar, and back out with the finger alone (no F11, no Escape)
+TEST_F(MainWindowTest, fullScreenButtonAndBackByTouch) {
+    window->setWidth(2000);  // room for the whole tool bar (it scrolls in a narrower window)
+    wait(100);
+    auto* button = findItem("fullScreenButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_TRUE(button->isVisible());
+    ASSERT_LT(button->mapToScene(QPointF(button->width(), 0)).x(), window->width()) << "in sight";
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    const auto tap = [&](QQuickItem* item) {
+        const QPoint at = item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
+        QTest::touchEvent(window, finger).press(1, at);
+        QTest::touchEvent(window, finger).release(1, at);
+        wait(80);
+    };
+    tap(button);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    ASSERT_TRUE(window->property("fullScreenMode").toBool()) << "the button goes full screen";
+
+    // The way back: the tool square, then "Leave full screen"
+    auto* square = find<QQuickItem>("quickToolSquare");
+    ASSERT_NE(square, nullptr);
+    ASSERT_TRUE(square->isVisible());
+    tap(square);
+    QObject* tools = find("quickTools");
+    ASSERT_TRUE(waitOpened(tools, true));
+    EXPECT_FALSE(button->isVisible()) << "not twice: the tools offer \"Leave full screen\" right below";
+    auto* leave = findItem("leaveFullScreenButton");
+    if (!leave) {
+        leave = find<QQuickItem>("leaveFullScreenButton");
+    }
+    ASSERT_NE(leave, nullptr);
+    ASSERT_TRUE(leave->isVisible());
+    tap(leave);
+    until([&] { return !window->property("fullScreenMode").toBool(); });
+    EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "left full screen by touch";
+    until([&] { return button->isVisible(); });
+    EXPECT_TRUE(button->isVisible()) << "back in the tool bar";
+}
+
 TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     // A 6-page PDF with an outline: "Chapter 1" p.1 (with "Section 1.1" p.3), "Chapter 2" p.5
     QTemporaryDir tmp;

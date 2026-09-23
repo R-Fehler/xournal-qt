@@ -589,6 +589,14 @@ ApplicationWindow {
             }
             ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
+            // Full screen (F11). Not inside full screen itself: the tools there end with "Leave full screen"
+            IconButton {
+                objectName: "fullScreenButton"
+                visible: !win.fullScreenMode
+                iconName: "xopp-fullscreen"
+                tip: qsTr("Full screen (F11)")
+                onClicked: win.fullScreenMode = true
+            }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
             IconButton {
                 objectName: "moreButton"
