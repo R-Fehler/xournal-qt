@@ -443,3 +443,11 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] A big PDF with the sidebar or the page grid open (many thumbnails asked for), zoomed in: close its tab, then
       close the app with such a tab open. Both happen at once (at most the page being drawn is waited for); before,
       the window froze for seconds.
+
+## Markdown code blocks and search boxes (qt/markdown-fixes)
+- [ ] Markdown written on the page, at the end of the text: type ```` ```py ````, Enter, `some code`, Enter,
+      `#stuff`, Enter. Each Enter starts one new line of the code (no blank line in between), and the grey background
+      follows. Type ```` ``` ```` and Enter: the code block is shown finished (fences hidden, grey ends at its last
+      line), the cursor is below it, outside the grey. Type a word: it appears at once where the cursor was, and the
+      cursor moves with every letter; Enter and another word as well. No need to type more or open the source beside
+      the page.

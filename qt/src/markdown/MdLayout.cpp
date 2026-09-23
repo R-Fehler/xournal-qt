@@ -120,7 +120,12 @@ public:
             top = i;
             current = {};
             const size_t first = out.items.size();
-            if (i == rawBlockIndex) {
+            if (i == rawBlockIndex && afterClosedCode(blocks[i])) {
+                // The cursor on the lines after a closed code block: the code is done (drawn as code), the cursor's
+                // line is where the next paragraph goes
+                block(blocks[i], 0, st.width, c);
+                rawBlock(nullptr, text::lineStart(source, active), rawEnd, c);
+            } else if (i == rawBlockIndex) {
                 rawBlock(&blocks[i], rawSpan.begin, rawEnd, c);
             } else {
                 block(blocks[i], 0, st.width, c);
@@ -685,11 +690,24 @@ private:
             index = addText(std::move(l), 0, y, c.color);
         }
         y += h + 2 * pad;
-        mainItem(index);
+        if (b) {
+            mainItem(index);
+        }
         out.rawItem = static_cast<int>(index);
         out.rawBegin = begin;
         out.rawEnd = rawEnd;
         margin(kind == BlockKind::Heading ? o.size * 0.45 : 0.75 * st.size);
+    }
+
+    /// Whether the cursor (`active`) is on the lines after a fenced code block that is closed (not on its lines).
+    bool afterClosedCode(const Block& b) const {
+        using namespace text;
+        if (b.kind != BlockKind::CodeBlock || !b.fenced || active < rawSpan.end || rawSpan.end == 0) {
+            return false;
+        }
+        const std::string fence = fenceOf(lineAt(source, rawSpan.begin));
+        const size_t last = lineStart(source, rawSpan.end - 1);  // (its last line)
+        return !fence.empty() && last > rawSpan.begin && closesFence(lineAt(source, last), fence);
     }
 
     static void collectRuns(const Block& b, size_t from, size_t to, std::vector<const Run*>& out) {

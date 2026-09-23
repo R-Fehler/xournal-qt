@@ -359,8 +359,18 @@ std::vector<BlockSpan> topLevelSpans(std::string_view src, const Document& doc) 
         size_t first = 0;
         if (b.textBegin != NO_SOURCE && b.textBegin >= prevEnd) {
             first = lineStart(src, b.textBegin);
-            if (b.kind == BlockKind::CodeBlock && b.fenced && first > prevEnd) {
-                first = lineStart(src, first - 1);  // the fence before the code
+            if (b.kind == BlockKind::CodeBlock && b.fenced) {
+                // The fence before the code: the code may start with blank lines (its text begins after them)
+                size_t fence = first;
+                while (fence > prevEnd) {
+                    fence = lineStart(src, fence - 1);
+                    if (!blank(lineAt(src, fence))) {
+                        break;
+                    }
+                }
+                if (fence < first && !fenceOf(lineAt(src, fence)).empty()) {
+                    first = fence;
+                }
             }
         } else {
             first = prevEnd;  // (no text, e.g. a rule: its first line that is not blank)

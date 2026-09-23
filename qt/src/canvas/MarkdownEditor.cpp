@@ -602,8 +602,22 @@ void MarkdownEditor::newLine(bool soft) {
     // In a code block: a line, indented as this one
     const md::Document doc = md::parse(t);
     const auto spans = md::topLevelSpans(t, doc);
+    // (a fence that is not closed goes on to the end of the text: the end is in the code as well)
+    const auto openFence = [&](const md::BlockSpan& span) {
+        const std::string fence = fenceOf(lineAt(t, span.begin));
+        if (fence.empty()) {
+            return false;
+        }
+        for (size_t l = nextLine(t, span.begin); l < span.end; l = nextLine(t, l)) {
+            if (closesFence(lineAt(t, l), fence)) {
+                return false;
+            }
+        }
+        return true;
+    };
     for (size_t i = 0; i < spans.size(); ++i) {
-        if (spans[i].begin <= from && from < spans[i].end && doc.root.children[i].kind == md::BlockKind::CodeBlock) {
+        const bool inside = from < spans[i].end || (from == t.size() && spans[i].end == t.size() && openFence(spans[i]));
+        if (spans[i].begin <= from && inside && doc.root.children[i].kind == md::BlockKind::CodeBlock) {
             const size_t indent = line.find_first_not_of(' ');
             insert("\n" + std::string(indent == std::string::npos ? line.size() : indent, ' '), EditKind::Other);
             return;

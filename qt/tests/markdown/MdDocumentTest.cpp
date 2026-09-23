@@ -128,3 +128,18 @@ TEST(MdDocument, TableAndLinks) {
     }
     EXPECT_EQ(linked, 2);
 }
+
+// A fenced code block whose code starts with blank lines: the block begins at its fence and ends after its closing
+// fence, and the paragraph after it is a block of its own (not swallowed by the code block).
+TEST(MdDocument, spansOfCodeThatStartsWithBlankLines) {
+    const std::string src = "Intro\n\n```py\n\nsome code\n\n#stuff\n\n```\n\nafter";
+    const Document d = parse(src);
+    ASSERT_EQ(d.root.children.size(), 3u);
+    ASSERT_EQ(d.root.children[1].kind, BlockKind::CodeBlock);
+    const auto spans = topLevelSpans(src, d);
+    ASSERT_EQ(spans.size(), 3u);
+    EXPECT_EQ(spans[1].begin, src.find("```py")) << "at its opening fence, not at the blank line after it";
+    EXPECT_EQ(spans[1].end, src.find("```\n\nafter") + 4) << "after its closing fence";
+    EXPECT_EQ(spans[2].begin, src.find("after"));
+    EXPECT_EQ(spans[2].end, src.size());
+}

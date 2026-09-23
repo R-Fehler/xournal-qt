@@ -18,7 +18,9 @@ Writing:
   drag selects. The page's text flows over its pages while it is written, and the cursor goes with it.
   - Keys:
     - Enter starts a new paragraph. In a list it starts the next item; on an empty item the list ends. In code it
-      starts a new line.
+      starts a new line (also at the end of the text, while its fence is not closed yet). After a code block's
+      closing fence, Enter leaves the code: the code is shown finished and the cursor is where the next paragraph
+      goes.
     - Shift+Enter continues the paragraph on a new line.
     - Moving: the arrows (with Ctrl, by words; Up and Down go by the lines as drawn), Home and End (with Ctrl, the
       whole text). Shift selects.

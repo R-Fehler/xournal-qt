@@ -151,3 +151,43 @@ TEST(MdLayout, checkBoxesKnowTheirMarks) {
     EXPECT_EQ(toggledTask(src, b.mark), "Tasks:\n\n- [x] open\n- [x] done\n- no task\n");
     EXPECT_EQ(toggledTask(src, l.checkBoxes[1].mark), "Tasks:\n\n- [ ] open\n- [ ] done\n- no task\n");
 }
+
+// Writing after a code block that ends the text (the cursor at the end): the paragraph being written is laid out
+// as its source, below the code block, whose grey background ends at its closing fence.
+TEST(MdLayout, writingAfterACodeBlockAtTheEnd) {
+    Style s;
+    s.width = 400;
+    for (const std::string code: {std::string("```py\nsome code\n#stuff\n```"),
+                                  std::string("```py\n\nsome code\n\n#stuff\n\n```")}) {
+        const std::string src = "Intro\n\n" + code + "\n\nafter";
+        const Layout l = layout(parse(src), s, src, src.size());
+        ASSERT_GE(l.rawItem, 0) << code;
+        const Item& raw = l.items[static_cast<size_t>(l.rawItem)];
+        EXPECT_STREQ(pango_layout_get_text(raw.layout.get()), "after") << code;
+        EXPECT_EQ(l.rawBegin, src.size() - 5) << code;
+        const Item* fill = nullptr;
+        for (const Item& it: l.items) {
+            fill = it.kind == Item::Kind::Fill ? &it : fill;
+        }
+        ASSERT_NE(fill, nullptr);
+        EXPECT_LE(fill->y + fill->height, raw.y) << code << ": the text is below the code block";
+    }
+    // Just after the closing fence (Enter pressed, nothing typed yet): the code is done and drawn as code; the
+    // cursor's empty line is below its grey background, where the next paragraph goes
+    const std::string src = "Intro\n\n```py\nsome code\n```\n\n";
+    const Layout l = layout(parse(src), s, src, src.size());
+    ASSERT_GE(l.rawItem, 0);
+    const Item& raw = l.items[static_cast<size_t>(l.rawItem)];
+    EXPECT_STREQ(pango_layout_get_text(raw.layout.get()), "");
+    EXPECT_EQ(l.rawBegin, src.size());
+    const Item* fill = nullptr;
+    for (const Item& it: l.items) {
+        fill = it.kind == Item::Kind::Fill ? &it : fill;
+    }
+    ASSERT_NE(fill, nullptr);
+    EXPECT_LE(fill->y + fill->height, raw.y) << "the cursor's line is not in the code's background";
+    const std::string typed = src + "a";
+    const Layout after = layout(parse(typed), s, typed, typed.size());
+    ASSERT_GE(after.rawItem, 0);
+    EXPECT_DOUBLE_EQ(after.items[static_cast<size_t>(after.rawItem)].y, raw.y) << "the text goes where the cursor was";
+}
