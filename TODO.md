@@ -64,7 +64,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 
 ## To decide (elaborate before building)
 
-- [ ] **Live text index for open documents** (`qt/document-search`; the author asked for it on 2026-09-24).
+- [~] **Live text index for open documents** (`qt/document-search`, started 2026-09-24; the author asked for it on 2026-09-24).
   - Why: search in an open document is much slower than library search. `DocumentSearch` calls poppler's
     `findText` on every page for every query (`DocumentSearch.cpp:128`), on the UI thread, restarting on each
     keystroke. Poppler rebuilds each page's text layout on every call and shares one lock per PDF with rendering.
@@ -81,6 +81,8 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - Risk: the scan and the rectangles must match text the same way (case, whitespace, hyphenation); otherwise
     counts and boxes differ. The fallback is word boxes per page, which cost more memory.
   - Measure: the time to the first hit and to all counts on pgfmanual (1,300 pages), before and after.
+  - Bug (the author, 2026-09-24): when search lags, the field drops the last typed characters. The app must never
+    overwrite what was typed; a newer query cancels the older one; debounce the expensive part.
 - [?] **Recent libraries, and libraries anywhere.** Keep a list of recently opened library folders on the home
   screen. "Open a folder as library…" already exists, so this is small.
   *Proposal:* yes. Also add "New library…" with a free location instead of only under `Xournal_Libraries`.
