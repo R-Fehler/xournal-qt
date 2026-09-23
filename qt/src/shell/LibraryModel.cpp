@@ -56,7 +56,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
         const fs::path meta = lib->metaDir();
         PreviewCache::setLibrary(lib->root(), meta / "previews");
         DocumentPlaces::setLibrary(lib->root(), meta / "pages.json");
-        idx = std::make_unique<LibraryIndex>(lib->root(), meta / "index");
+        idx = std::make_unique<LibraryIndex>(lib->root());
         connect(idx.get(), &LibraryIndex::progress, this, [this] {
             Q_EMIT indexChanged();
             if (!query.isEmpty() && !searchTimer.isActive()) {

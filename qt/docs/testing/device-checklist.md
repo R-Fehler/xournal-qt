@@ -443,3 +443,18 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] A big PDF with the sidebar or the page grid open (many thumbnails asked for), zoomed in: close its tab, then
       close the app with such a tab open. Both happen at once (at most the page being drawn is waited for); before,
       the window froze for seconds.
+
+## Per-folder library cache (qt/library-index)
+Try these on a **copy** of a library, or on a new one. Opening the real OneDrive library with this build changes its
+cache on disk (and, once the whole block is in, converts the old one), which OneDrive then syncs.
+- [ ] Open a library with documents in several folders and wait until the search finds text in them. Each folder
+      with documents now has a hidden `.xournal_library/` with `notes.pack` (and `pdf-text.pack` where there are
+      PDFs); folders without documents have none. Close and open the library again: the search works at once and
+      nothing is indexed again (no progress shown).
+- [ ] Write a text element into a `.xopp` and save it. A few seconds later only that folder's `notes.pack` has a new
+      time (`ls -la --time-style=full-iso <folder>/.xournal_library`); `pdf-text.pack` and the other folders' packs
+      keep theirs. The new text is found.
+- [ ] In the file manager, rename a folder of the library and move a document into another folder. Back in the app:
+      both are found by their text right away, nothing is indexed again.
+- [ ] Open a subfolder as a library of its own ("Open a folder as library…"): its search works at once.
+- [ ] Trash all documents of a folder in the app: its `.xournal_library/` goes too.

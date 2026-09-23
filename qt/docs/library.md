@@ -9,7 +9,7 @@ A **library** is a plain folder of documents that a window works in, like a work
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
   as library…". A window never shows two libraries.
 - The Downloads folder is offered there too, as a quick library: all downloaded papers at once. Like every library
-  it keeps its metadata (previews, search index) in its own `.xournal_library/`, so opening it again is as fast as
+  it keeps its cache (previews, search index) in `.xournal_library/` folders, so opening it again is as fast as
   any other library. A note in the library says that its files are
   short-lived, and importing or copying documents into it from elsewhere asks first.
 - "Copy to…" / "Move to…" can go into another library: the dialog has a library choice above the folders.
@@ -37,29 +37,50 @@ A **library** is a plain folder of documents that a window works in, like a work
 
 Code: `qt/src/shell/DocumentFiles.*`.
 
-## `.xournal_library/`
-Every library has one, Downloads included. It is only a cache, and it can be deleted at any time. For folders that
-cannot be written, it lives in `~/.cache/xournal-qt/libraries/<hash>` instead.
-- `previews/<hash>.png`: the first page, 360 px wide, rendered like the page thumbnails. The file name comes from the
-  path, sizes and modification times, so a changed document gets a new preview. Previews of documents outside a
-  library (recent files) go to `~/.cache/xournal-qt/previews`.
-- `index/<hash>.json`: what the library search searches, per document, in two parts:
-  - the text of the PDF pages the document shows, with the path of the PDF it uses (next to it, elsewhere or
-    attached) and that PDF's size and modification time;
-  - per page: which PDF page it shows, the text of its text elements, its shape.
+## The library cache (`.xournal_library/`)
+The cache only speeds things up and can be deleted at any time. Each folder with documents has its own hidden
+`.xournal_library/`, with the cache of **only the documents directly in it** (never those of its subfolders). A
+folder without documents gets none, and when its last document goes, the folder goes too (unless something other
+than the app's files is in it). Opening a library reads the caches of all its folders and merges them; a subfolder
+opened as a library of its own finds its caches already there. Entries are keyed by file name, so a folder moved or
+renamed by any program keeps its cache. Folders that cannot be written keep theirs in the app cache,
+`~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/`.
 
-  A background thread keeps it up to date, one document at a time:
-  - nothing changed (the `.xopp` and the PDF it uses have their size and time): nothing is read;
-  - only the `.xopp` changed (annotations, text elements, pages added or moved): the `.xopp` is read again, the PDF
-    text is kept (only PDF pages not shown before are read) — e.g. 100 ms instead of 470 ms for a 300-page PDF;
-  - the PDF changed (also an attached one, or one elsewhere): its text is read again;
-  - renamed or moved in the app (also whole folders): the entries move along; only a pair's `.xopp`, which is written
-    again with the new path of its PDF, is read again (without PDF text). Renamed by another program: the PDF text
-    is taken over from the entry of the same file (same size and time);
-  - a document that is gone: its entry is removed;
-  - an older index format: everything is read once.
+A cache folder holds a few **packs**, one file each, split by how often they change:
+- `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`), name, the size and time of its `.xopp`, the
+  PDF it uses (relative to the folder when it is in the library; next to it: its name) with that PDF's size and
+  time, and per page which PDF page it shows, the text of its text elements and its shape. Small; written again
+  when a `.xopp` in the folder is saved.
+- `pdf-text.pack`: per document, the text of the PDF pages it shows, tied to the PDF's size and time. Big; written
+  only when a PDF changed or a document came or went. A document with over 1 MB of PDF text gets a file of its own,
+  `pdf-text-<hash>.pack`, written only when that text changes.
 
-  Unsaved changes of open documents are not in the index (it reads the files).
+A pack is CBOR (Qt's `QCborValue`) compressed with zlib, behind a header with a format number: a pack of another
+format is read anew. It is always written whole, under another name first (`QSaveFile`), never changed in place:
+sync clients upload whole files anyway, and neither the app nor a sync client ever sees half a file. Changed packs
+are written in the background a few seconds after the last change (at the latest 30 s after the first one), and
+when the library is closed.
+
+The first-page previews and the reading positions are still in the root's `.xournal_library/` (`previews/`,
+`pages.json`), as before.
+
+**The search index** is what the library search searches. A background thread keeps it up to date, one document at
+a time:
+- nothing changed (the `.xopp` and the PDF it uses have their size and time): nothing is read;
+- only the `.xopp` changed (annotations, text elements, pages added or moved): the `.xopp` is read again, the PDF
+  text is kept (only PDF pages not shown before are read) — e.g. 100 ms instead of 470 ms for a 300-page PDF; only
+  the `notes.pack` of its folder is written;
+- the PDF changed (also an attached one, or one elsewhere): its text is read again;
+- renamed or moved in the app (also whole folders): the entries move along; only a pair's `.xopp`, which is written
+  again with the new path of its PDF, is read again (without PDF text). A moved folder takes its cache folders
+  along;
+- moved or renamed by another program: a folder keeps its cache; a document moved into another folder is found
+  again by its name, size and time (nothing is read). A renamed document takes over the PDF text of the entry of
+  the same file (same size and time), only the `.xopp` is read;
+- a document that is gone: its entry is removed;
+- an older index format: everything is read once.
+
+Unsaved changes of open documents are not in the index (it reads the files).
 
 The pages with hits of the extended search are drawn on demand (`HitPages.*`): the last 12 documents used stay
 loaded, drawn pages stay in memory (up to 128 MB) without marks, and the marks are painted into the page image.
