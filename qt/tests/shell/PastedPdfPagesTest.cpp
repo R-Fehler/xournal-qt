@@ -4,6 +4,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -429,9 +430,15 @@ TEST_F(PastedPdfPages, travelWithTheirDocumentInTheLibrary) {
               (std::vector<fs::path>{root / "lecture.xopp", root / ".lecture.pages.pdf", root / "lecture.pdf"}))
             << "what goes to the trash";
 
+    // A changed merged PDF changes the document's stamp (its previews and PDF text are read again)
+    const QString stamp = documentStamp(listing.items[0]);
+    fs::last_write_time(root / ".lecture.pages.pdf",
+                        fs::last_write_time(root / ".lecture.pages.pdf") + std::chrono::seconds(2));
+    EXPECT_NE(documentStamp(listing.items[0]), stamp);
+
     // The search index finds the pasted page's text
     {
-        LibraryIndex index(root, root / ".xournal_library" / "index");
+        LibraryIndex index(root);
         index.update(DocumentFiles::scanRecursive(root));
         index.waitForDone();
         const auto hits = index.search("pastedbeta");

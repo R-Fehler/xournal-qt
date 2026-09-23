@@ -12,7 +12,9 @@ ApplicationWindow {
     id: win
     width: 1280
     height: 900
-    visible: true
+    // Maximized when the app starts (people make it smaller with the tiling of their desktop); the size above is
+    // what it gets when it is not maximized, and what the tests use
+    visibility: app.startMaximized ? Window.Maximized : Window.Windowed
     title: app.homeVisible ? (app.library.available ? app.library.name + " — Xournal Qt" : "Xournal Qt")
                            : (app.modified ? "• " : "") + app.title + " — Xournal Qt"
     Material.theme: Material.Light
@@ -27,14 +29,45 @@ ApplicationWindow {
     /// Full screen: no tab strip, tool bar or page sidebar; a small square shows the current tool, a tap on it offers
     /// the tools (the same ones) and colors. The page / zoom pill stays.
     property bool fullScreenMode: false
-    property int visibilityBeforeFullScreen: Window.Windowed
+    /// The window's state outside full screen (maximized or not), followed all the time rather than read when full
+    /// screen starts: the platform may report the state late or in steps, and leaving full screen goes back to it
+    property int windowedVisibility: app.startMaximized ? Window.Maximized : Window.Windowed
+    property bool leavingFullScreen: false
+    property bool remaximized: false
+    onVisibilityChanged: {
+        if (leavingFullScreen) {
+            // The way back may pass through other states (the timer ends this). A compositor may also give back the
+            // size from before it was maximized when full screen ends, even after it reported maximized: then ask
+            // for maximized once more.
+            if (visibility === Window.Windowed && windowedVisibility === Window.Maximized && !remaximized) {
+                remaximized = true
+                showMaximized()
+            }
+        } else if (!fullScreenMode && (visibility === Window.Windowed || visibility === Window.Maximized)) {
+            windowedVisibility = visibility
+        }
+    }
+    Timer {  // ends the way back from full screen (a compositor may take a moment and several steps)
+        id: leavingFullScreenTimer
+        interval: 1500
+        onTriggered: {
+            win.leavingFullScreen = false
+            // settled: the state it is in now is the window's state
+            if (!win.fullScreenMode && (win.visibility === Window.Windowed || win.visibility === Window.Maximized))
+                win.windowedVisibility = win.visibility
+        }
+    }
     onFullScreenModeChanged: {
         if (fullScreenMode) {
-            visibilityBeforeFullScreen = visibility === Window.FullScreen ? Window.Windowed : visibility
+            leavingFullScreenTimer.stop()
+            leavingFullScreen = false
             showFullScreen()
         } else {
             quickTools.close()
-            if (visibilityBeforeFullScreen === Window.Maximized) showMaximized()
+            leavingFullScreen = true
+            remaximized = false
+            leavingFullScreenTimer.restart()
+            if (windowedVisibility === Window.Maximized) showMaximized()
             else showNormal()
         }
     }
@@ -1516,7 +1549,11 @@ ApplicationWindow {
         function onInsertPagesRequested(position) { insertPagesDialog.openAt(position) }
     }
 
-    SettingsPage { id: settingsPage; objectName: "settingsPage" }
+    SettingsPage {
+        id: settingsPage
+        objectName: "settingsPage"
+        onQuitRequested: win.closeWindow()  // (asks about unsaved documents first)
+    }
     TabOverview {
         id: tabOverview
         objectName: "tabOverview"

@@ -4,8 +4,9 @@
  * open it there again, if wanted).
  *
  * A .xopp has no place for them, so they are kept aside, in a small JSON file: for the documents of the library in
- * its metadata folder (by their path in the library, so they follow the library when it is moved), for the others in
- * the user's cache (by their whole path). Renaming and moving in the app take the entries along.
+ * the library's folder in the config ("~/.config/xournal-qt/libraries/<key>/pages.json", by their path in the
+ * library; not in its cache folders, which can be removed at any time), for the others in the user's cache (by
+ * their whole path). Renaming and moving in the app take the entries along.
  *
  * Safe from any thread (previews are drawn by workers).
  *

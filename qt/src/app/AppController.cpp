@@ -184,7 +184,12 @@ AppController::~AppController() {
 
 namespace {
 std::function<void(AppController*)> windowFactory;  // set by main(): makes the window for a controller
+bool windowsStartMaximized = false;                  // set by main()
 }  // namespace
+
+void AppController::setStartMaximized(bool on) { windowsStartMaximized = on; }
+
+bool AppController::startMaximized() const { return windowsStartMaximized; }
 
 void AppController::setWindowFactory(std::function<void(AppController*)> factory) {
     windowFactory = std::move(factory);

@@ -962,6 +962,48 @@ TEST_F(HomeScreenTest, theSettingsOpenFromTheLibrary) {
     EXPECT_TRUE(waitOpened(sheet, true));
 }
 
+// Settings → Storage: what the library's cache takes, moving it into the app's cache folder and back, and removing
+// all its cache folders (the window closes then, so the app does not build them again right away).
+TEST_F(HomeScreenTest, theStorageSettingsMoveAndRemoveTheLibraryCache) {
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->searchIndex()->flush();
+    ASSERT_TRUE(fs::exists(root / "Physics" / ".xournal_library" / "notes.pack"));
+    QObject* sheet = find("settingsPage");
+    ASSERT_NE(sheet, nullptr);
+    click(find<QQuickItem>("homeSettingsButton"));
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("storageTab"));
+    auto* size = findItem("cacheSizeLabel");
+    ASSERT_NE(size, nullptr);
+    until([&] { return size->property("text").toString().contains("files"); });
+    EXPECT_TRUE(size->property("text").toString().contains("files")) << size->property("text").toString().toStdString();
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(500);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    auto* toApp = findItem("cacheInAppSwitch");
+    ASSERT_NE(toApp, nullptr);
+    click(toApp);
+    EXPECT_TRUE(library->cacheInAppCache());
+    EXPECT_FALSE(fs::exists(root / "Physics" / ".xournal_library")) << "moved into the app cache";
+    EXPECT_TRUE(toApp->property("checked").toBool());
+    click(toApp);
+    EXPECT_FALSE(library->cacheInAppCache());
+    EXPECT_TRUE(fs::exists(root / "Physics" / ".xournal_library" / "notes.pack")) << "and back";
+
+    click(findItem("removeCachesButton"));
+    QObject* dialog = find("removeCachesDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(findItem("removeCachesConfirm"));
+    EXPECT_TRUE(library->cacheRemoved());
+    EXPECT_FALSE(fs::exists(root / "Physics" / ".xournal_library"));
+    EXPECT_FALSE(fs::exists(root / ".xournal_library"));
+    until([&] { return !window->isVisible(); });
+    EXPECT_FALSE(window->isVisible()) << "the window closes";
+}
+
 // A document read in the app shows on its card when and at which page; "Last read first" sorts by that.
 TEST_F(HomeScreenTest, cardsShowWhenAndWhereADocumentWasLastRead) {
     const QString lecture = QString::fromStdString((root / "lecture.pdf").string());
@@ -1381,6 +1423,40 @@ TEST_F(MainWindowTest, fullScreenButtonAndBackByTouch) {
     EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "left full screen by touch";
     until([&] { return button->isVisible(); });
     EXPECT_TRUE(button->isVisible()) << "back in the tool bar";
+}
+
+TEST_F(MainWindowTest, leavingFullScreenGoesBackToTheWindowState) {
+    // Maximized before: maximized after Escape (it came back as a small window)
+    window->showMaximized();
+    until([&] { return window->visibility() == QWindow::Maximized; });
+    ASSERT_EQ(window->visibility(), QWindow::Maximized);
+    window->setProperty("fullScreenMode", true);
+    until([&] { return window->visibility() == QWindow::FullScreen; });
+    ASSERT_EQ(window->visibility(), QWindow::FullScreen);
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return window->visibility() == QWindow::Maximized; });
+    EXPECT_FALSE(window->property("fullScreenMode").toBool());
+    EXPECT_EQ(window->visibility(), QWindow::Maximized) << "back to maximized";
+
+    // A compositor that gives back the size from before it was maximized when full screen ends (KWin on Wayland
+    // was seen doing so): the window asks for maximized once more
+    window->setProperty("fullScreenMode", true);
+    until([&] { return window->visibility() == QWindow::FullScreen; });
+    QTest::keyClick(window, Qt::Key_Escape);
+    window->showNormal();  // what the compositor did
+    until([&] { return window->visibility() == QWindow::Maximized; });
+    EXPECT_EQ(window->visibility(), QWindow::Maximized) << "maximized again after the compositor's normal size";
+
+    // Not maximized before (made smaller by the user): the same size after
+    window->showNormal();
+    until([&] { return window->visibility() == QWindow::Windowed; });
+    until([&] { return !window->property("leavingFullScreen").toBool(); }, 2000);
+    ASSERT_EQ(window->property("windowedVisibility").toInt(), int(QWindow::Windowed)) << "the user's choice is kept";
+    window->setProperty("fullScreenMode", true);
+    until([&] { return window->visibility() == QWindow::FullScreen; });
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return window->visibility() == QWindow::Windowed; });
+    EXPECT_EQ(window->visibility(), QWindow::Windowed) << "back to the window as it was";
 }
 
 TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {

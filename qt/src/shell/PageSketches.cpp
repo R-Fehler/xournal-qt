@@ -247,10 +247,7 @@ void PageSketches::seedTitlePage(quint64 id) {
             return;
         }
     }
-    QImage img;
-    std::error_code ec;
-    const fs::path png = PreviewCache::cacheFile(item);
-    if (fs::exists(png, ec) && img.load(QString::fromStdString(png.string()), "PNG")) {
+    if (const QImage img = PreviewCache::stored(item); !img.isNull()) {
         // (smaller than a preview: it is drawn later, the canvas shows this one meanwhile)
         store(id, pageId, s->pageRevision(title), img, true);
     }

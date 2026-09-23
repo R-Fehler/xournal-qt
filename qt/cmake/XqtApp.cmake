@@ -43,6 +43,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/GridSelection.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h
@@ -163,6 +165,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCacheTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CanvasMemoryTest.cpp

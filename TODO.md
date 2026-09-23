@@ -17,10 +17,21 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 `qt/render-visible` and `qt/ui-polish` are merged (2026-09-24, see ROADMAP).
 
-1. **Bugs and polish:** `qt/markdown-fixes`, started 2026-09-24 (`qt/render-visible` and `qt/ui-polish` are done).
+1. **Bugs and polish:** done (`qt/render-visible`, `qt/ui-polish`, `qt/markdown-fixes`; see ROADMAP).
+1b. **PDF writing with qpdf, high priority (the author, 2026-09-24):**
+   1. `qt/pdf-pages`: pasted PDF pages stay searchable. Started 2026-09-24 (worktree `../xournal_qt-pdf-pages`).
+   2. `qt/hybrid-pdf`: right after it. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
+   - Experiment `qt/mupdf`, started 2026-09-24: a MuPDF backend next to poppler, measured, with a short pdfium
+     check. Findings go to `qt/docs/pdf-engine-experiment.md`.
 2. **Library track**, in this order, because each step builds on the one before:
-   1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache):
-      `qt/library-index`, started 2026-09-24 (worktree `../xournal_qt-library-index`);
+   1. ~~the per-folder index format~~ `qt/library-index`: merged 2026-09-24 (see ROADMAP). Follow-ups:
+      - [?] **Previews: in the folders or always in the app cache?** A pack is rewritten whole, so a new preview
+        rewrites its folder's `previews.pack`: about 0.6 MB uploaded per changed document on the Uni library. The
+        index is expensive to rebuild (PDF text) and worth syncing; a preview is one page render.
+        *Proposal:* keep the index in the folders and put previews always in the app cache.
+      - [ ] Reading positions are keyed by the library's path, so a library folder renamed or moved outside the
+        app starts without them. Match them by file name, size and time like the index, or keep a copy in the
+        root's dot folder that the clean-up leaves alone.
    2. `qt/document-search`: a live text index for open documents (see below). It builds on the entry model from
       `qt/library-index` and changes `DocumentSearch`, which `qt/markdown-fixes` also touches;
    3. `.md` files and images in the library and its index, with snippet cards in the extended search;
@@ -35,16 +46,6 @@ Blocks for tracks 2–4 get their `qt/...` names when they are planned. Research
 is built.
 
 ## Ready: bug and polish blocks
-
-### `qt/markdown-fixes`
-Area: `qt/src/markdown`, the Markdown editor in `qt/src/canvas`, `DocumentSearch`. Tests: `-L markdown`.
-- [~] **A code block at the end of the text misbehaves in live rendering.** For example
-  `` ```py\n code\n #stuff ``` `` as the last thing in a box. The grey block background keeps being drawn, and
-  text typed after Enter stays invisible until more text is typed or the source sidebar is toggled once.
-  Probably the incremental re-layout does not handle an open or just-closed fence at the end.
-- [~] **Search boxes sit at the wrong place in rendered Markdown.** They are where the plain text would be in
-  a normal Xournal text box, not on the rendered words. The search must map hits through the Markdown
-  layout.
 
 ---
 
@@ -63,7 +64,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 
 ## To decide (elaborate before building)
 
-- [ ] **Live text index for open documents** (`qt/document-search`; the author asked for it on 2026-09-24).
+- [~] **Live text index for open documents** (`qt/document-search`, started 2026-09-24; the author asked for it on 2026-09-24).
   - Why: search in an open document is much slower than library search. `DocumentSearch` calls poppler's
     `findText` on every page for every query (`DocumentSearch.cpp:128`), on the UI thread, restarting on each
     keystroke. Poppler rebuilds each page's text layout on every call and shares one lock per PDF with rendering.
@@ -80,6 +81,8 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - Risk: the scan and the rectangles must match text the same way (case, whitespace, hyphenation); otherwise
     counts and boxes differ. The fallback is word boxes per page, which cost more memory.
   - Measure: the time to the first hit and to all counts on pgfmanual (1,300 pages), before and after.
+  - Bug (the author, 2026-09-24): when search lags, the field drops the last typed characters. The app must never
+    overwrite what was typed; a newer query cancels the older one; debounce the expensive part.
 - [?] **Recent libraries, and libraries anywhere.** Keep a list of recently opened library folders on the home
   screen. "Open a folder as library…" already exists, so this is small.
   *Proposal:* yes. Also add "New library…" with a free location instead of only under `Xournal_Libraries`.
@@ -206,12 +209,14 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF
 engines, with a recommendation and cheap experiments to decide.
-- [?] **Pasted PDF pages stay searchable, with qpdf now.** The research found that qpdf (already linked,
-  Apache-2.0, used by upstream's `QPdfExport`) can write a merged `name.pages.pdf`: option 1 of the ROADMAP
-  backlog item, still upstream-compatible, with no need to wait for MuPDF. Start with the qpdf page-merge spike
-  from the research.
+- [~] **Pasted PDF pages stay searchable, with qpdf** (`qt/pdf-pages`). Decided 2026-09-24:
+  - one merged PDF per document at most;
+  - a hidden `.name.pages.pdf` when the document already has a PDF, or a plain `name.pdf` (paired) when it had
+    none;
+  - compacted on save;
+  - a note on paste, like the undo note.
 - [?] **Experiments before the engine decision:**
-  - a render benchmark of poppler, MuPDF and pdfium;
+  - a render benchmark of poppler, MuPDF and pdfium (running: `qt/mupdf`);
   - a `/Ink` + `/AP` round trip through Acrobat, Xodo, Drawboard and Preview;
   - whether an embedded `.xopp` survives saves in other apps;
   - pen latency on the Surface and the iPad.

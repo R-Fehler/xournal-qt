@@ -3,15 +3,17 @@
  *
  * A library is a plain folder with PDFs and .xopp files, in subfolders if wanted. By default it is
  * "<Documents>/Xournal_Libraries/Default"; any folder can be opened as one. Each process shows one library.
- * Metadata that only speeds things up (first-page previews, the search index) lives in the hidden folder
- * ".xournal_library" of the library; it can be deleted at any time.
+ * Metadata that only speeds things up (first-page previews, the search index) is kept per folder, in its hidden
+ * folder ".xournal_library" or in the app cache (see LibraryCache.h); it can be deleted at any time.
  *
  * LibraryIndex keeps the text of every document for library-wide search, in two parts: the text of the PDF pages
  * (tied to the PDF the document uses and its size / modification time) and, per page, which PDF page it shows and
  * the text of its text elements. When only the .xopp changed (annotations, text elements, pages moved), it is read
  * again but the PDF text is kept; PDF text is read only for PDF pages not seen before, or when the PDF changed.
- * Documents renamed or moved by the app keep their entries. Everything happens in the background; the text is
- * stored as one JSON file per document.
+ * Documents renamed or moved by the app keep their entries; moved by another program, they are found again by
+ * name, size and time. Everything happens in the background. Each folder stores the entries of its documents, by
+ * file name, in two packs: "notes" (small, written again when a .xopp is saved) and "pdf-text" (big, written when
+ * a PDF changed). Opening a library reads the packs of all its folders and merges them.
  *
  * @license GNU GPLv2 or later
  */
@@ -21,9 +23,12 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
+#include <QCborMap>
+#include <QCborValue>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -31,6 +36,7 @@
 
 #include "filesystem.h"
 #include "DocumentFiles.h"
+#include "LibraryCache.h"
 
 class Document;
 class QThreadPool;
@@ -54,8 +60,17 @@ public:
     bool isTemporary() const;
     /// Short hash of the root (one instance and one session journal per library).
     std::string key() const;
-    /// The metadata folder (created when needed). For folders that cannot be written: in the user's cache.
-    fs::path metaDir() const;
+    /// The library's own state in the config folder, "~/.config/xournal-qt/libraries/<key>/" (created when
+    /// needed): what is not a cache and must survive cleaning it, e.g. the reading positions.
+    fs::path configDir() const;
+    /// Where the library keeps its cache: in its folders (the default) or in the app's cache folder (for folders
+    /// that sync clients upload). A setting of the library, kept in its config folder.
+    CacheLocation::Mode cacheMode() const;
+    void setCacheMode(CacheLocation::Mode mode) const;
+    CacheLocation cacheLocation() const { return CacheLocation(rootDir, cacheMode()); }
+    /// The reading positions (DocumentPlaces) of its documents. The ones kept in the library's
+    /// ".xournal_library/pages.json" before are taken over the first time.
+    fs::path placesFile() const;
     /// The file or folder is in the library.
     bool contains(const fs::path& p) const;
     /// Path relative to the root ("" for the root itself).
@@ -66,7 +81,7 @@ private:
 };
 
 /// A string that changes when one of the document's files changes (size, modification time): the .xopp, the PDF next
-/// to it, an attached PDF.
+/// to it, an attached PDF, the merged PDF of pasted pages (".name.pages.pdf").
 QString documentStamp(const DocumentItem& item);
 /// Size and modification time of one file ("" if it does not exist).
 QString fileStamp(const fs::path& file);
@@ -74,12 +89,13 @@ QString fileStamp(const fs::path& file);
 class LibraryIndex final: public QObject {
     Q_OBJECT
 public:
-    /// `dir`: where the index files are stored.
-    LibraryIndex(fs::path root, fs::path dir, QObject* parent = nullptr);
+    /// The index of the library at `root`, kept in the cache folders of `location` (default: in each folder).
+    explicit LibraryIndex(fs::path root, CacheLocation location = {}, QObject* parent = nullptr);
+    /// Writes what is not written yet.
     ~LibraryIndex() override;
 
-    /// Bring the index up to date with these documents, in the background: new and changed documents are read,
-    /// documents that are gone are dropped.
+    /// Bring the index up to date with these documents, in the background: the stored packs of their folders are
+    /// read (once), new and changed documents are read, documents that are gone are dropped.
     void update(std::vector<DocumentItem> items);
     bool busy() const { return running.load(); }
     int indexed() const { return doneCount.load(); }
@@ -90,9 +106,27 @@ public:
     /// text did not change): nothing is read again, except a .xopp that was written again (a renamed pair: the new
     /// path of its PDF), without its PDF text. In the background, before the next update.
     void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
-    /// Work done so far (tests): documents read, PDF pages whose text was read.
+    /// Write the changed packs now (else a few seconds after the last change, and when the index is closed).
+    void flush();
+    /// Stop: forget what is not written yet, and write or index nothing any more (its cache is being removed).
+    void discard();
+
+    /// The cache folder has files of the layout before the packs ("index/", "previews/", "pages.json").
+    static bool hasOldLayout(const fs::path& dir);
+    /// Convert them, in the background before the next update: the index entries (one JSON file per document)
+    /// and the previews (PNG files) go into the packs of the documents' folders, nothing is read again. Once the
+    /// packs are written, the old files are removed ("index/", "previews/", "pages.json" - which the library
+    /// took over into the config folder when it was opened -, nothing else).
+    void convertOldLayout(const fs::path& dir);
+    /// Old caches converted so far (tests).
+    int oldLayoutsConverted() const { return conversions.load(); }
+    /// How long writes wait for more changes (tests; default: WriteScheduler's).
+    void setWriteDelays(int quietMs, int maxDelayMs);
+    const CacheLocation& location() const { return where; }
+    /// Work done so far (tests): documents read, PDF pages whose text was read, packs written.
     int documentsRead() const { return docsRead.load(); }
     int pdfPagesRead() const { return pdfRead.load(); }
+    int packsWritten() const { return packWrites.load(); }
 
     struct PageHits {
         int page = 0;        ///< 0-based
@@ -113,8 +147,11 @@ public:
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
 
-    /// Format of the stored index files (older ones are indexed again).
-    static constexpr int FORMAT = 3;
+    /// Format of the stored entries (packs of another one are read anew).
+    static constexpr int FORMAT = 4;
+    /// The packs of a folder's cache
+    static const QString NOTES_PACK;     ///< per document: its pages, the text of its text elements, its PDF
+    static const QString PDF_TEXT_PACK;  ///< per document: the text of the PDF pages it shows
     /// Whitespace runs to one space (the PDF text has line breaks where the page has them).
     static QString simplified(const QString& text);
 
@@ -125,6 +162,7 @@ Q_SIGNALS:
 private:
     struct Entry {
         fs::path file;                   ///< the document's main file
+        QString kind;                    ///< "xopp" (also .xoj), "pdf"
         QString name;
         QString xoppStamp;               ///< of the .xopp ("": a PDF alone)
         fs::path pdf;                    ///< the PDF it uses (next to it, elsewhere, attached; "": none)
@@ -134,25 +172,55 @@ private:
         QStringList elementText;         ///< per page: the text of its text elements (simplified)
         std::vector<double> aspects;     ///< per page: height / width
         int pageCount() const { return static_cast<int>(elementText.size()); }
+        bool showsPdfPages() const;
         /// Nothing changed since it was read.
         bool upToDate(const DocumentItem& item) const;
     };
+    using EntryPtr = std::shared_ptr<const Entry>;
+    /// The documents directly in one folder, as in its packs.
+    struct Folder {
+        bool loaded = false;                   ///< its packs were read
+        std::map<std::string, EntryPtr> docs;  ///< by file name
+        bool notesChanged = false, textChanged = false;
+        std::set<QString> changedText;         ///< documents whose PDF text changed (big ones have a file of their own)
+    };
+
     void run(std::vector<DocumentItem> items, quint64 generation);
     void applyMoves(const std::vector<std::pair<fs::path, fs::path>>& moves);
     /// Read a document; PDF text is taken from `previous` or another entry with the same PDF where possible.
-    std::shared_ptr<Entry> read(const DocumentItem& item, const std::shared_ptr<const Entry>& previous);
-    std::shared_ptr<const Entry> loadStored(const fs::path& file) const;
-    void store(const Entry& e) const;
-    fs::path indexFile(const fs::path& file) const;
+    std::shared_ptr<Entry> read(const DocumentItem& item, const EntryPtr& previous);
+    /// Read the packs of a folder, if not done yet (the lock is not held).
+    void load(const fs::path& folder);
+    /// The entry of a document (the lock is held).
+    EntryPtr find(const fs::path& file) const;
+    /// Set or drop the entry of a document; its folder's packs are written later (the lock is held).
+    void put(const EntryPtr& e);
+    void erase(const fs::path& file);
+    /// An entry of a file that is gone, with this name and the same files (moved by another program).
+    EntryPtr movedHere(const DocumentItem& item, std::multimap<std::string, EntryPtr>& orphans, bool& collected);
+    /// Returns whether everything could be written.
+    bool writeChanged();
+    /// Remove `dir` and its parents while they are empty folders in the library's folder in the app cache.
+    void removeEmptyMirrors(fs::path dir) const;
+    void convert(const fs::path& dir);
+    QCborMap notesOf(const Entry& e) const;
+    std::shared_ptr<Entry> entryOf(const fs::path& folder, const QString& name, const QCborMap& notes,
+                                   const QCborValue& text) const;
 
-    fs::path rootDir, indexDir;
-    std::unique_ptr<QThreadPool> pool;
+    fs::path rootDir;
+    CacheLocation where;
+    std::unique_ptr<QThreadPool> pool;    ///< reading, one document after the other (also orders moves and updates)
+    std::unique_ptr<QThreadPool> writer;  ///< writing packs (while reading goes on)
+    std::unique_ptr<WriteScheduler> scheduler;
     mutable std::mutex mtx;
-    std::map<fs::path, std::shared_ptr<const Entry>> entries;  ///< by main file
+    std::mutex writeMtx;
+    std::map<fs::path, Folder> folders;  ///< by folder
+    bool firstRun = true;                ///< (the worker's) the stored packs of all folders are read once
     std::atomic<quint64> generation{0};
     std::atomic<bool> running{false};
+    std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
-    std::atomic<int> docsRead{0}, pdfRead{0};
+    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0};
 };
 
 }  // namespace xqt
