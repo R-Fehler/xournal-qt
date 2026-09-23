@@ -19,7 +19,8 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 
 1. **Bugs and polish:** `qt/markdown-fixes`, started 2026-09-24 (`qt/render-visible` and `qt/ui-polish` are done).
 2. **Library track**, in this order, because each step builds on the one before:
-   1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache);
+   1. the per-folder index format (one dot folder per folder, split packs, reading positions out of the cache):
+      `qt/library-index`, started 2026-09-24 (worktree `../xournal_qt-library-index`);
    2. `.md` files and images in the library and its index, with snippet cards in the extended search;
    3. the "Show" file type filter and the handling of other files;
    4. fuzzy search behind its toggle.
