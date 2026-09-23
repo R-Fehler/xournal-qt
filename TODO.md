@@ -154,6 +154,20 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     backlinks later.
   - Indexing is cheap: the file is plain text, so there is no PDF step.
   - A hit points to a heading or line, since `.md` has no pages until the paginated view exists.
+  - **Decided (2026-09-23): the extended search shows `.md` hits as rendered snippet cards, not page images.**
+    - Each card is the block that holds the hit (paragraph, list item, table row or code block), drawn by our
+      Markdown renderer.
+    - Above it is its heading path, for example *Lecture 3 › Kalman filter › Prediction*, taken from the headings
+      in the index.
+    - Hits are highlighted like the page marks, with the current hit in orange. Long blocks are cut to a few
+      lines around the hit.
+    - Tapping a card opens the file at that block with the document search active.
+    - In the results list, a PDF or `.xopp` result keeps its row of page images, and a `.md` result gets a row
+      of cards.
+    - Maybe later: a "snippets / pages" switch that shows paginated page previews, once the paginated view
+      exists.
+    - Markdown boxes inside `.xopp` pages stay in the page images. They depend on the search box fix in
+      `qt/markdown-fixes`.
   - Listing and indexing could land before the `.md` editor, with a hit opening the file read-only in the
     Markdown renderer.
   - Other text files (`.txt`, `.org`) could follow the same path later.
