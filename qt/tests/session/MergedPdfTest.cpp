@@ -174,3 +174,38 @@ TEST_F(MergedPdfTest, aHundredPagesMergeQuickly) {
     EXPECT_LT(ms, 1000);
     EXPECT_EQ(load(path("m.pdf")).getPageCount(), 101u);
 }
+
+// Sizes of a real case: XQT_BENCH_MERGE="<lecture.pdf>:<other.pdf>" pastes three pages of the other PDF (one paste
+// each) into the lecture's merged PDF, then drops one lecture page and one pasted page as a save would.
+TEST_F(MergedPdfTest, benchSizes) {
+    const QByteArray env = qgetenv("XQT_BENCH_MERGE");
+    const int colon = env.indexOf(':');
+    if (colon < 0) {
+        GTEST_SKIP() << "XQT_BENCH_MERGE=<lecture.pdf>:<other.pdf>";
+    }
+    const fs::path lecture = env.left(colon).toStdString(), other = env.mid(colon + 1).toStdString();
+    const fs::path merged = path(".lecture.pages.pdf");
+    const auto t0 = std::chrono::steady_clock::now();
+    fs::path base = lecture;
+    for (size_t page: {2, 5, 9}) {
+        std::string copied;
+        ASSERT_TRUE(MergedPdf::extract(other, {page}, copied).ok);
+        std::cout << "page " << page + 1 << " copied: " << copied.size() / 1024 << " KiB\n";
+        const auto r = MergedPdf::append(base, copied, merged, MergedPdf::Kind::WithSource);
+        ASSERT_TRUE(r.ok) << r.error;
+        base = merged;
+    }
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0);
+    const size_t pages = load(merged).getPageCount();
+    std::cout << "lecture " << fs::file_size(lecture) / 1024 << " KiB, " << pages - 3 << " pages; other "
+              << fs::file_size(other) / 1024 << " KiB; merged with 3 pasted pages: " << fs::file_size(merged) / 1024
+              << " KiB (" << ms.count() << " ms for the three pastes)\n";
+    std::vector<size_t> keep;
+    for (size_t i = 0; i < pages; ++i) {
+        if (i != 1 && i != pages - 2) {
+            keep.push_back(i);
+        }
+    }
+    ASSERT_TRUE(MergedPdf::keepOnly(merged, keep, merged).ok);
+    std::cout << "after dropping a lecture page and a pasted page: " << fs::file_size(merged) / 1024 << " KiB\n";
+}
