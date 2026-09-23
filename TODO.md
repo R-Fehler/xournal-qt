@@ -70,8 +70,10 @@ Area: `qt/src/app/qml`, a bit of `CanvasInput`. Mostly QML, so builds are cheap.
 - [~] **Tool bar docked left or right:**
   - the thin "show tool bar" strip stays at the top instead of moving to the dock side;
   - the hide button's arrow points into the canvas instead of towards the tool bar.
-- [~] **Paste pill on a long press with the pen.** With the pen (or another drawing tool) selected, a long
-  press on the canvas should show the copy/paste pill at the bottom of the canvas, as it does elsewhere.
+- [~] **Paste pill on a long press, with the pen and with a finger.** With a drawing tool selected, a long
+  press on the canvas should show the copy/paste pill at the bottom of the canvas. The same goes for a finger,
+  including over text. Today a long press on text only selects it and shows the text marking pill, so the
+  only way to paste is Ctrl+V.
 
 ---
 
