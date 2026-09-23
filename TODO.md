@@ -42,16 +42,6 @@ is built.
 
 ## Ready: bug and polish blocks
 
-### `qt/markdown-fixes`
-Area: `qt/src/markdown`, the Markdown editor in `qt/src/canvas`, `DocumentSearch`. Tests: `-L markdown`.
-- [~] **A code block at the end of the text misbehaves in live rendering.** For example
-  `` ```py\n code\n #stuff ``` `` as the last thing in a box. The grey block background keeps being drawn, and
-  text typed after Enter stays invisible until more text is typed or the source sidebar is toggled once.
-  Probably the incremental re-layout does not handle an open or just-closed fence at the end.
-- [~] **Search boxes sit at the wrong place in rendered Markdown.** They are where the plain text would be in
-  a normal Xournal text box, not on the rendered words. The search must map hits through the Markdown
-  layout.
-
 ---
 
 ## Ready after a short plan: platform

@@ -112,6 +112,16 @@
     (`RenderService::cancel` for a set). It waits only for the renders already running.
     - Closing a 1,300-page PDF: 5.4–6.4 s → 0.2–0.4 s.
     - Remaining: the one render each worker is running, and freeing the PDF instances.
+- **Markdown fixes, `qt/markdown-fixes` (2026-09-24, awaiting on-device test):**
+  - A code block at the end of the text:
+    - Enter at the end of an unclosed fence adds a line of code instead of a paragraph break.
+    - `topLevelSpans` finds the fence above blank lines.
+    - A finished block below the cursor is drawn as finished code.
+  - Search boxes in Markdown:
+    - A hit across a line break gets one box per line.
+    - While writing on the page, hits follow the block shown as source, and are searched again when writing ends.
+    - New `md::textRects` and `md::sourceRects` turn a text range into drawn rectangles, for the `.md` snippet cards.
+  - The reported "boxes where the plain text would be" did not reproduce; it needs steps if it is still seen.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
