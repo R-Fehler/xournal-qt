@@ -5,6 +5,7 @@
  */
 #include <fstream>
 #include <iostream>
+#include <array>
 #include <map>
 #include <random>
 
@@ -12,6 +13,7 @@
 #include <unistd.h>
 
 #include <QCoreApplication>
+#include <QCborArray>
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -1522,14 +1524,14 @@ TEST_F(LibraryTest, benchLibraryCache) {
     const auto items = DocumentFiles::scanRecursive(root);
     std::cout << items.size() << " documents generated in " << t.elapsed() << " ms\n";
 
-    // The cache as the app keeps it (old layout: one folder at the root)
+    // The cache as the app keeps it: packs in each folder
     const fs::path meta = root / DocumentFiles::META_DIR;
     const fs::path appCache;
     auto openIndex = [&] { return std::make_unique<LibraryIndex>(root); };
     auto flushIndex = [&](LibraryIndex& index) { index.flush(); };
     auto flushPreviews = [&] { PreviewCache::flush(); };
     PreviewCache::setLibrary(CacheLocation(root));
-    DocumentPlaces::setLibrary(root, meta / "pages.json");
+    DocumentPlaces::setLibrary(root, Library(root).placesFile());
 
     {
         auto index = openIndex();
@@ -1592,6 +1594,96 @@ TEST_F(LibraryTest, benchLibraryCache) {
     auto [allBytes, allFiles] = written(before, snapshot(cacheFiles(root, appCache)));
     std::cout << "with its new preview: " << allBytes / 1024.0 << " KiB in " << allFiles << " files\n";
     EXPECT_EQ(index->search("unicorn").size(), 1u);
+    index.reset();
+
+    // The same cache in the layout before the packs (as earlier builds wrote it: a JSON file per document, a PNG
+    // per preview, all in the root's cache folder), made from the packs
+    std::map<fs::path, std::array<QCborMap, 3>> packs;  // notes, PDF text, previews of each folder
+    int n = 0;
+    uintmax_t bookJson = 0;
+    for (const auto& item: DocumentFiles::scanRecursive(root)) {
+        const fs::path folder = item.folder();
+        if (!packs.count(folder)) {
+            const fs::path dir = folder / DocumentFiles::META_DIR;
+            packs[folder] = {Packs::read(dir, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT).value_or(QCborMap()),
+                             Packs::read(dir, LibraryIndex::PDF_TEXT_PACK, LibraryIndex::FORMAT).value_or(QCborMap()),
+                             Packs::read(dir, PreviewCache::PACK, PreviewCache::FORMAT).value_or(QCborMap())};
+        }
+        const auto& [notes, texts, previews] = packs[folder];
+        const QString name = QString::fromStdString(item.main().filename().string());
+        const QCborMap e = notes.value(name).toMap();
+        const QCborMap pdfPages = texts.value(name).toMap().value(QStringLiteral("pages")).toMap();
+        QJsonObject pdfText;
+        for (auto it = pdfPages.cbegin(); it != pdfPages.cend(); ++it) {
+            pdfText[QString::number(it.key().toInteger())] = it.value().toString();
+        }
+        QJsonArray pages;
+        const QCborArray pdfNr = e.value(QStringLiteral("pdfPages")).toArray();
+        for (qsizetype i = 0; i < pdfNr.size(); ++i) {
+            pages.append(QJsonObject{{"pdf", pdfNr[i].toInteger()},
+                                     {"text", e.value(QStringLiteral("text")).toArray()[i].toString()},
+                                     {"aspect", e.value(QStringLiteral("aspects")).toArray()[i].toDouble()}});
+        }
+        const fs::path pdf = e.value(QStringLiteral("pdf")).toString().isEmpty()
+                                     ? fs::path()
+                                     : (folder / e.value(QStringLiteral("pdf")).toString().toStdString()).lexically_normal();
+        const QJsonObject json{{"format", 3},
+                               {"file", QString::fromStdString(item.main().lexically_relative(root).string())},
+                               {"name", e.value(QStringLiteral("name")).toString()},
+                               {"xoppStamp", e.value(QStringLiteral("xopp")).toString()},
+                               {"pdf", QString::fromStdString(pdf.empty() ? "" : pdf.lexically_relative(root).string())},
+                               {"pdfStamp", e.value(QStringLiteral("pdfStamp")).toString()},
+                               {"pdfText", pdfText},
+                               {"pages", pages}};
+        const fs::path file = meta / "index" / (std::to_string(++n) + ".json");
+        fs::create_directories(file.parent_path());
+        QFile out(QString::fromStdString(file.string()));
+        ASSERT_TRUE(out.open(QIODevice::WriteOnly));
+        out.write(QJsonDocument(json).toJson(QJsonDocument::Compact));
+        out.close();
+        if (item.main().filename() == "book.pdf") {
+            bookJson = fs::file_size(file);
+        }
+        if (const QByteArray png = previews.value(name).toMap().value(QStringLiteral("png")).toByteArray(); !png.isEmpty()) {
+            fs::create_directories(meta / "previews");
+            QFile p(QString::fromStdString((meta / "previews" / PreviewCache::outsideFile(item).filename()).string()));
+            ASSERT_TRUE(p.open(QIODevice::WriteOnly));
+            p.write(png);
+        }
+    }
+    uintmax_t newBytes = 0, oldBytes = 0, bookPack = 0;
+    int newFiles = 0, oldFiles = 0;
+    for (const auto& f: cacheFiles(root)) {
+        const bool old = f.parent_path().filename() == "index" || f.parent_path().filename() == "previews";
+        (old ? oldBytes : newBytes) += fs::file_size(f);
+        ++(old ? oldFiles : newFiles);
+        if (f.parent_path() == meta && f.filename().string().rfind("pdf-text-", 0) == 0) {
+            bookPack = fs::file_size(f);  // (the only entry with a file of its own)
+        }
+    }
+    std::cout << "the same cache: old layout " << oldBytes / 1024 << " KiB in " << oldFiles << " files, packs "
+              << newBytes / 1024 << " KiB in " << newFiles << " files\n";
+    std::cout << "PDF text of the 250-page PDF: JSON " << bookJson / 1024 << " KiB, CBOR + zlib " << bookPack / 1024
+              << " KiB\n";
+    // Only the old layout left: converted when the library is opened
+    for (const auto& f: cacheFiles(root)) {
+        if (f.extension() == ".pack") {
+            fs::remove(f);
+        }
+    }
     PreviewCache::setLibrary({});
+    dropFromPageCache(cacheFiles(root));
+    t.restart();
+    {
+        LibraryModel model;
+        model.setLibrary(std::make_unique<Library>(root));
+        model.searchIndex()->waitForDone();
+        std::cout << "converting the old layout and opening: " << t.elapsed() << " ms, documents read: "
+                  << model.searchIndex()->documentsRead() << "\n";
+        EXPECT_EQ(model.searchIndex()->oldLayoutsConverted(), 1);
+        EXPECT_EQ(model.searchIndex()->documentsRead(), 0);
+        model.setLibrary(nullptr);
+    }
+    EXPECT_FALSE(fs::exists(meta / "index"));
     DocumentPlaces::setLibrary({}, {});
 }
