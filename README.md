@@ -18,7 +18,8 @@ What is new is everything around them — see [FORK.md](FORK.md) for how the two
 | | |
 | --- | --- |
 | **Tabs and an overview** | Several documents at once, an overview of them all, and a tab can be dragged into a window of its own. |
-| **A library** | Your folders of documents with previews, and a search over the text of every document in them (not only the open one). |
+| **A library** | Your folders of documents with previews, read where you left off, and title pages you choose. |
+| **Search on three levels** | In the page you are on, in every open document at once, or in the whole library — the text of documents you have not opened for months included. |
 | **Markdown on the page** | Write Markdown on a page and see it formatted as you type. It flows onto the next pages, its headings become chapters, and it is stored as ordinary Xournal++ text. |
 | **Pen, finger and mouse told apart** | The pen writes while your hand rests on the screen, a finger scrolls and zooms, the side buttons erase. Tuned on a convertible under Wayland. |
 | **Pages at a glance** | A page sidebar and a zoomable grid of all pages, with copy, move, insert, delete and drag and drop. |
@@ -31,8 +32,8 @@ Not there yet: audio recording, the plugin console and the LaTeX tool of Xournal
 ## What that makes possible
 
 - **Follow a lecture on one device.** The slides as a PDF in one tab, your own notes in another, both in the library.
-  Write on the slides, jump between the two with Ctrl+Tab, and find that one word later with the search over all
-  open documents.
+  Write on the slides, jump between the two with `Ctrl+Tab`, and when you look for that one word weeks later, the
+  library search finds it in a document you have not opened since.
 - **Keep a lab or reading notebook that is still text.** Type the parts that are text as Markdown — headings, task
   lists, tables, code — and draw the rest by hand on the same page. The headings become the table of contents.
 - **Work through a thick PDF.** Open it, scroll or fling; the pages are already rendered. The page grid shows
@@ -54,6 +55,26 @@ whatever you already use.
 - Each library keeps its own notes about itself in **`.xournal_library/`** inside it: the search index, the page
   previews, and which page of a document is its title page and where you stopped reading. It is a cache, not your
   data — delete it and it is built again the next time, and the documents are untouched.
+
+## Search that reaches further than the page
+
+Xournal++ searches the document you are in. Here the same search goes three ways, and every hit is shown where it
+stands on the page, not as a list of file names.
+
+- **In this document** (`Ctrl+F`) — the PDF's text, text you typed, and Markdown boxes (there the hit is marked where
+  the text is *drawn*, not where it sits in the source). Hits are marked on the page, `Enter` and `Shift+Enter` step
+  through them, and the page sidebar and the page grid mark them on the pictures of the pages with a count.
+- **In every open document** (`Ctrl+Shift+F`) — the overview searches all tabs at once and puts the pages that have
+  hits under each document; tapping one opens that document at that page. It reads the documents as they are at this
+  moment, so unsaved changes count too (a 179-page PDF takes about 0.1 s).
+- **In the whole library** (`Ctrl+Alt+F`) — every document in the folder, opened or not. Each library keeps an index
+  of its documents' text in its `.xournal_library/` folder, built and kept up to date in the background: the text of
+  a PDF is read once, a renamed or moved document keeps what was read, and annotating one does not make its PDF text
+  be read again. Results show the pages with hits, drawn with the hits marked on them, and a "Names" button narrows
+  the search to the documents' names.
+
+Short words are searched when you press `Enter`, not while typing: one letter in a 300-page PDF is hundreds of
+thousands of hits, and nobody meant to ask for those.
 
 <img src="qt/docs/screenshots/overview.png" width="900" alt="The overview of the open documents with a search over all of them, showing the pages that have hits">
 
