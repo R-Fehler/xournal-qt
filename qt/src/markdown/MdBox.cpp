@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cmath>
 #include <list>
+#include <mutex>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #include <pango/pango.h>
@@ -109,9 +111,36 @@ std::optional<size_t> checkBoxAt(const Text& text, double x, double y) {
     return std::nullopt;
 }
 
+namespace {
+struct Writing {
+    std::mutex mtx;
+    std::unordered_map<const Text*, size_t> cursors;
+};
+Writing& writing() {
+    static Writing w;
+    return w;
+}
+}  // namespace
+
+void setWritingCursor(const Text& text, size_t active) {
+    std::lock_guard lock(writing().mtx);
+    if (active == NO_SOURCE) {
+        writing().cursors.erase(&text);
+    } else {
+        writing().cursors[&text] = active;
+    }
+}
+
 std::vector<Rect> findText(const Text& text, const std::string& search) {
     const auto& shift = text.getTransformation().shift;
-    auto found = findText(cachedLayout(text.getText(), styleOf(text)), search);
+    size_t active = NO_SOURCE;
+    if (text.isInEditing()) {  // (written on the page: drawn as the editor draws it)
+        std::lock_guard lock(writing().mtx);
+        if (auto it = writing().cursors.find(&text); it != writing().cursors.end()) {
+            active = it->second;
+        }
+    }
+    auto found = findText(cachedLayout(text.getText(), styleOf(text), active), search);
     for (Rect& r: found) {
         r.x += shift.x;
         r.y += shift.y;

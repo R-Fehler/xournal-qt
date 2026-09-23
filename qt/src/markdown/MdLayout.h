@@ -109,15 +109,22 @@ std::optional<Layout::CheckBox> checkBoxAt(const Layout& layout, double x, doubl
 /// The text with a task's mark switched: "[ ]" <-> "[x]" (`mark`: the offset of the " " / "x").
 std::string toggledTask(const std::string& source, size_t mark);
 
-/// Where a text is shown (case-insensitive; box coordinates): one rectangle per match, from its first to its last
-/// character (as upstream's Text::findText).
+/// A rectangle in box coordinates.
 struct Rect {
     double x = 0;
     double y = 0;
     double width = 0;
     double height = 0;
 };
+/// Where a text is shown (case-insensitive; box coordinates): per match, a rectangle on each line it is drawn on
+/// (from its first to its last character there, as upstream's Text::findText does for a line).
 std::vector<Rect> findText(const Layout& layout, const std::string& search);
+/// Where bytes [from, to) of a Text item's Pango text are drawn (box coordinates): a rectangle per line.
+std::vector<Rect> textRects(const Item& item, int from, int to);
+/// Where a range of the source, [begin, end), is drawn (box coordinates): a rectangle per line of each text it is in.
+/// Marks that are not drawn (a "**", a fence) have no place; text that stands for source it does not show (an
+/// entity) is marked whole.
+std::vector<Rect> sourceRects(const Layout& layout, size_t begin, size_t end);
 
 /// Heading size factor (relative to the body text), level 1–6.
 double headingScale(int level);

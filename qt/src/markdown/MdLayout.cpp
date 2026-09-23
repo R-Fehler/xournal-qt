@@ -120,7 +120,12 @@ public:
             top = i;
             current = {};
             const size_t first = out.items.size();
-            if (i == rawBlockIndex) {
+            if (i == rawBlockIndex && afterClosedCode(blocks[i])) {
+                // The cursor on the lines after a closed code block: the code is done (drawn as code), the cursor's
+                // line is where the next paragraph goes
+                block(blocks[i], 0, st.width, c);
+                rawBlock(nullptr, text::lineStart(source, active), rawEnd, c);
+            } else if (i == rawBlockIndex) {
                 rawBlock(&blocks[i], rawSpan.begin, rawEnd, c);
             } else {
                 block(blocks[i], 0, st.width, c);
@@ -685,11 +690,24 @@ private:
             index = addText(std::move(l), 0, y, c.color);
         }
         y += h + 2 * pad;
-        mainItem(index);
+        if (b) {
+            mainItem(index);
+        }
         out.rawItem = static_cast<int>(index);
         out.rawBegin = begin;
         out.rawEnd = rawEnd;
         margin(kind == BlockKind::Heading ? o.size * 0.45 : 0.75 * st.size);
+    }
+
+    /// Whether the cursor (`active`) is on the lines after a fenced code block that is closed (not on its lines).
+    bool afterClosedCode(const Block& b) const {
+        using namespace text;
+        if (b.kind != BlockKind::CodeBlock || !b.fenced || active < rawSpan.end || rawSpan.end == 0) {
+            return false;
+        }
+        const std::string fence = fenceOf(lineAt(source, rawSpan.begin));
+        const size_t last = lineStart(source, rawSpan.end - 1);  // (its last line)
+        return !fence.empty() && last > rawSpan.begin && closesFence(lineAt(source, last), fence);
     }
 
     static void collectRuns(const Block& b, size_t from, size_t to, std::vector<const Run*>& out) {
@@ -784,6 +802,83 @@ std::string toggledTask(const std::string& source, size_t mark) {
     return out;
 }
 
+std::vector<Rect> textRects(const Item& it, int from, int to) {
+    std::vector<Rect> out;
+    if (it.kind != Item::Kind::Text || !it.layout || from >= to) {
+        return out;
+    }
+    constexpr double S = PANGO_SCALE;
+    PangoLayout* l = it.layout.get();
+    PangoLayoutIter* iter = pango_layout_get_iter(l);
+    do {
+        PangoLayoutLine* line = pango_layout_iter_get_line_readonly(iter);
+        const int start = line->start_index;
+        const int end = start + line->length;
+        if (end <= from || start >= to) {
+            if (start >= to) {
+                break;
+            }
+            continue;
+        }
+        // Left and right: the drawn range on this line; top and height: its first character's (as a caret's)
+        int* ranges = nullptr;
+        int n = 0;
+        pango_layout_line_get_x_ranges(line, std::max(from, start), std::min(to, end), &ranges, &n);
+        if (n > 0) {
+            int left = ranges[0];
+            int right = ranges[1];
+            for (int k = 1; k < n; ++k) {
+                left = std::min(left, ranges[2 * k]);
+                right = std::max(right, ranges[2 * k + 1]);
+            }
+            PangoRectangle first;
+            pango_layout_index_to_pos(l, std::max(from, start), &first);
+            out.push_back({it.x + left / S, it.y + first.y / S, (right - left) / S, first.height / S});
+        }
+        g_free(ranges);
+    } while (pango_layout_iter_next_line(iter));
+    pango_layout_iter_free(iter);
+    return out;
+}
+
+std::vector<Rect> sourceRects(const Layout& layout, size_t begin, size_t end) {
+    std::vector<Rect> out;
+    for (const Item& it: layout.items) {
+        if (it.kind != Item::Kind::Text) {
+            continue;
+        }
+        // The bytes of the item's text from that source, joined where they touch
+        int from = -1;
+        int to = -1;
+        const auto flush = [&] {
+            if (from >= 0 && to > from) {
+                const auto rects = textRects(it, from, to);
+                out.insert(out.end(), rects.begin(), rects.end());
+            }
+            from = to = -1;
+        };
+        for (const SourceMap& m: it.sources) {
+            if (m.source == NO_SOURCE || m.length == 0 || m.source + std::max<size_t>(m.sourceLength, 1) <= begin ||
+                m.source >= end) {
+                continue;
+            }
+            int a = m.start;
+            int b = m.start + m.length;
+            if (m.sourceLength == static_cast<size_t>(m.length)) {  // (the text is the source: byte for byte)
+                a = m.start + static_cast<int>(std::max(begin, m.source) - m.source);
+                b = m.start + static_cast<int>(std::min(end, m.source + m.sourceLength) - m.source);
+            }
+            if (a != to) {
+                flush();
+                from = a;
+            }
+            to = b;
+        }
+        flush();
+    }
+    return out;
+}
+
 std::vector<Rect> findText(const Layout& layout, const std::string& search) {
     std::vector<Rect> found;
     if (search.empty()) {
@@ -794,17 +889,14 @@ std::vector<Rect> findText(const Layout& layout, const std::string& search) {
         if (it.kind != Item::Kind::Text) {
             continue;
         }
-        const std::string text = StringUtils::toLowerCase(pango_layout_get_text(it.layout.get()));
+        const std::string_view shown = pango_layout_get_text(it.layout.get());
+        const std::string text = StringUtils::toLowerCase(std::string(shown));
         for (size_t pos = text.find(pattern); pos != std::string::npos; pos = text.find(pattern, pos + 1)) {
-            PangoRectangle a;
-            PangoRectangle b;
-            pango_layout_index_to_pos(it.layout.get(), static_cast<int>(pos), &a);
-            pango_layout_index_to_pos(it.layout.get(), static_cast<int>(pos + pattern.size() - 1), &b);
-            const double x1 = it.x + a.x / static_cast<double>(PANGO_SCALE);
-            const double y1 = it.y + a.y / static_cast<double>(PANGO_SCALE);
-            const double x2 = it.x + (b.x + b.width) / static_cast<double>(PANGO_SCALE);
-            const double y2 = it.y + (b.y + b.height) / static_cast<double>(PANGO_SCALE);
-            found.push_back({std::min(x1, x2), std::min(y1, y2), std::abs(x2 - x1), std::abs(y2 - y1)});
+            // (a lower case of another length moves the places a little; they stay in the text)
+            const auto from = static_cast<int>(std::min(pos, shown.size()));
+            const auto to = static_cast<int>(std::min(pos + pattern.size(), shown.size()));
+            const auto rects = textRects(it, from, to);
+            found.insert(found.end(), rects.begin(), rects.end());
         }
     }
     return found;

@@ -110,6 +110,8 @@ private:
     void changed(bool textChanged);
     void moveCursor(size_t to, bool keepAnchor);
     void setCurrent(size_t part);
+    /// A page's box is drawn otherwise (another block as its source, or formatted again): searched again.
+    void drawnAsWrittenChanged(const PageRef& page);
 
     // --- keys -----------------------------------------------------------------------------------------------------
     void newLine(bool soft);
@@ -129,6 +131,7 @@ private:
     size_t current = 0;           ///< the part with the cursor
     Text* editing = nullptr;      ///< its box, left out by the renderer while it is edited
     CanvasPage* page = nullptr;   ///< its page (with this editor's view)
+    size_t rawBegin = md::NO_SOURCE;  ///< where the block drawn as its source begins (in the box's text)
     size_t caret = 0;
     size_t anchor = 0;
     std::string preedit;          ///< the input method's text not yet typed

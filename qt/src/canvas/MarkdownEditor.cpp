@@ -100,17 +100,20 @@ MarkdownEditor::~MarkdownEditor() {
     }
     const PageRef edited = editing ? parts[std::min(current, parts.size() - 1)].page : nullptr;
     if (editing) {
+        md::setWritingCursor(*editing, md::NO_SOURCE);
         std::unique_lock lock(*session.getDocument());
         editing->setInEditing(false);
     }
     md.finish();  // (one undo step)
     if (edited) {
         edited->firePageChanged();  // (drawn by the renderer again)
+        drawnAsWrittenChanged(edited);
     }
 }
 
 void MarkdownEditor::cancel() {
     if (editing) {
+        md::setWritingCursor(*editing, md::NO_SOURCE);
         std::unique_lock lock(*session.getDocument());
         editing->setInEditing(false);
     }
@@ -348,11 +351,23 @@ void MarkdownEditor::paint(cairo_t* cr) const {
 
 // --- changes -----------------------------------------------------------------------------------------------------
 
+void MarkdownEditor::drawnAsWrittenChanged(const PageRef& p) {
+    size_t index = npos;
+    {
+        std::shared_lock lock(*session.getDocument());
+        index = session.getDocument()->indexOf(p);
+    }
+    if (index != npos) {
+        Q_EMIT session.pageContentChanged(index);  // (the search marks what is drawn)
+    }
+}
+
 void MarkdownEditor::setCurrent(size_t part) {
     part = std::min(part, parts.size() - 1);
     Text* box = parts[part].box;
     if (box != editing) {
         if (editing) {
+            md::setWritingCursor(*editing, md::NO_SOURCE);
             {
                 std::unique_lock lock(*session.getDocument());
                 editing->setInEditing(false);
@@ -360,9 +375,11 @@ void MarkdownEditor::setCurrent(size_t part) {
             for (const Part& p: parts) {
                 if (p.box == editing) {
                     p.page->firePageChanged();  // (drawn by the renderer again)
+                    drawnAsWrittenChanged(p.page);
                 }
             }
         }
+        rawBegin = md::NO_SOURCE;
         if (box) {
             {
                 std::unique_lock lock(*session.getDocument());
@@ -396,6 +413,16 @@ void MarkdownEditor::changed(bool textChanged) {
         return;
     }
     setCurrent(partOf(caret));
+    if (editing) {
+        // The block with the cursor is drawn as its source: the search marks what is drawn (searched again when
+        // another block is drawn as source; a change of the text is searched again anyway)
+        md::setWritingCursor(*editing, localOf(current, caret));
+        const size_t block = layoutOf(current).rawBegin;
+        if (block != rawBegin) {
+            rawBegin = block;
+            drawnAsWrittenChanged(parts[current].page);
+        }
+    }
     // Repaint where the box was and is; show the cursor
     const QRectF now = boxRect(current).adjusted(-FRAME_MARGIN * 2, -FRAME_MARGIN * 2, FRAME_MARGIN * 2,
                                                   FRAME_MARGIN * 2);
@@ -602,8 +629,22 @@ void MarkdownEditor::newLine(bool soft) {
     // In a code block: a line, indented as this one
     const md::Document doc = md::parse(t);
     const auto spans = md::topLevelSpans(t, doc);
+    // (a fence that is not closed goes on to the end of the text: the end is in the code as well)
+    const auto openFence = [&](const md::BlockSpan& span) {
+        const std::string fence = fenceOf(lineAt(t, span.begin));
+        if (fence.empty()) {
+            return false;
+        }
+        for (size_t l = nextLine(t, span.begin); l < span.end; l = nextLine(t, l)) {
+            if (closesFence(lineAt(t, l), fence)) {
+                return false;
+            }
+        }
+        return true;
+    };
     for (size_t i = 0; i < spans.size(); ++i) {
-        if (spans[i].begin <= from && from < spans[i].end && doc.root.children[i].kind == md::BlockKind::CodeBlock) {
+        const bool inside = from < spans[i].end || (from == t.size() && spans[i].end == t.size() && openFence(spans[i]));
+        if (spans[i].begin <= from && inside && doc.root.children[i].kind == md::BlockKind::CodeBlock) {
             const size_t indent = line.find_first_not_of(' ');
             insert("\n" + std::string(indent == std::string::npos ? line.size() : indent, ' '), EditKind::Other);
             return;
