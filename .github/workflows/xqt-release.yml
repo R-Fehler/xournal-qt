@@ -108,10 +108,20 @@ jobs:
           export QMAKE="$(command -v qmake6 || command -v qmake)"  # how the Qt plugin finds Qt
           version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
           case "$GITHUB_REF_NAME" in v*) export VERSION="${GITHUB_REF_NAME#v}" ;; *) export VERSION="$version" ;; esac
+          export OUTPUT="xournal-qt-$VERSION-x86_64.AppImage"  # else it is named after the desktop entry
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
               -d AppDir/usr/share/applications/xournal-qt.desktop \
               -i AppDir/usr/share/icons/hicolor/scalable/apps/xournal-qt.svg
-          mkdir -p out && mv ./*.AppImage out/ && ls -l out
+          # Only what was built, never the two tools of linuxdeploy (they are AppImages themselves)
+          mkdir -p out
+          if [ -f "$OUTPUT" ]; then
+              mv "$OUTPUT" out/
+          else
+              for f in *.AppImage; do
+                  case "$f" in linuxdeploy*) ;; *) mv "$f" "out/$OUTPUT" ;; esac
+              done
+          fi
+          ls -l out
 
       - uses: actions/upload-artifact@v4
         with:

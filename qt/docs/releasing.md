@@ -28,8 +28,9 @@ in a container; `qt/scripts/linux-deps.sh` installs the packages (the same scrip
    - `xournal-qt_x.y.z_amd64_neon-jammy.deb` — built on Ubuntu 22.04 with KDE neon's packages (Qt 6.7). For KDE
      neon and other Ubuntu 22.04 systems that have Qt 6.5 or newer.
    - `xournal-qt_x.y.z_amd64_debian13.deb` — built on Debian 13. Also for Ubuntu 25.04 and newer.
-   - `xournal-qt-x.y.z-x86_64.AppImage` — runs from Ubuntu 22.04 on, whatever Qt the system has. The recipe is new,
-     so the job may not produce it (`continue-on-error`); the release does not wait for it.
+   - `xournal-qt-x.y.z-x86_64.AppImage` — runs from Ubuntu 22.04 on, whatever Qt the system has; it carries Qt and
+     the QML modules with it (about 80 MB), which linuxdeploy and its Qt plugin put there. Those two are tools, they
+     are AppImages themselves, and they do not belong in the release.
 6. Install a package and try it, then write the notes and publish the draft on GitHub.
 
 Every job also keeps what it built as an artifact of the run (the "Artifacts" box at the bottom of the run's page,
