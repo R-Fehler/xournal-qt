@@ -84,18 +84,38 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - A setting keeps the index in the folders or in the app cache (the cache is already used for read-only
     folders).
   - A clean-up tab removes all dot folders. It warns first, then the app quits so it does not rebuild them.
-  - *Open questions:*
-    - How big is `.xournal_library/` today per folder: index only, or previews too?
-    - In the app-cache mode, are entries keyed by path, so a move means re-indexing?
-    - How does cloud sync handle many small dot folders?
-- [?] **Fuzzy search with logical operators**, modelled on fzf; clone `junegunn/fzf` as a reference.
-  - *Proposal:* use fzf's own extended syntax instead of inventing one:
+  - *Measured 2026-09-23* on the biggest library, `~/OneDrive/000_GoodNotes/00_Uni` (read only):
+    - 3,323 documents in 292 folders.
+    - `.xournal_library/` is 165 MB in **4,459 files, all at the top level**, and OneDrive syncs every one of them:
+      - `index/`: 3,323 JSON files, one per document, 100 MB. 2,196 are under 10 kB, 14 are over 1 MB, and the
+        largest is 9.1 MB. The PDF text is stored as plain JSON strings.
+      - `previews/`: 1,135 PNG files, 65 MB.
+      - `pages.json`: the last page read in each document. This is **user state, not cache**, so deleting the
+        folder loses it.
+    - Entries are named by a hash of the path, so a folder moved outside the app loses its entries. The PDF text
+      is taken over only when an old entry with the same size and time still exists.
+  - *Proposal from these numbers:*
+    - **One pack per folder**, not one file per document. Each folder gets a single index file for the documents
+      directly in it, keyed by file name, and compressed: PDF text shrinks to roughly a quarter. Previews for
+      that folder go into a single file too.
+    - 292 folders then mean about 600 files instead of 4,459, which cloud sync handles far better. A folder moved
+      by any program keeps its index.
+    - Opening a parent folder reads and merges the packs of its subfolders, and a subfolder opens as a library
+      instantly.
+    - A setting per library chooses where the cache lives: in the folders (the default) or in the app cache,
+      which is recommended for synced folders. In the app-cache mode, files moved outside the app are matched
+      again by name, size and time.
+    - Move reading positions (`pages.json`) out of the cache, into the config folder or a small file of its own
+      that the clean-up keeps. Otherwise "remove all dot folders" loses where you were in every document.
+- [ ] **Fuzzy search with logical operators**, modelled on fzf; clone `junegunn/fzf` as a reference.
+  - **Decided (2026-09-23): opt in, behind a toggle button** in the search bar. Without the toggle, search works
+    as it does today.
+  - *Proposal for the syntax when the toggle is on:* fzf's extended syntax:
     - a space means AND; `|` means OR; `!term` means NOT;
     - `'exact`, `^prefix` and `suffix$` narrow a term;
-    - parentheses sit behind an "advanced" toggle.
-  - Upper-case `AND`/`OR`/`XOR` would also work, but they collide with searching for those words. XOR is
-    rarely useful for documents.
-  - *Question:* should the operators always be on, as in fzf, or only behind a button?
+    - parentheses group terms.
+
+    XOR is left out; it is rarely useful for documents.
 
 ### Markdown
 - **Decided (2026-09-23): the `.md` engine is native**, not a web view: md4c with our layout and
