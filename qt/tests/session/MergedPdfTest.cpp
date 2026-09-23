@@ -188,11 +188,14 @@ TEST_F(MergedPdfTest, benchSizes) {
     const auto t0 = std::chrono::steady_clock::now();
     fs::path base = lecture;
     for (size_t page: {2, 5, 9}) {
+        const auto t = std::chrono::steady_clock::now();
         std::string copied;
         ASSERT_TRUE(MergedPdf::extract(other, {page}, copied).ok);
-        std::cout << "page " << page + 1 << " copied: " << copied.size() / 1024 << " KiB\n";
         const auto r = MergedPdf::append(base, copied, merged, MergedPdf::Kind::WithSource);
         ASSERT_TRUE(r.ok) << r.error;
+        std::cout << "page " << page + 1 << " copied: " << copied.size() / 1024 << " KiB, pasted in "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t).count()
+                  << " ms\n";
         base = merged;
     }
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0);
