@@ -2004,7 +2004,23 @@ QUrl AppController::openFolder() const {
     return last.empty() ? QUrl() : QUrl::fromLocalFile(QString::fromStdString(last.string()));
 }
 
-void AppController::openLink(const QString& uri) { QDesktopServices::openUrl(QUrl(uri)); }
+void AppController::openLink(const QString& uri) {
+    QUrl url(uri);
+    if (const QString host = uri.section(QLatin1Char('/'), 0, 0);
+        url.scheme().isEmpty() && !uri.startsWith(QLatin1Char('/')) && !uri.contains(QLatin1Char(':')) &&
+        host.contains(QLatin1Char('.')) && !host.contains(QLatin1Char(' '))) {
+        url = QUrl(QStringLiteral("https://") + uri);  // "example.org/page", as a browser reads it
+    }
+    // Only what a note may open by itself: a document from somewhere else must not start a program or open a file on
+    // this computer with one tap. The address is shown next to the button, so it can be copied.
+    static const QStringList opened{QStringLiteral("http"), QStringLiteral("https"), QStringLiteral("mailto")};
+    if (!url.isValid() || !opened.contains(url.scheme().toLower())) {
+        Q_EMIT message(tr("Link not opened"),
+                       tr("Only web and mail addresses are opened from a document. This link is:\n%1").arg(uri), true);
+        return;
+    }
+    QDesktopServices::openUrl(url);
+}
 
 QUrl AppController::suggestedExportFile() const {
     if (!session()) {

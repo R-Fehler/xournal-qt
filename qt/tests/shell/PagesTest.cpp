@@ -136,6 +136,19 @@ TEST(Chapters, comeFromTheHeadingsOfMarkdownBoxes) {
     EXPECT_EQ(outline->data(outline->index(2), OutlineModel::LevelRole).toInt(), 2);
 }
 
+// A document from somewhere else must not start a program or open a local file with one tap: only web and mail
+// addresses are opened, the rest is told to the user (its address is shown next to the button).
+TEST(PageLinks, onlyWebAndMailAddressesAreOpened) {
+    AppController c;
+    c.newDocument();
+    QSignalSpy refused(&c, &AppController::message);
+    for (const char* uri: {"file:///etc/passwd", "smb://host/share", "javascript:alert(1)", "/home/someone/x.sh"}) {
+        c.openLink(QString::fromLatin1(uri));
+    }
+    EXPECT_EQ(refused.count(), 4) << "each of them says why it was not opened";
+    EXPECT_TRUE(refused.first().at(1).toString().contains("/etc/passwd")) << "with the address";
+}
+
 TEST(PageLinks, followTheirPagesWhenPagesChange) {
     AppController c;
     c.newDocument();
