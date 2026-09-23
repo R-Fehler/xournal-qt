@@ -131,7 +131,8 @@ std::vector<PageRef> PageClipboard::pagesFor(DocumentSession& target, fs::path* 
                          (!pdfFile.empty() && targetPdf == pdfFile && stampOf(pdfFile) == pdfStamp);
     size_t first = npos;
     if (!samePdf && !pdfData.empty()) {
-        if (merged.session == target.serial() && merged.pdf == targetPdf && stampOf(targetPdf) == merged.stamp) {
+        if (merged.session == target.serial() && merged.pdf == targetPdf &&
+            stampOf(targetPdf) == merged.stamp) {
             first = merged.first;  // pasted into it before: the pages are there
         } else {
             std::string error;

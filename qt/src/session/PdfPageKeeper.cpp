@@ -396,7 +396,8 @@ void PdfPageKeeper::beforeSave(const fs::path& target) {
                 }
             } else if (limbo) {
                 t.limbo = limbo;
-                t.limboIndex = static_cast<size_t>(std::lower_bound(dropped.begin(), dropped.end(), n) - dropped.begin());
+                const auto at = std::lower_bound(dropped.begin(), dropped.end(), n);
+                t.limboIndex = static_cast<size_t>(at - dropped.begin());
             }
         }
         for (size_t i = 0; i < doc->getPageCount(); ++i) {

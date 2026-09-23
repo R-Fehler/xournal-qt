@@ -78,7 +78,8 @@ fs::path pairOf(const fs::path& xopp) {
 bool isSidecarName(const fs::path& pdf) {
     const std::string n = pdf.filename().string();
     const std::string suffix = PAGES_SUFFIX;
-    return n.size() > suffix.size() + 1 && n[0] == '.' && n.compare(n.size() - suffix.size(), suffix.size(), suffix) == 0;
+    return n.size() > suffix.size() + 1 && n[0] == '.' &&
+           n.compare(n.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 fs::path cacheFolder() { return Util::getCacheSubfolder("pasted-pages"); }

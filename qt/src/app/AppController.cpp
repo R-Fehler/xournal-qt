@@ -595,10 +595,19 @@ int AppController::pastePages(int position) {
     QString note = n == 1 ? tr("Page pasted") : tr("%1 pages pasted").arg(n);
     if (!keptIn.empty()) {
         // Once per paste: where the PDF pages went (a new file next to the document)
-        note = MergedPdf::inCache(keptIn)
-                       ? tr("%1. Its PDF text stays searchable: the PDF pages are saved next to the document.").arg(note)
-                       : tr("%1. Its PDF text stays searchable: the PDF pages are kept in %2 next to the document.")
-                                 .arg(note, QString::fromStdString(keptIn.filename().string()));
+        const QString where = QString::fromStdString(keptIn.filename().string());
+        if (MergedPdf::inCache(keptIn)) {
+            note = n == 1 ? tr("Page pasted. Its PDF text stays searchable: it is saved next to the document.")
+                          : tr("%1 pages pasted. Their PDF text stays searchable: they are saved next to the document.")
+                                    .arg(n);
+        } else {
+            note = n == 1 ? tr("Page pasted. Its PDF text stays searchable: it is kept in %1 next to the document.")
+                                    .arg(where)
+                          : tr("%1 pages pasted. Their PDF text stays searchable: they are kept in %2 next to the "
+                               "document.")
+                                    .arg(n)
+                                    .arg(where);
+        }
     }
     Q_EMIT pageActionDone(note, true);
     return n;

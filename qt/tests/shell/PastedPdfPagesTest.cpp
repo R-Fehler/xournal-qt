@@ -118,7 +118,8 @@ TEST_F(PastedPdfPages, stayPdfPagesWithTheirTextInAHiddenSidecar) {
     EXPECT_TRUE(fs::exists(root / ".lecture.pages.pdf"));
     EXPECT_EQ(bytesOf(root / "lecture.pdf"), original) << "the lecture's PDF is never changed";
     ASSERT_EQ(notes.count(), 1);
-    EXPECT_TRUE(notes.first().at(0).toString().contains(".lecture.pages.pdf")) << notes.first().at(0).toString().toStdString();
+    const QString note = notes.first().at(0).toString();
+    EXPECT_TRUE(note.contains(".lecture.pages.pdf")) << note.toStdString();
 
     // Its text: searched and selected like any PDF page; the other pages show what they showed.
     EXPECT_TRUE(pageHasText(s, 1, "pastedbeta"));
@@ -443,8 +444,8 @@ TEST_F(PastedPdfPages, travelWithTheirDocumentInTheLibrary) {
     ASSERT_TRUE(r.ok) << r.error;
     EXPECT_TRUE(fs::exists(root / ".renamed.pages.pdf"));
     EXPECT_FALSE(fs::exists(root / ".lecture.pages.pdf"));
-    EXPECT_NE(std::find(r.moved.begin(), r.moved.end(), std::make_pair(root / ".lecture.pages.pdf", root / ".renamed.pages.pdf")),
-              r.moved.end()) << "an open tab follows";
+    const auto sidecarMove = std::make_pair(root / ".lecture.pages.pdf", root / ".renamed.pages.pdf");
+    EXPECT_NE(std::find(r.moved.begin(), r.moved.end(), sidecarMove), r.moved.end()) << "an open tab follows";
     EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "renamed.xopp", WORDS), shown);
 
     fs::create_directories(root / "Week 1");
