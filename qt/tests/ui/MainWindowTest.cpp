@@ -174,6 +174,37 @@ TEST_F(MainWindowTest, ctrlTabSwitchesTabs) {
     EXPECT_EQ(controller->currentTab(), 1);
 }
 
+// Beside the overview button: the previous and the next document, like Ctrl+PgUp / Ctrl+PgDown (round the ends)
+TEST_F(MainWindowTest, arrowsBesideTheOverviewSwitchTabs) {
+    auto* previous = findItem("previousTabButton");
+    auto* next = findItem("nextTabButton");
+    auto* overview = findItem("overviewButton");
+    ASSERT_NE(previous, nullptr);
+    ASSERT_NE(next, nullptr);
+    ASSERT_NE(overview, nullptr);
+    ASSERT_EQ(controller->tabCount(), 1);
+    EXPECT_FALSE(previous->isVisible()) << "one document: nothing to switch to";
+    EXPECT_FALSE(next->isVisible());
+
+    controller->newDocument();
+    controller->newDocument();
+    wait(50);
+    ASSERT_EQ(controller->tabCount(), 3);
+    ASSERT_EQ(controller->currentTab(), 2);
+    EXPECT_TRUE(previous->isVisible());
+    EXPECT_TRUE(next->isVisible());
+    const auto sceneX = [](QQuickItem* i) { return i->mapToScene(QPointF(0, 0)).x(); };
+    EXPECT_LT(std::abs(sceneX(next) - sceneX(overview)), 120) << "next to the overview button";
+    EXPECT_LT(sceneX(previous), sceneX(next)) << "previous on the left";
+
+    click(next);
+    EXPECT_EQ(controller->currentTab(), 0) << "past the last one: the first, as Ctrl+PgDown";
+    click(previous);
+    EXPECT_EQ(controller->currentTab(), 2) << "before the first one: the last, as Ctrl+PgUp";
+    click(previous);
+    EXPECT_EQ(controller->currentTab(), 1);
+}
+
 TEST_F(MainWindowTest, tabOverviewSwitchesAndCloses) {
     controller->newDocument();
     controller->newDocument();

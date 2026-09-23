@@ -415,3 +415,6 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
       The same with Right (tab points right, strip at the right edge pointing left; the scroll bar sits beside the
       strip, not under it) and Top (tab points up, strip at the top pointing down). With the pen, the pen pill at
       the right edge does not cover the strip.
+- [ ] One document open: no arrows beside the "all open documents" button. Open three: ‹ and › appear right of
+      it; › goes to the next document and from the last one to the first (like Ctrl+PgDown), ‹ the other way. On
+      the home screen, either arrow goes back to the document behind it (like the shortcut). Touch sized with a finger.
