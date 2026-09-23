@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
     QGuiApplication::setDesktopFileName("xournal-qt");
     QGuiApplication::setApplicationName("xournal-qt");
     QGuiApplication::setApplicationDisplayName("Xournal Qt");
+    QGuiApplication::setApplicationVersion(XQT_VERSION);
     // A QApplication (not only QGuiApplication): the platform theme (e.g. KDE Plasma) then provides its native,
     // resizable file dialogs for QtQuick.Dialogs instead of Qt's built-in QML fallback.
     QApplication qapp(argc, argv);
@@ -61,6 +62,7 @@ int main(int argc, char* argv[]) {
     QCommandLineParser parser;
     parser.setApplicationDescription("Xournal Qt - note taking and PDF annotation");
     parser.addHelpOption();
+    parser.addVersionOption();
     parser.addPositionalArgument("folder", "Folder to open as library (default: the standard library)", "[folder]");
     parser.addPositionalArgument("file", "Documents to open (.xopp, .xoj or .pdf)", "[files...]");
     parser.process(qapp);

@@ -24,7 +24,7 @@
   - After the first device test: dialogs usable (the canvas only takes events where it is the topmost item), touchpad momentum, scroll bars, resizable native file dialogs (`QApplication` for the KDE platform theme), "Save as" suggests the `.xopp` next to an annotated PDF.
   - Checklist: `docs/testing/device-checklist.md`.
 - **M5a tabs and single instance: done, confirmed on the device.**
-  - `xqt-shell`: `TabManager` (one `DocumentSession` + `CanvasView` per tab; background tabs release their page buffers after 30 s), `SingleInstance` (`QLocalServer`; files opened from the file manager go to the running window as new tabs), `AppController`.
+  - `xqt-shell`: `TabManager` (one `DocumentSession` + `CanvasView` per tab; what the tabs keep of their rendered pages: `CanvasMemory`), `SingleInstance` (`QLocalServer`; files opened from the file manager go to the running window as new tabs), `AppController`.
   - Tab strip with close buttons, reordering, unsaved-changes prompts per tab and on quit.
 - **M5b page sidebar and page operations: done (awaiting on-device test).**
   - Sidebar with page thumbnails (`ThumbnailProvider`: async, rendered like upstream's `PreviewJob`; `PagesModel` follows the document events and refreshes thumbnails 400 ms after edits, undo and redo).
@@ -78,6 +78,9 @@
   - Full screen (F11): only a small current-tool square (drag it; tap: all tools and colors) and the page / zoom pill.
   - Table of contents: Pages | Contents in the sidebar; contents overview (Ctrl+Alt+O) with level-styled headings and the pages of each section side by side. The page grid button moved into the page / zoom pill.
   - Program icon and a .deb (CPack as upstream; qt/packaging/README.md): desktop file for PDF/.xopp/.xoj, mime types, Dolphin "Open as Xournal Qt library" for folders.
+  - Markdown boxes: write Markdown on a page (or beside it) and see it formatted while typing; it flows onto the next
+    pages, its headings are chapters, the search finds it where it is drawn, and it is stored as ordinary Xournal++
+    text in a layer "Markdown". See [markdown-boxes.md](markdown-boxes.md).
   - Text mode (Ctrl+Alt+E): type the page's text like in a word processor (headings, lists, per-paragraph bold / italic / size / color, markdown shortcuts), stored as Xournal++ text elements in a layer "Text" and read back; one undo step. See [text-mode.md](text-mode.md).
   - Downloads folder as a quick library (import warning); Copy to / Move to another library.
 - **Search with short texts** (user report: a one-letter search in a large document could crash): texts shorter than 4 characters are searched on Enter or a tap on the search icon only (document, tab overview, library). A one-letter search in a 300-page PDF (207k hits) peaked at ~1 GB: the sidebar and page grid made one QML item per hit. Thumbnails now show at most 50 marks per page, spread over it (the count badge stays exact): ~260 MB.
@@ -436,7 +439,12 @@ Reused without changes: `control/xojfile/*` (GMarkup parser, LoadHandler, SaveHa
 3. **Live-stroke latency from texture uploads.** Upload dirty 256–512 px tiles only; GPU tessellation is the fallback.
 4. **Upstream merge pain.** Keep upstream class and method names, tag edits `xqt:`, list replaced files in `FORK.md`, and merge `upstream/master` regularly.
 5. **Poppler serializes renders per document** with a mutex. Acceptable until MuPDF (M6). Pango works per thread as in upstream `RenderJob`.
-6. **Memory with many tabs.** A global tile budget, LRU across sessions, and background tabs release their tiles.
+6. **Memory with many tabs: done.** `CanvasMemory` holds one limit for the rendered pages of all tabs (Settings →
+   Documents → Memory; a quarter of the RAM by default, at most a third): the document used last takes up to 70 % of
+   it (35 % before the visible pages, 65 % after them) and renders them ahead on idle-priority workers; the others
+   keep theirs while the rest of the limit holds them, the one used longest ago giving them up first. A tenth of the
+   limit holds a preview of every page (`PageSketches`), which the canvas shows until a page is rendered and which
+   the sidebar and the overviews scale their thumbnails from; they are stored in the cache for the next opening.
 7. **Fractional scaling.** Snap to device pixels, and test at scales 1.25 and 1.5.
 
 ---

@@ -132,6 +132,7 @@ qt_add_executable(xournal-qt
 )
 target_include_directories(xournal-qt PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xournal-qt PRIVATE Qt6::Widgets Qt6::Quick Qt6::QuickControls2 xqt-quick xqt-shell xqt-uiplugin)
+target_compile_definitions(xournal-qt PRIVATE XQT_VERSION="${PROJECT_VERSION}")
 set_target_properties(xournal-qt PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 if(XQT_BUILD_TESTS)

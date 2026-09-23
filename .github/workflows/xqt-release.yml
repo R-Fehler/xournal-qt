@@ -1,0 +1,147 @@
+# xournal-qt: the artifacts of a release. Push a tag "v1.2.3" (or start this by hand) and a draft release with the
+# packages appears; look at it, write the notes and publish it.
+#
+# Qt 6.5 or newer is needed, which the runners' own Ubuntu 24.04 does not have (6.4), so every job builds in a
+# container: one on Ubuntu 22.04 with KDE neon's packages (Qt 6.7, as on the author's machine), one on Debian 13
+# (Qt 6.8, also for Ubuntu 25.04 and newer).
+name: xournal-qt release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  packages:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: KDE neon / Ubuntu 22.04
+            container: ubuntu:22.04
+            suffix: neon-jammy
+            neon: '1'
+          - name: Debian 13 / Ubuntu 25.04
+            container: debian:trixie
+            suffix: debian13
+            neon: '0'
+    steps:
+      - name: What the checkout needs in the container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Install the build dependencies
+        run: bash qt/scripts/linux-deps.sh
+        env:
+          XQT_NEON: ${{ matrix.neon }}
+
+      - name: The tag and the version of the project must say the same
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
+          tag="${GITHUB_REF_NAME#v}"
+          echo "project ${version}, tag ${tag}"
+          [ "$version" = "$tag" ] || { echo "::error::the tag says ${tag}, qt/CMakeLists.txt says ${version}"; exit 1; }
+
+      - name: Configure
+        run: cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_SPIKES=OFF
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300
+
+      - name: Make the package
+        run: |
+          cd build
+          cpack -G DEB
+          cd packages
+          for f in *.deb; do mv "$f" "${f%.deb}_${{ matrix.suffix }}.deb"; done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.suffix }}
+          path: build/packages/*.deb
+          if-no-files-found: error
+
+  appimage:
+    name: AppImage (Ubuntu 22.04 and newer)
+    runs-on: ubuntu-22.04
+    # The first one: it runs everywhere from Ubuntu 22.04 on, but the recipe is new - a release does not wait for it.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build dependencies
+        run: bash qt/scripts/linux-deps.sh
+        env:
+          XQT_NEON: '1'
+
+      - name: Build and install into an AppDir
+        run: |
+          cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXQT_BUILD_SPIKES=OFF \
+                -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j "$(nproc)"
+          DESTDIR="$PWD/AppDir" cmake --install build
+
+      - name: Pack it
+        run: |
+          export APPIMAGE_EXTRACT_AND_RUN=1  # the runners have no FUSE
+          base=https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous
+          plugin=https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous
+          curl -fsSLO "$base/linuxdeploy-x86_64.AppImage"
+          curl -fsSLO "$plugin/linuxdeploy-plugin-qt-x86_64.AppImage"
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          export QML_SOURCES_PATHS="$PWD/qt/src/app/qml"
+          export QMAKE="$(command -v qmake6 || command -v qmake)"  # how the Qt plugin finds Qt
+          export VERSION="${GITHUB_REF_NAME#v}"
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
+              -d AppDir/usr/share/applications/xournal-qt.desktop \
+              -i AppDir/usr/share/icons/hicolor/scalable/apps/xournal-qt.svg
+          mkdir -p out && mv ./*.AppImage out/ && ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-appimage
+          path: out/*.AppImage
+          if-no-files-found: error
+
+  draft:
+    name: Draft release
+    needs: [packages]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Write the draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -l artifacts
+          version="$(sed -n 's/^project(xournal-qt VERSION \([0-9.]*\).*/\1/p' qt/CMakeLists.txt)"
+          tag="${GITHUB_REF_NAME}"
+          case "$tag" in v*) ;; *) tag="v${version}" ;; esac   # started by hand: the version of the project
+          notes="qt/docs/release-notes/${tag#v}.md"
+          if [ -f "$notes" ]; then
+              gh release create "$tag" --draft --title "xournal-qt $tag" --notes-file "$notes" artifacts/* \
+                  || gh release upload "$tag" artifacts/* --clobber
+          else
+              gh release create "$tag" --draft --title "xournal-qt $tag" --generate-notes artifacts/* \
+                  || gh release upload "$tag" artifacts/* --clobber
+          fi

@@ -4,12 +4,18 @@ This repository is a **git fork of [Xournal++](https://github.com/xournalpp/xour
 It adds a new Qt 6 frontend: Qt Quick UI, several documents in tabs, tablet-first input, and Wayland-first support.
 The frontend reuses Xournal++'s tested core: the document model, `.xopp`/`.xoj` I/O, cairo rendering, undo, and the tools.
 
+[![xournal-qt](https://github.com/R-Fehler/xournal-qt/actions/workflows/xqt-build.yml/badge.svg?branch=main)](https://github.com/R-Fehler/xournal-qt/actions/workflows/xqt-build.yml)
+
 All new code lives in [`qt/`](qt/). Build it with:
 
 ```sh
+qt/scripts/linux-deps.sh   # Debian / Ubuntu: what the build needs (Qt 6.5 or newer)
 cmake -S qt -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build-qt
+ctest --test-dir build-qt -j8
 ```
+
+Packages and how a release is made: [`qt/docs/releasing.md`](qt/docs/releasing.md). Linux only so far.
 
 Everything else in the tree is upstream Xournal++. The upstream GTK build (root `CMakeLists.txt`) is left untouched.
 

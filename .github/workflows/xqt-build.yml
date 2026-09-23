@@ -1,0 +1,58 @@
+# xournal-qt (the Qt 6 frontend of this fork): build it and run its tests.
+# The upstream GTK workflows in this folder only run for pull requests to "master" and in the upstream repository, so
+# they stay out of the way here.
+name: xournal-qt
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'qt/**'
+      - 'src/**'
+      - 'test/**'
+      - 'cmake/**'
+      - '.github/workflows/xqt-build.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: xournal-qt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Debian 13 (Qt 6.8)
+    runs-on: ubuntu-latest
+    # Qt 6.5 or newer is needed: Ubuntu 24.04 (the runner's own system) has 6.4, Debian 13 has 6.8.
+    container: debian:trixie
+    steps:
+      - name: What the checkout needs in the container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Install the build dependencies
+        run: bash qt/scripts/linux-deps.sh
+
+      - name: Configure
+        run: cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXQT_BUILD_SPIKES=OFF
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Test
+        # The tests run off-screen and in their own configuration and cache folders (see their main.cpp).
+        run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300
+
+      - name: Keep the test output of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: |
+            build/Testing/**
+            build/**/*.log
+          if-no-files-found: ignore
