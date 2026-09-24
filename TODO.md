@@ -205,7 +205,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - **"New Markdown file"** in the library's New menu, next to "New document", once the editor is shipped
   (the author, 2026-09-24). It creates `name.md` in the current folder and opens it in the editor.
 
-### Horizontal scrolling and a presentation mode (the author, 2026-09-24; `qt/present`, started 2026-09-24)
+### Horizontal scrolling and a presentation mode (the author, 2026-09-24; `qt/present`, merged 2026-09-24)
 - [ ] **Horizontal scrolling mode**: pages side by side, each fit to the window height by default.
   - A toggle between snapping to whole pages and continuous horizontal scrolling.
   - Works with two or more columns (rows of pages).
@@ -216,7 +216,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     to that page. The number jump is useful in normal mode too.
   - Switch back and forth between present and edit from full screen, and start it from the normal tool bar.
   - Writing on slides while presenting follows from full screen (the tool square stays).
-- [~] **Switching tabs in full screen (editing)** (the author, 2026-09-24; queued in `qt/present`): a slim bar at the
+- [x] **Switching tabs in full screen (editing)** (the author, 2026-09-24; queued in `qt/present`): a slim bar at the
   top centre with one dot per tab (`PageIndicator`; "3 / 17" with many tabs). A tap opens the tab overview, and a
   horizontal swipe on the bar switches to the previous or next tab. Hidden with one tab and while presenting.
 - [ ] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
@@ -248,7 +248,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 
 ### Bugs
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
-- [~] **Fit width uses the widest page, not the current one** (the author, 2026-09-24): after pasting a 16:9 page
+- [x] **Fit width uses the widest page, not the current one** (fixed in `qt/present`) (the author, 2026-09-24): after pasting a 16:9 page
   into an A4 document, fit width fits the 16:9 width. It should fit the current page (in several columns, the
   current row). Given to `qt/present` as its next commit.
 - [ ] **A touch on the "pages with hits" filter can make the maximized window half as high** (old, flaky, probably
@@ -261,6 +261,10 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [ ] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
   `-j6` load (2026-09-24), at the check after "the way back brings it into view again". It passed 3 of 3 alone.
   The wait for the scroll back is probably too short under load.
+
+- [ ] `MainWindowTest.sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDown` ("no sharp one while racing")
+  fails now and then under load: 1 of 8 and 0 of 16 after `qt/present`, and once in the full suite; 0 of 16 on a
+  build from before it. It is timing-sensitive, and whether `qt/present` made it more likely is not settled.
 
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF

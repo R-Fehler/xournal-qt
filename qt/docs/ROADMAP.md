@@ -254,6 +254,16 @@
     and selections can be copied but not moved. Keys follow the side last tapped.
   - Memory: documents on screen keep their rendered pages before background tabs.
   - Left: the reference is not restored after a restart.
+- **Presenting and sideways scrolling, `qt/present` (2026-09-24, awaiting on-device test).**
+  - Page-number jump: type digits, then Enter.
+  - 16:9 slides (960×540 pt) in New document and Insert pages.
+  - Fit width fits the current page (or its row), not the widest page: `ViewController::fitWidthZoom(page)`.
+  - Sideways scrolling: pages fit the window height, snapping on or off, a Rows setting, ‹ › in the pill; wheel,
+    touchpad and swipe page through.
+  - Presenting (F5): full screen on black, PowerPoint keys, one page per swipe, a fading "12 / 40". Escape returns
+    to full-screen editing.
+  - A full-screen tab bar of dots (`PageIndicator`): a tap opens the overview, a swipe switches tabs.
+  - With a reference open, page keys act on the side that has the keys, and presenting shows the notes alone.
   318 KiB.
 
 ## Backlog (decide later)
