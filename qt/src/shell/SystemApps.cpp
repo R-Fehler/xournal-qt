@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDesktopServices>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QUrl>
@@ -78,6 +79,8 @@ bool SystemApps::showInFileManager(const QString& path) {
     return QDesktopServices::openUrl(QUrl::fromLocalFile(folder));
 #endif
 }
+
+bool SystemApps::moveToTrash(const QString& path) { return QFile::moveToTrash(path); }
 
 bool SystemApps::startLibraryWindow(const QString& folder) {
     return QProcess::startDetached(QCoreApplication::applicationFilePath(), {folder});

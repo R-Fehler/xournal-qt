@@ -1538,7 +1538,12 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
 namespace {
 /// Records what would be handed to the system (nothing is started).
 struct FakeSystemApps: xqt::SystemApps {
-    QStringList opened, shown, libraries;
+    QStringList opened, shown, libraries, trashed;
+    /// (removed instead: never the user's trash)
+    bool moveToTrash(const QString& path) override {
+        trashed << path;
+        return QFileInfo(path).isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
+    }
     bool openWithSystemApp(const QString& path) override {
         opened << path;
         return true;
@@ -4333,6 +4338,159 @@ TEST_F(MainWindowTest, saveAsOffersXoppAndPdfWithNotes) {
     until([&] { return !controller->anySaving(); }, 20000);
     EXPECT_FALSE(controller->isHybrid());
     EXPECT_TRUE(QFile::exists(dir.filePath("notes.xopp")));
+}
+
+namespace {
+/// Uses a fake for the system while it lives.
+struct UseSystemApps {
+    explicit UseSystemApps(xqt::SystemApps& apps) { xqt::SystemApps::setInstance(&apps); }
+    ~UseSystemApps() { xqt::SystemApps::setInstance(nullptr); }
+};
+}  // namespace
+
+// A document saved as "name.xopp" and then as a PDF with notes asks once what happens to the .xopp: to the trash (the
+// default), kept up to date for Xournal++, or kept as it is. "Don't ask again" stores the choice, which Settings →
+// Documents shows and changes. The .xopp open in another tab without changes: that tab is closed.
+TEST_F(MainWindowTest, savingAXoppAsPdfAsksWhatHappensToIt) {
+    FakeSystemApps fake;
+    UseSystemApps use(fake);
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    settings->set("hybridOldXopp", "ask");  // (the tests share the config folder)
+    QTemporaryDir dir;
+    const auto url = [&](const char* name) { return QUrl::fromLocalFile(dir.filePath(name)); };
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    drawStroke(*s, 0);
+    ASSERT_TRUE(controller->saveAs(url("notes.xopp")));
+    EXPECT_EQ(controller->oldXoppToAsk(), "notes.xopp");
+    // The same .xopp in another tab, unchanged
+    {
+        auto other = xqt::DocumentSession::loadFile(dir.filePath("notes.xopp").toStdString());
+        ASSERT_TRUE(other.document);
+        controller->tabManager().addTab(
+                std::make_unique<xqt::DocumentSession>(controller->context(), std::move(other.document)));
+        controller->tabManager().setCurrentIndex(controller->tabManager().indexOf(s));
+    }
+    ASSERT_EQ(controller->tabCount(), 2);
+
+    QObject* dialog = find("oldXoppDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("notes.pdf"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    ASSERT_TRUE(waitOpened(dialog, true)) << "asked before anything is written";
+    EXPECT_FALSE(QFile::exists(dir.filePath("notes.pdf")));
+    EXPECT_TRUE(find("oldXoppTrash")->property("checked").toBool()) << "the trash is the default";
+    click(find<QQuickItem>("oldXoppSave"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    until([&] { return !controller->anySaving() && !QFile::exists(dir.filePath("notes.xopp")); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(dir.filePath("notes.pdf").toStdString())));
+    EXPECT_FALSE(QFile::exists(dir.filePath("notes.xopp")));
+    EXPECT_TRUE(fake.trashed.contains(dir.filePath("notes.xopp")));
+    EXPECT_EQ(controller->tabCount(), 1) << "the other tab of it is closed";
+    EXPECT_EQ(controller->tabManager().currentSession(), s);
+    auto* snackbarText = findItem("snackbarText");
+    ASSERT_NE(snackbarText, nullptr);
+    EXPECT_TRUE(snackbarText->property("text").toString().contains("moved to the trash"));
+    EXPECT_EQ(settings->get("hybridOldXopp").toString(), "ask") << "asked again next time";
+
+    // Keep it as it is, and don't ask again
+    controller->newDocument();
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    ASSERT_TRUE(controller->saveAs(url("other.xopp")));
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("other.pdf"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(find<QQuickItem>("oldXoppKeep"));
+    click(find<QQuickItem>("oldXoppDontAsk"));
+    click(find<QQuickItem>("oldXoppSave"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(QFile::exists(dir.filePath("other.xopp"))) << "kept";
+    EXPECT_EQ(settings->get("hybridOldXopp").toString(), "keep") << "stored";
+
+    // Not asked now
+    controller->newDocument();
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    ASSERT_TRUE(controller->saveAs(url("third.xopp")));
+    EXPECT_EQ(controller->oldXoppToAsk(), "");
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("third.pdf"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    wait(100);
+    EXPECT_FALSE(dialog->property("visible").toBool());
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(QFile::exists(dir.filePath("third.xopp")));
+
+    // Settings → Documents shows the choice and goes back to asking
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("documentsTab"));
+    auto* row = findItem("hybridOldXoppRow");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    QQuickItem* combo = nullptr;
+    for (QQuickItem* c: row->childItems()) {
+        if (c->inherits("QQuickComboBox")) {
+            combo = c;
+        }
+    }
+    ASSERT_NE(combo, nullptr);
+    EXPECT_EQ(combo->property("currentValue").toString(), "keep");
+    settings->set("hybridOldXopp", "ask");
+    wait(50);
+    EXPECT_EQ(combo->property("currentValue").toString(), "ask");
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
+// "Keep it updated for Xournal++": the .xopp the document was is written again from the PDF's notes, now and on
+// every save (its PDF: the pages, hidden beside it); the annotated PDF itself is left alone. Removed by the user, it
+// is not written again.
+TEST_F(MainWindowTest, theOldXoppIsKeptUpdatedForXournalpp) {
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 3);
+    ASSERT_TRUE(controller->openPath(pdf));
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    drawStroke(*s, 0);
+    const QUrl xoppUrl = QUrl::fromLocalFile(dir.filePath("lecture.xopp"));
+    ASSERT_TRUE(controller->saveAs(xoppUrl));
+    const fs::path xopp = xoppUrl.toLocalFile().toStdString();
+    const fs::path notes = dir.filePath("lecture.notes.pdf").toStdString();
+    EXPECT_EQ(controller->suggestedHybridFile().toLocalFile().toStdString(), notes.string());
+
+    ASSERT_TRUE(controller->saveAsHybrid(QUrl::fromLocalFile(QString::fromStdString(notes.string())), "update"));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_EQ(xqt::HybridPdf::xoppExportOf(notes), xopp) << "recorded in the PDF";
+    auto exported = xqt::DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(exported.document) << exported.error;
+    EXPECT_EQ(strokesOn(*exported.document, 0), 1u);
+    EXPECT_EQ(exported.document->getPdfFilepath(), fs::path(dir.filePath(".lecture.pages.pdf").toStdString()));
+    {
+        QFile f(pdf);
+        ASSERT_TRUE(f.open(QIODevice::ReadOnly));
+        EXPECT_FALSE(f.readAll().contains("XournalQt")) << "the lecture itself is left alone";
+    }
+
+    // On every save
+    drawStroke(*s, 2);
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);
+    exported = xqt::DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(exported.document);
+    EXPECT_EQ(strokesOn(*exported.document, 2), 1u);
+    EXPECT_EQ(xqt::HybridPdf::xoppExportOf(notes), xopp);
+
+    // Removed: no more
+    fs::remove(xopp);
+    drawStroke(*s, 1);
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_FALSE(fs::exists(xopp));
+    EXPECT_EQ(xqt::HybridPdf::xoppExportOf(notes), fs::path());
 }
 
 // Settings → Search: the fuzzy search's toggle (the same setting as the search fields' button, both ways) and its typo

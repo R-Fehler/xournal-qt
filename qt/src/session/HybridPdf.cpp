@@ -718,7 +718,7 @@ QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const st
 }
 
 /// The PDF with the base pages (and, `hybrid`, our annotations, data and marker), written to `target`.
-Result assemble(const Prepared& prep, const fs::path& target, bool hybrid) {
+Result assemble(const Prepared& prep, const fs::path& target, bool hybrid, const std::string& xoppExport = {}) {
     Result r;
     Steps step;
     QPDF out;
@@ -761,6 +761,9 @@ Result assemble(const Prepared& prep, const fs::path& target, bool hybrid) {
         marker.replaceKey("/Data", QPDFObjectHandle::newUnicodeString(DATA_NAME));
         marker.replaceKey("/Files", files);
         marker.replaceKey("/Annots", hashes);
+        if (!xoppExport.empty()) {
+            marker.replaceKey("/XoppExport", QPDFObjectHandle::newUnicodeString(xoppExport));
+        }
         out.getRoot().replaceKey(MARKER, out.makeIndirectObject(marker));
     }
     QPDFObjectHandle trailer = out.getTrailer();
@@ -868,7 +871,8 @@ void touch(const fs::path& base) {
     fs::last_write_time(base.parent_path(), fs::file_time_type::clock::now(), ec);
 }
 
-Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount) {
+Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
+             const fs::path& xoppExport) {
     Result r;
     try {
         WorkDir work;
@@ -879,7 +883,15 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
             r.error = prep.error;
             return r;
         }
-        return assemble(prep, target, true);
+        std::string exportName;
+        if (!xoppExport.empty()) {
+            // Relative to the PDF when it is beside it or below (it follows the PDF when both are moved)
+            const fs::path rel = xoppExport.lexically_relative(target.parent_path());
+            const bool inside = !rel.empty() && *rel.begin() != "..";
+            const auto name = (inside ? rel : xoppExport).generic_u8string();
+            exportName.assign(name.begin(), name.end());
+        }
+        return assemble(prep, target, true, exportName);
     } catch (const std::exception& e) {
         r.error = e.what();
     }
@@ -950,6 +962,27 @@ bool isHybrid(const fs::path& pdf) {
     }
     known[key] = hybrid;
     return hybrid;
+}
+
+fs::path xoppExportOf(const fs::path& pdf) {
+    try {
+        QPDF q;
+        q.setSuppressWarnings(true);
+        q.processFile(pdf.string().c_str());
+        QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+        if (!marker.isDictionary()) {
+            return {};
+        }
+        QPDFObjectHandle name = marker.getKey("/XoppExport");
+        if (!name.isString() || name.getUTF8Value().empty()) {
+            return {};
+        }
+        const std::string utf8 = name.getUTF8Value();
+        const fs::path p(std::u8string(utf8.begin(), utf8.end()));
+        return p.is_absolute() ? p : (pdf.parent_path() / p).lexically_normal();
+    } catch (const std::exception&) {
+        return {};
+    }
 }
 
 Opened open(const fs::path& pdf) {

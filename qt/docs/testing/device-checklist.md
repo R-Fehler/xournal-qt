@@ -886,3 +886,15 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       dialog too). Save as PDF: the tab title is the `.pdf`, Ctrl+S writes it again, and Save as… now starts on the
       PDF type with its own name. Type `x.pdf` with the .xopp type chosen: it is saved as a PDF (the typed extension
       wins). There is no "Save as hybrid PDF…" in ⋮ any more; "Export as plain PDF…" (Ctrl+E) still flattens.
+- [ ] A new document saved as `notes.xopp`, then Save as… → "PDF with notes": a question "This document was saved
+      as notes.xopp" with "Move notes.xopp to the trash" (chosen), "Keep it updated for Xournal++", "Keep it as it
+      is" and "Don't ask again". Cancel: nothing is written. Save: `notes.pdf` is written, `notes.xopp` is in the
+      desktop trash (restore it from there), a note says so, and the library shows one card `notes`.
+- [ ] `lecture.pdf` with notes saved as `lecture.xopp`, then Save as… PDF (`lecture.notes.pdf`) with "Keep it
+      updated for Xournal++": `lecture.xopp` opens in Xournal++ with the notes; write more, Ctrl+S, reopen it in
+      Xournal++: the new ink is there. Close and reopen `lecture.notes.pdf` in xournal-qt, write, Ctrl+S: still
+      updated. Delete `lecture.xopp`, save again: it does not come back. `lecture.pdf` itself never changes.
+- [ ] With pasted PDF pages in a `.xopp` (it has a hidden `.name.pages.pdf`), save it as a PDF with the trash
+      choice: the pages keep showing, later saves work, and both files are in the trash.
+- [ ] "Keep it as it is" with "Don't ask again": the next document is not asked, its `.xopp` stays. Settings →
+      Documents → Hybrid PDF shows "Keep it as it is"; set it to "Ask each time": asked again.

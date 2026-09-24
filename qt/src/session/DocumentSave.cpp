@@ -549,7 +549,8 @@ void DocumentSession::takeSnapshot() {
                             return it != t.baseOf.end() ? it->second : npos;
                         };
                     }
-                    const auto r = HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount);
+                    const auto r =
+                            HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount, t.request.recordExport);
                     if (!r.ok) {
                         t.result = {false,
                                     FS(_F("Could not write the hybrid PDF \"{1}\": {2}") % t.target.u8string() %
@@ -637,6 +638,8 @@ void DocumentSession::finishWrite() {
             HybridPdf::touch(bg);  // (still used)
         }
         hybridChanges.clear();  // (written anew from the document)
+        xoppExportFor = t.target;  // (what the file records now)
+        xoppExportPath = t.request.recordExport;
     }
     finishSave(t.result);
 }

@@ -2080,8 +2080,16 @@ namespace {
 bool settingOn(Settings* settings, const char* key);
 }  // namespace
 
+namespace {
+std::string lowerExtension(const fs::path& p) {
+    std::string ext = p.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+    return ext;
+}
+}  // namespace
+
 bool AppController::startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,
-                              DocumentSession* document) {
+                              DocumentSession* document, const QString& oldXopp) {
     DocumentSession* s = document ? document : session();
     if (!s) {
         return false;
@@ -2110,7 +2118,53 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     }
     request.target = target;
     const bool hybrid = way == SaveWay::Hybrid || (way == SaveWay::Save && s->isHybrid());
-    if (hybrid && settingOn(app->getSettings(), "hybridExportXopp")) {
+    // A document saved as "name.xopp" becomes a PDF with notes: what happens to the .xopp (asked by the window, or
+    // the setting; not asked: it stays)
+    fs::path previous;
+    QString choice = QStringLiteral("keep");
+    if (way == SaveWay::Hybrid && s->hasFilePath() && !s->isHybrid() && lowerExtension(s->getFilePath()) == ".xopp") {
+        previous = s->getFilePath();
+        choice = oldXopp.isEmpty() ? settingsView->get("hybridOldXopp").toString() : oldXopp;
+        if (choice != "trash" && choice != "update") {
+            choice = QStringLiteral("keep");
+        }
+    }
+    QString keptBecause;
+    if (choice != "keep") {
+        // The .xopp open in another tab (another window of this process): closed if it has no unsaved changes; with
+        // changes it stays open, and the .xopp is left alone
+        const auto others = tabsWithFile(previous, s);
+        if (std::any_of(others.begin(), others.end(),
+                        [](const auto& o) { return o.second->isModified() || o.second->isSaving(); })) {
+            keptBecause = tr("%1 is open with unsaved changes in another tab, so it was left as it is.")
+                                  .arg(QString::fromStdString(previous.filename().string()));
+            choice = QStringLiteral("keep");
+        } else {
+            for (const auto& [window, other]: others) {
+                const int i = window->tabs->indexOf(other);
+                if (i >= 0) {
+                    window->closeTab(i);
+                }
+            }
+        }
+    }
+    // The .xopp for Xournal++ this document keeps up to date (recorded in the PDF). Gone from its place: no more.
+    fs::path own;
+    if (!previous.empty()) {
+        own = choice == "update" ? previous : fs::path();
+    } else if (hybrid) {
+        own = s->xoppExport();
+        std::error_code ec;
+        if (!own.empty() && !fs::exists(own, ec)) {
+            own.clear();
+        }
+    }
+    if (!own.empty()) {
+        request.recordExport = own;
+        if (choice != "update") {
+            request.exportXopp = own;  // (the first time: after the PDF is written, see below)
+        }
+    } else if (hybrid && settingOn(app->getSettings(), "hybridExportXopp")) {
         // "On every save of a hybrid PDF, also write a .xopp for Xournal++": from the same state, in the same job
         fs::path xopp = way == SaveWay::Save ? s->getFilePath() : target;
         if (way != SaveWay::Save && xopp.extension() != ".pdf") {
@@ -2120,7 +2174,8 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
         request.exportXopp = xopp;
     }
     QPointer<DocumentSession> guard(s);
-    request.done = [this, guard, way, target, then = std::move(then)](const DocumentSession::SaveResult& r) {
+    request.done = [this, guard, way, target, previous, choice, keptBecause,
+                    then = std::move(then)](const DocumentSession::SaveResult& r) {
         if (!guard) {
             return;
         }
@@ -2137,9 +2192,27 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
                 recent->add(saved.getFilePath());
             }
             if (saved.isHybrid()) {
+                if (choice == "update") {
+                    // The .xopp for Xournal++ from now on: its PDF may be the one the document shows pages from
+                    DocumentItem item;
+                    item.xopp = previous;
+                    std::vector<fs::path> files = DocumentFiles::filesOf(item);
+                    files.push_back(DocumentSession::exportPdfFor(previous));
+                    std::string error;
+                    if (!saved.detachBackground(files, error)) {
+                        Q_EMIT message(tr("Export for Xournal++ failed"), QString::fromStdString(error), true);
+                    } else {
+                        startSave(SaveWay::ExportXopp, previous, {}, &saved);
+                    }
+                } else if (choice == "trash") {
+                    trashOldXopp(saved, previous, saved.getFilePath());
+                }
                 afterHybridSave(saved);  // (the library index reads a hybrid PDF itself)
                 if (!r.exportError.empty()) {
                     Q_EMIT message(tr("Export for Xournal++ failed"), QString::fromStdString(r.exportError), true);
+                }
+                if (!keptBecause.isEmpty()) {
+                    Q_EMIT message(tr("The .xopp was kept"), keptBecause, false);
                 }
             } else {
                 handOverToLibrary(saved);
@@ -2190,8 +2263,82 @@ bool AppController::saveAsInBackground(const QUrl& url, const QJSValue& then) {
     return startSave(SaveWay::SaveAs, fs::path(url.toLocalFile().toStdString()), callWhenSaved(then));
 }
 
-bool AppController::saveAsHybridInBackground(const QUrl& url, const QJSValue& then) {
-    return startSave(SaveWay::Hybrid, fs::path(url.toLocalFile().toStdString()), callWhenSaved(then));
+bool AppController::saveAsHybridInBackground(const QUrl& url, const QJSValue& then, const QString& oldXopp,
+                                             bool remember) {
+    if (remember && (oldXopp == "trash" || oldXopp == "update" || oldXopp == "keep")) {
+        settingsView->set("hybridOldXopp", oldXopp);  // "Don't ask again"
+    }
+    return startSave(SaveWay::Hybrid, fs::path(url.toLocalFile().toStdString()), callWhenSaved(then), nullptr, oldXopp);
+}
+
+QString AppController::oldXoppToAsk() const {
+    const DocumentSession* s = session();
+    if (!s || !s->hasFilePath() || s->isHybrid() || lowerExtension(s->getFilePath()) != ".xopp" ||
+        settingsView->get("hybridOldXopp").toString() != "ask") {
+        return {};
+    }
+    std::error_code ec;
+    if (!fs::exists(s->getFilePath(), ec)) {
+        return {};
+    }
+    return QString::fromStdString(s->getFilePath().filename().string());
+}
+
+std::vector<std::pair<AppController*, DocumentSession*>> AppController::tabsWithFile(const fs::path& file,
+                                                                                    const DocumentSession* except) const {
+    std::vector<std::pair<AppController*, DocumentSession*>> found;
+    AppController* main = primary ? primary : const_cast<AppController*>(this);
+    std::vector<AppController*> all{main};
+    all.insert(all.end(), main->windows.begin(), main->windows.end());
+    for (AppController* w: all) {
+        for (int i = 0; i < w->tabs->count(); ++i) {
+            DocumentSession* t = w->tabs->session(i);
+            std::error_code ec;
+            if (t && t != except && t->hasFilePath() &&
+                (t->getFilePath() == file || fs::equivalent(t->getFilePath(), file, ec))) {
+                found.emplace_back(w, t);
+            }
+        }
+    }
+    return found;
+}
+
+void AppController::trashOldXopp(DocumentSession& s, const fs::path& xopp, const fs::path& pdf) {
+    DocumentItem item;
+    item.xopp = xopp;
+    std::vector<fs::path> files = DocumentFiles::filesOf(item);
+    // Its own PDF of pasted pages ("name.pdf" made for it) goes along; the PDF it annotates stays
+    std::error_code ec;
+    const fs::path pair = MergedPdf::pairOf(xopp);
+    fs::path ownPdf;
+    if (fs::exists(pair, ec) && !fs::equivalent(pair, pdf, ec) && MergedPdf::kindOf(pair) == MergedPdf::Kind::Own) {
+        ownPdf = pair;
+        files.push_back(pair);
+    }
+    const QString name = QString::fromStdString(xopp.filename().string());
+    if (std::any_of(files.begin(), files.end(), [&](const fs::path& f) {
+            std::error_code eec;
+            return fs::equivalent(f, pdf, eec);
+        })) {
+        return;  // (the PDF was saved as one of its files: nothing goes)
+    }
+    std::string error;
+    if (!s.detachBackground(files, error)) {  // (the document may show its pages from one of them)
+        Q_EMIT message(tr("Could not move %1 to the trash").arg(name), QString::fromStdString(error), true);
+        return;
+    }
+    DocumentFiles::Result r = DocumentFiles::trash(item);
+    if (r.ok && !ownPdf.empty() && !SystemApps::instance().moveToTrash(QString::fromStdString(ownPdf.string()))) {
+        r = {};
+        r.error = "Could not move \"" + ownPdf.filename().string() + "\" to the trash.";
+    }
+    library->refresh();
+    recent->refresh();
+    if (!r.ok) {
+        Q_EMIT message(tr("Could not move %1 to the trash").arg(name), QString::fromStdString(r.error), true);
+        return;
+    }
+    Q_EMIT pageActionDone(tr("%1 moved to the trash: the PDF holds everything now").arg(name), false);
 }
 
 void AppController::exportXoppInBackground(const QUrl& url) {
@@ -2272,13 +2419,6 @@ QUrl AppController::suggestedHybridFile() const {
     return QUrl::fromLocalFile(QString::fromStdString(target.string()));
 }
 
-namespace {
-std::string lowerExtension(const fs::path& p) {
-    std::string ext = p.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
-    return ext;
-}
-}  // namespace
 
 bool AppController::savesAsPdf(const QUrl& file, bool pdfChosen) const {
     const std::string ext = lowerExtension(fs::path(file.toLocalFile().toStdString()));
@@ -2335,9 +2475,10 @@ QUrl AppController::fileForFormat(const QUrl& file, bool pdf) const {
     return QUrl::fromLocalFile(QString::fromStdString(p.string()));
 }
 
-bool AppController::saveAsHybrid(const QUrl& url) {
+bool AppController::saveAsHybrid(const QUrl& url, const QString& oldXopp) {
     bool ok = false;
-    return startSave(SaveWay::Hybrid, fs::path(url.toLocalFile().toStdString()), [&ok](bool r) { ok = r; }) &&
+    return startSave(SaveWay::Hybrid, fs::path(url.toLocalFile().toStdString()), [&ok](bool r) { ok = r; }, nullptr,
+                     oldXopp) &&
            (waitForSave(), ok);
 }
 

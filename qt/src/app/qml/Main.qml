@@ -121,10 +121,16 @@ ApplicationWindow {
         }
         saveDialog.settingUp = false
     }
-    /// The Save as dialog was accepted: as a PDF with notes or as a .xopp (the extension typed wins)
+    /// The Save as dialog was accepted: as a PDF with notes or as a .xopp (the extension typed wins). A document
+    /// saved as "name.xopp" asks first what happens to that .xopp (unless the choice is stored).
     function saveChosen(url, pdfChosen, then) {
-        if (app.savesAsPdf(url, pdfChosen)) app.saveAsHybridInBackground(url, then ? then : null)
-        else app.saveAsInBackground(url, then ? then : null)
+        if (!app.savesAsPdf(url, pdfChosen)) {
+            app.saveAsInBackground(url, then ? then : null)
+            return
+        }
+        const old = app.oldXoppToAsk()
+        if (old === "") app.saveAsHybridInBackground(url, then ? then : null)
+        else oldXoppDialog.ask(old, url, then)
     }
     function openExportDialog() {
         const suggestion = app.suggestedExportFile().toString()
@@ -1263,6 +1269,79 @@ ApplicationWindow {
         defaultSuffix: "xopp"
         nameFilters: [qsTr("Xournal++ files (*.xopp)")]
         onAccepted: app.exportXoppInBackground(selectedFile)
+    }
+    // Saving a "name.xopp" as a PDF with notes: what happens to the .xopp (asked once, before it is written)
+    Dialog {
+        id: oldXoppDialog
+        objectName: "oldXoppDialog"
+        property string file: ""
+        property var url
+        property var afterSave: null
+        function ask(name, target, then) {
+            file = name
+            url = target
+            afterSave = then ? then : null
+            trashChoice.checked = true  // (the default)
+            dontAsk.checked = false
+            open()
+        }
+        /// "trash", "update" or "keep": the PDF is written, then that happens (Cancel: nothing is written)
+        function choose(choice) {
+            app.saveAsHybridInBackground(url, afterSave, choice, dontAsk.checked)
+            afterSave = null
+            close()
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(520, parent ? parent.width - 32 : 520)
+        title: qsTr("The PDF holds everything")
+        ColumnLayout {
+            width: oldXoppDialog.availableWidth
+            spacing: 4
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("This document was saved as %1. What happens to it?").arg(oldXoppDialog.file)
+            }
+            ButtonGroup { id: oldXoppChoices }
+            RadioButton {
+                id: trashChoice
+                objectName: "oldXoppTrash"
+                ButtonGroup.group: oldXoppChoices
+                text: qsTr("Move %1 to the trash (the PDF now holds everything)").arg(oldXoppDialog.file)
+            }
+            RadioButton {
+                id: updateChoice
+                objectName: "oldXoppUpdate"
+                ButtonGroup.group: oldXoppChoices
+                text: qsTr("Keep it updated for Xournal++")
+            }
+            RadioButton {
+                id: keepChoice
+                objectName: "oldXoppKeep"
+                ButtonGroup.group: oldXoppChoices
+                text: qsTr("Keep it as it is (not updated)")
+            }
+            CheckBox {
+                id: dontAsk
+                objectName: "oldXoppDontAsk"
+                text: qsTr("Don't ask again (Settings → Documents)")
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "oldXoppSave"
+                text: qsTr("Save")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: qsTr("Cancel")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+        onAccepted: choose(updateChoice.checked ? "update" : keepChoice.checked ? "keep" : "trash")
+        onRejected: afterSave = null
     }
     // A hybrid PDF whose ink another app changed: keep ours, or take theirs as plain annotations
     Dialog {

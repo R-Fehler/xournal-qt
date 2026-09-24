@@ -217,3 +217,27 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    separate "Save as hybrid PDF…" entry is gone. "Export as PDF…" is now "Export as plain PDF…" (the notes drawn
    into the pages, nothing editable). The `.xopp` suggestion of a hybrid PDF is `name.xopp` (not upstream's
    `name.pdf.xopp`).
+2. **The old `.xopp`.** Saving a document that was saved as `name.xopp` as a PDF with notes asks once, before
+   anything is written, what happens to `name.xopp`:
+   - **Move it to the trash** (the default; the PDF now holds everything). After the PDF is written, the `.xopp`
+     goes to the desktop trash with the files that belong to it alone (the library's trash:
+     `DocumentFiles::trash` with its attached PDF, `.name.pages.pdf` and background images, plus a `name.pdf` of
+     only pasted pages made for it). The PDF it annotates stays. When the document shows its pages from one of
+     those files, it takes them from a copy in the app cache first (`DocumentSession::detachBackground`, a hard
+     link where possible: the same pages under the same numbers).
+   - **Keep it updated for Xournal++**: the `.xopp` is written again from the PDF's notes now (with its PDF by the
+     export's rules: `name.pdf` if free, else the hidden `.name.pages.pdf`) and on every save of this document.
+     This is per document: the hybrid PDF records it in its marker (`/XoppExport`, relative to the PDF when it is
+     beside it or below; `HybridPdf::xoppExportOf`, `DocumentSession::xoppExport`), so it survives closing and
+     reopening. Deleting that `.xopp` ends it (a save no longer writes it or records it). The global setting "On
+     every save of a hybrid PDF, also write a .xopp" stays as it was.
+   - **Keep it as it is**: not touched, not updated. Known gap: kept beside a PDF of the same name (`notes.xopp` next
+     to the new `notes.pdf`), the library shows the two as one card that opens the old `.xopp`, because the pairing
+     only looks into the PDF when `.name.pages.pdf` exists (listing stays cheap).
+
+   The dialog has **"Don't ask again"**, which stores the choice in the setting `hybridOldXopp` (`ask`, `trash`,
+   `update`, `keep`); Settings → Documents → Hybrid PDF shows it and sets it back to "Ask each time". Cancel
+   writes nothing. Only `.xopp` files are asked about (`.xoj` ones are left alone).
+   If the `.xopp` is open in another tab of this process: without unsaved changes that tab is closed; with changes
+   the `.xopp` is kept as it is and a message says why. (Another process, e.g. a library's window, is not seen.)
+   All trashing of the app now goes through `SystemApps::moveToTrash`, so tests never fill the user's trash.

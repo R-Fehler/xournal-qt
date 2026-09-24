@@ -614,6 +614,59 @@ TEST_F(HybridPdfTest, exportsAPlainXoppForXournalpp) {
     EXPECT_EQ(DocumentSession::exportPdfFor(path("other.xopp")), path("other.pdf"));
 }
 
+// "Keep it updated for Xournal++": the hybrid PDF records the .xopp it keeps (relative to it), a session reads that
+// from the file, and a save without it drops it.
+TEST_F(HybridPdfTest, recordsTheXoppItKeepsForXournalpp) {
+    auto doc = annotated(path("lecture.pdf"));
+    DocumentSession session(*app, std::move(doc));
+    const fs::path out = path("lecture.notes.pdf"), xopp = path("lecture.xopp");
+    DocumentSession::SaveRequest request;
+    request.kind = DocumentSession::SaveKind::Hybrid;
+    request.target = out;
+    request.exportXopp = xopp;
+    request.recordExport = xopp;
+    ASSERT_TRUE(session.saveNow(request).ok);
+    EXPECT_TRUE(fs::exists(xopp));
+    EXPECT_EQ(HybridPdf::xoppExportOf(out), xopp);
+    EXPECT_EQ(session.xoppExport(), xopp);
+    QPDF q;
+    q.processFile(out.string().c_str());
+    EXPECT_EQ(q.getRoot().getKey("/XournalQt").getKey("/XoppExport").getUTF8Value(), "lecture.xopp")
+            << "relative: it follows the PDF";
+
+    auto reopened = DocumentSession::loadFile(out);
+    ASSERT_TRUE(reopened.document);
+    DocumentSession again(*app, std::move(reopened.document));
+    EXPECT_EQ(again.xoppExport(), xopp) << "read from the file";
+    ASSERT_TRUE(again.save().ok);
+    EXPECT_EQ(again.xoppExport(), fs::path()) << "a save that does not record it drops it";
+    EXPECT_EQ(HybridPdf::xoppExportOf(out), fs::path());
+}
+
+// The .xopp a document was goes to the trash (or is written over): the document takes its pages from a copy in the
+// cache first, the same pages under the same numbers.
+TEST_F(HybridPdfTest, aDocumentLetsGoOfTheFileItShowsPagesFrom) {
+    makeTextPdf(path("pages.pdf"), {"pageone", "pagetwo"});
+    auto loaded = DocumentSession::loadFile(path("pages.pdf"));
+    DocumentSession session(*app, std::move(loaded.document));
+    std::string error;
+    ASSERT_TRUE(session.detachBackground({path("other.pdf")}, error));
+    EXPECT_EQ(session.getDocument()->getPdfFilepath(), path("pages.pdf")) << "not one of them: stays";
+    ASSERT_TRUE(session.detachBackground({path("pages.pdf")}, error)) << error;
+    const fs::path copy = session.getDocument()->getPdfFilepath();
+    EXPECT_TRUE(HybridPdf::inCache(copy)) << copy;
+    fs::remove(path("pages.pdf"));
+    {
+        std::unique_lock lock(*session.getDocument());
+        addStroke(session.getDocument()->getPage(1)->getSelectedLayer(), StrokeTool::PEN, Color(0xffff0000U), 2,
+                  {Point(10, 10), Point(200, 300)});
+    }
+    ASSERT_TRUE(session.saveAsHybrid(path("pages.notes.pdf")).ok) << "the pages are still there";
+    auto again = DocumentSession::loadFile(path("pages.notes.pdf"));
+    ASSERT_TRUE(again.document);
+    EXPECT_EQ(describe(*again.document), describe(*session.getDocument()));
+}
+
 // --- measurements ---------------------------------------------------------------------------------------------------
 
 // XQT_BENCH_HYBRID=<pdf>: notes on every 25th page (strokes with pressure, a highlighter, a text); the time and size

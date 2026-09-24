@@ -1,6 +1,6 @@
 /*
  * xournal-qt: what the app hands to the system: a file to the app the system opens it with, a file to show in the
- * file manager, a library to open in a window of its own (another process).
+ * file manager, a library to open in a window of its own (another process), a file for the trash.
  *
  * Everything goes through one object that tests replace (setInstance), so no test starts an app, a file manager or
  * a window.
@@ -27,6 +27,9 @@ public:
     /// Open a folder as a library in a window of its own: the app started again with the folder (one library per
     /// process; a running window of that library takes over and comes to the front).
     virtual bool startLibraryWindow(const QString& folder);
+    /// Move a file or folder to the desktop trash (QFile::moveToTrash). Every trash of the app goes through here,
+    /// so tests never fill the user's trash.
+    virtual bool moveToTrash(const QString& path);
 
     /// There is a file manager to show files in (not on Android).
     static bool canShowInFileManager();

@@ -389,6 +389,17 @@ Popup {
                         key: "hybridExportXopp"
                         text: qsTr("On every save of a hybrid PDF, also write a .xopp for Xournal++")
                     }
+                    ComboRow {
+                        objectName: "hybridOldXoppRow"
+                        key: "hybridOldXopp"
+                        text: qsTr("A document saved as a .xopp is saved as a PDF with notes: its .xopp")
+                        options: [
+                            { text: qsTr("Ask each time"), value: "ask" },
+                            { text: qsTr("Move it to the trash"), value: "trash" },
+                            { text: qsTr("Keep it updated for Xournal++"), value: "update" },
+                            { text: qsTr("Keep it as it is"), value: "keep" }
+                        ]
+                    }
                     SectionTitle { text: qsTr("Autosave") }
                     SwitchRow { key: "autosaveEnabled"; text: qsTr("Save a backup of unsaved changes regularly") }
                     SliderRow {

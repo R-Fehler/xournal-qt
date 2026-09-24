@@ -17,6 +17,8 @@
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
 
+#include "SystemApps.h"
+
 namespace xqt {
 
 namespace {
@@ -816,7 +818,7 @@ Result trash(const DocumentItem& item) {
         return failure("The document does not exist.");
     }
     for (const fs::path& f: filesOf(item)) {
-        if (!QFile::moveToTrash(QString::fromStdString(f.string()))) {
+        if (!SystemApps::instance().moveToTrash(QString::fromStdString(f.string()))) {
             return failure("Could not move \"" + f.filename().string() + "\" to the trash.");
         }
     }
@@ -911,7 +913,7 @@ Result trashFolder(const fs::path& folder) {
     if (!isDir(folder)) {
         return failure("The folder does not exist.");
     }
-    if (!QFile::moveToTrash(QString::fromStdString(folder.string()))) {
+    if (!SystemApps::instance().moveToTrash(QString::fromStdString(folder.string()))) {
         return failure("Could not move \"" + folder.filename().string() + "\" to the trash.");
     }
     Result r;
