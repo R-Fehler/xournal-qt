@@ -88,10 +88,10 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         Search. It explains the syntax with examples.
       - Whole matching words are marked; `'exact`, `^` and `$` keep their meaning.
    5. ~~fuzzy search~~: `qt/fuzzy-search`, merged 2026-09-24 (see ROADMAP). Follow-ups: hit-page pictures mark `^`/`$`/`'word'` terms as plain substrings; the document search bar shows no sign that it is in fuzzy mode.
-3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
-   branches are open.
-4. **The `.md` editor:** `.md` documents, images in `<name>.assets/`, math, vaults. It is the biggest design
-   task and builds on the library already listing and indexing `.md` files.
+3. **Android:** ~~`qt/android-apk`~~ merged 2026-09-24; `qt/android-basics` running, then `qt/android-libraries`.
+4. **The `.md` editor:** ~~`qt/md-editor`~~ merged 2026-09-24. Left: images in `<name>.assets/`, math, vaults.
+5. **Windows:** ~~`qt/windows-build`~~ merged 2026-09-24; `qt/windows-feel` is the author's, on the Surface.
+6. **PDF as the document:** ~~`qt/pdf-incremental`~~ merged 2026-09-24; `qt/pdf-only` next.
 
 Blocks for tracks 2–4 get their `qt/...` names when they are planned. Research for each happens right before it
 is built.
@@ -313,7 +313,8 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
-1. [~] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (started 2026-09-24).
+1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
+   when a save falls back to a full write, and a check in MuPDF and pdf.js).
    - Ctrl+S appends only what changed (standard PDF incremental update, ISO 32000): the changed layer annotations
      or ink streams, the embedded `.xopp`, the catalog marker, and a new cross-reference section matching the file's
      style (a table, or a stream after an xref stream) with `/Prev`. The original pages are never rewritten. This is
@@ -326,7 +327,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
    - Verify: qpdf `--check`; poppler, MuPDF and pdf.js render the same after many incremental saves; size growth and
      compaction; save time on pgfmanual before and after.
    - qpdf cannot write incremental updates: our own small appender, with objects serialised through qpdf.
-2. [ ] **`qt/pdf-only`: a mode where every document is a single PDF**, with no sidecars.
+2. [~] **`qt/pdf-only`: a mode where every document is a single PDF**, with no sidecars (started 2026-09-24).
    - New documents are hybrid `name.pdf`. Annotating an existing PDF writes into that PDF, the Drawboard way.
      Pasted pages go into the PDF, and images are inside the Xournal data. Nothing is written next to files;
      autosave and recovery stay in the app's cache.

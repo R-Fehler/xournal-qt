@@ -362,6 +362,15 @@
   - Behaviour change: a line being drawn shows under the tool, not over it.
   318 KiB.
 
+- **Incremental saves of PDFs with notes, `qt/pdf-incremental` (2026-09-24).** Ctrl+S on a hybrid or archive PDF
+  appends only the changed layer annotations and drawings, the embedded `.xopp` and a new cross-reference section
+  (`IncrementalPdf`, objects serialised through qpdf). Written to a copy next to the file, flushed and renamed over
+  it, so a crash leaves the previous revision intact. Archive PDFs stay PDF/A-3b (veraPDF in CI).
+  - Compaction (a full write): Save as, before sharing, above 25% growth, a quarter of the pages new or removed, and
+    whenever the file has no safe base (changed outside, other app's ink, encrypted).
+  - pgfmanual: Ctrl+S 6.3 → 0.2 s (hybrid), 24.6 → 0.2–0.4 s (archive); reopen 5.5 → 0.44 s.
+  - Left: no UI message when a save falls back to a full write; MuPDF and pdf.js not yet checked.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
