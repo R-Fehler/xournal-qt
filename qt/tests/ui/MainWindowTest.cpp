@@ -2333,7 +2333,7 @@ TEST_F(MainWindowTest, fourOrFiveFingersShowThePagesOrTheDocuments) {
 }
 
 TEST_F(MainWindowTest, fiveWidthsInTheToolBar) {
-    window->setWidth(1600);  // room for the whole tool bar
+    window->setWidth(1920);  // room for the whole tool bar (full HD)
     wait(100);
     auto* fifth = findItem("customSizeButton");
     ASSERT_NE(fifth, nullptr);
