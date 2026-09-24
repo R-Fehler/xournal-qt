@@ -22,7 +22,8 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
    1. ~~`qt/pdf-pages`~~: merged 2026-09-24 (see ROADMAP). Follow-ups: the merge runs on the UI thread (about 0.2 s
       per paste on a 117 MB scan); the `.next.pdf` step relies on Linux rename semantics (check before Windows).
    2. ~~`qt/hybrid-pdf`~~: merged 2026-09-24 (see ROADMAP). Follow-ups:
-      - [ ] Save in the background: a 1,300-page hybrid save blocks the window for about 6 s.
+      - [~] Save in the background: a 1,300-page hybrid save blocks the window for about 6 s. `qt/background-save`,
+        started 2026-09-24, also covering the paste merge (0.2 s per paste on a 117 MB scan).
       - [ ] The round trip in other viewers (the author): Acrobat, Preview, Xodo, Drawboard, Chrome/pdf.js,
         Firefox, Okular, Evince, with the sample `~/xournal_qt_workspace/samples/hybrid-sample.pdf`. See the
         device checklist.
