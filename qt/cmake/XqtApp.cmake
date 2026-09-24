@@ -112,6 +112,7 @@ set(XQT_QML_FILES
     src/app/qml/MarkdownPanel.qml
     src/app/qml/CustomWidthPopup.qml
     src/app/qml/AppendPages.qml
+    src/app/qml/PageJump.qml
     src/app/qml/BackgroundDialog.qml
     src/app/qml/ChapterDialog.qml
     src/app/qml/ContextPill.qml

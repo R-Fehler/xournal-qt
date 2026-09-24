@@ -47,6 +47,14 @@ public:
         return was;
     }
 
+    /// The page the view was last sent to (scrollToPage, scrollToPageRect), once: it becomes the current page while
+    /// it can be seen, even if another one shows more of itself.
+    std::optional<size_t> takePageJump() {
+        auto page = pageJump;
+        pageJump.reset();
+        return page;
+    }
+
     /// View position of the content origin (includes the centering of content smaller than the view).
     QPointF contentOrigin() const;
     QPointF contentToView(QPointF c) const { return c + contentOrigin(); }
@@ -92,6 +100,7 @@ Q_SIGNALS:
 
 private:
     bool jumped = false;  ///< the last change went somewhere (not plain scrolling or zooming)
+    std::optional<size_t> pageJump;  ///< the last change went to this page
     struct Anchor {
         size_t page = 0;
         QPointF pagePoint;  ///< in points, may lie outside the page

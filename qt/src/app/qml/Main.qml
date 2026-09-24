@@ -1470,6 +1470,17 @@ ApplicationWindow {
         property alias text: messageLabel.text
         Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }
     }
+    // Digits typed while the page is at hand: go to that page (Enter)
+    PageJump {
+        id: pageJump
+        z: 100
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.top: canvas.top
+        anchors.topMargin: Math.round(canvas.height * 0.2)
+        pageCount: app.pageCount
+        returnFocus: canvas
+        onJumpRequested: function(page) { app.jumpToPage(page - 1) }
+    }
     Snackbar {
         id: snackbar
         objectName: "snackbar"
@@ -1712,6 +1723,25 @@ ApplicationWindow {
     readonly property bool toolKeys: docKeys && !pageGrid.visible && !contentsOverview.visible && !tabOverview.visible
                                      && !settingsPage.visible
     Shortcut { sequences: win.keysOf("toolPen"); enabled: toolKeys; onActivated: app.selectTool("pen") }
+    // A page number: the first digit opens the jump, which takes the following keys itself. (A field or a text on
+    // the page that is typed into takes its digits first.)
+    component DigitKey: Shortcut {
+        property int digit
+        sequence: String(digit)
+        enabled: win.toolKeys && !pageJump.visible
+        onActivated: pageJump.start(String(digit))
+    }
+    DigitKey { digit: 0 }
+    DigitKey { digit: 1 }
+    DigitKey { digit: 2 }
+    DigitKey { digit: 3 }
+    DigitKey { digit: 4 }
+    DigitKey { digit: 5 }
+    DigitKey { digit: 6 }
+    DigitKey { digit: 7 }
+    DigitKey { digit: 8 }
+    DigitKey { digit: 9 }
+
     Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.selectTool("eraser") }
     Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.selectTool("highlighter") }
     Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: app.selectTool("text") }

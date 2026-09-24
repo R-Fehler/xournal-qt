@@ -302,6 +302,8 @@ private:
     void refreshLayout();
     DocumentLayout::Config layoutConfig() const;
     void updateVisibility();
+    /// The page the view was sent to: the current one while it can be seen, until the view is scrolled or zoomed
+    std::optional<size_t> jumpedPage;
     /// A scroll or zoom change: the visibility update (the current page, the models, the sidebar that follows) at
     /// most every few milliseconds - the mouse sends more moves than there are frames.
     void viewChanged();

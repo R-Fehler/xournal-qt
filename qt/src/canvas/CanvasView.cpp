@@ -1361,6 +1361,7 @@ void CanvasView::refreshLayout() {
         refs.push_back(p->getPage());
     }
     layout.update(*session.getDocument(), refs, layoutConfig());
+    jumpedPage.reset();  // (pages came or went: another index)
     viewController.layoutChanged();
     Q_EMIT pagesChanged();
 }
@@ -1369,7 +1370,14 @@ void CanvasView::viewChanged() {
     const int EVERY_MS = visibilityDelay;  // (about one frame)
     // A jump (to a page, a fit, a new size) right away; plain scrolling and zooming send more changes than there are
     // frames, and looking at the visible pages tells the models and moves the sidebar along.
-    if (viewController.takeJumped() || !sinceVisibility.isValid() || sinceVisibility.elapsed() >= EVERY_MS) {
+    const std::optional<size_t> toPage = viewController.takePageJump();
+    const bool jumped = viewController.takeJumped();
+    if (toPage) {
+        jumpedPage = toPage;
+    } else if (!jumped) {
+        jumpedPage.reset();  // scrolled or zoomed by hand: the most visible page is the current one again
+    }
+    if (jumped || !sinceVisibility.isValid() || sinceVisibility.elapsed() >= EVERY_MS) {
         sinceVisibility.restart();
         visibilityTimer.stop();
         updateVisibility();
@@ -1390,9 +1398,18 @@ void CanvasView::updateVisibility() {
     size_t mostVisible = session.getCurrentPageNo();
     double bestArea = -1;
     const QRectF visible = viewController.visibleContentRect();
-    for (size_t i = first; i <= last && i < pages.size(); ++i) {
+    const auto shownArea = [&](size_t i) {
         const QRectF inter = layout.pageRect(i, zoom).intersected(visible);
-        if (const double area = inter.width() * inter.height(); area > bestArea) {
+        return inter.width() * inter.height();
+    };
+    // After a jump to a page, that page is the current one while it can be seen: at the end of the document the
+    // page before a small last page may show more of itself.
+    if (const auto p = jumpedPage; p && *p >= first && *p <= last && *p < pages.size() && shownArea(*p) > 0) {
+        mostVisible = *p;
+        bestArea = std::numeric_limits<double>::infinity();
+    }
+    for (size_t i = first; i <= last && i < pages.size(); ++i) {
+        if (const double area = shownArea(i); area > bestArea) {
             bestArea = area;
             mostVisible = i;
         }

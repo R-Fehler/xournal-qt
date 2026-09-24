@@ -682,3 +682,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       `previews.pack` is written. Then edit page 4 and save: `previews.pack` is left alone; edit page 2: it is written.
 - [ ] Settings → Storage → Clean-up still removes everything (also `preview-stamps.pack`); switching the cache to
       the app cache moves it along.
+
+## Presentation and horizontal scrolling (qt/present)
+- [ ] Page number jump: with a document open, type `12` on the keyboard (no text being written): "Go to page: 12
+      of N" appears over the page; Enter goes to page 12 (a number past the end goes to the last page), Escape or a
+      tap on the page cancels, Backspace takes a digit back, the number pad works too. Alt+Left goes back to where
+      you were. Typing digits into a text on the page, a Markdown box, the search field or a dialog does not open it.

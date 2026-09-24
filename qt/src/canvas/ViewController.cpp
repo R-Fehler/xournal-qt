@@ -182,6 +182,7 @@ void ViewController::scrollToPageRect(size_t page, QRectF rectPt) {
         scrollPos.setX(r.center().x() - view.width() / 2);
     }
     clamp();
+    pageJump = page;
     Q_EMIT changed();
 }
 
@@ -206,6 +207,7 @@ void ViewController::scrollToPage(size_t page) {
         scrollPos.setX(r.left() - DocumentLayout::PADDING);
     }
     clamp();
+    pageJump = page;
     Q_EMIT changed();
 }
 

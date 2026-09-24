@@ -4096,3 +4096,89 @@ TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
     controller->undo();
     EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u);
 }
+
+// --- qt/present: page number jump, 16:9 pages, horizontal scrolling, presentation --------------------------------
+
+// Digits typed while the page is at hand: "Go to page: 12", Enter goes there (the last page at most), Escape cancels.
+// Digits typed into a text on the page, the search field or a dialog stay there.
+TEST_F(MainWindowTest, typingAPageNumberJumpsToThePage) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    const int pages = controller->pageCount();
+    ASSERT_GE(pages, 10);
+    auto* jump = find<QQuickItem>("pageJump");
+    auto* digits = find<QQuickItem>("pageJumpDigits");
+    ASSERT_NE(jump, nullptr);
+    ASSERT_NE(digits, nullptr);
+    EXPECT_FALSE(jump->isVisible());
+    key(Qt::Key_1);
+    ASSERT_TRUE(jump->isVisible()) << "the first digit opens it";
+    key(Qt::Key_0);
+    EXPECT_EQ(digits->property("text").toString(), "10");
+    key(Qt::Key_Return);
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 10);
+    EXPECT_TRUE(controller->canGoBack()) << "a jump: Alt+Left goes back";
+
+    key(Qt::Key_9);
+    key(Qt::Key_9);
+    key(Qt::Key_9);
+    key(Qt::Key_Enter);
+    EXPECT_EQ(controller->pageNumber(), pages) << "past the end: the last page";
+
+    key(Qt::Key_2);
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(jump->isVisible()) << "Escape cancels";
+    EXPECT_EQ(controller->pageNumber(), pages);
+
+    key(Qt::Key_2);
+    key(Qt::Key_3);
+    key(Qt::Key_Backspace);
+    key(Qt::Key_Return);
+    EXPECT_EQ(controller->pageNumber(), 2) << "Backspace takes the last digit back";
+
+    key(Qt::Key_5, Qt::KeypadModifier);
+    key(Qt::Key_Enter, Qt::KeypadModifier);
+    EXPECT_EQ(controller->pageNumber(), 5) << "the number pad";
+
+    // Another key: no page number after all
+    key(Qt::Key_3);
+    ASSERT_TRUE(jump->isVisible());
+    key(Qt::Key_P);
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 5);
+
+    // The search field keeps its digits
+    key(Qt::Key_F, Qt::ControlModifier);
+    type("12");
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(find<QQuickItem>("searchField")->property("text").toString(), "12");
+    key(Qt::Key_Escape);
+
+    // So does a text on the page
+    controller->setTextMarkdown(false);  // (an ordinary text box, whatever a test before chose)
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    const QRectF page = view->pageViewRect(controller->pageNumber() - 1);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                      canvasItem->mapToScene(page.topLeft() + QPointF(60, 60)).toPoint());
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    type("42");
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(view->getTextEditor()->text(), "42");
+    key(Qt::Key_Escape);
+    controller->selectTool("pen");
+
+    // And a dialog
+    QObject* dialog = find("insertPagesDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "open");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    key(Qt::Key_7);
+    EXPECT_FALSE(jump->isVisible()) << "not under a dialog";
+    QMetaObject::invokeMethod(dialog, "close");
+    ASSERT_TRUE(waitOpened(dialog, false));
+}
