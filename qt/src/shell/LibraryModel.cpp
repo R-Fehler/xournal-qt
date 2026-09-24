@@ -1,4 +1,5 @@
 #include "LibraryModel.h"
+#include "ContentFiles.h"
 
 #include "DocumentPlaces.h"
 
@@ -13,6 +14,7 @@
 #include <QFileSystemWatcher>
 #include <QMimeDatabase>
 #include <QPointer>
+#include <QTemporaryDir>
 #include <QThreadPool>
 
 #include "HitPages.h"
@@ -896,8 +898,13 @@ void LibraryModel::importUrls(const QList<QUrl>& urls, const QString& folder) {
         return;
     }
     std::vector<fs::path> files;
+    QStringList foreign;
     const fs::path target = dirOf(folder);
     for (const QUrl& u: urls) {
+        if (ContentFiles::isForeign(u)) {
+            foreign << ContentFiles::sourceOf(u);
+            continue;
+        }
         if (!u.isLocalFile()) {
             continue;
         }
@@ -908,11 +915,11 @@ void LibraryModel::importUrls(const QList<QUrl>& urls, const QString& folder) {
         }
         files.push_back(f);
     }
-    copyInBackground(std::move(files), target);
+    copyInBackground(std::move(files), target, foreign);
 }
 
-void LibraryModel::copyInBackground(std::vector<fs::path> files, fs::path target) {
-    if (files.empty()) {
+void LibraryModel::copyInBackground(std::vector<fs::path> files, fs::path target, QStringList foreign) {
+    if (files.empty() && foreign.isEmpty()) {
         return;
     }
     ++importJobs;
@@ -920,9 +927,21 @@ void LibraryModel::copyInBackground(std::vector<fs::path> files, fs::path target
     QPointer<LibraryModel> self(this);
     // Copying (large PDFs) and rewriting .xopp files in the background. Text and other files too when they are
     // shown.
-    QThreadPool::globalInstance()->start([self, files, target, include = filter.include()] {
+    QThreadPool::globalInstance()->start([self, files, target, foreign, include = filter.include()]() mutable {
         int imported = 0;
         QStringList errors;
+        // Other apps' files first into a folder of our own (their names made safe), then imported from there
+        QTemporaryDir staging(QDir::tempPath() + "/xqt-import-XXXXXX");
+        for (const QString& source: foreign) {
+            std::string error;
+            const fs::path copy = ContentFiles::copyInto(source, fs::path(staging.path().toStdString()), error);
+            if (!copy.empty()) {
+                files.push_back(copy);
+            }
+            if (!error.empty()) {
+                errors << QString::fromStdString(error);
+            }
+        }
         for (const auto& f: files) {
             const auto r = DocumentFiles::import(f, target, include);
             imported += r.documents;

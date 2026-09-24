@@ -85,6 +85,15 @@ adb shell am start -a android.intent.action.SEND -t application/octet-stream \
 put the URI into the clip data, which carries the grant. So test SEND with a file of the app's own folder.) While
 the phone is locked the app's event loop is paused: a file handed over then opens when it is unlocked.
 
+**Opening and importing through Android's pickers.** "Open…" (tool bar, Recent), "Import files…" and "Import a
+folder…" (library) show Android's system pickers (the Storage Access Framework: `ACTION_OPEN_DOCUMENT` and, for
+folders, `ACTION_OPEN_DOCUMENT_TREE`, which Qt's `FileDialog` and `FolderDialog` use on Android). They return
+`content://` URIs: "Open…" copies the file into "Opened" as above and opens it; the imports copy into the library's
+current folder, a folder with all its subfolders (hidden ones stay behind) and every file the library shows. The
+copies go through a staging folder in the app's cache first, in the background ([LibraryModel](../src/shell/LibraryModel.cpp)
+`importUrls`). An image picked for "Insert image" is read the same way. "Open a folder as library" cannot take a
+picked folder yet (no path to scan): it says so and points to "Import a folder".
+
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
 `files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`.

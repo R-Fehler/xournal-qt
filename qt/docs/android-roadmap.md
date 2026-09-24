@@ -43,11 +43,11 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
 
 ## Files
 
-- (E) **The system file picker** (QtQuick.Dialogs `FileDialog` → Android's `ACTION_OPEN_DOCUMENT`) returns
-  `content://` URIs, not paths. The core opens paths. Until there is a Storage Access Framework layer (copy in,
-  write back, or keep a persisted URI grant), documents live in the app's own folder:
-  `/storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default`
-  (reachable with `adb push` and over USB).
+- Done (`qt/android-basics`): **"Open…", "Import files…", "Import a folder…" and "Insert image"** read what
+  Android's pickers return (`content://`) and copy it into the library (android.md).
+- (E) **Saving and exporting to a place the user picks** ("Save as", "Export as PDF", the archive export, the
+  library archive): Android's save picker returns a `content://` URI too, which the core cannot write. Write to a
+  file in the cache and copy it through `QFile` on the URI, the other way round.
 - Done (`qt/android-basics`): **"Open with" and the share sheet** copy the file into the library's folder "Opened"
   and open it (android.md). Open: sharing several files at once (SEND_MULTIPLE) is handled but was only tested with
   one; `.xopp` files that other apps hand over as `application/octet-stream` make the app appear in "Open with" for
@@ -55,7 +55,9 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
 - (E) **Writing back**: a document opened from another app is a copy; changes do not go back to the original (e.g.
   a PDF in a cloud app). A later step could keep the URI grant (`takePersistableUriPermission`) and offer "Save back".
 - (E) **Libraries anywhere** (VISION): a library folder chosen by the user means a SAF tree URI
-  (`ACTION_OPEN_DOCUMENT_TREE`); the library code (`qt/src/shell/Library*`) scans with `std::filesystem`.
+  (`ACTION_OPEN_DOCUMENT_TREE`); the library code (`qt/src/shell/Library*`) scans with `std::filesystem`. Today
+  "Open a folder as library" with a picked folder only explains that it cannot be done yet. Other libraries (New
+  library, the Libraries menu) start another process, which Android does not do either.
 - (E) **"Show in file manager"** has no Android equivalent; hide it. "Open externally" becomes an intent with a
   `FileProvider` URI (the provider is already in the manifest).
 - (E) **Printing** calls `lp`; on Android use the print framework or hide Print.

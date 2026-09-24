@@ -228,7 +228,8 @@ public:
     Q_INVOKABLE bool moveTo(int row, const QString& folder);
     Q_INVOKABLE bool trash(int row);
     /// Copy documents, or folders with their whole folder structure, into a folder of the library (relative; in the
-    /// background). `imported` tells the number of documents.
+    /// background). `imported` tells the number of documents. Files and folders of other apps (Android's pickers:
+    /// content:// URIs) are copied too (ContentFiles).
     Q_INVOKABLE void importUrls(const QList<QUrl>& urls, const QString& folder);
     /// All folders of the library: [{ folder, name, depth }], for "Move to".
     Q_INVOKABLE QVariantList folderList() const;
@@ -292,7 +293,8 @@ private:
     /// Files moved by the app: the index, the reading places and the previews follow.
     void followMoves(const std::vector<std::pair<fs::path, fs::path>>& moves);
     void setRows(std::vector<Row> newRows);
-    void copyInBackground(std::vector<fs::path> files, fs::path target);
+    /// `foreign`: sources that are no paths (ContentFiles), copied to a staging folder first.
+    void copyInBackground(std::vector<fs::path> files, fs::path target, QStringList foreign = {});
     void selectionUpdated();
 
     std::unique_ptr<Library> lib;

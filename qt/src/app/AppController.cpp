@@ -1729,6 +1729,13 @@ QVariantList AppController::libraries() const {
 }
 
 void AppController::openLibrary(const QUrl& folder) {
+    if (ContentFiles::isForeign(folder)) {  // (Android's folder picker: no path to scan)
+        Q_EMIT message(tr("Open a folder as library"),
+                       tr("This folder can only be read through Android's file picker, so it cannot be a library "
+                          "yet. \u201cImport a folder\u201d copies it into this library."),
+                       false);
+        return;
+    }
     const QString dir = folder.isLocalFile() ? folder.toLocalFile() : folder.toString();
     if (library->library() && Library(fs::path(dir.toStdString())).root() == library->library()->root()) {
         setHomeVisible(true);  // this one

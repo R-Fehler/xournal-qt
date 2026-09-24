@@ -1097,3 +1097,9 @@ Install the debug APK (`adb install -r …/android-build-debug.apk`; the documen
 - [ ] Share sheet: in the Gallery or in a mail app, share a photo or a PDF attachment → Xournal Qt. It opens as
       above. Share two photos at once: both open.
 - [ ] Share a link from the browser → Xournal Qt: a message says only files can be shared.
+- [ ] Library → Import → "Import files…": Android's picker opens; pick two PDFs from Downloads (long press to pick
+      several). "2 documents imported"; they are in the current folder of the library.
+- [ ] Import → "Import a folder with its subfolders…": the folder picker opens ("Use this folder", "Allow"). The
+      folder appears in the library with its subfolders and documents.
+- [ ] In a document, the Open button: the picker; the chosen PDF opens as a tab and its copy is in "Opened".
+- [ ] The image tool (or Insert image): pick a photo; it lands on the page as a selection.
