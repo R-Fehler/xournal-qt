@@ -31,6 +31,17 @@ ListView {
         bottomPadding: 6
         highlighted: index === app.outline.currentRow
         onClicked: if (page >= 0) app.jumpToPage(page)
+        // Press and hold, or a right click: a link to the chapter (qt/docs/links.md)
+        onPressAndHold: if (page >= 0) chapterMenu.popup()
+        TapHandler { acceptedButtons: Qt.RightButton; onTapped: if (entry.page >= 0) chapterMenu.popup() }
+        Menu {
+            id: chapterMenu
+            MenuItem {
+                objectName: "copyChapterLink"
+                text: qsTr("Copy link to this chapter")
+                onTriggered: app.copyChapterLink(entry.page, entry.title)
+            }
+        }
         contentItem: RowLayout {
             spacing: 2
             ToolButton {

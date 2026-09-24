@@ -4,6 +4,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QMimeData>
 #include <QVariantMap>
 
 #include "AppController.h"
@@ -16,7 +19,9 @@
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/ReferenceMode.h"
+#include "shell/DocumentFiles.h"
 #include "shell/TabManager.h"
+#include "util/TextLinks.h"
 
 using namespace xqt;
 
@@ -219,4 +224,88 @@ bool AppController::navigateDocuments(bool back) {
     }
     Q_EMIT navigationChanged();
     return shown;
+}
+
+// --- making links: Copy link -----------------------------------------------------------------------------------
+
+namespace {
+/// The name a link's title starts with: the document's name without its extension.
+QString nameOf(const fs::path& file) { return QString::fromStdString(file.stem().string()); }
+
+void putOnClipboard(const QString& title, const fs::path& file, const links::Link& link) {
+    auto* mime = new QMimeData;
+    links::toMime(*mime, title, file, link);
+    QGuiApplication::clipboard()->setMimeData(mime);
+}
+}  // namespace
+
+void AppController::copyPageLink(int page) {
+    DocumentSession* s = session();
+    const int index = page >= 0 ? page : pageNumber() - 1;
+    if (!s || index < 0) {
+        return;
+    }
+    const fs::path file = s->documentFile();
+    if (file.empty()) {
+        // No file yet: a link within the document, as upstream writes them
+        QGuiApplication::clipboard()->setText(QString::fromStdString(xoj::util::pageLinkText(index + 1)));
+        Q_EMIT pageActionDone(tr("Link to page %1 copied").arg(index + 1), false);
+        return;
+    }
+    const links::Link link = DocumentLinks::linkTo(*s, static_cast<size_t>(index), {});
+    putOnClipboard(tr("%1, page %2").arg(nameOf(file)).arg(index + 1), file, link);
+    Q_EMIT pageActionDone(tr("Link to page %1 copied").arg(index + 1), false);
+}
+
+void AppController::copyChapterLink(int page, const QString& title) {
+    DocumentSession* s = session();
+    if (!s || page < 0 || s->documentFile().empty()) {
+        copyPageLink(page);
+        return;
+    }
+    const fs::path file = s->documentFile();
+    const links::Link link = DocumentLinks::linkTo(*s, static_cast<size_t>(page), {}, title);
+    putOnClipboard(tr("%1, %2").arg(nameOf(file), title), file, link);
+    Q_EMIT pageActionDone(tr("Link to \u201c%1\u201d copied").arg(title), false);
+}
+
+bool AppController::copyDocumentLink(const QString& path, int page) {
+    fs::path file(path.toStdString());
+    if (const DocumentItem item = DocumentFiles::itemOf(file); item.valid()) {
+        file = item.main();
+    }
+    std::error_code ec;
+    if (file.empty() || !fs::exists(file, ec)) {
+        return false;
+    }
+    links::Link link;
+    QString title = nameOf(file);
+    if (page >= 0) {
+        title = tr("%1, page %2").arg(nameOf(file)).arg(page + 1);
+        if (const int open = tabs->indexOfFile(file); open >= 0) {
+            link = DocumentLinks::linkTo(*tabs->session(open), static_cast<size_t>(page), {});
+        } else {
+            link.page = page + 1;
+            const std::vector<links::Page> pages =
+                    library && library->searchIndex() ? library->searchIndex()->linkPages(file) : std::vector<links::Page>();
+            if (static_cast<size_t>(page) < pages.size()) {
+                const links::Page& p = pages[static_cast<size_t>(page)];
+                if (p.pdfPage > 0) {
+                    link.pdfPage = p.pdfPage;
+                } else {
+                    link.text = links::fingerprint(p.text);
+                }
+            }
+        }
+    }
+    putOnClipboard(title, file, link);
+    Q_EMIT pageActionDone(page >= 0 ? tr("Link to page %1 copied").arg(page + 1)
+                                    : tr("Link to \u201c%1\u201d copied").arg(nameOf(file)),
+                          false);
+    return true;
+}
+
+QString AppController::clipboardLinkMarkdown() const {
+    const auto copied = links::fromMime(QGuiApplication::clipboard()->mimeData());
+    return copied ? links::markdownFor(*copied, session() ? session()->documentFile() : fs::path()) : QString();
 }

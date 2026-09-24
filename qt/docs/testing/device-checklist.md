@@ -994,3 +994,13 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
 - [ ] Rename the chapter in the lecture, tap the link again: page 2 opens with the note "Chapter "Prediction step"
       not found, opened page 2".
 - [ ] `[[b#Part two]]` opens `b.md` at the page with "Part two".
+- [ ] In the lecture, the page sidebar's page menu → "Copy a link to this page", open a note and press Ctrl+V on its
+      page (nothing selected): a small blue "🔗 kalman, page 3" appears where the view is; a tap on it (hand tool
+      or finger) offers to open the lecture there. Undo removes it. Open the note in Xournal++: it shows
+      `[🔗 kalman, page 3](../Lectures/kalman.xopp#page=3…)` as text.
+- [ ] Select a sketch (lasso), Ctrl+V the link: the marker sits at the sketch's top right.
+- [ ] Write Markdown on a page (or in a `.md`), Ctrl+V the link: `[kalman, page 3](../Lectures/kalman.xopp#page=3)`,
+      relative to that document. The same in the editor beside the page.
+- [ ] Contents sidebar: press and hold a chapter → "Copy link to this chapter"; ⋮ → "Copy link to this page"; a
+      library card's menu → "Copy link"; a page with hits in the extended library search, press and hold → "Copy
+      link to this page". Paste each into a text editor of another app: a Markdown link with the full path.

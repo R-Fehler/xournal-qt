@@ -33,6 +33,8 @@
 
 #include "filesystem.h"
 
+class QMimeData;
+
 namespace xqt::links {
 
 struct Link {
@@ -106,5 +108,23 @@ struct TextPlace {
     QString note;
 };
 TextPlace resolveInText(const Link& link, const std::string& markdown);
+
+// --- the clipboard ----------------------------------------------------------------------------------------------
+
+/// "Copy link" puts a link on the clipboard three ways: the app's own format (the title and the link with the
+/// target's absolute path, made relative where it is pasted), Markdown `[title](/absolute/path#…)` as text, and an
+/// HTML link to the `file://` URI for rich text editors.
+inline constexpr const char* MIME = "application/x-xournalqt-link";
+struct Copied {
+    QString title;
+    Link link;  ///< its path is the target's absolute path
+};
+/// Fills `mime` with a link to `file` (absolute) at the place `link` says (its path is replaced).
+void toMime(QMimeData& mime, const QString& title, const fs::path& file, Link link);
+std::optional<Copied> fromMime(const QMimeData* mime);
+/// The Markdown link to paste into a document at `holder` (its file; empty: a new document, the path stays absolute).
+QString markdownFor(const Copied& copied, const fs::path& holder);
+/// A link marker's text: the Markdown link with a chain in front of its title.
+QString markerText(const Copied& copied, const fs::path& holder);
 
 }  // namespace xqt::links

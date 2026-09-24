@@ -3376,11 +3376,7 @@ bool AppController::addChapter(int page, const QString& title, int level) {
     return true;
 }
 
-void AppController::copyPageLink(int page) {
-    const int number = page >= 0 ? page + 1 : pageNumber();
-    QGuiApplication::clipboard()->setText(QString::fromStdString(xoj::util::pageLinkText(number)));
-    Q_EMIT pageActionDone(tr("Link to page %1 copied").arg(number), false);
-}
+// (Copy link to other places: AppLinks.cpp)
 
 bool AppController::pdfTextIsSelected() const { return canvas() && canvas()->hasPdfTextSelection(); }
 

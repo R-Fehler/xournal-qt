@@ -622,8 +622,18 @@ public:
     Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
     /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.
     Q_INVOKABLE bool addChapter(int page, const QString& title, int level);
-    /// Puts a link to a page ("#Page:12") into the clipboard: pasted into a text it becomes a tappable link.
+    /// "Copy link" (qt/docs/links.md): a link to a page of the current document (-1: the current page) onto the
+    /// clipboard, as the app's own format, Markdown and HTML (links::toMime). Pasted into a Markdown text it becomes
+    /// `[title](link)` relative to that document, on a page a link marker. A document without a file yet: "#Page:12",
+    /// a link within it, as before.
     Q_INVOKABLE void copyPageLink(int page);
+    /// The same for a chapter of the contents (its title, its page).
+    Q_INVOKABLE void copyChapterLink(int page, const QString& title);
+    /// The same for a document of the library (a card, a search hit), or a page of it (0-based; -1: the document).
+    Q_INVOKABLE bool copyDocumentLink(const QString& path, int page = -1);
+    /// The clipboard holds a link (Copy link): its Markdown for the Markdown text being written beside the page
+    /// (relative to the current document), else "".
+    Q_INVOKABLE QString clipboardLinkMarkdown() const;
     /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
     Q_INVOKABLE void requestPrint(const QList<int>& pages) { Q_EMIT printRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);

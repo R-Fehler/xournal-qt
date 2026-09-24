@@ -1433,6 +1433,23 @@ std::vector<fs::path> LibraryIndex::filesNamed(const QString& name, bool without
     return found;
 }
 
+std::vector<links::Page> LibraryIndex::linkPages(const fs::path& file) const {
+    std::vector<links::Page> pages;
+    std::lock_guard lock(mtx);
+    const EntryPtr e = find(file);
+    if (!e || pageless(e->kind)) {
+        return pages;
+    }
+    for (int i = 0; i < e->pageCount(); ++i) {
+        links::Page p;
+        const auto at = static_cast<size_t>(i);
+        p.pdfPage = at < e->pdfPage.size() && e->pdfPage[at] >= 0 ? e->pdfPage[at] + 1 : 0;
+        p.text = e->elementText.value(i);
+        pages.push_back(std::move(p));
+    }
+    return pages;
+}
+
 QString LibraryIndex::simplified(const QString& text) { return text.simplified(); }
 
 }  // namespace xqt

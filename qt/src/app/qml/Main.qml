@@ -771,6 +771,7 @@ ApplicationWindow {
                     id: moreMenu
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
+                    MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
                     MenuItem {
                         objectName: "editAsNotesItem"
                         visible: app.textDocument === "markdown"

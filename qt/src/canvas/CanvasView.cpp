@@ -5,6 +5,7 @@
 #include <shared_mutex>
 #include <limits>
 #include <QMimeData>
+#include <pango/pango.h>
 #include <QGuiApplication>
 #include <QClipboard>
 #include <QBuffer>
@@ -61,6 +62,7 @@
 #include "TextFlow.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
+#include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
 
 namespace xqt {
@@ -430,9 +432,102 @@ bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPo
     return true;
 }
 
+bool CanvasView::pasteLinkMarker(std::optional<QPointF> viewPos) {
+    const auto copied = links::fromMime(QGuiApplication::clipboard()->mimeData());
+    if (!copied) {
+        return false;
+    }
+    Document* doc = session.getDocument();
+    size_t pNr = session.getCurrentPageNo();
+    QPointF onPage(72, 72);
+    PageRef page;
+    if (const EditSelection* sel = getSelection()) {
+        // Next to the selection: its top right
+        page = sel->getSourcePage();
+        const auto r = sel->getRect();
+        onPage = QPointF(r.x + r.width + 4, r.y);
+        std::shared_lock lock(*doc);
+        const size_t idx = doc->indexOf(page);
+        if (idx == npos) {
+            return false;
+        }
+        pNr = idx;
+    } else {
+        if (viewPos) {
+            pNr = layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom()).value_or(pNr);
+        }
+        const double zoom = viewController.zoom();
+        const QRectF pageRect = layout.pageRect(pNr, zoom);
+        if (viewPos) {
+            onPage = (viewController.viewToContent(*viewPos) - pageRect.topLeft()) / zoom;
+        } else {
+            const QRectF visible = pageRect.intersected(viewController.visibleContentRect());
+            onPage = ((visible.isEmpty() ? pageRect : visible).center() - pageRect.topLeft()) / zoom;
+        }
+        std::shared_lock lock(*doc);
+        if (pNr >= doc->getPageCount()) {
+            return false;
+        }
+        page = doc->getPage(pNr);
+    }
+    // The page's Markdown layer (made if needed: at the bottom, the selected layer stays selected)
+    Layer* layer = nullptr;
+    {
+        std::shared_lock lock(*doc);
+        layer = md::markdownLayer(page);
+    }
+    if (!layer) {
+        Layer::Index selected = 0;
+        {
+            std::shared_lock lock(*doc);
+            selected = page->getSelectedLayerId();
+        }
+        layer = new Layer();
+        layer->setName(std::string(xoj::markdown::LAYER_NAME));
+        session.getLayerController()->insertLayer(page, layer, 0);  // (locks the document)
+        std::unique_lock lock(*doc);
+        page->setSelectedLayerId(selected > 0 ? selected + 1 : 0);
+    }
+    auto text = std::make_unique<Text>();
+    text->setText(links::markerText(*copied, session.documentFile()).toStdString());
+    const std::string family = session.getSettings()->getFont().getName();
+    text->setFont(XojFont(family.empty() ? "Sans" : family, std::max(6.0, markdownTextSize * 0.85)));
+    text->setColor(Color(0x1a, 0x5f, 0xd8));
+    // As wide as its text (the box is what is selected and moved)
+    text->setWrap(400);
+    double width = 20;
+    for (const md::Item& item: md::cachedLayout(text->getText(), md::styleOf(*text)).items) {
+        if (item.kind == md::Item::Kind::Text && item.layout) {
+            PangoRectangle logical;
+            pango_layout_get_extents(item.layout.get(), nullptr, &logical);
+            width = std::max(width, item.x + static_cast<double>(logical.x + logical.width) / PANGO_SCALE);
+        }
+    }
+    text->setWrap(std::ceil(width) + 2);
+    const double pageWidth = page->getWidth();
+    const double pageHeight = page->getHeight();
+    const double x = std::clamp(onPage.x(), 0.0, std::max(0.0, pageWidth - width - 2));
+    const double y = std::clamp(onPage.y(), 0.0, std::max(0.0, pageHeight - 20));
+    text->setTransformation(xoj::util::Matrix::TRANSLATION(x, y));
+    const Text* raw = text.get();
+    {
+        std::unique_lock lock(*doc);
+        layer->addElement(std::move(text));
+    }
+    session.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+    page->firePageChanged();
+    session.firePageChanged(pNr);
+    Q_EMIT updateRequested();
+    return true;
+}
+
 bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
     // Port of Control::clipboardPasteXournal
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    // A copied link ("Copy link"): a link marker (qt/docs/links.md)
+    if (mime && mime->hasFormat(links::MIME)) {
+        return pasteLinkMarker(viewPos);
+    }
     // Plain text from anywhere becomes a text element where it is pasted
     if (mime && !mime->hasFormat(XOURNAL_MIME) && !mime->hasImage() && mime->hasText() &&
         !mime->text().trimmed().isEmpty()) {

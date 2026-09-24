@@ -46,6 +46,7 @@
 #include "filesystem.h"
 #include "DocumentFiles.h"
 #include "LibraryCache.h"
+#include "session/DocumentLink.h"
 #include "session/Vocabulary.h"
 
 class Document;
@@ -205,6 +206,9 @@ public:
     /// The indexed documents whose file name is `name`, case ignored (links whose path is gone, wiki links). With
     /// `withoutExtension`, `name` has no extension ("turbines" finds "turbines.md", "Turbines.xopp").
     std::vector<fs::path> filesNamed(const QString& name, bool withoutExtension = false) const;
+    /// The pages of an indexed document, for a link to one of them (DocumentLink.h): the PDF page each shows
+    /// (1-based, 0: none) and the text of its text elements. Empty when it is not indexed or has no pages.
+    std::vector<links::Page> linkPages(const fs::path& file) const;
 
     /// Format of the stored entries (packs of another one are read anew).
     static constexpr int FORMAT = 4;

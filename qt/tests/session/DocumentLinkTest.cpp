@@ -5,6 +5,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <QMimeData>
 #include <gtest/gtest.h>
 
 #include "session/DocumentLink.h"
@@ -241,4 +242,24 @@ TEST(DocumentLinkTest, resolvesHeadingsAndLinesOfMarkdown) {
         EXPECT_EQ(p.offset, c.offset) << links::write(c.link).toStdString();
         EXPECT_EQ(p.note, QString::fromUtf8(c.note)) << links::write(c.link).toStdString();
     }
+}
+
+TEST(DocumentLinkTest, theClipboardHoldsTheLinkAsMarkdownAndHtmlAndIsMadeRelativeWherePasted) {
+    QMimeData mime;
+    links::toMime(mime, "Kalman, page 12", fs::path("/lib/Lectures/Kalman filter.xopp"), make("", 12, 7));
+    EXPECT_EQ(mime.text(), "[Kalman, page 12](/lib/Lectures/Kalman%20filter.xopp#page=12&pdfpage=7)");
+    EXPECT_NE(mime.html().indexOf("file:///lib/Lectures/Kalman%20filter.xopp#page=12&amp;pdfpage=7"), -1)
+            << mime.html().toStdString();
+    const auto copied = links::fromMime(&mime);
+    ASSERT_TRUE(copied);
+    EXPECT_EQ(copied->title, "Kalman, page 12");
+    EXPECT_EQ(copied->link.path, "/lib/Lectures/Kalman filter.xopp");
+    EXPECT_EQ(links::markdownFor(*copied, "/lib/Notes/a.md"),
+              "[Kalman, page 12](../Lectures/Kalman%20filter.xopp#page=12&pdfpage=7)");
+    EXPECT_EQ(links::markdownFor(*copied, {}), mime.text()) << "a new document: the absolute path";
+    EXPECT_EQ(links::markerText(*copied, "/lib/Lectures/notes.xopp"),
+              QString::fromUtf8("[\xF0\x9F\x94\x97 Kalman, page 12](Kalman%20filter.xopp#page=12&pdfpage=7)"));
+    QMimeData plain;
+    plain.setText("[x](/lib/a.xopp)");
+    EXPECT_FALSE(links::fromMime(&plain)) << "only the app's own format";
 }

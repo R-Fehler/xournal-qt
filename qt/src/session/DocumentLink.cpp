@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include <QCoreApplication>
+#include <QMimeData>
 #include <QStringList>
 #include <QUrl>
 
@@ -354,6 +355,51 @@ TextPlace resolveInText(const Link& link, const std::string& markdown) {
         place.offset = lineOffset(markdown, link.line);
     }
     return place;
+}
+
+void toMime(QMimeData& mime, const QString& title, const fs::path& file, Link link) {
+    link.wiki = false;
+    link.path = QString::fromStdString(file.generic_string());
+    const QString absolute = write(link);
+    mime.setData(MIME, (title + QLatin1Char('\n') + absolute).toUtf8());
+    mime.setText(markdown(title, link));
+    QUrl url = QUrl::fromLocalFile(link.path);
+    const qsizetype hash = absolute.indexOf(QLatin1Char('#'));
+    if (hash >= 0) {
+        url.setFragment(absolute.mid(hash + 1), QUrl::TolerantMode);
+    }
+    mime.setHtml(QStringLiteral("<a href=\"%1\">%2</a>")
+                         .arg(url.toString(QUrl::FullyEncoded).toHtmlEscaped(), title.toHtmlEscaped()));
+}
+
+std::optional<Copied> fromMime(const QMimeData* mime) {
+    if (!mime || !mime->hasFormat(MIME)) {
+        return std::nullopt;
+    }
+    const QString data = QString::fromUtf8(mime->data(MIME));
+    const qsizetype nl = data.indexOf(QLatin1Char('\n'));
+    if (nl < 0) {
+        return std::nullopt;
+    }
+    auto link = parse(data.mid(nl + 1));
+    if (!link || link->path.isEmpty()) {
+        return std::nullopt;
+    }
+    return Copied{data.left(nl), *link};
+}
+
+QString markdownFor(const Copied& copied, const fs::path& holder) {
+    Link link = copied.link;
+    if (!holder.empty()) {
+        link.path = relativePath(holder, fs::path(link.path.toStdString()));
+    }
+    return markdown(copied.title, link);
+}
+
+QString markerText(const Copied& copied, const fs::path& holder) {
+    Copied marked = copied;
+    marked.title = QStringLiteral("\U0001F517 ") + copied.title;
+    return markdownFor(marked, holder);
 }
 
 }  // namespace xqt::links

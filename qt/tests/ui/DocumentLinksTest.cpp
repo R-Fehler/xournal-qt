@@ -27,6 +27,9 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "canvas/CanvasView.h"
+#include "canvas/MarkdownEditor.h"
+#include "control/tools/EditSelection.h"
+#include "session/DocumentLink.h"
 #include "markdown/MdBox.h"
 #include "session/DocumentSession.h"
 #include "shell/LibraryModel.h"
@@ -271,4 +274,85 @@ TEST_F(DocumentLinksTest, wikiLinksHeadingsReferenceAndWhatWasNotFound) {
     // Web addresses are not links to documents
     EXPECT_FALSE(controller->documentLink("https://example.org/a.pdf").value("document").toBool());
     EXPECT_TRUE(controller->documentLink("../Lectures/kalman.xopp#page=2").value("found").toBool());
+}
+
+TEST_F(DocumentLinksTest, copiedLinksArePastedAsMarkdownAndAsMarkers) {
+    const QString kalman = QString::fromStdString((root / "Lectures" / "kalman.xopp").string());
+    ASSERT_TRUE(controller->openPath(kalman));
+    wait(200);
+    // A page: on the clipboard as the app's link, as Markdown and as HTML
+    controller->copyPageLink(2);
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    ASSERT_TRUE(mime->hasFormat(xqt::links::MIME));
+    EXPECT_EQ(mime->text(), "[kalman, page 3](" + kalman + "#page=3)");
+    EXPECT_NE(mime->html().indexOf("file://"), -1);
+    // A chapter
+    controller->copyChapterLink(3, "Prediction step");
+    EXPECT_EQ(QGuiApplication::clipboard()->text(), "[kalman, Prediction step](" + kalman + "#chapter=Prediction%20step&page=4)");
+
+    // Pasted into a .md being written: relative to it
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "Notes" / "a.md").string())));
+    wait(300);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    ASSERT_TRUE(view->ensureTextEditor());
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    QTest::keyClick(window, Qt::Key_V, Qt::ControlModifier);
+    wait(50);
+    EXPECT_NE(editor->text().find("[kalman, Prediction step](../Lectures/kalman.xopp#chapter=Prediction%20step&page=4)"),
+              std::string::npos)
+            << editor->text();
+    view->endTextEditing();
+    controller->undo();
+
+    // A library card
+    ASSERT_TRUE(controller->copyDocumentLink(QString::fromStdString((root / "Notes" / "b.md").string())));
+    EXPECT_EQ(QGuiApplication::clipboard()->text(),
+              "[b](" + QString::fromStdString((root / "Notes" / "b.md").string()) + ")");
+
+    // On a page of notes: a link marker in the Markdown layer, readable as Markdown; undo takes it away
+    controller->newDocument();
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "Notes" / "sketch.xopp").string()))));
+    controller->copyDocumentLink(kalman, 3);
+    view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_TRUE(controller->pasteElements());
+    PageRef page = current()->getDocument()->getPage(0);
+    Layer* layer = xqt::md::markdownLayer(page);
+    ASSERT_NE(layer, nullptr);
+    const Text* marker = xqt::md::boxOf(*layer);
+    ASSERT_NE(marker, nullptr);
+    EXPECT_EQ(marker->getText(),
+              "[\xF0\x9F\x94\x97 kalman, page 4](../Lectures/kalman.xopp#page=4&text=prediction%20step)")
+            << "a page without a PDF page: the page's first words";
+    EXPECT_LT(marker->getWrap(), 250) << "as wide as its text";
+
+    // A tap on it asks where to open the lecture
+    controller->selectTool("hand");
+    const auto r = xqt::md::boxRect(*marker);
+    view->getViewController().scrollToPageRect(0, QRectF(r.x, r.y, r.width, r.height));
+    wait(100);
+    const QPointF at = view->pageViewRect(0).topLeft() +
+                       QPointF(r.x + r.width / 2, r.y + r.height / 2) * view->getViewController().zoom();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(at).toPoint());
+    until([&] { return popupOpen(); });
+    ASSERT_TRUE(popupOpen());
+    EXPECT_NE(find("linkLabel")->property("text").toString().indexOf("kalman.xopp"), -1);
+    QMetaObject::invokeMethod(find("linkPopup"), "close");
+    wait(100);
+    controller->undo();
+    EXPECT_EQ(xqt::md::boxOf(*layer), nullptr) << "undone";
+
+    // With something selected: the marker goes next to it
+    ASSERT_TRUE(view->pasteText("A sketch", QPointF(view->pageViewRect(0).topLeft() + QPointF(60, 60))));
+    controller->selectTool("selectRect");
+    view->selectAllOnPage();
+    ASSERT_NE(view->getSelection(), nullptr);
+    const auto selected = view->getSelection()->getRect();
+    ASSERT_TRUE(controller->pasteElements());
+    const Text* next = xqt::md::boxOf(*layer);
+    ASSERT_NE(next, nullptr);
+    EXPECT_NEAR(next->getTransformation().shift.x, selected.x + selected.width + 4, 1);
+    EXPECT_NEAR(next->getTransformation().shift.y, selected.y, 1);
 }

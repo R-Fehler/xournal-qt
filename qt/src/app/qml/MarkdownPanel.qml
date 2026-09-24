@@ -252,6 +252,11 @@ Pane {
                         panel.setPrefix("#".repeat(event.key - Qt.Key_0) + " "); event.accepted = true
                     } else if (event.key === Qt.Key_Escape) {
                         panel.close(true); event.accepted = true
+                    } else if (event.matches(StandardKey.Paste) && app.clipboardLinkMarkdown() !== "") {
+                        // A copied link (Copy link): as a Markdown link relative to this document
+                        const link = app.clipboardLinkMarkdown()
+                        if (area.selectedText !== "") area.remove(area.selectionStart, area.selectionEnd)
+                        area.insert(area.cursorPosition, link); event.accepted = true
                     }
                 }
             }

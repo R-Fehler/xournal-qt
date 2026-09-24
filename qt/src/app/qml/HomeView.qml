@@ -1270,6 +1270,14 @@ Rectangle {
             onTriggered: app.openWithSystemApp(file)
         }
         MenuItem {
+            objectName: "copyLinkItem"
+            text: qsTr("Copy link")
+            // A link to the document, to paste into notes (qt/docs/links.md)
+            visible: !home.menuMany && !home.menuFolder && home.menuKind !== "library" && home.menuKind !== "other"
+            height: visible ? implicitHeight : 0
+            onTriggered: app.copyDocumentLink(home.menuPath)
+        }
+        MenuItem {
             objectName: "shareCardItem"
             text: qsTr("Share…")
             visible: !home.menuMany && !home.menuFolder && ["pdf", "notes", "md", "text"].indexOf(home.menuKind) >= 0

@@ -144,3 +144,25 @@ The author accepted the plan with its proposals:
   the document the link was in (its tab, or its file opened again), and Forward returns.
 - A link in the reference opens in a new tab (resolved from the reference's own file).
 - Markdown boxes keep whether a link is a `[[wiki link]]` (`md::LinkHit::wiki`), so a tap looks the name up.
+
+### 3. Making links (`AppLinks.cpp`, `CanvasView::pasteLinkMarker`, `links::toMime`)
+- **Copy link**: the page menu of the sidebar and the page grid ("Copy a link to this page"), ⋮ → "Copy link to
+  this page", the contents in the sidebar (press and hold or right-click a chapter → "Copy link to this chapter"),
+  a library card's menu ("Copy link"; also on search results), and a page with hits in the extended search (press
+  and hold or right-click → "Copy link to this page"). The page of a document that is not open is linked from the
+  library index (its PDF page, or its text for the fingerprint: `LibraryIndex::linkPages`).
+- The clipboard holds the link three ways: the app's own format `application/x-xournalqt-link` (the title and the
+  link with the target's absolute path), Markdown `[kalman, page 4](/abs/Lectures/kalman.xopp#page=4&text=…)` as
+  text for other apps, and an HTML link to the `file://` URI for rich text editors. (Not a `text/uri-list`: a file
+  manager would take that as a file to paste.) Titles: "kalman, page 4", "kalman, Prediction step", "kalman".
+  A document without a file yet copies "#Page:12", upstream's link within it, as before.
+- **Pasting** into Markdown being written on the page, into a `.md`, or beside the page (the panel) inserts
+  `[title](link)` with the path relative to that document (a new document without a file: the absolute path).
+- **Pasting on a page** (Ctrl+V, the paste of the context pill) makes a **link marker**: a small Markdown text box in
+  the page's Markdown layer (made if needed) holding `[🔗 title](link)`, in the link color, as wide as its text.
+  Xournal++ shows it as that text. It goes where it was pasted, or in the middle of the visible page; with elements
+  selected, at their top right ("this sketch links to …"). One undo step (plus one for a Markdown layer made for
+  it). A tap on it follows the link like any link in a Markdown box.
+- **Not built: dragging** a card, a page or a chapter onto the page. The library is a screen of its own (never beside
+  a page), and dragging a page in the sidebar or the grid moves it; a drop target on the canvas for these would need
+  a new drag source in each list. Copy link and paste do the same in two steps.
