@@ -2085,11 +2085,13 @@ TEST_F(SidewaysTest, presentingAPageFillsTheViewAndASwipeGoesOnePage) {
     EXPECT_EQ(vc().keptFit(), ViewController::Fit::Page);
     auto fills = [&](size_t page) {
         const QRectF r = view->pageViewRect(page);
-        return std::abs(r.height() - 900) < 0.5 || std::abs(r.width() - 1600) < 0.5;
+        const QSizeF v = vc().viewSize();
+        return std::abs(r.height() - v.height()) < 0.5 || std::abs(r.width() - v.width()) < 0.5;
     };
     auto inView = [&](size_t page) {
         const QRectF r = view->pageViewRect(page);
-        return r.left() >= -0.5 && r.right() <= 1600.5 && r.top() >= -0.5 && r.bottom() <= 900.5;
+        const QSizeF v = vc().viewSize();
+        return r.left() >= -0.5 && r.right() <= v.width() + 0.5 && r.top() >= -0.5 && r.bottom() <= v.height() + 0.5;
     };
     EXPECT_TRUE(fills(0));
     EXPECT_TRUE(inView(0));
@@ -2128,6 +2130,15 @@ TEST_F(SidewaysTest, presentingAPageFillsTheViewAndASwipeGoesOnePage) {
     vc().setViewSize(QSizeF(1920, 1080));
     EXPECT_EQ(vc().currentGroup(), 3u);
     EXPECT_NEAR(view->pageViewRect(3).width(), 1920, 0.5);
+
+    // Going to a page by its number (or Home / End): it fills the screen as well
+    ASSERT_EQ(vc().keptFit(), ViewController::Fit::Page);
+    vc().scrollToPage(0);
+    EXPECT_TRUE(fills(0));
+    EXPECT_TRUE(inView(0));
+    vc().scrollToPage(3);
+    EXPECT_NEAR(view->pageViewRect(3).width(), 1920, 0.5);
+    EXPECT_TRUE(inView(3));
 
     // Stopped: the layout and zoom from before
     view->setPresenting(false);

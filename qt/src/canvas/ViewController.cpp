@@ -250,6 +250,10 @@ void ViewController::scrollToPage(size_t page) {
     const QRectF r = layout->pageRect(page, z);
     const QRectF visible = visibleContentRect();
     if (layout->horizontal()) {
+        if (kept == Fit::Page) {
+            fitPresentedPage(page);  // presenting: the page fills the screen, whatever its shape
+            return;
+        }
         // Sideways: to the resting place of its group (always when snapping, so that it comes to rest there)
         if (!snapping() && visible.contains(r)) {
             pageJump = page;  // (in view already: the current page all the same)
