@@ -336,6 +336,22 @@
   - Text is drawn with Pango's fontconfig backend (`WindowsFonts.cpp`: a generated fonts.conf with the Windows font
     folders, the cache warmed in the background). Pango's win32 backend dies drawing text into images; it stays as
     an informational check for an upstream report.
+- **Archive export, `qt/archive-export` (2026-09-24, awaiting on-device test).** See [hybrid-pdf.md](hybrid-pdf.md),
+  "Archive PDF".
+  - PDF/A-3b with the ink flattened as appended, marked content streams, which the app removes again when opening,
+    so the file stays fully editable. The `.xopp` is embedded as an associated file (`/AFRelationship /Source`), with
+    the sRGB OutputIntent (ArgyllCMS v2 profile) and XMP.
+  - An honest report when a file is not PDF/A (fonts not embedded, CMYK without a profile…); repairs that keep the
+    look.
+  - "Export for the archive…" (⋮, Share) and "Export library as archive…" (folder structure kept, links rewritten
+    to the archived copies, README, progress and cancel).
+  - veraPDF checks samples in CI; hybrid PDFs no longer inherit a PDF/A claim.
+- **Tests wait for conditions, `qt/test-waits` (2026-09-24).**
+  - The offenders pass 40 of 40 under load (before: up to 28 of 40 failed).
+  - The worst was a tool tip covering a button. The UI tests now run with hover off, and waits for conditions
+    default to 5 s.
+  - Three app bugs fixed on the way: pages rendered after the memory plan stayed above the limit; a page whose
+    preview arrived by another route was never stored as a sketch; two sketch writers shared one `.part` file.
   318 KiB.
 
 ## Backlog (decide later)

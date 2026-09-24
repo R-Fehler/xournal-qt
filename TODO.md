@@ -268,13 +268,13 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   In-app renames rewrite the links, backed by the index's backlinks. Built as `qt/links` after the running blocks.
 
 ### Archive export (the author, 2026-09-24; `qt/archive-export`, merged 2026-09-24)
-- [ ] **"Export for the archive…"** per document (⋮ and Share), with a short explanation in the dialog of what it
+- [x] **"Export for the archive…"** per document (⋮ and Share), with a short explanation in the dialog of what it
   means: a PDF/A-3 file meant to stay readable for decades in any PDF viewer, with the ink flattened into the pages
   so no viewer can hide or lose it, and the full Xournal data embedded so the app can still open it for editing.
   - PDF/A-3b: fonts embedded (report source PDFs that cannot comply instead of claiming it), an output colour
     profile, XMP metadata, and the embedded `.xopp` marked as the source data (`/AFRelationship /Source`).
   - Validation with veraPDF in CI on sample files, as a test tool only.
-- [ ] **"Export library as archive…"** in the library menu: every document of the library (or the current folder)
+- [x] **"Export library as archive…"** in the library menu: every document of the library (or the current folder)
   exported as an archive PDF into a chosen folder, keeping the folder structure. Other files are copied as they are,
   and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
 
@@ -343,12 +343,10 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   takes over a gone one with the same size, time and name or content sample. 40 of 40 under load; the CI retry is
   gone.
 
-- [ ] **Harden the UI tests that use fixed waits** (`qt/test-waits`). Under load (a full suite at `-j6` next to agent
-  builds) timing tests fail now and then: on 2026-09-24 `theCanvasShowsThePreviewUntilThePageIsRendered` (1 of 4
-  alone), `sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDown`,
-  `HomeScreenFilterTest.textFilesAndImagesOpenExternally`, and `CanvasMemoryTest.theCurrentDocumentRendersAheadMoreThanBehind`.
-  All pass alone. Replace fixed `wait(ms)` with waiting for the condition (with a generous timeout), and find tests
-  whose expectation itself depends on timing.
+- [x] **The UI tests that used fixed waits** are hardened (`qt/test-waits`, merged 2026-09-24).
+- [ ] `Tabs.closingATabDoesNotWaitForQueuedWork` checks a fixed time limit for closing a tab: it failed once in the
+  full suite at a load of about 15 and passed 6 of 6 alone. Make its limit relative (for example to one render's
+  time), or measure the waiting rather than wall time.
 
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF
