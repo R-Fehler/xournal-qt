@@ -295,10 +295,11 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
 // --- writing --------------------------------------------------------------------------------------------------------
 
 /// The embedded .xopp: its PDF pages refer to the base pages of the hybrid PDF (page i shows base page i), and its
-/// PDF is `pdfName` next to it. Everything else as upstream's SaveHandler writes it.
+/// PDF is `pdfName` next to it (`attach`: upstream's attached PDF "name.xopp.bg.pdf", domain "attach", file name
+/// "bg.pdf"). Everything else as upstream's SaveHandler writes it.
 class HybridSaveHandler: public SaveHandler {
 public:
-    explicit HybridSaveHandler(std::string pdfName): pdfName(std::move(pdfName)) {}
+    HybridSaveHandler(std::string pdfName, bool attach): pdfName(std::move(pdfName)), attach(attach) {}
 
 protected:
     void visitPage(XmlNode* root, ConstPageRef p, const Document* doc, int id, const fs::path& target) override {
@@ -323,8 +324,8 @@ protected:
             // (the order of the attributes matters to the original Xournal)
             node->setAttrib(xoj::xml_attrs::TYPE_STR, BackgroundType::NAMES[BackgroundType::PDF]);
             if (first) {
-                node->setAttrib(xoj::xml_attrs::DOMAIN_STR, Domain::NAMES[Domain::ABSOLUTE]);
-                node->setAttrib(xoj::xml_attrs::FILENAME_STR, pdfName);
+                node->setAttrib(xoj::xml_attrs::DOMAIN_STR, Domain::NAMES[attach ? Domain::ATTACH : Domain::ABSOLUTE]);
+                node->setAttrib(xoj::xml_attrs::FILENAME_STR, attach ? std::string("bg.pdf") : pdfName);
             }
             node->setAttrib(xoj::xml_attrs::PAGE_NUMBER_STR, static_cast<size_t>(id) + 1);
             bg = std::move(node);
@@ -340,6 +341,7 @@ protected:
 
 private:
     std::string pdfName;
+    bool attach;
 };
 
 cairo_status_t appendTo(void* closure, const unsigned char* data, unsigned int length) {
@@ -376,7 +378,7 @@ struct Prepared {
 
 /// Everything that needs the document: under its shared lock (and briefly its lock).
 Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
-                 size_t pdfPageCount) {
+                 size_t pdfPageCount, bool attach = false) {
     Prepared out;
     {
         std::shared_lock lock(doc);
@@ -491,7 +493,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
     }
     // The .xopp
     const fs::path xopp = work / DATA_NAME;
-    HybridSaveHandler h(pdfName);
+    HybridSaveHandler h(pdfName, attach);
     {
         std::shared_lock lock(doc);
         h.prepareSave(&doc, xopp);
@@ -898,18 +900,29 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
     return r;
 }
 
-Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount) {
+Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount, bool attached) {
     Result r;
     try {
         WorkDir work;
-        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {}, pdfPageCount);
+        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {}, pdfPageCount, attached);
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;
         }
-        r = assemble(prep, pdf, false);
-        if (!r.ok) {
-            return r;
+        bool anyPdfPage = false;
+        {
+            std::shared_lock lock(doc);
+            for (size_t i = 0; i < doc.getPageCount() && !anyPdfPage; ++i) {
+                anyPdfPage = doc.getPage(i)->getBackgroundType().isPdfPage();
+            }
+        }
+        if (attached && !anyPdfPage) {
+            r.ok = true;  // (no PDF page: the .xopp refers to no PDF, none is written)
+        } else {
+            r = assemble(prep, pdf, false);
+            if (!r.ok) {
+                return r;
+            }
         }
         const fs::path tmp = partOf(xopp);
         if (!writeFile(tmp, prep.xopp)) {

@@ -429,6 +429,7 @@ public:
     Q_INVOKABLE bool openWithSystemApp(const QString& path);
     /// There is a file manager to show files in (not on Android).
     bool canShowInFileManager() const;
+    bool canShare() const;
     Q_INVOKABLE void openUrls(const QList<QUrl>& urls);
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
     /// new document stays, to write the notes in). Without a document open: opened as the document.
@@ -494,6 +495,27 @@ public:
     /// "Export as .xopp for Xournal++…": "name.xopp" next to the hybrid PDF.
     Q_INVOKABLE QUrl suggestedXoppExport() const;
     Q_INVOKABLE bool exportXopp(const QUrl& url);
+    // --- Share (qt/docs/hybrid-pdf.md) ---
+    /// What "Share → PDF with notes" does with the current document: "share" (its file as it is: a hybrid PDF without
+    /// unsaved changes, a PDF without notes), "save" (saved first: a hybrid PDF with changes, notes that go into the
+    /// PDF itself), "ask" (a .xopp: saved as a PDF with notes, or a PDF copy), "saveAs" (no file yet: Save as).
+    Q_INVOKABLE QString shareStep() const;
+    /// The steps "share" and "save": then the PDF goes to the system (SystemApps::share: the file manager on the
+    /// desktop) or, `toClipboard`, onto the clipboard. False for the other steps (the window asks).
+    Q_INVOKABLE bool sharePdf(bool toClipboard);
+    /// A PDF with notes as a copy at `target` (empty: in the app cache), the document keeps its file and format; then
+    /// shared or copied.
+    Q_INVOKABLE bool sharePdfCopy(const QUrl& target, bool toClipboard);
+    /// "For Xournal++ (.xopp + PDF)": a one-time export into `folder`, never the document's own folder, as
+    /// "name.xopp" + "name.xopp.bg.pdf" (upstream's attached PDF; a free name there), then shared. `file`: that PDF
+    /// (a library card) instead of the current document.
+    Q_INVOKABLE bool shareForXournal(const QUrl& folder, const QString& file = QString());
+    /// A file as it is (a library card's PDF): shared or copied.
+    Q_INVOKABLE bool shareFile(const QString& path, bool toClipboard);
+    /// Files onto the clipboard, to paste them into another app (SystemApps::copyToClipboard).
+    Q_INVOKABLE bool copyToClipboard(const QStringList& files);
+    /// The folder the "For Xournal++" dialog starts in: the one chosen last, else the documents folder.
+    Q_INVOKABLE QUrl shareFolder() const;
     /// After hybridEditedElsewhere: take the other app's version of the changed annotations (or keep ours).
     Q_INVOKABLE bool importHybridChanges();
     Q_INVOKABLE void keepHybridData();
@@ -575,6 +597,8 @@ public:
     Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
     /// Which one lies on the page ("" if none).
     Q_PROPERTY(bool canShowInFileManager READ canShowInFileManager CONSTANT)
+    /// Share → "PDF with notes" works here (SystemApps::canShare).
+    Q_PROPERTY(bool canShare READ canShare CONSTANT)
     Q_PROPERTY(QString geometryTool READ geometryTool NOTIFY toolChanged)
     QString geometryTool() const;
     /// The setsquare / compass is put aside for a moment (its pill stays, small; a tap brings it back).
@@ -702,6 +726,8 @@ Q_SIGNALS:
     void markdownBoxRequested(int page, double x, double y);
     /// The hybrid PDF just opened was edited in another app: its ink differs from the Xournal data.
     void hybridEditedElsewhere(const QString& file);
+    /// Files were exported for Xournal++ and shown (`text` says where): the window offers to copy them.
+    void sharedForXournal(const QStringList& files, const QString& text);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 
@@ -723,7 +749,11 @@ private:
     /// paste, delete and select all act on it.
     xqt::CanvasView* editedReference() const;
     bool savesWithoutDialog(const xqt::DocumentSession* s) const;
-    enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };
+    /// ExportHybrid: a hybrid PDF copy (to share); ShareXopp: the export for Xournal++ with an attached PDF.
+    enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp, ExportHybrid, ShareXopp };
+    /// Hand files to the system (share), or put them on the clipboard.
+    bool handOver(const QStringList& files, bool toClipboard);
+    fs::path lastShareFolder;
     /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
     /// `oldXopp`: see saveAsHybridInBackground.
     bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,

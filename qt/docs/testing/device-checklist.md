@@ -898,3 +898,17 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       choice: the pages keep showing, later saves work, and both files are in the trash.
 - [ ] "Keep it as it is" with "Don't ask again": the next document is not asked, its `.xopp` stays. Settings →
       Documents → Hybrid PDF shows "Keep it as it is"; set it to "Ask each time": asked again.
+- [ ] ⋮ → Share… on a PDF with notes that has unsaved changes → "PDF with notes": it is saved, then Dolphin opens
+      with the file selected. Drag it into an email or chat; the other side sees the notes.
+- [ ] Share… → "Copy the PDF with notes": a note "PDF copied". Paste into Dolphin (a copy of the file appears),
+      into Telegram / a browser upload field / a chat app: the PDF is attached. Paste into a text editor: its path.
+- [ ] Share… on a `.xopp` document → "PDF with notes": asked "Save as PDF with notes…" or "Save a PDF copy…".
+      The copy leaves the tab as the `.xopp` (title, unsaved changes); Save as goes through the .xopp question.
+      "Copy the PDF with notes" on a `.xopp` does not ask: the clipboard gets a PDF copy from the app cache.
+- [ ] Share… → "For Xournal++": a folder dialog. Choosing the document's own folder: refused with a message.
+      Another folder: `name.xopp` and `name.xopp.bg.pdf` appear there, Dolphin shows both selected, the note offers
+      "Copy". Open that `.xopp` in upstream Xournal++ (also after moving both files elsewhere): all pages with their
+      PDF pages and the notes, editable. A second export into the same folder is "name (2).xopp".
+- [ ] The tab's context menu → Share…: that tab comes to the front with the Share choices. A PDF card in the library
+      (or Recent) → Share…: the PDF itself (shown / copied), and "For Xournal++" exports without opening a tab. A
+      notes card (or a PDF with its `.xopp`) → Share…: it opens, then the Share choices for it.

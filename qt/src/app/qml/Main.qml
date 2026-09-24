@@ -140,13 +140,23 @@ ApplicationWindow {
         }
         exportDialog.open()
     }
-    function openXoppExportDialog() {
-        const suggestion = app.suggestedXoppExport().toString()
-        if (suggestion !== "") {
-            xoppExportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-            xoppExportDialog.selectedFile = suggestion
+    /// Share → a PDF with notes of the current document (`file`: a PDF of the library instead), shown in the file
+    /// manager or onto the clipboard. Saved first if needed; a .xopp is never turned into a PDF unasked.
+    function sharePdfOf(file, toClipboard) {
+        if (file !== "") {
+            app.shareFile(file, toClipboard)
+            return
         }
-        xoppExportDialog.open()
+        const step = app.shareStep()
+        if (step === "share" || step === "save") {
+            app.sharePdf(toClipboard)
+        } else if (step === "saveAs") {
+            openSaveDialog(function() { app.sharePdf(toClipboard) }, "pdf")
+        } else if (toClipboard) {
+            app.sharePdfCopy("", true)  // (a .xopp: a PDF copy in the cache; the document stays as it is)
+        } else {
+            shareXoppDialog.open()
+        }
     }
     function saveOrAsk(then) {
         if (app.savesWithoutDialog()) {
@@ -239,6 +249,11 @@ ApplicationWindow {
         onOverviewRequested: tabOverview.open()
         onUndockRequested: function(index) { app.undockTab(index) }
         onDockRequested: function(index) { app.dockTab(index) }
+        onShareRequested: function(index) {
+            app.currentTab = index
+            app.homeVisible = false
+            shareDialog.openFor("")
+        }
       }
       ToolBar {
         id: topTools
@@ -707,13 +722,7 @@ ApplicationWindow {
                 Menu {
                     id: moreMenu
                     MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
-                    MenuItem {
-                        objectName: "exportXoppItem"
-                        visible: app.isHybrid
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Export as .xopp for Xournal++…")
-                        onTriggered: openXoppExportDialog()
-                    }
+                    MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
                     // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type of
                     // Save as)
                     MenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); onTriggered: openExportDialog() }
@@ -1262,13 +1271,136 @@ ApplicationWindow {
         onRejected: afterSave = null
     }
 
+    /// A choice of the Share dialog: a title and a line about it
+    component ShareChoice: ItemDelegate {
+        id: choice
+        property string detail
+        Layout.fillWidth: true
+        contentItem: ColumnLayout {
+            spacing: 2
+            Label { text: choice.text; font.weight: Font.DemiBold; Layout.fillWidth: true; wrapMode: Text.Wrap }
+            Label {
+                text: choice.detail
+                color: "#6b6f75"
+                font.pixelSize: 13
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+            }
+        }
+    }
+    // Share…: the PDF with notes (shown in the file manager, or copied), or a copy for Xournal++ users
+    Dialog {
+        id: shareDialog
+        objectName: "shareDialog"
+        property string file: ""  // a PDF of the library; "": the current document
+        function openFor(path) {
+            file = path
+            open()
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(460, parent ? parent.width - 32 : 460)
+        title: qsTr("Share")
+        standardButtons: Dialog.Cancel
+        ColumnLayout {
+            width: shareDialog.availableWidth
+            spacing: 0
+            ShareChoice {
+                objectName: "sharePdfChoice"
+                text: qsTr("PDF with notes (opens in any app)")
+                detail: app.canShare ? qsTr("Shown in the file manager, to send it on.")
+                                     : qsTr("Not available on this system yet.")
+                enabled: app.canShare
+                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, false) }
+            }
+            ShareChoice {
+                objectName: "shareCopyChoice"
+                text: qsTr("Copy the PDF with notes")
+                detail: qsTr("Paste it into another app or a chat.")
+                onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, true) }
+            }
+            ShareChoice {
+                objectName: "shareXournalChoice"
+                text: qsTr("For Xournal++ (.xopp + PDF)")
+                detail: qsTr("A copy in a folder you choose, never next to the document.")
+                onClicked: {
+                    shareDialog.close()
+                    xournalFolderDialog.file = shareDialog.file
+                    xournalFolderDialog.currentFolder = app.shareFolder()
+                    xournalFolderDialog.open()
+                }
+            }
+        }
+    }
+    // Share → PDF of a .xopp: saved as a PDF with notes (the document becomes it), or a PDF copy
+    Dialog {
+        id: shareXoppDialog
+        objectName: "shareXoppDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(500, parent ? parent.width - 32 : 500)
+        title: qsTr("Share as a PDF with notes")
+        Label {
+            width: shareXoppDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("This document is saved as Xournal notes (.xopp). Other apps need a PDF with notes: save the "
+                       + "document as one (it stays editable here), or write a PDF copy and keep the .xopp.")
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "shareSaveAsPdf"
+                text: qsTr("Save as PDF with notes…")
+                flat: true
+                onClicked: {
+                    shareXoppDialog.close()
+                    openSaveDialog(function() { app.sharePdf(false) }, "pdf")
+                }
+            }
+            Button {
+                objectName: "shareSaveCopy"
+                text: qsTr("Save a PDF copy…")
+                flat: true
+                onClicked: {
+                    shareXoppDialog.close()
+                    const suggestion = app.suggestedHybridFile().toString()
+                    if (suggestion !== "") {
+                        pdfCopyDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
+                        pdfCopyDialog.selectedFile = suggestion
+                    }
+                    pdfCopyDialog.open()
+                }
+            }
+            Button {
+                text: qsTr("Cancel")
+                flat: true
+                onClicked: shareXoppDialog.close()
+            }
+        }
+    }
     FileDialog {
-        id: xoppExportDialog
-        title: qsTr("Export as .xopp for Xournal++")
+        id: pdfCopyDialog
+        objectName: "pdfCopyDialog"
+        title: qsTr("Save a PDF copy with notes")
         fileMode: FileDialog.SaveFile
-        defaultSuffix: "xopp"
-        nameFilters: [qsTr("Xournal++ files (*.xopp)")]
-        onAccepted: app.exportXoppInBackground(selectedFile)
+        defaultSuffix: "pdf"
+        nameFilters: [qsTr("PDF with notes, editable (*.pdf)")]
+        onAccepted: app.sharePdfCopy(selectedFile, false)
+    }
+    FolderDialog {
+        id: xournalFolderDialog
+        objectName: "xournalFolderDialog"
+        property string file: ""
+        title: qsTr("Folder for the copy for Xournal++")
+        onAccepted: app.shareForXournal(selectedFolder, file)
+    }
+    Connections {
+        target: app
+        // Exported for Xournal++ and shown: the two files can be copied too
+        function onSharedForXournal(files, text) {
+            snackbar.show(text, false, qsTr("Copy"), function() { app.copyToClipboard(files) })
+        }
     }
     // Saving a "name.xopp" as a PDF with notes: what happens to the .xopp (asked once, before it is written)
     Dialog {
@@ -1503,6 +1635,7 @@ ApplicationWindow {
 
     Dialog {
         id: messageDialog
+        objectName: "messageDialog"
         anchors.centerIn: parent
         modal: true
         width: Math.min(win.width * 0.8, 640)
@@ -1705,6 +1838,14 @@ ApplicationWindow {
         visible: app.homeVisible
         onOpenFileRequested: openDialog.open()
         onSettingsRequested: settingsPage.open()
+        // A PDF card: the file itself; a card of notes (also a PDF with its .xopp): opened, then shared as a document
+        onShareRequested: function(path) {
+            if (path.toLowerCase().endsWith(".pdf")) {
+                shareDialog.openFor(path)
+            } else if (app.openPath(path)) {
+                shareDialog.openFor("")
+            }
+        }
     }
 
     // Putting the tool bar away and getting it back: a small tab at its end, and a slim strip while it is away.

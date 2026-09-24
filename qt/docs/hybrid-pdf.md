@@ -241,3 +241,29 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    If the `.xopp` is open in another tab of this process: without unsaved changes that tab is closed; with changes
    the `.xopp` is kept as it is and a message says why. (Another process, e.g. a library's window, is not seen.)
    All trashing of the app now goes through `SystemApps::moveToTrash`, so tests never fill the user's trash.
+3. **Share…** (⋮ → Share…, the tab menu, and the menu of a PDF or notes card in the library or Recent; a card of
+   notes, also a PDF with its `.xopp`, is opened first and shared as the open document) offers three things:
+   - **PDF with notes (opens in any app)**: the hybrid PDF itself, saved first when it has changes; a PDF without
+     notes as it is; notes that go into the PDF itself are saved first. On the desktop the file manager then shows
+     it, selected (`SystemApps::share`: `ShowItems` over D-Bus, `explorer /select,`, `open -R`); Android and iOS
+     will open the share sheet (false there for now). A document without a file opens Save as on the PDF type and
+     shares after the save. A `.xopp` is never turned into a PDF unasked: the window offers **Save as PDF with
+     notes…** (the document becomes the PDF; the old-.xopp question applies) or **Save a PDF copy…** (a hybrid PDF
+     written from the document, `SaveKind::ExportHybrid`, never over the PDF it shows; the document keeps its file,
+     format and unsaved changes).
+   - **Copy the PDF with notes** (the author, 2026-09-24): the same PDF onto the clipboard, to paste it into another
+     app or a chat (`SystemApps::copyToClipboard`): its URL as `text/uri-list` (Dolphin, browsers, Telegram and
+     most chat apps take a pasted file that way) and as GNOME's `x-special/gnome-copied-files`, the PDF's bytes as
+     `application/pdf` up to 50 MB, and the path as text. "PDF copied: paste it into another app". A `.xopp` is
+     not asked about here: a PDF copy is written into the app cache (`~/.cache/xournal-qt/share/name.pdf`) and
+     copied; the document stays as it is.
+   - **For Xournal++ (.xopp + PDF)**: a one-time export into a folder the user chooses, never the document's own
+     folder (there the library would take it for the document), as `name.xopp` + `name.xopp.bg.pdf`: upstream's
+     attached PDF (`<background type="pdf" domain="attach" filename="bg.pdf">`, which upstream's `LoadHandler`
+     resolves as the `.xopp`'s path + `.bg.pdf`), so the pair opens with its pages right wherever it is moved
+     together (tested with the LoadHandler, also after moving both). Its PDF is the base pages in document order,
+     page *i* of the `.xopp` showing page *i*; no PDF is written when no page shows a PDF page. A name taken there
+     becomes "name (2)". Then the file manager shows the files, and the note offers **Copy** (both files as a
+     URI list). From a library card, the PDF is loaded and exported on a worker, without opening a tab.
+   "Export as .xopp for Xournal++…" (next to the hybrid PDF) left the ⋮ menu: the one-time export is Share's, and
+   the `.xopp` kept beside the PDF is "Keep it updated for Xournal++" (or the global setting).

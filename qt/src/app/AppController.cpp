@@ -24,6 +24,7 @@
 #include <QPrinter>
 #include <QTemporaryDir>
 #include <QElapsedTimer>
+#include <QStandardPaths>
 #include <QMouseEvent>
 #include <QTouchEvent>
 #include <QWindow>
@@ -1712,6 +1713,8 @@ void AppController::showInFileManager(const QString& path) { SystemApps::instanc
 
 bool AppController::canShowInFileManager() const { return SystemApps::canShowInFileManager(); }
 
+bool AppController::canShare() const { return SystemApps::canShare(); }
+
 bool AppController::openWithSystemApp(const QString& path) {
     if (!QFileInfo::exists(path)) {
         return false;
@@ -2115,6 +2118,13 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
         case SaveWay::ExportXopp:
             request.kind = DocumentSession::SaveKind::ExportXopp;
             break;
+        case SaveWay::ShareXopp:
+            request.kind = DocumentSession::SaveKind::ExportXopp;
+            request.attachedPdf = true;
+            break;
+        case SaveWay::ExportHybrid:
+            request.kind = DocumentSession::SaveKind::ExportHybrid;
+            break;
     }
     request.target = target;
     const bool hybrid = way == SaveWay::Hybrid || (way == SaveWay::Save && s->isHybrid());
@@ -2181,8 +2191,12 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
         }
         DocumentSession& saved = *guard;
         if (!r.ok) {
-            Q_EMIT message(way == SaveWay::ExportXopp ? tr("Export failed") : tr("Saving failed"),
+            Q_EMIT message(way == SaveWay::ExportXopp || way == SaveWay::ShareXopp || way == SaveWay::ExportHybrid
+                                   ? tr("Export failed")
+                                   : tr("Saving failed"),
                            QString::fromStdString(r.error), true);
+        } else if (way == SaveWay::ShareXopp || way == SaveWay::ExportHybrid) {
+            // (a copy to share: `then` hands it over)
         } else if (way == SaveWay::ExportXopp) {
             library->refresh();
             Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
@@ -2505,6 +2519,175 @@ bool AppController::exportXopp(const QUrl& url) {
     }
     bool ok = false;
     return startSave(SaveWay::ExportXopp, xopp, [&ok](bool r) { ok = r; }) && (waitForSave(), ok);
+}
+
+QString AppController::shareStep() const {
+    const DocumentSession* s = session();
+    if (!s) {
+        return {};
+    }
+    if (s->isHybrid()) {
+        return s->isModified() || s->isSaving() ? QStringLiteral("save") : QStringLiteral("share");
+    }
+    if (s->hasFilePath()) {
+        return QStringLiteral("ask");  // (a .xopp: its format is not changed unasked)
+    }
+    if (const fs::path pdf = s->annotatedPdf();
+        !pdf.empty() && !s->isModified() && !HybridPdf::inCache(pdf) && !MergedPdf::inCache(pdf)) {
+        return QStringLiteral("share");  // a PDF without notes: itself
+    }
+    return savesWithoutDialog(s) ? QStringLiteral("save") : QStringLiteral("saveAs");
+}
+
+bool AppController::handOver(const QStringList& files, bool toClipboard) {
+    if (files.isEmpty()) {
+        return false;
+    }
+    const QString name = QFileInfo(files.first()).fileName();
+    if (toClipboard) {
+        if (!SystemApps::instance().copyToClipboard(files)) {
+            Q_EMIT message(tr("Copy"), tr("The clipboard cannot be used here."), true);
+            return false;
+        }
+        Q_EMIT pageActionDone(files.size() == 1 && name.endsWith(".pdf", Qt::CaseInsensitive)
+                                      ? tr("PDF copied: paste it into another app")
+                                      : tr("%1 files copied: paste them into another app").arg(files.size()),
+                              false);
+        return true;
+    }
+    if (!SystemApps::instance().share(files)) {
+        Q_EMIT message(tr("Share"), tr("Sharing is not available on this system yet."), true);
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("%1 is shown in the file manager, to send it on").arg(name), false);
+    return true;
+}
+
+bool AppController::sharePdf(bool toClipboard) {
+    DocumentSession* s = session();
+    const QString step = shareStep();
+    if (step == "share") {
+        const fs::path file = s->isHybrid() ? s->getFilePath() : s->annotatedPdf();
+        return handOver({QString::fromStdString(file.string())}, toClipboard);
+    }
+    if (step != "save") {
+        return false;
+    }
+    QPointer<DocumentSession> guard(s);
+    return startSave(SaveWay::Save, {}, [this, guard, toClipboard](bool ok) {
+        if (ok && guard && guard->isHybrid()) {
+            handOver({QString::fromStdString(guard->getFilePath().string())}, toClipboard);
+        }
+    });
+}
+
+bool AppController::sharePdfCopy(const QUrl& target, bool toClipboard) {
+    DocumentSession* s = session();
+    if (!s) {
+        return false;
+    }
+    fs::path copy(target.toLocalFile().toStdString());
+    if (copy.empty()) {
+        // In the app cache (the clipboard or a share sheet takes it from there): named like the document
+        fs::path name(s->getDisplayName());
+        name.replace_extension(".pdf");
+        copy = Util::getCacheSubfolder("share") / name;
+    } else if (lowerExtension(copy) != ".pdf") {
+        copy += ".pdf";
+    }
+    return startSave(SaveWay::ExportHybrid, copy, [this, copy, toClipboard](bool ok) {
+        if (ok) {
+            handOver({QString::fromStdString(copy.string())}, toClipboard);
+        }
+    });
+}
+
+bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
+    const fs::path dir(folder.toLocalFile().toStdString());
+    DocumentSession* s = file.isEmpty() ? session() : nullptr;
+    if (dir.empty() || (file.isEmpty() && !s)) {
+        return false;
+    }
+    fs::path document = s ? (s->hasFilePath() ? s->getFilePath() : s->annotatedPdf()) : fs::path(file.toStdString());
+    if (s && HybridPdf::inCache(document)) {
+        document.clear();
+    }
+    std::error_code ec;
+    if (!document.empty() && fs::equivalent(document.parent_path(), dir, ec)) {
+        Q_EMIT message(tr("Choose another folder"),
+                       tr("The copy for Xournal++ never goes next to the document: there it would be taken for the "
+                          "document itself. Choose another folder, e.g. one you send or sync from."),
+                       true);
+        return false;
+    }
+    lastShareFolder = dir;
+    // A free name there: "name.xopp" with its PDF "name.xopp.bg.pdf" (Xournal++ opens the pair wherever it goes)
+    fs::path stem = document.empty() ? fs::path(s->getDisplayName()) : document.filename();
+    stem.replace_extension();
+    if (lowerExtension(stem) == ".notes") {
+        stem.replace_extension();  // ("lecture.notes.pdf": "lecture.xopp")
+    }
+    const fs::path xopp = dir / (DocumentFiles::uniqueName(dir, stem.string()) + ".xopp");
+    fs::path pdf = xopp;
+    pdf += ".bg.pdf";
+    auto shared = [this, xopp, pdf, dir](bool ok) {
+        if (!ok) {
+            return;
+        }
+        QStringList files{QString::fromStdString(xopp.string())};
+        std::error_code e;
+        if (fs::exists(pdf, e)) {
+            files << QString::fromStdString(pdf.string());
+        }
+        for (const fs::path& img: DocumentFiles::imageAttachmentsOf(xopp)) {
+            files << QString::fromStdString(img.string());
+        }
+        SystemApps::instance().share(files);
+        Q_EMIT sharedForXournal(files, tr("For Xournal++: %1 in %2")
+                                               .arg(QString::fromStdString(xopp.filename().string()),
+                                                    QString::fromStdString(dir.filename().string())));
+    };
+    if (s) {
+        return startSave(SaveWay::ShareXopp, xopp, shared);
+    }
+    // A PDF from the library, not open: loaded and exported on a worker
+    QPointer<AppController> self(this);
+    QThreadPool::globalInstance()->start([self, document, xopp, pdf, shared] {
+        std::string error;
+        auto loaded = DocumentSession::loadFile(document);
+        if (!loaded.document) {
+            error = loaded.error;
+        } else if (const auto r = HybridPdf::exportXopp(*loaded.document, xopp, pdf, npos, true); !r.ok) {
+            error = r.error;
+        }
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [self, error, shared] {
+            if (!self) {
+                return;
+            }
+            if (!error.empty()) {
+                Q_EMIT self->message(tr("Export failed"), QString::fromStdString(error), true);
+                return;
+            }
+            shared(true);
+        });
+    });
+    return true;
+}
+
+bool AppController::shareFile(const QString& path, bool toClipboard) {
+    if (!QFileInfo::exists(path)) {
+        return false;
+    }
+    return handOver({path}, toClipboard);
+}
+
+bool AppController::copyToClipboard(const QStringList& files) { return handOver(files, true); }
+
+QUrl AppController::shareFolder() const {
+    if (!lastShareFolder.empty()) {
+        return QUrl::fromLocalFile(QString::fromStdString(lastShareFolder.string()));
+    }
+    return QUrl::fromLocalFile(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
 }
 
 bool AppController::importHybridChanges() {

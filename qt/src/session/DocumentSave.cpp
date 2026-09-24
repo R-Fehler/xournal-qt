@@ -357,6 +357,23 @@ void DocumentSession::beginSave() {
             t.target = t.request.target;
             t.expectedBg = backgroundOf(*doc);
             return takeSnapshot();
+        case SaveKind::ExportHybrid: {
+            t.target = t.request.target;
+            if (!hasExtension(t.target, ".pdf")) {
+                t.target += ".pdf";
+            }
+            t.hybrid = true;  // (its pages as a hybrid PDF is written from them)
+            t.expectedBg = backgroundOf(*doc);
+            std::error_code ec;
+            if ((!t.expectedBg.empty() && fs::exists(t.target, ec) && fs::equivalent(t.expectedBg, t.target, ec)) ||
+                (hasFilePath() && fs::exists(t.target, ec) && fs::equivalent(getFilePath(), t.target, ec))) {
+                return finishSave({false,
+                                   FS(_F("A copy cannot be written over the document's own file \"{1}\".") %
+                                      t.target.u8string()),
+                                   {}});
+            }
+            return takeSnapshot();
+        }
     }
     if (!t.hybrid) {
         Util::safeReplaceExtension(t.target, "xopp");
@@ -468,7 +485,7 @@ void DocumentSession::takeSnapshot() {
         return;  // (its copy would show pages whose PDF pages are not in the file yet)
     }
     SaveTask& t = *saveTask;
-    const bool exporting = t.request.kind == SaveKind::ExportXopp;
+    const bool exporting = t.request.kind == SaveKind::ExportXopp || t.request.kind == SaveKind::ExportHybrid;
     if (!exporting && backgroundOf(*doc) != t.expectedBg) {
         return planFiles();  // pages were pasted meanwhile: their PDF goes next to the document too
     }
@@ -533,8 +550,14 @@ void DocumentSession::takeSnapshot() {
                     t.result = {false, "stopped (test)", {}};
                     return;
                 }
-                if (exporting) {
-                    const auto r = HybridPdf::exportXopp(*t.snapshot, t.target, exportPdfFor(t.target), t.pdfPageCount);
+                if (exporting && !t.hybrid) {
+                    fs::path pdf = exportPdfFor(t.target);
+                    if (t.request.attachedPdf) {
+                        pdf = t.target;
+                        pdf += ".bg.pdf";
+                    }
+                    const auto r = HybridPdf::exportXopp(*t.snapshot, t.target, pdf, t.pdfPageCount,
+                                                         t.request.attachedPdf);
                     t.result = r.ok ? SaveResult{true, {}, {}}
                                     : SaveResult{false,
                                                  FS(_F("Could not export \"{1}\": {2}") % t.target.u8string() % r.error),
@@ -549,8 +572,8 @@ void DocumentSession::takeSnapshot() {
                             return it != t.baseOf.end() ? it->second : npos;
                         };
                     }
-                    const auto r =
-                            HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount, t.request.recordExport);
+                    const auto r = HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount,
+                                                    exporting ? fs::path() : t.request.recordExport);
                     if (!r.ok) {
                         t.result = {false,
                                     FS(_F("Could not write the hybrid PDF \"{1}\": {2}") % t.target.u8string() %
@@ -559,7 +582,7 @@ void DocumentSession::takeSnapshot() {
                         return;
                     }
                     t.result = {true, {}, {}};
-                    if (const fs::path& xopp = t.request.exportXopp; !xopp.empty()) {
+                    if (const fs::path& xopp = t.request.exportXopp; !xopp.empty() && !exporting) {
                         // The .xopp for Xournal++ (a setting), from the same state
                         const auto e = HybridPdf::exportXopp(*t.snapshot, xopp, exportPdfFor(xopp), t.pdfPageCount);
                         if (!e.ok) {
@@ -605,7 +628,7 @@ void DocumentSession::takeSnapshot() {
 
 void DocumentSession::finishWrite() {
     SaveTask& t = *saveTask;
-    if (t.request.kind == SaveKind::ExportXopp) {
+    if (t.request.kind == SaveKind::ExportXopp || t.request.kind == SaveKind::ExportHybrid) {
         return finishSave(t.result);
     }
     const bool ok = t.result.ok;
@@ -652,7 +675,7 @@ void DocumentSession::finishSave(SaveResult result) {
         saveFailed = !result.ok;  // (the saved point is the copy's state, which is not in the file then)
     }
     lastSaveResult = result;
-    if (result.ok && task->request.kind != SaveKind::ExportXopp) {
+    if (result.ok && task->request.kind != SaveKind::ExportXopp && task->request.kind != SaveKind::ExportHybrid) {
         Q_EMIT filePathChanged();
     }
     undoRedoChanged();  // (the undo actions and the modified state)

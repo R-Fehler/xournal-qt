@@ -83,6 +83,8 @@ public:
         SaveAs,      ///< as .xopp to `target`; the document takes this path ("Save as")
         Hybrid,      ///< as a hybrid PDF to `target` (see saveAsHybrid)
         ExportXopp,  ///< only exportXopp to `target` (the document's state and saved point stay)
+        /// A copy as a hybrid PDF at `target` (to share): the document keeps its file, state and saved point.
+        ExportHybrid,
     };
     struct SaveRequest {
         SaveKind kind = SaveKind::Save;
@@ -94,6 +96,9 @@ public:
         /// A hybrid PDF: the .xopp for Xournal++ this document keeps up to date on every save (recorded in the file,
         /// see xoppExport()); empty: none. Usually the same as exportXopp.
         fs::path recordExport;
+        /// ExportXopp: the PDF is upstream's attached PDF of the .xopp, "name.xopp.bg.pdf" (a copy for Xournal++ that
+        /// travels as a pair), not the export's name.pdf / .name.pages.pdf.
+        bool attachedPdf = false;
     };
     /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
     /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the

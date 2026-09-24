@@ -17,6 +17,7 @@ Rectangle {
     /// The tab should get a window of its own (dragged off the strip), or go back to the main window.
     signal undockRequested(int index)
     signal dockRequested(int index)
+    signal shareRequested(int index)
     implicitHeight: 46
     color: "#dfe1e5"
 
@@ -203,6 +204,11 @@ Rectangle {
                                 app.homeVisible = false
                             }
                         }
+                    }
+                    MenuItem {
+                        objectName: "shareTabItem"
+                        text: qsTr("Share…")
+                        onTriggered: strip.shareRequested(tab.index)
                     }
                     MenuItem { text: qsTr("Close"); onTriggered: strip.closeRequested(tab.index) }
                 }

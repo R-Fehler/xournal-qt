@@ -416,7 +416,8 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     the subfolder is a library with a key and settings of its own, starts with the cache in its folders and indexes
     its documents once.)
   - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder,
-    Open with the system app (text and other files), Show in file manager, Remove from list, Move to trash)
+    Open with the system app (text and other files), Share… (PDFs and notes, see hybrid-pdf.md), Show in file manager, Remove
+    from list, Move to trash)
 - **Other files** (Office files and the rest, shown with "All other files"): a card with an icon of their type (a
   document, spreadsheet, slides, archive, audio, video or image file, by extension and MIME type; else a plain file),
   the extension as badge, the whole file name, size and date. A tap opens it with the app the system has for it

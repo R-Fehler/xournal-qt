@@ -62,8 +62,11 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {
              const fs::path& xoppExport = {});
 
 /// Export for Xournal++: a plain `xopp` whose background is `pdf`, the document's base pages in document order (the
-/// hybrid PDF without our annotations and data). The document keeps its own files.
-Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount = npos);
+/// hybrid PDF without our annotations and data). The document keeps its own files. `attached`: `pdf` is upstream's
+/// attached PDF of the .xopp ("name.xopp.bg.pdf", referred to as domain "attach", "bg.pdf"; not written when no page
+/// shows a PDF page), so Xournal++ opens the two as one document wherever they are put.
+Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount = npos,
+                  bool attached = false);
 
 /// The .xopp for Xournal++ that this hybrid PDF keeps up to date on every save (write's `xoppExport`; empty: none).
 fs::path xoppExportOf(const fs::path& pdf);

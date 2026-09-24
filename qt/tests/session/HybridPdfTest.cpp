@@ -667,6 +667,76 @@ TEST_F(HybridPdfTest, aDocumentLetsGoOfTheFileItShowsPagesFrom) {
     EXPECT_EQ(describe(*again.document), describe(*session.getDocument()));
 }
 
+// Share → For Xournal++: "name.xopp" with upstream's attached PDF "name.xopp.bg.pdf" (domain "attach"), which upstream's
+// LoadHandler opens with the pages right, also after the two were moved elsewhere together.
+TEST_F(HybridPdfTest, aCopyForXournalppTakesItsPdfAlongAsAttachment) {
+    auto doc = annotated(path("lecture.pdf"));
+    const std::string expected = describeAsXopp(*doc, path("roundtrip.xopp"));  // (as a .xopp gives it back)
+    DocumentSession session(*app, std::move(doc));
+    fs::create_directories(path("out"));
+    const fs::path xopp = path("out") / "lecture.xopp";
+    DocumentSession::SaveRequest request;
+    request.kind = DocumentSession::SaveKind::ExportXopp;
+    request.target = xopp;
+    request.attachedPdf = true;
+    ASSERT_TRUE(session.saveNow(request).ok);
+    EXPECT_TRUE(fs::exists(path("out") / "lecture.xopp.bg.pdf"));
+    EXPECT_FALSE(fs::exists(path("out") / "lecture.pdf"));
+    EXPECT_FALSE(fs::exists(path("out") / ".lecture.pages.pdf"));
+    auto check = [&](const fs::path& file) {
+        auto loaded = DocumentSession::loadFile(file);  // (upstream's LoadHandler)
+        ASSERT_TRUE(loaded.document) << loaded.error;
+        Document& d = *loaded.document;
+        EXPECT_TRUE(d.isAttachPdf());
+        fs::path bg = file;
+        bg += ".bg.pdf";
+        EXPECT_EQ(d.getPdfFilepath(), bg);
+        EXPECT_EQ(describe(d), expected);
+        for (size_t i = 0; i < d.getPageCount(); ++i) {
+            if (d.getPage(i)->getBackgroundType().isPdfPage()) {
+                EXPECT_EQ(d.getPage(i)->getPdfPageNr(), i) << "base page i";
+            }
+        }
+    };
+    check(xopp);
+    fs::rename(path("out"), path("moved"));
+    check(path("moved") / "lecture.xopp");
+
+    // Notes without a PDF: the .xopp alone
+    DocumentSession notes(*app);
+    request.target = path("moved") / "notes.xopp";
+    ASSERT_TRUE(notes.saveNow(request).ok);
+    EXPECT_TRUE(fs::exists(path("moved") / "notes.xopp"));
+    EXPECT_FALSE(fs::exists(path("moved") / "notes.xopp.bg.pdf"));
+}
+
+// Share → a PDF copy of a .xopp: the document keeps its file, format and unsaved changes. Never over its own PDF.
+TEST_F(HybridPdfTest, aPdfCopyLeavesTheDocumentAsItIs) {
+    auto doc = annotated(path("lecture.pdf"));
+    DocumentSession session(*app, std::move(doc));
+    ASSERT_TRUE(session.saveAs(path("lecture.xopp")).ok);
+    {
+        std::unique_lock lock(*session.getDocument());
+        addStroke(session.getDocument()->getPage(0)->getSelectedLayer(), StrokeTool::PEN, Color(0xff00ff00U), 2,
+                  {Point(10, 10), Point(300, 300)});
+    }
+    const bool modified = session.isModified();
+    DocumentSession::SaveRequest request;
+    request.kind = DocumentSession::SaveKind::ExportHybrid;
+    request.target = path("copy");
+    ASSERT_TRUE(session.saveNow(request).ok);
+    EXPECT_EQ(session.getFilePath(), path("lecture.xopp"));
+    EXPECT_FALSE(session.isHybrid());
+    EXPECT_EQ(session.isModified(), modified);
+    ASSERT_TRUE(HybridPdf::isHybrid(path("copy.pdf")));
+    auto copy = DocumentSession::loadFile(path("copy.pdf"));
+    ASSERT_TRUE(copy.document);
+    EXPECT_EQ(describe(*copy.document), describeAsXopp(*session.getDocument(), path("roundtrip.xopp")));
+    request.target = path("lecture.pdf");
+    EXPECT_FALSE(session.saveNow(request).ok) << "not over the PDF it shows";
+    EXPECT_FALSE(HybridPdf::isHybrid(path("lecture.pdf")));
+}
+
 // --- measurements ---------------------------------------------------------------------------------------------------
 
 // XQT_BENCH_HYBRID=<pdf>: notes on every 25th page (strokes with pressure, a highlighter, a text); the time and size
