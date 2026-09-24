@@ -109,6 +109,7 @@ protected:
         ASSERT_NE(window, nullptr);
         window->requestActivate();
         ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
+        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
         wait(100);
     }
     void TearDown() override {
@@ -129,7 +130,7 @@ protected:
         return window->findChild<T*>(name);
     }
     /// Waits until the popup is fully open (or closed).
-    static bool waitOpened(QObject* popup, bool opened, int timeoutMs = 2000) {
+    static bool waitOpened(QObject* popup, bool opened, int timeoutMs = 5000) {
         auto done = [&] {
             return popup->property("opened").toBool() == opened && popup->property("visible").toBool() == opened;
         };
@@ -160,7 +161,8 @@ protected:
         return walk(window->contentItem());
     }
     /// Waits until something is true (animations, delegates of a list, a popup fading out).
-    void until(const std::function<bool()>& done, int ms = 1500) {
+    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
+    void until(const std::function<bool()>& done, int ms = 5000) {
         QElapsedTimer t;
         t.start();
         while (!done() && t.elapsed() < ms) {
@@ -172,6 +174,12 @@ protected:
         QTest::mouseClick(window, Qt::LeftButton, m,
                           item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         wait(50);
+    }
+    /// Until the window drew its next frame: layouts changed meanwhile are done, the items are where they are shown
+    void nextFrame() {
+        QSignalSpy drawn(window, &QQuickWindow::frameSwapped);
+        window->update();
+        drawn.wait(5000);
     }
     /// Types text into the focused item (QTest::keyClicks is for widgets only).
     void type(const char* text) {
@@ -1017,7 +1025,7 @@ TEST_F(MainWindowTest, shortSearchTextsWaitForEnter) {
     EXPECT_EQ(controller->searchQuery(), "p1");
     EXPECT_GT(controller->searchHitCount() + (controller->searchRunning() ? 1 : 0), 0);
     type("0 x");  // "p10 x": long enough
-    wait(400);
+    until([&] { return controller->searchQuery() == "p10 x"; });  // (once the typing paused)
     EXPECT_EQ(controller->searchQuery(), "p10 x");
 }
 
@@ -1389,7 +1397,7 @@ TEST_F(HomeScreenTest, searchFindsFoldersAndOpensThem) {
     ASSERT_NE(field, nullptr);
     field->forceActiveFocus();
     type("physics");
-    wait(400);
+    until([&] { return controller->libraryModel()->property("searchQuery").toString() == "physics"; });
     ASSERT_EQ(controller->libraryModel()->property("searchQuery").toString(), "physics");
     ASSERT_GE(gridCount(), 1);
     auto* first = card(0);
@@ -2941,12 +2949,16 @@ TEST_F(MainWindowTest, sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDow
     ASSERT_NE(sharp, nullptr);
     until([&] { return sketch->property("source").toUrl().toString().startsWith("image://sketch/"); });
     EXPECT_TRUE(sketch->property("source").toUrl().toString().startsWith("image://sketch/"));
+    until([&] { return sharp->property("source").toUrl().toString().startsWith("image://thumbnail/"); });
     EXPECT_TRUE(sharp->property("source").toUrl().toString().startsWith("image://thumbnail/"));
 
     // Racing to the end: the pages that come into view have their sketch only
     auto* race = list->property("race").value<QObject*>();
     ASSERT_NE(race, nullptr);
-    // (it calms down 150 ms after the last move: not while this test is slow under load)
+    // The test says when the list races, not the speed of this machine: the watch neither looks at the moves (on
+    // its way to the end the list moves more than once, and a small move a moment after the jump is no race) nor
+    // calms down 150 ms after the last one (a test slowed down by load takes longer)
+    race->property("moves").value<QObject*>()->setProperty("enabled", false);
     race->property("calm").value<QObject*>()->setProperty("interval", 60000);
     race->setProperty("racing", true);
     const int last = controller->pageCount() - 1;
@@ -2969,25 +2981,29 @@ TEST_F(MainWindowTest, theCanvasShowsThePreviewUntilThePageIsRendered) {
     until([&] { return sketches.idle(); }, 10000);
     auto* canvas = findItem("canvas");
     ASSERT_NE(canvas, nullptr);
-    auto* render = controller->context().getRenderService();
-    render->blockRerenderZoom(std::chrono::milliseconds(60000));  // (as if rendering took long)
     xqt::CanvasView* view = controller->tabManager().currentView();
     const size_t target = 6;
+    until([&] { return !view->preview(target).isNull(); }, 10000);
+    ASSERT_FALSE(view->preview(target).isNull()) << "page 7 has its preview";
+    auto* render = controller->context().getRenderService();
+    // Nothing is being rendered (page 7 in advance, landing after its buffer is gone, would show the page itself)
+    render->waitForIdle();
+    render->blockRerenderZoom(std::chrono::milliseconds(60000));  // (as if rendering took long)
     view->getPage(target)->deleteViewBuffer();
     controller->goToPage(static_cast<int>(target));
     int shown = 0;
     until([&] {
         QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
         return shown > 0;
-    });
+    }, 10000);
     EXPECT_GE(shown, 1) << "the preview instead of a white page";
     render->blockRerenderZoom(std::chrono::milliseconds(0));
-    until([&] { return view->getPage(target)->bufferInfo().valid; }, 5000);
+    until([&] { return view->getPage(target)->bufferInfo().valid; }, 10000);
     ASSERT_TRUE(view->getPage(target)->bufferInfo().valid);
     until([&] {
         QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
         return shown == 0;
-    });
+    }, 10000);
     EXPECT_EQ(shown, 0) << "rendered: the page itself";
     sketches.setDelays(400, 1500);
 }
@@ -3260,15 +3276,14 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     // Scrolling moves the text under the pill, so the pill goes along (a little, the word stays in view)
     const double pan = std::max(10.0, std::min(40.0, textY - 20));
     view->getViewController().panBy(QPointF(0, -pan));
-    wait(60);
+    until([&] { return std::abs(bar->y() - (barY - pan)) <= 3; }, 5000);
     EXPECT_NEAR(controller->pdfSelectionBox().y(), textY - pan, 2);
     EXPECT_NEAR(bar->y(), barY - pan, 3) << "the actions stay at the text";
     EXPECT_FALSE(bar->property("away").toBool()) << "still in view";
 
     // Far away: the pill waits at the top of the canvas, the knobs are out of the way
     controller->jumpToPage(controller->pageCount() - 1);
-    wait(80);
-    until([&] { return bar->property("away").toBool(); });
+    until([&] { return bar->property("away").toBool(); }, 5000);
     EXPECT_TRUE(bar->property("away").toBool()) << "the text is out of sight";
     EXPECT_TRUE(bar->isVisible()) << "but the actions stay, the text is still selected";
     EXPECT_LT(bar->y(), canvasItem->mapToScene(QPointF(0, 0)).y() + 40) << "at the top edge";
@@ -3280,9 +3295,11 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
                 << "no knobs while the text is away";
     }
 
-    // The way back brings it into view again
+    // The way back brings it into view again (the pill's row, which the button joined, laid out first: it is
+    // clicked where it is shown)
+    nextFrame();
     click(back);
-    until([&] { return !bar->property("away").toBool(); });
+    until([&] { return !bar->property("away").toBool(); }, 5000);
     EXPECT_FALSE(bar->property("away").toBool());
     const QRectF box = controller->pdfSelectionBox();
     EXPECT_GE(box.y(), 0);

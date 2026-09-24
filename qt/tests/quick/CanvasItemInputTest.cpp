@@ -120,7 +120,11 @@ protected:
     void openDialog() {
         QObject* dialog = window->property("dialog").value<QObject*>();
         QMetaObject::invokeMethod(dialog, "open");
-        wait(400);  // opening transition
+        QElapsedTimer t;  // (until the opening transition is done: it takes longer on a busy machine)
+        t.start();
+        while (!dialog->property("opened").toBool() && t.elapsed() < 5000) {
+            wait(20);
+        }
         ASSERT_TRUE(dialog->property("opened").toBool());
     }
 

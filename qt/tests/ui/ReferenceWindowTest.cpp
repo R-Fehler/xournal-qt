@@ -71,6 +71,7 @@ protected:
         ASSERT_NE(window, nullptr);
         window->requestActivate();
         ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
+        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
         wait(100);
         main = findItem("canvas");
         reference = findItem("referenceCanvas");
@@ -94,7 +95,8 @@ protected:
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
         }
     }
-    void until(const std::function<bool()>& done, int ms = 1500) {
+    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
+    void until(const std::function<bool()>& done, int ms = 5000) {
         QElapsedTimer t;
         t.start();
         while (!done() && t.elapsed() < ms) {
@@ -201,10 +203,8 @@ TEST_F(ReferenceWindowTest, theReferenceIsShownBesideTheMainDocument) {
     // The tab strip marks it
     auto* badge = findItem("referenceBadge");
     ASSERT_NE(badge, nullptr);
-    until([&] {
-        auto* b = findItem("referenceBadge");
-        return b && b->isVisible();
-    });
+    // (every tab has one, hidden but where it marks: wait for a shown one, not for the first one found)
+    until([&] { return findItem("referenceBadge", true) != nullptr; });
     int shownBadges = 0;
     std::function<void(QQuickItem*)> count = [&](QQuickItem* i) {
         if (i->objectName() == "referenceBadge" && i->isVisible()) {
@@ -366,7 +366,7 @@ TEST_F(ReferenceWindowTest, thePageButtonGoesToAPage) {
     until([&] { return popup->hasActiveFocus(); });
     QTest::keyClick(window, Qt::Key_4);
     key(Qt::Key_Return);
-    wait(300);
+    until([&] { return ref().pageNumber() == 4; });
     EXPECT_EQ(ref().pageNumber(), 4);
     EXPECT_EQ(controller->pageNumber(), 1) << "the main document stays where it is";
 }
@@ -625,7 +625,7 @@ TEST_F(ReferenceWindowTest, theGridOfTheReferenceShowsItsPagesInItsHalf) {
     QMetaObject::invokeMethod(gridView, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, 2));
     ASSERT_NE(cell, nullptr);
     click(cell);
-    wait(200);
+    until([&] { return ref().pageNumber() == 3; });
     EXPECT_EQ(ref().pageNumber(), 3);
     EXPECT_FALSE(grid->isVisible());
     EXPECT_EQ(controller->pageNumber(), 1);

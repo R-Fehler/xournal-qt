@@ -440,6 +440,7 @@ void CanvasPage::rasterUpdated(std::optional<Rectangle<double>> area) {
         flagDirtyRegion(Range(*area));
     } else {
         repaintPage();
+        view.pageRendered(this);
     }
 }
 

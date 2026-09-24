@@ -113,6 +113,9 @@ public:
     quint64 visibilityUpdates() const { return visibilityCount; }
     /// How long scroll changes are collected before the visible pages are looked at (ms; tests)
     void setVisibilityDelay(int ms) { visibilityDelay = ms; }
+    /// A page was rendered whole (CanvasPage): one outside the window of the last plan that is not in view any more
+    /// (its render was asked for before that plan, the reader went on meanwhile) asks for a new plan.
+    void pageRendered(const CanvasPage* page);
     /// Pages from `first` to `last` keep their buffers (the window of the last planCache; tests)
     std::pair<size_t, size_t> cacheWindow() const { return window; }
 

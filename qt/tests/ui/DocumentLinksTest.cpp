@@ -77,6 +77,7 @@ protected:
         window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
         ASSERT_NE(window, nullptr);
         ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
+        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
         wait(100);
     }
     void TearDown() override {
@@ -115,7 +116,8 @@ protected:
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
         }
     }
-    void until(const std::function<bool()>& done, int ms = 2000) {
+    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
+    void until(const std::function<bool()>& done, int ms = 5000) {
         QElapsedTimer t;
         t.start();
         while (!done() && t.elapsed() < ms) {

@@ -1,6 +1,7 @@
 #include "PageSketches.h"
 
 #include <algorithm>
+#include <atomic>
 #include <shared_mutex>
 
 #include <QCryptographicHash>
@@ -71,11 +72,16 @@ QImage readPage(const fs::path& file) {
 void writePage(const fs::path& file, const QImage& image) {
     std::error_code ec;
     fs::create_directories(file.parent_path(), ec);
-    // Written under another name first: a reader never sees half a file.
-    const QString path = QString::fromStdString(file.string());
-    if (image.convertToFormat(QImage::Format_RGB888).save(path + ".part", "JPG", 85)) {
-        QFile::remove(path);
-        QFile::rename(path + ".part", path);
+    // Written under a name of its own first, then put in place in one step (replacing an older one): a reader never
+    // sees half a file, and two workers that store the same page at once (a plan made while its draw ran) do not
+    // remove each other's file. (With one name for both, the second removed the page the first had just put there.)
+    static std::atomic<quint64> writes{0};
+    const fs::path part = file.string() + "." + std::to_string(++writes) + ".part";
+    if (image.convertToFormat(QImage::Format_RGB888).save(QString::fromStdString(part.string()), "JPG", 85)) {
+        fs::rename(part, file, ec);
+    }
+    if (fs::exists(part, ec)) {
+        fs::remove(part, ec);  // (not written whole, or not put in place)
     }
 }
 
@@ -506,7 +512,12 @@ void PageSketches::next() {
             const bool sOk = s && s->revision == job.revision && s->image.width() == sl;
             const bool pOk = v && v->revision == job.revision && v->image.width() == pl;
             if (sOk && (!job.preview || pOk)) {
-                continue;  // made from a sharp thumbnail meanwhile
+                // Made from a sharp thumbnail meanwhile (or by a draw that began before the document had its file):
+                // as saved, its preview still goes to disk
+                if (pOk && !file.empty() && !stored) {
+                    jobs.push_front(Job{job.session, job.pageId, job.revision, true, true});
+                }
+                continue;
             }
             if (v && v->revision == job.revision && v->image.width() >= target) {
                 from = v->image;
