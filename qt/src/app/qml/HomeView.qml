@@ -177,6 +177,8 @@ Rectangle {
     Connections {
         target: app.library
         function onError(text) { errorDialog.text = text; errorDialog.open() }
+        // (Android: the window switched to another library, e.g. from the Recent grid: show it)
+        function onLibraryChanged() { home.page = 0 }
         function onImported(count) {
             if (count > 0) importedNote.show(count === 1 ? qsTr("1 document imported") : qsTr("%1 documents imported").arg(count), false)
         }
