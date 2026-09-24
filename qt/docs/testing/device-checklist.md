@@ -576,3 +576,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Search the library for a word of a Markdown file (in a heading, a paragraph, a list, a table, a code block): the
       file is found, with the text around the hit on its card. Its Markdown syntax (`**`, `#`, link targets) is not
       found. Edit the file in another editor and save: after a moment the new text is found, the old one not.
+- [ ] Tap a Markdown card: it opens as A4 pages with the text formatted, the tab titled `notes.md`, and a note over
+      the page says it is read-only for now. Scroll, zoom, search (Ctrl+F) in it. Close it: no question about saving,
+      and the `.md` is unchanged. Write on it with the pen, then close: it asks to save (as a `.xopp`, not next to the
+      `.md`).

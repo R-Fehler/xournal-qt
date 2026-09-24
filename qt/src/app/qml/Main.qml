@@ -701,6 +701,45 @@ ApplicationWindow {
         view: app.view
     }
 
+    // A Markdown file shown read-only for now, an image to write on: what that means (closed for this tab with ×)
+    Pane {
+        id: shownFileNote
+        objectName: "shownFileNote"
+        property string closedFor: ""
+        visible: app.shownFileNote !== "" && closedFor !== app.title && !pageGrid.visible && !contentsOverview.visible
+        anchors.top: canvas.top
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.topMargin: 12
+        width: Math.min(canvas.width - 32, 620)
+        padding: 2
+        leftPadding: 14
+        background: Rectangle {
+            radius: 12
+            color: "#f2fff8e1"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        RowLayout {
+            width: parent.width
+            spacing: 4
+            Label {
+                objectName: "shownFileNoteText"
+                Layout.fillWidth: true
+                text: app.shownFileNote
+                wrapMode: Text.Wrap
+                color: "#4a3b00"
+                font.pixelSize: 13
+            }
+            ToolButton {
+                objectName: "shownFileNoteClose"
+                text: "×"
+                font.pixelSize: 18
+                implicitWidth: 36
+                onClicked: shownFileNote.closedFor = app.title
+            }
+        }
+    }
+
     // Page and zoom status, floating over the canvas.
     Pane {
         id: viewPill

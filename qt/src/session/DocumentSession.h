@@ -82,17 +82,23 @@ public:
     SaveResult autosave();
 
     /// Suggested target for "Save as" (port of upstream Control::saveImpl): the document's own path; for an
-    /// annotated PDF the .xopp next to the PDF ("lecture.pdf" -> "lecture.xopp"); else the default name
-    /// (Settings::getDefaultSaveName) in the last save folder.
+    /// annotated PDF the .xopp next to the PDF ("lecture.pdf" -> "lecture.xopp"), the same for a shown image
+    /// ("photo.jpg" -> "photo.xopp": the library pairs them); else the default name (Settings::getDefaultSaveName) in
+    /// the last save folder.
     fs::path suggestSavePath() const;
 
     bool hasFilePath() const;
     fs::path getFilePath() const;
-    /// The file the document is known by: its .xopp, or the PDF it annotates while it has no .xopp yet (empty: a new
-    /// document).
+    /// The file the document is known by: its .xopp, or the PDF it annotates while it has no .xopp yet, or the file it
+    /// shows (empty: a new document).
     fs::path documentFile() const;
-    /// Title for the tab: file name, or "Untitled" / the PDF name for unsaved documents.
+    /// Title for the tab: file name, or "Untitled" / the PDF name / the shown file's name for unsaved documents.
     std::string getDisplayName() const;
+    /// The file this new document shows without being that file: a Markdown file shown read-only (MarkdownFile.h), an
+    /// image to write on (ImageFile.h). It is never written: saving asks for a .xopp (see suggestSavePath), and once
+    /// saved the document is that .xopp. Empty: none.
+    void setShownFile(const fs::path& file);
+    const fs::path& shownFile() const { return shownPath; }
     bool isModified() const;
     const fs::path& getLastAutosaveFile() const { return lastAutosaveFile; }
     /// Unique number of this session in this process (names its autosave and emergency files).
@@ -252,6 +258,7 @@ private:
 
     QTimer autosaveTimer;
     fs::path lastAutosaveFile;
+    fs::path shownPath;
     quint64 serialNo = 0;
     std::unique_ptr<PdfPageKeeper> pdfPages;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session

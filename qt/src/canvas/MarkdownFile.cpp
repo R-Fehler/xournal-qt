@@ -100,7 +100,7 @@ std::unique_ptr<Document> document(const std::string& source, size_t maxPages) {
     return doc;
 }
 
-size_t pageOf(Document& doc, size_t offset) {
+std::vector<size_t> pageStarts(Document& doc) {
     std::vector<std::string> slices;
     {
         std::shared_lock lock(doc);
@@ -116,9 +116,18 @@ size_t pageOf(Document& doc, size_t offset) {
     }
     std::vector<md::Part> parts;
     md::join(slices, &parts);
+    std::vector<size_t> starts;
+    for (const md::Part& p: parts) {
+        starts.push_back(p.begin);
+    }
+    return starts;
+}
+
+size_t pageOf(Document& doc, size_t offset) {
+    const std::vector<size_t> starts = pageStarts(doc);
     size_t page = 0;
-    for (size_t i = 0; i < parts.size(); ++i) {
-        if (parts[i].begin <= offset) {
+    for (size_t i = 0; i < starts.size(); ++i) {
+        if (starts[i] <= offset) {
             page = i;
         }
     }

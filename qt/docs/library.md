@@ -48,6 +48,16 @@ A **library** is a plain folder of documents that a window works in, like a work
   any document (`.xopp`, PDF, `.md`, image), so a moved `.xopp` never pairs with an image or PDF that was there.
 - **Trash** moves the files (or the folder) to the desktop trash.
 
+### Markdown files and images, opened
+- A **Markdown file** opens read-only for now (the `.md` editor comes later and replaces this): a new document of
+  plain A4 pages with the file's text as the page's Markdown text flowing over them (`qt/src/canvas/MarkdownFile.*`,
+  drawn by our Markdown renderer), titled with the file name. A note over the page says it is read-only and that
+  changes are not saved to the file. The document is never written back to the `.md`; it can be written on, and
+  "Save as" makes a `.xopp` of it (under the default name, not next to the `.md`). Of a file over 2 MB the first
+  2 MB are shown (the note says so). Opening it again shows its tab.
+- A library search hit in a Markdown file opens it with the search active: at the page of the passage with the hit
+  (a snippet card, below: its first hit there is the current one).
+
 ### PDF pages pasted from another PDF
 A `.xopp` has one background PDF, and its pages refer to page numbers in it (that is the format, and it stays
 openable by Xournal++). PDF pages pasted from another PDF therefore go into one **merged PDF** per document, which

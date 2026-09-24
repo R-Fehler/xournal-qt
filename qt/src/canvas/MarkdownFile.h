@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "filesystem.h"
 
@@ -39,6 +40,9 @@ md::Style style();
 /// A new document showing `source` on plain A4 pages (at most `maxPages`; the rest is left out). Any thread.
 std::unique_ptr<Document> document(const std::string& source, size_t maxPages = static_cast<size_t>(-1));
 
+/// Where the part of the text on each page of a document made by document() begins (bytes of the text), from its
+/// pages as they are now.
+std::vector<size_t> pageStarts(Document& doc);
 /// The page of a document made by document() that shows byte `offset` of its text (0 if it shows none).
 size_t pageOf(Document& doc, size_t offset);
 

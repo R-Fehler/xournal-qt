@@ -57,8 +57,11 @@
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
 #include "MarkdownEditor.h"
+#include "MarkdownFile.h"
 #include "MarkdownSession.h"
 #include "MdBox.h"
+#include "MdPassages.h"
+#include "session/TextMatch.h"
 #include "TextFlow.h"
 #include "session/MergedPdf.h"
 #include "shell/PageClipboard.h"
@@ -830,6 +833,27 @@ QString AppController::title() const {
 }
 bool AppController::modified() const { return session() && session()->isModified(); }
 bool AppController::hasFilePath() const { return session() && session()->hasFilePath(); }
+
+QString AppController::shownFileNote() const {
+    const fs::path file = session() && !session()->hasFilePath() ? session()->shownFile() : fs::path();
+    if (file.empty()) {
+        return {};
+    }
+    const QString name = QString::fromStdString(file.filename().string());
+    if (DocumentFiles::isMarkdownFile(file)) {
+        std::error_code ec;
+        const bool cut = fs::file_size(file, ec) > MarkdownFile::MAX_BYTES && !ec;
+        return tr("Read-only for now: %1 is shown as it is formatted; changes are not saved to it (a Markdown editor "
+                  "comes later).")
+                       .arg(name) +
+               (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
+                    : QString());
+    }
+    fs::path xopp = file;
+    xopp.replace_extension(".xopp");
+    return tr("%1 is the background of this new page. Saving keeps what you write as %2 next to it.")
+            .arg(name, QString::fromStdString(xopp.filename().string()));
+}
 bool AppController::canUndo() const { return session() && session()->getUndoRedoHandler()->canUndo(); }
 bool AppController::canRedo() const { return session() && session()->getUndoRedoHandler()->canRedo(); }
 
@@ -1275,6 +1299,47 @@ bool AppController::openSearchHitAt(const QString& path, const QString& query, i
     return true;
 }
 
+bool AppController::openSearchHitInPassage(const QString& path, const QString& query, int passage) {
+    if (!openPath(path) || !session()) {
+        return false;
+    }
+    DocumentSession* s = session();
+    // The passage in the text the document shows (read as it was, parsed as the index does), and its page
+    const std::string source = MarkdownFile::read(fs::path(path.toStdString()));
+    const std::vector<md::Passage> passages = md::passages(md::parse(source));
+    if (passage < 0 || static_cast<size_t>(passage) >= passages.size()) {
+        return openSearchHit(path, query);
+    }
+    const md::Passage& target = passages[static_cast<size_t>(passage)];
+    std::vector<size_t> starts = MarkdownFile::pageStarts(*s->getDocument());
+    if (starts.empty()) {
+        starts.push_back(0);
+    }
+    size_t page = 0;
+    for (size_t i = 0; i < starts.size(); ++i) {
+        if (starts[i] <= target.begin) {
+            page = i;
+        }
+    }
+    // The hits on that page before the passage: its first hit is the one after them
+    const QString prepared = textmatch::prepare(LibraryIndex::simplified(query));
+    int before = 0;
+    for (size_t i = 0; i < static_cast<size_t>(passage); ++i) {
+        if (passages[i].begin != md::NO_SOURCE && passages[i].begin >= starts[page]) {
+            before += textmatch::count(LibraryIndex::simplified(QString::fromStdString(passages[i].text)), prepared);
+        }
+    }
+    s->setCurrentPageNo(page);
+    s->getScrollHandler()->scrollToPage(page);  // right away; the hit follows when the search found it
+    if (!query.trimmed().isEmpty()) {
+        if (s->search().query() != query) {
+            s->search().setQuery(query, false);
+        }
+        s->search().jumpToHit(page, before);
+    }
+    return true;
+}
+
 QVariantList AppController::libraries() const {
     QVariantList list;
     const fs::path current = library->library() ? library->library()->root() : fs::path();
@@ -1526,6 +1591,27 @@ QVariantList AppController::modifiedTabs() const {
     return list;
 }
 
+namespace {
+/// A new document made from a Markdown file (MarkdownFile.h) or an image (ImageFile.h): it shows the file and is
+/// never written back to it.
+DocumentSession::LoadResult loadShownFile(const fs::path& file) {
+    DocumentSession::LoadResult result;
+    if (DocumentFiles::isMarkdownFile(file)) {
+        std::error_code ec;
+        if (!fs::is_regular_file(file, ec)) {
+            result.error =
+                    AppController::tr("\"%1\" cannot be read.").arg(QString::fromStdString(file.string())).toStdString();
+            return result;
+        }
+        result.document = MarkdownFile::document(MarkdownFile::read(file));
+        return result;
+    }
+    result.error =
+            AppController::tr("\"%1\" cannot be opened.").arg(QString::fromStdString(file.string())).toStdString();
+    return result;
+}
+}  // namespace
+
 bool AppController::openFile(const QUrl& url) { return openPath(url.toLocalFile()); }
 
 bool AppController::openPath(const QString& path) {
@@ -1535,14 +1621,24 @@ bool AppController::openPath(const QString& path) {
         setHomeVisible(false);
         return true;
     }
-    auto result = DocumentSession::loadFile(file);
+    // A Markdown file, an image: a new document made from it (the file is not written); an image with its .xopp:
+    // the .xopp
+    const bool shown = DocumentFiles::isMarkdownFile(file) || DocumentFiles::isImageFile(file);
+    if (shown && !DocumentFiles::itemOf(file).xopp.empty()) {
+        return openPath(QString::fromStdString(DocumentFiles::itemOf(file).xopp.string()));
+    }
+    auto result = shown ? loadShownFile(file) : DocumentSession::loadFile(file);
     if (!result.document) {
         Q_EMIT message(tr("Cannot open file"), QString::fromStdString(result.error), true);
         return false;
     }
     // An untouched new document is replaced instead of keeping an empty tab around.
     const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
-    tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+    auto opened = std::make_unique<DocumentSession>(*app, std::move(result.document));
+    if (shown) {
+        opened->setShownFile(file);
+    }
+    tabs->addTab(std::move(opened));
     if (pristine >= 0) {
         tabs->closeTab(pristine);
     }
@@ -1578,6 +1674,7 @@ bool AppController::openPath(const QString& path) {
     }
     return true;
 }
+
 
 bool AppController::save() {
     if (!session() || !session()->hasFilePath()) {

@@ -5,9 +5,12 @@
  * @license GNU GPLv2 or later
  */
 #include <fstream>
+#include <functional>
 
 #include <QCborArray>
 #include <QCborMap>
+#include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QColor>
 #include <QImage>
 #include <QImageWriter>
@@ -19,7 +22,10 @@
 #include "model/DocumentHandler.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
+#include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "shell/TabManager.h"
+#include "AppController.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/Library.h"
@@ -28,6 +34,7 @@
 #include "shell/Previews.h"
 
 #include "MarkdownFile.h"
+#include "MdPassages.h"
 
 using namespace xqt;
 
@@ -47,6 +54,25 @@ std::vector<std::string> names(const std::vector<DocumentItem>& items) {
 }
 
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
+
+void waitFor(const std::function<bool()>& cond, int ms = 5000) {
+    QElapsedTimer t;
+    t.start();
+    while (!cond() && t.elapsed() < ms) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+}
+
+/// A long Markdown text: a heading, then paragraphs; "needle" in paragraphs 5, 40, 41 and 80.
+std::string longMarkdown() {
+    std::string text = "# Lecture 3\n\n## Kalman filter\n\n";
+    for (int i = 0; i < 120; ++i) {
+        const bool hit = i == 5 || i == 40 || i == 41 || i == 80;
+        text += "Paragraph " + std::to_string(i) + (hit ? " has the needle" : " is about the prediction") +
+                " step of the filter.\n\n";
+    }
+    return text;
+}
 
 /// An image file (the format from the extension), `w` x `h`, of one color.
 void makeImage(const fs::path& p, int w, int h, const QColor& color = QColor(40, 120, 200)) {
@@ -414,4 +440,43 @@ TEST_F(LibraryFilesTest, markdownTextIsIndexedWithoutItsSyntaxAndFoundWithItsHea
     EXPECT_EQ(again.documentsRead(), 1);
     EXPECT_TRUE(again.search("prediction").empty());
     EXPECT_EQ(again.search("smoothing").size(), 1u);
+}
+
+TEST_F(LibraryFilesTest, aMarkdownFileOpensReadOnlyAndAHitAtItsPassage) {
+    writeFile(root / "notes.md", longMarkdown());
+    const auto before = fs::last_write_time(root / "notes.md");
+    AppController c;
+    ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
+    DocumentSession* s = c.tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->shownFile(), root / "notes.md");
+    EXPECT_FALSE(s->hasFilePath()) << "never written back";
+    EXPECT_EQ(c.title(), "notes.md");
+    EXPECT_FALSE(c.modified());
+    EXPECT_GT(s->getDocument()->getPageCount(), 2u);
+    EXPECT_TRUE(c.shownFileNote().startsWith("Read-only")) << c.shownFileNote().toStdString();
+    EXPECT_EQ(s->suggestSavePath().extension(), ".xopp");
+    EXPECT_NE(s->suggestSavePath().parent_path(), root) << "not a .xopp next to the Markdown file";
+    // Opened again: the same tab
+    ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
+    EXPECT_EQ(c.tabManager().count(), 1);
+
+    // A hit in a passage (as the library index numbers them): its page, and there its first hit
+    const auto ps = md::passages(md::parse(longMarkdown()));
+    int passage = -1;
+    for (size_t i = 0; i < ps.size(); ++i) {
+        if (ps[i].text.find("Paragraph 41 ") == 0) {
+            passage = static_cast<int>(i);
+        }
+    }
+    ASSERT_GE(passage, 0);
+    ASSERT_TRUE(c.openSearchHitInPassage(qstr(root / "notes.md"), "needle", passage));
+    waitFor([&] { return !s->search().isRunning() && s->search().currentHit() >= 0; });
+    const size_t page = MarkdownFile::pageOf(*s->getDocument(), ps[static_cast<size_t>(passage)].begin);
+    EXPECT_GT(page, 0u);
+    EXPECT_EQ(s->search().currentPage(), page);
+    const size_t page40 = MarkdownFile::pageOf(*s->getDocument(), ps[static_cast<size_t>(passage - 1)].begin);
+    EXPECT_EQ(s->search().currentOnPage(), page40 == page ? 1 : 0) << "the hit of paragraph 40 comes before it";
+    EXPECT_EQ(s->search().hitCount(), 4);
+    EXPECT_EQ(fs::last_write_time(root / "notes.md"), before);
 }
