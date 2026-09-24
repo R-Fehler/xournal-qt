@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 #include <QClipboard>
 #include <QFile>
@@ -236,6 +237,22 @@ void ReferenceMode::swapRoles() {
         setFocused(false);  // (the keys are for the main document, now the other one)
         tabs.swapReference();
     }
+}
+
+void ReferenceMode::popOut() {
+    const int notes = tabs.currentIndex();
+    const int reference = tabs.referenceOf(notes);
+    if (reference < 0) {
+        return;
+    }
+    DocumentSession* shown = tabs.session(reference);
+    setFocused(false);
+    tabs.setReference(notes, -1);
+    // Right after the notes; beside them already (before or after): one step away as it is
+    if (std::abs(reference - notes) != 1) {
+        tabs.moveTab(reference, reference > notes ? notes + 1 : notes);
+    }
+    tabs.setCurrentIndex(tabs.indexOf(shown));
 }
 
 void ReferenceMode::fitWidth() {

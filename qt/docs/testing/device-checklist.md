@@ -977,3 +977,14 @@ keyboard on the phone.
 - [ ] Settings open; the tool bar icons are drawn (not empty squares).
 - [ ] Fold and unfold the phone, and put the app in split screen: it keeps running, the page stays visible.
 - [ ] `adb logcat --pid=$(adb shell pidof org.xournalqt.app)` shows no crash (a crash: note the backtrace).
+
+## Reference pop out (qt/reference-popout)
+Three documents open: A (notes), B, C, in this order; in A, "Open as reference" on C.
+- [ ] The reference pill has a new button (a window with tabs), tooltip "Show as a tab". Tap it: the split closes, C
+      fills the window, and the tab strip reads A, C, B (C moved right after A).
+- [ ] Ctrl+Shift+Tab: A, without the split (the pair is not kept; "Open as reference" on C shows it again). Ctrl+Tab:
+      C again. The arrows beside the tab overview do the same.
+- [ ] Reference already beside the notes (A, C as neighbours, either side): "Show as a tab" moves no tab, only shows C.
+- [ ] In full screen: split with a reference, tap "Show as a tab": still full screen, the reference fills it, the tab
+      dots at the top mark C; a swipe along the dots goes back to A.
+- [ ] An undocked window with its own tabs: the pop out stays within that window.

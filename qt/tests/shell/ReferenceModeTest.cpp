@@ -142,6 +142,55 @@ TEST(ReferenceMode, swappingRolesMakesTheReferenceTheMainDocument) {
     EXPECT_EQ(t.ref().view(), book);
 }
 
+TEST(ReferenceMode, poppingOutPutsTheReferenceTabNextToTheNotesAndShowsIt) {
+    ThreeTabs t;
+    DocumentSession* a = t.tabs().session(0);
+    DocumentSession* b = t.tabs().session(1);
+    DocumentSession* c = t.tabs().session(2);
+    t.ref().showTab(2);
+    t.ref().popOut();
+    EXPECT_EQ(t.tabs().indexOf(a), 0);
+    EXPECT_EQ(t.tabs().indexOf(c), 1) << "the reference comes right after the notes";
+    EXPECT_EQ(t.tabs().indexOf(b), 2);
+    EXPECT_EQ(t.c.currentTab(), 1) << "the reference is shown";
+    EXPECT_FALSE(t.ref().active());
+    EXPECT_EQ(t.tabs().referenceOf(0), -1) << "the split of the notes is closed";
+    t.c.previousTab();
+    EXPECT_EQ(t.tabs().session(t.c.currentTab()), a) << "one step back: the notes";
+    EXPECT_FALSE(t.ref().active());
+}
+
+TEST(ReferenceMode, poppingOutAReferenceBeforeTheNotesPutsItAfterThem) {
+    ThreeTabs t;
+    DocumentSession* a = t.tabs().session(0);
+    DocumentSession* b = t.tabs().session(1);
+    DocumentSession* c = t.tabs().session(2);
+    t.c.setCurrentTab(2);
+    t.ref().showTab(0);
+    t.ref().popOut();
+    EXPECT_EQ(t.tabs().indexOf(b), 0);
+    EXPECT_EQ(t.tabs().indexOf(c), 1);
+    EXPECT_EQ(t.tabs().indexOf(a), 2);
+    EXPECT_EQ(t.c.currentTab(), 2);
+    EXPECT_EQ(t.tabs().referenceOf(1), -1);
+}
+
+TEST(ReferenceMode, poppingOutAReferenceBesideTheNotesMovesNoTab) {
+    for (const auto& [notes, reference]: {std::pair{0, 1}, std::pair{1, 0}}) {
+        ThreeTabs t;
+        t.c.setCurrentTab(notes);
+        t.ref().showTab(reference);
+        QSignalSpy moved(&t.tabs(), &QAbstractItemModel::rowsMoved);
+        t.ref().popOut();
+        EXPECT_EQ(moved.count(), 0) << notes << " " << reference;
+        EXPECT_EQ(t.c.currentTab(), reference);
+        EXPECT_EQ(t.tabs().referenceOf(notes), -1);
+    }
+    ThreeTabs t;
+    t.ref().popOut();  // no reference: nothing happens
+    EXPECT_EQ(t.c.currentTab(), 0);
+}
+
 TEST(ReferenceMode, theDividerAndTheSideAreSettingsOfTheApplication) {
     ThreeTabs t;
     EXPECT_DOUBLE_EQ(t.ref().ratio(), 0.5);
