@@ -6,6 +6,7 @@
 #include <cmath>
 #include <atomic>
 #include <limits>
+#include <set>
 #include <unordered_set>
 #include <mutex>
 #include <shared_mutex>
@@ -24,6 +25,7 @@
 #include "model/Layer.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
+#include "undo/DeleteUndoAction.h"
 #include "undo/InsertDeletePageUndoAction.h"
 #include "undo/EmergencySaveRestore.h"
 #include "undo/SwapUndoAction.h"
@@ -38,6 +40,7 @@
 
 #include "AppContext.h"
 #include "DocumentSearch.h"
+#include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PageOrderUndoAction.h"
 #include "PdfPageKeeper.h"
@@ -92,9 +95,37 @@ bool hasExtension(const fs::path& p, const char* ext) {
 
 bool DocumentSession::LoadResult::isNewerFileVersion() const { return fileVersion > FILE_FORMAT_VERSION; }
 
+namespace {
+void prepareLoaded(Document& doc) {
+    doc.setDocumentHandler(&detachedHandler());  // the LoadHandler's handler dies with it
+    // Element sizes are computed lazily, also by the (parallel) renderers: compute them once, here, before any
+    // renderer sees the document.
+    for (size_t i = 0; i < doc.getPageCount(); ++i) {
+        for (const Layer* layer: doc.getPage(i)->getLayers()) {
+            for (const auto& e: layer->getElementsView()) {
+                e->getBoundingBox();
+            }
+        }
+    }
+}
+}  // namespace
+
 auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResult {
     LoadResult result;
     if (hasExtension(path, ".pdf")) {
+        // xournal-qt: a hybrid PDF opens as the document it carries (else, if that fails, as a plain PDF)
+        if (HybridPdf::isHybrid(path)) {
+            auto opened = HybridPdf::open(path);
+            if (opened.document) {
+                result.document = std::move(opened.document);
+                result.warnings = std::move(opened.warnings);
+                result.hybrid = true;
+                result.hybridChanged = std::move(opened.changed);
+                prepareLoaded(*result.document);
+                return result;
+            }
+            result.warnings.push_back(opened.error + " " + _("It is opened as a plain PDF."));
+        }
         // Port of Control::openPdfFile: annotate a PDF, one page per PDF page.
         auto doc = std::make_unique<Document>(&detachedHandler());
         if (doc->readPdf(path, /*initPages=*/true, attachPdf)) {
@@ -112,16 +143,7 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
         result.attachedPdfMissing = loadHandler.isAttachedPdfMissing();
         result.fileVersion = loadHandler.getFileVersion();
         if (result.document) {
-            result.document->setDocumentHandler(&detachedHandler());  // the LoadHandler's handler dies with it
-            // Element sizes are computed lazily, also by the (parallel) renderers: compute them once, here, before
-            // any renderer sees the document.
-            for (size_t i = 0; i < result.document->getPageCount(); ++i) {
-                for (const Layer* layer: result.document->getPage(i)->getLayers()) {
-                    for (const auto& e: layer->getElementsView()) {
-                        e->getBoundingBox();
-                    }
-                }
-            }
+            prepareLoaded(*result.document);
         }
     } catch (const std::exception& e) {
         result.document.reset();
@@ -161,6 +183,16 @@ void DocumentSession::init() {
     pageLinkKeeper = std::make_unique<PageLinkKeeper>(*this);
     pageRevisionKeeper = std::make_unique<PageRevisionKeeper>(*this);
     pdfPages = std::make_unique<PdfPageKeeper>(*this);  // (after the revisions: it hears pages that come after them)
+    if (const fs::path bg = doc->getPdfFilepath(); HybridPdf::inCache(bg)) {
+        HybridPdf::retain(bg);  // (the clean copy of a hybrid PDF: kept while this document uses it)
+        retainedBases.push_back(bg);
+        if (hasExtension(doc->getFilepath(), ".pdf")) {  // opened from it: page i was its page i
+            for (size_t i = 0; i < doc->getPageCount(); ++i) {
+                PageRef p = doc->getPage(i);
+                hybridBase[p.get()] = {p, i};
+            }
+        }
+    }
 
     scrollHandler.indexOf = [this](const PageRef& page) { return doc->indexOf(page); };
     scrollHandler.onScrollToPage = [this](size_t page, XojPdfRectangle) {
@@ -187,6 +219,9 @@ void DocumentSession::init() {
 }
 
 DocumentSession::~DocumentSession() {
+    for (const auto& b: retainedBases) {
+        HybridPdf::release(b);
+    }
     autosaveTimer.stop();
     layerController->unregisterListener();
     layerController.reset();
@@ -842,6 +877,7 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     if (stop(4)) {
         return {false, "stopped (test)"};
     }
+    hybridBase.clear();  // (the PDF pages may have been renumbered)
     pdfPages->finishStaged();  // (the file under the other name: no .xopp refers to it now)
     // Port of Control::resetSavedStatus
     undoRedo->documentSaved();
@@ -928,7 +964,152 @@ auto DocumentSession::save() -> SaveResult {
     if (!hasFilePath()) {
         return {false, _("The document has no file name yet (use \"Save as\").")};
     }
+    if (isHybrid()) {
+        return saveHybridImpl(getFilePath());
+    }
     return saveImpl(getFilePath());
+}
+
+bool DocumentSession::isHybrid() const { return hasExtension(getFilePath(), ".pdf"); }
+
+auto DocumentSession::saveAsHybrid(fs::path target) -> SaveResult {
+    clearSelectionEndText();
+    if (!hasExtension(target, ".pdf")) {
+        target += ".pdf";
+    }
+    return saveHybridImpl(target);
+}
+
+auto DocumentSession::saveHybridImpl(const fs::path& target) -> SaveResult {
+    updatePreview(*doc);
+    fs::path bg;
+    {
+        std::shared_lock lock(*doc);
+        bg = doc->getPdfFilepath();
+    }
+    std::error_code ec;
+    const bool exists = fs::exists(target, ec);
+    if (exists && !HybridPdf::isHybrid(target)) {
+        // A PDF of the user's becomes a hybrid PDF (notes saved into the PDF itself): its original is kept once
+        fs::path original = target;
+        original.replace_extension(".original.pdf");
+        if (!fs::exists(original, ec)) {
+            fs::copy_file(target, original, ec);
+            if (ec) {
+                return {false, FS(_F("Could not keep the original PDF as \"{1}\": {2}") % original.u8string() %
+                                  ec.message())};
+            }
+        }
+    }
+    if (exists && !bg.empty() && fs::exists(bg, ec) && fs::equivalent(bg, target, ec)) {
+        // The pages come from the file that is written: from a copy of it from now on (the same pages and numbers)
+        const fs::path copy = HybridPdf::cacheFolder() / ("own-" + std::to_string(Util::getPid()) + "-" +
+                                                          std::to_string(serialNo)) / "base.pdf";
+        fs::create_directories(copy.parent_path(), ec);
+        fs::copy_file(target, copy, fs::copy_options::overwrite_existing, ec);
+        if (ec || !doc->readPdf(copy, /*initPages=*/false, /*attachToDocument=*/false)) {
+            return {false, FS(_F("Could not copy the PDF \"{1}\" before writing into it: {2}") % target.u8string() %
+                              (ec ? ec.message() : doc->getLastErrorMsg()))};
+        }
+        HybridPdf::retain(copy);
+        retainedBases.push_back(copy);
+        bg = copy;
+    }
+    HybridPdf::BasePageOf baseOf;
+    if (!hybridBase.empty() && (HybridPdf::inCache(bg) || MergedPdf::inCache(bg))) {
+        baseOf = [this](const XojPage* page) {
+            auto it = hybridBase.find(page);
+            return it != hybridBase.end() && it->second.first.lock().get() == page ? it->second.second : npos;
+        };
+    }
+    const auto r = HybridPdf::write(*doc, target, baseOf);
+    if (!r.ok) {
+        return {false, FS(_F("Could not write the hybrid PDF \"{1}\": {2}") % target.u8string() % r.error)};
+    }
+    if (HybridPdf::inCache(bg)) {
+        HybridPdf::touch(bg);  // (still used)
+    }
+    doc->lock();
+    doc->setFilepath(target);
+    doc->unlock();
+    hybridChanges.clear();  // (written anew from the document)
+    undoRedo->documentSaved();
+    undoRedoChanged();
+    Q_EMIT filePathChanged();
+    return {true, {}};
+}
+
+bool DocumentSession::importHybridChanges(std::string& error) {
+    if (!isHybrid() || hybridChanges.empty()) {
+        return false;
+    }
+    const fs::path base = HybridPdf::importCopy(getFilePath(), hybridChanges, error);
+    if (base.empty()) {
+        return false;
+    }
+    if (!doc->readPdf(base, /*initPages=*/false, /*attachToDocument=*/false)) {
+        error = doc->getLastErrorMsg();
+        return false;
+    }
+    HybridPdf::retain(base);
+    retainedBases.push_back(base);
+    clearSelectionEndText();
+    std::set<size_t> pages;
+    for (const auto& name: hybridChanges) {
+        size_t pageNo = 0, layerNo = 0;
+        if (!HybridPdf::parseName(name, pageNo, layerNo)) {
+            continue;
+        }
+        pages.insert(pageNo);
+        std::unique_lock lock(*doc);
+        if (pageNo >= doc->getPageCount()) {
+            continue;
+        }
+        PageRef page = doc->getPage(pageNo);
+        auto& layers = page->getLayers();
+        if (layerNo >= layers.size()) {
+            continue;
+        }
+        Layer* layer = layers[layerNo];
+        auto elements = layer->clearNoFree();
+        if (elements.empty()) {
+            continue;
+        }
+        auto undo = std::make_unique<DeleteUndoAction>(page, false);
+        Element::Index pos = 0;
+        for (auto& e: elements) {
+            undo->addElement(layer, std::move(e), pos++);
+        }
+        lock.unlock();
+        undoRedo->addUndoAction(std::move(undo));
+    }
+    hybridChanges.clear();
+    for (size_t p: pages) {
+        if (p < doc->getPageCount()) {
+            firePageChanged(p);
+            revisePage(p);
+        }
+    }
+    return true;
+}
+
+fs::path DocumentSession::exportPdfFor(const fs::path& xopp) {
+    const fs::path pair = MergedPdf::pairOf(xopp);
+    std::error_code ec;
+    if (!fs::exists(pair, ec) || MergedPdf::kindOf(pair) != MergedPdf::Kind::None) {
+        return pair;  // (the library shows the two as one document)
+    }
+    return MergedPdf::sidecarOf(xopp);
+}
+
+auto DocumentSession::exportXopp(const fs::path& xopp) -> SaveResult {
+    clearSelectionEndText();
+    updatePreview(*doc);
+    const auto r = HybridPdf::exportXopp(*doc, xopp, exportPdfFor(xopp));
+    if (!r.ok) {
+        return {false, FS(_F("Could not export \"{1}\": {2}") % xopp.u8string() % r.error)};
+    }
+    return {true, {}};
 }
 
 auto DocumentSession::saveAs(fs::path target) -> SaveResult {

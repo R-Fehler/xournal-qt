@@ -85,6 +85,8 @@ class AppController: public QObject {
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
     Q_PROPERTY(bool hasFilePath READ hasFilePath NOTIFY titleChanged)
+    /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
+    Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
     Q_PROPERTY(QString tool READ tool NOTIFY toolChanged)
@@ -384,6 +386,20 @@ public:
     // --- current document ---
     Q_INVOKABLE bool save();
     Q_INVOKABLE bool saveAs(const QUrl& url);
+    // Hybrid PDF (qt/docs/hybrid-pdf.md)
+    bool isHybrid() const;
+    /// "Save as hybrid PDF…": the document's own hybrid PDF; for an annotated PDF "name.notes.pdf" next to it, or the
+    /// PDF itself with the setting "Save notes into the PDF itself"; else the .xopp suggestion as .pdf.
+    Q_INVOKABLE QUrl suggestedHybridFile() const;
+    Q_INVOKABLE bool saveAsHybrid(const QUrl& url);
+    /// Save writes without asking: the document has a file, or it is an annotated PDF and the notes go into it.
+    Q_INVOKABLE bool savesWithoutDialog() const;
+    /// "Export as .xopp for Xournal++…": "name.xopp" next to the hybrid PDF.
+    Q_INVOKABLE QUrl suggestedXoppExport() const;
+    Q_INVOKABLE bool exportXopp(const QUrl& url);
+    /// After hybridEditedElsewhere: take the other app's version of the changed annotations (or keep ours).
+    Q_INVOKABLE bool importHybridChanges();
+    Q_INVOKABLE void keepHybridData();
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
     Q_INVOKABLE void fitWidth();
@@ -579,12 +595,16 @@ Q_SIGNALS:
     void markdownRequested(int page);
     /// The text tool tapped a Markdown text box, or a place for a new one: the window opens its editor.
     void markdownBoxRequested(int page, double x, double y);
+    /// The hybrid PDF just opened was edited in another app: its ink differs from the Xournal data.
+    void hybridEditedElsewhere(const QString& file);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
 
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// After the document was saved as a hybrid PDF: the .xopp for Xournal++ (setting), the library.
+    void afterHybridSave();
     /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
     void applyMarkdownText();
     /// Editing beside the page: the page's text, or the text box at a point.

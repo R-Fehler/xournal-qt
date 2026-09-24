@@ -559,3 +559,33 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       the extended view marks the hits on the first pages.
 - [ ] Save a document of the library after adding a text: the library search finds the new text at once and the
       library shows no indexing progress for it.
+
+## Hybrid PDF (qt/hybrid-pdf)
+- [ ] Open a lecture PDF, write with pressure, highlight a line of its text, add a text box, add a ruled page. More →
+      Save as hybrid PDF…: it suggests `lecture.notes.pdf` next to the lecture. Save. The tab is called
+      `lecture.notes.pdf`; `lecture.pdf` is unchanged (size and date).
+- [ ] Open `lecture.notes.pdf` in other PDF apps: **Acrobat, Preview (macOS/iPad), Xodo, Drawboard, Chrome (pdf.js
+      in Chrome/Firefox), Okular, Evince**. For each note: the ink looks like in xournal-qt (pressure widths, not one
+      width per stroke); the highlighter is see-through and the text under it stays readable (multiply); the text
+      box and the ruled page show; the lecture's own bookmarks and links still work. Note which apps differ.
+- [ ] In those apps: select a stroke layer (one annotation per layer and page), move it, delete another, add a
+      comment of your own, save. Reopen in xournal-qt: it says the PDF was edited in another app. "Keep the Xournal
+      data": the ink is where it was, your comment shows; save, reopen in the other app: the comment is still there.
+      Do it again and choose "Import": the moved ink shows where the other app put it (not editable), Undo brings the
+      editable layer back.
+- [ ] Which apps keep the attachment `document.xopp` when they save (the file opens in xournal-qt with editable
+      strokes afterwards), and which drop it (it then opens as a plain PDF with the ink as annotations)? Which save
+      incrementally (file only grows) and which rewrite it?
+- [ ] Ctrl+S on the hybrid PDF saves it again without asking (the date changes); close and reopen: all strokes are
+      editable, layers and text boxes as they were.
+- [ ] More → Export as .xopp for Xournal++…: `lecture.notes.xopp` appears (and hidden `.lecture.notes.pages.pdf`).
+      Open it in upstream Xournal++ if installed: the pages and the ink show once, not twice. In the library the
+      hybrid PDF and its `.xopp` are one card, which opens the hybrid PDF.
+- [ ] Settings → Documents: turn on "Save notes into the PDF itself": an explanation shows once (not when turned
+      off and on again). Open another PDF, write, Ctrl+S: no dialog; the PDF itself now has the notes, and
+      `name.original.pdf` next to it is the old file. Write more, Ctrl+S again: `name.original.pdf` does not change.
+- [ ] Turn on "also write a .xopp for Xournal++": every Ctrl+S on a hybrid PDF also writes `name.xopp`.
+- [ ] A `.xopp` document and an unsaved new document still save as `.xopp` with Ctrl+S / Save as (nothing changed).
+- [ ] Library search finds a word of a hybrid PDF's pages and a word of one of its text boxes.
+- [ ] Time Ctrl+S on a hybrid PDF of a long PDF (several hundred pages) with notes on a few pages: acceptable?
+
