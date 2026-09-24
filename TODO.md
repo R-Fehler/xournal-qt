@@ -21,7 +21,14 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 1b. **PDF writing with qpdf, high priority (the author, 2026-09-24):**
    1. ~~`qt/pdf-pages`~~: merged 2026-09-24 (see ROADMAP). Follow-ups: the merge runs on the UI thread (about 0.2 s
       per paste on a 117 MB scan); the `.next.pdf` step relies on Linux rename semantics (check before Windows).
-   2. `qt/hybrid-pdf`: started 2026-09-24 (worktree `../xournal_qt-hybrid-pdf`). Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
+   2. ~~`qt/hybrid-pdf`~~: merged 2026-09-24 (see ROADMAP). Follow-ups:
+      - [ ] Save in the background: a 1,300-page hybrid save blocks the window for about 6 s.
+      - [ ] The round trip in other viewers (the author): Acrobat, Preview, Xodo, Drawboard, Chrome/pdf.js,
+        Firefox, Okular, Evince, with the sample `~/xournal_qt_workspace/samples/hybrid-sample.pdf`. See the
+        device checklist.
+      - [ ] Not handled yet: a page deleted in another app; encrypted, rotated or cropped source PDFs (in code,
+        untested); audio attachments; a "has notes" badge. Writing into the PDF itself renames over the file
+        while it is read, which may fail on Windows. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
    - Experiment `qt/mupdf`, started 2026-09-24: a MuPDF backend next to poppler, measured, with a short pdfium
      check. Findings go to `qt/docs/pdf-engine-experiment.md`.
 2. **Library track**, in this order, because each step builds on the one before:

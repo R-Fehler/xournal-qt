@@ -171,6 +171,19 @@
     - per key: 3–7 ms; longest UI-thread pass 45–57 → 0.3 ms.
   - Integration fix at merge: the index also rebuilds when another background PDF is loaded, so pasted pages are
     found at once.
+- **Hybrid PDF, `qt/hybrid-pdf` (2026-09-24, awaiting on-device test and a round trip in other viewers).** See
+  [hybrid-pdf.md](hybrid-pdf.md).
+  - Writer (qpdf): the base pages; one annotation per visible layer per page (`/Ink`, or `/Stamp` for layers
+    without strokes) whose `/AP` is the layer drawn by cairo; `/NM (xopp:…)`; an embedded `document.xopp`; a
+    catalog marker with the format version and a hash per annotation. The write is atomic.
+  - Reader: the embedded document opens with a clean copy of the file, without our annotations, as its
+    background, cached. Other apps' annotations stay. Changes to ours are reported, with "keep the Xournal data" or
+    "import them as plain annotations".
+  - UI: "Save as hybrid PDF…" (`name.notes.pdf`); the setting "Save notes into the PDF itself" (off, keeps
+    `name.original.pdf`); "Export as .xopp for Xournal++"; optional automatic `.xopp` export; one library card.
+    `.xopp` stays the default.
+  - Measured on 1,321 pages with notes on 53: save 5.6 s (on the UI thread; background saving is a follow-up);
+    first open 5.5 s (clean copy), cached 0.5 s; 10.3 MB, the same as our PDF export.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
