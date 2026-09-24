@@ -119,10 +119,10 @@ NDK r27c (27.2.12479018) in `~/Android/Sdk`; Qt 6.11.2 desktop (host, `gcc_64`) 
 `aqtinstall` (`~/.local/bin/aqt`); 6.11.3 was not fully mirrored yet. Installed 2026-09-24. The block itself comes after the `.md` editor, at the author's wish.
 Research is already done in `../cross-platform-qt-research/` (03-android-plan, 05-qfield-reference,
 06-risks). Keep the current PDF engine (poppler/cairo).
-- [ ] vcpkg manifest and toolchain-agnostic dependency lookup, following QField (`../QField`).
-- [ ] Android build: CMake preset, `AndroidManifest`, an unsigned debug APK that can be installed with `adb install`.
+- [x] vcpkg manifest and toolchain-agnostic dependency lookup, following QField (`../QField`).
+- [x] Android build: CMake preset, `AndroidManifest`, an unsigned debug APK that can be installed with `adb install`.
 - [ ] A CI job modelled on QField's, running only when asked (manual dispatch).
-- [ ] Start `qt/docs/android-roadmap.md` for everything about Android UI/UX. That work waits until mobile
+- [x] Start `qt/docs/android-roadmap.md` for everything about Android UI/UX. That work waits until mobile
   testing is a real concern.
 
 ---
@@ -226,11 +226,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   (the author, 2026-09-24). It creates `name.md` in the current folder and opens it in the editor.
 
 ### Horizontal scrolling and a presentation mode (the author, 2026-09-24; `qt/present`, merged 2026-09-24)
-- [ ] **Horizontal scrolling mode**: pages side by side, each fit to the window height by default.
+- [x] **Horizontal scrolling mode**: pages side by side, each fit to the window height by default.
   - A toggle between snapping to whole pages and continuous horizontal scrolling.
   - Works with two or more columns (rows of pages).
   - In this mode, ‹ › buttons (previous / next page) in the page / zoom pill.
-- [ ] **Presentation mode**, for teaching and presenting, built on full screen:
+- [x] **Presentation mode**, for teaching and presenting, built on full screen:
   - Each page fills the screen, with snapped horizontal scrolling.
   - PowerPoint-like keys: Space and the arrow keys go to the next or previous page; typing a number and Enter goes
     to that page. The number jump is useful in normal mode too.
@@ -239,11 +239,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [x] **Switching tabs in full screen (editing)** (the author, 2026-09-24; queued in `qt/present`): a slim bar at the
   top centre with one dot per tab (`PageIndicator`; "3 / 17" with many tabs). A tap opens the tab overview, and a
   horizontal swipe on the bar switches to the previous or next tab. Hidden with one tab and while presenting.
-- [ ] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
+- [x] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
   pages, for documents meant to be presented.
 
 ### Reference mode (the author, 2026-09-24; `qt/reference-view`, merged 2026-09-24)
-- [~] **A second document beside the current one, in the same tab**, for reading while writing notes.
+- [x] **A second document beside the current one, in the same tab**, for reading while writing notes.
   - A draggable divider splits the canvas area. The main document has a thin highlight border. Sides can be
     swapped for left or right hand. Works in full screen.
   - The reference side is a plain scrollable canvas with no tool bar, only a tiny pill: page counter and number
@@ -329,11 +329,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   `XQT_LOG_WINDOW=1` and look for a touch cancel, or an odd touch end, just before the resize.
 
 ### Flaky tests
-- [ ] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
+- [x] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
   `-j6` load (2026-09-24), at the check after "the way back brings it into view again". It passed 3 of 3 alone.
   The wait for the scroll back is probably too short under load.
 
-- [ ] `MainWindowTest.sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDown` ("no sharp one while racing")
+- [x] `MainWindowTest.sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDown` ("no sharp one while racing")
   fails now and then under load: 1 of 8 and 0 of 16 after `qt/present`, and once in the full suite; 0 of 16 on a
   build from before it. It is timing-sensitive, and whether `qt/present` made it more likely is not settled.
 
