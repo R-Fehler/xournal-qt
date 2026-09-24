@@ -26,13 +26,17 @@ namespace {
 struct PaperFormat {
     const char* name;
     double width, height;  ///< portrait, in points
+    bool wide = false;     ///< meant to be landscape (choosing it turns the page)
 };
-// The common formats of upstream's page format dialog (GtkPaperSize), in points.
-constexpr std::array<PaperFormat, 5> PAPER_FORMATS{{{"A5", 419.527559, 595.275591},
+// The common formats of upstream's page format dialog (GtkPaperSize), in points, and a 16:9 slide as PowerPoint
+// makes it (13.33 x 7.5 in): a plain page size in the .xopp, as upstream stores any other.
+constexpr std::array<PaperFormat, 6> PAPER_FORMATS{{{"A5", 419.527559, 595.275591},
                                                      {"A4", 595.275591, 841.889764},
                                                      {"A3", 841.889764, 1190.551181},
                                                      {"Letter", 612, 792},
-                                                     {"Legal", 612, 1008}}};
+                                                     {"Legal", 612, 1008},
+                                                     {QT_TRANSLATE_NOOP("SettingsModel", "16:9 (presentation)"), 540, 960,
+                                                      true}}};
 
 /// How long touch waits once the pen is away ("touch" / "timeout"), in milliseconds. Upstream waits a second; with a
 /// pen that tells when it is near, touch is ignored while it is anyway, so here it does not wait at all.
@@ -280,8 +284,8 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 return;
             }
             withTemplate([&](PageTemplateSettings& tpl) {
-                const bool landscape = tpl.getPageWidth() > tpl.getPageHeight();
                 const PaperFormat& f = PAPER_FORMATS[static_cast<size_t>(i)];
+                const bool landscape = f.wide || tpl.getPageWidth() > tpl.getPageHeight();
                 tpl.setPageWidth(landscape ? f.height : f.width);
                 tpl.setPageHeight(landscape ? f.width : f.height);
             });
@@ -338,9 +342,13 @@ QStringList SettingsModel::pageBackgroundFormats() const {
 QStringList SettingsModel::paperFormats() const {
     QStringList names;
     for (const auto& f: PAPER_FORMATS) {
-        names << QString::fromLatin1(f.name);
+        names << tr(f.name);
     }
     return names;
+}
+
+bool SettingsModel::paperIsWide(int index) const {
+    return index >= 0 && index < static_cast<int>(PAPER_FORMATS.size()) && PAPER_FORMATS[static_cast<size_t>(index)].wide;
 }
 
 QStringList SettingsModel::keys() const {

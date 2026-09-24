@@ -1870,3 +1870,280 @@ TEST_F(CanvasReplayTest, pdfTextIsHighlightedByDraggingOverIt) {
     EXPECT_TRUE(view->markPdfText(CanvasView::PdfTextMode::Underline));
     EXPECT_EQ(elementCount(0), marks);
 }
+
+// --- Scrolling sideways (qt/present): the pages side by side, fit to the height; the wheel, a swipe of the finger
+// and the touchpad go from page to page when the view stops on whole pages.
+namespace {
+/// Waits until the view came to rest on a page.
+void settle(CanvasReplayTest* t, ViewController& vc, AppContext& app) {
+    QElapsedTimer clock;
+    clock.start();
+    while (vc.isAnimating() && clock.elapsed() < 2000) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    (void)t;
+    (void)app;
+}
+/// One finger from `from` by `by` in `steps` moves, `msPerStep` apart (a flick when fast), then lifted.
+void swipe(CanvasInput& input, const QPointingDevice& screen, QPointF from, QPointF by, int steps, int msPerStep) {
+    touch(input, screen, QEvent::TouchBegin, QEventPoint::State::Pressed, from);
+    for (int i = 1; i <= steps; ++i) {
+        QThread::msleep(static_cast<unsigned long>(msPerStep));
+        touch(input, screen, QEvent::TouchUpdate, QEventPoint::State::Updated, from + by * i / steps);
+    }
+    touch(input, screen, QEvent::TouchEnd, QEventPoint::State::Released, from + by);
+}
+}  // namespace
+
+class SidewaysTest: public CanvasReplayTest {
+protected:
+    /// Six pages side by side in a 900 x 600 view
+    void sideways(bool snap) {
+        for (int i = 0; i < 4; ++i) {
+            session->insertNewPage(1);
+        }
+        session->setCurrentPageNo(0);  // (it starts on the first page)
+        app->getSettings()->setViewFixedRows(true);
+        app->getSettings()->getCustomElement("xournalQt").setBool("snapPages", snap);
+        Q_EMIT app->settingsChanged();
+        view->getViewController().setViewSize(QSizeF(900, 600));
+        processEvents();
+    }
+    ViewController& vc() { return view->getViewController(); }
+    double x() { return vc().scrollPosition().x(); }
+    void wheel(QPoint angle) {
+        QWheelEvent e(QPointF(400, 300), QPointF(400, 300), QPoint(), angle, Qt::NoButton, Qt::NoModifier,
+                      Qt::NoScrollPhase, false);
+        input->wheelEvent(&e, QPointF(400, 300));
+    }
+};
+
+TEST_F(SidewaysTest, thePagesFitTheHeightAndOnlyThoseInViewCount) {
+    sideways(true);
+    ASSERT_EQ(view->pageCount(), 6u);
+    const auto& layout = view->documentLayout();
+    ASSERT_TRUE(layout.horizontal());
+    EXPECT_NEAR(vc().zoom(), layout.fitHeightZoom(600), 1e-9) << "fit to the height";
+    EXPECT_LE(layout.contentSize(vc().zoom()).height(), 600.5) << "nothing to scroll up or down";
+    EXPECT_EQ(vc().keptFit(), ViewController::Fit::Height);
+    const auto [first, last] = view->visiblePages();
+    EXPECT_EQ(first, 0u);
+    EXPECT_LE(last, 2u) << "only the pages in view, not the whole row";
+
+    // A bigger window: fitted again, on the same page
+    vc().stepPages(2);
+    settle(this, vc(), *app);
+    vc().setViewSize(QSizeF(1200, 900));
+    EXPECT_NEAR(vc().zoom(), layout.fitHeightZoom(900), 1e-9);
+    EXPECT_EQ(vc().currentGroup(), 2u);
+    // Zooming by hand ends that
+    vc().zoomBy(1.2, QPointF(600, 450));
+    EXPECT_EQ(vc().keptFit(), ViewController::Fit::None);
+}
+
+TEST_F(SidewaysTest, theWheelGoesFromPageToPage) {
+    sideways(true);
+    ASSERT_TRUE(vc().groupFitsView());
+    wheel(QPoint(0, -120));  // one notch down
+    EXPECT_TRUE(vc().isAnimating()) << "on its way";
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 1u);
+    EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
+    processEvents();
+    EXPECT_EQ(session->getCurrentPageNo(), 1u);
+    // Two notches in a row: two pages on, whatever the animation did in between
+    wheel(QPoint(0, -120));
+    wheel(QPoint(0, -120));
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 3u);
+    wheel(QPoint(0, 120));  // up: back
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 2u);
+    // Small steps of a fine wheel add up to a notch
+    for (int i = 0; i < 3; ++i) {
+        wheel(QPoint(0, -40));
+    }
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 3u);
+}
+
+TEST_F(SidewaysTest, withoutStoppingOnPagesTheWheelScrollsSideways) {
+    sideways(false);
+    const double before = x();
+    wheel(QPoint(0, -120));
+    EXPECT_FALSE(vc().isAnimating());
+    EXPECT_NEAR(x() - before, 48, 1) << "down scrolls right: there is nothing to scroll down";
+    processEvents(100);
+    EXPECT_NEAR(x() - before, 48, 1) << "and stays there";
+}
+
+TEST_F(SidewaysTest, aSwipeGoesOnePageOnAndASlowDragComesBack) {
+    sideways(true);
+    const double pageWidth = view->pageViewRect(1).left() - view->pageViewRect(0).left();
+    // A gentle swipe to the left, less than half a page: the next page
+    swipe(*input, touchscreen, QPointF(600, 300), QPointF(-pageWidth * 0.3, 0), 6, 40);
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 1u) << "flicked on";
+    EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
+
+    // A slow drag of a third of a page, held before lifting: back where it was
+    auto dragAndHold = [&](QPointF from, double by) {
+        touch(*input, touchscreen, QEvent::TouchBegin, QEventPoint::State::Pressed, from);
+        for (int i = 1; i <= 10; ++i) {
+            touch(*input, touchscreen, QEvent::TouchUpdate, QEventPoint::State::Updated, from + QPointF(by * i / 10, 0));
+        }
+        QThread::msleep(80);  // (held still: no flick)
+        touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, from + QPointF(by, 0));
+    };
+    dragAndHold(QPointF(600, 300), -pageWidth * 0.33);
+    EXPECT_TRUE(vc().isAnimating());
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 1u) << "not far enough: it springs back";
+    EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
+
+    // Dragged slowly more than half a page: the page it was dragged to
+    dragAndHold(QPointF(800, 300), -pageWidth * 0.7);
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 2u);
+    EXPECT_NEAR(x(), vc().restRange(2).first, 0.5);
+
+    // A swipe to the right: back one page
+    swipe(*input, touchscreen, QPointF(300, 300), QPointF(pageWidth * 0.3, 0), 6, 40);
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 1u);
+
+    // A strong flick carries on as the momentum would, and comes to rest on a page
+    const double before = x();
+    swipe(*input, touchscreen, QPointF(700, 300), QPointF(-pageWidth * 0.4, 0), 6, 6);
+    settle(this, vc(), *app);
+    EXPECT_GT(vc().currentGroup(), 2u) << "further than one page";
+    EXPECT_NEAR(x(), vc().restRange(vc().currentGroup()).first, 0.5);
+    EXPECT_GT(x(), before);
+}
+
+TEST_F(SidewaysTest, theTouchpadComesToRestOnAPage) {
+    sideways(true);
+    sendWheel(*input, touchpad, QPoint(-20, 0), Qt::ScrollBegin);
+    for (int i = 0; i < 6; ++i) {
+        QThread::msleep(30);
+        sendWheel(*input, touchpad, QPoint(-20, 0), Qt::ScrollUpdate);
+    }
+    sendWheel(*input, touchpad, QPoint(0, 0), Qt::ScrollEnd);
+    EXPECT_TRUE(vc().isAnimating()) << "the momentum carries it on to a page";
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 1u);
+    EXPECT_NEAR(x(), vc().restRange(1).first, 0.5);
+
+    // Two fingers going up or down move sideways too
+    sendWheel(*input, touchpad, QPoint(0, -30), Qt::ScrollBegin);
+    const double before = x();
+    sendWheel(*input, touchpad, QPoint(0, -30), Qt::ScrollUpdate);
+    EXPECT_NEAR(x() - before, 30, 1);
+    sendWheel(*input, touchpad, QPoint(0, 0), Qt::ScrollEnd);
+    settle(this, vc(), *app);
+}
+
+// Paging must be instant: the pages next to the one in view are drawn in advance, at the zoom of the view.
+TEST_F(SidewaysTest, theNextAndThePreviousPageAreDrawnInAdvance) {
+    sideways(true);
+    view->setShown(true);
+    vc().stepPages(2);
+    settle(this, vc(), *app);
+    const double zoom = vc().zoom();
+    QElapsedTimer clock;
+    clock.start();
+    auto ready = [&](size_t p) {
+        const auto info = view->getPage(p)->bufferInfo();
+        return info.valid && info.zoom == zoom;
+    };
+    while (!(ready(1) && ready(3) && ready(4)) && clock.elapsed() < 3000) {
+        processEvents(20);
+    }
+    EXPECT_TRUE(ready(1)) << "the page before";
+    EXPECT_TRUE(ready(3)) << "the page after";
+    EXPECT_TRUE(ready(4));
+    view->setShown(false);
+}
+
+// Presenting: a page fills the view, a swipe goes one page on however strong it is, the pen writes (it does not page)
+TEST_F(SidewaysTest, presentingAPageFillsTheViewAndASwipeGoesOnePage) {
+    for (int i = 0; i < 4; ++i) {
+        session->insertNewPage(1);
+    }
+    // A 16:9 slide among the A4 pages
+    session->getDocument()->lock();
+    session->getDocument()->getPage(3)->setSize(960, 540);
+    session->getDocument()->unlock();
+    view->pageSizeChanged(3);
+    view->getViewController().setViewSize(QSizeF(1600, 900));
+    session->setCurrentPageNo(0);  // (presenting starts on the current page)
+    view->setPresenting(true);
+    processEvents();
+    const auto& layout = view->documentLayout();
+    ASSERT_TRUE(layout.horizontal());
+    EXPECT_EQ(layout.padding(), 0.0) << "no margin";
+    EXPECT_EQ(vc().keptFit(), ViewController::Fit::Page);
+    auto fills = [&](size_t page) {
+        const QRectF r = view->pageViewRect(page);
+        const QSizeF v = vc().viewSize();
+        return std::abs(r.height() - v.height()) < 0.5 || std::abs(r.width() - v.width()) < 0.5;
+    };
+    auto inView = [&](size_t page) {
+        const QRectF r = view->pageViewRect(page);
+        const QSizeF v = vc().viewSize();
+        return r.left() >= -0.5 && r.right() <= v.width() + 0.5 && r.top() >= -0.5 && r.bottom() <= v.height() + 0.5;
+    };
+    EXPECT_TRUE(fills(0));
+    EXPECT_TRUE(inView(0));
+    EXPECT_NEAR(view->pageViewRect(0).center().x(), 800, 0.5) << "in the middle";
+
+    // A strong flick: one page, not more
+    const double pageStep = view->pageViewRect(1).left() - view->pageViewRect(0).left();
+    swipe(*input, touchscreen, QPointF(1200, 450), QPointF(-pageStep * 0.4, 0), 6, 6);
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 1u) << "one page per swipe";
+    EXPECT_TRUE(inView(1));
+    processEvents();
+    EXPECT_EQ(session->getCurrentPageNo(), 1u);
+
+    // The slide has another shape: it fills the screen too
+    vc().stepPages(1);
+    settle(this, vc(), *app);
+    vc().stepPages(1);
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 3u);
+    EXPECT_TRUE(fills(3));
+    EXPECT_TRUE(inView(3));
+    EXPECT_NEAR(view->pageViewRect(3).width(), 1600, 0.5) << "the 16:9 slide is as wide as the screen";
+
+    // The pen writes on the page and the view stays
+    const double x = vc().scrollPosition().x();
+    const size_t before = elementCount(3);
+    const QRectF slide = view->pageViewRect(3);
+    drawLine(3, QPointF(100, 100), QPointF(500, 300));
+    processEvents();
+    EXPECT_EQ(elementCount(3), before + 1);
+    EXPECT_DOUBLE_EQ(vc().scrollPosition().x(), x);
+    EXPECT_EQ(view->pageViewRect(3), slide);
+
+    // The window grows (full screen arrives late): it fits again, on the same page
+    vc().setViewSize(QSizeF(1920, 1080));
+    EXPECT_EQ(vc().currentGroup(), 3u);
+    EXPECT_NEAR(view->pageViewRect(3).width(), 1920, 0.5);
+
+    // Going to a page by its number (or Home / End): it fills the screen as well
+    ASSERT_EQ(vc().keptFit(), ViewController::Fit::Page);
+    vc().scrollToPage(0);
+    EXPECT_TRUE(fills(0));
+    EXPECT_TRUE(inView(0));
+    vc().scrollToPage(3);
+    EXPECT_NEAR(view->pageViewRect(3).width(), 1920, 0.5);
+    EXPECT_TRUE(inView(3));
+
+    // Stopped: the layout and zoom from before
+    view->setPresenting(false);
+    processEvents();
+    EXPECT_FALSE(view->documentLayout().horizontal());
+    EXPECT_GT(view->documentLayout().padding(), 0.0);
+    EXPECT_EQ(session->getCurrentPageNo(), 3u);
+}

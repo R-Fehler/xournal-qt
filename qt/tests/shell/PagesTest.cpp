@@ -114,7 +114,10 @@ TEST(Chapters, comeFromTheDocumentWhenNoPdfHasThem) {
     }
     EXPECT_TRUE(found);
     c.undo();
-    processEvents(40);
+    // (the outline follows the document after a short delay: wait for it, a fixed wait fails under load)
+    for (int i = 0; i < 100 && outline->count() != 1; ++i) {
+        processEvents(20);
+    }
     EXPECT_EQ(outline->count(), 1) << "undo takes the chapter back";
 }
 

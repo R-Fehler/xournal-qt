@@ -18,6 +18,7 @@
 #include <QJSValue>
 #include <QMetaObject>
 #include <QObject>
+#include <QPointer>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
@@ -164,6 +165,14 @@ class AppController: public QObject {
     Q_PROPERTY(int viewColumns READ viewColumns WRITE setViewColumns NOTIFY viewLayoutChanged)
     Q_PROPERTY(bool pairedPages READ pairedPages WRITE setPairedPages NOTIFY viewLayoutChanged)
     Q_PROPERTY(int pairsOffset READ pairsOffset WRITE setPairsOffset NOTIFY viewLayoutChanged)
+    /// Scrolling sideways: the pages in a row (in viewRows rows), each fit to the height (upstream settings
+    /// viewFixedRows with viewLayoutVert, viewRows); snapPages: coming to rest on whole pages (ours)
+    Q_PROPERTY(bool horizontalScrolling READ horizontalScrolling WRITE setHorizontalScrolling NOTIFY viewLayoutChanged)
+    Q_PROPERTY(int viewRows READ viewRows WRITE setViewRows NOTIFY viewLayoutChanged)
+    Q_PROPERTY(bool snapPages READ snapPages WRITE setSnapPages NOTIFY viewLayoutChanged)
+    /// Presenting the current document in this window: a page fills the view, a swipe or a key goes one page on
+    /// (the window goes full screen for it, in QML)
+    Q_PROPERTY(bool presenting READ presenting WRITE setPresenting NOTIFY presentingChanged)
     /// Elements are selected on the canvas (select tools).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     // Page operations (sidebar, page grid) go onto the one undo stack of the document (these are the same as undo)
@@ -305,6 +314,20 @@ public:
     void setPairedPages(bool paired);
     int pairsOffset() const;
     void setPairsOffset(int offset);
+    bool horizontalScrolling() const;
+    void setHorizontalScrolling(bool on);
+    int viewRows() const;
+    void setViewRows(int rows);
+    bool snapPages() const;
+    void setSnapPages(bool snap);
+    bool presenting() const { return presentingOn; }
+    void setPresenting(bool on);
+    /// The previous / next page (scrolling sideways: its group, animated), the first / the last one; of the reference
+    /// while it has the keys
+    Q_INVOKABLE void previousPage();
+    Q_INVOKABLE void nextPage();
+    Q_INVOKABLE void firstPage();
+    Q_INVOKABLE void lastPage();
 
     // --- home: library and recent documents ---
     /// The folder this window works in (main.cpp: the command line, else the default library). Tabs of this
@@ -631,6 +654,7 @@ Q_SIGNALS:
     void recoveryChanged();
     void searchChanged();
     void viewLayoutChanged();
+    void presentingChanged();
     void pageUndoChanged();
     void selectionChanged();
     void fontChanged();
@@ -671,6 +695,14 @@ private:
     mutable std::shared_ptr<const xqt::FuzzyQuery> fuzzyParsed;
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// Presenting: the view that presents (the current one; another tab takes it over)
+    bool presentingOn = false;
+    QPointer<xqt::CanvasView> presentedView;
+    void updatePresentedView();
+    /// The canvas the keys act on: the reference while it has the focus, else the main document's
+    xqt::CanvasView* keyCanvas() const;
+    void stepPage(int delta);
+    void showPage(size_t page);
     /// The reference while it has the keys and is written in (its edit switch), else nullptr: then undo, cut,
     /// paste, delete and select all act on it.
     xqt::CanvasView* editedReference() const;

@@ -216,6 +216,9 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     to that page. The number jump is useful in normal mode too.
   - Switch back and forth between present and edit from full screen, and start it from the normal tool bar.
   - Writing on slides while presenting follows from full screen (the tool square stays).
+- [~] **Switching tabs in full screen (editing)** (the author, 2026-09-24; queued in `qt/present`): a slim bar at the
+  top centre with one dot per tab (`PageIndicator`; "3 / 17" with many tabs). A tap opens the tab overview, and a
+  horizontal swipe on the bar switches to the previous or next tab. Hidden with one tab and while presenting.
 - [ ] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
   pages, for documents meant to be presented.
 
@@ -237,6 +240,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     - The lasso bar, the canvas context menu, Markdown when editable, and Ctrl+S saving the focused reference.
   - The reference is another open tab ("Open as reference" in the tab overview, the tab menu and the library and
     Recent card menus); the tab strip marks it.
+
+### Links between documents (the author, 2026-09-24)
+- [ ] Design agreed 2026-09-24: [qt/docs/links.md](qt/docs/links.md). Links are relative paths with `#page=`, `#chapter=…&page=`
+  as the fallback, and `pdfpage=` for pages of annotated PDFs. A tap offers a new tab, reference view or "here".
+  In-app renames rewrite the links, backed by the index's backlinks. Built as `qt/links` after the running blocks.
 
 ### Bugs
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.

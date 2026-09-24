@@ -49,6 +49,8 @@ public:
     QStringList pageBackgrounds() const;
     QStringList pageBackgroundFormats() const;
     QStringList paperFormats() const;
+    /// The paper format at `index` is meant to be landscape (16:9): choosing it turns the page.
+    Q_INVOKABLE bool paperIsWide(int index) const;
     /// All keys, for tests.
     QStringList keys() const;
 

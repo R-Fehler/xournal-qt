@@ -886,3 +886,64 @@ TEST_F(ReferenceWindowTest, ctrlSSavesTheReferenceWhenItIsWrittenIn) {
     EXPECT_FALSE(notes->isModified());
     EXPECT_TRUE(book->isModified());
 }
+
+// qt/present with a reference: a typed page number and the page keys of the sideways layout act on the side that
+// has the keys; presenting shows the notes alone, and the reference comes back afterwards.
+TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsTheNotesAlone) {
+    for (int i = 0; i < 5; ++i) {
+        tabs().session(1)->insertNewPage(1);
+        tabs().session(0)->insertNewPage(1);
+    }
+    tabs().session(0)->setCurrentPageNo(0);
+    tabs().session(1)->setCurrentPageNo(0);
+    ref().showTab(1);
+    wait(100);
+    controller->selectTool("hand");
+    click(reference);
+    ASSERT_TRUE(ref().focused());
+    const int notesPage = controller->pageNumber();
+    key(Qt::Key_4);
+    key(Qt::Key_Return);
+    wait(100);
+    EXPECT_EQ(ref().pageNumber(), 4) << "the reference went to page 4";
+    EXPECT_EQ(controller->pageNumber(), notesPage) << "the notes stay";
+    EXPECT_TRUE(ref().focused()) << "and it keeps the keys";
+
+    // Sideways: → pages the side with the keys
+    controller->setHorizontalScrolling(true);
+    wait(50);
+    click(reference);
+    ASSERT_TRUE(ref().focused());
+    key(Qt::Key_Right);
+    until([&] { return !tabs().view(1)->getViewController().isAnimating(); }, 2000);
+    wait(50);
+    EXPECT_EQ(ref().pageNumber(), 5);
+    EXPECT_EQ(controller->pageNumber(), notesPage);
+    click(main);
+    ASSERT_FALSE(ref().focused());
+    key(Qt::Key_Right);
+    until([&] { return !tabs().view(0)->getViewController().isAnimating(); }, 2000);
+    wait(50);
+    EXPECT_EQ(controller->pageNumber(), notesPage + 1);
+    EXPECT_EQ(ref().pageNumber(), 5);
+    controller->setHorizontalScrolling(false);
+    wait(50);
+
+    // Presenting: the notes alone, over the whole area
+    const double splitWidth = split->width();
+    key(Qt::Key_F5);
+    until([&] { return controller->presenting(); });
+    ASSERT_TRUE(controller->presenting());
+    wait(100);
+    EXPECT_FALSE(reference->isVisible()) << "no reference while presenting";
+    EXPECT_NEAR(main->width(), split->width(), 1);
+    key(Qt::Key_Escape);  // presenting ends
+    key(Qt::Key_Escape);  // full screen too
+    until([&] { return !window->property("fullScreenMode").toBool(); });
+    wait(100);
+    EXPECT_TRUE(ref().active());
+    EXPECT_TRUE(reference->isVisible()) << "the reference is back";
+    EXPECT_LT(main->width(), split->width() - 10);
+    (void)splitWidth;
+}
+

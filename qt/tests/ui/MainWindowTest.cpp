@@ -45,6 +45,7 @@
 #include <qpdf/QPDFPageObjectHelper.hh>
 #include <qpdf/QPDFWriter.hh>
 
+#include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Point.h"
@@ -4330,4 +4331,448 @@ TEST_F(MainWindowTest, closingWaitsForARunningSave) {
     until([&] { return !window->isVisible(); }, 10000);
     EXPECT_FALSE(window->isVisible()) << "closed once it was written";
     EXPECT_EQ(strokesIn(first), 1u);
+}
+
+// --- qt/present: page number jump, 16:9 pages, horizontal scrolling, presentation --------------------------------
+
+// Digits typed while the page is at hand: "Go to page: 12", Enter goes there (the last page at most), Escape cancels.
+// Digits typed into a text on the page, the search field or a dialog stay there.
+TEST_F(MainWindowTest, typingAPageNumberJumpsToThePage) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    const int pages = controller->pageCount();
+    ASSERT_GE(pages, 10);
+    auto* jump = find<QQuickItem>("pageJump");
+    auto* digits = find<QQuickItem>("pageJumpDigits");
+    ASSERT_NE(jump, nullptr);
+    ASSERT_NE(digits, nullptr);
+    EXPECT_FALSE(jump->isVisible());
+    key(Qt::Key_1);
+    ASSERT_TRUE(jump->isVisible()) << "the first digit opens it";
+    key(Qt::Key_0);
+    EXPECT_EQ(digits->property("text").toString(), "10");
+    key(Qt::Key_Return);
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 10);
+    EXPECT_TRUE(controller->canGoBack()) << "a jump: Alt+Left goes back";
+
+    key(Qt::Key_9);
+    key(Qt::Key_9);
+    key(Qt::Key_9);
+    key(Qt::Key_Enter);
+    EXPECT_EQ(controller->pageNumber(), pages) << "past the end: the last page";
+
+    key(Qt::Key_2);
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(jump->isVisible()) << "Escape cancels";
+    EXPECT_EQ(controller->pageNumber(), pages);
+
+    key(Qt::Key_2);
+    key(Qt::Key_3);
+    key(Qt::Key_Backspace);
+    key(Qt::Key_Return);
+    EXPECT_EQ(controller->pageNumber(), 2) << "Backspace takes the last digit back";
+
+    key(Qt::Key_5, Qt::KeypadModifier);
+    key(Qt::Key_Enter, Qt::KeypadModifier);
+    EXPECT_EQ(controller->pageNumber(), 5) << "the number pad";
+
+    // Another key: no page number after all
+    key(Qt::Key_3);
+    ASSERT_TRUE(jump->isVisible());
+    key(Qt::Key_P);
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 5);
+
+    // The search field keeps its digits
+    key(Qt::Key_F, Qt::ControlModifier);
+    type("12");
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(find<QQuickItem>("searchField")->property("text").toString(), "12");
+    key(Qt::Key_Escape);
+
+    // So does a text on the page
+    controller->setTextMarkdown(false);  // (an ordinary text box, whatever a test before chose)
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    const QRectF page = view->pageViewRect(controller->pageNumber() - 1);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                      canvasItem->mapToScene(page.topLeft() + QPointF(60, 60)).toPoint());
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    type("42");
+    EXPECT_FALSE(jump->isVisible());
+    EXPECT_EQ(view->getTextEditor()->text(), "42");
+    key(Qt::Key_Escape);
+    controller->selectTool("pen");
+
+    // And a dialog
+    QObject* dialog = find("insertPagesDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "open");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    key(Qt::Key_7);
+    EXPECT_FALSE(jump->isVisible()) << "not under a dialog";
+    QMetaObject::invokeMethod(dialog, "close");
+    ASSERT_TRUE(waitOpened(dialog, false));
+}
+
+// A 16:9 slide in the New document and the Insert pages dialogs: choosing it turns the page to landscape, and the
+// pages are 960 x 540 points (PowerPoint's 13.33 x 7.5 in), a plain page size in the .xopp.
+TEST_F(MainWindowTest, sixteenByNinePagesForPresenting) {
+    const int slide = controller->settingsModel()->property("paperFormats").toStringList().indexOf("16:9 (presentation)");
+    ASSERT_GE(slide, 0);
+    auto sizeOf = [&](int page) {
+        auto* s = controller->tabManager().currentSession();
+        const PageRef p = s->getDocument()->getPage(static_cast<size_t>(page));
+        return QSizeF(p->getWidth(), p->getHeight());
+    };
+    QObject* newDialog = find("newDocumentDialog");
+    ASSERT_NE(newDialog, nullptr);
+    QMetaObject::invokeMethod(newDialog, "open");
+    ASSERT_TRUE(waitOpened(newDialog, true));
+    auto* paperBox = findItem("paperBox");
+    if (!paperBox) {
+        paperBox = find<QQuickItem>("paperBox");
+    }
+    ASSERT_NE(paperBox, nullptr);
+    newDialog->setProperty("landscape", false);
+    paperBox->setProperty("currentIndex", slide);
+    QMetaObject::invokeMethod(paperBox, "activated", Q_ARG(int, slide));
+    EXPECT_TRUE(newDialog->property("landscape").toBool()) << "a slide is landscape";
+    const int tabs = controller->tabCount();
+    QMetaObject::invokeMethod(newDialog, "create");
+    ASSERT_TRUE(waitOpened(newDialog, false));
+    ASSERT_EQ(controller->tabCount(), tabs + 1);
+    EXPECT_EQ(sizeOf(0), QSizeF(960, 540));
+
+    // Inserted after an A4 page
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    settings->set("paperFormat", settings->paperFormats().indexOf("A4"));
+    settings->set("landscape", false);
+    controller->newDocument();
+    ASSERT_NEAR(sizeOf(0).width(), 595.3, 0.1);
+    QObject* insert = find("insertPagesDialog");
+    ASSERT_NE(insert, nullptr);
+    QMetaObject::invokeMethod(insert, "openAt", Q_ARG(QVariant, QVariant::fromValue(1)));
+    ASSERT_TRUE(waitOpened(insert, true));
+    auto* insertBox = findItem("insertPaperBox");
+    if (!insertBox) {
+        insertBox = find<QQuickItem>("insertPaperBox");
+    }
+    ASSERT_NE(insertBox, nullptr);
+    EXPECT_FALSE(insert->property("landscape").toBool());
+    insertBox->setProperty("currentIndex", slide + 1);
+    QMetaObject::invokeMethod(insertBox, "activated", Q_ARG(int, slide + 1));
+    EXPECT_TRUE(insert->property("landscape").toBool());
+    QMetaObject::invokeMethod(insert, "insert");
+    ASSERT_TRUE(waitOpened(insert, false));
+    ASSERT_EQ(controller->pageCount(), 2);
+    EXPECT_EQ(sizeOf(1), QSizeF(960, 540));
+}
+
+// Scrolling sideways from the layout menu: the pages in a row, ‹ › in the pill and the arrow keys go from page to
+// page; kept in upstream's settings (viewFixedRows, viewRows) and ours (snapPages).
+TEST_F(MainWindowTest, pagesSideBySideScrollSideways) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    auto settle = [&] { until([&] { return !vc.isAnimating(); }, 2000); };
+    auto* previous = find<QQuickItem>("previousPageButton");
+    auto* next = find<QQuickItem>("nextPageButton");
+    ASSERT_NE(previous, nullptr);
+    ASSERT_NE(next, nullptr);
+    EXPECT_FALSE(next->isVisible()) << "not while the pages go down";
+
+    // From the layout menu (press and hold on the layout button)
+    auto* layoutMenu = find<QObject>("layoutMenu");
+    auto* layoutButton = find<QQuickItem>("layoutButton");
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
+                      layoutButton->mapToScene(QPointF(layoutButton->width() / 2, layoutButton->height() / 2)).toPoint());
+    ASSERT_TRUE(waitOpened(layoutMenu, true));
+    QQuickItem* sideways = findItem("sidewaysItem");
+    if (!sideways) {
+        sideways = find<QQuickItem>("sidewaysItem");
+    }
+    ASSERT_NE(sideways, nullptr);
+    QMetaObject::invokeMethod(sideways, "triggered");
+    QMetaObject::invokeMethod(layoutMenu, "close");
+    ASSERT_TRUE(waitOpened(layoutMenu, false));
+    wait(50);
+    EXPECT_TRUE(controller->horizontalScrolling());
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    EXPECT_TRUE(s->getSettings()->isViewFixedRows()) << "upstream's setting";
+    ASSERT_TRUE(view->documentLayout().horizontal());
+    EXPECT_EQ(view->documentLayout().rows(), 1u);
+    EXPECT_NEAR(vc.zoom(), view->documentLayout().fitHeightZoom(vc.viewSize().height()), 1e-6) << "fit to the height";
+    EXPECT_TRUE(next->isVisible()) << "the pill has ‹ ›";
+    EXPECT_TRUE(previous->isVisible());
+    ASSERT_EQ(controller->pageNumber(), 1);
+
+    click(next);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 2);
+    key(Qt::Key_Right);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 3);
+    key(Qt::Key_PageDown);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 4);
+    key(Qt::Key_PageUp);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 3);
+    click(previous);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 2);
+    key(Qt::Key_End);
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), controller->pageCount());
+    key(Qt::Key_Home);
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 1);
+    // The number jump too
+    key(Qt::Key_5);
+    key(Qt::Key_Return);
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 5);
+    EXPECT_NEAR(vc.scrollPosition().x(), vc.restRange(view->documentLayout().groupOf(4)).first, 1)
+            << "the page where it rests";
+
+    // Two rows; snapping off
+    controller->setViewRows(2);
+    wait(30);
+    EXPECT_EQ(view->documentLayout().rows(), 2u);
+    EXPECT_EQ(find<QQuickItem>("columnsLabel")->property("text").toString(), "2") << "the menu counts rows now";
+    controller->setSnapPages(false);
+    EXPECT_FALSE(vc.snapping());
+    EXPECT_FALSE(controller->snapPages());
+
+    // Back to pages going down
+    controller->setViewRows(1);
+    controller->setSnapPages(true);
+    controller->setHorizontalScrolling(false);
+    wait(30);
+    EXPECT_FALSE(view->documentLayout().horizontal());
+    EXPECT_FALSE(s->getSettings()->isViewFixedRows());
+    EXPECT_FALSE(next->isVisible());
+    key(Qt::Key_Right);
+    EXPECT_EQ(controller->pageNumber(), 5) << "the arrow keys are not for pages going down";
+}
+
+// Presenting: F5 or the tool bar's button goes full screen with a page filling it; Space and the arrow keys go page
+// by page like PowerPoint, a finger swipes one page on, the pen writes; Escape goes back to editing in full screen
+// (the zoom from before), a second Escape leaves full screen.
+TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    auto settle = [&] {
+        until([&] { return !vc.isAnimating(); }, 2000);
+        wait(30);
+    };
+    const double editZoom = vc.zoom();
+    auto* pill = find<QQuickItem>("viewPill");
+    auto* square = find<QQuickItem>("quickToolSquare");
+    auto* indicator = find<QQuickItem>("presentPageIndicator");
+    ASSERT_NE(indicator, nullptr);
+
+    key(Qt::Key_F5);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "presenting is full screen";
+    ASSERT_TRUE(controller->presenting());
+    EXPECT_TRUE(view->isPresenting());
+    wait(100);
+    EXPECT_EQ(controller->pageNumber(), 1);
+    EXPECT_FALSE(pill->isVisible()) << "a clean page";
+    EXPECT_TRUE(square->isVisible()) << "the tools stay at hand";
+    EXPECT_TRUE(indicator->isVisible()) << "the page number, for a moment";
+    EXPECT_EQ(find<QQuickItem>("presentPageIndicatorText")->property("text").toString(),
+              QString("1 / %1").arg(controller->pageCount()));
+    const QRectF first = view->pageViewRect(0);
+    const QSizeF size = vc.viewSize();
+    EXPECT_TRUE(std::abs(first.height() - size.height()) < 1 || std::abs(first.width() - size.width()) < 1)
+            << "the page fills the screen";
+    EXPECT_NEAR(first.center().x(), size.width() / 2, 1);
+
+    const std::vector<std::pair<Qt::Key, int>> steps{{Qt::Key_Space, 2},    {Qt::Key_Right, 3}, {Qt::Key_Down, 4},
+                                                     {Qt::Key_PageDown, 5}, {Qt::Key_Left, 4},  {Qt::Key_Up, 3},
+                                                     {Qt::Key_PageUp, 2},   {Qt::Key_Backspace, 1}};
+    for (const auto& [k, page]: steps) {
+        key(k);
+        settle();
+        EXPECT_EQ(controller->pageNumber(), page) << "after key " << k;
+    }
+    key(Qt::Key_End);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), controller->pageCount());
+    key(Qt::Key_Home);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 1);
+    key(Qt::Key_4);
+    key(Qt::Key_Return);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 4) << "a page number and Enter";
+
+    // A finger swipes one page on
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    const QPoint from = canvasItem->mapToScene(QPointF(size.width() * 0.7, size.height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(0, from);
+    for (int i = 1; i <= 6; ++i) {
+        QTest::qWait(10);
+        QTest::touchEvent(window, finger).move(0, from - QPoint(40 * i, 0));
+    }
+    QTest::touchEvent(window, finger).release(0, from - QPoint(240, 0));
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 5) << "swiped on";
+
+    // The pen writes on the page, it does not page
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    auto strokes = [&] { return s->getDocument()->getPage(4)->getSelectedLayer()->getElementsView().size(); };
+    const size_t before = strokes();
+    const QRectF page = view->pageViewRect(4);
+    const QPoint a = canvasItem->mapToScene(page.center()).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (int i = 1; i <= 8; ++i) {
+        QTest::mouseMove(window, a + QPoint(-20 * i, 10 * i));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(-160, 80));
+    settle();
+    EXPECT_EQ(strokes(), before + 1) << "written";
+    EXPECT_EQ(controller->pageNumber(), 5) << "still on the page";
+    EXPECT_EQ(view->pageViewRect(4), page);
+
+    // Escape: editing in full screen again, with the zoom from before
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "still full screen";
+    EXPECT_FALSE(view->documentLayout().horizontal());
+    EXPECT_NEAR(vc.zoom(), editZoom, 1e-6);
+    EXPECT_EQ(controller->pageNumber(), 5);
+    EXPECT_TRUE(pill->isVisible());
+
+    // From the tools of the full screen: present, and back
+    QMetaObject::invokeMethod(find("quickTools"), "open");
+    ASSERT_TRUE(waitOpened(find("quickTools"), true));
+    QQuickItem* toggle = findItem("presentToggleButton");
+    if (!toggle) {
+        toggle = find<QQuickItem>("presentToggleButton");
+    }
+    ASSERT_NE(toggle, nullptr);
+    QMetaObject::invokeMethod(toggle, "clicked");
+    EXPECT_TRUE(controller->presenting());
+    EXPECT_EQ(controller->pageNumber(), 5) << "from the current page";
+    EXPECT_TRUE(waitOpened(find("quickTools"), false)) << "the tools close";
+    // Leaving full screen ends presenting too
+    key(Qt::Key_F11);
+    EXPECT_FALSE(window->property("fullScreenMode").toBool());
+    EXPECT_FALSE(controller->presenting());
+
+    // The tool bar's button: full screen and presenting at once
+    window->setWidth(2000);  // (room for the whole tool bar)
+    wait(100);
+    until([&] { return !window->property("leavingFullScreen").toBool(); }, 2000);
+    auto* present = findItem("presentButton");
+    ASSERT_NE(present, nullptr);
+    ASSERT_TRUE(present->isVisible());
+    click(present);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    EXPECT_TRUE(controller->presenting());
+    key(Qt::Key_Escape);
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "the second Escape leaves full screen";
+}
+
+// Full screen (editing): a slim bar at the top shows the tabs as dots; a tap opens the overview of the documents, a
+// swipe along it goes to the next or previous document (its title shows for a moment). Not with one tab, not while
+// presenting; with many tabs "3 / 17" instead of dots.
+TEST_F(MainWindowTest, fullScreenTabDotsSwitchDocuments) {
+    auto* bar = find<QQuickItem>("fullScreenTabs");
+    ASSERT_NE(bar, nullptr);
+    key(Qt::Key_F11);
+    ASSERT_TRUE(window->property("fullScreenMode").toBool());
+    wait(50);
+    EXPECT_FALSE(bar->isVisible()) << "one tab: nothing to switch";
+
+    controller->newDocument();
+    controller->newDocument();
+    wait(50);
+    ASSERT_EQ(controller->tabCount(), 3);
+    ASSERT_EQ(controller->currentTab(), 2);
+    ASSERT_TRUE(bar->isVisible());
+    auto* dots = find<QQuickItem>("fullScreenTabDots");
+    ASSERT_NE(dots, nullptr);
+    EXPECT_TRUE(dots->isVisible());
+    EXPECT_EQ(dots->property("count").toInt(), 3);
+    EXPECT_EQ(dots->property("currentIndex").toInt(), 2);
+    EXPECT_GE(bar->height(), 24) << "big enough for a finger";
+    EXPECT_LT(bar->mapToScene(QPointF(0, bar->height())).y(), 40) << "at the top";
+    auto* square = find<QQuickItem>("quickToolSquare");
+    const QRectF barRect(bar->mapToScene(QPointF(0, 0)), bar->size());
+    const QRectF squareRect(square->mapToScene(QPointF(0, 0)), square->size());
+    EXPECT_FALSE(barRect.intersects(squareRect)) << "not over the tool square";
+
+    // A swipe along the bar: the next / previous document, and its title for a moment
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    auto swipe = [&](int dx) {
+        const QPoint from = bar->mapToScene(QPointF(bar->width() / 2, bar->height() / 2)).toPoint();
+        QTest::touchEvent(window, finger).press(0, from);
+        for (int i = 1; i <= 8; ++i) {
+            QTest::touchEvent(window, finger).move(0, from + QPoint(dx * i / 8, 0));
+            wait(10);
+        }
+        QTest::touchEvent(window, finger).release(0, from + QPoint(dx, 0));
+        wait(80);
+    };
+    swipe(90);  // to the right: back
+    EXPECT_EQ(controller->currentTab(), 1);
+    auto* toast = find<QQuickItem>("fullScreenTabToast");
+    ASSERT_NE(toast, nullptr);
+    EXPECT_TRUE(toast->isVisible()) << "the title shows";
+    EXPECT_EQ(find<QQuickItem>("fullScreenTabToastText")->property("text").toString(), controller->title());
+    swipe(-90);  // to the left: on
+    EXPECT_EQ(controller->currentTab(), 2);
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "still full screen";
+
+    // A tap: the overview of the open documents
+    QObject* overview = find("tabOverview");
+    click(bar);
+    ASSERT_TRUE(waitOpened(overview, true));
+    QMetaObject::invokeMethod(overview, "close");
+    ASSERT_TRUE(waitOpened(overview, false));
+
+    // Not while presenting
+    controller->setPresenting(true);
+    wait(30);
+    EXPECT_FALSE(bar->isVisible());
+    controller->setPresenting(false);
+    wait(30);
+    EXPECT_TRUE(bar->isVisible());
+
+    // Many tabs: a count instead of dots
+    for (int i = 0; i < 14; ++i) {
+        controller->newDocument();
+    }
+    wait(50);
+    ASSERT_EQ(controller->tabCount(), 17);
+    EXPECT_FALSE(dots->isVisible());
+    auto* count = find<QQuickItem>("fullScreenTabCount");
+    ASSERT_NE(count, nullptr);
+    EXPECT_TRUE(count->isVisible());
+    EXPECT_EQ(count->property("text").toString(), "17 / 17");
+    key(Qt::Key_F11);
 }

@@ -220,7 +220,8 @@ void ReferenceMode::showTab(int index) {
     // Shown anew in the narrower half: its width fits (the window gave the canvas its size meanwhile). Switching
     // tabs or roles keeps the zoom (and the rendered pages).
     if (anew && shownView) {
-        shownView->getViewController().fitWidth();
+        // (sideways: the height; else the width of its page in view)
+        shownView->getViewController().fitDefault(shownView->getSession().getCurrentPageNo());
     }
 }
 
@@ -239,7 +240,8 @@ void ReferenceMode::swapRoles() {
 
 void ReferenceMode::fitWidth() {
     if (shownView) {
-        shownView->getViewController().fitWidth();
+        // The width of its current page (ViewController::fitWidthZoom), not of its widest one
+        shownView->getViewController().fitWidth(shownView->getSession().getCurrentPageNo());
     }
 }
 

@@ -98,6 +98,19 @@ TEST_F(SettingsModelTest, newPageTemplate) {
     model->set("landscape", true);
     EXPECT_NEAR(s->getPageTemplateSettings().getPageWidth(), 792, 0.01);
     EXPECT_EQ(model->get("paperFormat").toInt(), model->paperFormats().indexOf("Letter"));
+    // A 16:9 slide (PowerPoint's 13.33 x 7.5 in) is landscape whatever the page was
+    model->set("landscape", false);
+    const int slide = model->paperFormats().indexOf("16:9 (presentation)");
+    ASSERT_GE(slide, 0);
+    EXPECT_TRUE(model->paperIsWide(slide));
+    EXPECT_FALSE(model->paperIsWide(model->paperFormats().indexOf("A4")));
+    model->set("paperFormat", slide);
+    EXPECT_NEAR(s->getPageTemplateSettings().getPageWidth(), 960, 0.01);
+    EXPECT_NEAR(s->getPageTemplateSettings().getPageHeight(), 540, 0.01);
+    EXPECT_TRUE(model->get("landscape").toBool());
+    EXPECT_EQ(model->get("paperFormat").toInt(), slide);
+    model->set("paperFormat", model->paperFormats().indexOf("Letter"));
+    model->set("landscape", true);
     model->set("pageColor", QColor("#fdf6e3"));
     EXPECT_EQ(model->get("pageColor").value<QColor>(), QColor("#fdf6e3"));
 

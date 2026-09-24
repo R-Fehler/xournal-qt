@@ -20,7 +20,7 @@ ApplicationWindow {
                              + " — Xournal Qt"
     Material.theme: Material.Light
     Material.accent: Material.Indigo
-    color: "#5f6368"
+    color: app.presenting ? "#000000" : "#5f6368"  // (presenting: black around the pages, like a projector)
 
     property var afterDiscardCheck: null
     property bool sidebarShown: width >= 900
@@ -67,6 +67,7 @@ ApplicationWindow {
             showFullScreen()
         } else {
             quickTools.close()
+            app.presenting = false  // (presenting is full screen)
             leavingFullScreen = true
             remaximized = false
             leavingFullScreenTimer.restart()
@@ -82,6 +83,13 @@ ApplicationWindow {
     Connections {
         target: app
         function onHomeVisibleChanged() { if (app.homeVisible) win.fullScreenMode = false }
+    }
+
+    /// Present from the current page: full screen, a page fills it
+    function startPresenting() {
+        if (app.homeVisible) return
+        fullScreenMode = true
+        app.presenting = true
     }
 
     function withSavedChanges(action) {
@@ -671,6 +679,14 @@ ApplicationWindow {
                 tip: qsTr("Full screen (F11)")
                 onClicked: win.fullScreenMode = true
             }
+            // Present: full screen, page by page (from the current page)
+            IconButton {
+                objectName: "presentButton"
+                visible: !win.fullScreenMode
+                iconName: "xopp-presentation-mode"
+                tip: qsTr("Present (F5)")
+                onClicked: win.startPresenting()
+            }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
             IconButton {
                 objectName: "moreButton"
@@ -707,6 +723,11 @@ ApplicationWindow {
                         objectName: "hideToolbarItem"
                         text: app.toolbarHidden ? qsTr("Show the tool bar") : qsTr("Hide the tool bar")
                         onTriggered: app.toolbarHidden = !app.toolbarHidden
+                    }
+                    MenuItem {
+                        objectName: "presentItem"
+                        text: qsTr("Present (F5)")
+                        onTriggered: win.startPresenting()
                     }
                     MenuItem {
                         objectName: "fullScreenItem"
@@ -808,7 +829,8 @@ ApplicationWindow {
     Pane {
         id: viewPill
         objectName: "viewPill"
-        visible: !pageGrid.visible && !contentsOverview.visible  // also in full screen
+        // also in full screen; presenting only the page number, for a moment (presentPageIndicator)
+        visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: 28
@@ -870,10 +892,15 @@ ApplicationWindow {
                     id: layoutMenu
                     objectName: "layoutMenu"
                     MenuItem {
-                        text: qsTr("One page per row")
+                        objectName: "onePageItem"
+                        text: app.horizontalScrolling ? qsTr("Pages in one row") : qsTr("One page per row")
                         checkable: true
-                        checked: app.viewColumns === 1 && !app.pairedPages
-                        onTriggered: { app.pairedPages = false; app.viewColumns = 1 }
+                        checked: !app.pairedPages && (app.horizontalScrolling ? app.viewRows === 1 : app.viewColumns === 1)
+                        onTriggered: {
+                            app.pairedPages = false
+                            if (app.horizontalScrolling) app.viewRows = 1
+                            else app.viewColumns = 1
+                        }
                     }
                     MenuItem {
                         text: qsTr("Two pages side by side")
@@ -888,27 +915,52 @@ ApplicationWindow {
                         onTriggered: { app.viewColumns = 2; app.pairsOffset = 1; app.pairedPages = true }
                     }
                     MenuSeparator {}
-                    // N columns
+                    // N columns (scrolling sideways: N rows)
                     RowLayout {
                         width: parent ? parent.width : implicitWidth
-                        Label { text: qsTr("Columns"); Layout.leftMargin: 16; Layout.fillWidth: true }
+                        readonly property bool rows: app.horizontalScrolling
+                        readonly property int count: rows ? app.viewRows : app.viewColumns
+                        function setCount(n) {
+                            if (rows) { app.viewRows = n; return }
+                            app.pairedPages = false
+                            app.viewColumns = n
+                        }
+                        Label { text: parent.rows ? qsTr("Rows") : qsTr("Columns"); Layout.leftMargin: 16; Layout.fillWidth: true }
                         ToolButton {
+                            objectName: "fewerColumnsButton"
                             text: "−"; font.pixelSize: 20
-                            enabled: app.viewColumns > 1
-                            onClicked: { app.pairedPages = false; app.viewColumns = app.viewColumns - 1 }
+                            enabled: parent.count > 1
+                            onClicked: parent.setCount(parent.count - 1)
                         }
                         Label {
                             objectName: "columnsLabel"
-                            text: app.viewColumns
+                            text: parent.count
                             font.weight: Font.DemiBold
                             horizontalAlignment: Text.AlignHCenter
                             Layout.minimumWidth: 20
                         }
                         ToolButton {
+                            objectName: "moreColumnsButton"
                             text: "+"; font.pixelSize: 20
-                            enabled: app.viewColumns < 8
-                            onClicked: { app.pairedPages = false; app.viewColumns = app.viewColumns + 1 }
+                            enabled: parent.count < 8
+                            onClicked: parent.setCount(parent.count + 1)
                         }
+                    }
+                    MenuSeparator {}
+                    MenuItem {
+                        objectName: "sidewaysItem"
+                        text: qsTr("Scroll sideways")
+                        checkable: true
+                        checked: app.horizontalScrolling
+                        onTriggered: app.horizontalScrolling = !app.horizontalScrolling
+                    }
+                    MenuItem {
+                        objectName: "snapPagesItem"
+                        text: qsTr("Stop on whole pages")
+                        enabled: app.horizontalScrolling
+                        checkable: true
+                        checked: app.snapPages
+                        onTriggered: app.snapPages = !app.snapPages
                     }
                 }
             }
@@ -921,7 +973,33 @@ ApplicationWindow {
                 icon.width: 22; icon.height: 22
                 onClicked: pageGrid.open()
             }
-            Label { text: app.pageNumber + " / " + app.pageCount; color: "#505050"; Layout.rightMargin: 6 }
+            // Scrolling sideways: the previous and the next page on either side of the page number
+            IconButton {
+                objectName: "previousPageButton"
+                visible: app.horizontalScrolling
+                iconName: "xqt-chevron-left"
+                tip: qsTr("Previous page (←, Page Up)")
+                implicitWidth: 36; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                enabled: app.pageNumber > 1
+                onClicked: app.previousPage()
+            }
+            Label {
+                objectName: "pageNumberLabel"
+                text: app.pageNumber + " / " + app.pageCount
+                color: "#505050"
+                Layout.rightMargin: app.horizontalScrolling ? 0 : 6
+            }
+            IconButton {
+                objectName: "nextPageButton"
+                visible: app.horizontalScrolling
+                iconName: "xqt-chevron-right"
+                tip: qsTr("Next page (→, Page Down)")
+                implicitWidth: 36; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                enabled: app.pageNumber < app.pageCount
+                onClicked: app.nextPage()
+            }
             ToolSeparator {}
             ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }
             ToolButton {
@@ -1141,7 +1219,7 @@ ApplicationWindow {
         canvasItem: canvas
         // (beside the strip that brings a right tool bar back, not under it)
         rightInset: toolbarShow.visible && toolbarShow.side === "right" ? toolbarShow.width : 0
-        hidden: pageGrid.visible
+        hidden: pageGrid.visible || app.presenting  // (presenting: no scroll bars)
     }
 
     FileDialog {
@@ -1357,6 +1435,171 @@ ApplicationWindow {
         property alias text: messageLabel.text
         Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }
     }
+    // Full screen (editing): the open documents as dots in a slim bar at the top; a tap shows them all, a swipe along
+    // the bar goes to the next or previous one (only on the bar: the pages keep every touch)
+    Rectangle {
+        id: fullScreenTabs
+        objectName: "fullScreenTabs"
+        visible: win.fullScreenMode && !app.presenting && !app.homeVisible && app.tabs.count > 1
+                 && !searchBar.visible
+        z: 59
+        // at the top, in the middle of the window (over the notes and a reference beside them alike)
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: 0
+        height: 26  // (thin to look at, a finger's height to touch)
+        width: Math.max(120, (tabDots.visible ? tabDots.implicitWidth : tabCountLabel.implicitWidth) + 36)
+        radius: 13
+        color: "#b3303134"
+        readonly property bool manyTabs: app.tabs.count > 12
+        PageIndicator {
+            id: tabDots
+            objectName: "fullScreenTabDots"
+            anchors.centerIn: parent
+            visible: !fullScreenTabs.manyTabs
+            count: app.tabs.count
+            currentIndex: app.currentTab
+            interactive: false
+            padding: 0
+            spacing: 7
+            delegate: Item {
+                required property int index
+                implicitWidth: 9
+                implicitHeight: 9
+                // (read again when a document is changed or another one comes to the front)
+                readonly property bool unsaved: (app.modified, app.currentTab, app.tabModified(index))
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: index === tabDots.currentIndex ? "#ffffff" : "transparent"
+                    border.width: 1.5
+                    border.color: "#e8eaed"
+                }
+                Rectangle {  // not saved: a small orange mark
+                    visible: parent.unsaved
+                    width: 5; height: 5; radius: 2.5
+                    x: parent.width - 3; y: -2
+                    color: "#ffb74d"
+                }
+            }
+        }
+        Label {
+            id: tabCountLabel
+            objectName: "fullScreenTabCount"
+            anchors.centerIn: parent
+            visible: fullScreenTabs.manyTabs
+            text: (app.currentTab + 1) + " / " + app.tabs.count
+            color: "#ffffff"
+            font.pixelSize: 13
+        }
+        TapHandler { onTapped: tabOverview.open() }
+        DragHandler {
+            id: tabSwipe
+            target: null
+            yAxis.enabled: false
+            onActiveChanged: {
+                if (active) return
+                const dx = centroid.position.x - centroid.pressPosition.x
+                if (Math.abs(dx) < 30) return
+                if (dx < 0) app.nextTab()
+                else app.previousTab()
+                tabToast.show()
+            }
+        }
+        ToolTip.visible: tabHover.hovered
+        ToolTip.text: qsTr("Open documents: tap for all of them, swipe for the next or previous one")
+        ToolTip.delay: 800
+        HoverHandler { id: tabHover }
+    }
+    // The document swiped to: its title, for a moment
+    Rectangle {
+        id: tabToast
+        objectName: "fullScreenTabToast"
+        z: 59
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: fullScreenTabs.height + 8
+        visible: opacity > 0 && win.fullScreenMode
+        opacity: 0
+        width: Math.min(tabToastText.implicitWidth + 28, parent.width - 160)
+        height: 32
+        radius: 16
+        color: "#e6303134"
+        Label {
+            id: tabToastText
+            objectName: "fullScreenTabToastText"
+            anchors.centerIn: parent
+            width: Math.min(implicitWidth, parent.width - 28)
+            elide: Text.ElideMiddle
+            text: app.title
+            color: "#ffffff"
+            font.pixelSize: 14
+        }
+        function show() {
+            toastFade.stop()
+            opacity = 1
+            toastFade.start()
+        }
+        SequentialAnimation {
+            id: toastFade
+            PauseAnimation { duration: 1200 }
+            NumberAnimation { target: tabToast; property: "opacity"; to: 0; duration: 500 }
+        }
+    }
+
+    // Presenting: the page number, for a moment after each page change (and when it starts)
+    Rectangle {
+        id: presentIndicator
+        objectName: "presentPageIndicator"
+        z: 90
+        visible: app.presenting && opacity > 0
+        opacity: 0
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.bottom: canvas.bottom
+        anchors.bottomMargin: 18
+        width: indicatorText.implicitWidth + 24
+        height: 30
+        radius: 15
+        color: "#99000000"
+        Label {
+            id: indicatorText
+            objectName: "presentPageIndicatorText"
+            anchors.centerIn: parent
+            text: app.pageNumber + " / " + app.pageCount
+            color: "#ffffff"
+            font.pixelSize: 14
+        }
+        function flash() {
+            if (!app.presenting) return
+            fade.stop()
+            opacity = 0.9
+            fade.start()
+        }
+        SequentialAnimation {
+            id: fade
+            PauseAnimation { duration: 1500 }
+            NumberAnimation { target: presentIndicator; property: "opacity"; to: 0; duration: 600 }
+        }
+        Connections {
+            target: app
+            function onPageChanged() { presentIndicator.flash() }
+            function onPresentingChanged() { if (app.presenting) presentIndicator.flash(); else presentIndicator.opacity = 0 }
+        }
+    }
+    // Digits typed while the page is at hand: go to that page (Enter)
+    PageJump {
+        id: pageJump
+        z: 100
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.top: canvas.top
+        anchors.topMargin: Math.round(canvas.height * 0.2)
+        /// The number is for the reference (it had the keys when the first digit was typed)
+        property bool forReference: false
+        pageCount: forReference ? app.reference.pageCount : app.pageCount
+        returnFocus: forReference ? referenceSplit.referenceCanvas : canvas
+        onJumpRequested: function(page) {
+            if (forReference) app.reference.goToPage(page - 1)
+            else app.jumpToPage(page - 1)
+        }
+    }
     Snackbar {
         id: snackbar
         objectName: "snackbar"
@@ -1526,10 +1769,21 @@ ApplicationWindow {
                 height: Math.min(toolRow.implicitHeight, win.contentItem.height - 90)
             }
             Button {
+                objectName: "presentToggleButton"
+                width: parent.width
+                flat: true
+                icon.source: app.iconUrl("xopp-presentation-mode")
+                text: app.presenting ? qsTr("Stop presenting (Esc)") : qsTr("Present (F5)")
+                onClicked: {
+                    quickTools.close()
+                    app.presenting = !app.presenting
+                }
+            }
+            Button {
                 objectName: "leaveFullScreenButton"
                 width: parent.width
                 flat: true
-                text: qsTr("Leave full screen (Esc)")
+                text: qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
                 onClicked: win.fullScreenMode = false
             }
         }
@@ -1599,6 +1853,42 @@ ApplicationWindow {
     readonly property bool toolKeys: docKeys && !pageGrid.visible && !contentsOverview.visible && !tabOverview.visible
                                      && !settingsPage.visible
     Shortcut { sequences: win.keysOf("toolPen"); enabled: toolKeys; onActivated: app.selectTool("pen") }
+    // A page number: the first digit opens the jump, which takes the following keys itself. (A field or a text on
+    // the page that is typed into takes its digits first.)
+    component DigitKey: Shortcut {
+        property int digit
+        sequence: String(digit)
+        enabled: win.toolKeys && !pageJump.visible && !app.reference.pagesShown
+        onActivated: {
+            pageJump.forReference = app.reference.focused  // (before the jump takes the keys)
+            pageJump.start(String(digit))
+        }
+    }
+    DigitKey { digit: 0 }
+    DigitKey { digit: 1 }
+    DigitKey { digit: 2 }
+    DigitKey { digit: 3 }
+    DigitKey { digit: 4 }
+    DigitKey { digit: 5 }
+    DigitKey { digit: 6 }
+    DigitKey { digit: 7 }
+    DigitKey { digit: 8 }
+    DigitKey { digit: 9 }
+    // Scrolling sideways: the arrow keys and Page Up / Down go from page to page (a text being typed keeps them)
+    readonly property bool sidewaysKeys: toolKeys && app.horizontalScrolling && !app.presenting
+    Shortcut { sequences: ["Left", "PgUp"]; enabled: win.sidewaysKeys; onActivated: app.previousPage() }
+    Shortcut { sequences: ["Right", "PgDown"]; enabled: win.sidewaysKeys; onActivated: app.nextPage() }
+    Shortcut { sequence: "Home"; enabled: win.sidewaysKeys; onActivated: app.firstPage() }
+    Shortcut { sequence: "End"; enabled: win.sidewaysKeys; onActivated: app.lastPage() }
+    // Presenting, like PowerPoint: Space, → ↓ Page Down on, ← ↑ Page Up Backspace back (Backspace deletes what is
+    // selected, if anything)
+    readonly property bool presentKeys: toolKeys && app.presenting
+    Shortcut { sequences: ["Space", "Right", "Down", "PgDown"]; enabled: win.presentKeys; onActivated: app.nextPage() }
+    Shortcut { sequences: ["Left", "Up", "PgUp"]; enabled: win.presentKeys; onActivated: app.previousPage() }
+    Shortcut { sequence: "Backspace"; enabled: win.presentKeys && !app.hasSelection; onActivated: app.previousPage() }
+    Shortcut { sequence: "Home"; enabled: win.presentKeys; onActivated: app.firstPage() }
+    Shortcut { sequence: "End"; enabled: win.presentKeys; onActivated: app.lastPage() }
+
     Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.selectTool("eraser") }
     Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.selectTool("highlighter") }
     Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: app.selectTool("text") }
@@ -1667,7 +1957,14 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)
     Shortcut { sequences: win.keysOf("fullScreen"); enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
-    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection; onActivated: win.fullScreenMode = false }
+    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection && !app.presenting; onActivated: win.fullScreenMode = false }
+    // Presenting: F5 starts and ends it, Escape ends it (full screen stays: a second Escape leaves that too)
+    Shortcut {
+        sequences: win.keysOf("present")
+        enabled: !app.homeVisible
+        onActivated: app.presenting ? (app.presenting = false) : win.startPresenting()
+    }
+    Shortcut { sequence: "Escape"; enabled: app.presenting && !app.hasSelection; onActivated: app.presenting = false }
     Shortcut { sequences: win.keysOf("export"); enabled: docKeys; onActivated: openExportDialog() }
     Shortcut { sequences: win.keysOf("print"); enabled: docKeys; onActivated: printDialog.open() }
     Shortcut { sequences: win.keysOf("back"); enabled: docKeys; onActivated: app.navigateBack() }

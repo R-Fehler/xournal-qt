@@ -47,6 +47,7 @@
 #include "GeometryToolLayer.h"
 
 class EditSelection;
+class Settings;
 class PdfCache;
 class PdfElemSelection;
 
@@ -69,6 +70,12 @@ public:
     RenderService& getRenderService() const { return renderService; }
     ViewController& getViewController() { return viewController; }
     const DocumentLayout& documentLayout() const { return layout; }
+    /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
+    static bool snapSetting(Settings& settings);
+    /// Presenting: one page after the other, each filling the view, a swipe goes one page on; the layout and zoom
+    /// from before come back afterwards.
+    void setPresenting(bool on);
+    bool isPresenting() const { return presenting; }
 
     size_t pageCount() const { return pages.size(); }
     CanvasPage* getPage(size_t index) const { return pages[index].get(); }
@@ -313,7 +320,17 @@ private:
     void cancelRenders();
     void refreshLayout();
     DocumentLayout::Config layoutConfig() const;
+    /// Lay out again after the layout settings changed, keeping the current page in view
+    void relayout();
+    /// Snapping to pages (the setting, or presenting)
+    void applyScrolling();
+    bool presenting = false;
+    /// The zoom before presenting (the fit that was kept, else the zoom itself)
+    double zoomBeforePresenting = 0;
+    ViewController::Fit fitBeforePresenting = ViewController::Fit::None;
     void updateVisibility();
+    /// The page the view was sent to: the current one while it can be seen, until the view is scrolled or zoomed
+    std::optional<size_t> jumpedPage;
     /// A scroll or zoom change: the visibility update (the current page, the models, the sidebar that follows) at
     /// most every few milliseconds - the mouse sends more moves than there are frames.
     void viewChanged();
