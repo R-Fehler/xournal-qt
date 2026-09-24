@@ -44,7 +44,8 @@ fs::path normalized(const fs::path& p) {
     std::error_code ec;
     fs::path n = fs::weakly_canonical(fs::absolute(p, ec), ec);
     if (ec) {
-        n = fs::absolute(p).lexically_normal();
+        std::error_code aec;  // (never throws, also not for an empty path)
+        n = fs::absolute(p, aec).lexically_normal();
     }
     if (!n.has_filename() && n.has_parent_path() && n != n.root_path()) {
         n = n.parent_path();

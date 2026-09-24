@@ -48,6 +48,17 @@ protected:
 };
 }  // namespace
 
+TEST_F(RecentLibrariesTest, anEmptyPathIsIgnoredNotACrash) {
+    // A document without a file of its own (a text document before the save path knew it) was added with an empty
+    // path, and fs::absolute threw "cannot make absolute path []" out of Save as
+    std::ofstream(root / "a.xopp") << "x";  // (files that are gone drop out of the list)
+    RecentFiles recent(root / "recent.json");
+    recent.add(root / "a.xopp");
+    EXPECT_NO_THROW(recent.add(fs::path{}));
+    EXPECT_NO_THROW(recent.addLibrary(fs::path{}));
+    EXPECT_EQ(recent.count(), 1) << "nothing added for an empty path";
+}
+
 TEST_F(RecentLibrariesTest, librariesAreListedAmongTheDocumentsByTime) {
     writeFile(root / "a.xopp", "x");
     writeFile(root / "b.md", "# B\n");
