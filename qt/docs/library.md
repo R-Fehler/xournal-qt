@@ -293,10 +293,12 @@ and its row of pages (the extended view) lists the pages on which the expression
 there with the toggle on: the expression over the titles alone.
 
 The query is parsed once per search (`qt/src/session/FuzzyQuery.*`, fzf's port in `FuzzyMatch.*`), each text is
-scanned once per term. Measured on a generated library of 3,000 Markdown files (~12 MB of text, six of them ~2 MB)
-on the development machine while it was busy with other builds: the index search takes 28–55 ms for a plain word,
-40–74 ms for the same word fuzzy, 61–133 ms for `kalman filter` and 100–215 ms for `(kalman | robust) !draft ^lin`
-(`XQT_BENCH_FUZZY=3000 xqt-shell-tests --gtest_filter='LibraryFuzzyTest.bench*'`).
+scanned once per term. Measured on a generated library of 3,000 Markdown files in 320 folders (~12 MB of text, six
+files of ~1.7 MB) on the development machine, best of three, in several runs while other builds kept it busy (load
+5-7), so as ranges: the index search takes 18-55 ms for a plain word, 24-74 ms for the same word fuzzy, 44-133 ms
+for `kalman filter` and 77-215 ms for `(kalman | robust) !draft ^lin`; the library model adds 10-90 ms around it (it
+lists the folders again, as the plain search does). Typing waits 300 ms before it searches, as before.
+`XQT_BENCH_FUZZY=3000 xqt-shell-tests --gtest_filter='LibraryFuzzyTest.bench*'` repeats the measurement.
 
 ## Home screen
 - It is the first tab (library icon and name). It is shown when no document is open, and closing the last tab
