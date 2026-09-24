@@ -134,8 +134,8 @@ TEST_F(PastedPdfPages, stayPdfPagesWithTheirTextInAHiddenSidecar) {
     while (s.search().isRunning() && t.elapsed() < 5000) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
     }
-    ASSERT_EQ(s.search().hits().size(), 1u);
-    EXPECT_EQ(s.search().hits()[0].page, 1u);
+    ASSERT_EQ(s.search().hitCount(), 1);
+    EXPECT_EQ(s.search().countOn(1), 1) << "on the pasted page";
     const std::string selected = s.getDocument()->getPdfPage(pasted->getPdfPageNr())->selectText(
             XojPdfRectangle(0, 0, pasted->getWidth(), pasted->getHeight()), XojPdfPageSelectionStyle::Area);
     EXPECT_NE(selected.find("pastedbeta"), std::string::npos) << selected;

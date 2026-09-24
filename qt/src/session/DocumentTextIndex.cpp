@@ -610,7 +610,8 @@ void DocumentTextIndex::release() {
 // --- document events (the index is up to date before the search hears of them) -----------------------------------
 
 void DocumentTextIndex::documentChanged(DocumentChangeType type) {
-    if (type == DOCUMENT_CHANGE_CLEARED || type == DOCUMENT_CHANGE_COMPLETE) {
+    // (PDF_BOOKMARKS: another background PDF was loaded, e.g. pasted PDF pages joined the merged PDF)
+    if (type == DOCUMENT_CHANGE_CLEARED || type == DOCUMENT_CHANGE_COMPLETE || type == DOCUMENT_CHANGE_PDF_BOOKMARKS) {
         if (QThread::currentThread() != thread()) {
             QMetaObject::invokeMethod(this, [this, type] { documentChanged(type); }, Qt::QueuedConnection);
             return;
