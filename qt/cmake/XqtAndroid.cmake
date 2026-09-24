@@ -4,8 +4,12 @@
 qt_policy(SET QTP0002 NEW)  # Android paths in target properties may be generator expressions
 set(XQT_ANDROID_DIR "${CMAKE_CURRENT_LIST_DIR}/../packaging/android")
 
+target_sources(xournal-qt PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.cpp)
+
 # The resources the core reads as files (page templates, palettes, icons) travel as Qt resources and are copied to
-# the app's data folder at start.
+# the app's data folder at start (AndroidSetup.cpp).
 file(GLOB_RECURSE _xqt_share_files LIST_DIRECTORIES false RELATIVE "${XQT_BUILD_RESOURCE_DIR}" "${XQT_BUILD_RESOURCE_DIR}/*")
 set(_xqt_share_abs)
 foreach(f ${_xqt_share_files})
