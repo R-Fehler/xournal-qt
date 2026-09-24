@@ -106,10 +106,10 @@ is built.
 - [~] First feedback from a Surface Pro 8 with Windows 11 (the author, 2026-09-24): "works great". Two bugs:
   - Fixed (merged 2026-09-24): Downloads opened by its path (`LocalUrl`). `XQT_LOG_INPUT` and
     `xournal-qt-debug.bat` are in the zip.
-  - Pressure: the input log shows real pen events (wmpointer, Stylus, Pressure capability) and the canvas uses the
-    pressure, but the values span only 0.82–0.98 even for light strokes (first 5 samples per stroke logged). Open:
-    whether Windows or the Surface compresses the range, or our mapping flattens it. Next: a full log
-    (`XQT_LOG_INPUT=2`) and a pressure calibration in Settings → Pen.
+  - Pressure: not a bug. The pressure comes through (the author confirmed, 2026-09-24; the input log shows real pen
+    events). A pressure calibration in Settings → Pen remains a nice-to-have.
+  - The author will fine-tune the Windows feel with a Claude Code session on the Surface: local MSYS2 builds, on
+    its own branch (e.g. `qt/windows-feel`), fetched and merged here.
   Original notes:
   - Pen pressure is constant. There will be an `XQT_LOG_INPUT=1` log and a `xournal-qt-debug.bat` in the zip.
   - "Open Downloads as a quick library" fails with "cannot open c//": a file URL built by hand. The whole app is
