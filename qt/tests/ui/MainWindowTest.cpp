@@ -5886,3 +5886,35 @@ TEST_F(MainWindowTest, settingsChangeTheDocumentMode) {
     ASSERT_TRUE(waitOpened(sheet, false));
     xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);  // (the tests share the config folder)
 }
+
+// PDF files mode in the window: Save as starts on "PDF with notes" for a new document; Ctrl+S on an annotated PDF
+// writes the notes into it without a dialog, and the first time a note says so.
+TEST_F(MainWindowTest, pdfFilesModeSavesIntoThePdf) {
+    Settings& s = *controller->context().getSettings();
+    xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Pdf);
+    QObject* dialog = find("saveDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(window, "setUpSaveDialog", Q_ARG(QVariant, QVariant(QString())));
+    auto* filter = dialog->property("selectedNameFilter").value<QObject*>();
+    ASSERT_NE(filter, nullptr);
+    EXPECT_EQ(filter->property("index").toInt(), 1) << "PDF with notes";
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".pdf"));
+
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 2);
+    ASSERT_TRUE(controller->openPath(pdf));
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving() && !controller->modified(); }, 20000);
+    EXPECT_FALSE(dialog->property("visible").toBool()) << "no dialog";
+    EXPECT_FALSE(controller->modified());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(pdf.toStdString())));
+    EXPECT_EQ(QDir(dir.path()).entryList(QDir::Files | QDir::Hidden), QStringList{"lecture.pdf"});
+    auto* snackbarText = findItem("snackbarText");
+    ASSERT_NE(snackbarText, nullptr);
+    until([&] { return snackbarText->property("text").toString().startsWith("Your notes are saved in lecture.pdf"); });
+    EXPECT_TRUE(snackbarText->property("text").toString().startsWith("Your notes are saved in lecture.pdf"))
+            << snackbarText->property("text").toString().toStdString();
+    xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);  // (the tests share the config folder)
+}

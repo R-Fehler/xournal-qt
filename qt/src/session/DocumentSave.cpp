@@ -19,6 +19,8 @@
  */
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cstdio>
 #include <exception>
 #include <future>
 #include <mutex>
@@ -32,6 +34,7 @@
 #include <cairo.h>
 #include <glib.h>
 
+#include "control/settings/Settings.h"
 #include "control/xojfile/SaveHandler.h"
 #include "model/Document.h"
 #include "model/DocumentHandler.h"
@@ -48,6 +51,8 @@
 #include "view/DocumentView.h"
 #include "view/background/BackgroundFlags.h"
 
+#include "AppContext.h"
+#include "DocumentMode.h"
 #include "DocumentSaveTask.h"
 #include "DocumentSession.h"
 #include "HybridPdf.h"
@@ -182,6 +187,48 @@ DocumentSession::SaveResult writeXoppFile(Document& copy, const fs::path& target
 }
 
 bool stopAt(int step) { return PdfPageKeeper::stopSaveAt && PdfPageKeeper::stopSaveAt(step); }
+
+/// PDF files mode (DocumentMode.h): the original of a user's PDF that becomes a PDF with notes is kept once in the
+/// app cache, never next to it: "<cache>/originals/<hash of its path>/<its name>". Kept for this long.
+constexpr auto ORIGINALS_KEPT = std::chrono::hours(24 * 30);
+
+fs::path originalsFolder() { return Util::getCacheSubfolder("originals"); }
+
+fs::path originalInCacheFor(const fs::path& pdf) {
+    std::error_code ec;
+    const fs::path abs = fs::absolute(pdf, ec).lexically_normal();
+    char key[17];
+    std::snprintf(key, sizeof key, "%016llx",
+                  static_cast<unsigned long long>(std::hash<std::string>{}((ec ? pdf : abs).string())));
+    return originalsFolder() / key / pdf.filename();
+}
+
+bool isOriginalInCache(const fs::path& p) { return p.parent_path().parent_path() == originalsFolder(); }
+
+/// Keep `pdf` as `original` in the cache: a hard link where the file system allows it (no copy: the file is replaced
+/// by a rename, so the link keeps the original bytes), else a copy. Entries older than ORIGINALS_KEPT go.
+bool keepOriginalInCache(const fs::path& pdf, const fs::path& original, std::error_code& ec) {
+    std::error_code ignored;
+    const auto now = fs::file_time_type::clock::now();
+    for (const auto& entry: fs::directory_iterator(originalsFolder(), ignored)) {
+        std::error_code tec;
+        const auto time = fs::last_write_time(entry.path(), tec);
+        if (!tec && now - time > ORIGINALS_KEPT && entry.path() != original.parent_path()) {
+            fs::remove_all(entry.path(), ignored);
+        }
+    }
+    fs::remove_all(original.parent_path(), ignored);  // (an older original of that path: this one now)
+    fs::create_directories(original.parent_path(), ec);
+    if (ec) {
+        return false;
+    }
+    fs::create_hard_link(pdf, original, ec);
+    if (ec) {
+        ec.clear();
+        fs::copy_file(pdf, original, fs::copy_options::overwrite_existing, ec);
+    }
+    return !ec;
+}
 }  // namespace
 
 // --- the interface -------------------------------------------------------------------------------------------------
@@ -408,11 +455,17 @@ void DocumentSession::planFiles() {
         t.ownCopy.clear();
         const bool exists = fs::exists(t.target, ec);
         if (exists && !HybridPdf::isHybrid(t.target)) {
-            // A PDF of the user's becomes a hybrid PDF (notes saved into the PDF itself): its original is kept once
-            fs::path original = t.target;
-            original.replace_extension(".original.pdf");
-            if (!fs::exists(original, ec)) {
-                t.original = original;
+            // A PDF of the user's becomes a hybrid PDF (notes saved into the PDF itself): its original is kept once,
+            // next to it as "name.original.pdf"; in PDF files mode nothing is written next to the user's files, so in
+            // the app cache (for a while)
+            if (DocumentMode::pdfOnly(*app.getSettings())) {
+                t.original = originalInCacheFor(t.target);
+            } else {
+                fs::path original = t.target;
+                original.replace_extension(".original.pdf");
+                if (!fs::exists(original, ec)) {
+                    t.original = original;
+                }
             }
         }
         if (exists && !bg.empty() && fs::exists(bg, ec) && fs::equivalent(bg, t.target, ec)) {
@@ -426,7 +479,13 @@ void DocumentSession::planFiles() {
         onWorker(
                 [&t] {
                     std::error_code ec;
-                    if (!t.original.empty()) {
+                    if (!t.original.empty() && isOriginalInCache(t.original)) {
+                        if (!keepOriginalInCache(t.target, t.original, ec)) {
+                            t.result.error = FS(_F("Could not keep the original PDF in the app cache as \"{1}\": {2}") %
+                                                t.original.u8string() % ec.message());
+                            return;
+                        }
+                    } else if (!t.original.empty()) {
                         fs::copy_file(t.target, t.original, ec);
                         if (ec) {
                             t.result.error = FS(_F("Could not keep the original PDF as \"{1}\": {2}") %
@@ -504,6 +563,19 @@ void DocumentSession::takeSnapshot() {
         return planFiles();  // pages were pasted meanwhile: their PDF goes next to the document too
     }
     clearSelectionEndText();  // like upstream's Control::saveImpl: the selected elements go back first
+    if (t.hybrid && !isExport(t.request.kind) && DocumentMode::pdfOnly(*app.getSettings())) {
+        // PDF files mode: the document is this one PDF. An image file shown as a page's background goes into it (an
+        // attached image of the embedded .xopp), not referred to by its path
+        std::unique_lock lock(*doc);
+        for (size_t i = 0; i < doc->getPageCount(); ++i) {
+            const PageRef page = doc->getPage(i);
+            BackgroundImage img = page->getBackgroundImage();
+            if (page->getBackgroundType().isImagePage() && !img.isAttached() && img.getPixbuf() &&
+                !img.getFilepath().empty()) {
+                img.setAttach(true);  // (its content is shared with the page's)
+            }
+        }
+    }
     {
         std::shared_lock lock(*doc);
         if (!t.hybrid && !exporting && doc->isAttachPdf() && !doc->getPdfFilepath().empty()) {
