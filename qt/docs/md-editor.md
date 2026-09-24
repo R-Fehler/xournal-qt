@@ -20,6 +20,12 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
 - Undo / redo (Ctrl+Z / Ctrl+Shift+Z and the undo button) go step by step through the text being written (a word,
   a line break, a deletion). The editor keeps changes, not copies of the text, so a long file stays cheap.
 
+## New Markdown file, new text file
+The library's new button (the file with a plus) opens a menu: **New document…** (notes, as before), **New
+Markdown file…** and **New text file…**. The last two ask for a name and make an empty `name.md` / `name.txt` in the
+current folder (a name that is taken becomes "name (2)"; a `.md` also avoids the name of a `.xopp` or PDF there),
+open it and put the cursor in it.
+
 ## Pages or one continuous page
 Text files are on A4 pages by default (the native feel; the pagination of the Markdown boxes). The layout menu of
 the page / zoom pill (press and hold, or right-click, the layout button) has **Text on pages** and **Text on one

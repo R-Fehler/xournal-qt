@@ -24,6 +24,7 @@
 #include "session/DocumentSession.h"
 #include "session/TextFile.h"
 #include "shell/DocumentFiles.h"
+#include "shell/LibraryModel.h"
 #include "shell/TabManager.h"
 #include "util/PathUtil.h"
 #include "control/ScrollHandler.h"
@@ -186,6 +187,26 @@ bool AppController::openExternally() {
     }
     textCheckTimer.stop();
     return openWithSystemApp(QString::fromStdString(session()->shownFile().string()));
+}
+
+bool AppController::createTextFile(const QString& name, const QString& extension) {
+    if ((extension != QLatin1String(".md") && extension != QLatin1String(".txt")) || !library->available()) {
+        return false;
+    }
+    const QString path = library->newTextFilePath(name, extension);
+    QSaveFile f(path);
+    if (path.isEmpty() || !f.open(QIODevice::WriteOnly) || !f.commit()) {
+        Q_EMIT message(tr("Cannot create the file"), tr("\"%1\" cannot be written.").arg(path), true);
+        return false;
+    }
+    library->refresh();
+    if (!openPath(path)) {
+        return false;
+    }
+    if (CanvasView* v = canvas()) {
+        v->ensureTextEditor();  // (write at once)
+    }
+    return true;
 }
 
 bool AppController::editAsNotes() {

@@ -395,7 +395,9 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     first one, which opening the card makes current, in orange), a long passage cut to a few lines around its
     first hit. Tapping a card opens the file at that passage with the search active. The cells are taller; − / + (also Ctrl+wheel, pinch) make them smaller or bigger, in
     both views. Texts shorter than 4 characters are searched on Enter.
-  - New document: name, background, paper size, orientation. It is saved at once in the current folder.
+  - New (the file with a plus): "New document…" (name, background, paper size, orientation; it is saved at once in
+    the current folder), "New Markdown file…" and "New text file…" (an empty `name.md` / `name.txt` there, opened to
+    write in: [md-editor.md](md-editor.md)).
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders
     from the file manager. They are copied.
   - New folder

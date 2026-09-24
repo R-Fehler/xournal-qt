@@ -918,3 +918,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       same pages; write on them with the pen, and the text tool edits the Markdown text there. Close it: asked to
       save; Save suggests `name.xopp` next to the `.md`. The `.md` is unchanged, and the library shows two cards
       (MD and the notes).
+- [ ] Library: the new button (file with a plus) opens a menu: New document… (as before), New Markdown file…, New
+      text file…. "New Markdown file…", type a name, Enter: `name.md` appears in the current folder, opens, and you
+      can type at once. The same name again gives "name (2).md".

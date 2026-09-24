@@ -912,6 +912,38 @@ TEST_F(HomeScreenTest, startsOnTheLibraryAndOpensDocuments) {
     EXPECT_EQ(controller->recentModel()->property("count").toInt(), 1);
 }
 
+TEST_F(HomeScreenTest, newMarkdownAndTextFilesAreMadeInTheFolderAndOpened) {
+    for (const char* item: {"newMarkdownItem", "newTextItem"}) {
+        click(find<QQuickItem>("newDocumentButton"));
+        QObject* menu = find("newMenu");
+        ASSERT_TRUE(waitOpened(menu, true));
+        click(findItem(item));
+        QObject* dialog = find("textFileDialog");
+        ASSERT_NE(dialog, nullptr);
+        ASSERT_TRUE(waitOpened(dialog, true));
+        type("Ideas");
+        key(Qt::Key_Return);
+        EXPECT_TRUE(waitOpened(dialog, false));
+        wait(50);
+        type("First line");
+        ASSERT_TRUE(controller->save());
+        controller->setHomeVisible(true);
+        wait(50);
+    }
+    EXPECT_EQ(controller->tabCount(), 2);
+    for (const char* name: {"Ideas.md", "Ideas.txt"}) {
+        std::ifstream in(root / name, std::ios::binary);
+        ASSERT_TRUE(in) << name;
+        EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()), "First line")
+                << name;
+    }
+    // A name that is taken: the next free one
+    EXPECT_TRUE(controller->createTextFile("Ideas", ".md"));
+    EXPECT_TRUE(fs::exists(root / "Ideas (2).md"));
+    EXPECT_EQ(controller->title(), "Ideas (2).md");
+    EXPECT_EQ(controller->textDocument(), "markdown");
+}
+
 TEST_F(HomeScreenTest, severalDocumentsAreSelectedAndMovedIntoAFolder) {
     ASSERT_EQ(gridCount(), 3);
     click(card(rowOf("lecture.pdf")), Qt::ControlModifier);
@@ -941,6 +973,10 @@ TEST_F(HomeScreenTest, severalDocumentsAreSelectedAndMovedIntoAFolder) {
 
 TEST_F(HomeScreenTest, newDocumentIsSavedInTheLibrary) {
     click(find<QQuickItem>("newDocumentButton"));
+    QObject* menu = find("newMenu");
+    ASSERT_NE(menu, nullptr);
+    ASSERT_TRUE(waitOpened(menu, true));
+    click(findItem("newDocumentItem"));
     QObject* dialog = find("newDocumentDialog");
     ASSERT_NE(dialog, nullptr);
     ASSERT_TRUE(waitOpened(dialog, true));

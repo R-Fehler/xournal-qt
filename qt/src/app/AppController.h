@@ -379,6 +379,9 @@ public:
     /// "paperFormat", "landscape"). With a name and a library, it is saved at once in the library's current folder
     /// as "<name>.xopp"; else it is a new unsaved document.
     Q_INVOKABLE bool createDocument(const QString& name, bool inLibrary);
+    /// "New Markdown file" / "New text file": an empty "name.md" / "name.txt" (`extension`: ".md" or ".txt") in the
+    /// library's current folder, opened for writing (the cursor in it).
+    Q_INVOKABLE bool createTextFile(const QString& name, const QString& extension);
     /// Open a document found by the library search, with the search active on its first hit.
     Q_INVOKABLE bool openSearchHit(const QString& path, const QString& query);
     /// The same, at a page (0-based) with hits: its first hit is the current one.
