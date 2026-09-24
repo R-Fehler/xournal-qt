@@ -191,6 +191,17 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [ ] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
   pages, for documents meant to be presented.
 
+### Reference mode (the author, 2026-09-24; `qt/reference-view`, started 2026-09-24)
+- [~] **A second document beside the current one, in the same tab**, for reading while writing notes.
+  - A draggable divider splits the canvas area. The main document has a thin highlight border. Sides can be
+    swapped for left or right hand. Works in full screen.
+  - The reference side is a plain scrollable canvas with no tool bar, only a tiny pill: page counter and number
+    jump, fit width, swap sides, swap roles (make it the main document), close.
+  - Decided for the first version: the reference is for reading. Pen, touch and mouse scroll and zoom there, and
+    strokes never land in it. PDF text selection, copy and lasso copy work, to paste into the notes.
+  - The reference is another open tab ("Open as reference" in the tab overview, the tab menu and the library and
+    Recent card menus); the tab strip marks it.
+
 ### Bugs
 - [~] **A PDF page pasted into a document that has a PDF shows late on the canvas** (fixed on `qt/background-save`,
   waiting to merge: only pages new in the PDF are drawn again).
