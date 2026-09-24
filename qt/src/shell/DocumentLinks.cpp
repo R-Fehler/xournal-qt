@@ -214,4 +214,71 @@ links::Link linkTo(DocumentSession& session, size_t page, const fs::path& from, 
     return link;
 }
 
+std::vector<fs::path> backlinks(const std::vector<LinkRewrite::Source>& sources, const fs::path& target) {
+    std::vector<fs::path> found;
+    const DocumentItem item = DocumentFiles::itemOf(target);
+    const auto isTarget = [&](const fs::path& file) {
+        return file == target || (item.valid() && item.has(file));
+    };
+    const QString stem = QString::fromStdString(target.stem().string());
+    for (const LinkRewrite::Source& s: sources) {
+        if (isTarget(s.file)) {
+            continue;
+        }
+        bool links = false;
+        for (const QString& written: s.links) {
+            const auto link = links::parse(written);
+            if (link && !link->path.isEmpty() && isTarget(links::resolvePath(s.file.parent_path(), link->path))) {
+                links = true;
+                break;
+            }
+        }
+        for (const QString& written: s.wikiLinks) {
+            if (links) {
+                break;
+            }
+            const QString name = written.section(QLatin1Char('#'), 0, 0).section(QLatin1Char('/'), -1);
+            links = name.compare(stem, Qt::CaseInsensitive) == 0 ||
+                    name.compare(QString::fromStdString(target.filename().string()), Qt::CaseInsensitive) == 0;
+        }
+        if (links) {
+            found.push_back(s.file);
+        }
+    }
+    return found;
+}
+
+fs::path findMoved(const links::Link& link, const fs::path& from, const LibraryIndex& index) {
+    const fs::path folder = from.parent_path();
+    const auto closest = [&](const std::vector<fs::path>& files) {
+        return *std::min_element(files.begin(), files.end(), [&](const fs::path& a, const fs::path& b) {
+            return distance(folder, a.parent_path()) < distance(folder, b.parent_path());
+        });
+    };
+    const QString name = link.path.section(QLatin1Char('/'), -1);
+    if (!name.isEmpty()) {
+        std::vector<fs::path> named = index.filesNamed(name);
+        if (named.empty()) {
+            // A PDF with its .xopp is indexed by the .xopp: the same name without the extension
+            named = index.filesNamed(QString::fromStdString(fs::path(name.toStdString()).stem().string()), true);
+        }
+        if (!named.empty()) {
+            return opened(closest(named));
+        }
+    }
+    if (!link.text.isEmpty()) {
+        if (const std::vector<fs::path> withText = index.filesWithPageText(link.text); !withText.empty()) {
+            return opened(closest(withText));
+        }
+    }
+    return {};
+}
+
+QString relinked(const QString& written, const fs::path& from, const fs::path& target) {
+    links::Link l;
+    l.path = from.empty() ? qstr(target.generic_string()) : links::relativePath(from, target);
+    const qsizetype hash = written.indexOf(QLatin1Char('#'));
+    return links::write(l) + (hash < 0 ? QString() : written.mid(hash));
+}
+
 }  // namespace xqt::DocumentLinks

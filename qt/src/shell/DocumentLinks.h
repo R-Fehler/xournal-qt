@@ -15,6 +15,7 @@
 #include <QString>
 
 #include "filesystem.h"
+#include "LinkRewrite.h"
 #include "session/DocumentLink.h"
 
 class Document;
@@ -48,6 +49,19 @@ fs::path targetOf(const links::Link& link, const fs::path& from, const fs::path&
 links::Link linkTo(DocumentSession& session, size_t page, const fs::path& from, const QString& chapter = {});
 /// The link to a document (a library card), with no place in it.
 links::Link linkToFile(const fs::path& file, const fs::path& from);
+
+/// The documents whose links lead to `target` (any of its files: a PDF with its .xopp is one document; a wiki link
+/// by its name), each once, in the order of `sources`. `target` itself is left out.
+std::vector<fs::path> backlinks(const std::vector<LinkRewrite::Source>& sources, const fs::path& target);
+
+/// A link whose file is gone (moved or renamed by another program): the document it probably means, from the library
+/// index - one of that file name (the closest to `from`), else one with a page that has the link's fingerprint.
+/// Empty when there is none.
+fs::path findMoved(const links::Link& link, const fs::path& from, const LibraryIndex& index);
+
+/// The Markdown text of a link to `target` as the document at `from` writes it: its path relative to `from`
+/// (encoded), with the fragment of `written` (the link as it was).
+QString relinked(const QString& written, const fs::path& from, const fs::path& target);
 
 }  // namespace DocumentLinks
 }  // namespace xqt

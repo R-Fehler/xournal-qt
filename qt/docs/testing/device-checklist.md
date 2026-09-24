@@ -1004,3 +1004,15 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
 - [ ] Contents sidebar: press and hold a chapter → "Copy link to this chapter"; ⋮ → "Copy link to this page"; a
       library card's menu → "Copy link"; a page with hits in the extended library search, press and hold → "Copy
       link to this page". Paste each into a text editor of another app: a Markdown link with the full path.
+- [ ] Open the lecture, ⋮ → "Linked from…": `a.md` and the note with the marker are listed; a tap opens one.
+- [ ] Close everything but the library. Rename the lecture in the library ("Kalman filter"): a note "Updated N links"
+      comes; `a.md` (opened in the app or in a text editor) now links to `../Lectures/Kalman%20filter.xopp#…` and
+      nothing else in it changed (`git diff` or `diff` against a copy: only those links). The marker in the note
+      follows too (open it in Xournal++: the new path). Move `a.md` into a subfolder: its own links become
+      `../../Lectures/…`.
+- [ ] With `a.md` open and unchanged, rename the lecture again: the link changes in the open tab, it is saved, and
+      Ctrl+Z brings the old link back.
+- [ ] Move the lecture into another folder with the file manager, then tap the link in `a.md`: the lecture opens
+      from its new folder and a dialog offers "Update the link"; Yes changes the link in `a.md`.
+- [ ] A link to a file that is nowhere (`[x](missing.xopp)`): "Document not found … Locate it?" → Open → pick a
+      file: the link now points there and it opens.

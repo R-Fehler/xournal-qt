@@ -772,6 +772,7 @@ ApplicationWindow {
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
                     MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
+                    MenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); onTriggered: backlinksDialog.show() }
                     MenuItem {
                         objectName: "editAsNotesItem"
                         visible: app.textDocument === "markdown"
@@ -1697,6 +1698,15 @@ ApplicationWindow {
             hybridEditedDialog.file = file
             hybridEditedDialog.open()
         }
+        function onLinkTargetFound(name, folder) {
+            linkFoundDialog.file = name
+            linkFoundDialog.folder = folder
+            linkFoundDialog.open()
+        }
+        function onLinkTargetMissing(name) {
+            linkMissingDialog.file = name
+            linkMissingDialog.open()
+        }
         function onEditAnywayWarning(name) {
             editAnywayDialog.file = name
             editAnywayDialog.open()
@@ -1759,6 +1769,83 @@ ApplicationWindow {
                        + "stay as they are). For more, open it externally in an editor made for it.")
         }
         onAccepted: app.editAnyway(true)
+    }
+    // "Linked from": the documents of the library that link to this one (qt/docs/links.md)
+    Dialog {
+        id: backlinksDialog
+        objectName: "backlinksDialog"
+        property var items: []
+        function show() { items = app.backlinks(); open() }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(460, parent ? parent.width - 32 : 460)
+        title: qsTr("Linked from")
+        standardButtons: Dialog.Close
+        ColumnLayout {
+            width: backlinksDialog.availableWidth
+            Label {
+                visible: backlinksDialog.items.length === 0
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                opacity: 0.7
+                text: qsTr("No document of the library links to this one.")
+            }
+            Repeater {
+                model: backlinksDialog.items
+                delegate: ItemDelegate {
+                    required property var modelData
+                    objectName: "backlink"
+                    Layout.fillWidth: true
+                    text: modelData.folder !== "" ? modelData.name + "  —  " + modelData.folder : modelData.name
+                    onClicked: { backlinksDialog.close(); app.openPath(modelData.path) }
+                }
+            }
+        }
+    }
+    // A followed link's file was gone: found elsewhere (update the link?) or not at all (locate it?)
+    Dialog {
+        id: linkFoundDialog
+        objectName: "linkFoundDialog"
+        property string file: ""
+        property string folder: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, parent ? parent.width - 32 : 480)
+        title: qsTr("The linked document was moved")
+        standardButtons: Dialog.Yes | Dialog.No
+        Label {
+            width: linkFoundDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("It was found as \u201c%1\u201d in %2 and opened. Update the link to point there?")
+                  .arg(linkFoundDialog.file).arg(linkFoundDialog.folder !== "" ? linkFoundDialog.folder : qsTr("the library"))
+        }
+        onAccepted: app.updateFoundLink()
+    }
+    Dialog {
+        id: linkMissingDialog
+        objectName: "linkMissingDialog"
+        property string file: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, parent ? parent.width - 32 : 480)
+        title: qsTr("Document not found")
+        standardButtons: Dialog.Open | Dialog.Cancel
+        Label {
+            width: linkMissingDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("\u201c%1\u201d is not where the link says, and nothing like it is in the library. Locate it? "
+                       + "The link then points to the file you choose.").arg(linkMissingDialog.file)
+        }
+        onAccepted: locateLinkDialog.open()
+    }
+    FileDialog {
+        id: locateLinkDialog
+        title: qsTr("Locate the linked document")
+        currentFolder: app.openFolder()
+        onAccepted: app.relinkTo(selectedFile)
     }
     // A text file changed on disk (another program) while it has changes here: which version stays
     Dialog {

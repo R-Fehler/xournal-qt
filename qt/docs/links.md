@@ -100,10 +100,10 @@ The author accepted the plan with its proposals:
 ## What is built (`qt/links`)
 
 ### 1. The link format (`qt/src/session/DocumentLink.*`, tests `DocumentLinkTest`)
-- `links::parse` reads a Markdown link target: a path with a known document extension (`.xopp`, `.xoj`, `.pdf`,
-  `.md`, `.txt`, images, `.tex`, …) or one that starts with `./`, `../` or `/`, and `file://` URLs. Web and mail
-  addresses, other schemes, upstream's `#Page:12` and a bare `#anchor` are not links to documents (so
-  `example.org/page` stays a web address). A path of `<…>` and percent-escapes (`%20`) are read as Markdown writes
+- `links::parse` reads a Markdown link target: a path (or a `file://` URL) of a file the app opens as a document
+  (`.xopp`, `.xoj`, `.pdf`, `.md`, `.txt`, images, `.tex`, …). Web and mail addresses, other schemes, other files
+  (`/home/x.sh`: a tap never opens anything else on the computer), upstream's `#Page:12` and a bare `#anchor` are
+  not links to documents (so `example.org/page` stays a web address). A path of `<…>` and percent-escapes (`%20`) are read as Markdown writes
   them. A target without a path but with a place (`#page=5`, `#chapter=…`) points into the same document.
 - The fragment: `chapter=`, `heading=`, `page=`, `pdfpage=`, `line=`, and **`text=`**, the page's fingerprint (its
   first five words, normalised, at most 48 characters), written only for a page that shows no PDF page. Unknown keys
@@ -166,3 +166,35 @@ The author accepted the plan with its proposals:
 - **Not built: dragging** a card, a page or a chapter onto the page. The library is a screen of its own (never beside
   a page), and dragging a page in the sidebar or the grid moves it; a drop target on the canvas for these would need
   a new drag source in each list. Copy link and paste do the same in two steps.
+
+### 4. The library: links in the index, backlinks, rewriting, the search for a moved file
+(`qt/src/shell/LinkRewrite.*`, `DocumentLinks::backlinks` / `findMoved`, `AppLinks.cpp`; tests `LinkRewrite.*` in
+`-L shell`, `DocumentLinksTest` in `-L ui`)
+- **Outgoing links in the index**: besides a Markdown file's links (as before), a `.xopp`'s entry in `notes.pack`
+  now has the links and wiki links of its Markdown boxes and link markers (`links`, `wikiLinks`). An entry of notes
+  written before has no `links` key: its `.xopp` is read once more (only the `.xopp`: its PDF text is kept), no
+  format change. Entries converted from the layout before the packs learn their links when the `.xopp` is saved.
+  `LibraryIndex::linkSources` lists them.
+- **Backlinks**: ⋮ → **Linked from…** lists the documents of the library whose links lead to the current one (a
+  link to any of its files: the PDF of a `.xopp` counts; a wiki link by its name); a tap opens one.
+- **Rewritten after a rename or move in the app** (the library's Rename, Move to…, dragging onto a folder; also
+  whole folders): `LinkRewrite::plan` finds the links that point elsewhere now - links to what moved, and the
+  relative links of a moved document itself - and writes each anew relative to where it is (the fragment stays; a
+  wiki link to a renamed document gets the new name). Only link targets change: `](…)`, `](<…>)`, `[id]: …`,
+  `[[…]]`; the rest of the text stays byte for byte.
+  - Open documents change through themselves, with undo (a `.xopp`'s texts as text edits, a `.md` as one edit of
+    its text), and are saved when they had no unsaved changes (so the file has the new link too); with unsaved
+    changes they keep the change until they are saved.
+  - The others in the background: a `.md` through its text file (`TextFile`: byte for byte where nothing changed,
+    written atomically), a `.xopp` loaded and written again. Then the note **"Updated N links"**, and the library
+    reads them again. A hybrid PDF and an old `.xoj` that are not open are left as they are (said in the code; not
+    in the note).
+- **A link whose file is gone** (moved outside the app): the library index is asked for a document of that file
+  name (the closest to the linking document; a PDF with its `.xopp` by its name without the extension), then for a
+  page with the link's fingerprint. Found, it opens (at the place the link says) and the window asks **"The linked
+  document was moved … Update the link to point there?"**; Yes rewrites the link in the document it was followed
+  from (through it, with undo). Not found: **"Document not found … Locate it?"**, a file dialog, and the link is
+  written anew to the chosen file and followed.
+  - **Deviation:** the PDF's `/ID` is not used. A link does not carry it (the format has no key for it), so there
+    is nothing to compare; the name and the page's text cover the cases seen so far. A `pdfid=` key could be added
+    to the fragment later.

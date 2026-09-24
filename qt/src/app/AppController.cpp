@@ -1791,6 +1791,7 @@ void AppController::filesChanged(const DocumentFiles::Result& r) {
     }
     recent->refresh();
     Q_EMIT titleChanged();
+    rewriteLinksAfter(r.moved);  // (AppLinks.cpp)
 }
 
 void AppController::startSession(const QStringList& files) {

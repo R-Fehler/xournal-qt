@@ -54,8 +54,9 @@ struct Link {
     bool wholeDocument() const { return page <= 0 && pdfPage <= 0 && chapter.isEmpty() && heading.isEmpty() && line <= 0; }
 };
 
-/// A link target as written in a Markdown link (`[t](target)`) or a text: a link to a document, or nothing (a web or
-/// mail address, any other scheme, "#Page:12" of upstream, an empty target). `file://` URLs are documents too.
+/// A link target as written in a Markdown link (`[t](target)`) or a text: a link to a document (a file the app
+/// opens as one: .xopp, .pdf, .md, images, ...), or nothing (a web or mail address, any other scheme, any other
+/// file, "#Page:12" of upstream, an empty target). `file://` URLs of documents are documents too.
 std::optional<Link> parse(const QString& target);
 /// The target of a [[wiki link]] (md4c gives it without the "|label"): "note#heading" or "note".
 std::optional<Link> parseWiki(const QString& target);

@@ -16,8 +16,8 @@ namespace xqt::links {
 namespace {
 QString tr(const char* text) { return QCoreApplication::translate("DocumentLink", text); }
 
-/// Extensions of the files a link may point to without "./" in front ("paper.pdf"); anything else needs "./", "../"
-/// or an absolute path, so that "example.org/page" stays a web address.
+/// Extensions of the files a link to a document may point to (documents the app opens itself); anything else is no
+/// link to a document ("example.org/page" stays a web address, "/home/x.sh" is not opened).
 bool knownExtension(const QString& path) {
     static const QStringList known{"xopp", "xoj",  "pdf",  "md",  "markdown", "txt", "png",
                                    "jpg",  "jpeg", "webp", "heic", "heif",    "tex", "org", "rst"};
@@ -117,6 +117,9 @@ std::optional<Link> parse(const QString& written) {
                 return std::nullopt;
             }
             link.path = url.toLocalFile();
+            if (!knownExtension(link.path)) {
+                return std::nullopt;
+            }
             readFragment(url.fragment(QUrl::FullyEncoded), link);
             return link;
         }
@@ -133,9 +136,8 @@ std::optional<Link> parse(const QString& written) {
         readFragment(fragment, link);
         return link.wholeDocument() ? std::nullopt : std::optional<Link>(link);
     }
-    const bool explicitPath = link.path.startsWith(QLatin1String("./")) || link.path.startsWith(QLatin1String("../")) ||
-                              link.path.startsWith(QLatin1Char('/'));
-    if (!explicitPath && !knownExtension(link.path)) {
+    // Only files the app opens as documents: a link never opens anything else on this computer with a tap
+    if (!knownExtension(link.path)) {
         return std::nullopt;
     }
     readFragment(fragment, link);

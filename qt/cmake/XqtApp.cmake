@@ -59,6 +59,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentLinks.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentLinks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LinkRewrite.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LinkRewrite.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
@@ -187,6 +189,7 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LinkRewriteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ReferenceModeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp

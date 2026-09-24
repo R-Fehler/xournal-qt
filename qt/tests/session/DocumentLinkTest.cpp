@@ -64,6 +64,9 @@ TEST(DocumentLinkTest, parsesTheFormsOfTheDesign) {
             {"#heading-in-this-text", std::nullopt},
             {"example.org/page", std::nullopt},
             {"javascript:alert(1)", std::nullopt},
+            {"/home/someone/x.sh", std::nullopt},
+            {"file:///etc/passwd", std::nullopt},
+            {"../bin/tool", std::nullopt},
     };
     for (const Case& c: cases) {
         const auto parsed = links::parse(QString::fromUtf8(c.target));

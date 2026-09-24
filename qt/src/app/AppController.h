@@ -59,6 +59,9 @@ class ReferenceMode;
 namespace DocumentFiles {
 struct Result;
 }
+namespace LinkRewrite {
+struct Change;
+}
 }  // namespace xqt
 class Palette;
 
@@ -712,6 +715,14 @@ public:
     /// changes; Back opens it again). The place is looked up (DocumentLinks::placeIn); what was not found is said.
     /// False when it is no link to a document or the file is not found.
     Q_INVOKABLE bool followDocumentLink(const QString& uri, const QString& how);
+    /// "Linked from": the documents of the library whose links lead to the current one (the index's links):
+    /// [{ name, path, folder (relative to the library) }].
+    Q_INVOKABLE QVariantList backlinks() const;
+    /// After linkTargetFound: the link is written anew in the document it was followed from, to the file found
+    /// (through that document, with undo; saved when it had no unsaved changes).
+    Q_INVOKABLE bool updateFoundLink();
+    /// After linkTargetMissing: the file the link means, chosen by the reader. The link is written anew, then followed.
+    Q_INVOKABLE bool relinkTo(const QUrl& file);
     /// Call before quitting: writes settings.
     Q_INVOKABLE void shutdown();
 
@@ -778,6 +789,11 @@ Q_SIGNALS:
     void contextRequested(QPointF viewPos);
     /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.
     void linkTapped(const QString& uri, int page, QRectF rect);
+    /// A followed link's file was gone; a document of that name (or with that page's text) was found elsewhere in the
+    /// library and opened: the window offers to update the link (updateFoundLink).
+    void linkTargetFound(const QString& name, const QString& folder);
+    /// A followed link's file is gone and nothing like it is in the library: the window offers to locate it (relinkTo).
+    void linkTargetMissing(const QString& name);
     void copiedPagesChanged();
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
@@ -943,6 +959,22 @@ private:
     /// no unsaved changes). False when it cannot be shown.
     bool showPlace(const DocPlace& place, bool replacing);
     bool navigateDocuments(bool back);
+    /// A link whose file was gone: where it was followed from, as written, and the file found or chosen instead.
+    struct Relink {
+        QPointer<xqt::DocumentSession> source;
+        QString written;
+        QString how;
+        fs::path target;
+    } relink;
+    /// Write links anew in an open document (through it, with undo; saved when it had no unsaved changes). Returns
+    /// how many were changed.
+    int rewriteOpenDocument(xqt::DocumentSession& s, const std::vector<xqt::LinkRewrite::Change>& changes);
+    /// After documents were renamed or moved in the app: the links to them, and their own relative links, are
+    /// written anew (open documents through themselves, the others in the background), with a note.
+    void rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::path>>& moves);
+    /// The change of a link as written in `source` to lead to `target`.
+    std::vector<xqt::LinkRewrite::Change> relinkChange(const xqt::DocumentSession* source, const QString& written,
+                                                     const fs::path& target) const;
     QTimer textCheckTimer;  ///< (programs write in steps: looked at a moment after the last change)
     QPointer<xqt::DocumentSession> askingTextChange;
 };

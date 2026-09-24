@@ -306,7 +306,7 @@ bool LibraryIndex::Entry::showsPdfPages() const {
 }
 
 bool LibraryIndex::Entry::upToDate(const DocumentItem& item) const {
-    return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf);
+    return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf) && linksRead;
 }
 
 // --- the packs: entries by file name
@@ -343,6 +343,10 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
         notes.insert(QStringLiteral("wikiLinks"), QCborArray::fromStringList(e.wikiLinks));
     } else if (e.kind == QLatin1String("text")) {
         notes.insert(QStringLiteral("blocks"), QCborArray::fromStringList(e.blockText));
+    } else if (e.kind != QLatin1String("image")) {
+        // Notes (and hybrid PDFs): the links of their Markdown boxes and link markers
+        notes.insert(QStringLiteral("links"), QCborArray::fromStringList(e.links));
+        notes.insert(QStringLiteral("wikiLinks"), QCborArray::fromStringList(e.wikiLinks));
     }
     return notes;
 }
@@ -400,6 +404,14 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
         for (const auto& b: notes.value(QStringLiteral("blocks")).toArray()) {
             e->blockText << b.toString();
             e->blockLevel.push_back(0);
+        }
+    } else if (e->kind != QLatin1String("image")) {
+        e->linksRead = notes.contains(QStringLiteral("links")) || e->kind != QLatin1String("xopp");
+        for (const auto& l: notes.value(QStringLiteral("links")).toArray()) {
+            e->links << l.toString();
+        }
+        for (const auto& l: notes.value(QStringLiteral("wikiLinks")).toArray()) {
+            e->wikiLinks << l.toString();
         }
     }
     if (e->showsPdfPages()) {
@@ -744,7 +756,17 @@ bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, boo
         for (const Layer* layer: page->getLayers()) {
             for (const auto& el: layer->getElementsView()) {
                 if (el->getType() == ELEMENT_TEXT) {
-                    elements += ' ' + QString::fromStdString(static_cast<const Text*>(el)->getText());
+                    const auto* text = static_cast<const Text*>(el);
+                    elements += ' ' + QString::fromStdString(text->getText());
+                    if (text->isMarkdown()) {
+                        // Its links (Markdown boxes, link markers), for backlinks (qt/docs/links.md)
+                        for (const md::LinkTarget& l: md::linksOf(md::parse(text->getText()))) {
+                            QStringList& into = l.wiki ? e.wikiLinks : e.links;
+                            if (const QString t = QString::fromStdString(l.target); !into.contains(t)) {
+                                into << t;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1448,6 +1470,39 @@ std::vector<links::Page> LibraryIndex::linkPages(const fs::path& file) const {
         pages.push_back(std::move(p));
     }
     return pages;
+}
+
+std::vector<LinkRewrite::Source> LibraryIndex::linkSources() const {
+    std::vector<LinkRewrite::Source> sources;
+    std::lock_guard lock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [name, e]: f.docs) {
+            if (!e->links.isEmpty() || !e->wikiLinks.isEmpty()) {
+                sources.push_back({e->file, e->links, e->wikiLinks});
+            }
+        }
+    }
+    return sources;
+}
+
+std::vector<fs::path> LibraryIndex::filesWithPageText(const QString& fingerprint) const {
+    std::vector<fs::path> found;
+    const QString wanted = links::normalised(fingerprint);
+    if (wanted.isEmpty()) {
+        return found;
+    }
+    std::lock_guard lock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [name, e]: f.docs) {
+            for (const QString& page: e->elementText) {
+                if (!page.isEmpty() && links::normalised(page).contains(wanted)) {
+                    found.push_back(e->file);
+                    break;
+                }
+            }
+        }
+    }
+    return found;
 }
 
 QString LibraryIndex::simplified(const QString& text) { return text.simplified(); }

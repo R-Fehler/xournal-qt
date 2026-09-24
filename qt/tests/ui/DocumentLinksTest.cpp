@@ -32,6 +32,7 @@
 #include "session/DocumentLink.h"
 #include "markdown/MdBox.h"
 #include "session/DocumentSession.h"
+#include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/PageSketches.h"
 #include "shell/Previews.h"
@@ -97,7 +98,8 @@ protected:
         controller->closeTab(0);
         writeFile(root / "Notes" / "a.md",
                   "# Notes\n\nSee [Kalman](../Lectures/kalman.xopp#chapter=Prediction%20step&page=2) first.\n\n"
-                  "Then [[b#Part two]] and [gone](../Lectures/kalman.xopp#chapter=Gone&page=5).\n");
+                  "Then [[b#Part two]] and [gone](../Lectures/kalman.xopp#chapter=Gone&page=5).\n\n"
+                  "And [lost](../Lectures/lost.xopp#page=1).\n");
         std::string b = "# Part one\n\n";
         for (int i = 0; i < 80; ++i) {
             b += "A line of the first part, number " + std::to_string(i) + ".\n\n";
@@ -265,8 +267,8 @@ TEST_F(DocumentLinksTest, wikiLinksHeadingsReferenceAndWhatWasNotFound) {
     EXPECT_TRUE(controller->reference().active());
     EXPECT_EQ(controller->reference().pageNumber(), 2);
 
-    // A file that is not there: said, nothing opens
-    QSignalSpy messages(controller.get(), &AppController::message);
+    // A file that is not there: said (the window offers to locate it), nothing opens
+    QSignalSpy messages(controller.get(), &AppController::linkTargetMissing);
     const int tabs = controller->tabCount();
     EXPECT_FALSE(controller->followDocumentLink("../Lectures/nothing.xopp#page=2", "tab"));
     EXPECT_EQ(controller->tabCount(), tabs);
@@ -355,4 +357,113 @@ TEST_F(DocumentLinksTest, copiedLinksArePastedAsMarkdownAndAsMarkers) {
     ASSERT_NE(next, nullptr);
     EXPECT_NEAR(next->getTransformation().shift.x, selected.x + selected.width + 4, 1);
     EXPECT_NEAR(next->getTransformation().shift.y, selected.y, 1);
+}
+
+namespace {
+std::string readText(const fs::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+}  // namespace
+
+TEST_F(DocumentLinksTest, renamingInTheLibraryUpdatesTheLinksAndBacklinksAreListed) {
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    const fs::path kalman = root / "Lectures" / "kalman.xopp";
+    // A sketch with a link marker to the lecture (closed), and the note with links to it (open)
+    controller->newDocument();
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "Notes" / "sketch.xopp").string()))));
+    ASSERT_TRUE(controller->copyDocumentLink(QString::fromStdString(kalman.string()), 1));
+    ASSERT_TRUE(controller->pasteElements());
+    ASSERT_TRUE(controller->save());
+    controller->closeTab(controller->currentTab());
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "Notes" / "a.md").string())));
+    library->refresh();
+    library->searchIndex()->waitForDone();
+
+    // Linked from
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(kalman.string())));
+    const QVariantList from = controller->backlinks();
+    ASSERT_EQ(from.size(), 2);
+    QStringList names;
+    for (const QVariant& v: from) {
+        names << v.toMap().value("name").toString();
+    }
+    names.sort();
+    EXPECT_EQ(names, (QStringList{"a", "sketch"}));
+
+    // Renamed in the library: the open note is changed through itself (undo), the closed sketch in the background
+    QSignalSpy notes(controller.get(), &AppController::pageActionDone);
+    library->setFolder("Lectures");
+    const int row = library->rowOf(QString::fromStdString(kalman.string()));
+    ASSERT_GE(row, 0);
+    ASSERT_TRUE(library->rename(row, "Kalman filter"));
+    until([&] {
+        auto loaded = xqt::DocumentSession::loadFile(root / "Notes" / "sketch.xopp");
+        Layer* layer = loaded.document ? xqt::md::markdownLayer(loaded.document->getPage(0)) : nullptr;
+        return layer && xqt::md::boxOf(*layer) &&
+               xqt::md::boxOf(*layer)->getText().find("Kalman%20filter.xopp#page=2") != std::string::npos;
+    }, 5000);
+    auto sketch = xqt::DocumentSession::loadFile(root / "Notes" / "sketch.xopp");
+    ASSERT_TRUE(sketch.document);
+    Layer* layer = xqt::md::markdownLayer(sketch.document->getPage(0));
+    ASSERT_NE(layer, nullptr);
+    EXPECT_EQ(xqt::md::boxOf(*layer)->getText(),
+              "[\xF0\x9F\x94\x97 kalman, page 2](../Lectures/Kalman%20filter.xopp#page=2)");
+    until([&] { return readText(root / "Notes" / "a.md").find("Kalman%20filter.xopp") != std::string::npos; }, 3000);
+    const std::string note = readText(root / "Notes" / "a.md");
+    EXPECT_NE(note.find("[Kalman](../Lectures/Kalman%20filter.xopp#chapter=Prediction%20step&page=2)"), std::string::npos)
+            << note;
+    EXPECT_NE(note.find("[gone](../Lectures/Kalman%20filter.xopp#chapter=Gone&page=5)"), std::string::npos) << note;
+    EXPECT_NE(note.find("[[b#Part two]]"), std::string::npos) << "the rest as it was";
+    until([&] {
+        for (const auto& args: notes) {
+            if (args.at(0).toString().startsWith("Updated")) {
+                return true;
+            }
+        }
+        return false;
+    }, 3000);
+    bool said = false;
+    for (const auto& args: notes) {
+        said = said || args.at(0).toString().startsWith("Updated ");
+    }
+    EXPECT_TRUE(said) << "a note says so";
+}
+
+TEST_F(DocumentLinksTest, aLinkWhoseFileWasMovedElsewhereIsFoundOrLocated) {
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    // Moved by another program
+    fs::create_directories(root / "Archive");
+    fs::rename(root / "Lectures" / "kalman.xopp", root / "Archive" / "kalman.xopp");
+    library->refresh();
+    library->searchIndex()->waitForDone();
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "Notes" / "a.md").string())));
+    wait(200);
+    QSignalSpy found(controller.get(), &AppController::linkTargetFound);
+    ASSERT_TRUE(controller->followDocumentLink("../Lectures/kalman.xopp#chapter=Prediction%20step&page=2", "tab"));
+    EXPECT_EQ(currentFile(), "kalman.xopp");
+    EXPECT_EQ(controller->pageNumber(), 4);
+    ASSERT_EQ(found.count(), 1);
+    EXPECT_EQ(found.first().at(1).toString(), "Archive");
+    until([&] { return find("linkFoundDialog")->property("opened").toBool(); });
+    EXPECT_TRUE(find("linkFoundDialog")->property("opened").toBool());
+    QMetaObject::invokeMethod(find("linkFoundDialog"), "close");
+    ASSERT_TRUE(controller->updateFoundLink());
+    xqt::DocumentSession* note = controller->tabManager().session(0);
+    EXPECT_NE(note->currentText().find("[Kalman](../Archive/kalman.xopp#chapter=Prediction%20step&page=2)"),
+              std::string::npos)
+            << note->currentText();
+
+    // Nothing like it: the reader locates it
+    controller->setCurrentTab(0);
+    QSignalSpy missing(controller.get(), &AppController::linkTargetMissing);
+    EXPECT_FALSE(controller->followDocumentLink("../Lectures/lost.xopp#page=1", "tab"));
+    ASSERT_EQ(missing.count(), 1);
+    EXPECT_EQ(missing.first().at(0).toString(), "lost.xopp");
+    until([&] { return find("linkMissingDialog")->property("opened").toBool(); });
+    EXPECT_TRUE(find("linkMissingDialog")->property("opened").toBool());
+    QMetaObject::invokeMethod(find("linkMissingDialog"), "close");
+    ASSERT_TRUE(controller->relinkTo(QUrl::fromLocalFile(QString::fromStdString((root / "Archive" / "kalman.xopp").string()))));
+    EXPECT_EQ(currentFile(), "kalman.xopp") << "followed";
+    EXPECT_NE(note->currentText().find("[lost](../Archive/kalman.xopp#page=1)"), std::string::npos) << note->currentText();
 }
