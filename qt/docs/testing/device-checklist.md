@@ -1035,7 +1035,10 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
 ## Archive export (qt/archive-export)
 
 - [ ] Take a lecture PDF with notes (pen with pressure, a highlighter over its text, a text box, a Markdown link to
-      another PDF, an inserted ruled page). Export it for the archive (below), open `lecture.archive.pdf` in Okular,
+      another PDF, an inserted ruled page). ⋮ → "Export for the archive…": the dialog explains what an archive PDF is
+      and offers "Next to the document, as lecture.archive.pdf" or a folder. Export (with an unsaved stroke): the
+      window stays usable, then "lecture.archive.pdf is a PDF/A-3b file"; "Show in folder" shows it selected. The tab
+      still has its unsaved change (the dot). Open `lecture.archive.pdf` in Okular,
       Firefox and Acrobat: the ink looks as in the app, the highlighter lets the text show through, and the ink can
       not be hidden (Okular: "Show annotations" off changes nothing; Acrobat's comment list has only the link). The
       link opens the other PDF.
@@ -1043,3 +1046,8 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
       PDF/A standard"); Attachments shows `document.xopp`. File → Properties: the title is the lecture's.
 - [ ] Open `lecture.archive.pdf` in xournal-qt: every stroke is editable, and none is shown twice (erase one: nothing
       stays behind). Ctrl+S, open it in Okular again: the stroke is gone there too, and Acrobat still says PDF/A.
+- [ ] Share… (⋮, the tab menu, a PDF card in the library) → "For the archive (PDF/A)" opens the same dialog. From a
+      card, choose "In a folder I choose…": the archive appears there without a tab opening.
+- [ ] Export a PDF whose fonts are not embedded (`pdffonts file.pdf` shows "no" under "emb"; old PDFs with
+      Helvetica or Times often are): the report says "not PDF/A" with the font names, and the file still opens
+      everywhere; Acrobat shows no PDF/A bar for it.

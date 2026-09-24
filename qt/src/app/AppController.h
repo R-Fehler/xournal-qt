@@ -565,6 +565,19 @@ public:
     Q_INVOKABLE bool copyToClipboard(const QStringList& files);
     /// The folder the "For Xournal++" dialog starts in: the one chosen last, else the documents folder.
     Q_INVOKABLE QUrl shareFolder() const;
+    // --- Archive PDF (qt/docs/hybrid-pdf.md, "Archive PDF") ---
+    /// "Export for the archive…": "name.archive.pdf" next to the current document, or next to `file` (a library card's
+    /// PDF). Empty when the document has no file yet (the window then asks for a folder).
+    Q_INVOKABLE QUrl suggestedArchiveFile(const QString& file = QString()) const;
+    /// The archive PDF of the current document (or of `file`) in `folder`.
+    Q_INVOKABLE QUrl archiveFileIn(const QUrl& folder, const QString& file = QString()) const;
+    /// Write the archive PDF `target` in the background: from the current document as it is now (unsaved changes
+    /// included; it keeps its file and state), or from `file`, loaded on a worker without opening a tab. Then
+    /// archiveExported, or a message if it failed.
+    Q_INVOKABLE bool exportArchive(const QUrl& target, const QString& file = QString());
+    /// Archive exports running (their dialog shows it).
+    Q_PROPERTY(int archiveExports READ archiveExports NOTIFY archiveExportsChanged)
+    int archiveExports() const { return archiveRunning; }
     /// After hybridEditedElsewhere: take the other app's version of the changed annotations (or keep ours).
     Q_INVOKABLE bool importHybridChanges();
     Q_INVOKABLE void keepHybridData();
@@ -812,6 +825,9 @@ Q_SIGNALS:
     void hybridEditedElsewhere(const QString& file);
     /// Files were exported for Xournal++ and shown (`text` says where): the window offers to copy them.
     void sharedForXournal(const QStringList& files, const QString& text);
+    /// An archive PDF was written: whether it is PDF/A-3b, else why not; what was changed in its source PDF.
+    void archiveExported(const QString& path, bool pdfa, const QStringList& notPdfA, const QStringList& adjusted);
+    void archiveExportsChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
     /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
@@ -846,6 +862,11 @@ private:
     /// Hand files to the system (share), or put them on the clipboard.
     bool handOver(const QStringList& files, bool toClipboard);
     fs::path lastShareFolder;
+    int archiveRunning = 0;
+    /// The document an archive is made of: `file`, or the current document's file (empty: none yet).
+    fs::path archiveSource(const QString& file) const;
+    void archiveDone(const fs::path& target, bool ok, const std::string& error, bool pdfa,
+                     const std::vector<std::string>& notPdfA, const std::vector<std::string>& adjusted);
     /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
     /// `oldXopp`: see saveAsHybridInBackground.
     bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,

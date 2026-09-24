@@ -78,6 +78,10 @@ public:
         bool ok = false;
         std::string error;
         std::string exportError;  ///< SaveRequest::exportXopp failed (the save itself may have succeeded)
+        // --- ExportArchive (HybridPdf::writeArchive)
+        bool pdfa = false;                  ///< the archive PDF carries the PDF/A-3b identification
+        std::vector<std::string> notPdfA;   ///< why not
+        std::vector<std::string> adjusted;  ///< what was changed in the source PDF to conform
     };
     enum class SaveKind {
         Save,        ///< to the document's file: its .xopp, or its hybrid PDF. Requires hasFilePath().
@@ -86,7 +90,13 @@ public:
         ExportXopp,  ///< only exportXopp to `target` (the document's state and saved point stay)
         /// A copy as a hybrid PDF at `target` (to share): the document keeps its file, state and saved point.
         ExportHybrid,
+        /// A copy as an archive PDF (PDF/A-3b, HybridPdf::writeArchive) at `target`: the document keeps its file, state
+        /// and saved point. The result has the PDF/A report.
+        ExportArchive,
     };
+    static bool isExport(SaveKind kind) {
+        return kind == SaveKind::ExportXopp || kind == SaveKind::ExportHybrid || kind == SaveKind::ExportArchive;
+    }
     struct SaveRequest {
         SaveKind kind = SaveKind::Save;
         fs::path target;
@@ -142,6 +152,8 @@ public:
     /// Export for Xournal++: a plain `xopp` next to the hybrid PDF with the base pages as its PDF (the merged-PDF
     /// rules of qt/pdf-pages: "name.pdf" if free, else ".name.pages.pdf"). The document keeps its file.
     SaveResult exportXopp(const fs::path& xopp);
+    /// A copy as an archive PDF (SaveKind::ExportArchive), waiting for it.
+    SaveResult exportArchive(const fs::path& pdf);
     /// saveInBackground, waiting for its result.
     SaveResult saveNow(SaveRequest request);
     /// Where exportXopp puts the PDF for this .xopp.

@@ -345,6 +345,26 @@ check failed.
   19 PDFs from the system's documentation, every file our check called PDF/A-3b passed veraPDF, and every file it
   did not failed veraPDF for the reasons listed (the files that also used `.notdef` glyphs used CMYK too).
 
+### Export for the archive (per document)
+
+- **⋮ → Export for the archive…** (not for Markdown and text files) and **Share… → For the archive (PDF/A)** (the tab
+  menu and a library card's Share too) open a dialog that says what it means, in the author's words: "A PDF made for
+  keeping (PDF/A-3). It stays readable for decades in any PDF viewer. Your ink is merged into the pages, so no
+  viewer can hide or lose it. The full Xournal data is embedded, so this app can still open it for editing."
+- Where it goes: **next to the document as `name.archive.pdf`** (the default; `lecture.notes.pdf` gives
+  `lecture.archive.pdf`; an archive PDF itself gets `name.archive (2).pdf`, never its own file), or **in a folder I
+  choose…** (a folder dialog; the same name there). A document without a file yet only has the folder. An existing
+  file of that name is replaced (it is the archive of the same document).
+- It runs in the background ("Writing the archive PDF…"): the current document through the save machinery
+  (`SaveKind::ExportArchive`, `DocumentSession::exportArchive`): its state now, unsaved changes included; the document
+  keeps its file, its changes and its saved point. A library card's document is loaded and written on a worker
+  without a tab (`AppController::exportArchive(target, file)`).
+- Afterwards a report: "name.archive.pdf is a PDF/A-3b file …", or "… was written … It is not PDF/A, because:" with
+  the reasons, plus a grey line with what was changed to conform, and **Show in folder** (the file manager, where
+  sharing works).
+- Tests: `MainWindowTest.exportForTheArchive` (the dialog's text and default, the report, the file with the unsaved
+  stroke, the document still modified, Share's entry, a folder, a card's document).
+
 ### Validation
 
 - The tests: `qpdf --check` passes; poppler draws each page like our PDF export (mean difference < 0.5/255, < 0.2 %

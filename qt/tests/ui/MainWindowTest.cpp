@@ -129,13 +129,13 @@ protected:
         return window->findChild<T*>(name);
     }
     /// Waits until the popup is fully open (or closed).
-    static bool waitOpened(QObject* popup, bool opened) {
+    static bool waitOpened(QObject* popup, bool opened, int timeoutMs = 2000) {
         auto done = [&] {
             return popup->property("opened").toBool() == opened && popup->property("visible").toBool() == opened;
         };
         QElapsedTimer t;
         t.start();
-        while (!done() && t.elapsed() < 2000) {
+        while (!done() && t.elapsed() < timeoutMs) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
         }
         return done();
@@ -4890,6 +4890,72 @@ TEST_F(MainWindowTest, sharingForXournalpp) {
     auto fromCard = xqt::DocumentSession::loadFile(cardOut.filePath("lecture.xopp").toStdString());
     ASSERT_TRUE(fromCard.document) << fromCard.error;
     EXPECT_EQ(strokesOn(*fromCard.document, 1), 1u);
+}
+
+// ⋮ → "Export for the archive…" (and Share → "For the archive"): the dialog says what it means, the PDF/A-3b file goes
+// next to the document (or into a chosen folder), in the background, and the report says whether it is PDF/A. The
+// document keeps its file and its unsaved changes.
+TEST_F(MainWindowTest, exportForTheArchive) {
+    FakeSystemApps fake;
+    UseSystemApps use(fake);
+    QTemporaryDir dir, out;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 2);
+    ASSERT_TRUE(controller->openPath(pdf));
+    drawStroke(*controller->tabManager().currentSession(), 1);
+    ASSERT_TRUE(controller->modified());
+    ASSERT_NE(find("exportArchiveItem"), nullptr);
+
+    QObject* dialog = find("archiveDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QVariant(QString())));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    const QString explanation = findItem("archiveExplanation")->property("text").toString();
+    EXPECT_TRUE(explanation.contains("PDF/A-3") && explanation.contains("decades") &&
+                explanation.contains("merged into the pages") && explanation.contains("open it for editing"))
+            << explanation.toStdString();
+    auto* nextTo = findItem("archiveNextTo");
+    EXPECT_TRUE(nextTo->property("checked").toBool());
+    EXPECT_TRUE(nextTo->property("text").toString().contains("lecture.archive.pdf"));
+    QObject* report = find("archiveReportDialog");
+    ASSERT_NE(report, nullptr);
+    click(findItem("archiveExportButton"));
+    ASSERT_TRUE(waitOpened(report, true, 30000));
+    const QString archive = dir.filePath("lecture.archive.pdf");
+    EXPECT_EQ(report->property("path").toString(), archive);
+    EXPECT_TRUE(report->property("pdfa").toBool());
+    EXPECT_TRUE(findItem("archiveReportText")->property("text").toString().contains("PDF/A-3b"));
+    EXPECT_TRUE(xqt::HybridPdf::isArchive(fs::path(archive.toStdString())));
+    auto written = xqt::DocumentSession::loadFile(archive.toStdString());
+    ASSERT_TRUE(written.document) << written.error;
+    EXPECT_EQ(strokesOn(*written.document, 1), 1u) << "with the unsaved stroke";
+    EXPECT_TRUE(controller->modified()) << "the document keeps its changes";
+    EXPECT_EQ(controller->title(), "lecture.pdf");
+    click(findItem("archiveShowButton"));
+    until([&] { return fake.shared.size() == 1; });
+    EXPECT_EQ(fake.shared.value(0), archive);
+    ASSERT_TRUE(waitOpened(report, false));
+
+    // Share → "For the archive" opens the same dialog; into a folder: the same name there
+    QObject* share = find("shareDialog");
+    QMetaObject::invokeMethod(share, "openFor", Q_ARG(QVariant, QVariant(QString())));
+    ASSERT_TRUE(waitOpened(share, true));
+    click(findItem("shareArchiveChoice"));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    QMetaObject::invokeMethod(dialog, "close");
+    ASSERT_TRUE(waitOpened(dialog, false));
+    const QUrl inFolder = controller->archiveFileIn(QUrl::fromLocalFile(out.path()));
+    EXPECT_EQ(inFolder.toLocalFile(), out.filePath("lecture.archive.pdf"));
+
+    // A library card's document, not open: written in the background
+    ASSERT_TRUE(controller->exportArchive(inFolder, archive));
+    ASSERT_TRUE(waitOpened(report, true, 30000));
+    EXPECT_EQ(report->property("path").toString(), out.filePath("lecture.archive.pdf"));
+    EXPECT_TRUE(report->property("pdfa").toBool());
+    QMetaObject::invokeMethod(report, "close");
+    ASSERT_TRUE(waitOpened(report, false));
+    EXPECT_EQ(controller->suggestedArchiveFile(archive).toLocalFile(), dir.filePath("lecture.archive (2).pdf"))
+            << "never the archive itself";
 }
 
 // Settings → Search: the fuzzy search's toggle (the same setting as the search fields' button, both ways) and its typo

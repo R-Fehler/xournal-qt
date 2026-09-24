@@ -797,6 +797,14 @@ ApplicationWindow {
                     // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type of
                     // Save as)
                     MenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); onTriggered: openExportDialog() }
+                    // A PDF/A for keeping: the ink merged into the pages, the Xournal data inside
+                    MenuItem {
+                        objectName: "exportArchiveItem"
+                        visible: !win.textDoc
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Export for the archive…")
+                        onTriggered: archiveDialog.openFor("")
+                    }
                     MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     MenuSeparator {}
@@ -1502,6 +1510,13 @@ ApplicationWindow {
                 onClicked: { shareDialog.close(); win.sharePdfOf(shareDialog.file, true) }
             }
             ShareChoice {
+                objectName: "shareArchiveChoice"
+                visible: shareDialog.textFile === ""
+                text: qsTr("For the archive (PDF/A)")
+                detail: qsTr("A PDF made for keeping: readable for decades, the ink merged into the pages.")
+                onClicked: { shareDialog.close(); archiveDialog.openFor(shareDialog.file) }
+            }
+            ShareChoice {
                 objectName: "shareXournalChoice"
                 visible: shareDialog.textFile === ""
                 text: qsTr("For Xournal++ (.xopp + PDF)")
@@ -1582,6 +1597,154 @@ ApplicationWindow {
         // Exported for Xournal++ and shown: the two files can be copied too
         function onSharedForXournal(files, text) {
             snackbar.show(text, false, qsTr("Copy"), function() { app.copyToClipboard(files) })
+        }
+    }
+    // Export for the archive: what it means, where it goes; then the PDF/A report
+    Dialog {
+        id: archiveDialog
+        objectName: "archiveDialog"
+        property string file: ""  // a library card's document; "": the current document
+        property url suggestion
+        function openFor(path) {
+            file = path
+            suggestion = app.suggestedArchiveFile(path)
+            if (suggestion.toString() !== "")
+                archiveNextTo.checked = true
+            else
+                archiveInFolder.checked = true
+            open()
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(520, parent ? parent.width - 32 : 520)
+        title: qsTr("Export for the archive")
+        ColumnLayout {
+            width: archiveDialog.availableWidth
+            spacing: 6
+            Label {
+                objectName: "archiveExplanation"
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("A PDF made for keeping (PDF/A-3). It stays readable for decades in any PDF viewer. "
+                           + "Your ink is merged into the pages, so no viewer can hide or lose it. The full Xournal "
+                           + "data is embedded, so this app can still open it for editing.")
+            }
+            Label {
+                Layout.fillWidth: true
+                Layout.topMargin: 6
+                text: qsTr("Where it goes")
+                font.weight: Font.DemiBold
+            }
+            ButtonGroup { id: archivePlaces }
+            RadioButton {
+                id: archiveNextTo
+                objectName: "archiveNextTo"
+                Layout.fillWidth: true
+                ButtonGroup.group: archivePlaces
+                enabled: archiveDialog.suggestion.toString() !== ""
+                text: enabled ? qsTr("Next to the document, as %1")
+                                    .arg(decodeURIComponent(archiveDialog.suggestion.toString().replace(/^.*\//, "")))
+                              : qsTr("Next to the document (it has no file yet)")
+            }
+            RadioButton {
+                id: archiveInFolder
+                objectName: "archiveInFolder"
+                Layout.fillWidth: true
+                ButtonGroup.group: archivePlaces
+                text: qsTr("In a folder I choose…")
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "archiveExportButton"
+                text: qsTr("Export")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: qsTr("Cancel")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+        onAccepted: {
+            if (archiveNextTo.checked) {
+                app.exportArchive(suggestion, file)
+            } else {
+                archiveFolderDialog.file = file
+                archiveFolderDialog.currentFolder = app.shareFolder()
+                archiveFolderDialog.open()
+            }
+        }
+    }
+    FolderDialog {
+        id: archiveFolderDialog
+        objectName: "archiveFolderDialog"
+        property string file: ""
+        title: qsTr("Folder for the archive PDF")
+        onAccepted: app.exportArchive(app.archiveFileIn(selectedFolder, file), file)
+    }
+    Dialog {
+        id: archiveReportDialog
+        objectName: "archiveReportDialog"
+        property string path: ""
+        property bool pdfa: false
+        property var problems: []
+        property var adjusted: []
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(520, parent ? parent.width - 32 : 520)
+        title: pdfa ? qsTr("Archive PDF written") : qsTr("Written, but not as PDF/A")
+        ColumnLayout {
+            width: archiveReportDialog.availableWidth
+            spacing: 6
+            Label {
+                objectName: "archiveReportText"
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: {
+                    const name = archiveReportDialog.path.replace(/^.*\//, "")
+                    if (archiveReportDialog.pdfa)
+                        return qsTr("%1 is a PDF/A-3b file: made for keeping, with your ink in the pages and the "
+                                    + "Xournal data inside.").arg(name)
+                    return qsTr("%1 was written with your ink in the pages and the Xournal data inside, and it opens "
+                                + "in any PDF viewer. It is not PDF/A, because:").arg(name)
+                            + "\n• " + archiveReportDialog.problems.join("\n• ")
+                }
+            }
+            Label {
+                objectName: "archiveReportAdjusted"
+                visible: archiveReportDialog.adjusted.length > 0
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                color: "#6b6f75"
+                font.pixelSize: 13
+                text: qsTr("Changed to make it conform: %1.").arg(archiveReportDialog.adjusted.join("; "))
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "archiveShowButton"
+                visible: app.canShare
+                text: qsTr("Show in folder")
+                flat: true
+                onClicked: { app.shareFile(archiveReportDialog.path, false); archiveReportDialog.close() }
+            }
+            Button {
+                objectName: "archiveOkButton"
+                text: qsTr("OK")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+    }
+    Connections {
+        target: app
+        function onArchiveExported(path, pdfa, notPdfA, adjusted) {
+            archiveReportDialog.path = path
+            archiveReportDialog.pdfa = pdfa
+            archiveReportDialog.problems = notPdfA
+            archiveReportDialog.adjusted = adjusted
+            archiveReportDialog.open()
         }
     }
     // Saving a "name.xopp" as a PDF with notes: what happens to the .xopp (asked once, before it is written)
