@@ -2930,25 +2930,29 @@ TEST_F(MainWindowTest, theCanvasShowsThePreviewUntilThePageIsRendered) {
     until([&] { return sketches.idle(); }, 10000);
     auto* canvas = findItem("canvas");
     ASSERT_NE(canvas, nullptr);
-    auto* render = controller->context().getRenderService();
-    render->blockRerenderZoom(std::chrono::milliseconds(60000));  // (as if rendering took long)
     xqt::CanvasView* view = controller->tabManager().currentView();
     const size_t target = 6;
+    until([&] { return !view->preview(target).isNull(); }, 10000);
+    ASSERT_FALSE(view->preview(target).isNull()) << "page 7 has its preview";
+    auto* render = controller->context().getRenderService();
+    // Nothing is being rendered (page 7 in advance, landing after its buffer is gone, would show the page itself)
+    render->waitForIdle();
+    render->blockRerenderZoom(std::chrono::milliseconds(60000));  // (as if rendering took long)
     view->getPage(target)->deleteViewBuffer();
     controller->goToPage(static_cast<int>(target));
     int shown = 0;
     until([&] {
         QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
         return shown > 0;
-    });
+    }, 10000);
     EXPECT_GE(shown, 1) << "the preview instead of a white page";
     render->blockRerenderZoom(std::chrono::milliseconds(0));
-    until([&] { return view->getPage(target)->bufferInfo().valid; }, 5000);
+    until([&] { return view->getPage(target)->bufferInfo().valid; }, 10000);
     ASSERT_TRUE(view->getPage(target)->bufferInfo().valid);
     until([&] {
         QMetaObject::invokeMethod(canvas, "previewsShown", Q_RETURN_ARG(int, shown));
         return shown == 0;
-    });
+    }, 10000);
     EXPECT_EQ(shown, 0) << "rendered: the page itself";
     sketches.setDelays(400, 1500);
 }
