@@ -177,8 +177,23 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   Plain `.md` files are edited as text; ink is never stored in a `.md`.
 - Build on the live-rendering editor of the Markdown boxes, and on UI patterns from the reference editors.
 
+### Wishlist: horizontal scrolling and a presentation mode (the author, 2026-09-24)
+- [ ] **Horizontal scrolling mode**: pages side by side, each fit to the window height by default.
+  - A toggle between snapping to whole pages and continuous horizontal scrolling.
+  - Works with two or more columns (rows of pages).
+  - In this mode, ‹ › buttons (previous / next page) in the page / zoom pill.
+- [ ] **Presentation mode**, for teaching and presenting, built on full screen:
+  - Each page fills the screen, with snapped horizontal scrolling.
+  - PowerPoint-like keys: Space and the arrow keys go to the next or previous page; typing a number and Enter goes
+    to that page. The number jump is useful in normal mode too.
+  - Switch back and forth between present and edit from full screen, and start it from the normal tool bar.
+  - Writing on slides while presenting follows from full screen (the tool square stays).
+- [ ] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
+  pages, for documents meant to be presented.
+
 ### Bugs
-- [~] **A PDF page pasted into a document that has a PDF stays blank on the canvas** (only the previews show it).
+- [~] **A PDF page pasted into a document that has a PDF shows late on the canvas** (fixed on `qt/background-save`,
+  waiting to merge: only pages new in the PDF are drawn again).
   Pasting into a `.xopp` without a PDF works. Given to `qt/background-save`, which reworks that paste path; to fix
   first, with a test. Likely cause: the page is drawn against the old PDF before the merged PDF is loaded, and it is
   not drawn again afterwards.
