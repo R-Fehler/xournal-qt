@@ -1,6 +1,6 @@
 # Links between documents: design draft
 
-Status: **draft, 2026-09-24**; the points under "To decide" need the author. Goal (the author's words): link to
+Status: **design agreed 2026-09-24** (the author: "the link plan is sound"); built as `qt/links` after the running blocks. Goal (the author's words): link to
 another document, optionally to a page or a chapter; if it is a chapter, keep its page as a fallback for when the
 name changes. When the link is followed, choose between a new tab and reference view.
 
@@ -78,14 +78,15 @@ Written as `#page=12&pdfpage=7`. Viewers that know only `page=` still get close.
 - **Backlinks** come for free from the same index: a small "Linked from" list for the current document (sidebar or ⋮
   menu), useful for notes that reference each other.
 
-## To decide (the author)
+## Decided (2026-09-24)
 
-1. **Link markers on ink and images:** is a small visible marker (a chain icon next to the object) right, or should
-   the object itself become tappable, which is harder to see and harder to tell from writing?
-2. **Rewriting links in other files** after a rename or move in the app: automatic, with a note ("Updated 3
-   links"), or ask first?
-3. **The default action on a tap:** always ask (with "remember"), or reference view by default, since the main use
-   is reading a source next to the notes?
+The author accepted the plan with its proposals:
+1. **Links on ink and images get a small visible marker** (a chain icon next to the object); the object itself
+   does not become tappable.
+2. **Links in other files are rewritten automatically** after a rename or move in the app, with a note ("Updated
+   3 links").
+3. **A tap asks** (new tab, reference view, here) with "Remember my choice"; the default can be changed in
+   Settings → Documents.
 
 ## Build plan (`qt/links`, after the running blocks)
 
