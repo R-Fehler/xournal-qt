@@ -1087,3 +1087,26 @@ the Surface or another Windows 10/11 machine. See [../windows.md](../windows.md)
 - [ ] Start it on a big library and press Cancel: it stops after the current file, the summary says "cancelled", and
       the README says the archive is incomplete.
 - [ ] With a folder open in the library, "Only this folder" archives that folder and its subfolders only.
+
+## Setsquare and compass on high-DPI screens (qt/geometry-gpu)
+
+On the Surface Pro 8 (2880×1920 at 200 %), with `XQT_PERF=1` if possible (the `geometry` field of the perf line
+counts the pictures of the tool drawn; it should stay 0 while moving and turning).
+
+- [ ] Put the setsquare on a page, make it big with two fingers (its scale reads about 15 cm to each side), then move
+      and turn it with two fingers for a while: it follows the fingers smoothly, without lag, at 100 % zoom and
+      zoomed in. The same with the right mouse button.
+- [ ] While sizing it, it grows smoothly (its marks look stretched for a moment); a moment after the fingers stop it
+      is sharp again, with the marks and numbers of its new size.
+- [ ] Zoom (pinch, Ctrl+wheel) with the setsquare out: it zooms with the page, and is sharp again a moment after the
+      zoom stops. At rest it looks as sharp as before this change (marks, numbers, the angle in the small circle).
+- [ ] Turn it: the angle in the small circle changes with it and its number stays upright. Stop: the marks are
+      sharp at any angle (no waiting needed).
+- [ ] The pen draws along its edges as before (long edge, both legs, a line across the triangle ends on the nearest
+      edge); the eraser reaches what lies under it. A line being drawn is shown under the tool (it was over it
+      before); once finished it is under it, as before.
+- [ ] A setsquare hanging over the edge of its page is cut at the page's edge, as before. Put aside (the pill) and
+      back: where it was, turned as before.
+- [ ] The compass: the same (big, moved, turned, sized, zoomed); a line drawn on its disc follows its circle.
+- [ ] A very big one (30 cm) zoomed in to 300 %: moving is still smooth; while it moves a part coming into view may
+      be a little soft, and is sharp a moment after it rests.

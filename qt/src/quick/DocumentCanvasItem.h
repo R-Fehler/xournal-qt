@@ -6,18 +6,24 @@
  * events; events outside the item are left alone, so the pen keeps working on the QML controls.
  * Rendering: each visible page is a transform node with texture tiles (256 px) composed from the page buffer and
  * the overlay views (live strokes). Only dirty tiles are re-composed and re-uploaded; zooming scales the existing
- * tiles on the GPU until the page has been re-rendered at the new zoom.
+ * tiles on the GPU until the page has been re-rendered at the new zoom. The setsquare or compass is a node of its own
+ * over its page: pictures of it (GeometryToolPicture) under a transform, which is all that changes while it is moved,
+ * turned or sized; they are drawn anew only for a new size or zoom, once that has been stable for a moment. They are
+ * this item's (one set per canvas that shows the tool), at most 4096 pixels a side.
  *
  * @license GNU GPLv2 or later
  */
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <memory>
 
+#include <QMatrix4x4>
 #include <QPointF>
 #include <QPointer>
 #include <QQuickItem>
+#include <QTimer>
 
 namespace xqt {
 class CanvasInput;
@@ -63,6 +69,28 @@ public:
         mostTiles = 0;
         previewFrames = 0;
     }
+    /// What the frames cost so far (tests, benchmarks): the frames, their time in the scene graph sync (composing
+    /// and uploading happen there, and the UI thread waits for it), the page tiles composed and the pixels uploaded.
+    struct FrameStats {
+        qint64 frames = 0;
+        qint64 syncNanos = 0;
+        qint64 tiles = 0;
+        qint64 uploadedPixels = 0;
+    };
+    FrameStats frameStats() const { return {statFrames, statSyncNanos, statTiles, statPixels}; }
+    void forgetFrameStats() { statFrames = statSyncNanos = statTiles = statPixels = 0; }
+    /// The setsquare or compass in the last frame (tests): shown or not, the transform of its body (its own
+    /// coordinates to the item's), and how many pictures of it this canvas uploaded so far.
+    struct GeometryShown {
+        bool shown = false;
+        QMatrix4x4 body;
+        QMatrix4x4 display;
+        double scale = 0;  ///< pixels per point of its whole picture
+        bool sharpPart = false;  ///< a sharp picture of the part in view over it
+        int bodies = 0;
+        int displays = 0;
+    };
+    GeometryShown geometryShown() const { return geometryStats; }
 
 Q_SIGNALS:
     void viewChanged();
@@ -85,6 +113,7 @@ private:
     void updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale);
     void takeKeyboardFocus();
     void updateSelectionNode(QSGNode* root, double zoom, double dpr);
+    void updateGeometryNode(QSGNode* root, double zoom, double dpr);
     bool claims(QPointF scenePos) const;
     /// Another canvas of the window holds the pen, the mouse or the touch (`grab` of that canvas): a stroke that began
     /// there stays there, also where it crosses this canvas.
@@ -105,6 +134,13 @@ private:
     std::atomic<int> shownPreviews{0};
     std::atomic<int> mostTiles{0};
     std::atomic<int> previewFrames{0};
+    std::atomic<qint64> statFrames{0}, statSyncNanos{0}, statTiles{0}, statPixels{0};
     QPointF lastScroll;  ///< of the last frame (scene graph thread): whether the view is moving
     double lastZoom = 0;
+    /// The setsquare or compass: what it was like in the last frame (size, place, zoom, ...), and whether that has not
+    /// changed for a moment (then a new size or zoom is drawn anew)
+    std::array<double, 10> lastGeometryKey{};
+    std::atomic<bool> geometrySettled{false};
+    QTimer geometryTimer;
+    GeometryShown geometryStats;
 };

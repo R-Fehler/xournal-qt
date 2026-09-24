@@ -51,6 +51,7 @@
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "GeometryToolPicture.h"
 #include "PenHover.h"
 #include "../SearchHits.h"
 #include "config-test.h"
@@ -581,15 +582,24 @@ TEST_F(CanvasReplayTest, theSetsquareGuidesTheStrokeAndCanBeMoved) {
     const QPointF onUpright = geometry.snap(middle + QPointF(6, 100 + 60));
     EXPECT_NEAR(onUpright.x(), middle.x(), 1);
 
-    // It is really drawn on the page (an overlay of the page, like the selection)
-    EXPECT_TRUE(view->getPage(0)->hasOverlays()) << "the setsquare is an overlay of the page";
+    // It is shown by the canvas over its page, as pictures of its own (moved and turned on the GPU): the page itself
+    // is not drawn with it, nor again when it moves
+    ASSERT_NE(geometry.picture(), nullptr) << "it has its pictures";
+    EXPECT_EQ(geometry.picture()->type(), GeometryToolType::SETSQUARE);
+    EXPECT_FALSE(view->getPage(0)->hasOverlays()) << "the setsquare is not an overlay of the page";
     processEvents(300);
     const auto info = view->getPage(0)->bufferInfo();
+    bool all = false;
+    view->getPage(0)->takeDirty(info, all);
     const QImage withTool = view->getPage(0)->composeTile(QRect(QPoint(0, 0), info.pixelSize));
+    geometry.moveBy(QPointF(20, 10));
+    geometry.turnAndSize(0.3, 1.2);
+    EXPECT_TRUE(view->getPage(0)->takeDirty(info, all).empty() && !all) << "moving it leaves the page as it is";
     geometry.hide();
     processEvents(300);
     const QImage without = view->getPage(0)->composeTile(QRect(QPoint(0, 0), info.pixelSize));
-    EXPECT_NE(withTool, without) << "the page looks different with the setsquare on it";
+    EXPECT_EQ(withTool, without) << "the page itself does not show it";
+    EXPECT_EQ(geometry.picture(), nullptr);
     geometry.toggle(GeometryToolType::SETSQUARE);
     processEvents(100);
 
@@ -736,7 +746,7 @@ TEST_F(CanvasReplayTest, theSetsquareTurnsInStepsAndCanBePutAside) {
     EXPECT_FALSE(geometry.visible());
     EXPECT_TRUE(geometry.active());
     EXPECT_TRUE(geometry.minimized());
-    EXPECT_FALSE(view->getPage(0)->hasOverlays()) << "not drawn";
+    EXPECT_EQ(geometry.page(), nullptr) << "not on the page, so not drawn";
     const size_t before = elementCount(0);
     drawLine(0, middle + QPointF(-60, 45), middle + QPointF(60, 45));  // on the triangle, 5 pt off its edge
     processEvents();
@@ -752,7 +762,7 @@ TEST_F(CanvasReplayTest, theSetsquareTurnsInStepsAndCanBePutAside) {
     geometry.setMinimized(false);
     EXPECT_TRUE(geometry.visible());
     EXPECT_NEAR(geometry.rotation(), turned, 1e-9) << "turned as before";
-    EXPECT_TRUE(view->getPage(0)->hasOverlays());
+    EXPECT_EQ(geometry.page(), view->getPage(0));
     geometry.hide();
     EXPECT_FALSE(geometry.active());
 }
@@ -1180,7 +1190,7 @@ TEST_F(CanvasReplayTest, theSetsquareStaysOnItsPageWhenThePageMovesAndGoesAsideW
     ASSERT_NE(geometry.page(), nullptr);
     EXPECT_EQ(geometry.page()->getPage(), itsPage) << "on the page it lay on";
     EXPECT_EQ(geometry.middle(), middle);
-    EXPECT_TRUE(geometry.page()->hasOverlays()) << "and drawn there";
+    EXPECT_NE(geometry.picture(), nullptr) << "and drawn there (the canvas draws it over the page it lies on)";
     // It still guides the pen on that page
     EXPECT_NEAR(geometry.snap(middle + QPointF(40, 5)).y(), middle.y(), 0.5);
 

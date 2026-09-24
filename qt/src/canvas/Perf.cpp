@@ -75,7 +75,8 @@ void Perf::report() {
     std::fprintf(stderr,
                  "xqt-perf 1.0 s: input mouse %lld (claimed %lld, hit test %.2f/%.2f ms) touch %lld pen %lld | "
                  "scroll %lld -> visibility %lld (%.2f/%.2f ms, of it the current page %.2f/%.2f ms) | frames %lld "
-                 "sync %.2f/%.2f ms | tiles %lld previews %lld | sharp %lld after %.0f/%.0f ms\n",
+                 "sync %.2f/%.2f ms | tiles %lld previews %lld | geometry %lld (displays %lld) | sharp %lld after "
+                 "%.0f/%.0f ms\n",
                  static_cast<long long>(values[MouseEvents]), static_cast<long long>(values[MouseClaimed]),
                  ms[HitTest].average, ms[HitTest].worst, static_cast<long long>(values[TouchEvents]),
                  static_cast<long long>(values[PenEvents]), static_cast<long long>(values[Scrolls]),
@@ -83,6 +84,7 @@ void Perf::report() {
                  ms[CurrentPageTime].average, ms[CurrentPageTime].worst, static_cast<long long>(values[Frames]),
                  ms[SyncTime].average, ms[SyncTime].worst,
                  static_cast<long long>(values[Tiles]), static_cast<long long>(values[Previews]),
+                 static_cast<long long>(values[GeometryPictures]), static_cast<long long>(values[GeometryDisplays]),
                  static_cast<long long>(sharp), ms[SharpTime].average, ms[SharpTime].worst);
     std::fflush(stderr);
 }
