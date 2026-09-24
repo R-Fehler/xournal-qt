@@ -68,6 +68,7 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "shell/LocalUrl.h"
 #include "shell/PdfPrinting.h"
 #include "ImageFile.h"
 #include "MarkdownEditor.h"
@@ -1728,7 +1729,7 @@ QVariantList AppController::libraries() const {
 }
 
 void AppController::openLibrary(const QUrl& folder) {
-    const QString dir = folder.isLocalFile() ? folder.toLocalFile() : folder.toString();
+    const QString dir = xqt::localPathOf(folder);
     if (library->library() && Library(fs::path(dir.toStdString())).root() == library->library()->root()) {
         setHomeVisible(true);  // this one
         return;
@@ -1931,7 +1932,7 @@ void AppController::openPaths(const QStringList& paths) {
 
 void AppController::openUrls(const QList<QUrl>& urls) {
     for (const QUrl& u: urls) {
-        openPath(u.toLocalFile());
+        openPath(xqt::localPathOf(u));
     }
 }
 
@@ -2062,7 +2063,7 @@ DocumentSession::LoadResult loadShownFile(const fs::path& file) {
 }
 }  // namespace
 
-bool AppController::openFile(const QUrl& url) { return openPath(url.toLocalFile()); }
+bool AppController::openFile(const QUrl& url) { return openPath(xqt::localPathOf(url)); }
 
 bool AppController::openPath(const QString& path) {
     const fs::path file(path.toStdString());

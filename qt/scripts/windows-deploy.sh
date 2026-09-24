@@ -214,7 +214,12 @@ Settings are kept in %LOCALAPPDATA%\xournal-qt, caches in %LOCALAPPDATA%\cache\x
 Documents\Xournal_Libraries\Default.
 
 bin\xournal-qt-cli.exe is the command line tool (PDF and PNG export, as `xournalpp --create-pdf`).
+
+xournal-qt-debug.bat starts the program with a log of the pen, touch and mouse input (input-log.txt next to it), for
+reporting problems with the pen.
 EOF
+# The input log starter (Windows wants CRLF in a batch file)
+sed 's/\r*$/\r/' "$source_dir/qt/packaging/windows/xournal-qt-debug.bat" > "$dist/xournal-qt-debug.bat"
 
 step "Summary"
 du -sh "$dist"

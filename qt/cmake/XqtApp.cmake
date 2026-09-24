@@ -15,7 +15,9 @@ add_library(xqt-quick STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TextFlowEditor.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TextFlowEditor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.cpp)
 target_include_directories(xqt-quick PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src/quick)
 target_link_libraries(xqt-quick PUBLIC Qt6::Quick Qt6::Qml xqt-canvas)
 set_target_properties(xqt-quick PROPERTIES AUTOMOC ON)
@@ -77,6 +79,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LocalUrl.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LocalUrl.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h

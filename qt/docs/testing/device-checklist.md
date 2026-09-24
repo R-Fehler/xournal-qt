@@ -1038,6 +1038,10 @@ the Surface or another Windows 10/11 machine. See [../windows.md](../windows.md)
 - [ ] `bin\xournal-qt.exe` starts (no console window) and shows the library "Default" in Documents\Xournal_Libraries.
       SmartScreen may warn first (unsigned): "More info" → "Run anyway".
 - [ ] The tool bar icons are drawn (not empty squares); the Material style is used.
+- [ ] Pen pressure: light strokes thin, hard ones wide. If not: double-click `xournal-qt-debug.bat`, draw a few strokes,
+      close the program and send `input-log.txt` (windows.md, "Pen input").
+- [ ] Library menu → "Downloads folder (quick library)": a window with the Downloads folder opens (it said "cannot
+      open c//" before).
 - [ ] New document → Create: draw with the mouse and with the pen; undo/redo; the document is saved in the library and
       is still there after a restart.
 - [ ] Text tool: real letters, also ä ö ü ß; the page thumbnail shows the same text.

@@ -11,7 +11,8 @@
 #   3. text-probe (qt/tools/text-probe.c): Pango and Cairo alone, drawing text into a PNG and a PDF, with the DLLs of
 #      the folder; with Pango's default backend on Windows (win32, which died drawing into images on 2026-09-24),
 #      with and without the UTF-8 C locale, and with fontconfig
-#   4. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits
+#   4. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits; then
+#      a library given as a Windows path with backslashes
 #
 # When a step fails (not when it hangs), it runs again under gdb, which stops at the crash, abort() or exit() and
 # prints the backtraces and the loaded DLLs into <step>.gdb.log. A failing text export also runs with FC_DEBUG=1 and
@@ -202,7 +203,9 @@ fi
 # --- The app -------------------------------------------------------------------------------------------------------
 # Off-screen, Qt Quick's software renderer (no GPU on the runner), log to stderr (a GUI program's messages go to the
 # debugger otherwise).
-app_env=(QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QT_FORCE_STDERR_LOGGING=1 XQT_SCREENSHOT_DELAY_MS=5000)
+# XQT_LOG_INPUT: the input log's code runs once on Windows (no input comes off-screen).
+app_env=(QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QT_FORCE_STDERR_LOGGING=1 XQT_SCREENSHOT_DELAY_MS=5000
+    XQT_LOG_INPUT=1)
 app_args=("$bin/xournal-qt.exe" "$(win "$library")" "$text")
 if ! attempt app 300 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app.png")" "${app_args[@]}"; then
     failures=$((failures + 1))
@@ -216,6 +219,15 @@ if ! attempt app 300 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app.png")" "${a
         "$bin/xournal-qt.exe" "$(win "$library")"
 fi
 expect_file app "$out/app.png"
+
+# A library given as a Windows path with backslashes, as Explorer and the library menu (Downloads, 2026-09-24:
+# "cannot open c//") hand it over.
+downloads="$out/Downloads"
+mkdir -p "$downloads"
+cp "$fixtures/load/strokes.xopp" "$downloads/"
+attempt app-windows-path 300 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-windows-path.png")" \
+    "$bin/xournal-qt.exe" "$(cygpath -w "$downloads")" || failures=$((failures + 1))
+expect_file app-windows-path "$out/app-windows-path.png"
 
 printf '\n=== %d failure(s)\n' "$failures"
 ((failures == 0))
