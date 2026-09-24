@@ -6,7 +6,7 @@ name: xournal-qt Windows
 on:
   workflow_dispatch:
   push:
-    branches: [qt/windows-build]
+    branches: [qt/windows-build, qt/windows-feel]  # (qt/windows-feel: work done on the Surface)
 
 concurrency:
   group: xqt-windows-${{ github.ref }}
