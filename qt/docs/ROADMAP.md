@@ -152,6 +152,25 @@
   - Measured: a 56-page lecture with 3 pasted pages gives a 453 KiB sidecar against the 393 KiB original.
     Pasting into a 117 MB scan takes about 0.2 s per paste, on the UI thread.
   - Resolves the backlog item "Searchable text in pages pasted from another PDF" (option 1).
+- **Fast search in open documents, `qt/document-search` (2026-09-24, awaiting on-device test).**
+  - `DocumentTextIndex` per open document: the PDF text of each page plus the drawn text of text elements and
+    Markdown.
+    - It is seeded from the library index when the entry is current. Otherwise it is read once in the background,
+      from the current page outwards, yielding to the pages in view, with its own poppler instance.
+    - It is kept current by edits, undo and redo, page moves, and a change of background PDF (pasted pages).
+  - `DocumentSearch` works in two steps: a string scan counts the hits of all pages, and hit places are computed
+    only for pages that need them (from poppler's text layout, 0 mismatches on pgfmanual).
+  - One matcher, `TextMatch`, for the document and the library: case, whitespace, ligatures, and words hyphenated
+    at line ends.
+  - Saving hands the entry to the library index, so it does not re-read the `.xopp`.
+  - The search field no longer drops typed characters: it was bound to the query and reset by stale results.
+  - On pgfmanual (1,321 pages):
+    - before: all counts took 3.3–3.8 s, again for every key typed;
+    - after, in a library: 8–11 ms;
+    - after, outside a library: counts fill in once in the background over about 6 s;
+    - per key: 3–7 ms; longest UI-thread pass 45–57 → 0.3 ms.
+  - Integration fix at merge: the index also rebuilds when another background PDF is loaded, so pasted pages are
+    found at once.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
