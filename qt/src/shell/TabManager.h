@@ -95,6 +95,8 @@ Q_SIGNALS:
     void currentTabChanged();
     /// A document started or finished saving.
     void savingChanged();
+    /// Pasted PDF pages could not be added to a document's merged PDF (DocumentSession::pdfPagesFailed).
+    void pdfPagesFailed(const QString& error);
 
 private:
     /// The tab reports to this list (and stops reporting to the one it came from).

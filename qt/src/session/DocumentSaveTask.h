@@ -48,6 +48,8 @@ struct DocumentSession::SaveTask {
     xoj::util::CairoSurfaceSPtr preview;
     bool xoppWritten = false;
     bool commitTried = false, committed = false;
+    // --- or pasted PDF pages joining the merged PDF
+    std::shared_ptr<PdfMerge> merge;
     // --- the step that runs
     std::shared_future<void> work;
     std::function<void()> then;

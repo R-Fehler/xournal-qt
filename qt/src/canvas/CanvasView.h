@@ -119,6 +119,7 @@ public:
     // --- RasterHost (rasterParams is called from render threads) -----------------------------------------------
     Document* rasterDocument() const override;
     PdfCache* rasterPdfCache(bool background) const override;
+    XojPdfPageSPtr rasterPendingPdfPage(size_t number) const override;
     RasterParams rasterParams() const override;
     void rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rectangle<double>> area) override;
 

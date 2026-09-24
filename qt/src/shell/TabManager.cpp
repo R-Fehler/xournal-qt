@@ -193,6 +193,7 @@ int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
 void TabManager::listenTo(Tab& tab) {
     DocumentSession* s = tab.session.get();
     connect(s, &DocumentSession::modifiedChanged, this, [this, s] { tabDataChanged(s, {ModifiedRole, ThumbnailRole}); });
+    connect(s, &DocumentSession::pdfPagesFailed, this, &TabManager::pdfPagesFailed);
     connect(s, &DocumentSession::savingChanged, this, [this, s] {
         tabDataChanged(s, {SavingRole});
         Q_EMIT savingChanged();

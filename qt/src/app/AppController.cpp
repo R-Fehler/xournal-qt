@@ -167,6 +167,12 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
 void AppController::makeTabs() {
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
+    connect(tabs.get(), &TabManager::pdfPagesFailed, this, [this](const QString& error) {
+        Q_EMIT message(tr("Pasting PDF pages failed"),
+                       tr("The pasted pages show their PDF page as a picture (its text cannot be searched).\n\n%1")
+                               .arg(error),
+                       true);
+    });
     connect(tabs.get(), &TabManager::savingChanged, this, [this] {
         Q_EMIT anySavingChanged();
         if (!tabs->anySaving() && !whenAllSavedCalls.empty()) {
@@ -621,7 +627,7 @@ int AppController::pastePages(int position) {
         const QList<int> sel = pages->selectedPages();
         position = (sel.isEmpty() ? static_cast<int>(session()->getCurrentPageNo()) : sel.last()) + 1;
     }
-    fs::path keptIn;  // PDF pages from another PDF: the document's merged PDF
+    bool keptIn = false;  // PDF pages from another PDF: in the document's merged PDF
     auto copies = pageClipboard->pagesFor(*session(), &keptIn);
     const int n = static_cast<int>(copies.size());
     session()->insertPages(copies, static_cast<size_t>(position));
@@ -631,7 +637,7 @@ int AppController::pastePages(int position) {
     }
     pages->selectPages(pasted);
     QString note = n == 1 ? tr("Page pasted") : tr("%1 pages pasted").arg(n);
-    if (!keptIn.empty()) {
+    if (keptIn) {
         // Once per paste: where the PDF pages went (a new file next to the document)
         const fs::path place = session()->mergedPdfPlace();  // (in the cache until it is saved)
         const QString where = QString::fromStdString(place.filename().string());

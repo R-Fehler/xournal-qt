@@ -609,6 +609,11 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Paste PDF pages from another PDF while a document with a large merged PDF saves: the paste may wait a moment,
       then both are in the file after the next save; nothing refers to the cache (close, reopen from another
       folder view or after clearing `~/.cache/xournal-qt/pasted-pages`).
+- [ ] Paste a page from another PDF into a long PDF (pgfmanual, a lecture of hundreds of pages) and into the large
+      scan: the page is there at once and shows its PDF page; the window does not freeze (it used to for seconds).
+      Its thumbnail may be white for a few seconds. Search finds its text a little later. Undo and redo the paste
+      right away: fine. Ctrl+S right after the paste: saves once the page is in the merged PDF; close and reopen:
+      the page is there with its text.
 - [ ] Kill the app (`kill -TERM <pid>`) while it saves a long hybrid PDF: at the next start the document is offered
       for recovery with the latest strokes, and the hybrid PDF is either the old or the new version (it opens).
 - [ ] (Fix) Paste a PDF page from another PDF into a document that has a background PDF (best: the large scan):

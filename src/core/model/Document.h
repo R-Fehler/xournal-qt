@@ -93,6 +93,10 @@ public:
 
 #ifdef XOJ_NO_GTK  // xournal-qt
     const DocumentOutline& getOutline() const;
+    /// xournal-qt: load a PDF whose first pages are those of the current PDF, with the same numbers (pasted pages
+    /// joined the merged PDF, or a copy of the same file): the outline stays, it is not read again (half a second for
+    /// a long PDF with a big outline).
+    bool readPdfKeepingOutline(const fs::path& filename);
 #else
     GtkTreeModel* getContentsModel() const;
 #endif

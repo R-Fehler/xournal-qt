@@ -1604,6 +1604,8 @@ PdfCache* CanvasView::rasterPdfCache(bool background) const {
     return backgroundPdfCache ? backgroundPdfCache.get() : pdfCache.get();
 }
 
+XojPdfPageSPtr CanvasView::rasterPendingPdfPage(size_t number) const { return session.pendingPdfPage(number); }
+
 void CanvasView::recreatePdfCache() { replacePdfCache(true); }
 
 void CanvasView::replacePdfCache(bool rerender) {

@@ -288,6 +288,7 @@ fs::path crashAfterPasting(const fs::path& doc, const fs::path& other) {
         a.copyPages({0});
         EXPECT_TRUE(a.openPath(QString::fromStdString(doc.string())));
         EXPECT_EQ(a.pastePages(0), 1);
+        a.tabManager().currentSession()->waitForSaves();  // (the merged PDF is written in the background)
         cached = a.tabManager().currentSession()->getDocument()->getPdfFilepath();
         EXPECT_TRUE(MergedPdf::inCache(cached));
         EXPECT_EQ(SessionRecovery::emergencySaveAll(), 1);

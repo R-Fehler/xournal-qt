@@ -130,7 +130,13 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
         height = page->getHeight();
     }
     if (renderPdfFirst) {
-        xoj::view::PdfBackgroundView(width, height, pdfPageNo, pdfCache).draw(cr);
+        if (XojPdfPageSPtr pending = host->rasterPendingPdfPage(pdfPageNo)) {
+            cairo_save(cr);
+            pending->render(cr);  // (a pasted page: from the pasted PDF until the merged PDF is written)
+            cairo_restore(cr);
+        } else {
+            xoj::view::PdfBackgroundView(width, height, pdfPageNo, pdfCache).draw(cr);
+        }
         flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
     }
 

@@ -29,7 +29,7 @@ The Qt build defines `XOJ_NO_GTK=1`. The upstream GTK build is unaffected by the
 | File | Change | Why |
 |------|--------|-----|
 | `src/util/include/util/Util.h`, `src/util/Util.cpp` | `execInUiThread` goes through a pluggable `Util::setUiThreadDispatcher()`; the default is a GLib idle source. `paintBackgroundWhite` is guarded. | `gdk_threads_add_idle_full` / `GtkWidget` |
-| `src/core/model/Document.h`, `.cpp` | PDF table of contents as `DocumentOutline` (plain C++) instead of a `GtkTreeStore`: `getOutline()` replaces `getContentsModel()`. | `GtkTreeModel` |
+| `src/core/model/Document.h`, `.cpp` | PDF table of contents as `DocumentOutline` (plain C++) instead of a `GtkTreeStore`: `getOutline()` replaces `getContentsModel()`. `readPdfKeepingOutline()`: load a PDF with the same first pages (pasted pages joined the merged PDF) without reading the outline again. | `GtkTreeModel` |
 | `src/core/pdf/base/XojCairoPdfExport.cpp` | `populatePdfOutline()` walks `DocumentOutline`, in the same traversal order as upstream. | `GtkTreeModel` |
 | `src/core/model/PaperSize.h`, `.cpp` | The `GtkPaperSize` constructor and the `gui/PaperFormatUtils.h` include are guarded. | `GtkPaperSize`, `GtkComboBox` |
 | `src/core/control/settings/Settings.h`, `.cpp` | The `GdkDevice*` overloads of `get/setDeviceClassForDevice` are guarded. | `gdk_device_get_*` |

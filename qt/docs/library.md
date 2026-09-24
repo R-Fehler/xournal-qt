@@ -53,6 +53,9 @@ the document uses as its background from then on. Their text stays searchable an
   saving, the document leaves nothing next to it, and the cache copy is removed (also for a document recovered
   after a crash, and when the recovery is declined).
 - Every later paste, from any PDF, goes into the same file; the same copied pages pasted again are not added twice.
+- The merged PDF is written in the background (qpdf writes the whole file: seconds for a long PDF). The pasted pages
+  get their numbers in it at once, since it only grows, and the canvas draws them from the copied pages until it is
+  written. A save waits for it; if it cannot be written, the pasted pages keep their PDF page as an image.
   Pages pasted within the same document keep referring to its own PDF pages.
 - Saving drops the PDF pages no page shows any more (deleted pasted pages, deleted pages) and renumbers the pages;
   nothing is written when nothing changed. Pages that come back through undo get their PDF pages back (kept in

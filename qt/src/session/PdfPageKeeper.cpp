@@ -1,14 +1,20 @@
 #include "PdfPageKeeper.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
 #include <mutex>
 #include <shared_mutex>
 #include <system_error>
 #include <unordered_set>
 
+#include <cairo.h>
+#include <gio/gio.h>
 #include <glib.h>
 
+#include "model/BackgroundImage.h"
 #include "model/Document.h"
+#include "model/PageType.h"
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfDocument.h"
 #include "util/PathUtil.h"
@@ -97,52 +103,246 @@ bool PdfPageKeeper::switchTo(const fs::path& pdf, std::string& error) {
     return true;
 }
 
+namespace {
+std::string keyOf(const std::string& pdf) {
+    uint64_t h = 1469598103934665603ULL;  // (FNV-1a)
+    for (unsigned char c: pdf) {
+        h ^= c;
+        h *= 1099511628211ULL;
+    }
+    return std::to_string(h) + ":" + std::to_string(pdf.size());
+}
+}  // namespace
+
+std::function<void()> PdfPageKeeper::beforeMergeWritten;
+
 size_t PdfPageKeeper::add(const std::string& pdf, std::string& error) {
-    session.waitForPdfWork();  // (a save that writes the merged PDF on a worker: that first)
+    session.waitForPdfWork();  // (a save that writes the merged PDF on a worker: that first, it may renumber)
     Document* doc = session.getDocument();
-    fs::path bg, xopp;
+    fs::path bg;
     size_t bgPages = 0;
     {
         std::shared_lock lock(*doc);
         bg = doc->getPdfFilepath();
-        xopp = doc->getFilepath();
         bgPages = doc->getPdfPageCount();
     }
     if (!bg.empty() && bgPages == 0) {
         error = "The background PDF of the document is missing.";  // (its pages must keep their numbers)
         return npos;
     }
-    const MergedPdf::Kind bgKind = bg.empty() ? MergedPdf::Kind::None : kindOf(bg);
-    // Pasted pages go into the cache until the document is saved (nothing is written next to it before)
-    const bool inPlace = bgKind != MergedPdf::Kind::None && MergedPdf::inCache(bg);
-    fs::path target;
-    MergedPdf::Kind kind = bgKind;
-    if (inPlace) {
-        target = bg;
-    } else {
-        if (kind == MergedPdf::Kind::None) {
-            kind = bg.empty() ? MergedPdf::Kind::Own : MergedPdf::Kind::WithSource;
+    if (addedNumbering != numberingNo) {
+        addedAt.clear();
+        addedNumbering = numberingNo;
+    }
+    std::string key = keyOf(pdf);
+    if (auto it = addedAt.find(key); it != addedAt.end()) {
+        return it->second;  // added before: the pages are there (or on their way)
+    }
+    auto merge = std::make_shared<Merge>();
+    GError* e = nullptr;
+    if (!merge->shown.load(std::make_unique<std::string>(pdf), "", &e) || merge->shown.getPageCount() == 0) {
+        error = e ? e->message : "The PDF pages could not be read.";
+        if (e) {
+            g_error_free(e);
         }
-        target = MergedPdf::cacheFolder() / (std::to_string(Util::getPid()) + "-" + std::to_string(session.serial()) +
-                                             "-" + std::to_string(++cacheFiles) + ".pdf");
-    }
-    const auto r = MergedPdf::append(bg, pdf, target, kind);
-    if (!r.ok) {
-        error = r.error;
         return npos;
     }
-    if (!switchTo(target, error)) {
-        return npos;
+    merge->pdf = pdf;
+    merge->pages = merge->shown.getPageCount();
+    merge->key = key;
+    {
+        std::lock_guard lock(pendingMutex);
+        merge->first = bgPages + pendingPages;  // (after the pages of the merges before it)
+        pendingPages += merge->pages;
+        pending.push_back(merge);
     }
-    if (!inPlace) {
-        madeFrom = bgKind == MergedPdf::Kind::None ? bg : fs::path();
-        grownFrom = bg;  // (its pages keep their numbers in the new file)
-        createdInCache.insert(target);
+    addedAt[key] = merge->first;
+    session.queueMerge(merge);
+    return merge->first;
+}
+
+void PdfPageKeeper::startMerge(Merge& m) {
+    Document* doc = session.getDocument();
+    {
+        std::shared_lock lock(*doc);
+        m.bg = doc->getPdfFilepath();
     }
-    knownPath = target;
-    knownStamp = stampOf(target);
-    knownKind = kind;
-    return r.first;
+    m.bgKind = m.bg.empty() ? MergedPdf::Kind::None : kindOf(m.bg);
+    // Pasted pages go into the cache until the document is saved (nothing is written next to it before)
+    m.inPlace = m.bgKind != MergedPdf::Kind::None && MergedPdf::inCache(m.bg);
+    m.kind = m.bgKind;
+    if (m.inPlace) {
+        m.target = m.bg;
+    } else {
+        if (m.kind == MergedPdf::Kind::None) {
+            m.kind = m.bg.empty() ? MergedPdf::Kind::Own : MergedPdf::Kind::WithSource;
+        }
+        m.target = MergedPdf::cacheFolder() / (std::to_string(Util::getPid()) + "-" + std::to_string(session.serial()) +
+                                               "-" + std::to_string(++cacheFiles) + ".pdf");
+    }
+}
+
+void PdfPageKeeper::writeMerge(Merge& m) {
+    if (beforeMergeWritten) {
+        beforeMergeWritten();
+    }
+    // XQT_PASTE_TIMES=1: the time of the steps on stderr (for measuring)
+    static const bool times = qEnvironmentVariableIsSet("XQT_PASTE_TIMES");
+    auto started = std::chrono::steady_clock::now();
+    auto step = [&](const char* what) {
+        if (times) {
+            const auto now = std::chrono::steady_clock::now();
+            std::fprintf(stderr, "paste: %-28s %8.1f ms\n", what,
+                         std::chrono::duration<double, std::milli>(now - started).count());
+            started = now;
+        }
+    };
+    m.result = MergedPdf::append(m.bg, m.pdf, m.target, m.kind);
+    step("append (qpdf, worker)");
+    if (!m.result.ok) {
+        return;
+    }
+    // Load it once on its own first: a PDF that does not load must not take the document's PDF away
+    XojPdfDocument probe;
+    GError* e = nullptr;
+    m.loads = probe.load(m.target, "", &e);
+    if (e) {
+        m.result.error = e->message;
+        g_error_free(e);
+    }
+    step("probe (poppler, worker)");
+}
+
+std::string PdfPageKeeper::finishMerge(Merge& m) {
+    Document* doc = session.getDocument();
+    std::string error;
+    // (its pages are those of the document's PDF, with the same numbers, and the added ones)
+    const auto started = std::chrono::steady_clock::now();
+    const bool ok = m.result.ok && m.loads && session.loadPdfKeepingPictures(m.target);
+    if (qEnvironmentVariableIsSet("XQT_PASTE_TIMES")) {
+        std::fprintf(stderr, "paste: %-28s %8.1f ms\n", "load it (poppler, UI thread)",
+                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+    }
+    if (ok) {
+        if (!m.inPlace) {
+            madeFrom = m.bgKind == MergedPdf::Kind::None ? m.bg : fs::path();
+            grownFrom = m.bg;  // (its pages keep their numbers in the new file)
+            createdInCache.insert(m.target);
+        }
+        knownPath = m.target;
+        knownStamp = stampOf(m.target);
+        knownKind = m.kind;
+        if (auto it = addedAt.find(m.key); it != addedAt.end()) {
+            it->second = m.result.first;  // (as it came out)
+        }
+    } else {
+        error = !m.result.error.empty() ? m.result.error : doc->getLastErrorMsg();
+        if (!m.inPlace && m.result.ok) {
+            std::error_code ec;
+            fs::remove(m.target, ec);
+        }
+        addedAt.erase(m.key);
+    }
+    // The pages of this merge: with their numbers in it (if it came out otherwise), or as images of their PDF page
+    std::unordered_set<const XojPage*> changed;
+    const long delta = ok ? static_cast<long>(m.result.first) - static_cast<long>(m.first) : 0;
+    {
+        std::unique_lock lock(*doc);
+        for (auto& [ptr, t]: tracked) {
+            const PageRef p = t.page.lock();
+            if (!p || !isPdf(p) || p->getPdfPageNr() < m.first || p->getPdfPageNr() >= m.first + m.pages) {
+                continue;
+            }
+            const size_t local = p->getPdfPageNr() - m.first;
+            if (ok) {
+                if (delta != 0) {
+                    t.last = m.result.first + local;
+                    p->setBackgroundPdfPageNr(t.last);
+                }
+            } else {
+                if (XojPdfPageSPtr page = m.shown.getPage(local); !page || !toImageBackground(*p, *page)) {
+                    p->setBackgroundType(PageType(PageTypeFormat::Plain));  // (the annotations at least)
+                }
+                t.last = npos;
+            }
+            changed.insert(p.get());
+        }
+    }
+    {
+        std::lock_guard lock(pendingMutex);
+        pending.erase(std::remove_if(pending.begin(), pending.end(), [&](const auto& x) { return x.get() == &m; }),
+                      pending.end());
+        pendingPages -= std::min(pendingPages, m.pages);
+    }
+    std::vector<size_t> inDocument;
+    {
+        std::shared_lock lock(*doc);
+        for (size_t i = 0; i < doc->getPageCount(); ++i) {
+            if (changed.count(doc->getPage(i).get())) {
+                inDocument.push_back(i);
+            }
+        }
+    }
+    for (size_t i: inDocument) {
+        if (!ok || delta != 0) {
+            session.firePageChanged(i);  // (drawn again)
+        }
+        session.revisePage(i);  // (their thumbnails were drawn without the PDF page)
+    }
+    return error;
+}
+
+XojPdfPageSPtr PdfPageKeeper::pendingPage(size_t number) const {
+    std::lock_guard lock(pendingMutex);
+    for (const auto& m: pending) {
+        if (number >= m->first && number < m->first + m->pages) {
+            return m->shown.getPage(number - m->first);
+        }
+    }
+    return nullptr;
+}
+
+namespace {
+cairo_status_t appendPng(void* closure, const unsigned char* data, unsigned int length) {
+    auto* buffer = static_cast<std::vector<unsigned char>*>(closure);
+    buffer->insert(buffer->end(), data, data + length);
+    return CAIRO_STATUS_SUCCESS;
+}
+}  // namespace
+
+bool PdfPageKeeper::toImageBackground(XojPage& page, const XojPdfPage& pdf, double dpi) {
+    const double scale = dpi / 72.0;
+    const int w = std::max(1, static_cast<int>(page.getWidth() * scale));
+    const int h = std::max(1, static_cast<int>(page.getHeight() * scale));
+    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
+    cairo_t* cr = cairo_create(surface);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_paint(cr);
+    cairo_scale(cr, scale, scale);
+    pdf.render(cr);
+    cairo_destroy(cr);
+    std::vector<unsigned char> png;
+    const bool ok = cairo_surface_write_to_png_stream(surface, appendPng, &png) == CAIRO_STATUS_SUCCESS;
+    cairo_surface_destroy(surface);
+    if (!ok) {
+        return false;
+    }
+    GBytes* bytes = g_bytes_new(png.data(), png.size());
+    GInputStream* stream = g_memory_input_stream_new_from_bytes(bytes);
+    g_bytes_unref(bytes);
+    BackgroundImage img;
+    GError* error = nullptr;
+    img.loadFile(stream, fs::path("pasted-pdf-page.png"), &error);
+    g_object_unref(stream);
+    if (error) {
+        g_warning("Could not convert the PDF page: %s", error->message);
+        g_error_free(error);
+        return false;
+    }
+    img.setAttach(true);  // stored in the .xopp
+    page.setBackgroundImage(img);
+    page.setBackgroundType(PageType(PageTypeFormat::Image));
+    return true;
 }
 
 fs::path PdfPageKeeper::annotatedPdf() const {
@@ -248,7 +448,7 @@ void PdfPageKeeper::pageChanged(size_t index) {
 
 void PdfPageKeeper::restore(std::shared_ptr<Limbo> limbo) {  // (a copy: the pages' own are reset here)
     std::string error;
-    const size_t first = add(limbo->pdf, error);
+    const size_t first = add(limbo->pdf, error);  // (merged in the background; the numbers are known now)
     if (first == npos) {
         g_warning("Could not add the PDF pages of pages that came back: %s", error.c_str());
     }
@@ -282,12 +482,20 @@ fs::path PdfPageKeeper::placeFor(const fs::path& xopp) {
         std::shared_lock lock(*session.getDocument());
         bg = session.getDocument()->getPdfFilepath();
     }
-    const MergedPdf::Kind kind = bg.empty() ? MergedPdf::Kind::None : kindOf(bg);
+    MergedPdf::Kind kind = bg.empty() ? MergedPdf::Kind::None : kindOf(bg);
+    bool coming = false;  // the merged PDF it is going to have (pasted pages are being merged)
+    if (kind == MergedPdf::Kind::None) {
+        std::lock_guard lock(pendingMutex);
+        if (!pending.empty()) {
+            kind = bg.empty() ? MergedPdf::Kind::Own : MergedPdf::Kind::WithSource;
+            coming = true;
+        }
+    }
     if (kind == MergedPdf::Kind::None || xopp.empty()) {
         return {};
     }
     const fs::path pair = MergedPdf::pairOf(xopp), sidecar = MergedPdf::sidecarOf(xopp);
-    if (bg == pair || bg == sidecar) {
+    if (!coming && (bg == pair || bg == sidecar)) {
         return bg;
     }
     std::error_code ec;

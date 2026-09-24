@@ -16,6 +16,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -25,6 +26,8 @@
 
 #include "model/DocumentListener.h"
 #include "model/PageRef.h"
+#include "pdf/base/XojPdfDocument.h"
+#include "pdf/base/XojPdfPage.h"
 
 #include "util/Util.h"  // npos
 
@@ -35,14 +38,47 @@ namespace xqt {
 
 class DocumentSession;
 
+/// One PdfPageKeeper::add() on its way into the merged PDF.
+struct PdfMerge {
+    std::string pdf;    ///< the pages to add (a PDF in memory)
+    size_t pages = 0;   ///< how many
+    size_t first = 0;   ///< the number of the first of them in the merged PDF (as expected when it was added)
+    XojPdfDocument shown;  ///< `pdf`, loaded: the pages are drawn from it until they are merged
+    std::string key;       ///< (the same pages added again)
+    // --- startMerge (this thread): what is written
+    fs::path bg, target;
+    MergedPdf::Kind bgKind = MergedPdf::Kind::None, kind = MergedPdf::Kind::None;
+    bool inPlace = false;
+    // --- writeMerge (worker)
+    MergedPdf::Result result;
+    bool loads = false;
+};
+
 class PdfPageKeeper final: public DocumentListener {
 public:
     explicit PdfPageKeeper(DocumentSession& session);
     ~PdfPageKeeper() override;
 
-    /// Add the pages of a PDF in memory to the merged PDF (made from the document's background PDF the first time)
-    /// and make it the background. Returns the number of the first added page in it, or npos (`error`).
+    /// Add the pages of a PDF in memory to the merged PDF (made from the document's background PDF the first time),
+    /// which becomes the background. Returns the number of the first added page in it at once, or npos (`error`).
+    /// The merged PDF only grows, in order, so the numbers are known before it is written: that is done in the
+    /// background (a Merge: DocumentSession runs them one after the other, before the saves that wait), and until then
+    /// the views draw the pages from the PDF in memory (pendingPage). Pages whose merge fails get their PDF page as an image.
+    /// The same pages added again (the same PDF) are not added twice.
     size_t add(const std::string& pdf, std::string& error);
+
+    using Merge = PdfMerge;
+    void startMerge(Merge& merge);
+    static void writeMerge(Merge& merge);
+    /// The document takes the merged PDF (or, if it could not be written, the pages get their PDF page as an image
+    /// background; returns the error then).
+    std::string finishMerge(Merge& merge);
+    /// A PDF page that is being merged (any thread; nullptr: none): the views draw it from the PDF in memory.
+    XojPdfPageSPtr pendingPage(size_t number) const;
+    /// Tests: called on the worker before a merge is written.
+    static std::function<void()> beforeMergeWritten;
+    /// The PDF page as an (attached) image background of the page (the fallback when it cannot stay a PDF page).
+    static bool toImageBackground(XojPage& page, const XojPdfPage& pdf, double dpi = 200);
     /// The PDF the document annotates for the user: its background PDF, or the one the merged PDF was made from
     /// while that is in the cache (a document not saved yet).
     fs::path annotatedPdf() const;
@@ -136,6 +172,13 @@ private:
     fs::path leftStaging;  ///< the staged file, removed when the .xopp no longer refers to it
     std::unordered_map<const XojPage*, Tracked> tracked;
     quint64 numberingNo = 0;
+    /// Merges not finished yet (their pages: from their PDF in memory)
+    mutable std::mutex pendingMutex;
+    std::vector<std::shared_ptr<Merge>> pending;
+    size_t pendingPages = 0;
+    /// The first number of pages added before, by their PDF (while the numbering stays)
+    std::unordered_map<std::string, size_t> addedAt;
+    quint64 addedNumbering = 0;
 };
 
 }  // namespace xqt

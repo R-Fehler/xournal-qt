@@ -792,11 +792,13 @@ fs::path DocumentSession::documentFile() const {
 
 size_t DocumentSession::addPdfPages(const std::string& pdf, std::string& error) { return pdfPages->add(pdf, error); }
 
+XojPdfPageSPtr DocumentSession::pendingPdfPage(size_t number) const { return pdfPages->pendingPage(number); }
+
 fs::path DocumentSession::annotatedPdf() const { return pdfPages->annotatedPdf(); }
 
 bool DocumentSession::loadPdfKeepingPictures(const fs::path& pdf) {
     keepingPictures = true;
-    const bool ok = doc->readPdf(pdf, /*initPages=*/false, /*attachToDocument=*/false);
+    const bool ok = doc->readPdfKeepingOutline(pdf);  // (the same pages: the same outline)
     keepingPictures = false;
     return ok;
 }

@@ -27,6 +27,7 @@
 
 #include "control/Control.h"
 #include "control/zoom/ZoomControl.h"
+#include "pdf/base/XojPdfPage.h"
 #include "undo/UndoRedoHandler.h"  // for UndoRedoListener
 
 #include "HeadlessViews.h"
@@ -39,6 +40,7 @@ namespace xqt {
 
 class DocumentSearch;
 class PdfPageKeeper;
+struct PdfMerge;
 
 class AppContext;
 
@@ -169,8 +171,18 @@ public:
     // --- PDF pages from other PDFs (MergedPdf.h) ----------------------------------------------------------------
     /// Add PDF pages from another PDF (a PDF in memory) to the document's merged background PDF, which is made from
     /// its own PDF the first time and becomes its background. Returns the number of the first of them in it, or npos
-    /// if that failed (`error`). The numbers of the other pages stay.
+    /// if that failed (`error`). The numbers of the other pages stay. The merged PDF is written in the background
+    /// (seconds for a long PDF): pages with these numbers are drawn from `pdf` until then (pendingPdfPage); if it
+    /// fails, they get their PDF page as an image and pdfPagesFailed() says why.
     size_t addPdfPages(const std::string& pdf, std::string& error);
+    /// A PDF page that is still being added to the merged PDF (any thread; nullptr: none).
+    XojPdfPageSPtr pendingPdfPage(size_t number) const;
+    /// PDF pages are being added to the merged PDF.
+    bool mergingPdfPages() const;
+    /// Wait (blocking) until they are (and a save before them is done): e.g. before pages are copied.
+    void waitForMerges();
+    /// (PdfPageKeeper) Write this merge after the ones before it, before the saves that wait.
+    void queueMerge(std::shared_ptr<PdfMerge> merge);
     /// The page numbers in the background PDF stay valid while this does not change (a save dropped unused pages
     /// of the merged PDF and renumbered the pages).
     quint64 pdfNumbering() const;
@@ -269,6 +281,8 @@ Q_SIGNALS:
     void modifiedChanged(bool modified);
     /// isSaving() changed.
     void savingChanged(bool saving);
+    /// Pasted PDF pages could not be added to the merged PDF (they show their PDF page as an image instead).
+    void pdfPagesFailed(const QString& error);
     void undoRedoStateChanged();
     /// A page change was undone (or redone): its text ("Insert page", ...).
     void pageActionUndone(const QString& text, bool undone);
@@ -296,6 +310,9 @@ private:
     struct SaveTask;
     void startNextSave();
     void beginSave();
+    void beginMerge();
+    /// Pages were pasted while this save had not copied the document yet: the merges first, then it starts again.
+    bool yieldToMerges();
     void planFiles();
     void takeSnapshot();
     void finishWrite();
@@ -329,6 +346,7 @@ private:
 
     std::unique_ptr<SaveTask> saveTask;  ///< the save that runs
     std::deque<SaveRequest> saveQueue;   ///< the saves after it
+    std::deque<std::shared_ptr<PdfMerge>> mergeQueue;  ///< pasted PDF pages to merge (before the saves)
     quint64 saveStage = 0;               ///< the step of the running save (a stale resume is ignored)
     bool lastSaving = false;
     /// The saved point of the undo stack is the state a running save copied: modified until it is written.

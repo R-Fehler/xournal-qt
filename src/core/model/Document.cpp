@@ -305,6 +305,27 @@ void Document::buildContentsModel() {
 
 auto Document::getOutline() const -> const DocumentOutline& { return this->outline; }
 
+bool Document::readPdfKeepingOutline(const fs::path& filename) {  // xournal-qt
+    GError* popplerError = nullptr;
+    lock();
+    if (!pdfDocument.load(filename, password, &popplerError)) {
+        lastError = FS(_F("Document not loaded! ({1}), {2}") % filename.u8string() %
+                       (popplerError ? popplerError->message : ""));
+        if (popplerError) {
+            g_error_free(popplerError);
+        }
+        unlock();
+        return false;
+    }
+    this->pdfFilepath = filename;
+    this->attachPdf = false;
+    lastError = "";
+    updateIndexPageNumbers();
+    unlock();
+    this->handler->fireDocumentChanged(DOCUMENT_CHANGE_PDF_BOOKMARKS);
+    return true;
+}
+
 void Document::fillOutlinePageLabels(DocumentOutline& entries) {
     for (auto& entry: entries) {
         auto page = findPdfPage(entry.dest.getPdfPage());

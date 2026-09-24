@@ -527,6 +527,7 @@ TEST(Pages, pdfPagesPastedIntoAnotherDocumentStayPdfPages) {
     c.newDocument();
     ASSERT_EQ(c.pastePages(1), 1);
     DocumentSession* other = c.tabManager().currentSession();
+    other->waitForSaves();  // (the merged PDF is written in the background)
     auto page = other->getDocument()->getPage(1);
     EXPECT_TRUE(page->getBackgroundType().isPdfPage()) << "a PDF page of the new document's merged PDF";
     EXPECT_EQ(other->getDocument()->getPdfPageCount(), 1u);

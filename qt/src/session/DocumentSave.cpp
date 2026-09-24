@@ -26,6 +26,7 @@
 #include <unordered_map>
 
 #include <QMetaObject>
+#include <QString>
 #include <QThreadPool>
 
 #include <cairo.h>
@@ -184,9 +185,16 @@ bool stopAt(int step) { return PdfPageKeeper::stopSaveAt && PdfPageKeeper::stopS
 
 // --- the interface -------------------------------------------------------------------------------------------------
 
-bool DocumentSession::isSaving() const { return saveTask || !saveQueue.empty(); }
+bool DocumentSession::isSaving() const { return (saveTask && !saveTask->merge) || !saveQueue.empty(); }
 
-bool DocumentSession::pdfWorkRunning() const { return saveTask && saveTask->pdfWork; }
+bool DocumentSession::mergingPdfPages() const { return (saveTask && saveTask->merge) || !mergeQueue.empty(); }
+
+bool DocumentSession::pdfWorkRunning() const { return (saveTask && saveTask->pdfWork) || mergingPdfPages(); }
+
+void DocumentSession::queueMerge(std::shared_ptr<PdfMerge> merge) {
+    mergeQueue.push_back(std::move(merge));
+    startNextSave();
+}
 
 void DocumentSession::saveInBackground(SaveRequest request) {
     if (request.kind == SaveKind::Save && !saveQueue.empty() && saveQueue.back().kind == SaveKind::Save) {
@@ -235,7 +243,7 @@ auto DocumentSession::exportXopp(const fs::path& xopp) -> SaveResult {
 }
 
 bool DocumentSession::waitForSaves() {
-    while (isSaving()) {
+    while (saveTask || !saveQueue.empty() || !mergeQueue.empty()) {  // (the merges of pasted pages too)
         if (!saveTask) {
             startNextSave();
             continue;
@@ -248,6 +256,19 @@ bool DocumentSession::waitForSaves() {
     return lastSaveResult.ok;
 }
 
+void DocumentSession::waitForMerges() {
+    while (mergingPdfPages()) {
+        if (!saveTask) {
+            startNextSave();
+            continue;
+        }
+        if (!saveTask->then) {
+            break;  // (called from within one of the steps)
+        }
+        resumeSave(saveStage);
+    }
+}
+
 void DocumentSession::waitForPdfWork() {
     while (saveTask && saveTask->pdfWork && saveTask->then) {
         resumeSave(saveStage);
@@ -257,7 +278,13 @@ void DocumentSession::waitForPdfWork() {
 // --- the steps -----------------------------------------------------------------------------------------------------
 
 void DocumentSession::startNextSave() {
-    if (!saveTask && !saveQueue.empty()) {
+    if (!saveTask && !mergeQueue.empty()) {
+        // Pasted PDF pages first: the saves that wait refer to them
+        saveTask = std::make_unique<SaveTask>();
+        saveTask->merge = std::move(mergeQueue.front());
+        mergeQueue.pop_front();
+        beginMerge();
+    } else if (!saveTask && !saveQueue.empty()) {
         saveTask = std::make_unique<SaveTask>();
         saveTask->request = std::move(saveQueue.front());
         saveQueue.pop_front();
@@ -265,6 +292,33 @@ void DocumentSession::startNextSave() {
         beginSave();  // (a save that fails at once starts the next one from finishSave)
     }
     updateSaving();
+}
+
+void DocumentSession::beginMerge() {
+    PdfMerge& merge = *saveTask->merge;
+    pdfPages->startMerge(merge);
+    onWorker([&merge] { PdfPageKeeper::writeMerge(merge); },
+             [this] {
+                 const std::unique_ptr<SaveTask> task = std::move(saveTask);
+                 ++saveStage;
+                 const std::string error = pdfPages->finishMerge(*task->merge);
+                 if (!error.empty()) {
+                     g_warning("Could not add the PDF pages to the document's PDF: %s", error.c_str());
+                     Q_EMIT pdfPagesFailed(QString::fromStdString(error));
+                 }
+                 startNextSave();
+             });
+}
+
+bool DocumentSession::yieldToMerges() {
+    if (mergeQueue.empty()) {
+        return false;
+    }
+    saveQueue.push_front(std::move(saveTask->request));
+    saveTask.reset();
+    ++saveStage;
+    startNextSave();
+    return true;
 }
 
 void DocumentSession::updateSaving() {
@@ -311,6 +365,9 @@ void DocumentSession::beginSave() {
 }
 
 void DocumentSession::planFiles() {
+    if (yieldToMerges()) {
+        return;
+    }
     SaveTask& t = *saveTask;
     const fs::path bg = backgroundOf(*doc);
     t.expectedBg = bg;
@@ -407,6 +464,9 @@ void DocumentSession::planFiles() {
 }
 
 void DocumentSession::takeSnapshot() {
+    if (yieldToMerges()) {
+        return;  // (its copy would show pages whose PDF pages are not in the file yet)
+    }
     SaveTask& t = *saveTask;
     const bool exporting = t.request.kind == SaveKind::ExportXopp;
     if (!exporting && backgroundOf(*doc) != t.expectedBg) {
