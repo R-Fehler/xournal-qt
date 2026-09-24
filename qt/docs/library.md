@@ -27,7 +27,8 @@ A **library** is a plain folder of documents that a window works in, like a work
 - **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
   with a thumbnail. `name.xopp` next to `name.jpg` is one document, like a PDF and its `.xopp`: it opens as the `.xopp`
   (the image is the background of its page). A `.xopp` next to a PDF of its name belongs to the PDF; of several
-  images of one name, the first of `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`, `.heif` pairs.
+  images of one name, the first of `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`, `.heif` pairs (the extension written in
+  lower or upper case).
 - Cards show what a document is: "PDF", "MD", "IMG" ("✎": with its `.xopp`). The library model has a kind per row
   (`notes`, `pdf`, `md`, `image`) for a filter by kind.
 - These files are never shown:
@@ -51,13 +52,13 @@ A **library** is a plain folder of documents that a window works in, like a work
 ### Markdown files and images, opened
 - A **Markdown file** opens read-only for now (the `.md` editor comes later and replaces this): a new document of
   plain A4 pages with the file's text as the page's Markdown text flowing over them (`qt/src/canvas/MarkdownFile.*`,
-  drawn by our Markdown renderer), titled with the file name. A note over the page says it is read-only and that
-  changes are not saved to the file. The document is never written back to the `.md`; it can be written on, and
+  drawn by our Markdown renderer), titled with the file name. A note at the bottom left of the page view says it is
+  read-only and that changes are not saved to the file (× closes it for this tab). The document is never written back to the `.md`; it can be written on, and
   "Save as" makes a `.xopp` of it (under the default name, not next to the `.md`). Of a file over 2 MB the first
   2 MB are shown (the note says so). Opening it again shows its tab.
 - An **image** opens as a new document with one page that has the image as its background (upstream's image
-  background), as big as the image fits into A4's long side, titled with the file name; nothing is written until it
-  is saved. "Save" suggests `photo.xopp` next to `photo.jpg`, and the library then shows the two as one card (above),
+  background), as big as the image fits into A4's long side, titled with the file name, with a note that saving
+  keeps it next to the image; nothing is written until it is saved. "Save" suggests `photo.xopp` next to `photo.jpg`, and the library then shows the two as one card (above),
   which opens the `.xopp`. A PNG or JPEG that needs no turning is used by its path, as upstream refers to background
   images (the `.xopp` stays small); any other image (WebP, HEIC, a photo turned upright by its orientation tag, which
   upstream would show sideways) is stored with the `.xopp` as a PNG of at most 4096 px (`photo.xopp.bg_1.png`,
