@@ -308,6 +308,8 @@
     folders, resources and a fontconfig pointed at `/system/fonts`.
   - Qt 6.11.2 (aqt), NDK r27c, JDK 17.
 - **An empty path no longer throws out of the recent list (2026-09-24).**
+- **Reference pop out, `qt/reference-popout` (2026-09-24).** "Show as a tab" in the reference pill closes the split,
+  puts the reference's tab right after the notes, and switches to it; Ctrl+Tab then goes between the two.
   318 KiB.
 
 ## Backlog (decide later)

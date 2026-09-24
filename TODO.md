@@ -244,7 +244,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - **The page grid for the reference** (a grid button in its pill), but **no page sidebar** for it: space is
     limited, and the sidebar keeps showing the main document.
   - Merged 2026-09-24, with the follow-up (full text selection and context menus, shared with the main canvas).
-  - [~] **Pop out** (the author, 2026-09-24; `qt/reference-popout`): a button in the reference pill that shows the
+  - [x] **Pop out** (merged 2026-09-24, `qt/reference-popout`): a button in the reference pill that shows the
     reference as its own tab, placed right after the current one, so Ctrl+Tab switches between notes and reference.
     - Copy always; Highlight, Underline, Strike through and Paste only when editing is on.
     - The lasso bar, the canvas context menu, Markdown when editable, and Ctrl+S saving the focused reference.
