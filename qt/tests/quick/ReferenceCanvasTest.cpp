@@ -7,6 +7,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <functional>
 #include <memory>
 
 #include <QCoreApplication>
@@ -98,6 +99,14 @@ protected:
         while (t.elapsed() < ms) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
             app->getRenderService()->waitForIdle();
+        }
+    }
+    /// Until something is true (an animation that takes longer on a busy machine), at most `ms`
+    void until(const std::function<bool()>& done, int ms = 5000) {
+        QElapsedTimer t;
+        t.start();
+        while (!done() && t.elapsed() < ms) {
+            wait(20);
         }
     }
 
@@ -231,7 +240,7 @@ TEST_F(ReferenceCanvasTest, theWheelScrollsTheCanvasUnderThePointer) {
     QWheelEvent wheel(QPointF(600, 300), window->mapToGlobal(QPointF(600, 300)), QPoint(), QPoint(0, -240),
                       Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
     QCoreApplication::sendEvent(window, &wheel);
-    wait(50);
+    until([&] { return refCanvas->contentY() > refY; });
     EXPECT_GT(refCanvas->contentY(), refY);
     EXPECT_DOUBLE_EQ(mainCanvas->contentY(), mainY);
 }
