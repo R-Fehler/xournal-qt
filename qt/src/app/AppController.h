@@ -108,6 +108,9 @@ class AppController: public QObject {
     /// The current document is another text file (code, LaTeX, JSON, ...) shown read-only: it can be edited as plain
     /// text after a warning (editAnyway).
     Q_PROPERTY(bool canEditAnyway READ canEditAnyway NOTIFY titleChanged)
+    /// The current document is a file the app does not keep as a .xopp or PDF (a .md, a text file, an image to write
+    /// on): "Open externally" hands it to its app.
+    Q_PROPERTY(bool canOpenExternally READ canOpenExternally NOTIFY titleChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
@@ -229,6 +232,13 @@ public:
     /// Edit the text file shown read-only as plain text: the first time for a file the window warns first
     /// (editAnywayWarning), and "OK" calls this again with `confirmed`. From then on the file opens for editing.
     Q_INVOKABLE bool editAnyway(bool confirmed = false);
+    bool canOpenExternally() const;
+    /// Hand the current document's file to the app the system has for it (SystemApps). Unsaved changes are the
+    /// window's business (it asks to save first). When the file comes back changed, the tab reads it again.
+    Q_INVOKABLE bool openExternally();
+    /// The file "Open externally" hands over for a library card's path ("" for notes and PDFs): the Markdown, text or
+    /// other file, the image a .xopp annotates.
+    Q_INVOKABLE QString externalFileOf(const QString& path) const;
     /// Look whether the text files of the open tabs changed on disk (another program): an unmodified one is read
     /// again, a modified one is asked about (textChangedOnDisk). Also done when the window becomes active.
     Q_INVOKABLE void checkTextFiles();

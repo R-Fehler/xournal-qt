@@ -58,6 +58,14 @@ written says why and stays read-only.
 - A file that cannot be edited opens read-only, as before, with a note saying why: not UTF-8, bigger than 2 MB, or
   a file that cannot be written.
 
+## Open externally
+Every file the app does not keep as a `.xopp` or PDF (a `.md`, a `.txt`, another text file, an image being written
+on) has **Open externally**: a button in the tool bar (an arrow out of a box), an entry in ⋮, and "Open externally"
+in the library card's menu (Markdown, text and other files, images; a `.xopp` that annotates an image hands over
+the image). It hands the file to the app the system has for it (`SystemApps`: `xdg-open` on Linux). A text file
+with unsaved changes asks first: **Save and open**, **Open without saving** or Cancel. When the other app changed
+the file, the tab reads it again (below) as soon as the window is looked at again.
+
 ## Changed by another program
 The file is watched (and looked at when the window becomes active again and when its tab is shown). If another
 program changed it (its bytes differ from what was read or saved last; our own saves are not changes):

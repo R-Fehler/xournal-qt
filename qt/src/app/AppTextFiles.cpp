@@ -144,6 +144,28 @@ bool AppController::editAnyway(bool confirmed) {
     return true;
 }
 
+bool AppController::canOpenExternally() const {
+    const DocumentSession* s = session();
+    return s && !s->hasFilePath() && !s->shownFile().empty();
+}
+
+bool AppController::openExternally() {
+    if (!canOpenExternally()) {
+        return false;
+    }
+    textCheckTimer.stop();
+    return openWithSystemApp(QString::fromStdString(session()->shownFile().string()));
+}
+
+QString AppController::externalFileOf(const QString& path) const {
+    const DocumentItem item = DocumentFiles::itemOf(fs::path(path.toStdString()), DocumentFiles::AllFiles);
+    if (!item.valid() || !item.pdf.empty()) {
+        return {};  // (a PDF, with its notes or not: opened here)
+    }
+    const fs::path& file = !item.image.empty() ? item.image : !item.md.empty() ? item.md : item.other;
+    return file.empty() ? QString() : QString::fromStdString(file.string());
+}
+
 QString AppController::textDocument() const {
     const DocumentSession* s = session();
     if (!s || !s->textFile() || s->hasFilePath()) {

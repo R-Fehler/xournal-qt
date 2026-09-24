@@ -905,3 +905,8 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       too). Tap it: a warning that the app does not know the format; Cancel keeps it read-only, OK shows it as
       plain text to edit, in the same tab. Close and open it again: editable at once, no warning. Another file
       asks again.
+- [ ] "Open externally" (the arrow-out-of-a-box button in the tool bar, ⋮, and the library card menu of a `.md`,
+      `.txt`, code file or image): the file opens in its system app (e.g. Kate / a code editor). With unsaved
+      changes in a `.md`: asked "Save before opening it elsewhere?"; Save and open saves, then opens. Change and
+      save it in the other app, come back to the window: the tab shows the new text. A `.xopp` or PDF has no such
+      button or entry.

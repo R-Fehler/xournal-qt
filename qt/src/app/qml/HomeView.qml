@@ -1241,10 +1241,13 @@ Rectangle {
         }
         MenuItem {
             objectName: "openWithSystemAppItem"
-            text: qsTr("Open with the system app")
-            visible: !home.menuMany && (home.menuKind === "other" || home.menuKind === "text")
+            text: qsTr("Open externally")
+            // Markdown, text and other files, images: in the app the system has for them (not notes and PDFs)
+            readonly property string file: !home.menuMany && ["md", "image", "text", "other"].indexOf(home.menuKind) >= 0
+                                           ? app.externalFileOf(home.menuPath) : ""
+            visible: file !== ""
             height: visible ? implicitHeight : 0
-            onTriggered: app.openWithSystemApp(home.menuPath)
+            onTriggered: app.openWithSystemApp(file)
         }
         MenuItem {
             objectName: "showInFileManagerItem"

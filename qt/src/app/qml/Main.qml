@@ -139,6 +139,14 @@ ApplicationWindow {
         }
         xoppExportDialog.open()
     }
+    // "Open externally": a text file with unsaved changes is saved first (asked), so the other app sees them
+    function openExternally() {
+        if (app.textEditable && app.modified) {
+            externalSaveDialog.open()
+        } else {
+            app.openExternally()
+        }
+    }
     function saveOrAsk(then) {
         if (app.savesWithoutDialog()) {
             // In the background: the window stays usable; `then` runs once the file is written (with its tab
@@ -299,6 +307,14 @@ ApplicationWindow {
             IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
             IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
+            // A .md, a text file, an image: in the app the system has for it (a code editor, …)
+            IconButton {
+                objectName: "openExternallyButton"
+                visible: app.canOpenExternally
+                iconName: "xqt-external-link"
+                tip: qsTr("Open externally (in the app the system has for this file)")
+                onClicked: win.openExternally()
+            }
             ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { visible: !win.textDoc; iconName: "xopp-tool-pencil"; tip: qsTr("Pen"); checked: app.tool === "pen"; onClicked: app.selectTool("pen") }
             IconButton { visible: !win.textDoc; iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
@@ -721,6 +737,13 @@ ApplicationWindow {
                         height: visible ? implicitHeight : 0
                         text: qsTr("Export as .xopp for Xournal++…")
                         onTriggered: openXoppExportDialog()
+                    }
+                    MenuItem {
+                        objectName: "openExternallyItem"
+                        visible: app.canOpenExternally
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Open externally")
+                        onTriggered: win.openExternally()
                     }
                     MenuItem {
                         objectName: "editAnywayItem"
@@ -1345,6 +1368,40 @@ ApplicationWindow {
             textChangedDialog.file = name
             textChangedDialog.open()
         }
+    }
+    // Open externally with unsaved changes: save them first?
+    Dialog {
+        id: externalSaveDialog
+        objectName: "externalSaveDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, parent ? parent.width - 32 : 480)
+        title: qsTr("Save before opening it elsewhere?")
+        Label {
+            width: externalSaveDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("%1 has changes that are not saved. The other app sees the file as it is on disk.").arg(app.title)
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "externalCancelButton"
+                text: qsTr("Cancel")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "externalWithoutSavingButton"
+                text: qsTr("Open without saving")
+                DialogButtonBox.buttonRole: DialogButtonBox.DestructiveRole
+                onClicked: { externalSaveDialog.close(); app.openExternally() }
+            }
+            Button {
+                objectName: "externalSaveButton"
+                text: qsTr("Save and open")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: saveOrAsk(function() { app.openExternally() })
     }
     // "Edit anyway" for a code, LaTeX, JSON... file: once per file, what editing it here means
     Dialog {

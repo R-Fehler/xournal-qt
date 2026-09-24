@@ -1754,10 +1754,54 @@ TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManage
     EXPECT_TRUE(openWith->isVisible());
     click(child(menu, "showInFileManagerItem"));
     EXPECT_EQ(fake.shown, QStringList{docx});
-    // A document has no "Open with the system app"
+    // A document has no "Open externally"
     click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
     ASSERT_TRUE(waitOpened(menu, true));
     EXPECT_FALSE(child(menu, "openWithSystemAppItem")->isVisible());
+}
+
+TEST_F(HomeScreenFilterTest, textFilesAndImagesOpenExternally) {
+    // A read-only text file: the button in the tool bar hands it over
+    const QString py = QString::fromStdString((root / "kalman.py").string());
+    ASSERT_TRUE(controller->openPath(py));
+    wait(50);
+    auto* button = findItem("openExternallyButton");
+    ASSERT_NE(button, nullptr);
+    ASSERT_TRUE(button->isVisible());
+    click(button);
+    EXPECT_EQ(fake.opened, QStringList{py});
+
+    // A .md with unsaved changes: asked to save first; saved, then handed over
+    const fs::path md = root / "draft.md";
+    std::ofstream(md, std::ios::binary) << "# Draft\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(md.string())));
+    wait(50);
+    click(find<QQuickItem>("canvas"));
+    type("x");
+    ASSERT_TRUE(controller->modified());
+    click(findItem("openExternallyButton"));
+    auto* dialog = find<QObject>("externalSaveDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(fake.opened.size(), 1) << "not before it is saved";
+    click(find<QQuickItem>("externalSaveButton"));
+    until([&] { return fake.opened.size() == 2; });
+    ASSERT_EQ(fake.opened.size(), 2);
+    EXPECT_EQ(fake.opened.last(), QString::fromStdString(md.string()));
+    EXPECT_FALSE(controller->modified());
+    // The other app changes it: shown as it is when the window is looked at again
+    std::ofstream(md, std::ios::binary) << "# Draft, edited elsewhere\n";
+    controller->checkTextFiles();
+    EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Draft, edited elsewhere\n");
+
+    // Notes have no "Open externally"
+    controller->newDocument();
+    wait(50);
+    EXPECT_FALSE(findItem("openExternallyButton")->isVisible());
+    EXPECT_EQ(controller->externalFileOf(QString::fromStdString((root / "notes.xopp").string())), "");
+    EXPECT_EQ(controller->externalFileOf(QString::fromStdString((root / "lecture.pdf").string())), "");
+    EXPECT_EQ(controller->externalFileOf(py), py);
+    EXPECT_EQ(controller->externalFileOf(QString::fromStdString(md.string())), QString::fromStdString(md.string()));
 }
 
 TEST_F(HomeScreenFilterTest, aFolderOpensAsALibraryInAWindowOfItsOwn) {
