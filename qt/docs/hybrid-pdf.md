@@ -316,6 +316,10 @@ It is a hybrid PDF with three differences:
      compressed again.
    - The marker says `/Version 2 /Archive true` (older builds refuse it instead of showing the ink twice); hybrid PDFs
      stay version 1.
+   - **A hybrid PDF never claims PDF/A.** Its annotations and attachment are not PDF/A, so when its source PDF was
+     PDF/A the writer removes the PDF/A identification (`pdfaid:part`, `conformance`, `amd`, `rev`, as elements or
+     attributes) from the XMP metadata it keeps; the rest of the metadata and an output intent (which alone claims
+     nothing) stay. The same for the base pages exported for Xournal++. Silent: the UI says nothing about it.
    - **Saving an archive PDF again in the app** (Ctrl+S after opening it) writes an archive PDF again (the file's
      marker decides); the clean copy has no output intent, `/AF` or metadata of ours left, so a hybrid PDF written
      from it never claims PDF/A.

@@ -1322,3 +1322,51 @@ TEST_F(ArchivePdfTest, archiveOfAGivenPdf) {
     }
     keepSample(out, (fs::path(source).stem().string() + ".archive.pdf").c_str());
 }
+
+// A hybrid PDF is never PDF/A (its annotations and attachment break it): a PDF/A source's identification is dropped
+// from the metadata it keeps; an archive of the same source is PDF/A again.
+TEST_F(ArchivePdfTest, aHybridPdfOfAPdfASourceDoesNotClaimPdfA) {
+    makeTextPdf(path("source.pdf"), {"lectureone"});
+    {  // the source says it is PDF/A-2b (in both forms XMP allows), with an output intent
+        auto loaded = DocumentSession::loadFile(path("source.pdf"));
+        ASSERT_TRUE(loaded.document);
+        ASSERT_TRUE(HybridPdf::writeArchive(*loaded.document, path("pdfa.pdf")).ok);
+        editWithQpdf(path("pdfa.pdf"), [](QPDF& q) {
+            QPDFObjectHandle root = q.getRoot();
+            for (const char* key: {"/XournalQt", "/AF", "/Names"}) {
+                root.removeKey(key);  // (a plain PDF/A, not ours)
+            }
+            QPDFObjectHandle meta = root.getKey("/Metadata");
+            std::string xmp = streamText(meta);
+            const auto at = xmp.find("<pdfaid:part>3</pdfaid:part>");
+            ASSERT_NE(at, std::string::npos);
+            xmp.replace(at, std::string("<pdfaid:part>3</pdfaid:part>").size(),
+                        "<pdfaid:part>2</pdfaid:part><dc:rights>kept</dc:rights>");
+            const auto d = xmp.find("<rdf:Description rdf:about=\"\"");
+            xmp.insert(d + std::string("<rdf:Description").size(), " pdfaid:amd=\"2005\"");
+            meta.replaceStreamData(xmp, QPDFObjectHandle::newNull(), QPDFObjectHandle::newNull());
+        });
+    }
+    auto loaded = DocumentSession::loadFile(path("pdfa.pdf"));
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    EXPECT_FALSE(loaded.hybrid);
+    addStroke(loaded.document->getPage(0)->getSelectedLayer(), StrokeTool::PEN, Color(0xffcc0000U), 2,
+              {Point(100, 200), Point(200, 250)});
+    loaded.document->getPage(0)->getSelectedLayer()->getElementsView().front()->getBoundingBox();
+
+    ASSERT_TRUE(HybridPdf::write(*loaded.document, path("hybrid.pdf")).ok);
+    QPDF hybrid;
+    hybrid.processFile(path("hybrid.pdf").string().c_str());
+    const std::string xmp = streamText(hybrid.getRoot().getKey("/Metadata"));
+    EXPECT_EQ(xmp.find("pdfaid:part"), std::string::npos) << xmp;
+    EXPECT_EQ(xmp.find("pdfaid:conformance"), std::string::npos);
+    EXPECT_EQ(xmp.find("pdfaid:amd"), std::string::npos);
+    EXPECT_NE(xmp.find("<dc:rights>kept</dc:rights>"), std::string::npos) << "the rest of the metadata stays";
+
+    const auto archive = HybridPdf::writeArchive(*loaded.document, path("again.archive.pdf"));
+    ASSERT_TRUE(archive.ok) << archive.error;
+    EXPECT_TRUE(archive.pdfa);
+    QPDF a;
+    a.processFile(path("again.archive.pdf").string().c_str());
+    EXPECT_NE(streamText(a.getRoot().getKey("/Metadata")).find("<pdfaid:part>3</pdfaid:part>"), std::string::npos);
+}

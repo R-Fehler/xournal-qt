@@ -1141,6 +1141,9 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     info.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
     step("annotations, data, marker");
     ArchiveWrite how;
+    if (!archive) {
+        ArchivePdf::dropPdfAClaim(out);  // (a hybrid PDF is never PDF/A, even when its source PDF was)
+    }
     if (archive) {
         ArchivePdf::Metadata meta;
         meta.fallbackTitle = title;

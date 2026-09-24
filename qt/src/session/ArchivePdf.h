@@ -52,6 +52,11 @@ struct Metadata {
 /// Make `pdf` (assembled: pages, embedded files, marker) conform to PDF/A-3b as far as possible, see above.
 Report conform(QPDF& pdf, const Metadata& meta);
 
+/// A PDF that is not an archive PDF (a hybrid PDF, base pages for Xournal++) must not claim PDF/A: the PDF/A
+/// identification (pdfaid:part, conformance, amd, rev) is removed from its XMP metadata, the rest of it stays. Whether
+/// there was one.
+bool dropPdfAClaim(QPDF& pdf);
+
 /// The embedded sRGB ICC profile (bytes).
 const std::string& srgbProfile();
 

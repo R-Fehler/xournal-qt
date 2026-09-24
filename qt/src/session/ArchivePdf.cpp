@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <ctime>
 #include <map>
+#include <regex>
 #include <set>
 #include <sstream>
 
@@ -583,6 +584,33 @@ std::string xmp(const std::map<std::string, std::string>& info, const Dates& d, 
 }
 
 }  // namespace
+
+bool dropPdfAClaim(QPDF& pdf) {
+    OH meta = pdf.getRoot().getKey("/Metadata");
+    if (!meta.isStream()) {
+        return false;
+    }
+    std::string xmp;
+    try {
+        auto buffer = meta.getStreamData(qpdf_dl_all);
+        xmp.assign(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize());
+    } catch (const std::exception&) {
+        return false;
+    }
+    if (xmp.find("pdfaid:") == std::string::npos) {
+        return false;
+    }
+    // As elements (<pdfaid:part>2</pdfaid:part>) and as attributes (pdfaid:part="2"); the schema's description in a
+    // pdfaExtension block (pdfaSchema:prefix>pdfaid<) is not a claim and stays
+    static const std::regex element(R"(<pdfaid:(part|conformance|amd|rev)\b[^>]*?(/>|>[^<]*</pdfaid:\1\s*>))");
+    static const std::regex attribute(R"(\s+pdfaid:(part|conformance|amd|rev)\s*=\s*("[^"]*"|'[^']*'))");
+    std::string out = std::regex_replace(std::regex_replace(xmp, element, ""), attribute, "");
+    if (out == xmp) {
+        return false;
+    }
+    meta.replaceStreamData(out, OH::newNull(), OH::newNull());
+    return true;
+}
 
 const std::string& srgbProfile() {
     static const std::string bytes(reinterpret_cast<const char*>(SRGB_ICC), SRGB_ICC_SIZE);
