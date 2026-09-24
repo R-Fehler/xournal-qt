@@ -109,7 +109,8 @@ A cache folder holds a few **packs**, one file each, split by how often they cha
 - `pdf-text.pack`: per document, the text of the PDF pages it shows, tied to the PDF's size and time. Big; written
   only when a PDF changed or a document came or went. A document with over 1 MB of PDF text gets a file of its own,
   `pdf-text-<hash>.pack`, written only when that text changes.
-- `previews.pack`: the first-page previews (PNG, 360 px wide, drawn like the page thumbnails, of the title page),
+- `previews.pack`: the first-page previews (PNG, 360 px wide, drawn like the page thumbnails, of the title page; a
+  Markdown file: its first page as it opens, an image: the image scaled down and turned upright by its orientation tag),
   each with the size and time of the document's files and its title page, so a changed document gets a new
   preview. Not compressed again (PNG is). A folder's pack is read when its first card is shown and kept in memory
   (up to 48 MB of previews; the folders used least recently go first); new previews are written a few seconds

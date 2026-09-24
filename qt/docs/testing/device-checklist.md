@@ -571,3 +571,5 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       the new name, and the `.xopp` still shows the photo. Move it into a folder and copy it to another library: the
       same. Trash takes both.
 - [ ] Rename, move, copy and trash a Markdown file card; import a folder with `.md` files and images: they come along.
+- [ ] The card of a Markdown file shows its first page as an A4 page with the text formatted (headings, lists,
+      tables, code). An image card shows the image; a phone photo taken upright is upright, also a `.heic`.

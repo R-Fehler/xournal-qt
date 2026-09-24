@@ -18,7 +18,9 @@
 #include "session/DocumentSession.h"
 #include "util/PathUtil.h"
 
+#include "ImageFile.h"
 #include "Library.h"
+#include "MarkdownFile.h"
 #include "Thumbnails.h"
 
 namespace xqt {
@@ -273,6 +275,16 @@ bool inLibrary(const DocumentItem& item) {
 }
 
 QImage render(const DocumentItem& item) {
+    if (item.xopp.empty() && !item.image.empty()) {
+        return ImageFile::read(item.image, PreviewCache::WIDTH);  // an image alone: a thumbnail of it
+    }
+    if (!item.md.empty()) {
+        // A Markdown file: its title page as it opens (enough of its text for the pages up to it)
+        const size_t title = static_cast<size_t>(std::max(0, titleOf(item)));
+        const size_t bytes = std::min(MarkdownFile::MAX_BYTES, (title + 1) * 16384);
+        auto doc = MarkdownFile::document(MarkdownFile::read(item.md, bytes), title + 1);
+        return ThumbnailProvider::renderDocument(*doc, std::min(title, doc->getPageCount() - 1), PreviewCache::WIDTH);
+    }
     auto loaded = DocumentSession::loadFile(item.main());
     if (!loaded.document || loaded.document->getPageCount() == 0) {
         return {};

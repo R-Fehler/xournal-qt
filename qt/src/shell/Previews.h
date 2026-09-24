@@ -2,8 +2,8 @@
  * xournal-qt: first-page previews of documents on disk (library and recent files grids).
  *
  * PreviewProvider is an asynchronous QML image provider ("image://preview/<id>", see url()). A preview is rendered
- * once (the document is loaded on a worker thread and its title page drawn like the page thumbnails) and stored as
- * PNG, with a stamp of the document's files (sizes, modification times) and its title page, so a changed document
+ * once (the document is loaded on a worker thread and its title page drawn like the page thumbnails; a Markdown file
+ * as it opens, see MarkdownFile.h; an image: scaled down) and stored as PNG, with a stamp of the document's files (sizes, modification times) and its title page, so a changed document
  * gets a new preview:
  *  - for the documents of the library in the "previews" pack of their folder's cache (see LibraryCache.h), by file
  *    name. A folder's pack is read when one of its previews is first wanted, and kept in memory (up to 48 MB of

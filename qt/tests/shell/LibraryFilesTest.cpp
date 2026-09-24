@@ -8,6 +8,7 @@
 
 #include <QColor>
 #include <QImage>
+#include <QImageWriter>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -21,6 +22,9 @@
 #include "shell/DocumentPlaces.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
+#include "shell/Previews.h"
+
+#include "MarkdownFile.h"
 
 using namespace xqt;
 
@@ -64,6 +68,17 @@ void makeXoppWithAttachedImage(const fs::path& xopp, const fs::path& png) {
     page->setBackgroundType(PageType(PageTypeFormat::Image));
     doc.addPage(page);
     ASSERT_TRUE(DocumentSession::writeDocument(doc, xopp).ok);
+}
+
+/// Dark pixels (text) in a part of an image.
+int darkPixels(const QImage& img, const QRect& part) {
+    int n = 0;
+    for (int y = part.top(); y <= part.bottom(); ++y) {
+        for (int x = part.left(); x <= part.right(); ++x) {
+            n += qGray(img.pixel(x, y)) < 128 ? 1 : 0;
+        }
+    }
+    return n;
 }
 
 /// A .xopp with one blank page.
@@ -289,4 +304,55 @@ TEST_F(LibraryFilesTest, theLibraryShowsWhatKindEachDocumentIs) {
     model.setSearchQuery("board");
     ASSERT_EQ(model.count(), 1);
     EXPECT_EQ(model.data(model.index(0), LibraryModel::PathRole).toString(), qstr(root / "board.png"));
+}
+
+TEST_F(LibraryFilesTest, markdownFilesShowTheirFirstPageAndImagesAThumbnail) {
+    writeFile(root / "notes.md", "# Kalman filter\n\nPrediction and **update**.\n\n- one\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```cpp\nint x = 1;\n```\n");
+    makeImage(root / "wide.png", 800, 400, Qt::black);
+    // A photo taken sideways: its orientation tag turns it upright
+    {
+        QImage img(80, 40, QImage::Format_RGB32);
+        img.fill(Qt::black);
+        QImageWriter writer(QString::fromStdString((root / "photo.jpg").string()));
+        writer.setTransformation(QImageIOHandler::TransformationRotate90);
+        ASSERT_TRUE(writer.write(img));
+    }
+    PreviewCache::setLibrary(CacheLocation(root));
+
+    const QImage md = PreviewCache::preview(DocumentFiles::itemOf(root / "notes.md"));
+    ASSERT_EQ(md.width(), PreviewCache::WIDTH);
+    EXPECT_NEAR(md.height(), PreviewCache::WIDTH * MarkdownFile::PAGE_HEIGHT / MarkdownFile::PAGE_WIDTH, 2) << "an A4 page";
+    EXPECT_GT(darkPixels(md, QRect(0, 0, md.width(), md.height() / 8)), 50) << "the heading at the top";
+    EXPECT_EQ(darkPixels(md, QRect(0, md.height() / 2, md.width(), md.height() / 2)), 0);
+
+    const QImage wide = PreviewCache::preview(DocumentFiles::itemOf(root / "wide.png"));
+    EXPECT_EQ(wide.size(), QSize(PreviewCache::WIDTH, PreviewCache::WIDTH / 2));
+    const QImage photo = PreviewCache::preview(DocumentFiles::itemOf(root / "photo.jpg"));
+    EXPECT_EQ(photo.size(), QSize(40, 80)) << "upright (and not made bigger)";
+
+    PreviewCache::flush();
+    PreviewCache::setLibrary({});
+}
+
+TEST_F(LibraryFilesTest, aMarkdownFileFlowsOverA4Pages) {
+    std::string text = "# Lecture 3\n\n## Kalman filter\n\n";
+    for (int i = 0; i < 120; ++i) {
+        text += "Paragraph " + std::to_string(i) + " about the prediction step of the filter.\n\n";
+    }
+    auto doc = MarkdownFile::document(text);
+    ASSERT_GT(doc->getPageCount(), 2u);
+    EXPECT_EQ(doc->getPage(0)->getWidth(), MarkdownFile::PAGE_WIDTH);
+    // The page that shows a place of the text
+    EXPECT_EQ(MarkdownFile::pageOf(*doc, 0), 0u);
+    EXPECT_EQ(MarkdownFile::pageOf(*doc, text.size() - 5), doc->getPageCount() - 1);
+    EXPECT_EQ(MarkdownFile::document(text, 1)->getPageCount(), 1u);
+    EXPECT_EQ(MarkdownFile::document("")->getPageCount(), 1u) << "an empty file: one empty page";
+
+    // Read: at most so much of a file, cut at a line end
+    writeFile(root / "long.md", "\xEF\xBB\xBF" "abc\ndef\nghi\n");
+    bool cut = false;
+    EXPECT_EQ(MarkdownFile::read(root / "long.md", 11, &cut), "abc\ndef\n");
+    EXPECT_TRUE(cut);
+    EXPECT_EQ(MarkdownFile::read(root / "long.md", 100, &cut), "abc\ndef\nghi\n");
+    EXPECT_FALSE(cut);
 }
