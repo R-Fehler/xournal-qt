@@ -273,6 +273,34 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   exported as an archive PDF into a chosen folder, keeping the folder structure. Other files are copied as they are,
   and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
 
+### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
+1. [ ] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs**, first. It starts after
+   `qt/archive-export` is merged, since both change `HybridPdf`.
+   - Ctrl+S appends only what changed (standard PDF incremental update, ISO 32000): the changed layer annotations
+     or ink streams, the embedded `.xopp`, the catalog marker, and a new cross-reference section matching the file's
+     style (a table, or a stream after an xref stream) with `/Prev`. The original pages are never rewritten. This is
+     how Acrobat and Drawboard save.
+   - Automatic compaction: a full rewrite when the appended part exceeds about 25% of the file, and on Save as.
+   - Share, Export and Archive export always write a fresh, compacted file, because older versions inside an
+     incrementally saved file can still hold deleted ink (privacy).
+   - PDF/A-2/3 allow incremental updates; archive files must stay valid after them (veraPDF in CI).
+   - The clean background copy is kept across incremental saves, since the base pages do not change.
+   - Verify: qpdf `--check`; poppler, MuPDF and pdf.js render the same after many incremental saves; size growth and
+     compaction; save time on pgfmanual before and after.
+   - qpdf cannot write incremental updates: our own small appender, with objects serialised through qpdf.
+2. [ ] **`qt/pdf-only`: a mode where every document is a single PDF**, with no sidecars.
+   - New documents are hybrid `name.pdf`. Annotating an existing PDF writes into that PDF, the Drawboard way.
+     Pasted pages go into the PDF, and images are inside the Xournal data. Nothing is written next to files;
+     autosave and recovery stay in the app's cache.
+   - **Asked at the first start**, explaining what each means, with a recommendation:
+     - "PDF files (like Drawboard PDF, GoodNotes, Xodo)": every document is one PDF that any app opens. Recommended
+       for most people.
+     - "Xournal++ files (like Xournal++)": `.xopp` notes next to their PDFs, fully compatible with Xournal++.
+       Recommended if you also use Xournal++.
+
+     It can be changed later in Settings → Documents. Xournal++ exports stay available through Share → "For
+     Xournal++".
+
 ### Bugs
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
 - [x] **Fit width uses the widest page, not the current one** (fixed in `qt/present`) (the author, 2026-09-24): after pasting a 16:9 page
