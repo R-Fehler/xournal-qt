@@ -559,3 +559,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       the extended view marks the hits on the first pages.
 - [ ] Save a document of the library after adding a text: the library search finds the new text at once and the
       library shows no indexing progress for it.
+
+## Markdown files and images in the library (qt/library-files)
+- [ ] Open a `.xopp` with an image as page background stored with it (upstream: page background → image, "attach";
+      next to it `name.xopp.bg_1.png`), rename it in the library, move it into a folder, copy it to another library:
+      each time it opens with its background image, and no `.bg_1.png` is left behind at the old place. Trash takes
+      the image along.

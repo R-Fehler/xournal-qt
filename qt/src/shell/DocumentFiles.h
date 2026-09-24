@@ -4,8 +4,8 @@
  * A document is one item even when it is two files: a .xopp with the PDF it annotates next to it under the same name
  * ("lecture.xopp" + "lecture.pdf"). A lone .xopp (or .xoj) and a lone PDF are items, too. Renaming, moving and
  * importing keep the two files together; the .xopp's reference to its PDF follows (it is rewritten with upstream's
- * LoadHandler / SaveHandler). Attached PDFs ("name.xopp.bg.pdf") and the hidden merged PDF of pasted PDF pages
- * (".name.pages.pdf", see session/MergedPdf.h) travel with their .xopp.
+ * LoadHandler / SaveHandler). Attached PDFs ("name.xopp.bg.pdf"), attached background images ("name.xopp.bg_1.png")
+ * and the hidden merged PDF of pasted PDF pages (".name.pages.pdf", see session/MergedPdf.h) travel with their .xopp.
  *
  * @license GNU GPLv2 or later
  */
@@ -53,7 +53,9 @@ bool isDocumentFile(const fs::path& file);
 fs::path attachmentOf(const fs::path& xopp);
 /// The hidden PDF with the pages of a .xopp pasted from other PDFs (".name.pages.pdf").
 fs::path pagesOf(const fs::path& xopp);
-/// The files of a document that exist: the .xopp, its attached PDF and pages PDF, the PDF.
+/// The images a .xopp keeps next to it as page backgrounds (upstream attaches them as "name.xopp.bg_1.png", ...).
+std::vector<fs::path> imageAttachmentsOf(const fs::path& xopp);
+/// The files of a document that exist: the .xopp, its attached PDF, background images and pages PDF, the PDF.
 std::vector<fs::path> filesOf(const DocumentItem& item);
 
 /// Outcome of a file operation.

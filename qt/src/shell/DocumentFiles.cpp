@@ -154,6 +154,8 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
     Rollback rollback;
     std::string error;
     const bool rewritten = doc != nullptr;
+    const std::vector<fs::path> oldImages =
+            item.xopp.empty() ? std::vector<fs::path>() : DocumentFiles::imageAttachmentsOf(item.xopp);
     if (!newXopp.empty()) {
         if (fileExists(newXopp)) {
             return failure("\"" + newXopp.filename().string() + "\" already exists.");
@@ -184,6 +186,28 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
                 r.moved.emplace_back(att, newAtt);
             }
         }
+        // Background images stored with it: a .xopp written again writes its own (below the old ones go)
+        if (rewritten) {
+            for (const fs::path& img: DocumentFiles::imageAttachmentsOf(newXopp)) {
+                rollback.steps.emplace_back([img] {
+                    std::error_code ec;
+                    fs::remove(img, ec);
+                });
+            }
+        } else {
+            const std::string oldName = item.xopp.filename().string();
+            for (const fs::path& img: DocumentFiles::imageAttachmentsOf(item.xopp)) {
+                const fs::path newImg =
+                        folder / (newXopp.filename().string() + img.filename().string().substr(oldName.size()));
+                if (!transfer(img, newImg, copy, error)) {
+                    return failure(error);
+                }
+                rollback.transferred(img, newImg, copy);
+                if (!copy) {
+                    r.moved.emplace_back(img, newImg);
+                }
+            }
+        }
         if (const fs::path pages = DocumentFiles::pagesOf(item.xopp); fileExists(pages)) {
             const fs::path newPages = DocumentFiles::pagesOf(newXopp);
             if (fileExists(newPages)) {
@@ -211,8 +235,11 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
     if (!newXopp.empty() && !copy) {
         r.moved.emplace_back(item.xopp, newXopp);
         if (rewritten) {
-            // The rewritten .xopp is a new file: the old one goes last.
+            // The rewritten .xopp is a new file (with its own background images): the old one goes last.
             std::error_code ec;
+            for (const fs::path& img: oldImages) {
+                fs::remove(img, ec);
+            }
             fs::remove(item.xopp, ec);
         }
     }
@@ -246,6 +273,21 @@ fs::path attachmentOf(const fs::path& xopp) {
 
 fs::path pagesOf(const fs::path& xopp) { return MergedPdf::sidecarOf(xopp); }
 
+std::vector<fs::path> imageAttachmentsOf(const fs::path& xopp) {
+    std::vector<fs::path> images;
+    const std::string prefix = xopp.filename().string() + ".bg_";
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(xopp.parent_path(), ec); !ec && it != fs::directory_iterator();
+         it.increment(ec)) {
+        const std::string name = it->path().filename().string();
+        if (name.size() > prefix.size() && name.compare(0, prefix.size(), prefix) == 0) {
+            images.push_back(it->path());
+        }
+    }
+    std::sort(images.begin(), images.end());
+    return images;
+}
+
 std::vector<fs::path> filesOf(const DocumentItem& item) {
     std::vector<fs::path> files;
     const fs::path none;
@@ -253,6 +295,11 @@ std::vector<fs::path> filesOf(const DocumentItem& item) {
                              item.xopp.empty() ? none : pagesOf(item.xopp), item.pdf}) {
         if (!f.empty() && fileExists(f)) {
             files.push_back(f);
+        }
+    }
+    if (!item.xopp.empty()) {
+        for (const fs::path& img: imageAttachmentsOf(item.xopp)) {
+            files.push_back(img);
         }
     }
     return files;

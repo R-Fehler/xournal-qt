@@ -26,6 +26,8 @@ A **library** is a plain folder of documents that a window works in, like a work
   - `name.xopp.bg.pdf`, an attached PDF. It belongs to its `.xopp` and travels with it.
   - `.name.pages.pdf`, the merged PDF of a `.xopp` with PDF pages pasted from other PDFs (below). It belongs to its
     `.xopp` and travels with it.
+  - `name.xopp.bg_1.png`, …: page background images stored with a `.xopp` (upstream's attached images). They belong
+    to their `.xopp` and travel with it (rename, move, copy, trash).
   - hidden files: autosaves, `.xournal_library`
   - backups (`~`)
 - **Rename / move** rename or move both files. The `.xopp` is loaded and written again with upstream's LoadHandler and
