@@ -4,14 +4,28 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 
+#ifdef Q_OS_WIN
+#include <QCryptographicHash>
+#else
 #include <unistd.h>
+#endif
 
 namespace xqt {
 
 SingleInstance::SingleInstance(QString key, QObject* parent): QObject(parent), key(std::move(key)) {
     if (this->key.isEmpty()) {
-        this->key = QString("xournal-qt-%1").arg(getuid());
+        this->key = QString("xournal-qt-%1").arg(userId());
     }
+}
+
+QString SingleInstance::userId() {
+#ifdef Q_OS_WIN
+    // A hash: user names may hold characters that do not belong in a pipe name.
+    const QString user = qEnvironmentVariable("USERDOMAIN") + '\\' + qEnvironmentVariable("USERNAME");
+    return QString::fromLatin1(QCryptographicHash::hash(user.toUtf8(), QCryptographicHash::Sha1).toHex().left(16));
+#else
+    return QString::number(getuid());
+#endif
 }
 
 SingleInstance::~SingleInstance() = default;

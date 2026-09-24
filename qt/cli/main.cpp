@@ -45,6 +45,10 @@
 
 #include "filesystem.h"
 
+#ifdef _WIN32
+#include "../src/app/WindowsFonts.h"
+#endif
+
 namespace {
 
 void throwIfMissingPdfFileName(const LoadHandler& loader) {
@@ -207,6 +211,15 @@ int main(int argc, char* argv[]) {
     // Same as upstream initCAndCoutLocales(): numbers in C locale for cairo/PDF output.
     setlocale(LC_ALL, "");
     setlocale(LC_NUMERIC, "C");
+#ifdef _WIN32
+    // std::filesystem converts narrow strings with the C library's character set: make that UTF-8, as everywhere
+    // else in the program (see qt/docs/windows.md). XQT_NO_UTF8_LOCALE=1 skips it (a diagnostic).
+    if (!g_getenv("XQT_NO_UTF8_LOCALE")) {
+        setlocale(LC_CTYPE, ".UTF-8");
+    }
+    // Text with Pango's fontconfig backend: its Windows one dies drawing into images (PNG export).
+    xqt::windows::useFontconfig();
+#endif
     std::cout.imbue(std::locale());
 
     gchar** optFilename = nullptr;
@@ -266,7 +279,17 @@ int main(int argc, char* argv[]) {
     GOptionContext* context = g_option_context_new("FILE - headless Xournal++ core tool (xournal-qt)");
     g_option_context_add_main_entries(context, options.data(), nullptr);
     GError* error = nullptr;
-    if (!g_option_context_parse(context, &argc, &argv, &error)) {
+#ifdef _WIN32
+    // The arguments in UTF-8 (argv is in the ANSI code page), as GLib expects file names on Windows.
+    (void)argc;
+    (void)argv;
+    gchar** args = g_win32_get_command_line();
+    const bool parsed = g_option_context_parse_strv(context, &args, &error);
+    g_strfreev(args);
+#else
+    const bool parsed = g_option_context_parse(context, &argc, &argv, &error);
+#endif
+    if (!parsed) {
         std::cerr << error->message << std::endl;
         g_error_free(error);
         g_option_context_free(context);

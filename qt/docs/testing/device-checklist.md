@@ -1031,3 +1031,25 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
       → "PDF with notes": open the PDF in Okular or Firefox: the marker's text is a link; clicking it opens
       `lecture.pdf` at the linked page (Okular may ask first), the web link opens the browser. Open the PDF in the app
       again: no "changed in another app" question; save again: the links are still there once each.
+
+## Windows build (qt/windows-build)
+The zip from the GitHub Actions run "xournal-qt Windows" (artifact `xournal-qt-windows-x64`), unpacked anywhere, on
+the Surface or another Windows 10/11 machine. See [../windows.md](../windows.md).
+- [ ] `bin\xournal-qt.exe` starts (no console window) and shows the library "Default" in Documents\Xournal_Libraries.
+      SmartScreen may warn first (unsigned): "More info" → "Run anyway".
+- [ ] The tool bar icons are drawn (not empty squares); the Material style is used.
+- [ ] New document → Create: draw with the mouse and with the pen; undo/redo; the document is saved in the library and
+      is still there after a restart.
+- [ ] Text tool: real letters, also ä ö ü ß; the page thumbnail shows the same text.
+- [ ] A PDF in the library (Explorer: copy it into the folder): it appears, opens, its text renders; annotate, save,
+      reopen.
+- [ ] A folder and a document whose names have umlauts (e.g. `Übungen\Prüfung.xopp`): both open and save.
+- [ ] Open a second window of the same library from Explorer (`bin\xournal-qt.exe <folder> <file>`): the file opens as
+      a tab of the running window.
+- [ ] Card menu → "Show in file manager": Explorer opens with the file selected. "Open with the system app" on a
+      `.docx` or image opens the right program.
+- [ ] Print: the Windows print dialog; a real printer and "Microsoft Print to PDF" both get the pages (upright,
+      landscape pages turned onto the sheet), the page range and copies are honoured.
+- [ ] Settings stay after a restart (`%LOCALAPPDATA%\xournal-qt`); caches are in `%LOCALAPPDATA%\cache\xournal-qt`.
+- [ ] Kill the program in the Task Manager with an unsaved document: at the next start it offers to recover it.
+- [ ] `bin\xournal-qt-cli.exe some.xopp --create-pdf out.pdf` in a terminal writes the PDF.
