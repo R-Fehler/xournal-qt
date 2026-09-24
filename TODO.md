@@ -45,10 +45,14 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
        another, whatever the engine. Worth fixing before comparing engines in the app.
 2. **Library track**, in this order, because each step builds on the one before:
    1. ~~the per-folder index format~~ `qt/library-index`: merged 2026-09-24 (see ROADMAP). Follow-ups:
-      - [?] **Previews: in the folders or always in the app cache?** A pack is rewritten whole, so a new preview
-        rewrites its folder's `previews.pack`: about 0.6 MB uploaded per changed document on the Uni library. The
-        index is expensive to rebuild (PDF text) and worth syncing; a preview is one page render.
-        *Proposal:* keep the index in the folders and put previews always in the app cache.
+      - [ ] **Previews are rewritten only when the first page's image changes** (decided 2026-09-24; after
+        `qt/library-filter`, which works in `Previews.cpp`).
+        - Today a preview is valid only for the files' size and time (`Previews.cpp:83`). So every save draws it
+          again and rewrites the folder's whole `previews.pack`, 0.3–0.6 MB on OneDrive, even when page 1 did not
+          change.
+        - Fix: after a save, draw page 1 and compare. If the image is the same, write nothing to `previews.pack`;
+          keep "valid for this version" in `notes.pack`, which is written on every save anyway. Previews stay in
+          the folders.
       - [ ] Reading positions are keyed by the library's path, so a library folder renamed or moved outside the
         app starts without them. Match them by file name, size and time like the index, or keep a copy in the
         root's dot folder that the clean-up leaves alone.
@@ -124,9 +128,12 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     and ReText (Qt); foam for wikilinks.
 - **Decided (2026-09-23): images in `.md` go in the sidecar folder `<name>.assets/`** (Typora's convention).
   Inside `.xopp`, images live in the file bundle.
-- [?] **Math:** MicroTeX, in Markdown boxes, the `.md` editor and the full-page Markdown mode.
-- [?] **Mermaid:** optional; it needs a JavaScript engine or a renderer written from scratch. Until then, show
-  the source as a code block.
+- **Decided (2026-09-24): math with MicroTeX**, vendored (MIT, no LaTeX install, works on mobile).
+  - Syntax `$…$` inline and `$$…$$` as a block, like Obsidian, Zettlr and GitHub.
+  - In Markdown boxes, the `.md` editor and the full-page mode.
+  - Check first that its Qt backend is still maintained.
+- **Decided (2026-09-24): Mermaid stays a code block.** The app must work as a bundle with no external tools
+  (VISION), and Mermaid needs a browser engine. Revisit only if a native renderer turns up.
 - [x] **`.md` files and images in the library and its search index, with snippet cards**: merged as
   `qt/library-files` on 2026-09-24 (see ROADMAP). Other text files (`.txt`, `.org`, code) follow in
   `qt/library-filter`.
@@ -154,8 +161,26 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - Lowest priority, only with MuPDF: EPUB and CBZ as documents, since MuPDF lays them out as pages.
   - A `.tex` file and its compiled `.pdf` could be paired like `.xopp` and `.pdf`: one card, with the source a
     tap away.
-- [?] **Vaults** (Obsidian, Zettlr, foam): open a vault folder as a library; resolve `[[wikilinks]]` and
-  Markdown links by file name; backlinks later.
+- [ ] **Vaults** (Obsidian, Zettlr, foam). Decided 2026-09-24:
+  - **Detect a vault** when a `.md` is opened: a `.obsidian/` folder next to it or in a parent folder up to the
+    library root. Tell the user once per vault that it is an Obsidian vault and that Markdown attachments are
+    stored in and loaded from the vault's configured attachment folder (`.obsidian/app.json`), not `<name>.assets/`.
+  - **Editing:** plain `.md` files are editable. A file that uses Obsidian-only syntax asks once, with an OK
+    button, before it can be edited. That syntax: wikilinks and embeds `[[…]]` / `![[…]]`, block references
+    `^id`, callouts `> [!note]`, comments `%%…%%`, highlights `==…==`, `dataview` blocks, Obsidian front-matter
+    keys.
+    - Feasible: md4c plus a scan for these patterns is cheap.
+    - The editor changes only the source of the edited blocks, so untouched text stays byte-identical. The risk
+      is mostly how such content is shown, not that it is rewritten.
+  - Resolve `[[wikilinks]]` and Markdown links by file name; backlinks later.
+
+### The `.md` editor (decided 2026-09-24)
+- **Pages by default**, the native feel, with a toggle for a continuous page (infinite canvas). Pagination exists
+  from the Markdown boxes.
+- **Ink on Markdown: an "Edit as notes" button** turns the `.md` into a `.xopp`-like document: its text as a
+  Markdown box flowing over pages. Editing and inking continue there, in a new tab, with the `.md` left as it was.
+  Plain `.md` files are edited as text; ink is never stored in a `.md`.
+- Build on the live-rendering editor of the Markdown boxes, and on UI patterns from the reference editors.
 
 ### Bugs
 - [~] **A PDF page pasted into a document that has a PDF stays blank on the canvas** (only the previews show it).
