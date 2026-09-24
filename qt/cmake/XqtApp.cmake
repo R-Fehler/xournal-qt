@@ -123,6 +123,8 @@ set(XQT_QML_FILES
     src/app/qml/LayerList.qml
     src/app/qml/PagePicture.qml
     src/app/qml/RaceWatch.qml
+    src/app/qml/FuzzyToggle.qml
+    src/app/qml/Fuzzy.js
     src/app/qml/Popups.js)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
@@ -176,6 +178,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilterTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFuzzyTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecentLibrariesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCacheTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp

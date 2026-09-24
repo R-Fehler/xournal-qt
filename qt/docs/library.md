@@ -238,6 +238,60 @@ in about 10 ms, a document read for the first time has all counts after about 6 
 after 0.1 s) with at most 0.3 ms per event loop pass, and each key typed costs about 7 ms. The index takes 6.6 MB
 for the manual's text, the kept character boxes about 4 MB, the worker's poppler instance about 8 MB.
 
+## Fuzzy search
+"Fuzzy" in the library's search field (and in the tab overview's, below) turns on fzf's extended search syntax
+(modelled on [fzf](https://github.com/junegunn/fzf#search-syntax); its matching is ported from fzf, MIT). Off by
+default; an app-wide setting (`fuzzySearch` in the `xournalQt` part of the settings file), shared by all windows. Off,
+the search is exactly the plain one. The button's tooltip is the short help.
+
+| Typed | Finds |
+| --- | --- |
+| `kalman` | names (and folder paths) with these letters in this order, best first; text containing `kalman` |
+| `kalman filter` | both (a space is AND) |
+| `kalman \| lqr` | either; `\|` binds closer than the space: `a b \| c` is a and (b or c), as in fzf |
+| `!draft` | without it: not in the name, the folder path or the text (an exact substring; `!'dft`: fuzzy on names) |
+| `(a b) \| c`, `!(a b)` | a group (parentheses are an addition to fzf's syntax) |
+| `'lect` | exactly `lect`, also in names |
+| `'lecture'` | the whole word |
+| `^lec`, `ure$` | the name starts / ends with it; in text: a word starts / ends with it |
+| `^lecture\ 3$` | the name is it (`\ ` is a space inside a term; `\(` `\)` parentheses) |
+
+Case never matters. A term left empty by its marks (`^`, `!`) is ignored, as fzf ignores it. An expression that is
+not valid (a `(` not closed, a `)` not opened, a `|` without a term on both sides, empty `()`) is never an error: a
+short red hint next to the field says why, and the text is searched as plain text.
+
+**What is matched where.** A document's **name** and its **folder path** in the library are matched with fzf's
+algorithm (FuzzyMatchV2 and its exact, boundary, prefix, suffix and equal matches) and scored: the name first; a term
+not in the name is looked for in "folder/name" (so `uni lect` finds `Uni/Lecture 3`) and scores a quarter. Its
+**text** (PDF text, text elements, Markdown passages, text files) is searched per term as a substring through the
+same matcher as the plain search (`TextMatch`: case, whitespace, ligatures, hyphenation), at word bounds for `^`, `$`
+and `'word'` (a word broken at a line end is one word). A fuzzy subsequence over megabytes of text would match
+nearly anything, so a plain term is a substring there. A term **holds for a document** when its name/path or its text
+has it, and the document is found when the expression holds with these values: `kalman filter` finds a lecture with
+"Kalman" on page 3 and "filter" on page 7, and `lecture !draft` drops "Lecture 3 draft" and every document with
+"draft" in it. Folders are found by their names and paths, other files (not indexed) by their names only.
+
+**Pages with hits** (the extended search): the pages with hits of the terms that are not negated on which the
+expression holds, a term counting as found on a page when that page, the name or the folder path has it. So
+`kalman filter` lists the pages that have both words, and `lecture kalman` (with "Lecture" in the name) every page
+with "kalman". When the expression holds on no single page (the words are on different pages), all pages with hits
+are listed, so a document found never shows an empty row. A Markdown file's passages are its pages here. The count
+on a card is all hits of the terms that are not negated (overlapping hits of two terms count once, as they are
+marked).
+
+**Order**: fzf's score of the name and folder path first (documents found only by their text have none), then the
+hits in the text, then the newest. The matched letters of a name are highlighted on its card, as fzf shows them.
+
+Opening a hit (a card, a page, a snippet card) searches the document with the same query and syntax; refined in the
+document's search bar it stays a fuzzy search until the bar is cleared. The pictures of the pages mark every term
+that is not negated (poppler's search, so `^`, `$` and `'word'` are marked as substrings there).
+
+The query is parsed once per search (`qt/src/session/FuzzyQuery.*`, fzf's port in `FuzzyMatch.*`), each text is
+scanned once per term. Measured on a generated library of 3,000 Markdown files (~12 MB of text, six of them ~2 MB)
+on the development machine while it was busy with other builds: the index search takes 28–55 ms for a plain word,
+40–74 ms for the same word fuzzy, 61–133 ms for `kalman filter` and 100–215 ms for `(kalman | robust) !draft ^lin`
+(`XQT_BENCH_FUZZY=3000 xqt-shell-tests --gtest_filter='LibraryFuzzyTest.bench*'`).
+
 ## Home screen
 - It is the first tab (library icon and name). It is shown when no document is open, and closing the last tab
   returns to it. Ctrl+Shift+L toggles it. Ctrl+Tab goes back to the document.
@@ -259,7 +313,8 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
     A PDF with its `.xopp` counts as a PDF, an image with its `.xopp` as an image. For "only PDFs with notes" a PDF
     alone is looked into once per version (whether it is a hybrid PDF). Turning text files on or off brings them into
     the search index or takes them out.
-  - search: folders whose name matches (tap one to open it), then documents whose name or text matches
+  - search: folders whose name matches (tap one to open it), then documents whose name or text matches; "Fuzzy"
+    in the field: fzf's syntax, names ranked (see Fuzzy search above)
   - extended search (the pages button next to the search field): each result also shows its pages with hits,
     marked, in a row under the title (swipe or scroll sideways); tapping a page opens the document at that page
     with the search active. A Markdown file shows a row of **snippet cards** instead: per passage with hits (a

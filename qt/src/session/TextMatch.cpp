@@ -155,17 +155,7 @@ bool contains(QStringView text, QStringView query, unsigned bounds) {
     return found;
 }
 
-std::vector<Span> find(QStringView text, const std::vector<Term>& terms) {
-    if (terms.size() == 1) {
-        return find(text, terms.front().text, terms.front().bounds);
-    }
-    std::vector<Span> all;
-    for (const Term& t: terms) {
-        scan(text, t.text, t.bounds, [&](qsizetype a, qsizetype b) {
-            all.push_back({a, b});
-            return true;
-        });
-    }
+std::vector<Span> merged(std::vector<Span> all) {
     std::sort(all.begin(), all.end(), [](const Span& a, const Span& b) {
         return a.start != b.start ? a.start < b.start : a.end > b.end;
     });
@@ -179,19 +169,40 @@ std::vector<Span> find(QStringView text, const std::vector<Term>& terms) {
     return out;
 }
 
+namespace {
+/// The matches of all terms, not merged; `found`: how many terms have matches
+std::vector<Span> collect(QStringView text, const std::vector<Term>& terms, int& found) {
+    std::vector<Span> all;
+    found = 0;
+    for (const Term& t: terms) {
+        const size_t before = all.size();
+        scan(text, t.text, t.bounds, [&](qsizetype a, qsizetype b) {
+            all.push_back({a, b});
+            return true;
+        });
+        found += all.size() > before ? 1 : 0;
+    }
+    return all;
+}
+}  // namespace
+
+std::vector<Span> find(QStringView text, const std::vector<Term>& terms) {
+    if (terms.size() == 1) {
+        return find(text, terms.front().text, terms.front().bounds);
+    }
+    int found = 0;
+    std::vector<Span> all = collect(text, terms, found);
+    return found > 1 ? merged(std::move(all)) : all;
+}
+
 int count(QStringView text, const std::vector<Term>& terms) {
     if (terms.size() == 1) {
         return count(text, terms.front().text, terms.front().bounds);
     }
-    // Only a text with matches of several terms needs them placed (they may overlap)
-    int found = 0, total = 0;
-    for (const Term& t: terms) {
-        if (const int n = count(text, t.text, t.bounds); n > 0) {
-            ++found;
-            total += n;
-        }
-    }
-    return found > 1 ? static_cast<int>(find(text, terms).size()) : total;
+    // One scan per term; only matches of several terms need to be put in order (they may overlap)
+    int found = 0;
+    std::vector<Span> all = collect(text, terms, found);
+    return found > 1 ? static_cast<int>(merged(std::move(all)).size()) : static_cast<int>(all.size());
 }
 
 QString encode(const std::vector<Term>& terms) {

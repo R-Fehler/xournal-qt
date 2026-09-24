@@ -65,6 +65,8 @@ struct Term {
 /// same start: the longer one) is kept - so the count and the marks of several terms agree as they do for one.
 std::vector<Span> find(QStringView text, const std::vector<Term>& terms);
 int count(QStringView text, const std::vector<Term>& terms);
+/// Matches of several terms in order, without overlaps (as find() keeps them).
+std::vector<Span> merged(std::vector<Span> spans);
 /// Terms as one string and back (for image URLs).
 QString encode(const std::vector<Term>& terms);
 std::vector<Term> decode(QStringView encoded);

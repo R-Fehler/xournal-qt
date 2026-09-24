@@ -668,3 +668,24 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] In the library's folder view, a folder card's menu (⋮, right click, press and hold) has "Open as library (new
       window)": a new window opens with that folder as library, its cards appear at once with their previews, and
       the search finds its documents without "Indexing for search" running through them again.
+
+## Fuzzy search (qt/fuzzy-search)
+- [ ] The library's search field has a "Fuzzy" button, off. Hover (or press and hold on touch): the tooltip is a
+      short table of the syntax. Off, the search is as before (`kalman | lqr` finds nothing unless that text is there).
+- [ ] Turn it on and type part of a document's name with letters left out (`lctr` for "Lecture"): it is found, first
+      of all, with the matched letters orange and underlined on the card. Better matches come first (letters at word
+      starts, in a row).
+- [ ] `kalman filter` finds documents that have both words anywhere (also on different pages); in the extended search
+      (the pages button) a document shows the pages with both words, or all pages with hits when no page has both.
+- [ ] `a | b` finds either; `a b | c` is a and (b or c); `(a b) | c` groups; `!draft` drops documents with "draft" in
+      the name, the folder or the text; `!archive` drops everything in a folder "Archive".
+- [ ] `'word'` finds the whole word only, `^pre` names starting with "pre" (in text: words starting with it),
+      `ing$` the ends. A term in a folder's name finds its documents (`uni lect` for Uni/Lecture 3).
+- [ ] Type `(kalman` or `kalman |`: a short red hint appears next to the field and the text is searched as plain
+      text; complete the expression and the hint goes.
+- [ ] Open a result, a page of it or a snippet card: the document opens with the same terms marked (all of `a | b`),
+      and the search bar steps through them. Edit the query there: it stays fuzzy; clear it: the next search is
+      plain.
+- [ ] Close and start the app again: "Fuzzy" is still on. A second window shows it on too; turning it off in one
+      turns it off in both.
+- [ ] A big library (thousands of documents): typing in the fuzzy search stays as responsive as the plain one.

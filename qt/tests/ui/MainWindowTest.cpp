@@ -1117,6 +1117,57 @@ TEST_F(HomeScreenTest, theLibrarySearchCanBeLimitedToNames) {
     EXPECT_FALSE(library->property("namesOnly").toBool()) << "the full search again";
 }
 
+// "Fuzzy" in the library search: fzf's syntax, names matched fuzzily with their matched letters highlighted, a hint
+// for an expression that is not valid. An app-wide setting, off by default.
+TEST_F(HomeScreenTest, theLibrarySearchHasAFuzzyToggle) {
+    auto* button = find<QQuickItem>("librarySearchFuzzy");
+    ASSERT_NE(button, nullptr);
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    EXPECT_FALSE(button->property("checked").toBool());
+    library->setSearchQuery("lctr");
+    EXPECT_EQ(gridCount(), 0) << "not fuzzy: no such text";
+
+    click(button);
+    EXPECT_TRUE(library->fuzzySearch());
+    EXPECT_TRUE(button->property("checked").toBool());
+    ASSERT_TRUE(waitFor([&] { return gridCount() == 1; }));
+    QQuickItem* name = nullptr;
+    until([&] {
+        QQuickItem* c = card(0);
+        if (!c) {
+            return false;
+        }
+        for (auto* item: c->findChildren<QQuickItem*>()) {
+            if (item->objectName() == "cardName") {
+                name = item;
+            }
+        }
+        return name != nullptr;
+    });
+    ASSERT_NE(name, nullptr);
+    EXPECT_TRUE(name->property("text").toString().contains("<font")) << name->property("text").toString().toStdString();
+    EXPECT_EQ(name->property("textFormat").toInt(), 4) << "Text.StyledText";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(800);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    auto* hint = find<QQuickItem>("librarySyntaxHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->isVisible());
+    library->setSearchQuery("(lecture");
+    until([&] { return hint->isVisible(); });
+    EXPECT_TRUE(hint->isVisible()) << "a ( that is not closed";
+    EXPECT_FALSE(hint->property("text").toString().isEmpty());
+
+    click(button);
+    EXPECT_FALSE(library->fuzzySearch()) << "off again";
+    until([&] { return !hint->isVisible(); });
+    EXPECT_FALSE(hint->isVisible());
+    library->setSearchQuery("");
+}
+
 // The library has a button for the settings (no tool bar there, and not everybody has a keyboard at hand).
 TEST_F(HomeScreenTest, theSettingsOpenFromTheLibrary) {
     auto* button = find<QQuickItem>("homeSettingsButton");

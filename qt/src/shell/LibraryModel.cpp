@@ -16,6 +16,7 @@
 #include <QThreadPool>
 
 #include "HitPages.h"
+#include "session/FuzzyQuery.h"
 #include "MdSnippets.h"
 #include "Previews.h"
 
@@ -262,6 +263,122 @@ void LibraryModel::setSearchQuery(const QString& q) {
     }
 }
 
+void LibraryModel::setFuzzySearch(bool on) {
+    if (on != fuzzy) {
+        fuzzy = on;
+        Q_EMIT fuzzySearchChanged();
+        if (!query.isEmpty()) {
+            Q_EMIT searchChanged();  // (its hint)
+            rebuild();
+        }
+    }
+}
+
+QString LibraryModel::searchHint() const {
+    return fuzzy && !query.trimmed().isEmpty() ? FuzzyQuery(query).hint() : QString();
+}
+
+LibraryModel::Row LibraryModel::itemRow(const DocumentItem& item) {
+    Row r;
+    r.path = item.main();
+    r.item = item;
+    r.name = QString::fromStdString(item.name());
+    r.modified = modifiedOf(item);
+    if (isOtherKind(item)) {
+        std::error_code ec;
+        const auto size = fs::file_size(item.other, ec);
+        r.size = ec ? -1 : static_cast<qint64>(size);
+        r.icon = fileIconOf(item.other);
+    }
+    return r;
+}
+
+LibraryModel::Row LibraryModel::folderRow(const fs::path& f) const {
+    Row r;
+    r.isFolder = true;
+    r.path = f;
+    r.name = QString::fromStdString(f.filename().string());
+    r.modified = QFileInfo(qstr(f)).lastModified();
+    const auto inside = DocumentFiles::scan(f, filter.include());
+    r.itemCount = static_cast<int>(inside.folders.size() +
+                                   std::count_if(inside.items.begin(), inside.items.end(),
+                                                 [this](const DocumentItem& i) { return filter.shows(i); }));
+    return r;
+}
+
+std::vector<LibraryModel::Row> LibraryModel::fuzzyRows(const FuzzyQuery& parsed) {
+    std::vector<Row> folderRows, docRows;
+    const unsigned include = filter.include();
+    auto folderOf = [this](const fs::path& p) { return QString::fromStdString(lib->relative(p.parent_path())); };
+    auto named = [&](Row& r, const FuzzyQuery::NameMatch& m) {
+        r.hit.file = r.path;
+        r.hit.inName = m.score > 0;
+        r.hit.nameScore = m.score;
+        r.hit.nameMarks = m.positions;
+    };
+    // Folders by their names and paths (not in the flat list when only names are searched: it shows no folders)
+    if (!(onlyNames && flatView)) {
+        for (const auto& f: DocumentFiles::foldersRecursive(lib->root())) {
+            const QString name = QString::fromStdString(f.filename().string());
+            const FuzzyQuery::NameMatch m = parsed.matchName(name, folderOf(f));
+            if (parsed.evaluate([&](size_t t) { return m.found[t] != 0; })) {
+                Row r = folderRow(f);
+                named(r, m);
+                folderRows.push_back(std::move(r));
+            }
+        }
+    }
+    auto byName = [&](const DocumentItem& item) {
+        Row r = itemRow(item);
+        const FuzzyQuery::NameMatch m = parsed.matchName(r.name, folderOf(item.main()));
+        if (!parsed.evaluate([&](size_t t) { return m.found[t] != 0; })) {
+            return false;
+        }
+        named(r, m);
+        docRows.push_back(std::move(r));
+        return true;
+    };
+    if (onlyNames) {
+        auto all = DocumentFiles::scanRecursive(lib->root(), include);
+        for (const auto& item: all) {
+            if (filter.shows(item)) {
+                byName(item);
+            }
+        }
+    } else {
+        for (auto& hit: idx->search(parsed)) {
+            const DocumentItem item = DocumentFiles::itemOf(hit.file, include);
+            if (item.valid() && filter.shows(item)) {
+                Row r = itemRow(item);
+                r.hit = std::move(hit);
+                docRows.push_back(std::move(r));
+            }
+        }
+        // (other files are not in the index: by their names)
+        if (filter.other) {
+            for (const auto& item: DocumentFiles::scanRecursive(lib->root(), DocumentFiles::OtherFiles)) {
+                if (item.kind() == DocumentItem::Kind::Other) {
+                    byName(item);
+                }
+            }
+        }
+    }
+    // fzf's score of the names first, then the hits in the text, then the newest
+    auto ranked = [](const Row& a, const Row& b) {
+        if (a.hit.nameScore != b.hit.nameScore) {
+            return a.hit.nameScore > b.hit.nameScore;
+        }
+        if (a.hit.count != b.hit.count) {
+            return a.hit.count > b.hit.count;
+        }
+        return a.modified > b.modified;
+    };
+    std::stable_sort(folderRows.begin(), folderRows.end(), ranked);
+    std::stable_sort(docRows.begin(), docRows.end(), ranked);
+    std::move(docRows.begin(), docRows.end(), std::back_inserter(folderRows));
+    return folderRows;
+}
+
 bool LibraryModel::indexing() const { return idx && idx->busy(); }
 int LibraryModel::indexed() const { return idx ? idx->indexed() : 0; }
 int LibraryModel::indexTotal() const { return idx ? idx->total() : 0; }
@@ -317,34 +434,17 @@ void LibraryModel::watchFolders(const std::vector<fs::path>& folders) {
 
 void LibraryModel::rebuild() {
     std::vector<Row> newRows;
+    marks = query;
+    if (lib && fuzzy && !query.trimmed().isEmpty()) {
+        if (const FuzzyQuery parsed(query); parsed.isValid()) {
+            marks = HitPageProvider::marksOf(parsed.markTerms());
+            setRows(fuzzyRows(parsed));
+            return;
+        }
+        // (not valid: searched as plain text, with a hint)
+    }
     if (lib) {
         const unsigned include = filter.include();
-        auto itemRow = [](const DocumentItem& item) {
-            Row r;
-            r.path = item.main();
-            r.item = item;
-            r.name = QString::fromStdString(item.name());
-            r.modified = modifiedOf(item);
-            if (isOtherKind(item)) {
-                std::error_code ec;
-                const auto size = fs::file_size(item.other, ec);
-                r.size = ec ? -1 : static_cast<qint64>(size);
-                r.icon = fileIconOf(item.other);
-            }
-            return r;
-        };
-        auto folderRow = [this, include](const fs::path& f) {
-            Row r;
-            r.isFolder = true;
-            r.path = f;
-            r.name = QString::fromStdString(f.filename().string());
-            r.modified = QFileInfo(qstr(f)).lastModified();
-            const auto inside = DocumentFiles::scan(f, include);
-            r.itemCount = static_cast<int>(inside.folders.size() +
-                                           std::count_if(inside.items.begin(), inside.items.end(),
-                                                         [this](const DocumentItem& i) { return filter.shows(i); }));
-            return r;
-        };
         // The documents of the library that are shown
         auto allShown = [this, include] {
             auto all = DocumentFiles::scanRecursive(lib->root(), include);
@@ -553,7 +653,7 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return pages;
         }
         case HitPageBaseRole:
-            return r.isFolder || r.hit.pageHits.empty() ? QString() : HitPageProvider::baseUrl(r.item, query);
+            return r.isFolder || r.hit.pageHits.empty() ? QString() : HitPageProvider::baseUrl(r.item, marks);
         case KindRole:
             return r.isFolder ? QString() : QString::fromLatin1(r.item.kindName());
         case HybridRole:
@@ -567,7 +667,7 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return passages;
         }
         case HitPassageBaseRole:
-            return r.isFolder || r.hit.blockHits.empty() ? QString() : MdSnippetProvider::baseUrl(r.item, query);
+            return r.isFolder || r.hit.blockHits.empty() ? QString() : MdSnippetProvider::baseUrl(r.item, marks);
         case SizeRole:
             if (r.isFolder) {
                 return -1;
@@ -580,6 +680,13 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return r.size;
         case FileIconRole:
             return r.icon;
+        case NameMarksRole: {
+            QVariantList list;
+            for (const int p: r.hit.nameMarks) {
+                list.append(p);
+            }
+            return list;
+        }
         default:
             return {};
     }
@@ -611,7 +718,8 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {HitPassageListRole, "hitPassageList"},
             {HitPassageBaseRole, "hitPassageBase"},
             {SizeRole, "size"},
-            {FileIconRole, "fileIcon"}};
+            {FileIconRole, "fileIcon"},
+            {NameMarksRole, "nameMarks"}};
 }
 
 void LibraryModel::setShowFilter(const ShowFilter& f) {
