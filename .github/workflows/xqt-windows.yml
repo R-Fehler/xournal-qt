@@ -44,6 +44,7 @@ jobs:
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
             mingw-w64-ucrt-x86_64-ccache
+            mingw-w64-ucrt-x86_64-gdb
             mingw-w64-ucrt-x86_64-glib2
             mingw-w64-ucrt-x86_64-cairo
             mingw-w64-ucrt-x86_64-pango
@@ -81,7 +82,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build-logs
+          # -g1: function names and lines for gdb's backtraces in the smoke test (no local variables; a few MB).
           cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_C_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" \
             -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON \
             2>&1 | tee build-logs/configure.log
 
@@ -116,8 +119,8 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-      - name: Smoke test (CLI exports, the app off-screen)
-        timeout-minutes: 15
+      - name: Smoke test (CLI exports, the app off-screen; gdb backtraces of what fails)
+        timeout-minutes: 45
         run: |
           set -euo pipefail
           bash qt/scripts/windows-smoke.sh dist/xournal-qt smoke

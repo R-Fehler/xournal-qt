@@ -209,8 +209,10 @@ int main(int argc, char* argv[]) {
     setlocale(LC_NUMERIC, "C");
 #ifdef _WIN32
     // std::filesystem converts narrow strings with the C library's character set: make that UTF-8, as everywhere
-    // else in the program (see qt/docs/windows.md).
-    setlocale(LC_CTYPE, ".UTF-8");
+    // else in the program (see qt/docs/windows.md). XQT_NO_UTF8_LOCALE=1 skips it (a diagnostic).
+    if (!g_getenv("XQT_NO_UTF8_LOCALE")) {
+        setlocale(LC_CTYPE, ".UTF-8");
+    }
 #endif
     std::cout.imbue(std::locale());
 

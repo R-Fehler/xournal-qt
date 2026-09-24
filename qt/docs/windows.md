@@ -78,10 +78,20 @@ The workflow's steps:
      nothing is run), and a final check that every import is in `bin\` or part of Windows.
 5. **Publish** the folder as the artifact `xournal-qt-windows-x64`.
 6. **Smoke test** ([qt/scripts/windows-smoke.sh](../scripts/windows-smoke.sh)), with a `PATH` of Windows alone so
-   that a DLL missing from the folder shows here: the CLI's `--version`, a PNG export of a document with text, PDF
-   exports of a document with images and of one with a PDF background; then the app itself, off-screen with Qt
-   Quick's software renderer, opening a library and a document and saving a screenshot of its window after 5 s. When
-   the app fails, it runs again with `QT_DEBUG_PLUGINS=1` and `QML_IMPORT_TRACE=1`.
+   that a DLL missing from the folder shows here: the CLI's `--version`; exports chosen to tell apart what fails
+   (strokes to PNG: raster without text; text to PDF: text without raster; text to PNG: both; images to PDF; a PDF
+   background to PDF); then the app itself, off-screen with Qt Quick's software renderer, opening a library and a
+   document and saving a screenshot of its window after 5 s. Last, `text-probe` ([qt/tools/text-probe.c](../tools/text-probe.c)),
+   Pango and Cairo alone drawing text into a PNG and a PDF with the folder's DLLs, with each of Pango's font backends
+   and with and without the UTF-8 C locale.
+
+   A step that fails runs again under **gdb** (`<step>.gdb.log`: the backtraces of every thread, stopped at the
+   crash, `abort()` or `exit()`, and the loaded DLLs; the build has `-g1` for function names). A failing text export
+   also runs with `FC_DEBUG=1 G_MESSAGES_DEBUG=all`, with Pango's fontconfig backend (`PANGOCAIRO_BACKEND=fc`), and
+   without the UTF-8 C locale (`XQT_NO_UTF8_LOCALE=1`); a failing app with `QT_DEBUG_PLUGINS=1 QML_IMPORT_TRACE=1`,
+   the same variants, and without a document. MSYS2 reports a Windows program's fatal NTSTATUS as exit code 139
+   (access violation) or 127 (anything else: stack overflow, heap corruption, `__fastfail` from `abort()` or an
+   invalid C runtime parameter, a DLL that cannot be loaded).
 
 The unit tests are not built on Windows yet: they use POSIX headers and `/proc` in places (see the roadmap).
 
@@ -97,7 +107,7 @@ The unit tests are not built on Windows yet: they use POSIX headers and `/proc` 
 | Memory size ([CanvasMemory.cpp](../src/canvas/CanvasMemory.cpp)) | `sysconf` | `GlobalMemoryStatusEx` |
 | Background render threads ([RenderService.cpp](../src/render/RenderService.cpp)) | `SCHED_IDLE` | `THREAD_PRIORITY_IDLE` |
 | CLI arguments ([cli/main.cpp](../cli/main.cpp)) | `argv` | the UTF-8 command line (`g_win32_get_command_line`) |
-| CMake | strict C++20 | gnu++20 (MinGW's headers hide `M_PI` and POSIX names under strict C++), `NOMINMAX`, a GUI executable (`WIN32_EXECUTABLE`), `-Wa,-mbig-obj` (large translation units), no desktop files or `.deb` |
+| CMake | strict C++20 | gnu++20 (MinGW's headers hide `M_PI` and POSIX names under strict C++), `NOMINMAX`, 8 MB thread stacks as on Linux (MinGW's default is 2 MB), a GUI executable (`WIN32_EXECUTABLE`), `-Wa,-mbig-obj` (large translation units), no desktop files or `.deb` |
 
 ## Building it on a Windows machine
 
