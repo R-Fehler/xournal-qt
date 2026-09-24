@@ -10,7 +10,7 @@
 #
 # Paths (override through the environment):
 #   ANDROID_SDK_ROOT  ~/Android/Sdk               ANDROID_NDK_ROOT  $ANDROID_SDK_ROOT/ndk/27.2.12479018
-#   JAVA_HOME         ~/.local/jdk-17             QT_ANDROID        ~/Qt/6.11.2/android_arm64_v8a
+#   XQT_JAVA_HOME     ~/.local/jdk-17             QT_ANDROID        ~/Qt/6.11.2/android_arm64_v8a
 #   QT_HOST           ~/Qt/6.11.2/gcc_64          VCPKG_ROOT        <workspace>/vcpkg (cloned when missing)
 #   XQT_ANDROID_BUILD <checkout>/build-android    VCPKG_BINARY_CACHE ~/.cache/vcpkg/archives
 set -euo pipefail
@@ -23,7 +23,8 @@ workspace="$(dirname "$checkout")"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
 export ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-$ANDROID_SDK_ROOT/ndk/27.2.12479018}"
 export ANDROID_NDK_HOME="$ANDROID_NDK_ROOT"   # the name vcpkg's Android toolchain reads
-export JAVA_HOME="${JAVA_HOME:-$HOME/.local/jdk-17}"
+# Not $JAVA_HOME: a desktop JDK (e.g. 25) breaks the Android build (jlink of the android.jar).
+export JAVA_HOME="${XQT_JAVA_HOME:-$HOME/.local/jdk-17}"
 export QT_ANDROID="${QT_ANDROID:-$HOME/Qt/6.11.2/android_arm64_v8a}"
 export QT_HOST="${QT_HOST:-$HOME/Qt/6.11.2/gcc_64}"
 export VCPKG_ROOT="${VCPKG_ROOT:-$workspace/vcpkg}"
@@ -101,7 +102,7 @@ apk() {
         -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
         -DVCPKG_INSTALLED_DIR="$build/vcpkg_installed"
     heavy cmake --build "$build" --target apk -j "$jobs"
-    local out="$build/android-build-xournal-qt/build/outputs/apk/debug/android-build-xournal-qt-debug.apk"
+    local out="$build/android-build/build/outputs/apk/debug/android-build-debug.apk"
     [ -f "$out" ] || out="$(find "$build" -name '*.apk' -newer "$build/CMakeCache.txt" | head -1)"
     echo "APK: $out ($(du -h "$out" | cut -f1))"
     echo "Install: adb install -r '$out'"
