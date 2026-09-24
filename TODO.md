@@ -82,6 +82,8 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         word list per document and page, so it stays fast.
       - Typo tolerance, set in a new **Settings → Search** tab (the author, 2026-09-24): off, 1 letter for words of
         5+ letters (the default), or up to 2 letters for words of 8+. The tab also holds the fuzzy on/off setting.
+      - A help page for the fuzzy search: a long press or right click on the Fuzzy toggle, and a link in Settings →
+        Search. It explains the syntax with examples.
       - Whole matching words are marked; `'exact`, `^` and `$` keep their meaning.
    5. ~~fuzzy search~~: `qt/fuzzy-search`, merged 2026-09-24 (see ROADMAP). Follow-ups: hit-page pictures mark `^`/`$`/`'word'` terms as plain substrings; the document search bar shows no sign that it is in fuzzy mode.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
