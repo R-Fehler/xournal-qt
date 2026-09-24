@@ -24,6 +24,8 @@ set_target_properties(xqt-quick PROPERTIES AUTOMOC ON)
 add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
@@ -125,6 +127,7 @@ set(XQT_QML_FILES
     src/app/qml/RaceWatch.qml
     src/app/qml/FuzzyToggle.qml
     src/app/qml/Fuzzy.js
+    src/app/qml/ReferenceSplit.qml
     src/app/qml/Popups.js)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
@@ -152,7 +155,8 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-quick-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasItemInputTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasItemRenderTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasItemRenderTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp)
     target_link_libraries(xqt-quick-tests PRIVATE xqt-quick Qt6::QuickControls2 Qt6::GuiPrivate Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick
@@ -161,7 +165,8 @@ if(XQT_BUILD_TESTS)
     # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
     add_executable(xqt-ui-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/main.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
         GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
@@ -172,6 +177,7 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ReferenceModeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp

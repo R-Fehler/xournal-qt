@@ -136,6 +136,8 @@ Rectangle {
                 required property bool modified
                 required property bool saving
                 required property bool current
+                /// Shown beside the current document (reference mode)
+                required property bool isReference
                 readonly property bool shown: current && !app.homeVisible
                 width: Math.min(260, Math.max(140, titleLabel.implicitWidth + 70))
                 height: list.height
@@ -188,6 +190,20 @@ Rectangle {
                         onTriggered: app.secondaryWindow ? strip.dockRequested(tab.index)
                                                          : strip.undockRequested(tab.index)
                     }
+                    MenuItem {
+                        objectName: "openAsReferenceTabItem"
+                        text: tab.isReference ? qsTr("Close the reference") : qsTr("Open as reference")
+                        visible: !tab.current  // (beside the current document; not beside itself)
+                        height: visible ? implicitHeight : 0
+                        onTriggered: {
+                            if (tab.isReference) {
+                                app.reference.close()
+                            } else {
+                                app.reference.showTab(tab.index)
+                                app.homeVisible = false
+                            }
+                        }
+                    }
                     MenuItem { text: qsTr("Close"); onTriggered: strip.closeRequested(tab.index) }
                 }
 
@@ -209,10 +225,23 @@ Rectangle {
                 }
                 contentItem: RowLayout {
                     spacing: 2
+                    Image {  // shown beside the current document as its reference
+                        objectName: "referenceBadge"
+                        visible: tab.isReference && !app.homeVisible
+                        source: app.iconUrl("xqt-reference")
+                        sourceSize.width: 16
+                        sourceSize.height: 16
+                        Layout.leftMargin: 10
+                        Layout.topMargin: 4
+                        ToolTip.visible: badgeHover.hovered
+                        ToolTip.text: qsTr("Shown beside the current document")
+                        ToolTip.delay: 600
+                        HoverHandler { id: badgeHover }
+                    }
                     Label {
                         id: titleLabel
                         Layout.fillWidth: true
-                        Layout.leftMargin: 12
+                        Layout.leftMargin: tab.isReference && !app.homeVisible ? 4 : 12
                         Layout.topMargin: 4
                         // (the dot stays until the file is written)
                         text: (tab.modified ? "● " : "") + tab.title + (tab.saving ? " — " + qsTr("saving…") : "")

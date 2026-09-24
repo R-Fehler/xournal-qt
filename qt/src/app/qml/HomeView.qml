@@ -1183,6 +1183,15 @@ Rectangle {
             onTriggered: home.openAll(home.menuPaths, home.menuModel)
         }
         MenuItem {
+            objectName: "openAsReferenceItem"
+            text: qsTr("Open as reference")
+            // Beside the document open now (without one it is simply opened)
+            visible: !home.menuMany && !home.menuFolder && app.tabs.count > 0
+                     && ["notes", "pdf", "md", "image", "text"].indexOf(home.menuKind) >= 0
+            height: visible ? implicitHeight : 0
+            onTriggered: app.openAsReference(home.menuPath)
+        }
+        MenuItem {
             objectName: "openAsLibraryItem"
             text: qsTr("Open as library (new window)")
             visible: !home.menuMany && home.menuFolder && home.menuModel === app.library

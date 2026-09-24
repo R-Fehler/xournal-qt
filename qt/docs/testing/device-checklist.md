@@ -737,3 +737,48 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       are highlighted, a document found by its title alone says "In the name"; with the pages button, a document shows
       the pages on which the whole expression holds. "Names" with Fuzzy on matches the titles fuzzily.
 - [ ] A big library (thousands of documents): typing in the fuzzy search stays as responsive as the plain one.
+
+## Reference mode (qt/reference-view)
+
+- [ ] Two canvases side by side (the reference for reading only): writing with the pen on the notes and moving on
+      across the divider into the reference: the stroke stays on the notes, the reference does not scroll under it;
+      the next stroke on the reference scrolls it. The same with the mouse.
+- [ ] On the reference, pen, highlighter, eraser, text and shape tools scroll it like the hand (a tap on a link
+      shows the link); nothing is ever written, erased or marked there, and the tab of the reference gets no "●".
+- [ ] A two-finger tap on the reference undoes nothing (a two-finger tap on the notes still undoes there).
+- [ ] "Open as reference" from the tab strip's menu of another tab (press and hold / right click), from the book icon
+      on a card of the tab overview (Ctrl+Shift+E), and from the menu of a card in the library and in Recent: the
+      document appears beside the current one (on the left), fitted to its half, with a small book in its tab. An
+      untouched new document stays open for the notes. The notes have a thin blue frame.
+- [ ] Drag the divider's grip with a finger and with the pen: both halves follow; it stops at a fifth of the width.
+      Restart the app: the divider is where it was left.
+- [ ] Switch to another tab and back: each tab shows its own reference (or none). The home screen hides it.
+- [ ] The reference's pill: the page counter (tap it, type a number, Enter: that page), fit width, swap sides (the
+      notes on the left for a left hand; remembered), swap roles (the reference becomes the notes and the other way
+      round, nothing is drawn again), × (the split closes, the tab stays). Closing the reference's tab also closes
+      the split.
+- [ ] Scroll the reference with a finger (fling), the pen, the mouse wheel and the touchpad (with momentum); pinch
+      and Ctrl+wheel zoom only the reference; a double tap zooms into a column. The notes do not move meanwhile.
+- [ ] PDF text in the reference: with the PDF text tool (even in highlight mode) drag over a line, or press and hold
+      a word: the copy button appears in its pill; tap it and paste into the notes (Ctrl+V after a tap on the notes).
+      The same with the lasso: select strokes in the reference, copy, paste in the notes.
+- [ ] A link in the reference (a table of contents): tap it, "Go to page" goes there in the reference; back with
+      Alt+Left after a tap on the reference's pill.
+- [ ] Keys: after a tap on the reference (or its pill) Ctrl+C, Ctrl++ / Ctrl+-, Ctrl+0 and Alt+Left act on the
+      reference; after a tap on the notes they act on the notes again. Ctrl+Z undoes in the notes (unless the
+      reference is written in, see below).
+- [ ] Full screen (F11): the split stays, the tool square starts over the notes; with the tool bar docked left, right
+      and at the top nothing overlaps.
+- [ ] The pen button in the reference's pill: on (highlighted), the reference is written in with the tool in hand
+      (pen, highlighter, eraser, text, lasso that moves), its tab gets its "●", Ctrl+Z / Ctrl+Y (and a two-finger
+      tap on it) undo there while it was the last one written on; a tap on the notes and Ctrl+Z undoes in the notes.
+      A stroke that begins on either side stays on that side across the divider. Off: for reading again. Each tab
+      remembers it for its reference; a new reference, and the notes after "swap roles", start for reading. Save
+      the reference from its own tab (or when closing it / quitting, which asks).
+- [ ] The grid button in the reference's pill: the pages of the reference fill its half (the notes and their page
+      sidebar stay as they are); scroll it with a finger and the touchpad; a tap on a page goes there and closes the
+      grid; the button closes it too. The page sidebar never shows the reference's pages.
+- [ ] With `XQT_PERF=1` and a long PDF as the reference beside the notes: scroll the reference and the notes in
+      turn; both show sharp pages quickly, neither waits behind the other's pages rendered in advance. Swap roles:
+      no page goes blurry or is drawn again. Switch to a third tab and back: the reference's pages near where it
+      was read are still there.

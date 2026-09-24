@@ -82,6 +82,7 @@
 #include "shell/SessionRecovery.h"
 #include "shell/SettingsModel.h"
 #include "shell/SystemApps.h"
+#include "shell/ReferenceMode.h"
 #include "shell/TabManager.h"
 
 using namespace xqt;
@@ -189,6 +190,11 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
 void AppController::makeTabs() {
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
+    referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
+    connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
+    connect(referenceMode.get(), &ReferenceMode::copied, this, [this](const QString& what) {
+        Q_EMIT pageActionDone(what, false);
+    });
     connect(tabs.get(), &TabManager::pdfPagesFailed, this, [this](const QString& error) {
         Q_EMIT message(tr("Pasting PDF pages failed"),
                        tr("The pasted pages show their PDF page as a picture (its text cannot be searched).\n\n%1")
@@ -234,6 +240,7 @@ AppController::~AppController() {
     outline->setSession(nullptr);
     layers->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
+    referenceMode.reset();
     tabs.reset();
 }
 
@@ -636,9 +643,25 @@ void AppController::currentTabChanged() {
 }
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
-bool AppController::copySelection() { return canvas() && canvas()->copySelection(); }
-bool AppController::cutSelection() { return canvas() && canvas()->cutSelection(); }
+bool AppController::copySelection() {
+    if (referenceMode->focused() && referenceMode->hasSelection()) {
+        return referenceMode->copy();  // (the keys are for the reference while it has the focus)
+    }
+    return canvas() && canvas()->copySelection();
+}
+CanvasView* AppController::editedReference() const {
+    return referenceMode->focused() && referenceMode->editing() ? referenceMode->canvas() : nullptr;
+}
+bool AppController::cutSelection() {
+    if (CanvasView* r = editedReference()) {
+        return r->cutSelection();
+    }
+    return canvas() && canvas()->cutSelection();
+}
 bool AppController::pasteElements() {
+    if (CanvasView* r = editedReference()) {
+        return !r->getSession().isReadOnly() && r->pasteElements();
+    }
     return canvas() && !session()->isReadOnly() && canvas()->pasteElements();
 }
 bool AppController::pasteAt(qreal x, qreal y) {
@@ -649,17 +672,19 @@ bool AppController::canPaste() const {
     return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal"));
 }
 void AppController::deleteSelection() {
-    if (canvas()) {
+    if (CanvasView* r = editedReference()) {
+        r->deleteSelection();
+    } else if (canvas()) {
         canvas()->deleteSelection();
     }
 }
 void AppController::selectAllOnPage() {
-    if (canvas()) {
+    if (CanvasView* target = editedReference() ? editedReference() : canvas()) {
         if (app->getToolHandler()->getToolType() != TOOL_SELECT_RECT &&
             app->getToolHandler()->getToolType() != TOOL_SELECT_REGION) {
             selectTool("selectRegion");  // so that the selection can be moved right away
         }
-        canvas()->selectAllOnPage();
+        target->selectAllOnPage();
     }
 }
 bool AppController::insertImage(const QUrl& url) {
@@ -1754,6 +1779,30 @@ void AppController::openUrls(const QList<QUrl>& urls) {
     }
 }
 
+QObject* AppController::referenceObject() const { return referenceMode.get(); }
+
+bool AppController::openAsReference(const QString& path) {
+    DocumentSession* main = session();
+    if (!main) {
+        return openPath(path);  // nothing to show it beside
+    }
+    int index = tabs->indexOfFile(fs::path(path.toStdString()));
+    if (index < 0) {
+        replacePristine = false;  // (the new document is for the notes)
+        const bool opened = openPath(path);
+        replacePristine = true;
+        if (!opened) {
+            tabs->setCurrentIndex(tabs->indexOf(main));
+            return false;
+        }
+        index = tabs->currentIndex();  // (the opened document)
+    }
+    tabs->setCurrentIndex(tabs->indexOf(main));
+    referenceMode->showTab(index);  // (not beside itself)
+    setHomeVisible(false);
+    return true;
+}
+
 void AppController::closeTab(int index) {
     if (flow && flowSession == tabs->session(index)) {
         endTextFlow(true);
@@ -1880,7 +1929,7 @@ bool AppController::openPath(const QString& path) {
     }
     const std::vector<std::string> hybridChanged = result.hybridChanged;
     // An untouched new document is replaced instead of keeping an empty tab around.
-    const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
+    const int pristine = replacePristine && tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
     auto opened = std::make_unique<DocumentSession>(*app, std::move(result.document));
     if (shown) {
         opened->setShownFile(file, !DocumentFiles::isImageFile(file));
@@ -2166,6 +2215,10 @@ bool AppController::saveAs(const QUrl& url) {
 }
 
 void AppController::undo() {
+    if (editedReference()) {
+        referenceMode->undo();  // (the canvas last written on has the keys)
+        return;
+    }
     if (!session()) {
         return;
     }
@@ -2177,6 +2230,10 @@ void AppController::undo() {
 }
 
 void AppController::redo() {
+    if (editedReference()) {
+        referenceMode->redo();
+        return;
+    }
     if (!session()) {
         return;
     }
@@ -2298,7 +2355,9 @@ void AppController::setSize(int s) {
 }
 
 void AppController::fitWidth() {
-    if (canvas()) {
+    if (referenceMode->focused()) {
+        referenceMode->fitWidth();
+    } else if (canvas()) {
         canvas()->getViewController().fitWidth();
     }
 }
@@ -2332,7 +2391,9 @@ bool AppController::currentPageDiffers() const {
 }
 
 void AppController::zoomIn() {
-    if (canvas()) {
+    if (referenceMode->focused()) {
+        referenceMode->zoomIn();
+    } else if (canvas()) {
         auto& vc = canvas()->getViewController();
         vc.zoomBy(1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
@@ -2347,7 +2408,9 @@ void AppController::setZoomPercent(int percent) {
 }
 
 void AppController::zoomOut() {
-    if (canvas()) {
+    if (referenceMode->focused()) {
+        referenceMode->zoomOut();
+    } else if (canvas()) {
         auto& vc = canvas()->getViewController();
         vc.zoomBy(1 / 1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
@@ -2414,12 +2477,16 @@ void AppController::jumpToPage(int index) {
 bool AppController::canGoBack() const { return canvas() && canvas()->canGoBack(); }
 bool AppController::canGoForward() const { return canvas() && canvas()->canGoForward(); }
 void AppController::navigateBack() {
-    if (canvas()) {
+    if (referenceMode->focused()) {
+        referenceMode->navigateBack();
+    } else if (canvas()) {
         canvas()->navigateBack();
     }
 }
 void AppController::navigateForward() {
-    if (canvas()) {
+    if (referenceMode->focused()) {
+        referenceMode->navigateForward();
+    } else if (canvas()) {
         canvas()->navigateForward();
     }
 }

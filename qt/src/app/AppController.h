@@ -52,6 +52,7 @@ class SessionRecovery;
 class Library;
 class LibraryModel;
 class RecentFiles;
+class ReferenceMode;
 namespace DocumentFiles {
 struct Result;
 }
@@ -174,6 +175,8 @@ class AppController: public QObject {
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
     /// What the PDF text tools do with the selected text: highlight, underline, strikethrough, select
     Q_PROPERTY(QString pdfTextMode READ pdfTextMode WRITE setPdfTextMode NOTIFY pdfTextModeChanged)
+    /// Reference mode: another document beside the current one (xqt::ReferenceMode).
+    Q_PROPERTY(QObject* reference READ referenceObject CONSTANT)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -404,6 +407,11 @@ public:
     /// There is a file manager to show files in (not on Android).
     bool canShowInFileManager() const;
     Q_INVOKABLE void openUrls(const QList<QUrl>& urls);
+    /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
+    /// new document stays, to write the notes in). Without a document open: opened as the document.
+    Q_INVOKABLE bool openAsReference(const QString& path);
+    QObject* referenceObject() const;
+    xqt::ReferenceMode& reference() const { return *referenceMode; }
     /// Close a tab without asking (QML asks about unsaved changes first). The last tab is replaced by a new one.
     Q_INVOKABLE void closeTab(int index);
     Q_INVOKABLE void moveTab(int from, int to);
@@ -659,6 +667,9 @@ private:
     mutable std::shared_ptr<const xqt::FuzzyQuery> fuzzyParsed;
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// The reference while it has the keys and is written in (its edit switch), else nullptr: then undo, cut,
+    /// paste, delete and select all act on it.
+    xqt::CanvasView* editedReference() const;
     enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };
     /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
     bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then);
@@ -692,6 +703,8 @@ private:
     bool windowGone = false;           ///< its window was closed (it is on its way out)
     std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
     std::unique_ptr<xqt::TabManager> tabs;
+    std::unique_ptr<xqt::ReferenceMode> referenceMode;  ///< (after `tabs`, reset before it)
+    bool replacePristine = true;  ///< opening a file replaces an untouched new document (not for a reference)
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::OutlineModel> outline;

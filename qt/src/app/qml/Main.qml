@@ -744,14 +744,23 @@ ApplicationWindow {
     DocumentCanvas {
         id: canvas
         objectName: "canvas"
+        // The canvas area, or the main document's side of it when the tab shows a reference beside it
+        x: referenceSplit.x + referenceSplit.mainX
+        y: referenceSplit.y
+        width: referenceSplit.mainWidth
+        height: referenceSplit.height
+        clip: true  // zoomed-in pages must not paint over the sidebar
+        view: app.view
+    }
+    // Reference mode: another document beside this one (the canvas area is split)
+    ReferenceSplit {
+        id: referenceSplit
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.right: textFlowPanel.visible ? textFlowPanel.left
                        : markdownPanel.visible ? markdownPanel.left
                        : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible ? sidebar.right : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
-        clip: true  // zoomed-in pages must not paint over the sidebar
-        view: app.view
     }
 
     // A Markdown file shown read-only for now, an image to write on: what that means (closed for this tab with ×).
@@ -1604,8 +1613,8 @@ ApplicationWindow {
         // Only in full screen: with the bar merely put away, the arrow strip brings it back at once
         visible: win.fullScreenMode && !app.homeVisible
         z: 60
-        x: 16
-        y: 16
+        x: canvas.x + 16  // (over the main document, also when a reference is beside it)
+        y: canvas.y + 16
         width: 56
         height: 56
         radius: 12

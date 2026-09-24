@@ -92,6 +92,8 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             return s->isModified();
         case SavingRole:
             return s->isSaving();
+        case ReferenceRole:
+            return current >= 0 && current < count() && tabs[static_cast<size_t>(current)].reference == s;
         case FilePathRole:
             return QString::fromStdString(s->getFilePath().string());
         case CurrentRole:
@@ -164,7 +166,8 @@ QHash<int, QByteArray> TabManager::roleNames() const {
     return {{TitleRole, "title"},         {ModifiedRole, "modified"},     {FilePathRole, "filePath"},
             {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"},
             {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}, {HitPagesRole, "hitPages"},
-            {SketchRole, "sketch"},       {SavingRole, "saving"},       {SearchMatchRole, "searchMatch"}};
+            {SketchRole, "sketch"},       {SavingRole, "saving"},       {SearchMatchRole, "searchMatch"},
+            {ReferenceRole, "isReference"}};
 }
 
 bool TabManager::anySaving() const {
@@ -243,13 +246,18 @@ std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
     tab = std::make_unique<Tab>(std::move(tabs[static_cast<size_t>(index)]));
     tabs.erase(tabs.begin() + index);
     endRemoveRows();
+    const bool hadReference = std::exchange(tab->reference, nullptr) != nullptr;  // (it stays in this window)
     Q_EMIT countChanged();
     const int old = current;
     if (current > index || current >= count()) {
         current = std::min(current - (current > index ? 1 : 0), count() - 1);
     }
+    forgetReferencesTo(s);
     backgroundChanged(old);
     Q_EMIT currentIndexChanged();
+    if (hadReference) {
+        Q_EMIT referencesChanged();
+    }
     Q_EMIT currentTabChanged();
     Q_EMIT savingChanged();
     return tab;
@@ -279,6 +287,7 @@ void TabManager::closeTab(int index) {
     if (tabs.empty()) {
         current = -1;
     }
+    forgetReferencesTo(tab.session.get());  // (its split closes)
     Q_EMIT countChanged();
     Q_EMIT currentIndexChanged();
     if (wasCurrent) {
@@ -334,6 +343,78 @@ void TabManager::backgroundChanged(int oldCurrent) {
     }
     if (current >= 0) {
         Q_EMIT dataChanged(index(current), index(current), {CurrentRole});
+    }
+    referenceMarksChanged();  // (each tab has its own reference)
+}
+
+void TabManager::referenceMarksChanged() {
+    if (count() > 0) {
+        Q_EMIT dataChanged(index(0), index(count() - 1), {ReferenceRole});
+    }
+}
+
+int TabManager::referenceOf(int index) const {
+    if (index < 0 || index >= count()) {
+        return -1;
+    }
+    const DocumentSession* ref = tabs[static_cast<size_t>(index)].reference;
+    return ref ? rowOf(ref) : -1;
+}
+
+void TabManager::setReference(int index, int reference) {
+    if (index < 0 || index >= count() || reference == index || reference >= count()) {
+        return;
+    }
+    DocumentSession* ref = reference >= 0 ? tabs[static_cast<size_t>(reference)].session.get() : nullptr;
+    if (std::exchange(tabs[static_cast<size_t>(index)].reference, ref) != ref) {
+        tabs[static_cast<size_t>(index)].referenceEditable = false;  // (another reference: for reading at first)
+        referenceMarksChanged();
+        Q_EMIT referencesChanged();
+    }
+}
+
+void TabManager::swapReference() {
+    const int ref = referenceOf(current);
+    if (ref < 0) {
+        return;
+    }
+    // The pair is the same, the other way round (and the other tab no longer shows it beside itself twice)
+    tabs[static_cast<size_t>(ref)].reference = tabs[static_cast<size_t>(current)].session.get();
+    tabs[static_cast<size_t>(ref)].referenceEditable = false;  // (the notes shown for reading at first)
+    tabs[static_cast<size_t>(current)].reference = nullptr;
+    tabs[static_cast<size_t>(current)].referenceEditable = false;
+    const int old = current;
+    current = ref;
+    backgroundChanged(old);
+    Q_EMIT referencesChanged();
+    Q_EMIT currentIndexChanged();
+    Q_EMIT currentTabChanged();
+}
+
+bool TabManager::referenceEditable(int index) const {
+    return index >= 0 && index < count() && tabs[static_cast<size_t>(index)].reference &&
+           tabs[static_cast<size_t>(index)].referenceEditable;
+}
+
+void TabManager::setReferenceEditable(int index, bool on) {
+    if (index >= 0 && index < count() && tabs[static_cast<size_t>(index)].reference &&
+        std::exchange(tabs[static_cast<size_t>(index)].referenceEditable, on) != on) {
+        Q_EMIT referencesChanged();
+    }
+}
+
+void TabManager::forgetReferencesTo(const DocumentSession* s) {
+    bool changed = false;
+    for (Tab& t: tabs) {
+        if (t.reference == s) {
+            t.reference = nullptr;
+            t.referenceEditable = false;
+            changed = true;
+        }
+    }
+    if (changed) {
+        referenceMarksChanged();
+        Q_EMIT referencesChanged();
     }
 }
 

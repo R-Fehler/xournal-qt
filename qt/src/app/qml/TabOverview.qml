@@ -271,6 +271,7 @@ Popup {
                 required property string title
                 required property bool modified
                 required property bool current
+                required property bool isReference
                 required property string thumbnail
                 required property string sketch
                 required property int pageCount
@@ -460,6 +461,35 @@ Popup {
                     }
                     TapHandler {
                         onTapped: overview.activate(cell.index)
+                    }
+                    // Reference mode: shown beside the current document (again: not any more)
+                    ToolButton {
+                        objectName: "overviewReferenceButton"
+                        visible: !cell.current && !overview.searching
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.margins: 2
+                        implicitWidth: 40
+                        implicitHeight: 40
+                        checkable: false
+                        icon.source: app.iconUrl("xqt-reference")
+                        icon.color: cell.isReference ? Material.accentColor : "#3c4043"
+                        display: AbstractButton.IconOnly
+                        background: Rectangle {
+                            radius: 10
+                            color: cell.isReference ? "#e0e3f5" : "transparent"
+                        }
+                        onClicked: {
+                            if (cell.isReference) {
+                                app.reference.close()
+                            } else {
+                                app.reference.showTab(cell.index)
+                                app.homeVisible = false
+                                overview.close()
+                            }
+                        }
+                        ToolTip.visible: hovered
+                        ToolTip.text: cell.isReference ? qsTr("Close the reference") : qsTr("Open as reference")
                     }
                     ToolButton {
                         anchors.top: parent.top

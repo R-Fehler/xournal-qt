@@ -147,6 +147,12 @@ QRect tileRect(int index, int cols, QSize pixelSize) {
 }
 
 double snap(double v, double dpr) { return std::round(v * dpr) / dpr; }
+
+/// All canvas items (a window may have two: the document of the tab and its reference beside it)
+std::vector<DocumentCanvasItem*>& allCanvases() {
+    static std::vector<DocumentCanvasItem*> items;
+    return items;
+}
 }  // namespace
 
 void xqt::registerQuickTypes() {
@@ -161,9 +167,12 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     setCursor(Qt::CrossCursor);
     // Proximity events are only delivered to the application object.
     qApp->installEventFilter(this);
+    allCanvases().push_back(this);
 }
 
 DocumentCanvasItem::~DocumentCanvasItem() {
+    auto& items = allCanvases();
+    items.erase(std::remove(items.begin(), items.end(), this), items.end());
     qApp->removeEventFilter(this);
     if (filteredWindow) {
         filteredWindow->removeEventFilter(this);
@@ -179,13 +188,18 @@ void DocumentCanvasItem::setView(QObject* object) {
     }
     if (canvasView) {
         disconnect(canvasView, nullptr, this, nullptr);
-        canvasView->setShown(false);
+        // (two canvases that swap their views: the other one may show it already)
+        if (!shownByAnother(canvasView)) {
+            canvasView->setShown(false);
+            canvasView->setReadingOnly(false);
+        }
     }
     input.reset();
     canvasView = v;
     viewReplaced = true;
     if (canvasView) {
         canvasView->setShown(true);
+        canvasView->setReadingOnly(reading);
         input = std::make_unique<xqt::CanvasInput>(*canvasView);
         connect(canvasView, &xqt::CanvasView::updateRequested, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &QQuickItem::update);
@@ -214,6 +228,28 @@ void DocumentCanvasItem::setView(QObject* object) {
     Q_EMIT viewChanged();
     Q_EMIT viewportChanged();
     update();
+}
+
+void DocumentCanvasItem::setReadingOnly(bool on) {
+    if (on == reading) {
+        return;
+    }
+    reading = on;
+    if (canvasView) {
+        canvasView->setReadingOnly(on);
+    }
+    Q_EMIT readingOnlyChanged();
+}
+
+bool DocumentCanvasItem::shownByAnother(const xqt::CanvasView* v) const {
+    return std::any_of(allCanvases().begin(), allCanvases().end(),
+                       [&](const DocumentCanvasItem* c) { return c != this && c->canvasView == v; });
+}
+
+bool DocumentCanvasItem::heldByAnother(bool DocumentCanvasItem::*grab) const {
+    return std::any_of(allCanvases().begin(), allCanvases().end(), [&](const DocumentCanvasItem* c) {
+        return c != this && c->filteredWindow == filteredWindow && c->*grab;
+    });
 }
 
 qreal DocumentCanvasItem::contentWidth() const {
@@ -360,7 +396,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
         case QEvent::TabletRelease: {
             auto* t = static_cast<QTabletEvent*>(e);
             xqt::Perf::add(xqt::Perf::PenEvents);
-            if (!penGrab && !claims(t->position())) {
+            if (!penGrab && (heldByAnother(&DocumentCanvasItem::penGrab) || !claims(t->position()))) {
                 return false;  // unaccepted: Qt synthesizes mouse events for the QML controls
             }
             if (e->type() == QEvent::TabletPress && t->button() == Qt::LeftButton) {
@@ -380,7 +416,8 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             auto* t = static_cast<QTouchEvent*>(e);
             xqt::Perf::add(xqt::Perf::TouchEvents);
             if (e->type() == QEvent::TouchBegin) {
-                touchSessionOwned = !t->points().isEmpty() && claims(t->points().first().scenePosition());
+                touchSessionOwned = !t->points().isEmpty() && !heldByAnother(&DocumentCanvasItem::touchSessionOwned) &&
+                                    claims(t->points().first().scenePosition());
                 if (touchSessionOwned) {
                     takeKeyboardFocus();
                 }
@@ -405,7 +442,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             if (!mouseGrab && (m->buttons() == Qt::NoButton ? e->type() == QEvent::MouseMove : mouseElsewhere)) {
                 return false;
             }
-            const bool inside = claims(m->scenePosition());
+            const bool inside = !heldByAnother(&DocumentCanvasItem::mouseGrab) && claims(m->scenePosition());
             xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
             if (!mouseGrab && !inside) {
                 mouseElsewhere = m->buttons() != Qt::NoButton;
