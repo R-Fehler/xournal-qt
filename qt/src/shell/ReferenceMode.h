@@ -1,0 +1,127 @@
+/*
+ * xournal-qt: reference mode - a second document beside the current one, in the same tab, for reading while writing.
+ *
+ * The reference is another open tab (TabManager::Tab::reference, one per tab): the window shows its CanvasView in a
+ * second canvas item, beside the current tab's, behind a movable divider. It is for reading only (the canvas item's
+ * readingOnly): it scrolls and zooms, and its elements and PDF text can be selected and copied, to paste them into
+ * the notes. Where the divider is (the share of the main document) and on which side the reference is are settings
+ * of the application, the same for every tab.
+ *
+ * Keys: the window's shortcuts act on the main document; while the reference has the focus (a tap on it or on its
+ * pill), copying, zooming, fitting the width and going back and forth act on the reference (AppController).
+ *
+ * @license GNU GPLv2 or later
+ */
+#pragma once
+
+#include <QMetaObject>
+#include <QObject>
+#include <QPointF>
+#include <QPointer>
+#include <QRectF>
+#include <QString>
+
+#include <vector>
+
+class Settings;
+
+namespace xqt {
+
+class CanvasView;
+class DocumentSession;
+class TabManager;
+
+class ReferenceMode final: public QObject {
+    Q_OBJECT
+    /// The CanvasView of the current tab's reference (nullptr: none).
+    Q_PROPERTY(QObject* view READ view NOTIFY changed)
+    Q_PROPERTY(bool active READ active NOTIFY changed)
+    /// Its tab (-1: none)
+    Q_PROPERTY(int tab READ tab NOTIFY changed)
+    Q_PROPERTY(QString title READ title NOTIFY changed)
+    Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
+    Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
+    Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
+    /// The reference has the keyboard focus (set by the window: a tap on it or on its pill).
+    Q_PROPERTY(bool focused READ focused WRITE setFocused NOTIFY focusedChanged)
+    /// Elements or PDF text are selected in the reference (to copy them).
+    Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
+    Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
+    Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
+    /// The share of the width for the main document (the divider), 0.2 ... 0.8.
+    Q_PROPERTY(double ratio READ ratio WRITE setRatio NOTIFY layoutChanged)
+    /// The reference is on the left of the main document (else on the right).
+    Q_PROPERTY(bool onLeft READ onLeft WRITE setOnLeft NOTIFY layoutChanged)
+public:
+    static constexpr double MIN_RATIO = 0.2;
+    static constexpr double MAX_RATIO = 0.8;
+
+    ReferenceMode(TabManager& tabs, Settings* settings, QObject* parent = nullptr);
+    ~ReferenceMode() override;
+
+    QObject* view() const;
+    CanvasView* canvas() const;
+    bool active() const;
+    int tab() const;
+    QString title() const;
+    int pageNumber() const;
+    int pageCount() const;
+    int zoomPercent() const;
+    bool focused() const;
+    void setFocused(bool on);
+    bool hasSelection() const;
+    bool canGoBack() const;
+    bool canGoForward() const;
+    double ratio() const;
+    void setRatio(double ratio);
+    bool onLeft() const;
+    void setOnLeft(bool left);
+
+    /// Show the document of tab `index` beside the current tab's (the current tab itself: nothing).
+    Q_INVOKABLE void showTab(int index);
+    /// The current tab shows no reference any more (its tab stays open).
+    Q_INVOKABLE void close();
+    Q_INVOKABLE void swapSides() { setOnLeft(!onLeft()); }
+    /// The reference becomes the main document of the tab, and the main document its reference.
+    Q_INVOKABLE void swapRoles();
+    Q_INVOKABLE void fitWidth();
+    Q_INVOKABLE void zoomIn();
+    Q_INVOKABLE void zoomOut();
+    /// Go to a page of the reference (0-based), remembering the place for "back".
+    Q_INVOKABLE void goToPage(int index);
+    Q_INVOKABLE void navigateBack();
+    Q_INVOKABLE void navigateForward();
+    /// Follow a link tapped in the reference: a page of it, or an external link (openExternal).
+    Q_INVOKABLE void followLink(const QString& uri, int page);
+    /// Copy what is selected in the reference (PDF text, else elements). False if nothing is selected.
+    Q_INVOKABLE bool copy();
+    Q_INVOKABLE void clearSelection();
+
+Q_SIGNALS:
+    void changed();
+    void pageChanged();
+    void zoomChanged();
+    void focusedChanged();
+    void selectionChanged();
+    void navigationChanged();
+    void layoutChanged();
+    /// A link was tapped in the reference: uri (external) or page of the reference; rect in its canvas coordinates.
+    void linkTapped(const QString& uri, int page, QRectF rect);
+    /// An external link should be opened (AppController::openLink).
+    void openExternal(const QString& uri);
+    /// Something was copied from the reference (the window says so).
+    void copied(const QString& what);
+
+private:
+    /// The current tab or its reference changed: follow the reference's view.
+    void update();
+
+    TabManager& tabs;
+    Settings* settings;
+    QPointer<CanvasView> shownView;
+    DocumentSession* shownSession = nullptr;
+    std::vector<QMetaObject::Connection> connections;
+    bool focus = false;
+};
+
+}  // namespace xqt

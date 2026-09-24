@@ -24,6 +24,8 @@ set_target_properties(xqt-quick PROPERTIES AUTOMOC ON)
 add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TabManager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ReferenceMode.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SingleInstance.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Thumbnails.h
@@ -171,6 +173,7 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ReferenceModeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
