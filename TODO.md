@@ -57,7 +57,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
       - [ ] Page operations on a read-only `.md` still work, and saving them makes a `.xopp` under the default name.
       - [ ] A `.md` changed by another program is only picked up at the next library refresh.
       - [ ] Snippet cards are small by default (9–11 px text); −/+ zooms them.
-   4. the "Show" file type filter and the handling of other files;
+   4. the "Show" file type filter and the handling of other files: `qt/library-filter`, started 2026-09-24;
    5. fuzzy search behind its toggle.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
    branches are open.
