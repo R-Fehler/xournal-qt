@@ -26,6 +26,7 @@ constexpr Color MARKER(0x9a, 0xa0, 0xa6);
 
 constexpr double LINE_SPACING = 1.25;
 constexpr double CODE_LINE_SPACING = 1.15;
+constexpr double PLAIN_LINE_SPACING = 1.2;
 
 guint16 u16(uint8_t c) { return static_cast<guint16>(c * 257); }
 
@@ -90,6 +91,9 @@ public:
     Layouter(const Style& style, std::string_view source, size_t active): st(style), source(source), active(active) {}
 
     Layout run(const Document& doc) {
+        if (doc.plain) {
+            return runPlain(doc);
+        }
         out.links = doc.links;
         const auto& blocks = doc.root.children;
         out.blocks.resize(blocks.size());
@@ -148,6 +152,47 @@ public:
     }
 
 private:
+    /// A plain text (Document::plain): its lines one below the other, as they are (wrapped at the box's width), in
+    /// the box's font. The line with the cursor is the raw item (its text is exactly its source).
+    Layout runPlain(const Document& doc) {
+        const auto& blocks = doc.root.children;
+        out.blocks.resize(blocks.size());
+        for (size_t i = 0; i < blocks.size(); ++i) {
+            top = i;
+            const Block& b = blocks[i];
+            if (b.kind != BlockKind::Paragraph) {
+                out.blocks[i] = {y, y};  // (the marker line: not shown)
+                continue;
+            }
+            std::vector<Run> runs = b.runs;
+            for (Run& r: runs) {
+                r.flags = 0;
+            }
+            auto l = text(runs, {st.size, false, false, st.width, PLAIN_LINE_SPACING});
+            const double h = pangoHeight(l.get());
+            const size_t index = addText(std::move(l), 0, y, st.color);
+            out.blocks[i] = {y, y + h, static_cast<int>(index), {}};
+            const size_t next = i + 1 < blocks.size() ? blocks[i + 1].textBegin : NO_SOURCE;
+            const bool withCursor = active != NO_SOURCE && active >= b.textBegin && active < next;
+            if (withCursor) {
+                out.rawItem = static_cast<int>(index);
+                out.rawBegin = b.textBegin;
+                out.rawEnd = b.textEnd;
+            }
+            // The empty line after the last line break takes no room unless the cursor is on it (a page that ends
+            // with a line break is not a line longer)
+            const bool emptyLast = i + 1 == blocks.size() && i > 1 && b.textBegin == b.textEnd;
+            if (emptyLast && !withCursor) {
+                out.items[index].height = 0;
+                out.blocks[i] = {y, y, static_cast<int>(index), {}};
+                continue;
+            }
+            y += h;
+        }
+        out.height = y;
+        return std::move(out);
+    }
+
     // --- vertical spacing: the space between two blocks is the larger of their margins (as in CSS) -------------
     void margin(double m) { pending = std::max(pending, m); }
     /// Content goes at y now: after the pending space, unless it is the first thing (of the box or a container).

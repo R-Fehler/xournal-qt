@@ -4,6 +4,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
+#include <cctype>
+
 #include <QFileInfo>
 #include <QGuiApplication>
 
@@ -20,18 +23,33 @@
 
 using namespace xqt;
 
+namespace {
+/// A plain text file edited without asking: .txt (other text and code files only after a warning).
+bool isPlainTextFile(const fs::path& file) {
+    std::string ext = file.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext == ".txt";
+}
+}  // namespace
+
 std::unique_ptr<DocumentSession> AppController::openTextFile(const fs::path& file, std::string& error) {
-    if (!DocumentFiles::isMarkdownFile(file)) {
+    const bool markdown = DocumentFiles::isMarkdownFile(file);
+    if (!markdown && !isPlainTextFile(file)) {
         return nullptr;
     }
     auto text = std::make_unique<TextFile>();
-    if (!text->load(file, TextFile::Kind::Markdown, error)) {
+    if (!text->load(file, markdown ? TextFile::Kind::Markdown : TextFile::Kind::Plain, error)) {
         error = tr("\"%1\" cannot be read.").arg(QString::fromStdString(file.string())).toStdString();
         return nullptr;
     }
     // Edited when it can be written back as it was: UTF-8, not too big, a file we may write
     const bool editable = text->editable() && QFileInfo(QString::fromStdString(file.string())).isWritable();
-    auto doc = editable ? MarkdownFile::textDocument(*text) : MarkdownFile::document(MarkdownFile::read(file));
+    std::unique_ptr<Document> doc;
+    if (editable) {
+        doc = MarkdownFile::textDocument(*text);
+    } else {
+        doc = MarkdownFile::document(markdown ? MarkdownFile::read(file) : MarkdownFile::readAsPlainText(file));
+    }
     auto session = std::make_unique<DocumentSession>(*app, std::move(doc));
     session->setTextFile(std::move(text), !editable);
     return session;

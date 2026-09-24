@@ -32,6 +32,9 @@ struct Style {
     double size = 12;          ///< body text (points)
     Color color = Color(0, 0, 0);
     double width = 480;        ///< width of the box (points)
+    /// A plain text (MdDocument.h, isPlain): paginate() starts each page's slice with the plain marker. (Drawing
+    /// knows it from the source.)
+    bool plain = false;
 };
 
 /// A link in the text of an item: its bytes in the Pango layout's text, and the index into Layout::links.

@@ -26,7 +26,11 @@
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
+#include "MdBox.h"
+#include "MdDocument.h"
 #include "TextFlow.h"
+#include "model/Layer.h"
+#include "model/Text.h"
 
 using namespace xqt;
 
@@ -73,10 +77,10 @@ protected:
         writeFile(p, bytes);
         return p;
     }
-    void open(const fs::path& p) {
+    void open(const fs::path& p, TextFile::Kind kind = TextFile::Kind::Markdown) {
         auto text = std::make_unique<TextFile>();
         std::string error;
-        ASSERT_TRUE(text->load(p, TextFile::Kind::Markdown, error)) << error;
+        ASSERT_TRUE(text->load(p, kind, error)) << error;
         session = std::make_unique<DocumentSession>(*app, MarkdownFile::textDocument(*text));
         session->setTextFile(std::move(text), false);
         view = std::make_unique<CanvasView>(*session);
@@ -249,4 +253,38 @@ TEST_F(TextDocumentTest, aTapAnywhereOnAPagePutsTheCursorIntoTheText) {
     view->textPress(*view->canvasPageOf(session->getDocument()->getPage(0).get()), TextFlow::MARGIN + 1,
                     TextFlow::MARGIN + 1);
     EXPECT_LT(view->getMarkdownEditor()->cursorPosition(), starts[1]);
+}
+
+TEST_F(TextDocumentTest, aPlainTextFileIsWrittenAsItIsWithoutMarkdown) {
+    std::string bytes;
+    for (int i = 0; i < 120; ++i) {
+        bytes += "    line " + std::to_string(i) + ": **not bold**, # not a heading, - not a list\r\n";
+    }
+    const fs::path p = file("notes.txt", bytes);
+    open(p, TextFile::Kind::Plain);
+    EXPECT_GT(session->getDocument()->getPageCount(), 1u);
+    EXPECT_EQ(session->currentText(), TextFile::normalized(bytes));
+    // Nothing is formatted: every page's box is plain text, drawn as it is
+    const Text* box = nullptr;
+    {
+        const Layer* layer = md::markdownLayer(session->getDocument()->getPage(0));
+        ASSERT_NE(layer, nullptr);
+        box = md::pageBoxOf(*layer, TextFlow::MARGIN, TextFlow::MARGIN);
+    }
+    ASSERT_NE(box, nullptr);
+    EXPECT_TRUE(md::isPlain(box->getText()));
+    EXPECT_EQ(md::shownTexts(*box).at(0), "    line 0: **not bold**, # not a heading, - not a list");
+    // Enter keeps the indentation (no list, no new paragraph), Ctrl+B adds no marks, Tab is a tab
+    cursorBefore("line 5:");
+    key(Qt::Key_End);
+    key(Qt::Key_Return, "\r");
+    type("next");
+    key(Qt::Key_B, "", Qt::ControlModifier);
+    key(Qt::Key_Tab, "\t");
+    type("x");
+    ASSERT_TRUE(session->save().ok);
+    std::string expected = bytes;
+    const std::string line5 = "    line 5: **not bold**, # not a heading, - not a list";
+    expected.insert(expected.find(line5) + line5.size(), "\r\n    next\tx");
+    EXPECT_EQ(readFile(p), expected);
 }

@@ -72,6 +72,7 @@ MarkdownEditor::MarkdownEditor(CanvasView& view, DocumentSession& session, size_
     } else {
         md.beginBox(pageNo, style, x, y);
     }
+    plain = md.boxStyle().plain || (md.text().empty() && style.plain);
     parts = md.parts();
     PageRef tapped;
     {
@@ -654,6 +655,12 @@ void MarkdownEditor::newLine(bool soft) {
     const size_t from = std::min(caret, anchor);
     const size_t ls = lineStart(t, from);
     const std::string line = t.substr(ls, from - ls);
+    if (plain) {
+        // Plain text: a line, indented as this one (as Ghostwriter and most editors do)
+        const size_t indent = line.find_first_not_of(" \t");
+        insert("\n" + line.substr(0, indent == std::string::npos ? line.size() : indent), EditKind::Other);
+        return;
+    }
     // In a code block: a line, indented as this one
     const md::Document doc = md::parse(t);
     const auto spans = md::topLevelSpans(t, doc);
@@ -758,6 +765,23 @@ void MarkdownEditor::indent(bool in) {
     const std::string& t = md.text();
     const size_t ls = lineStart(t, caret);
     const size_t at = caret;
+    if (plain) {
+        if (in) {
+            insert("\t", EditKind::Other);  // (plain text: a tab where the cursor is)
+        } else if (ls < t.size() && t[ls] == '\t') {
+            edit(ls, ls + 1, "");
+            moveCursor(at > ls ? at - 1 : ls, false);
+        } else {
+            const size_t spaces = std::min<size_t>(4, lineAt(t, ls).find_first_not_of(' ') == std::string_view::npos
+                                                                  ? lineAt(t, ls).size()
+                                                                  : lineAt(t, ls).find_first_not_of(' '));
+            if (spaces > 0) {
+                edit(ls, ls + spaces, "");
+                moveCursor(at >= ls + spaces ? at - spaces : ls, false);
+            }
+        }
+        return;
+    }
     if (in) {
         edit(ls, ls, "  ");
         moveCursor(at + 2, false);
@@ -790,6 +814,7 @@ bool MarkdownEditor::wantsKeyEvent(const QKeyEvent* e) const {
             case Qt::Key_1:
             case Qt::Key_2:
             case Qt::Key_3:
+                return !plain;
             case Qt::Key_Left:
             case Qt::Key_Right:
             case Qt::Key_Home:
@@ -901,6 +926,22 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
             case Qt::Key_Y:
                 undoEdit(true);
                 return true;
+            case Qt::Key_B:
+            case Qt::Key_I:
+            case Qt::Key_E:
+            case Qt::Key_K:
+            case Qt::Key_0:
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+                if (plain) {
+                    return false;  // (plain text: no Markdown marks)
+                }
+                break;
+            default:
+                break;
+        }
+        switch (e->key()) {
             case Qt::Key_B:
                 wrap("**", "**");
                 return true;

@@ -2,7 +2,7 @@
 
 Markdown files (`.md`) are documents of their own: opened from the library (or with Open, or on the command line),
 they are written in on their pages, and saving writes the text back to the file. Never a `.xopp`: ink never goes
-into a `.md`.
+into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (below).
 
 ## Writing
 - The file's text flows over plain A4 pages as the page's Markdown text (see
@@ -19,6 +19,19 @@ into a `.md`.
   whole mark (as in Ghostwriter).
 - Undo / redo (Ctrl+Z / Ctrl+Shift+Z and the undo button) go step by step through the text being written (a word,
   a line break, a deletion). The editor keeps changes, not copies of the text, so a long file stays cheap.
+
+## Plain text (`.txt`)
+A `.txt` opens as plain text, like a notepad: no Markdown, no highlighting. Every line is shown as it is, in a
+monospaced font (10 pt, so columns line up and code or LaTeX reads as written), wrapped at the page's width, and
+the pages follow the text as for a `.md`. Enter starts a line indented as the one before; Tab types a tab
+(Shift+Tab takes one tab or up to four spaces of indentation away); Ctrl+B / I / E / K and the heading keys do
+nothing. Saving has the same guarantees as for a `.md`.
+
+In the engine, a plain text is a page's slice that starts with the line `<!-- xqt:plain -->` (a continuing page:
+`<!-- xqt:cont plain -->`), a Markdown comment that Xournal++ shows as it is: `md::parse` then makes a paragraph of
+one run per line (no md4c), `md::layout` puts the lines below each other in the box's font, and the pages split
+between lines (or within a line longer than a page). `md::join` takes the marker away again. The empty line after
+the last line break takes room only while the cursor is on it.
 
 ## Saving
 - Save (Ctrl+S, the save button, the question when closing) writes the text back to the file, in the background
@@ -49,7 +62,10 @@ program changed it (its bytes differ from what was read or saved last; our own s
   text), the atomic write, `changedOnDisk`.
 - `DocumentSession::setTextFile` and the text parts of `DocumentSession.cpp` / `DocumentSave.cpp`
   (`beginTextSave`): the modified state by the text, saving, autosave.
-- `qt/src/canvas/MarkdownFile.*`: the document of a text file, `setText` (a new text as one undo step).
+- `qt/src/canvas/MarkdownFile.*`: the document of a text file, `setText` (a new text as one undo step),
+  `plainStyle`.
+- `qt/src/markdown/MdDocument.*` (`isPlain`, the plain parse), `MdLayout.cpp` (`runPlain`), `MdPaginate.cpp`
+  (`Style::plain`): plain text.
 - `CanvasView::textMode` / `textPress` / `ensureTextEditor`, `CanvasInput` (`textPress`): the input.
 - `qt/src/app/AppTextFiles.cpp`: opening, the file watcher, reloading; `SessionRecovery`: the journal's `text` flag.
 

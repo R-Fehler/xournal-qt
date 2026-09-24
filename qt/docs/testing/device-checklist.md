@@ -898,3 +898,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Kill the app (`kill -9`) with an unsaved `.md`: at the next start the recovery offers it by its name;
       recovered, the tab is the `.md` with your text, modified; the file on disk is unchanged until you save.
 - [ ] A `.md` that is not UTF-8 (e.g. Latin-1) or read-only on disk opens read-only with a note saying why.
+- [ ] Open a `.txt` (the library's "Show" → Text and code, or Open): monospaced lines as they are, `**` and `#`
+      shown as typed, no highlighting. Type, Enter (the new line keeps the indentation), Tab (a tab), Ctrl+B does
+      nothing. A long `.txt` flows over pages; Ctrl+S writes it back (line ends as they were).

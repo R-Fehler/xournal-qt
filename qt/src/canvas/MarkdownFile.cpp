@@ -106,9 +106,17 @@ md::Style style() {
     return s;
 }
 
-md::Style style(const TextFile& /*file*/) { return style(); }
+md::Style plainStyle() {
+    md::Style s = style();
+    s.family = "Monospace";  // (like a notepad: columns line up, code and LaTeX read as they are)
+    s.size = 10;
+    s.plain = true;
+    return s;
+}
 
-std::unique_ptr<Document> textDocument(const TextFile& file) { return document(file.text()); }
+md::Style style(const TextFile& file) { return file.kind() == TextFile::Kind::Plain ? plainStyle() : style(); }
+
+std::unique_ptr<Document> textDocument(const TextFile& file) { return document(file.text(), style(file)); }
 
 void setText(DocumentSession& session, const std::string& text) {
     MarkdownSession md(session);
@@ -118,9 +126,12 @@ void setText(DocumentSession& session, const std::string& text) {
 }
 
 std::unique_ptr<Document> document(const std::string& source, size_t maxPages) {
+    return document(source, style(), maxPages);
+}
+
+std::unique_ptr<Document> document(const std::string& source, const md::Style& s, size_t maxPages) {
     md::installRenderer();  // (idempotent: the boxes are drawn formatted and are as big as they are drawn)
     auto doc = std::make_unique<Document>(&handler());
-    const md::Style s = style();
     const md::Frame f = frame();
     const md::Pagination pages = md::paginate(source, s, [f](size_t) { return f; });
     const size_t count = std::max<size_t>(1, std::min(maxPages, pages.slices.size()));

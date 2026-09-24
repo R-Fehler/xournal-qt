@@ -49,8 +49,10 @@ std::string plainText(const std::string& text, const std::string& language);
 
 /// How the text of a Markdown file is drawn.
 md::Style style();
-/// How the text of this file is drawn while it is edited.
+/// How the text of this file is drawn while it is edited: a Markdown file as style(); a plain text file as it is,
+/// monospaced (plainStyle()).
 md::Style style(const TextFile& file);
+md::Style plainStyle();
 
 /// The document that edits a text file: its text on plain A4 pages.
 std::unique_ptr<Document> textDocument(const TextFile& file);
@@ -58,8 +60,11 @@ std::unique_ptr<Document> textDocument(const TextFile& file);
 /// now. Text written on the canvas ends first.
 void setText(DocumentSession& session, const std::string& text);
 
-/// A new document showing `source` on plain A4 pages (at most `maxPages`; the rest is left out). Any thread.
+/// A new document showing `source` on plain A4 pages (at most `maxPages`; the rest is left out), drawn in `style`
+/// (a plain text: style.plain). Any thread.
 std::unique_ptr<Document> document(const std::string& source, size_t maxPages = static_cast<size_t>(-1));
+std::unique_ptr<Document> document(const std::string& source, const md::Style& style,
+                                   size_t maxPages = static_cast<size_t>(-1));
 
 /// Where the part of the text on each page of a document made by document() begins (bytes of the text), from its
 /// pages as they are now.

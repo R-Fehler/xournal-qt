@@ -1582,6 +1582,23 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsWrittenInAndSavedBack) {
     EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Third\n");
 }
 
+TEST_F(HomeScreenMarkdownTest, aTxtFileIsEditedAsPlainText) {
+    const fs::path file = root / "todo.txt";
+    std::ofstream(file, std::ios::binary) << "# not a heading\n**not bold**\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    EXPECT_EQ(controller->textDocument(), "plain");
+    EXPECT_TRUE(controller->textEditable());
+    EXPECT_FALSE(find<QQuickItem>("shownFileNote")->isVisible());
+    click(find<QQuickItem>("canvas"));
+    key(Qt::Key_End, Qt::ControlModifier);
+    type("done");
+    ASSERT_TRUE(controller->save());
+    std::ifstream in(file, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()),
+              "# not a heading\n**not bold**\ndone");
+}
+
 namespace {
 /// Records what would be handed to the system (nothing is started).
 struct FakeSystemApps: xqt::SystemApps {

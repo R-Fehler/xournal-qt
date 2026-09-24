@@ -337,7 +337,52 @@ private:
 
 }  // namespace
 
+bool isPlain(std::string_view source) {
+    const auto startsWithLine = [&](std::string_view marker) {
+        return source.substr(0, marker.size()) == marker &&
+               (source.size() == marker.size() || source[marker.size()] == '\n');
+    };
+    return startsWithLine(PLAIN_MARKER) || startsWithLine(PLAIN_CONTINUATION);
+}
+
+namespace {
+/// A plain text: the marker line (a comment, not shown), then a paragraph of one run per line, the text as it is.
+Document parsePlain(std::string_view source) {
+    using namespace text;
+    Document doc;
+    doc.plain = true;
+    Block marker;
+    marker.kind = BlockKind::Html;
+    const std::string_view first = lineAt(source, 0);
+    marker.runs.push_back(Run{std::string(first), Html, -1, 0, first.size()});
+    marker.textBegin = 0;
+    marker.textEnd = first.size();
+    doc.root.children.push_back(std::move(marker));
+    size_t pos = nextLine(source, 0);
+    if (pos == first.size()) {
+        return doc;  // (no line break after the marker: no text)
+    }
+    for (;;) {
+        const std::string_view line = lineAt(source, pos);
+        Block b;
+        b.kind = BlockKind::Paragraph;
+        b.runs.push_back(Run{std::string(line), 0, -1, pos, line.size()});
+        b.textBegin = pos;
+        b.textEnd = pos + line.size();
+        doc.root.children.push_back(std::move(b));
+        if (pos + line.size() >= source.size()) {
+            break;  // (the last line: after the last line break, maybe empty)
+        }
+        pos = nextLine(source, pos);
+    }
+    return doc;
+}
+}  // namespace
+
 Document parse(std::string_view source) {
+    if (isPlain(source)) {
+        return parsePlain(source);
+    }
     Builder builder(source);
     MD_PARSER parser{};
     parser.abi_version = 0;

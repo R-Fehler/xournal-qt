@@ -274,7 +274,9 @@ Pagination paginate(const std::string& source, Style style, const std::function<
                     const Pagination* before, const std::string* beforeSource) {
     Pagination out;
     size_t pos = 0;      // where the rest of the text starts in the source
-    std::string prefix;  // the lines the next page starts with (marker, fence, table header)
+    // the lines the next page starts with (marker, fence, table header); a plain text: its marker on every page
+    std::string prefix = style.plain ? std::string(PLAIN_MARKER) + "\n" : std::string();
+    const std::string plainNext = std::string(PLAIN_CONTINUATION) + "\n";
     size_t page = 0;
     // After a change: the pages before the one with the change are as they were (its first block could go back onto
     // the page before: from that one on); the text after the change is the text from before, moved by `delta`
@@ -359,8 +361,11 @@ Pagination paginate(const std::string& source, Style style, const std::function<
             out.overflow = std::max(out.overflow, overflow);
             break;
         }
-        const Split split =
-                Splitter(laidOut, prefix.size(), doc, lay, f.height, startOf(lineAt(prefix, 0)), style.size).find();
+        Split split = Splitter(laidOut, prefix.size(), doc, lay, f.height, startOf(lineAt(prefix, 0)), style.size).find();
+        if (style.plain) {
+            split.close.clear();
+            split.next = plainNext;  // (lines as they are: nothing added, only the marker)
+        }
         out.overflow = std::max(out.overflow, split.overflow);
         const size_t next = pos + (split.at - prefix.size());
         if (next >= source.size() || blankText(std::string_view(source).substr(next))) {
@@ -388,7 +393,9 @@ std::string join(const std::vector<std::string>& slices, std::vector<Part>* part
         std::string_view s = slices[i];
         const size_t sliceSize = s.size();
         size_t removedAtEnd = 0;  // (a closing fence of the slice before)
-        if (i > 0 && continues(s)) {
+        if (i == 0 && isPlain(s)) {
+            s.remove_prefix(nextLine(s, 0));  // (a plain text's marker)
+        } else if (i > 0 && continues(s)) {
             const std::string_view first = lineAt(s, 0);
             s.remove_prefix(nextLine(s, 0));
             const bool code = first.find(" code") != std::string_view::npos;
