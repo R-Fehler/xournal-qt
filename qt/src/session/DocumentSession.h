@@ -178,6 +178,14 @@ public:
     void relocate(const fs::path& xopp, const fs::path& pdf);
     /// Write the autosave file if there are unsaved changes since the last autosave.
     SaveResult autosave();
+    /// What the autosave timer does: write the autosave (a text file: its text) if something changed since the last
+    /// one and no merged PDF is being written. True if a file was written. Also called when the app goes to the
+    /// background (AppController::applicationStateChanged).
+    bool autosaveChanges();
+    /// Autosaves of saved documents go to the app cache (as those of unsaved ones), not next to the document: on
+    /// Android, where libraries are often folders that sync apps upload. Recovery looks in both places.
+    static bool autosaveInAppCache();
+    static void setAutosaveInAppCache(bool inAppCache);  ///< (tests)
 
     /// Suggested target for "Save as" (port of upstream Control::saveImpl): the document's own path; for an
     /// annotated PDF the .xopp next to the PDF ("lecture.pdf" -> "lecture.xopp"), the same for a shown image
@@ -238,7 +246,8 @@ public:
     /// Unique number of this session in this process (names its autosave and emergency files).
     quint64 serial() const { return serialNo; }
     /// Where autosave() writes: ".name.autosave.xopp" next to the document (upstream), or for unsaved
-    /// documents "<cache>/autosaves/<pid>-<serial>.autosave.xopp" (one file per tab).
+    /// documents (and on Android, autosaveInAppCache) "<cache>/autosaves/<pid>-<serial>.autosave.xopp" (one file per
+    /// tab).
     fs::path autosavePath() const;
     /// Where a crash (emergency) save of this session goes: "<cache>/autosaves/<pid>-<serial>.emergency.xopp".
     static fs::path emergencyPath(qint64 pid, quint64 serial);

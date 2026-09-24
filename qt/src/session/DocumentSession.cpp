@@ -212,14 +212,7 @@ void DocumentSession::init() {
     };
 
     autosaveTimer.setSingleShot(false);
-    connect(&autosaveTimer, &QTimer::timeout, this, [this] {
-        // (not while a save writes the merged PDF: the autosave would refer to a file that is being moved)
-        if (text) {
-            autosaveText();  // (a text file: its text, if it changed)
-        } else if (undoRedo->isChangedAutosave() && !pdfWorkRunning()) {
-            autosave();
-        }
-    });
+    connect(&autosaveTimer, &QTimer::timeout, this, [this] { autosaveChanges(); });
     enableAutosave(app.getSettings()->isAutosaveEnabled());
     connect(&app, &AppContext::settingsChanged, this, [this] {
         const int minutes = std::max(1, this->app.getSettings()->getAutosaveTimeout());
@@ -1210,6 +1203,29 @@ auto DocumentSession::autosave() -> SaveResult {
     return {true, {}};
 }
 
+bool DocumentSession::autosaveChanges() {
+    // (not while a save writes the merged PDF: the autosave would refer to a file that is being moved)
+    if (text) {
+        const std::string before = lastAutosavedText;
+        return autosaveText().ok && lastAutosavedText != before;  // (a text file: its text, if it changed)
+    }
+    if (undoRedo->isChangedAutosave() && !pdfWorkRunning()) {
+        return autosave().ok;
+    }
+    return false;
+}
+
+namespace {
+#ifdef Q_OS_ANDROID
+bool autosavesInAppCache = true;
+#else
+bool autosavesInAppCache = false;
+#endif
+}  // namespace
+
+bool DocumentSession::autosaveInAppCache() { return autosavesInAppCache; }
+void DocumentSession::setAutosaveInAppCache(bool inAppCache) { autosavesInAppCache = inAppCache; }
+
 fs::path DocumentSession::unnamedAutosavePath(qint64 pid, quint64 serial) {
     // xournal-qt: upstream uses "<pid>.xopp" (one document per process); here every tab needs its own file.
     fs::path p = Util::getAutosaveFilepath();
@@ -1232,7 +1248,8 @@ fs::path DocumentSession::autosavePath() const {
     }
     // PDF files mode (DocumentMode.h): nothing next to the user's files, the autosave of a saved document goes to the
     // app cache too (under the tab's name, as for unsaved documents; recovery looks there as well)
-    if (filepath.empty() || DocumentMode::pdfOnly(*app.getSettings())) {
+    // The same on Android (autosaveInAppCache): sync apps would upload a ".name.autosave.xopp" next to the document.
+    if (filepath.empty() || DocumentMode::pdfOnly(*app.getSettings()) || autosaveInAppCache()) {
         return unnamedAutosavePath(Util::getPid(), serialNo);
     }
     return namedAutosavePath(filepath);

@@ -172,6 +172,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
         filesChanged(r);
     };
     journalFile = SessionRecovery::defaultJournalFile();
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &AppController::applicationStateChanged);
 }
 
 // A window of its own: the same settings, tools, library and rendering, but its own documents.
@@ -1848,6 +1849,41 @@ void AppController::startSession(const QStringList& files) {
         openPath(f);
     }
     recovery->start();
+}
+
+void AppController::applicationStateChanged(Qt::ApplicationState state) {
+#ifdef Q_OS_ANDROID
+    const bool background = state == Qt::ApplicationSuspended || state == Qt::ApplicationInactive;
+#else
+    // (on the desktop a window only loses the focus when the app becomes inactive: the timer's autosave suffices)
+    const bool background = state == Qt::ApplicationSuspended;
+#endif
+    if (!background) {
+        return;
+    }
+    autosaveAll();
+    if (recovery) {
+        recovery->writeNow();  // (the current pages too)
+    }
+}
+
+int AppController::autosaveAll() {
+    if (!app->getSettings()->isAutosaveEnabled()) {
+        return 0;
+    }
+    int written = 0;
+    auto autosaveTabs = [&written](TabManager& t) {
+        for (int i = 0; i < t.count(); ++i) {
+            if (DocumentSession* s = t.session(i); s && s->isModified() && s->autosaveChanges()) {
+                ++written;
+            }
+        }
+    };
+    autosaveTabs(*tabs);
+    for (AppController* w: windows) {
+        autosaveTabs(w->tabManager());
+    }
+    return written;
 }
 
 QVariantList AppController::recoveryItems() const {

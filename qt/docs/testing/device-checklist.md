@@ -1205,3 +1205,15 @@ Install the debug APK (`adb install -r …/android-build-debug.apk`; the documen
       the other, all readable.
 - [ ] New document: the dialog opens without the keyboard. Tap the name: the keyboard opens, the dialog moves above
       it (it scrolls), Create stays visible; the keyboard's ✓ key creates the document.
+
+## Android libraries (qt/android-libraries)
+
+Install the debug APK over the old one (`adb install -r …/android-build-debug.apk`; never uninstall: the library
+with "Uni sample" stays).
+
+- [ ] Autosave when the app goes to the background: open a document, draw a stroke, don't save. Switch to the home
+      screen, then swipe the app away in Recents (or Settings → Apps → Xournal Qt → Force stop). Start the app: the
+      recovery dialog offers the document; Recover brings the stroke back. Without a change since the last save:
+      no dialog, the tabs come back.
+- [ ] After that, no `.name.autosave.xopp` is next to the document in the library folder (Android keeps autosaves in
+      the app's cache).

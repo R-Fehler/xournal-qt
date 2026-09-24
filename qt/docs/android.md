@@ -103,6 +103,14 @@ in the tool bar (next to the hand) and Settings → Touch → "Draw with the fin
 platform: one finger draws with the current tool, two fingers scroll and zoom (a stroke the first finger began is
 taken back), the hand tool still scrolls, and while a pen is near the finger is ignored (palm rejection).
 
+**Going to the background.** Android may end an app in the background without warning (a force stop, swiping it
+away in Recents, low memory). When the app leaves the screen (Qt's `ApplicationInactive`, then `ApplicationSuspended`)
+the autosave of every document changed since its last autosave is written at once, and the session journal too
+(`AppController::applicationStateChanged`); the next start offers them in the recovery dialog. The documents' own
+files are not saved then: that is still the user's Save. Autosaves of saved documents are kept in the app's cache on
+Android (`cache/xournal-qt/autosaves/`), never next to the document (`.name.autosave.xopp`), where a sync app would
+upload them. Autosaving off (Settings) writes nothing.
+
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
 `files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`.

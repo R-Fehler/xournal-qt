@@ -416,6 +416,14 @@ public:
     /// Answer to the recovery offer: reopen the tabs of the crashed run, with the recovered changes (accept) or as
     /// last saved (discard; the recovery files are deleted).
     Q_INVOKABLE void recover(bool accept);
+    /// The app's state changed (QGuiApplication::applicationStateChanged; the main window listens). When it goes to
+    /// the background (ApplicationSuspended; on Android also ApplicationInactive, which comes first: Android may kill
+    /// a background app without warning) the autosaves of the modified documents are written at once and the journal
+    /// too, so a force-stop loses nothing that was drawn. The user's files are not saved (only the autosave).
+    void applicationStateChanged(Qt::ApplicationState state);
+    /// Write the autosave of every document of this window and its undocked windows that changed since its last
+    /// autosave (DocumentSession::autosaveChanges), now, if autosaving is on (Settings → Autosave). The count written.
+    int autosaveAll();
 
     // --- several pages (sidebar / page grid selection; page indices). Empty list: the current page ---
     Q_INVOKABLE void copyPages(const QList<int>& pages);
