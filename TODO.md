@@ -211,6 +211,9 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 
 ### Bugs
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
+- [~] **Fit width uses the widest page, not the current one** (the author, 2026-09-24): after pasting a 16:9 page
+  into an A4 document, fit width fits the 16:9 width. It should fit the current page (in several columns, the
+  current row). Given to `qt/present` as its next commit.
 - [ ] **A touch on the "pages with hits" filter can make the maximized window half as high** (old, flaky, probably
   touch only, KWin). Also seen with the page grid button in the page / zoom pill. Does not reproduce off-screen.
   Both taps change what is under the finger (an overlay opens, or the list is filtered); suspect a touch whose item
