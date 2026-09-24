@@ -620,3 +620,38 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       that passage, with that hit current in the search bar (e.g. "2 / 2"), and the read-only note at the bottom left.
       Swipe the row sideways with a finger.
 - [ ] "Open" (Ctrl+O) and the library's "Import" offer Markdown files and images among the documents.
+
+## Show filter and other files (qt/library-filter)
+
+- [ ] Put into a library folder: `thesis.tex`, `kalman.py`, `notes.txt`, `Makefile`, `report.docx`, `budget.xlsx`,
+      `slides.pptx`, `archive.zip`, `song.mp3`. With the default "Show" filter none of them is a card, the folder's
+      card counts only its documents, and the library looks as before.
+- [ ] The "Show" button (funnel, next to the sort button) opens a list of toggles: Notes, PDFs with "Only PDFs with
+      notes" below it, Markdown, Images, Text and code, All other files. Turn on "Text and code": the `.tex`, `.py`,
+      `.txt` and `Makefile` are cards ("TEX", "PY", "TXT") showing their first lines in a monospaced font. The button is
+      marked. The popup stays open while toggling; a tap outside closes it.
+- [ ] Turn on "All other files": the Office files and the rest are cards with an icon of their type (document,
+      spreadsheet, slides, archive, audio), the extension as badge, the whole file name, size and date. Folder cards
+      count them now.
+- [ ] "Only PDFs with notes": lone PDFs go, PDFs with their `.xopp` stay, a hybrid PDF (also alone) stays. Turning
+      "PDFs" off greys the sub-toggle.
+- [ ] Close the window and open the library again: the filter is as you left it. Another library has its own
+      (the default one for a library never changed). "Defaults" in the popup brings the default back.
+- [ ] Tap a `.py` card: it opens read-only as A4 pages, monospaced, with colors for the code (if KSyntaxHighlighting is
+      built in), titled `kalman.py`, the read-only note at the bottom left. The pen does not write; Ctrl+F finds text
+      in it. A `.txt` has no colors. A text file with a line of backticks in it is shown whole.
+- [ ] With "Text and code" on, search the library for a word inside the `.py`: it is found, the card shows the text
+      around the hit ("Found in the text" in the extended search). Turn "Text and code" off: it is not found any more.
+      A text file over 1 MB is found by its name only.
+- [ ] With "All other files" on, search for part of `report.docx`'s name: it is found (before documents that only
+      contain the word). Its text is never searched.
+- [ ] Tap `report.docx`: LibreOffice (or the app set for it) opens it; no tab opens. Its menu (⋮, right click, press
+      and hold) has "Open with the system app" and "Show in file manager": Dolphin (or the file manager) opens the
+      folder with `report.docx` selected. A text file's menu has "Open with the system app" too (the editor set for
+      it); a PDF's has not.
+- [ ] Rename `report.docx` (the dialog shows the whole name; change it to `Report 2026.docx`), move it into a folder
+      with a `Report 2026.docx` already there (it becomes `Report 2026 (2).docx`), copy it to another library, trash
+      it. The same for a text file.
+- [ ] Import a folder with `.docx` and `.py` files while "All other files" / "Text and code" are off: only the
+      documents come along. With them on: they come along too.
+- [ ] Android (later): "Show in file manager" is not in the card menu; tapping an Office file offers the apps for it.

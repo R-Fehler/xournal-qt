@@ -511,7 +511,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return QString::fromStdString(rel);
         }
         case PreviewRole:
-            return r.isFolder ? QString() : PreviewCache::url(r.item);
+            // (other files have none: an icon of their type)
+            return r.isFolder || r.item.kind() == DocumentItem::Kind::Other ? QString() : PreviewCache::url(r.item);
         case ModifiedRole:
             return r.modified;
         case HasPdfRole:

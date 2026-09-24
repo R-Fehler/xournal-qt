@@ -275,9 +275,18 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
 - **Recent**: the documents opened lately that still exist (the list is shared by all windows:
   `recent.json` in the config folder).
 - **On a card**:
-  - tap: open (a folder: enter it)
-  - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder /
-    file manager, Remove from list, Move to trash)
+  - tap: open (a folder: enter it; another file (not a document or text): its app, below)
+  - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder,
+    Open with the system app (text and other files), Show in file manager, Remove from list, Move to trash)
+- **Other files** (Office files and the rest, shown with "All other files"): a card with an icon of their type (a
+  document, spreadsheet, slides, archive, audio, video or image file, by extension and MIME type; else a plain file),
+  the extension as badge, the whole file name, size and date. A tap opens it with the app the system has for it
+  (`QDesktopServices::openUrl`: `xdg-open` on Linux, an intent on Android); no tab opens and it is not in Recent. A
+  text file's badge is its extension too ("PY", "TEX"; "TXT" without one), with its first lines as preview.
+- **Show in file manager** selects the file in the file manager: `org.freedesktop.FileManager1.ShowItems` over D-Bus
+  on Linux (when no file manager answers there, or Qt has no D-Bus: the folder is opened), `explorer /select,` on
+  Windows, `open -R` on macOS; a folder is opened. Not offered on Android. Everything handed to the system goes
+  through `qt/src/shell/SystemApps.*`, which the tests replace with a fake.
   - press and hold, then move: drag onto a folder card or a breadcrumb to move it there
 - **Selection**:
   - Ctrl+click toggles, Shift+click selects a range. The circle in a card's corner selects it; while something is

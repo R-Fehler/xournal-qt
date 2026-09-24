@@ -50,6 +50,13 @@ Rectangle {
         if (d.toDateString() === now.toDateString()) return qsTr("Today %1").arg(d.toLocaleTimeString(Qt.locale(), Locale.ShortFormat))
         return d.toLocaleDateString(Qt.locale(), Locale.ShortFormat)
     }
+    function sizeText(bytes) {
+        if (bytes < 0) return ""
+        if (bytes < 1024) return qsTr("%1 B").arg(bytes)
+        if (bytes < 1024 * 1024) return qsTr("%1 KB").arg(Math.round(bytes / 1024))
+        if (bytes < 1024 * 1024 * 1024) return qsTr("%1 MB").arg((bytes / (1024 * 1024)).toFixed(1))
+        return qsTr("%1 GB").arg((bytes / (1024 * 1024 * 1024)).toFixed(1))
+    }
     function pagesText(n) { return n < 0 ? "" : (n === 1 ? qsTr("1 page") : qsTr("%1 pages").arg(n)) }
     function focusGrid() { (page === 0 ? libraryGrid : recentGrid).forceActiveFocus() }
     function focusSearch() {
@@ -70,12 +77,12 @@ Rectangle {
         } else if (home.searching) {
             app.openSearchHit(item.path, lib.searchQuery)
         } else {
-            app.openPath(item.path)
+            app.openListed([item.path])  // (other files: with their app)
         }
     }
     function openRecentRow(index) {
         const item = recentGrid.itemAtIndex(index)
-        if (item) app.openPath(item.path)
+        if (item) app.openListed([item.path])
     }
     readonly property var currentModel: page === 0 ? app.library : app.recent
     readonly property int selectionCount: currentModel.selectionCount
@@ -98,7 +105,7 @@ Rectangle {
             app.library.folder = app.library.relativeFolder(paths[0])
         } else if (docs.length > 0) {
             if (model === app.library && home.searching && docs.length === 1) app.openSearchHit(docs[0], lib.searchQuery)
-            else app.openPaths(docs)
+            else app.openListed(docs)
         }
         model.clearSelection()
     }
@@ -133,11 +140,14 @@ Rectangle {
     property string menuName: ""
     property string menuPath: ""
     property bool menuFolder: false
+    /// The kind of the row ("notes", "pdf", "md", "image", "text", "other"; a folder: "")
+    property string menuKind: ""
     /// What the menu applies to: the row, or all selected items if the row is one of them.
     property var menuPaths: []
     readonly property bool menuMany: menuPaths.length > 1
-    function showMenu(model, row, name, path, isFolder, item, x, y) {
+    function showMenu(model, row, name, path, isFolder, item, x, y, kind) {
         menuModel = model; menuRow = row; menuName = name; menuPath = path; menuFolder = isFolder
+        menuKind = kind || ""
         menuPaths = model.pathsFor(row)
         itemMenu.popup(item, x, y)
     }
@@ -500,6 +510,66 @@ Rectangle {
                 checked: app.library.flat
                 onClicked: app.library.flat = !app.library.flat
             }
+            // Which kinds of files the library shows (a setting of the library), marked when not the default
+            IconButton {
+                id: showButton
+                objectName: "showButton"
+                visible: home.page === 0 && app.library.available
+                iconName: "xqt-filter"
+                tip: app.library.showFiltered ? qsTr("Show: some kinds of files are hidden or added") : qsTr("Show: which kinds of files")
+                checked: app.library.showFiltered
+                onClicked: showPopup.opened ? showPopup.close() : showPopup.open()
+                Popup {
+                    id: showPopup
+                    objectName: "showPopup"
+                    y: showButton.height
+                    x: Math.min(0, showButton.width - width)
+                    padding: 8
+                    readonly property var show: app.library.show
+                    component ShowToggle: CheckDelegate {
+                        property string key
+                        Layout.fillWidth: true
+                        checked: showPopup.show[key] === true
+                        onToggled: app.library.setShown(key, checked)
+                        font.pixelSize: 14
+                        topPadding: 6
+                        bottomPadding: 6
+                    }
+                    contentItem: ColumnLayout {
+                        spacing: 0
+                        Label {
+                            text: qsTr("Show in this library")
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                            color: "#5f6368"
+                            Layout.leftMargin: 12
+                            Layout.bottomMargin: 4
+                        }
+                        ShowToggle { objectName: "showNotes"; key: "notes"; text: qsTr("Notes (.xopp, .xoj)") }
+                        ShowToggle { objectName: "showPdfs"; key: "pdfs"; text: qsTr("PDFs") }
+                        ShowToggle {
+                            objectName: "showOnlyPdfsWithNotes"
+                            key: "onlyPdfsWithNotes"
+                            text: qsTr("Only PDFs with notes")
+                            enabled: showPopup.show.pdfs === true
+                            leftPadding: 40
+                            font.pixelSize: 13
+                        }
+                        ShowToggle { objectName: "showMarkdown"; key: "markdown"; text: qsTr("Markdown (.md)") }
+                        ShowToggle { objectName: "showImages"; key: "images"; text: qsTr("Images") }
+                        ShowToggle { objectName: "showText"; key: "text"; text: qsTr("Text and code (.txt, .tex, .py, …)") }
+                        ShowToggle { objectName: "showOther"; key: "other"; text: qsTr("All other files") }
+                        Button {
+                            objectName: "showDefaults"
+                            Layout.alignment: Qt.AlignRight
+                            flat: true
+                            text: qsTr("Defaults")
+                            enabled: app.library.showFiltered
+                            onClicked: app.library.resetShown()
+                        }
+                    }
+                }
+            }
             IconButton {
                 visible: home.page === 0 && app.library.available
                 iconName: "xqt-sort"
@@ -755,6 +825,7 @@ Rectangle {
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
                         kind: model.kind
+                        fileIcon: model.fileIcon
                         hits: model.hits
                         snippet: model.snippet
                         itemCount: model.itemCount
@@ -783,6 +854,7 @@ Rectangle {
                             }
                             const parts = []
                             if ((home.searching || app.library.flat) && model.location !== "") parts.push(model.location)
+                            if (model.kind === "other" || model.kind === "text") parts.push(home.sizeText(model.size))
                             if (model.pageCount >= 0) parts.push(home.pagesText(model.pageCount))
                             parts.push(home.formatDate(model.modified))
                             return parts.join(" · ")
@@ -795,7 +867,7 @@ Rectangle {
                         onToggleRequested: app.library.toggleSelected(index)
                         onMenuRequested: function(item, x, y) {
                             libraryGrid.currentIndex = index
-                            home.showMenu(app.library, index, model.name, model.path, model.isFolder, item, x, y)
+                            home.showMenu(app.library, index, model.name, model.path, model.isFolder, item, x, y, model.kind)
                         }
                     }
                 }
@@ -961,7 +1033,7 @@ Rectangle {
                         onToggleRequested: app.recent.toggleSelected(index)
                         onMenuRequested: function(item, x, y) {
                             recentGrid.currentIndex = index
-                            home.showMenu(app.recent, index, model.name, model.path, false, item, x, y)
+                            home.showMenu(app.recent, index, model.name, model.path, false, item, x, y, model.kind)
                         }
                     }
                 }
@@ -1117,8 +1189,16 @@ Rectangle {
             }
         }
         MenuItem {
+            objectName: "openWithSystemAppItem"
+            text: qsTr("Open with the system app")
+            visible: !home.menuMany && (home.menuKind === "other" || home.menuKind === "text")
+            height: visible ? implicitHeight : 0
+            onTriggered: app.openWithSystemApp(home.menuPath)
+        }
+        MenuItem {
+            objectName: "showInFileManagerItem"
             text: qsTr("Show in file manager")
-            visible: !home.menuMany
+            visible: !home.menuMany && app.canShowInFileManager
             height: visible ? implicitHeight : 0
             onTriggered: app.showInFileManager(home.menuPath)
         }
@@ -1157,7 +1237,8 @@ Rectangle {
                 wrapMode: Text.Wrap
                 font.pixelSize: 12
                 color: "#6b6f75"
-                text: qsTr("The Xournal file and its PDF are renamed together.")
+                text: home.menuKind === "other" || home.menuKind === "text" ? qsTr("The whole file name, with its extension.")
+                                                                              : qsTr("The Xournal file and its PDF are renamed together.")
             }
         }
         standardButtons: Dialog.Ok | Dialog.Cancel
