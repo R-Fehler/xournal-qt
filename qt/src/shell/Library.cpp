@@ -92,10 +92,26 @@ QJsonObject settingsOf(const fs::path& file) {
 }
 }  // namespace
 
+namespace {
+#ifdef Q_OS_ANDROID
+CacheLocation::Mode platformCacheMode = CacheLocation::Mode::AppCache;
+#else
+CacheLocation::Mode platformCacheMode = CacheLocation::Mode::Folders;
+#endif
+}  // namespace
+
+CacheLocation::Mode Library::defaultCacheMode() { return platformCacheMode; }
+void Library::setDefaultCacheMode(CacheLocation::Mode mode) { platformCacheMode = mode; }
+
 CacheLocation::Mode Library::cacheMode() const {
-    return settingsOf(configDir() / "library.json").value("cache").toString() == QLatin1String("app")
-                   ? CacheLocation::Mode::AppCache
-                   : CacheLocation::Mode::Folders;
+    const QString mode = settingsOf(configDir() / "library.json").value("cache").toString();
+    return mode == QLatin1String("app")       ? CacheLocation::Mode::AppCache
+           : mode == QLatin1String("folders") ? CacheLocation::Mode::Folders
+                                              : defaultCacheMode();
+}
+
+bool Library::hasCacheSetting() const {
+    return settingsOf(configDir() / "library.json").value("cache").isString();
 }
 
 namespace {

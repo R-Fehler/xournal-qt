@@ -16,6 +16,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QGuiApplication>
 #include <QTemporaryDir>
 #include <cairo-pdf.h>
 #include <gtest/gtest.h>
@@ -280,6 +281,72 @@ TEST_F(RecoveryTest, pdfFilesModeAutosavesInTheCacheAndRecovers) {
     pdfMode(b, DocumentMode::Mode::Xopp);
     EXPECT_EQ(recovered->autosavePath(), DocumentSession::namedAutosavePath(pdf));
     DocumentMode::store(*b.context().getSettings(), DocumentMode::Mode::Unset);
+}
+
+// Android may kill an app in the background without warning: going to the background (Suspended) writes the autosaves
+// of the modified documents at once, and a "force stop" after it loses nothing. Nothing when nothing changed.
+TEST_F(RecoveryTest, goingToTheBackgroundWritesTheAutosaves) {
+    const fs::path second = fs::path(tmp.filePath("second.xopp").toStdString());
+    fs::copy_file(doc, second);
+    {
+        AppController a;
+        a.startSession({});
+        ASSERT_TRUE(a.openPath(QString::fromStdString(doc.string())));
+        ASSERT_TRUE(a.openPath(QString::fromStdString(second.string())));
+        DocumentSession& changed = *a.tabManager().session(0);
+        DocumentSession& unchanged = *a.tabManager().session(1);
+        scribble(changed);
+        // The window becomes active or loses the focus (desktop): nothing is written
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationActive);
+        EXPECT_FALSE(fs::exists(changed.autosavePath()));
+        // To the background: the signal the platform sends
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationSuspended);
+        ASSERT_TRUE(fs::exists(changed.autosavePath())) << "autosaved at once";
+        EXPECT_EQ(changed.getLastAutosaveFile(), changed.autosavePath());
+        EXPECT_FALSE(fs::exists(unchanged.autosavePath())) << "nothing to autosave";
+        EXPECT_TRUE(changed.isModified()) << "only the autosave: the file is not saved";
+        EXPECT_EQ(a.autosaveAll(), 0) << "not again without new changes";
+        scribble(changed);
+        EXPECT_EQ(a.autosaveAll(), 1);
+        fs::last_write_time(changed.autosavePath(), fs::last_write_time(doc) + std::chrono::seconds(2));
+        // "force stop": no shutdown()
+    }
+    markJournalCrashed();
+    AppController b;
+    b.startSession({});
+    ASSERT_EQ(b.recoveryItems().size(), 1);
+    b.recover(true);
+    ASSERT_EQ(b.tabCount(), 2);
+    const size_t savedElements = elementCount(*b.tabManager().session(1));
+    EXPECT_EQ(elementCount(*b.tabManager().session(0)), savedElements + 2) << "both strokes are back";
+}
+
+// On Android the autosave of a saved document goes to the app cache, not next to it (sync apps would upload it), and
+// is recovered from there.
+TEST_F(RecoveryTest, autosavesInTheAppCacheAreRecovered) {
+    DocumentSession::setAutosaveInAppCache(true);
+    {
+        AppController a;
+        a.startSession({});
+        ASSERT_TRUE(a.openPath(QString::fromStdString(doc.string())));
+        DocumentSession& s = *a.tabManager().session(0);
+        scribble(s);
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationSuspended);
+        ASSERT_FALSE(s.getLastAutosaveFile().empty());
+        EXPECT_EQ(s.getLastAutosaveFile().parent_path(), Util::getAutosaveFilepath().parent_path()) << "the app cache";
+        EXPECT_FALSE(fs::exists(DocumentSession::namedAutosavePath(doc))) << "nothing next to the document";
+        fs::last_write_time(s.getLastAutosaveFile(), fs::last_write_time(doc) + std::chrono::seconds(2));
+    }
+    DocumentSession::setAutosaveInAppCache(false);
+    markJournalCrashed();
+    AppController b;
+    b.startSession({});
+    ASSERT_EQ(b.recoveryItems().size(), 1);
+    EXPECT_EQ(b.recoveryItems()[0].toMap()["title"].toString(), "notes.xopp");
+    b.recover(true);
+    ASSERT_EQ(b.tabCount(), 1);
+    EXPECT_EQ(b.tabManager().session(0)->getFilePath(), doc);
+    EXPECT_TRUE(b.tabManager().session(0)->isModified());
 }
 
 TEST_F(RecoveryTest, aTextFileIsRecoveredWithItsText) {

@@ -1,4 +1,5 @@
 #include "DocumentFiles.h"
+#include "SyncConflicts.h"
 
 #include <chrono>
 
@@ -521,6 +522,43 @@ std::vector<fs::path> filesOf(const DocumentItem& item) {
     return files;
 }
 
+namespace {
+/// Conflict copies of sync apps (SyncConflicts.h) whose document is among `items` go to its `conflicts`.
+void foldConflicts(std::vector<DocumentItem>& items) {
+    std::map<std::string, size_t> byFile;  ///< every file name of an item -> the item
+    for (size_t i = 0; i < items.size(); ++i) {
+        for (const fs::path* f: {&items[i].xopp, &items[i].pdf, &items[i].md, &items[i].image, &items[i].other}) {
+            if (!f->empty()) {
+                byFile.emplace(f->filename().string(), i);
+            }
+        }
+    }
+    std::vector<bool> folded(items.size(), false);
+    for (size_t i = 0; i < items.size(); ++i) {
+        const auto conflict = SyncConflicts::parse(items[i].main().filename().string());
+        if (!conflict) {
+            continue;
+        }
+        const auto owner = byFile.find(conflict->original);
+        if (owner == byFile.end() || owner->second == i || folded[owner->second]) {
+            continue;  // (its document is not here: a document of its own)
+        }
+        items[owner->second].conflicts.push_back(items[i].main());
+        folded[i] = true;
+    }
+    size_t kept = 0;
+    for (size_t i = 0; i < items.size(); ++i) {
+        if (!folded[i]) {
+            if (kept != i) {
+                items[kept] = std::move(items[i]);  // (not onto itself: that empties it)
+            }
+            ++kept;
+        }
+    }
+    items.resize(kept);
+}
+}  // namespace
+
 Listing scan(const fs::path& dir, unsigned include) {
     Listing l;
     std::map<std::string, fs::path> xopps, pdfs;
@@ -599,6 +637,7 @@ Listing scan(const fs::path& dir, unsigned include) {
         item.other = file;
         l.items.push_back(std::move(item));
     }
+    foldConflicts(l.items);
     std::sort(l.folders.begin(), l.folders.end(),
               [](const fs::path& a, const fs::path& b) { return naturalLess(a.filename().string(), b.filename().string()); });
     std::stable_sort(l.items.begin(), l.items.end(),

@@ -821,6 +821,7 @@ void DocumentSession::finishSave(SaveResult result) {
         saveFailed = !result.ok;  // (the saved point is the copy's state, which is not in the file then)
     }
     lastSaveResult = result;
+    stampFiles();  // (what was written is the app's own: never a change "by another program")
     if (result.ok && !isExport(task->request.kind)) {
         madeUnsaved = false;  // (made from a .md: it is in its own file now)
         Q_EMIT filePathChanged();

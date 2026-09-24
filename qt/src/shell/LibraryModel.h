@@ -120,6 +120,8 @@ public:
         FileIconRole,
         /// Fuzzy search: the characters of the name that matched, [index, ...] (to highlight them)
         NameMarksRole,
+        /// Conflict copies of the document that sync apps left next to it (SyncConflicts.h): their paths
+        ConflictsRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
@@ -201,6 +203,17 @@ public:
     Q_INVOKABLE QVariantList foldersOf(const QString& root) const;
     /// Move documents and folders to the trash.
     Q_INVOKABLE bool trashPaths(const QStringList& paths);
+    /// The conflict copies of the document at `path` (SyncConflicts.h): [{ path, name, app, when, modified, size }],
+    /// and the document itself first, as { path, name, modified, size, original: true }.
+    Q_INVOKABLE QVariantList conflictsOf(const QString& path) const;
+    /// Keep one of a document and its conflict copy `conflict`: the conflict copy (`keepCopy`: it takes the
+    /// document's file name, the document's file of that kind goes), or the document (the copy goes). What goes is
+    /// moved to the trash; where there is none (canTrash, Android) it is deleted, which the window asks about first.
+    /// A .xopp copy keeps the PDF of its document. False (with `error`) if that failed.
+    Q_INVOKABLE bool resolveConflict(const QString& conflict, bool keepCopy);
+    /// There is a trash for what the library removes (not on Android).
+    Q_PROPERTY(bool canTrash READ canTrash CONSTANT)
+    static bool canTrash();
 
     const ShowFilter& showFilter() const { return filter; }
     /// Show these kinds of files (kept as the library's setting).
@@ -278,6 +291,8 @@ private:
     fs::path currentDir() const;
     /// The index and the previews, where the library keeps its cache.
     void openCache();
+    /// Cache folders in the library although it keeps its cache in the app cache by default: moved there (once).
+    void adoptFolderCaches();
     /// The library and all its folders.
     std::vector<fs::path> allFolders() const;
     fs::path dirOf(const QString& relative) const;

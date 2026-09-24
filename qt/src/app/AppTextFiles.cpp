@@ -278,12 +278,21 @@ void AppController::watchTextFiles() {
                 textCheckTimer.start();  // (back from another app: what did it do to the files?)
             }
         });
+        // After the app's own saves (a file renamed over the old one is watched anew; nothing counts as changed)
+        connect(tabs.get(), &TabManager::savingChanged, this, [this] {
+            if (!tabs->anySaving()) {
+                textCheckTimer.start();
+            }
+        });
     }
     QStringList wanted;
     for (int i = 0; i < tabs->count(); ++i) {
         const DocumentSession* s = tabs->session(i);
         if (s->textFile() && !s->hasFilePath()) {
             wanted << QString::fromStdString(s->textFile()->path().string());
+        }
+        for (const fs::path& f: s->filesOnDisk()) {  // (a .xopp, a PDF)
+            wanted << QString::fromStdString(f.string());
         }
     }
     const QStringList watched = textWatcher->files();
@@ -300,10 +309,75 @@ void AppController::watchTextFiles() {
 }
 
 void AppController::checkTextFiles() {
+    // (a reload replaces a tab: the list is taken first)
+    std::vector<QPointer<DocumentSession>> sessions;
     for (int i = 0; i < tabs->count(); ++i) {
-        checkTextFile(tabs->session(i));
+        sessions.emplace_back(tabs->session(i));
+    }
+    for (const auto& s: sessions) {
+        if (s) {
+            checkTextFile(s);
+        }
+        if (s) {
+            checkDocumentFiles(s);
+        }
     }
     watchTextFiles();
+}
+
+void AppController::checkDocumentFiles(DocumentSession* s) {
+    if (!s || s->textFile() || s == askingTextChange || !s->filesChangedOnDisk()) {
+        return;
+    }
+    const QString name = QString::fromStdString(s->documentFile().filename().string());
+    if (!s->isModified()) {
+        if (reloadDocument(s)) {  // nothing to lose: the files as they are now
+            Q_EMIT pageActionDone(tr("%1 was changed by another app: shown as it is now").arg(name), false);
+        }
+        return;
+    }
+    // Changes here and there: the window asks (with that tab shown)
+    askingTextChange = s;
+    tabs->setCurrentIndex(tabs->indexOf(s));
+    setHomeVisible(false);
+    Q_EMIT documentChangedOnDisk(name);
+}
+
+bool AppController::reloadDocument(DocumentSession* s) {
+    const int index = tabs->indexOf(s);
+    if (index < 0) {
+        return false;
+    }
+    const fs::path file = s->documentFile();
+    auto result = DocumentSession::loadFile(file);
+    if (!result.document) {
+        s->stampFiles();  // (not asked again about this version)
+        Q_EMIT message(tr("Cannot reload"),
+                       tr("%1 was changed by another app, but it cannot be read: %2")
+                               .arg(QString::fromStdString(file.filename().string()),
+                                    QString::fromStdString(result.error)),
+                       true);
+        return false;
+    }
+    const int current = tabs->currentIndex();
+    const size_t page = s->getCurrentPageNo();
+    const std::vector<std::string> hybridChanged = result.hybridChanged;
+    // The new one right after it, then the old one closed: the new one is in its place
+    tabs->setCurrentIndex(index);
+    tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+    DocumentSession* fresh = tabs->currentSession();
+    closeTab(index);
+    if (current != index) {
+        tabs->setCurrentIndex(current);
+    }
+    const size_t p = std::min(page, fresh->getDocument()->getPageCount() - 1);
+    fresh->setCurrentPageNo(p);
+    fresh->getScrollHandler()->scrollToPage(p);
+    if (!hybridChanged.empty()) {
+        fresh->setHybridChanges(hybridChanged);
+    }
+    watchTextFiles();
+    return true;
 }
 
 void AppController::checkTextFile(DocumentSession* s) {
@@ -331,6 +405,14 @@ void AppController::resolveTextChange(bool reload) {
     DocumentSession* s = askingTextChange;
     askingTextChange = nullptr;
     if (!s) {
+        return;
+    }
+    if (!s->textFile()) {  // a document
+        if (reload) {
+            reloadDocument(s);
+        } else {
+            s->stampFiles();  // (the next save writes over it; not asked again for this version)
+        }
         return;
     }
     if (!reload) {

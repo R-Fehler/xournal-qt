@@ -15,7 +15,8 @@ keyboard. Mobile UI work waits until mobile testing is a real concern. Items are
   in it (the same file reads fine). Probably the emulator's ARM translation, like the dark bars below; check on the
   phone.
 - (O) The **recovery dialog** ("Recover unsaved changes?") appears after every `am start -S`/force stop with a
-  changed document open: Android kills without warning, so saving on `ApplicationSuspended` (Lifecycle) matters.
+  changed document open: Android kills without warning. Done (`qt/android-libraries`): the autosaves are written when
+  the app goes to the background (Lifecycle), so the dialog brings back everything drawn before.
 - (O) "Open with" a 145 MB PDF (the author on the Fold 7) froze the window while it was copied: fixed (copied in the
   background, with a note); opening it again is instant.
 
@@ -78,10 +79,12 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   every unknown file type.
 - (E) **Writing back**: a document opened from another app is a copy; changes do not go back to the original (e.g.
   a PDF in a cloud app). A later step could keep the URI grant (`takePersistableUriPermission`) and offer "Save back".
-- (E) **Libraries anywhere** (VISION): a library folder chosen by the user means a SAF tree URI
-  (`ACTION_OPEN_DOCUMENT_TREE`); the library code (`qt/src/shell/Library*`) scans with `std::filesystem`. Today
-  "Open a folder as library" with a picked folder only explains that it cannot be done yet. Other libraries (New
-  library, the Libraries menu) start another process, which Android does not do either.
+- Done (`qt/android-libraries`): **libraries in the shared storage** (VISION: libraries anywhere) with "All files
+  access": a picked folder's tree URI is mapped to its path, and the window switches to another library instead of
+  starting a process (android.md). Open: folders only a cloud app's provider offers (`content://` trees of Nextcloud,
+  Drive, OneDrive) stay out; they would need a library that reads through SAF. Google Play restricts
+  `MANAGE_EXTERNAL_STORAGE`: a Play build would need another way (SAF trees, or Play's exception for file managers
+  and document apps).
 - (E) **"Show in file manager"** has no Android equivalent; hide it. "Open externally" becomes an intent with a
   `FileProvider` URI (the provider is already in the manifest).
 - (E) **Printing** calls `lp`; on Android use the print framework or hide Print.
@@ -102,8 +105,9 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
 
 ## Lifecycle
 
-- (E) **Saving when the app goes to the background**: Android may kill a background app without warning. Save
-  (or write the recovery files) on `Qt::ApplicationSuspended`.
+- Done (`qt/android-libraries`): **autosave when the app goes to the background** (android.md). Only the autosave,
+  not a save of the user's file: a save changes the file other apps and sync clients see, and a half-finished
+  thought would be uploaded; the recovery dialog decides after a kill. Open: saving the files themselves as an option.
 - (E) **Crash handlers**: `SessionRecovery::installCrashHandlers()` is off on Android, because replacing the signal
   handlers hides the backtrace in logcat. Chain to the previous handler (`sigaction`) and turn it on again.
 - (E) **Memory**: the canvas memory budget (`CanvasMemory`) is a desktop default. Android's per-app limit and

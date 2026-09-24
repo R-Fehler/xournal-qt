@@ -1397,6 +1397,69 @@ TEST_F(LibraryTest, theCacheMovesToTheAppCacheAndBack) {
     model.setLibrary(nullptr);
 }
 
+// Where a library without a setting keeps its cache: in its folders on the desktop, in the app cache on Android (sync
+// apps would upload the cache folders). A setting of the library wins either way.
+TEST_F(LibraryTest, theCacheDefaultsToTheFoldersOnTheDesktopAndToTheAppCacheOnAndroid) {
+    makeFolders(root);
+    EXPECT_EQ(Library::defaultCacheMode(), CacheLocation::Mode::Folders) << "the desktop";
+    EXPECT_FALSE(Library(root).hasCacheSetting());
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::Folders);
+
+    Library::setDefaultCacheMode(CacheLocation::Mode::AppCache);  // Android
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::AppCache);
+    {
+        LibraryModel model;
+        model.setLibrary(std::make_unique<Library>(root));
+        EXPECT_TRUE(model.cacheInAppCache());
+        model.searchIndex()->flush();
+        const fs::path app = Library(root).cacheLocation().appCacheDir();
+        EXPECT_TRUE(fs::exists(app / "Physics" / DocumentFiles::META_DIR / "notes.pack"));
+        for (const fs::path& f: {root, root / "Physics", root / "Physics" / "Mechanics"}) {
+            EXPECT_FALSE(fs::exists(f / DocumentFiles::META_DIR)) << f;
+        }
+        EXPECT_FALSE(Library(root).hasCacheSetting()) << "nothing to move: no setting written";
+        model.setLibrary(nullptr);
+    }
+    // A setting of the library wins
+    Library(root).setCacheMode(CacheLocation::Mode::Folders);
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::Folders);
+    Library::setDefaultCacheMode(CacheLocation::Mode::Folders);
+    Library(root).setCacheMode(CacheLocation::Mode::AppCache);
+    EXPECT_EQ(Library(root).cacheMode(), CacheLocation::Mode::AppCache);
+    fs::remove_all(Library(root).cacheLocation().appCacheDir());
+    fs::remove(Library(root).configDir() / "library.json");
+}
+
+// A library with cache folders of its own (from a desktop, or from before the default) opened where the default is
+// the app cache: the folders' caches move there once, nothing is read again.
+TEST_F(LibraryTest, cacheFoldersMoveToTheAppCacheWhenThatIsTheDefault) {
+    makeFolders(root);
+    {
+        LibraryModel model;
+        model.setLibrary(std::make_unique<Library>(root));
+        model.searchIndex()->flush();
+        model.setLibrary(nullptr);
+    }
+    ASSERT_TRUE(fs::exists(root / "Physics" / DocumentFiles::META_DIR / "notes.pack"));
+    Library::setDefaultCacheMode(CacheLocation::Mode::AppCache);
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    Library::setDefaultCacheMode(CacheLocation::Mode::Folders);
+    EXPECT_TRUE(model.cacheInAppCache()) << "the setting is written";
+    EXPECT_TRUE(Library(root).hasCacheSetting());
+    const fs::path app = Library(root).cacheLocation().appCacheDir();
+    for (const fs::path& f: {root, root / "Physics", root / "Physics" / "Mechanics"}) {
+        EXPECT_FALSE(fs::exists(f / DocumentFiles::META_DIR)) << f;
+    }
+    EXPECT_TRUE(fs::exists(app / "Physics" / DocumentFiles::META_DIR / "notes.pack"));
+    model.searchIndex()->waitForDone();
+    EXPECT_EQ(model.searchIndex()->documentsRead(), 0) << "moved, not made anew";
+    EXPECT_EQ(model.searchIndex()->search("zebra").size(), 1u);
+    model.setLibrary(nullptr);
+    fs::remove_all(app);
+    fs::remove(Library(root).configDir() / "library.json");
+}
+
 // In the app cache, a folder moved by another program leaves its cache behind: its documents are found again by
 // name, size and time, and the old place is cleaned up.
 TEST_F(LibraryTest, inTheAppCacheDocumentsMovedByAnotherProgramAreFoundAgain) {

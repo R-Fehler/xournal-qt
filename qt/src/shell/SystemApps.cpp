@@ -10,6 +10,10 @@
 #include <QFileInfo>
 #include <QProcess>
 #include <QUrl>
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#include <QtCore/qcoreapplication_platform.h>
+#endif
 
 #ifdef XQT_HAVE_DBUS
 #include <QDBusConnection>
@@ -35,6 +39,14 @@ SystemApps& SystemApps::instance() {
 void SystemApps::setInstance(SystemApps* apps) { current() = apps; }
 
 bool SystemApps::canShowInFileManager() {
+#ifdef Q_OS_ANDROID
+    return false;
+#else
+    return true;
+#endif
+}
+
+bool SystemApps::canTrash() {
 #ifdef Q_OS_ANDROID
     return false;
 #else
@@ -141,6 +153,38 @@ bool SystemApps::copyToClipboard(const QStringList& files) {
 }
 
 bool SystemApps::moveToTrash(const QString& path) { return QFile::moveToTrash(path); }
+
+#ifdef Q_OS_ANDROID
+namespace {
+constexpr const char* ACTIVITY = "org/xournalqt/app/XournalActivity";
+}  // namespace
+
+bool SystemApps::librariesInOwnWindows() { return false; }
+
+bool SystemApps::needsAllFilesAccess(const QString& folder) {
+    const QString path = QDir::cleanPath(QFileInfo(folder).absoluteFilePath());
+    const bool shared = path.startsWith(QLatin1String("/storage/")) || path.startsWith(QLatin1String("/sdcard")) ||
+                        path.startsWith(QLatin1String("/mnt/"));
+    if (!shared) {
+        return false;  // (the app's private folders)
+    }
+    // The app's own folder in the shared storage (Android/data/<package>) needs no permission
+    const QString package =
+            QNativeInterface::QAndroidApplication::context().callMethod<jstring>("getPackageName").toString();
+    return !path.contains(QStringLiteral("/Android/data/") + package);
+}
+
+bool SystemApps::hasAllFilesAccess() { return QJniObject::callStaticMethod<jboolean>(ACTIVITY, "hasAllFilesAccess", "()Z"); }
+
+bool SystemApps::requestAllFilesAccess() {
+    return QJniObject::callStaticMethod<jboolean>(ACTIVITY, "requestAllFilesAccess", "()Z");
+}
+#else
+bool SystemApps::librariesInOwnWindows() { return true; }
+bool SystemApps::needsAllFilesAccess(const QString&) { return false; }
+bool SystemApps::hasAllFilesAccess() { return true; }
+bool SystemApps::requestAllFilesAccess() { return false; }
+#endif
 
 bool SystemApps::startLibraryWindow(const QString& folder) {
     return QProcess::startDetached(QCoreApplication::applicationFilePath(), {folder});

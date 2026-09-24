@@ -40,6 +40,8 @@ Item {
     property string lastRead
     property int lastPage: -1
     property int hits: 0
+    /// Conflict copies of sync apps next to it (their number): a badge that opens "compare / keep one"
+    property int conflicts: 0
     property string snippet
     property bool highlighted: false
     property bool selected: false
@@ -63,6 +65,7 @@ Item {
     /// A tap or click (with the keyboard modifiers of a click)
     signal activated(int modifiers)
     signal toggleRequested()
+    signal conflictsRequested()
     signal menuRequested(Item item, real x, real y)
 
     HoverHandler { id: hover }
@@ -218,6 +221,35 @@ Item {
                             font.weight: Font.Bold
                             color: "#ffffff"
                         }
+                    }
+                }
+                // Sync conflicts: a badge that opens "compare / keep one" (conflictsRequested)
+                Rectangle {
+                    objectName: "conflictBadge"
+                    visible: !card.isFolder && card.conflicts > 0
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 6
+                    // (above the "last read" tag, which a narrow card fills across)
+                    anchors.bottomMargin: card.lastRead !== "" && card.snippet === "" ? 28 : 6
+                    z: 3
+                    radius: 4
+                    color: "#e65100"
+                    width: conflictLabel.implicitWidth + 12
+                    height: 22
+                    Label {
+                        id: conflictLabel
+                        anchors.centerIn: parent
+                        text: card.conflicts === 1 ? qsTr("Conflict") : qsTr("%1 conflicts").arg(card.conflicts)
+                        font.pixelSize: 11
+                        font.weight: Font.Bold
+                        color: "#ffffff"
+                    }
+                    MouseArea {
+                        objectName: "conflictBadgeArea"
+                        anchors.fill: parent
+                        anchors.margins: -6  // (a finger's size)
+                        onClicked: card.conflictsRequested()
                     }
                 }
                 // Search: the text around the first match

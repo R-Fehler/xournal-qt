@@ -5,12 +5,69 @@
  */
 #include "ContentFiles.h"
 
+#include <QDir>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QMimeDatabase>
 
 namespace xqt::ContentFiles {
+
+QString sharedStoragePath(const QUrl& url, const StorageRoots& roots) {
+    if (url.scheme() != QLatin1String("content")) {
+        return {};
+    }
+    // The path is ".../tree/<tree id>" or ".../tree/<tree id>/document/<document id>" (or ".../document/<id>"), the
+    // ids percent-encoded as one segment each ("primary%3ADocuments%2FUni"): the document id, where there is one, is
+    // what was picked
+    const QStringList segments = url.path(QUrl::FullyEncoded).split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    QString id;
+    for (qsizetype i = 0; i + 1 < segments.size(); ++i) {
+        if (segments[i] == QLatin1String("tree") || segments[i] == QLatin1String("document")) {
+            id = QUrl::fromPercentEncoding(segments[i + 1].toUtf8());
+        }
+    }
+    if (id.isEmpty()) {
+        return {};
+    }
+    QString path;
+    const QString authority = url.host();
+    if (authority == QLatin1String("com.android.externalstorage.documents")) {
+        const qsizetype colon = id.indexOf(QLatin1Char(':'));
+        if (colon <= 0) {
+            return {};
+        }
+        const QString volume = id.left(colon);
+        const QString rel = id.mid(colon + 1);
+        QString base;
+        if (volume == QLatin1String("primary")) {
+            base = roots.primary;
+        } else if (volume == QLatin1String("home")) {
+            base = roots.primary + QStringLiteral("/Documents");  // (the picker's "Documents")
+        } else if (!volume.contains(QLatin1Char('/')) && volume != QLatin1String("..")) {
+            base = roots.volumes + QLatin1Char('/') + volume;  // an SD card, a USB drive ("1234-ABCD")
+        } else {
+            return {};
+        }
+        path = rel.isEmpty() ? base : base + QLatin1Char('/') + rel;
+    } else if (authority == QLatin1String("com.android.providers.downloads.documents")) {
+        if (id == QLatin1String("downloads")) {
+            path = roots.primary + QStringLiteral("/Download");
+        } else if (id.startsWith(QLatin1String("raw:/"))) {
+            path = id.mid(4);
+        } else {
+            return {};  // (numbers of the downloads database: no path)
+        }
+    } else {
+        return {};
+    }
+    // No way out of the storage by "..", and only what is there
+    const QString clean = QDir::cleanPath(path);
+    if (path.split(QLatin1Char('/')).contains(QStringLiteral(".."))) {
+        return {};
+    }
+    return QFileInfo::exists(clean) ? clean : QString();
+}
 
 namespace {
 

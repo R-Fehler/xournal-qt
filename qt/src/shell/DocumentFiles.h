@@ -35,6 +35,10 @@ struct DocumentItem {
     bool hybrid = false;
     /// A text or code file, or any other file the library lists (alone), or empty.
     fs::path other;
+    /// Conflict copies of its files that sync apps left next to it (SyncConflicts.h; found by scan()): they are shown
+    /// on its card, not as documents of their own. Each is the main file of such a copy. Not part of the document
+    /// (rename, move, trash leave them).
+    std::vector<fs::path> conflicts;
     /// The file to open: the .xopp (not the export of a hybrid PDF), else the PDF, the Markdown file, the image, the
     /// other file.
     const fs::path& main() const {
@@ -99,7 +103,8 @@ struct Listing {
     std::vector<DocumentItem> items;
 };
 /// Folders and documents in a folder, not recursive (with text and other files if included). Hidden entries,
-/// backups, attached PDFs and background images are left out.
+/// backups, attached PDFs and background images are left out. Conflict copies of sync apps whose document is in the
+/// folder are its `conflicts`, not items.
 Listing scan(const fs::path& dir, unsigned include = Documents);
 /// All documents in a folder and its subfolders.
 std::vector<DocumentItem> scanRecursive(const fs::path& dir, unsigned include = Documents);

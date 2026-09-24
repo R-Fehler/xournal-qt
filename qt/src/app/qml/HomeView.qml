@@ -89,6 +89,12 @@ Rectangle {
         if (item && item.isLibrary) openLibraryFolder(item.path)
         else if (item) app.openListed([item.path])
     }
+    /// "Open a folder as library…": the folder picker. On Android a folder of the phone's storage can be a library
+    /// only with "All files access": explained and asked for first (then the picker opens, see onPickLibraryFolder).
+    function pickLibraryFolder() {
+        if (app.storageAccess) openLibraryDialog.open()
+        else storageAccessDialog.ask("")
+    }
     /// A folder as library: this one's home screen, else a window of its own (raised if it is open already)
     function openLibraryFolder(path) {
         if (app.library.available && path === app.library.rootPath) {
@@ -171,6 +177,8 @@ Rectangle {
     Connections {
         target: app.library
         function onError(text) { errorDialog.text = text; errorDialog.open() }
+        // (Android: the window switched to another library, e.g. from the Recent grid: show it)
+        function onLibraryChanged() { home.page = 0 }
         function onImported(count) {
             if (count > 0) importedNote.show(count === 1 ? qsTr("1 document imported") : qsTr("%1 documents imported").arg(count), false)
         }
@@ -178,6 +186,11 @@ Rectangle {
     Connections {
         target: app.recent
         function onError(text) { errorDialog.text = text; errorDialog.open() }
+    }
+    Connections {
+        target: app
+        function onStorageAccessNeeded(folder) { storageAccessDialog.ask(folder) }
+        function onPickLibraryFolder() { openLibraryDialog.open() }
     }
 
     ColumnLayout {
@@ -333,7 +346,8 @@ Rectangle {
                     property var libraries: []
                     onAboutToShow: libraries = app.libraries()
                     Label {
-                        text: qsTr("Libraries (another one opens in a new window)")
+                        text: app.libraryWindows ? qsTr("Libraries (another one opens in a new window)")
+                                                 : qsTr("Libraries (the window switches to another one)")
                         leftPadding: 16
                         rightPadding: 16
                         topPadding: 8
@@ -368,8 +382,15 @@ Rectangle {
                         onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
                     }
                     MenuSeparator {}
-                    MenuItem { text: qsTr("New library… (new window)"); onTriggered: newLibraryDialog.open() }
-                    MenuItem { text: qsTr("Open a folder as library… (new window)"); onTriggered: openLibraryDialog.open() }
+                    MenuItem {
+                        text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
+                        onTriggered: newLibraryDialog.open()
+                    }
+                    MenuItem {
+                        objectName: "openFolderAsLibraryItem"
+                        text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
+                        onTriggered: home.pickLibraryFolder()
+                    }
                     MenuItem {
                         text: qsTr("Show in file manager")
                         enabled: app.library.available
@@ -808,6 +829,8 @@ Rectangle {
                         kind: model.kind
                         fileIcon: model.fileIcon
                         hits: model.hits
+                        conflicts: model.conflicts ? model.conflicts.length : 0
+                        onConflictsRequested: conflictDialog.show(model.path)
                         snippet: model.snippet
                         itemCount: model.itemCount
                         hitPages: home.extendedView ? model.hitPageList : []
@@ -1265,7 +1288,7 @@ Rectangle {
         }
         MenuItem {
             objectName: "openAsLibraryItem"
-            text: qsTr("Open as library (new window)")
+            text: app.libraryWindows ? qsTr("Open as library (new window)") : qsTr("Open as library")
             visible: !home.menuMany && home.menuFolder && home.menuModel === app.library
             height: visible ? implicitHeight : 0
             onTriggered: app.openLibraryAt(home.menuPath)
@@ -1546,6 +1569,42 @@ Rectangle {
         }
     }
 
+    // Android: why "All files access" is asked for, before the system's page for it
+    Dialog {
+        id: storageAccessDialog
+        objectName: "storageAccessDialog"
+        property string folder: ""  // then opened as library ("": the folder picker)
+        function ask(path) { folder = path; open() }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Allow access to your files?")
+        width: Math.min(parent ? parent.width - 32 : 520, 520)
+        Label {
+            width: storageAccessDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("To use a folder of the phone's storage as a library (for example one that Syncthing, "
+                       + "FolderSync or Autosync keeps in sync), Xournal Qt needs “All files access”. It then "
+                       + "works with the folder as on a computer: its documents, previews and search, and changes "
+                       + "other apps make are seen at once. It only reads and writes the folders you open as a "
+                       + "library.")
+                  + "\n\n" + qsTr("Android shows its settings page next: turn on the switch for Xournal Qt, then "
+                                   + "come back.")
+        }
+        footer: DialogButtonBox {
+            Button {
+                text: qsTr("Not now")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "storageAccessContinue"
+                text: qsTr("Continue")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: app.requestStorageAccess(folder)
+    }
+
     Dialog {
         id: newLibraryDialog
         parent: Overlay.overlay
@@ -1568,7 +1627,8 @@ Rectangle {
                 wrapMode: Text.Wrap
                 font.pixelSize: 12
                 color: "#6b6f75"
-                text: qsTr("A library is a folder in Documents/Xournal_Libraries. It opens in a new window.")
+                text: app.libraryWindows ? qsTr("A library is a folder in Documents/Xournal_Libraries. It opens in a new window.")
+                                         : qsTr("A library is a folder in Documents/Xournal_Libraries.")
             }
         }
         standardButtons: Dialog.Ok | Dialog.Cancel
@@ -1794,6 +1854,137 @@ Rectangle {
     }
 
     NewDocumentDialog { id: newDocumentDialog }
+
+    // Sync conflicts of a document (the badge on its card): compare side by side, or keep one (the other goes to the
+    // trash; where there is none, deleted after asking)
+    Dialog {
+        id: conflictDialog
+        objectName: "conflictDialog"
+        property string documentPath: ""
+        property var items: []  // app.library.conflictsOf: the document first, then its conflict copies
+        function show(path) {
+            documentPath = path
+            items = app.library.conflictsOf(path)
+            if (items.length > 1) open()
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Sync conflict")
+        width: Math.min(parent ? parent.width - 32 : 560, 560)
+        height: Math.min(implicitHeight, parent ? parent.height - 64 : 800)
+        standardButtons: Dialog.Close
+        contentItem: Flickable {
+            implicitHeight: conflictColumn.implicitHeight
+            contentHeight: conflictColumn.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            ColumnLayout {
+                id: conflictColumn
+                width: parent.width
+                spacing: 12
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    text: qsTr("A sync app found this document changed in two places and kept both versions. Compare "
+                               + "them side by side, then keep one; the other goes to the trash.")
+                          + (app.library.canTrash ? "" : " " + qsTr("(There is no trash here: it is deleted.)"))
+                }
+                Repeater {
+                    model: conflictDialog.items
+                    delegate: Frame {
+                        id: conflictRow
+                        required property var modelData
+                        Layout.fillWidth: true
+                        ColumnLayout {
+                            width: parent.width
+                            spacing: 4
+                            Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WrapAnywhere
+                                font.weight: Font.DemiBold
+                                text: conflictRow.modelData.original ? qsTr("This document: %1").arg(conflictRow.modelData.name)
+                                                                     : conflictRow.modelData.name
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.Wrap
+                                font.pixelSize: 12
+                                color: "#5f6368"
+                                text: {
+                                    const d = conflictRow.modelData
+                                    let parts = []
+                                    if (!d.original && d.app) parts.push(qsTr("Conflict copy (%1)").arg(d.app))
+                                    else if (!d.original) parts.push(qsTr("Conflict copy"))
+                                    parts.push(qsTr("changed %1").arg(d.modified.toLocaleString(Qt.locale(), Locale.ShortFormat)))
+                                    parts.push(home.sizeText(d.size))
+                                    return parts.join(" · ")
+                                }
+                            }
+                            Flow {
+                                Layout.fillWidth: true
+                                visible: !conflictRow.modelData.original
+                                spacing: 8
+                                Button {
+                                    objectName: "conflictCompareButton"
+                                    text: qsTr("Compare")
+                                    onClicked: {
+                                        conflictDialog.close()
+                                        app.compareConflict(conflictDialog.documentPath, conflictRow.modelData.path)
+                                    }
+                                }
+                                Button {
+                                    objectName: "conflictKeepDocumentButton"
+                                    text: qsTr("Keep the document")
+                                    onClicked: conflictConfirm.ask(conflictRow.modelData.path, false,
+                                                                   conflictRow.modelData.name)
+                                }
+                                Button {
+                                    objectName: "conflictKeepCopyButton"
+                                    text: qsTr("Keep this copy")
+                                    onClicked: conflictConfirm.ask(conflictRow.modelData.path, true,
+                                                                   conflictDialog.items[0].name)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Keep one: without a trash (Android), what goes is deleted - asked first
+    Dialog {
+        id: conflictConfirm
+        objectName: "conflictConfirm"
+        property string copyPath: ""
+        property bool keepCopy: false
+        property string goes: ""
+        function ask(path, keep, goesName) {
+            copyPath = path
+            keepCopy = keep
+            goes = goesName
+            if (app.library.canTrash) resolve()
+            else open()
+        }
+        function resolve() {
+            if (app.library.resolveConflict(copyPath, keepCopy)) {
+                conflictDialog.show(conflictDialog.documentPath)  // (more copies: still listed)
+                if (conflictDialog.items.length < 2) conflictDialog.close()
+            }
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Delete the other version?")
+        width: Math.min(parent ? parent.width - 32 : 480, 480)
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        Label {
+            width: conflictConfirm.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("There is no trash on this device: %1 is deleted and cannot be brought back.").arg(conflictConfirm.goes)
+        }
+        onAccepted: resolve()
+    }
 
     Dialog {
         id: errorDialog

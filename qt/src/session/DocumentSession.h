@@ -13,7 +13,9 @@
  */
 #pragma once
 
+#include <cstdint>
 #include <deque>
+#include <map>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -179,6 +181,29 @@ public:
     /// Write the autosave file if there are unsaved changes since the last autosave.
     SaveResult autosave();
 
+    // --- changes on disk by other programs (a sync app, another editor) -------------------------------------------
+    /// The files of the document whose change by another program matters: its file (the .xopp, the hybrid PDF, the
+    /// PDF it annotates) and the background PDF of a .xopp (not one in the app cache). None for a text file (TextFile
+    /// has its own check), a shown image or a new document.
+    std::vector<fs::path> filesOnDisk() const;
+    /// One of them is not what the app read or wrote last: its size and time differ, and so does its content (size,
+    /// or a sample of its start and end; a file only touched is not a change). Not while a save or PDF work runs
+    /// (asked again after it): the app's own saves are recorded when they finish (hybrid PDFs appended to,
+    /// renamed-over .xopp files, the merged PDF), so they never count. A file not seen yet (the document took a new
+    /// file) is recorded without counting. A file that is gone (being replaced) counts when it is back.
+    bool filesChangedOnDisk();
+    /// Take the files as they are now as the ones the document knows (read, written, or "Keep mine": not asked again
+    /// about this version).
+    void stampFiles();
+    /// What the autosave timer does: write the autosave (a text file: its text) if something changed since the last
+    /// one and no merged PDF is being written. True if a file was written. Also called when the app goes to the
+    /// background (AppController::applicationStateChanged).
+    bool autosaveChanges();
+    /// Autosaves of saved documents go to the app cache (as those of unsaved ones), not next to the document: on
+    /// Android, where libraries are often folders that sync apps upload. Recovery looks in both places.
+    static bool autosaveInAppCache();
+    static void setAutosaveInAppCache(bool inAppCache);  ///< (tests)
+
     /// Suggested target for "Save as" (port of upstream Control::saveImpl): the document's own path; for an
     /// annotated PDF the .xopp next to the PDF ("lecture.pdf" -> "lecture.xopp"), the same for a shown image
     /// ("photo.jpg" -> "photo.xopp": the library pairs them); else the default name (Settings::getDefaultSaveName) in
@@ -238,7 +263,8 @@ public:
     /// Unique number of this session in this process (names its autosave and emergency files).
     quint64 serial() const { return serialNo; }
     /// Where autosave() writes: ".name.autosave.xopp" next to the document (upstream), or for unsaved
-    /// documents "<cache>/autosaves/<pid>-<serial>.autosave.xopp" (one file per tab).
+    /// documents (and on Android, autosaveInAppCache) "<cache>/autosaves/<pid>-<serial>.autosave.xopp" (one file per
+    /// tab).
     fs::path autosavePath() const;
     /// Where a crash (emergency) save of this session goes: "<cache>/autosaves/<pid>-<serial>.emergency.xopp".
     static fs::path emergencyPath(qint64 pid, quint64 serial);
@@ -464,6 +490,14 @@ private:
     fs::path madeSuggestion;  ///< setMadeFrom
     bool madeUnsaved = false;
     std::string lastAutosavedText;
+    /// filesOnDisk() as read or written last (size, time, a sample of the content)
+    struct DiskStamp {
+        std::uintmax_t size = 0;
+        std::int64_t time = 0;
+        QByteArray sample;
+    };
+    static std::optional<DiskStamp> diskStampOf(const fs::path& file);
+    std::map<fs::path, DiskStamp> diskStamps;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };
 

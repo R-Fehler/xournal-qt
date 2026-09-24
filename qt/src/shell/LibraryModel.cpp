@@ -1,4 +1,5 @@
 #include "LibraryModel.h"
+#include "SyncConflicts.h"
 #include "ContentFiles.h"
 
 #include "DocumentPlaces.h"
@@ -21,6 +22,7 @@
 #include "session/FuzzyQuery.h"
 #include "MdSnippets.h"
 #include "Previews.h"
+#include "SystemApps.h"
 
 namespace xqt {
 
@@ -71,6 +73,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     filter = lib ? lib->showFilter() : ShowFilter();
     if (lib) {
         DocumentPlaces::setLibrary(lib->root(), lib->placesFile());
+        adoptFolderCaches();
         openCache();
         // A cache of the layout before the packs (in the library, or in the app cache for a library that could
         // not be written): converted first
@@ -93,6 +96,23 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     Q_EMIT cacheChanged();
     Q_EMIT showChanged();
     refresh();
+}
+
+void LibraryModel::adoptFolderCaches() {
+    // A library without a cache setting that goes into the app cache by default (Android), but has cache folders
+    // of its own (from before that default, or from a desktop): they are moved there once, so nothing is read again
+    // and the library's folders are left clean. The setting is written, so this happens only once.
+    if (lib->hasCacheSetting() || lib->cacheMode() != CacheLocation::Mode::AppCache) {
+        return;
+    }
+    const CacheLocation folders(lib->root(), CacheLocation::Mode::Folders);
+    const auto all = allFolders();
+    std::error_code ec;
+    if (std::none_of(all.begin(), all.end(), [&](const fs::path& f) { return fs::is_directory(folders.inFolder(f), ec); })) {
+        return;
+    }
+    lib->setCacheMode(CacheLocation::Mode::AppCache);
+    CacheFolders::move(folders, lib->cacheLocation(), all);
 }
 
 void LibraryModel::openCache() {
@@ -698,6 +718,13 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             }
             return list;
         }
+        case ConflictsRole: {
+            QStringList list;
+            for (const fs::path& c: r.item.conflicts) {
+                list << qstr(c);
+            }
+            return list;
+        }
         default:
             return {};
     }
@@ -730,7 +757,8 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {HitPassageBaseRole, "hitPassageBase"},
             {SizeRole, "size"},
             {FileIconRole, "fileIcon"},
-            {NameMarksRole, "nameMarks"}};
+            {NameMarksRole, "nameMarks"},
+            {ConflictsRole, "conflicts"}};
 }
 
 void LibraryModel::setShowFilter(const ShowFilter& f) {
@@ -1149,6 +1177,89 @@ bool LibraryModel::trashPaths(const QStringList& paths) {
         Q_EMIT error(errors.join('\n'));
     }
     return errors.isEmpty();
+}
+
+bool LibraryModel::canTrash() { return SystemApps::canTrash(); }
+
+QVariantList LibraryModel::conflictsOf(const QString& path) const {
+    const fs::path file = toPath(path);
+    const auto listing = DocumentFiles::scan(file.parent_path(), DocumentFiles::AllFiles);
+    auto describe = [](const fs::path& f) {
+        const QFileInfo info(qstr(f));
+        return QVariantMap{{"path", qstr(f)},
+                           {"name", QString::fromStdString(f.filename().string())},
+                           {"modified", info.lastModified()},
+                           {"size", info.size()}};
+    };
+    QVariantList list;
+    for (const DocumentItem& item: listing.items) {
+        if (!item.has(file) || item.conflicts.empty()) {
+            continue;
+        }
+        QVariantMap own = describe(item.main());
+        own["original"] = true;
+        list.append(own);
+        for (const fs::path& c: item.conflicts) {
+            QVariantMap m = describe(c);
+            if (const auto conflict = SyncConflicts::parse(c.filename().string())) {
+                m["app"] = QString::fromStdString(conflict->app);
+                m["when"] = QString::fromStdString(conflict->when);
+                m["original"] = false;
+                m["of"] = QString::fromStdString(conflict->original);
+            }
+            list.append(m);
+        }
+    }
+    return list;
+}
+
+bool LibraryModel::resolveConflict(const QString& conflictPath, bool keepCopy) {
+    const fs::path copy = toPath(conflictPath);
+    const auto conflict = SyncConflicts::parse(copy.filename().string());
+    std::error_code ec;
+    if (!conflict || !fs::exists(copy, ec)) {
+        Q_EMIT error(tr("%1 is not there any more.").arg(qstr(copy.filename())));
+        return false;
+    }
+    const fs::path original = copy.parent_path() / conflict->original;
+    // What goes: to the trash, or deleted where there is none (the window asked)
+    auto remove = [this](const fs::path& f) {
+        if (SystemApps::canTrash()) {
+            if (!SystemApps::instance().moveToTrash(qstr(f))) {
+                Q_EMIT error(tr("Could not move %1 to the trash.").arg(qstr(f.filename())));
+                return false;
+            }
+            return true;
+        }
+        std::error_code rec;
+        if (!fs::remove(f, rec) || rec) {
+            Q_EMIT error(tr("Could not delete %1.").arg(qstr(f.filename())));
+            return false;
+        }
+        return true;
+    };
+    DocumentFiles::Result r;
+    if (!keepCopy) {
+        if (!remove(copy)) {
+            return false;
+        }
+    } else {
+        if (fs::exists(original, ec) && !remove(original)) {
+            return false;
+        }
+        fs::rename(copy, original, ec);
+        if (ec) {
+            Q_EMIT error(tr("Could not rename %1: %2").arg(qstr(copy.filename()), QString::fromStdString(ec.message())));
+            return false;
+        }
+        r.ok = true;
+        r.moved.emplace_back(copy, original);
+        if (onFilesChanged) {
+            onFilesChanged(r);  // (a tab of the copy follows it; one of the document reads the file again)
+        }
+    }
+    refresh();
+    return true;
 }
 
 int LibraryModel::rowOf(const QString& path) const {

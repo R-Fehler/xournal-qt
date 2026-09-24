@@ -745,6 +745,50 @@ TEST_F(LibraryFilesTest, aReceivedFileIsCopiedIntoTheOpenedFolderOnceAndOpened) 
     EXPECT_EQ(errors.count(), 1);
 }
 
+// With "All files access" a folder picked through Android's system picker (a tree URI) is opened by its real path, if
+// it is in the shared storage and there. (The URIs as the picker returns them, Android 11-16.)
+TEST_F(LibraryFilesTest, pickedTreesOfTheSharedStorageHaveTheirPaths) {
+    ContentFiles::StorageRoots roots{qstr(root / "emulated" / "0"), qstr(root)};
+    const fs::path primary = root / "emulated" / "0";
+    for (const char* dir: {"Documents/Uni/Week 1", "Documents/Ünï Nötes", "Download/Papers", "Sync/a b+c%d",
+                           "Documents/Semester: 3"}) {
+        fs::create_directories(primary / dir);
+    }
+    fs::create_directories(root / "1A2B-3C4D" / "Books");
+    auto path = [&](const char* uri) { return ContentFiles::sharedStoragePath(QUrl(QString::fromUtf8(uri)), roots); };
+    const QString p = qstr(primary);
+    // The external storage provider: primary, a tree and a document in it, Documents ("home:"), an SD card
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FUni"), p + "/Documents/Uni");
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FUni/document/"
+                   "primary%3ADocuments%2FUni%2FWeek%201"),
+              p + "/Documents/Uni/Week 1") << "the document picked in the tree";
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/document/primary%3ADocuments%2FUni"), p + "/Documents/Uni");
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3ADocuments%2F%C3%9Cn%C3%AF%20N%C3%B6tes"),
+              p + QString::fromUtf8("/Documents/Ünï Nötes"));
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3ASync%2Fa%20b%2Bc%25d"), p + "/Sync/a b+c%d");
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FSemester%3A%203"),
+              p + "/Documents/Semester: 3") << "a colon in a folder name";
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3A"), p) << "the whole storage";
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/home%3AUni"), p + "/Documents/Uni");
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/1A2B-3C4D%3ABooks"), qstr(root / "1A2B-3C4D" / "Books"));
+    // The Downloads provider: the folder, and a folder in it by its path
+    EXPECT_EQ(path("content://com.android.providers.downloads.documents/tree/downloads"), p + "/Download");
+    EXPECT_EQ(path(("content://com.android.providers.downloads.documents/tree/raw%3A" +
+                    QUrl::toPercentEncoding(p + "/Download/Papers")).constData()),
+              p + "/Download/Papers");
+    // Not a path: a folder that is not there, a number of the downloads database, other apps' providers, a way out
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FGone"), "");
+    EXPECT_EQ(path("content://com.android.providers.downloads.documents/tree/msd%3A42"), "");
+    EXPECT_EQ(path("content://com.android.providers.downloads.documents/document/1234"), "");
+    EXPECT_EQ(path("content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3DencodedRoot"), "");
+    EXPECT_EQ(path("content://org.nextcloud.documents/tree/1%2FDocuments"), "");
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primary%3A..%2F..%2Fetc"), "");
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/..%3AData"), "");
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/tree/primaryDocuments"), "") << "no volume";
+    EXPECT_EQ(path("content://com.android.externalstorage.documents/root/primary"), "") << "no tree or document";
+    EXPECT_EQ(ContentFiles::sharedStoragePath(QUrl::fromLocalFile(qstr(primary / "Documents"))), "") << "a path already";
+}
+
 TEST_F(LibraryFilesTest, pickedFoldersAreCopiedWithTheirStructureAndNamesAreMadeSafe) {
     const fs::path picked = root / "Picked" / "Semester";
     makeNotes(picked / "Week 1" / "notes.xopp");

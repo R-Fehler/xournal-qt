@@ -79,10 +79,17 @@ public:
     /// The library's own state in the config folder, "~/.config/xournal-qt/libraries/<key>/" (created when
     /// needed): what is not a cache and must survive cleaning it, e.g. the reading positions.
     fs::path configDir() const;
-    /// Where the library keeps its cache: in its folders (the default) or in the app's cache folder (for folders
-    /// that sync clients upload). A setting of the library, kept in its config folder.
+    /// Where the library keeps its cache: in its folders or in the app's cache folder (for folders that sync clients
+    /// upload). A setting of the library, kept in its config folder; without one, defaultCacheMode().
     CacheLocation::Mode cacheMode() const;
     void setCacheMode(CacheLocation::Mode mode) const;
+    /// The library has a cache setting of its own (else it follows defaultCacheMode()).
+    bool hasCacheSetting() const;
+    /// Where a library without a setting keeps its cache: in its folders on the desktop; in the app cache on Android,
+    /// where libraries are often folders that sync apps (Syncthing, FolderSync, ...) upload.
+    static CacheLocation::Mode defaultCacheMode();
+    /// (tests) Pretend another platform: the default from now on.
+    static void setDefaultCacheMode(CacheLocation::Mode mode);
     CacheLocation cacheLocation() const { return CacheLocation(rootDir, cacheMode()); }
     /// Which kinds of files the library shows ("Show" in the library; the defaults when never set). Kept in its config
     /// folder, next to the cache mode.

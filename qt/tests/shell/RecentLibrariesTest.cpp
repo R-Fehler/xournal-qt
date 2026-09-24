@@ -6,6 +6,7 @@
  */
 #include <fstream>
 
+#include <QGuiApplication>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -161,6 +162,97 @@ TEST_F(RecentLibrariesTest, aWindowsPathOpensItsLibraryHoweverItBecameAUrl) {
         c.openLibraryAt("C:/Users/x/Fifth");
         EXPECT_EQ(fake.libraries.last(), "C:/Users/x/Fifth");
 #endif
+    }
+    SystemApps::setInstance(nullptr);
+}
+
+namespace {
+/// Android: one window, and the shared storage needs "All files access" (`granted`), asked for through the system's
+/// settings page (`requested`).
+struct FakeAndroid: FakeSystemApps {
+    QString sharedStorage;
+    bool granted = false;
+    int requested = 0;
+    bool librariesInOwnWindows() override { return false; }
+    bool needsAllFilesAccess(const QString& folder) override { return folder.startsWith(sharedStorage); }
+    bool hasAllFilesAccess() override { return granted; }
+    bool requestAllFilesAccess() override {
+        ++requested;
+        return true;
+    }
+};
+}  // namespace
+
+// Android: "Open a folder as library" with a folder of the shared storage asks for "All files access" first (the
+// window explains it), shows the system's page, and opens the folder when the app is back with it: in this window,
+// which switches to that library and remembers it. Without it, nothing opens.
+TEST_F(RecentLibrariesTest, onAndroidTheWindowSwitchesToASharedFolderAfterAllFilesAccess) {
+    FakeAndroid android;
+    android.sharedStorage = qstr(root / "storage");
+    SystemApps::setInstance(&android);
+    const fs::path own = root / "own" / "Default";
+    const fs::path uni = root / "storage" / "Documents" / "Uni";
+    writeFile(uni / "Week 1" / "notes.md", "# Notes\n");
+    fs::create_directories(own);
+    {
+        AppController c;
+        auto* recent = qobject_cast<RecentFiles*>(c.recentModel());
+        recent->clear();
+        c.setLibraryRoot(own);
+        c.newDocument();
+        QStringList asked;
+        int picker = 0;
+        QObject::connect(&c, &AppController::storageAccessNeeded, [&](const QString& f) { asked << f; });
+        QObject::connect(&c, &AppController::pickLibraryFolder, [&] { ++picker; });
+        EXPECT_FALSE(c.libraryWindows());
+        EXPECT_FALSE(c.storageAccess());
+
+        c.openLibraryAt(qstr(uni));
+        EXPECT_EQ(asked, QStringList{qstr(uni)}) << "explained first";
+        EXPECT_EQ(c.libraryModel()->property("rootPath").toString(), qstr(own)) << "not opened yet";
+        c.requestStorageAccess(qstr(uni));
+        EXPECT_EQ(android.requested, 1) << "the system's page";
+        // The app goes to the background for the settings page and comes back without it: a message, nothing opens
+        QStringList messages;
+        QObject::connect(&c, &AppController::message, [&](const QString&, const QString& text) { messages << text; });
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationActive);
+        EXPECT_TRUE(messages.isEmpty()) << "(not back yet: it has not left)";
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationSuspended);
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationActive);
+        EXPECT_EQ(messages.size(), 1);
+        EXPECT_EQ(c.libraryModel()->property("rootPath").toString(), qstr(own));
+
+        // Again, and allowed this time: the folder opens in this window; the tab stays
+        c.requestStorageAccess(qstr(uni));
+        android.granted = true;
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationInactive);
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationActive);
+        EXPECT_TRUE(c.storageAccess());
+        EXPECT_EQ(c.libraryModel()->property("rootPath").toString(), qstr(uni));
+        EXPECT_TRUE(android.libraries.isEmpty()) << "no window of its own";
+        EXPECT_EQ(c.tabCount(), 1);
+        EXPECT_TRUE(c.homeVisible());
+        EXPECT_EQ(c.rememberedLibrary(), qstr(uni)) << "opened at the next start";
+        ASSERT_GE(recent->count(), 1);
+        EXPECT_EQ(at(*recent, 0, RecentFiles::PathRole), qstr(uni)) << "in the Recent grid";
+
+        // "Open a folder as library…" with the permission: the picker gives a tree URI of the storage; one of a
+        // cloud app's provider cannot be a library
+        c.openLibraryAt(qstr(own));
+        EXPECT_EQ(c.libraryModel()->property("rootPath").toString(), qstr(own)) << "the app's own folder: no question";
+        EXPECT_EQ(asked.size(), 1);
+        messages.clear();
+        c.openLibrary(QUrl("content://com.google.android.apps.docs.storage/tree/acc%3D1%3Bdoc%3Dabc"));
+        EXPECT_EQ(messages.size(), 1);
+        EXPECT_EQ(c.libraryModel()->property("rootPath").toString(), qstr(own));
+        // Asked for from the picker ("" : the picker opens again when it is given)
+        android.granted = false;
+        c.requestStorageAccess("");
+        android.granted = true;
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationSuspended);
+        Q_EMIT qGuiApp->applicationStateChanged(Qt::ApplicationActive);
+        EXPECT_EQ(picker, 1);
+        recent->clear();
     }
     SystemApps::setInstance(nullptr);
 }

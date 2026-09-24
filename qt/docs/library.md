@@ -8,7 +8,8 @@ A **library** is a plain folder of documents that a window works in, like a work
   works.
 - The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
-  as library…". A window never shows two libraries.
+  as library…". A window never shows two libraries. On Android there is one window: it switches to the other library
+  (the open tabs stay), and a folder of the phone's storage needs "All files access" ([android.md](android.md)).
 - The Downloads folder is offered there too, as a quick library: all downloaded papers at once. Like every library
   it keeps its cache (previews, search index) in `.xournal_library/` folders, so opening it again is as fast as
   any other library. A note in the library says that its files are
@@ -115,6 +116,46 @@ the document uses as its background from then on. Their text stays searchable an
 
 Code: `qt/src/shell/DocumentFiles.*`; the merged PDF: `qt/src/session/MergedPdf.*` (qpdf), `PdfPageKeeper.*`.
 
+### Conflict copies of sync apps
+When a document changed in two places before a sync app could pass the change on, the app keeps both: the other
+version is a **conflict copy** next to it, named its own way (`qt/src/shell/SyncConflicts.*`):
+
+| App | Conflict copy of `notes.xopp` |
+| --- | --- |
+| Syncthing | `notes.sync-conflict-20240312-101530-ABCDEFG.xopp` |
+| Dropbox | `notes (conflicted copy).xopp`, `notes (Anna's conflicted copy 2024-03-12).xopp`, `(Case Conflict)`, `(Selective Sync Conflict)` |
+| Nextcloud, ownCloud (desktop clients) | `notes (conflicted copy 2024-03-12 101530).xopp`, translated (`(Konflikt …)`, `(copie en conflit …)`, …); older ownCloud `notes_conflict-20240312-101530.xopp` |
+| Seafile | `notes (SFConflict anna@example.org 2024-03-12-10-15-30).xopp` |
+| OneDrive | `notes-DESKTOP-AB12CDE.xopp` (Windows' default computer names only) |
+| others (FolderSync, Autosync, …) | a word for "conflict" in parentheses before the extension |
+
+- The library shows a conflict copy as a **conflict of its document**, not as a document of its own: an orange badge
+  "Conflict" ("2 conflicts") on the document's card. A copy counts only when its document is in the same folder
+  (`Essay (conflict theory).pdf` alone is a document). Copies of any file of a document count (the PDF of a
+  `.xopp` + PDF pair too). They are not in the search index. (`DocumentFiles::scan`, `DocumentItem::conflicts`.)
+- The badge opens **"Sync conflict"**: the document and each copy with the app, when it was changed and its size.
+  **Compare** opens both side by side: the document as the tab, the copy as its reference (the reference view).
+  **Keep the document** moves the copy to the trash; **Keep this copy** moves the document's file of that kind to
+  the trash and gives the copy its name (a `.xopp` copy keeps the PDF next to it). Where there is no trash (Android)
+  the file is deleted, after a question. An open tab of the document then reads the file again (below).
+
+### Changed by another program
+An open document whose files another program changes (a sync app bringing a newer version, Xournal++, a PDF viewer
+that saves annotations) is handled as a Markdown file is ([md-editor.md](md-editor.md), "Changed by another
+program"): the files are watched, and looked at again when the window becomes active and after each save.
+- Which files: the document's file (the `.xopp`, the PDF with notes, the PDF it annotates while it has no `.xopp`)
+  and the PDF a `.xopp` annotates (not the app's copies in its cache). `DocumentSession::filesOnDisk`.
+- Changed means: size or time differ from what the app read or wrote last, and so does the content (the size, or a
+  sample of the first and last 64 KB); a file only touched is no change. The app's own writes are recorded when a
+  save finishes (the `.xopp` renamed over the old one, a PDF with notes written anew or appended to, the merged PDF of
+  pasted pages), and nothing is looked at while a save runs, so they never count. (`filesChangedOnDisk`, `stampFiles`.)
+- Without unsaved changes, the document is read again at once, in its tab, at its page, and a note says so. With
+  unsaved changes the window asks: **Reload** (the other version; the changes here are discarded) or **Keep mine**
+  (not asked again about that version; saving writes over it). A reference split beside the tab closes when it is
+  read again.
+
+Code: `AppController::checkTextFiles`, `checkDocumentFiles`, `reloadDocument` (`qt/src/app/AppTextFiles.cpp`).
+
 ## The library cache (`.xournal_library/`)
 The cache only speeds things up and can be deleted at any time. Each folder with documents has its own hidden
 `.xournal_library/`, with the cache of **only the documents directly in it** (never those of its subfolders). A
@@ -125,12 +166,17 @@ renamed by any program keeps its cache.
 
 **Where the cache is kept** is a setting of each library (Settings → Storage), stored next to the library's other
 state in `~/.config/xournal-qt/libraries/<key of the library>/library.json`:
-- in the folders (the default): the hidden `.xournal_library/` in each folder;
-- in the app cache (recommended for folders that sync clients upload): the same cache folders under
-  `~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/`, so the library's
-  folders get no files of the app. Documents moved by another program are found again by size and time (see the
-  search index below).
+- in the folders (the default on the desktop): the hidden `.xournal_library/` in each folder;
+- in the app cache (recommended for folders that sync clients upload; **the default on Android**, where libraries
+  are usually folders that Syncthing, FolderSync and the like keep in sync): the same cache folders under
+  `~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/` (on Android the app's
+  own cache, `/data/user/0/org.xournalqt.app/cache/xournal-qt/libraries/…`), so the library's folders get no files of
+  the app. Documents moved by another program are found again by size and time (see the search index below).
   (A subfolder opened as a library of its own has its own setting and cache there.)
+
+A library without a setting follows the platform's default (`Library::defaultCacheMode`). One that has cache folders
+of its own when it is opened where the default is the app cache (a library made on the desktop, then synced to the
+phone) gets them moved into the app cache once, and the setting is written; nothing is read again.
 
 Switching moves the packs from one place to the other. Folders that cannot be written keep their cache in the app
 cache in either mode.

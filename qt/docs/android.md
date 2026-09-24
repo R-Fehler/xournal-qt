@@ -93,8 +93,41 @@ folders, `ACTION_OPEN_DOCUMENT_TREE`, which Qt's `FileDialog` and `FolderDialog`
 `content://` URIs: "Open…" copies the file into "Opened" as above and opens it; the imports copy into the library's
 current folder, a folder with all its subfolders (hidden ones stay behind) and every file the library shows. The
 copies go through a staging folder in the app's cache first, in the background ([LibraryModel](../src/shell/LibraryModel.cpp)
-`importUrls`). An image picked for "Insert image" is read the same way. "Open a folder as library" cannot take a
-picked folder yet (no path to scan): it says so and points to "Import a folder".
+`importUrls`). An image picked for "Insert image" is read the same way.
+
+**Libraries in the phone's storage ("All files access").** A library can be any folder of the shared storage, e.g.
+`Documents/Uni`, which a sync app (Syncthing, Syncthing-Fork, FolderSync, Autosync) keeps in step with a computer or
+a cloud. The providers' own apps (Nextcloud, OneDrive, Google Drive) only offer `content://` documents, which cannot
+be a library; their sync apps mirror into real folders, which can. Such a folder works exactly as on the desktop:
+per-folder packs, the search index, and the folder watcher that sees what the sync app changes.
+- It needs Android's **"All files access"** (`MANAGE_EXTERNAL_STORAGE`; before Android 11 the storage permission,
+  `WRITE_EXTERNAL_STORAGE` with `requestLegacyExternalStorage`). It is asked for only when it is needed: "Open a
+  folder as library…" (the library menu ▾), or a library card in Recent or the library menu that lies in the shared
+  storage. A dialog explains why ("Allow access to your files?"), Continue opens the system's settings page for the
+  app ("Allow access to manage all files"), and when the app comes back with it the step goes on: the folder picker
+  opens, or the library that was tapped. Without it a message says that "Import a folder" copies a folder instead.
+  (`AppController::openLibrary`, `requestStorageAccess`; the Java side is `XournalActivity.hasAllFilesAccess` and
+  `requestAllFilesAccess`.) Google Play allows this permission only to some kinds of apps; fine for sideloading and
+  F-Droid, to be revisited for Play.
+- The folder is picked with Android's folder picker (Qt's `FolderDialog` is the system's `ACTION_OPEN_DOCUMENT_TREE`
+  on Android and gives a `content://` tree URI, no path). A tree of the external storage provider is mapped to its
+  path (`ContentFiles::sharedStoragePath`): `content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FUni`
+  is `/storage/emulated/0/Documents/Uni`, `home:` is the Documents folder, `<volume id>:` an SD card
+  (`/storage/1A2B-3C4D/…`), and the Downloads provider's `downloads` / `raw:<path>` the Download folder. Only when
+  the path is there; a folder of another app's provider (a cloud app) gets a message instead. (Android's picker does
+  not offer the root of the storage, `Download` itself or `Android/data`.)
+- **One window**: Android runs one window, so another library does not start a process of its own as on the
+  desktop; the window switches to it (`AppController::switchLibrary`; the open tabs stay). The library is kept in the
+  settings (`library` in the `xournalQt` part) and opened at the next start (while the app still has the access). A
+  library outside `Xournal_Libraries` is in the Recent grid, as on the desktop, and "New library…" and the libraries
+  of the library menu switch the same way. One session journal for all of them (`session.json`).
+- The system picker (`content://`) stays for opening and importing single files and for "Import a folder".
+- Conflict copies that sync apps leave (Syncthing's `.sync-conflict-…`, "(conflicted copy)", …) are a badge on
+  their document's card, with "compare / keep one" (library.md). Android has no trash for files: what is not kept
+  is deleted, after a question.
+- What a sync app changes is seen as on the desktop: the library's folder watcher shows new and changed files, and
+  an open document whose file changes is read again (or, with unsaved changes, the window asks; library.md,
+  "Changed by another program").
 
 **Drawing with the finger.** The Fold 7 has no pen, so on Android the finger draws from the first start when the
 device reports no stylus (Android's input devices: no `SOURCE_STYLUS`; checked once, at the first start, through
@@ -103,9 +136,21 @@ in the tool bar (next to the hand) and Settings → Touch → "Draw with the fin
 platform: one finger draws with the current tool, two fingers scroll and zoom (a stroke the first finger began is
 taken back), the hand tool still scrolls, and while a pen is near the finger is ignored (palm rejection).
 
+**Going to the background.** Android may end an app in the background without warning (a force stop, swiping it
+away in Recents, low memory). When the app leaves the screen (Qt's `ApplicationInactive`, then `ApplicationSuspended`)
+the autosave of every document changed since its last autosave is written at once, and the session journal too
+(`AppController::applicationStateChanged`); the next start offers them in the recovery dialog. The documents' own
+files are not saved then: that is still the user's Save. Autosaves of saved documents are kept in the app's cache on
+Android (`cache/xournal-qt/autosaves/`), never next to the document (`.name.autosave.xopp`), where a sync app would
+upload them. Autosaving off (Settings) writes nothing.
+
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
-`files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`.
+`files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`. The library cache (previews, search
+index) is in `cache/xournal-qt/libraries/` too: on Android a library keeps its cache in the app cache by default, not
+in hidden `.xournal_library` folders next to the documents that a sync app would upload ([library.md](library.md),
+"Where the cache is kept"; Settings → Storage switches it per library). Android may clear the app cache when storage
+runs low; the library then reads its documents once again.
 
 ## How it is built
 
@@ -124,7 +169,9 @@ settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-
   files are broken and fail even a `QUIET` lookup).
 - **Packaging** ([qt/cmake/XqtAndroid.cmake](../cmake/XqtAndroid.cmake), [qt/packaging/android/](../packaging/android)):
   Qt's manifest template with the app's id, name and icon (the desktop SVG as PNGs), min SDK 28 (Qt 6.11's minimum),
-  target SDK 36, no permissions, resizable activity, intent filters for "Open with" and the share sheet. The APK is debug-signed
+  target SDK 36, "All files access" (`MANAGE_EXTERNAL_STORAGE`, asked for at run time only when a library in the
+  shared storage is opened; the storage permissions up to Android 10), resizable activity, intent filters for "Open
+  with" and the share sheet. The APK is debug-signed
   (`QT_ANDROID_DEPLOYMENT_TYPE=Debug`, the SDK's debug keystore) while the native code is `RelWithDebInfo`, so that
   pages draw at full speed.
 - **KSyntaxHighlighting** (the colours of code blocks in Markdown): vcpkg's `syntax-highlighting` port builds
@@ -159,7 +206,7 @@ settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-
 ## Checked so far (without the phone)
 
 - `aapt2 dump badging`: `org.xournalqt.app`, version 0.1.0 (100), min SDK 28, target SDK 36, arm64-v8a, debuggable,
-  label and icon, no permissions.
+  label and icon, no permissions (`qt/android-apk`; since `qt/android-libraries`: the storage permissions above).
 - `llvm-readelf`: the app library needs only system libraries and bundled Qt libraries; LOAD segments are aligned to
   16 KB (Android 15+ devices with 16 KB pages).
 - A headless x86_64 emulator (Android 15 image, which runs arm64 apps through ARM translation) in

@@ -1205,3 +1205,56 @@ Install the debug APK (`adb install -r …/android-build-debug.apk`; the documen
       the other, all readable.
 - [ ] New document: the dialog opens without the keyboard. Tap the name: the keyboard opens, the dialog moves above
       it (it scrolls), Create stays visible; the keyboard's ✓ key creates the document.
+
+## Android libraries (qt/android-libraries)
+
+Install the debug APK over the old one (`adb install -r …/android-build-debug.apk`; never uninstall: the library
+with "Uni sample" stays).
+
+- [ ] Autosave when the app goes to the background: open a document, draw a stroke, don't save. Switch to the home
+      screen, then swipe the app away in Recents (or Settings → Apps → Xournal Qt → Force stop). Start the app: the
+      recovery dialog offers the document; Recover brings the stroke back. Without a change since the last save:
+      no dialog, the tabs come back.
+- [ ] After that, no `.name.autosave.xopp` is next to the document in the library folder (Android keeps autosaves in
+      the app's cache).
+- [ ] The cache in the app cache: after opening a library folder (below) and scrolling through it, the folder has no
+      `.xournal_library` in any of its subfolders (a file manager with hidden files shown, or `adb shell ls -a`).
+      Settings → Storage shows "Keep the cache in the app's cache folder" on. The default library "Default" with
+      "Uni sample": its old `.xournal_library` folders are gone after the first start, and the search still finds
+      text at once (moved, not read again).
+- [ ] Put a folder with documents into the phone's storage (a computer over USB, or `adb push Uni
+      /sdcard/Documents/`). Library menu ▾ → "Open a folder as library…": a dialog explains "All files access";
+      "Not now" closes it and nothing else happens. Again → Continue: Android's page "All files access" for Xournal
+      Qt opens; turn it on, go back: the folder picker opens by itself. Pick `Documents/Uni` → "Use this folder" →
+      Allow: the window shows the library "Uni" with its folders and documents; open one, draw, save.
+- [ ] The library menu and Recent list "Uni" (Recent: a folder card with the library mark). Tap the default library
+      in the menu: the window switches back (tabs stay open); tap "Uni" in Recent: back to Uni.
+- [ ] Close the app (swipe away) and start it: it opens with "Uni" again.
+- [ ] Settings → Apps → Xournal Qt → Permissions (or "Special app access" → "All files access"): turn it off, start
+      the app: it opens the default library (it cannot read Uni). Tap "Uni" in Recent: the explanation comes again.
+- [ ] In the folder picker, pick a folder of Google Drive or Nextcloud (left menu): a message says it is not in the
+      phone's storage; nothing else changes.
+- [ ] Desktop: open a `.xopp` of the library, don't change it. Change the same file in Xournal++ (or copy another
+      version over it). Back in the window: the document shows the new version at the same page, with a note "…
+      was changed by another app". Draw a stroke (unsaved), change the file again elsewhere: the dialog "Changed in
+      another app" asks; Keep mine keeps the stroke (and Save writes over the file); Reload shows the other version.
+- [ ] Saving does not trigger it: Ctrl+S a few times in a `.xopp`, a PDF with notes (Settings → PDF files mode) and
+      a `.xopp` next to its PDF: no note, no dialog.
+- [ ] **Syncthing / Autosync on the Fold 7.** Set up a folder pair: the phone's `Documents/Uni` with a folder on the
+      computer (Syncthing-Fork from F-Droid, or Autosync for OneDrive/Google Drive/Dropbox). Open `Documents/Uni` as
+      library (above).
+      - On the computer, add a PDF to the folder: after the sync it appears in the library on the phone.
+      - Open a document on the phone, leave it unchanged; change and save it on the computer: after the sync the phone
+        shows the new version (a note says so).
+      - Draw on the phone without saving, change the same document on the computer: after the sync the dialog asks
+        (Keep mine / Reload).
+      - On the phone, look into the synced folder on the computer: no `.xournal_library` folders and no
+        `.name.autosave.xopp` files come over from the phone.
+- [ ] Sync conflicts (desktop, or the phone with a synced folder): make a conflict copy by hand next to a document,
+      e.g. `cp notes.xopp "notes.sync-conflict-20240312-101530-ABCDEFG.xopp"` and change one of them. The library
+      shows one card "notes" with an orange "Conflict" badge, no second card. Tap the badge: "Sync conflict" lists
+      both with "Syncthing" and their times. Compare: both side by side. Keep the document: the copy goes to the
+      trash (Android: a question "Delete …?" first), the badge is gone. With another copy: Keep this copy: the
+      document's old file goes, the copy is now `notes.xopp`.
+- [ ] With Syncthing on the Fold 7 and the computer: edit the same document on both while one is offline, then let
+      them sync: the conflict badge appears on the phone (and the copy on the computer).

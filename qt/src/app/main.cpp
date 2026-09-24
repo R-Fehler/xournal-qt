@@ -34,6 +34,7 @@
 #include "shell/Previews.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SingleInstance.h"
+#include "shell/SystemApps.h"
 #include "shell/PageSketches.h"
 #include "shell/Thumbnails.h"
 #include "DocumentCanvasItem.h"
@@ -125,6 +126,15 @@ int main(int argc, char* argv[]) {
     QQuickStyle::setStyle("Material");
     xqt::registerQuickTypes();
     AppController controller;
+#ifdef Q_OS_ANDROID
+    // One window: it opens the library it showed last (a folder of the shared storage only while the app may read it)
+    if (const QString last = controller.rememberedLibrary(); libraryDir.isEmpty() && !last.isEmpty()) {
+        xqt::SystemApps& apps = xqt::SystemApps::instance();
+        if (QFileInfo(last).isDir() && (!apps.needsAllFilesAccess(last) || apps.hasAllFilesAccess())) {
+            library.emplace(fs::path(last.toStdString()));
+        }
+    }
+#endif
     if (library) {
         controller.setLibraryRoot(library->root());
     }
