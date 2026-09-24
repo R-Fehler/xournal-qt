@@ -1031,3 +1031,15 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
       → "PDF with notes": open the PDF in Okular or Firefox: the marker's text is a link; clicking it opens
       `lecture.pdf` at the linked page (Okular may ask first), the web link opens the browser. Open the PDF in the app
       again: no "changed in another app" question; save again: the links are still there once each.
+
+## Archive export (qt/archive-export)
+
+- [ ] Take a lecture PDF with notes (pen with pressure, a highlighter over its text, a text box, a Markdown link to
+      another PDF, an inserted ruled page). Export it for the archive (below), open `lecture.archive.pdf` in Okular,
+      Firefox and Acrobat: the ink looks as in the app, the highlighter lets the text show through, and the ink can
+      not be hidden (Okular: "Show annotations" off changes nothing; Acrobat's comment list has only the link). The
+      link opens the other PDF.
+- [ ] Acrobat (Reader is enough): the file opens with the blue "PDF/A" bar ("This file claims compliance with the
+      PDF/A standard"); Attachments shows `document.xopp`. File → Properties: the title is the lecture's.
+- [ ] Open `lecture.archive.pdf` in xournal-qt: every stroke is editable, and none is shown twice (erase one: nothing
+      stays behind). Ctrl+S, open it in Okular again: the stroke is gone there too, and Acrobat still says PDF/A.

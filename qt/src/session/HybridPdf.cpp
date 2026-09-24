@@ -55,6 +55,7 @@
 #include "view/background/BackgroundFlags.h"
 #include "view/background/BackgroundView.h"
 
+#include "ArchivePdf.h"
 #include "DocumentLink.h"
 #include "MdBox.h"
 #include "MergedPdf.h"
@@ -129,7 +130,13 @@ fs::path partOf(const fs::path& target) {
                                    std::to_string(++counter) + ".part");
 }
 
-void writePdfTo(QPDF& pdf, const fs::path& target) {
+/// How an archive PDF is written (PDF/A): never encrypted, at least PDF 1.7, streams with a forbidden filter decoded.
+struct ArchiveWrite {
+    bool on = false;
+    bool recompress = false;
+};
+
+void writePdfTo(QPDF& pdf, const fs::path& target, ArchiveWrite archive = {}) {
     const fs::path tmp = partOf(target);
     std::error_code ec;
     try {
@@ -137,7 +144,12 @@ void writePdfTo(QPDF& pdf, const fs::path& target) {
         w.setObjectStreamMode(qpdf_o_generate);
         // The streams of the PDF as they are (decoding and compressing them again doubled the time); new streams
         // without a filter are still compressed
-        w.setDecodeLevel(qpdf_dl_none);
+        w.setDecodeLevel(archive.recompress ? qpdf_dl_generalized : qpdf_dl_none);
+        if (archive.on) {
+            w.setPreserveEncryption(false);
+            w.setMinimumPDFVersion("1.7");
+            w.setNewlineBeforeEndstream(true);  // (PDF/A: an end of line before "endstream")
+        }
         w.write();
     } catch (...) {
         fs::remove(tmp, ec);
@@ -209,6 +221,68 @@ double round1(double v) { return std::round(v * 10) / 10; }
 
 QPDFObjectHandle real1(double v) { return QPDFObjectHandle::newReal(round1(v), 1); }
 
+/// An archive PDF: remove the content streams we added to a page (marked with our key: the "q" before its content,
+/// and the stream after it that draws our layers) and the Form XObjects they drew. The page's own streams, and streams
+/// other apps added, stay as they are. The names of the layers found go into `found`.
+void unflatten(QPDFObjectHandle page, std::set<std::string>& found) {
+    QPDFObjectHandle contents = page.getKey("/Contents");
+    if (!contents.isArray()) {
+        return;
+    }
+    auto markOf = [](QPDFObjectHandle c) {
+        return c.isStream() ? c.getDict().getKey(MARKER) : QPDFObjectHandle::newNull();
+    };
+    // Content another app appended after ours was drawn with the page's own content in "q ... Q": it keeps that (a
+    // plain "q" and "Q" instead of ours), so it stays where it was
+    int lastOurs = -1;
+    for (int i = 0; i < contents.getArrayNItems(); ++i) {
+        if (markOf(contents.getArrayItem(i)).isDictionary()) {
+            lastOurs = i;
+        }
+    }
+    const bool trailing = lastOurs >= 0 && lastOurs + 1 < contents.getArrayNItems();
+    QPDF* owner = page.getOwningQPDF();
+    QPDFObjectHandle kept = QPDFObjectHandle::newArray();
+    std::vector<std::string> xobjects;
+    bool removed = false;
+    for (int i = 0; i < contents.getArrayNItems(); ++i) {
+        QPDFObjectHandle c = contents.getArrayItem(i);
+        QPDFObjectHandle mark = markOf(c);
+        if (!mark.isDictionary()) {
+            kept.appendItem(c);
+            continue;
+        }
+        removed = true;
+        if (trailing && owner) {
+            kept.appendItem(QPDFObjectHandle::newStream(owner, mark.hasKey("/Layers") ? "Q\n" : "q\n"));
+        }
+        for (const char* key: {"/XObjects", "/Layers"}) {
+            QPDFObjectHandle list = mark.getKey(key);
+            for (int k = 0; list.isArray() && k < list.getArrayNItems(); ++k) {
+                QPDFObjectHandle v = list.getArrayItem(k);
+                if (v.isName()) {
+                    xobjects.push_back(v.getName());
+                } else if (v.isString()) {
+                    found.insert(v.getUTF8Value());
+                }
+            }
+        }
+    }
+    if (!removed) {
+        return;
+    }
+    page.replaceKey("/Contents", kept);
+    QPDFObjectHandle resources = page.getKey("/Resources");
+    QPDFObjectHandle xobj = resources.isDictionary() ? resources.getKey("/XObject") : QPDFObjectHandle::newNull();
+    if (xobj.isDictionary()) {
+        for (const auto& name: xobjects) {
+            if (xobj.hasKey(name)) {
+                xobj.removeKey(name);
+            }
+        }
+    }
+}
+
 /// Remove our annotations from every page (except `keep`, which lose our mark), our marker and our embedded files.
 /// Returns the /NM of our annotations whose hash differs from the marker's, or that are missing.
 std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}) {
@@ -235,10 +309,24 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
             }
         }
     }
+    std::set<std::string> flattened;  // an archive PDF: the layers merged into the page content
+    bool archive = false;
+    if (marker.isDictionary()) {
+        archive = marker.getKey("/Archive").isBool() && marker.getKey("/Archive").getBoolValue();
+        QPDFObjectHandle flat = marker.getKey("/Flattened");
+        if (flat.isArray()) {
+            for (int i = 0; i < flat.getArrayNItems(); ++i) {
+                if (flat.getArrayItem(i).isString()) {
+                    flattened.insert(flat.getArrayItem(i).getUTF8Value());
+                }
+            }
+        }
+    }
     std::vector<std::string> changed;
     std::set<std::string> seen;
     for (auto& page: QPDFPageDocumentHelper(pdf).getAllPages()) {
         QPDFObjectHandle p = page.getObjectHandle();
+        unflatten(p, seen);
         QPDFObjectHandle annots = p.getKey("/Annots");
         if (!annots.isArray()) {
             continue;
@@ -275,8 +363,37 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
             changed.push_back(nm);  // deleted in another app
         }
     }
+    for (const auto& nm: flattened) {
+        if (!seen.count(nm)) {
+            changed.push_back(nm);  // its content stream is gone (another app rewrote the page)
+        }
+    }
     if (root.hasKey(MARKER)) {
         root.removeKey(MARKER);
+    }
+    if (archive) {
+        // What the archive added for PDF/A: the associated files of our data, the output intent, the metadata
+        QPDFObjectHandle af = root.getKey("/AF");
+        if (af.isArray()) {
+            QPDFObjectHandle kept = QPDFObjectHandle::newArray();
+            for (int i = 0; i < af.getArrayNItems(); ++i) {
+                QPDFObjectHandle spec = af.getArrayItem(i);
+                QPDFObjectHandle name = spec.isDictionary() ? spec.getKey("/UF") : QPDFObjectHandle::newNull();
+                if (!(name.isString() && files.count(name.getUTF8Value()))) {
+                    kept.appendItem(spec);
+                }
+            }
+            if (kept.getArrayNItems() > 0) {
+                root.replaceKey("/AF", kept);
+            } else {
+                root.removeKey("/AF");
+            }
+        }
+        for (const char* key: {"/OutputIntents", "/Metadata"}) {
+            if (root.hasKey(key)) {
+                root.removeKey(key);
+            }
+        }
     }
     QPDFEmbeddedFileDocumentHelper efdh(pdf);
     for (const auto& f: files) {
@@ -381,7 +498,9 @@ struct LinkSpec {
 /// Where a link of a Markdown box leads for other PDF viewers, from the PDF written in `folder`: a web address, or a
 /// PDF and its page (a .xopp with its PDF next to it: that PDF, at the linked PDF page). False: nothing a viewer can
 /// open (a .md, a lone .xopp, a place in this document).
-bool linkFor(const md::LinkHit& hit, const fs::path& folder, LinkSpec& spec) {
+/// `map`: the links of a document archived into another folder (read from its own folder; archived documents linked
+/// in the archive).
+bool linkFor(const md::LinkHit& hit, const fs::path& folder, LinkSpec& spec, const LinkMap* map = nullptr) {
     const QString target = QString::fromStdString(hit.target);
     if (!hit.wiki && (target.startsWith(QLatin1String("http://")) || target.startsWith(QLatin1String("https://")) ||
                       target.startsWith(QLatin1String("mailto:")))) {
@@ -392,7 +511,16 @@ bool linkFor(const md::LinkHit& hit, const fs::path& folder, LinkSpec& spec) {
     if (!link || link->path.isEmpty()) {
         return false;
     }
-    fs::path file = links::resolvePath(folder, link->path);
+    fs::path file = links::resolvePath(map && !map->from.empty() ? map->from : folder, link->path);
+    if (map && map->archived) {
+        if (const fs::path archived = map->archived(file); !archived.empty()) {
+            // (its pages are the pages of its document)
+            const int page = link->page > 0 ? link->page : link->pdfPage > 0 ? link->pdfPage : 1;
+            spec.file = links::relativePath(folder / "x.pdf", archived).toStdString();
+            spec.destPage = page - 1;
+            return true;
+        }
+    }
     std::string ext = file.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     std::error_code ec;
@@ -429,7 +557,8 @@ struct Prepared {
 
 /// Everything that needs the document: under its shared lock (and briefly its lock).
 Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
-                 size_t pdfPageCount, bool attach = false, const fs::path& linkFolder = {}) {
+                 size_t pdfPageCount, bool attach = false, const fs::path& linkFolder = {},
+                 const LinkMap* linkMap = nullptr) {
     Prepared out;
     {
         std::shared_lock lock(doc);
@@ -511,7 +640,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
                             // Its links, for other viewers (/Link annotations)
                             for (const md::LinkHit& hit: md::linkBoxes(*text)) {
                                 LinkSpec link;
-                                if (linkFor(hit, linkFolder, link)) {
+                                if (linkFor(hit, linkFolder, link, linkMap)) {
                                     link.page = i;
                                     link.x0 = hit.x;
                                     link.y0 = hit.y;
@@ -601,11 +730,19 @@ struct WorkDir {
     fs::path path;
 };
 
-void addEmbedded(QPDF& pdf, const std::string& name, const std::string& data, const std::string& description) {
+/// `relationship`: an archive PDF's associated file (PDF/A-3): how it relates to the PDF (/Source, /Supplement).
+void addEmbedded(QPDF& pdf, const std::string& name, const std::string& data, const std::string& description,
+                 const char* relationship = nullptr) {
     auto stream = QPDFEFStreamObjectHelper::createEFStream(pdf, data);
-    stream.setSubtype(name == DATA_NAME ? "application/x-xopp" : "image/png");
+    stream.setSubtype(name == DATA_NAME ? ArchivePdf::XOPP_MIME : "image/png");
+    if (relationship) {
+        stream.setModDate(pdfDateNow());
+    }
     auto spec = QPDFFileSpecObjectHelper::createFileSpec(pdf, name, stream);
     spec.setDescription(description);
+    if (relationship) {
+        spec.getObjectHandle().replaceKey("/AFRelationship", QPDFObjectHandle::newName(relationship));
+    }
     QPDFEmbeddedFileDocumentHelper(pdf).replaceEmbeddedFile(name, spec);
 }
 
@@ -719,6 +856,7 @@ void annotateLinks(QPDF& out, const Prepared& prep, const std::vector<QPDFObject
         }
         annot.replaceKey("/Rect", rect);
         annot.replaceKey("/Border", QPDFObjectHandle::parse("[0 0 0]"));
+        annot.replaceKey("/F", QPDFObjectHandle::newInteger(4));  // print (PDF/A wants it on every annotation)
         const std::string nm = std::string(NAME_PREFIX) + "p" + std::to_string(l.page + 1) + "-link" +
                                std::to_string(++perPage[l.page]);
         annot.replaceKey("/NM", QPDFObjectHandle::newUnicodeString(nm));
@@ -752,6 +890,94 @@ void annotateLinks(QPDF& out, const Prepared& prep, const std::vector<QPDFObject
     }
 }
 
+/// A layer's drawing as a Form XObject of `out`, placed on its base page by its /Matrix (the drawn page is in PDF space,
+/// y up; the base page's crop box, its rotation undone), with the box it covers there.
+struct Placed {
+    QPDFObjectHandle form;
+    QPDFObjectHandle::Rectangle rect;
+    QPDFMatrix cm;
+};
+Placed placeLayer(QPDF& out, std::vector<QPDFPageObjectHelper>& drawnPages, const AnnotSpec& a,
+                  QPDFObjectHandle pageObj, double h) {
+    QPDFPageObjectHelper page(pageObj);
+    QPDFObjectHandle form = drawnPages.at(a.drawnPage).getFormXObjectForPage(false);
+    QPDFObjectHandle group = form.getDict().getKey("/Group");
+    if (group.isDictionary() && group.hasKey("/I")) {
+        group.removeKey("/I");  // (not isolated: the highlighter multiplies with the page, as upstream's export)
+    }
+    const QPDFObjectHandle::Rectangle crop = page.getCropBox().getArrayAsRectangle();
+    Placed p;
+    p.cm = page.getMatrixForFormXObjectPlacement(form, crop, true, true, true);
+    p.form = out.copyForeignObject(form);
+    const QPDFObjectHandle::Rectangle box(std::floor(a.x0 * 10) / 10, std::floor((h - a.y1) * 10) / 10,
+                                          std::ceil(a.x1 * 10) / 10, std::ceil((h - a.y0) * 10) / 10);
+    p.form.getDict().replaceKey("/BBox", QPDFObjectHandle::newArray(box));
+    p.form.getDict().replaceKey("/Matrix", QPDFObjectHandle::newArray(p.cm));
+    p.rect = p.cm.transformRectangle(box);
+    return p;
+}
+
+/// An archive PDF: our layers merged into the content of their base pages. The page's own content streams stay as
+/// they are; a stream "q" goes before them and a stream after them draws our layers (each a Form XObject "/XqtInkN"
+/// in the page's resources, the same drawing as the /AP of a hybrid PDF's annotation). Both streams carry our key
+/// with the XObjects and layers they add, so the reader removes exactly them (unflatten). Returns the layers' names.
+std::vector<std::string> flatten(QPDF& out, QPDF& drawn, const Prepared& prep, const std::vector<QPDFObjectHandle>& order) {
+    std::vector<std::string> names;
+    if (prep.annots.empty()) {
+        return names;
+    }
+    std::vector<QPDFPageObjectHelper> drawnPages = QPDFPageDocumentHelper(drawn).getAllPages();
+    std::map<size_t, std::vector<const AnnotSpec*>> byPage;
+    for (const AnnotSpec& a: prep.annots) {
+        byPage[a.page].push_back(&a);
+    }
+    for (const auto& [pageNo, specs]: byPage) {
+        QPDFObjectHandle pageObj = order.at(pageNo);
+        const double h = prep.pages[pageNo].height;
+        // The page's own resources and XObjects (the dictionaries may be shared with other pages)
+        QPDFObjectHandle res = pageObj.getKey("/Resources");
+        res = res.isDictionary() ? res.shallowCopy() : QPDFObjectHandle::newDictionary();
+        QPDFObjectHandle xobjects = res.getKey("/XObject");
+        xobjects = xobjects.isDictionary() ? xobjects.shallowCopy() : QPDFObjectHandle::newDictionary();
+        res.replaceKey("/XObject", xobjects);
+        pageObj.replaceKey("/Resources", res);
+        std::string draw = "Q\n";
+        QPDFObjectHandle xnames = QPDFObjectHandle::newArray();
+        QPDFObjectHandle layers = QPDFObjectHandle::newArray();
+        for (const AnnotSpec* a: specs) {
+            const Placed placed = placeLayer(out, drawnPages, *a, pageObj, h);
+            int suffix = 1;
+            const std::string name = res.getUniqueResourceName("/XqtInk", suffix);
+            xobjects.replaceKey(name, placed.form);
+            draw += "q " + name + " Do Q\n";
+            xnames.appendItem(QPDFObjectHandle::newName(name));
+            const std::string nm = nameOf(a->page, a->layer);
+            layers.appendItem(QPDFObjectHandle::newUnicodeString(nm));
+            names.push_back(nm);
+        }
+        QPDFObjectHandle before = QPDFObjectHandle::newStream(&out, "q\n");
+        before.getDict().replaceKey(MARKER, QPDFObjectHandle::newDictionary());
+        QPDFObjectHandle after = QPDFObjectHandle::newStream(&out, draw);
+        QPDFObjectHandle mark = QPDFObjectHandle::newDictionary();
+        mark.replaceKey("/XObjects", xnames);
+        mark.replaceKey("/Layers", layers);
+        after.getDict().replaceKey(MARKER, mark);
+        QPDFObjectHandle old = pageObj.getKey("/Contents");
+        QPDFObjectHandle contents = QPDFObjectHandle::newArray();
+        contents.appendItem(before);
+        if (old.isArray()) {
+            for (int i = 0; i < old.getArrayNItems(); ++i) {
+                contents.appendItem(old.getArrayItem(i));
+            }
+        } else if (old.isStream()) {
+            contents.appendItem(old);
+        }
+        contents.appendItem(after);
+        pageObj.replaceKey("/Contents", contents);
+    }
+    return names;
+}
+
 /// Our annotations onto the base pages; returns the marker's /Annots (name -> hash).
 QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const std::vector<QPDFObjectHandle>& order) {
     QPDFObjectHandle hashes = QPDFObjectHandle::newDictionary();
@@ -763,22 +989,11 @@ QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const st
     const std::string now = pdfDateNow();
     for (const AnnotSpec& a: prep.annots) {
         QPDFObjectHandle pageObj = order.at(a.page);
-        QPDFPageObjectHelper page(pageObj);
         const double h = prep.pages[a.page].height;
-        QPDFObjectHandle form = drawnPages.at(a.drawnPage).getFormXObjectForPage(false);
-        QPDFObjectHandle group = form.getDict().getKey("/Group");
-        if (group.isDictionary() && group.hasKey("/I")) {
-            group.removeKey("/I");  // (not isolated: the highlighter multiplies with the page, as upstream's export)
-        }
-        // From the drawn page (PDF space, y up) onto the base page: its crop box, its rotation undone
-        const QPDFObjectHandle::Rectangle crop = page.getCropBox().getArrayAsRectangle();
-        const QPDFMatrix cm = page.getMatrixForFormXObjectPlacement(form, crop, true, true, true);
-        QPDFObjectHandle local = out.copyForeignObject(form);
-        const QPDFObjectHandle::Rectangle box(std::floor(a.x0 * 10) / 10, std::floor((h - a.y1) * 10) / 10,
-                                              std::ceil(a.x1 * 10) / 10, std::ceil((h - a.y0) * 10) / 10);
-        local.getDict().replaceKey("/BBox", QPDFObjectHandle::newArray(box));
-        local.getDict().replaceKey("/Matrix", QPDFObjectHandle::newArray(cm));
-        const QPDFObjectHandle::Rectangle r = cm.transformRectangle(box);
+        const Placed placed = placeLayer(out, drawnPages, a, pageObj, h);
+        const QPDFMatrix& cm = placed.cm;
+        QPDFObjectHandle local = placed.form;
+        const QPDFObjectHandle::Rectangle r = placed.rect;
 
         QPDFObjectHandle annot = QPDFObjectHandle::newDictionary();
         annot.replaceKey("/Type", QPDFObjectHandle::newName("/Annot"));
@@ -840,8 +1055,17 @@ QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const st
     return hashes;
 }
 
-/// The PDF with the base pages (and, `hybrid`, our annotations, data and marker), written to `target`.
-Result assemble(const Prepared& prep, const fs::path& target, bool hybrid, const std::string& xoppExport = {}) {
+enum class Mode {
+    Plain,    ///< the base pages only (the export for Xournal++)
+    Hybrid,   ///< and our annotations, data and marker
+    Archive,  ///< and our layers merged into the pages, links, data as the source, marker; PDF/A-3b
+};
+
+/// The PDF with the base pages (and, by `mode`, our drawing, data and marker), written to `target`.
+Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const std::string& xoppExport = {},
+                const std::string& title = {}) {
+    const bool hybrid = mode != Mode::Plain;
+    const bool archive = mode == Mode::Archive;
     Result r;
     Steps step;
     QPDF out;
@@ -870,17 +1094,35 @@ Result assemble(const Prepared& prep, const fs::path& target, bool hybrid, const
     r.pages = order.size();
     step("base pages");
     if (hybrid) {
-        QPDFObjectHandle hashes = annotate(out, drawn, prep, order);
-        r.annotations = prep.annots.size();
+        QPDFObjectHandle hashes;
+        QPDFObjectHandle flattened = QPDFObjectHandle::newArray();
+        if (archive) {
+            for (const auto& nm: flatten(out, drawn, prep, order)) {
+                flattened.appendItem(QPDFObjectHandle::newUnicodeString(nm));
+            }
+            r.flattened = static_cast<size_t>(flattened.getArrayNItems());
+            hashes = QPDFObjectHandle::newDictionary();
+            annotateLinks(out, prep, order, hashes);
+        } else {
+            hashes = annotate(out, drawn, prep, order);
+            r.annotations = prep.annots.size();
+        }
         step("annotations");
-        addEmbedded(out, DATA_NAME, prep.xopp, "The Xournal++ document of this PDF (xournal-qt hybrid PDF)");
+        addEmbedded(out, DATA_NAME, prep.xopp,
+                    archive ? "The Xournal++ document of this PDF, with the ink editable (xournal-qt archive PDF)"
+                            : "The Xournal++ document of this PDF (xournal-qt hybrid PDF)",
+                    archive ? "/Source" : nullptr);
         QPDFObjectHandle files = QPDFObjectHandle::newArray();
         for (const auto& [name, data]: prep.extras) {
-            addEmbedded(out, name, data, "A file of the Xournal++ document of this PDF");
+            addEmbedded(out, name, data, "A file of the Xournal++ document of this PDF", archive ? "/Supplement" : nullptr);
             files.appendItem(QPDFObjectHandle::newUnicodeString(name));
         }
         QPDFObjectHandle marker = QPDFObjectHandle::newDictionary();
-        marker.replaceKey("/Version", QPDFObjectHandle::newInteger(FORMAT_VERSION));
+        marker.replaceKey("/Version", QPDFObjectHandle::newInteger(archive ? ARCHIVE_FORMAT_VERSION : FORMAT_VERSION));
+        if (archive) {
+            marker.replaceKey("/Archive", QPDFObjectHandle::newBool(true));
+            marker.replaceKey("/Flattened", flattened);
+        }
         marker.replaceKey("/Data", QPDFObjectHandle::newUnicodeString(DATA_NAME));
         marker.replaceKey("/Files", files);
         marker.replaceKey("/Annots", hashes);
@@ -898,7 +1140,19 @@ Result assemble(const Prepared& prep, const fs::path& target, bool hybrid, const
     info.replaceKey("/Producer", QPDFObjectHandle::newString(std::string(PROJECT_STRING) + " + QPDF " + QPDF_VERSION));
     info.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
     step("annotations, data, marker");
-    writePdfTo(out, target);
+    ArchiveWrite how;
+    if (archive) {
+        ArchivePdf::Metadata meta;
+        meta.fallbackTitle = title;
+        const ArchivePdf::Report report = ArchivePdf::conform(out, meta);
+        r.pdfa = report.pdfa;
+        r.notPdfA = report.problems;
+        r.adjusted = report.adjusted;
+        how.on = true;
+        how.recompress = report.recompress;
+        step("PDF/A");
+    }
+    writePdfTo(out, target, how);
     step("write");
     r.ok = true;
     return r;
@@ -947,6 +1201,19 @@ void prune(const fs::path& keep) {
 }
 
 }  // namespace
+
+/// The title of a PDF without one: its file name without ".pdf", ".notes.pdf", ".archive.pdf".
+static std::string titleOf(const fs::path& pdf) {
+    fs::path stem = pdf.filename();
+    stem.replace_extension();
+    for (const char* tail: {".archive", ".notes"}) {
+        if (stem.extension() == tail) {
+            stem.replace_extension();
+        }
+    }
+    const auto u8 = stem.u8string();
+    return std::string(u8.begin(), u8.end());
+}
 
 // --- public ---------------------------------------------------------------------------------------------------------
 
@@ -1015,7 +1282,28 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
             const auto name = (inside ? rel : xoppExport).generic_u8string();
             exportName.assign(name.begin(), name.end());
         }
-        return assemble(prep, target, true, exportName);
+        // An archive PDF saved again stays one
+        std::error_code ec;
+        const Mode mode = fs::exists(target, ec) && isArchive(target) ? Mode::Archive : Mode::Hybrid;
+        return assemble(prep, target, mode, exportName, titleOf(target));
+    } catch (const std::exception& e) {
+        r.error = e.what();
+    }
+    return r;
+}
+
+Result writeArchive(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount,
+                    const LinkMap& links) {
+    Result r;
+    try {
+        WorkDir work;
+        const Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false,
+                                      target.parent_path(), links.archived || !links.from.empty() ? &links : nullptr);
+        if (!prep.error.empty()) {
+            r.error = prep.error;
+            return r;
+        }
+        return assemble(prep, target, Mode::Archive, {}, titleOf(target));
     } catch (const std::exception& e) {
         r.error = e.what();
     }
@@ -1041,7 +1329,7 @@ Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size
         if (attached && !anyPdfPage) {
             r.ok = true;  // (no PDF page: the .xopp refers to no PDF, none is written)
         } else {
-            r = assemble(prep, pdf, false);
+            r = assemble(prep, pdf, Mode::Plain);
             if (!r.ok) {
                 return r;
             }
@@ -1072,9 +1360,11 @@ Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size
     return r;
 }
 
-bool isHybrid(const fs::path& pdf) {
+namespace {
+/// 0: no marker, 1: a hybrid PDF, 2: an archive PDF (remembered by path, size and time)
+int kindOf(const fs::path& pdf) {
     static std::mutex m;
-    static std::unordered_map<std::string, bool> known;
+    static std::unordered_map<std::string, int> known;
     const std::string key = pdf.string() + "|" + stampOf(pdf);
     {
         std::lock_guard lock(m);
@@ -1082,22 +1372,31 @@ bool isHybrid(const fs::path& pdf) {
             return it->second;
         }
     }
-    bool hybrid = false;
+    int kind = 0;
     try {
         QPDF q;
         q.setSuppressWarnings(true);
         q.processFile(pdf.string().c_str());
-        hybrid = q.getRoot().getKey(MARKER).isDictionary();
+        QPDFObjectHandle marker = q.getRoot().getKey(MARKER);
+        if (marker.isDictionary()) {
+            QPDFObjectHandle archive = marker.getKey("/Archive");
+            kind = archive.isBool() && archive.getBoolValue() ? 2 : 1;
+        }
     } catch (const std::exception&) {
-        hybrid = false;
+        kind = 0;
     }
     std::lock_guard lock(m);
     if (known.size() > 4096) {
         known.clear();
     }
-    known[key] = hybrid;
-    return hybrid;
+    known[key] = kind;
+    return kind;
 }
+}  // namespace
+
+bool isHybrid(const fs::path& pdf) { return kindOf(pdf) != 0; }
+
+bool isArchive(const fs::path& pdf) { return kindOf(pdf) == 2; }
 
 fs::path xoppExportOf(const fs::path& pdf) {
     try {
@@ -1140,7 +1439,7 @@ Opened open(const fs::path& pdf) {
                 o.error = "The PDF has no Xournal data.";
                 return o;
             }
-            if (QPDFObjectHandle v = marker.getKey("/Version"); v.isInteger() && v.getIntValue() > FORMAT_VERSION) {
+            if (QPDFObjectHandle v = marker.getKey("/Version"); v.isInteger() && v.getIntValue() > ARCHIVE_FORMAT_VERSION) {
                 o.error = "The Xournal data of this PDF was written by a newer version of xournal-qt.";
                 return o;
             }

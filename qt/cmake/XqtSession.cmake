@@ -6,6 +6,22 @@ configure_file("${XOJ_UPSTREAM_DIR}/resources-templates/pagetemplates.ini.in"
     "${XQT_BUILD_RESOURCE_DIR}/pagetemplates.ini" COPYONLY)
 file(COPY "${XOJ_UPSTREAM_DIR}/palettes" DESTINATION "${XQT_BUILD_RESOURCE_DIR}")
 
+# The sRGB profile of archive PDFs (qt/resources/icc/README.md), compiled in as bytes
+set(XQT_SRGB_ICC "${CMAKE_CURRENT_LIST_DIR}/../resources/icc/sRGB.icc")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${XQT_SRGB_ICC}")
+file(READ "${XQT_SRGB_ICC}" XQT_SRGB_HEX HEX)
+file(SIZE "${XQT_SRGB_ICC}" XQT_SRGB_SIZE)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," XQT_SRGB_BYTES "${XQT_SRGB_HEX}")
+file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/generated/SrgbIcc.cpp" CONTENT
+"// Generated from qt/resources/icc/sRGB.icc by XqtSession.cmake
+namespace xqt::ArchivePdf {
+extern const unsigned char SRGB_ICC[] = {
+${XQT_SRGB_BYTES}
+};
+extern const unsigned long SRGB_ICC_SIZE = ${XQT_SRGB_SIZE};
+}  // namespace xqt::ArchivePdf
+" @ONLY)
+
 add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/AppContext.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/AppContext.cpp
@@ -32,6 +48,9 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HybridPdf.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/ArchivePdf.cpp
+    ${CMAKE_BINARY_DIR}/generated/SrgbIcc.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfPageKeeper.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfPageKeeper.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.cpp
