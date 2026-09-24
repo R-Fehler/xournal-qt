@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | `.github/workflows/xqt-build.yml` | every push and pull request to `master-qt` | builds in a Debian 13 container (Qt 6.8) and runs all tests |
 | `.github/workflows/xqt-release.yml` | a tag `v1.2.3`, or started by hand | builds, tests, packages, and opens a **draft** release with the packages |
+| `.github/workflows/xqt-windows.yml` | started by hand, or a push to `qt/windows-build` | builds for Windows in MSYS2 UCRT64 and publishes a portable zip ([windows.md](windows.md)) |
 
 The upstream Xournal++ workflows in the same folder stay dormant here: they only run for pull requests to `master`
 or carry `if: github.repository == 'xournalpp/xournalpp'`.
@@ -60,10 +61,10 @@ the same release workflow. What is missing is the environment and the packaging,
   `gdk-pixbuf`, `qt@6`, and `kf6-syntax-highlighting` for code blocks). The app bundle and the `.dmg` come from
   `macdeployqt` (it takes the QML modules with `-qmldir=qt/src/app/qml`). Upstream's `mac-setup/` does the same for
   the GTK build and shows the shape of the job.
-- **Windows**: MSYS2 (UCRT64) has all of them as `mingw-w64-ucrt-x86_64-…` packages, including Qt 6 and
-  KSyntaxHighlighting. `windeployqt --qmldir qt/src/app/qml` collects the Qt parts; upstream's `windows-setup/`
-  builds an NSIS installer that can be reused.
+- **Windows**: a first build exists (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,
+  `windeployqt --qmldir qt/src/app/qml`, a portable zip, no installer yet. Upstream's `windows-setup/` builds an
+  NSIS installer that can be reused ([windows-roadmap.md](windows-roadmap.md)).
 - Open questions on both: the pen and touch input (Qt's tablet events on Windows Ink and on macOS), the file
   associations, and the places where the fork writes its settings and cache (`Util::getCacheSubfolder`).
 
-Until then the fork is Linux only, and the CI says so.
+Until then the releases are Linux only; the Windows zip is a test build.
