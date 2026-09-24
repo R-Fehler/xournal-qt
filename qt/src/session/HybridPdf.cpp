@@ -1408,10 +1408,6 @@ std::vector<std::string> stringsOf(QPDFObjectHandle array) {
 
 /// Open `target` for an incremental update from `rev` (nullptr and `why`: it cannot be appended to).
 std::unique_ptr<Existing> openExisting(const fs::path& target, const Revision& rev, bool archive, std::string& why) {
-    if (archive) {
-        why = "an archive PDF is written in full";  // (its PDF/A metadata is not kept up to date by an update yet)
-        return nullptr;
-    }
     if (stampOf(target) != rev.stamp) {
         why = "the file is not the version last written or opened";
         return nullptr;
@@ -1661,6 +1657,11 @@ public:
         step("annotations");
         embedData();
         mark(xoppExport);
+        if (archive) {
+            // PDF/A: the dates of the information and its XMP metadata stay the same (the new drawings were checked
+            // before they were copied)
+            r.pdfa = ArchivePdf::update(q, u);
+        }
         step("data, marker");
 
         // Appended, unless the file has grown too much since it was last written in full
@@ -1943,7 +1944,7 @@ private:
     }
 
     /// The drawing of a layer placed as `p` says: `mine` (the one it had), or one of the file that shows the same,
-    /// or the new drawing (copied from `drawn`).
+    /// or the new drawing (copied from `drawn`; in an archive PDF checked for PDF/A first).
     QPDFObjectHandle drawingFor(const AnnotSpec& a, const Placed& p, QPDFObjectHandle mine) {
         if (!mine.isStream()) {
             if (auto it = e.formBySig.find(a.sig); it != e.formBySig.end()) {
@@ -1960,6 +1961,9 @@ private:
         QPDFObjectHandle group = form.getDict().getKey("/Group");
         if (group.isDictionary() && group.hasKey("/I")) {
             group.removeKey("/I");  // (not isolated, as formOf)
+        }
+        if (archive && !ArchivePdf::check({form}).empty()) {  // (repaired where it can be, before it is copied)
+            throw std::runtime_error("a new drawing is not PDF/A");
         }
         QPDFObjectHandle local = u.copy(form);
         local.replaceKey("/BBox", QPDFObjectHandle::newArray(p.box));
@@ -2275,7 +2279,9 @@ private:
             u.touch(info);
         }
         info.replaceKey("/Producer", QPDFObjectHandle::newString(std::string(PROJECT_STRING) + " + QPDF " + QPDF_VERSION));
-        info.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
+        if (!archive) {
+            info.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));  // (an archive's: ArchivePdf::update)
+        }
     }
 
     Existing& e;

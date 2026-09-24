@@ -919,7 +919,7 @@ TEST_F(HybridPdfTest, linksOfMarkdownBoxesBecomeLinksOtherViewersFollow) {
 
 namespace {
 class ArchivePdfTest: public HybridPdfTest {
-protected:
+public:
     /// XQT_ARCHIVE_SAMPLES=<folder>: the archive PDFs that should be PDF/A go there (veraPDF checks them in CI).
     static void keepSample(const fs::path& pdf, const char* name) {
         if (const char* dir = std::getenv("XQT_ARCHIVE_SAMPLES")) {
@@ -1764,6 +1764,61 @@ TEST_F(IncrementalSaveTest, anotherAppsRevisionIsNoticedAndKept) {
     auto clean = DocumentSession::loadFile(out);
     ASSERT_TRUE(clean.document);
     EXPECT_TRUE(clean.hybridChanged.empty());
+}
+
+// An archive PDF stays PDF/A-3b after incremental saves: the dates of its information and XMP metadata agree
+TEST_F(IncrementalSaveTest, anArchivePdfStaysPdfAAfterIncrementalSaves) {
+    auto doc = annotated(path("lecture.pdf"));
+    const fs::path out = path("lecture.archive.pdf");
+    ASSERT_TRUE(HybridPdf::writeArchive(*doc, out).pdfa);
+    doc.reset();
+    auto loaded = DocumentSession::loadFile(out);
+    ASSERT_TRUE(loaded.document);
+    DocumentSession s(*app, std::move(loaded.document));
+    for (int i = 0; i < 3; ++i) {
+        drawOn(s, static_cast<size_t>(i), 500 + 20 * i);
+        if (i == 2) {  // and the pen stroke of page 1 goes
+            std::unique_lock lock(*s.getDocument());
+            s.getDocument()->getPage(0)->getLayers().at(0)->clearNoFree();
+        }
+        const auto r = s.save();
+        ASSERT_TRUE(r.ok) << r.error;
+        EXPECT_TRUE(r.incremental) << "save " << i + 1;
+        EXPECT_TRUE(HybridPdf::isArchive(out));
+        int code = -1;
+        const std::string check = qpdfCheck(out, code);
+        EXPECT_EQ(code, 0) << check;
+        QPDF q;
+        q.processFile(out.string().c_str());
+        const std::string xmp = streamText(q.getRoot().getKey("/Metadata"));
+        EXPECT_FALSE(q.getRoot().getKey("/Metadata").getDict().hasKey("/Filter"));
+        EXPECT_NE(xmp.find("<pdfaid:part>3</pdfaid:part>"), std::string::npos);
+        QPDFObjectHandle info = q.getTrailer().getKey("/Info");
+        const std::string date = info.getKey("/ModDate").getUTF8Value();
+        ASSERT_GE(date.size(), 16u);
+        EXPECT_NE(xmp.find("<xmp:ModifyDate>" + date.substr(2, 4) + "-" + date.substr(6, 2) + "-" + date.substr(8, 2) +
+                           "T" + date.substr(10, 2) + ":" + date.substr(12, 2) + ":" + date.substr(14, 2) + "+00:00"),
+                  std::string::npos)
+                << xmp;
+        const std::string created = info.getKey("/CreationDate").getUTF8Value();
+        EXPECT_NE(xmp.find("<xmp:CreateDate>" + created.substr(2, 4) + "-"), std::string::npos) << "kept";
+        EXPECT_FALSE(q.isEncrypted());
+    }
+    const fs::path full = path("full.archive.pdf");
+    ASSERT_TRUE(HybridPdf::writeArchive(*s.getDocument(), full).ok);
+    expectSamePages(out, full, 4, "an archive PDF after three incremental saves");
+    EXPECT_EQ(countOf(fileBytes(out), "startxref"), 4u);
+    ArchivePdfTest::keepSample(out, "archive-incremental-3.pdf");
+    // Reopened: the background is the original page, the ink comes from the data
+    auto reopened = DocumentSession::loadFile(out);
+    ASSERT_TRUE(reopened.document);
+    EXPECT_TRUE(reopened.hybridChanged.empty());
+    EXPECT_EQ(describe(*reopened.document), describeAsXopp(*s.getDocument(), path("same.xopp")));
+    cairo_surface_t* bg = render(reopened.document->getPdfFilepath(), 0);
+    cairo_surface_t* original = render(path("lecture.pdf"), 0);
+    EXPECT_EQ(compare(bg, original).differ, 0.0) << "no ink in the background";
+    cairo_surface_destroy(bg);
+    cairo_surface_destroy(original);
 }
 
 // Pages pasted from another PDF are appended to the file (the pages it has stay as they are)

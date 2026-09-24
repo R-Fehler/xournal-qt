@@ -414,7 +414,7 @@ check failed.
 
 ## Saving: incremental updates (`qt/pdf-incremental`)
 
-Ctrl+S on a hybrid PDF appends only what changed, as a standard incremental update (ISO 32000-1, 7.5.6),
+Ctrl+S on a hybrid or archive PDF appends only what changed, as a standard incremental update (ISO 32000-1, 7.5.6),
 the way Acrobat and Drawboard save: the file's bytes stay as they are, and a new revision follows them. On
 pgfmanual (1,321 pages, notes on 53) a save after one stroke takes about 0.2 s instead of 7.5 s and appends about
 22 KB.
@@ -490,8 +490,8 @@ means reading most of the file (seconds). An incremental save reads only what it
 - When many pages changed at once: more than a quarter of the pages are new base pages (pasted, or a new
   background drawn), or more than a quarter of the file's pages were removed (their dead weight would stay).
 - When there is nothing to build on: the file changed since it was written or opened (another app saved it), it was
-  edited in another app (its hash check found a change), the other app's version was imported, it is an archive
-  PDF (for now), the file is encrypted, its page tree is not flat or passes attributes on, the embedded images changed, or anything unexpected
+  edited in another app (its hash check found a change), the other app's version was imported, the file is
+  encrypted, its page tree is not flat or passes attributes on, the embedded images changed, or anything unexpected
   (an exception): the save falls back to the full write, which is always correct. `XQT_HYBRID_TIMES=1` prints why.
 
 ### The clean copy and "edited in another app"
@@ -505,6 +505,18 @@ means reading most of the file (seconds). An incremental save reads only what it
   or deletes one of ours, the check reports it; the next save writes the file anew. An update of another app that
   only adds its own annotations is kept, and the next save appends on top of it.
 
+### PDF/A
+
+PDF/A-2 and -3 allow incremental updates. An archive PDF saved again stays PDF/A-3b: the update has no encryption,
+a cross-reference stream and object streams (allowed from PDF/A-2 on), `/ID` in its trailer, an end of line before
+every `endstream`, and nothing after `%%EOF` but one end of line. The document information's `/ModDate` and the XMP
+metadata's `xmp:ModifyDate` and `MetadataDate` get the same new date (the XMP stream is written again, uncompressed,
+with its creation date and PDF/A identification kept; `ArchivePdf::update`). A new drawing is checked and repaired
+like the source PDF was (`ArchivePdf::check`, e.g. an image's `/Interpolate`) before it is copied into the file; if it
+cannot conform, the file is written anew instead (as every save of an archive PDF was before), which claims PDF/A
+only when everything conforms. CI's veraPDF step also validates an archive
+PDF saved incrementally three times (`IncrementalSaveTest.anArchivePdfStaysPdfAAfterIncrementalSaves`).
+
 ### Tests and measurements
 
 Tests: `IncrementalPdfTest` (the appender: both cross-reference styles, the previous revision readable, poppler and
@@ -513,6 +525,6 @@ changed is appended; eight saves in a row with every kind of change — strokes,
 added, deleted, a background changed, a text, a page shown twice — each checked with `qpdf --check`, drawn by
 poppler like a full write of the same document, and opened as the same document; pages pasted from another PDF;
 the compaction rules; exports and shared files without earlier revisions; the clean copy kept; another app's
-appended revision; a file of an earlier version). UI: sharing compacts
+appended revision; a file of an earlier version; an archive PDF staying PDF/A). UI: sharing compacts
 (`sharingThePdfWithNotes`, `shareFromALibraryCard`).
 

@@ -1100,6 +1100,8 @@ the Surface or another Windows 10/11 machine. See [../windows.md](../windows.md)
       PDF card in the library. Export as plain PDF, for the archive, and for Xournal++ give single-revision files.
 - [ ] Draw on many pages at once, or keep saving until the file grew by a quarter: that save takes the old time
       (the whole file written anew, `startxref` count back to 1); the next ones are fast again.
+- [ ] An archive PDF (Export for the archive, then open it and Ctrl+S after a stroke, three times): Acrobat still
+      shows the PDF/A bar; File → Properties shows the new modification date.
 - [ ] Add a comment to the file in Okular or Acrobat (saved there, possibly as their own incremental update), open it
       again in xournal-qt: the comment is shown and kept by the next Ctrl+S. Move one of our strokes in Acrobat: the
       "edited in another app" question comes, and after "Keep the Xournal data" the next save writes the file anew.
