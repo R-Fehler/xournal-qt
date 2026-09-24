@@ -310,6 +310,16 @@
 - **An empty path no longer throws out of the recent list (2026-09-24).**
 - **Reference pop out, `qt/reference-popout` (2026-09-24).** "Show as a tab" in the reference pill closes the split,
   puts the reference's tab right after the notes, and switches to it; Ctrl+Tab then goes between the two.
+- **Links between documents, `qt/links` (2026-09-24, awaiting on-device test).** See [links.md](links.md).
+  - `DocumentLink`: relative paths with `#page=`, `pdfpage=`, `chapter=`, a `text=` fingerprint, and `.md`
+    headings; resolved with fallbacks.
+  - A tap offers a new tab, the reference or here, with a remembered choice; back and forward work across
+    documents.
+  - "Copy link" on pages, chapters, cards, search hits and ⋮. Pasting makes `[title](link)` in Markdown, or a
+    🔗 marker on the page.
+  - The index records links: "Linked from…", links rewritten after in-app renames and moves, and a search for
+    targets that were moved outside the app.
+  - Hybrid PDFs get `/Link` annotations (`GoToR` or `/URI`).
   318 KiB.
 
 ## Backlog (decide later)

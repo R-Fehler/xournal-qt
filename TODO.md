@@ -258,11 +258,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     Recent card menus); the tab strip marks it.
 
 ### Links between documents (the author, 2026-09-24)
-- [~] Design agreed 2026-09-24: [qt/docs/links.md](qt/docs/links.md). `qt/links` started 2026-09-24. Links are relative paths with `#page=`, `#chapter=…&page=`
+- [x] Merged 2026-09-24 (`qt/links`). Design: [qt/docs/links.md](qt/docs/links.md). Left: a `pdfid=` key for the PDF `/ID` search; drag and drop onto the page; rewriting links in hybrid PDFs and `.xoj` files that are not open; link boxes on rotated pages of hybrid PDFs. Links are relative paths with `#page=`, `#chapter=…&page=`
   as the fallback, and `pdfpage=` for pages of annotated PDFs. A tap offers a new tab, reference view or "here".
   In-app renames rewrite the links, backed by the index's backlinks. Built as `qt/links` after the running blocks.
 
-### Archive export (the author, 2026-09-24; after `qt/links`)
+### Archive export (the author, 2026-09-24; `qt/archive-export`, started 2026-09-24)
 - [ ] **"Export for the archive…"** per document (⋮ and Share), with a short explanation in the dialog of what it
   means: a PDF/A-3 file meant to stay readable for decades in any PDF viewer, with the ink flattened into the pages
   so no viewer can hide or lose it, and the full Xournal data embedded so the app can still open it for editing.
