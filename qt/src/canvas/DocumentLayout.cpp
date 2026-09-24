@@ -264,7 +264,12 @@ double DocumentLayout::fitWidthZoom(double viewWidth, size_t page) const {
     const double gaps = gapPrefix[c1] - gapPrefix[c0];
     const double upstream = (viewWidth - gaps) / (width + 20.0);
     const double exact = (viewWidth - 2 * padding() - gaps - 4) / width;  // a little air: no scroll bar
-    return c0 == c1 && !config.noMargins ? upstream : std::min(upstream, exact);
+    if (c0 == c1 && !config.noMargins) {
+        // One page: upstream's, unless the view is narrower than the page's points plus 20 - then the paddings
+        // (pixels) would push the content past the view: the page fills the room between them
+        return std::min(upstream, (viewWidth - 2 * padding() - gaps) / width);
+    }
+    return std::min(upstream, exact);
 }
 
 double DocumentLayout::fitHeightZoom(double viewHeight) const {

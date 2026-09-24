@@ -799,6 +799,8 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Ctrl+S after writing in the reference (pen button on, last tap on the reference): the reference is saved (its
       "●" goes), the notes keep theirs. A new, never saved reference: its tab comes forward and asks where to save.
       For reading (pen button off), Ctrl+S saves the notes as before.
+- [ ] (Fix) Fit width in a narrow half beside a reference (and in a narrow window): the page fills the width and
+      there is no horizontal scroll bar on either side (it used to appear for a few pixels).
 
 ## Presentation and horizontal scrolling (qt/present)
 - [ ] Page number jump: with a document open, type `12` on the keyboard (no text being written): "Go to page: 12

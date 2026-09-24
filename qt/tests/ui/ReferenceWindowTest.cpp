@@ -947,3 +947,19 @@ TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsThe
     (void)splitWidth;
 }
 
+// Beside a reference both halves are narrower than an A4 page's points plus 20: fitted to the width, neither shows a
+// horizontal scroll bar (upstream's formula made the content a few pixels too wide).
+TEST_F(ReferenceWindowTest, fittedToTheWidthNeitherHalfScrollsSideways) {
+    ref().showTab(1);
+    wait(100);
+    controller->fitWidth();
+    ref().fitWidth();
+    wait(100);
+    for (QQuickItem* c: {main, reference}) {
+        EXPECT_LE(c->property("contentWidth").toDouble(), c->width() + 1)
+                << c->objectName().toStdString() << ": " << c->property("contentWidth").toDouble() << " in "
+                << c->width();
+    }
+    EXPECT_FALSE(findItem("horizontalScrollBar")->isVisible()) << "the notes scroll sideways";
+    EXPECT_FALSE(findItem("referenceHorizontalScrollBar")->isVisible()) << "the reference scrolls sideways";
+}
