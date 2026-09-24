@@ -27,6 +27,20 @@ inline bool lineBreakHyphen(QStringView t, qsizetype j) {
     return j > 0 && j + 2 < t.size() && t[j] == u'-' && t[j + 1] == u' ' && t[j - 1].isLetter() && t[j + 2].isLower();
 }
 
+/// A letter or digit (of a word)
+inline bool wordChar(QChar c) { return c.isLetterOrNumber(); }
+
+/// The match [a, b) lies where `bounds` want it (a word broken at a line end is one word)
+inline bool inBounds(QStringView t, qsizetype a, qsizetype b, unsigned bounds) {
+    if ((bounds & WordStart) && a > 0 && (wordChar(t[a - 1]) || (a >= 2 && lineBreakHyphen(t, a - 2)))) {
+        return false;
+    }
+    if ((bounds & WordEnd) && b < t.size() && (wordChar(t[b]) || lineBreakHyphen(t, b))) {
+        return false;
+    }
+    return true;
+}
+
 /// The end of the match of `q` at `j`, or -1
 qsizetype matchAt(QStringView t, qsizetype j, QStringView q) {
     const qsizetype n = t.size();
@@ -71,19 +85,6 @@ qsizetype matchAt(QStringView t, qsizetype j, QStringView q) {
     return j;
 }
 
-/// A letter or digit (of a word)
-inline bool wordChar(QChar c) { return c.isLetterOrNumber(); }
-
-/// The match [a, b) lies where `bounds` want it
-inline bool inBounds(QStringView t, qsizetype a, qsizetype b, unsigned bounds) {
-    if ((bounds & WordStart) && a > 0 && wordChar(t[a - 1])) {
-        return false;
-    }
-    if ((bounds & WordEnd) && b < t.size() && wordChar(t[b])) {
-        return false;
-    }
-    return true;
-}
 
 /// Calls f(start, end) for each match; f returns false to stop
 template <typename F>

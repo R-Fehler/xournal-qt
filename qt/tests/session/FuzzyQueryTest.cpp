@@ -135,6 +135,9 @@ TEST(TextMatch, wordBounds) {
             {u"x2filter", "filter", WordStart, 0},
             {u"über überall", "über", Word, 1},
             {u"a hyphen- ated word", "hyphenated", Word, 1},
+            {u"a hyphen- ated word", "ated", WordStart, 0},  // a word broken at a line end is one word
+            {u"a hyphen- ated word", "hyphen", WordEnd, 0},
+            {u"a hyphen- ated word", "hyphen", WordStart, 1},
             {u"aaa", "aa", WordEnd, 1},  // (the match at 1, after the one at 0 failed)
             {u"", "x", Word, 0},
     };
