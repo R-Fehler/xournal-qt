@@ -96,3 +96,28 @@ The author accepted the plan with its proposals:
 3. Making links: "Copy link" everywhere, pasting into Markdown and markers, drag and drop.
 4. The library: outgoing links in the index, backlinks, rewriting on rename and move, the fallback search.
 5. The hybrid PDF: `GoToR` link annotations.
+
+## What is built (`qt/links`)
+
+### 1. The link format (`qt/src/session/DocumentLink.*`, tests `DocumentLinkTest`)
+- `links::parse` reads a Markdown link target: a path with a known document extension (`.xopp`, `.xoj`, `.pdf`,
+  `.md`, `.txt`, images, `.tex`, …) or one that starts with `./`, `../` or `/`, and `file://` URLs. Web and mail
+  addresses, other schemes, upstream's `#Page:12` and a bare `#anchor` are not links to documents (so
+  `example.org/page` stays a web address). A path of `<…>` and percent-escapes (`%20`) are read as Markdown writes
+  them. A target without a path but with a place (`#page=5`, `#chapter=…`) points into the same document.
+- The fragment: `chapter=`, `heading=`, `page=`, `pdfpage=`, `line=`, and **`text=`**, the page's fingerprint (its
+  first five words, normalised, at most 48 characters), written only for a page that shows no PDF page. Unknown keys
+  (`zoom=`, …) are left out. A plain fragment is a heading of a `.md` (`note.md#blade-design`), else a chapter.
+- `links::parseWiki` reads `[[note#heading]]` (the name is looked up later: it has no extension).
+- `links::write` writes the fragment in the order chapter, heading, page, pdfpage, line, text, and escapes what a
+  Markdown link cannot hold (space, `%`, `#`, `?`, parentheses, brackets, `<` `>`; in values also `&`, `=`, `+`).
+  Letters beyond ASCII stay as they are (`Übung%203.xopp`). `links::markdown` gives `[title](link)`.
+- Paths are relative to the folder of the document that holds the link (`links::relativePath`, `resolvePath`).
+- Where a link leads (`links::resolve`, on a list of the target's chapters and pages): the chapter by its title,
+  then by its normalised title (case folded, only letters and digits); the PDF page (`pdfpage=`); the page number,
+  checked against the fingerprint (the nearest page with that text, an earlier one on a tie). What was not found
+  gives the note: "Chapter "Correction" not found, opened page 12", "PDF page 9 not found, opened page 1", "Page 99
+  not found, opened page 30".
+- In a Markdown text (`links::resolveInText`): the heading whose slug (GitHub's: lower case, punctuation dropped,
+  spaces to `-`) is the link's (a heading written as text, as Obsidian does, is slugged first), else the line, with
+  "Heading "…" not found, opened line 40".
