@@ -156,8 +156,6 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     `ShellExecute` on Windows, an intent on Android.
   - "Show in file manager" needs one call per platform: `org.freedesktop.FileManager1.ShowItems` over D-Bus,
     `explorer /select,` on Windows, `open -R` on macOS. Android has none, so the entry is hidden there.
-  - Later, desktop only: "Annotate as PDF" for Office files, through `soffice --headless --convert-to pdf` when
-    LibreOffice is installed. The result becomes a PDF + `.xopp` pair.
   - Lowest priority, only with MuPDF: EPUB and CBZ as documents, since MuPDF lays them out as pages.
   - A `.tex` file and its compiled `.pdf` could be paired like `.xopp` and `.pdf`: one card, with the source a
     tap away.
