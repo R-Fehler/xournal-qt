@@ -222,6 +222,19 @@
 - **Preview writes, `qt/preview-writes` (2026-09-24).** A changed document's first page is drawn again and compared
   with the stored preview. If it looks the same, only a tiny `preview-stamps.pack` records the new version, and
   `previews.pack` stays untouched until it is written anyway. Editing page 3: 1.1 KiB written instead of about
+- **Saving in the background, `qt/background-save` (2026-09-24, awaiting on-device test).**
+  - Saving: the pages are copied under the read lock on the UI thread (a few ms), then the files are written on a
+    worker (`DocumentSave.cpp`). The merged PDF keeps its 5-step crash-safe order.
+    - An edit during a save stays unsaved and the document stays modified; a failed save keeps it modified.
+    - A second Ctrl+S during a save is queued; close and quit wait with the window usable.
+    - Tabs and the title show "saving…".
+  - Pasting from another PDF: the merge runs in the background, and the page is drawn at once from the pasted PDF in
+    memory. Export and print wait for the merge.
+  - Fix: a pasted page showed late on the canvas, because every page was re-rendered at visible priority. Now only
+    pages new in the PDF are drawn again (`loadPdfKeepingPictures`): 40–110 ms instead of up to 890 ms.
+  - Seam: `Document::readPdfKeepingOutline` (ADR-0002).
+  - Measured on pgfmanual: a hybrid save blocks the window for at most 0.8 ms (before: 5.3 s); a paste 1–22 ms
+    (before: 9.7 s).
   318 KiB.
 
 ## Backlog (decide later)

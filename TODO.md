@@ -22,8 +22,11 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
    1. ~~`qt/pdf-pages`~~: merged 2026-09-24 (see ROADMAP). Follow-ups: the merge runs on the UI thread (about 0.2 s
       per paste on a 117 MB scan); the `.next.pdf` step relies on Linux rename semantics (check before Windows).
    2. ~~`qt/hybrid-pdf`~~: merged 2026-09-24 (see ROADMAP). Follow-ups:
-      - [~] Save in the background: a 1,300-page hybrid save blocks the window for about 6 s. `qt/background-save`,
-        started 2026-09-24, also covering the paste merge (0.2 s per paste on a 117 MB scan).
+      - [x] Save in the background (`qt/background-save`, merged 2026-09-24). Left:
+        - [ ] A crash save while a paste merge is pending: the recovered pasted pages show "PDF background missing".
+        - [ ] Autosave still runs on the UI thread.
+        - [ ] Thumbnails of just-pasted pages stay white, and their text is not searchable, until the merge is done.
+        - [ ] A save that drops unused pages still reloads the PDF, outline included, on the UI thread.
       - [ ] The round trip in other viewers (the author): Acrobat, Preview, Xodo, Drawboard, Chrome/pdf.js,
         Firefox, Okular, Evince, with the sample `~/xournal_qt_workspace/samples/hybrid-sample.pdf`. See the
         device checklist.
@@ -203,11 +206,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     Recent card menus); the tab strip marks it.
 
 ### Bugs
-- [~] **A PDF page pasted into a document that has a PDF shows late on the canvas** (fixed on `qt/background-save`,
-  waiting to merge: only pages new in the PDF are drawn again).
-  Pasting into a `.xopp` without a PDF works. Given to `qt/background-save`, which reworks that paste path; to fix
-  first, with a test. Likely cause: the page is drawn against the old PDF before the merged PDF is loaded, and it is
-  not drawn again afterwards.
+- [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
 - [ ] **A touch on the "pages with hits" filter can make the maximized window half as high** (old, flaky, probably
   touch only, KWin). Also seen with the page grid button in the page / zoom pill. Does not reproduce off-screen.
   Both taps change what is under the finger (an overlay opens, or the list is filtered); suspect a touch whose item
