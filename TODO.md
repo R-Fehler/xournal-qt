@@ -238,6 +238,12 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - The reference is another open tab ("Open as reference" in the tab overview, the tab menu and the library and
     Recent card menus); the tab strip marks it.
 
+### Links between documents (the author, 2026-09-24)
+- [?] Design draft: [qt/docs/links.md](qt/docs/links.md). Links are relative paths with `#page=`, `#chapter=…&page=`
+  as the fallback, and `pdfpage=` for pages of annotated PDFs. A tap offers a new tab, reference view or "here".
+  In-app renames rewrite the links, backed by the index's backlinks. Three points for the author to decide; then
+  `qt/links`.
+
 ### Bugs
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
 - [~] **Fit width uses the widest page, not the current one** (the author, 2026-09-24): after pasting a 16:9 page
