@@ -250,7 +250,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     Recent card menus); the tab strip marks it.
 
 ### Links between documents (the author, 2026-09-24)
-- [ ] Design agreed 2026-09-24: [qt/docs/links.md](qt/docs/links.md). Links are relative paths with `#page=`, `#chapter=…&page=`
+- [~] Design agreed 2026-09-24: [qt/docs/links.md](qt/docs/links.md). `qt/links` started 2026-09-24. Links are relative paths with `#page=`, `#chapter=…&page=`
   as the fallback, and `pdfpage=` for pages of annotated PDFs. A tap offers a new tab, reference view or "here".
   In-app renames rewrite the links, backed by the index's backlinks. Built as `qt/links` after the running blocks.
 
