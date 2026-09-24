@@ -77,6 +77,7 @@ protected:
         window = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
         ASSERT_NE(window, nullptr);
         ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
+        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
         wait(100);
     }
     void TearDown() override {

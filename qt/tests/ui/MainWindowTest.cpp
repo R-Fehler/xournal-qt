@@ -109,6 +109,7 @@ protected:
         ASSERT_NE(window, nullptr);
         window->requestActivate();
         ASSERT_TRUE(QTest::qWaitForWindowExposed(window));
+        QTest::mouseMove(window, QPoint(-20, -20));  // (the pointer rests outside: nothing hovered, no tool tips)
         wait(100);
     }
     void TearDown() override {
