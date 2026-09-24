@@ -306,7 +306,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
      Xournal++".
 
 ### Setsquare and compass on high-DPI screens (the author, 2026-09-24)
-- [ ] **`qt/geometry-gpu`: the setsquare lags on the Surface Pro 8** (2880×1920 at 200%) once it is larger than
+- [~] **`qt/geometry-gpu` (started 2026-09-24): the setsquare lags on the Surface Pro 8** (2880×1920 at 200%) once it is larger than
   about 10 cm; it is smooth on the full-HD Linux screen.
   - Cause: upstream's `SetsquareView`/`CompassView` draw with cairo on the CPU into the page overlay, including every
     mm tick and number as text, and the old and new bounding boxes are redrawn on every move and turn. The cost grows
