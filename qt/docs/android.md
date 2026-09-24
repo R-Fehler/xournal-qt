@@ -94,6 +94,13 @@ copies go through a staging folder in the app's cache first, in the background (
 `importUrls`). An image picked for "Insert image" is read the same way. "Open a folder as library" cannot take a
 picked folder yet (no path to scan): it says so and points to "Import a folder".
 
+**Drawing with the finger.** The Fold 7 has no pen, so on Android the finger draws from the first start when the
+device reports no stylus (Android's input devices: no `SOURCE_STYLUS`; checked once, at the first start, through
+`XournalActivity.hasStylus()`; a tablet with an S Pen starts with it off, as the desktop does). The finger button
+in the tool bar (next to the hand) and Settings → Touch → "Draw with the finger" turn it on and off on every
+platform: one finger draws with the current tool, two fingers scroll and zoom (a stroke the first finger began is
+taken back), the hand tool still scrolls, and while a pen is near the finger is ignored (palm rejection).
+
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
 `files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`.

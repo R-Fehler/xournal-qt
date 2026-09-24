@@ -72,6 +72,7 @@ CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), vi
     longPressTimer.setSingleShot(true);
     longPressTimer.setInterval(LONG_PRESS_MS);
     connect(&longPressTimer, &QTimer::timeout, this, [this] {
+        cancelFingerStroke();  // (held still while drawing with the finger: the dot it began is taken back)
         longPressFired = true;
         Q_EMIT this->view.contextRequested(touchSessionStartPos);
     });
@@ -119,6 +120,11 @@ void CanvasInput::penHeld() {
 // --- tablet --------------------------------------------------------------------------------------------------------
 
 bool CanvasInput::tabletEvent(QTabletEvent* e, QPointF viewPos) {
+    if (fingerDrawing) {
+        // The pen comes: the finger was a hand resting on the screen
+        cancelFingerStroke();
+        touchSessionIgnored = !touches.empty();
+    }
     lastPenEventMs = monotonicMs();
     PenHover::instance().record(*e);
     if (penNear()) {
@@ -748,7 +754,7 @@ void CanvasInput::endTouchSelection() {
 }
 
 bool CanvasInput::penNear() const {
-    if (deviceClassPressed && runningDeviceClass != DeviceClass::Mouse) {
+    if (deviceClassPressed && runningDeviceClass != DeviceClass::Mouse && runningDeviceClass != DeviceClass::Touch) {
         return true;  // writing
     }
     if (!penInProximity) {
@@ -774,7 +780,37 @@ bool CanvasInput::touchBlocked() const {
     return monotonicMs() - since < waitMs;
 }
 
+bool CanvasInput::fingerDraws() const {
+    DocumentSession& s = view.getSession();
+    if (!s.getSettings()->getTouchDrawingEnabled() || deviceClassPressed) {
+        return false;
+    }
+    // The hand scrolls; a document only to read (a Markdown file shown, the reference) and a text file edited
+    // (the finger scrolls, a tap puts the cursor) are not drawn in
+    return s.getToolHandler()->getToolType() != TOOL_HAND && !s.isReadOnly() && !view.isReadingOnly() &&
+           !view.textMode();
+}
+
+void CanvasInput::cancelFingerStroke() {
+    if (!fingerDrawing) {
+        return;
+    }
+    fingerDrawing = false;
+    fingerDrawingId = -1;
+    if (inputRunning && sequenceStartPage && lastEvent) {
+        sequenceStartPage->onSequenceCancelEvent(DeviceId(static_cast<const GdkDevice*>(lastEvent->device)));
+    }
+    sequenceStartPage = nullptr;
+    inputRunning = false;
+    deviceClassPressed = false;
+    runningDeviceClass.reset();
+    if (ToolHandler* h = view.getSession().getToolHandler(); h->pointActiveToolToToolbarTool()) {
+        h->fireToolChanged();
+    }
+}
+
 void CanvasInput::cancelTouchGesture() {
+    cancelFingerStroke();
     if (pinching) {
         view.getViewController().pinchEnd();
     }
@@ -806,6 +842,7 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
     const double now = monotonicMs();
 
     if (e->type() == QEvent::TouchCancel) {
+        cancelFingerStroke();
         if (pinching) {
             vc.pinchEnd();
         }
@@ -860,6 +897,72 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         }
     }
     touchSessionMaxPoints = std::max(touchSessionMaxPoints, static_cast<int>(touches.size()));
+
+    // Drawing with the finger: the first finger of a touch draws with the tool, like the pen
+    if (touchSessionMaxPoints == 1 && touches.size() == 1 && !fingerDrawing && !touchSessionIgnored &&
+        !touchSelection && !longPressFired && fingerDraws()) {
+        for (const auto& pt: e->points()) {
+            if (pt.state() == QEventPoint::State::Pressed) {
+                fingerDrawing = true;
+                fingerDrawingId = pt.id();
+                deviceClassPressed = true;
+                runningDeviceClass = DeviceClass::Touch;
+                Event ev;
+                ev.deviceClass = DeviceClass::Touch;
+                ev.viewPos = touches[pt.id()].pos;
+                ev.pressure = Point::NO_PRESSURE;
+                ev.timestamp = static_cast<guint32>(e->timestamp());
+                ev.device = e->pointingDevice();
+                actionStart(ev);
+                if (!penHoldTool()) {
+                    longPressTimer.stop();  // (held still, only the pen and highlighter offer what can be done)
+                }
+                break;
+            }
+        }
+    }
+    if (fingerDrawing && touches.size() >= 2) {
+        cancelFingerStroke();  // a second finger: the fingers scroll and zoom (upstream takes the stroke back too)
+    }
+    if (fingerDrawing) {
+        for (const auto& pt: e->points()) {
+            if (pt.id() != fingerDrawingId) {
+                continue;
+            }
+            Event ev;
+            ev.deviceClass = DeviceClass::Touch;
+            ev.viewPos = sceneToView(pt.scenePosition());
+            ev.pressure = Point::NO_PRESSURE;
+            ev.timestamp = static_cast<guint32>(e->timestamp());
+            ev.device = e->pointingDevice();
+            touchSessionTravel = std::max(touchSessionTravel, std::hypot(ev.viewPos.x() - touchSessionStartPos.x(),
+                                                                         ev.viewPos.y() - touchSessionStartPos.y()));
+            if (touchSessionTravel > TAP_SLOP_PX) {
+                longPressTimer.stop();  // it moved: a stroke, not a long press
+            }
+            if (pt.state() == QEventPoint::State::Released) {
+                actionEnd(ev);
+                deviceClassPressed = false;
+                runningDeviceClass.reset();
+                fingerDrawing = false;
+                fingerDrawingId = -1;
+            } else if (pt.state() == QEventPoint::State::Updated) {
+                actionMotion(ev);
+            }
+        }
+        for (int id: released) {
+            touches.erase(id);
+        }
+        if (touches.empty()) {
+            // The touch drew: no tap, double tap or fling
+            longPressTimer.stop();
+            touchSessionIgnored = false;
+            velocitySamples.clear();
+            fingerDrawingId = -1;
+        }
+        return true;
+    }
+
     if (touchSessionMaxPoints > 1 || touchSessionTravel > TAP_SLOP_PX) {
         longPressTimer.stop();  // moved or a second finger: no long press
     }

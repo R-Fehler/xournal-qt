@@ -280,10 +280,20 @@ Popup {
                                      + "also choose here from which height on it counts as away.")
                     }
                     SectionTitle { text: qsTr("Gestures") }
+                    SwitchRow {
+                        objectName: "touchDrawingSwitch"
+                        key: "touchDrawing"
+                        text: qsTr("Draw with the finger")
+                    }
+                    Hint {
+                        text: qsTr("One finger draws with the current tool (the hand still scrolls), two fingers scroll "
+                                   + "and zoom. The same as the finger button in the tool bar. The mouse always draws "
+                                   + "with its left button.")
+                    }
                     SwitchRow { key: "zoomGestures"; text: qsTr("Pinch with two fingers to zoom") }
                     Hint {
-                        text: qsTr("One finger scrolls, two fingers pan and zoom. Tap with two fingers to undo, with "
-                                   + "three fingers to redo.")
+                        text: qsTr("One finger scrolls (unless it draws), two fingers pan and zoom. Tap with two "
+                                   + "fingers to undo, with three fingers to redo.")
                     }
                     Item { Layout.preferredHeight: 16 }
                 }

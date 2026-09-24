@@ -2147,3 +2147,67 @@ TEST_F(SidewaysTest, presentingAPageFillsTheViewAndASwipeGoesOnePage) {
     EXPECT_GT(view->documentLayout().padding(), 0.0);
     EXPECT_EQ(session->getCurrentPageNo(), 3u);
 }
+
+// --- drawing with the finger (the tool bar's toggle, upstream's "touchDrawing" setting) --------------------------
+
+TEST_F(CanvasReplayTest, withFingerDrawingOneFingerDrawsAndTwoFingersScroll) {
+    using S = QEventPoint::State;
+    processEvents(100);
+    // Off (the default): one finger scrolls and draws nothing
+    ASSERT_FALSE(app->getSettings()->getTouchDrawingEnabled());
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 50) << "one finger scrolls";
+    EXPECT_EQ(elementCount(0), 0u);
+
+    // On: the finger draws a stroke with the pen where it went, the view stays
+    app->getSettings()->setTouchDrawingEnabled(true);
+    auto& vc = view->getViewController();
+    const double top = vc.visibleContentRect().top();
+    const QPointF from = viewPos(0, QPointF(100, 300)), to = viewPos(0, QPointF(300, 340));
+    touch(*input, touchscreen, QEvent::TouchBegin, S::Pressed, from);
+    for (int i = 1; i <= 20; ++i) {
+        touch(*input, touchscreen, QEvent::TouchUpdate, S::Updated, from + (to - from) * (i / 20.0));
+    }
+    touch(*input, touchscreen, QEvent::TouchEnd, S::Released, to);
+    processEvents();
+    ASSERT_EQ(elementCount(0), 1u);
+    const auto* stroke =
+            dynamic_cast<const Stroke*>(session->getDocument()->getPage(0)->getSelectedLayer()->getElementsView().front());
+    ASSERT_NE(stroke, nullptr);
+    EXPECT_EQ(stroke->getToolType(), StrokeTool::PEN);
+    EXPECT_NEAR(stroke->getBoundingBox().x, 100, 3);
+    EXPECT_NEAR(stroke->getBoundingBox().x + stroke->getBoundingBox().width, 300, 3);
+    EXPECT_DOUBLE_EQ(vc.visibleContentRect().top(), top) << "drawing does not scroll";
+
+    // Two fingers still scroll (back up); the stroke the first finger began is taken back
+    twoFingerGesture(*input, touchscreen, [](int i, int) {
+        return std::pair{QPointF(300, 300 + 15.0 * i), QPointF(420, 300 + 15.0 * i)};
+    });
+    vc.stopMomentum();
+    processEvents();
+    EXPECT_LT(vc.visibleContentRect().top() - top, -50) << "two fingers scroll";
+    EXPECT_EQ(elementCount(0), 1u) << "no stroke from the first of the two fingers";
+
+    // A two-finger tap still undoes (the stroke)
+    const QPointF a = viewPos(0, QPointF(200, 200)), b = viewPos(0, QPointF(260, 200));
+    touchN(*input, touchscreen, QEvent::TouchBegin, {{1, S::Pressed, a}});
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Stationary, a}, {2, S::Pressed, b}});
+    touchN(*input, touchscreen, QEvent::TouchUpdate, {{1, S::Stationary, a}, {2, S::Released, b}});
+    touchN(*input, touchscreen, QEvent::TouchEnd, {{1, S::Released, a}});
+    processEvents();
+    EXPECT_EQ(elementCount(0), 0u) << "two-finger tap: undo";
+
+    // The hand tool: the finger scrolls again
+    app->getToolHandler()->selectTool(TOOL_HAND);
+    EXPECT_GT(fingerPan(*input, touchscreen, *view), 50) << "the hand scrolls";
+    EXPECT_EQ(elementCount(0), 0u);
+    app->getToolHandler()->selectTool(TOOL_PEN);
+
+    // While the pen is near, a finger is a resting hand: nothing is drawn
+    input->proximityEvent(true);
+    touch(*input, touchscreen, QEvent::TouchBegin, S::Pressed, from);
+    touch(*input, touchscreen, QEvent::TouchUpdate, S::Updated, to);
+    touch(*input, touchscreen, QEvent::TouchEnd, S::Released, to);
+    input->proximityEvent(false);
+    processEvents();
+    EXPECT_EQ(elementCount(0), 0u) << "palm rejection";
+}

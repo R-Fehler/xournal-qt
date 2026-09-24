@@ -232,6 +232,9 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         });
     add("zoomGestures", [&s] { return QVariant(s.isZoomGesturesEnabled()); },
         [&s](const QVariant& v) { s.setZoomGesturesEnabled(v.toBool()); });
+    // One finger draws with the tool, two scroll and zoom (upstream's setting; also the tool bar's toggle)
+    add("touchDrawing", [&s] { return QVariant(s.getTouchDrawingEnabled()); },
+        [&s](const QVariant& v) { s.setTouchDrawingEnabled(v.toBool()); });
 
     // --- stabilizer (ranges as in upstream's settings dialog) ---
     add("stabilizerAveraging", [&s] { return QVariant(static_cast<int>(s.getStabilizerAveragingMethod())); },

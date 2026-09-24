@@ -173,6 +173,9 @@ int main(int argc, char* argv[]) {
     engine.loadFromModule("XournalQt", "Main");
     AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
 #ifdef Q_OS_ANDROID
+    // A phone without a pen (the Galaxy Fold 7) is written on with the finger: drawing with the finger is on at the
+    // first start there, off where a stylus is attached (as on the desktop)
+    controller.setFingerDrawingDefault(!xqt::android::hasStylus());
     // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
     // is there to show them and what went wrong)
     xqt::android::watchIncomingFiles([&controller](const QStringList& files) { controller.receiveFiles(files); });

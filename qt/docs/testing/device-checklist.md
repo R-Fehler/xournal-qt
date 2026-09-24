@@ -1103,3 +1103,9 @@ Install the debug APK (`adb install -r …/android-build-debug.apk`; the documen
       folder appears in the library with its subfolders and documents.
 - [ ] In a document, the Open button: the picker; the chosen PDF opens as a tab and its copy is in "Opened".
 - [ ] The image tool (or Insert image): pick a photo; it lands on the page as a selection.
+- [ ] After installing this APK the finger button in the tool bar (next to the hand) is on (the Fold 7 has no pen).
+      One finger writes with the pen; the hand tool scrolls with one finger; two fingers scroll and pinch-zoom (the
+      line the first finger began disappears); a quick two-finger tap undoes. Turn the button off: one finger scrolls
+      again. Settings → Touch → "Draw with the finger" shows the same state.
+- [ ] Desktop (Linux, Surface): the finger button is off at first; turned on, the touch screen draws with one finger;
+      the mouse draws with the left button either way; with the pen near, a resting hand draws nothing.

@@ -396,6 +396,16 @@ ApplicationWindow {
                 }
             }
             IconButton { visible: !win.textDoc; iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
+            // Draw with the finger (one finger draws, two scroll and zoom): a switch, not a tool
+            IconButton {
+                visible: !win.textDoc
+                objectName: "touchDrawingButton"
+                iconName: "xopp-touch-drawing"
+                tip: checked ? qsTr("The finger draws (two fingers scroll) - tap: the finger scrolls")
+                             : qsTr("Draw with the finger (two fingers scroll)")
+                checked: (app.settings.revision, app.settings.get("touchDrawing"))
+                onClicked: app.settings.set("touchDrawing", !checked)
+            }
             IconButton {
                 visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "textButton"

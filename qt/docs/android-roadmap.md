@@ -32,6 +32,9 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   replays `getHistorical*` samples through JNI (research 02-stylus-input.md). Measure first with an input logger
   (`xqt.input`). The Galaxy Fold 7 has no S Pen support, so stylus tests need another device (a Galaxy Tab with an
   S Pen) or the emulator's stylus.
+- Done (`qt/android-basics`): **draw with the finger** (tool bar toggle, Settings → Touch), on by default on
+  Android devices without a stylus. Open: a long press with the finger while drawing takes the dot back and shows
+  the context menu only with the pen and highlighter (as the pen does); other tools just draw.
 - (E) **Palm rejection and touch vs. pen**: the canvas already separates them on Linux; Android reports
   `TOOL_TYPE_STYLUS` / `TOOL_TYPE_ERASER`, which Qt maps to `QPointingDevice` types. Check the eraser end and the
   side button.

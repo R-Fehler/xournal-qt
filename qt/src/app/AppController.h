@@ -488,6 +488,9 @@ public:
     void receiveFiles(const QStringList& sources);
     /// The folder receiveFiles copies into.
     fs::path receivedFolder() const;
+    /// Drawing with the finger (the tool bar's toggle, setting "touchDrawing") on or off, once: the first start on a
+    /// device decides (Android: on when it has no stylus); afterwards the user's choice stays.
+    void setFingerDrawingDefault(bool on);
 
 private:
     void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);

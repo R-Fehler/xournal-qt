@@ -325,6 +325,49 @@ TEST_F(MainWindowTest, penHeightIsOfferedOnceThePenTellsIt) {
     xqt::PenHover::instance().reset();
 }
 
+// Drawing with the finger: a toggle in the tool bar and the same setting in Settings -> Touch (off on the desktop).
+TEST_F(MainWindowTest, fingerDrawingIsAToggleInTheToolBarAndASetting) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    EXPECT_FALSE(settings->get("touchDrawing").toBool()) << "off by default";
+    controller->newDocument();
+    auto* button = findItem("touchDrawingButton");
+    ASSERT_NE(button, nullptr);
+    until([&] { return button->isVisible(); });
+    EXPECT_FALSE(button->property("checked").toBool());
+    click(button);
+    EXPECT_TRUE(settings->get("touchDrawing").toBool());
+    EXPECT_TRUE(button->property("checked").toBool());
+
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("touchTab"));
+    auto* row = findItem("touchDrawingSwitch");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    QQuickItem* toggle = nullptr;
+    for (QQuickItem* child: row->childItems()) {
+        if (QString(child->metaObject()->className()).contains("Switch")) {
+            toggle = child;
+        }
+    }
+    ASSERT_NE(toggle, nullptr);
+    EXPECT_TRUE(toggle->property("checked").toBool()) << "the same setting";
+    click(toggle);
+    EXPECT_FALSE(settings->get("touchDrawing").toBool());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    EXPECT_FALSE(button->property("checked").toBool());
+
+    // The first start on a phone without a pen turns it on, once; the user's choice stays after that
+    controller->setFingerDrawingDefault(true);
+    EXPECT_TRUE(settings->get("touchDrawing").toBool());
+    settings->set("touchDrawing", false);
+    controller->setFingerDrawingDefault(true);
+    EXPECT_FALSE(settings->get("touchDrawing").toBool()) << "only once";
+}
+
 TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     ASSERT_NE(settings, nullptr);

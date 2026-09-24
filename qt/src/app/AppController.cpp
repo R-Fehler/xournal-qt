@@ -2032,6 +2032,18 @@ void AppController::receiveFiles(const QStringList& sources) {
     });
 }
 
+void AppController::setFingerDrawingDefault(bool on) {
+    Settings* s = app->getSettings();
+    bool applied = false;
+    if (s->getCustomElement("touch").getBool("drawingDefaultApplied", applied) && applied) {
+        return;
+    }
+    s->getCustomElement("touch").setBool("drawingDefaultApplied", true);
+    s->customSettingsChanged();
+    s->setTouchDrawingEnabled(on);
+    s->save();
+}
+
 void AppController::openReceived(const fs::path& folder, const std::vector<fs::path>& files,
                                  const QStringList& errors) {
     library->refresh();
