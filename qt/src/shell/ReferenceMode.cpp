@@ -101,6 +101,9 @@ void ReferenceMode::update() {
         connections.push_back(connect(v, &CanvasView::linkTapped, this, &ReferenceMode::linkTapped));
         // A long press or right click: the window offers what can be done there
         connections.push_back(connect(v, &CanvasView::contextRequested, this, &ReferenceMode::contextRequested));
+        // The text tool on a Markdown text (only while the reference is written in: else the tool scrolls)
+        connections.push_back(connect(v, &CanvasView::markdownRequested, this, &ReferenceMode::markdownRequested));
+        connections.push_back(connect(v, &CanvasView::markdownBoxRequested, this, &ReferenceMode::markdownBoxRequested));
     }
     Q_EMIT changed();
     Q_EMIT pageChanged();

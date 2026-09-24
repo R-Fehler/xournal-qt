@@ -793,3 +793,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       Select all, Image…), acting on the reference.
 - [ ] Lasso or rectangle in the reference: its bar appears above the reference's pill with Copy (and Deselect);
       with the pen button on, also Cut, Paste and Delete.
+- [ ] Markdown in the reference: with the pen button on, tap a Markdown text box of the reference with the text tool:
+      the panel beside the pages edits the reference's text (its tab gets the "●"); for reading, the text tool only
+      scrolls there and Ctrl+M (Markdown) still writes in the notes.

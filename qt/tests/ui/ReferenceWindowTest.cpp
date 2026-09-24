@@ -817,3 +817,36 @@ TEST_F(ReferenceWindowTest, aSelectionInTheReferenceHasItsBarOnItsSide) {
     EXPECT_EQ(elements(session), 0u) << "not deleted in the reference";
     EXPECT_FALSE(bar->isVisible());
 }
+
+TEST_F(ReferenceWindowTest, markdownIsWrittenInTheReferenceWhenItIsWrittenIn) {
+    ref().showTab(1);
+    wait(100);
+    auto* notes = tabs().session(0);
+    auto* book = tabs().session(1);
+    controller->selectTool("hand");
+    click(reference);  // (in hand)
+    ASSERT_TRUE(ref().focused());
+    // For reading: Markdown goes into the notes, as before
+    controller->beginMarkdown(-1);
+    controller->updateMarkdown("in the notes");
+    controller->endMarkdown(true);
+    EXPECT_TRUE(notes->isModified());
+    EXPECT_FALSE(book->isModified());
+
+    // Written in: the text tool opens its Markdown text beside the page
+    ref().setEditing(true);
+    controller->setTextMarkdown(true);
+    controller->setMarkdownInPanel(true);
+    controller->selectTool("text");
+    QSignalSpy asked(controller.get(), &AppController::markdownBoxRequested);
+    click(reference);
+    EXPECT_EQ(asked.count(), 1) << "the reference's text tool did not ask for its Markdown box";
+    auto* panel = findItem("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(controller->markdownActive());
+    controller->updateMarkdown("in the reference");
+    controller->endMarkdown(true);
+    EXPECT_TRUE(book->isModified()) << "the Markdown text did not go into the reference";
+    controller->setTextMarkdown(false);
+}

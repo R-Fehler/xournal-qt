@@ -160,6 +160,9 @@ Q_SIGNALS:
     void pdfTextModeChanged();
     /// A long press or right click on the reference (its canvas coordinates): the window offers what fits.
     void contextRequested(QPointF viewPos);
+    /// The text tool on a Markdown text of the reference (while it is written in), as CanvasView's signals.
+    void markdownRequested(int page);
+    void markdownBoxRequested(int page, double x, double y);
 
 private:
     /// The current tab or its reference changed: follow the reference's view.

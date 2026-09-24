@@ -195,7 +195,10 @@ void AppController::makeTabs() {
     connect(referenceMode.get(), &ReferenceMode::copied, this, [this](const QString& what) {
         Q_EMIT pageActionDone(what, false);
     });
-
+    // The reference written in: its text tool makes Markdown text as the notes' does, edited in the same panel
+    connect(referenceMode.get(), &ReferenceMode::changed, this, &AppController::applyMarkdownText);
+    connect(referenceMode.get(), &ReferenceMode::markdownRequested, this, &AppController::markdownRequested);
+    connect(referenceMode.get(), &ReferenceMode::markdownBoxRequested, this, &AppController::markdownBoxRequested);
     connect(tabs.get(), &TabManager::pdfPagesFailed, this, [this](const QString& error) {
         Q_EMIT message(tr("Pasting PDF pages failed"),
                        tr("The pasted pages show their PDF page as a picture (its text cannot be searched).\n\n%1")
@@ -504,10 +507,12 @@ QVariantMap AppController::takeMarkdownFromPage() {
 QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     endMarkdown(true);
     endTextFlow(true);
-    if (!session() || session()->isReadOnly()) {
+    // The document with the keys: the reference while it is written in, else the notes
+    DocumentSession* target = editedReference() ? &editedReference()->getSession() : session();
+    if (!target || target->isReadOnly()) {
         return {};  // (a Markdown file shown read-only: not edited here)
     }
-    mdSession = session();
+    mdSession = target;
     markdown = std::make_unique<MarkdownSession>(*mdSession);
     md::Style style;
     style.family = textFlowFamily().toStdString();
@@ -1280,8 +1285,11 @@ void AppController::setMarkdownBoxSize(double size) {
 }
 
 void AppController::applyMarkdownText() {
-    if (CanvasView* v = canvas()) {
-        v->setMarkdownText(textMarkdown(), markdownFontSize(), markdownInPanel());
+    // (the notes, and the reference beside them: it may be written in)
+    for (CanvasView* v: {canvas(), referenceMode ? referenceMode->canvas() : nullptr}) {
+        if (v) {
+            v->setMarkdownText(textMarkdown(), markdownFontSize(), markdownInPanel());
+        }
     }
 }
 
