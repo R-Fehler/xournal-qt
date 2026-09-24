@@ -139,7 +139,9 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    of the file and is the document's background PDF; the file path of the document is the hybrid PDF, so the tab,
    recent files and Ctrl+S use it. Library, previews and search load it the same way.
    - Our annotations are removed from the clean copy; annotations of other apps stay in it (poppler shows them)
-     and are written again on save.
+     and are written again on save, also on pages with a generated background (the session remembers which page of
+     the clean copy each page was, so they follow a page that is moved). The clean copy is the document's PDF even
+     when no page shows a PDF page.
    - The clean copy carries the merged-PDF mark `Own` of `qt/pdf-pages`, so "Save as" `.xopp` from a hybrid PDF
      puts its pages next to the `.xopp` (`name.pdf` or `.name.pages.pdf`) instead of referring into the cache.
    - The cache: a document retains the clean copy it uses (in this process); opening a file removes the clean

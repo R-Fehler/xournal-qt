@@ -21,6 +21,7 @@
  */
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,6 +29,7 @@
 #include "filesystem.h"
 
 class Document;
+class XojPage;
 
 namespace xqt::HybridPdf {
 
@@ -44,10 +46,14 @@ struct Result {
     size_t annotations = 0;  ///< our annotations written
 };
 
+/// The page of the background PDF a page of the document was when it was opened from a hybrid PDF (npos: none).
+using BasePageOf = std::function<size_t(const XojPage*)>;
+
 /// Write the document as a hybrid PDF `target` (atomically: a temporary file next to it, renamed over it). The
 /// document is read under its shared lock (the caller must not hold it). `target` may be the document's background
-/// PDF.
-Result write(Document& doc, const fs::path& target);
+/// PDF. `baseOf`: a page with a generated background keeps the annotations other apps put on that page of the
+/// background PDF (the clean copy of the hybrid PDF it was opened from).
+Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {});
 
 /// Export for Xournal++: a plain `xopp` whose background is `pdf`, the document's base pages in document order (the
 /// hybrid PDF without our annotations and data). The document keeps its own files.

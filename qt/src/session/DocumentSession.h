@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <QObject>
@@ -277,6 +278,9 @@ private:
     std::unique_ptr<PdfPageKeeper> pdfPages;
     std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)
     std::vector<std::string> hybridChanges;
+    /// Opened from a hybrid PDF: the page of its clean copy each page was (annotations of other apps on pages with a
+    /// generated background are kept from there). Forgotten when the pages of the background PDF may be renumbered.
+    std::unordered_map<const XojPage*, std::pair<std::weak_ptr<XojPage>, size_t>> hybridBase;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };
 

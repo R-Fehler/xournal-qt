@@ -436,14 +436,21 @@ TEST_F(HybridPdfTest, annotationsOfOtherAppsStay) {
     auto doc = annotated(path("lecture.pdf"));
     const fs::path out = path("lecture.notes.pdf");
     ASSERT_TRUE(HybridPdf::write(*doc, out).ok);
-    editWithQpdf(out, [](QPDF& q) {  // a comment on page 4, as another app adds it
-        QPDFObjectHandle page = QPDFPageDocumentHelper(q).getAllPages().at(3).getObjectHandle();
-        QPDFObjectHandle note = q.makeIndirectObject(QPDFObjectHandle::parse(
-                "<< /Type /Annot /Subtype /Text /Rect [100 100 120 120] /Contents (from another app) /NM (other-1) >>"));
-        if (!page.getKey("/Annots").isArray()) {
-            page.replaceKey("/Annots", QPDFObjectHandle::newArray());
+    editWithQpdf(out, [](QPDF& q) {  // comments on page 4 and on the ruled page 2, as another app adds them
+        for (int n: {3, 1}) {
+            QPDFObjectHandle page = QPDFPageDocumentHelper(q).getAllPages().at(n).getObjectHandle();
+            QPDFObjectHandle note = q.makeIndirectObject(QPDFObjectHandle::parse(
+                    "<< /Type /Annot /Subtype /Text /Rect [100 100 120 120] /Contents (from another app) /NM (other-" +
+                    std::to_string(n) + ") >>"));
+            QPDFObjectHandle annots = QPDFObjectHandle::newArray();
+            if (page.getKey("/Annots").isArray()) {
+                for (int i = 0; i < page.getKey("/Annots").getArrayNItems(); ++i) {
+                    annots.appendItem(page.getKey("/Annots").getArrayItem(i));
+                }
+            }
+            annots.appendItem(note);
+            page.replaceKey("/Annots", annots);
         }
-        page.getKey("/Annots").appendItem(note);
     });
     auto loaded = DocumentSession::loadFile(out);
     ASSERT_TRUE(loaded.document);
@@ -453,17 +460,41 @@ TEST_F(HybridPdfTest, annotationsOfOtherAppsStay) {
         clean.processFile(loaded.document->getPdfFilepath().string().c_str());
         auto annots = QPDFPageDocumentHelper(clean).getAllPages().at(3).getAnnotations();
         ASSERT_EQ(annots.size(), 1u) << "the clean copy keeps it (shown by the background)";
-        EXPECT_EQ(annots[0].getObjectHandle().getKey("/NM").getUTF8Value(), "other-1");
+        EXPECT_EQ(annots[0].getObjectHandle().getKey("/NM").getUTF8Value(), "other-3");
     }
     DocumentSession session(*app, std::move(loaded.document));
+    {  // the ruled page moves to the end: its comment goes with it
+        std::unique_lock lock(*session.getDocument());
+        PageRef ruled = session.getDocument()->getPage(1);
+        session.getDocument()->deletePage(1);
+        session.getDocument()->insertPage(ruled, 3);
+    }
     ASSERT_TRUE(session.save().ok);
     QPDF saved;
     saved.processFile(out.string().c_str());
     auto pages = QPDFPageDocumentHelper(saved).getAllPages();
-    EXPECT_EQ(pages.at(3).getAnnotations().size(), 1u);
-    EXPECT_EQ(pages.at(3).getAnnotations()[0].getObjectHandle().getKey("/Contents").getUTF8Value(),
+    ASSERT_EQ(pages.at(2).getAnnotations().size(), 1u) << "the last PDF page, now third";
+    EXPECT_EQ(pages.at(2).getAnnotations()[0].getObjectHandle().getKey("/Contents").getUTF8Value(),
               "from another app");
     EXPECT_EQ(pages.at(0).getAnnotations().size(), 2u) << "ours, written once";
+    std::vector<std::string> onRuled;
+    for (auto& a: pages.at(3).getAnnotations()) {
+        onRuled.push_back(a.getObjectHandle().getKey("/NM").getUTF8Value());
+    }
+    EXPECT_EQ(onRuled, (std::vector<std::string>{"other-1", HybridPdf::nameOf(3, 0)}))
+            << "a page with a generated background keeps the other app's comment too";
+    EXPECT_EQ(pages.at(3).getAnnotations()[0].getObjectHandle().getKey("/P").getObjGen(),
+              pages.at(3).getObjectHandle().getObjGen());
+    int code = -1;
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+
+    // "Save as" .xopp: its pages go next to it, not a reference into the cache
+    ASSERT_TRUE(session.saveAs(path("notes.xopp")).ok);
+    EXPECT_FALSE(session.isHybrid());
+    EXPECT_EQ(session.getDocument()->getPdfFilepath(), path("notes.pdf"));
+    auto xopp = DocumentSession::loadFile(path("notes.xopp"));
+    ASSERT_TRUE(xopp.document);
+    EXPECT_EQ(describe(*xopp.document), describe(*session.getDocument()));
 }
 
 TEST_F(HybridPdfTest, inkChangedInAnotherAppIsReportedAndCanBeImported) {

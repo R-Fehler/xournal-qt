@@ -186,6 +186,12 @@ void DocumentSession::init() {
     if (const fs::path bg = doc->getPdfFilepath(); HybridPdf::inCache(bg)) {
         HybridPdf::retain(bg);  // (the clean copy of a hybrid PDF: kept while this document uses it)
         retainedBases.push_back(bg);
+        if (hasExtension(doc->getFilepath(), ".pdf")) {  // opened from it: page i was its page i
+            for (size_t i = 0; i < doc->getPageCount(); ++i) {
+                PageRef p = doc->getPage(i);
+                hybridBase[p.get()] = {p, i};
+            }
+        }
     }
 
     scrollHandler.indexOf = [this](const PageRef& page) { return doc->indexOf(page); };
@@ -871,6 +877,7 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     if (stop(4)) {
         return {false, "stopped (test)"};
     }
+    hybridBase.clear();  // (the PDF pages may have been renumbered)
     pdfPages->finishStaged();  // (the file under the other name: no .xopp refers to it now)
     // Port of Control::resetSavedStatus
     undoRedo->documentSaved();
@@ -1008,7 +1015,14 @@ auto DocumentSession::saveHybridImpl(const fs::path& target) -> SaveResult {
         retainedBases.push_back(copy);
         bg = copy;
     }
-    const auto r = HybridPdf::write(*doc, target);
+    HybridPdf::BasePageOf baseOf;
+    if (!hybridBase.empty() && (HybridPdf::inCache(bg) || MergedPdf::inCache(bg))) {
+        baseOf = [this](const XojPage* page) {
+            auto it = hybridBase.find(page);
+            return it != hybridBase.end() && it->second.first.lock().get() == page ? it->second.second : npos;
+        };
+    }
+    const auto r = HybridPdf::write(*doc, target, baseOf);
     if (!r.ok) {
         return {false, FS(_F("Could not write the hybrid PDF \"{1}\": {2}") % target.u8string() % r.error)};
     }

@@ -351,6 +351,7 @@ struct PageSpec {
     double width = 0, height = 0;
     size_t pdfPage = npos;    ///< base page from the background PDF
     size_t drawnPage = npos;  ///< base page drawn by cairo (page of `drawn`)
+    size_t annotsFrom = npos; ///< a drawn page: the annotations of other apps on this page of the background PDF
 };
 
 struct AnnotSpec {
@@ -374,7 +375,7 @@ struct Prepared {
 };
 
 /// Everything that needs the document: under its shared lock (and briefly its lock).
-Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work) {
+Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf) {
     Prepared out;
     {
         std::shared_lock lock(doc);
@@ -403,6 +404,11 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
                 cairo_restore(cr);
                 cairo_show_page(cr);
                 spec.drawnPage = drawn++;
+                if (baseOf && !out.bg.empty()) {
+                    if (const size_t b = baseOf(p.get()); b < bgPages) {
+                        spec.annotsFrom = b;
+                    }
+                }
             }
             out.pages.push_back(spec);
             size_t layerNo = 0;
@@ -572,7 +578,25 @@ std::vector<QPDFObjectHandle> basePages(QPDF& out, QPDF& drawn, const Prepared& 
             order.push_back(h);
         } else {
             helper.addPage(drawnPages.at(spec.drawnPage), false);
-            order.push_back(QPDFPageDocumentHelper(out).getAllPages().back().getObjectHandle());
+            QPDFObjectHandle h = QPDFPageDocumentHelper(out).getAllPages().back().getObjectHandle();
+            if (spec.annotsFrom < bgPages.size()) {
+                // A page with a generated background: the annotations other apps put on it stay
+                QPDFPageObjectHelper from = bgPages[spec.annotsFrom];
+                QPDFObjectHandle annots = from.getObjectHandle().getKey("/Annots");
+                if (annots.isArray() && annots.getArrayNItems() > 0) {
+                    QPDFObjectHandle mine = QPDFObjectHandle::newArray();
+                    for (int i = 0; i < annots.getArrayNItems(); ++i) {
+                        QPDFObjectHandle a = annots.getArrayItem(i);
+                        if (a.isDictionary()) {
+                            a = out.makeIndirectObject(a.shallowCopy());
+                            a.replaceKey("/P", h);
+                        }
+                        mine.appendItem(a);
+                    }
+                    h.replaceKey("/Annots", mine);
+                }
+            }
+            order.push_back(h);
         }
     }
     QPDFObjectHandle pagesRoot = out.getRoot().getKey("/Pages");
@@ -698,7 +722,8 @@ Result assemble(const Prepared& prep, const fs::path& target, bool hybrid) {
     Steps step;
     QPDF out;
     out.setSuppressWarnings(true);
-    const bool fromBg = std::any_of(prep.pages.begin(), prep.pages.end(), [](auto& p) { return p.pdfPage != npos; });
+    const bool fromBg = std::any_of(prep.pages.begin(), prep.pages.end(),
+                                    [](auto& p) { return p.pdfPage != npos || p.annotsFrom != npos; });
     if (fromBg) {
         out.processFile(prep.bg.string().c_str());
         if (out.getRoot().hasKey(MARKER)) {
@@ -842,12 +867,12 @@ void touch(const fs::path& base) {
     fs::last_write_time(base.parent_path(), fs::file_time_type::clock::now(), ec);
 }
 
-Result write(Document& doc, const fs::path& target) {
+Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf) {
     Result r;
     try {
         WorkDir work;
         Steps step;
-        const Prepared prep = prepare(doc, target.filename().string(), work.path);
+        const Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf);
         step("draw and write the .xopp");
         if (!prep.error.empty()) {
             r.error = prep.error;
@@ -864,7 +889,7 @@ Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf) {
     Result r;
     try {
         WorkDir work;
-        const Prepared prep = prepare(doc, pdf.filename().string(), work.path);
+        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {});
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;
@@ -1003,7 +1028,7 @@ Opened open(const fs::path& pdf) {
             o.error = "The Xournal data of this PDF cannot be read.";
             return o;
         }
-        if (!o.document->getPdfFilepath().empty()) {
+        {  // (also without PDF pages: the annotations of other apps on its pages are kept from it)
             if (!o.document->readPdf(base, /*initPages=*/false, /*attachToDocument=*/false)) {
                 o.error = "The pages of this PDF cannot be read: " + o.document->getLastErrorMsg();
                 o.document.reset();
