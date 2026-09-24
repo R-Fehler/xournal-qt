@@ -9,6 +9,7 @@
 #include <shared_mutex>
 
 #include <QElapsedTimer>
+#include <QCoreApplication>
 #include <QThread>
 #include <QThreadPool>
 #include <poppler.h>
@@ -41,6 +42,13 @@ QThreadPool& textPool() {
         auto* p = new QThreadPool;  // (never destroyed: see ~DocumentTextIndex)
         p->setMaxThreadCount(1);
         p->setThreadPriority(QThread::LowPriority);
+        // Before the program's statics go: a task still queued or running would release its poppler document
+        // while poppler and glib are torn down (a crash at exit, which the crash handler then takes for a real one)
+        qAddPostRoutine([] {
+            QThreadPool& p = textPool();
+            p.clear();
+            p.waitForDone();
+        });
         return p;
     }();
     return *pool;
