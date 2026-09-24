@@ -305,6 +305,18 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
      It can be changed later in Settings → Documents. Xournal++ exports stay available through Share → "For
      Xournal++".
 
+### Setsquare and compass on high-DPI screens (the author, 2026-09-24)
+- [ ] **`qt/geometry-gpu`: the setsquare lags on the Surface Pro 8** (2880×1920 at 200%) once it is larger than
+  about 10 cm; it is smooth on the full-HD Linux screen.
+  - Cause: upstream's `SetsquareView`/`CompassView` draw with cairo on the CPU into the page overlay, including every
+    mm tick and number as text, and the old and new bounding boxes are redrawn on every move and turn. The cost grows
+    with (size × zoom × screen scale)²: 4× the pixels per cm at 200% versus 100%.
+  - Fix: draw the tool once into a texture at the current zoom and scale; move and turn it as a GPU transform
+    (`QSGTransformNode`) during interaction; draw it again only on a zoom or size change, and once after a turn ends,
+    for sharpness.
+  - Measure on Linux with `QT_SCALE_FACTOR=2` and `XQT_PERF=1`: frame times before and after, for a 15 cm setsquare
+    moved and turned.
+
 ### Bugs
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
 - [x] **Fit width uses the widest page, not the current one** (fixed in `qt/present`) (the author, 2026-09-24): after pasting a 16:9 page
