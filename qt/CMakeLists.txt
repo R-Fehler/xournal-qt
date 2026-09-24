@@ -54,9 +54,15 @@ qt_standard_project_setup(REQUIRES 6.5)
 add_compile_definitions(QT_NO_KEYWORDS)
 
 # Windows with MinGW (MSYS2, see docs/windows.md): big translation units (AppController, the QML cache) have more
-# sections than COFF allows by default.
+# sections than COFF allows by default. And MinGW's C library headers hide M_PI, the POSIX names and more under strict
+# ISO C++ (__STRICT_ANSI__), which upstream's code uses: compile as gnu++20 there, as upstream Xournal++ does on MSYS2.
+# <windows.h> must not define min and max macros, whichever header includes it first.
 if(MINGW)
     add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-Wa,-mbig-obj>")
+    set(CMAKE_CXX_EXTENSIONS ON)
+endif()
+if(WIN32)
+    add_compile_definitions(NOMINMAX)
 endif()
 
 if(XQT_BUILD_CORE)

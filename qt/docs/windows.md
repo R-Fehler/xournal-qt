@@ -97,7 +97,7 @@ The unit tests are not built on Windows yet: they use POSIX headers and `/proc` 
 | Memory size ([CanvasMemory.cpp](../src/canvas/CanvasMemory.cpp)) | `sysconf` | `GlobalMemoryStatusEx` |
 | Background render threads ([RenderService.cpp](../src/render/RenderService.cpp)) | `SCHED_IDLE` | `THREAD_PRIORITY_IDLE` |
 | CLI arguments ([cli/main.cpp](../cli/main.cpp)) | `argv` | the UTF-8 command line (`g_win32_get_command_line`) |
-| CMake | – | a GUI executable (`WIN32_EXECUTABLE`), `-Wa,-mbig-obj` (large translation units), no desktop files or `.deb` |
+| CMake | strict C++20 | gnu++20 (MinGW's headers hide `M_PI` and POSIX names under strict C++), `NOMINMAX`, a GUI executable (`WIN32_EXECUTABLE`), `-Wa,-mbig-obj` (large translation units), no desktop files or `.deb` |
 
 ## Building it on a Windows machine
 
