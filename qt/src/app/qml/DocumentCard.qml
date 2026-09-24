@@ -230,6 +230,8 @@ Item {
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     anchors.margins: 6
+                    // (above the "last read" tag, which a narrow card fills across)
+                    anchors.bottomMargin: card.lastRead !== "" && card.snippet === "" ? 28 : 6
                     z: 3
                     radius: 4
                     color: "#e65100"

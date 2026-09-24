@@ -1912,7 +1912,7 @@ Rectangle {
                                 text: {
                                     const d = conflictRow.modelData
                                     let parts = []
-                                    if (!d.original && d.app) parts.push(qsTr("Conflict copy of %1").arg(d.app))
+                                    if (!d.original && d.app) parts.push(qsTr("Conflict copy (%1)").arg(d.app))
                                     else if (!d.original) parts.push(qsTr("Conflict copy"))
                                     parts.push(qsTr("changed %1").arg(d.modified.toLocaleString(Qt.locale(), Locale.ShortFormat)))
                                     parts.push(home.sizeText(d.size))
@@ -1973,7 +1973,7 @@ Rectangle {
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
-        title: qsTr("Delete %1?").arg(goes)
+        title: qsTr("Delete the other version?")
         width: Math.min(parent ? parent.width - 32 : 480, 480)
         standardButtons: Dialog.Cancel | Dialog.Ok
         Label {
