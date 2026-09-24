@@ -75,7 +75,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
       - [ ] Snippet cards are small by default (9–11 px text); −/+ zooms them.
    4. ~~the "Show" filter and other files~~: `qt/library-filter`, merged 2026-09-24 (see ROADMAP). Follow-ups:
       - [ ] "Only PDFs with notes" checks each lone PDF for being hybrid on the UI thread (qpdf, cached per file
-        version). Not measured on the Uni library; move it to the index (a hybrid flag in the entry).
+        version). Not measured on the author's largest library; move it to the index (a hybrid flag in the entry).
       - [ ] Dropping a file of a hidden kind into the library gives the old "not a document the library shows"
         error; it should say which filter hides it.
    6. ~~`qt/fuzzy-text`~~: merged 2026-09-24 (see ROADMAP). Left: the first fuzzy search of a big open document builds its vocabularies on the UI thread (about 160 ms for 1,300 pages).
