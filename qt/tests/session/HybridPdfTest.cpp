@@ -4,6 +4,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <functional>
@@ -49,6 +50,7 @@
 #include "session/DocumentSession.h"
 #include "session/ArchivePdf.h"
 #include "session/HybridPdf.h"
+#include "session/IncrementalPdf.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "config.h"
@@ -489,8 +491,12 @@ TEST_F(HybridPdfTest, annotationsOfOtherAppsStay) {
     }
     EXPECT_EQ(onRuled, (std::vector<std::string>{"other-1", HybridPdf::nameOf(3, 0)}))
             << "a page with a generated background keeps the other app's comment too";
-    EXPECT_EQ(pages.at(3).getAnnotations()[0].getObjectHandle().getKey("/P").getObjGen(),
-              pages.at(3).getObjectHandle().getObjGen());
+    // (a copy made by a full write points at its page; appended, the other app's annotation stays as it was, on the
+    // same page object)
+    QPDFObjectHandle onPage = pages.at(3).getAnnotations()[0].getObjectHandle().getKey("/P");
+    if (!onPage.isNull()) {
+        EXPECT_EQ(onPage.getObjGen(), pages.at(3).getObjectHandle().getObjGen());
+    }
     int code = -1;
     EXPECT_EQ((qpdfCheck(out, code), code), 0);
 
@@ -1369,4 +1375,474 @@ TEST_F(ArchivePdfTest, aHybridPdfOfAPdfASourceDoesNotClaimPdfA) {
     QPDF a;
     a.processFile(path("again.archive.pdf").string().c_str());
     EXPECT_NE(streamText(a.getRoot().getKey("/Metadata")).find("<pdfaid:part>3</pdfaid:part>"), std::string::npos);
+}
+
+// --- saving again: incremental updates (qt/docs/hybrid-pdf.md, "Saving: incremental updates") ------------------------
+
+namespace {
+std::string fileBytes(const fs::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+size_t countOf(const std::string& text, const std::string& what) {
+    size_t n = 0;
+    for (size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + 1)) {
+        ++n;
+    }
+    return n;
+}
+
+/// A stroke on a page (as the stroke tool adds it, through the undo machinery).
+void drawOn(DocumentSession& s, size_t pageNo, double y, size_t layer = 0) {
+    PageRef page = s.getDocument()->getPage(pageNo);
+    auto stroke = std::make_unique<Stroke>();
+    stroke->setWidth(1.41);
+    stroke->setColor(Color(0xff008000U));
+    for (int j = 0; j < 12; ++j) {
+        stroke->addPoint(Point(80 + j * 20, y + 6 * std::sin(j / 2.0), 1 + (j % 4) / 4.0));
+    }
+    stroke->getBoundingBox();
+    s.getDocument()->lock();
+    (layer == 0 ? page->getSelectedLayer() : page->getLayers().at(layer))->addElement(std::move(stroke));
+    s.getDocument()->unlock();
+}
+
+/// Each page of `a` looks like the same page of `b` (poppler, with annotations).
+void expectSamePages(const fs::path& a, const fs::path& b, size_t pages, const std::string& when) {
+    for (size_t i = 0; i < pages; ++i) {
+        cairo_surface_t* x = render(a, i);
+        cairo_surface_t* y = render(b, i);
+        const Diff d = compare(x, y);
+        EXPECT_LT(d.mean, 0.5) << when << ", page " << i + 1;
+        EXPECT_LT(d.differ, 0.002) << when << ", page " << i + 1;
+        cairo_surface_destroy(x);
+        cairo_surface_destroy(y);
+    }
+}
+
+std::vector<QPDFObjGen> annotIds(const fs::path& pdf, size_t page) {
+    QPDF q;
+    q.processFile(pdf.string().c_str());
+    std::vector<QPDFObjGen> ids;
+    for (auto& a: QPDFPageDocumentHelper(q).getAllPages().at(page).getAnnotations()) {
+        ids.push_back(a.getObjectHandle().getObjGen());
+    }
+    return ids;
+}
+
+class IncrementalSaveTest: public HybridPdfTest {
+protected:
+    void SetUp() override {
+        HybridPdfTest::SetUp();
+        HybridPdf::compactAbove = 1000;  // (the small test files: never compacted, unless a test says so)
+    }
+    void TearDown() override {
+        HybridPdf::compactAbove = 0.25;
+        IncrementalPdf::failWriteAt = nullptr;
+    }
+    /// A session of the annotated lecture saved as a PDF with notes (in full).
+    std::unique_ptr<DocumentSession> savedLecture(const fs::path& out) {
+        auto s = std::make_unique<DocumentSession>(*app, annotated(path("lecture.pdf")));
+        const auto r = s->saveAsHybrid(out);
+        EXPECT_TRUE(r.ok) << r.error;
+        EXPECT_FALSE(r.incremental);
+        return s;
+    }
+    /// The document's state as a full write gives it, to compare with.
+    fs::path writtenInFull(DocumentSession& s, const char* name) {
+        const fs::path full = path(name);
+        EXPECT_TRUE(HybridPdf::write(*s.getDocument(), full).ok);
+        return full;
+    }
+};
+}  // namespace
+
+// A crash or a full disk while the update is written leaves the file as it was, byte for byte
+TEST_F(IncrementalSaveTest, aFailedAppendLeavesTheFileAsItWas) {
+    auto s = savedLecture(path("notes.pdf"));
+    const std::string before = fileBytes(path("notes.pdf"));
+    drawOn(*s, 0, 500);
+    // Before anything of the update is written, and when all of it is written but not yet in place
+    for (const uint64_t at: {uint64_t(0), uint64_t(1)}) {
+        IncrementalPdf::failWriteAt = [at](uint64_t written) { return written >= at; };
+        const auto r = s->save();
+        EXPECT_FALSE(r.ok) << "fails at " << at;
+        EXPECT_EQ(fileBytes(path("notes.pdf")), before);
+        for (auto& e: fs::directory_iterator(tmp.path().toStdString())) {
+            EXPECT_NE(e.path().extension(), ".part") << "no temporary file left: " << e.path();
+        }
+    }
+    IncrementalPdf::failWriteAt = nullptr;
+    // A temporary file a crash left behind (the process died while it wrote it) goes with the next save
+    const fs::path stale = path(".notes.pdf.12345-1.part");
+    std::ofstream(stale) << before.substr(0, 1000);
+    fs::last_write_time(stale, fs::file_time_type::clock::now() - std::chrono::hours(1));
+    const auto r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    EXPECT_EQ(fileBytes(path("notes.pdf")).substr(0, before.size()), before);
+    EXPECT_FALSE(fs::exists(stale));
+}
+
+// Ctrl+S appends the changed layer (its annotation and drawing), the embedded document, the marker: nothing else
+TEST_F(IncrementalSaveTest, ctrlSAppendsOnlyWhatChanged) {
+    const fs::path out = path("lecture.notes.pdf");
+    auto s = savedLecture(out);
+    const std::string before = fileBytes(out);
+    const auto page1 = annotIds(out, 0);
+    const auto page3 = annotIds(out, 2);
+    drawOn(*s, 2, 600);  // (page 3, the layer of its text: the ruled page is page 2)
+    const auto r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    const std::string after = fileBytes(out);
+    EXPECT_EQ(after.substr(0, before.size()), before);
+    EXPECT_EQ(r.appended, after.size() - before.size());
+    EXPECT_LT(r.appended, 12000u) << "one layer, the .xopp, the marker";
+    EXPECT_EQ(annotIds(out, 0), page1) << "the annotations of an unchanged page are the same objects";
+    ASSERT_EQ(annotIds(out, 2).size(), 1u) << "the layer of the text and the new stroke";
+    EXPECT_NE(annotIds(out, 2), page3) << "written again";
+    int code = -1;
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    EXPECT_TRUE(HybridPdf::hasEarlierRevisions(out));
+    EXPECT_TRUE(s->hasEarlierRevisions());
+    expectSamePages(out, writtenInFull(*s, "full.pdf"), 4, "after one incremental save");
+    auto loaded = DocumentSession::loadFile(out);
+    ASSERT_TRUE(loaded.document);
+    EXPECT_TRUE(loaded.hybridChanged.empty());
+    EXPECT_EQ(describe(*loaded.document), describeAsXopp(*s->getDocument(), path("same.xopp")));
+    // Saved again without a change: little more than the .xopp and the marker
+    const auto again = s->save();
+    ASSERT_TRUE(again.ok);
+    EXPECT_TRUE(again.incremental);
+    EXPECT_LT(again.appended, 8000u);
+}
+
+// Many saves in a row, with every kind of change: each file is valid, looks like a full write, and opens as the
+// document; the earlier revisions stay in it
+TEST_F(IncrementalSaveTest, manySavesLookAndOpenLikeFullWrites) {
+    const fs::path out = path("notes.pdf");
+    auto s = savedLecture(out);
+    Document& doc = *s->getDocument();
+    const std::vector<std::pair<std::string, std::function<void()>>> edits = {
+            {"a stroke", [&] { drawOn(*s, 0, 700); }},
+            {"a stroke on the highlighter layer, erased",
+             [&] {
+                 std::unique_lock lock(doc);
+                 Layer* l = doc.getPage(0)->getLayers().at(1);
+                 l->removeElement(l->getElementsView().front());
+             }},
+            {"pages moved",
+             [&] {
+                 std::unique_lock lock(doc);
+                 PageRef p = doc.getPage(3);
+                 doc.deletePage(3);
+                 doc.insertPage(p, 0);
+             }},
+            {"a ruled page added",
+             [&] {
+                 auto ruled = std::make_shared<XojPage>(595, 842);
+                 ruled->setBackgroundType(PageType(PageTypeFormat::Ruled));
+                 std::unique_lock lock(doc);
+                 doc.insertPage(ruled, 2);
+                 lock.unlock();
+                 drawOn(*s, 2, 300);
+             }},
+            {"a background changed",
+             [&] {
+                 std::unique_lock lock(doc);
+                 doc.getPage(2)->setBackgroundType(PageType(PageTypeFormat::Graph));
+             }},
+            {"a page deleted",
+             [&] {
+                 std::unique_lock lock(doc);
+                 doc.deletePage(4);
+             }},
+            {"a text", [&] {
+                 std::unique_lock lock(doc);
+                 addText(doc.getPage(1)->getSelectedLayer(), "added later", 100, 300);
+             }},
+            {"the PDF page shown twice", [&] {
+                 std::unique_lock lock(doc);
+                 PageRef first = doc.getPage(1);  // (a PDF page)
+                 auto twice = std::make_shared<XojPage>(first->getWidth(), first->getHeight());
+                 twice->setBackgroundType(first->getBackgroundType());
+                 twice->setBackgroundPdfPageNr(first->getPdfPageNr());
+                 doc.insertPage(twice, 4);
+             }},
+    };
+    size_t revisions = 1;
+    for (const auto& [what, edit]: edits) {
+        edit();
+        const auto r = s->save();
+        ASSERT_TRUE(r.ok) << what << ": " << r.error;
+        EXPECT_TRUE(r.incremental) << what;
+        revisions += r.incremental ? 1 : 0;
+        int code = -1;
+        const std::string check = qpdfCheck(out, code);
+        EXPECT_EQ(code, 0) << what << "\n" << check;
+        const fs::path full = writtenInFull(*s, "full.pdf");
+        expectSamePages(out, full, doc.getPageCount(), what);
+        auto loaded = DocumentSession::loadFile(out);
+        ASSERT_TRUE(loaded.document) << what;
+        EXPECT_TRUE(loaded.hybridChanged.empty()) << what;
+        EXPECT_EQ(describe(*loaded.document), describeAsXopp(doc, path("same.xopp"))) << what;
+    }
+    EXPECT_EQ(countOf(fileBytes(out), "startxref"), revisions);
+}
+
+// The file is written anew in full when it grew too much, and when asked to (Save as, Share)
+TEST_F(IncrementalSaveTest, compactsWhenItGrewTooMuchOrWhenAsked) {
+    const fs::path out = path("notes.pdf");
+    auto s = savedLecture(out);
+    drawOn(*s, 0, 500);
+    HybridPdf::compactAbove = 0.0001;
+    auto r = s->save();
+    ASSERT_TRUE(r.ok);
+    EXPECT_FALSE(r.incremental) << "grew by more than the limit: written in full";
+    EXPECT_FALSE(HybridPdf::hasEarlierRevisions(out));
+    HybridPdf::compactAbove = 1000;
+    drawOn(*s, 0, 550);
+    r = s->save();
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.incremental) << "after a full write, appended again";
+    EXPECT_TRUE(s->hasEarlierRevisions());
+    DocumentSession::SaveRequest share;
+    share.compact = true;
+    r = s->saveNow(share);
+    ASSERT_TRUE(r.ok);
+    EXPECT_FALSE(r.incremental);
+    EXPECT_FALSE(s->hasEarlierRevisions()) << "shared: no earlier revision goes along";
+    r = s->saveAsHybrid(path("other.pdf"));
+    ASSERT_TRUE(r.ok);
+    EXPECT_FALSE(r.incremental) << "Save as";
+    drawOn(*s, 1, 400);
+    r = s->save();
+    EXPECT_TRUE(r.incremental) << "then Ctrl+S appends to the new file";
+}
+
+// Share, Export and the archive export write fresh files: nothing of the earlier revisions (deleted ink) goes along
+TEST_F(IncrementalSaveTest, whatIsSharedOrExportedHasNoEarlierRevisions) {
+    const fs::path out = path("notes.pdf");
+    auto s = savedLecture(out);
+    {  // the highlighter goes: its annotation stays in the earlier revision
+        std::unique_lock lock(*s->getDocument());
+        s->getDocument()->getPage(0)->getLayers().at(1)->clearNoFree();
+    }
+    ASSERT_TRUE(s->save().incremental);
+    auto hasHighlighter = [](const fs::path& pdf) {
+        QPDF q;
+        q.processFile(pdf.string().c_str());
+        for (QPDFObjectHandle o: q.getAllObjects()) {
+            if (o.isDictionary() && o.getKey("/NM").isString() && o.getKey("/NM").getUTF8Value() == "xopp:p1-l2") {
+                return true;
+            }
+        }
+        return false;
+    };
+    EXPECT_TRUE(hasHighlighter(out)) << "the earlier revision holds it";
+    ASSERT_TRUE(s->saveNow({DocumentSession::SaveKind::ExportHybrid, path("copy.pdf"), {}, {}}).ok);
+    ASSERT_TRUE(s->exportArchive(path("archive.pdf")).ok);
+    ASSERT_TRUE(s->exportXopp(path("export.xopp")).ok);
+    for (const char* f: {"copy.pdf", "archive.pdf", "export.pdf"}) {
+        EXPECT_FALSE(HybridPdf::hasEarlierRevisions(path(f))) << f;
+        EXPECT_FALSE(hasHighlighter(path(f))) << f;
+    }
+    // A PDF of the library shared as it is: written anew in one piece first
+    fs::copy_file(out, path("card.pdf"));
+    std::string error;
+    ASSERT_TRUE(HybridPdf::compact(path("card.pdf"), error)) << error;
+    EXPECT_FALSE(HybridPdf::hasEarlierRevisions(path("card.pdf")));
+    EXPECT_FALSE(hasHighlighter(path("card.pdf")));
+    int code = -1;
+    EXPECT_EQ((qpdfCheck(path("card.pdf"), code), code), 0);
+    auto loaded = DocumentSession::loadFile(path("card.pdf"));
+    ASSERT_TRUE(loaded.document);
+    EXPECT_TRUE(loaded.hybridChanged.empty());
+    EXPECT_EQ(describe(*loaded.document), describeAsXopp(*s->getDocument(), path("same.xopp")));
+}
+
+// Opened again, the first Ctrl+S appends too; the clean copy is kept across incremental saves (not made again)
+TEST_F(IncrementalSaveTest, theCleanCopyIsKeptAcrossIncrementalSaves) {
+    const fs::path out = path("notes.pdf");
+    savedLecture(out).reset();
+    auto loaded = DocumentSession::loadFile(out);
+    ASSERT_TRUE(loaded.document);
+    const fs::path base = loaded.document->getPdfFilepath();
+    ASSERT_TRUE(HybridPdf::inCache(base));
+    DocumentSession s(*app, std::move(loaded.document));
+    drawOn(s, 0, 650);
+    const auto r = s.save();
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.incremental) << "the first save after opening the file";
+    auto again = DocumentSession::loadFile(out);
+    ASSERT_TRUE(again.document);
+    const fs::path next = again.document->getPdfFilepath();
+    EXPECT_NE(next.parent_path(), base.parent_path()) << "the entry of the new version";
+    EXPECT_TRUE(fs::equivalent(next, base)) << "the same clean copy (a hard link), not made again";
+    EXPECT_EQ(describe(*again.document), describeAsXopp(*s.getDocument(), path("same.xopp")));
+    // Pages moved: the next open makes a clean copy of that version
+    {
+        std::unique_lock lock(*s.getDocument());
+        PageRef p = s.getDocument()->getPage(3);
+        s.getDocument()->deletePage(3);
+        s.getDocument()->insertPage(p, 0);
+    }
+    ASSERT_TRUE(s.save().incremental);
+    auto moved = DocumentSession::loadFile(out);
+    ASSERT_TRUE(moved.document);
+    EXPECT_FALSE(fs::equivalent(moved.document->getPdfFilepath(), base));
+    EXPECT_EQ(describe(*moved.document), describeAsXopp(*s.getDocument(), path("same.xopp")));
+    // Opened from that version, the next save appends again
+    DocumentSession reopened(*app, std::move(moved.document));
+    drawOn(reopened, 1, 200);
+    EXPECT_TRUE(reopened.save().incremental);
+}
+
+// Another app appends its own revision: a moved annotation of ours is noticed, and the next save writes the file anew;
+// a comment it added is kept, and the next save appends again
+TEST_F(IncrementalSaveTest, anotherAppsRevisionIsNoticedAndKept) {
+    const fs::path out = path("notes.pdf");
+    auto s = savedLecture(out);
+    drawOn(*s, 0, 450);
+    ASSERT_TRUE(s->save().incremental);
+    s.reset();
+    auto appendAsAnotherApp = [&](const std::function<void(QPDF&, IncrementalPdf::Update&)>& change) {
+        IncrementalPdf::Tail tail;
+        std::string error;
+        ASSERT_TRUE(IncrementalPdf::readTail(out, tail, error));
+        QPDF q;
+        q.processFile(out.string().c_str());
+        IncrementalPdf::Update u(q);
+        change(q, u);
+        ASSERT_TRUE(IncrementalPdf::append(out, tail, u.serialize(tail)).ok);
+        fs::last_write_time(out, fs::last_write_time(out) + std::chrono::seconds(5));
+    };
+    appendAsAnotherApp([](QPDF& q, IncrementalPdf::Update& u) {  // a comment on page 3
+        QPDFObjectHandle page = QPDFPageDocumentHelper(q).getAllPages().at(2).getObjectHandle();
+        u.touch(page);
+        QPDFObjectHandle note = q.makeIndirectObject(QPDFObjectHandle::parse(
+                "<< /Type /Annot /Subtype /Text /Rect [300 300 320 320] /Contents (other app) /NM (other) >>"));
+        std::vector<QPDFObjectHandle> annots = page.getKey("/Annots").getArrayAsVector();
+        annots.push_back(note);
+        page.replaceKey("/Annots", QPDFObjectHandle::newArray(annots));
+    });
+    auto loaded = DocumentSession::loadFile(out);
+    ASSERT_TRUE(loaded.document);
+    EXPECT_TRUE(loaded.hybridChanged.empty()) << "ours are as they were";
+    DocumentSession kept(*app, std::move(loaded.document));
+    drawOn(kept, 0, 380);
+    auto r = kept.save();
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.incremental) << "appended on top of the other app's revision";
+    std::vector<std::string> names;
+    {
+        QPDF q;
+        q.processFile(out.string().c_str());
+        for (auto& a: QPDFPageDocumentHelper(q).getAllPages().at(2).getAnnotations()) {
+            names.push_back(a.getObjectHandle().getKey("/NM").getUTF8Value());
+        }
+    }
+    EXPECT_NE(std::find(names.begin(), names.end(), "other"), names.end()) << "its comment stays";
+    int code = -1;
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    // Now it moves our pen stroke
+    appendAsAnotherApp([](QPDF& q, IncrementalPdf::Update& u) {
+        QPDFObjectHandle a = ourAnnot(q, 0, HybridPdf::nameOf(0, 0));
+        u.touch(a);
+        a.replaceKey("/Rect", QPDFObjectHandle::parse("[10 10 50 50]"));
+    });
+    auto changed = DocumentSession::loadFile(out);
+    ASSERT_TRUE(changed.document);
+    EXPECT_EQ(changed.hybridChanged, std::vector<std::string>{HybridPdf::nameOf(0, 0)}) << "edited in another app";
+    DocumentSession after(*app, std::move(changed.document));
+    after.setHybridChanges({});  // "Keep the Xournal data"
+    r = after.save();
+    ASSERT_TRUE(r.ok);
+    EXPECT_FALSE(r.incremental) << "written anew from the Xournal data";
+    auto clean = DocumentSession::loadFile(out);
+    ASSERT_TRUE(clean.document);
+    EXPECT_TRUE(clean.hybridChanged.empty());
+}
+
+// Pages pasted from another PDF are appended to the file (the pages it has stay as they are)
+TEST_F(IncrementalSaveTest, pastedPdfPagesAreAppended) {
+    makeTextPdf(path("other.pdf"), {"pastedone", "pastedtwo"});
+    const std::string other = fileBytes(path("other.pdf"));
+    const fs::path out = path("notes.pdf");
+    auto paste = [&](DocumentSession& s, size_t at) {
+        std::string error;
+        const size_t first = s.addPdfPages(other, error);
+        ASSERT_NE(first, npos) << error;
+        s.waitForMerges();
+        auto page = std::make_shared<XojPage>(595, 842);
+        page->setBackgroundType(PageType(PageTypeFormat::Pdf));
+        page->setBackgroundPdfPageNr(first + 1);
+        std::unique_lock lock(*s.getDocument());
+        s.getDocument()->insertPage(page, at);
+    };
+    auto s = savedLecture(out);  // (its background: the user's PDF)
+    paste(*s, 1);
+    auto r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    expectSamePages(out, writtenInFull(*s, "full.pdf"), 5, "a page pasted");
+    s.reset();
+    auto loaded = DocumentSession::loadFile(out);  // (its background: the clean copy)
+    ASSERT_TRUE(loaded.document);
+    DocumentSession reopened(*app, std::move(loaded.document));
+    paste(reopened, 0);
+    drawOn(reopened, 0, 300);
+    r = reopened.save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    int code = -1;
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    expectSamePages(out, writtenInFull(reopened, "full.pdf"), 6, "pasted into the reopened file");
+    auto again = DocumentSession::loadFile(out);
+    ASSERT_TRUE(again.document);
+    EXPECT_EQ(describe(*again.document), describeAsXopp(*reopened.getDocument(), path("same.xopp")));
+    XojPdfDocument pdf;
+    ASSERT_TRUE(pdf.load(out, "", nullptr));
+    EXPECT_FALSE(pdf.getPage(0)->findText("pastedtwo").empty());
+}
+
+// A file written by an earlier version (no record of our layers in its marker, no drawing keys): the first Ctrl+S
+// reads the pages with our notes and appends; the next ones use the record it wrote
+TEST_F(IncrementalSaveTest, aFileOfAnEarlierVersionIsAppendedTo) {
+    const fs::path out = path("notes.pdf");
+    savedLecture(out).reset();
+    editWithQpdf(out, [](QPDF& q) {
+        QPDFObjectHandle marker = q.getRoot().getKey("/XournalQt");
+        marker.removeKey("/Layers");
+        marker.removeKey("/Drawn");
+        for (auto& page: QPDFPageDocumentHelper(q).getAllPages()) {
+            if (page.getObjectHandle().hasKey("/XournalQt")) {
+                page.getObjectHandle().removeKey("/XournalQt");
+            }
+            for (auto& a: page.getAnnotations()) {
+                QPDFObjectHandle mark = a.getObjectHandle().getKey("/XournalQt");
+                if (mark.isDictionary() && mark.hasKey("/Sig")) {
+                    mark.removeKey("/Sig");
+                }
+            }
+        }
+    });
+    auto loaded = DocumentSession::loadFile(out);
+    ASSERT_TRUE(loaded.document);
+    DocumentSession s(*app, std::move(loaded.document));
+    for (int n = 0; n < 2; ++n) {
+        drawOn(s, 2, 500 + 40 * n);
+        const auto r = s.save();
+        ASSERT_TRUE(r.ok) << r.error;
+        EXPECT_TRUE(r.incremental) << "save " << n + 1;
+        int code = -1;
+        EXPECT_EQ((qpdfCheck(out, code), code), 0);
+        expectSamePages(out, writtenInFull(s, "full.pdf"), 4, "a file of an earlier version, save " + std::to_string(n + 1));
+        auto again = DocumentSession::loadFile(out);
+        ASSERT_TRUE(again.document);
+        EXPECT_TRUE(again.hybridChanged.empty());
+        EXPECT_EQ(describe(*again.document), describeAsXopp(*s.getDocument(), path("same.xopp")));
+    }
 }

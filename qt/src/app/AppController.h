@@ -879,8 +879,9 @@ private:
                      const std::vector<std::string>& notPdfA, const std::vector<std::string>& adjusted);
     /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
     /// `oldXopp`: see saveAsHybridInBackground.
+    /// `compact`: a hybrid PDF is written anew in full, not appended to (before it is shared).
     bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,
-                   xqt::DocumentSession* document = nullptr, const QString& oldXopp = QString());
+                   xqt::DocumentSession* document = nullptr, const QString& oldXopp = QString(), bool compact = false);
     /// Wait for the current document's saves; false if the last one failed.
     bool waitForSave();
     /// `then` from QML, after a save: with the saved document's tab current (from the event loop).

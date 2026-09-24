@@ -21,9 +21,11 @@
  */
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "util/Util.h"  // npos
@@ -43,11 +45,40 @@ constexpr const char* DATA_NAME = "document.xopp";
 /// The /NM of our annotations starts with this.
 constexpr const char* NAME_PREFIX = "xopp:";
 
+/// A hybrid PDF as this app last wrote it (or as it was when it was opened): what an incremental save builds on
+/// (qt/docs/hybrid-pdf.md, "Saving: incremental updates").
+struct Revision {
+    std::string stamp;  ///< the file's size and time then (another version of the file is written in full)
+    /// The page objects of the file (object number, generation) by the page numbers of the document's background PDF
+    /// (the clean copy's page k is the file's page k when it was opened); {0, 0}: none.
+    std::vector<std::pair<int, int>> pages;
+    bool valid() const { return !stamp.empty(); }
+};
+
+/// How write() saves an existing hybrid PDF.
+struct WriteOptions {
+    /// The file as last written or opened: when it is still that file, only what changed is appended (an
+    /// incremental update), unless the policy says to write it anew (see compactAbove). nullptr: written in full.
+    const Revision* revision = nullptr;
+    /// Written anew in full, never appended to (Save as, Share: older revisions may hold deleted ink).
+    bool compact = false;
+    /// Receives what the file is now (for the next incremental save).
+    Revision* written = nullptr;
+};
+
+/// An incremental save writes the whole file anew instead when the file would then have grown by more than this
+/// share since it was last written in full (and when many pages were added or removed at once).
+extern double compactAbove;
+
 struct Result {
     bool ok = false;
     std::string error;
     size_t pages = 0;        ///< pages written
     size_t annotations = 0;  ///< our annotations written
+    // --- an existing hybrid PDF saved again
+    bool incremental = false;  ///< only the changes were appended
+    uint64_t appended = 0;     ///< bytes appended
+    std::string whyFull;       ///< why it was written in full although a revision was given (for measuring)
     // --- an archive PDF (writeArchive)
     size_t flattened = 0;             ///< layers merged into the page content
     bool pdfa = false;                ///< it carries the PDF/A-3b identification
@@ -73,8 +104,9 @@ using BasePageOf = std::function<size_t(const XojPage*)>;
 /// PDF, for a document whose PDF is not loaded (a copy of an open document written on a worker; npos: the document's).
 /// `xoppExport`: this document keeps a .xopp for Xournal++ there up to date (recorded in the marker, see
 /// xoppExportOf; relative to the PDF when it is in its folder or below).
+/// `options`: an incremental save (see WriteOptions).
 Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {}, size_t pdfPageCount = npos,
-             const fs::path& xoppExport = {});
+             const fs::path& xoppExport = {}, const WriteOptions& options = {});
 
 /// Write the document as an archive PDF (PDF/A-3b, ArchivePdf.h): the base pages with the ink merged into their
 /// content, links as /Link annotations, the .xopp embedded as the file's source data, the marker (so the app opens it
@@ -97,6 +129,17 @@ fs::path xoppExportOf(const fs::path& pdf);
 bool isHybrid(const fs::path& pdf);
 /// Whether it is an archive PDF (writeArchive; remembered likewise).
 bool isArchive(const fs::path& pdf);
+/// Whether the file holds earlier revisions (incremental updates, by this app or another): older versions of the ink
+/// may still be in it, so it is written anew before it is shared (remembered likewise).
+bool hasEarlierRevisions(const fs::path& pdf);
+
+/// Write the file anew in one piece, without its earlier revisions (the same content; qpdf), atomically. For a file
+/// shared as it is.
+bool compact(const fs::path& pdf, std::string& error);
+
+/// The revision of `pdf` that `cleanCopy` (the background of a document opened from it) was made from, if the file is
+/// still that version and was not edited in another app (else an invalid revision: the next save writes it in full).
+Revision revisionOf(const fs::path& cleanCopy, const fs::path& pdf);
 
 struct Opened {
     std::unique_ptr<Document> document;  ///< nullptr: not opened (`error`)

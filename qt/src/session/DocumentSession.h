@@ -41,6 +41,9 @@ namespace xqt {
 class DocumentSearch;
 class PdfPageKeeper;
 class TextFile;
+namespace HybridPdf {
+struct Revision;
+}
 struct PdfMerge;
 
 class AppContext;
@@ -82,6 +85,9 @@ public:
         bool pdfa = false;                  ///< the archive PDF carries the PDF/A-3b identification
         std::vector<std::string> notPdfA;   ///< why not
         std::vector<std::string> adjusted;  ///< what was changed in the source PDF to conform
+        // --- a hybrid PDF saved again (qt/docs/hybrid-pdf.md, "Saving: incremental updates")
+        bool incremental = false;  ///< only what changed was appended
+        uint64_t appended = 0;     ///< bytes appended
     };
     enum class SaveKind {
         Save,        ///< to the document's file: its .xopp, or its hybrid PDF. Requires hasFilePath().
@@ -110,6 +116,9 @@ public:
         /// ExportXopp: the PDF is upstream's attached PDF of the .xopp, "name.xopp.bg.pdf" (a copy for Xournal++ that
         /// travels as a pair), not the export's name.pdf / .name.pages.pdf.
         bool attachedPdf = false;
+        /// Save of a hybrid PDF: written anew in full, never as an incremental update (before it is shared: older
+        /// revisions in the file may still hold deleted ink).
+        bool compact = false;
     };
     /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
     /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the
@@ -136,6 +145,9 @@ public:
     SaveResult saveAsHybrid(fs::path target);
     /// The document is saved as a hybrid PDF (its file is a .pdf).
     bool isHybrid() const;
+    /// A hybrid PDF whose file holds earlier revisions (incremental updates): written anew (SaveRequest::compact)
+    /// before it is shared.
+    bool hasEarlierRevisions() const;
     /// A hybrid PDF: the .xopp for Xournal++ it keeps up to date on every save ("Keep it updated for Xournal++",
     /// SaveRequest::recordExport; read from the file the first time). Empty: none.
     fs::path xoppExport() const;
@@ -436,6 +448,11 @@ private:
     std::unique_ptr<PdfPageKeeper> pdfPages;
     std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)
     std::vector<std::string> hybridChanges;
+    /// A hybrid PDF as last written or opened: what the next Ctrl+S appends to (valid while the page numbers of the
+    /// background PDF stay, `hybridNumbering`, and for `hybridRevisionFile` only).
+    std::shared_ptr<HybridPdf::Revision> hybridRevision;
+    quint64 hybridNumbering = 0;
+    fs::path hybridRevisionFile;
     /// xoppExport(), known for this file
     mutable fs::path xoppExportFor, xoppExportPath;
     /// Opened from a hybrid PDF: the page of its clean copy each page was (annotations of other apps on pages with a

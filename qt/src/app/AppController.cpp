@@ -2156,7 +2156,7 @@ std::string lowerExtension(const fs::path& p) {
 }  // namespace
 
 bool AppController::startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,
-                              DocumentSession* document, const QString& oldXopp) {
+                              DocumentSession* document, const QString& oldXopp, bool compact) {
     DocumentSession* s = document ? document : session();
     if (!s) {
         return false;
@@ -2194,6 +2194,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
             break;
     }
     request.target = target;
+    request.compact = compact;
     const bool hybrid = way == SaveWay::Hybrid || (way == SaveWay::Save && s->isHybrid());
     // A document saved as "name.xopp" becomes a PDF with notes: what happens to the .xopp (asked by the window, or
     // the setting; not asked: it stays)
@@ -2600,7 +2601,9 @@ QString AppController::shareStep() const {
         return QStringLiteral("text");  // (a text file is shared as itself: sharedTextFile)
     }
     if (s->isHybrid()) {
-        return s->isModified() || s->isSaving() ? QStringLiteral("save") : QStringLiteral("share");
+        // (written anew first when it holds earlier revisions: they may still have ink that was deleted)
+        return s->isModified() || s->isSaving() || s->hasEarlierRevisions() ? QStringLiteral("save")
+                                                                            : QStringLiteral("share");
     }
     if (s->hasFilePath()) {
         return QStringLiteral("ask");  // (a .xopp: its format is not changed unasked)
@@ -2647,11 +2650,15 @@ bool AppController::sharePdf(bool toClipboard) {
         return false;
     }
     QPointer<DocumentSession> guard(s);
-    return startSave(SaveWay::Save, {}, [this, guard, toClipboard](bool ok) {
-        if (ok && guard && guard->isHybrid()) {
-            handOver({QString::fromStdString(guard->getFilePath().string())}, toClipboard);
-        }
-    });
+    // Written anew in full, not appended to: what is shared holds no earlier revisions (deleted ink)
+    return startSave(
+            SaveWay::Save, {},
+            [this, guard, toClipboard](bool ok) {
+                if (ok && guard && guard->isHybrid()) {
+                    handOver({QString::fromStdString(guard->getFilePath().string())}, toClipboard);
+                }
+            },
+            nullptr, QString(), true);
 }
 
 bool AppController::sharePdfCopy(const QUrl& target, bool toClipboard) {
@@ -2897,6 +2904,30 @@ void AppController::cancelLibraryArchive() {
 bool AppController::shareFile(const QString& path, bool toClipboard) {
     if (!QFileInfo::exists(path)) {
         return false;
+    }
+    const fs::path file(path.toStdString());
+    if (lowerExtension(file) == ".pdf" && HybridPdf::isHybrid(file) && HybridPdf::hasEarlierRevisions(file)) {
+        // A PDF with notes saved incrementally: written anew in one piece first (on a worker), so that no earlier
+        // revision with deleted ink goes along
+        QPointer<AppController> guard(this);
+        QThreadPool::globalInstance()->start([guard, file, path, toClipboard] {
+            std::string error;
+            const bool ok = HybridPdf::compact(file, error);
+            QMetaObject::invokeMethod(
+                    guard.data(),
+                    [guard, path, toClipboard, ok, error] {
+                        if (!guard) {
+                            return;
+                        }
+                        if (!ok) {
+                            Q_EMIT guard->message(tr("Share"), QString::fromStdString(error), true);
+                            return;
+                        }
+                        guard->handOver({path}, toClipboard);
+                    },
+                    Qt::QueuedConnection);
+        });
+        return true;
     }
     return handOver({path}, toClipboard);
 }
