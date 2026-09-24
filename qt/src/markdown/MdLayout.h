@@ -82,6 +82,7 @@ struct Layout {
     std::vector<Extent> blocks;
     double height = 0;  ///< of everything
     std::vector<std::string> links;  ///< link targets (Document::links)
+    std::vector<bool> wikiLinks;     ///< per link: a [[wiki link]] (Document::wikiLinks)
     /// Editing (layout with `active`): the block being edited is laid out as its source, source[rawBegin, rawEnd),
     /// in this item (its text is exactly that source).
     int rawItem = -1;
@@ -101,6 +102,7 @@ struct Layout {
 /// A link at a point (box coordinates): its target and where it is (box coordinates).
 struct LinkHit {
     std::string target;
+    bool wiki = false;  ///< a [[wiki link]]: the target is a name to look for
     double x = 0;
     double y = 0;
     double width = 0;

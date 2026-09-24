@@ -977,3 +977,20 @@ keyboard on the phone.
 - [ ] Settings open; the tool bar icons are drawn (not empty squares).
 - [ ] Fold and unfold the phone, and put the app in split screen: it keeps running, the page stays visible.
 - [ ] `adb logcat --pid=$(adb shell pidof org.xournalqt.app)` shows no crash (a crash: note the backtrace).
+
+## Links between documents (qt/links)
+Make a folder with a lecture (`Lectures/kalman.xopp` with a chapter "Prediction step" on page 4, "Start a chapter
+here…" in the page menu) and a note `Notes/a.md` with `[Kalman](../Lectures/kalman.xopp#chapter=Prediction%20step&page=2)`
+and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages down).
+- [ ] In `a.md`, tap the link with a finger (or Ctrl+click with the mouse or pen): a popup with "kalman.xopp, chapter
+      "Prediction step"" and Open in a new tab / Open as reference / Open here / Remember my choice. The pen with
+      the pen tool does not open it (in a `.xopp`'s Markdown box it keeps writing).
+- [ ] "Open in a new tab": the lecture opens at page 4 (the chapter, not page 2). Alt+Left (or ← in the pill) goes
+      back to `a.md`, Alt+Right forward to the lecture. The same link again switches to the open tab.
+- [ ] "Open as reference": the lecture beside the note, at page 4.
+- [ ] "Open here" with "Remember my choice": the note's tab goes, the lecture is in its place; Back brings the note
+      back. The next tap opens at once, no popup. Settings → Documents → Links → "Ask each time" brings the popup
+      back.
+- [ ] Rename the chapter in the lecture, tap the link again: page 2 opens with the note "Chapter "Prediction step"
+      not found, opened page 2".
+- [ ] `[[b#Part two]]` opens `b.md` at the page with "Part two".

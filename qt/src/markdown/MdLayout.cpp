@@ -130,6 +130,7 @@ public:
             return runPlain(doc);
         }
         out.links = doc.links;
+        out.wikiLinks = doc.wikiLinks;
         const auto& blocks = doc.root.children;
         out.blocks.resize(blocks.size());
         continuedListStart = continuationStart(doc);
@@ -907,6 +908,8 @@ std::optional<LinkHit> linkAt(const Layout& layout, double x, double y) {
                 }
                 LinkHit hit;
                 hit.target = layout.links[static_cast<size_t>(span.link)];
+                hit.wiki = static_cast<size_t>(span.link) < layout.wikiLinks.size() &&
+                           layout.wikiLinks[static_cast<size_t>(span.link)];
                 hit.x = it.x + a.x / static_cast<double>(PANGO_SCALE);
                 hit.y = it.y + a.y / static_cast<double>(PANGO_SCALE);
                 hit.width = (b.x + b.width - a.x) / static_cast<double>(PANGO_SCALE);

@@ -802,6 +802,9 @@ std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) co
                     target.pdfPage = -1;
                     target.page = -1;
                     target.uri = QString::fromStdString(hit->target);
+                    if (hit->wiki) {
+                        target.uri = QStringLiteral("[[%1]]").arg(target.uri);  // (a name to look for: AppLinks.cpp)
+                    }
                     if (target.uri.startsWith(QLatin1String("#Page:"))) {  // a page of this document
                         target.page = target.uri.mid(6).toInt() - 1;
                         target.uri.clear();

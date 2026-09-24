@@ -1417,6 +1417,22 @@ int LibraryIndex::pageCount(const fs::path& file) const {
     return e && !pageless(e->kind) ? e->pageCount() : -1;
 }
 
+std::vector<fs::path> LibraryIndex::filesNamed(const QString& name, bool withoutExtension) const {
+    std::vector<fs::path> found;
+    const QString wanted = name.toCaseFolded();
+    std::lock_guard lock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [fileName, e]: f.docs) {
+            const fs::path file(fileName);
+            const QString have = QString::fromStdString((withoutExtension ? file.stem() : file).string());
+            if (have.toCaseFolded() == wanted) {
+                found.push_back(e->file);
+            }
+        }
+    }
+    return found;
+}
+
 QString LibraryIndex::simplified(const QString& text) { return text.simplified(); }
 
 }  // namespace xqt

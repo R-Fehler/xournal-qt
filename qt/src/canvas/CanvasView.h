@@ -244,6 +244,8 @@ public:
     /// Go to a page and remember where the view was.
     void jumpToPage(size_t page);
     bool canGoBack() const { return !backStack.empty(); }
+    /// How many places Back can go to in this view (a link from another document came in at this depth).
+    size_t backDepth() const { return backStack.size(); }
     bool canGoForward() const { return !forwardStack.empty(); }
     bool navigateBack();
     bool navigateForward();

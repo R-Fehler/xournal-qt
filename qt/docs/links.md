@@ -121,3 +121,26 @@ The author accepted the plan with its proposals:
 - In a Markdown text (`links::resolveInText`): the heading whose slug (GitHub's: lower case, punctuation dropped,
   spaces to `-`) is the link's (a heading written as text, as Obsidian does, is slugged first), else the line, with
   "Heading "…" not found, opened line 40".
+
+### 2. Following links (`qt/src/app/AppLinks.cpp`, `qt/src/shell/DocumentLinks.*`, tests `DocumentLinksTest` in `-L ui`)
+- A tap on a link in a Markdown box or a `.md` (as before: a finger, the mouse or the pen with the hand or a select
+  tool; Ctrl + click in a `.md`) that leads to another document shows the popup with the document's name and the
+  place ("kalman.xopp, chapter "Prediction step""), **Open in a new tab**, **Open as reference**, **Open here** and
+  **Remember my choice**. Remembered, a tap opens the document at once; Settings → Documents → Links → "A link to
+  another document opens" (`linkOpening` in the `xournalQt` part of the settings: `ask`, `tab`, `reference`,
+  `here`) changes it back. A link into the same document (`#page=5`, a link to its own file) goes there without
+  asking; a web address still shows "Open".
+- The file: the path relative to the document holding the link (a new document: relative to the library); a PDF
+  with its `.xopp` opens as the `.xopp`, as in the library. A wiki link's name is looked for next to the document
+  (with `.md` added), then in the library index by file name (`LibraryIndex::filesNamed`; a `.md` first, then the
+  closest folder). A file that is not there: "Document not found" (the search for a moved file is step 4).
+- An open document is switched to (its tab), not opened twice. The place is looked up in it
+  (`DocumentLinks::placeIn`: the chapters of its contents, its pages; a `.md` by heading and line); a note says what
+  was not found.
+- "Open here" opens the document in place of the current one, which closes if it has no unsaved changes (with
+  changes it stays open behind). Back opens it again, at the page it was left at, in place of the other.
+- Back and Forward (Alt+Left/Right, the ← → pill) go across documents: a followed link is remembered with where it
+  came from; Back first goes through the places jumped to in the document since the link was followed, then back to
+  the document the link was in (its tab, or its file opened again), and Forward returns.
+- A link in the reference opens in a new tab (resolved from the reference's own file).
+- Markdown boxes keep whether a link is a `[[wiki link]]` (`md::LinkHit::wiki`), so a tap looks the name up.

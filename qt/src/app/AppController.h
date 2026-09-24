@@ -688,8 +688,20 @@ public:
     /// Print: makes a PDF (with what was written on it, or the background PDF alone) and hands it to the system's
     /// print dialog. `range`: "" for everything, else e.g. "2-5" or "3".
     Q_INVOKABLE bool printDocument(bool withAnnotations, const QString& range);
-    /// Open an external link (from a PDF) in the browser / its application.
+    /// Open an external link (from a PDF) in the browser / its application. A link to a document (links::parse,
+    /// "[[wiki]]") is followed in a new tab.
     Q_INVOKABLE void openLink(const QString& uri);
+
+    // --- links between documents (qt/docs/links.md; AppLinks.cpp) ---
+    /// About a tapped link (a Markdown link target, "[[a wiki link]]"): { document: it leads to a document, name: the
+    /// file's name ("" for this document), place: "page 12", "chapter …", found: the file is there, here: it is
+    /// this document }.
+    Q_INVOKABLE QVariantMap documentLink(const QString& uri) const;
+    /// Follow a link to a document from the current one: "tab" (switches to it when it is open), "reference" (beside
+    /// the current document) or "here" (in place of the current document, which closes when it has no unsaved
+    /// changes; Back opens it again). The place is looked up (DocumentLinks::placeIn); what was not found is said.
+    /// False when it is no link to a document or the file is not found.
+    Q_INVOKABLE bool followDocumentLink(const QString& uri, const QString& how);
     /// Call before quitting: writes settings.
     Q_INVOKABLE void shutdown();
 
@@ -894,6 +906,33 @@ private:
     /// The text file's new bytes are shown (the cursor stays where it was, as far as it can).
     void reloadText(xqt::DocumentSession* s, std::string bytes);
     std::unique_ptr<QFileSystemWatcher> textWatcher;
+
+    // --- links between documents (AppLinks.cpp) ---
+    /// A link followed from the document `from` (the file holding the link; empty: the current document).
+    bool followDocumentLinkFrom(const QString& uri, const QString& how, const fs::path& from);
+    /// Back and forward across documents: a place in a document (its tab while it is open, else its file).
+    struct DocPlace {
+        QPointer<xqt::DocumentSession> session;
+        fs::path file;
+        int page = 0;
+    };
+    /// A link followed from one document to another (`here`: in place of it). `depth`: how many places Back had in
+    /// the view it arrived in (going back beyond them goes back to `from`).
+    struct DocJump {
+        DocPlace from;
+        DocPlace to;
+        bool here = false;
+        size_t depth = 0;
+    };
+    std::vector<DocJump> docBack, docForward;
+    bool isCurrentPlace(const DocPlace& place) const;
+    /// The jump Back / Forward would take now (nullptr: the view's own places).
+    const DocJump* backJump() const;
+    const DocJump* forwardJump() const;
+    /// Show a place: its tab, else its file opened again, at its page (`replacing`: the current tab goes if it has
+    /// no unsaved changes). False when it cannot be shown.
+    bool showPlace(const DocPlace& place, bool replacing);
+    bool navigateDocuments(bool back);
     QTimer textCheckTimer;  ///< (programs write in steps: looked at a moment after the last change)
     QPointer<xqt::DocumentSession> askingTextChange;
 };
