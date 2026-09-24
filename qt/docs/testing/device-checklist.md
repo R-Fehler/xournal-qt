@@ -1217,3 +1217,8 @@ with "Uni sample" stays).
       no dialog, the tabs come back.
 - [ ] After that, no `.name.autosave.xopp` is next to the document in the library folder (Android keeps autosaves in
       the app's cache).
+- [ ] The cache in the app cache: after opening a library folder (below) and scrolling through it, the folder has no
+      `.xournal_library` in any of its subfolders (a file manager with hidden files shown, or `adb shell ls -a`).
+      Settings → Storage shows "Keep the cache in the app's cache folder" on. The default library "Default" with
+      "Uni sample": its old `.xournal_library` folders are gone after the first start, and the search still finds
+      text at once (moved, not read again).

@@ -278,6 +278,8 @@ private:
     fs::path currentDir() const;
     /// The index and the previews, where the library keeps its cache.
     void openCache();
+    /// Cache folders in the library although it keeps its cache in the app cache by default: moved there (once).
+    void adoptFolderCaches();
     /// The library and all its folders.
     std::vector<fs::path> allFolders() const;
     fs::path dirOf(const QString& relative) const;

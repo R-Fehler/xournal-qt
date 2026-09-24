@@ -113,7 +113,11 @@ upload them. Autosaving off (Settings) writes nothing.
 
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
-`files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`.
+`files/fonts.conf` and `files/fonts/` (fonts of your own for text boxes), caches in `cache/`. The library cache (previews, search
+index) is in `cache/xournal-qt/libraries/` too: on Android a library keeps its cache in the app cache by default, not
+in hidden `.xournal_library` folders next to the documents that a sync app would upload ([library.md](library.md),
+"Where the cache is kept"; Settings → Storage switches it per library). Android may clear the app cache when storage
+runs low; the library then reads its documents once again.
 
 ## How it is built
 

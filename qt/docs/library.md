@@ -125,12 +125,17 @@ renamed by any program keeps its cache.
 
 **Where the cache is kept** is a setting of each library (Settings → Storage), stored next to the library's other
 state in `~/.config/xournal-qt/libraries/<key of the library>/library.json`:
-- in the folders (the default): the hidden `.xournal_library/` in each folder;
-- in the app cache (recommended for folders that sync clients upload): the same cache folders under
-  `~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/`, so the library's
-  folders get no files of the app. Documents moved by another program are found again by size and time (see the
-  search index below).
+- in the folders (the default on the desktop): the hidden `.xournal_library/` in each folder;
+- in the app cache (recommended for folders that sync clients upload; **the default on Android**, where libraries
+  are usually folders that Syncthing, FolderSync and the like keep in sync): the same cache folders under
+  `~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/` (on Android the app's
+  own cache, `/data/user/0/org.xournalqt.app/cache/xournal-qt/libraries/…`), so the library's folders get no files of
+  the app. Documents moved by another program are found again by size and time (see the search index below).
   (A subfolder opened as a library of its own has its own setting and cache there.)
+
+A library without a setting follows the platform's default (`Library::defaultCacheMode`). One that has cache folders
+of its own when it is opened where the default is the app cache (a library made on the desktop, then synced to the
+phone) gets them moved into the app cache once, and the setting is written; nothing is read again.
 
 Switching moves the packs from one place to the other. Folders that cannot be written keep their cache in the app
 cache in either mode.

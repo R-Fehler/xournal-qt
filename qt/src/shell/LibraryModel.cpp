@@ -71,6 +71,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     filter = lib ? lib->showFilter() : ShowFilter();
     if (lib) {
         DocumentPlaces::setLibrary(lib->root(), lib->placesFile());
+        adoptFolderCaches();
         openCache();
         // A cache of the layout before the packs (in the library, or in the app cache for a library that could
         // not be written): converted first
@@ -93,6 +94,23 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     Q_EMIT cacheChanged();
     Q_EMIT showChanged();
     refresh();
+}
+
+void LibraryModel::adoptFolderCaches() {
+    // A library without a cache setting that goes into the app cache by default (Android), but has cache folders
+    // of its own (from before that default, or from a desktop): they are moved there once, so nothing is read again
+    // and the library's folders are left clean. The setting is written, so this happens only once.
+    if (lib->hasCacheSetting() || lib->cacheMode() != CacheLocation::Mode::AppCache) {
+        return;
+    }
+    const CacheLocation folders(lib->root(), CacheLocation::Mode::Folders);
+    const auto all = allFolders();
+    std::error_code ec;
+    if (std::none_of(all.begin(), all.end(), [&](const fs::path& f) { return fs::is_directory(folders.inFolder(f), ec); })) {
+        return;
+    }
+    lib->setCacheMode(CacheLocation::Mode::AppCache);
+    CacheFolders::move(folders, lib->cacheLocation(), all);
 }
 
 void LibraryModel::openCache() {
