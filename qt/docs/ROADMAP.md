@@ -245,6 +245,15 @@
   - A document matches when the expression holds over its name and text; a page is listed when it holds on that
     page.
   - Measured on 3,000 `.md` files with 12 MB of text: 20–200 ms per search under load.
+- **Reference mode, `qt/reference-view` (2026-09-24, awaiting on-device test).**
+  - A second document beside the notes in the same tab ("Open as reference" in the tab strip, tab overview, library
+    and Recent), with a divider, a frame around the notes, and swappable sides and roles.
+  - Its pill: go to page, copy, fit width, swap, close, the page grid, and an edit switch (off by default, per tab;
+    its own undo, saved like any tab).
+  - Input: a stroke stays on the canvas it started on. The reference is read-only by default: tools scroll there,
+    and selections can be copied but not moved. Keys follow the side last tapped.
+  - Memory: documents on screen keep their rendered pages before background tabs.
+  - Left: the reference is not restored after a restart.
   318 KiB.
 
 ## Backlog (decide later)
