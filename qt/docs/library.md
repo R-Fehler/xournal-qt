@@ -35,6 +35,10 @@ A **library** is a plain folder of documents that a window works in, like a work
 - Cards show what a document is: "PDF", "MD", "IMG" ("✎": with its `.xopp`). The library model has a kind per row
   (`notes`, `pdf`, `md`, `image`) for a filter by kind; a hybrid PDF is `pdf`, with the row's `hybrid` flag set when
   it is known from the listing (next to its `.xopp` export; a lone hybrid PDF is not looked into when listing).
+- **Text and code files** (`.txt`, `.tex`, `.py`, `.cpp`, `.h`, `.json`, `.csv`, `.org`, `.rst`, `.yaml`, `.toml`,
+  `.sh`, and many more, also `Makefile`, `README`, … without an extension) and **all other files** (Office files and
+  the rest) are items too, each known by its whole file name (`report.docx`), when the library's "Show" filter shows
+  them (below; off by default). A `.tex` next to its `.pdf` is two cards.
 - These files are never shown:
   - `name.xopp.bg.pdf`, an attached PDF. It belongs to its `.xopp` and travels with it.
   - `.name.pages.pdf`, the merged PDF of a `.xopp` with PDF pages pasted from other PDFs (below). It belongs to its
@@ -43,13 +47,16 @@ A **library** is a plain folder of documents that a window works in, like a work
     to their `.xopp` and travel with it (rename, move, copy, trash).
   - hidden files: autosaves, `.xournal_library`
   - backups (`~`)
+  - `Thumbs.db`, `desktop.ini`
 - **Rename / move** rename or move both files. The `.xopp` is loaded and written again with upstream's LoadHandler and
   SaveHandler, so its PDF reference (relative to the `.xopp`) points to the new place; the same for the image a
   `.xopp` annotates. Open tabs and the recent list follow the new paths.
+- Text and other files are renamed by their whole file name, moved, copied and trashed like documents; a name that is
+  taken becomes "name (2).ext".
 - **Import / copy** copy a `.xopp` together with the PDF it uses. That PDF is stored as `name.pdf` next to the copy,
   even if it came from somewhere else. A PDF brings the `.xopp` next to it along, as does an image. A folder is
   copied with its whole folder structure (also empty subfolders) and all documents in it (also Markdown files and
-  images). Other files and hidden folders (`.git`, …) stay behind. A name that is taken becomes "name (2)": taken by
+  images). Text and other files come along only when the library shows them; hidden folders (`.git`, …) stay behind. A name that is taken becomes "name (2)": taken by
   any document (`.xopp`, PDF, `.md`, image), so a moved `.xopp` never pairs with an image or PDF that was there.
 - **Trash** moves the files (or the folder) to the desktop trash.
 
@@ -134,6 +141,9 @@ A cache folder holds a few **packs**, one file each, split by how often they cha
     headings above it), and the targets of its links and `[[wiki links]]` (for backlinks later). Reading it is cheap
     (plain text, no PDF step); of a file over 2 MB only the start is read (cut at a line end), as it opens.
   - An image has no text: its entry has its name only.
+  - A text or code file (kind `text`, only while the library shows text files) has its text, simplified like the
+    rest, if the file is at most 1 MB; a bigger one has its name only. A hit shows the text around it on the card
+    (no snippet cards). Other files are not in the index: the search finds them by name when they are shown.
 - `pdf-text.pack`: per document, the text of the PDF pages it shows, tied to the PDF's size and time. Big; written
   only when a PDF changed or a document came or went. A document with over 1 MB of PDF text gets a file of its own,
   `pdf-text-<hash>.pack`, written only when that text changes.
@@ -227,6 +237,22 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
   returns to it. Ctrl+Shift+L toggles it. Ctrl+Tab goes back to the document.
 - **Library**:
   - views: folders with breadcrumbs, or all documents at once; sort by name or last modified
+  - **Show** (the button next to the sort button): which kinds of files the library shows. A setting of each library,
+    kept in its `library.json` (`"show"`). It applies to the grid, the flat list, the counts on folder cards and the
+    search results (the Recent grid is not filtered: it lists what was opened, from any library).
+
+    | Toggle | Default |
+    | --- | --- |
+    | Notes (`.xopp`, `.xoj` alone) | on |
+    | PDFs (alone or with their `.xopp`), and "only PDFs with notes" (with a `.xopp` next to them, or hybrid PDFs) | on, off |
+    | Markdown (`.md`) | on |
+    | Images (alone or with their `.xopp`) | on |
+    | Text and code | off |
+    | All other files | off |
+
+    A PDF with its `.xopp` counts as a PDF, an image with its `.xopp` as an image. For "only PDFs with notes" a PDF
+    alone is looked into once per version (whether it is a hybrid PDF). Turning text files on or off brings them into
+    the search index or takes them out.
   - search: folders whose name matches (tap one to open it), then documents whose name or text matches
   - extended search (the pages button next to the search field): each result also shows its pages with hits,
     marked, in a row under the title (swipe or scroll sideways); tapping a page opens the document at that page

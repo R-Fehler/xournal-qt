@@ -18,7 +18,8 @@
  * A Markdown file's entry (in "notes") has the text of its passages (headings, paragraphs, list items, table rows,
  * code blocks; read through md4c, without the Markdown syntax; the start of a huge file, see MarkdownFile.h), which
  * of them are headings (for the heading path of a hit), and its links and wiki links. An image's entry has its name
- * only.
+ * only. A text or code file's entry (kind "text") has its text, if the file is not bigger than TEXT_LIMIT (else its
+ * name only). Other files are not in the index.
  *
  * @license GNU GPLv2 or later
  */
@@ -73,6 +74,10 @@ public:
     CacheLocation::Mode cacheMode() const;
     void setCacheMode(CacheLocation::Mode mode) const;
     CacheLocation cacheLocation() const { return CacheLocation(rootDir, cacheMode()); }
+    /// Which kinds of files the library shows ("Show" in the library; the defaults when never set). Kept in its config
+    /// folder, next to the cache mode.
+    ShowFilter showFilter() const;
+    void setShowFilter(const ShowFilter& filter) const;
     /// The reading positions (DocumentPlaces) of its documents. The ones kept in the library's
     /// ".xournal_library/pages.json" before are taken over the first time.
     fs::path placesFile() const;
@@ -171,6 +176,8 @@ public:
 
     /// Format of the stored entries (packs of another one are read anew).
     static constexpr int FORMAT = 4;
+    /// Text files up to this size are indexed with their text, bigger ones by name only.
+    static constexpr qint64 TEXT_LIMIT = 1024 * 1024;
     /// The packs of a folder's cache
     static const QString NOTES_PACK;     ///< per document: its pages, the text of its text elements, its PDF
     static const QString PDF_TEXT_PACK;  ///< per document: the text of the PDF pages it shows
@@ -184,7 +191,7 @@ Q_SIGNALS:
 private:
     struct Entry {
         fs::path file;                   ///< the document's main file
-        QString kind;                    ///< "xopp" (also .xoj), "pdf", "md", "image"
+        QString kind;                    ///< "xopp" (also .xoj), "pdf", "md", "image", "text"
         QString name;
         QString xoppStamp;               ///< of the .xopp, the Markdown file, the image alone ("": a PDF alone)
         fs::path pdf;                    ///< the PDF it uses (next to it, elsewhere, attached; "": none)
@@ -193,7 +200,7 @@ private:
         std::vector<int> pdfPage;        ///< per page: the PDF page it shows (-1: none)
         QStringList elementText;         ///< per page: the text of its text elements (simplified)
         std::vector<double> aspects;     ///< per page: height / width
-        // A Markdown file (no pages): its text, read through md4c without the syntax
+        // A Markdown file (no pages): its text, read through md4c without the syntax; a text file: its text, one block
         QStringList blockText;           ///< per passage (MdPassages.h): its text (simplified)
         std::vector<int> blockLevel;     ///< per passage: a heading's level (0: not a heading)
         QStringList links;               ///< link targets (for backlinks)

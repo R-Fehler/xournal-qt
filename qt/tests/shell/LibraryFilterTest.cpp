@@ -14,6 +14,8 @@
 #include <gtest/gtest.h>
 
 #include "shell/DocumentFiles.h"
+#include "shell/Library.h"
+#include "shell/LibraryModel.h"
 
 using namespace xqt;
 
@@ -28,6 +30,17 @@ std::vector<std::string> files(const std::vector<DocumentItem>& items) {
     std::vector<std::string> n;
     for (const auto& i: items) {
         n.push_back(i.main().filename().string());
+    }
+    return n;
+}
+
+QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
+
+/// The names of the rows of a library model, in order
+std::vector<std::string> rowNames(const LibraryModel& m) {
+    std::vector<std::string> n;
+    for (int i = 0; i < m.count(); ++i) {
+        n.push_back(m.data(m.index(i), LibraryModel::NameRole).toString().toStdString());
     }
     return n;
 }
@@ -195,4 +208,105 @@ TEST_F(LibraryFilterTest, otherFilesAreRenamedMovedCopiedAndTrashedLikeDocuments
     if (r.ok) {  // (no trash in some test environments)
         EXPECT_FALSE(fs::exists(root / "report.docx"));
     }
+}
+
+TEST_F(LibraryFilterTest, theLibraryShowsWhatItsFilterSaysAndRemembersIt) {
+    fillMixedFolder();
+    writeFile(root / "Sub" / "sheet.pdf", "%PDF");
+    writeFile(root / "Sub" / "budget.ods", "PK");
+    {
+        LibraryModel model;
+        model.setLibrary(std::make_unique<Library>(root));
+        EXPECT_FALSE(model.showFiltered());
+        EXPECT_EQ(rowNames(model), (std::vector<std::string>{"Sub", "board", "lecture", "notes", "paper", "readme"}));
+        const int sub = model.rowOf(qstr(root / "Sub"));
+        EXPECT_EQ(model.data(model.index(sub), LibraryModel::ItemCountRole).toInt(), 1) << "the PDF, not the .ods";
+
+        // Text and code files, and all other files
+        model.setShown("text", true);
+        model.setShown("other", true);
+        EXPECT_TRUE(model.showFiltered());
+        EXPECT_EQ(model.count(), 11);
+        const QModelIndex docx = model.index(model.rowOf(qstr(root / "report.docx")));
+        EXPECT_EQ(model.data(docx, LibraryModel::KindRole).toString(), "other");
+        EXPECT_EQ(model.data(docx, LibraryModel::NameRole).toString(), "report.docx");
+        EXPECT_EQ(model.data(docx, LibraryModel::SizeRole).toLongLong(), 2);
+        EXPECT_EQ(model.data(docx, LibraryModel::FileIconRole).toString(), "xqt-file-doc");
+        EXPECT_EQ(model.data(model.index(model.rowOf(qstr(root / "data.xlsx"))), LibraryModel::FileIconRole).toString(),
+                  "xqt-file-spreadsheet");
+        EXPECT_EQ(model.data(model.index(model.rowOf(qstr(root / "script.py"))), LibraryModel::KindRole).toString(),
+                  "text");
+        EXPECT_EQ(model.data(model.index(model.rowOf(qstr(root / "Sub"))), LibraryModel::ItemCountRole).toInt(), 2);
+
+        // Only PDFs with notes, no images
+        model.setShown("other", false);
+        model.setShown("onlyPdfsWithNotes", true);
+        model.setShown("images", false);
+        EXPECT_EQ(rowNames(model),
+                  (std::vector<std::string>{"Sub", "lecture", "Makefile", "notes", "readme", "script.py", "thesis.tex"}));
+        EXPECT_EQ(model.data(model.index(model.rowOf(qstr(root / "Sub"))), LibraryModel::ItemCountRole).toInt(), 0);
+        // The flat list too
+        model.setFlat(true);
+        EXPECT_EQ(rowNames(model),
+                  (std::vector<std::string>{"lecture", "Makefile", "notes", "readme", "script.py", "thesis.tex"}));
+    }
+    // Remembered for this library
+    LibraryModel again;
+    again.setLibrary(std::make_unique<Library>(root));
+    const QVariantMap show = again.show();
+    EXPECT_TRUE(show["text"].toBool());
+    EXPECT_FALSE(show["other"].toBool());
+    EXPECT_FALSE(show["images"].toBool());
+    EXPECT_TRUE(show["onlyPdfsWithNotes"].toBool());
+    EXPECT_EQ(again.count(), 7);
+    again.resetShown();
+    EXPECT_FALSE(again.showFiltered());
+    EXPECT_EQ(again.count(), 6) << "Sub, board, lecture, notes, paper, readme";
+    // Another library has its own
+    fs::create_directories(root / "Sub" / "x");
+    LibraryModel sub;
+    sub.setLibrary(std::make_unique<Library>(root / "Sub"));
+    EXPECT_FALSE(sub.showFiltered());
+}
+
+TEST_F(LibraryFilterTest, searchFindsTextFilesByTheirTextAndOtherFilesByTheirNames) {
+    writeFile(root / "notes.md", "# Notes\n\nNothing here.\n");
+    writeFile(root / "code" / "kalman.py", "def predict(state):\n    # the needle of the filter\n    return state\n");
+    writeFile(root / "big.txt", std::string(LibraryIndex::TEXT_LIMIT + 10, 'a') + " needle");
+    writeFile(root / "needle report.docx", "PK");
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    model.setSearchQuery("needle");
+    EXPECT_EQ(model.count(), 0) << "text and other files are not shown";
+
+    model.setShown("text", true);  // the text files come into the index
+    model.searchIndex()->waitForDone();
+    model.setSearchQuery("");
+    model.setSearchQuery("needle");
+    ASSERT_EQ(model.count(), 1) << "a big text file is known by its name only";
+    EXPECT_EQ(model.data(model.index(0), LibraryModel::PathRole).toString(), qstr(root / "code" / "kalman.py"));
+    EXPECT_EQ(model.data(model.index(0), LibraryModel::HitsRole).toInt(), 1);
+    EXPECT_TRUE(model.data(model.index(0), LibraryModel::SnippetRole).toString().contains("needle of the filter"));
+    EXPECT_TRUE(model.data(model.index(0), LibraryModel::HitPassageListRole).toList().isEmpty()) << "no snippet cards";
+    EXPECT_EQ(model.data(model.index(0), LibraryModel::PageCountRole).toInt(), -1);
+    model.setSearchQuery("big");
+    ASSERT_EQ(model.count(), 1);
+    EXPECT_EQ(model.data(model.index(0), LibraryModel::PathRole).toString(), qstr(root / "big.txt"));
+
+    // Other files: by their names, never in the index
+    model.setShown("other", true);
+    model.setSearchQuery("needle");
+    EXPECT_EQ(rowNames(model), (std::vector<std::string>{"needle report.docx", "kalman.py"}))
+            << "found by its name, before the hits in the text";
+    model.setNamesOnly(true);
+    EXPECT_EQ(rowNames(model), (std::vector<std::string>{"needle report.docx"}));
+
+    // Hidden again: out of the index
+    model.setNamesOnly(false);
+    model.setShown("text", false);
+    model.searchIndex()->waitForDone();
+    model.setSearchQuery("");
+    model.setSearchQuery("predict");
+    EXPECT_EQ(model.count(), 0);
 }
