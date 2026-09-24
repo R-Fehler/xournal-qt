@@ -344,7 +344,8 @@ Rectangle {
                     property var libraries: []
                     onAboutToShow: libraries = app.libraries()
                     Label {
-                        text: qsTr("Libraries (another one opens in a new window)")
+                        text: app.libraryWindows ? qsTr("Libraries (another one opens in a new window)")
+                                                 : qsTr("Libraries (the window switches to another one)")
                         leftPadding: 16
                         rightPadding: 16
                         topPadding: 8
@@ -1581,7 +1582,7 @@ Rectangle {
             width: storageAccessDialog.availableWidth
             wrapMode: Text.Wrap
             text: qsTr("To use a folder of the phone's storage as a library (for example one that Syncthing, "
-                       + "FolderSync or Autosync keeps in sync), Xournal Qt needs \u201cAll files access\u201d. It then "
+                       + "FolderSync or Autosync keeps in sync), Xournal Qt needs “All files access”. It then "
                        + "works with the folder as on a computer: its documents, previews and search, and changes "
                        + "other apps make are seen at once. It only reads and writes the folders you open as a "
                        + "library.")
