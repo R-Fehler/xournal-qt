@@ -253,24 +253,29 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
 "Fuzzy" in the library's search field (and in the tab overview's, below) turns on fzf's extended search syntax
 (modelled on [fzf](https://github.com/junegunn/fzf#search-syntax); its matching is ported from fzf, MIT). Off by
 default; an app-wide setting (`fuzzySearch` in the `xournalQt` part of the settings file), shared by all windows. Off,
-the search is exactly the plain one. The button's tooltip is the short help.
+the search is exactly the plain one. The button's tooltip is one line; a **long press or a right click** on it (in
+the library and in the tab overview) opens the **help** (`qt/src/app/qml/FuzzyHelp.qml`, also from Settings →
+Search): what fuzzy means for names and for text, with the typo tolerance as it is set, the syntax with an example
+per row, and how the pages with hits are chosen. The help is where this text lives; the table below mirrors it.
 
 **Settings → Search** has the same switch (the same setting: turning it on there turns the button on, and back) and
 the **typo tolerance** of fuzzy terms in text (`fuzzyTypos` in the `xournalQt` part of the settings file): *Off*;
 *1 letter, in words of 5+ letters* (the default); *up to 2 letters, in words of 8+ letters* (terms of 5-7 letters
 still one). A query takes the tolerance when it is parsed, so a changed setting counts from the next key typed.
 
-| Typed | Finds |
-| --- | --- |
-| `kalman` | names (and folder paths) with these letters in this order, best first; in text: words with these letters close together, or with a typo (`tbine` finds "turbine") |
-| `kalman filter` | both (a space is AND) |
-| `kalman \| lqr` | either; `\|` binds closer than the space: `a b \| c` is a and (b or c), as in fzf |
-| `!draft` | without it: not in the name, the folder path or the text (an exact substring; `!'dft`: fuzzy on names) |
-| `(a b) \| c`, `!(a b)` | a group (parentheses are an addition to fzf's syntax) |
-| `'lect` | exactly `lect`, also in names |
-| `'lecture'` | the whole word |
-| `^lec`, `ure$` | the name starts / ends with it; in text: a word starts / ends with it |
-| `^lecture\ 3$` | the name is it (`\ ` is a space inside a term; `\(` `\)` parentheses) |
+| Typed | Finds | Example |
+| --- | --- | --- |
+| `tbine` | names (and folder paths) with these letters in this order, best first; in text: words with the letters close together from their first letter on, or with a typo | `tbine` finds "turbine", `klmn` "Kalman" |
+| `a b` | both (a space is AND), anywhere in the document | `kalman filter` |
+| `a \| b` | either; `\|` binds closer than the space: `a b \| c` is a and (b or c), as in fzf | `lecture \| exercise` |
+| `!a` | without it: not in the name, the folder path or the text (an exact substring; `!'dft`: fuzzy) | `kalman !draft` |
+| `( … )` | a group, also negated: `!(a b)` (parentheses are an addition to fzf's syntax) | `(lecture \| exercise) !draft` |
+| `'a` | exactly these letters, also in names (no fuzzy words) | `'turbine`: not "turbnie" |
+| `'a'` | the whole word | `'wind'`: not "window" |
+| `^a` | the name starts with it; in text: a word | `^intro`: "Introduction" |
+| `a$` | the name ends with it; in text: a word | `sheet$`: "Exercise sheet" |
+| `^a$` | the name is it; in text: the whole word | `^lecture\ 3$` |
+| `\ ` `\(` `\)` | a space, a parenthesis within a term | `kalman\ filter`: the phrase |
 
 Case never matters. A term left empty by its marks (`^`, `!`) is ignored, as fzf ignores it. An expression that is
 not valid (a `(` not closed, a `)` not opened, a `|` without a term on both sides, empty `()`) is never an error: a

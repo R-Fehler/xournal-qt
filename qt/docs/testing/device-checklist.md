@@ -754,3 +754,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       button of the library's search field; switch it there, the button follows, and the other way round.
 - [ ] Typo tolerance "Off": `turbnie` no longer finds "turbine" (`tbine` still does). "Up to 2 letters":
       `trasnfromation` finds "transformation"; back to "1 letter" (the default) it does not.
+- [ ] Hover the "Fuzzy" button: a one-line tooltip that mentions the help. Long press it (touch) or right-click it
+      (mouse), in the library and in the tab overview: the fuzzy search's help opens (the button does not toggle),
+      scrolls with a finger, and closes with a tap outside or Escape. Its typo sentence follows the setting in
+      Settings → Search, which has a "Help" button that opens the same help.

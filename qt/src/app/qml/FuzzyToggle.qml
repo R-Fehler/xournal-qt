@@ -1,6 +1,6 @@
 // The fuzzy search's toggle in a search field (library, tab overview): the search reads fzf's syntax - names fuzzy
 // and ranked, words ANDed, | for or, ! for not, parentheses. An app-wide setting (app.library.fuzzySearch), off by
-// default; the tooltip is its help.
+// default. A long press or a right click opens its help (FuzzyHelp.qml); the tooltip says so.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -17,24 +17,22 @@ ToolButton {
     font.pixelSize: 13
     font.weight: checked ? Font.DemiBold : Font.Normal
     Material.foreground: checked ? Material.accentColor : "#5f6368"
-    ToolTip.visible: hovered || pressed
+    ToolTip.visible: (hovered || pressed) && !help.visible
     ToolTip.delay: 600
-    ToolTip.timeout: 20000
+    ToolTip.timeout: 6000
     ToolTip.text: (checked ? qsTr("Fuzzy search is on (like fzf) - tap for the plain search.")
                            : qsTr("Fuzzy search (like fzf): tap to turn it on."))
-                  + "<br>" + qsTr("Names match when their letters come in this order, best matches first; the text "
-                                  + "of the documents is searched for each word.")
-                  + "<table cellspacing=\"4\">"
-                  + "<tr><td><tt>a b</tt></td><td>" + qsTr("both") + "</td></tr>"
-                  + "<tr><td><tt>a | b</tt></td><td>" + qsTr("either (<tt>a b | c</tt>: a and (b or c))") + "</td></tr>"
-                  + "<tr><td><tt>!a</tt></td><td>" + qsTr("without a (not in the name, the folder or the text)") + "</td></tr>"
-                  + "<tr><td><tt>( … )</tt></td><td>" + qsTr("a group: <tt>(a b) | c</tt>, <tt>!(a b)</tt>") + "</td></tr>"
-                  + "<tr><td><tt>'a</tt></td><td>" + qsTr("exactly a, also in names") + "</td></tr>"
-                  + "<tr><td><tt>'a'</tt></td><td>" + qsTr("the whole word a") + "</td></tr>"
-                  + "<tr><td><tt>^a</tt> &nbsp; <tt>a$</tt></td><td>" + qsTr("the name (or a word) starts / ends with a") + "</td></tr>"
-                  + "<tr><td><tt>^a$</tt></td><td>" + qsTr("the name (or a word) is a") + "</td></tr>"
-                  + "<tr><td><tt>\\&nbsp;</tt></td><td>" + qsTr("a space within a word") + "</td></tr>"
-                  + "</table>"
+                  + " " + qsTr("Long press or right-click for help.")
+    // The help (FuzzyHelp.qml): a long press (then the button is not toggled) or a right click
+    onPressAndHold: help.open()
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: help.open()
+    }
+    FuzzyHelp {
+        id: help
+        objectName: toggle.objectName + "Help"
+    }
     background: Rectangle {
         radius: 10
         color: toggle.checked ? "#e0e3f5" : (toggle.pressed ? "#e8e8e8" : "transparent")

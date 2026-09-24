@@ -10,6 +10,8 @@
 #include <future>
 #include <memory>
 
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <QCoreApplication>
 #include <cmath>
 
@@ -1171,6 +1173,68 @@ TEST_F(HomeScreenTest, theLibrarySearchHasAFuzzyToggle) {
     until([&] { return !hint->isVisible(); });
     EXPECT_FALSE(hint->isVisible());
     library->setSearchQuery("");
+}
+
+// The fuzzy search's help: a long press on the "Fuzzy" button (which does not toggle it then), a right click, or the
+// help button in Settings → Search; it tells the typo tolerance as it is set, and closes with Escape.
+TEST_F(HomeScreenTest, theFuzzySearchButtonOpensItsHelp) {
+    auto* button = find<QQuickItem>("librarySearchFuzzy");
+    ASSERT_NE(button, nullptr);
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    QObject* help = find("librarySearchFuzzyHelp");
+    ASSERT_NE(help, nullptr);
+
+    // A long press
+    const QPoint center = button->mapToScene(QPointF(button->width() / 2, button->height() / 2)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, center);
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, center);
+    ASSERT_TRUE(waitOpened(help, true)) << "opened by a long press";
+    EXPECT_FALSE(library->fuzzySearch()) << "not toggled by it";
+    auto* rows = findItem("fuzzyHelpRows");
+    ASSERT_NE(rows, nullptr);
+    EXPECT_EQ(rows->property("count").toInt(), 11) << "the syntax, a row each";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(800);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    settings->set("fuzzyTypos", 0);
+    EXPECT_TRUE(help->property("typoText").toString().contains("not tolerated"));
+    settings->set("fuzzyTypos", 1);
+    EXPECT_TRUE(help->property("typoText").toString().contains("5 or more"));
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(help, false));
+
+    // A right click
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, center);
+    ASSERT_TRUE(waitOpened(help, true)) << "opened by a right click";
+    EXPECT_FALSE(library->fuzzySearch());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(help, false));
+    click(button);
+    EXPECT_TRUE(library->fuzzySearch()) << "a tap still toggles";
+    EXPECT_FALSE(help->property("visible").toBool());
+    library->setFuzzySearch(false);
+
+    // From Settings → Search
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("searchTab"));
+    auto* helpButton = findItem("fuzzyHelpButton");
+    ASSERT_NE(helpButton, nullptr);
+    until([&] { return helpButton->isVisible(); });
+    click(helpButton);
+    QObject* fromSettings = find("settingsFuzzyHelp");
+    ASSERT_NE(fromSettings, nullptr);
+    ASSERT_TRUE(waitOpened(fromSettings, true));
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(fromSettings, false));
+    EXPECT_TRUE(sheet->property("visible").toBool()) << "back in the settings";
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
 }
 
 // The library has a button for the settings (no tool bar there, and not everybody has a keyboard at hand).

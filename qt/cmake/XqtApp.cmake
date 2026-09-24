@@ -124,6 +124,7 @@ set(XQT_QML_FILES
     src/app/qml/PagePicture.qml
     src/app/qml/RaceWatch.qml
     src/app/qml/FuzzyToggle.qml
+    src/app/qml/FuzzyHelp.qml
     src/app/qml/Fuzzy.js
     src/app/qml/Popups.js)
 foreach(f ${XQT_QML_FILES})

@@ -31,6 +31,8 @@ Popup {
 
     background: Rectangle { color: "#fafafa"; radius: 14 }
 
+    FuzzyHelp { id: fuzzyHelp; objectName: "settingsFuzzyHelp" }
+
     // --- rows -----------------------------------------------------------------------------------------------------
     component SectionTitle: Label {
         Layout.topMargin: 18
@@ -435,7 +437,17 @@ Popup {
                     width: parent.width - 48
                     x: 24
                     spacing: 10
-                    SectionTitle { text: qsTr("Fuzzy search") }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        SectionTitle { text: qsTr("Fuzzy search") }
+                        Button {
+                            objectName: "fuzzyHelpButton"
+                            Layout.topMargin: 18
+                            flat: true
+                            text: qsTr("Help: syntax and examples")
+                            onClicked: fuzzyHelp.open()
+                        }
+                    }
                     RowLayout {
                         Layout.fillWidth: true
                         Label {
