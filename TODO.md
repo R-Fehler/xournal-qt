@@ -33,7 +33,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
       - [ ] Not handled yet: a page deleted in another app; encrypted, rotated or cropped source PDFs (in code,
         untested); audio attachments; a "has notes" badge. Writing into the PDF itself renames over the file
         while it is read, which may fail on Windows.
-   3. `qt/hybrid-flow` (decided 2026-09-24; started 2026-09-24):
+   3. ~~`qt/hybrid-flow`~~: merged 2026-09-24 (see ROADMAP). Left: a hybrid flag in the index, since same-name `.xopp` + PDF pairs now get one qpdf check per listing. As planned:
       - **Save as with a format choice:** "Xournal notes (.xopp)" or "PDF with notes, editable (.pdf)", replacing the
         separate "Save as hybrid PDF…" entry. "Export as PDF" stays for a plain, flattened PDF.
       - **When a saved `.xopp` becomes a hybrid PDF, ask once** what happens to the old `.xopp`:
@@ -273,6 +273,10 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [ ] `MainWindowTest.sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDown` ("no sharp one while racing")
   fails now and then under load: 1 of 8 and 0 of 16 after `qt/present`, and once in the full suite; 0 of 16 on a
   build from before it. It is timing-sensitive, and whether `qt/present` made it more likely is not settled.
+
+- [~] `LibraryTest.renamedAndMovedDocumentsKeepTheirIndex` (the known race in `qt/docs/releasing.md`) failed 1 of 4
+  runs on 2026-09-24, under load with the Android build. The fix of its cause, taking over an entry with the same
+  size and time, is being done as `qt/index-rename-race`.
 
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF
