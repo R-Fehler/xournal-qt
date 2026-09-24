@@ -149,6 +149,20 @@ INSTANTIATE_TEST_SUITE_P(Fixtures, PageRasterTest,
                                            std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.5, 1.0),
                                            std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.0, 1.25)));
 
+TEST(PageRaster, aPdfBackgroundIsRenderedOnceForTheScreenScale) {
+    // A page on a 2x screen at zoom 1 has exactly the pixels of the page at zoom 2 on a 1x screen. The PDF background
+    // came out different: its buffer took the screen scale twice (4x the pixels, then scaled down when painted).
+    Settings settings(fs::path{});
+    auto loaded = load(u8"packaged_xopp/pdfBackground/old.xopp");
+    ASSERT_TRUE(loaded.doc);
+    const PageRef page = loaded.doc->getPage(0);
+    ASSERT_TRUE(page->getBackgroundType().isPdfPage());
+    auto onHiDpi = referenceRender(loaded.doc.get(), &settings, page, RasterParams{1.0, 2.0});
+    auto zoomedIn = referenceRender(loaded.doc.get(), &settings, page, RasterParams{2.0, 1.0});
+    EXPECT_EQ(compareSurfaces(cairo_get_target(onHiDpi.get()), cairo_get_target(zoomedIn.get())), 0)
+            << "the PDF is rendered at the pixels the screen shows";
+}
+
 TEST(PageRaster, partialRerenderMatchesFullRender) {
     Settings settings(fs::path{});
     auto loaded = load(u8"packaged_xopp/pdfBackground/old.xopp");
