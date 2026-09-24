@@ -679,8 +679,8 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
 }
 
 bool CanvasView::tapAt(QPointF viewPos) {
-    // A task's check box in a Markdown text: switched
-    if (CanvasPage* page = pageAt(viewPos)) {
+    // A task's check box in a Markdown text: switched (not in a document shown for reading only)
+    if (CanvasPage* page = readingOnly ? nullptr : pageAt(viewPos)) {
         if (const auto idx = indexOf(page)) {
             const QRectF r = pageViewRect(*idx);
             const double zoom = viewController.zoom();
@@ -968,7 +968,7 @@ bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle s
     if (QClipboard* cb = QGuiApplication::clipboard(); cb->supportsSelection()) {
         cb->setText(QString::fromStdString(pdfSelection->getSelectedText()), QClipboard::Selection);
     }
-    if (mark && pdfTextMode != PdfTextMode::Select) {
+    if (mark && pdfTextMode != PdfTextMode::Select && !readingOnly) {
         markPdfText(pdfTextMode);  // the tool marks right away: no extra tap
         return true;
     }
@@ -985,7 +985,7 @@ bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle s
 
 bool CanvasView::markPdfText(PdfTextMode mode) {
     // Port of PdfFloatingToolbox::createStrokes: marker strokes over the selected text lines.
-    if (!hasPdfTextSelection() || mode == PdfTextMode::Select) {
+    if (!hasPdfTextSelection() || mode == PdfTextMode::Select || readingOnly) {
         return false;
     }
     const auto textRects = pdfSelection->getSelectedTextRects();
@@ -1429,6 +1429,16 @@ void CanvasView::updateVisibility() {
 }
 
 // --- memory ----------------------------------------------------------------------------------------------------------
+
+void CanvasView::setReadingOnly(bool on) {
+    if (on == readingOnly) {
+        return;
+    }
+    readingOnly = on;
+    if (on) {
+        endTextEditing();  // (a text being typed when the document became the reference: kept, as when it is left)
+    }
+}
 
 void CanvasView::setShown(bool value) {
     shown = value;

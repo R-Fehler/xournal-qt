@@ -712,3 +712,12 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] (Fix) Paste a PDF page from another PDF into a document that has a background PDF (best: the large scan):
       the pasted page shows its PDF page on the canvas right away (it used to stay blank for a while), a second
       paste from a third PDF too; the other pages do not flicker or re-render.
+
+## Reference mode (qt/reference-view)
+
+- [ ] Two canvases side by side (the reference for reading only): writing with the pen on the notes and moving on
+      across the divider into the reference: the stroke stays on the notes, the reference does not scroll under it;
+      the next stroke on the reference scrolls it. The same with the mouse.
+- [ ] On the reference, pen, highlighter, eraser, text and shape tools scroll it like the hand (a tap on a link
+      shows the link); nothing is ever written, erased or marked there, and the tab of the reference gets no "●".
+- [ ] A two-finger tap on the reference undoes nothing (a two-finger tap on the notes still undoes there).

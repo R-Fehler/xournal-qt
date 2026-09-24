@@ -82,6 +82,14 @@ public:
     void setDevicePixelRatio(double dpr);
     double devicePixelRatio() const { return dpr; }
 
+    // --- reading only (the reference beside the document of a tab) ---------------------------------------------
+    /// Shown for reading only: every tool but the select tools (elements, PDF text) scrolls, as the hand does; a
+    /// selection can be made and copied but not moved, changed or deleted; PDF text is selected, never marked;
+    /// taps follow links, they do not switch the check boxes of Markdown tasks; no undo from gestures. Nothing
+    /// lands in the document.
+    void setReadingOnly(bool on);
+    bool isReadingOnly() const { return readingOnly; }
+
     // --- memory (CanvasMemory) --------------------------------------------------------------------------------
     /// Shown in a window (DocumentCanvasItem): scrolling in it makes it the current view of CanvasMemory.
     void setShown(bool shown);
@@ -331,6 +339,7 @@ private:
     size_t pdfCachePages = 0;  ///< the pages of the PDF of `pdfCache`
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
+    bool readingOnly = false;
     std::pair<size_t, size_t> window{1, 0};
     int visibilityDelay = 8;
     QElapsedTimer sinceVisibility;
