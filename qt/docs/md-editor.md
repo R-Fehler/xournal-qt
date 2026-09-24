@@ -35,10 +35,12 @@ switching it lays the current text document out again (the text being written en
 anew, the text stays as it is); other open text documents keep their layout until they are opened again. The menu
 shows how the current one is laid out. Print and PDF export print what is shown (one long page when continuous).
 
-The continuous page does not split the text (`md::onePage`), but its whole text is laid out again on every key
-(twice: as drawn and as written): fine for notes, noticeably slower than pages for long files
-(`XQT_BENCH_TEXT=1 xqt-canvas-tests --gtest_filter='TextDocumentTest.bench*'` measures it). The fix is a layout cache
-per block in `md::layout`.
+The continuous page does not split the text (`md::onePage`), and its whole text is parsed and laid out again on
+every key. The Pango layouts are shared through a per-thread cache in `md::layout` (keyed by a block's text,
+formatting and options; two generations of 1,500), so only the block that changed is shaped anew: 20 keys in a
+13-page file took 1.4–1.8 s before and 0.56–0.62 s after, against 0.36–0.42 s on pages (under load 9–11, so
+ranges). `XQT_BENCH_TEXT=1 xqt-canvas-tests --gtest_filter='TextDocumentTest.bench*'` measures it. What is left is
+md4c's parse and the layout pass over the whole text.
 
 ## Plain text (`.txt`)
 A `.txt` opens as plain text, like a notepad: no Markdown, no highlighting. Every line is shown as it is, in a

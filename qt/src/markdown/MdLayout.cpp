@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 #include <pango/pangocairo.h>
@@ -83,8 +84,42 @@ struct Laid {
     xoj::util::GObjectSPtr<PangoLayout> layout;
     std::vector<LinkSpan> links;
     std::vector<SourceMap> sources;
+    bool cached = false;  ///< taken from LayoutCache
     PangoLayout* get() const { return layout.get(); }
 };
+
+/// The Pango layouts made last on this thread, by their text, formatting and options (never changed once made:
+/// items share them). Two generations: when the newer one is full, the older one goes (the layouts still used by
+/// laid out texts stay alive with them).
+class LayoutCache {
+public:
+    static constexpr size_t GENERATION = 1500;
+    xoj::util::GObjectSPtr<PangoLayout> find(const std::string& key) {
+        if (auto it = now.find(key); it != now.end()) {
+            return it->second;
+        }
+        if (auto it = before.find(key); it != before.end()) {
+            auto l = it->second;
+            put(key, l);  // (still used: into the newer generation)
+            return l;
+        }
+        return {};
+    }
+    void put(std::string key, xoj::util::GObjectSPtr<PangoLayout> l) {
+        if (now.size() >= GENERATION) {
+            before = std::move(now);
+            now.clear();
+        }
+        now.emplace(std::move(key), std::move(l));
+    }
+
+private:
+    std::unordered_map<std::string, xoj::util::GObjectSPtr<PangoLayout>> now, before;
+};
+LayoutCache& layoutCache() {
+    static thread_local LayoutCache cache;
+    return cache;
+}
 
 class Layouter {
 public:
@@ -205,6 +240,61 @@ private:
     }
 
     Laid text(const std::vector<Run>& runs, const TextOptions& o, const std::vector<CodeSpan>& code = {}) {
+        // The Pango layout of the same text with the same formatting is taken again (LayoutCache): while typing,
+        // only the block that changed is shaped anew (a long text on one continuous page)
+        std::string key;
+        key.reserve(64);
+        const auto add = [&key](const void* p, size_t n) { key.append(static_cast<const char*>(p), n); };
+        add(&o.size, sizeof o.size);
+        add(&o.width, sizeof o.width);
+        add(&o.lineSpacing, sizeof o.lineSpacing);
+        const char flags[] = {static_cast<char>(o.bold), static_cast<char>(o.mono), static_cast<char>(o.align)};
+        add(flags, sizeof flags);
+        key += st.family;
+        key += '\0';
+        key += st.monoFamily;
+        key += '\0';
+        for (const Run& r: runs) {
+            const uint32_t n = static_cast<uint32_t>(r.text.size());
+            add(&n, sizeof n);
+            add(&r.flags, sizeof r.flags);
+            key += r.text;
+        }
+        for (const CodeSpan& c: code) {
+            add(&c.start, sizeof c.start);
+            add(&c.length, sizeof c.length);
+            add(&c.color, sizeof c.color);
+            const char b[] = {static_cast<char>(c.bold), static_cast<char>(c.italic)};
+            add(b, sizeof b);
+        }
+        Laid laid = makeText(runs, o, code, layoutCache().find(key));
+        if (!laid.cached) {
+            layoutCache().put(std::move(key), laid.layout);
+        }
+        return laid;
+    }
+
+    /// The layout of a text (`cached`: the same one made before; only the links and sources are made here).
+    Laid makeText(const std::vector<Run>& runs, const TextOptions& o, const std::vector<CodeSpan>& code,
+                  xoj::util::GObjectSPtr<PangoLayout> cached) {
+        if (cached) {
+            std::vector<LinkSpan> links;
+            std::vector<SourceMap> sources;
+            size_t at = 0;
+            for (const Run& r: runs) {
+                const size_t from = at;
+                at += r.text.size();
+                sources.push_back({static_cast<int>(from), static_cast<int>(at - from), r.source, r.sourceLength, r.flags});
+                if ((r.flags & Link) && r.link >= 0) {
+                    if (!links.empty() && links.back().link == r.link && links.back().end == static_cast<int>(from)) {
+                        links.back().end = static_cast<int>(at);
+                    } else {
+                        links.push_back({static_cast<int>(from), static_cast<int>(at), r.link});
+                    }
+                }
+            }
+            return {std::move(cached), std::move(links), std::move(sources), true};
+        }
         xoj::util::GObjectSPtr<PangoLayout> l(pango_layout_new(context()), xoj::util::adopt);
         PangoFontDescription* d = pango_font_description_new();
         pango_font_description_set_family(d, (o.mono ? st.monoFamily : st.family).c_str());
