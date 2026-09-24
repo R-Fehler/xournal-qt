@@ -668,3 +668,17 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] In the library's folder view, a folder card's menu (⋮, right click, press and hold) has "Open as library (new
       window)": a new window opens with that folder as library, its cards appear at once with their previews, and
       the search finds its documents without "Indexing for search" running through them again.
+
+## Preview writes (qt/preview-writes)
+- [ ] In a library folder synced by OneDrive (cache in the folders), open a `.xopp` with a few pages, write on page 3,
+      save, go back to the library and wait ~5 s: the card shows the same preview. `ls -l --time-style=full-iso
+      <folder>/.xournal_library/`: `previews.pack` keeps its time; `notes.pack` and a small `preview-stamps.pack`
+      (well under 1 KB) are new. The sync client uploads only those.
+- [ ] Close and open the library again: the card shows its preview at once (not drawn again), `previews.pack`
+      still keeps its time.
+- [ ] Write on page 1 and save: the card shows the new first page, `previews.pack` is written again (new time) and
+      `preview-stamps.pack` is gone.
+- [ ] Make page 2 the title page ("Make it the title page" in the page grid): the card shows page 2 and
+      `previews.pack` is written. Then edit page 4 and save: `previews.pack` is left alone; edit page 2: it is written.
+- [ ] Settings → Storage → Clean-up still removes everything (also `preview-stamps.pack`); switching the cache to
+      the app cache moves it along.

@@ -390,6 +390,63 @@ TEST_F(LibraryTest, previewsOfAFolderAreOnePackReadWhenFirstWanted) {
     PreviewCache::setLibrary({});
 }
 
+/// A preview as stored (PNG) and as drawn compare equal.
+static QImage argb(const QImage& img) { return img.convertToFormat(QImage::Format_ARGB32); }
+
+// A saved document gets a new stamp, so its preview is drawn again. When its first page looks as before, the
+// folder's previews.pack (0.3-0.6 MB, uploaded by sync clients) is not written again; only when it changed.
+TEST_F(LibraryTest, previewsPackIsRewrittenOnlyWhenTheFirstPageChanged) {
+    const fs::path xopp = root / "notes.xopp";
+    fs::copy_file(fixture(u8"load/pages.xopp"), xopp);
+    makePdf(root / "other.pdf");
+    const fs::path pack = root / DocumentFiles::META_DIR / "previews.pack";
+    PreviewCache::setLibrary(CacheLocation(root));
+    const QImage first = PreviewCache::preview(DocumentFiles::itemOf(xopp));
+    ASSERT_FALSE(first.isNull());
+    ASSERT_FALSE(PreviewCache::preview(DocumentFiles::itemOf(root / "other.pdf")).isNull());
+    PreviewCache::flush();
+    ASSERT_TRUE(fs::exists(pack));
+    const auto packTime = fs::last_write_time(pack);
+    const int writes = PreviewCache::packsWritten();
+    const int stampWrites = PreviewCache::stampPacksWritten();
+
+    // Page 3 edited: the preview is drawn again (a new stamp), looks the same, and previews.pack is left alone
+    QThread::msleep(20);  // (a new modification time)
+    addText(xopp, 2, "unicorn");
+    const DocumentItem edited = DocumentFiles::itemOf(xopp);
+    EXPECT_TRUE(PreviewCache::stored(edited).isNull()) << "not known yet whether the stored one still fits";
+    EXPECT_EQ(argb(PreviewCache::preview(edited)), argb(first));
+    PreviewCache::flush();
+    EXPECT_EQ(PreviewCache::packsWritten(), writes) << "previews.pack not written again";
+    EXPECT_EQ(PreviewCache::stampPacksWritten(), stampWrites + 1);
+    EXPECT_EQ(fs::last_write_time(pack), packTime);
+    const fs::path stamps = root / DocumentFiles::META_DIR / "preview-stamps.pack";
+    EXPECT_TRUE(fs::exists(stamps)) << "the new stamp is kept in the small pack";
+    std::error_code sizeError;
+    EXPECT_LT(fs::file_size(stamps, sizeError), 1024u);
+    EXPECT_EQ(argb(PreviewCache::stored(edited)), argb(first)) << "the stored preview is valid for the new version";
+    // ... also when the library is opened again (kept on disk)
+    PreviewCache::setLibrary(CacheLocation(root));
+    EXPECT_EQ(argb(PreviewCache::stored(edited)), argb(first));
+    EXPECT_FALSE(PreviewCache::stored(DocumentFiles::itemOf(root / "other.pdf")).isNull());
+    EXPECT_EQ(PreviewCache::packsWritten(), writes);
+
+    // Page 1 edited: a new preview, written into previews.pack
+    QThread::msleep(20);
+    addText(xopp, 0, "giraffe");
+    const DocumentItem firstPage = DocumentFiles::itemOf(xopp);
+    const QImage changed = PreviewCache::preview(firstPage);
+    EXPECT_NE(argb(changed), argb(first));
+    PreviewCache::flush();
+    EXPECT_EQ(PreviewCache::packsWritten(), writes + 1);
+    EXPECT_NE(fs::last_write_time(pack), packTime);
+    EXPECT_FALSE(fs::exists(stamps)) << "folded into previews.pack";
+    PreviewCache::setLibrary(CacheLocation(root));
+    EXPECT_EQ(argb(PreviewCache::stored(firstPage)), argb(changed));
+    EXPECT_FALSE(PreviewCache::stored(DocumentFiles::itemOf(root / "other.pdf")).isNull());
+    PreviewCache::setLibrary({});
+}
+
 TEST_F(LibraryTest, recentFilesShowExistingDocumentsOnce) {
     makePdf(root / "lecture.pdf");
     makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
@@ -1717,8 +1774,22 @@ TEST_F(LibraryTest, benchLibraryCache) {
     PreviewCache::preview(DocumentFiles::itemOf(edited));
     flushPreviews();
     auto [allBytes, allFiles] = written(before, snapshot(cacheFiles(root, appCache)));
-    std::cout << "with its new preview: " << allBytes / 1024.0 << " KiB in " << allFiles << " files\n";
+    std::cout << "with its preview (page 3 edited: drawn again, looks the same): " << allBytes / 1024.0 << " KiB in "
+              << allFiles << " files\n";
     EXPECT_EQ(index->search("unicorn").size(), 1u);
+    // Page 1 edited: a new preview, the folder's previews.pack is written again
+    const auto beforeFirst = snapshot(cacheFiles(root, appCache));
+    QThread::msleep(20);
+    addText(edited, 0, "pegasus");
+    index->update(DocumentFiles::scanRecursive(root));
+    index->waitForDone();
+    flushIndex(*index);
+    PreviewCache::preview(DocumentFiles::itemOf(edited));
+    flushPreviews();
+    auto [firstBytes, firstFiles] = written(beforeFirst, snapshot(cacheFiles(root, appCache)));
+    std::cout << "page 1 edited, index and preview: " << firstBytes / 1024.0 << " KiB in " << firstFiles
+              << " files (previews.pack: " << fs::file_size(edited.parent_path() / DocumentFiles::META_DIR / "previews.pack") / 1024.0
+              << " KiB)\n";
     index.reset();
 
     // The same cache in the layout before the packs (as earlier builds wrote it: a JSON file per document, a PNG
