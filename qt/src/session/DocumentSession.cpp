@@ -39,6 +39,7 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "AppContext.h"
+#include "DocumentMode.h"
 #include "DocumentSaveTask.h"
 #include "DocumentSearch.h"
 #include "HybridPdf.h"
@@ -1229,7 +1230,12 @@ fs::path DocumentSession::autosavePath() const {
         std::shared_lock lock(*doc);
         filepath = doc->getFilepath();
     }
-    return filepath.empty() ? unnamedAutosavePath(Util::getPid(), serialNo) : namedAutosavePath(filepath);
+    // PDF files mode (DocumentMode.h): nothing next to the user's files, the autosave of a saved document goes to the
+    // app cache too (under the tab's name, as for unsaved documents; recovery looks there as well)
+    if (filepath.empty() || DocumentMode::pdfOnly(*app.getSettings())) {
+        return unnamedAutosavePath(Util::getPid(), serialNo);
+    }
+    return namedAutosavePath(filepath);
 }
 
 fs::path DocumentSession::namedAutosavePath(fs::path document) {

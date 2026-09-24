@@ -609,6 +609,12 @@ every document is a single PDF, with no sidecars.
   notes in this mode, an image file shown as a page background becomes an attached image of the embedded `.xopp`
   (embedded in the PDF), so the PDF does not depend on the image file. Images inserted on pages were always inside
   the `.xopp` data.
+- **Autosave and recovery stay in the app cache.** Upstream (and Xournal++ files mode) autosaves a saved document as
+  `.name.autosave.xopp` next to it; in PDF files mode every autosave goes to `~/.cache/xournal-qt/autosaves/<pid>-<tab
+  serial>.autosave.xopp`, the name unsaved tabs always had (`DocumentSession::autosavePath`). Recovery after a crash
+  looks there for saved documents too (`SessionRecovery::findCandidates`, whatever the mode is now), recovers the
+  document as its PDF, and its next save writes into it. Crash (emergency) saves were already in the cache; so are the
+  clean copies, the merged PDFs of pasted pages and the kept originals.
 - **Existing `.xopp` files keep their format**: they open and save as `.xopp` (with their sidecars, which are part of
   that format); Save as starts on `.xopp` for them. Save as → "PDF with notes" and its old-`.xopp` question work as
   before.

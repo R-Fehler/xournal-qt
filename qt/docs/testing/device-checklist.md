@@ -1162,6 +1162,9 @@ Working in PDF files mode (choose "PDF files", or Settings → Documents):
       picture is still there.
 - [ ] Open an existing `.xopp`, write, Ctrl+S: it stays a `.xopp`. Share → "For Xournal++" still exports a pair into
       a chosen folder.
+- [ ] Autosave (Settings → Documents, every minute): write on a saved PDF with notes, wait over a minute: no
+      `.name.autosave.xopp` appears next to it; `~/.cache/xournal-qt/autosaves/` has a `…autosave.xopp`. Kill the app
+      (`kill -9`), start it: the recovery question offers the PDF; recover, Ctrl+S: saved into the PDF.
 - [ ] Switch back to "Xournal++ files": a plain PDF's notes ask for a place again (`.xopp` / `name.notes.pdf`), as
       before.
 - [ ] Windows: annotate a PDF that the library shows (its preview visible), Ctrl+S: saved without an error. If an

@@ -222,9 +222,12 @@ TEST_F(PdfOnlyMode, annotatingAPdfSavesIntoItThenAppends) {
     const fs::path pdf = root / "lecture.pdf";
     const std::string original = bytesOf(pdf);
     const std::vector<std::string> originalPages = pageContents(pdf);
+    const fs::path originals = Util::getCacheSubfolder("originals");
+    fs::remove_all(originals);  // (the test's cache: what other tests of this run kept)
     ASSERT_EQ(originalPages.size(), 3u);
     AppController c;
     Mode mode(c, DocumentMode::Mode::Pdf);
+    c.context().getSettings()->getCustomElement("xournalQt").setBool("pdfOnlyIntoPdfNoticed", false);  // (this run)
     QSignalSpy notes(&c, &AppController::pageActionDone);
     ASSERT_TRUE(open(c, pdf));
     EXPECT_FALSE(c.modified());
@@ -242,7 +245,6 @@ TEST_F(PdfOnlyMode, annotatingAPdfSavesIntoItThenAppends) {
     EXPECT_EQ(pageContents(pdf), originalPages) << "the original pages are not rewritten";
 
     // The original, once, in the app cache
-    const fs::path originals = Util::getCacheSubfolder("originals");
     std::vector<fs::path> kept;
     for (const auto& e: fs::recursive_directory_iterator(originals)) {
         if (e.is_regular_file()) {
@@ -383,4 +385,29 @@ TEST_F(PdfOnlyMode, aXoppStaysAXopp) {
     EXPECT_FALSE(c.isHybrid());
     EXPECT_EQ(current(c).getFilePath(), root / "notes.xopp");
     EXPECT_EQ(filesIn(root), (std::vector<std::string>{"lecture.pdf", "notes.xopp"}));
+}
+
+// Autosaves stay in the app cache in PDF files mode, also for a saved document (Xournal++ files mode: next to it,
+// as upstream). Recovery: RecoveryTest.pdfFilesModeAutosavesInTheCacheAndRecovers.
+TEST_F(PdfOnlyMode, autosavesStayInTheCache) {
+    const fs::path pdf = root / "lecture.pdf";
+    AppController c;
+    Mode mode(c, DocumentMode::Mode::Pdf);
+    ASSERT_TRUE(open(c, pdf));
+    DocumentSession& s = current(c);
+    drawStroke(s, 0);
+    ASSERT_TRUE(s.autosave().ok);  // (not saved yet)
+    EXPECT_EQ(s.getLastAutosaveFile().parent_path(), Util::getAutosaveFilepath().parent_path());
+    ASSERT_TRUE(c.save());
+    drawStroke(s, 1);
+    ASSERT_TRUE(s.autosave().ok);  // (saved: it has a file now)
+    const fs::path autosave = s.getLastAutosaveFile();
+    EXPECT_EQ(autosave.parent_path(), Util::getAutosaveFilepath().parent_path()) << "the app cache";
+    EXPECT_TRUE(fs::exists(autosave));
+    EXPECT_EQ(filesIn(root), std::vector<std::string>{"lecture.pdf"}) << "nothing next to the PDF";
+
+    mode.set(DocumentMode::Mode::Xopp);
+    EXPECT_EQ(s.autosavePath(), DocumentSession::namedAutosavePath(pdf)) << "Xournal++ files: as before";
+    c.closeTab(0);
+    EXPECT_FALSE(fs::exists(autosave)) << "closed without losing anything: removed";
 }
