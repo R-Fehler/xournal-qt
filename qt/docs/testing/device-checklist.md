@@ -468,8 +468,8 @@ Report problems with the input log (see qt/spikes/inkpad/README.md) or a screen 
 - [ ] Made smaller (not maximized), full screen, Escape: back to that size.
 
 ## Per-folder library cache (qt/library-index)
-Try these on a **copy** of a library, or on a new one. Opening the real OneDrive library with this build changes its
-cache on disk (and, once the whole block is in, converts the old one), which OneDrive then syncs.
+Try these on a **copy** of a library, or on a new one. Opening a real, cloud-synced library with this build changes its
+cache on disk (and, once the whole block is in, converts the old one), which the sync client then uploads.
 - [ ] Open a library with documents in several folders and wait until the search finds text in them. Each folder
       with documents now has a hidden `.xournal_library/` with `notes.pack` (and `pdf-text.pack` where there are
       PDFs); folders without documents have none. Close and open the library again: the search works at once and
@@ -489,8 +489,8 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       has a folder for the library with `pages.json`. Delete every `.xournal_library/` of the (copied) library by
       hand and open it again: the cards still show when and at which page each document was read.
 - [ ] Converting an old cache: make a copy of a library that was used with an older build (its root has
-      `.xournal_library/index/`, `previews/`, `pages.json`) and open the copy. **Opening the real OneDrive library
-      converts it for good** (the old files are removed and OneDrive syncs that). After a few seconds: `index/`,
+      `.xournal_library/index/`, `previews/`, `pages.json`) and open the copy. **Opening a real, cloud-synced library
+      converts it for good** (the old files are removed and the sync client uploads that). After a few seconds: `index/`,
       `previews/` and `pages.json` are gone from the root's `.xournal_library/`, each folder has its packs, no
       progress of indexing was shown (nothing read again), the search finds text at once, the cards show their
       previews without drawing them again, and the cards still show when and at which page documents were read.
