@@ -722,6 +722,13 @@ ApplicationWindow {
                         text: qsTr("Export as .xopp for Xournal++…")
                         onTriggered: openXoppExportDialog()
                     }
+                    MenuItem {
+                        objectName: "editAnywayItem"
+                        visible: app.canEditAnyway
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Edit anyway (as plain text)…")
+                        onTriggered: app.editAnyway(false)
+                    }
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
                     MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
@@ -828,6 +835,13 @@ ApplicationWindow {
                 wrapMode: Text.Wrap
                 color: "#4a3b00"
                 font.pixelSize: 13
+            }
+            Button {
+                objectName: "editAnywayButton"
+                visible: app.canEditAnyway
+                flat: true
+                text: qsTr("Edit anyway")
+                onClicked: app.editAnyway(false)
             }
             ToolButton {
                 objectName: "shownFileNoteClose"
@@ -1323,10 +1337,34 @@ ApplicationWindow {
             hybridEditedDialog.file = file
             hybridEditedDialog.open()
         }
+        function onEditAnywayWarning(name) {
+            editAnywayDialog.file = name
+            editAnywayDialog.open()
+        }
         function onTextChangedOnDisk(name) {
             textChangedDialog.file = name
             textChangedDialog.open()
         }
+    }
+    // "Edit anyway" for a code, LaTeX, JSON... file: once per file, what editing it here means
+    Dialog {
+        id: editAnywayDialog
+        objectName: "editAnywayDialog"
+        property string file: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(520, parent ? parent.width - 32 : 520)
+        title: qsTr("Edit %1 as plain text?").arg(file)
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Label {
+            width: editAnywayDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("This file is edited as plain text; the app does not know its format. It does not check or "
+                       + "complete what you write, and it writes the text back as you leave it (lines you do not touch "
+                       + "stay as they are). For more, open it externally in an editor made for it.")
+        }
+        onAccepted: app.editAnyway(true)
     }
     // A text file changed on disk (another program) while it has changes here: which version stays
     Dialog {

@@ -901,3 +901,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Open a `.txt` (the library's "Show" → Text and code, or Open): monospaced lines as they are, `**` and `#`
       shown as typed, no highlighting. Type, Enter (the new line keeps the indentation), Tab (a tab), Ctrl+B does
       nothing. A long `.txt` flows over pages; Ctrl+S writes it back (line ends as they were).
+- [ ] Open a `.py` or `.tex` (Show → Text and code): read-only with highlighting, the note has "Edit anyway" (and ⋮
+      too). Tap it: a warning that the app does not know the format; Cancel keeps it read-only, OK shows it as
+      plain text to edit, in the same tab. Close and open it again: editable at once, no warning. Another file
+      asks again.

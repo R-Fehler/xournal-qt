@@ -1599,6 +1599,59 @@ TEST_F(HomeScreenMarkdownTest, aTxtFileIsEditedAsPlainText) {
               "# not a heading\n**not bold**\ndone");
 }
 
+TEST_F(HomeScreenMarkdownTest, otherTextFilesAreEditedOnlyAfterAWarning) {
+    const fs::path file = root / "script.py";
+    std::ofstream(file, std::ios::binary) << "def f():\r\n    return 1\r\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    EXPECT_EQ(controller->textDocument(), "") << "read-only, as before";
+    EXPECT_TRUE(controller->canEditAnyway());
+    auto* button = find<QQuickItem>("editAnywayButton");
+    ASSERT_NE(button, nullptr);
+    ASSERT_TRUE(button->isVisible());
+    auto* dialog = find<QObject>("editAnywayDialog");
+    ASSERT_NE(dialog, nullptr);
+    // Cancel: it stays read-only
+    click(button);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    QMetaObject::invokeMethod(dialog, "reject");
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(controller->textDocument(), "");
+    // OK: edited as plain text, in the same tab
+    click(button);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    QMetaObject::invokeMethod(dialog, "accept");
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(controller->textDocument(), "plain");
+    EXPECT_TRUE(controller->textEditable());
+    EXPECT_EQ(controller->tabCount(), 1);
+    EXPECT_EQ(controller->title(), "script.py");
+    click(find<QQuickItem>("canvas"));
+    key(Qt::Key_End, Qt::ControlModifier);
+    type("# end");
+    ASSERT_TRUE(controller->save());
+    {
+        std::ifstream in(file, std::ios::binary);
+        EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()),
+                  "def f():\r\n    return 1\r\n# end");
+    }
+    // Opened again later: edited at once, no warning (once per file)
+    controller->closeTab(0);
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(50);
+    EXPECT_EQ(controller->textDocument(), "plain");
+    EXPECT_FALSE(dialog->property("visible").toBool());
+    // Another file is asked about again
+    const fs::path other = root / "data.json";
+    std::ofstream(other, std::ios::binary) << "{}\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(other.string())));
+    wait(50);
+    EXPECT_EQ(controller->textDocument(), "");
+    EXPECT_FALSE(controller->editAnyway());
+    ASSERT_TRUE(waitOpened(dialog, true));
+    QMetaObject::invokeMethod(dialog, "reject");
+}
+
 namespace {
 /// Records what would be handed to the system (nothing is started).
 struct FakeSystemApps: xqt::SystemApps {

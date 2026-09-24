@@ -105,6 +105,9 @@ class AppController: public QObject {
     Q_PROPERTY(QString textDocument READ textDocument NOTIFY titleChanged)
     /// ... and it is edited (not shown read-only).
     Q_PROPERTY(bool textEditable READ textEditable NOTIFY titleChanged)
+    /// The current document is another text file (code, LaTeX, JSON, ...) shown read-only: it can be edited as plain
+    /// text after a warning (editAnyway).
+    Q_PROPERTY(bool canEditAnyway READ canEditAnyway NOTIFY titleChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
@@ -222,6 +225,10 @@ public:
     QString shownFileNote() const;
     QString textDocument() const;
     bool textEditable() const;
+    bool canEditAnyway() const;
+    /// Edit the text file shown read-only as plain text: the first time for a file the window warns first
+    /// (editAnywayWarning), and "OK" calls this again with `confirmed`. From then on the file opens for editing.
+    Q_INVOKABLE bool editAnyway(bool confirmed = false);
     /// Look whether the text files of the open tabs changed on disk (another program): an unmodified one is read
     /// again, a modified one is asked about (textChangedOnDisk). Also done when the window becomes active.
     Q_INVOKABLE void checkTextFiles();
@@ -705,6 +712,8 @@ Q_SIGNALS:
     /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
     /// (resolveTextChange).
     void textChangedOnDisk(const QString& name);
+    /// "Edit anyway" for a file not accepted before: the window warns (OK: editAnyway(true)).
+    void editAnywayWarning(const QString& name);
 
 private:
     /// The last query fuzzyName() parsed

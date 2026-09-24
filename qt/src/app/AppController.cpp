@@ -1171,7 +1171,8 @@ QString AppController::shownFileNote() const {
     if (DocumentFiles::isTextFile(file)) {
         std::error_code ec;
         const bool cut = fs::file_size(file, ec) > MarkdownFile::MAX_BYTES && !ec;
-        return tr("Read-only: %1 is shown as plain text, to read and search. Open it with another app to edit it.")
+        return tr("Read-only: %1 is shown to read and search. \"Edit anyway\" edits it here as plain text; \"Open "
+                  "externally\" opens it in its app.")
                        .arg(name) +
                (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
                     : QString());

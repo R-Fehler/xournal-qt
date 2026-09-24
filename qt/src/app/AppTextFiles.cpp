@@ -7,7 +7,11 @@
 #include <algorithm>
 #include <cctype>
 
+#include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QSaveFile>
 #include <QGuiApplication>
 
 #include "AppController.h"
@@ -20,6 +24,8 @@
 #include "session/TextFile.h"
 #include "shell/DocumentFiles.h"
 #include "shell/TabManager.h"
+#include "util/PathUtil.h"
+#include "control/ScrollHandler.h"
 
 using namespace xqt;
 
@@ -30,12 +36,49 @@ bool isPlainTextFile(const fs::path& file) {
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return ext == ".txt";
 }
+
+/// The other text files the user chose to edit as plain text ("Edit anyway", after its warning): they open for
+/// editing from then on. In the config folder, the newest last (at most MAX_ACCEPTED).
+constexpr int MAX_ACCEPTED = 500;
+fs::path acceptedStore() { return Util::getConfigFile("edit-as-text.json"); }
+QStringList acceptedFiles() {
+    QFile f(QString::fromStdString(acceptedStore().string()));
+    if (!f.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    QStringList list;
+    for (const QJsonValue& v: QJsonDocument::fromJson(f.readAll()).array()) {
+        list << v.toString();
+    }
+    return list;
+}
+bool isAccepted(const fs::path& file) {
+    return acceptedFiles().contains(QFileInfo(QString::fromStdString(file.string())).absoluteFilePath());
+}
+void accept(const fs::path& file) {
+    QStringList list = acceptedFiles();
+    const QString path = QFileInfo(QString::fromStdString(file.string())).absoluteFilePath();
+    list.removeAll(path);
+    list << path;
+    while (list.size() > MAX_ACCEPTED) {
+        list.removeFirst();
+    }
+    QSaveFile f(QString::fromStdString(acceptedStore().string()));
+    if (f.open(QIODevice::WriteOnly)) {
+        f.write(QJsonDocument(QJsonArray::fromStringList(list)).toJson(QJsonDocument::Compact));
+        f.commit();
+    }
+}
+/// An "other" text file (code, LaTeX, JSON, ...): not a .md, not a .txt.
+bool isOtherTextFile(const fs::path& file) {
+    return DocumentFiles::isTextFile(file) && !DocumentFiles::isMarkdownFile(file) && !isPlainTextFile(file);
+}
 }  // namespace
 
 std::unique_ptr<DocumentSession> AppController::openTextFile(const fs::path& file, std::string& error) {
     const bool markdown = DocumentFiles::isMarkdownFile(file);
-    if (!markdown && !isPlainTextFile(file)) {
-        return nullptr;
+    if (!markdown && !isPlainTextFile(file) && !(isOtherTextFile(file) && isAccepted(file))) {
+        return nullptr;  // (another text file: read-only until "Edit anyway")
     }
     auto text = std::make_unique<TextFile>();
     if (!text->load(file, markdown ? TextFile::Kind::Markdown : TextFile::Kind::Plain, error)) {
@@ -53,6 +96,52 @@ std::unique_ptr<DocumentSession> AppController::openTextFile(const fs::path& fil
     auto session = std::make_unique<DocumentSession>(*app, std::move(doc));
     session->setTextFile(std::move(text), !editable);
     return session;
+}
+
+bool AppController::canEditAnyway() const {
+    const DocumentSession* s = session();
+    return s && !s->textFile() && !s->hasFilePath() && isOtherTextFile(s->shownFile());
+}
+
+bool AppController::editAnyway(bool confirmed) {
+    if (!canEditAnyway()) {
+        return false;
+    }
+    const fs::path file = session()->shownFile();
+    const QString name = QString::fromStdString(file.filename().string());
+    if (!confirmed && !isAccepted(file)) {
+        Q_EMIT editAnywayWarning(name);  // (asked once per file; "OK" calls this again, confirmed)
+        return false;
+    }
+    auto text = std::make_unique<TextFile>();
+    std::string error;
+    if (!text->load(file, TextFile::Kind::Plain, error)) {
+        Q_EMIT message(tr("Cannot edit %1").arg(name), tr("It cannot be read."), true);
+        return false;
+    }
+    if (!text->editable() || !QFileInfo(QString::fromStdString(file.string())).isWritable()) {
+        const QString why = text->isTooBig() ? tr("It is bigger than %1 MB.").arg(TextFile::MAX_EDIT_BYTES / (1024 * 1024))
+                            : !text->isUtf8() ? tr("It is not UTF-8 text.")
+                                              : tr("The file cannot be written.");
+        Q_EMIT message(tr("Cannot edit %1").arg(name), why, true);
+        return false;
+    }
+    accept(file);
+    // The tab shows it as a plain text to edit now (in the place of the read-only one)
+    const size_t page = session()->getCurrentPageNo();
+    auto doc = MarkdownFile::textDocument(*text);
+    auto edited = std::make_unique<DocumentSession>(*app, std::move(doc));
+    edited->setTextFile(std::move(text), false);
+    const int old = tabs->currentIndex();
+    tabs->addTab(std::move(edited));
+    tabs->closeTab(old);
+    if (DocumentSession* s = session(); s && page < s->getDocument()->getPageCount()) {
+        s->setCurrentPageNo(page);
+        s->getScrollHandler()->scrollToPage(page);
+    }
+    watchTextFiles();
+    Q_EMIT titleChanged();
+    return true;
 }
 
 QString AppController::textDocument() const {

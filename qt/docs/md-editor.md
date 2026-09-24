@@ -33,6 +33,14 @@ one run per line (no md4c), `md::layout` puts the lines below each other in the 
 between lines (or within a line longer than a page). `md::join` takes the marker away again. The empty line after
 the last line break takes room only while the cursor is on it.
 
+## Other text files (code, LaTeX, JSON, …)
+They open read-only, as before (one code block, highlighted by its extension), with a note that offers **Edit
+anyway** (also in ⋮). The first time for a file it warns: "This file is edited as plain text; the app does not know
+its format…" (OK / Cancel). OK edits it as plain text (as a `.txt`, in the same tab), and the file opens for
+editing from then on without asking; the accepted files are listed in the config folder
+(`~/.config/xournal-qt/edit-as-text.json`, the last 500). A file that is not UTF-8, is over 2 MB or cannot be
+written says why and stays read-only.
+
 ## Saving
 - Save (Ctrl+S, the save button, the question when closing) writes the text back to the file, in the background
   like every save. Unchanged text is written byte for byte as it was:
