@@ -1,10 +1,12 @@
 #include "FuzzyQuery.h"
 
 #include <algorithm>
+#include <atomic>
 
 #include <QCoreApplication>
 
 #include "FuzzyMatch.h"
+#include "WordMatch.h"
 
 namespace xqt {
 
@@ -14,6 +16,8 @@ constexpr QChar OPEN_MARK(0xE001);    // "\("
 constexpr QChar CLOSE_MARK(0xE002);   // "\)"
 
 QString tr(const char* text) { return QCoreApplication::translate("FuzzyQuery", text); }
+
+std::atomic<int> typoSetting{wordmatch::DEFAULT_TYPOS};
 }  // namespace
 
 /// Tokens, then a recursive descent: and := or (' ' or)* ; or := unary ('|' unary)* ; unary := '(' and ')' |
@@ -199,6 +203,7 @@ private:
             s.remove(0, 1);
         }
         t.text = textmatch::prepare(s);
+        t.typos = FuzzyQuery::typoTolerance();
         if (t.text.isEmpty()) {
             return -1;  // (left out, as fzf leaves it out)
         }
@@ -217,11 +222,20 @@ textmatch::Term FuzzyQuery::Term::textTerm() const {
         case Type::Suffix: return {text, textmatch::WordEnd};
         case Type::Equal:
         case Type::Boundary: return {text, textmatch::Word};
+        case Type::Fuzzy:
+            if (wordmatch::perWord(text)) {
+                return {text, textmatch::Fuzzy | textmatch::typoBits(typos)};
+            }
+            return {text, textmatch::Anywhere};
         default: return {text, textmatch::Anywhere};
     }
 }
 
 FuzzyQuery::FuzzyQuery(const QString& query): text(query) { FuzzyQueryParser(*this).run(); }
+
+void FuzzyQuery::setTypoTolerance(int typos) { typoSetting = std::clamp(typos, 0, wordmatch::MAX_TYPOS); }
+
+int FuzzyQuery::typoTolerance() { return typoSetting.load(); }
 
 void FuzzyQuery::markPolarity(int node, bool positive) {
     const Node& n = nodes[static_cast<size_t>(node)];

@@ -14,6 +14,7 @@
 #include "session/FuzzyMatch.h"
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
+#include "session/WordMatch.h"
 
 using namespace xqt;
 
@@ -173,6 +174,175 @@ TEST(TextMatch, severalTermsAtOnce) {
     EXPECT_TRUE(decode(QString()).empty());
 }
 
+// --- fuzzy words in text (WordMatch) ------------------------------------------------------------------------------
+
+TEST(WordMatch, matchesWordsByTheRule) {
+    using wordmatch::Exact;
+    using wordmatch::Fuzzy;
+    using wordmatch::None;
+    struct Case {
+        const char* term;
+        const char* word;
+        int typos;  ///< the typo tolerance
+        wordmatch::Quality expected;
+    };
+    const std::vector<Case> cases = {
+            // 1. the word contains the term: exact
+            {"turbine", "turbine", 1, Exact},
+            {"turbine", "turbines", 1, Exact},
+            {"bine", "turbine", 1, Exact},
+            {"ing", "sing", 0, Exact},
+            // 2. its letters in this order from the word's first one, at most half the term's length in between
+            {"tbine", "turbine", 0, Fuzzy},       // u, r between
+            {"tbine", "turbines", 0, Fuzzy},      // (letters after the last one do not count)
+            {"tbine", "tambourine", 0, None},     // 5 between
+            {"tbine", "timberline", 0, None},
+            {"klmn", "kalman", 0, Fuzzy},
+            {"klmn", "kilimanjaro", 0, None},     // 3 between
+            {"thrm", "thermal", 0, Fuzzy},
+            {"thrm", "theorem", 0, None},
+            {"mtrx", "matrix", 0, Fuzzy},
+            {"sgnals", "signals", 0, Fuzzy},
+            {"trnsfrm", "transformation", 0, Fuzzy},
+            {"lectr", "lecture", 0, Fuzzy},
+            {"exrcse", "exercise", 0, Fuzzy},
+            // short terms: the letters close together, from the word's start
+            {"abc", "abacus", 0, Fuzzy},          // one between
+            {"abc", "abduct", 0, None},           // two between (3 letters allow one)
+            {"abc", "cab", 0, None},
+            {"tbn", "tubing", 0, None},
+            {"tbn", "turbine", 0, None},
+            {"klm", "kalman", 0, Fuzzy},
+            {"trb", "turbine", 0, Fuzzy},
+            {"urb", "turbine", 0, Exact},         // (inside: only as a substring)
+            {"tbe", "turbine", 0, None},          // u, r, i, n between
+            {"rbine", "turbine", 0, Exact},
+            {"ubine", "turbine", 0, None},        // not from the word's first letter
+            // 3. typos: one in terms of 5+ letters (tolerance 1), two in terms of 8+ (tolerance 2)
+            {"turbnie", "turbine", 1, Fuzzy},     // swapped
+            {"trbine", "turbine", 1, Fuzzy},      // left out (also rule 2)
+            {"urbine", "turbine", 1, Exact},      // (a substring)
+            {"turbinne", "turbine", 1, Fuzzy},    // one too many
+            {"turbime", "turbine", 1, Fuzzy},     // wrong
+            {"yurbine", "turbine", 1, Fuzzy},     // wrong, the first letter
+            {"turbnie", "turbine", 0, None},      // tolerance 0
+            {"tubrnie", "turbine", 1, None},      // two typos
+            {"tubrnie", "turbine", 2, None},      // (7 letters: one)
+            {"trubine", "turbine", 1, Fuzzy},
+            {"tuxbine", "turbine", 1, Fuzzy},
+            {"kalmn", "kalman", 1, Fuzzy},        // (also rule 2)
+            {"kalamn", "kalman", 1, Fuzzy},
+            {"kalamn", "kalman", 0, None},
+            {"lcture", "lecture", 1, Fuzzy},
+            {"elcture", "lecture", 1, Fuzzy},
+            {"filtr", "filter", 1, Fuzzy},
+            {"fitler", "filter", 1, Fuzzy},
+            {"fitler", "filter", 0, None},
+            {"fliter", "filter", 0, None},        // (the letters in another order: a typo)
+            {"fliter", "filter", 1, Fuzzy},
+            {"hosue", "house", 1, Fuzzy},
+            {"hsue", "house", 1, None},           // 4 letters: no typos
+            {"huose", "horse", 1, None},          // two apart
+            {"trasnformation", "transformation", 1, Fuzzy},
+            {"trasnfromation", "transformation", 1, None},
+            {"trasnfromation", "transformation", 2, Fuzzy},  // 14 letters: two
+            {"eigenvaleus", "eigenvalues", 2, Fuzzy},
+            {"eignevaleus", "eigenvalues", 2, Fuzzy},
+            {"eignevaleus", "eigenvalues", 1, None},
+            {"reprot", "report", 2, Fuzzy},       // 6 letters: one, also with tolerance 2
+            {"rpeort", "report", 2, Fuzzy},
+            {"rpeotr", "report", 2, None},
+            // digits are letters of a word
+            {"2024", "2024", 0, Exact},
+            {"x2y", "x23y", 0, Fuzzy},
+    };
+    for (const Case& c: cases) {
+        SCOPED_TRACE(std::string(c.term) + " / " + c.word + " / typos " + std::to_string(c.typos));
+        const wordmatch::Rule rule(textmatch::prepare(q(c.term)), c.typos);
+        EXPECT_EQ(rule.match(textmatch::prepare(q(c.word))), c.expected);
+    }
+}
+
+TEST(WordMatch, editDistanceAndGaps) {
+    using wordmatch::editDistance;
+    EXPECT_EQ(editDistance(u"turbine", u"turbine", 2), 0);
+    EXPECT_EQ(editDistance(u"turbnie", u"turbine", 2), 1) << "a swap is one edit";
+    EXPECT_EQ(editDistance(u"turbine", u"turbin", 2), 1);
+    EXPECT_EQ(editDistance(u"turbine", u"turbinexx", 2), 2);
+    EXPECT_EQ(editDistance(u"turbine", u"turbinexxx", 2), 3) << "over the limit: limit + 1";
+    EXPECT_EQ(editDistance(u"abcdef", u"badcfe", 3), 3);
+    EXPECT_EQ(editDistance(u"ca", u"abc", 3), 3) << "optimal string alignment (not full Damerau-Levenshtein)";
+    EXPECT_EQ(wordmatch::gapsOf(u"tbine", u"turbine"), 2);
+    EXPECT_EQ(wordmatch::gapsOf(u"tbine", u"tambourine"), 5);
+    EXPECT_EQ(wordmatch::gapsOf(u"tbine", u"bine"), -1);
+    EXPECT_EQ(wordmatch::gapsOf(u"tbine", u"tbin"), -1);
+    EXPECT_EQ(wordmatch::typosAllowed(4, 2), 0);
+    EXPECT_EQ(wordmatch::typosAllowed(5, 1), 1);
+    EXPECT_EQ(wordmatch::typosAllowed(7, 2), 1);
+    EXPECT_EQ(wordmatch::typosAllowed(8, 2), 2);
+    EXPECT_EQ(wordmatch::typosAllowed(8, 0), 0);
+}
+
+TEST(TextMatch, fuzzyTermsMatchWholeWords) {
+    using namespace textmatch;
+    // The words of a text, as the matcher reads them
+    std::vector<std::pair<QString, qsizetype>> seen;
+    const QString text = QStringLiteral("The Turbine's ﬁrst tur- bine; hyphen- Ated wind­turbine 2024-x");
+    words(text, [&](qsizetype start, qsizetype end, QStringView word) {
+        seen.emplace_back(word.toString(), end - start);
+    });
+    const std::vector<std::pair<QString, qsizetype>> expected{
+            {"the", 3}, {"turbine", 7}, {"s", 1}, {"first", 4}, {"turbine", 9}, {"hyphen", 6}, {"ated", 4},
+            {"windturbine", 12}, {"2024", 4}, {"x", 1}};
+    EXPECT_EQ(seen, expected) << "folded, ligatures written out, broken words and soft hyphens joined";
+
+    const Term tbine{prepare("tbine"), Fuzzy};
+    const auto spans = find(text, tbine.text, tbine.bounds);
+    ASSERT_EQ(spans.size(), 2u) << "turbine, tur- bine (windturbine: not from its start)";
+    EXPECT_EQ(text.mid(spans[0].start, spans[0].end - spans[0].start), QStringLiteral("Turbine")) << "the whole word";
+    EXPECT_EQ(text.mid(spans[1].start, spans[1].end - spans[1].start), QStringLiteral("tur- bine"));
+    EXPECT_EQ(count(text, tbine.text, tbine.bounds), 2);
+    EXPECT_TRUE(contains(text, tbine.text, tbine.bounds));
+    const Term turbine{prepare("turbine"), Fuzzy};
+    EXPECT_EQ(count(text, turbine.text, turbine.bounds), 3) << "and windturbine: it contains the term";
+    EXPECT_EQ(count(text, prepare("turbine"), Anywhere), 3);
+
+    // Typos by the term's bits
+    const QString typo = prepare("turbnie");
+    EXPECT_EQ(count(text, typo, Fuzzy), 0);
+    EXPECT_EQ(count(text, typo, Fuzzy | typoBits(1)), 2);
+    EXPECT_EQ(typosOf(Fuzzy | typoBits(2)), 2);
+
+    // With other terms: overlapping hits count once, as they are marked
+    const std::vector<Term> terms{{prepare("tbine"), Fuzzy}, {prepare("urb"), Anywhere}, {prepare("first"), Fuzzy}};
+    EXPECT_EQ(count(text, terms), static_cast<int>(find(text, terms).size()));
+    EXPECT_EQ(count(text, terms), 4) << "Turbine (not its urb), first, tur- bine, the urb of windturbine";
+
+    // Encoded for image URLs with their bits
+    const std::vector<Term> encoded{{prepare("tbine"), Fuzzy | typoBits(2)}, {prepare("kal"), WordStart}};
+    EXPECT_EQ(decode(encode(encoded)), encoded);
+}
+
+TEST(FuzzyQuery, fuzzyTermsTakeTheTypoTolerance) {
+    const int before = FuzzyQuery::typoTolerance();
+    EXPECT_EQ(before, wordmatch::DEFAULT_TYPOS);
+    FuzzyQuery::setTypoTolerance(2);
+    const FuzzyQuery two(QStringLiteral("turbine"));
+    FuzzyQuery::setTypoTolerance(0);
+    const FuzzyQuery none(QStringLiteral("turbine"));
+    FuzzyQuery::setTypoTolerance(7);
+    EXPECT_EQ(FuzzyQuery::typoTolerance(), wordmatch::MAX_TYPOS);
+    FuzzyQuery::setTypoTolerance(before);
+    EXPECT_EQ(textmatch::typosOf(two.terms()[0].textTerm().bounds), 2) << "taken when parsed";
+    EXPECT_EQ(textmatch::typosOf(none.terms()[0].textTerm().bounds), 0);
+    EXPECT_EQ(FuzzyQuery::textTerms(QStringLiteral("tbine | 'x"), true),
+              (std::vector<textmatch::Term>{{"tbine", textmatch::Fuzzy | textmatch::typoBits(before)},
+                                            {"x", textmatch::Anywhere}}));
+    EXPECT_EQ(FuzzyQuery::textTerms(QStringLiteral("tbine"), false),
+              (std::vector<textmatch::Term>{{"tbine", textmatch::Anywhere}}))
+            << "not fuzzy: as before";
+}
+
 // --- the query ------------------------------------------------------------------------------------------------
 
 namespace {
@@ -222,6 +392,7 @@ TEST(FuzzyQuery, parsesFzfSyntaxWithGroups) {
 
 TEST(FuzzyQuery, termMarks) {
     using T = FuzzyQuery::Type;
+    const unsigned FUZZY = textmatch::Fuzzy | textmatch::typoBits(FuzzyQuery::typoTolerance());
     struct Case {
         const char* query;
         const char* text;
@@ -230,17 +401,21 @@ TEST(FuzzyQuery, termMarks) {
         unsigned bounds;  ///< in text
     };
     const std::vector<Case> cases = {
-            {"kalman", "kalman", T::Fuzzy, false, textmatch::Anywhere},
+            {"kalman", "kalman", T::Fuzzy, false, FUZZY},  // word by word
+            {"kal", "kal", T::Fuzzy, false, FUZZY},
+            {"ka", "ka", T::Fuzzy, false, textmatch::Anywhere},  // too short: a substring
+            {"x2y", "x2y", T::Fuzzy, false, FUZZY},
+            {"e.g", "e.g", T::Fuzzy, false, textmatch::Anywhere},  // not a word: a substring
             {"'kalman", "kalman", T::Exact, false, textmatch::Anywhere},
             {"'kalman'", "kalman", T::Boundary, false, textmatch::Word},
             {"^kal", "kal", T::Prefix, false, textmatch::WordStart},
             {"man$", "man", T::Suffix, false, textmatch::WordEnd},
             {"^kalman$", "kalman", T::Equal, false, textmatch::Word},
             {"!draft", "draft", T::Exact, true, textmatch::Anywhere},
-            {"!'draft", "draft", T::Fuzzy, true, textmatch::Anywhere},
+            {"!'draft", "draft", T::Fuzzy, true, FUZZY},
             {"!^draft", "draft", T::Prefix, true, textmatch::WordStart},
             {"!old$", "old", T::Suffix, true, textmatch::WordEnd},
-            {"KALMAN", "kalman", T::Fuzzy, false, textmatch::Anywhere},
+            {"KALMAN", "kalman", T::Fuzzy, false, FUZZY},
             {"$", "$", T::Fuzzy, false, textmatch::Anywhere},
             {"a\\ b", "a b", T::Fuzzy, false, textmatch::Anywhere},
             {"f\\(x\\)", "f(x)", T::Fuzzy, false, textmatch::Anywhere},
@@ -287,7 +462,8 @@ TEST(FuzzyQuery, marksTheTermsThatAreNotNegated) {
         }
         return out;
     };
-    EXPECT_EQ(marked("kalman !draft"), (std::vector<std::string>{"kalman/0"}));
+    const std::string fuzzy = std::to_string(textmatch::Fuzzy | textmatch::typoBits(FuzzyQuery::typoTolerance()));
+    EXPECT_EQ(marked("kalman !draft"), (std::vector<std::string>{"kalman/" + fuzzy})) << "a word, fuzzy";
     EXPECT_EQ(marked("a | b a"), (std::vector<std::string>{"a/0", "b/0"})) << "each once";
     EXPECT_EQ(marked("!(a !b) ^c"), (std::vector<std::string>{"b/0", "c/1"})) << "two negations: marked";
     EXPECT_EQ(marked("'x' y$"), (std::vector<std::string>{"x/3", "y/2"}));

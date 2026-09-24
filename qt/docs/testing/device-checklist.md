@@ -737,3 +737,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       are highlighted, a document found by its title alone says "In the name"; with the pages button, a document shows
       the pages on which the whole expression holds. "Names" with Fuzzy on matches the titles fuzzily.
 - [ ] A big library (thousands of documents): typing in the fuzzy search stays as responsive as the plain one.
+
+## Fuzzy search in text (qt/fuzzy-text)
+- [ ] Open a PDF with the word "turbine" in its text, search with Fuzzy on (from the library or the tab overview):
+      `tbine` finds it, `turbnie` (letters swapped), `trbine` (one left out) and `turbime` (one wrong) too; the whole
+      word "turbine" is marked on the canvas, in the sidebar and in the page grid, and the count matches the marks.
+- [ ] Short terms stay strict: `tb` finds only what contains "tb" (as before); `tbn` does not mark "turbine".
