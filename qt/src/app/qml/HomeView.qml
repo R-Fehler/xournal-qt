@@ -17,6 +17,8 @@ import "Popups.js" as Popups
 Rectangle {
     id: home
     objectName: "homeView"
+    /// A narrow window (a phone): the library search gets a row of its own
+    readonly property bool narrow: width < 760
     color: "#eef0f3"
     /// 0: library, 1: recent documents
     property int page: app.library.available ? 0 : 1
@@ -247,12 +249,28 @@ Rectangle {
         }
 
         // --- header: library / recent, search, actions ---
-        RowLayout {
+        // (a window too narrow for all of it scrolls it sideways, like the tool bar; a narrow one, e.g. a phone, has
+        // the search in a row of its own below)
+        Flickable {
+            id: headerFlick
+            objectName: "homeHeader"
             visible: home.selectionCount === 0
             Layout.fillWidth: true
-            Layout.leftMargin: 16
-            Layout.rightMargin: 8
             Layout.topMargin: 10
+            Layout.preferredHeight: headerRow.implicitHeight
+            contentWidth: headerRow.width + 24
+            contentHeight: headerRow.implicitHeight
+            flickableDirection: Flickable.HorizontalFlick
+            boundsBehavior: Flickable.StopAtBounds
+            interactive: contentWidth > width + 1
+            clip: true
+        RowLayout {
+            id: headerRow
+            x: 16
+            // (the search field gives way down to its minimum before the row scrolls, as it did without scrolling)
+            width: Math.max(headerFlick.width - 24, implicitWidth - (searchSlot.visible
+                            ? searchSlot.Layout.preferredWidth - searchSlot.Layout.minimumWidth : 0))
+            height: headerFlick.height
             spacing: 6
 
             Rectangle {
@@ -368,120 +386,16 @@ Rectangle {
 
             Item { Layout.fillWidth: true }
 
-            // Search in the whole library
-            Rectangle {
-                visible: home.page === 0 && app.library.available
-                // As wide as there is room for, up to 380 (the buttons of the row come first on a narrow screen)
+            // Search in the whole library (searchGroup, below): here, or in a row of its own when the window is narrow
+            Item {
+                id: searchSlot
+                visible: !home.narrow && home.page === 0 && app.library.available
+                // As wide as there is room for, up to 380 and the button (the buttons of the row come first)
                 Layout.fillWidth: true
-                Layout.minimumWidth: 180
-                Layout.maximumWidth: 380
-                Layout.preferredWidth: 380
-                Layout.preferredHeight: 44
-                radius: 22
-                color: "#ffffff"
-                border.width: searchField.activeFocus ? 2 : 1
-                border.color: searchField.activeFocus ? Material.accentColor : "#c9ccd1"
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 4
-                    ToolButton {
-                        objectName: "librarySearchButton"
-                        implicitWidth: 36; implicitHeight: 36
-                        icon.source: app.iconUrl("xqt-search")
-                        icon.color: "#3c4043"
-                        display: AbstractButton.IconOnly
-                        onClicked: { searchTyping.stop(); home.lib.searchQuery = searchField.text }
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Search (Enter)")
-                        ToolTip.delay: 600
-                    }
-                    TextField {
-                        id: searchField
-                        objectName: "librarySearchField"
-                        Layout.fillWidth: true
-                        background: null
-                        selectByMouse: true
-                        Label {
-                            anchors.verticalCenter: parent.verticalCenter
-                            x: parent.leftPadding
-                            width: parent.width - parent.leftPadding - parent.rightPadding  // (a narrow field: …)
-                            elide: Text.ElideRight
-                            visible: parent.text === "" && parent.preeditText === ""
-                            text: qsTr("Search documents and folders")
-                            color: "#8a8d91"
-                        }
-                        onTextEdited: home.typed()
-                        Keys.onReturnPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
-                        Keys.onEnterPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
-                        Keys.onDownPressed: libraryGrid.forceActiveFocus()
-                        Keys.onEscapePressed: { text = ""; home.lib.searchQuery = ""; libraryGrid.forceActiveFocus() }
-                    }
-                    Label {
-                        objectName: "librarySearchHint"
-                        visible: searchField.text !== "" && searchField.text.length < 4 && searchField.text !== home.lib.searchQuery
-                        text: qsTr("Enter ↵")
-                        color: "#6b6f75"
-                        font.pixelSize: 12
-                    }
-                    // Fuzzy search: an expression that is not valid is searched as plain text, and says why
-                    Label {
-                        objectName: "librarySyntaxHint"
-                        visible: home.lib.searchHint !== ""
-                        Layout.maximumWidth: 150
-                        text: home.lib.searchHint
-                        elide: Text.ElideRight
-                        color: "#b3261e"
-                        font.pixelSize: 12
-                        ToolTip.visible: hintHover.hovered
-                        ToolTip.text: qsTr("%1 - searched as plain text").arg(home.lib.searchHint)
-                        ToolTip.delay: 300
-                        HoverHandler { id: hintHover }
-                    }
-                    FuzzyToggle { objectName: "librarySearchFuzzy" }
-                    // The reduced search: names only (of documents, and of folders unless the list is flat)
-                    ToolButton {
-                        id: namesOnly
-                        objectName: "searchNamesOnly"
-                        text: qsTr("Names")
-                        checkable: true
-                        checked: home.lib.namesOnly
-                        onToggled: home.lib.namesOnly = checked
-                        implicitHeight: 36
-                        font.pixelSize: 13
-                        font.weight: checked ? Font.DemiBold : Font.Normal
-                        Material.foreground: checked ? Material.accentColor : "#5f6368"
-                        ToolTip.visible: hovered
-                        ToolTip.text: checked ? qsTr("Searching names only - tap to search the text of the documents too")
-                                              : qsTr("Search names only: of documents, and of folders when they are shown")
-                        ToolTip.delay: 600
-                        background: Rectangle {
-                            radius: 10
-                            color: namesOnly.checked ? "#e0e3f5" : (namesOnly.pressed ? "#e8e8e8" : "transparent")
-                        }
-                    }
-                    ToolButton {
-                        visible: searchField.text !== ""
-                        implicitWidth: 36; implicitHeight: 36
-                        icon.source: app.iconUrl("xqt-close")
-                        icon.color: "#3c4043"
-                        display: AbstractButton.IconOnly
-                        onClicked: { searchField.text = ""; searchTyping.stop(); home.lib.searchQuery = "" }
-                    }
-                }
-                Timer {
-                    id: searchTyping
-                    interval: 300
-                    onTriggered: home.lib.searchQuery = searchField.text
-                }
-            }
-            IconButton {
-                objectName: "extendedSearchButton"
-                visible: home.page === 0 && app.library.available
-                iconName: "xqt-pages-grid"
-                tip: qsTr("Extended search: show the pages with hits of every result")
-                checked: home.extended
-                onClicked: home.extended = !home.extended
+                Layout.minimumWidth: 180 + 6 + 48
+                Layout.maximumWidth: 380 + 6 + 48
+                Layout.preferredWidth: 380 + 6 + 48
+                Layout.preferredHeight: 48
             }
 
             Item { Layout.fillWidth: true }
@@ -674,6 +588,17 @@ Rectangle {
                 tip: qsTr("Settings (Ctrl+,)")
                 onClicked: home.settingsRequested()
             }
+        }
+        }
+        // The search's own row in a narrow window
+        Item {
+            id: narrowSearchSlot
+            visible: home.narrow && home.selectionCount === 0 && home.page === 0 && app.library.available
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.topMargin: 8
+            Layout.preferredHeight: 48
         }
 
         // --- where we are in the library ---
@@ -958,12 +883,15 @@ Rectangle {
                         color: "#80868b"
                         text: qsTr("Drop PDFs and Xournal files here, import them, or create a new document.")
                     }
-                    RowLayout {
+                    // (one below the other when they do not fit side by side)
+                    GridLayout {
                         visible: !home.searching
                         Layout.alignment: Qt.AlignHCenter
-                        Button { text: qsTr("New document"); highlighted: true; onClicked: newDocumentDialog.open() }
-                        Button { text: qsTr("Import files…"); flat: true; onClicked: importDialog.open() }
-                        Button { text: qsTr("Import a folder…"); flat: true; onClicked: importFolderDialog.open() }
+                        columns: emptyNew.implicitWidth + emptyImport.implicitWidth + emptyImportFolder.implicitWidth
+                                 + 2 * columnSpacing <= parent.width ? 3 : 1
+                        Button { id: emptyNew; objectName: "emptyNewDocument"; Layout.alignment: Qt.AlignHCenter; text: qsTr("New document"); highlighted: true; onClicked: newDocumentDialog.open() }
+                        Button { id: emptyImport; objectName: "emptyImportFiles"; Layout.alignment: Qt.AlignHCenter; text: qsTr("Import files…"); flat: true; onClicked: importDialog.open() }
+                        Button { id: emptyImportFolder; objectName: "emptyImportFolder"; Layout.alignment: Qt.AlignHCenter; text: qsTr("Import a folder…"); flat: true; onClicked: importFolderDialog.open() }
                     }
                 }
 
@@ -1118,6 +1046,122 @@ Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    // Search in the whole library, and the extended search: in the header, or in a row of its own when narrow
+    RowLayout {
+        id: searchGroup
+        parent: home.narrow ? narrowSearchSlot : searchSlot
+        anchors.fill: parent
+        spacing: 6
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 44
+            radius: 22
+            color: "#ffffff"
+            border.width: searchField.activeFocus ? 2 : 1
+            border.color: searchField.activeFocus ? Material.accentColor : "#c9ccd1"
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 14
+                anchors.rightMargin: 4
+                ToolButton {
+                    objectName: "librarySearchButton"
+                    implicitWidth: 36; implicitHeight: 36
+                    icon.source: app.iconUrl("xqt-search")
+                    icon.color: "#3c4043"
+                    display: AbstractButton.IconOnly
+                    onClicked: { searchTyping.stop(); home.lib.searchQuery = searchField.text }
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Search (Enter)")
+                    ToolTip.delay: 600
+                }
+                TextField {
+                    id: searchField
+                    objectName: "librarySearchField"
+                    Layout.fillWidth: true
+                    background: null
+                    selectByMouse: true
+                    Label {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: parent.leftPadding
+                        width: parent.width - parent.leftPadding - parent.rightPadding  // (a narrow field: …)
+                        elide: Text.ElideRight
+                        visible: parent.text === "" && parent.preeditText === ""
+                        text: qsTr("Search documents and folders")
+                        color: "#8a8d91"
+                    }
+                    onTextEdited: home.typed()
+                    Keys.onReturnPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
+                    Keys.onEnterPressed: { searchTyping.stop(); home.lib.searchQuery = text; libraryGrid.forceActiveFocus() }
+                    Keys.onDownPressed: libraryGrid.forceActiveFocus()
+                    Keys.onEscapePressed: { text = ""; home.lib.searchQuery = ""; libraryGrid.forceActiveFocus() }
+                }
+                Label {
+                    objectName: "librarySearchHint"
+                    visible: searchField.text !== "" && searchField.text.length < 4 && searchField.text !== home.lib.searchQuery
+                    text: qsTr("Enter ↵")
+                    color: "#6b6f75"
+                    font.pixelSize: 12
+                }
+                // Fuzzy search: an expression that is not valid is searched as plain text, and says why
+                Label {
+                    objectName: "librarySyntaxHint"
+                    visible: home.lib.searchHint !== ""
+                    Layout.maximumWidth: 150
+                    text: home.lib.searchHint
+                    elide: Text.ElideRight
+                    color: "#b3261e"
+                    font.pixelSize: 12
+                    ToolTip.visible: hintHover.hovered
+                    ToolTip.text: qsTr("%1 - searched as plain text").arg(home.lib.searchHint)
+                    ToolTip.delay: 300
+                    HoverHandler { id: hintHover }
+                }
+                FuzzyToggle { objectName: "librarySearchFuzzy" }
+                // The reduced search: names only (of documents, and of folders unless the list is flat)
+                ToolButton {
+                    id: namesOnly
+                    objectName: "searchNamesOnly"
+                    text: qsTr("Names")
+                    checkable: true
+                    checked: home.lib.namesOnly
+                    onToggled: home.lib.namesOnly = checked
+                    implicitHeight: 36
+                    font.pixelSize: 13
+                    font.weight: checked ? Font.DemiBold : Font.Normal
+                    Material.foreground: checked ? Material.accentColor : "#5f6368"
+                    ToolTip.visible: hovered
+                    ToolTip.text: checked ? qsTr("Searching names only - tap to search the text of the documents too")
+                                          : qsTr("Search names only: of documents, and of folders when they are shown")
+                    ToolTip.delay: 600
+                    background: Rectangle {
+                        radius: 10
+                        color: namesOnly.checked ? "#e0e3f5" : (namesOnly.pressed ? "#e8e8e8" : "transparent")
+                    }
+                }
+                ToolButton {
+                    visible: searchField.text !== ""
+                    implicitWidth: 36; implicitHeight: 36
+                    icon.source: app.iconUrl("xqt-close")
+                    icon.color: "#3c4043"
+                    display: AbstractButton.IconOnly
+                    onClicked: { searchField.text = ""; searchTyping.stop(); home.lib.searchQuery = "" }
+                }
+            }
+            Timer {
+                id: searchTyping
+                interval: 300
+                onTriggered: home.lib.searchQuery = searchField.text
+            }
+        }
+        IconButton {
+            objectName: "extendedSearchButton"
+            iconName: "xqt-pages-grid"
+            tip: qsTr("Extended search: show the pages with hits of every result")
+            checked: home.extended
+            onClicked: home.extended = !home.extended
         }
     }
 

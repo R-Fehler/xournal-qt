@@ -4,6 +4,7 @@
 #   qt/scripts/android-build.sh          # dependencies (vcpkg), configure, build the APK
 #   qt/scripts/android-build.sh deps     # only the C dependencies through vcpkg (hours the first time)
 #   qt/scripts/android-build.sh apk      # only configure + build (the dependencies must be there)
+#   qt/scripts/android-build.sh ksyntax  # only KSyntaxHighlighting (part of deps; Markdown code colours)
 #
 # Every heavy step runs with at most XQT_JOBS jobs (default 4), at low priority and, where systemd is there, in a
 # user scope capped at XQT_MEM (default 6G) and XQT_JOBS cores, so that the machine stays usable.
@@ -92,6 +93,53 @@ deps() {
         --clean-buildtrees-after-build --clean-packages-after-build
 }
 
+# KSyntaxHighlighting (KDE Frameworks; the colours of code blocks in Markdown) built against the official Qt for
+# Android: vcpkg's port builds against vcpkg's own Qt and does not support Android. Needs only Qt and ECM (CMake
+# files). Its indexer of the syntax definitions runs while building, so it is built for this machine too, against
+# the desktop Qt. Everything lands in $build/kf6 (the library in kf6/android, static, the definitions inside).
+kf_version=6.30.0
+ksyntax() {
+    local kf="$build/kf6"
+    local src="$kf/src" prefix="$kf/android"
+    if [ -f "$prefix/lib/cmake/KF6SyntaxHighlighting/KF6SyntaxHighlightingConfig.cmake" ]; then
+        return
+    fi
+    mkdir -p "$src"
+    local r
+    for r in extra-cmake-modules syntax-highlighting; do
+        if [ ! -d "$src/$r-$kf_version" ]; then
+            (cd "$src" && curl -fsSL -o "$r-$kf_version.tar.gz" \
+                "https://github.com/KDE/$r/archive/refs/tags/v$kf_version.tar.gz" && tar xf "$r-$kf_version.tar.gz")
+        fi
+    done
+    local sh="$src/syntax-highlighting-$kf_version"
+    # (KDE's clang-format hook would write into the sources while configuring)
+    printf 'DisableFormat: true\nSortIncludes: false\n' > "$sh/.clang-format"
+    # Two changes to the sources: the desktop rcc compresses the definitions with zstd, which the official Qt for
+    # Android cannot read (--no-zstd, also for the themes through AUTORCC below); and the command line tool is not
+    # needed (it would be an Android program).
+    sed -i 's/COMMAND Qt6::rcc --name syntax_data/COMMAND Qt6::rcc --no-zstd --name syntax_data/' "$sh/data/CMakeLists.txt"
+    sed -i 's/^    add_subdirectory(cli)$/    # add_subdirectory(cli)  # xournal-qt: not for Android/' "$sh/src/CMakeLists.txt"
+    cmake -S "$src/extra-cmake-modules-$kf_version" -B "$kf/ecm-build" -DCMAKE_INSTALL_PREFIX="$kf/ecm" \
+        -DBUILD_TESTING=OFF -DBUILD_DOC=OFF -DBUILD_HTML_DOCS=OFF -DBUILD_MAN_DOCS=OFF -DBUILD_QTHELP_DOCS=OFF
+    cmake --install "$kf/ecm-build"
+    local ecm="$kf/ecm/share/ECM/cmake"
+    local common=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DECM_DIR="$ecm" -DBUILD_TESTING=OFF
+        -DKF_SKIP_PO_PROCESSING=ON -DCMAKE_DISABLE_FIND_PACKAGE_Python=ON -DCMAKE_DISABLE_FIND_PACKAGE_XercesC=ON
+        -DCMAKE_DISABLE_FIND_PACKAGE_Qt6Quick=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6Widgets=ON
+        -DCMAKE_DISABLE_FIND_PACKAGE_Qt6PrintSupport=ON)
+    heavy cmake -S "$sh" -B "$kf/host-build" "${common[@]}" -DCMAKE_PREFIX_PATH="$QT_HOST" \
+        -DKSYNTAXHIGHLIGHTING_USE_GUI=OFF
+    heavy cmake --build "$kf/host-build" --target katehighlightingindexer -j "$jobs"
+    heavy cmake -S "$sh" -B "$kf/android-build" "${common[@]}" -DCMAKE_INSTALL_PREFIX="$prefix" \
+        -DCMAKE_TOOLCHAIN_FILE="$QT_ANDROID/lib/cmake/Qt6/qt.toolchain.cmake" -DQT_HOST_PATH="$QT_HOST" \
+        -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
+        -DBUILD_SHARED_LIBS=OFF -DKATEHIGHLIGHTINGINDEXER_EXECUTABLE="$kf/host-build/bin/katehighlightingindexer" \
+        -DCMAKE_AUTORCC_OPTIONS=--no-zstd
+    heavy cmake --build "$kf/android-build" -j "$jobs"
+    cmake --install "$kf/android-build"
+}
+
 apk() {
     # The preset (qt/CMakePresets.json) with this script's paths, which may come from the environment.
     heavy cmake --preset android-arm64-debug -S "$qt_dir" -B "$build" \
@@ -100,7 +148,8 @@ apk() {
         -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
         -DQT_CHAINLOAD_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
         -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
-        -DVCPKG_INSTALLED_DIR="$build/vcpkg_installed"
+        -DVCPKG_INSTALLED_DIR="$build/vcpkg_installed" \
+        -DKF6SyntaxHighlighting_DIR="$build/kf6/android/lib/cmake/KF6SyntaxHighlighting"
     heavy cmake --build "$build" --target apk -j "$jobs"
     local out="$build/android-build/build/outputs/apk/debug/android-build-debug.apk"
     [ -f "$out" ] || out="$(find "$build" -name '*.apk' -newer "$build/CMakeCache.txt" | head -1)"
@@ -109,8 +158,9 @@ apk() {
 }
 
 case "${1:-all}" in
-    deps) deps ;;
+    deps) deps; ksyntax ;;
+    ksyntax) ksyntax ;;
     apk) apk ;;
-    all) deps; apk ;;
-    *) echo "usage: $0 [deps|apk|all]" >&2; exit 2 ;;
+    all) deps; ksyntax; apk ;;
+    *) echo "usage: $0 [deps|ksyntax|apk|all]" >&2; exit 2 ;;
 esac

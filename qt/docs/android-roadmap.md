@@ -5,17 +5,38 @@ the desktop app builds, installs and starts on a phone (Galaxy Fold 7, Android 1
 keyboard. Mobile UI work waits until mobile testing is a real concern. Items are observed (O) on a device or expected
 (E) from the code and the research in `../cross-platform-qt-research/`.
 
+## Seen on the Fold 7 and in the emulator (qt/android-basics, 2026-09-24), not fixed yet
+
+- (O) The **selection bar** of the library (items selected) and long **breadcrumbs** are still one row that does not
+  scroll: on the cover screen they can run past the right edge.
+- (O) The **document tool bar** scrolls sideways on the cover screen (about half of the tools are off-screen); a
+  compact tool bar for phones is the real fix.
+- (O) **Markdown file being edited** in the emulator: the text shows overlapping, smeared glyphs while the cursor is
+  in it (the same file reads fine). Probably the emulator's ARM translation, like the dark bars below; check on the
+  phone.
+- (O) The **recovery dialog** ("Recover unsaved changes?") appears after every `am start -S`/force stop with a
+  changed document open: Android kills without warning, so saving on `ApplicationSuspended` (Lifecycle) matters.
+- (O) "Open with" a 145 MB PDF (the author on the Fold 7) froze the window while it was copied: fixed (copied in the
+  background, with a note); opening it again is instant.
+
 ## Seen in the emulator (2026-09-24)
 
 A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translation; see [android.md](android.md)).
 
-- (O) **Edge-to-edge**: the status bar lies over the tab strip (the clock covers the library tab). Needs the safe
-  area margins (see Screen and windows).
-- (O) **Missing symbols in the UI font**: the tabs' close button "✕" shows an empty box. Android's fonts have no
-  such glyph and Qt finds no fallback. The QML uses more of these (✎ ☐ ✓ ● ⋮ ↵ arrows); use SVG icons (Lucide has
-  them) or check each glyph against Roboto/Noto.
-- (O) **The soft keyboard** opens as soon as the New document dialog shows (its name field has the focus) and hides
-  half of the dialog, including Create. With a hardware keyboard this does not happen.
+- Done (`qt/android-basics`): **edge-to-edge**: the tab strip starts below the status bar (the window's safe area
+  margin, `Main.qml` `safeTop`; the New document dialog keeps below it too). Only the top is handled: the bottom
+  gesture bar and a side cut-out in landscape still overlap the canvas edge (harmless so far).
+- Done: **missing symbols**: the tab close button and the sidebar's page menu button are the SVG icons now (as on
+  the desktop), and a small symbol font (a DejaVu Sans subset, `qt/resources/fonts`) is Qt's fallback on Android
+  for ✓ ✎ ☐ ● ⋮ ↵ and the arrows in texts. The phones have "Noto Sans Symbols" with them, but split over two
+  files of that name, and Qt takes the one without them.
+- Done: **the soft keyboard and the New document dialog**: the name field no longer takes the focus on Android (so
+  the keyboard does not open by itself); when it is open, the dialog moves above it, gets only the room there and
+  scrolls, so Create stays in reach; the keyboard's Enter key creates the document. The paper and orientation row
+  wraps in a narrow window.
+- Done: **the home screen on a phone-wide window**: the library header scrolls sideways (as the tool bar does), the
+  search has a row of its own below 760 px, and the buttons of an empty folder stand one below the other (shared
+  QML, so narrow desktop windows get the same).
 - (O) **The image tool** opens Android's picker ("Recent images") when tapping the page; the chosen image comes back
   as a `content://` URI (see Files).
 - (O) **Dark bars across text at the left edge of each 256 px canvas tile** (the page thumbnails, drawn in one
@@ -32,6 +53,9 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   replays `getHistorical*` samples through JNI (research 02-stylus-input.md). Measure first with an input logger
   (`xqt.input`). The Galaxy Fold 7 has no S Pen support, so stylus tests need another device (a Galaxy Tab with an
   S Pen) or the emulator's stylus.
+- Done (`qt/android-basics`): **draw with the finger** (tool bar toggle, Settings → Touch), on by default on
+  Android devices without a stylus. Open: a long press with the finger while drawing takes the dot back and shows
+  the context menu only with the pen and highlighter (as the pen does); other tools just draw.
 - (E) **Palm rejection and touch vs. pen**: the canvas already separates them on Linux; Android reports
   `TOOL_TYPE_STYLUS` / `TOOL_TYPE_ERASER`, which Qt maps to `QPointingDevice` types. Check the eraser end and the
   side button.
@@ -43,15 +67,21 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
 
 ## Files
 
-- (E) **The system file picker** (QtQuick.Dialogs `FileDialog` → Android's `ACTION_OPEN_DOCUMENT`) returns
-  `content://` URIs, not paths. The core opens paths. Until there is a Storage Access Framework layer (copy in,
-  write back, or keep a persisted URI grant), documents live in the app's own folder:
-  `/storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default`
-  (reachable with `adb push` and over USB).
-- (E) **Opening a PDF from another app** ("Open with", share sheet): needs an intent filter for
-  `application/pdf` and `application/x-xopp`, and the URI handling above.
+- Done (`qt/android-basics`): **"Open…", "Import files…", "Import a folder…" and "Insert image"** read what
+  Android's pickers return (`content://`) and copy it into the library (android.md).
+- (E) **Saving and exporting to a place the user picks** ("Save as", "Export as PDF", the archive export, the
+  library archive): Android's save picker returns a `content://` URI too, which the core cannot write. Write to a
+  file in the cache and copy it through `QFile` on the URI, the other way round.
+- Done (`qt/android-basics`): **"Open with" and the share sheet** copy the file into the library's folder "Opened"
+  and open it (android.md). Open: sharing several files at once (SEND_MULTIPLE) is handled but was only tested with
+  one; `.xopp` files that other apps hand over as `application/octet-stream` make the app appear in "Open with" for
+  every unknown file type.
+- (E) **Writing back**: a document opened from another app is a copy; changes do not go back to the original (e.g.
+  a PDF in a cloud app). A later step could keep the URI grant (`takePersistableUriPermission`) and offer "Save back".
 - (E) **Libraries anywhere** (VISION): a library folder chosen by the user means a SAF tree URI
-  (`ACTION_OPEN_DOCUMENT_TREE`); the library code (`qt/src/shell/Library*`) scans with `std::filesystem`.
+  (`ACTION_OPEN_DOCUMENT_TREE`); the library code (`qt/src/shell/Library*`) scans with `std::filesystem`. Today
+  "Open a folder as library" with a picked folder only explains that it cannot be done yet. Other libraries (New
+  library, the Libraries menu) start another process, which Android does not do either.
 - (E) **"Show in file manager"** has no Android equivalent; hide it. "Open externally" becomes an intent with a
   `FileProvider` URI (the provider is already in the manifest).
 - (E) **Printing** calls `lp`; on Android use the print framework or hide Print.

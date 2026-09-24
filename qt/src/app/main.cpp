@@ -39,6 +39,7 @@
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
 #ifdef Q_OS_ANDROID
+#include "AndroidActivity.h"
 #include "AndroidSetup.h"
 #endif
 #ifdef Q_OS_WIN
@@ -60,6 +61,7 @@ int main(int argc, char* argv[]) {
 #ifdef Q_OS_ANDROID
     // Folders, resources and fonts for the core (GLib, fontconfig), before anything reads them.
     xqt::android::prepareEnvironment();
+    xqt::android::addSymbolFallback();
 #endif
 #ifdef Q_OS_WIN
     // UTF-8 for std::filesystem's narrow strings, GLib's cache folder, fontconfig (see qt/docs/windows.md).
@@ -171,6 +173,23 @@ int main(int argc, char* argv[]) {
             Qt::QueuedConnection);
     engine.loadFromModule("XournalQt", "Main");
     AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    // Edge to edge (Android 15 and newer): the status bar lies over the top of the window, so the tab strip starts
+    // below it (Main.qml's safeTop; 0 on the desktop)
+    if (auto* w = qobject_cast<QQuickWindow*>(engine.rootObjects().value(0))) {
+        auto applySafeArea = [w] { w->setProperty("safeTop", w->safeAreaMargins().top()); };
+        QObject::connect(w, &QWindow::safeAreaMarginsChanged, w, applySafeArea);
+        applySafeArea();
+    }
+#endif
+#ifdef Q_OS_ANDROID
+    // A phone without a pen (the Galaxy Fold 7) is written on with the finger: drawing with the finger is on at the
+    // first start there, off where a stylus is attached (as on the desktop)
+    controller.setFingerDrawingDefault(!xqt::android::hasStylus());
+    // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
+    // is there to show them and what went wrong)
+    xqt::android::watchIncomingFiles([&controller](const QStringList& files) { controller.receiveFiles(files); });
+#endif
 
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
     // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).

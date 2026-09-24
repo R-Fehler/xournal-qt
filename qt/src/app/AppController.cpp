@@ -57,6 +57,7 @@
 #include "session/DocumentTextIndex.h"
 #include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
+#include "shell/ContentFiles.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
@@ -730,7 +731,7 @@ bool AppController::insertImage(const QUrl& url) {
     if (textPagesFixed()) {
         return false;  // (a text file: its pages are its text)
     }
-    QFile f(url.toLocalFile());
+    QFile f(ContentFiles::sourceOf(url));  // (Android's picker: a content:// URI, which Qt reads too)
     if (!canvas() || !f.open(QIODevice::ReadOnly)) {
         return false;
     }
@@ -1748,6 +1749,13 @@ QVariantList AppController::libraries() const {
 }
 
 void AppController::openLibrary(const QUrl& folder) {
+    if (ContentFiles::isForeign(folder)) {  // (Android's folder picker: no path to scan)
+        Q_EMIT message(tr("Open a folder as library"),
+                       tr("This folder can only be read through Android's file picker, so it cannot be a library "
+                          "yet. \u201cImport a folder\u201d copies it into this library."),
+                       false);
+        return;
+    }
     const QString dir = xqt::localPathOf(folder);
     if (library->library() && Library(fs::path(dir.toStdString())).root() == library->library()->root()) {
         setHomeVisible(true);  // this one
@@ -1950,9 +1958,130 @@ void AppController::openPaths(const QStringList& paths) {
 }
 
 void AppController::openUrls(const QList<QUrl>& urls) {
+    QStringList received;
     for (const QUrl& u: urls) {
-        openPath(xqt::localPathOf(u));
+        if (ContentFiles::isForeign(u)) {
+            received << u.toString();
+        } else {
+            openPath(xqt::localPathOf(u));
+        }
     }
+    if (!received.isEmpty()) {
+        receiveFiles(received);
+    }
+}
+
+fs::path AppController::receivedFolder() const {
+    const Library* lib = library->library();
+    const fs::path base = lib ? lib->root()
+                              : fs::path(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation).toStdString());
+    return base / tr("Opened").toStdString();
+}
+
+void AppController::receiveFiles(const QStringList& sources) {
+    // (Android's share sheet may hand over text alone, see XournalActivity.java)
+    QStringList files;
+    for (const QString& s: sources) {
+        if (s == QLatin1String("xournal-qt:shared-text")) {
+            Q_EMIT message(tr("Nothing to open"), tr("Only files can be shared with Xournal Qt, not text."), false);
+        } else if (!s.isEmpty()) {
+            const QUrl url(s);
+            files << (url.isLocalFile() ? url.toLocalFile() : s);  // (file:// from some apps)
+        }
+    }
+    if (files.isEmpty()) {
+        Q_EMIT filesReceived(0);
+        return;
+    }
+    const fs::path folder = receivedFolder();
+    std::error_code ec;
+    fs::create_directories(folder, ec);
+    // Copying a big PDF takes a moment: in the background, and said so
+    qint64 bytes = 0;
+    for (const QString& f: files) {
+        bytes += QFileInfo(f).size();
+    }
+    if (bytes > 20 * 1024 * 1024) {
+        Q_EMIT pageActionDone(tr("Copying into the library…"), false);
+    }
+    QPointer<AppController> self(this);
+    QThreadPool::globalInstance()->start([self, files, folder] {
+        // The copies are made in a folder of our own first (the names other apps give are cleaned up there), then
+        // moved in the way the library imports documents (a .xopp with its PDF, free names)
+        QTemporaryDir staging(QDir::tempPath() + "/xqt-received-XXXXXX");
+        QStringList errors;
+        std::vector<fs::path> received;
+        std::error_code ec;
+        for (const QString& source: files) {
+            // Received before (the same name and size): that copy, which may have notes by now
+            const QFileInfo info(source);
+            const fs::path before = folder / ContentFiles::safeName(info.fileName());
+            if (info.isFile() && fs::is_regular_file(before, ec) &&
+                fs::file_size(before, ec) == static_cast<std::uintmax_t>(info.size())) {
+                received.push_back(before);
+                continue;
+            }
+            std::string error;
+            const fs::path copy = ContentFiles::copyInto(source, fs::path(staging.path().toStdString()), error);
+            if (copy.empty()) {
+                errors << QString::fromStdString(error);
+                continue;
+            }
+            const fs::path same = folder / copy.filename();  // (the name may have got its extension only now)
+            if (fs::is_regular_file(copy, ec) && fs::is_regular_file(same, ec) &&
+                fs::file_size(same, ec) == fs::file_size(copy, ec)) {
+                received.push_back(same);
+                continue;
+            }
+            const auto result = DocumentFiles::import(copy, folder, DocumentFiles::TextFiles);
+            if (!result.ok || !result.item.valid()) {
+                errors << QString::fromStdString(
+                        result.error.empty() ? "\"" + copy.filename().string() + "\" cannot be opened." : result.error);
+                continue;
+            }
+            received.push_back(result.item.main());
+        }
+        QMetaObject::invokeMethod(
+                QCoreApplication::instance(),
+                [self, folder, errors, received] {
+                    if (self) {
+                        self->openReceived(folder, received, errors);
+                    }
+                },
+                Qt::QueuedConnection);
+    });
+}
+
+void AppController::setFingerDrawingDefault(bool on) {
+    Settings* s = app->getSettings();
+    bool applied = false;
+    if (s->getCustomElement("touch").getBool("drawingDefaultApplied", applied) && applied) {
+        return;
+    }
+    s->getCustomElement("touch").setBool("drawingDefaultApplied", true);
+    s->customSettingsChanged();
+    s->setTouchDrawingEnabled(on);
+    s->save();
+}
+
+void AppController::openReceived(const fs::path& folder, const std::vector<fs::path>& files,
+                                 const QStringList& errors) {
+    library->refresh();
+    int count = 0;
+    for (const fs::path& f: files) {
+        count += openPath(QString::fromStdString(f.string())) ? 1 : 0;
+    }
+    if (!errors.isEmpty()) {
+        Q_EMIT message(tr("Cannot open file"), errors.join('\n'), true);
+    }
+    if (count > 0) {
+        Q_EMIT pageActionDone(library->library() ? tr("A copy is in the library, in the folder “%1”")
+                                                           .arg(QString::fromStdString(folder.filename().string()))
+                                                 : tr("A copy is in “%1”")
+                                                           .arg(QString::fromStdString(folder.string())),
+                              false);
+    }
+    Q_EMIT filesReceived(count);
 }
 
 QObject* AppController::referenceObject() const { return referenceMode.get(); }

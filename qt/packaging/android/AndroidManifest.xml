@@ -1,8 +1,10 @@
 <?xml version="1.0"?>
 <!-- xournal-qt: the Android manifest. Qt's template (Qt 6.11, src/android/templates) with the app's own settings:
      no permissions yet (documents live in the app's own folders, see qt/docs/android.md), a resizable activity for
-     split screen, pop-up windows, DeX and the Fold's two screens, and an optional stylus. The %%INSERT_...%% markers
-     are filled in by androiddeployqt from the target's QT_ANDROID_* properties (qt/cmake/XqtAndroid.cmake). -->
+     split screen, pop-up windows, DeX and the Fold's two screens, and an optional stylus. The activity is Qt's with
+     the handling of files from other apps (src/org/xournalqt/app/XournalActivity.java): "Open with" and the share
+     sheet for PDFs, Xournal++ files, Markdown and text files and images. The %%INSERT_...%% markers are filled in by
+     androiddeployqt from the target's QT_ANDROID_* properties (qt/cmake/XqtAndroid.cmake). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.xournalqt.app"
     android:installLocation="auto"
@@ -30,10 +32,10 @@
         android:fullBackupOnly="false"
         android:resizeableActivity="true">
         <activity
-            android:name="org.qtproject.qt.android.bindings.QtActivity"
+            android:name="org.xournalqt.app.XournalActivity"
             android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
             android:label="-- %%INSERT_APP_NAME%% --"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:screenOrientation="unspecified"
             android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize"
@@ -41,6 +43,60 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- "Open with": a copy goes into the library (folder "Opened") and opens (AppController::receiveFiles).
+                 One task (singleTask): a file handed over while the app runs opens in it as a tab. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/x-xopp" />
+                <data android:mimeType="application/x-xojpp" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <!-- .xopp and .xoj files have no MIME type most apps know: file managers hand them over as a byte stream
+                 (a .xopp is gzip) or with their name only -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/gzip" />
+                <data android:mimeType="application/x-gzip" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.xopp" />
+                <data android:pathPattern=".*\\..*\\.xopp" />
+                <data android:pathPattern=".*\\.xoj" />
+                <data android:pathPattern=".*\\.md" />
+            </intent-filter>
+            <!-- The share sheet: one file or several -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/x-xopp" />
+                <data android:mimeType="application/x-xojpp" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/gzip" />
+                <data android:mimeType="text/markdown" />
+                <data android:mimeType="text/x-markdown" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
             </intent-filter>
 
             <meta-data

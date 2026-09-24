@@ -6,7 +6,9 @@ set(XQT_ANDROID_DIR "${CMAKE_CURRENT_LIST_DIR}/../packaging/android")
 
 target_sources(xournal-qt PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.cpp)
 
 # The resources the core reads as files (page templates, palettes, icons) travel as Qt resources and are copied to
 # the app's data folder at start (AndroidSetup.cpp).
@@ -17,6 +19,10 @@ foreach(f ${_xqt_share_files})
 endforeach()
 qt_add_resources(xournal-qt xqt_android_share PREFIX /xqt-share BASE "${XQT_BUILD_RESOURCE_DIR}"
     FILES ${_xqt_share_abs})
+
+# A symbol font for the UI (Android's UI font has no ✓ ✕ ↵ ...; see resources/fonts/README.md)
+qt_add_resources(xournal-qt xqt_android_fonts PREFIX /xqt-fonts BASE "${CMAKE_CURRENT_LIST_DIR}/../resources/fonts"
+    FILES "${CMAKE_CURRENT_LIST_DIR}/../resources/fonts/XqtSymbols.ttf")
 
 # Package id, name, versions. The version code grows with the version (0.1.0 -> 100).
 math(EXPR _xqt_version_code "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")

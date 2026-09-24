@@ -16,6 +16,7 @@
 #include <QColor>
 #include <QImage>
 #include <QBuffer>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <gtest/gtest.h>
@@ -30,6 +31,7 @@
 #include "session/HybridPdf.h"
 #include "shell/TabManager.h"
 #include "AppController.h"
+#include "shell/ContentFiles.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/Library.h"
@@ -681,4 +683,93 @@ TEST_F(LibraryFilesTest, aHitInAMarkdownFileIsASnippetCardOfItsPassage) {
     EXPECT_EQ(passages[1].toMap()["passage"].toInt(), 3);
     EXPECT_TRUE(model.data(model.index(0), LibraryModel::HitPassageBaseRole).toString().startsWith("image://mdsnippet/"));
     EXPECT_TRUE(model.data(model.index(0), LibraryModel::HitPageListRole).toList().isEmpty());
+}
+
+// --- files of other apps (Android: "Open with", the share sheet, the file pickers; content:// URIs) ---------------
+
+TEST_F(LibraryFilesTest, aReceivedFileIsCopiedIntoTheOpenedFolderOnceAndOpened) {
+    const fs::path library = root / "Library";
+    const fs::path outside = root / "Other app";
+    fs::create_directories(library);
+    makeNotes(outside / "Lecture 1.xopp");
+    makeImage(outside / "board.png", 40, 30);
+    writeFile(outside / "todo.md", "# To do\n");
+    writeFile(outside / "notes.txt", "plain text\n");
+    AppController c;
+    c.setLibraryRoot(library);
+    QSignalSpy note(&c, &AppController::pageActionDone);
+    QSignalSpy errors(&c, &AppController::message);
+    QSignalSpy done(&c, &AppController::filesReceived);
+    // (in the background: the number opened comes with filesReceived)
+    auto receive = [&](const QStringList& files) {
+        done.clear();
+        c.receiveFiles(files);
+        waitFor([&] { return done.count() > 0; });
+        return done.isEmpty() ? -1 : done.first().first().toInt();
+    };
+
+    EXPECT_EQ(receive({qstr(outside / "Lecture 1.xopp"), qstr(outside / "board.png"), qstr(outside / "todo.md"),
+                              qstr(outside / "notes.txt")}),
+              4);
+    const fs::path opened = library / "Opened";
+    EXPECT_TRUE(fs::exists(opened / "Lecture 1.xopp"));
+    EXPECT_TRUE(fs::exists(opened / "board.png"));
+    EXPECT_TRUE(fs::exists(opened / "todo.md"));
+    EXPECT_TRUE(fs::exists(opened / "notes.txt"));
+    EXPECT_EQ(c.tabCount(), 4);
+    EXPECT_TRUE(fs::exists(outside / "Lecture 1.xopp")) << "the other app's file stays";
+    ASSERT_EQ(note.count(), 1) << "one note for all of them";
+    EXPECT_TRUE(note.first().first().toString().contains("Opened")) << note.first().first().toString().toStdString();
+    EXPECT_EQ(errors.count(), 0);
+
+    // The same file again: the copy there is opened, not copied a second time; another file of that name is copied
+    // under a free name
+    EXPECT_EQ(receive({qstr(outside / "Lecture 1.xopp")}), 1);
+    EXPECT_FALSE(fs::exists(opened / "Lecture 1 (2).xopp"));
+    writeFile(root / "Elsewhere" / "Lecture 1.xopp", "");  // (the folder)
+    DocumentHandler handler;
+    Document doc(&handler);
+    doc.addPage(std::make_shared<XojPage>(400, 300));
+    doc.addPage(std::make_shared<XojPage>(400, 300));
+    ASSERT_TRUE(DocumentSession::writeDocument(doc, root / "Elsewhere" / "Lecture 1.xopp").ok);
+    EXPECT_EQ(receive({qstr(root / "Elsewhere" / "Lecture 1.xopp")}), 1);
+    EXPECT_TRUE(fs::exists(opened / "Lecture 1 (2).xopp"));
+
+    // Something that cannot be read: said so, nothing opened
+    errors.clear();
+    EXPECT_EQ(receive({qstr(outside / "missing.pdf")}), 0);
+    EXPECT_EQ(errors.count(), 1);
+    // Text shared without a file
+    errors.clear();
+    EXPECT_EQ(receive({"xournal-qt:shared-text"}), 0);
+    EXPECT_EQ(errors.count(), 1);
+}
+
+TEST_F(LibraryFilesTest, pickedFoldersAreCopiedWithTheirStructureAndNamesAreMadeSafe) {
+    const fs::path picked = root / "Picked" / "Semester";
+    makeNotes(picked / "Week 1" / "notes.xopp");
+    writeFile(picked / "Week 2" / "summary.md", "# Summary\n");
+    writeFile(picked / ".git" / "config", "x");
+    writeFile(picked / "Makefile", "all:\n");  // (in a folder, names stay as they are)
+    const fs::path into = root / "Staging";
+    fs::create_directories(into);
+    std::string error;
+    const fs::path copy = ContentFiles::copyInto(qstr(picked), into, error);
+    EXPECT_EQ(copy, into / "Semester");
+    EXPECT_TRUE(error.empty()) << error;
+    EXPECT_TRUE(fs::exists(into / "Semester" / "Week 1" / "notes.xopp"));
+    EXPECT_TRUE(fs::exists(into / "Semester" / "Week 2" / "summary.md"));
+    EXPECT_FALSE(fs::exists(into / "Semester" / ".git")) << "hidden folders stay behind";
+    EXPECT_TRUE(fs::exists(into / "Semester" / "Makefile"));
+    // A single file whose name (another app's) has no extension: it is taken from the content
+    writeFile(root / "Picked" / "1234", "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n");
+    EXPECT_EQ(ContentFiles::copyInto(qstr(root / "Picked" / "1234"), into, error), into / "1234.pdf");
+
+    EXPECT_EQ(ContentFiles::safeName("../../etc/passwd"), "passwd");
+    EXPECT_EQ(ContentFiles::safeName(".hidden"), "hidden");
+    EXPECT_EQ(ContentFiles::safeName("a:b?.pdf"), "a_b_.pdf");
+    EXPECT_EQ(ContentFiles::safeName(""), "Document");
+    EXPECT_TRUE(ContentFiles::isForeign(QUrl("content://com.android.providers.downloads.documents/document/12")));
+    EXPECT_FALSE(ContentFiles::isForeign(QUrl::fromLocalFile("/tmp/a.pdf")));
+    EXPECT_EQ(ContentFiles::sourceOf(QUrl::fromLocalFile("/tmp/a b.pdf")), "/tmp/a b.pdf");
 }

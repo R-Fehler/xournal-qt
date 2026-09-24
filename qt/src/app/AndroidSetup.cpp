@@ -9,6 +9,7 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QFontDatabase>
 #include <QStandardPaths>
 #include <QtGlobal>
 
@@ -86,6 +87,22 @@ void writeFontConfig(const QString& file, const QString& cacheDir, const QString
 }
 
 }  // namespace
+
+void addSymbolFallback() {
+    // Roboto (the UI font) has no ✓ ✎ ☐ ● ↵ ← → and friends, and Qt finds them in no other font: they showed as empty
+    // boxes. (Android's "Noto Sans Symbols" has them, but in one of two files of that name, and Qt uses the other.)
+    // A subset of DejaVu Sans with them comes with the app (qt/resources/fonts).
+    const int id = QFontDatabase::addApplicationFont(QStringLiteral(":/xqt-fonts/XqtSymbols.ttf"));
+    const QStringList families = QFontDatabase::applicationFontFamilies(id);
+    if (families.isEmpty()) {
+        qWarning("xournal-qt: the symbol font could not be loaded");
+        return;
+    }
+    // (Symbols in a label are shaped with the text around them, so the fallback is needed for Latin text too.)
+    for (const auto script: {QChar::Script_Common, QChar::Script_Latin}) {
+        QFontDatabase::addApplicationFallbackFontFamily(script, families.first());
+    }
+}
 
 void prepareEnvironment() {
     // The app's private folders: /data/user/0/<package>/files and .../cache.

@@ -11,7 +11,9 @@
  *
  * Touch: navigation (pan with momentum, anchored pinch zoom), 2-finger tap = undo, 3-finger tap = redo, and
  * Krita-style palm rejection: touch is ignored while the pen is in proximity, pressed or was used recently, and a
- * pen press cancels a running touch gesture. Touch drawing is not supported yet (upstream default: off).
+ * pen press cancels a running touch gesture. Drawing with the finger (upstream's "touchDrawing" setting, the tool
+ * bar's toggle): one finger draws with the current tool like the pen (the hand tool still scrolls); a second
+ * finger takes that stroke back, as upstream's TouchDrawingInputHandler does, and the fingers scroll and zoom.
  *
  * @license GNU GPLv2 or later
  */
@@ -60,7 +62,7 @@ Q_SIGNALS:
     void hoverChanged();
 
 private:
-    enum class DeviceClass { Pen, Eraser, Mouse };
+    enum class DeviceClass { Pen, Eraser, Mouse, Touch };
     struct Event {
         DeviceClass deviceClass = DeviceClass::Pen;
         QPointF viewPos;
@@ -86,6 +88,13 @@ private:
 
     // --- touch ---
     bool touchBlocked() const;
+    /// A finger that goes down now draws (the setting is on, a tool that draws, a document to write in)
+    bool fingerDraws() const;
+    /// The stroke of the drawing finger is taken back (a second finger, the pen, a long press)
+    void cancelFingerStroke();
+    /// This touch: the finger `fingerDrawingId` draws
+    bool fingerDrawing = false;
+    int fingerDrawingId = -1;
     void cancelTouchGesture();
     void undo();
     void redo();

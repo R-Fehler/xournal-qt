@@ -18,11 +18,14 @@ Rectangle {
     signal undockRequested(int index)
     signal dockRequested(int index)
     signal shareRequested(int index)
-    implicitHeight: 46
+    /// Room at the top for the system's status bar (Android draws the window under it)
+    property real topInset: 0
+    implicitHeight: 46 + topInset
     color: "#dfe1e5"
 
     RowLayout {
         anchors.fill: parent
+        anchors.topMargin: strip.topInset
         anchors.leftMargin: 6
         spacing: 0
 
@@ -259,9 +262,11 @@ Rectangle {
                         Layout.topMargin: 4
                         implicitWidth: 36
                         implicitHeight: 36
-                        text: "✕"
-                        font.pixelSize: 14
-                        Material.foreground: "#5f6368"
+                        icon.source: app.iconUrl("xqt-close")
+                        icon.width: 16
+                        icon.height: 16
+                        icon.color: "#5f6368"
+                        display: AbstractButton.IconOnly
                         onClicked: strip.closeRequested(tab.index)
                     }
                 }

@@ -482,7 +482,25 @@ public:
     /// There is a file manager to show files in (not on Android).
     bool canShowInFileManager() const;
     bool canShare() const;
+    /// Open picked files (file dialogs, drops). Files of other apps that are no paths (Android's content:// URIs from
+    /// the system's file picker) are received as with receiveFiles.
     Q_INVOKABLE void openUrls(const QList<QUrl>& urls);
+    /// Files handed over by another app (Android: "Open with", the share sheet, the file picker; content:// URIs or
+    /// paths): a copy of each goes into the library's folder "Opened" and is opened. A file of the same name and size
+    /// there already is that copy (opened again, not copied twice). Without a library the folder is in the app's
+    /// data. A short note says where the copies are. The copying runs in the background; `filesReceived` tells how
+    /// many were opened.
+    void receiveFiles(const QStringList& sources);
+    /// The folder receiveFiles copies into.
+    fs::path receivedFolder() const;
+    /// Drawing with the finger (the tool bar's toggle, setting "touchDrawing") on or off, once: the first start on a
+    /// device decides (Android: on when it has no stylus); afterwards the user's choice stays.
+    void setFingerDrawingDefault(bool on);
+
+private:
+    void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);
+
+public:
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
     /// new document stays, to write the notes in). Without a document open: opened as the document.
     Q_INVOKABLE bool openAsReference(const QString& path);
@@ -854,6 +872,8 @@ Q_SIGNALS:
     void archiveExportsChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
+    /// receiveFiles is done: `opened` documents were opened.
+    void filesReceived(int opened);
     /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
     /// (resolveTextChange).
     void textChangedOnDisk(const QString& name);

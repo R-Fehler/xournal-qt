@@ -8,7 +8,8 @@ mouse and a keyboard. What is left for later is in [android-roadmap.md](android-
 
 ```sh
 qt/scripts/android-build.sh          # C dependencies (vcpkg), configure, APK
-qt/scripts/android-build.sh deps     # only the dependencies
+qt/scripts/android-build.sh deps     # only the dependencies (vcpkg, then KSyntaxHighlighting)
+qt/scripts/android-build.sh ksyntax  # only KSyntaxHighlighting
 qt/scripts/android-build.sh apk      # only configure + build (after deps)
 ```
 
@@ -27,6 +28,7 @@ Measured on the 8-thread 2-in-1 (2026-09-24), with 4 jobs:
 |---|---|
 | Dependencies, first build (55 vcpkg packages, host tools included) | about 17 min |
 | Dependencies again from the binary cache (`~/.cache/vcpkg/archives`), e.g. in a new worktree | 7 s |
+| KSyntaxHighlighting (download, ECM, the host indexer, the Android library; 2026-09-24) | about 1 min |
 | App, clean native build + APK, without ccache | 8 min 14 s (Gradle: 22 s) |
 | After changing one `.cpp` file (compile, link, Gradle) | 15 s |
 | After changing only the manifest (Gradle) | 80 s |
@@ -49,18 +51,57 @@ Other paths: set `ANDROID_SDK_ROOT`, `ANDROID_NDK_ROOT`, `QT_ANDROID`, `QT_HOST`
 
 ```sh
 adb install -r build-android/android-build/build/outputs/apk/debug/android-build-debug.apk
-adb shell am start -n org.xournalqt.app/org.qtproject.qt.android.bindings.QtActivity
+adb shell am start -n org.xournalqt.app/.XournalActivity
 adb logcat --pid=$(adb shell pidof org.xournalqt.app)       # the app's log (Qt warnings have the tag "default")
 ```
 
 Or copy the APK to the phone and open it (allow installing from the file manager). The app is "Xournal Qt",
 package `org.xournalqt.app`. A document can be opened at start from adb (debug builds only):
-`adb shell am start -S -n org.xournalqt.app/org.qtproject.qt.android.bindings.QtActivity -e applicationArguments <path>`.
+`adb shell am start -S -n org.xournalqt.app/.XournalActivity -e applicationArguments <path>`.
 
 **Where the documents are.** The default library is the app's own folder on the shared storage:
 `/storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default`. Files can be put
 there with `adb push <file> <that folder>/` or over USB. New documents are saved there. Uninstalling the app deletes
 this folder.
+
+**Files from other apps.** "Open with" (a PDF, a `.xopp` or `.xoj`, a `.md` or `.txt`, an image in a file
+manager, a mail or a browser's downloads) and the share sheet (one file or several) hand the app `content://` URIs.
+A copy of each goes into the library, in the folder **"Opened"** (created when needed), and opens as a tab; a small
+note at the bottom says where the copy is. A file with the same name and size already there is that copy: it opens
+again instead of being copied twice (another file of the same name is copied as "name (2)"). Text shared without a
+file (a link from a browser) is refused with a message. Files handed over while the app runs open in the running
+window (the activity is `singleTask`). The activity is Qt's with this added: `org.xournalqt.app.XournalActivity`
+([qt/packaging/android/src](../packaging/android/src/org/xournalqt/app/XournalActivity.java)), the native side is
+[AndroidActivity.cpp](../src/app/AndroidActivity.cpp) and `AppController::receiveFiles`; the copy is made by
+[ContentFiles](../src/shell/ContentFiles.h), so nothing after it sees a `content://` URI. Testing from adb:
+
+```sh
+adb shell am start -a android.intent.action.VIEW -d content://media/external/file/<id> -t application/pdf \
+    --grant-read-uri-permission -n org.xournalqt.app/.XournalActivity    # the id: adb shell content query ...
+adb shell am start -a android.intent.action.SEND -t application/octet-stream \
+    --eu android.intent.extra.STREAM file:///storage/emulated/0/Android/data/org.xournalqt.app/files/<file> \
+    -n org.xournalqt.app/.XournalActivity
+```
+
+(`am` grants no read access to a `content://` URI in `EXTRA_STREAM`, only to the intent's data; real share sheets
+put the URI into the clip data, which carries the grant. So test SEND with a file of the app's own folder.) While
+the phone is locked the app's event loop is paused: a file handed over then opens when it is unlocked.
+
+**Opening and importing through Android's pickers.** "Open…" (tool bar, Recent), "Import files…" and "Import a
+folder…" (library) show Android's system pickers (the Storage Access Framework: `ACTION_OPEN_DOCUMENT` and, for
+folders, `ACTION_OPEN_DOCUMENT_TREE`, which Qt's `FileDialog` and `FolderDialog` use on Android). They return
+`content://` URIs: "Open…" copies the file into "Opened" as above and opens it; the imports copy into the library's
+current folder, a folder with all its subfolders (hidden ones stay behind) and every file the library shows. The
+copies go through a staging folder in the app's cache first, in the background ([LibraryModel](../src/shell/LibraryModel.cpp)
+`importUrls`). An image picked for "Insert image" is read the same way. "Open a folder as library" cannot take a
+picked folder yet (no path to scan): it says so and points to "Import a folder".
+
+**Drawing with the finger.** The Fold 7 has no pen, so on Android the finger draws from the first start when the
+device reports no stylus (Android's input devices: no `SOURCE_STYLUS`; checked once, at the first start, through
+`XournalActivity.hasStylus()`; a tablet with an S Pen starts with it off, as the desktop does). The finger button
+in the tool bar (next to the hand) and Settings → Touch → "Draw with the finger" turn it on and off on every
+platform: one finger draws with the current tool, two fingers scroll and zoom (a stroke the first finger began is
+taken back), the hand tool still scrolls, and while a pen is near the finger is ignored (palm rejection).
 
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
@@ -83,9 +124,16 @@ settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-
   files are broken and fail even a `QUIET` lookup).
 - **Packaging** ([qt/cmake/XqtAndroid.cmake](../cmake/XqtAndroid.cmake), [qt/packaging/android/](../packaging/android)):
   Qt's manifest template with the app's id, name and icon (the desktop SVG as PNGs), min SDK 28 (Qt 6.11's minimum),
-  target SDK 36, no permissions, resizable activity. The APK is debug-signed
+  target SDK 36, no permissions, resizable activity, intent filters for "Open with" and the share sheet. The APK is debug-signed
   (`QT_ANDROID_DEPLOYMENT_TYPE=Debug`, the SDK's debug keystore) while the native code is `RelWithDebInfo`, so that
   pages draw at full speed.
+- **KSyntaxHighlighting** (the colours of code blocks in Markdown): vcpkg's `syntax-highlighting` port builds
+  against vcpkg's own Qt and does not support Android, so the script builds KDE's release 6.30.0 itself
+  (`ksyntax` step, into `<build>/kf6`): ECM (CMake files), the syntax definition indexer for this machine against the
+  desktop Qt (it runs during the build), and the library for Android against the official Qt, static, with the
+  definitions inside. Two changes to its sources, made by the script: its resources are compiled without zstd
+  (`--no-zstd`; the official Qt for Android cannot read zstd resources), and its command line tool is left out.
+  The configure step passes `KF6SyntaxHighlighting_DIR`, so `XqtMarkdown.cmake` finds it as on the desktop.
 - **Resources**: page templates, palettes and icons, which the core reads as plain files, are Qt resources in the APK
   and are copied to the app's data folder at start ([AndroidSetup.cpp](../src/app/AndroidSetup.cpp)).
 - **Fonts**: vcpkg's fontconfig knows no configuration on the phone. The app writes its own `fonts.conf` at start
@@ -106,7 +154,6 @@ settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-
 | Single instance (local socket per library) | Android starts one activity (`singleTop`) |
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
 | Audio, Lua plugins, X11, gtksourceview | already off in the Qt build |
-| KSyntaxHighlighting (Markdown code colours) | optional; vcpkg's `syntax-highlighting` (KF6) depends on vcpkg's own Qt, not the official Qt for Android. Code blocks are plain for now |
 | Floating point `std::from_chars` | missing in the NDK's libc++; upstream's `g_ascii_strtod` fallback is used (the same check as upstream's CMake) |
 
 ## Checked so far (without the phone)

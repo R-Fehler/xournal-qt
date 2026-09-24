@@ -1169,3 +1169,39 @@ Working in PDF files mode (choose "PDF files", or Settings → Documents):
       before.
 - [ ] Windows: annotate a PDF that the library shows (its preview visible), Ctrl+S: saved without an error. If an
       error "could not rename" comes, note it (see hybrid-pdf.md, "PDF-only mode").
+
+## Android basics (qt/android-basics)
+
+Install the debug APK (`adb install -r …/android-build-debug.apk`; the documents in the app's folder stay).
+
+- [ ] "Open with": in My Files (or Files by Google), long press a PDF in Downloads → Open with → Xournal Qt. The app
+      starts (or comes to the front), the PDF opens as a tab, a note at the bottom says "A copy is in the library, in
+      the folder “Opened”". The library shows the folder "Opened" with the PDF. Open the same PDF the same way again:
+      its tab comes back, no "(2)" copy appears.
+- [ ] The same with a `.xopp` (sent to yourself by mail or in Downloads), a `.md` file and a photo: each opens (the
+      photo as a page to write on).
+- [ ] Share sheet: in the Gallery or in a mail app, share a photo or a PDF attachment → Xournal Qt. It opens as
+      above. Share two photos at once: both open.
+- [ ] Share a link from the browser → Xournal Qt: a message says only files can be shared.
+- [ ] Library → Import → "Import files…": Android's picker opens; pick two PDFs from Downloads (long press to pick
+      several). "2 documents imported"; they are in the current folder of the library.
+- [ ] Import → "Import a folder with its subfolders…": the folder picker opens ("Use this folder", "Allow"). The
+      folder appears in the library with its subfolders and documents.
+- [ ] In a document, the Open button: the picker; the chosen PDF opens as a tab and its copy is in "Opened".
+- [ ] The image tool (or Insert image): pick a photo; it lands on the page as a selection.
+- [ ] After installing this APK the finger button in the tool bar (next to the hand) is on (the Fold 7 has no pen).
+      One finger writes with the pen; the hand tool scrolls with one finger; two fingers scroll and pinch-zoom (the
+      line the first finger began disappears); a quick two-finger tap undoes. Turn the button off: one finger scrolls
+      again. Settings → Touch → "Draw with the finger" shows the same state.
+- [ ] Desktop (Linux, Surface): the finger button is off at first; turned on, the touch screen draws with one finger;
+      the mouse draws with the left button either way; with the pen near, a resting hand draws nothing.
+- [ ] Open a `.md` with a fenced code block (```` ```python ````): keywords, strings, numbers and comments are in
+      colour, as on the desktop.
+- [ ] Unfolded and folded (cover screen): the tab strip starts below the status bar (the clock does not cover the
+      library tab). The tab close buttons show an ×, the page sidebar's buttons ⋮ (no empty boxes). Type two letters
+      into the library search: "Enter ↵" (not a box).
+- [ ] Cover screen: the library header scrolls sideways (the settings button is at its right end), the search field
+      is in a row of its own; an empty folder shows "New document", "Import files…", "Import a folder…" one below
+      the other, all readable.
+- [ ] New document: the dialog opens without the keyboard. Tap the name: the keyboard opens, the dialog moves above
+      it (it scrolls), Create stays visible; the keyboard's ✓ key creates the document.
