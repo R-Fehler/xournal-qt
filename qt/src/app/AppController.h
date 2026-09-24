@@ -29,6 +29,8 @@
 
 #include "filesystem.h"
 
+class QWindow;
+
 namespace xqt {
 class AppContext;
 class CanvasView;
@@ -539,6 +541,10 @@ public:
     /// Open windows maximized (people make them smaller with the tiling of their desktop). Set once, from main().
     static void setStartMaximized(bool on);
     bool startMaximized() const;
+    /// XQT_LOG_WINDOW=1: every change of a window's state, size and position, the touch and mouse presses around
+    /// it, and what the app itself asks of the window, on stderr (the compositor may change a window unasked).
+    static void watchWindow(QWindow* window);
+    Q_INVOKABLE void logWindow(const QString& what) const;
     /// Move the tab into a window of its own (a new one). Does nothing for the last tab of such a window.
     /// Close every tab of this window (unsaved changes are the UI's business).
     Q_INVOKABLE void closeAllTabs();

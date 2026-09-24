@@ -138,6 +138,7 @@ int main(int argc, char* argv[]) {
         }
         object->setParent(window);
         if (auto* w = qobject_cast<QQuickWindow*>(object)) {
+            AppController::watchWindow(w);
             w->show();
             w->requestActivate();
         }
@@ -146,6 +147,7 @@ int main(int argc, char* argv[]) {
             &engine, &QQmlApplicationEngine::objectCreationFailed, &qapp, [] { QCoreApplication::exit(1); },
             Qt::QueuedConnection);
     engine.loadFromModule("XournalQt", "Main");
+    AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
 
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
     // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).

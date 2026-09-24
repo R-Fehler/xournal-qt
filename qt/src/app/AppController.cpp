@@ -4,6 +4,7 @@
 #include <QThreadPool>
 
 #include <algorithm>
+#include <cstdio>
 #include <limits>
 
 #include <shared_mutex>
@@ -20,6 +21,10 @@
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QTemporaryDir>
+#include <QElapsedTimer>
+#include <QMouseEvent>
+#include <QTouchEvent>
+#include <QWindow>
 
 #include "control/ToolEnums.h"
 #include "control/ExportHelper.h"
@@ -198,6 +203,91 @@ bool windowsStartMaximized = false;                  // set by main()
 }  // namespace
 
 void AppController::setStartMaximized(bool on) { windowsStartMaximized = on; }
+
+namespace {
+bool windowLogOn() {
+    static const bool on = qEnvironmentVariableIsSet("XQT_LOG_WINDOW");
+    return on;
+}
+/// On stderr like XQT_PERF (qInfo may go to the journal when stderr is not a terminal)
+template <typename... Args>
+void windowLogLine(const char* format, Args... args) {
+    std::fprintf(stderr, format, args...);
+    std::fputc('\n', stderr);
+}
+qint64 windowLogMs() {
+    static QElapsedTimer clock;
+    if (!clock.isValid()) {
+        clock.start();
+    }
+    return clock.elapsed();
+}
+QString statesText(Qt::WindowStates s) {
+    QStringList parts;
+    if (s & Qt::WindowMinimized) parts << "minimized";
+    if (s & Qt::WindowMaximized) parts << "maximized";
+    if (s & Qt::WindowFullScreen) parts << "fullscreen";
+    if (s & Qt::WindowActive) parts << "active";
+    return parts.isEmpty() ? QStringLiteral("normal") : parts.join('+');
+}
+/// Logs what happens to a window (XQT_LOG_WINDOW)
+class WindowWatcher final: public QObject {
+public:
+    explicit WindowWatcher(QWindow* w): QObject(w) {
+        w->installEventFilter(this);
+        connect(w, &QWindow::windowStateChanged, this, [w](Qt::WindowState) {
+            windowLogLine("[window %6lld ms] %p states -> %s (geometry %d,%d %dx%d)", windowLogMs(), static_cast<void*>(w),
+                  qPrintable(statesText(w->windowStates())), w->x(), w->y(), w->width(), w->height());
+        });
+    }
+    bool eventFilter(QObject* o, QEvent* e) override {
+        auto* w = static_cast<QWindow*>(o);
+        switch (e->type()) {
+            case QEvent::Resize:
+                windowLogLine("[window %6lld ms] %p resized to %dx%d (%s)", windowLogMs(), static_cast<void*>(w), w->width(),
+                      w->height(), qPrintable(statesText(w->windowStates())));
+                break;
+            case QEvent::Move:
+                windowLogLine("[window %6lld ms] %p moved to %d,%d", windowLogMs(), static_cast<void*>(w), w->x(), w->y());
+                break;
+            case QEvent::TouchBegin:
+            case QEvent::TouchEnd:
+            case QEvent::TouchCancel:
+            case QEvent::MouseButtonPress:
+            case QEvent::MouseButtonRelease: {
+                const auto* pe = static_cast<QPointerEvent*>(e);
+                const auto& points = pe->points();
+                const QPointF at = points.isEmpty() ? QPointF() : points.first().scenePosition();
+                windowLogLine("[window %6lld ms] %p %s at %.0f,%.0f (%d points)", windowLogMs(), static_cast<void*>(w),
+                      e->type() == QEvent::TouchBegin         ? "touch begin"
+                      : e->type() == QEvent::TouchEnd         ? "touch end"
+                      : e->type() == QEvent::TouchCancel      ? "touch cancel"
+                      : e->type() == QEvent::MouseButtonPress ? "mouse press"
+                                                              : "mouse release",
+                      at.x(), at.y(), static_cast<int>(points.size()));
+                break;
+            }
+            default:
+                break;
+        }
+        return false;
+    }
+};
+}  // namespace
+
+void AppController::watchWindow(QWindow* window) {
+    if (window && windowLogOn()) {
+        new WindowWatcher(window);
+        windowLogLine("[window %6lld ms] %p watched (%s, %dx%d)", windowLogMs(), static_cast<void*>(window),
+              qPrintable(statesText(window->windowStates())), window->width(), window->height());
+    }
+}
+
+void AppController::logWindow(const QString& what) const {
+    if (windowLogOn()) {
+        windowLogLine("[window %6lld ms] app asks: %s", windowLogMs(), qPrintable(what));
+    }
+}
 
 bool AppController::startMaximized() const { return windowsStartMaximized; }
 
