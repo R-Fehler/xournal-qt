@@ -138,7 +138,7 @@ QString documentStamp(const DocumentItem& item) {
     QString stamp;
     const fs::path none;
     for (const fs::path& f: {item.xopp, item.pdf, item.xopp.empty() ? none : DocumentFiles::attachmentOf(item.xopp),
-                             item.xopp.empty() ? none : DocumentFiles::pagesOf(item.xopp)}) {
+                             item.xopp.empty() ? none : DocumentFiles::pagesOf(item.xopp), item.md, item.image}) {
         if (!f.empty()) {
             stamp += fileStamp(f) + ';';
         }
@@ -154,6 +154,21 @@ const QString LibraryIndex::PDF_TEXT_PACK = QStringLiteral("pdf-text");
 namespace {
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
 fs::path toPath(const QString& s) { return fs::path(s.toStdString()); }
+/// The stamp of the file an entry reads itself (its "xopp" stamp): the .xopp, a Markdown file, a lone image; a lone
+/// PDF has none (its PDF stamp).
+QString ownStamp(const DocumentItem& item) {
+    if (!item.xopp.empty()) {
+        return fileStamp(item.xopp);
+    }
+    return item.pdf.empty() ? fileStamp(item.main()) : QString();
+}
+/// The kind of an entry: what it read ("xopp" also for .xoj, "pdf", "md", "image").
+QString entryKind(const DocumentItem& item) {
+    if (!item.xopp.empty()) {
+        return QStringLiteral("xopp");
+    }
+    return !item.pdf.empty() ? QStringLiteral("pdf") : !item.md.empty() ? QStringLiteral("md") : QStringLiteral("image");
+}
 }  // namespace
 
 LibraryIndex::LibraryIndex(fs::path root, CacheLocation location, QObject* parent):
@@ -220,8 +235,7 @@ bool LibraryIndex::Entry::showsPdfPages() const {
 }
 
 bool LibraryIndex::Entry::upToDate(const DocumentItem& item) const {
-    return file == item.main() && xoppStamp == (item.xopp.empty() ? QString() : fileStamp(item.xopp)) &&
-           pdfStamp == fileStamp(pdf);
+    return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf);
 }
 
 // --- the packs: entries by file name
@@ -509,9 +523,13 @@ void LibraryIndex::convert(const fs::path& dir) {
 std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item, const EntryPtr& previous) {
     auto e = std::make_shared<Entry>();
     e->file = item.main();
-    e->kind = item.xopp.empty() ? QStringLiteral("pdf") : QStringLiteral("xopp");
+    e->kind = entryKind(item);
     e->name = QString::fromStdString(item.name());
-    e->xoppStamp = item.xopp.empty() ? QString() : fileStamp(item.xopp);
+    e->xoppStamp = ownStamp(item);
+    if (item.xopp.empty() && item.pdf.empty()) {
+        ++docsRead;
+        return e;  // a Markdown file, an image: its name
+    }
     auto loaded = DocumentSession::loadFile(item.main());
     ++docsRead;
     if (!loaded.document) {
@@ -644,8 +662,9 @@ LibraryIndex::EntryPtr LibraryIndex::movedHere(const DocumentItem& item, std::mu
     for (auto it = from; it != to; ++it) {
         const EntryPtr& old = it->second;
         // The same file: the same size and time
-        const bool same = item.xopp.empty() ? old->xoppStamp.isEmpty() && old->pdfStamp == fileStamp(item.pdf)
-                                            : old->xoppStamp == fileStamp(item.xopp);
+        const bool same = item.xopp.empty() && !item.pdf.empty()
+                                  ? old->xoppStamp.isEmpty() && old->pdfStamp == fileStamp(item.pdf)
+                                  : old->xoppStamp == ownStamp(item);
         if (!same) {
             continue;
         }
@@ -926,7 +945,7 @@ std::map<int, QString> LibraryIndex::knownPdfText(const fs::path& pdf) const {
 int LibraryIndex::pageCount(const fs::path& file) const {
     std::lock_guard lock(mtx);
     const EntryPtr e = find(file);
-    return e ? e->pageCount() : -1;
+    return e && e->kind != QLatin1String("md") && e->kind != QLatin1String("image") ? e->pageCount() : -1;
 }
 
 QString LibraryIndex::simplified(const QString& text) { return text.simplified(); }

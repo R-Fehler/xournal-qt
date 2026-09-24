@@ -165,8 +165,9 @@ void RecentFiles::removePaths(const QStringList& paths) {
     for (const QString& p: paths) {
         const DocumentItem item = DocumentFiles::itemOf(fs::path(p.toStdString()));
         gone.insert(fs::path(p.toStdString()));
-        gone.insert(item.xopp);
-        gone.insert(item.pdf);
+        for (const fs::path& f: {item.xopp, item.pdf, item.md, item.image}) {
+            gone.insert(f);
+        }
     }
     auto entries = load();
     std::erase_if(entries, [&](const Entry& e) { return gone.count(e.path) > 0; });
@@ -181,7 +182,7 @@ void RecentFiles::remove(int row) {
     }
     const DocumentItem item = rows[static_cast<size_t>(row)].item;
     auto entries = load();
-    std::erase_if(entries, [&](const Entry& e) { return e.path == item.xopp || e.path == item.pdf; });
+    std::erase_if(entries, [&](const Entry& e) { return item.has(e.path); });
     store(entries);
     refresh();
 }
@@ -256,6 +257,8 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
             return !r.item.pdf.empty();
         case HasXoppRole:
             return !r.item.xopp.empty();
+        case KindRole:
+            return QString::fromLatin1(r.item.kindName());
         case SelectedRole:
             return selection.contains(r.item.main());
         case LastPageRole:
@@ -267,7 +270,8 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
 
 QHash<int, QByteArray> RecentFiles::roleNames() const {
     return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {PreviewRole, "preview"},
-            {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}, {LastPageRole, "lastPage"}};
+            {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}, {LastPageRole, "lastPage"},
+            {KindRole, "kind"}};
 }
 
 }  // namespace xqt

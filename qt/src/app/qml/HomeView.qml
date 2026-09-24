@@ -754,6 +754,7 @@ Rectangle {
                         lastRead: model.lastRead ? home.formatDate(model.lastRead) : ""
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
+                        kind: model.kind
                         hits: model.hits
                         snippet: model.snippet
                         itemCount: model.itemCount
@@ -938,6 +939,7 @@ Rectangle {
                         lastRead: home.formatDate(model.opened)
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
+                        kind: model.kind
                         width: recentGrid.cellWidth
                         height: recentGrid.cellHeight
                         active: home.visible

@@ -35,7 +35,8 @@ public:
         HasPdfRole,
         HasXoppRole,
         SelectedRole,
-        LastPageRole  ///< the page the document was left at (-1: not known)
+        LastPageRole,  ///< the page the document was left at (-1: not known)
+        KindRole,      ///< "notes", "pdf", "md", "image" (DocumentItem::kindName)
     };
     static constexpr int MAX_ENTRIES = 100;
 

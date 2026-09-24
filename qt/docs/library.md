@@ -4,7 +4,8 @@ A **library** is a plain folder of documents that a window works in, like a work
 (process) shows one library. Two libraries mean two windows.
 
 - `xournal-qt` opens the default library `<Documents>/Xournal_Libraries/Default` and creates it if needed.
-- `xournal-qt <folder> [files…]` opens a folder as library. Any folder with PDFs and `.xopp` files works.
+- `xournal-qt <folder> [files…]` opens a folder as library. Any folder with PDFs, `.xopp`, Markdown files or images
+  works.
 - The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
   as library…". A window never shows two libraries.
@@ -22,6 +23,13 @@ A **library** is a plain folder of documents that a window works in, like a work
 ## Documents on disk
 - `name.xopp` next to `name.pdf` is **one** document, and it opens as the `.xopp`. A lone `.xopp` (or `.xoj`) or a
   lone PDF is one document too. Older `name.pdf.xopp` files pair with `name.pdf`.
+- **Markdown files** (`.md`) are documents: a card with a preview of their start, opened read-only for now (below).
+- **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
+  with a thumbnail. `name.xopp` next to `name.jpg` is one document, like a PDF and its `.xopp`: it opens as the `.xopp`
+  (the image is the background of its page). A `.xopp` next to a PDF of its name belongs to the PDF; of several
+  images of one name, the first of `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`, `.heif` pairs.
+- Cards show what a document is: "PDF", "MD", "IMG" ("✎": with its `.xopp`). The library model has a kind per row
+  (`notes`, `pdf`, `md`, `image`) for a filter by kind.
 - These files are never shown:
   - `name.xopp.bg.pdf`, an attached PDF. It belongs to its `.xopp` and travels with it.
   - `.name.pages.pdf`, the merged PDF of a `.xopp` with PDF pages pasted from other PDFs (below). It belongs to its
@@ -31,12 +39,13 @@ A **library** is a plain folder of documents that a window works in, like a work
   - hidden files: autosaves, `.xournal_library`
   - backups (`~`)
 - **Rename / move** rename or move both files. The `.xopp` is loaded and written again with upstream's LoadHandler and
-  SaveHandler, so its PDF reference (relative to the `.xopp`) points to the new place. Open tabs and the recent list
-  follow the new paths.
+  SaveHandler, so its PDF reference (relative to the `.xopp`) points to the new place; the same for the image a
+  `.xopp` annotates. Open tabs and the recent list follow the new paths.
 - **Import / copy** copy a `.xopp` together with the PDF it uses. That PDF is stored as `name.pdf` next to the copy,
-  even if it came from somewhere else. A PDF brings the `.xopp` next to it along. A folder is copied with its whole
-  folder structure (also empty subfolders) and all documents in it. Other files and hidden folders (`.git`, …) stay
-  behind. A name that is taken becomes "name (2)".
+  even if it came from somewhere else. A PDF brings the `.xopp` next to it along, as does an image. A folder is
+  copied with its whole folder structure (also empty subfolders) and all documents in it (also Markdown files and
+  images). Other files and hidden folders (`.git`, …) stay behind. A name that is taken becomes "name (2)": taken by
+  any document (`.xopp`, PDF, `.md`, image), so a moved `.xopp` never pairs with an image or PDF that was there.
 - **Trash** moves the files (or the folder) to the desktop trash.
 
 ### PDF pages pasted from another PDF

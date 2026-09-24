@@ -172,9 +172,9 @@ Q_SIGNALS:
 private:
     struct Entry {
         fs::path file;                   ///< the document's main file
-        QString kind;                    ///< "xopp" (also .xoj), "pdf"
+        QString kind;                    ///< "xopp" (also .xoj), "pdf", "md", "image"
         QString name;
-        QString xoppStamp;               ///< of the .xopp ("": a PDF alone)
+        QString xoppStamp;               ///< of the .xopp, the Markdown file, the image alone ("": a PDF alone)
         fs::path pdf;                    ///< the PDF it uses (next to it, elsewhere, attached; "": none)
         QString pdfStamp;
         std::map<int, QString> pdfText;  ///< simplified text of the PDF pages it shows

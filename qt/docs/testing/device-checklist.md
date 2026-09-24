@@ -565,3 +565,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       next to it `name.xopp.bg_1.png`), rename it in the library, move it into a folder, copy it to another library:
       each time it opens with its background image, and no `.bg_1.png` is left behind at the old place. Trash takes
       the image along.
+- [ ] Put `notes.md`, `board.png`, `photo.jpg` and a phone photo `.heic` (if Qt can read it here) into a library
+      folder: each is a card ("MD", "IMG"), also in "All documents" and in "Recent" once opened. A `.txt` stays hidden.
+- [ ] Rename `photo` in the library while `photo.xopp` is next to `photo.jpg` (one card, "IMG ✎"): both files get
+      the new name, and the `.xopp` still shows the photo. Move it into a folder and copy it to another library: the
+      same. Trash takes both.
+- [ ] Rename, move, copy and trash a Markdown file card; import a folder with `.md` files and images: they come along.

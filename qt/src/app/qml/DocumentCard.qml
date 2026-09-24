@@ -19,6 +19,8 @@ Item {
     property int itemCount: 0
     property bool hasPdf: false
     property bool hasXopp: false
+    /// "notes", "pdf", "md", "image" (a PDF or an image with its .xopp: "pdf" / "image" and hasXopp)
+    property string kind
     /// When it was last read in this app (formatted; "": never) and at which page (0-based; -1: not known)
     property string lastRead
     property int lastPage: -1
@@ -103,21 +105,26 @@ Item {
                     sourceSize: Qt.size(iconSize, iconSize)
                     opacity: 0.8
                 }
-                // "PDF" for documents with a PDF (annotated or not)
+                // "PDF" for documents with a PDF (annotated or not), "MD" for Markdown files, "IMG" for images
                 Rectangle {
                     id: pdfBadge
-                    visible: card.hasPdf
+                    objectName: "kindBadge"
+                    readonly property string label: card.hasPdf || card.kind === "pdf" ? qsTr("PDF")
+                                                    : card.kind === "md" ? qsTr("MD")
+                                                    : card.kind === "image" ? qsTr("IMG") : ""
+                    visible: !card.isFolder && label !== ""
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 6
                     radius: 4
-                    color: "#d93025"
+                    color: card.kind === "md" ? "#455a64" : card.kind === "image" ? "#00897b" : "#d93025"
                     width: pdfLabel.implicitWidth + 8
                     height: 16
                     Label {
                         id: pdfLabel
+                        objectName: "kindBadgeText"
                         anchors.centerIn: parent
-                        text: card.hasXopp ? qsTr("PDF ✎") : qsTr("PDF")
+                        text: card.hasXopp ? pdfBadge.label + " ✎" : pdfBadge.label
                         font.pixelSize: 10
                         font.weight: Font.Bold
                         color: "#ffffff"
@@ -127,7 +134,7 @@ Item {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 6
-                    anchors.topMargin: card.hasPdf ? 26 : 6
+                    anchors.topMargin: pdfBadge.visible ? 26 : 6
                     count: card.hits
                 }
                 // Last read in this app, and at which page - a tag like "PDF", in the accent of "Last page"

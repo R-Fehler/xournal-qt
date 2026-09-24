@@ -90,6 +90,9 @@ public:
         HitPageListRole,
         /// Search: image URL of the pages with hits marked (append "/<page>")
         HitPageBaseRole,
+        /// What the document is: "notes" (a .xopp alone), "pdf" (with or without its .xopp), "md", "image" (with or
+        /// without its .xopp); folders: ""
+        KindRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
