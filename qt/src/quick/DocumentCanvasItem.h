@@ -63,6 +63,16 @@ public:
         mostTiles = 0;
         previewFrames = 0;
     }
+    /// What the frames cost so far (tests, benchmarks): the frames, their time in the scene graph sync (composing
+    /// and uploading happen there, and the UI thread waits for it), the page tiles composed and the pixels uploaded.
+    struct FrameStats {
+        qint64 frames = 0;
+        qint64 syncNanos = 0;
+        qint64 tiles = 0;
+        qint64 uploadedPixels = 0;
+    };
+    FrameStats frameStats() const { return {statFrames, statSyncNanos, statTiles, statPixels}; }
+    void forgetFrameStats() { statFrames = statSyncNanos = statTiles = statPixels = 0; }
 
 Q_SIGNALS:
     void viewChanged();
@@ -105,6 +115,7 @@ private:
     std::atomic<int> shownPreviews{0};
     std::atomic<int> mostTiles{0};
     std::atomic<int> previewFrames{0};
+    std::atomic<qint64> statFrames{0}, statSyncNanos{0}, statTiles{0}, statPixels{0};
     QPointF lastScroll;  ///< of the last frame (scene graph thread): whether the view is moving
     double lastZoom = 0;
 };

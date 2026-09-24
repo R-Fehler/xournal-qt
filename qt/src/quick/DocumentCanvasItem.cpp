@@ -11,6 +11,7 @@
 #include <cairo.h>
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QInputMethodEvent>
 #include <QInputMethod>
@@ -625,6 +626,16 @@ void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, d
 QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*) {
     xqt::Perf::add(xqt::Perf::Frames);
     const xqt::PerfScope measure(xqt::Perf::SyncTime);
+    QElapsedTimer syncClock;
+    syncClock.start();
+    struct Count {  // (on every way out)
+        DocumentCanvasItem* item;
+        QElapsedTimer& clock;
+        ~Count() {
+            ++item->statFrames;
+            item->statSyncNanos += clock.nsecsElapsed();
+        }
+    } count{this, syncClock};
     auto* root = static_cast<CanvasRootNode*>(old);
     if (!root) {
         root = new CanvasRootNode;
@@ -760,6 +771,8 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             delete previous;
             node->composed[static_cast<size_t>(t)] = true;
             xqt::Perf::add(xqt::Perf::Tiles);
+            ++statTiles;
+            statPixels += static_cast<qint64>(img.width()) * img.height();
             if (!tile->parent()) {
                 node->insertChildNodeBefore(tile, node->searchRoot);
             }
