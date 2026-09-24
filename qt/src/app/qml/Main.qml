@@ -1107,114 +1107,19 @@ ApplicationWindow {
     }
 
     // Actions on the selected elements (select tools).
-    Pane {
+    SelectionPill {
         id: selectionBar
         objectName: "selectionBar"
-        visible: app.hasSelection && !pageGrid.visible
-        anchors.bottom: canvas.bottom
-        anchors.bottomMargin: 24
-        anchors.horizontalCenter: canvas.horizontalCenter
-        padding: 2
-        leftPadding: 8
-        rightPadding: 8
-        Material.foreground: "#303030"
-        background: Rectangle {
-            radius: height / 2
-            color: "#f7fafafa"
-            border.width: 1
-            border.color: "#40000000"
-        }
-        RowLayout {
-            spacing: 0
-            IconButton { iconName: "xopp-edit-copy"; tip: qsTr("Copy (Ctrl+C)"); onClicked: app.copySelection() }
-            IconButton { iconName: "xopp-edit-cut"; tip: qsTr("Cut (Ctrl+X)"); onClicked: app.cutSelection() }
-            IconButton { iconName: "xopp-edit-paste"; tip: qsTr("Paste (Ctrl+V)"); onClicked: app.pasteElements() }
-            IconButton { iconName: "xqt-delete"; tip: qsTr("Delete (Del)"); onClicked: app.deleteSelection() }
-            ToolSeparator {}
-            IconButton { iconName: "xqt-close"; tip: qsTr("Deselect (Esc)"); onClicked: app.clearSelection() }
-        }
+        canvasItem: canvas
+        hidden: pageGrid.visible
     }
 
-    // Selected PDF text: mark or copy it. The pill sits at the text and goes along with it while scrolling; once
-    // the text is out of sight it waits at the top edge of the canvas and offers the way back to it.
-    Pane {
+    // Selected PDF text: mark or copy it (at the text, going along with it).
+    PdfTextPill {
         id: pdfTextBar
         objectName: "pdfTextBar"
-        visible: app.pdfTextIsSelected && !pageGrid.visible && !contentsOverview.visible
-        padding: 2
-        /// The selected text on the canvas; read again whenever the view moves
-        property rect box: Qt.rect(0, 0, 0, 0)
-        readonly property bool above: box.y + box.height < 8
-        readonly property bool below: box.y > canvas.height - 8
-        /// The text is not in view any more
-        readonly property bool away: (box.width !== 0 || box.height !== 0) && (above || below)
-        function refresh() {
-            box = app.pdfSelectionBox()
-            if (away) {
-                x = canvas.x + (canvas.width - width) / 2
-                y = canvas.y + 12
-                return
-            }
-            x = Math.max(canvas.x + 8, Math.min(canvas.x + box.x, canvas.x + canvas.width - width - 8))
-            y = canvas.y + box.y - height - 8 < canvas.y ? canvas.y + box.y + box.height + 8
-                                                         : canvas.y + box.y - height - 8
-        }
-        onVisibleChanged: if (visible) refresh(); else pasteOffered = false
-        /// Selected by a long press (finger or pen): paste at that place is offered too, as the long press does
-        /// everywhere else (only if there is something to paste)
-        property bool pasteOffered: false
-        property point pasteAt: Qt.point(0, 0)
-        function offerPaste(viewPos) {
-            pasteAt = viewPos
-            pasteOffered = app.canPaste()
-            Qt.callLater(refresh)  // (wider now)
-        }
-        Material.foreground: "#303030"
-        background: Rectangle {
-            radius: height / 2
-            color: "#f7fafafa"
-            border.width: 1
-            border.color: "#40000000"
-        }
-        Connections {
-            target: app
-            function onPdfTextSelectionChanged() { pdfTextBar.refresh() }
-            function onPdfTextSelected(rect) { pdfTextBar.refresh() }
-        }
-        Connections {
-            target: canvas
-            function onViewportChanged() { pdfTextBar.refresh() }
-        }
-        RowLayout {
-            spacing: 0
-            // Only while the text is out of sight: back to it
-            IconButton {
-                objectName: "pdfBackToSelection"
-                iconName: pdfTextBar.above ? "xqt-chevron-up" : "xqt-chevron-down"
-                tip: qsTr("Back to the selected text")
-                visible: pdfTextBar.away
-                onClicked: app.showPdfSelection()
-            }
-            ToolSeparator { visible: pdfTextBar.away }
-            IconButton { iconName: "xopp-select-pdf-text-ht"; tip: qsTr("Highlight"); onClicked: app.markPdfText("highlight") }
-            HighlightColors { onPicked: app.markPdfText("highlight") }  // a color: highlight in it right away
-            ToolSeparator {}
-            IconButton { iconName: "xqt-underline"; tip: qsTr("Underline"); onClicked: app.markPdfText("underline") }
-            IconButton { iconName: "xqt-strikethrough"; tip: qsTr("Strike through"); onClicked: app.markPdfText("strikethrough") }
-            IconButton { iconName: "xopp-edit-copy"; tip: qsTr("Copy text"); onClicked: app.copyPdfText() }
-            ToolSeparator { visible: pdfTextBar.pasteOffered }
-            IconButton {
-                objectName: "pdfTextPaste"
-                iconName: "xopp-edit-paste"
-                tip: qsTr("Paste here")
-                visible: pdfTextBar.pasteOffered
-                onClicked: {
-                    const at = pdfTextBar.pasteAt
-                    app.clearPdfTextSelection()  // it was about pasting, not about the text
-                    app.pasteAt(at.x, at.y)
-                }
-            }
-        }
+        canvasItem: canvas
+        hidden: pageGrid.visible || contentsOverview.visible
     }
 
     // Back / forward after jumps (links, page grid, sidebar)
@@ -1310,59 +1215,11 @@ ApplicationWindow {
     }
 
     // Scroll bars over the canvas: wide enough to be dragged with a finger or the pen.
-    ScrollBar {
-        id: vbar
-        orientation: Qt.Vertical
-        anchors.top: canvas.top
-        anchors.right: canvas.right
+    CanvasScrollBars {
+        canvasItem: canvas
         // (beside the strip that brings a right tool bar back, not under it)
-        anchors.rightMargin: toolbarShow.visible && toolbarShow.side === "right" ? toolbarShow.width : 0
-        anchors.bottom: canvas.bottom
-        anchors.bottomMargin: hbar.visible ? hbar.height : 0
-        visible: canvas.contentHeight > canvas.height + 1 && !pageGrid.visible && !app.presenting
-        policy: ScrollBar.AlwaysOn
-        padding: 6
-        minimumSize: 0.05
-        size: canvas.contentHeight > 0 ? Math.min(1, canvas.height / canvas.contentHeight) : 1
-        position: canvas.contentHeight > 0 ? canvas.contentY / canvas.contentHeight : 0
-        onPositionChanged: if (pressed) canvas.scrollTo(canvas.contentX, position * canvas.contentHeight)
-        contentItem: Rectangle {
-            implicitWidth: vbar.pressed || vbar.hovered ? 10 : 7
-            implicitHeight: 48
-            radius: width / 2
-            // Light handle with a dark outline: visible on the grey background and on white pages.
-            color: vbar.pressed ? "#ffffff" : "#e8eaed"
-            border.width: 1
-            border.color: "#80000000"
-            opacity: vbar.pressed || vbar.hovered ? 1.0 : 0.9
-        }
-        background: Rectangle { color: vbar.pressed || vbar.hovered ? "#30ffffff" : "transparent" }
-    }
-    ScrollBar {
-        id: hbar
-        orientation: Qt.Horizontal
-        anchors.left: canvas.left
-        anchors.right: canvas.right
-        anchors.bottom: canvas.bottom
-        anchors.rightMargin: vbar.visible ? vbar.width : 0
-        visible: canvas.contentWidth > canvas.width + 1 && !pageGrid.visible && !app.presenting
-        policy: ScrollBar.AlwaysOn
-        padding: 6
-        minimumSize: 0.05
-        size: canvas.contentWidth > 0 ? Math.min(1, canvas.width / canvas.contentWidth) : 1
-        position: canvas.contentWidth > 0 ? canvas.contentX / canvas.contentWidth : 0
-        onPositionChanged: if (pressed) canvas.scrollTo(position * canvas.contentWidth, canvas.contentY)
-        contentItem: Rectangle {
-            implicitWidth: 48
-            implicitHeight: hbar.pressed || hbar.hovered ? 10 : 7
-            radius: height / 2
-            // Light handle with a dark outline: visible on the grey background and on white pages.
-            color: hbar.pressed ? "#ffffff" : "#e8eaed"
-            border.width: 1
-            border.color: "#80000000"
-            opacity: hbar.pressed || hbar.hovered ? 1.0 : 0.9
-        }
-        background: Rectangle { color: hbar.pressed || hbar.hovered ? "#30ffffff" : "transparent" }
+        rightInset: toolbarShow.visible && toolbarShow.side === "right" ? toolbarShow.width : 0
+        hidden: pageGrid.visible || app.presenting  // (presenting: no scroll bars)
     }
 
     FileDialog {
@@ -1941,7 +1798,7 @@ ApplicationWindow {
     InsertPagesDialog { id: insertPagesDialog }
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
-    ContextPill { id: contextPill }
+    ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
     PdfTextHandles { }
     Connections {
         target: app
@@ -2040,7 +1897,8 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
     Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
-    Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: saveOrAsk(null) }
+    // (the reference, while it has the keys and is written in)
+    Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }
     Shortcut { sequences: win.keysOf("saveAs"); enabled: docKeys; onActivated: openSaveDialog(null) }
     Shortcut { sequences: win.keysOf("open"); onActivated: openDialog.open() }
     // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document

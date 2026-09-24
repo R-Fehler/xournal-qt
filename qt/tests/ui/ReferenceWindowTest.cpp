@@ -19,7 +19,12 @@
 #include <QTest>
 #include <gtest/gtest.h>
 
+#include <QFile>
+#include <QTemporaryDir>
+
 #include "model/Document.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
 #include "model/Layer.h"
 #include "model/XojPage.h"
 #include "canvas/CanvasPage.h"
@@ -125,6 +130,38 @@ protected:
         wait(20);
     }
     xqt::ReferenceMode& ref() const { return controller->reference(); }
+    /// A place of a page of the reference (page points) in the window
+    QPoint onReferencePage(size_t page, QPointF pt) const {
+        auto* v = ref().canvas();
+        return reference->mapToScene(v->pageViewRect(page).topLeft() + pt * v->getViewController().zoom()).toPoint();
+    }
+    /// The PDF with a word "Test" as the reference (packaged_xopp/pdfBackground/old.xopp); its place in the window
+    QPoint openPdfReference() {
+        EXPECT_TRUE(controller->openAsReference(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+        wait(200);
+        auto* session = tabs().session(ref().tab());
+        QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
+        session->search().setQuery("Test", false);
+        EXPECT_TRUE(searched.wait(3000));
+        const auto placed = xqt::test::placedHits(session->search());
+        EXPECT_FALSE(placed.empty());
+        const QRectF hit = placed.empty() ? QRectF() : placed.front().rect;
+        session->search().clear();
+        ref().canvas()->getViewController().scrollToPage(0);
+        wait(100);
+        return onReferencePage(0, hit.center());
+    }
+    size_t elements(xqt::DocumentSession* s) const {
+        return s->getDocument()->getPage(0)->getSelectedLayer()->getElements().size();
+    }
+    void rightClick(QPoint at) {
+        QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, at);
+        wait(100);
+    }
+    bool shownOver(QQuickItem* item, QQuickItem* canvas) const {
+        const QRectF r = sceneRect(item);
+        return item->isVisible() && sceneRect(canvas).contains(r.center());
+    }
     xqt::TabManager& tabs() const { return controller->tabManager(); }
     static QRectF sceneRect(QQuickItem* i) { return QRectF(i->mapToScene(QPointF(0, 0)), i->size()); }
 
@@ -590,6 +627,266 @@ TEST_F(ReferenceWindowTest, swappingRolesDrawsNothingAgain) {
     EXPECT_TRUE(visibleRendered(book));
 }
 
+
+// --- the reference has the same scroll bars, knobs and pills as the notes, on its side ------------------------
+
+TEST_F(ReferenceWindowTest, theReferenceHasItsOwnScrollBars) {
+    for (int i = 0; i < 4; ++i) {
+        tabs().session(1)->insertNewPage(1);
+    }
+    ref().showTab(1);
+    wait(100);
+    auto* bar = findItem("referenceVerticalScrollBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_TRUE(shownOver(bar, reference)) << "no scroll bar on the reference";
+    // Dragged: the reference scrolls, the notes stay
+    QMetaObject::invokeMethod(reference, "scrollTo", Q_ARG(qreal, 0), Q_ARG(qreal, 0));
+    wait(50);
+    const double notesY = main->property("contentY").toDouble();
+    const double before = reference->property("contentY").toDouble();
+    const QPoint handle = bar->mapToScene(QPointF(bar->width() / 2, 20)).toPoint();  // (the handle at the top)
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, handle);
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, handle + QPoint(0, 10 * i));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, handle + QPoint(0, 100));
+    wait(50);
+    EXPECT_GT(reference->property("contentY").toDouble(), before + 50);
+    EXPECT_DOUBLE_EQ(main->property("contentY").toDouble(), notesY);
+    EXPECT_EQ(elements(tabs().session(1)), 0u);
+    // Zoomed in: the horizontal one too
+    ref().zoomIn();
+    ref().zoomIn();
+    ref().zoomIn();
+    wait(50);
+    EXPECT_TRUE(shownOver(findItem("referenceHorizontalScrollBar"), reference));
+    // The notes keep theirs
+    EXPECT_NE(findItem("verticalScrollBar"), nullptr);
+}
+
+TEST_F(ReferenceWindowTest, pdfTextOfTheReferenceHasItsKnobsAndPillOnItsSide) {
+    const QPoint word = openPdfReference();
+    auto* session = tabs().session(ref().tab());
+    auto* notes = tabs().currentSession();
+    controller->selectTool("hand");
+    rightClick(word);  // (a long press does the same)
+    auto* bar = findItem("referencePdfTextBar");
+    auto* handles = findItem("referencePdfTextHandles");
+    ASSERT_NE(bar, nullptr);
+    ASSERT_NE(handles, nullptr);
+    until([&] { return bar->isVisible(); });
+    ASSERT_TRUE(ref().pdfTextIsSelected());
+    EXPECT_FALSE(controller->pdfTextIsSelected()) << "the notes have nothing selected";
+    EXPECT_FALSE(findItem("pdfTextBar")->isVisible()) << "the notes' pill is shown";
+    EXPECT_FALSE(findItem("pdfTextHandles")->isVisible());
+    EXPECT_TRUE(shownOver(bar, reference)) << "the text pill is not over the reference";
+    EXPECT_TRUE(handles->isVisible());
+    EXPECT_EQ(sceneRect(handles), sceneRect(reference)) << "the knobs are not on the reference";
+    // For reading: copy only
+    EXPECT_FALSE(findItem("referencePdfHighlightButton")->isVisible());
+    EXPECT_FALSE(findItem("referencePdfUnderlineButton")->isVisible());
+    EXPECT_TRUE(findItem("referencePdfCopyTextButton")->isVisible());
+    // It goes along with the text
+    const double barY = bar->y(), textY = ref().canvas()->pdfSelectionBox().y();
+    const QPoint origin = onReferencePage(0, QPointF(0, 0));
+    ref().canvas()->getViewController().panBy(QPointF(0, 40));
+    wait(100);
+    EXPECT_NEAR(bar->y() - barY, ref().canvas()->pdfSelectionBox().y() - textY, 2);
+    QGuiApplication::clipboard()->clear();
+    click(findItem("referencePdfCopyTextButton"));
+    EXPECT_TRUE(QGuiApplication::clipboard()->text().contains("Test"));
+    until([&] { return !bar->isVisible(); });
+
+    // Written in: marking too
+    ref().setEditing(true);
+    wait(50);
+    rightClick(word + (onReferencePage(0, QPointF(0, 0)) - origin));  // (where the word is now)
+    until([&] { return bar->isVisible(); });
+    auto* highlight = findItem("referencePdfHighlightButton");
+    ASSERT_TRUE(highlight->isVisible());
+    EXPECT_NE(findItem("referenceHighlightColor", true), nullptr) << "the colours";
+    const size_t before = elements(session);
+    click(highlight);
+    EXPECT_EQ(elements(session), before + 1) << "not highlighted in the reference";
+    EXPECT_TRUE(session->isModified());
+    EXPECT_EQ(elements(notes), 0u);
+}
+
+TEST_F(ReferenceWindowTest, aKnobOfTheReferenceMovesTheReferencesSelectionOnly) {
+    const QPoint word = openPdfReference();
+    controller->selectTool("hand");
+    rightClick(word);
+    auto* handles = findItem("referencePdfTextHandles");
+    until([&] { return handles->isVisible(); });
+    ASSERT_TRUE(ref().pdfTextIsSelected());
+    const QRectF before = ref().pdfSelectionEnds();
+    ASSERT_FALSE(before.isNull());
+    // The knob at the end: dragged to the right along the line
+    const QPoint knob = reference->mapToScene(before.bottomRight()).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, knob);
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, knob + QPoint(12 * i, 0));
+        wait(5);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, knob + QPoint(120, 0));
+    wait(100);
+    ASSERT_TRUE(ref().pdfTextIsSelected());
+    EXPECT_GT(ref().pdfSelectionEnds().right(), before.right() + 30) << "the knob did not move the selection";
+    EXPECT_FALSE(controller->pdfTextIsSelected()) << "the notes got a selection";
+    EXPECT_FALSE(tabs().session(ref().tab())->isModified());
+}
+
+TEST_F(ReferenceWindowTest, theContextPillOfTheReferenceOffersWhatFits) {
+    ref().showTab(1);
+    wait(100);
+    QGuiApplication::clipboard()->setText("words to paste");
+    controller->selectTool("hand");
+    const QPoint at = reference->mapToScene(QPointF(reference->width() / 2, 250)).toPoint();
+    auto* pill = window->findChild<QObject*>("referenceContextPill");
+    ASSERT_NE(pill, nullptr);
+    rightClick(at);
+    until([&] { return pill->property("opened").toBool(); });
+    ASSERT_TRUE(pill->property("opened").toBool());
+    EXPECT_FALSE(window->findChild<QObject*>("contextPill")->property("opened").toBool()) << "the notes' pill";
+    EXPECT_TRUE(shownOver(findItem("referenceContextSelectAll", true), reference));
+    EXPECT_EQ(findItem("referenceContextPaste", true), nullptr) << "paste into a reference for reading";
+    EXPECT_EQ(findItem("referenceContextImage", true), nullptr);
+    EXPECT_NE(findItem("referenceContextFitWidth", true), nullptr);
+    auto* goTo = findItem("referenceContextGoToPage", true);
+    ASSERT_NE(goTo, nullptr);
+    click(goTo);
+    auto* field = findItem("referencePageField");
+    until([&] { return field->hasActiveFocus(); });
+    EXPECT_TRUE(field->hasActiveFocus()) << "go to page… asks for the page of the reference";
+    key(Qt::Key_Escape);
+    wait(300);
+
+    // Written in: as on the notes
+    ref().setEditing(true);
+    rightClick(at);
+    until([&] { return pill->property("opened").toBool(); });
+    auto* paste = findItem("referenceContextPaste", true);
+    ASSERT_NE(paste, nullptr);
+    EXPECT_EQ(findItem("referenceContextGoToPage", true), nullptr);
+    EXPECT_NE(findItem("referenceContextImage", true), nullptr);
+    click(paste);
+    EXPECT_EQ(elements(tabs().session(1)), 1u) << "not pasted into the reference";
+    EXPECT_EQ(elements(tabs().session(0)), 0u);
+}
+
+TEST_F(ReferenceWindowTest, aSelectionInTheReferenceHasItsBarOnItsSide) {
+    ref().showTab(1);
+    wait(100);
+    auto* session = tabs().session(1);
+    {
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setWidth(2);
+        stroke->addPoint(Point(100, 100, 1.0));
+        stroke->addPoint(Point(200, 150, 1.0));
+        session->getDocument()->getPage(0)->getSelectedLayer()->addElement(std::move(stroke));
+        session->firePageChanged(0);
+    }
+    controller->selectTool("selectRect");
+    auto drag = [&](QPoint from, QPoint to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 8; ++i) {
+            QTest::mouseMove(window, from + (to - from) * i / 8);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(100);
+    };
+    drag(onReferencePage(0, QPointF(80, 80)), onReferencePage(0, QPointF(230, 180)));
+    ASSERT_NE(ref().canvas()->getSelection(), nullptr);
+    EXPECT_TRUE(ref().hasSelection());
+    EXPECT_FALSE(controller->hasSelection());
+    auto* bar = findItem("referenceSelectionBar");
+    until([&] { return bar->isVisible(); });
+    EXPECT_TRUE(shownOver(bar, reference)) << "the selection's bar is not on the reference";
+    EXPECT_FALSE(findItem("selectionBar")->isVisible()) << "the notes' bar is shown";
+    EXPECT_TRUE(findItem("referenceSelectionCopy")->isVisible());
+    EXPECT_FALSE(findItem("referenceSelectionCut")->isVisible()) << "cut from a reference for reading";
+    EXPECT_FALSE(findItem("referenceSelectionDelete")->isVisible());
+    EXPECT_FALSE(findItem("referenceSelectionPaste")->isVisible());
+    EXPECT_GT(sceneRect(findItem("referencePill")).top(), sceneRect(bar).bottom()) << "over the reference's pill";
+
+    ref().setEditing(true);
+    wait(50);
+    EXPECT_TRUE(findItem("referenceSelectionDelete")->isVisible());
+    EXPECT_TRUE(findItem("referenceSelectionCut")->isVisible());
+    click(findItem("referenceSelectionDelete"));
+    EXPECT_EQ(elements(session), 0u) << "not deleted in the reference";
+    EXPECT_FALSE(bar->isVisible());
+}
+
+TEST_F(ReferenceWindowTest, markdownIsWrittenInTheReferenceWhenItIsWrittenIn) {
+    ref().showTab(1);
+    wait(100);
+    auto* notes = tabs().session(0);
+    auto* book = tabs().session(1);
+    controller->selectTool("hand");
+    click(reference);  // (in hand)
+    ASSERT_TRUE(ref().focused());
+    // For reading: Markdown goes into the notes, as before
+    controller->beginMarkdown(-1);
+    controller->updateMarkdown("in the notes");
+    controller->endMarkdown(true);
+    EXPECT_TRUE(notes->isModified());
+    EXPECT_FALSE(book->isModified());
+
+    // Written in: the text tool opens its Markdown text beside the page
+    ref().setEditing(true);
+    controller->setTextMarkdown(true);
+    controller->setMarkdownInPanel(true);
+    controller->selectTool("text");
+    QSignalSpy asked(controller.get(), &AppController::markdownBoxRequested);
+    click(reference);
+    EXPECT_EQ(asked.count(), 1) << "the reference's text tool did not ask for its Markdown box";
+    auto* panel = findItem("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(controller->markdownActive());
+    controller->updateMarkdown("in the reference");
+    controller->endMarkdown(true);
+    EXPECT_TRUE(book->isModified()) << "the Markdown text did not go into the reference";
+    controller->setTextMarkdown(false);
+}
+
+TEST_F(ReferenceWindowTest, ctrlSSavesTheReferenceWhenItIsWrittenIn) {
+    QTemporaryDir tmp;
+    const QString notesFile = tmp.filePath("notes.xopp"), bookFile = tmp.filePath("book.xopp");
+    ASSERT_TRUE(QFile::copy(fixturePath(u8"load/layers.xopp"), notesFile));
+    ASSERT_TRUE(QFile::copy(fixturePath(u8"load/layers.xopp"), bookFile));
+    ASSERT_TRUE(controller->openPath(notesFile));
+    ASSERT_TRUE(controller->openAsReference(bookFile));
+    wait(100);
+    auto* notes = tabs().currentSession();
+    auto* book = tabs().session(ref().tab());
+    notes->insertNewPage(1);
+    book->insertNewPage(1);
+    ASSERT_TRUE(notes->isModified());
+    ASSERT_TRUE(book->isModified());
+    controller->selectTool("hand");
+    ref().setEditing(true);
+    click(reference);
+    ASSERT_TRUE(ref().focused());
+    key(Qt::Key_S, Qt::ControlModifier);
+    book->waitForSaves();
+    until([&] { return !book->isModified(); }, 3000);
+    EXPECT_FALSE(book->isModified()) << "Ctrl+S did not save the reference being written in";
+    EXPECT_TRUE(notes->isModified()) << "the notes were saved instead";
+    EXPECT_EQ(controller->tabManager().currentSession(), notes);
+
+    // For reading: Ctrl+S saves the notes
+    ref().setEditing(false);
+    book->insertNewPage(1);
+    click(reference);
+    key(Qt::Key_S, Qt::ControlModifier);
+    notes->waitForSaves();
+    until([&] { return !notes->isModified(); }, 3000);
+    EXPECT_FALSE(notes->isModified());
+    EXPECT_TRUE(book->isModified());
+}
+
 // qt/present with a reference: a typed page number and the page keys of the sideways layout act on the side that
 // has the keys; presenting shows the notes alone, and the reference comes back afterwards.
 TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsTheNotesAlone) {
@@ -648,4 +945,21 @@ TEST_F(ReferenceWindowTest, pageKeysActOnTheSideWithTheKeysAndPresentingShowsThe
     EXPECT_TRUE(reference->isVisible()) << "the reference is back";
     EXPECT_LT(main->width(), split->width() - 10);
     (void)splitWidth;
+}
+
+// Beside a reference both halves are narrower than an A4 page's points plus 20: fitted to the width, neither shows a
+// horizontal scroll bar (upstream's formula made the content a few pixels too wide).
+TEST_F(ReferenceWindowTest, fittedToTheWidthNeitherHalfScrollsSideways) {
+    ref().showTab(1);
+    wait(100);
+    controller->fitWidth();
+    ref().fitWidth();
+    wait(100);
+    for (QQuickItem* c: {main, reference}) {
+        EXPECT_LE(c->property("contentWidth").toDouble(), c->width() + 1)
+                << c->objectName().toStdString() << ": " << c->property("contentWidth").toDouble() << " in "
+                << c->width();
+    }
+    EXPECT_FALSE(findItem("horizontalScrollBar")->isVisible()) << "the notes scroll sideways";
+    EXPECT_FALSE(findItem("referenceHorizontalScrollBar")->isVisible()) << "the reference scrolls sideways";
 }

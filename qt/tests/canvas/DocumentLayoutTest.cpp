@@ -3,6 +3,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <memory>
 
 #include <QSignalSpy>
@@ -198,6 +199,26 @@ TEST(DocumentLayout, viewFollowsTheColumnSettings) {
     EXPECT_LE(view.documentLayout().contentSize(z).width(), 1200.0 + 1) << "fits the width";
 }
 
+// Upstream's fit to width (width / (page width + 20)) makes the content a few pixels wider than a view narrower than
+// the page's points plus 20 (the paddings stay 2 x 10 px): a needless horizontal scroll bar, e.g. in a half of the
+// window beside a reference. Then the page fits the room between the paddings instead.
+TEST(DocumentLayout, fitWidthNeverNeedsAHorizontalScrollBar) {
+    const QSizeF a4(595.27559, 841.88976);
+    Pages pages({a4, a4});
+    const auto l = pages.layout({});
+    for (double view: {300.0, 531.0, 614.0, 640.0, 800.0, 1400.0}) {
+        const double z = l.fitWidthZoom(view, 0);
+        EXPECT_LE(l.contentSize(z).width(), view + 1e-9) << "a scroll bar at " << view << " px";
+        EXPECT_GE(l.contentSize(z).width(), view - 30) << "not filling " << view << " px";
+    }
+    EXPECT_DOUBLE_EQ(l.fitWidthZoom(800, 0), 800 / (a4.width() + 20)) << "wide enough: upstream's zoom";
+}
+
+namespace {
+/// Fit to width of one page: upstream's, unless that makes the content wider than the view
+double fitOne(double view, double pageWidth) { return std::min(view / (pageWidth + 20), (view - 2 * P) / pageWidth); }
+}  // namespace
+
 // "Fit the width" fits the page in view, not the widest page of the document: after a 16:9 slide was pasted into
 // an A4 document, the A4 pages still fill the width (the columns stay as wide as upstream makes them).
 TEST(DocumentLayout, fitWidthFitsThePageInView) {
@@ -209,11 +230,11 @@ TEST(DocumentLayout, fitWidthFitsThePageInView) {
     vc.setViewSize(QSizeF(800, 600));
     const double onA4 = 800 / (a4.width() + 20);  // upstream: width / (page width + 20)
     EXPECT_NEAR(vc.zoom(), onA4, 1e-6) << "opened on an A4 page";
-    EXPECT_NEAR(vc.fitWidthZoom(2), 800 / (slide.width() + 20), 1e-6);
+    EXPECT_NEAR(vc.fitWidthZoom(2), fitOne(800, slide.width()), 1e-6);
 
     vc.scrollToPage(2);
     vc.fitWidth();
-    EXPECT_NEAR(vc.zoom(), 800 / (slide.width() + 20), 1e-6) << "on the slide: the slide's width";
+    EXPECT_NEAR(vc.zoom(), fitOne(800, slide.width()), 1e-6) << "on the slide: the slide's width";
     const QRectF slideRect = layout.pageRect(2, vc.zoom()).translated(vc.contentOrigin());
     EXPECT_GE(slideRect.left(), 0);
     EXPECT_LE(slideRect.right(), 800) << "all of it in view";
