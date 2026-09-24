@@ -417,7 +417,7 @@ check failed.
 Ctrl+S on a hybrid or archive PDF appends only what changed, as a standard incremental update (ISO 32000-1, 7.5.6),
 the way Acrobat and Drawboard save: the file's bytes stay as they are, and a new revision follows them. On
 pgfmanual (1,321 pages, notes on 53) a save after one stroke takes about 0.2 s instead of 7.5 s and appends about
-22 KB.
+22 KB (measurements below).
 
 ### The appender (`qt/src/session/IncrementalPdf.*`)
 
@@ -528,3 +528,28 @@ the compaction rules; exports and shared files without earlier revisions; the cl
 appended revision; a file of an earlier version; an archive PDF staying PDF/A). UI: sharing compacts
 (`sharingThePdfWithNotes`, `shareFromALibraryCard`).
 
+Measurements (2026-09-24, the 2-in-1, files on its SSD, load 1–5 from other builds; `XQT_BENCH_HYBRID=<pdf>` runs
+`IncrementalSaveTest.benchCtrlS`, `XQT_BENCH_SAVE=<pdf with notes>` one save, `XQT_HYBRID_TIMES=1` prints the steps).
+pgfmanual, 1,321 pages, 10.1 MB, notes on every 25th page (20 pressure strokes, a highlighter, a text); Ctrl+S after
+one stroke on another page, as `DocumentSession::save()` waits for it:
+
+| | hybrid PDF (10.3 MB) | archive PDF (10.2 MB) |
+| --- | --- | --- |
+| Ctrl+S written in full (as before) | 6.3 s | 24.6 s (the PDF/A check walks every page) |
+| Ctrl+S appended | 0.20–0.24 s, 22–23 KB | 0.18–0.36 s, 25–26 KB |
+| opened again after appending (clean copy kept) | 0.44 s (5.5 s when it is made) | 0.72 s (5.7 s) |
+
+An appended save: opening the file for the update 0.08 s, the `.xopp` (the whole document, gzipped) and the new
+drawing 0.1–0.15 s, the changed page 0.01 s, the copy, update and `fsync` 0.01–0.04 s, the clean copy's cache entry
+0.02–0.06 s. The appended bytes are mostly the embedded `.xopp` (about 20 KB here), which is always written whole.
+The first save of a file written by an earlier version reads the pages with notes once (0.7 s here). At 25% growth
+the file is written in full again: here after about 110 such saves.
+
+Validation of the files after several incremental saves (`XQT_INCREMENTAL_SAMPLES=<folder>` writes them, with a full
+write of the same document): `qpdf --check` passes after every save; poppler (in the tests), pdfium (Chrome's
+renderer, through pypdfium2, with annotations) and Ghostscript 9.55 draw every page of the lecture after eight saves,
+and pages 1, 2, 11, 26, 41, 51, 71, 76, 101, 126, 131, 501, 1001 and 1321 of pgfmanual (hybrid and archive),
+identically to the full write (no pixel differs). veraPDF 1.28.2 passes the archive PDF saved incrementally three
+times (PDF/A-3b); pgfmanual's archive PDF is not PDF/A with or without increments (its source is not, and the file
+does not claim it). MuPDF (`mutool` is not installed; the `qt/mupdf` branch was not merged for this) and pdf.js (not
+installed; it needs a download) were not tried.
