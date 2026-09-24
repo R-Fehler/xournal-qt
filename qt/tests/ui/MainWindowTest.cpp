@@ -5001,10 +5001,15 @@ TEST_F(MainWindowTest, sharingForXournalpp) {
     // The note's "Copy": both files onto the clipboard
     auto* action = findItem("snackbarAction");
     ASSERT_NE(action, nullptr);
-    until([&] { return action->isVisible(); });
+    until([&] { return action->isVisible() && action->width() > 0; });
+    nextFrame();  // (the note is laid out: the button is where the click goes, also under load)
     EXPECT_EQ(action->property("text").toString(), "Copy");
     click(action);  // (the message about the document's folder was closed above)
-    const QMimeData* data = QGuiApplication::clipboard()->mimeData();
+    const QMimeData* data = nullptr;
+    until([&] {
+        data = QGuiApplication::clipboard()->mimeData();
+        return data && data->hasUrls();
+    });
     ASSERT_TRUE(data && data->hasUrls());
     EXPECT_EQ(data->urls().size(), 2);
     EXPECT_EQ(data->urls().value(0).toLocalFile().toStdString(), xopp.toStdString());
