@@ -48,8 +48,12 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   write back, or keep a persisted URI grant), documents live in the app's own folder:
   `/storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default`
   (reachable with `adb push` and over USB).
-- (E) **Opening a PDF from another app** ("Open with", share sheet): needs an intent filter for
-  `application/pdf` and `application/x-xopp`, and the URI handling above.
+- Done (`qt/android-basics`): **"Open with" and the share sheet** copy the file into the library's folder "Opened"
+  and open it (android.md). Open: sharing several files at once (SEND_MULTIPLE) is handled but was only tested with
+  one; `.xopp` files that other apps hand over as `application/octet-stream` make the app appear in "Open with" for
+  every unknown file type.
+- (E) **Writing back**: a document opened from another app is a copy; changes do not go back to the original (e.g.
+  a PDF in a cloud app). A later step could keep the URI grant (`takePersistableUriPermission`) and offer "Save back".
 - (E) **Libraries anywhere** (VISION): a library folder chosen by the user means a SAF tree URI
   (`ACTION_OPEN_DOCUMENT_TREE`); the library code (`qt/src/shell/Library*`) scans with `std::filesystem`.
 - (E) **"Show in file manager"** has no Android equivalent; hide it. "Open externally" becomes an intent with a

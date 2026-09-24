@@ -1083,3 +1083,17 @@ the Surface or another Windows 10/11 machine. See [../windows.md](../windows.md)
 - [ ] Start it on a big library and press Cancel: it stops after the current file, the summary says "cancelled", and
       the README says the archive is incomplete.
 - [ ] With a folder open in the library, "Only this folder" archives that folder and its subfolders only.
+
+## Android basics (qt/android-basics)
+
+Install the debug APK (`adb install -r …/android-build-debug.apk`; the documents in the app's folder stay).
+
+- [ ] "Open with": in My Files (or Files by Google), long press a PDF in Downloads → Open with → Xournal Qt. The app
+      starts (or comes to the front), the PDF opens as a tab, a note at the bottom says "A copy is in the library, in
+      the folder “Opened”". The library shows the folder "Opened" with the PDF. Open the same PDF the same way again:
+      its tab comes back, no "(2)" copy appears.
+- [ ] The same with a `.xopp` (sent to yourself by mail or in Downloads), a `.md` file and a photo: each opens (the
+      photo as a page to write on).
+- [ ] Share sheet: in the Gallery or in a mail app, share a photo or a PDF attachment → Xournal Qt. It opens as
+      above. Share two photos at once: both open.
+- [ ] Share a link from the browser → Xournal Qt: a message says only files can be shared.

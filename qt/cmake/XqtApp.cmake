@@ -44,6 +44,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SessionRecovery.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ContentFiles.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ContentFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/GridSelection.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.cpp

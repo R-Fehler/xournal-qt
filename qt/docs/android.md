@@ -49,18 +49,41 @@ Other paths: set `ANDROID_SDK_ROOT`, `ANDROID_NDK_ROOT`, `QT_ANDROID`, `QT_HOST`
 
 ```sh
 adb install -r build-android/android-build/build/outputs/apk/debug/android-build-debug.apk
-adb shell am start -n org.xournalqt.app/org.qtproject.qt.android.bindings.QtActivity
+adb shell am start -n org.xournalqt.app/.XournalActivity
 adb logcat --pid=$(adb shell pidof org.xournalqt.app)       # the app's log (Qt warnings have the tag "default")
 ```
 
 Or copy the APK to the phone and open it (allow installing from the file manager). The app is "Xournal Qt",
 package `org.xournalqt.app`. A document can be opened at start from adb (debug builds only):
-`adb shell am start -S -n org.xournalqt.app/org.qtproject.qt.android.bindings.QtActivity -e applicationArguments <path>`.
+`adb shell am start -S -n org.xournalqt.app/.XournalActivity -e applicationArguments <path>`.
 
 **Where the documents are.** The default library is the app's own folder on the shared storage:
 `/storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default`. Files can be put
 there with `adb push <file> <that folder>/` or over USB. New documents are saved there. Uninstalling the app deletes
 this folder.
+
+**Files from other apps.** "Open with" (a PDF, a `.xopp` or `.xoj`, a `.md` or `.txt`, an image in a file
+manager, a mail or a browser's downloads) and the share sheet (one file or several) hand the app `content://` URIs.
+A copy of each goes into the library, in the folder **"Opened"** (created when needed), and opens as a tab; a small
+note at the bottom says where the copy is. A file with the same name and size already there is that copy: it opens
+again instead of being copied twice (another file of the same name is copied as "name (2)"). Text shared without a
+file (a link from a browser) is refused with a message. Files handed over while the app runs open in the running
+window (the activity is `singleTask`). The activity is Qt's with this added: `org.xournalqt.app.XournalActivity`
+([qt/packaging/android/src](../packaging/android/src/org/xournalqt/app/XournalActivity.java)), the native side is
+[AndroidActivity.cpp](../src/app/AndroidActivity.cpp) and `AppController::receiveFiles`; the copy is made by
+[ContentFiles](../src/shell/ContentFiles.h), so nothing after it sees a `content://` URI. Testing from adb:
+
+```sh
+adb shell am start -a android.intent.action.VIEW -d content://media/external/file/<id> -t application/pdf \
+    --grant-read-uri-permission -n org.xournalqt.app/.XournalActivity    # the id: adb shell content query ...
+adb shell am start -a android.intent.action.SEND -t application/octet-stream \
+    --eu android.intent.extra.STREAM file:///storage/emulated/0/Android/data/org.xournalqt.app/files/<file> \
+    -n org.xournalqt.app/.XournalActivity
+```
+
+(`am` grants no read access to a `content://` URI in `EXTRA_STREAM`, only to the intent's data; real share sheets
+put the URI into the clip data, which carries the grant. So test SEND with a file of the app's own folder.) While
+the phone is locked the app's event loop is paused: a file handed over then opens when it is unlocked.
 
 **What the app keeps privately** (`/data/user/0/org.xournalqt.app/`, `adb shell run-as org.xournalqt.app ls files`):
 settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-qt/` (copied from the APK at start),
@@ -83,7 +106,7 @@ settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-
   files are broken and fail even a `QUIET` lookup).
 - **Packaging** ([qt/cmake/XqtAndroid.cmake](../cmake/XqtAndroid.cmake), [qt/packaging/android/](../packaging/android)):
   Qt's manifest template with the app's id, name and icon (the desktop SVG as PNGs), min SDK 28 (Qt 6.11's minimum),
-  target SDK 36, no permissions, resizable activity. The APK is debug-signed
+  target SDK 36, no permissions, resizable activity, intent filters for "Open with" and the share sheet. The APK is debug-signed
   (`QT_ANDROID_DEPLOYMENT_TYPE=Debug`, the SDK's debug keystore) while the native code is `RelWithDebInfo`, so that
   pages draw at full speed.
 - **Resources**: page templates, palettes and icons, which the core reads as plain files, are Qt resources in the APK

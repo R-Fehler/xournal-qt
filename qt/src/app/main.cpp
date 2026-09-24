@@ -39,6 +39,7 @@
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
 #ifdef Q_OS_ANDROID
+#include "AndroidActivity.h"
 #include "AndroidSetup.h"
 #endif
 #ifdef Q_OS_WIN
@@ -171,6 +172,11 @@ int main(int argc, char* argv[]) {
             Qt::QueuedConnection);
     engine.loadFromModule("XournalQt", "Main");
     AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
+#ifdef Q_OS_ANDROID
+    // "Open with" and the share sheet: files other apps hand over, at start and while the app runs (the window
+    // is there to show them and what went wrong)
+    xqt::android::watchIncomingFiles([&controller](const QStringList& files) { controller.receiveFiles(files); });
+#endif
 
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
     // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).

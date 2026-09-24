@@ -6,7 +6,9 @@ set(XQT_ANDROID_DIR "${CMAKE_CURRENT_LIST_DIR}/../packaging/android")
 
 target_sources(xournal-qt PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidSetup.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.cpp)
 
 # The resources the core reads as files (page templates, palettes, icons) travel as Qt resources and are copied to
 # the app's data folder at start (AndroidSetup.cpp).

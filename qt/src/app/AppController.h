@@ -477,7 +477,16 @@ public:
     /// There is a file manager to show files in (not on Android).
     bool canShowInFileManager() const;
     bool canShare() const;
+    /// Open picked files (file dialogs, drops). Files of other apps that are no paths (Android's content:// URIs from
+    /// the system's file picker) are received as with receiveFiles.
     Q_INVOKABLE void openUrls(const QList<QUrl>& urls);
+    /// Files handed over by another app (Android: "Open with", the share sheet, the file picker; content:// URIs or
+    /// paths): a copy of each goes into the library's folder "Opened" and is opened. A file of the same name and size
+    /// there already is that copy (opened again, not copied twice). Without a library the folder is in the app's
+    /// data. A short note says where the copies are. Returns how many were opened.
+    int receiveFiles(const QStringList& sources);
+    /// The folder receiveFiles copies into.
+    fs::path receivedFolder() const;
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
     /// new document stays, to write the notes in). Without a document open: opened as the document.
     Q_INVOKABLE bool openAsReference(const QString& path);
