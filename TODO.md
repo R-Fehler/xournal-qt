@@ -46,7 +46,9 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
       - **"Share…"** with two options: "PDF with notes (opens in any app)", which is the hybrid itself (saved first),
         and "For Xournal++ (.xopp + PDF)", a one-time export into a folder the user chooses, never next to the
         document, as `name.xopp` plus `name.xopp.bg.pdf` (upstream's attached-background name). On Linux it then
-        shows the files in the file manager; on Android and iOS it will open the share sheet. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
+        shows the files in the file manager; on Android and iOS it will open the share sheet.
+      - "Copy to clipboard" in Share (the author, 2026-09-24): the file as a `text/uri-list`, plus the PDF data, to
+        paste into another app or chat. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
    - Experiment `qt/mupdf`, done 2026-09-24: branch `qt/mupdf` (not merged), findings in
      `qt/docs/pdf-engine-experiment.md` on that branch.
      - The MuPDF backend works in the app behind `-DXQT_WITH_MUPDF=ON` + `XQT_PDF_BACKEND=mupdf`.
@@ -195,7 +197,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
       is mostly how such content is shown, not that it is rewritten.
   - Resolve `[[wikilinks]]` and Markdown links by file name; backlinks later.
 
-### The `.md` editor (decided 2026-09-24)
+### The `.md` editor (decided 2026-09-24; `qt/md-editor`, started 2026-09-24, before Android at the author's wish)
+- **Plain `.txt` editing** like a notepad or a simple mobile editor: no syntax highlighting, just text.
+- **Other text files** (code, LaTeX, …) are editable as plain text only after a warning is accepted; read-only
+  otherwise.
+- **"Open externally"**, easy to reach, for every file that is not `.xopp`/`.pdf` (open it in a code editor and so on).
 - **Pages by default**, the native feel, with a toggle for a continuous page (infinite canvas). Pagination exists
   from the Markdown boxes.
 - **Ink on Markdown: an "Edit as notes" button** turns the `.md` into a `.xopp`-like document: its text as a
