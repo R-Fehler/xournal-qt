@@ -29,21 +29,35 @@ Pane {
     function closeBar() {
         open = false
         typing.stop()
+        sent = ""
         app.clearSearch()
         field.text = ""
     }
 
-    // The field follows the current tab's search (tab switches, search from the tab overview).
+    /// The text this bar searched for last. What is typed is never written back from the search: results of the
+    /// text searched before may come in while typing goes on (the field used to be bound to the query, and every
+    /// result set it back, dropping the letters typed meanwhile).
+    property string sent: ""
+    function send(text) {
+        sent = text
+        app.searchQuery = text
+    }
+    // The field follows the current tab's search when it was changed elsewhere (tab switches, search from the tab
+    // overview or the library), not the results of its own.
     Connections {
         target: app
         function onSearchChanged() {
-            if (!field.activeFocus && field.text !== app.searchQuery) field.text = app.searchQuery
+            if (app.searchQuery !== bar.sent) {
+                typing.stop()
+                bar.sent = app.searchQuery
+                field.text = app.searchQuery
+            }
         }
     }
     Timer {
         id: typing
-        interval: 250
-        onTriggered: app.searchQuery = field.text
+        interval: 150
+        onTriggered: bar.send(field.text)
     }
     readonly property int liveSearchLength: 4
     /// The text in the field waits for Enter (too short to search while typing).
@@ -51,7 +65,7 @@ Pane {
                                             && field.text.length < liveSearchLength
     function searchNow() {
         typing.stop()
-        app.searchQuery = field.text
+        send(field.text)
     }
 
     RowLayout {
@@ -79,7 +93,6 @@ Pane {
                 text: qsTr("Search in document")
                 color: "#8a8d91"
             }
-            text: app.searchQuery
             onTextEdited: {
                 if (text === "" || text.length >= bar.liveSearchLength) typing.restart()
                 else typing.stop()  // short: on Enter only
@@ -90,7 +103,7 @@ Pane {
             function go(event) {
                 if (typing.running || app.searchQuery !== text) {
                     typing.stop()
-                    app.searchQuery = text  // first Enter: search now
+                    bar.send(text)  // first Enter: search now
                 } else if (event.modifiers & Qt.ShiftModifier) {
                     app.searchPrevious()
                 } else {

@@ -142,6 +142,16 @@ public:
         QString snippet;     ///< text around the first match
         std::vector<PageHits> pageHits;  ///< the pages with matches, in order
     };
+    /// The text of the pages of this PDF read before (by PDF page, 0-based), if it was read from the file as it is now
+    /// (same size and time): an open document takes it for its search instead of reading it again.
+    std::map<int, QString> knownPdfText(const fs::path& pdf) const;
+    /// A document open in the app was saved: its entry is made from the document in memory and the PDF text the app
+    /// knows (by PDF page), instead of reading the file again. False if that is not possible (not in the library, its
+    /// folder's packs not read yet, PDF text missing): the next update reads it as usual.
+    bool documentSaved(const fs::path& file, Document& doc, const std::map<int, QString>& pdfText);
+    /// Entries taken over from saved documents so far (tests).
+    int savedTakenOver() const { return handedOver.load(); }
+
     /// Search the text and the names of all indexed documents (case-insensitive, whitespace-insensitive).
     std::vector<Hit> search(const QString& query) const;
     /// Pages of an indexed document (-1: not indexed yet).
@@ -189,6 +199,11 @@ private:
     void applyMoves(const std::vector<std::pair<fs::path, fs::path>>& moves);
     /// Read a document; PDF text is taken from `previous` or another entry with the same PDF where possible.
     std::shared_ptr<Entry> read(const DocumentItem& item, const EntryPtr& previous);
+    /// An entry with the PDF text of `e`'s PDF (the same size and time): `previous`, else any (the lock is not held).
+    EntryPtr donorFor(const Entry& e, const EntryPtr& previous) const;
+    /// The pages of a document (locked by the caller) into `e`; PDF text from `donor`, else read (`readMissing`) or
+    /// give up (false).
+    bool fillPages(Entry& e, Document& doc, const EntryPtr& donor, bool readMissing);
     /// Read the packs of a folder, if not done yet (the lock is not held).
     void load(const fs::path& folder);
     /// The entry of a document (the lock is held).
@@ -220,7 +235,7 @@ private:
     std::atomic<bool> running{false};
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
-    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0};
+    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0};
 };
 
 }  // namespace xqt

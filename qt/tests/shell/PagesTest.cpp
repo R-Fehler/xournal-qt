@@ -23,6 +23,7 @@
 #include "model/Stroke.h"
 #include "model/XojPage.h"
 #include "session/DocumentSearch.h"
+#include "../SearchHits.h"
 #include "session/DocumentSession.h"
 #include "shell/PageFilterModel.h"
 #include "shell/LayersModel.h"
@@ -357,7 +358,10 @@ TEST(Pages, searchHitsPerPage) {
     QSignalSpy finished(&s->search(), &DocumentSearch::finished);
     c.setSearchQuery("p1");
     ASSERT_TRUE(finished.wait(3000));
-    auto hitsOf = [&](int row) { return m.data(m.index(row), PagesModel::SearchHitsRole).toList(); };
+    auto hitsOf = [&](int row) {
+        xqt::test::placesOn(s->search(), static_cast<size_t>(row));  // (a thumbnail in view asks for them)
+        return m.data(m.index(row), PagesModel::SearchHitsRole).toList();
+    };
     ASSERT_EQ(hitsOf(0).size(), 1);
     EXPECT_EQ(hitsOf(1).size(), 0);
     EXPECT_EQ(hitsOf(9).size(), 1);

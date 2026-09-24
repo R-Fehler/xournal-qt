@@ -109,43 +109,37 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             return session ? PageSketches::instance().url(sessionId, session->pageId(row)) : QString();
         case SelectedRole:
             return row < selected.size() && selected[row];
-        case SearchHitCountRole: {
-            if (!session) {
-                return 0;
-            }
-            const auto& hits = session->search().hits();
-            auto [a, b] = std::equal_range(hits.begin(), hits.end(), DocumentSearch::Hit{row, {}},
-                                           [](const DocumentSearch::Hit& x, const DocumentSearch::Hit& y) {
-                                               return x.page < y.page;
-                                           });
-            return static_cast<int>(b - a);
-        }
+        case SearchHitCountRole:
+            return session ? session->search().countOn(row) : 0;
         case SearchHitsRole:
         case CurrentSearchHitRole: {
             if (!session) {
                 return role == SearchHitsRole ? QVariant(QVariantList()) : QVariant(-1);
             }
             const auto& search = session->search();
-            const auto& hits = search.hits();
-            auto it = std::lower_bound(hits.begin(), hits.end(), row,
-                                       [](const DocumentSearch::Hit& h, size_t p) { return h.page < p; });
             QVariantList rects;
             int currentOnPage = -1;
+            // (asked for while the thumbnail is shown: the search changes when they are placed)
+            const auto* places = search.placesOn(row);
+            if (!places) {
+                return role == SearchHitsRole ? QVariant(rects) : QVariant(-1);
+            }
             const QSizeF size = sizes[row];
             // A thumbnail shows a limited number of marks, spread over the page (a one-letter search has hundreds per
             // page: that many marks cost a lot of memory and time, and at this size they cover the page anyway).
-            const auto end = std::find_if(it, hits.end(), [row](const DocumentSearch::Hit& h) { return h.page != row; });
-            const auto step = std::max<std::ptrdiff_t>(1, ((end - it) + MAX_THUMBNAIL_HITS - 1) / MAX_THUMBNAIL_HITS);
-            for (auto first = it; it != end; ++it) {
-                const bool current = static_cast<int>(it - hits.begin()) == search.currentHit();
-                if ((it - first) % step != 0 && !current) {
+            const int n = static_cast<int>(places->size());
+            const int current = search.currentPage() == row ? search.currentOnPage() : -1;
+            const int step = std::max(1, (n + MAX_THUMBNAIL_HITS - 1) / MAX_THUMBNAIL_HITS);
+            for (int i = 0; i < n; ++i) {
+                if (i % step != 0 && i != current) {
                     continue;
                 }
-                if (current) {
+                if (i == current) {
                     currentOnPage = static_cast<int>(rects.size());
                 }
-                rects.append(QRectF(it->rect.x() / size.width(), it->rect.y() / size.height(),
-                                    it->rect.width() / size.width(), it->rect.height() / size.height()));
+                const QRectF& r = (*places)[static_cast<size_t>(i)].rect;
+                rects.append(QRectF(r.x() / size.width(), r.y() / size.height(), r.width() / size.width(),
+                                    r.height() / size.height()));
             }
             return role == SearchHitsRole ? QVariant(rects) : QVariant(currentOnPage);
         }

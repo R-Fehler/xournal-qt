@@ -114,35 +114,39 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
         case SketchRole:
             return PageSketches::instance().url(ThumbnailProvider::idOf(s), s->pageId(s->getCurrentPageNo()));
         case SearchHitsRole:
-            return static_cast<int>(s->search().hits().size());
+            return s->search().hitCount();
         case SearchRunningRole:
             return s->search().isRunning();
         case HitPagesRole: {
             // As the page grid marks them (PagesModel), grouped by page
             QVariantList pages;
-            const auto& hits = s->search().hits();
+            // Their places are asked for the first pages only (the rest is marked when it was placed anyway)
+            const DocumentSearch& search = s->search();
             Document* doc = s->getDocument();
             std::shared_lock lock(*doc);
-            for (auto it = hits.begin(); it != hits.end();) {
-                const size_t page = it->page;
-                const auto end = std::find_if(it, hits.end(), [page](const DocumentSearch::Hit& h) { return h.page != page; });
+            int asked = 0;
+            for (const DocumentSearch::PageHits& hit: search.pages()) {
+                const size_t page = hit.page;
                 const PageRef p = page < doc->getPageCount() ? doc->getPage(page) : PageRef();
                 const double w = p ? p->getWidth() : 1, h = p ? p->getHeight() : 1.414;
-                const auto step = std::max<std::ptrdiff_t>(1, ((end - it) + MAX_PAGE_HITS - 1) / MAX_PAGE_HITS);
                 QVariantList rects;
-                for (auto r = it; r < end; r += step) {
-                    rects.append(QRectF(r->rect.x() / w, r->rect.y() / h, r->rect.width() / w, r->rect.height() / h));
+                if (const auto* places = search.placesOn(page, asked++ < PLACED_HIT_PAGES)) {
+                    const auto n = static_cast<std::ptrdiff_t>(places->size());
+                    const auto step = std::max<std::ptrdiff_t>(1, (n + MAX_PAGE_HITS - 1) / MAX_PAGE_HITS);
+                    for (std::ptrdiff_t r = 0; r < n; r += step) {
+                        const QRectF& rect = (*places)[static_cast<size_t>(r)].rect;
+                        rects.append(QRectF(rect.x() / w, rect.y() / h, rect.width() / w, rect.height() / h));
+                    }
                 }
                 pages.append(QVariantMap{
                         {"page", static_cast<int>(page)},
-                        {"count", static_cast<int>(end - it)},
+                        {"count", hit.count},
                         {"aspect", h / w},
                         {"thumbnail", QString("image://thumbnail/%1/%2/%3")
                                               .arg(ThumbnailProvider::idOf(s))
                                               .arg(page)
                                               .arg(s->pageRevision(page))},
                         {"rects", rects}});
-                it = end;
             }
             return pages;
         }

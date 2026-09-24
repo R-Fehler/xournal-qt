@@ -58,6 +58,7 @@
 
 #include "AppController.h"
 #include "TextFlow.h"
+#include "../SearchHits.h"
 #include "config-test.h"
 
 namespace {
@@ -919,6 +920,78 @@ TEST_F(MainWindowTest, shortSearchTextsWaitForEnter) {
     EXPECT_EQ(controller->searchQuery(), "p10 x");
 }
 
+namespace {
+/// A PDF of `pages` pages full of text, "search" three times per page: its search takes a while.
+void makeLongTextPdf(const std::string& file, int pages) {
+    cairo_surface_t* surface = cairo_pdf_surface_create(file.c_str(), 595, 842);
+    cairo_t* cr = cairo_create(surface);
+    cairo_select_font_face(cr, "sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 10);
+    for (int p = 0; p < pages; ++p) {
+        for (int line = 0; line < 60; ++line) {
+            cairo_move_to(cr, 40, 40 + line * 12.5);
+            cairo_show_text(cr, line % 20 == 7 ? "a line to search for in the long text of this page"
+                                               : "lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do");
+        }
+        cairo_show_page(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+}
+}  // namespace
+
+// Typing on while the search for what was typed before still runs: the field used to be set back to the text of
+// that search whenever its results came in (the field's text was bound to the query), and the letters typed
+// meanwhile were gone. Whatever is typed stays; the results are those of the text in the field.
+TEST_F(MainWindowTest, theSearchFieldsKeepWhatIsTypedWhileASearchRuns) {
+    QTemporaryDir tmp;
+    const std::string pdf = tmp.filePath("long.pdf").toStdString();
+    makeLongTextPdf(pdf, 400);
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(pdf)));
+    wait(50);
+    key(Qt::Key_F, Qt::ControlModifier);
+    auto* field = find<QQuickItem>("searchField");
+    ASSERT_NE(field, nullptr);
+    until([&] { return field->hasActiveFocus(); });
+    type("sear");
+    ASSERT_TRUE(waitFor([&] { return controller->searchQuery() == "sear"; }));
+    // The search for "sear" has started; typing goes on, key by key
+    for (const char c: std::string("ch fo")) {
+        QTest::keyClick(window, c);
+        wait(15);
+        EXPECT_TRUE(field->property("text").toString().endsWith(QChar(c == ' ' ? ' ' : c)))
+                << "typed '" << c << "', the field has \"" << field->property("text").toString().toStdString() << '"';
+    }
+    EXPECT_EQ(field->property("text").toString(), QStringLiteral("search fo"));
+    ASSERT_TRUE(waitFor([&] { return controller->searchQuery() == "search fo" && !controller->searchRunning(); },
+                        20000));
+    wait(100);
+    EXPECT_EQ(field->property("text").toString(), QStringLiteral("search fo")) << "nothing typed is lost";
+    EXPECT_EQ(controller->searchHitCount(), 400 * 3) << "the hits of the text in the field";
+    key(Qt::Key_Escape);
+
+    // The search over all open documents
+    QObject* overview = find("tabOverview");
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    auto* overviewField = find<QQuickItem>("overviewSearchField");
+    ASSERT_NE(overviewField, nullptr);
+    overviewField->forceActiveFocus();
+    type("line");
+    wait(350);
+    for (const char c: std::string(" to s")) {
+        QTest::keyClick(window, c);
+        wait(15);
+    }
+    EXPECT_EQ(overviewField->property("text").toString(), QStringLiteral("line to s"));
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    const auto hits = [&] { return tabs->index(0, 0).data(xqt::TabManager::SearchHitsRole).toInt(); };
+    const auto running = [&] { return tabs->index(0, 0).data(xqt::TabManager::SearchRunningRole).toBool(); };
+    ASSERT_TRUE(waitFor([&] { return controller->searchQuery() == "line to s" && !running(); }, 20000));
+    EXPECT_EQ(overviewField->property("text").toString(), QStringLiteral("line to s"));
+    EXPECT_EQ(hits(), 400 * 3);
+}
+
 // Typing on the library starts a search, but keys that only have a control character as their text do not type it.
 TEST_F(HomeScreenTest, onlyVisibleCharactersStartTheLibrarySearch) {
     auto* grid = find<QQuickItem>("libraryGrid");
@@ -933,6 +1006,24 @@ TEST_F(HomeScreenTest, onlyVisibleCharactersStartTheLibrarySearch) {
     EXPECT_EQ(field->property("text").toString(), QString()) << "no control characters in the search";
     key(Qt::Key_L);
     EXPECT_EQ(field->property("text").toString(), QStringLiteral("l")) << "a letter starts the search";
+}
+
+// As the search in a document: typing on while the search for the text before runs keeps every letter.
+TEST_F(HomeScreenTest, theLibrarySearchFieldKeepsWhatIsTyped) {
+    auto* field = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(field, nullptr);
+    QObject* library = controller->libraryModel();
+    field->forceActiveFocus();
+    type("lect");
+    ASSERT_TRUE(waitFor([&] { return library->property("searchQuery").toString() == "lect"; }));
+    for (const char c: std::string("ure")) {
+        QTest::keyClick(window, c);
+        wait(15);
+    }
+    EXPECT_EQ(field->property("text").toString(), QStringLiteral("lecture"));
+    ASSERT_TRUE(waitFor([&] { return library->property("searchQuery").toString() == "lecture"; }));
+    wait(50);
+    EXPECT_EQ(field->property("text").toString(), QStringLiteral("lecture"));
 }
 
 // "Names" next to the library search: the reduced search over names only.
@@ -2322,8 +2413,9 @@ TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {
     QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
     session->search().setQuery("Test", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
     const QPointF onWord =
             view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
@@ -2383,8 +2475,9 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
     session->search().setQuery("Test", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
     const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
     ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
@@ -2441,8 +2534,9 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
     session->search().setQuery("Test", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
     const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
     const QPoint onWordInWindow = canvasItem->mapToScene(onWord).toPoint();

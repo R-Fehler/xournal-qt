@@ -40,6 +40,10 @@
 #include "shell/Previews.h"
 #include "shell/RecentFiles.h"
 
+#include "session/DocumentSearch.h"
+#include "session/DocumentTextIndex.h"
+#include "shell/TabManager.h"
+#include "AppController.h"
 #include "config-test.h"
 
 using namespace xqt;
@@ -791,6 +795,101 @@ TEST_F(LibraryTest, benchHitPages) {
     std::cout << "the same 20 pages, other search (marks only): " << t.elapsed() << " ms\n";
 }
 
+
+// The PDF text the index read is what an open document of the same PDF searches, as long as the PDF is the same file
+// (size and time); a saved document hands its entry over, so the index does not read the .xopp again.
+TEST_F(LibraryTest, openDocumentsShareTheirTextWithTheIndex) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    ASSERT_EQ(index.documentsRead(), 1);
+    const auto known = index.knownPdfText(root / "lecture.pdf");
+    ASSERT_EQ(known.size(), 2u) << "both pages";
+    EXPECT_TRUE(known.at(1).contains("Page 2"));
+    EXPECT_TRUE(index.knownPdfText(root / "other.pdf").empty());
+
+    // Annotated and saved in the app: the entry comes from the document in memory
+    auto loaded = DocumentSession::loadFile(root / "lecture.xopp");
+    ASSERT_TRUE(loaded.document);
+    auto t = std::make_unique<Text>();
+    t->setText("unicorn");
+    t->move(100, 100);
+    loaded.document->getPage(1)->getSelectedLayer()->addElement(std::move(t));
+    ASSERT_TRUE(DocumentSession::writeDocument(*loaded.document, root / "lecture.xopp").ok);
+    ASSERT_TRUE(index.documentSaved(root / "lecture.xopp", *loaded.document, known));
+    EXPECT_EQ(index.savedTakenOver(), 1);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    EXPECT_EQ(index.documentsRead(), 1) << "the saved .xopp is not read again";
+    auto hits = index.search("unicorn");
+    ASSERT_EQ(hits.size(), 1u);
+    EXPECT_EQ(hits[0].firstPage, 1);
+    EXPECT_EQ(index.search("page 2").size(), 1u) << "with its PDF text";
+    index.flush();
+    LibraryIndex again(root);
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.documentsRead(), 0) << "and stored";
+    EXPECT_EQ(again.search("unicorn").size(), 1u);
+
+    // Outside the library, or without its PDF text: not taken over (read as usual)
+    EXPECT_FALSE(index.documentSaved(fs::path(tmp.path().toStdString()) / ".." / "elsewhere.xopp", *loaded.document,
+                                     known));
+
+    // A changed PDF: its old text is not handed out
+    fs::remove(root / "lecture.pdf");
+    makeWordPdf(root / "lecture.pdf", "zebra");
+    EXPECT_TRUE(index.knownPdfText(root / "lecture.pdf").empty());
+}
+
+// In the app: a library document opened for the first time searches the text its library read (all counts at once,
+// no PDF read), and saving it hands its entry to the library.
+TEST_F(LibraryTest, theAppSeedsTheSearchOfOpenDocumentsFromTheLibrary) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    c.setLibraryRoot(root);
+    LibraryIndex* index = qobject_cast<LibraryModel*>(c.libraryModel())->searchIndex();
+    ASSERT_NE(index, nullptr);
+    waitFor([&] { return !index->busy() && index->indexed() == 1; });
+    index->waitForDone();
+    ASSERT_TRUE(c.openPath(QString::fromStdString((root / "lecture.xopp").string())));
+    DocumentSession* s = c.tabManager().currentSession();
+    s->search().setQuery("Page 2", false);
+    EXPECT_FALSE(s->search().isRunning()) << "all counts at once";
+    EXPECT_EQ(s->search().hitCount(), 1);
+    EXPECT_EQ(s->search().textIndex().pdfPagesSeeded(), 2);
+    EXPECT_EQ(s->search().textIndex().pdfPagesRead(), 0);
+
+    auto t = std::make_unique<Text>();
+    t->setText("unicorn");
+    t->move(100, 100);
+    s->getDocument()->lock();
+    s->getDocument()->getPage(0)->getSelectedLayer()->addElement(std::move(t));
+    s->getDocument()->unlock();
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(index->savedTakenOver(), 1);
+    EXPECT_EQ(index->search("unicorn").size(), 1u) << "found in the library at once";
+}
+
+// The library search matches text as the search of an open document does (so their counts agree): a word broken at a
+// line end is found whole, a ligature as its letters.
+TEST_F(LibraryTest, theLibrarySearchMatchesAsTheDocumentSearch) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    addText(root / "lecture.xopp", 1, "a hyphen-\nated word, the \xef\xac\x81rst one");
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    auto hits = index.search("hyphenated");
+    ASSERT_EQ(hits.size(), 1u) << "broken at the line end";
+    EXPECT_EQ(hits[0].firstPage, 1);
+    EXPECT_TRUE(hits[0].snippet.contains("hyphen- ated")) << hits[0].snippet.toStdString();
+    EXPECT_EQ(index.search("first one").size(), 1u) << "the ligature";
+    EXPECT_EQ(index.search("PAGE 2").size(), 1u);
+}
 
 TEST_F(LibraryTest, onlyTheXoppIsReadAgainWhenAnnotationsChange) {
     makePdf(root / "lecture.pdf");
