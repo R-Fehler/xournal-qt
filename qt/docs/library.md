@@ -116,6 +116,23 @@ the document uses as its background from then on. Their text stays searchable an
 
 Code: `qt/src/shell/DocumentFiles.*`; the merged PDF: `qt/src/session/MergedPdf.*` (qpdf), `PdfPageKeeper.*`.
 
+### Changed by another program
+An open document whose files another program changes (a sync app bringing a newer version, Xournal++, a PDF viewer
+that saves annotations) is handled as a Markdown file is ([md-editor.md](md-editor.md), "Changed by another
+program"): the files are watched, and looked at again when the window becomes active and after each save.
+- Which files: the document's file (the `.xopp`, the PDF with notes, the PDF it annotates while it has no `.xopp`)
+  and the PDF a `.xopp` annotates (not the app's copies in its cache). `DocumentSession::filesOnDisk`.
+- Changed means: size or time differ from what the app read or wrote last, and so does the content (the size, or a
+  sample of the first and last 64 KB); a file only touched is no change. The app's own writes are recorded when a
+  save finishes (the `.xopp` renamed over the old one, a PDF with notes written anew or appended to, the merged PDF of
+  pasted pages), and nothing is looked at while a save runs, so they never count. (`filesChangedOnDisk`, `stampFiles`.)
+- Without unsaved changes, the document is read again at once, in its tab, at its page, and a note says so. With
+  unsaved changes the window asks: **Reload** (the other version; the changes here are discarded) or **Keep mine**
+  (not asked again about that version; saving writes over it). A reference split beside the tab closes when it is
+  read again.
+
+Code: `AppController::checkTextFiles`, `checkDocumentFiles`, `reloadDocument` (`qt/src/app/AppTextFiles.cpp`).
+
 ## The library cache (`.xournal_library/`)
 The cache only speeds things up and can be deleted at any time. Each folder with documents has its own hidden
 `.xournal_library/`, with the cache of **only the documents directly in it** (never those of its subfolders). A

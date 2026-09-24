@@ -242,7 +242,7 @@ void AppController::makeTabs() {
     });
     connect(tabs.get(), &TabManager::countChanged, this, [this] {
         if (textWatcher) {
-            watchTextFiles();  // (a text file closed)
+            watchTextFiles();  // (a file opened or closed: watched for changes by other programs)
         }
         if (tabs->count() == 0) {
             if (isSecondary()) {
@@ -2364,14 +2364,11 @@ bool AppController::openPath(const QString& path) {
     if (shown && !opened->textFile()) {
         opened->setShownFile(file, !DocumentFiles::isImageFile(file));
     }
-    const bool isText = opened->textFile() != nullptr;
     tabs->addTab(std::move(opened));
     if (pristine >= 0) {
         tabs->closeTab(pristine);
     }
-    if (isText) {
-        watchTextFiles();
-    }
+    watchTextFiles();  // (changes by other programs: a text file, a .xopp, a PDF)
     app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
     recent->add(file);
     DocumentPlaces::setRead(DocumentPlaces::keyOf(file));

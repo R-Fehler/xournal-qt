@@ -1234,3 +1234,19 @@ with "Uni sample" stays).
       the app: it opens the default library (it cannot read Uni). Tap "Uni" in Recent: the explanation comes again.
 - [ ] In the folder picker, pick a folder of Google Drive or Nextcloud (left menu): a message says it is not in the
       phone's storage; nothing else changes.
+- [ ] Desktop: open a `.xopp` of the library, don't change it. Change the same file in Xournal++ (or copy another
+      version over it). Back in the window: the document shows the new version at the same page, with a note "…
+      was changed by another app". Draw a stroke (unsaved), change the file again elsewhere: the dialog "Changed in
+      another app" asks; Keep mine keeps the stroke (and Save writes over the file); Reload shows the other version.
+- [ ] Saving does not trigger it: Ctrl+S a few times in a `.xopp`, a PDF with notes (Settings → PDF files mode) and
+      a `.xopp` next to its PDF: no note, no dialog.
+- [ ] **Syncthing / Autosync on the Fold 7.** Set up a folder pair: the phone's `Documents/Uni` with a folder on the
+      computer (Syncthing-Fork from F-Droid, or Autosync for OneDrive/Google Drive/Dropbox). Open `Documents/Uni` as
+      library (above).
+      - On the computer, add a PDF to the folder: after the sync it appears in the library on the phone.
+      - Open a document on the phone, leave it unchanged; change and save it on the computer: after the sync the phone
+        shows the new version (a note says so).
+      - Draw on the phone without saving, change the same document on the computer: after the sync the dialog asks
+        (Keep mine / Reload).
+      - On the phone, look into the synced folder on the computer: no `.xournal_library` folders and no
+        `.name.autosave.xopp` files come over from the phone.

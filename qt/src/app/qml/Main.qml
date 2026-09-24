@@ -1890,6 +1890,12 @@ ApplicationWindow {
         }
         function onTextChangedOnDisk(name) {
             textChangedDialog.file = name
+            textChangedDialog.document = false
+            textChangedDialog.open()
+        }
+        function onDocumentChangedOnDisk(name) {
+            textChangedDialog.file = name
+            textChangedDialog.document = true
             textChangedDialog.open()
         }
     }
@@ -2029,6 +2035,7 @@ ApplicationWindow {
         id: textChangedDialog
         objectName: "textChangedDialog"
         property string file: ""
+        property bool document: false  // a .xopp or PDF (reloading it cannot be undone)
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
@@ -2039,8 +2046,11 @@ ApplicationWindow {
             width: textChangedDialog.availableWidth
             wrapMode: Text.Wrap
             text: qsTr("%1 was changed by another app, and it has changes here that are not saved.").arg(textChangedDialog.file)
-                  + "\n\n" + qsTr("Reload: the file as it is now is shown (Undo brings your changes back). Keep mine: "
-                                 + "your version stays, and saving writes over the other app's changes.")
+                  + "\n\n" + (textChangedDialog.document
+                               ? qsTr("Reload: the file as it is now is shown, and your changes here are discarded. "
+                                      + "Keep mine: your version stays, and saving writes over the other app's changes.")
+                               : qsTr("Reload: the file as it is now is shown (Undo brings your changes back). Keep mine: "
+                                      + "your version stays, and saving writes over the other app's changes."))
         }
         footer: DialogButtonBox {
             Button {

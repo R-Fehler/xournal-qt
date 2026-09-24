@@ -257,12 +257,17 @@ public:
     /// The file "Open externally" hands over for a library card's path ("" for notes and PDFs): the Markdown, text or
     /// other file, the image a .xopp annotates.
     Q_INVOKABLE QString externalFileOf(const QString& path) const;
-    /// Look whether the text files of the open tabs changed on disk (another program): an unmodified one is read
-    /// again, a modified one is asked about (textChangedOnDisk). Also done when the window becomes active.
+    /// Look whether the files of the open tabs changed on disk (another program, a sync app): the text files, and the
+    /// .xopp files and PDFs of the documents (DocumentSession::filesChangedOnDisk; the app's own saves never count).
+    /// An unmodified one is read again, a modified one is asked about (textChangedOnDisk, documentChangedOnDisk).
+    /// Also done when the window becomes active, and after saves.
     Q_INVOKABLE void checkTextFiles();
-    /// The answer to textChangedOnDisk for the current tab: read the file again (the changes here are lost; undo
-    /// brings them back), or keep the text here (saving writes over the file).
+    /// The answer to textChangedOnDisk / documentChangedOnDisk for the current tab: read the file again (the changes
+    /// here are lost; for a text file undo brings them back), or keep the version here (saving writes over the file).
     Q_INVOKABLE void resolveTextChange(bool reload);
+    /// Read a document again from its files (changed by another program): the tab keeps its place and page. False if
+    /// it could not be read (the tab stays as it was, with a message).
+    bool reloadDocument(xqt::DocumentSession* s);
     bool canUndo() const;
     bool canRedo() const;
     QString tool() const;
@@ -910,6 +915,8 @@ Q_SIGNALS:
     /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
     /// (resolveTextChange).
     void textChangedOnDisk(const QString& name);
+    /// The same for a document (.xopp, PDF): changed on disk while it has unsaved changes here.
+    void documentChangedOnDisk(const QString& name);
     void textLayoutChanged();
     /// "Edit anyway" for a file not accepted before: the window warns (OK: editAnyway(true)).
     void editAnywayWarning(const QString& name);
@@ -1029,6 +1036,7 @@ private:
     /// Watch the files of the open text documents (changes by other programs).
     void watchTextFiles();
     void checkTextFile(xqt::DocumentSession* s);
+    void checkDocumentFiles(xqt::DocumentSession* s);
     /// The text file's new bytes are shown (the cursor stays where it was, as far as it can).
     void reloadText(xqt::DocumentSession* s, std::string bytes);
     std::unique_ptr<QFileSystemWatcher> textWatcher;

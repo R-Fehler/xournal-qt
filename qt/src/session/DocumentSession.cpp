@@ -3,6 +3,7 @@
 #include <functional>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <atomic>
 #include <limits>
@@ -13,6 +14,9 @@
 #include <utility>
 
 #include <glib.h>
+
+#include <QCryptographicHash>
+#include <QFile>
 
 #include "control/layer/LayerController.h"
 #include "control/settings/PageTemplateSettings.h"
@@ -172,6 +176,7 @@ DocumentSession::DocumentSession(AppContext& app, std::unique_ptr<Document> docu
         QObject(parent), app(app), doc(std::move(document)) {
     doc->setDocumentHandler(this);
     init();
+    stampFiles();  // (as read)
 }
 
 void DocumentSession::init() {
@@ -1039,7 +1044,103 @@ void DocumentSession::relocate(const fs::path& xopp, const fs::path& pdf) {
         doc->setPdfAttributes(pdf, doc->isAttachPdf());
     }
     doc->unlock();
+    stampFiles();  // (moved or written by the app)
     Q_EMIT filePathChanged();
+}
+
+// --- changes on disk -------------------------------------------------------------------------------------------------
+
+std::vector<fs::path> DocumentSession::filesOnDisk() const {
+    if (text || (!shownPath.empty() && !hasFilePath())) {
+        return {};
+    }
+    std::vector<fs::path> files;
+    const fs::path main = documentFile();
+    if (!main.empty()) {
+        files.push_back(main);
+    }
+    fs::path pdf;
+    {
+        std::shared_lock lock(*doc);
+        pdf = doc->getPdfFilepath();
+    }
+    // (the merged PDF of pasted pages and the clean copies of hybrid PDFs in the app cache are the app's alone)
+    const auto inCache = [](const fs::path& p) {
+        const fs::path cache = Util::getCacheSubfolder().lexically_normal();
+        const fs::path rel = p.lexically_normal().lexically_relative(cache);
+        return !rel.empty() && *rel.begin() != "..";
+    };
+    if (!pdf.empty() && pdf != main && !inCache(pdf)) {
+        files.push_back(pdf);
+    }
+    return files;
+}
+
+std::optional<DocumentSession::DiskStamp> DocumentSession::diskStampOf(const fs::path& file) {
+    std::error_code ec;
+    const auto size = fs::file_size(file, ec);
+    if (ec) {
+        return std::nullopt;
+    }
+    const auto time = fs::last_write_time(file, ec);
+    if (ec) {
+        return std::nullopt;
+    }
+    DiskStamp stamp;
+    stamp.size = size;
+    stamp.time = std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count();
+    // The first and the last 64 KB (the end of a PDF has its cross-reference table, of a .xopp gzip's checksum)
+    QFile f(QString::fromStdString(file.string()));
+    if (f.open(QIODevice::ReadOnly)) {
+        constexpr qint64 PART = 64 * 1024;
+        QCryptographicHash hash(QCryptographicHash::Sha1);
+        hash.addData(f.read(PART));
+        if (f.size() > PART) {
+            f.seek(std::max(PART, f.size() - PART));
+            hash.addData(f.read(PART));
+        }
+        stamp.sample = hash.result();
+    }
+    return stamp;
+}
+
+void DocumentSession::stampFiles() {
+    diskStamps.clear();
+    for (const fs::path& f: filesOnDisk()) {
+        if (auto stamp = diskStampOf(f)) {
+            diskStamps[f] = std::move(*stamp);
+        }
+    }
+}
+
+bool DocumentSession::filesChangedOnDisk() {
+    if (isSaving() || pdfWorkRunning() || mergingPdfPages()) {
+        return false;  // (asked again after it: the save records what it wrote)
+    }
+    bool changed = false;
+    std::map<fs::path, DiskStamp> next;
+    for (const fs::path& f: filesOnDisk()) {
+        const auto now = diskStampOf(f);
+        const auto known = diskStamps.find(f);
+        if (known == diskStamps.end()) {
+            if (now) {
+                next[f] = *now;  // (a file the document took since: as it is)
+            }
+            continue;
+        }
+        if (!now || (now->size == known->second.size && now->time == known->second.time)) {
+            next[f] = known->second;  // (unchanged; or gone for a moment: asked again when it is back)
+            continue;
+        }
+        if (now->size == known->second.size && now->sample == known->second.sample) {
+            next[f] = *now;  // (only touched)
+            continue;
+        }
+        changed = true;
+        next[f] = known->second;  // (until it is read again or kept: stampFiles)
+    }
+    diskStamps = std::move(next);
+    return changed;
 }
 
 bool DocumentSession::isHybrid() const { return hasExtension(getFilePath(), ".pdf"); }
