@@ -375,12 +375,13 @@ struct Prepared {
 };
 
 /// Everything that needs the document: under its shared lock (and briefly its lock).
-Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf) {
+Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
+                 size_t pdfPageCount) {
     Prepared out;
     {
         std::shared_lock lock(doc);
         out.bg = doc.getPdfFilepath();
-        const size_t bgPages = doc.getPdfPageCount();
+        const size_t bgPages = pdfPageCount != npos ? pdfPageCount : doc.getPdfPageCount();
         cairo_surface_t* surface = cairo_pdf_surface_create_for_stream(appendTo, &out.drawn, 1, 1);
         cairo_t* cr = cairo_create(surface);
         cairo_font_options_t* fontOptions = cairo_font_options_create();  // as upstream's PDF export
@@ -867,12 +868,12 @@ void touch(const fs::path& base) {
     fs::last_write_time(base.parent_path(), fs::file_time_type::clock::now(), ec);
 }
 
-Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf) {
+Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, size_t pdfPageCount) {
     Result r;
     try {
         WorkDir work;
         Steps step;
-        const Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf);
+        const Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount);
         step("draw and write the .xopp");
         if (!prep.error.empty()) {
             r.error = prep.error;
@@ -885,11 +886,11 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf) {
     return r;
 }
 
-Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf) {
+Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount) {
     Result r;
     try {
         WorkDir work;
-        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {});
+        const Prepared prep = prepare(doc, pdf.filename().string(), work.path, {}, pdfPageCount);
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;

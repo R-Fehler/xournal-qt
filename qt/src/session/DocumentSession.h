@@ -13,6 +13,8 @@
  */
 #pragma once
 
+#include <deque>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -72,7 +74,38 @@ public:
     struct SaveResult {
         bool ok = false;
         std::string error;
+        std::string exportError;  ///< SaveRequest::exportXopp failed (the save itself may have succeeded)
     };
+    enum class SaveKind {
+        Save,        ///< to the document's file: its .xopp, or its hybrid PDF. Requires hasFilePath().
+        SaveAs,      ///< as .xopp to `target`; the document takes this path ("Save as")
+        Hybrid,      ///< as a hybrid PDF to `target` (see saveAsHybrid)
+        ExportXopp,  ///< only exportXopp to `target` (the document's state and saved point stay)
+    };
+    struct SaveRequest {
+        SaveKind kind = SaveKind::Save;
+        fs::path target;
+        /// A hybrid PDF: also export the .xopp for Xournal++ here (exportXopp), from the same state.
+        fs::path exportXopp;
+        /// Called on this thread when the file is written, or when that failed.
+        std::function<void(const SaveResult&)> done;
+    };
+    /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
+    /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the
+    /// document can be edited meanwhile. It counts as saved only if nothing changed since that copy, and it stays
+    /// modified until the file is written (isSaving()). One save at a time: a save asked for while one runs follows
+    /// it (several plain saves in a row: one). The merged PDF of pasted pages is written first (on the worker, its
+    /// crash-safe steps as before), then the copy is taken.
+    void saveInBackground(SaveRequest request);
+    /// A save runs or waits.
+    bool isSaving() const;
+    /// Wait (blocking this thread) until the running and waiting saves are done; false if the last one failed.
+    bool waitForSaves();
+    /// The merged PDF must not change while a save writes it: pasting waits for that part (usually well under a
+    /// second).
+    void waitForPdfWork();
+    bool pdfWorkRunning() const;
+    /// save(), saveAs(), saveAsHybrid(): the same, waiting for the result (tests, library moves).
     /// Save to the document's path (as .xopp). Requires hasFilePath().
     SaveResult save();
     /// Save to a new path; the document takes this path ("Save as").
@@ -91,6 +124,8 @@ public:
     /// Export for Xournal++: a plain `xopp` next to the hybrid PDF with the base pages as its PDF (the merged-PDF
     /// rules of qt/pdf-pages: "name.pdf" if free, else ".name.pages.pdf"). The document keeps its file.
     SaveResult exportXopp(const fs::path& xopp);
+    /// saveInBackground, waiting for its result.
+    SaveResult saveNow(SaveRequest request);
     /// Where exportXopp puts the PDF for this .xopp.
     static fs::path exportPdfFor(const fs::path& xopp);
     /// Write a document that is not open in a session (e.g. a library document being moved) to `target` (.xopp),
@@ -226,6 +261,8 @@ public:
 
 Q_SIGNALS:
     void modifiedChanged(bool modified);
+    /// isSaving() changed.
+    void savingChanged(bool saving);
     void undoRedoStateChanged();
     /// A page change was undone (or redone): its text ("Insert page", ...).
     void pageActionUndone(const QString& text, bool undone);
@@ -248,10 +285,22 @@ private:
     void updatePageActions();
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
-    SaveResult saveImpl(fs::path target);
-    SaveResult saveHybridImpl(const fs::path& target);
-    /// Write the .xopp (the file only).
-    SaveResult writeXopp(const fs::path& target);
+
+    // Saving in the background (DocumentSave.cpp): a save goes through steps, on this thread or on a worker.
+    struct SaveTask;
+    void startNextSave();
+    void beginSave();
+    void planFiles();
+    void takeSnapshot();
+    void finishWrite();
+    void finishSave(SaveResult result);
+    /// Run `work` on a worker, then `then` on this thread.
+    void onWorker(std::function<void()> work, std::function<void()> then);
+    /// Run `then` on this thread from the event loop.
+    void postStep(std::function<void()> then);
+    void resumeSave(quint64 stage);
+    void updateModified();
+    void updateSaving();
 
     // UndoRedoListener
     void undoRedoChanged() override;
@@ -271,6 +320,17 @@ private:
     SessionScrollHandler scrollHandler;
     size_t currentPage = 0;
     bool lastModified = false;
+
+    std::unique_ptr<SaveTask> saveTask;  ///< the save that runs
+    std::deque<SaveRequest> saveQueue;   ///< the saves after it
+    quint64 saveStage = 0;               ///< the step of the running save (a stale resume is ignored)
+    bool lastSaving = false;
+    /// The saved point of the undo stack is the state a running save copied: modified until it is written.
+    bool saveUnconfirmed = false;
+    /// The last save failed after the saved point was moved: modified until a save succeeds.
+    bool saveFailed = false;
+    bool destroying = false;
+    SaveResult lastSaveResult;
 
     QTimer autosaveTimer;
     fs::path lastAutosaveFile;

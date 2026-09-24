@@ -48,16 +48,48 @@ public:
     fs::path annotatedPdf() const;
     /// Before the document is written to `target`: the merged PDF goes next to it, without the PDF pages that are not
     /// used any more (see above). Problems are logged; the document stays as it is then.
+    /// In three steps, so that the PDF work runs on a worker while the document stays open for editing (see
+    /// DocumentSession's background save): planSave (this thread: what to write), writePlanned (any thread, only
+    /// files) and applySave (this thread: the document takes the written PDF, its pages renumbered).
+    struct SavePlan {
+        bool needed = false;  ///< false: nothing to write, the document stays as it is
+        fs::path bg;          ///< the background PDF when planned
+        size_t count = 0;     ///< its pages
+        MergedPdf::Kind kind = MergedPdf::Kind::None;
+        fs::path place, staging;
+        fs::path grownFrom;           ///< (PdfPageKeeper::grownFrom when planned)
+        bool compact = false;         ///< PDF pages are dropped
+        std::vector<size_t> used;     ///< the PDF pages the document shows (kept)
+        std::vector<size_t> dropped;  ///< PDF pages of pages that may come back (undo, redo): kept in memory
+        // --- written by writePlanned
+        bool written = false;  ///< the PDF was written (to writeTo): apply it
+        fs::path writeTo;
+        bool stage = false;  ///< written under another name (staging), gets its name after the .xopp refers to it
+        std::string limbo;   ///< the dropped PDF pages as a PDF (empty: none)
+        std::unordered_map<size_t, size_t> renumber;  ///< old -> new
+    };
+    SavePlan planSave(const fs::path& target);
+    static void writePlanned(SavePlan& plan);
+    /// False if the document shows PDF pages that the written PDF dropped (they came back meanwhile): plan again.
+    bool applySave(SavePlan& plan);
+    /// All three at once (on this thread).
     void beforeSave(const fs::path& target);
     /// beforeSave wrote a renumbered PDF under another name, and the .xopp was written referring to it: now it gets
     /// its name (the .xopp is written again then, and finishStaged() removes the other name).
     bool hasStaged() const { return !stagedAs.empty(); }
+    /// The name the staged PDF gets.
+    const fs::path& stagedName() const { return stagedAs; }
     void commitStaged();
+    /// commitStaged in two steps: the file gets its name (any thread: a second link, renamed over the old one), then
+    /// the document refers to it by that name (`committed`) or keeps referring to the other name.
+    static bool commitFile(const fs::path& staged, const fs::path& name, std::string& error);
+    void commitApplied(const fs::path& staged, bool committed);
     void finishStaged();
     /// Where the merged PDF goes when the document is saved as `xopp` (empty: it has none).
     fs::path placeFor(const fs::path& xopp);
     /// Tests: a save stops before this step (1: the PDF is written, 2: the .xopp refers to it under its other name,
-    /// 3: the PDF has its name, 4: the .xopp refers to that) when this returns true, as if it crashed there.
+    /// 3: the PDF has its name, 4: the .xopp refers to that) when this returns true, as if it crashed there. Step 0
+    /// (the merged PDF is about to be written, on the worker) is only a place to wait.
     static std::function<bool(int)> stopSaveAt;
     /// Page numbers of the background PDF stay valid while this does not change (a save dropped PDF pages).
     quint64 numbering() const { return numberingNo; }

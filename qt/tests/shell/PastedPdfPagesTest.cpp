@@ -4,7 +4,10 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <atomic>
 #include <chrono>
+#include <future>
+#include <thread>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -80,6 +83,43 @@ std::vector<std::string> pdfsIn(const fs::path& dir) {
     std::sort(out.begin(), out.end());
     return out;
 }
+
+bool waitFor(const std::function<bool()>& done, int ms = 20000) {
+    QElapsedTimer t;
+    t.start();
+    while (!done()) {
+        if (t.elapsed() > ms) {
+            return false;
+        }
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    return true;
+}
+
+/// Holds the first write of a merged PDF by a save (on its worker) until released.
+struct HeldPdfWrite {
+    HeldPdfWrite() {
+        PdfPageKeeper::stopSaveAt = [this](int step) {
+            if (step == 0 && writes++ == 0) {
+                released.wait_for(std::chrono::seconds(10));
+            }
+            return false;
+        };
+    }
+    ~HeldPdfWrite() {
+        release();
+        PdfPageKeeper::stopSaveAt = nullptr;
+    }
+    void release() {
+        if (!done.exchange(true)) {
+            promise.set_value();
+        }
+    }
+    std::atomic<int> writes{0};
+    std::atomic<bool> done{false};
+    std::promise<void> promise;
+    std::shared_future<void> released = promise.get_future().share();
+};
 
 class PastedPdfPages: public ::testing::Test {
 protected:
@@ -563,4 +603,81 @@ TEST_F(PastedPdfPages, aSaveStoppedAtAnyStepLeavesAMatchingPair) {
         EXPECT_EQ(backgroundOf(current(c)), root / ".lecture.pages.pdf");
         EXPECT_EQ(pdfsIn(root), (std::vector<std::string>{".lecture.pages.pdf", "lecture.pdf", "other.pdf", "third.pdf"}));
     }
+}
+
+// While a save writes the merged PDF on its worker, the document can be edited: a deleted page that comes back
+// through undo keeps its PDF page (the save plans again), and the saved files show it.
+TEST_F(PastedPdfPages, anUndoWhileTheMergedPdfIsWrittenIsSavedRight) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({0, 1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    ASSERT_EQ(c.pastePages(1), 2);  // lectureone, pastedalpha, pastedbeta, lecturetwo, lecturethree
+    ASSERT_TRUE(c.save());
+    ASSERT_TRUE(c.deletePages({1}));  // pastedalpha: the next save drops its PDF page
+    HeldPdfWrite held;
+    bool finished = false;
+    DocumentSession::SaveResult result;
+    s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, [&](const DocumentSession::SaveResult& r) {
+                            result = r;
+                            finished = true;
+                        }});
+    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }));
+    c.undoPages();  // pastedalpha comes back while its PDF page is being dropped
+    EXPECT_TRUE(pageHasText(s, 1, "pastedalpha"));
+    held.release();
+    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(result.ok) << result.error;
+    EXPECT_FALSE(s.isModified());
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "pastedalpha", "pastedbeta", "lecturetwo", "lecturethree"}));
+    EXPECT_TRUE(pageHasText(s, 1, "pastedalpha"));
+    EXPECT_TRUE(pageHasText(s, 2, "pastedbeta"));
+    EXPECT_EQ(pdfsIn(root), (std::vector<std::string>{".lecture.pages.pdf", "lecture.pdf", "other.pdf", "third.pdf"}));
+}
+
+// Pages pasted while a save writes the merged PDF: the paste waits for that write, and the save then puts their PDF
+// pages next to the document too (never a .xopp that refers to the cache).
+TEST_F(PastedPdfPages, pagesPastedWhileTheMergedPdfIsWrittenGoNextToTheDocumentToo) {
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});  // pastedbeta
+    c.newDocument();
+    const int fresh = c.tabManager().currentIndex();
+    DocumentSession& s = current(c);
+    ASSERT_EQ(c.pastePages(1), 1);
+    const fs::path cached = backgroundOf(s);
+    ASSERT_TRUE(MergedPdf::inCache(cached));
+    ASSERT_TRUE(open(c, root / "third.pdf"));
+    c.copyPages({0});  // pastedgamma
+    c.tabManager().setCurrentIndex(fresh);
+    ASSERT_EQ(&current(c), &s);
+
+    HeldPdfWrite held;
+    bool finished = false;
+    DocumentSession::SaveResult result;
+    s.saveInBackground({DocumentSession::SaveKind::SaveAs, root / "fresh.xopp", {},
+                        [&](const DocumentSession::SaveResult& r) {
+                            result = r;
+                            finished = true;
+                        }});
+    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }));
+    std::thread releaser([&] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        held.release();
+    });
+    ASSERT_EQ(c.pastePages(2), 1);  // (waits for the merged PDF to be written)
+    releaser.join();
+    EXPECT_TRUE(pageHasText(s, 2, "pastedgamma"));
+    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(result.ok) << result.error;
+    EXPECT_FALSE(s.isModified());
+    EXPECT_EQ(backgroundOf(s), root / "fresh.pdf");
+    EXPECT_FALSE(fs::exists(cached));
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "fresh.xopp", WORDS),
+              (std::vector<std::string>{"", "pastedbeta", "pastedgamma"}));
+    EXPECT_TRUE(pageHasText(s, 1, "pastedbeta"));
+    EXPECT_TRUE(pageHasText(s, 2, "pastedgamma"));
 }

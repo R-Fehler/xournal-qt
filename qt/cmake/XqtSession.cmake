@@ -11,6 +11,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/AppContext.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSave.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSaveTask.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentTextIndex.h
@@ -74,7 +76,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSearchTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp)
     target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")

@@ -26,6 +26,8 @@
 #include <string>
 #include <vector>
 
+#include "util/Util.h"  // npos
+
 #include "filesystem.h"
 
 class Document;
@@ -52,12 +54,13 @@ using BasePageOf = std::function<size_t(const XojPage*)>;
 /// Write the document as a hybrid PDF `target` (atomically: a temporary file next to it, renamed over it). The
 /// document is read under its shared lock (the caller must not hold it). `target` may be the document's background
 /// PDF. `baseOf`: a page with a generated background keeps the annotations other apps put on that page of the
-/// background PDF (the clean copy of the hybrid PDF it was opened from).
-Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {});
+/// background PDF (the clean copy of the hybrid PDF it was opened from). `pdfPageCount`: the pages of the background
+/// PDF, for a document whose PDF is not loaded (a copy of an open document written on a worker; npos: the document's).
+Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {}, size_t pdfPageCount = npos);
 
 /// Export for Xournal++: a plain `xopp` whose background is `pdf`, the document's base pages in document order (the
 /// hybrid PDF without our annotations and data). The document keeps its own files.
-Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf);
+Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount = npos);
 
 /// Whether this PDF carries our marker (remembered by path, size and time).
 bool isHybrid(const fs::path& pdf);
