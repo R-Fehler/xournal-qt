@@ -73,15 +73,13 @@ int imageRank(const fs::path& p) {
     return it == exts.end() ? -1 : static_cast<int>(it - exts.begin());
 }
 bool isImage(const fs::path& p) { return imageRank(p) >= 0 && !isImageAttachment(p) && !isHidden(p); }
-/// The ways an extension is written that pair an image with a .xopp: ".jpg", ".JPG", ".Jpg" (in the order of
-/// their names, as a listing sorts them)
+/// The ways an extension is written that pair an image with a .xopp: ".JPG", ".jpg" (in the order of their names, as
+/// a listing sorts them)
 std::vector<std::string> spellings(const std::string& ext) {
-    std::string upper = ext, capital = ext;
-    std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
-    if (capital.size() > 1) {
-        capital[1] = static_cast<char>(std::toupper(static_cast<unsigned char>(capital[1])));
-    }
-    return {upper, capital, ext};
+    std::string upper = ext;
+    std::transform(upper.begin(), upper.end(), upper.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    return {upper, ext};
 }
 bool pairingSpelling(const fs::path& image) {
     const std::string ext = image.extension().string();
