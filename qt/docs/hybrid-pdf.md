@@ -99,3 +99,36 @@ A hybrid PDF is a normal PDF with four additions:
 2. Reader: marker, embedded `.xopp`, clean copy for the background, the hash check with its message.
 3. UI: Save as hybrid PDF, export `.xopp` (once, automatic), library card and index.
 4. Measurements: save time and size for a 50-page and a 1,300-page PDF with notes.
+
+## What is built (`qt/hybrid-pdf`)
+
+Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/HybridPdfTest.cpp`.
+
+1. **Writer** (done). `HybridPdf::write(document, target)`:
+   - Base pages: the background PDF is opened with qpdf and its page tree is rebuilt in document order (pages shown
+     twice are shallow copies, pages no longer shown lose their content but stay for bookmarks), so the PDF's
+     outline, links, names and metadata stay. Generated backgrounds (plain, ruled, graph, images) are drawn by cairo
+     into a page of their own. Pages whose PDF page is missing get a drawn page too.
+   - One annotation per **visible** layer with content per page (hidden layers are only in the embedded data).
+     A layer with strokes is an `/Ink` (all its strokes in `/InkList`, `/C` and `/BS /W` of its first stroke); a
+     layer without strokes is a `/Stamp`. The `/AP` draws the **whole layer** in its order (strokes, text, images,
+     TeX), so a mixed layer stays one annotation and looks exact; text elements also go into `/Contents`. The
+     appearance is the layer drawn by cairo on a PDF page of its own and turned into a Form XObject with qpdf, as
+     upstream's export does (its transparency group not isolated, so the highlighter multiplies with the page);
+     its `/BBox` is the layer's box plus 2 pt, its `/Matrix` places it on the page's crop box with the page's
+     `/Rotate` undone. Points and boxes are written with 0.1 pt precision.
+   - Marks: `/NM (xopp:p<page>-l<layer>)` (1-based) and a private `/XournalQt << /Page /Layer >>`; `/F 4` (print).
+   - The embedded `document.xopp` (`/EmbeddedFiles`, subtype `application/x-xopp`) is written by upstream's
+     SaveHandler with one change: its PDF background is this file by name (`domain="absolute"`, relative
+     `filename`), and PDF page *i* of the `.xopp` is base page *i*. Attached background images go along as
+     `document.xopp.bg_N.png`; image files of the user are referred to by absolute path.
+   - The marker: `/XournalQt << /Version 1 /Data (document.xopp) /Files [...] /Annots << /xopp:p1-l1 (hash) ... >> >>`
+     in the catalog. **Deviation:** the hashes are in the marker, not in the `.xopp` (which stays exactly upstream's
+     format). A hash covers what another app may change: `/Subtype`, `/Rect` and `/InkList` (to 0.1 pt), `/C`; not
+     the appearance stream, which some apps write again on every save.
+   - A merged-PDF mark (`/XournalQtPages`, `qt/pdf-pages`) that the background had is removed: a hybrid PDF is never
+     rewritten as a merged PDF.
+   - Written to a temporary file next to the target and renamed over it; object streams (smaller).
+   - Tests: `qpdf --check` (through `QPDFJob`) passes; each page drawn by poppler (with annotations) matches our PDF
+     export of the same document (mean difference < 0.5/255, < 0.2 % of the pixels off); the embedded document
+     opens. `XQT_HYBRID_SAMPLE=<file>` makes the first test copy its hybrid PDF there (a sample for other apps).
