@@ -844,6 +844,9 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
             doneCount = ++done;
             continue;
         }
+        if (checkHook) {
+            checkHook(file);
+        }
         EntryPtr current;
         {
             std::lock_guard lock(mtx);

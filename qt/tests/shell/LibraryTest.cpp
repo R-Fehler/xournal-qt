@@ -1036,6 +1036,116 @@ TEST_F(LibraryTest, renamedAndMovedDocumentsKeepTheirIndex) {
     EXPECT_EQ(model.searchIndex()->pageCount(root / "Semester" / "Archive" / "older.pdf"), 2);
 }
 
+TEST_F(LibraryTest, aDocumentMovedWhileAnUpdateLooksAtItKeepsItsEntry) {
+    // What made renamedAndMovedDocumentsKeepTheirIndex flaky: an update (of a folder made just before) still runs
+    // when the app moves a folder; the document is found on disk, then it is gone. Its entry must stay for the move.
+    makePdf(root / "Archive" / "lecture.pdf");
+    makeAnnotation(root / "Archive" / "lecture.pdf", root / "Archive" / "lecture.xopp");
+    addText(root / "Archive" / "lecture.xopp", 1, "unicorn");
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    const int docs = index.documentsRead(), pages = index.pdfPagesRead();
+    ASSERT_EQ(pages, 2);
+
+    fs::create_directories(root / "Semester");
+    const auto listed = DocumentFiles::scanRecursive(root);  // (made before the move)
+    bool movedOnce = false;
+    index.setCheckHook([&](const fs::path& file) {
+        if (!movedOnce && file == root / "Archive" / "lecture.xopp") {
+            movedOnce = true;
+            fs::rename(root / "Archive", root / "Semester" / "Archive");
+        }
+    });
+    index.update(listed);
+    index.waitForDone();
+    index.setCheckHook({});
+    ASSERT_TRUE(movedOnce);
+    index.moved({{root / "Archive", root / "Semester" / "Archive"}});
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+
+    EXPECT_EQ(index.pdfPagesRead(), pages) << "no PDF text is read again";
+    EXPECT_EQ(index.documentsRead(), docs) << "nothing is read";
+    const auto hits = index.search("unicorn");
+    ASSERT_EQ(hits.size(), 1u);
+    EXPECT_EQ(hits[0].file, root / "Semester" / "Archive" / "lecture.xopp");
+    EXPECT_EQ(index.search("xournal").size(), 1u);
+}
+
+TEST_F(LibraryTest, aRenameSeenBeforeItIsToldKeepsTheEntry) {
+    // The file system watcher can make the library look again before the index was told about a move: the
+    // documents are found under their new names first. Their entries are taken over by size and time.
+    makePdf(root / "sheet.pdf");
+    std::ofstream(root / "notes.md") << "# Diary\n\nA walrus on the beach.\n";
+    fs::create_directories(root / "Archive");
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    const int docs = index.documentsRead(), pages = index.pdfPagesRead();
+    ASSERT_EQ(docs, 2);
+
+    const std::vector<std::pair<fs::path, fs::path>> moves{{root / "sheet.pdf", root / "Week 1.pdf"},
+                                                           {root / "notes.md", root / "Archive" / "Diary.md"}};
+    for (const auto& [from, to]: moves) {
+        fs::rename(from, to);
+    }
+    index.update(DocumentFiles::scanRecursive(root));  // the rescan first
+    index.waitForDone();
+    EXPECT_EQ(index.documentsRead(), docs) << "found again by size and time, under another name";
+    index.moved(moves);  // then the move
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+
+    EXPECT_EQ(index.documentsRead(), docs);
+    EXPECT_EQ(index.pdfPagesRead(), pages);
+    ASSERT_EQ(index.search("walrus").size(), 1u);
+    EXPECT_EQ(index.search("walrus")[0].file, root / "Archive" / "Diary.md");
+    ASSERT_EQ(index.search("xournal").size(), 1u);
+    EXPECT_EQ(index.search("xournal")[0].file, root / "Week 1.pdf");
+    EXPECT_EQ(index.pageCount(root / "Week 1.pdf"), 2);
+    index.flush();
+    EXPECT_EQ(packKeys(root, LibraryIndex::NOTES_PACK), QStringList{"Week 1.pdf"});
+    EXPECT_EQ(packKeys(root / "Archive", LibraryIndex::NOTES_PACK), QStringList{"Diary.md"});
+}
+
+TEST_F(LibraryTest, anotherDocumentWithTheSameSizeAndTimeIsNotTakenForAMovedOne) {
+    // Two different files can have the same size and time (e.g. unpacked from an archive): the entry of one that is
+    // gone is not taken over by the other (its content is compared too), whatever their names.
+    std::ofstream(root / "alpha.md") << "The alpha notes.\n";
+    std::ofstream(root / "sigma.md") << "The sigma notes.\n";
+    const auto time = fs::file_time_type::clock::now() - std::chrono::hours(1);
+    fs::last_write_time(root / "alpha.md", time);
+    fs::last_write_time(root / "sigma.md", time);
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    const int docs = index.documentsRead();
+    ASSERT_EQ(index.search("sigma").size(), 1u);
+
+    // Both gone; others with the same size and time come: one with another name, one with the same name in another
+    // folder
+    fs::remove(root / "alpha.md");
+    fs::remove(root / "sigma.md");
+    fs::create_directories(root / "Archive");
+    std::ofstream(root / "gamma.md") << "The gamma notes.\n";
+    std::ofstream(root / "Archive" / "alpha.md") << "The delta notes.\n";
+    fs::last_write_time(root / "gamma.md", time);
+    fs::last_write_time(root / "Archive" / "alpha.md", time);
+    ASSERT_EQ(fs::file_size(root / "gamma.md"), 17u);
+    ASSERT_EQ(fs::file_size(root / "Archive" / "alpha.md"), 17u);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+
+    EXPECT_EQ(index.documentsRead(), docs + 2) << "both are read";
+    EXPECT_TRUE(index.search("alpha notes").empty());
+    EXPECT_TRUE(index.search("sigma").empty());
+    ASSERT_EQ(index.search("gamma").size(), 1u);
+    EXPECT_EQ(index.search("gamma")[0].file, root / "gamma.md");
+    ASSERT_EQ(index.search("delta").size(), 1u);
+    EXPECT_EQ(index.search("delta")[0].file, root / "Archive" / "alpha.md");
+}
+
 TEST_F(LibraryTest, changesOfAttachedOrOtherPdfsAreNoticed) {
     // Attached PDF ("name.xopp.bg.pdf")
     fs::copy_file(fixture(u8"packaged_xopp/pdfBackground/old.xopp"), root / "att.xopp");

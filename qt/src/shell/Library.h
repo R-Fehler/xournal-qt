@@ -26,6 +26,7 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -143,6 +144,9 @@ public:
     int documentsRead() const { return docsRead.load(); }
     int pdfPagesRead() const { return pdfRead.load(); }
     int packsWritten() const { return packWrites.load(); }
+    /// Called on the worker for each document of an update once it was found on disk, before its entry is looked at
+    /// (tests: a move that lands just then). Set it while the index is idle.
+    void setCheckHook(std::function<void(const fs::path&)> hook) { checkHook = std::move(hook); }
 
     struct PageHits {
         int page = 0;        ///< 0-based
@@ -294,6 +298,7 @@ private:
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
     std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0};
+    std::function<void(const fs::path&)> checkHook;
 };
 
 }  // namespace xqt
