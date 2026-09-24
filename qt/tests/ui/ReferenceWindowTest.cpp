@@ -353,6 +353,10 @@ TEST_F(ReferenceWindowTest, pdfTextOfTheReferenceIsCopiedForTheNotes) {
     session->search().clear();
     view->getViewController().scrollToPage(0);
     wait(100);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {  // (a picture of the split, to look at)
+        wait(1500);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
     const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
 
     // The highlighter of PDF text selects there, it never marks
