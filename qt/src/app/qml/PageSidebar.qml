@@ -177,9 +177,11 @@ Rectangle {
                     anchors.right: parent.right
                     implicitWidth: 40
                     implicitHeight: 40
-                    text: "⋮"
-                    font.pixelSize: 20
-                    Material.foreground: "#3c4043"
+                    icon.source: app.iconUrl("xqt-more")
+                    icon.width: 20
+                    icon.height: 20
+                    icon.color: "#3c4043"
+                    display: AbstractButton.IconOnly
                     opacity: entry.current || entry.selected || hovered ? 1 : 0.55
                     onClicked: pageMenu.openFor(entry.pageIndex, this, 0, height)
                 }

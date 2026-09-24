@@ -16,4 +16,7 @@ namespace xqt::android {
 ///   fonts, and a cache folder in the app's cache.
 void prepareEnvironment();
 
+/// Symbols the UI font has no glyph for (✓ ✎ ☐ ● arrows) come from Android's symbol font. After the QApplication.
+void addSymbolFallback();
+
 }  // namespace xqt::android

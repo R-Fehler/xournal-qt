@@ -1041,6 +1041,73 @@ TEST_F(HomeScreenTest, newDocumentIsSavedInTheLibrary) {
     EXPECT_EQ(controller->title(), "Week.xopp");
 }
 
+// A phone-wide window (411 px, the Fold 7 folded): nothing of the home screen is wider than the window. The header
+// scrolls sideways, the search has a row of its own, the buttons of an empty folder stand one below the other, and
+// the new document dialog fits.
+TEST_F(HomeScreenTest, aPhoneWideWindowFitsTheHomeScreenAndTheNewDocumentDialog) {
+    auto* search = find<QQuickItem>("librarySearchField");
+    auto* header = find<QQuickItem>("homeHeader");
+    auto* settingsButton = find<QQuickItem>("homeSettingsButton");
+    ASSERT_NE(search, nullptr);
+    ASSERT_NE(header, nullptr);
+    ASSERT_NE(settingsButton, nullptr);
+    const double wideSearchY = search->mapToScene(QPointF(0, 0)).y();
+    EXPECT_LE(header->width(), window->width()) << "(a header wider than the window scrolls)";
+
+    window->resize(411, 820);
+    wait(150);
+    auto rightEdge = [](QQuickItem* item) { return item->mapToScene(QPointF(item->width(), 0)).x(); };
+    EXPECT_LE(rightEdge(search), window->width()) << "the search field fits";
+    EXPECT_GT(search->mapToScene(QPointF(0, 0)).y(), wideSearchY + 30) << "in a row of its own, below";
+    EXPECT_LE(rightEdge(header), window->width() + 0.5);
+    EXPECT_TRUE(header->property("interactive").toBool()) << "the header scrolls sideways";
+    EXPECT_GT(rightEdge(settingsButton), window->width()) << "(its last buttons are further right)";
+    if (wantShots()) {
+        saveShot(window, "phone-home");
+    }
+
+    // An empty folder: its three buttons one below the other, all inside the window
+    fs::create_directories(root / "Empty");
+    controller->libraryModel()->setProperty("folder", "Empty");
+    wait(100);
+    ASSERT_EQ(controller->libraryModel()->property("folder").toString(), "Empty");
+    ASSERT_EQ(gridCount(), 0);
+    QList<QQuickItem*> emptyButtons;
+    for (const char* name: {"emptyNewDocument", "emptyImportFiles", "emptyImportFolder"}) {
+        auto* b = findItem(name);
+        ASSERT_NE(b, nullptr) << name;
+        EXPECT_TRUE(b->isVisible()) << name;
+        emptyButtons << b;
+    }
+    ASSERT_EQ(emptyButtons.size(), 3);
+    for (QQuickItem* b: emptyButtons) {
+        EXPECT_LE(rightEdge(b), window->width()) << b->property("text").toString().toStdString();
+        EXPECT_GE(b->mapToScene(QPointF(0, 0)).x(), 0);
+    }
+    EXPECT_NE(emptyButtons[0]->mapToScene(QPointF(0, 0)).y(), emptyButtons[1]->mapToScene(QPointF(0, 0)).y());
+    if (wantShots()) {
+        saveShot(window, "phone-empty-folder");
+    }
+
+    // The new document dialog: nothing in it is wider than the window
+    QObject* dialog = find("newDocumentDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "open");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    wait(400);
+    for (const char* name: {"newDocumentName", "landscapeButton", "saveInLibrary", "paperBox"}) {
+        auto* item = findItem(name);
+        ASSERT_NE(item, nullptr) << name;
+        EXPECT_LE(rightEdge(item), window->width()) << name;
+    }
+    if (wantShots()) {
+        saveShot(window, "phone-new-document");
+    }
+    key(Qt::Key_Escape);
+    EXPECT_TRUE(waitOpened(dialog, false));
+    window->resize(1280, 900);
+}
+
 TEST_F(MainWindowTest, tabStripUsesTheWholeWidthForManyTabs) {
     auto* list = find<QQuickItem>("tabList");
     auto* plus = find<QQuickItem>("newTabButton");

@@ -61,6 +61,7 @@ int main(int argc, char* argv[]) {
 #ifdef Q_OS_ANDROID
     // Folders, resources and fonts for the core (GLib, fontconfig), before anything reads them.
     xqt::android::prepareEnvironment();
+    xqt::android::addSymbolFallback();
 #endif
 #ifdef Q_OS_WIN
     // UTF-8 for std::filesystem's narrow strings, GLib's cache folder, fontconfig (see qt/docs/windows.md).
@@ -172,6 +173,15 @@ int main(int argc, char* argv[]) {
             Qt::QueuedConnection);
     engine.loadFromModule("XournalQt", "Main");
     AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    // Edge to edge (Android 15 and newer): the status bar lies over the top of the window, so the tab strip starts
+    // below it (Main.qml's safeTop; 0 on the desktop)
+    if (auto* w = qobject_cast<QQuickWindow*>(engine.rootObjects().value(0))) {
+        auto applySafeArea = [w] { w->setProperty("safeTop", w->safeAreaMargins().top()); };
+        QObject::connect(w, &QWindow::safeAreaMarginsChanged, w, applySafeArea);
+        applySafeArea();
+    }
+#endif
 #ifdef Q_OS_ANDROID
     // A phone without a pen (the Galaxy Fold 7) is written on with the finger: drawing with the finger is on at the
     // first start there, off where a stylus is attached (as on the desktop)

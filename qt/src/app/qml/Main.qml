@@ -23,6 +23,8 @@ ApplicationWindow {
     color: app.presenting ? "#000000" : "#5f6368"  // (presenting: black around the pages, like a projector)
 
     property var afterDiscardCheck: null
+    /// The part of the window's top under the system's status bar (edge to edge on Android; set by main.cpp)
+    property real safeTop: 0
     property bool sidebarShown: width >= 900
     property bool quitting: false
     readonly property string toolbarPosition: app.toolbarPosition
@@ -266,6 +268,7 @@ ApplicationWindow {
       TabStrip {
         id: tabStrip
         width: parent.width
+        topInset: win.safeTop
         visible: !win.fullScreenMode
         onCloseRequested: function(index) { requestCloseTab(index) }
         onOverviewRequested: tabOverview.open()

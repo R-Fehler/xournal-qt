@@ -5,17 +5,38 @@ the desktop app builds, installs and starts on a phone (Galaxy Fold 7, Android 1
 keyboard. Mobile UI work waits until mobile testing is a real concern. Items are observed (O) on a device or expected
 (E) from the code and the research in `../cross-platform-qt-research/`.
 
+## Seen on the Fold 7 and in the emulator (qt/android-basics, 2026-09-24), not fixed yet
+
+- (O) The **selection bar** of the library (items selected) and long **breadcrumbs** are still one row that does not
+  scroll: on the cover screen they can run past the right edge.
+- (O) The **document tool bar** scrolls sideways on the cover screen (about half of the tools are off-screen); a
+  compact tool bar for phones is the real fix.
+- (O) **Markdown file being edited** in the emulator: the text shows overlapping, smeared glyphs while the cursor is
+  in it (the same file reads fine). Probably the emulator's ARM translation, like the dark bars below; check on the
+  phone.
+- (O) The **recovery dialog** ("Recover unsaved changes?") appears after every `am start -S`/force stop with a
+  changed document open: Android kills without warning, so saving on `ApplicationSuspended` (Lifecycle) matters.
+- (O) "Open with" a 145 MB PDF (the author on the Fold 7) froze the window while it was copied: fixed (copied in the
+  background, with a note); opening it again is instant.
+
 ## Seen in the emulator (2026-09-24)
 
 A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translation; see [android.md](android.md)).
 
-- (O) **Edge-to-edge**: the status bar lies over the tab strip (the clock covers the library tab). Needs the safe
-  area margins (see Screen and windows).
-- (O) **Missing symbols in the UI font**: the tabs' close button "✕" shows an empty box. Android's fonts have no
-  such glyph and Qt finds no fallback. The QML uses more of these (✎ ☐ ✓ ● ⋮ ↵ arrows); use SVG icons (Lucide has
-  them) or check each glyph against Roboto/Noto.
-- (O) **The soft keyboard** opens as soon as the New document dialog shows (its name field has the focus) and hides
-  half of the dialog, including Create. With a hardware keyboard this does not happen.
+- Done (`qt/android-basics`): **edge-to-edge**: the tab strip starts below the status bar (the window's safe area
+  margin, `Main.qml` `safeTop`; the New document dialog keeps below it too). Only the top is handled: the bottom
+  gesture bar and a side cut-out in landscape still overlap the canvas edge (harmless so far).
+- Done: **missing symbols**: the tab close button and the sidebar's page menu button are the SVG icons now (as on
+  the desktop), and a small symbol font (a DejaVu Sans subset, `qt/resources/fonts`) is Qt's fallback on Android
+  for ✓ ✎ ☐ ● ⋮ ↵ and the arrows in texts. The phones have "Noto Sans Symbols" with them, but split over two
+  files of that name, and Qt takes the one without them.
+- Done: **the soft keyboard and the New document dialog**: the name field no longer takes the focus on Android (so
+  the keyboard does not open by itself); when it is open, the dialog moves above it, gets only the room there and
+  scrolls, so Create stays in reach; the keyboard's Enter key creates the document. The paper and orientation row
+  wraps in a narrow window.
+- Done: **the home screen on a phone-wide window**: the library header scrolls sideways (as the tool bar does), the
+  search has a row of its own below 760 px, and the buttons of an empty folder stand one below the other (shared
+  QML, so narrow desktop windows get the same).
 - (O) **The image tool** opens Android's picker ("Recent images") when tapping the page; the chosen image comes back
   as a `content://` URI (see Files).
 - (O) **Dark bars across text at the left edge of each 256 px canvas tile** (the page thumbnails, drawn in one

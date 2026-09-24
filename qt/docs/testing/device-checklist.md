@@ -1111,3 +1111,11 @@ Install the debug APK (`adb install -r …/android-build-debug.apk`; the documen
       the mouse draws with the left button either way; with the pen near, a resting hand draws nothing.
 - [ ] Open a `.md` with a fenced code block (```` ```python ````): keywords, strings, numbers and comments are in
       colour, as on the desktop.
+- [ ] Unfolded and folded (cover screen): the tab strip starts below the status bar (the clock does not cover the
+      library tab). The tab close buttons show an ×, the page sidebar's buttons ⋮ (no empty boxes). Type two letters
+      into the library search: "Enter ↵" (not a box).
+- [ ] Cover screen: the library header scrolls sideways (the settings button is at its right end), the search field
+      is in a row of its own; an empty folder shows "New document", "Import files…", "Import a folder…" one below
+      the other, all readable.
+- [ ] New document: the dialog opens without the keyboard. Tap the name: the keyboard opens, the dialog moves above
+      it (it scrolls), Create stays visible; the keyboard's ✓ key creates the document.
