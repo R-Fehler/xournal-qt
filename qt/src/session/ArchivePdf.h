@@ -26,6 +26,7 @@
 #endif
 #include <qpdf/QPDF.hh>
 
+#include "IncrementalPdf.h"
 #include "filesystem.h"
 
 namespace xqt::ArchivePdf {
@@ -51,6 +52,14 @@ struct Metadata {
 
 /// Make `pdf` (assembled: pages, embedded files, marker) conform to PDF/A-3b as far as possible, see above.
 Report conform(QPDF& pdf, const Metadata& meta);
+
+/// An archive PDF saved again as an incremental update: a new drawing (Form XObjects, before they are copied into it)
+/// is checked, and repaired where it can be. Returns what is not PDF/A (the caller writes the file anew instead,
+/// which reports why).
+std::vector<std::string> check(const std::vector<QPDFObjectHandle>& forms);
+/// And its document information and XMP metadata get the new modification date (their other values, the creation
+/// date and the PDF/A identification stay). Whether it claims PDF/A.
+bool update(QPDF& pdf, IncrementalPdf::Update& update);
 
 /// A PDF that is not an archive PDF (a hybrid PDF, base pages for Xournal++) must not claim PDF/A: the PDF/A
 /// identification (pdfaid:part, conformance, amd, rev) is removed from its XMP metadata, the rest of it stays. Whether

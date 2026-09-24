@@ -201,6 +201,7 @@ void DocumentSession::saveInBackground(SaveRequest request) {
     if (request.kind == SaveKind::Save && !saveQueue.empty() && saveQueue.back().kind == SaveKind::Save) {
         // Ctrl+S again while a save waits: that one writes the latest state, for both
         SaveRequest& waiting = saveQueue.back();
+        waiting.compact = waiting.compact || request.compact;
         waiting.done = [first = std::move(waiting.done), second = std::move(request.done)](const SaveResult& r) {
             if (first) {
                 first(r);
@@ -532,6 +533,10 @@ void DocumentSession::takeSnapshot() {
             }
         }
         const fs::path bg = doc->getPdfFilepath();
+        if (t.hybrid && t.request.kind == SaveKind::Save && !t.request.compact && hybridRevision &&
+            hybridNumbering == pdfPages->numbering() && hybridRevisionFile == t.target) {
+            t.revision = *hybridRevision;  // (Ctrl+S: an incremental update, if the file is still that version)
+        }
         if (t.hybrid && !hybridBase.empty() && (HybridPdf::inCache(bg) || MergedPdf::inCache(bg))) {
             for (size_t i = 0; i < doc->getPageCount(); ++i) {
                 const PageRef live = doc->getPage(i);
@@ -595,8 +600,12 @@ void DocumentSession::takeSnapshot() {
                                                      {}};
                         return;
                     }
+                    HybridPdf::WriteOptions options;
+                    options.revision = t.revision.valid() ? &t.revision : nullptr;
+                    options.compact = t.request.compact;
+                    options.written = exporting ? nullptr : &t.written;
                     const auto r = HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount,
-                                                    exporting ? fs::path() : t.request.recordExport);
+                                                    exporting ? fs::path() : t.request.recordExport, options);
                     if (!r.ok) {
                         t.result = {false,
                                     FS(_F("Could not write the hybrid PDF \"{1}\": {2}") % t.target.u8string() %
@@ -605,6 +614,8 @@ void DocumentSession::takeSnapshot() {
                         return;
                     }
                     t.result = {true, {}, {}};
+                    t.result.incremental = r.incremental;
+                    t.result.appended = r.appended;
                     if (const fs::path& xopp = t.request.exportXopp; !xopp.empty() && !exporting) {
                         // The .xopp for Xournal++ (a setting), from the same state
                         const auto e = HybridPdf::exportXopp(*t.snapshot, xopp, exportPdfFor(xopp), t.pdfPageCount);
@@ -719,6 +730,13 @@ void DocumentSession::finishWrite() {
         hybridChanges.clear();  // (written anew from the document)
         xoppExportFor = t.target;  // (what the file records now)
         xoppExportPath = t.request.recordExport;
+        if (t.written.valid()) {
+            hybridRevision = std::make_shared<HybridPdf::Revision>(std::move(t.written));
+            hybridNumbering = pdfPages->numbering();
+            hybridRevisionFile = t.target;
+        } else {
+            hybridRevision.reset();
+        }
     }
     finishSave(t.result);
 }

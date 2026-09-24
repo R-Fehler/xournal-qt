@@ -50,7 +50,8 @@ jobs:
 
       - name: Validate archive PDFs with veraPDF
         # Archive PDFs (qt/docs/hybrid-pdf.md, "Archive PDF") must be PDF/A-3b. veraPDF, the reference validator, is a
-        # test tool only: the app never runs it. The tests write their archive PDFs that claim PDF/A into a folder.
+        # test tool only: the app never runs it. The tests write their archive PDFs that claim PDF/A into a folder
+        # (also one saved incrementally three times, qt/pdf-incremental).
         env:
           VERAPDF_VERSION: 1.28.2
           VERAPDF_SHA1: 7484fd844c7f2fc5c7f554f25511e2a1b2a7dc00
@@ -60,7 +61,7 @@ jobs:
           curl -fsSL -o "$jar" "https://repo1.maven.org/maven2/org/verapdf/apps/greenfield-apps/$VERAPDF_VERSION/$jar"
           echo "$VERAPDF_SHA1  $jar" | sha1sum -c -
           QT_QPA_PLATFORM=offscreen XQT_ARCHIVE_SAMPLES="$PWD/archive-samples" \
-            build/xqt-session-tests --gtest_filter='ArchivePdfTest.*'
+            build/xqt-session-tests --gtest_filter='ArchivePdfTest.*:IncrementalSaveTest.anArchivePdfStaysPdfA*'
           ls archive-samples
           java -cp "$jar" org.verapdf.apps.GreenfieldCliWrapper --flavour 3b --format text -v archive-samples/*.pdf \
             | tee verapdf.txt

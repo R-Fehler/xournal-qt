@@ -18,6 +18,7 @@
 #include "util/raii/CairoWrappers.h"
 
 #include "DocumentSession.h"
+#include "HybridPdf.h"
 #include "PdfPageKeeper.h"
 #include "filesystem.h"
 
@@ -39,6 +40,8 @@ struct DocumentSession::SaveTask {
     PageRef previewPage;
     XojPdfPageSPtr previewPdf;
     std::unordered_map<const XojPage*, size_t> baseOf;  ///< a hybrid PDF: page of the copy -> page of its clean copy
+    HybridPdf::Revision revision;  ///< a hybrid PDF saved again: the file as last written or opened (incremental)
+    HybridPdf::Revision written;   ///< and what it is after the save
     bool createBackup = false;
     fs::path staged, stagedAs;  ///< the merged PDF written under another name, and its name
     fs::path pathWhenTaken;

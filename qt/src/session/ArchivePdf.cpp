@@ -535,8 +535,9 @@ std::string textOf(OH info, const char* key) {
     return v.isString() ? v.getUTF8Value() : std::string();
 }
 
-/// The XMP packet: the same title, author, subject, keywords, tools and dates as the document information.
-std::string xmp(const std::map<std::string, std::string>& info, const Dates& d, bool pdfa) {
+/// The XMP packet: the same title, author, subject, keywords, tools and dates as the document information (`created`:
+/// its creation date in XMP's form).
+std::string xmp(const std::map<std::string, std::string>& info, const std::string& created, const Dates& d, bool pdfa) {
     std::ostringstream x;
     x << "<?xpacket begin=\"\xEF\xBB\xBF\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n"
       << "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n"
@@ -565,7 +566,7 @@ std::string xmp(const std::map<std::string, std::string>& info, const Dates& d, 
         x << "   <pdf:Keywords>" << xmlEscape(k) << "</pdf:Keywords>\n";
     }
     x << "   <xmp:CreatorTool>" << xmlEscape(get("/Creator")) << "</xmp:CreatorTool>\n"
-      << "   <xmp:CreateDate>" << d.xmp << "</xmp:CreateDate>\n"
+      << "   <xmp:CreateDate>" << created << "</xmp:CreateDate>\n"
       << "   <xmp:ModifyDate>" << d.xmp << "</xmp:ModifyDate>\n"
       << "   <xmp:MetadataDate>" << d.xmp << "</xmp:MetadataDate>\n"
       << "   <pdf:Producer>" << xmlEscape(get("/Producer")) << "</pdf:Producer>\n";
@@ -610,6 +611,53 @@ bool dropPdfAClaim(QPDF& pdf) {
     }
     meta.replaceStreamData(out, OH::newNull(), OH::newNull());
     return true;
+}
+
+std::vector<std::string> check(const std::vector<QPDFObjectHandle>& forms) {
+    std::vector<std::string> problems;
+    Walker w;
+    for (OH form: forms) {
+        w.xobject(form, false);
+    }
+    for (const auto& f: w.fontsMissing) {
+        problems.push_back("a font is not embedded: " + f);
+    }
+    for (const auto& [p, pages]: w.problems) {
+        problems.push_back("problem " + std::to_string(static_cast<int>(p)));
+    }
+    return problems;
+}
+
+bool update(QPDF& pdf, IncrementalPdf::Update& u) {
+    Report report;
+    const Dates dates = now();
+    OH info = pdf.getTrailer().getKey("/Info");
+    u.touch(info);
+    info.replaceKey("/ModDate", OH::newString(dates.pdf));
+    OH root = pdf.getRoot();
+    OH meta = root.getKey("/Metadata");
+    if (!meta.isStream()) {
+        return false;  // (not PDF/A)
+    }
+    std::string old;
+    {
+        auto buffer = meta.getStreamData(qpdf_dl_all);
+        old.assign(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize());
+    }
+    report.pdfa = old.find("<pdfaid:part>") != std::string::npos;
+    std::string created = dates.xmp;
+    static const std::regex createDate(R"(<xmp:CreateDate>([^<]*)</xmp:CreateDate>)");
+    if (std::smatch m; std::regex_search(old, m, createDate)) {
+        created = m[1].str();
+    }
+    std::map<std::string, std::string> values;
+    for (const char* k: {"/Title", "/Author", "/Subject", "/Keywords", "/Creator", "/Producer"}) {
+        values[k] = textOf(info, k);
+    }
+    u.touch(meta);
+    u.touchData(meta);
+    meta.replaceStreamData(xmp(values, created, dates, report.pdfa), OH::newNull(), OH::newNull());
+    return report.pdfa;
 }
 
 const std::string& srgbProfile() {
@@ -831,7 +879,7 @@ Report conform(QPDF& pdf, const Metadata& meta) {
     newInfo.replaceKey("/ModDate", OH::newString(dates.pdf));
     pdf.getTrailer().replaceKey("/Info", pdf.makeIndirectObject(newInfo));
 
-    OH metadata = OH::newStream(&pdf, xmp(info, dates, report.pdfa));
+    OH metadata = OH::newStream(&pdf, xmp(info, dates.xmp, dates, report.pdfa));
     metadata.getDict().replaceKey("/Type", OH::newName("/Metadata"));
     metadata.getDict().replaceKey("/Subtype", OH::newName("/XML"));
     root.replaceKey("/Metadata", metadata);

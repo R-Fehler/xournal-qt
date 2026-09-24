@@ -195,6 +195,12 @@ void DocumentSession::init() {
                 PageRef p = doc->getPage(i);
                 hybridBase[p.get()] = {p, i};
             }
+            // What the next Ctrl+S appends to (if the file is still the version the clean copy was made from)
+            if (auto rev = HybridPdf::revisionOf(bg, doc->getFilepath()); rev.valid()) {
+                hybridRevision = std::make_shared<HybridPdf::Revision>(std::move(rev));
+                hybridNumbering = pdfPages->numbering();
+                hybridRevisionFile = doc->getFilepath();
+            }
         }
     }
 
@@ -1044,6 +1050,11 @@ void DocumentSession::relocate(const fs::path& xopp, const fs::path& pdf) {
 
 bool DocumentSession::isHybrid() const { return hasExtension(getFilePath(), ".pdf"); }
 
+bool DocumentSession::hasEarlierRevisions() const {
+    std::error_code ec;
+    return isHybrid() && fs::exists(getFilePath(), ec) && HybridPdf::hasEarlierRevisions(getFilePath());
+}
+
 fs::path DocumentSession::xoppExport() const {
     if (!isHybrid()) {
         return {};
@@ -1101,6 +1112,7 @@ bool DocumentSession::importHybridChanges(std::string& error) {
     if (base.empty()) {
         return false;
     }
+    hybridRevision.reset();  // (the other app's ink becomes plain annotations: the next save writes the file anew)
     if (!doc->readPdf(base, /*initPages=*/false, /*attachToDocument=*/false)) {
         error = doc->getLastErrorMsg();
         return false;

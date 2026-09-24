@@ -50,7 +50,8 @@ A hybrid PDF is a normal PDF with four additions:
 
 - A full rewrite with qpdf, from the clean base, our annotations built from the model, and the embedded `.xopp`.
   The write is atomic (a temp file plus rename), in the background, with the document read under its lock. qpdf
-  has no incremental save; measure on a 1,300-page PDF to see whether the full rewrite is fast enough.
+  has no incremental save; measure on a 1,300-page PDF to see whether the full rewrite is fast enough. (Since
+  `qt/pdf-incremental`, Ctrl+S appends an incremental update instead: see "Saving: incremental updates" below.)
 - Pages removed from the document are removed from the file. Base pages are copied once and kept across saves.
 - Autosave and crash saves stay `.xopp` files in the cache (as today). The hybrid file is written only on a real
   save.
@@ -204,7 +205,8 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    Since `qt/background-save` it runs in the background (DocumentSave.cpp): the document's pages are copied on the UI
    thread (a few milliseconds), the drawing, the `.xopp` and qpdf work on that copy on a worker, and the undo stack's
    saved point is the copied state. The whole save still takes as long; the window stays usable. qpdf has no
-   incremental save; appending an incremental update ourselves would make saves of long PDFs cheap.
+   incremental save; appending an incremental update ourselves makes saves of long PDFs cheap (done in
+   `qt/pdf-incremental`, below).
 
 ## The flow around it (`qt/hybrid-flow`)
 
@@ -409,3 +411,145 @@ check failed.
   of them is not PDF/A-3b. Locally: `java -cp greenfield-apps-1.28.2.jar org.verapdf.apps.GreenfieldCliWrapper
   --flavour 3b --format text <files>`; `XQT_ARCHIVE_SOURCE=<pdf>` makes `ArchivePdfTest.archiveOfAGivenPdf` write
   an archive of any PDF (with a stroke on page 1) and print its report, to compare with veraPDF.
+
+## Saving: incremental updates (`qt/pdf-incremental`)
+
+Ctrl+S on a hybrid or archive PDF appends only what changed, as a standard incremental update (ISO 32000-1, 7.5.6),
+the way Acrobat and Drawboard save: the file's bytes stay as they are, and a new revision follows them. On
+pgfmanual (1,321 pages, notes on 53) a save after one stroke takes about 0.2 s instead of 7.5 s and appends about
+22 KB (measurements below).
+
+### The appender (`qt/src/session/IncrementalPdf.*`)
+
+qpdf reads and changes the PDF but can only write whole files, so the update is written by our own small appender,
+with every object serialised through qpdf (`unparseResolved`, a stream's dictionary and its raw data):
+
+- The file is opened with qpdf and an `Update` is started. Each object of the file is `touch()`ed before it is
+  changed (its text is remembered); at the end the touched objects whose text differs are written again under their
+  numbers, with the new objects they reach. Nothing else of the file is read or written.
+- New objects are made by the `Update` (`add`, `addStream`, `copy` of another PDF's objects, `copyStream`), numbered
+  after the file's highest object. Not with qpdf's `makeIndirectObject` or `newStream`: in qpdf 10 the first new
+  object makes it read every object of the file (7 s for pgfmanual); qpdf 11 does not. A new stream is a dictionary
+  in the qpdf document (so other objects can refer to it) whose data the `Update` keeps.
+- The cross-reference section matches the file's style: a cross-reference stream after one (PDF 1.5; our full
+  writes use them), with the new dictionaries in an object stream, else a classic table. The trailer has `/Size`,
+  `/Root`, `/Info`, `/ID` (the file's first identifier, a new second one) and `/Prev` (the last `startxref`, the
+  one thing read from the file's bytes directly). New streams without a filter are compressed (not XMP metadata);
+  every `endstream` has an end of line before it (PDF/A).
+- **Crash safety.** The update is written to a copy of the file (`.name.pdf.<pid>-<n>.part` next to it; copying uses
+  `copy_file_range` or a reflink where the file system has one: about 10 ms for 10 MB here), flushed to the disk
+  (`fsync`) and renamed over the file. A crash, a full disk or any failure at any point leaves the previous revision
+  exactly as it was, and readers of the file meanwhile (the library's index and previews, other apps, a sync
+  client) never see a half-written update: appending in place would leave a tail without `startxref` after a crash,
+  which readers repair in different ways, and could be read half-written. The price is the copy; the new bytes on
+  the disk are the update's. Temporary files a crash left behind are removed by the next save of that file (after
+  ten minutes). The in-memory state of the session (the revision, below) changes only after the rename succeeded.
+  Tested with an injected failure before the first byte and after the last one: the file is byte for byte what it
+  was, no temporary file is left, and the next save succeeds.
+
+### What changes, and how it is found without reading the pages
+
+A long PDF written with object streams has its page dictionaries spread over the whole file, so reading every page
+means reading most of the file (seconds). An incremental save reads only what it changes:
+
+- **Which base page is which.** A `Revision` (in `HybridPdf.h`) maps the page numbers of the document's background
+  PDF to the page objects of the file. After opening, it comes from the clean copy's cache entry: `pages.txt` lists
+  the file's page objects in order (the clean copy's page *k* is the file's page *k*), valid while the file is that
+  version (size and time) and was not edited in another app (`changed.txt` empty). After a save it comes from the
+  save itself: the session keeps it (`DocumentSession::hybridRevision`) while the numbering of the background PDF
+  stays. Pages pasted from other PDFs (the merged PDF grows, the numbers stay) are copied from the background PDF.
+- **What each drawing shows.** Each layer and each generated background has a *sig*: a hash of its XML as the
+  `.xopp` holds it (the layer's elements, or the background with an image's pixels), the page size and the app's
+  version. `prepare()` computes the `.xopp` first and draws only what the file does not have yet. The sig is in
+  our annotation's private dictionary (`/XournalQt /Sig`), in an archive page's ink stream (`/Sigs`), and in a
+  drawn base page (`/XournalQt /Bg`); the marker lists the drawn pages (`/Drawn`).
+- **The record.** The marker records each layer's sig, its drawing (Form XObject) and its annotation (`/Layers <<
+  /xopp:p3-l1 [(sig) form annot] >>`). A page in its place whose layers and links are as recorded is not read at all.
+  Only changed pages are: their annotations of other apps stay in place, ours are kept when unchanged (written again
+  when only their name or page moved), a drawing the file has with the same sig is reused (a copy when it is placed
+  differently), and only new drawings are added.
+- **Per save** the update holds: the changed pages (their `/Annots` or, in an archive PDF, the `/Contents` and
+  `/Resources`), the new or rewritten annotations and drawings, the page tree's root when pages were added,
+  removed or moved, new base pages, the embedded `document.xopp` (a new stream in its file specification; for
+  archive files with `/Params /ModDate`), the marker (hashes, record, `/Base` and `/Updates`), and `/Info` (and the XMP
+  metadata of an archive PDF). A removed page is only taken out of the page tree (its objects stay, so undo can
+  bring it back cheaply; the next full write drops it).
+- Files of earlier versions (no record, no sigs) are appended to as well: the first save reads the pages with our
+  notes and redraws all layers; it writes the record, so the next saves are fast.
+
+### When the whole file is written anew (compaction)
+
+- **Save as**, and a save that **shares** the file (Share → PDF with notes, Copy the PDF with notes: older
+  revisions can still hold ink that was deleted, a privacy matter): `SaveRequest::compact`, and a hybrid PDF that holds
+  earlier revisions counts as needing a save before it is shared (`AppController::shareStep`). A hybrid PDF card of
+  the library shared as it is is first written anew in one piece by qpdf, the same content (`HybridPdf::compact`,
+  on a worker). **Export** (plain PDF, archive, For Xournal++, a PDF copy) and the library's archive export always
+  write fresh files from the document, as before.
+- When the file would then have grown by more than **25%** since it was last written in full (`/Base` in the
+  marker; `HybridPdf::compactAbove`). For small files that is soon: they are cheap to write.
+- When many pages changed at once: more than a quarter of the pages are new base pages (pasted, or a new
+  background drawn), or more than a quarter of the file's pages were removed (their dead weight would stay).
+- When there is nothing to build on: the file changed since it was written or opened (another app saved it), it was
+  edited in another app (its hash check found a change), the other app's version was imported, the file is
+  encrypted, its page tree is not flat or passes attributes on, the embedded images changed, or anything unexpected
+  (an exception): the save falls back to the full write, which is always correct. `XQT_HYBRID_TIMES=1` prints why.
+
+### The clean copy and "edited in another app"
+
+- **The clean copy is kept** across incremental saves: when the pages are the same pages in the same order, the
+  cache entry of the new version gets the clean copy of the previous one as a hard link (a copy where links fail),
+  with the new `document.xopp`, so opening the file again takes 0.4 s instead of 5 s. When pages were added, removed or
+  moved, the next open makes a clean copy of that version (in the background right after the save, as before).
+- **"Edited in another app"** works on incremental files as before: qpdf reads the latest revision, and the hashes
+  in the latest marker describe our annotations as they are now. When another app appends its own update that moves
+  or deletes one of ours, the check reports it; the next save writes the file anew. An update of another app that
+  only adds its own annotations is kept, and the next save appends on top of it.
+
+### PDF/A
+
+PDF/A-2 and -3 allow incremental updates. An archive PDF saved again stays PDF/A-3b: the update has no encryption,
+a cross-reference stream and object streams (allowed from PDF/A-2 on), `/ID` in its trailer, an end of line before
+every `endstream`, and nothing after `%%EOF` but one end of line. The document information's `/ModDate` and the XMP
+metadata's `xmp:ModifyDate` and `MetadataDate` get the same new date (the XMP stream is written again, uncompressed,
+with its creation date and PDF/A identification kept; `ArchivePdf::update`). A new drawing is checked and repaired
+like the source PDF was (`ArchivePdf::check`, e.g. an image's `/Interpolate`) before it is copied into the file; if it
+cannot conform, the file is written anew instead (as every save of an archive PDF was before), which claims PDF/A
+only when everything conforms. CI's veraPDF step also validates an archive
+PDF saved incrementally three times (`IncrementalSaveTest.anArchivePdfStaysPdfAAfterIncrementalSaves`).
+
+### Tests and measurements
+
+Tests: `IncrementalPdfTest` (the appender: both cross-reference styles, the previous revision readable, poppler and
+`qpdf --check`, new and copied objects, a failed write) and `IncrementalSaveTest` in `HybridPdfTest.cpp` (only what
+changed is appended; eight saves in a row with every kind of change — strokes, an erased stroke, pages moved,
+added, deleted, a background changed, a text, a page shown twice — each checked with `qpdf --check`, drawn by
+poppler like a full write of the same document, and opened as the same document; pages pasted from another PDF;
+the compaction rules; exports and shared files without earlier revisions; the clean copy kept; another app's
+appended revision; a file of an earlier version; an archive PDF staying PDF/A). UI: sharing compacts
+(`sharingThePdfWithNotes`, `shareFromALibraryCard`).
+
+Measurements (2026-09-24, the 2-in-1, files on its SSD, load 1–5 from other builds; `XQT_BENCH_HYBRID=<pdf>` runs
+`IncrementalSaveTest.benchCtrlS`, `XQT_BENCH_SAVE=<pdf with notes>` one save, `XQT_HYBRID_TIMES=1` prints the steps).
+pgfmanual, 1,321 pages, 10.1 MB, notes on every 25th page (20 pressure strokes, a highlighter, a text); Ctrl+S after
+one stroke on another page, as `DocumentSession::save()` waits for it:
+
+| | hybrid PDF (10.3 MB) | archive PDF (10.2 MB) |
+| --- | --- | --- |
+| Ctrl+S written in full (as before) | 6.3 s | 24.6 s (the PDF/A check walks every page) |
+| Ctrl+S appended | 0.20–0.24 s, 22–23 KB | 0.18–0.36 s, 25–26 KB |
+| opened again after appending (clean copy kept) | 0.44 s (5.5 s when it is made) | 0.72 s (5.7 s) |
+
+An appended save: opening the file for the update 0.08 s, the `.xopp` (the whole document, gzipped) and the new
+drawing 0.1–0.15 s, the changed page 0.01 s, the copy, update and `fsync` 0.01–0.04 s, the clean copy's cache entry
+0.02–0.06 s. The appended bytes are mostly the embedded `.xopp` (about 20 KB here), which is always written whole.
+The first save of a file written by an earlier version reads the pages with notes once (0.7 s here). At 25% growth
+the file is written in full again: here after about 110 such saves.
+
+Validation of the files after several incremental saves (`XQT_INCREMENTAL_SAMPLES=<folder>` writes them, with a full
+write of the same document): `qpdf --check` passes after every save; poppler (in the tests), pdfium (Chrome's
+renderer, through pypdfium2, with annotations) and Ghostscript 9.55 draw every page of the lecture after eight saves,
+and pages 1, 2, 11, 26, 41, 51, 71, 76, 101, 126, 131, 501, 1001 and 1321 of pgfmanual (hybrid and archive),
+identically to the full write (no pixel differs). veraPDF 1.28.2 passes the archive PDF saved incrementally three
+times (PDF/A-3b); pgfmanual's archive PDF is not PDF/A with or without increments (its source is not, and the file
+does not claim it). MuPDF (`mutool` is not installed; the `qt/mupdf` branch was not merged for this) and pdf.js (not
+installed; it needs a download) were not tried.

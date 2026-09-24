@@ -1110,3 +1110,27 @@ counts the pictures of the tool drawn; it should stay 0 while moving and turning
 - [ ] The compass: the same (big, moved, turned, sized, zoomed); a line drawn on its disc follows its circle.
 - [ ] A very big one (30 cm) zoomed in to 300 %: moving is still smooth; while it moves a part coming into view may
       be a little soft, and is sharp a moment after it rests.
+
+## Incremental PDF saves (qt/pdf-incremental)
+
+- [ ] Open a long PDF with notes (e.g. pgfmanual saved as a PDF with notes). Add a stroke, Ctrl+S: the save is done
+      in well under a second (the tab's dot goes away almost at once). The file grew by a few tens of KB, not by
+      its whole size (`ls -l` before and after). Repeat a few times.
+- [ ] Open the file in Okular, Firefox (pdf.js), Chrome and Acrobat after several such saves: the ink looks as in
+      the app on every page, strokes that were erased are gone, moved pages are in their new places.
+- [ ] `qpdf --check file.pdf` says "No syntax or stream encoding errors". `grep -c startxref file.pdf` counts the
+      revisions (one more per Ctrl+S).
+- [ ] Close and open it again: it opens fast (the clean copy is kept, no seconds of "preparing"), every stroke is
+      editable, none is shown twice.
+- [ ] Share… → "PDF with notes" (and "Copy the PDF with notes") on a file saved with Ctrl+S before: it is written
+      anew first (a few seconds for a long PDF), then shown; afterwards `grep -c startxref` gives 1. The same from a
+      PDF card in the library. Export as plain PDF, for the archive, and for Xournal++ give single-revision files.
+- [ ] Draw on many pages at once, or keep saving until the file grew by a quarter: that save takes the old time
+      (the whole file written anew, `startxref` count back to 1); the next ones are fast again.
+- [ ] An archive PDF (Export for the archive, then open it and Ctrl+S after a stroke, three times): Acrobat still
+      shows the PDF/A bar; File → Properties shows the new modification date.
+- [ ] Add a comment to the file in Okular or Acrobat (saved there, possibly as their own incremental update), open it
+      again in xournal-qt: the comment is shown and kept by the next Ctrl+S. Move one of our strokes in Acrobat: the
+      "edited in another app" question comes, and after "Keep the Xournal data" the next save writes the file anew.
+- [ ] Pull the power (or kill the app with `kill -9`) during a save of a long PDF: the file still opens in every
+      viewer as it was before that save; a hidden `.name.pdf.….part` file next to it goes away with a later save.

@@ -70,6 +70,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "session/FuzzyQuery.h"
+#include "session/IncrementalPdf.h"
 #include "session/HybridPdf.h"
 #include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
@@ -4884,6 +4885,23 @@ TEST_F(MainWindowTest, sharingThePdfWithNotes) {
     EXPECT_FALSE(controller->modified());
     ASSERT_TRUE(waitOpened(dialog, false));
 
+    // Saved incrementally since (Ctrl+S appends): written anew in one piece before it is shared, so that no earlier
+    // revision with deleted ink goes along
+    xqt::HybridPdf::compactAbove = 1000;  // (a small file: appended to, not compacted)
+    drawStroke(*s, 0);
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);
+    xqt::HybridPdf::compactAbove = 0.25;
+    const fs::path notesFile(notes.toStdString());
+    EXPECT_TRUE(xqt::HybridPdf::hasEarlierRevisions(notesFile)) << "Ctrl+S appended";
+    EXPECT_FALSE(controller->modified());
+    EXPECT_EQ(controller->shareStep(), "save") << "earlier revisions: written anew first";
+    ASSERT_TRUE(controller->sharePdf(false));
+    until([&] { return fake.shared.size() == 3; }, 20000);
+    EXPECT_EQ(fake.shared.value(2), notes);
+    EXPECT_FALSE(xqt::HybridPdf::hasEarlierRevisions(notesFile));
+    EXPECT_EQ(controller->shareStep(), "share");
+
     // The clipboard
     ASSERT_TRUE(controller->sharePdf(true));
     const QMimeData* data = QGuiApplication::clipboard()->mimeData();
@@ -4907,8 +4925,8 @@ TEST_F(MainWindowTest, sharingThePdfWithNotes) {
     QMetaObject::invokeMethod(ask, "close");
     ASSERT_TRUE(waitOpened(ask, false));
     ASSERT_TRUE(controller->sharePdfCopy(QUrl::fromLocalFile(dir.filePath("copy.pdf")), false));
-    until([&] { return fake.shared.size() == 3; }, 20000);
-    EXPECT_EQ(fake.shared.value(2), dir.filePath("copy.pdf"));
+    until([&] { return fake.shared.size() == 4; }, 20000);
+    EXPECT_EQ(fake.shared.value(3), dir.filePath("copy.pdf"));
     EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(dir.filePath("copy.pdf").toStdString())));
     EXPECT_FALSE(controller->isHybrid());
     EXPECT_EQ(controller->title(), "lecture.xopp");
@@ -5698,4 +5716,32 @@ TEST_F(HomeScreenFilterTest, shareFromALibraryCard) {
     EXPECT_EQ(controller->shareStep(), "ask");
     QMetaObject::invokeMethod(dialog, "close");
     ASSERT_TRUE(waitOpened(dialog, false));
+
+    // A PDF with notes that holds earlier revisions (incremental updates): written anew in one piece, then shared
+    const fs::path hybrid = root / "withnotes.pdf";
+    {
+        auto loaded = xqt::DocumentSession::loadFile(root / "lecture.pdf");
+        ASSERT_TRUE(loaded.document);
+        ASSERT_TRUE(xqt::HybridPdf::write(*loaded.document, hybrid).ok);
+        xqt::IncrementalPdf::Tail tail;
+        std::string error;
+        ASSERT_TRUE(xqt::IncrementalPdf::readTail(hybrid, tail, error));
+        QPDF q;
+        q.processFile(hybrid.string().c_str());
+        xqt::IncrementalPdf::Update u(q);
+        QPDFObjectHandle info = q.getTrailer().getKey("/Info");
+        u.touch(info);
+        info.replaceKey("/Subject", QPDFObjectHandle::newString("a later revision"));
+        ASSERT_TRUE(xqt::IncrementalPdf::append(hybrid, tail, u.serialize(tail)).ok);
+    }
+    ASSERT_TRUE(xqt::HybridPdf::hasEarlierRevisions(hybrid));
+    const QString withNotes = QString::fromStdString(hybrid.string());
+    fake.shared.clear();
+    QMetaObject::invokeMethod(home, "shareRequested", Q_ARG(QString, withNotes));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(find<QQuickItem>("sharePdfChoice"));
+    until([&] { return fake.shared.size() == 1; }, 20000);
+    EXPECT_EQ(fake.shared, QStringList{withNotes});
+    EXPECT_FALSE(xqt::HybridPdf::hasEarlierRevisions(hybrid));
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(hybrid));
 }
