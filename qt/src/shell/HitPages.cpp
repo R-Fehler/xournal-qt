@@ -114,11 +114,25 @@ public:
 };
 }  // namespace
 
-QString HitPageProvider::baseUrl(const DocumentItem& item, const QString& query) {
+namespace {
+constexpr QChar TERMS(0x1f);  // marks that are terms of the fuzzy search
+}
+
+QString HitPageProvider::marksOf(const std::vector<textmatch::Term>& terms) { return TERMS + textmatch::encode(terms); }
+
+std::vector<textmatch::Term> HitPageProvider::termsOf(const QString& marks) {
+    if (marks.startsWith(TERMS)) {
+        return textmatch::decode(QStringView(marks).sliced(1));
+    }
+    const QString prepared = textmatch::prepare(LibraryIndex::simplified(marks));
+    return prepared.isEmpty() ? std::vector<textmatch::Term>() : std::vector<textmatch::Term>{{prepared}};
+}
+
+QString HitPageProvider::baseUrl(const DocumentItem& item, const QString& marks) {
     const QString stamp = QString::fromLatin1(
             QCryptographicHash::hash(documentStamp(item).toUtf8(), QCryptographicHash::Md5).toHex().left(8));
     return QStringLiteral("image://hitpage/") + encode(QString::fromStdString(item.main().string())) + '/' + stamp +
-           '/' + encode(LibraryIndex::simplified(query).trimmed());
+           '/' + encode(marks.startsWith(TERMS) ? marks : LibraryIndex::simplified(marks).trimmed());
 }
 
 QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& query, int width) {
@@ -157,11 +171,19 @@ QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& 
         ++caches().renders;
         caches().store(imageKey, img);
     }
-    const QString q = LibraryIndex::simplified(query).trimmed();
-    if (q.isEmpty() || pageWidth <= 0) {
+    if (pageWidth <= 0) {
         return img;
     }
-    const auto rects = DocumentSearch::findOnPage(*doc, static_cast<size_t>(pageNo), q.toStdString());
+    std::vector<QRectF> rects;
+    if (query.startsWith(TERMS)) {
+        // (poppler's search: the terms as substrings, their word bounds left aside)
+        for (const textmatch::Term& t: textmatch::decode(QStringView(query).sliced(1))) {
+            const auto found = DocumentSearch::findOnPage(*doc, static_cast<size_t>(pageNo), t.text.toStdString());
+            rects.insert(rects.end(), found.begin(), found.end());
+        }
+    } else if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty()) {
+        rects = DocumentSearch::findOnPage(*doc, static_cast<size_t>(pageNo), q.toStdString());
+    }
     if (rects.empty()) {
         return img;
     }

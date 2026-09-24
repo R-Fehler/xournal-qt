@@ -70,6 +70,7 @@
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "MdPassages.h"
+#include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
 #include "TextFlow.h"
 #include "session/HybridPdf.h"
@@ -141,6 +142,16 @@ AppController::AppController(QObject* parent): QObject(parent) {
         return index ? index->knownPdfText(pdf) : std::map<int, QString>();
     });
     library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
+    // The fuzzy search's toggle is an app-wide setting (shared by all windows through the library model)
+    {
+        bool fuzzy = false;
+        app->getSettings()->getCustomElement("xournalQt").getBool("fuzzySearch", fuzzy);
+        library->setFuzzySearch(fuzzy);
+        connect(library, &LibraryModel::fuzzySearchChanged, this, [this] {
+            app->getSettings()->getCustomElement("xournalQt").setBool("fuzzySearch", library->fuzzySearch());
+            app->getSettings()->customSettingsChanged();
+        });
+    }
     ownRecent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
     recent = ownRecent.get();
     recent->onFilesChanged = [this](const DocumentFiles::Result& r) {
@@ -676,7 +687,8 @@ void AppController::clearSelection() {
 QString AppController::searchQuery() const { return session() ? session()->search().query() : QString(); }
 void AppController::setSearchQuery(const QString& query) {
     if (session()) {
-        session()->search().setQuery(query, true);
+        // A search handed over by the fuzzy search stays one while it is refined here (until it is cleared)
+        session()->search().setQuery(query, true, session()->search().fuzzy() && !query.isEmpty());
     }
 }
 int AppController::searchHitCount() const {
@@ -885,8 +897,29 @@ void AppController::clearSearch() {
 
 void AppController::searchAllTabs(const QString& query) {
     for (int i = 0; i < tabs->count(); ++i) {
-        tabs->session(i)->search().setQuery(query, false);
+        tabs->session(i)->search().setQuery(query, false, library->fuzzySearch());
     }
+}
+
+QVariantMap AppController::fuzzyName(const QString& query, const QString& name) const {
+    if (query != fuzzyText || !fuzzyParsed) {
+        fuzzyText = query;  // (parsed once per query, not per card)
+        fuzzyParsed = std::make_shared<FuzzyQuery>(query);
+    }
+    const FuzzyQuery& q = *fuzzyParsed;
+    if (!q.isValid()) {
+        return {{"match", name.contains(query.trimmed(), Qt::CaseInsensitive)}, {"marks", QVariantList()}};
+    }
+    const FuzzyQuery::NameMatch m = q.matchName(name);
+    QVariantList marks;
+    for (const int p: m.positions) {
+        marks.append(p);
+    }
+    return {{"match", q.evaluate([&](size_t t) { return m.found[t] != 0; })}, {"marks", marks}};
+}
+
+QString AppController::fuzzyHint(const QString& query) const {
+    return query.trimmed().isEmpty() ? QString() : FuzzyQuery(query).hint();
 }
 
 void AppController::openSearchResult(int index) {
@@ -1430,7 +1463,7 @@ bool AppController::openSearchHit(const QString& path, const QString& query) {
     }
     if (session() && !query.trimmed().isEmpty()) {
         session()->setCurrentPageNo(0);
-        session()->search().setQuery(query, true);  // shows the first hit
+        session()->search().setQuery(query, true, library->fuzzySearch());  // shows the first hit
     }
     return true;
 }
@@ -1445,10 +1478,10 @@ bool AppController::openSearchHitAt(const QString& path, const QString& query, i
     s->setCurrentPageNo(p);
     s->getScrollHandler()->scrollToPage(p);  // right away; the hit follows when the search found it
     if (!query.trimmed().isEmpty()) {
-        if (s->search().query() == query) {
+        if (s->search().query() == query && s->search().fuzzy() == library->fuzzySearch()) {
             s->search().jumpToFirstFromCurrentPage();
         } else {
-            s->search().setQuery(query, true);  // current: the first hit from this page on
+            s->search().setQuery(query, true, library->fuzzySearch());  // current: the first hit from this page on
         }
     }
     return true;
@@ -1477,18 +1510,18 @@ bool AppController::openSearchHitInPassage(const QString& path, const QString& q
         }
     }
     // The hits on that page before the passage: its first hit is the one after them
-    const QString prepared = textmatch::prepare(LibraryIndex::simplified(query));
+    const auto terms = FuzzyQuery::textTerms(LibraryIndex::simplified(query), library->fuzzySearch());
     int before = 0;
     for (size_t i = 0; i < static_cast<size_t>(passage); ++i) {
         if (passages[i].begin != md::NO_SOURCE && passages[i].begin >= starts[page]) {
-            before += textmatch::count(LibraryIndex::simplified(QString::fromStdString(passages[i].text)), prepared);
+            before += textmatch::count(LibraryIndex::simplified(QString::fromStdString(passages[i].text)), terms);
         }
     }
     s->setCurrentPageNo(page);
     s->getScrollHandler()->scrollToPage(page);  // right away; the hit follows when the search found it
     if (!query.trimmed().isEmpty()) {
-        if (s->search().query() != query) {
-            s->search().setQuery(query, false);
+        if (s->search().query() != query || s->search().fuzzy() != library->fuzzySearch()) {
+            s->search().setQuery(query, false, library->fuzzySearch());
         }
         s->search().jumpToHit(page, before);
     }

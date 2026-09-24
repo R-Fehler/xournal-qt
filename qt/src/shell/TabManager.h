@@ -42,7 +42,10 @@ public:
                  /// URL of the sketch of the current page (PageSketches), shown under the thumbnail; may be empty
                  SketchRole,
                  /// The document is being saved (in the background)
-                 SavingRole };
+                 SavingRole,
+                 /// The document matches its search: it has hits; a fuzzy search: its expression holds with the terms
+                 /// in the title or the text (DocumentSearch::matches)
+                 SearchMatchRole };
 
     explicit TabManager(AppContext& app, QObject* parent = nullptr);
     ~TabManager() override;

@@ -51,6 +51,11 @@ class LibraryModel final: public QAbstractListModel {
     /// "name" or "modified"
     Q_PROPERTY(QString sortBy READ sortBy WRITE setSortBy NOTIFY sortByChanged)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchChanged)
+    /// The search reads the query with fzf's extended syntax (FuzzyQuery.h): names fuzzy and ranked, `|`, `!`,
+    /// parentheses, ... An app-wide setting (the controller keeps it), shared by all windows and the tab overview.
+    Q_PROPERTY(bool fuzzySearch READ fuzzySearch WRITE setFuzzySearch NOTIFY fuzzySearchChanged)
+    /// Fuzzy search: why the query is searched as plain text ("": it is not)
+    Q_PROPERTY(QString searchHint READ searchHint NOTIFY searchChanged)
     Q_PROPERTY(bool indexing READ indexing NOTIFY indexChanged)
     Q_PROPERTY(int indexed READ indexed NOTIFY indexChanged)
     Q_PROPERTY(int indexTotal READ indexTotal NOTIFY indexChanged)
@@ -113,6 +118,8 @@ public:
         SizeRole,
         /// A text or other file: the icon for its type ("xqt-file-spreadsheet", ...); else ""
         FileIconRole,
+        /// Fuzzy search: the characters of the name that matched, [index, ...] (to highlight them)
+        NameMarksRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
@@ -148,6 +155,9 @@ public:
     void setSortBy(const QString& key);
     QString searchQuery() const { return query; }
     void setSearchQuery(const QString& query);
+    bool fuzzySearch() const { return fuzzy; }
+    void setFuzzySearch(bool on);
+    QString searchHint() const;
     bool indexing() const;
     int indexed() const;
     int indexTotal() const;
@@ -236,6 +246,7 @@ Q_SIGNALS:
     void folderChanged();
     void flatChanged();
     void namesOnlyChanged();
+    void fuzzySearchChanged();
     void sortByChanged();
     void searchChanged();
     void indexChanged();
@@ -267,6 +278,11 @@ private:
     std::vector<fs::path> allFolders() const;
     fs::path dirOf(const QString& relative) const;
     void rebuild();
+    static Row itemRow(const DocumentItem& item);
+    /// A folder, with the number of items in it that are shown
+    Row folderRow(const fs::path& folder) const;
+    /// The rows of a fuzzy search (a valid query)
+    std::vector<Row> fuzzyRows(const FuzzyQuery& parsed);
     void updateSearch();
     void watchFolders(const std::vector<fs::path>& folders);
     void applyResult(const DocumentFiles::Result& r);
@@ -287,6 +303,8 @@ private:
     bool onlyNames = false;
     QString sortKey = "name";
     QString query;
+    bool fuzzy = false;
+    QString marks;  ///< what the pictures of the pages with hits mark: the query, or its terms (HitPages.h)
     int importJobs = 0;
     GridSelection selection;
     CacheFolders::Usage cacheUsage{-1, 0};

@@ -23,6 +23,7 @@
 #include <QStringList>
 #include <QUrl>
 #include <QVariantList>
+#include <QVariantMap>
 
 #include <functional>
 #include <memory>
@@ -35,6 +36,7 @@ class QWindow;
 namespace xqt {
 class AppContext;
 class CanvasView;
+class FuzzyQuery;
 class DocumentSession;
 class TabManager;
 class PagesModel;
@@ -371,6 +373,11 @@ public:
     Q_INVOKABLE void clearSearch();
     /// Search all open documents (tab overview); the hits per tab are in the tabs model ("searchHits").
     Q_INVOKABLE void searchAllTabs(const QString& query);
+    /// The fuzzy search (FuzzyQuery.h) of a name alone: { match: the expression holds with the name, marks: [the
+    /// characters matched] } (a query that is not valid: whether the name contains it, no marks).
+    Q_INVOKABLE QVariantMap fuzzyName(const QString& query, const QString& name) const;
+    /// Why a fuzzy query is searched as plain text ("": it is not).
+    Q_INVOKABLE QString fuzzyHint(const QString& query) const;
     /// Switch to a tab found by searchAllTabs and show its first hit from the current page on.
     Q_INVOKABLE void openSearchResult(int index);
     /// The same, at the first hit on or after `page` (a page of the extended search).
@@ -647,6 +654,9 @@ Q_SIGNALS:
     void pageActionDone(const QString& text, bool undoable);
 
 private:
+    /// The last query fuzzyName() parsed
+    mutable QString fuzzyText;
+    mutable std::shared_ptr<const xqt::FuzzyQuery> fuzzyParsed;
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
     enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };

@@ -414,6 +414,21 @@ Rectangle {
                         color: "#6b6f75"
                         font.pixelSize: 12
                     }
+                    // Fuzzy search: an expression that is not valid is searched as plain text, and says why
+                    Label {
+                        objectName: "librarySyntaxHint"
+                        visible: home.lib.searchHint !== ""
+                        Layout.maximumWidth: 150
+                        text: home.lib.searchHint
+                        elide: Text.ElideRight
+                        color: "#b3261e"
+                        font.pixelSize: 12
+                        ToolTip.visible: hintHover.hovered
+                        ToolTip.text: qsTr("%1 - searched as plain text").arg(home.lib.searchHint)
+                        ToolTip.delay: 300
+                        HoverHandler { id: hintHover }
+                    }
+                    FuzzyToggle { objectName: "librarySearchFuzzy" }
                     // The reduced search: names only (of documents, and of folders unless the list is flat)
                     ToolButton {
                         id: namesOnly
@@ -829,6 +844,7 @@ Rectangle {
                         required property int index
                         required property var model
                         name: model.name
+                        nameMarks: home.searching && home.lib.fuzzySearch ? model.nameMarks : []
                         path: model.path
                         isFolder: model.isFolder
                         preview: model.preview

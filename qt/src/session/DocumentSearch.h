@@ -12,6 +12,10 @@
  * The current hit is a page and a hit on it; stepping to a page whose hits are not placed yet counts on the page's
  * count and scrolls there once they are.
  *
+ * A query of the fuzzy search (FuzzyQuery.h; handed over from the library or the tab overview with the toggle on)
+ * counts and marks the hits of all its terms that are not negated. Whether the document matches the whole
+ * expression (with its name) and on which pages it holds, the tab overview asks with matches() and matchingPages().
+ *
  * @license GNU GPLv2 or later
  */
 #pragma once
@@ -26,6 +30,7 @@
 #include <QString>
 
 #include "DocumentTextIndex.h"
+#include "FuzzyQuery.h"
 
 class Document;
 
@@ -51,10 +56,22 @@ public:
     ~DocumentSearch() override;
 
     /// Search for `text` (see TextMatch; empty: clear). With `jump`, the first hit from the current page on
-    /// becomes current (and is scrolled to).
-    void setQuery(const QString& text, bool jump = true);
+    /// becomes current (and is scrolled to). With `fuzzy`, the text is read with the fuzzy search's syntax
+    /// (FuzzyQuery.h; an expression that is not valid: as plain text).
+    void setQuery(const QString& text, bool jump = true, bool fuzzy = false);
     const QString& query() const { return text; }
+    /// The query is read with the fuzzy search's syntax.
+    bool fuzzy() const { return fuzzyMode; }
+    /// Why a fuzzy query is searched as plain text ("": it is not, or the search is not fuzzy).
+    QString hint() const { return fuzzyMode ? parsed.hint() : QString(); }
     void clear() { setQuery({}); }
+
+    /// The document matches the search: it has hits; a fuzzy query: its expression holds with the terms found in the
+    /// document's text or in `name` (its title).
+    bool matches(QStringView name) const;
+    /// The pages with hits on which a fuzzy query's expression holds (a term counts as found on a page when the page
+    /// or `name` has it); if it holds on none of them, all pages with hits. Not fuzzy: pages().
+    std::vector<PageHits> matchingPages(QStringView name) const;
 
     /// Not all counts are known yet: PDF text is still being read.
     bool isRunning() const { return !text.isEmpty() && !index.complete(); }
@@ -108,12 +125,18 @@ private:
     bool tryPendingJump();
     void finish();
     void pageMoved(size_t page, int delta);
+    /// A fuzzy query: which of its terms are on the page
+    std::vector<char> termsOn(size_t page);
+    bool expressionOn(size_t page, const std::vector<char>& inName) const;
 
     DocumentSession& session;
     DocumentTextIndex index;
     QString text;
-    QString prepared;
+    bool fuzzyMode = false;
+    FuzzyQuery parsed;                    ///< the query, when fuzzy
+    std::vector<textmatch::Term> terms;   ///< what is counted and marked (empty: nothing searched)
     std::vector<int> counts;        ///< per page
+    std::vector<std::vector<char>> found;  ///< a valid fuzzy query: per page, which of its terms are on it
     std::vector<PageHits> withHits;
     int total = 0;
     std::map<size_t, std::vector<Place>> places;  ///< per page, for this query

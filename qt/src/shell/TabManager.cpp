@@ -24,7 +24,7 @@ namespace xqt {
 void TabManager::searchChanged(const DocumentSession* s, bool finished) {
     if (finished) {
         searchPending.erase(s);
-        tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole});
+        tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole, SearchMatchRole});
         return;
     }
     searchPending.insert(s);
@@ -38,7 +38,7 @@ TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(par
     searchRefresh.setInterval(150);
     connect(&searchRefresh, &QTimer::timeout, this, [this] {
         for (const DocumentSession* s: std::exchange(searchPending, {})) {
-            tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole});
+            tabDataChanged(s, {SearchHitsRole, SearchRunningRole, HitPagesRole, SearchMatchRole});
         }
     });
     connect(&PageSketches::instance(), &PageSketches::changed, this, [this](qulonglong id) {
@@ -119,6 +119,8 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             return s->search().hitCount();
         case SearchRunningRole:
             return s->search().isRunning();
+        case SearchMatchRole:
+            return s->search().matches(QString::fromStdString(s->getDisplayName()));
         case HitPagesRole: {
             // As the page grid marks them (PagesModel), grouped by page
             QVariantList pages;
@@ -127,7 +129,8 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             Document* doc = s->getDocument();
             std::shared_lock lock(*doc);
             int asked = 0;
-            for (const DocumentSearch::PageHits& hit: search.pages()) {
+            // (a fuzzy search: the pages on which its expression holds)
+            for (const DocumentSearch::PageHits& hit: search.matchingPages(QString::fromStdString(s->getDisplayName()))) {
                 const size_t page = hit.page;
                 const PageRef p = page < doc->getPageCount() ? doc->getPage(page) : PageRef();
                 const double w = p ? p->getWidth() : 1, h = p ? p->getHeight() : 1.414;
@@ -161,7 +164,7 @@ QHash<int, QByteArray> TabManager::roleNames() const {
     return {{TitleRole, "title"},         {ModifiedRole, "modified"},     {FilePathRole, "filePath"},
             {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"},
             {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}, {HitPagesRole, "hitPages"},
-            {SketchRole, "sketch"},       {SavingRole, "saving"}};
+            {SketchRole, "sketch"},       {SavingRole, "saving"},       {SearchMatchRole, "searchMatch"}};
 }
 
 bool TabManager::anySaving() const {

@@ -24,6 +24,7 @@
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfPage.h"
 #include "session/DocumentSession.h"
+#include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
 #include "util/PathUtil.h"
 
@@ -1053,6 +1054,176 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
     std::stable_sort(hits.begin(), hits.end(), [](const Hit& a, const Hit& b) {
         if (a.inName != b.inName) {
             return a.inName;
+        }
+        return a.count > b.count;
+    });
+    return hits;
+}
+
+std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) const {
+    if (!query.isValid()) {
+        return search(query.source());
+    }
+    const auto& terms = query.terms();
+    const std::vector<textmatch::Term> marks = query.markTerms();
+    std::vector<textmatch::Term> termText;
+    for (const auto& t: terms) {
+        termText.push_back(t.textTerm());
+    }
+    std::vector<EntryPtr> snapshot;
+    {
+        std::lock_guard lock(mtx);
+        for (const auto& [folder, f]: folders) {
+            for (const auto& [name, e]: f.docs) {
+                snapshot.push_back(e);
+            }
+        }
+    }
+    // A page, a passage of a Markdown file or a text file's text: which terms are on it, and the hits of those that
+    // are not negated
+    struct Unit {
+        int index = 0;
+        int count = 0;
+        std::vector<char> on;
+    };
+    std::vector<Hit> hits;
+    for (const auto& e: snapshot) {
+        Hit h;
+        h.file = e->file;
+        const fs::path dir = e->file.parent_path().lexically_relative(rootDir);
+        const QString folder = dir.empty() || dir == "." ? QString() : QString::fromStdString(dir.generic_string());
+        const FuzzyQuery::NameMatch name = query.matchName(e->name, folder);
+        std::vector<char> inText(terms.size(), 0);
+        std::vector<Unit> units;  // with hits
+        const QString* snippetText = nullptr;
+        std::vector<textmatch::Span> spans;
+        const auto positives = std::count_if(terms.begin(), terms.end(), [&](const auto& t) {
+            return query.positive(static_cast<size_t>(&t - terms.data()));
+        });
+        auto examine = [&](int index, std::initializer_list<const QString*> texts) {
+            Unit u;
+            u.index = index;
+            u.on.assign(terms.size(), 0);
+            // One scan of each text per term: the hits of the counted terms, whether the negated ones are on it
+            for (const QString* text: texts) {
+                if (!text || text->isEmpty()) {
+                    continue;
+                }
+                spans.clear();
+                int present = 0, single = 0;
+                for (size_t t = 0; t < terms.size(); ++t) {
+                    const textmatch::Term& term = termText[t];
+                    if (query.positive(t) && positives == 1) {
+                        if (const int c = textmatch::count(*text, term.text, term.bounds); c > 0) {
+                            u.on[t] = 1;
+                            single += c;
+                        }
+                    } else if (query.positive(t)) {
+                        const size_t before = spans.size();
+                        for (const textmatch::Span& m: textmatch::find(*text, term.text, term.bounds)) {
+                            spans.push_back(m);
+                        }
+                        if (spans.size() > before) {
+                            u.on[t] = 1;
+                            ++present;
+                        }
+                    } else if (!u.on[t] && textmatch::contains(*text, term.text, term.bounds)) {
+                        u.on[t] = 1;
+                    }
+                }
+                // (overlapping hits of several terms count once, as they are marked)
+                const int n = present > 1 ? static_cast<int>(textmatch::merged(spans).size())
+                                          : static_cast<int>(spans.size()) + single;
+                if (n > 0 && !snippetText) {
+                    snippetText = text;
+                }
+                u.count += n;
+            }
+            for (size_t t = 0; t < terms.size(); ++t) {
+                inText[t] |= u.on[t];
+            }
+            return u;
+        };
+        for (qsizetype b = 0; b < e->blockText.size(); ++b) {
+            if (Unit u = examine(static_cast<int>(b), {&e->blockText[b]}); u.count > 0) {
+                units.push_back(std::move(u));
+            }
+        }
+        const bool pagesOf = e->blockText.isEmpty();
+        for (int p = 0; pagesOf && p < e->pageCount(); ++p) {
+            const QString* pdfText = nullptr;
+            if (const int pdfNr = e->pdfPage[static_cast<size_t>(p)]; pdfNr >= 0) {
+                if (auto it = e->pdfText.find(pdfNr); it != e->pdfText.end()) {
+                    pdfText = &it->second;
+                }
+            }
+            if (Unit u = examine(p, {pdfText, &e->elementText[p]}); u.count > 0) {
+                units.push_back(std::move(u));
+            }
+        }
+        const bool matches = query.evaluate([&](size_t t) { return name.found[t] || inText[t]; });
+        if (!matches) {
+            continue;
+        }
+        h.nameScore = name.score;
+        h.nameMarks = name.positions;
+        h.inName = name.score > 0;
+        // The pages on which the expression holds (else all with hits)
+        std::vector<const Unit*> listed;
+        for (const Unit& u: units) {
+            h.count += u.count;
+            if (query.evaluate([&](size_t t) { return name.found[t] || u.on[t]; })) {
+                listed.push_back(&u);
+            }
+        }
+        if (listed.empty()) {
+            for (const Unit& u: units) {
+                listed.push_back(&u);
+            }
+        }
+        if (snippetText) {
+            const auto found = textmatch::find(*snippetText, marks);
+            if (!found.empty()) {
+                const qsizetype from = found.front().start;
+                const qsizetype start = std::max<qsizetype>(0, from - 40);
+                const qsizetype length = found.front().end - start + 60;
+                h.snippet = (start > 0 ? QStringLiteral("…") : QString()) + snippetText->mid(start, length) +
+                            (start + length < snippetText->size() ? QStringLiteral("…") : QString());
+            }
+        }
+        if (e->kind == QLatin1String("md")) {
+            // Each passage with the headings above it
+            std::vector<std::pair<int, QString>> headings;
+            size_t next = 0;
+            for (qsizetype b = 0; b < e->blockText.size() && next < listed.size(); ++b) {
+                if (listed[next]->index == b) {
+                    QStringList path;
+                    for (const auto& [l, text]: headings) {
+                        path << (text.size() > 40 ? text.left(39) + QStringLiteral("…") : text);
+                    }
+                    h.blockHits.push_back({static_cast<int>(b), listed[next]->count, path.join(QStringLiteral(" › "))});
+                    ++next;
+                }
+                if (const int level = e->blockLevel[static_cast<size_t>(b)]; level > 0) {
+                    while (!headings.empty() && headings.back().first >= level) {
+                        headings.pop_back();
+                    }
+                    headings.emplace_back(level, e->blockText[b]);
+                }
+            }
+            h.pages = static_cast<int>(h.blockHits.size());
+        } else if (pagesOf) {
+            for (const Unit* u: listed) {
+                h.pageHits.push_back({u->index, u->count, e->aspects[static_cast<size_t>(u->index)]});
+            }
+            h.pages = static_cast<int>(h.pageHits.size());
+            h.firstPage = h.pageHits.empty() ? -1 : h.pageHits.front().page;
+        }
+        hits.push_back(std::move(h));
+    }
+    std::stable_sort(hits.begin(), hits.end(), [](const Hit& a, const Hit& b) {
+        if (a.nameScore != b.nameScore) {
+            return a.nameScore > b.nameScore;
         }
         return a.count > b.count;
     });

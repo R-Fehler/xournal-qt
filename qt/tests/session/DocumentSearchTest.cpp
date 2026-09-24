@@ -177,6 +177,84 @@ TEST_F(DocumentSearchTest, findsPdfText) {
     EXPECT_NEAR(hits[0].rect.bottom(), poppler[0].bottom(), 2.0);
 }
 
+TEST_F(DocumentSearchTest, fuzzyQueryCountsAndMarksItsTerms) {
+    auto s = open(u8"load/pages.xopp");  // page i: "p<i+1>"
+    auto fuzzy = [&](const char* query) {
+        s->search().setQuery(QString::fromUtf8(query), false, true);
+        EXPECT_TRUE(waitForCounts(s->search()));
+        std::vector<size_t> pages;
+        for (const auto& h: s->search().pages()) {
+            pages.push_back(h.page);
+        }
+        return pages;
+    };
+    using P = std::vector<size_t>;
+    EXPECT_EQ(fuzzy("p1 | p5"), (P{0, 4, 9, 10})) << "the hits of every term";
+    EXPECT_EQ(s->search().hitCount(), 4);
+    EXPECT_EQ(static_cast<int>(placedHits(s->search()).size()), 4) << "counted and marked alike";
+    EXPECT_EQ(s->search().countCorrections(), 0);
+    EXPECT_EQ(fuzzy("'p1'"), (P{0})) << "a whole word";
+    EXPECT_EQ(fuzzy("^p1"), (P{0, 9, 10})) << "a word that starts with it";
+    EXPECT_EQ(fuzzy("p1$"), (P{0})) << "a word that ends with it";
+    EXPECT_EQ(fuzzy("p1 !p10"), (P{0, 9, 10})) << "negated terms are not marked";
+    EXPECT_FALSE(s->search().matches(u"pages")) << "p10 is in the document";
+    EXPECT_EQ(fuzzy("p1 !p12"), (P{0, 9, 10}));
+    EXPECT_TRUE(s->search().matches(u"pages"));
+    EXPECT_TRUE(s->search().hint().isEmpty());
+
+    // The whole expression: over the document; on a page, where its terms are on that page (or in the name)
+    fuzzy("p2 p3");
+    EXPECT_TRUE(s->search().matches(u"pages")) << "both are in the document";
+    auto matching = [&](const char16_t* name) {
+        P pages;
+        for (const auto& h: s->search().matchingPages(name)) {
+            pages.push_back(h.page);
+        }
+        return pages;
+    };
+    EXPECT_EQ(matching(u"pages"), (P{1, 2})) << "on no page together: all pages with hits";
+    fuzzy("p1 pages");
+    EXPECT_TRUE(s->search().matches(u"pages")) << "a term found in the name";
+    EXPECT_FALSE(s->search().matches(u"other"));
+    EXPECT_EQ(matching(u"pages"), (P{0, 9, 10}));
+    fuzzy("(p1 | p2) !p3");
+    EXPECT_EQ(matching(u"x"), (P{0, 1, 9, 10}));
+    fuzzy("p4 | (p5 xyz)");
+    EXPECT_TRUE(s->search().matches(u"x"));
+    EXPECT_EQ(matching(u"x"), (P{3})) << "p5 is on a page, but not with xyz";
+
+    // Not valid: plain text, with a hint
+    EXPECT_EQ(fuzzy("(p1"), P{});
+    EXPECT_FALSE(s->search().hint().isEmpty());
+    EXPECT_FALSE(s->search().matches(u"pages"));
+    // The same text without the syntax: plain
+    search(*s, "p1 | p5");
+    EXPECT_EQ(s->search().hitCount(), 0);
+    EXPECT_FALSE(s->search().fuzzy());
+    s->search().setQuery("p1 | p5", false, true);
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 4) << "the same text, now fuzzy";
+}
+
+TEST_F(DocumentSearchTest, fuzzyQueryInPdfText) {
+    auto s = open(makeLinesPdf(tmp, 2));
+    s->search().setQuery(QStringLiteral("'every' ^hyphen"), false, true);
+    ASSERT_TRUE(waitForCounts(s->search()));
+    // Per page: "every" twice (once across a line break), "hyphenated" once (broken at a line end)
+    EXPECT_EQ(s->search().countOn(0), 3);
+    EXPECT_EQ(static_cast<int>(placedHits(s->search()).size()), s->search().hitCount());
+    EXPECT_EQ(s->search().countCorrections(), 0);
+    s->search().setQuery(QStringLiteral("^ated"), false, true);
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 0) << "a broken word is one word";
+    s->search().setQuery(QStringLiteral("hyphen$"), false, true);
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 0);
+    s->search().setQuery(QStringLiteral("'hyphenated'"), false, true);
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 2);
+}
+
 TEST_F(DocumentSearchTest, currentHitStartsAtTheCurrentPageAndCycles) {
     auto s = open(u8"load/pages.xopp");
     s->setCurrentPageNo(5);

@@ -9,10 +9,14 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import "Fuzzy.js" as Fuzzy
 
 Item {
     id: card
     property string name
+    /// Fuzzy search: the characters of the name its query matched (highlighted)
+    property var nameMarks: []
+    readonly property string markedName: Fuzzy.marked(name, nameMarks, "#c2410c")
     property string path
     property string subtitle
     property string preview
@@ -246,7 +250,8 @@ Item {
                     Label {
                         objectName: "cardName"
                         Layout.fillWidth: true
-                        text: card.name
+                        text: card.markedName !== "" ? card.markedName : card.name
+                        textFormat: card.markedName !== "" ? Text.StyledText : Text.AutoText
                         elide: Text.ElideMiddle
                         font.weight: Font.DemiBold
                         color: "#202124"

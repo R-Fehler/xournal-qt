@@ -14,6 +14,7 @@
 
 #include "session/TextMatch.h"
 
+#include "HitPages.h"
 #include "Library.h"
 #include "MarkdownFile.h"
 #include "MdLayout.h"
@@ -94,8 +95,8 @@ QString decode(const QString& s) {
 /// source ranges, in order.
 std::vector<std::pair<size_t, size_t>> matchesIn(const md::Passage& p, const QString& query) {
     std::vector<std::pair<size_t, size_t>> out;
-    const QString prepared = textmatch::prepare(LibraryIndex::simplified(query));
-    if (prepared.isEmpty()) {
+    const std::vector<textmatch::Term> terms = HitPageProvider::termsOf(query);
+    if (terms.empty()) {
         return out;
     }
     // UTF-16 index -> byte of the passage's text
@@ -113,7 +114,7 @@ std::vector<std::pair<size_t, size_t>> matchesIn(const md::Passage& p, const QSt
     }
     byteOf.push_back(byte);
     const textmatch::Simplified simple = textmatch::simplify(text);
-    for (const textmatch::Span& m: textmatch::find(simple.text, prepared)) {
+    for (const textmatch::Span& m: textmatch::find(simple.text, terms)) {
         const auto from = static_cast<size_t>(simple.origin[static_cast<size_t>(m.start)]);
         const auto to = static_cast<size_t>(simple.origin[static_cast<size_t>(m.end - 1)]) + 1;
         const auto range = md::sourceRange(p, byteOf[std::min(from, byteOf.size() - 1)],
@@ -140,7 +141,7 @@ QString MdSnippetProvider::baseUrl(const DocumentItem& item, const QString& quer
     const QString stamp = QString::fromLatin1(
             QCryptographicHash::hash(documentStamp(item).toUtf8(), QCryptographicHash::Md5).toHex().left(8));
     return QStringLiteral("image://mdsnippet/") + encode(QString::fromStdString(item.main().string())) + '/' + stamp +
-           '/' + encode(LibraryIndex::simplified(query).trimmed());
+           '/' + encode(query.startsWith(QChar(0x1f)) ? query : LibraryIndex::simplified(query).trimmed());
 }
 
 QImage MdSnippetProvider::render(const fs::path& file, int passage, const QString& query, int width, int maxHeight) {

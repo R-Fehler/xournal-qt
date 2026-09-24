@@ -447,6 +447,34 @@ int DocumentTextIndex::count(size_t page, QStringView query) {
     return n;
 }
 
+int DocumentTextIndex::count(size_t page, const std::vector<textmatch::Term>& terms) {
+    if (page >= pages.size() || terms.empty()) {
+        return 0;
+    }
+    if (pages[page].dirty) {
+        refresh(page);
+    }
+    const Page& p = pages[page];
+    int n = textmatch::count(p.elements, terms);
+    if (p.pdf >= 0 && pdfKnown[static_cast<size_t>(p.pdf)]) {
+        n += textmatch::count(pdfText[static_cast<size_t>(p.pdf)], terms);
+    }
+    return n;
+}
+
+bool DocumentTextIndex::contains(size_t page, const textmatch::Term& term) {
+    if (page >= pages.size()) {
+        return false;
+    }
+    if (pages[page].dirty) {
+        refresh(page);
+    }
+    const Page& p = pages[page];
+    return textmatch::contains(p.elements, term.text, term.bounds) ||
+           (p.pdf >= 0 && pdfKnown[static_cast<size_t>(p.pdf)] &&
+            textmatch::contains(pdfText[static_cast<size_t>(p.pdf)], term.text, term.bounds));
+}
+
 std::map<int, QString> DocumentTextIndex::pdfTexts() const {
     std::map<int, QString> out;
     for (size_t i = 0; i < pdfText.size(); ++i) {
