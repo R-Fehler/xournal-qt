@@ -874,6 +874,23 @@ TEST_F(LibraryTest, theAppSeedsTheSearchOfOpenDocumentsFromTheLibrary) {
     EXPECT_EQ(index->search("unicorn").size(), 1u) << "found in the library at once";
 }
 
+// The library search matches text as the search of an open document does (so their counts agree): a word broken at a
+// line end is found whole, a ligature as its letters.
+TEST_F(LibraryTest, theLibrarySearchMatchesAsTheDocumentSearch) {
+    makePdf(root / "lecture.pdf");
+    makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");
+    addText(root / "lecture.xopp", 1, "a hyphen-\nated word, the \xef\xac\x81rst one");
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    auto hits = index.search("hyphenated");
+    ASSERT_EQ(hits.size(), 1u) << "broken at the line end";
+    EXPECT_EQ(hits[0].firstPage, 1);
+    EXPECT_TRUE(hits[0].snippet.contains("hyphen- ated")) << hits[0].snippet.toStdString();
+    EXPECT_EQ(index.search("first one").size(), 1u) << "the ligature";
+    EXPECT_EQ(index.search("PAGE 2").size(), 1u);
+}
+
 TEST_F(LibraryTest, onlyTheXoppIsReadAgainWhenAnnotationsChange) {
     makePdf(root / "lecture.pdf");
     makeAnnotation(root / "lecture.pdf", root / "lecture.xopp");

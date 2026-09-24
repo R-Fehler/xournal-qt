@@ -23,6 +23,7 @@
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfPage.h"
 #include "session/DocumentSession.h"
+#include "session/TextMatch.h"
 #include "util/PathUtil.h"
 
 #include "Previews.h"
@@ -839,6 +840,7 @@ void LibraryIndex::applyMoves(const std::vector<std::pair<fs::path, fs::path>>& 
 
 std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const {
     const QString q = simplified(query).trimmed();
+    const QString folded = textmatch::prepare(q);
     std::vector<Hit> hits;
     if (q.isEmpty()) {
         return hits;
@@ -856,20 +858,20 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
         Hit h;
         h.file = e->file;
         h.inName = e->name.contains(q, Qt::CaseInsensitive);
-        // Matches in a text (and the text around the first one)
+        // Matches in a text (and the text around the first one), as the search of an open document matches them
         auto count = [&](const QString& text) {
-            int n = 0;
-            for (qsizetype from = text.indexOf(q, 0, Qt::CaseInsensitive); from >= 0;
-                 from = text.indexOf(q, from + q.size(), Qt::CaseInsensitive)) {
-                if (h.snippet.isEmpty()) {
-                    const qsizetype start = std::max<qsizetype>(0, from - 40);
-                    const qsizetype length = from - start + q.size() + 60;
-                    h.snippet = (start > 0 ? QStringLiteral("…") : QString()) + text.mid(start, length) +
-                                (start + length < text.size() ? QStringLiteral("…") : QString());
-                }
-                ++n;
+            if (!h.snippet.isEmpty()) {
+                return textmatch::count(text, folded);
             }
-            return n;
+            const auto found = textmatch::find(text, folded);
+            if (!found.empty()) {
+                const qsizetype from = found.front().start;
+                const qsizetype start = std::max<qsizetype>(0, from - 40);
+                const qsizetype length = found.front().end - start + 60;
+                h.snippet = (start > 0 ? QStringLiteral("…") : QString()) + text.mid(start, length) +
+                            (start + length < text.size() ? QStringLiteral("…") : QString());
+            }
+            return static_cast<int>(found.size());
         };
         for (int p = 0; p < e->pageCount(); ++p) {
             int n = 0;
