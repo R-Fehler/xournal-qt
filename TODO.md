@@ -102,7 +102,7 @@ is built.
 
 ## Ready after a short plan: platform
 
-### `qt/android-apk`: first APK (started 2026-09-24; limited to 4 build jobs at low priority, so other agents keep working)
+### `qt/android-apk`: first APK (merged 2026-09-24; `~/xournal_qt_workspace/samples/xournal-qt-debug-arm64.apk`; see `qt/docs/android.md` and `qt/docs/android-roadmap.md`)
 Tooling (2026-09-24, in the author's home, no sudo): JDK 17 in `~/.local/jdk-17`; Android command-line tools and
 NDK r27c (27.2.12479018) in `~/Android/Sdk`; Qt 6.11.2 desktop (host, `gcc_64`) and `android_arm64_v8a` in `~/Qt` (2 GB) through
 `aqtinstall` (`~/.local/bin/aqt`); 6.11.3 was not fully mirrored yet. Installed 2026-09-24. The block itself comes after the `.md` editor, at the author's wish.
@@ -200,7 +200,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
       is mostly how such content is shown, not that it is rewritten.
   - Resolve `[[wikilinks]]` and Markdown links by file name; backlinks later.
 
-### The `.md` editor (decided 2026-09-24; `qt/md-editor`, started 2026-09-24, before Android at the author's wish)
+### The `.md` editor (decided 2026-09-24; `qt/md-editor`, merged 2026-09-24)
 - **Plain `.txt` editing** like a notepad or a simple mobile editor: no syntax highlighting, just text.
 - **Other text files** (code, LaTeX, …) are editable as plain text only after a warning is accepted; read-only
   otherwise.
@@ -279,6 +279,13 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   that vanished under it with an empty one; now such an entry stays for the move, and a document without an entry
   takes over a gone one with the same size, time and name or content sample. 40 of 40 under load; the CI retry is
   gone.
+
+- [ ] **Harden the UI tests that use fixed waits** (`qt/test-waits`). Under load (a full suite at `-j6` next to agent
+  builds) timing tests fail now and then: on 2026-09-24 `theCanvasShowsThePreviewUntilThePageIsRendered` (1 of 4
+  alone), `sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDown`,
+  `HomeScreenFilterTest.textFilesAndImagesOpenExternally`, and `CanvasMemoryTest.theCurrentDocumentRendersAheadMoreThanBehind`.
+  All pass alone. Replace fixed `wait(ms)` with waiting for the condition (with a generous timeout), and find tests
+  whose expectation itself depends on timing.
 
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF

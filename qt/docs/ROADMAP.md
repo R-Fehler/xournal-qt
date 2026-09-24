@@ -286,6 +286,28 @@
       upstream's loader.
   - Trashing goes through `SystemApps::moveToTrash`.
   - A `.xopp` kept next to its hybrid PDF opens the PDF; one edited more than 60 s later is listed separately.
+- **The library index keeps entries across moves, `qt/index-rename-race` (2026-09-24).** An update that looked at a
+  file just being moved stored an empty entry, so the document was read again. Now a file gone while it is read
+  keeps its old entry, and a document seen under a new name takes over an entry with the same size, time and
+  content sample (a SHA-1 of the first and last 64 KB). The flaky test is fixed, and the CI retry is gone.
+- **`.md` and text editor, `qt/md-editor` (2026-09-24, awaiting on-device test).** See [md-editor.md](md-editor.md).
+  - `.md` is edited with the live-rendering Markdown editor. Only the text is saved, atomically; untouched bytes stay
+    the same (CRLF, BOM, no final newline). Autosave and recovery keep the text in the cache. External changes are
+    reloaded, or asked about.
+  - `.txt` is a plain, monospace notepad. Other text files are editable after an "Edit anyway" warning.
+  - "Open externally" through `SystemApps`. Pages or one continuous page (a per-block layout cache makes it about 3×
+    faster).
+  - "Edit as notes" makes a `.xopp` copy (two library cards). The New menu has New Markdown file and New text file.
+  - Share for text documents shares the file itself.
+- **Android, `qt/android-apk` (2026-09-24).** See [android.md](android.md) and [android-roadmap.md](android-roadmap.md).
+  - vcpkg (manifest, pinned baseline, static arm64-android triplet, 55 packages).
+  - `XojDeps.cmake` finds dependencies the same way on the desktop and in a toolchain, with an `android-arm64-debug`
+    preset.
+  - `qt/scripts/android-build.sh` runs with 4 jobs, `nice` and a memory cap.
+  - A debug APK (94 MB, minSdk 28, target 36) that started and worked in an emulator. `AndroidSetup.cpp` sets up the
+    folders, resources and a fontconfig pointed at `/system/fonts`.
+  - Qt 6.11.2 (aqt), NDK r27c, JDK 17.
+- **An empty path no longer throws out of the recent list (2026-09-24).**
   318 KiB.
 
 ## Backlog (decide later)
