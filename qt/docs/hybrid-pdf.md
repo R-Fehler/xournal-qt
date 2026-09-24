@@ -231,9 +231,12 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
      beside it or below; `HybridPdf::xoppExportOf`, `DocumentSession::xoppExport`), so it survives closing and
      reopening. Deleting that `.xopp` ends it (a save no longer writes it or records it). The global setting "On
      every save of a hybrid PDF, also write a .xopp" stays as it was.
-   - **Keep it as it is**: not touched, not updated. Known gap: kept beside a PDF of the same name (`notes.xopp` next
-     to the new `notes.pdf`), the library shows the two as one card that opens the old `.xopp`, because the pairing
-     only looks into the PDF when `.name.pages.pdf` exists (listing stays cheap).
+   - **Keep it as it is**: not touched, not updated. Kept beside the hybrid PDF of its name (`notes.xopp` next to
+     the new `notes.pdf`), the library shows one card that opens the hybrid PDF, as for its export: every same-name
+     pair of a `.xopp` and a PDF looks into the PDF (`HybridPdf::isHybrid`, remembered per file version; lone PDFs
+     are not looked into, and the library index does not record it). A `.xopp` changed more than a minute after the
+     PDF (edited in Xournal++ afterwards; an export is written right after the PDF) is not hidden: the two are listed
+     as two documents, each opening its own file.
 
    The dialog has **"Don't ask again"**, which stores the choice in the setting `hybridOldXopp` (`ask`, `trash`,
    `update`, `keep`); Settings → Documents → Hybrid PDF shows it and sets it back to "Ask each time". Cancel

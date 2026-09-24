@@ -896,6 +896,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       updated. Delete `lecture.xopp`, save again: it does not come back. `lecture.pdf` itself never changes.
 - [ ] With pasted PDF pages in a `.xopp` (it has a hidden `.name.pages.pdf`), save it as a PDF with the trash
       choice: the pages keep showing, later saves work, and both files are in the trash.
+- [ ] "Keep it as it is" next to the PDF of the same name (`notes.xopp` + `notes.pdf`): the library shows one card
+      "notes" (PDF) that opens the PDF with notes. Edit `notes.xopp` in Xournal++ and save it: after a refresh the
+      library shows two cards "notes", the PDF and the `.xopp`, each opening its own file.
 - [ ] "Keep it as it is" with "Don't ask again": the next document is not asked, its `.xopp` stays. Settings →
       Documents → Hybrid PDF shows "Keep it as it is"; set it to "Ask each time": asked again.
 - [ ] ⋮ → Share… on a PDF with notes that has unsaved changes → "PDF with notes": it is saved, then Dolphin opens

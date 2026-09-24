@@ -1,5 +1,7 @@
 #include "DocumentFiles.h"
 
+#include <chrono>
+
 #include <algorithm>
 #include <cctype>
 #include <functional>
@@ -445,11 +447,26 @@ bool DocumentItem::has(const fs::path& file) const {
 namespace DocumentFiles {
 
 namespace {
-/// A .xopp exported from the hybrid PDF next to it: its PDF pages are in ".name.pages.pdf" (the hybrid PDF has the
-/// name). Only then is the PDF looked into, so listing folders stays cheap.
-void markHybrid(DocumentItem& item) {
-    item.hybrid = !item.xopp.empty() && !item.pdf.empty() && fileExists(pagesOf(item.xopp)) &&
-                  HybridPdf::isHybrid(item.pdf);
+/// A .xopp changed this long after the hybrid PDF of its name was not written with it (an export is written right
+/// after the PDF): it was edited elsewhere, e.g. in Xournal++.
+constexpr auto EDITED_AFTER = std::chrono::seconds(60);
+
+/// A .xopp next to the hybrid PDF of its name (its export for Xournal++, or the .xopp it was, kept as it is): the PDF
+/// is the document, and the card opens it. Only such pairs look into the PDF (HybridPdf::isHybrid, remembered per
+/// file version), lone PDFs are not. Returns true if the .xopp was changed well after the PDF: then it is not hidden
+/// behind the PDF, the two are two documents (the caller splits them).
+bool markHybrid(DocumentItem& item) {
+    item.hybrid = false;
+    if (item.xopp.empty() || item.pdf.empty() || !HybridPdf::isHybrid(item.pdf)) {
+        return false;
+    }
+    std::error_code ex, ep;
+    const auto xoppTime = fs::last_write_time(item.xopp, ex), pdfTime = fs::last_write_time(item.pdf, ep);
+    if (!ex && !ep && xoppTime > pdfTime + EDITED_AFTER) {
+        return true;
+    }
+    item.hybrid = true;
+    return false;
 }
 }  // namespace
 
@@ -556,7 +573,10 @@ Listing scan(const fs::path& dir, unsigned include) {
         if (pdf != pdfs.end()) {
             item.pdf = pdf->second;
             pdfs.erase(pdf);
-            markHybrid(item);
+            if (markHybrid(item)) {
+                l.items.push_back({{}, item.pdf});  // (a .xopp edited after its hybrid PDF: both listed)
+                item.pdf.clear();
+            }
         } else if (auto img = images.find(stem); img != images.end() && pairingSpelling(img->second.front())) {
             item.image = img->second.front();
             img->second.erase(img->second.begin());
@@ -626,7 +646,9 @@ DocumentItem itemOf(const fs::path& file, unsigned include) {
         if (item.pdf.empty()) {
             item.image = imageNamed(dir, stem);
         }
-        markHybrid(item);
+        if (markHybrid(item)) {
+            item.pdf.clear();  // (edited after its hybrid PDF: a document of its own)
+        }
         return item;
     }
     if (isPdf(file)) {
@@ -637,7 +659,9 @@ DocumentItem itemOf(const fs::path& file, unsigned include) {
                 break;
             }
         }
-        markHybrid(item);
+        if (markHybrid(item)) {
+            item.xopp.clear();  // (a .xopp edited after it: a document of its own)
+        }
         return item;
     }
     if (isMd(file)) {
