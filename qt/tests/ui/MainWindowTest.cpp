@@ -1402,6 +1402,50 @@ TEST_F(HomeScreenTest, searchFindsFoldersAndOpensThem) {
     EXPECT_EQ(gridCount(), 1);  // sheet.pdf
 }
 
+// Library menu → "Export library as archive…": the dialog explains it, never into the library, then in the background
+// with progress, and a summary at the end.
+TEST_F(HomeScreenTest, exportLibraryAsArchive) {
+    ASSERT_NE(find("exportLibraryArchiveItem"), nullptr);
+    QObject* dialog = find("libraryArchiveDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "open");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    const QString text = findItem("libraryArchiveExplanation")->property("text").toString();
+    EXPECT_TRUE(text.contains("PDF/A-3") && text.contains("copied") && text.contains("not changed")) << text.toStdString();
+    EXPECT_TRUE(findItem("archiveWholeLibrary")->property("checked").toBool());
+    EXPECT_FALSE(findItem("archiveThisFolder")->property("enabled").toBool()) << "at the library's top";
+    QMetaObject::invokeMethod(dialog, "close");
+    ASSERT_TRUE(waitOpened(dialog, false));
+
+    EXPECT_FALSE(controller->exportLibraryArchive(QUrl::fromLocalFile(QString::fromStdString((root / "Physics").string())),
+                                                  false))
+            << "never into the library";
+    QObject* messageDialog = find("messageDialog");
+    ASSERT_TRUE(waitOpened(messageDialog, true));
+    QMetaObject::invokeMethod(messageDialog, "close");
+    ASSERT_TRUE(waitOpened(messageDialog, false));
+
+    QTemporaryDir out;
+    QObject* summary = find("libraryArchiveSummary");
+    ASSERT_NE(summary, nullptr);
+    ASSERT_TRUE(controller->exportLibraryArchive(QUrl::fromLocalFile(out.path()), false));
+    EXPECT_TRUE(find("libraryArchiveProgress")->property("visible").toBool());
+    EXPECT_NE(findItem("libraryArchiveCancel"), nullptr);
+    ASSERT_TRUE(waitOpened(summary, true, 60000));
+    EXPECT_FALSE(find("libraryArchiveProgress")->property("visible").toBool());
+    const QVariantMap result = summary->property("summary").toMap();
+    EXPECT_EQ(result["archived"].toInt(), 3) << "sheet, lecture, notes";
+    EXPECT_TRUE(findItem("libraryArchiveSummaryText")->property("text").toString().startsWith("3 archived"));
+    const fs::path target(result["target"].toString().toStdString());
+    EXPECT_EQ(target.parent_path(), fs::path(out.path().toStdString()));
+    for (const char* f: {"Physics/sheet.pdf", "lecture.pdf", "notes.pdf", "README.txt"}) {
+        EXPECT_TRUE(fs::exists(target / f)) << f;
+    }
+    EXPECT_TRUE(xqt::HybridPdf::isArchive(target / "notes.pdf"));
+    QMetaObject::invokeMethod(summary, "close");
+    ASSERT_TRUE(waitOpened(summary, false));
+}
+
 TEST_F(HomeScreenTest, libraryMenuMarksThisLibraryWithoutToggles) {
     click(find<QQuickItem>("libraryMenuButton"));
     QObject* menu = find("libraryMenu");

@@ -365,6 +365,32 @@ check failed.
 - Tests: `MainWindowTest.exportForTheArchive` (the dialog's text and default, the report, the file with the unsaved
   stroke, the document still modified, Share's entry, a folder, a card's document).
 
+### Export library as archive (`qt/src/shell/LibraryArchive.*`; tests `LibraryArchiveTest`, `HomeScreenTest.exportLibraryAsArchive`)
+
+- **Library menu → Export library as archive…**: a dialog explains it (every document an archive PDF, other files
+  copied as they are, a README, a new folder, the library unchanged) and offers **the whole library** or **only this
+  folder** (with its subfolders; when a folder is open). Then a folder dialog.
+- Everything goes into a **new folder "<name> archive <YYYY-MM-DD>"** (" (2)" when it exists) inside the chosen one,
+  so nothing there is overwritten; `<name>` is the library's (or the folder's). A chosen folder inside the library is
+  refused ("The archive never goes into the library itself"); nothing is ever written into the library.
+- The folder structure is kept. The documents are the library's cards (`DocumentFiles::scanRecursive` with all files):
+  a `.xopp` alone, a `.xopp` with its PDF, a hybrid PDF (with its exported `.xopp`), a plain PDF, and a `.xopp` over
+  an image. Each is loaded like a card (`DocumentSession::loadFile`) and written as `<name>.pdf` (not `.archive.pdf`
+  there: the whole folder is the archive; " (2)" when two documents of a folder share a name). The image a `.xopp`
+  annotates is copied too. Markdown, images, text and all other files are copied as they are, with their times.
+  Hidden files and folders (the library's `.xournal_library`) are not.
+- **Links** between documents lead to their archive PDFs: `HybridPdf::LinkMap` reads each link from the document's own
+  folder, and a linked document of the export (its `.xopp` or its PDF) becomes a `/GoToR` to its archive PDF, at the
+  document's page (`page=`; archive pages are document pages).
+- A **README.txt** in the new folder: what the files are (PDF/A-3, the ink in the pages), how to edit again (open the
+  PDF in xournal-qt; `document.xopp` is an attachment), that other files are copied, the counts, the files that are
+  not PDF/A with the reasons, the ones that failed, and "incomplete" when it was cancelled.
+- It runs on a worker thread of the global pool at low priority, one file after the other, with a progress dialog
+  ("3 of 12 · Lectures/lecture.xopp") and **Cancel** (looked at between files; what was written stays, with the
+  README). At the end a summary: "N archived (N of them PDF/A-3b), N copied, N not PDF/A, N failed", the reasons,
+  and **Show in file manager**. A document whose PDF is missing, or that cannot be read, is listed as failed and the
+  rest goes on.
+
 ### Validation
 
 - The tests: `qpdf --check` passes; poppler draws each page like our PDF export (mean difference < 0.5/255, < 0.2 %

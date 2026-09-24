@@ -39,6 +39,7 @@ class QWindow;
 namespace xqt {
 class AppContext;
 class CanvasView;
+class LibraryArchive;
 class FuzzyQuery;
 class DocumentSession;
 class TabManager;
@@ -578,6 +579,14 @@ public:
     /// Archive exports running (their dialog shows it).
     Q_PROPERTY(int archiveExports READ archiveExports NOTIFY archiveExportsChanged)
     int archiveExports() const { return archiveRunning; }
+    /// "Export library as archive…" (LibraryArchive: running, done, total, current; finished(summary)).
+    Q_PROPERTY(QObject* libraryArchive READ libraryArchiveObject CONSTANT)
+    QObject* libraryArchiveObject() const;
+    /// Every document of the library (or of the current folder, with its subfolders) as an archive PDF in a new
+    /// folder inside `into`, other files copied; in the background. False (and a message) if it cannot start, e.g.
+    /// `into` is inside the library.
+    Q_INVOKABLE bool exportLibraryArchive(const QUrl& into, bool currentFolderOnly);
+    Q_INVOKABLE void cancelLibraryArchive();
     /// After hybridEditedElsewhere: take the other app's version of the changed annotations (or keep ours).
     Q_INVOKABLE bool importHybridChanges();
     Q_INVOKABLE void keepHybridData();
@@ -863,6 +872,7 @@ private:
     bool handOver(const QStringList& files, bool toClipboard);
     fs::path lastShareFolder;
     int archiveRunning = 0;
+    std::unique_ptr<xqt::LibraryArchive> libraryArchiveTask;
     /// The document an archive is made of: `file`, or the current document's file (empty: none yet).
     fs::path archiveSource(const QString& file) const;
     void archiveDone(const fs::path& target, bool ok, const std::string& error, bool pdfa,

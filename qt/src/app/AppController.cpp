@@ -62,6 +62,7 @@
 #include "shell/MdSnippets.h"
 #include "shell/Previews.h"
 #include "shell/Library.h"
+#include "shell/LibraryArchive.h"
 #include "shell/LibraryModel.h"
 #include "shell/DocumentChapters.h"
 #include "shell/LayersModel.h"
@@ -2859,6 +2860,37 @@ bool AppController::exportArchive(const QUrl& target, const QString& file) {
     s->saveInBackground(std::move(request));
     Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
     return true;
+}
+
+QObject* AppController::libraryArchiveObject() const {
+    if (!libraryArchiveTask) {
+        const_cast<AppController*>(this)->libraryArchiveTask = std::make_unique<LibraryArchive>();
+    }
+    return libraryArchiveTask.get();
+}
+
+bool AppController::exportLibraryArchive(const QUrl& into, bool currentFolderOnly) {
+    if (!library || !library->available()) {
+        return false;
+    }
+    libraryArchiveObject();
+    const fs::path root(library->rootPath().toStdString());
+    const QString folder = library->folder();
+    const bool sub = currentFolderOnly && !folder.isEmpty();
+    const fs::path source = sub ? root / fs::path(folder.toStdString()) : root;
+    const std::string name = sub ? source.filename().string() : library->name().toStdString();
+    std::string error;
+    if (!libraryArchiveTask->start(source, fs::path(into.toLocalFile().toStdString()), root, name, error)) {
+        Q_EMIT message(tr("Export failed"), QString::fromStdString(error), true);
+        return false;
+    }
+    return true;
+}
+
+void AppController::cancelLibraryArchive() {
+    if (libraryArchiveTask) {
+        libraryArchiveTask->cancel();
+    }
 }
 
 bool AppController::shareFile(const QString& path, bool toClipboard) {

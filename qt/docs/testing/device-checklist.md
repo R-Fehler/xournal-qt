@@ -1051,3 +1051,13 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
 - [ ] Export a PDF whose fonts are not embedded (`pdffonts file.pdf` shows "no" under "emb"; old PDFs with
       Helvetica or Times often are): the report says "not PDF/A" with the font names, and the file still opens
       everywhere; Acrobat shows no PDF/A bar for it.
+- [ ] Library menu → "Export library as archive…" on a real library (with subfolders, a lecture PDF with its
+      `.xopp`, a hybrid PDF, `.md` notes, images, a Word file): choose a folder outside the library (a folder inside
+      it is refused with a message). A progress dialog counts the files; the window stays usable. At the end the
+      summary; "Show in file manager" shows the new folder "<library> archive <date>" with the same subfolders, a
+      PDF per document, the other files as they were, and README.txt. The library is unchanged (no new files there).
+- [ ] In the archive folder, open a note that links to a lecture (in Okular or Acrobat): the link opens the lecture's
+      archive PDF at the right page.
+- [ ] Start it on a big library and press Cancel: it stops after the current file, the summary says "cancelled", and
+      the README says the archive is incomplete.
+- [ ] With a folder open in the library, "Only this folder" archives that folder and its subfolders only.
