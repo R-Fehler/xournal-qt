@@ -22,7 +22,10 @@
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/XojPage.h"
+#include "canvas/CanvasPage.h"
 #include "canvas/CanvasView.h"
+#include "render/RenderService.h"
+#include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "shell/HitPages.h"
@@ -544,4 +547,41 @@ TEST_F(ReferenceWindowTest, theGridOfTheReferenceShowsItsPagesInItsHalf) {
     EXPECT_TRUE(grid->isVisible());
     click(gridButton);
     EXPECT_FALSE(grid->isVisible());
+}
+
+// Both documents in sight are drawn as pages in view; swapping their roles moves them to the other canvas and draws
+// nothing again (the zoom and the rendered pages stay with the view).
+TEST_F(ReferenceWindowTest, swappingRolesDrawsNothingAgain) {
+    for (int tab: {0, 1}) {
+        for (int i = 0; i < 3; ++i) {
+            tabs().session(tab)->insertNewPage(1);
+        }
+    }
+    ref().showTab(1);
+    auto* renders = controller->context().getRenderService();
+    for (int i = 0; i < 3; ++i) {  // (renders after the zoom settled)
+        wait(150);
+        renders->waitForIdle();
+    }
+    auto visibleRendered = [&](xqt::CanvasView* v) {
+        const auto [first, last] = v->visiblePages();
+        bool all = first <= last;
+        for (size_t i = first; i <= last; ++i) {
+            const auto info = v->getPage(i)->bufferInfo();
+            all = all && info.valid && info.zoom == v->getViewController().zoom();
+        }
+        return all;
+    };
+    auto* notes = tabs().view(0);
+    auto* book = tabs().view(1);
+    ASSERT_TRUE(visibleRendered(notes));
+    ASSERT_TRUE(visibleRendered(book)) << "the reference's pages in view were not drawn";
+    const double notesZoom = notes->getViewController().zoom(), bookZoom = book->getViewController().zoom();
+
+    click(findItem("referenceSwapRolesButton"));
+    EXPECT_FALSE(renders->hasWork(xqt::RenderService::Priority::Visible)) << "a page was drawn again";
+    EXPECT_DOUBLE_EQ(notes->getViewController().zoom(), notesZoom);
+    EXPECT_DOUBLE_EQ(book->getViewController().zoom(), bookZoom);
+    EXPECT_TRUE(visibleRendered(notes));
+    EXPECT_TRUE(visibleRendered(book));
 }

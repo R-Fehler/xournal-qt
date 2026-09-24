@@ -753,3 +753,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] The grid button in the reference's pill: the pages of the reference fill its half (the notes and their page
       sidebar stay as they are); scroll it with a finger and the touchpad; a tap on a page goes there and closes the
       grid; the button closes it too. The page sidebar never shows the reference's pages.
+- [ ] With `XQT_PERF=1` and a long PDF as the reference beside the notes: scroll the reference and the notes in
+      turn; both show sharp pages quickly, neither waits behind the other's pages rendered in advance. Swap roles:
+      no page goes blurry or is drawn again. Switch to a third tab and back: the reference's pages near where it
+      was read are still there.
