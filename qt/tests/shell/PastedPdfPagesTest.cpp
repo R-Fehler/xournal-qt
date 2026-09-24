@@ -1013,3 +1013,28 @@ TEST_F(PastedPdfPages, aFailedMergeKeepsThePastedPageAsAnImage) {
     ASSERT_TRUE(reopened.document);
     EXPECT_TRUE(reopened.document->getPage(1)->getBackgroundType().isImagePage());
 }
+
+// Export as PDF right after a paste (its merged PDF still being written): the exported page shows the pasted PDF
+// page, with its text.
+TEST_F(PastedPdfPages, anExportRightAfterAPasteHasThePastedPage) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    auto held = std::make_unique<HeldMerge>();
+    ASSERT_EQ(c.pastePages(1), 1);
+    ASSERT_TRUE(waitFor([&] { return held->entered == 1; }));
+    std::thread releaser([&] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        held->release();
+    });
+    const fs::path exported = root / "exported.pdf";
+    ASSERT_TRUE(c.exportPdf(QUrl::fromLocalFile(QString::fromStdString(exported.string()))));
+    releaser.join();
+    held.reset();
+    auto loaded = DocumentSession::loadFile(exported);
+    ASSERT_TRUE(loaded.document);
+    ASSERT_EQ(loaded.document->getPageCount(), 4u);
+    EXPECT_FALSE(DocumentSearch::findOnPage(*loaded.document, 1, "pastedbeta").empty());
+}

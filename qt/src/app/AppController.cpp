@@ -2358,6 +2358,7 @@ bool AppController::exportPdf(const QUrl& url) {
         return false;
     }
     session()->clearSelectionEndText();  // everything back in the document
+    session()->waitForMerges();          // (pages pasted just now: their PDF pages)
     fs::path target(url.toLocalFile().toStdString());
     if (target.extension() != ".pdf") {
         target += ".pdf";
@@ -2456,6 +2457,7 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
         return false;
     }
     s->clearSelectionEndText();
+    s->waitForMerges();  // (pages pasted just now: their PDF pages)
     // What is printed: the document as a PDF, or the PDF it annotates as it is
     QTemporaryDir temporary;
     if (!temporary.isValid()) {
