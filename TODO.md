@@ -102,7 +102,7 @@ is built.
 
 ## Ready after a short plan: platform
 
-### `qt/windows-build`: first Windows build (the author, 2026-09-24; started)
+### `qt/windows-build`: first Windows build (merged 2026-09-24; `~/xournal_qt_workspace/samples/xournal-qt-windows-x64.zip`; next steps in `qt/docs/windows-roadmap.md`)
 - GitHub Actions on a Windows runner with MSYS2 UCRT64 (upstream Xournal++'s toolchain; the C libraries and Qt 6
   come prebuilt), started by hand or by a push to the branch. It produces a zip, with an installer later. QField's
   MSVC + vcpkg way is the fallback.

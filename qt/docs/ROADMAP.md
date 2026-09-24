@@ -320,6 +320,22 @@
   - The index records links: "Linked from…", links rewritten after in-app renames and moves, and a search for
     targets that were moved outside the app.
   - Hybrid PDFs get `/Link` annotations (`GoToR` or `/URI`).
+- **Windows build, `qt/windows-build` (2026-09-24).** See [windows.md](windows.md) and
+  [windows-roadmap.md](windows-roadmap.md).
+  - GitHub Actions `xqt-windows.yml` (on a push to `qt/windows-build`, or by hand): MSYS2 UCRT64, Qt 6, a portable
+    `xournal-qt-windows-x64` folder deployed with windeployqt and the MinGW DLLs, and a smoke test (CLI exports and
+    the app off-screen, with gdb backtraces of failures).
+  - Windows fixes:
+    - single instance, memory size, crash handling (an unhandled-exception filter);
+    - printing through poppler and Qt;
+    - a UTF-8 C locale and XDG folders;
+    - an 8 MB thread stack;
+    - gnu++20 / `NOMINMAX`;
+    - `Util::toUri` for poppler;
+    - `PageFilterModel` signals connected one by one.
+  - Text is drawn with Pango's fontconfig backend (`WindowsFonts.cpp`: a generated fonts.conf with the Windows font
+    folders, the cache warmed in the background). Pango's win32 backend dies drawing text into images; it stays as
+    an informational check for an upstream report.
   318 KiB.
 
 ## Backlog (decide later)
