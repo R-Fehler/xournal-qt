@@ -60,6 +60,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"zoomOut", tr("Zoom out"), view, standard(QKeySequence::ZoomOut)},
             {"fitWidth", tr("Fit the width"), view, {"Ctrl+0"}},
             {"fullScreen", tr("Full screen"), view, {"F11"}},
+            {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
             {"back", tr("Back"), view, standard(QKeySequence::Back)},
             {"forward", tr("Forward"), view, standard(QKeySequence::Forward)},
             {"settings", tr("Settings"), view, {"Ctrl+,"}},

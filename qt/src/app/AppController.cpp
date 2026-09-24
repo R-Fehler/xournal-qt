@@ -626,6 +626,7 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
     }
+    updatePresentedView();  // (another tab: it presents now)
     Q_EMIT documentChanged();
     Q_EMIT titleChanged();
     Q_EMIT modifiedChanged();
@@ -898,6 +899,91 @@ void AppController::setPairsOffset(int offset) {
         app->getSettings()->setPairsOffset(offset);
         Q_EMIT app->settingsChanged();
         Q_EMIT viewLayoutChanged();
+    }
+}
+
+bool AppController::horizontalScrolling() const { return app->getSettings()->isViewFixedRows(); }
+int AppController::viewRows() const { return std::max(1, app->getSettings()->getViewRows()); }
+bool AppController::snapPages() const { return CanvasView::snapSetting(*app->getSettings()); }
+
+void AppController::setHorizontalScrolling(bool on) {
+    if (on != horizontalScrolling()) {
+        // Upstream's "fixed rows", filled column by column (its vertical layout): the same pages side by side
+        app->getSettings()->setViewFixedRows(on);
+        app->getSettings()->setViewLayoutVert(on);
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+void AppController::setViewRows(int rows) {
+    rows = std::clamp(rows, 1, 8);
+    if (rows != viewRows()) {
+        app->getSettings()->setViewRows(rows);
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+void AppController::setSnapPages(bool snap) {
+    if (snap != snapPages()) {
+        app->getSettings()->getCustomElement("xournalQt").setBool("snapPages", snap);  // (see CanvasView::snapSetting)
+        app->getSettings()->customSettingsChanged();
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+
+void AppController::setPresenting(bool on) {
+    if (on == presentingOn || (on && !canvas())) {
+        return;
+    }
+    presentingOn = on;
+    updatePresentedView();
+    Q_EMIT presentingChanged();
+}
+
+void AppController::updatePresentedView() {
+    CanvasView* wanted = presentingOn ? canvas() : nullptr;
+    if (presentedView == wanted) {
+        return;
+    }
+    if (presentedView) {
+        presentedView->setPresenting(false);
+    }
+    presentedView = wanted;
+    if (presentedView) {
+        presentedView->setPresenting(true);
+    }
+}
+
+xqt::CanvasView* AppController::keyCanvas() const {
+    if (referenceMode->focused() && referenceMode->canvas()) {
+        return referenceMode->canvas();  // (the reference has the keys)
+    }
+    return canvas();
+}
+
+void AppController::stepPage(int delta) {
+    CanvasView* v = keyCanvas();
+    if (!v || v->pageCount() == 0 || v->getViewController().stepPages(delta)) {
+        return;
+    }
+    const auto page = static_cast<std::ptrdiff_t>(v->getSession().getCurrentPageNo()) + delta;
+    showPage(static_cast<size_t>(std::clamp<std::ptrdiff_t>(page, 0, static_cast<std::ptrdiff_t>(v->pageCount()) - 1)));
+}
+
+void AppController::showPage(size_t page) {
+    if (CanvasView* v = keyCanvas(); v && page < v->pageCount()) {
+        v->getSession().setCurrentPageNo(page);
+        v->getViewController().scrollToPage(page);
+    }
+}
+
+void AppController::previousPage() { stepPage(-1); }
+void AppController::nextPage() { stepPage(1); }
+void AppController::firstPage() { showPage(0); }
+void AppController::lastPage() {
+    if (CanvasView* v = keyCanvas(); v && v->pageCount() > 0) {
+        showPage(v->pageCount() - 1);
     }
 }
 
@@ -2356,14 +2442,16 @@ void AppController::setSize(int s) {
 
 void AppController::fitWidth() {
     if (referenceMode->focused()) {
-        referenceMode->fitWidth();
-    } else if (canvas()) {
-        canvas()->getViewController().fitWidth();
+        referenceMode->fitWidth();  // (the page in view there)
+    } else if (canvas() && session()) {
+        canvas()->getViewController().fitWidth(session()->getCurrentPageNo());
     }
 }
 
 void AppController::fitHeight() {
-    if (canvas() && session()) {
+    if (canvas() && session() && canvas()->documentLayout().horizontal()) {
+        canvas()->getViewController().fitHeight();  // sideways: all rows, and kept
+    } else if (canvas() && session()) {
         canvas()->getViewController().fitPage(session()->getCurrentPageNo(), false);
     }
 }

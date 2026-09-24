@@ -15,7 +15,8 @@ Item {
     objectName: "referenceSplit"
     /// (the area itself takes no input: DocumentCanvasItem looks through it, to the main canvas under it)
     property bool inputTransparent: true
-    readonly property bool active: app.reference.active && !app.homeVisible
+    // (presenting shows the notes alone; the reference comes back afterwards)
+    readonly property bool active: app.reference.active && !app.homeVisible && !app.presenting
     readonly property bool onLeft: app.reference.onLeft
     /// The gap between the two canvases; the divider's handle is wider (touch)
     readonly property real gap: 8

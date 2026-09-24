@@ -125,13 +125,12 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     // Column layout changed in the settings: lay out again, keep the current page in view.
     connect(&session.getApp(), &AppContext::settingsChanged, this, [this] {
+        applyScrolling();
         if (layoutConfig() != layout.getConfig()) {
-            const size_t page = this->session.getCurrentPageNo();
-            refreshLayout();
-            viewController.fitWidth();
-            viewController.scrollToPage(page);
+            relayout();
         }
     });
+    applyScrolling();
 
     updateRenderParams();
     CanvasMemory::instance().add(this);
@@ -231,10 +230,67 @@ void CanvasView::rebuildPages() {
 }
 
 DocumentLayout::Config CanvasView::layoutConfig() const {
-    // Upstream's view settings (viewColumns, showPairedPages, numPairsOffset).
+    DocumentLayout::Config c;
+    if (presenting) {
+        // One page after the other, each filling the screen
+        c.horizontal = true;
+        c.noMargins = true;
+        return c;
+    }
+    // Upstream's view settings (viewColumns, showPairedPages, numPairsOffset; sideways: viewFixedRows, viewRows).
     const Settings* s = session.getSettings();
-    return {static_cast<size_t>(std::max(1, s->getViewColumns())), s->isShowPairedPages(),
-            static_cast<size_t>(std::max(0, s->getPairsOffset()))};
+    c.columns = static_cast<size_t>(std::max(1, s->getViewColumns()));
+    c.paired = s->isShowPairedPages();
+    c.pairsOffset = static_cast<size_t>(std::max(0, s->getPairsOffset()));
+    c.horizontal = s->isViewFixedRows();
+    c.rows = static_cast<size_t>(std::max(1, s->getViewRows()));
+    return c;
+}
+
+bool CanvasView::snapSetting(Settings& settings) {
+    bool snap = true;
+    settings.getCustomElement("xournalQt").getBool("snapPages", snap);
+    return snap;
+}
+
+void CanvasView::applyScrolling() {
+    viewController.setSnapping(presenting || snapSetting(*session.getSettings()), presenting ? 1 : 0);
+}
+
+void CanvasView::setPresenting(bool on) {
+    if (on == presenting) {
+        return;
+    }
+    const size_t page = session.getCurrentPageNo();
+    if (on) {
+        zoomBeforePresenting = viewController.zoom();
+        fitBeforePresenting = viewController.keptFit();
+    }
+    presenting = on;
+    applyScrolling();
+    refreshLayout();
+    if (on) {
+        viewController.fitPresentedPage(page);
+        return;
+    }
+    if (fitBeforePresenting != ViewController::Fit::None || zoomBeforePresenting <= 0) {
+        viewController.fitDefault(page);
+    } else {
+        const QSizeF size = viewController.viewSize();
+        viewController.setZoom(zoomBeforePresenting, QPointF(size.width() / 2, size.height() / 2));
+    }
+    viewController.scrollToPage(page);
+}
+
+void CanvasView::relayout() {
+    const size_t page = session.getCurrentPageNo();
+    refreshLayout();
+    if (presenting) {
+        viewController.fitPresentedPage(page);
+        return;
+    }
+    viewController.fitDefault(page);
+    viewController.scrollToPage(page);
 }
 
 // --- selection (port of upstream XournalView) ------------------------------------------------------------------
@@ -621,9 +677,13 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
     const QRectF pageRect = pageViewRect(*idx);
     const double zoom = viewController.zoom();
     const QPointF onPage((viewPos.x() - pageRect.x()) / zoom, (viewPos.y() - pageRect.y()) / zoom);
-    // Zoomed in already: back to the whole page
+    // Zoomed in already: back to the whole page (presenting: filling the screen again)
     if (pageRect.width() > viewController.viewSize().width() * 1.05) {
-        viewController.fitPage(*idx, true);
+        if (presenting) {
+            viewController.fitPresentedPage(*idx);
+        } else {
+            viewController.fitPage(*idx, true);
+        }
         return;
     }
     if (const auto column = textColumnAt(*idx, onPage)) {
@@ -631,7 +691,7 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
                                                    column->height()));
         return;
     }
-    viewController.fitWidth();
+    viewController.fitWidth(*idx);
 }
 
 bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
@@ -1362,6 +1422,7 @@ void CanvasView::refreshLayout() {
         refs.push_back(p->getPage());
     }
     layout.update(*session.getDocument(), refs, layoutConfig());
+    jumpedPage.reset();  // (pages came or went: another index)
     viewController.layoutChanged();
     Q_EMIT pagesChanged();
 }
@@ -1370,7 +1431,14 @@ void CanvasView::viewChanged() {
     const int EVERY_MS = visibilityDelay;  // (about one frame)
     // A jump (to a page, a fit, a new size) right away; plain scrolling and zooming send more changes than there are
     // frames, and looking at the visible pages tells the models and moves the sidebar along.
-    if (viewController.takeJumped() || !sinceVisibility.isValid() || sinceVisibility.elapsed() >= EVERY_MS) {
+    const std::optional<size_t> toPage = viewController.takePageJump();
+    const bool jumped = viewController.takeJumped();
+    if (toPage) {
+        jumpedPage = toPage;
+    } else if (!jumped) {
+        jumpedPage.reset();  // scrolled or zoomed by hand: the most visible page is the current one again
+    }
+    if (jumped || !sinceVisibility.isValid() || sinceVisibility.elapsed() >= EVERY_MS) {
         sinceVisibility.restart();
         visibilityTimer.stop();
         updateVisibility();
@@ -1391,9 +1459,18 @@ void CanvasView::updateVisibility() {
     size_t mostVisible = session.getCurrentPageNo();
     double bestArea = -1;
     const QRectF visible = viewController.visibleContentRect();
-    for (size_t i = first; i <= last && i < pages.size(); ++i) {
+    const auto shownArea = [&](size_t i) {
         const QRectF inter = layout.pageRect(i, zoom).intersected(visible);
-        if (const double area = inter.width() * inter.height(); area > bestArea) {
+        return inter.width() * inter.height();
+    };
+    // After a jump to a page, that page is the current one while it can be seen: at the end of the document the
+    // page before a small last page may show more of itself.
+    if (const auto p = jumpedPage; p && *p >= first && *p <= last && *p < pages.size() && shownArea(*p) > 0) {
+        mostVisible = *p;
+        bestArea = std::numeric_limits<double>::infinity();
+    }
+    for (size_t i = first; i <= last && i < pages.size(); ++i) {
+        if (const double area = shownArea(i); area > bestArea) {
             bestArea = area;
             mostVisible = i;
         }

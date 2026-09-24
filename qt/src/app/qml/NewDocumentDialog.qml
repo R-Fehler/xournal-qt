@@ -66,10 +66,13 @@ Dialog {
             ComboBox {
                 id: paperBox
                 objectName: "paperBox"
-                Layout.preferredWidth: 150
+                Layout.preferredWidth: 210
                 model: dlg.s.paperFormats
                 currentIndex: dlg.paper
-                onActivated: dlg.paper = currentIndex
+                onActivated: {
+                    dlg.paper = currentIndex
+                    if (dlg.s.paperIsWide(currentIndex)) dlg.landscape = true  // (a slide is landscape)
+                }
             }
             Item { Layout.fillWidth: true }
             ButtonGroup { id: orientation }

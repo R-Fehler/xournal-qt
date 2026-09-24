@@ -782,3 +782,60 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       turn; both show sharp pages quickly, neither waits behind the other's pages rendered in advance. Swap roles:
       no page goes blurry or is drawn again. Switch to a third tab and back: the reference's pages near where it
       was read are still there.
+
+## Presentation and horizontal scrolling (qt/present)
+- [ ] Page number jump: with a document open, type `12` on the keyboard (no text being written): "Go to page: 12
+      of N" appears over the page; Enter goes to page 12 (a number past the end goes to the last page), Escape or a
+      tap on the page cancels, Backspace takes a digit back, the number pad works too. Alt+Left goes back to where
+      you were. Typing digits into a text on the page, a Markdown box, the search field or a dialog does not open it.
+- [ ] 16:9 pages: New document → Paper "16:9 (presentation)": it switches to Landscape by itself; the pages are
+      wide slides (PowerPoint's 13.33 × 7.5 in). Insert pages… after an A4 page with "16:9 (presentation)": the new
+      pages are slides, the A4 page stays. Save and open the `.xopp` in upstream Xournal++: the same page sizes.
+- [ ] Fit width follows the page in view: in an A4 document, paste or insert a 16:9 page; on an A4 page, tap the
+      zoom button (fit width): the A4 page fills the width (not smaller because of the slide). Scroll to the slide
+      and tap it again: the slide fills the width. Scrolling back keeps the zoom (fit width is not re-applied by
+      itself). With two pages side by side the row in view fills the width. Double tap on a zoomed-in page: back to
+      that page's width.
+- [ ] Scroll sideways: press and hold (or right click) the layout button in the page / zoom pill → "Scroll
+      sideways". The pages stand side by side, each as high as the window; the pill shows ‹ 3 / 40 ›. ‹ › go to the
+      previous / next page with a short slide, and so do ← → and Page Up / Down (Home / End: first / last page);
+      tapping › several times quickly goes that many pages on smoothly.
+- [ ] With "Stop on whole pages" (on by default): a finger swipe goes to the next or previous page; a slow drag of
+      less than half a page springs back, more than half goes on; a strong fling goes on several pages and still
+      stops on one. Two fingers on the touchpad (sideways or up / down) do the same; the mouse wheel goes one page
+      per notch. The pages are sharp when they arrive (the next and previous pages are drawn in advance): watch
+      for blurry pages while paging quickly through a PDF.
+- [ ] Turn "Stop on whole pages" off: swiping, the touchpad and the wheel (up / down scrolls sideways) scroll freely
+      with momentum, as the pages going down do.
+- [ ] Layout menu → Rows +: two rows of pages (pages 1 and 2 above each other, then 3 and 4, …), both rows fit the
+      height; "Two pages side by side" and "Book" keep the pairs side by side. Resize the window: the pages fit the
+      height again, on the same page. Pinch or Ctrl+wheel zoom: the zoom stays when the window is resized.
+- [ ] Close and start the app again: the sideways layout, rows and "Stop on whole pages" are kept.
+      Switch back ("Scroll sideways" off): pages go down as before, on the same page.
+- [ ] Present from the tool bar (the presentation button next to full screen), from ⋮ → "Present (F5)", or with
+      F5: the window goes full screen on black, the current page fills the screen (a 16:9 slide edge to edge on a
+      16:9 screen, an A4 page in the middle with black on both sides), no pill, no scroll bars; the tool square stays
+      and "12 / 40" shows at the bottom for a moment after each page change, then fades.
+- [ ] Keys like PowerPoint: Space, →, ↓, Page Down next; ←, ↑, Page Up, Backspace previous; Home / End; a number
+      and Enter goes to that page. A presenter remote (clicker, sending Page Up / Down) pages too.
+- [ ] Swipe with a finger: one page per swipe, even a strong one; a short slow drag springs back. Two fingers on
+      the touchpad page as well.
+- [ ] Write with the pen while presenting: the stroke stays on the page, nothing pages or moves. Tap the tool
+      square: tools and colors; "Stop presenting" ends it there. Pinch to zoom into a slide: it scrolls within the
+      slide; a double tap brings it back to the whole slide.
+- [ ] Escape ends presenting: full-screen editing, with the zoom and layout from before, on the page that was
+      presented. A second Escape leaves full screen. From full screen, the tool square → "Present" starts it
+      again; F11 there leaves full screen and presenting at once.
+- [ ] A document with pages of different sizes (A4 and 16:9): each fills the screen when it is shown.
+- [ ] Performance: page quickly through a long PDF while presenting: each page arrives sharp (drawn in advance),
+      no grey or blurry page on arrival.
+- [ ] With a reference beside the notes: tap the reference, type `4` Enter: the reference goes to page 4, the
+      notes stay. Scrolling sideways, ← → page the side that was tapped last. The reference pill's fit width fits
+      the reference's current page. Present (F5): the notes alone fill the screen; after Escape, Escape the
+      reference is back beside them.
+- [ ] Full screen (editing) with several documents open: a slim bar at the top centre shows one dot per document
+      (the current one filled, a small orange mark on unsaved ones). Tap it: all open documents. Swipe left / right
+      along the bar with a finger: the next / previous document, its title shows for a moment. Swiping on the page
+      never switches documents. With one document, while presenting or with the search bar open, the bar is
+      hidden; it does not cover the tool square or the page / zoom pill, and spans a reference split in the middle.
+      With more than 12 documents it shows "3 / 17".

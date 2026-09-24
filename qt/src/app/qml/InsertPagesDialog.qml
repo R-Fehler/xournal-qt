@@ -54,10 +54,13 @@ Dialog {
             Label { text: qsTr("Paper") }
             ComboBox {
                 objectName: "insertPaperBox"
-                Layout.preferredWidth: 190
+                Layout.preferredWidth: 210
                 model: [qsTr("Like this page")].concat(app.settings.paperFormats)
                 currentIndex: dlg.paper + 1
-                onActivated: dlg.paper = currentIndex - 1
+                onActivated: {
+                    dlg.paper = currentIndex - 1
+                    if (app.settings.paperIsWide(dlg.paper)) dlg.landscape = true  // (a slide is landscape)
+                }
             }
             Item { Layout.fillWidth: true }
             ButtonGroup { id: orientation }
