@@ -22,6 +22,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/DocumentTextIndex.h"
 #include "session/FuzzyQuery.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
@@ -190,7 +191,8 @@ TEST_F(LibraryFuzzyTest, modelRanksHighlightsAndFallsBack) {
     QSignalSpy toggled(&model, &LibraryModel::fuzzySearchChanged);
     model.setFuzzySearch(true);
     EXPECT_EQ(toggled.count(), 1);
-    EXPECT_EQ(names(), (Names{"Kalman lecture"})) << "the letters in this order";
+    ASSERT_EQ(names().size(), 4u) << "the name, and the word kalman in the text (its letters close together)";
+    EXPECT_EQ(names().front(), "Kalman lecture") << "the letters in this order in the name first";
     const QVariantList marks = model.data(model.index(0), LibraryModel::NameMarksRole).toList();
     EXPECT_EQ(marks, (QVariantList{0, 2, 3, 5}));
 
@@ -253,6 +255,54 @@ TEST_F(LibraryFuzzyTest, hitPagesMarkTheTermsOfTheQuery) {
     EXPECT_NE(one, marked) << "both terms are marked, not one";
 }
 
+// Fuzzy terms match words of the text (WordMatch.h): `tbine` finds "turbine", the whole word is marked on the page
+// pictures, as often as it is counted, and documents with the word itself come first.
+TEST_F(LibraryFuzzyTest, fuzzyTermsFindWordsInText) {
+    makeWordPdf(root / "energy.pdf", "wind turbine blades");
+    makeWordPdf(root / "code.pdf", "the tbine module");
+    makeWordPdf(root / "music.pdf", "tambourine and timberline");
+    makeWordPdf(root / "short.pdf", "tb and tbn");
+    LibraryIndex index(root);
+    index.update(DocumentFiles::scanRecursive(root));
+    index.waitForDone();
+    auto search = [&](const char* query) { return index.search(FuzzyQuery(QString::fromUtf8(query))); };
+
+    auto hits = search("tbine");
+    ASSERT_EQ(files(hits), (Names{"code.pdf", "energy.pdf"})) << "the word itself first, then fuzzy matches";
+    EXPECT_FALSE(hits[0].fuzzyOnly);
+    EXPECT_TRUE(hits[1].fuzzyOnly);
+    EXPECT_EQ(hits[1].count, 1);
+    ASSERT_EQ(hits[1].pageHits.size(), 1u);
+    EXPECT_TRUE(hits[1].snippet.contains("turbine")) << hits[1].snippet.toStdString();
+    EXPECT_EQ(files(search("turbnie")), (Names{"energy.pdf"})) << "a typo";
+    EXPECT_EQ(files(search("tbine !'module")), (Names{"energy.pdf"}));
+    auto sorted = [&](const char* query) {
+        Names out = files(search(query));
+        std::sort(out.begin(), out.end());
+        return out;
+    };
+    EXPECT_EQ(sorted("tb"), (Names{"code.pdf", "short.pdf"})) << "a short term: a substring, as before";
+    EXPECT_TRUE(files(search("'tbine")).size() == 1) << "exact: only the word itself";
+    EXPECT_GT(index.vocabularyBytes(), 0u);
+
+    // The whole word is marked on the page's picture, once, as counted
+    const auto terms = FuzzyQuery(QStringLiteral("tbine")).markTerms();
+    auto loaded = DocumentSession::loadFile(root / "energy.pdf");
+    ASSERT_TRUE(loaded.document);
+    PdfLayoutReader reader(root / "energy.pdf");
+    const auto rects = termRects(*loaded.document->getPage(0), &reader, terms);
+    ASSERT_EQ(rects.size(), 1u);
+    const auto plain = termRects(*loaded.document->getPage(0), &reader, {{"turbine", textmatch::Anywhere}});
+    ASSERT_EQ(plain.size(), 1u);
+    EXPECT_EQ(rects[0], plain[0]) << "the whole word \"turbine\"";
+    const fs::path file = root / "energy.pdf";
+    const QImage none = HitPageProvider::render(file, 0, HitPageProvider::marksOf({{"nothing", textmatch::Anywhere}}), 256);
+    const QImage marked = HitPageProvider::render(file, 0, HitPageProvider::marksOf(terms), 256);
+    const QImage asWord = HitPageProvider::render(file, 0, HitPageProvider::marksOf({{"turbine", textmatch::Word}}), 256);
+    EXPECT_NE(none, marked);
+    EXPECT_EQ(marked, asWord) << "marked like the word itself";
+}
+
 // A search hit opened from the library with the fuzzy search on: the document's search reads the same syntax.
 TEST_F(LibraryFuzzyTest, openedHitsSearchTheDocumentTheSameWay) {
     makeLibrary();
@@ -299,7 +349,18 @@ TEST_F(LibraryFuzzyTest, benchFuzzySearch) {
     const std::vector<std::string> words{"kalman", "filter", "lecture", "notes", "signals", "systems", "control",
                                          "robust", "linear", "algebra", "sheet", "exam", "draft", "paper", "thesis",
                                          "analysis", "quantum", "optics", "report", "summary", "physics", "math"};
-    auto word = [&] { return words[rng() % words.size()]; };
+    // Besides these, a vocabulary of 40,000 made-up words (a quarter of the text), so the text has as many distinct
+    // words as a real library
+    std::vector<std::string> rare;
+    for (int i = 0; i < 40000; ++i) {
+        std::string w;
+        const int length = 4 + static_cast<int>(rng() % 9);
+        for (int k = 0; k < length; ++k) {
+            w += static_cast<char>('a' + rng() % 26);
+        }
+        rare.push_back(std::move(w));
+    }
+    auto word = [&] { return rng() % 4 == 0 ? rare[rng() % rare.size()] : words[rng() % words.size()]; };
     for (int i = 0; i < documents; ++i) {
         const fs::path dir = root / ("folder " + std::to_string(i % 40)) / ("sub " + std::to_string(i % 7));
         fs::create_directories(dir);
@@ -319,6 +380,13 @@ TEST_F(LibraryFuzzyTest, benchFuzzySearch) {
     model.setLibrary(std::make_unique<Library>(root));
     model.searchIndex()->waitForDone();
     std::cout << documents << " documents indexed in " << t.elapsed() << " ms" << std::endl;
+    {
+        // The first fuzzy search of the text (it may prepare what later ones use)
+        QElapsedTimer first;
+        first.start();
+        const size_t found = model.searchIndex()->search(FuzzyQuery(QStringLiteral("signals"))).size();
+        std::cout << "first fuzzy search: " << found << " documents, " << first.elapsed() << " ms" << std::endl;
+    }
     // (the best of three runs: the machine may be busy)
     auto measure = [&](bool fuzzy, const char* query) {
         model.setFuzzySearch(fuzzy);
@@ -344,6 +412,10 @@ TEST_F(LibraryFuzzyTest, benchFuzzySearch) {
     measure(false, "kalman filter");
     measure(true, "kalman filter");
     measure(true, "klmn");
+    measure(false, "klman");
+    measure(true, "klman");     // a typo
+    measure(true, "sgnals");    // letters left out
+    measure(true, "kalman");    // again: the words' matches are kept
     measure(true, "(kalman | robust) !draft ^lin");
     measure(true, "'quantum' optics$");
     SUCCEED();

@@ -64,6 +64,8 @@ public:
     /// For a term with textmatch::Fuzzy (kept for the last few terms, and extended when the dictionary grew).
     static std::shared_ptr<const Matches> of(const textmatch::Term& term);
     wordmatch::Quality quality(Id id) const;
+    /// How a word (as TextMatch::words() gives it) matches.
+    wordmatch::Quality match(QStringView word) const { return rule.match(word); }
 
     explicit Matches(const textmatch::Term& term);  // (use of())
 
@@ -98,6 +100,9 @@ public:
     bool contains(size_t i, std::initializer_list<QStringView> texts, const Vocabulary* vocab) const;
 
 private:
+    /// A match (of a counted term that is not fuzzy) overlaps a word that a counted fuzzy term matches.
+    bool touchesMatchingWord(QStringView text, const textmatch::Span& m) const;
+
     std::vector<textmatch::Term> list;
     std::vector<char> counts;
     std::vector<std::shared_ptr<const Matches>> matches;  ///< per term: of a fuzzy one

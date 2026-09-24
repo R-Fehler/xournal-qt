@@ -238,7 +238,8 @@ for the 1,300 pages of the pgf manual, on each key typed) - the count, "n pages 
 and the page grid and the counts in the tab overview come from it at once. Where the hits are drawn is computed
 only for the pages shown (canvas, thumbnails in view, the first pages of the overview) and the page of the current
 hit, from the text and the box of each character that poppler gives for the page (read on demand before any other
-work; the last 48 pages are kept). Both steps match the same text with the same matcher (`TextMatch.*`:
+work; the last 48 pages are kept). Fuzzy terms (the fuzzy search, below) are counted from the words of each page (its vocabulary), not by a scan.
+Both steps match the same text with the same matcher (`TextMatch.*`:
 case-insensitive, whitespace runs as one space - so a phrase across a line break is found -, ligatures as their
 letters, a word broken at a line end with a hyphen found whole), so the count and the marks agree.
 
@@ -256,7 +257,7 @@ the search is exactly the plain one. The button's tooltip is the short help.
 
 | Typed | Finds |
 | --- | --- |
-| `kalman` | names (and folder paths) with these letters in this order, best first; text containing `kalman` |
+| `kalman` | names (and folder paths) with these letters in this order, best first; in text: words with these letters close together, or with a typo (`tbine` finds "turbine") |
 | `kalman filter` | both (a space is AND) |
 | `kalman \| lqr` | either; `\|` binds closer than the space: `a b \| c` is a and (b or c), as in fzf |
 | `!draft` | without it: not in the name, the folder path or the text (an exact substring; `!'dft`: fuzzy on names) |
@@ -273,10 +274,30 @@ short red hint next to the field says why, and the text is searched as plain tex
 **What is matched where.** A document's **name** and its **folder path** in the library are matched with fzf's
 algorithm (FuzzyMatchV2 and its exact, boundary, prefix, suffix and equal matches) and scored: the name first; a term
 not in the name is looked for in "folder/name" (so `uni lect` finds `Uni/Lecture 3`) and scores a quarter. Its
-**text** (PDF text, text elements, Markdown passages, text files) is searched per term as a substring through the
-same matcher as the plain search (`TextMatch`: case, whitespace, ligatures, hyphenation), at word bounds for `^`, `$`
-and `'word'` (a word broken at a line end is one word). A fuzzy subsequence over megabytes of text would match
-nearly anything, so a plain term is a substring there. A term **holds for a document** when its name/path or its text
+**text** (PDF text, text elements, Markdown passages, text files) is read with the same matcher as the plain search
+(`TextMatch`: case, whitespace, ligatures, hyphenation):
+- a **plain term of 3 or more letters and digits** (`tbine`) matches **word by word** (`qt/src/session/WordMatch.*`):
+  a word matches when
+  1. it contains the term (what the plain search finds in it: "turbine", "turbines" for `turbine`) - *exact*;
+  2. it starts with the term's first letter and has all its letters in this order, with at most half as many other
+     letters between them as the term has (rounded down; letters after the last one do not count): `tbine` finds
+     "turbine" (u, r between) but not "tambourine" (5 between), `klmn` "kalman", `thrm` "thermal", `mtrx` "matrix",
+     `abc` "abacus" but not "abduct" - *fuzzy*;
+  3. it is the term with a **typo**, if the term has 5 or more letters: one letter swapped with the next, left out,
+     added or wrong (`turbnie`, `trbine`, `turbinne`, `turbime` find "turbine"; Damerau-Levenshtein distance, optimal
+     string alignment) - *fuzzy*. How many typos is a setting (Settings → Search, below).
+
+  The hit is the whole word (a word broken at a line end is one word), in the count and in the marks. fzf's score was
+  tried as the threshold for rule 2 first; on a dictionary of 73,000 words it does not tell good matches from bad
+  ones (turbine 77 % of a perfect score, tambourine 71 %; kalman 72 %, klansman 75 %), the letters in between do. A
+  fuzzy subsequence over the whole text would match nearly anything; within one word it does not. The first letter
+  at the word's start keeps short terms from matching letters scattered through long words;
+- a **term of 1-2 letters** (`tb`), or one with other characters (`e.g`, `c++`, `a\ b`), stays a substring, as in
+  the plain search;
+- `'exact` is a substring, `'word'` the whole word, `^pre` / `end$` a word that starts / ends with it, `!term` a
+  substring that must not be there (`!'term` is fuzzy, also in text).
+
+A term **holds for a document** when its name/path or its text
 has it, and the document is found when the expression holds with these values: `kalman filter` finds a lecture with
 "Kalman" on page 3 and "filter" on page 7, and `lecture !draft` drops "Lecture 3 draft" and every document with
 "draft" in it. Folders are found by their names and paths, other files (not indexed) by their names only.
@@ -289,12 +310,26 @@ are listed, so a document found never shows an empty row. A Markdown file's pass
 on a card is all hits of the terms that are not negated (overlapping hits of two terms count once, as they are
 marked).
 
-**Order**: fzf's score of the name and folder path first (documents found only by their text have none), then the
-hits in the text, then the newest. The matched letters of a name are highlighted on its card, as fzf shows them.
+**Order**: fzf's score of the name and folder path first (documents found only by their text have none), then
+documents with exact hits in the text (a word that contains the term, or a hit of a term that is not fuzzy) before
+those whose words only match fuzzily, then the hits in the text, then the newest. The matched letters of a name are highlighted on its card, as fzf shows them.
 
 Opening a hit (a card, a page, a snippet card) searches the document with the same query and syntax; refined in the
 document's search bar it stays a fuzzy search until the bar is cleared. The pictures of the pages mark every term
-that is not negated (poppler's search, so `^`, `$` and `'word'` are marked as substrings there).
+that is not negated where the search of an open document marks it: the page's PDF text is read with the boxes of its
+characters (a poppler instance of the cached document, `PdfLayoutReader`) and matched with `TextMatch`, so `^`, `$`
+and `'word'` are marked at word bounds and a fuzzy term's words whole. (The plain search's pictures still use
+poppler's search.)
+
+**Vocabularies.** Matching every word of megabytes of text for each key typed would be slow, so fuzzy terms are
+matched against the distinct words instead (`qt/src/session/Vocabulary.*`): every word seen gets a number in one
+dictionary for the program (never forgotten; a few MB at most), each page (a Markdown file: each passage) gets its
+words with how often each occurs, made from the index text in memory (the packs do not change) when the fuzzy search
+is turned on or at its first search, and kept until the document changes, and a term is matched once against the
+dictionary (the last 16 terms are kept). A page's count is the sum of the counts of its matching words, the hits
+`TextMatch` marks in its text; where a substring term's hit overlaps a matching word, that page is counted in its
+text, so it counts once, as it is marked. The index of an open document does the same per page (the first fuzzy
+search makes the vocabularies).
 
 **The tab overview** ("search all documents", Ctrl+Shift+F) has the same button and setting: a document (its
 title, and the text of its search index) is marked when the expression holds, its title's matched letters are
@@ -303,12 +338,22 @@ and its row of pages (the extended view) lists the pages on which the expression
 there with the toggle on: the expression over the titles alone.
 
 The query is parsed once per search (`qt/src/session/FuzzyQuery.*`, fzf's port in `FuzzyMatch.*`), each text is
-scanned once per term. Measured on a generated library of 3,000 Markdown files in 320 folders (~12 MB of text, six
+scanned once per term that is not fuzzy; fuzzy terms are counted from the vocabularies. Measured on a generated library of 3,000 Markdown files in 320 folders (~12 MB of text, six
 files of ~1.7 MB) on the development machine, best of three, in several runs while other builds kept it busy (load
 5-7), so as ranges: the index search takes 18-55 ms for a plain word, 24-74 ms for the same word fuzzy, 44-133 ms
 for `kalman filter` and 77-215 ms for `(kalman | robust) !draft ^lin`; the library model adds 10-90 ms around it (it
 lists the folders again, as the plain search does). Typing waits 300 ms before it searches, as before.
 `XQT_BENCH_FUZZY=3000 xqt-shell-tests --gtest_filter='LibraryFuzzyTest.bench*'` repeats the measurement.
+
+Fuzzy words in text (2026-09-24; the benchmark's text now also has 40,000 made-up words, a quarter of it, so it has
+as many distinct words as a real library; load 2-3, so again as ranges): before, with a fuzzy term a substring, the
+index search took 24-51 ms for one word (`kalman`, `klman`, `sgnals`), 72 ms for `kalman filter`, 133 ms for
+`(kalman | robust) !draft ^lin`; now, matching words, 25-41 ms, 35-41 ms and 104 ms. The first search makes the
+vocabularies of all 3,000 documents (~10 MB of text): 320-410 ms, done in the background when the fuzzy search is
+on. In an open document (the pgf manual, 1,321 pages): matching every word for each key typed took 54-75 ms (160 ms
+for two terms); from the vocabularies 1.7-7.8 ms, the substring search 3-5 ms. Its first fuzzy search makes the
+vocabularies, ~160 ms and 1.7 MB for 6.6 MB of text, a dictionary of 12,000 words. `XQT_BENCH_PDF=<pdf>
+xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open document.
 
 ## Home screen
 - It is the first tab (library icon and name). It is shown when no document is open, and closing the last tab

@@ -14,6 +14,7 @@
 #include "session/FuzzyMatch.h"
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
+#include "session/Vocabulary.h"
 #include "session/WordMatch.h"
 
 using namespace xqt;
@@ -288,7 +289,7 @@ TEST(TextMatch, fuzzyTermsMatchWholeWords) {
     // The words of a text, as the matcher reads them
     std::vector<std::pair<QString, qsizetype>> seen;
     const QString text = QStringLiteral("The Turbine's ﬁrst tur- bine; hyphen- Ated wind­turbine 2024-x");
-    words(text, [&](qsizetype start, qsizetype end, QStringView word) {
+    textmatch::words(text, [&](qsizetype start, qsizetype end, QStringView word) {
         seen.emplace_back(word.toString(), end - start);
     });
     const std::vector<std::pair<QString, qsizetype>> expected{
@@ -321,6 +322,48 @@ TEST(TextMatch, fuzzyTermsMatchWholeWords) {
     // Encoded for image URLs with their bits
     const std::vector<Term> encoded{{prepare("tbine"), Fuzzy | typoBits(2)}, {prepare("kal"), WordStart}};
     EXPECT_EQ(decode(encode(encoded)), encoded);
+}
+
+// Counted from vocabularies (no scan of the text for fuzzy terms), the hits are those TextMatch marks in the text.
+TEST(Vocabulary, countsAsTheMatcherMarks) {
+    using namespace textmatch;
+    const std::vector<QString> texts{
+            QStringLiteral("The Turbine's urbane turbines; a tur- bine and suburbs, turbnie."),
+            QStringLiteral("filter kalman filters Kalmanfilter kalmn filtr the end"),
+            QStringLiteral("nothing here"),
+            QString()};
+    const unsigned fuzzy = Fuzzy | typoBits(1);
+    const std::vector<std::vector<Term>> queries{
+            {{"tbine", fuzzy}},
+            {{"tbine", fuzzy}, {"urb", Anywhere}},            // overlapping: urb in Turbine
+            {{"tbine", fuzzy}, {"suburbs", WordStart}},       // not overlapping
+            {{"tbine", fuzzy}, {"turbine", fuzzy}},           // the same words: once
+            {{"kalman", fuzzy}, {"filter", fuzzy}, {"the", Word}},
+            {{"kalman", fuzzy}, {"an f", Anywhere}},          // across two words
+            {{"filtr", fuzzy}, {"lter", WordEnd}},
+            {{"xyz", fuzzy}}};
+    for (const QString& text: texts) {
+        const xqt::words::Vocabulary vocab({text});
+        for (const auto& q: queries) {
+            SCOPED_TRACE(text.toStdString() + " / " + q.front().text.toStdString() + " + " +
+                         std::to_string(q.size() - 1));
+            const xqt::words::Terms terms(q);
+            EXPECT_EQ(terms.count({text}, &vocab), count(text, q));
+            EXPECT_EQ(terms.count({text}, &vocab), static_cast<int>(find(text, q).size()));
+            for (size_t t = 0; t < q.size(); ++t) {
+                EXPECT_EQ(terms.contains(t, {text}, &vocab), contains(text, q[t].text, q[t].bounds));
+            }
+        }
+    }
+    // Only some terms counted (the others: whether they are there)
+    const QString text = texts[0];
+    const xqt::words::Vocabulary vocab({text});
+    const xqt::words::Terms some({{"tbine", fuzzy}, {"suburbs", Anywhere}}, {1, 0});
+    const auto f = some.examine({text}, &vocab);
+    EXPECT_EQ(f.count, 3) << "Turbine, turbines, tur- bine (turbnie: not for tbine)";
+    EXPECT_EQ(f.on, (std::vector<char>{1, 1}));
+    EXPECT_FALSE(f.exact) << "no word contains tbine";
+    EXPECT_TRUE(xqt::words::Terms({{"turbine", fuzzy}}).examine({text}, &vocab).exact);
 }
 
 TEST(FuzzyQuery, fuzzyTermsTakeTheTypoTolerance) {

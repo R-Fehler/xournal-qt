@@ -743,3 +743,10 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       `tbine` finds it, `turbnie` (letters swapped), `trbine` (one left out) and `turbime` (one wrong) too; the whole
       word "turbine" is marked on the canvas, in the sidebar and in the page grid, and the count matches the marks.
 - [ ] Short terms stay strict: `tb` finds only what contains "tb" (as before); `tbn` does not mark "turbine".
+- [ ] In the library with Fuzzy on, `tbine` lists the documents with "turbine" in their text. Search `turbine`:
+      documents with "turbine" or "turbines" come before those that only have a typo like "turbnie". The card's snippet shows "turbine", the pages button shows the page, and its
+      picture marks the whole word "turbine" (also `^turb` marks only word starts now, `'turbine'` whole words).
+- [ ] A Markdown file with "turbine" in a passage: `tbine` shows its snippet card with "turbine" marked; opening it
+      marks the same word in the document.
+- [ ] A big library: turning Fuzzy on, the first fuzzy search is not noticeably slower than the next ones (the words
+      are prepared in the background); typing stays as responsive as the plain search.

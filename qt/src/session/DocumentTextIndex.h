@@ -43,6 +43,7 @@
 
 class Text;
 class XojPage;
+struct _PopplerDocument;
 
 namespace xqt {
 
@@ -57,6 +58,28 @@ struct PdfPageLayout {
     /// Read from a poppler page's text (UTF-8) and the box of each of its characters (x1, y1, x2, y2 each).
     static PdfPageLayout from(const char* utf8, const double* boxes, size_t count);
 };
+
+/// The text and character boxes of the pages of a PDF file, read with a poppler instance of its own (the pictures of
+/// the library's pages with hits mark hits where the search of an open document marks them). One thread at a time.
+class PdfLayoutReader {
+public:
+    explicit PdfLayoutReader(fs::path pdf);
+    ~PdfLayoutReader();
+    PdfLayoutReader(const PdfLayoutReader&) = delete;
+    PdfLayoutReader& operator=(const PdfLayoutReader&) = delete;
+    /// Of a page (0-based); empty if it cannot be read.
+    PdfPageLayout layout(int pdfPage);
+
+private:
+    fs::path file;
+    ::_PopplerDocument* doc = nullptr;
+    bool failed = false;
+};
+
+/// Where the matches of `terms` (TextMatch.h) are on a page of a document: in its PDF text (`pdf` reads it; may be
+/// null) and in the texts of its text elements, as the search of an open document places them. The caller holds the
+/// document lock (shared).
+std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms);
 
 /// A piece of text shown by a text element of a page: a plain text whole, a Markdown box per text of its layout.
 struct ElementText {

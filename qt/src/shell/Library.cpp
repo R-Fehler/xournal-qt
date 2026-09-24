@@ -26,6 +26,7 @@
 #include "session/DocumentSession.h"
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
+#include "session/Vocabulary.h"
 #include "util/PathUtil.h"
 
 #include "MarkdownFile.h"
@@ -1067,8 +1068,10 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
     const auto& terms = query.terms();
     const std::vector<textmatch::Term> marks = query.markTerms();
     std::vector<textmatch::Term> termText;
-    for (const auto& t: terms) {
-        termText.push_back(t.textTerm());
+    std::vector<char> counted;  // the hits of the terms that are not negated count
+    for (size_t t = 0; t < terms.size(); ++t) {
+        termText.push_back(terms[t].textTerm());
+        counted.push_back(query.positive(t) ? 1 : 0);
     }
     std::vector<EntryPtr> snapshot;
     {
@@ -1079,15 +1082,26 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
             }
         }
     }
+    // Fuzzy terms match words: from the vocabularies of the documents, made first (then the words are matched at once)
+    const bool fuzzy = std::any_of(termText.begin(), termText.end(),
+                                   [](const textmatch::Term& t) { return (t.bounds & textmatch::Fuzzy) != 0; });
+    std::vector<std::shared_ptr<const EntryWords>> vocabularies;
+    if (fuzzy) {
+        vocabularies = wordsOf(snapshot);
+    }
+    const words::Terms prepared(termText, counted);
     // A page, a passage of a Markdown file or a text file's text: which terms are on it, and the hits of those that
     // are not negated
     struct Unit {
         int index = 0;
         int count = 0;
+        bool exact = false;
         std::vector<char> on;
     };
     std::vector<Hit> hits;
-    for (const auto& e: snapshot) {
+    for (size_t d = 0; d < snapshot.size(); ++d) {
+        const EntryPtr& e = snapshot[d];
+        const EntryWords* vocab = fuzzy ? vocabularies[d].get() : nullptr;
         Hit h;
         h.file = e->file;
         const fs::path dir = e->file.parent_path().lexically_relative(rootDir);
@@ -1096,56 +1110,20 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
         std::vector<char> inText(terms.size(), 0);
         std::vector<Unit> units;  // with hits
         const QString* snippetText = nullptr;
-        std::vector<textmatch::Span> spans;
-        const auto positives = std::count_if(terms.begin(), terms.end(), [&](const auto& t) {
-            return query.positive(static_cast<size_t>(&t - terms.data()));
-        });
-        auto examine = [&](int index, std::initializer_list<const QString*> texts) {
-            Unit u;
-            u.index = index;
-            u.on.assign(terms.size(), 0);
-            // One scan of each text per term: the hits of the counted terms, whether the negated ones are on it
-            for (const QString* text: texts) {
-                if (!text || text->isEmpty()) {
-                    continue;
-                }
-                spans.clear();
-                int present = 0, single = 0;
-                for (size_t t = 0; t < terms.size(); ++t) {
-                    const textmatch::Term& term = termText[t];
-                    if (query.positive(t) && positives == 1) {
-                        if (const int c = textmatch::count(*text, term.text, term.bounds); c > 0) {
-                            u.on[t] = 1;
-                            single += c;
-                        }
-                    } else if (query.positive(t)) {
-                        const size_t before = spans.size();
-                        for (const textmatch::Span& m: textmatch::find(*text, term.text, term.bounds)) {
-                            spans.push_back(m);
-                        }
-                        if (spans.size() > before) {
-                            u.on[t] = 1;
-                            ++present;
-                        }
-                    } else if (!u.on[t] && textmatch::contains(*text, term.text, term.bounds)) {
-                        u.on[t] = 1;
-                    }
-                }
-                // (overlapping hits of several terms count once, as they are marked)
-                const int n = present > 1 ? static_cast<int>(textmatch::merged(spans).size())
-                                          : static_cast<int>(spans.size()) + single;
-                if (n > 0 && !snippetText) {
-                    snippetText = text;
-                }
-                u.count += n;
-            }
+        auto examine = [&](int index, std::initializer_list<QStringView> texts) {
+            const auto unit = static_cast<size_t>(index);
+            const words::Terms::Found f =
+                    prepared.examine(texts, vocab && unit < vocab->units.size() ? &vocab->units[unit] : nullptr);
             for (size_t t = 0; t < terms.size(); ++t) {
-                inText[t] |= u.on[t];
+                inText[t] |= f.on[t];
             }
-            return u;
+            return Unit{index, f.count, f.exact, f.on};
         };
         for (qsizetype b = 0; b < e->blockText.size(); ++b) {
-            if (Unit u = examine(static_cast<int>(b), {&e->blockText[b]}); u.count > 0) {
+            if (Unit u = examine(static_cast<int>(b), {e->blockText[b]}); u.count > 0) {
+                if (!snippetText) {
+                    snippetText = &e->blockText[b];
+                }
                 units.push_back(std::move(u));
             }
         }
@@ -1157,7 +1135,12 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
                     pdfText = &it->second;
                 }
             }
-            if (Unit u = examine(p, {pdfText, &e->elementText[p]}); u.count > 0) {
+            const QString& elements = e->elementText[p];
+            if (Unit u = examine(p, {pdfText ? QStringView(*pdfText) : QStringView(), elements}); u.count > 0) {
+                if (!snippetText) {
+                    // (from the PDF text if that has hits, else from the text elements)
+                    snippetText = pdfText && !textmatch::find(*pdfText, marks).empty() ? pdfText : &elements;
+                }
                 units.push_back(std::move(u));
             }
         }
@@ -1170,8 +1153,10 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
         h.inName = name.score > 0;
         // The pages on which the expression holds (else all with hits)
         std::vector<const Unit*> listed;
+        bool exact = false;
         for (const Unit& u: units) {
             h.count += u.count;
+            exact = exact || u.exact;
             if (query.evaluate([&](size_t t) { return name.found[t] || u.on[t]; })) {
                 listed.push_back(&u);
             }
@@ -1181,6 +1166,7 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
                 listed.push_back(&u);
             }
         }
+        h.fuzzyOnly = h.count > 0 && !exact;
         if (snippetText) {
             const auto found = textmatch::find(*snippetText, marks);
             if (!found.empty()) {
@@ -1225,9 +1211,89 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
         if (a.nameScore != b.nameScore) {
             return a.nameScore > b.nameScore;
         }
+        if (a.fuzzyOnly != b.fuzzyOnly) {
+            return b.fuzzyOnly;  // exact words before words that only match fuzzily
+        }
         return a.count > b.count;
     });
     return hits;
+}
+
+std::vector<std::shared_ptr<const LibraryIndex::EntryWords>> LibraryIndex::wordsOf(
+        const std::vector<EntryPtr>& entries) const {
+    std::vector<std::shared_ptr<const EntryWords>> out(entries.size());
+    std::vector<size_t> missing;
+    {
+        std::lock_guard lock(wordsMtx);
+        for (size_t i = 0; i < entries.size(); ++i) {
+            if (auto it = wordCache.find(entries[i].get()); it != wordCache.end() && it->second.first == entries[i]) {
+                out[i] = it->second.second;
+            } else {
+                missing.push_back(i);
+            }
+        }
+    }
+    for (const size_t i: missing) {
+        const Entry& e = *entries[i];
+        auto w = std::make_shared<EntryWords>();
+        if (!e.blockText.isEmpty()) {
+            w->units.reserve(static_cast<size_t>(e.blockText.size()));
+            for (const QString& b: e.blockText) {
+                w->units.emplace_back(std::initializer_list<QStringView>{b});
+            }
+        } else {
+            w->units.reserve(static_cast<size_t>(e.pageCount()));
+            for (int p = 0; p < e.pageCount(); ++p) {
+                QStringView pdfText;
+                if (const int nr = e.pdfPage[static_cast<size_t>(p)]; nr >= 0) {
+                    if (auto it = e.pdfText.find(nr); it != e.pdfText.end()) {
+                        pdfText = it->second;
+                    }
+                }
+                w->units.emplace_back(std::initializer_list<QStringView>{pdfText, e.elementText[p]});
+            }
+        }
+        out[i] = std::move(w);
+    }
+    // Kept for the documents searched now (the entries of documents changed or gone are forgotten)
+    std::lock_guard lock(wordsMtx);
+    std::unordered_map<const Entry*, std::pair<EntryPtr, std::shared_ptr<const EntryWords>>> kept;
+    kept.reserve(entries.size());
+    for (size_t i = 0; i < entries.size(); ++i) {
+        kept.emplace(entries[i].get(), std::pair{entries[i], out[i]});
+    }
+    wordCache = std::move(kept);
+    return out;
+}
+
+void LibraryIndex::prepareWords() {
+    if (discarded || wordsQueued.exchange(true)) {
+        return;
+    }
+    pool->start([this] {
+        wordsQueued = false;
+        std::vector<EntryPtr> snapshot;
+        {
+            std::lock_guard lock(mtx);
+            for (const auto& [folder, f]: folders) {
+                for (const auto& [name, e]: f.docs) {
+                    snapshot.push_back(e);
+                }
+            }
+        }
+        wordsOf(snapshot);
+    });
+}
+
+size_t LibraryIndex::vocabularyBytes() const {
+    std::lock_guard lock(wordsMtx);
+    size_t bytes = 0;
+    for (const auto& [e, w]: wordCache) {
+        for (const words::Vocabulary& v: w.second->units) {
+            bytes += v.bytes();
+        }
+    }
+    return bytes;
 }
 
 std::map<int, QString> LibraryIndex::knownPdfText(const fs::path& pdf) const {

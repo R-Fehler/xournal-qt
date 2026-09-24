@@ -2,8 +2,11 @@
  * xournal-qt: the pages with search hits of library documents (extended library search).
  *
  * HitPageProvider is an asynchronous QML image provider, "image://hitpage/<path>/<stamp>/<marks>/<page>" (see
- * baseUrl()). What it marks is the query of the plain search, or the terms of the fuzzy search (marksOf()). A page is drawn like a page thumbnail, with the hits marked in the image itself (one texture per page,
- * no item per hit). For speed:
+ * baseUrl()). What it marks is the query of the plain search (poppler's search, as before), or the terms of the fuzzy
+ * search (marksOf(): found in the page's text with TextMatch and placed from the boxes of its characters, as the
+ * search of an open document marks them: `^`, `$` and 'word' at word bounds, a fuzzy term's whole words). A page is
+ * drawn like a page thumbnail, with the hits marked in the image itself (one texture per page, no item per hit). For
+ * speed:
  *  - loaded documents are kept (the last 12 used): all pages of a document come from one load;
  *  - drawn pages are kept in memory (up to 128 MB) without the marks: a new search or scrolling back only marks them;
  *  - widths are rounded up to steps of 64 px, so there are few different images of a page;

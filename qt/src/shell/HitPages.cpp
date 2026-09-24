@@ -16,6 +16,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/DocumentTextIndex.h"
 
 #include "Library.h"
 #include "Thumbnails.h"
@@ -31,6 +32,7 @@ struct CachedDocument {
     std::mutex mtx;
     std::unique_ptr<Document> doc;
     bool loaded = false;
+    std::unique_ptr<PdfLayoutReader> pdfText;  ///< the text of its PDF pages (terms of the fuzzy search)
 };
 
 struct Caches {
@@ -176,11 +178,14 @@ QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& 
     }
     std::vector<QRectF> rects;
     if (query.startsWith(TERMS)) {
-        // (poppler's search: the terms as substrings, their word bounds left aside)
-        for (const textmatch::Term& t: textmatch::decode(QStringView(query).sliced(1))) {
-            const auto found = DocumentSearch::findOnPage(*doc, static_cast<size_t>(pageNo), t.text.toStdString());
-            rects.insert(rects.end(), found.begin(), found.end());
+        // Found in the page's text as the search of an open document finds them (word bounds, fuzzy words: the whole
+        // word), where that search marks them
+        if (!cached->pdfText && !doc->getPdfFilepath().empty()) {
+            cached->pdfText = std::make_unique<PdfLayoutReader>(doc->getPdfFilepath());
         }
+        std::shared_lock docLock(*doc);
+        rects = termRects(*doc->getPage(static_cast<size_t>(pageNo)), cached->pdfText.get(),
+                          textmatch::decode(QStringView(query).sliced(1)));
     } else if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty()) {
         rects = DocumentSearch::findOnPage(*doc, static_cast<size_t>(pageNo), q.toStdString());
     }

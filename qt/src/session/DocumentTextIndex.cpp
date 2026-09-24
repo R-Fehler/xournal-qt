@@ -162,6 +162,86 @@ std::vector<QRectF> elementRects(const ElementText& piece, qsizetype start, qsiz
     return out;
 }
 
+// --- a reader of the text of PDF pages -------------------------------------------------------------------------
+
+namespace {
+/// The text of a poppler page and the box of each of its characters
+PdfPageLayout layoutOf(PopplerPage* page) {
+    char* raw = poppler_page_get_text(page);
+    PopplerRectangle* rects = nullptr;
+    guint n = 0;
+    poppler_page_get_text_layout(page, &rects, &n);  // (the text of the page is built once for both)
+    std::vector<double> boxes;
+    boxes.reserve(4 * n);
+    for (guint i = 0; i < n; ++i) {
+        boxes.insert(boxes.end(), {rects[i].x1, rects[i].y1, rects[i].x2, rects[i].y2});
+    }
+    g_free(rects);
+    PdfPageLayout l = PdfPageLayout::from(raw ? raw : "", boxes.data(), n);
+    g_free(raw);
+    return l;
+}
+
+PopplerDocument* openPdf(const fs::path& file) {
+    gchar* uri = g_filename_to_uri(file.c_str(), nullptr, nullptr);
+    GError* error = nullptr;
+    PopplerDocument* doc = uri ? poppler_document_new_from_file(uri, nullptr, &error) : nullptr;
+    g_free(uri);
+    if (error) {
+        g_error_free(error);
+    }
+    return doc;
+}
+}  // namespace
+
+PdfLayoutReader::PdfLayoutReader(fs::path pdf): file(std::move(pdf)) {}
+
+PdfLayoutReader::~PdfLayoutReader() {
+    if (doc) {
+        g_object_unref(doc);
+    }
+}
+
+PdfPageLayout PdfLayoutReader::layout(int nr) {
+    if (!doc && !failed) {
+        doc = openPdf(file);
+        failed = !doc;
+    }
+    if (!doc || nr < 0 || nr >= poppler_document_get_n_pages(doc)) {
+        return {};
+    }
+    PopplerPage* page = poppler_document_get_page(doc, nr);
+    if (!page) {
+        return {};
+    }
+    PdfPageLayout l = layoutOf(page);
+    g_object_unref(page);
+    return l;
+}
+
+std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms) {
+    std::vector<QRectF> out;
+    if (terms.empty()) {
+        return out;
+    }
+    if (pdf && page.getBackgroundType().isPdfPage()) {
+        const PdfPageLayout layout = pdf->layout(static_cast<int>(page.getPdfPageNr()));
+        for (const auto& m: textmatch::find(layout.text, terms)) {
+            const auto rects = layout.rects(m.start, m.end);
+            out.insert(out.end(), rects.begin(), rects.end());
+        }
+    }
+    for (const ElementText& piece: elementTexts(page)) {
+        const auto s = textmatch::simplify(piece.shown);
+        for (const auto& m: textmatch::find(s.text, terms)) {
+            const auto rects = elementRects(piece, s.origin[static_cast<size_t>(m.start)],
+                                            s.origin[static_cast<size_t>(m.end - 1)] + 1);
+            out.insert(out.end(), rects.begin(), rects.end());
+        }
+    }
+    return out;
+}
+
 // --- the worker ------------------------------------------------------------------------------------------------
 
 struct DocumentTextIndex::Worker {
@@ -192,13 +272,7 @@ struct DocumentTextIndex::Worker {
     }
     bool open() {
         if (!doc && !openFailed) {
-            gchar* uri = g_filename_to_uri(file.c_str(), nullptr, nullptr);
-            GError* error = nullptr;
-            doc = uri ? poppler_document_new_from_file(uri, nullptr, &error) : nullptr;
-            g_free(uri);
-            if (error) {
-                g_error_free(error);
-            }
+            doc = openPdf(file);
             openFailed = !doc;  // (e.g. with a password: its text is not searched)
         }
         return doc != nullptr;
@@ -273,22 +347,13 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
         if (w->open() && nr < poppler_document_get_n_pages(w->doc)) {
             PopplerPage* page = poppler_document_get_page(w->doc, nr);
             if (page) {
-                char* raw = poppler_page_get_text(page);
                 if (layout) {
-                    PopplerRectangle* rects = nullptr;
-                    guint n = 0;
-                    poppler_page_get_text_layout(page, &rects, &n);  // (the text of the page is built once for both)
-                    std::vector<double> boxes;
-                    boxes.reserve(4 * n);
-                    for (guint i = 0; i < n; ++i) {
-                        boxes.insert(boxes.end(), {rects[i].x1, rects[i].y1, rects[i].x2, rects[i].y2});
-                    }
-                    g_free(rects);
-                    pageLayout = std::make_shared<PdfPageLayout>(PdfPageLayout::from(raw ? raw : "", boxes.data(), n));
+                    pageLayout = std::make_shared<PdfPageLayout>(layoutOf(page));
                 } else {
+                    char* raw = poppler_page_get_text(page);
                     text = QString::fromUtf8(raw ? raw : "").simplified();
+                    g_free(raw);
                 }
-                g_free(raw);
                 g_object_unref(page);
             }
         }

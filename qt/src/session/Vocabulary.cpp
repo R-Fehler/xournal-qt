@@ -197,6 +197,30 @@ Terms::Terms(std::vector<textmatch::Term> terms, std::vector<char> counted): lis
     }
 }
 
+bool Terms::touchesMatchingWord(QStringView text, const textmatch::Span& m) const {
+    // From before the word the match starts in (a word broken at a line end: "tur- bine" has a space in it; going
+    // back too far only reads a few more words)
+    qsizetype j = m.start;
+    while (j > 0 && (m.start - j) < 256 &&
+           (text[j - 1] != u' ' || (j >= 2 && text[j - 2] == u'-')) && text[j - 1] != u'\n') {
+        --j;
+    }
+    QString word;
+    for (;;) {
+        const qsizetype start = textmatch::detail::nextWord(text, j, word);
+        if (start < 0 || start >= m.end) {
+            return false;
+        }
+        if (j > m.start) {  // (the word overlaps the match)
+            for (size_t t = 0; t < list.size(); ++t) {
+                if (matches[t] && counts[t] && matches[t]->match(word) != wordmatch::None) {
+                    return true;
+                }
+            }
+        }
+    }
+}
+
 Terms::Found Terms::examine(std::initializer_list<QStringView> texts, const Vocabulary* vocab) const {
     Found f;
     f.on.assign(list.size(), 0);
@@ -226,6 +250,7 @@ Terms::Found Terms::examine(std::initializer_list<QStringView> texts, const Voca
     }
     // The others: in the text. The counted ones are found (their hits may overlap), the rest only looked for
     int plainHits = 0;
+    bool overlap = false;
     for (const QStringView text: texts) {
         if (text.isEmpty()) {
             continue;
@@ -238,7 +263,16 @@ Terms::Found Terms::examine(std::initializer_list<QStringView> texts, const Voca
         if (countedPlain.empty()) {
             continue;
         }
-        const int n = textmatch::count(text, countedPlain);
+        int n = 0;
+        if (fuzzyHits > 0 && !overlap) {
+            // (their hits may overlap the words: found, to see whether one does)
+            const auto spans = textmatch::find(text, countedPlain);
+            n = static_cast<int>(spans.size());
+            overlap = std::any_of(spans.begin(), spans.end(),
+                                  [&](const textmatch::Span& m) { return touchesMatchingWord(text, m); });
+        } else {
+            n = textmatch::count(text, countedPlain);
+        }
         if (n > 0) {
             plainHits += n;
             f.exact = true;
@@ -253,8 +287,8 @@ Terms::Found Terms::examine(std::initializer_list<QStringView> texts, const Voca
             }
         }
     }
-    // Hits of counted terms of both kinds may overlap: counted in the text then, as they are marked
-    if (fuzzyHits == 0 || plainHits == 0) {
+    // Hits of counted terms of both kinds that overlap: counted in the text then, as they are marked (once)
+    if (!overlap) {
         f.count = fuzzyHits + plainHits;
         return f;
     }
