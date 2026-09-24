@@ -59,6 +59,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Previews.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.h

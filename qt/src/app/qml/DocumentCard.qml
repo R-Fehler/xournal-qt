@@ -3,7 +3,8 @@
 // right click, the ⋮ button or press and hold (without moving) for the menu; press and hold, then move to drag it
 // (with the other selected items) onto a folder (when `dragOverlay` is set).
 // Extended library search (`stripHeight` > 0): below the title, the pages with hits (marked), side by side;
-// tapping one opens the document at that page.
+// tapping one opens the document at that page. A Markdown file shows a card per passage with hits instead: the
+// passage drawn as it is formatted, the headings above it on top; tapping one opens the file there.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -40,7 +41,11 @@ Item {
     property var hitPages: []
     property string hitPageBase
     property int stripHeight: 0
+    /// Markdown: the passages with hits, [{ passage, count, headings }], and their image URL base
+    property var hitPassages: []
+    property string hitPassageBase
     signal pageActivated(int page)
+    signal passageActivated(int passage)
     /// A tap or click (with the keyboard modifiers of a click)
     signal activated(int modifiers)
     signal toggleRequested()
@@ -223,11 +228,79 @@ Item {
                     onClicked: card.menuRequested(this, width / 2, height)
                 }
             }
+            // A Markdown file: the passages with hits, as snippet cards
+            ListView {
+                id: passageStrip
+                objectName: "hitPassageStrip"
+                visible: card.stripHeight > 0 && card.hitPassages.length > 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: card.stripHeight
+                orientation: ListView.Horizontal
+                spacing: 6
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                model: visible ? card.hitPassages : []
+                cacheBuffer: Math.max(0, width)
+                ScrollBar.horizontal: ScrollBar { height: 6 }
+                delegate: AbstractButton {
+                    id: passageCard
+                    required property var modelData
+                    objectName: "hitPassage"
+                    width: Math.round(Math.max(120, Math.min(passageStrip.height * 1.8, passageStrip.width * 0.9)))
+                    height: passageStrip.height - 8
+                    onClicked: card.passageActivated(modelData.passage)
+                    contentItem: Rectangle {
+                        color: "#ffffff"
+                        border.width: passageCard.hovered ? 2 : 1
+                        border.color: passageCard.hovered ? Material.accentColor : "#d5d8dc"
+                        radius: 4
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            spacing: 2
+                            Label {
+                                objectName: "hitPassageHeadings"
+                                Layout.fillWidth: true
+                                Layout.rightMargin: 22
+                                visible: text !== ""
+                                text: passageCard.modelData.headings
+                                elide: Text.ElideLeft
+                                font.pixelSize: 10
+                                font.italic: true
+                                color: "#5f6368"
+                            }
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    asynchronous: true
+                                    fillMode: Image.PreserveAspectFit
+                                    horizontalAlignment: Image.AlignLeft
+                                    verticalAlignment: Image.AlignTop
+                                    source: card.active && card.hitPassageBase !== ""
+                                            ? card.hitPassageBase + "/" + passageCard.modelData.passage : ""
+                                    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
+                                }
+                            }
+                        }
+                        HitBadge {
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 3
+                            count: passageCard.modelData.count
+                        }
+                    }
+                    background: null
+                }
+            }
             // The pages with hits
             ListView {
                 id: strip
                 objectName: "hitPageStrip"
-                visible: card.stripHeight > 0
+                visible: card.stripHeight > 0 && card.hitPassages.length === 0
                 Layout.fillWidth: true
                 Layout.preferredHeight: card.stripHeight
                 orientation: ListView.Horizontal

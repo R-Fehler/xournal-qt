@@ -760,8 +760,13 @@ Rectangle {
                         itemCount: model.itemCount
                         hitPages: home.extendedView ? model.hitPageList : []
                         hitPageBase: model.hitPageBase
+                        hitPassages: home.extendedView ? model.hitPassageList : []
+                        hitPassageBase: model.hitPassageBase
                         stripHeight: home.extendedView && !model.isFolder ? libraryGrid.stripHeight : 0
                         onPageActivated: function(pageNo) { app.openSearchHitAt(model.path, home.lib.searchQuery, pageNo) }
+                        onPassageActivated: function(passage) {
+                            app.openSearchHitInPassage(model.path, home.lib.searchQuery, passage)
+                        }
                         width: libraryGrid.cellWidth
                         height: libraryGrid.cellHeight
                         active: home.visible

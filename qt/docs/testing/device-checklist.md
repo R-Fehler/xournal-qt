@@ -584,3 +584,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       with a note that saving keeps it as `photo.xopp`. Write on it, save: the dialog suggests `photo.xopp` next to the
       photo. Back in the library the two are one card ("IMG ✎") that opens what you wrote. The same with a photo from
       the phone taken upright (it stays upright after saving and opening again, also in Xournal++) and a `.heic`.
+- [ ] Extended library search (pages button) for a word in Markdown files: a Markdown result shows a row of cards
+      instead of pages, each the paragraph / list item / table row / code block with the hit, formatted, the headings
+      above it in small italics, the first hit orange, the others yellow; a long code block is cut around its hit.
+      A PDF or `.xopp` result next to it still shows its pages. Tap the second card: the file opens at the page of
+      that passage, with that hit current in the search bar (e.g. "2 / 2"), and the read-only note at the bottom left.
+      Swipe the row sideways with a finger.

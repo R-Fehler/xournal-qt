@@ -32,6 +32,7 @@
 #include "shell/Library.h"
 #include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
+#include "shell/MdSnippets.h"
 #include "shell/Previews.h"
 
 #include "MarkdownFile.h"
@@ -113,6 +114,28 @@ void makeSidewaysPhoto(const fs::path& p, int w, int h) {
                         "\x00\x01" "\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00" "\x00\x00\x00\x00";
     jpeg.insert(2, QByteArray(exif, sizeof(exif) - 1));
     std::ofstream(p, std::ios::binary).write(jpeg.constData(), jpeg.size());
+}
+
+/// Pixels marked orange (the current hit) or yellow (the others), also on a grey background (a code block).
+int orangePixels(const QImage& img) {
+    int n = 0;
+    for (int y = 0; y < img.height(); ++y) {
+        for (int x = 0; x < img.width(); ++x) {
+            const QColor c = img.pixelColor(x, y);
+            n += c.red() > 220 && c.green() > 120 && c.green() < 180 && c.blue() < 80 ? 1 : 0;
+        }
+    }
+    return n;
+}
+int yellowPixels(const QImage& img) {
+    int n = 0;
+    for (int y = 0; y < img.height(); ++y) {
+        for (int x = 0; x < img.width(); ++x) {
+            const QColor c = img.pixelColor(x, y);
+            n += c.red() > 220 && c.green() > 190 && c.blue() < 60 ? 1 : 0;
+        }
+    }
+    return n;
 }
 
 /// Dark pixels (text) in a part of an image.
@@ -537,4 +560,44 @@ TEST_F(LibraryFilesTest, anImageOpensAsAPageToWriteOnAndIsSavedAsItsXopp) {
         ASSERT_TRUE(c.openPath(qstr(root / "board.webp")));
         EXPECT_TRUE(c.tabManager().currentSession()->getDocument()->getPage(0)->getBackgroundType().isImagePage());
     }
+}
+
+TEST_F(LibraryFilesTest, aHitInAMarkdownFileIsASnippetCardOfItsPassage) {
+    std::string text = "# Lecture 3\n\n## Kalman filter\n\nThe needle and another needle.\n\n```\n";
+    for (int i = 0; i < 100; ++i) {
+        text += "line " + std::to_string(i) + (i == 80 ? " needle" : "") + "\n";
+    }
+    text += "```\n";
+    writeFile(root / "kalman.md", text);
+    MdSnippetProvider::clearCaches();
+    const int parses = MdSnippetProvider::parseCount();
+
+    // The paragraph: its hits marked, the first one (the current one when opened) orange
+    const QImage paragraph = MdSnippetProvider::render(root / "kalman.md", 2, "needle", 300, 0);
+    ASSERT_EQ(paragraph.width(), 300);
+    EXPECT_LT(paragraph.height(), 60) << "one line";
+    EXPECT_GT(orangePixels(paragraph), 20) << "the first hit";
+    EXPECT_GT(yellowPixels(paragraph), 20) << "the other one";
+    // A long code block: cut to the lines around its hit
+    const QImage code = MdSnippetProvider::render(root / "kalman.md", 3, "needle", 300, 120);
+    EXPECT_LE(code.height(), 120);
+    EXPECT_GT(orangePixels(code), 20) << "the hit is in the part shown";
+    EXPECT_GT(MdSnippetProvider::render(root / "kalman.md", 3, "needle", 300, 0).height(), 1000) << "all of it";
+    EXPECT_EQ(MdSnippetProvider::parseCount(), parses + 1) << "parsed once";
+    EXPECT_TRUE(MdSnippetProvider::render(root / "kalman.md", 99, "needle", 300, 0).isNull());
+
+    // The library's search result: a card per passage, with the headings above it
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    model.setSearchQuery("needle");
+    ASSERT_EQ(model.count(), 1);
+    const QVariantList passages = model.data(model.index(0), LibraryModel::HitPassageListRole).toList();
+    ASSERT_EQ(passages.size(), 2);
+    EXPECT_EQ(passages[0].toMap()["passage"].toInt(), 2);
+    EXPECT_EQ(passages[0].toMap()["count"].toInt(), 2);
+    EXPECT_EQ(passages[0].toMap()["headings"].toString(), "Lecture 3 › Kalman filter");
+    EXPECT_EQ(passages[1].toMap()["passage"].toInt(), 3);
+    EXPECT_TRUE(model.data(model.index(0), LibraryModel::HitPassageBaseRole).toString().startsWith("image://mdsnippet/"));
+    EXPECT_TRUE(model.data(model.index(0), LibraryModel::HitPageListRole).toList().isEmpty());
 }

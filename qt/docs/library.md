@@ -178,6 +178,11 @@ Unsaved changes of open documents are not in the index (it reads the files). A d
 entry over (made from the document in memory and the PDF text its search knows), so the index does not read the
 saved `.xopp` again.
 
+The snippet cards of Markdown files are drawn on demand as well (`MdSnippets.*`, image provider
+`image://mdsnippet`): the file is read and parsed as the index reads it (the last 8 files stay parsed), the passage
+alone is laid out (`md::snippet`, `qt/src/markdown/MdPassages.*`), and the hits are found in its text with the
+index's matcher and marked where their source is drawn (`md::sourceRects`), so the card and the count agree.
+
 The pages with hits of the extended search are drawn on demand (`HitPages.*`): the last 12 documents used stay
 loaded, drawn pages stay in memory (up to 128 MB) without marks, and the marks are painted into the page image.
 Measured on a 300-page text PDF: 3–13 ms per page (13 ms with ~700 marks of a one-letter search), 1–2 ms when only
@@ -219,7 +224,11 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
   - search: folders whose name matches (tap one to open it), then documents whose name or text matches
   - extended search (the pages button next to the search field): each result also shows its pages with hits,
     marked, in a row under the title (swipe or scroll sideways); tapping a page opens the document at that page
-    with the search active. The cells are taller; − / + (also Ctrl+wheel, pinch) make them smaller or bigger, in
+    with the search active. A Markdown file shows a row of **snippet cards** instead: per passage with hits (a
+    paragraph, a list item, a table row under its header, a code block) the passage drawn by our Markdown renderer,
+    the headings above it on top (*Lecture 3 › Kalman filter › Prediction*), the hits marked like on the pages (the
+    first one, which opening the card makes current, in orange), a long passage cut to a few lines around its
+    first hit. Tapping a card opens the file at that passage with the search active. The cells are taller; − / + (also Ctrl+wheel, pinch) make them smaller or bigger, in
     both views. Texts shorter than 4 characters are searched on Enter.
   - New document: name, background, paper size, orientation. It is saved at once in the current folder.
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders

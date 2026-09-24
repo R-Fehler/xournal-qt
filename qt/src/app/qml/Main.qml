@@ -701,16 +701,18 @@ ApplicationWindow {
         view: app.view
     }
 
-    // A Markdown file shown read-only for now, an image to write on: what that means (closed for this tab with ×)
+    // A Markdown file shown read-only for now, an image to write on: what that means (closed for this tab with ×).
     Pane {
         id: shownFileNote
         objectName: "shownFileNote"
         property string closedFor: ""
         visible: app.shownFileNote !== "" && closedFor !== app.title && !pageGrid.visible && !contentsOverview.visible
-        anchors.top: canvas.top
-        anchors.horizontalCenter: canvas.horizontalCenter
-        anchors.topMargin: 12
-        width: Math.min(canvas.width - 32, 620)
+        // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right)
+        anchors.bottom: canvas.bottom
+        anchors.left: canvas.left
+        anchors.bottomMargin: 24
+        anchors.leftMargin: 24
+        width: Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560))
         padding: 2
         leftPadding: 14
         background: Rectangle {

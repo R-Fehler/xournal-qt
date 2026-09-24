@@ -14,6 +14,7 @@
 #include <QThreadPool>
 
 #include "HitPages.h"
+#include "MdSnippets.h"
 #include "Previews.h"
 
 namespace xqt {
@@ -510,6 +511,16 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return r.isFolder || r.hit.pageHits.empty() ? QString() : HitPageProvider::baseUrl(r.item, query);
         case KindRole:
             return r.isFolder ? QString() : QString::fromLatin1(r.item.kindName());
+        case HitPassageListRole: {
+            QVariantList passages;
+            passages.reserve(static_cast<qsizetype>(r.hit.blockHits.size()));
+            for (const auto& h: r.hit.blockHits) {
+                passages.append(QVariantMap{{"passage", h.block}, {"count", h.count}, {"headings", h.headings}});
+            }
+            return passages;
+        }
+        case HitPassageBaseRole:
+            return r.isFolder || r.hit.blockHits.empty() ? QString() : MdSnippetProvider::baseUrl(r.item, query);
         default:
             return {};
     }
@@ -536,7 +547,9 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {LastPageRole, "lastPage"},
             {HitPageListRole, "hitPageList"},
             {HitPageBaseRole, "hitPageBase"},
-            {KindRole, "kind"}};
+            {KindRole, "kind"},
+            {HitPassageListRole, "hitPassageList"},
+            {HitPassageBaseRole, "hitPassageBase"}};
 }
 
 void LibraryModel::filesMoved(const DocumentFiles::Result& r) {

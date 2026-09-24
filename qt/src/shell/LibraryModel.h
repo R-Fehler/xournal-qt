@@ -93,6 +93,11 @@ public:
         /// What the document is: "notes" (a .xopp alone), "pdf" (with or without its .xopp), "md", "image" (with or
         /// without its .xopp); folders: ""
         KindRole,
+        /// Search in a Markdown file: its passages with hits, [{ passage, count, headings }] (headings: the path of
+        /// the headings above it, "Lecture 3 › Kalman filter")
+        HitPassageListRole,
+        /// Search: image URL of the snippet cards of those passages (append "/<passage>"), see MdSnippets.h
+        HitPassageBaseRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
