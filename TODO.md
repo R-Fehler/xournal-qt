@@ -91,7 +91,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 3. **Android:** ~~`qt/android-apk`~~ merged 2026-09-24; `qt/android-basics` running, then `qt/android-libraries`.
 4. **The `.md` editor:** ~~`qt/md-editor`~~ merged 2026-09-24. Left: images in `<name>.assets/`, math, vaults.
 5. **Windows:** ~~`qt/windows-build`~~ merged 2026-09-24; `qt/windows-feel` is the author's, on the Surface.
-6. **PDF as the document:** ~~`qt/pdf-incremental`~~ merged 2026-09-24; `qt/pdf-only` next.
+6. **PDF as the document:** ~~`qt/pdf-incremental`~~ and ~~`qt/pdf-only`~~ merged 2026-09-24.
 
 Blocks for tracks 2–4 get their `qt/...` names when they are planned. Research for each happens right before it
 is built.
@@ -327,7 +327,9 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
    - Verify: qpdf `--check`; poppler, MuPDF and pdf.js render the same after many incremental saves; size growth and
      compaction; save time on pgfmanual before and after.
    - qpdf cannot write incremental updates: our own small appender, with objects serialised through qpdf.
-2. [~] **`qt/pdf-only`: a mode where every document is a single PDF**, with no sidecars (started 2026-09-24).
+2. [x] **`qt/pdf-only`: a mode where every document is a single PDF**, with no sidecars (merged 2026-09-24).
+   Left: on Windows, the rename over a PDF another program holds open (retry or `ReplaceFileW`); a UI to restore the
+   original kept in the cache.
    - New documents are hybrid `name.pdf`. Annotating an existing PDF writes into that PDF, the Drawboard way.
      Pasted pages go into the PDF, and images are inside the Xournal data. Nothing is written next to files;
      autosave and recovery stay in the app's cache.

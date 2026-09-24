@@ -371,6 +371,17 @@
   - pgfmanual: Ctrl+S 6.3 → 0.2 s (hybrid), 24.6 → 0.2–0.4 s (archive); reopen 5.5 → 0.44 s.
   - Left: no UI message when a save falls back to a full write; MuPDF and pdf.js not yet checked.
 
+- **PDF-only mode, `qt/pdf-only` (2026-09-24, awaiting on-device test).** The first start asks once (existing
+  installs too) whether documents are "PDF files (like Drawboard PDF, GoodNotes, Xodo)", recommended and
+  preselected, or "Xournal++ files"; Settings → Documents shows the same cards. Nothing changes until a choice is
+  stored. `XQT_DOCUMENT_MODE=xopp|pdf` sets it for tests.
+  - PDF mode: new documents are `name.pdf`; Ctrl+S on an opened plain PDF writes the notes into it (first save in
+    full, then incremental), with a one-time notice; pasted pages leave no sidecars; image backgrounds are embedded;
+    autosaves go to the app cache, and recovery looks there. `.xopp` files stay `.xopp`.
+  - The original of a PDF that first gets notes is kept for 30 days in `~/.cache/xournal-qt/originals/` (a hard
+    link where possible), with no UI yet.
+  - Left: the rename over a PDF held open by another program on Windows; a UI to restore the kept original.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
