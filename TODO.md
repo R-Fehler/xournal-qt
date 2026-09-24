@@ -113,6 +113,20 @@ is built.
   MSVC + vcpkg way is the fallback.
 - Pushing only `qt/windows-build`, and only with the author's go.
 
+### `qt/android-basics` (the author tested the APK on the Fold 7, 2026-09-24; started)
+- "Feels the snappiest of all platforms: scrolling, fast movements, the general feel." The problems:
+  - no "Open with" or Share target;
+  - opening and importing files and folders fails (`content://`);
+  - Markdown syntax highlighting is off on Android;
+  - the UI is not adapted to Android.
+- Scope:
+  - "Open with" and Share intents for PDF, `.xopp`, `.md` and images (the core formats);
+  - opening and importing through the Storage Access Framework (`content://`);
+  - a draw-with-finger-or-mouse toggle (all platforms);
+  - KSyntaxHighlighting built for Android;
+  - only the clear UI problems (status bar over the tabs, the home screen overflowing). Keep the UI divergence
+    small and maintainable; the details come later, as the desktop UI is still changing.
+
 ### `qt/android-apk`: first APK (merged 2026-09-24; `~/xournal_qt_workspace/samples/xournal-qt-debug-arm64.apk`; see `qt/docs/android.md` and `qt/docs/android-roadmap.md`)
 Tooling (2026-09-24, in the author's home, no sudo): JDK 17 in `~/.local/jdk-17`; Android command-line tools and
 NDK r27c (27.2.12479018) in `~/Android/Sdk`; Qt 6.11.2 desktop (host, `gcc_64`) and `android_arm64_v8a` in `~/Qt` (2 GB) through
