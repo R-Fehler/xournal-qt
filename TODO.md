@@ -32,7 +32,21 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         device checklist.
       - [ ] Not handled yet: a page deleted in another app; encrypted, rotated or cropped source PDFs (in code,
         untested); audio attachments; a "has notes" badge. Writing into the PDF itself renames over the file
-        while it is read, which may fail on Windows. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
+        while it is read, which may fail on Windows.
+   3. `qt/hybrid-flow` (decided 2026-09-24; starts after `qt/present` and `qt/reference-view`):
+      - **Save as with a format choice:** "Xournal notes (.xopp)" or "PDF with notes, editable (.pdf)", replacing the
+        separate "Save as hybrid PDF…" entry. "Export as PDF" stays for a plain, flattened PDF.
+      - **When a saved `.xopp` becomes a hybrid PDF, ask once** what happens to the old `.xopp`:
+        - "Move it to the trash (the PDF now holds everything)", the default;
+        - "Keep it updated for Xournal++" (export on every save, for this document);
+        - "Keep it as it is" (an old copy that is not updated).
+
+        The dialog has a "Don't ask again" box that stores the choice. Settings → Documents shows the stored
+        choice and can change it or ask again.
+      - **"Share…"** with two options: "PDF with notes (opens in any app)", which is the hybrid itself (saved first),
+        and "For Xournal++ (.xopp + PDF)", a one-time export into a folder the user chooses, never next to the
+        document, as `name.xopp` plus `name.xopp.bg.pdf` (upstream's attached-background name). On Linux it then
+        shows the files in the file manager; on Android and iOS it will open the share sheet. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
    - Experiment `qt/mupdf`, done 2026-09-24: branch `qt/mupdf` (not merged), findings in
      `qt/docs/pdf-engine-experiment.md` on that branch.
      - The MuPDF backend works in the app behind `-DXQT_WITH_MUPDF=ON` + `XQT_PDF_BACKEND=mupdf`.
