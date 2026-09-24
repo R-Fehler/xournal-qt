@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <QColor>
+#include <QJSValue>
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
@@ -23,6 +24,7 @@
 #include <QStringList>
 #include <QUrl>
 #include <QVariantList>
+#include <QVariantMap>
 
 #include <functional>
 #include <memory>
@@ -35,6 +37,7 @@ class QWindow;
 namespace xqt {
 class AppContext;
 class CanvasView;
+class FuzzyQuery;
 class DocumentSession;
 class TabManager;
 class PagesModel;
@@ -50,6 +53,7 @@ class SessionRecovery;
 class Library;
 class LibraryModel;
 class RecentFiles;
+class ReferenceMode;
 namespace DocumentFiles {
 struct Result;
 }
@@ -87,6 +91,10 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* view READ view NOTIFY documentChanged)
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
+    /// The current document is being saved (in the background; it stays modified until the file is written).
+    Q_PROPERTY(bool saving READ saving NOTIFY savingChanged)
+    /// A document of this window is being saved.
+    Q_PROPERTY(bool anySaving READ anySaving NOTIFY anySavingChanged)
     Q_PROPERTY(bool hasFilePath READ hasFilePath NOTIFY titleChanged)
     /// The current document shows a file it is not (a Markdown file, read-only for now; an image to write on): what
     /// the note over the canvas says about it ("": nothing to say).
@@ -176,6 +184,8 @@ class AppController: public QObject {
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
     /// What the PDF text tools do with the selected text: highlight, underline, strikethrough, select
     Q_PROPERTY(QString pdfTextMode READ pdfTextMode WRITE setPdfTextMode NOTIFY pdfTextModeChanged)
+    /// Reference mode: another document beside the current one (xqt::ReferenceMode).
+    Q_PROPERTY(QObject* reference READ referenceObject CONSTANT)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
 public:
@@ -200,6 +210,8 @@ public:
     QObject* view() const;
     QString title() const;
     bool modified() const;
+    bool saving() const;
+    bool anySaving() const;
     bool hasFilePath() const;
     QString shownFileNote() const;
     bool canUndo() const;
@@ -310,7 +322,8 @@ public:
     void setSnapPages(bool snap);
     bool presenting() const { return presentingOn; }
     void setPresenting(bool on);
-    /// The previous / next page (scrolling sideways: its group, animated), the first / the last one
+    /// The previous / next page (scrolling sideways: its group, animated), the first / the last one; of the reference
+    /// while it has the keys
     Q_INVOKABLE void previousPage();
     Q_INVOKABLE void nextPage();
     Q_INVOKABLE void firstPage();
@@ -386,6 +399,11 @@ public:
     Q_INVOKABLE void clearSearch();
     /// Search all open documents (tab overview); the hits per tab are in the tabs model ("searchHits").
     Q_INVOKABLE void searchAllTabs(const QString& query);
+    /// The fuzzy search (FuzzyQuery.h) of a name alone: { match: the expression holds with the name, marks: [the
+    /// characters matched] } (a query that is not valid: whether the name contains it, no marks).
+    Q_INVOKABLE QVariantMap fuzzyName(const QString& query, const QString& name) const;
+    /// Why a fuzzy query is searched as plain text ("": it is not).
+    Q_INVOKABLE QString fuzzyHint(const QString& query) const;
     /// Switch to a tab found by searchAllTabs and show its first hit from the current page on.
     Q_INVOKABLE void openSearchResult(int index);
     /// The same, at the first hit on or after `page` (a page of the extended search).
@@ -412,6 +430,11 @@ public:
     /// There is a file manager to show files in (not on Android).
     bool canShowInFileManager() const;
     Q_INVOKABLE void openUrls(const QList<QUrl>& urls);
+    /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
+    /// new document stays, to write the notes in). Without a document open: opened as the document.
+    Q_INVOKABLE bool openAsReference(const QString& path);
+    QObject* referenceObject() const;
+    xqt::ReferenceMode& reference() const { return *referenceMode; }
     /// Close a tab without asking (QML asks about unsaved changes first). The last tab is replaced by a new one.
     Q_INVOKABLE void closeTab(int index);
     Q_INVOKABLE void moveTab(int from, int to);
@@ -422,8 +445,22 @@ public:
     Q_INVOKABLE QString tabTitle(int index) const;
     /// Indices of tabs with unsaved changes.
     Q_INVOKABLE QVariantList modifiedTabs() const;
+    /// The tab's document is being saved.
+    Q_INVOKABLE bool tabSaving(int index) const;
+    /// Call `then(index)` once the tab's document is saved (at once if it is not being saved): with the index it has
+    /// then. Not called if the tab was closed meanwhile.
+    Q_INVOKABLE void whenSaved(int index, const QJSValue& then);
+    /// Call `then()` once no document of this window is being saved (at once if none is).
+    Q_INVOKABLE void whenAllSaved(const QJSValue& then);
 
     // --- current document ---
+    /// Save the current document in the background (the window stays usable; errors come as message()). `then()`
+    /// is called after it was written, with its tab current again. False if it could not start.
+    Q_INVOKABLE bool saveInBackground(const QJSValue& then = QJSValue());
+    Q_INVOKABLE bool saveAsInBackground(const QUrl& url, const QJSValue& then = QJSValue());
+    Q_INVOKABLE bool saveAsHybridInBackground(const QUrl& url, const QJSValue& then = QJSValue());
+    Q_INVOKABLE void exportXoppInBackground(const QUrl& url);
+    /// The same, waiting until the file is written (tests): whether that worked.
     Q_INVOKABLE bool save();
     Q_INVOKABLE bool saveAs(const QUrl& url);
     // Hybrid PDF (qt/docs/hybrid-pdf.md)
@@ -600,6 +637,8 @@ Q_SIGNALS:
     void homeVisibleChanged();
     void titleChanged();
     void modifiedChanged();
+    void savingChanged();
+    void anySavingChanged();
     void undoRedoChanged();
     void toolChanged();
     void zoomChanged();
@@ -647,14 +686,32 @@ Q_SIGNALS:
     void pageActionDone(const QString& text, bool undoable);
 
 private:
+    /// The last query fuzzyName() parsed
+    mutable QString fuzzyText;
+    mutable std::shared_ptr<const xqt::FuzzyQuery> fuzzyParsed;
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
     /// Presenting: the view that presents (the current one; another tab takes it over)
     bool presentingOn = false;
     QPointer<xqt::CanvasView> presentedView;
     void updatePresentedView();
-    /// After the document was saved as a hybrid PDF: the .xopp for Xournal++ (setting), the library.
-    void afterHybridSave();
+    /// The canvas the keys act on: the reference while it has the focus, else the main document's
+    xqt::CanvasView* keyCanvas() const;
+    void stepPage(int delta);
+    void showPage(size_t page);
+    /// The reference while it has the keys and is written in (its edit switch), else nullptr: then undo, cut,
+    /// paste, delete and select all act on it.
+    xqt::CanvasView* editedReference() const;
+    enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };
+    /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
+    bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then);
+    /// Wait for the current document's saves; false if the last one failed.
+    bool waitForSave();
+    /// `then` from QML, after a save: with the saved document's tab current (from the event loop).
+    std::function<void(bool)> callWhenSaved(const QJSValue& then);
+    /// After a hybrid PDF was saved: its clean copy in the background, the library.
+    void afterHybridSave(xqt::DocumentSession& s);
+    std::vector<QJSValue> whenAllSavedCalls;
     /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
     void applyMarkdownText();
     /// Editing beside the page: the page's text, or the text box at a point.
@@ -678,6 +735,8 @@ private:
     bool windowGone = false;           ///< its window was closed (it is on its way out)
     std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
     std::unique_ptr<xqt::TabManager> tabs;
+    std::unique_ptr<xqt::ReferenceMode> referenceMode;  ///< (after `tabs`, reset before it)
+    bool replacePristine = true;  ///< opening a file replaces an untouched new document (not for a reference)
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::OutlineModel> outline;

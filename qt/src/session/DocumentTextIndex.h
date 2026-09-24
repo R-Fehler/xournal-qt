@@ -35,6 +35,8 @@
 #include <QString>
 #include <QTimer>
 
+#include "TextMatch.h"
+
 #include "model/DocumentListener.h"
 #include "filesystem.h"
 
@@ -96,6 +98,10 @@ public:
     bool known(size_t page) const;
     /// Hits of a query (TextMatch::prepare) on a page, in the text known so far.
     int count(size_t page, QStringView query);
+    /// Hits of several terms (TextMatch.h: overlapping hits of different terms count once).
+    int count(size_t page, const std::vector<textmatch::Term>& terms);
+    /// A term is on the page (in the text known so far).
+    bool contains(size_t page, const textmatch::Term& term);
     /// The PDF page a page shows (-1: none).
     int pdfPageOf(size_t page) const { return page < pages.size() ? pages[page].pdf : -1; }
     /// The PDF text known by page number (for the library index when the document is saved).

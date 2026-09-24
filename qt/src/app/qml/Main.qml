@@ -16,7 +16,8 @@ ApplicationWindow {
     // what it gets when it is not maximized, and what the tests use
     visibility: app.startMaximized ? Window.Maximized : Window.Windowed
     title: app.homeVisible ? (app.library.available ? app.library.name + " — Xournal Qt" : "Xournal Qt")
-                           : (app.modified ? "• " : "") + app.title + " — Xournal Qt"
+                           : (app.modified ? "• " : "") + app.title + (app.saving ? " (" + qsTr("saving…") + ")" : "")
+                             + " — Xournal Qt"
     Material.theme: Material.Light
     Material.accent: Material.Indigo
     color: app.presenting ? "#000000" : "#5f6368"  // (presenting: black around the pages, like a projector)
@@ -138,14 +139,20 @@ ApplicationWindow {
     }
     function saveOrAsk(then) {
         if (app.savesWithoutDialog()) {
-            if (app.save() && then) then()
+            // In the background: the window stays usable; `then` runs once the file is written (with its tab
+            // current), not at all if that failed (a message says why)
+            app.saveInBackground(then ? then : null)
         } else {
             openSaveDialog(then)
         }
     }
 
-    // Close a tab; unsaved changes are asked about first (with that tab shown).
+    // Close a tab; unsaved changes are asked about first (with that tab shown). A tab being saved waits for its save.
     function requestCloseTab(index) {
+        if (app.tabSaving(index)) {
+            app.whenSaved(index, function(i) { requestCloseTab(i) })
+            return
+        }
         if (!app.tabModified(index)) {
             app.closeTab(index)
             return
@@ -153,8 +160,12 @@ ApplicationWindow {
         app.currentTab = index
         withSavedChanges(function() { app.closeTab(app.currentTab) })
     }
-    // Close every document; unsaved changes are asked about one by one.
+    // Close every document; unsaved changes are asked about one by one (after the saves that run).
     function closeAllTabs() {
+        if (app.anySaving) {
+            app.whenAllSaved(function() { closeAllTabs() })
+            return
+        }
         const pending = app.modifiedTabs()
         if (pending.length === 0) {
             app.closeAllTabs()
@@ -163,8 +174,17 @@ ApplicationWindow {
         app.currentTab = pending[0]
         withSavedChanges(function() { app.closeTab(app.currentTab); closeAllTabs() })
     }
-    // Quitting: go through the tabs with unsaved changes one by one.
+    // Quitting: the saves that run finish first (the window stays usable meanwhile), then the tabs with unsaved
+    // changes are asked about one by one.
+    property bool waitingToClose: false
     function closeWindow() {
+        if (app.anySaving) {
+            if (!waitingToClose) {
+                waitingToClose = true
+                app.whenAllSaved(function() { waitingToClose = false; closeWindow() })
+            }
+            return
+        }
         const pending = app.modifiedTabs()
         if (pending.length === 0) {
             quitting = true
@@ -176,7 +196,7 @@ ApplicationWindow {
     }
 
     onClosing: function(close) {
-        if (!quitting && app.modifiedTabs().length > 0) {
+        if (!quitting && (app.modifiedTabs().length > 0 || app.anySaving)) {
             close.accepted = false
             closeWindow()
             return
@@ -745,14 +765,23 @@ ApplicationWindow {
     DocumentCanvas {
         id: canvas
         objectName: "canvas"
+        // The canvas area, or the main document's side of it when the tab shows a reference beside it
+        x: referenceSplit.x + referenceSplit.mainX
+        y: referenceSplit.y
+        width: referenceSplit.mainWidth
+        height: referenceSplit.height
+        clip: true  // zoomed-in pages must not paint over the sidebar
+        view: app.view
+    }
+    // Reference mode: another document beside this one (the canvas area is split)
+    ReferenceSplit {
+        id: referenceSplit
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.right: textFlowPanel.visible ? textFlowPanel.left
                        : markdownPanel.visible ? markdownPanel.left
                        : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible ? sidebar.right : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
-        clip: true  // zoomed-in pages must not paint over the sidebar
-        view: app.view
     }
 
     // A Markdown file shown read-only for now, an image to write on: what that means (closed for this tab with ×).
@@ -1354,7 +1383,7 @@ ApplicationWindow {
         defaultSuffix: "xopp"
         nameFilters: [qsTr("Xournal++ files (*.xopp)")]
         onAccepted: {
-            if (app.saveAs(selectedFile) && afterSave) afterSave()
+            app.saveAsInBackground(selectedFile, afterSave)
             afterSave = null
         }
         onRejected: afterSave = null
@@ -1369,7 +1398,7 @@ ApplicationWindow {
         defaultSuffix: "pdf"
         nameFilters: [qsTr("PDF with Xournal data (*.pdf)")]
         onAccepted: {
-            if (app.saveAsHybrid(selectedFile) && afterSave) afterSave()
+            app.saveAsHybridInBackground(selectedFile, afterSave)
             afterSave = null
         }
         onRejected: afterSave = null
@@ -1380,7 +1409,7 @@ ApplicationWindow {
         fileMode: FileDialog.SaveFile
         defaultSuffix: "xopp"
         nameFilters: [qsTr("Xournal++ files (*.xopp)")]
-        onAccepted: app.exportXopp(selectedFile)
+        onAccepted: app.exportXoppInBackground(selectedFile)
     }
     // A hybrid PDF whose ink another app changed: keep ours, or take theirs as plain annotations
     Dialog {
@@ -1452,6 +1481,7 @@ ApplicationWindow {
 
     Dialog {
         id: unsavedDialog
+        objectName: "unsavedDialog"
         anchors.centerIn: parent
         modal: true
         title: qsTr("Unsaved changes")
@@ -1594,9 +1624,14 @@ ApplicationWindow {
         anchors.horizontalCenter: canvas.horizontalCenter
         anchors.top: canvas.top
         anchors.topMargin: Math.round(canvas.height * 0.2)
-        pageCount: app.pageCount
-        returnFocus: canvas
-        onJumpRequested: function(page) { app.jumpToPage(page - 1) }
+        /// The number is for the reference (it had the keys when the first digit was typed)
+        property bool forReference: false
+        pageCount: forReference ? app.reference.pageCount : app.pageCount
+        returnFocus: forReference ? referenceSplit.referenceCanvas : canvas
+        onJumpRequested: function(page) {
+            if (forReference) app.reference.goToPage(page - 1)
+            else app.jumpToPage(page - 1)
+        }
     }
     Snackbar {
         id: snackbar
@@ -1711,8 +1746,8 @@ ApplicationWindow {
         // Only in full screen: with the bar merely put away, the arrow strip brings it back at once
         visible: win.fullScreenMode && !app.homeVisible
         z: 60
-        x: 16
-        y: 16
+        x: canvas.x + 16  // (over the main document, also when a reference is beside it)
+        y: canvas.y + 16
         width: 56
         height: 56
         radius: 12
@@ -1856,8 +1891,11 @@ ApplicationWindow {
     component DigitKey: Shortcut {
         property int digit
         sequence: String(digit)
-        enabled: win.toolKeys && !pageJump.visible
-        onActivated: pageJump.start(String(digit))
+        enabled: win.toolKeys && !pageJump.visible && !app.reference.pagesShown
+        onActivated: {
+            pageJump.forReference = app.reference.focused  // (before the jump takes the keys)
+            pageJump.start(String(digit))
+        }
     }
     DigitKey { digit: 0 }
     DigitKey { digit: 1 }

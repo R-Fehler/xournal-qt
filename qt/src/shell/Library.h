@@ -49,6 +49,8 @@ class QThreadPool;
 
 namespace xqt {
 
+class FuzzyQuery;
+
 class Library {
 public:
     explicit Library(const fs::path& root);
@@ -160,6 +162,8 @@ public:
         QString snippet;     ///< text around the first match
         std::vector<PageHits> pageHits;  ///< the pages with matches, in order
         std::vector<BlockHits> blockHits;  ///< a Markdown file: the passages with matches, in order
+        int nameScore = 0;               ///< fuzzy search: fzf's score of the name and folder path (0: not in them)
+        std::vector<int> nameMarks;      ///< fuzzy search: the characters of the name that matched
     };
     /// The text of the pages of this PDF read before (by PDF page, 0-based), if it was read from the file as it is now
     /// (same size and time): an open document takes it for its search instead of reading it again.
@@ -173,6 +177,13 @@ public:
 
     /// Search the text and the names of all indexed documents (case-insensitive, whitespace-insensitive).
     std::vector<Hit> search(const QString& query) const;
+    /// The fuzzy search (FuzzyQuery.h; one that is not valid: the plain search of its text). A document is a hit when
+    /// the expression holds with each term found in its name or folder path (fzf's matching, relative to the library)
+    /// or in its text (TextMatch). Its count is the hits of the terms that are not negated; its pages (passages of a
+    /// Markdown file) are those with hits on which the expression holds, a term counting as found on a page when the
+    /// page, the name or the folder path has it - or, if it holds on none, all pages with hits. Ordered by the score
+    /// of the name, then the count.
+    std::vector<Hit> search(const FuzzyQuery& query) const;
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
 

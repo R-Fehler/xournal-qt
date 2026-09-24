@@ -449,8 +449,11 @@ bool CanvasInput::actionStart(const Event& event) {
     this->sequenceStartPage = currentPage;
     this->pressViewPos = event.viewPos;
     this->pressTimeMs = monotonicMs();
-    // A read-only document (a Markdown file shown): every tool is the hand
-    this->readOnlyPress = view.getSession().isReadOnly() && toolType != TOOL_HAND;
+    // A read-only document (a Markdown file shown): every tool is the hand. A document shown for reading only (the
+    // reference beside another one): every tool but the select tools, which select to copy.
+    const bool readingTool = isSelectToolType(toolType) || xoj::tool::isPdfSelectionTool(toolType);
+    this->readOnlyPress = (view.getSession().isReadOnly() || (view.isReadingOnly() && !readingTool)) &&
+                          toolType != TOOL_HAND;
     if (toolType == TOOL_HAND || this->readOnlyPress) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
     }
@@ -467,6 +470,9 @@ bool CanvasInput::actionStart(const Event& event) {
             PositionInputData selectionPos = this->getInputDataRelativeToCurrentPage(selectionPage, event);
             const CursorSelectionType selType =
                     selection->getSelectionTypeForPos(selectionPos.x, selectionPos.y, view.getZoom());
+            if (selType && view.isReadingOnly()) {
+                return true;  // for reading only: the selection stays as it is (to copy it), nothing moves
+            }
             if (selType) {
                 if (selType == CURSOR_SELECTION_MOVE && modifier3) {
                     selection->copySelection();
@@ -621,7 +627,7 @@ bool CanvasInput::actionEnd(const Event& event) {
         this->inputRunning = false;
         return false;
     }
-    if (EditSelection* selection = view.getSelection()) {
+    if (EditSelection* selection = view.getSelection(); selection && (!view.isReadingOnly() || selection->isMoving())) {
         selection->mouseUp();
     }
 
@@ -671,8 +677,8 @@ bool CanvasInput::actionEnd(const Event& event) {
 
 bool CanvasInput::startTouchSelection(QPointF viewPos) {
     EditSelection* selection = view.getSelection();
-    if (!selection) {
-        return false;
+    if (!selection || view.isReadingOnly()) {
+        return false;  // (for reading only: a finger scrolls over a selection too, it never moves it)
     }
     auto* page = static_cast<CanvasPage*>(selection->getView());
     if (!page) {
@@ -755,7 +761,7 @@ void CanvasInput::cancelTouchGesture() {
 
 void CanvasInput::undo() {
     DocumentSession& s = view.getSession();
-    if (s.getUndoRedoHandler()->canUndo()) {
+    if (s.getUndoRedoHandler()->canUndo() && !view.isReadingOnly()) {
         s.clearSelectionEndText();
         s.getUndoRedoHandler()->undo();
     }
@@ -763,7 +769,7 @@ void CanvasInput::undo() {
 
 void CanvasInput::redo() {
     DocumentSession& s = view.getSession();
-    if (s.getUndoRedoHandler()->canRedo()) {
+    if (s.getUndoRedoHandler()->canRedo() && !view.isReadingOnly()) {
         s.clearSelectionEndText();
         s.getUndoRedoHandler()->redo();
     }

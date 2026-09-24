@@ -61,15 +61,18 @@ DocumentSearch::DocumentSearch(DocumentSession& session): session(session), inde
 
 DocumentSearch::~DocumentSearch() = default;
 
-void DocumentSearch::setQuery(const QString& query, bool jump) {
-    if (query == text) {
+void DocumentSearch::setQuery(const QString& query, bool jump, bool fuzzy) {
+    if (query == text && (fuzzy == fuzzyMode || query.isEmpty())) {
         if (jump && curIndex < 0) {
             jumpToFirstFromCurrentPage();
         }
         return;
     }
     text = query;
-    prepared = textmatch::prepare(query);
+    fuzzyMode = fuzzy && !query.isEmpty();
+    parsed = fuzzyMode ? FuzzyQuery(query) : FuzzyQuery();
+    terms = FuzzyQuery::textTerms(query, fuzzyMode);
+    found.clear();
     ++generation;
     places.clear();
     waiting.clear();
@@ -79,11 +82,11 @@ void DocumentSearch::setQuery(const QString& query, bool jump) {
     }
     curIndex = -1;
     scrollPending = false;
-    pendingJump = jump && !prepared.isEmpty();
+    pendingJump = jump && !terms.empty();
     jumpScrolls = true;
     startPage = session.getCurrentPageNo();
     startIndex = 0;
-    if (prepared.isEmpty()) {
+    if (terms.empty()) {
         index.release();
     } else {
         index.setFocusPage(startPage);
@@ -102,9 +105,13 @@ void DocumentSearch::setQuery(const QString& query, bool jump) {
 
 void DocumentSearch::recountAll() {
     counts.assign(index.pageCount(), 0);
-    if (!prepared.isEmpty()) {
+    found.assign(parsed.isValid() ? counts.size() : 0, {});
+    if (!terms.empty()) {
         for (size_t i = 0; i < counts.size(); ++i) {
-            counts[i] = index.count(i, prepared);
+            counts[i] = index.count(i, terms);
+            if (parsed.isValid()) {
+                found[i] = termsOn(i);
+            }
         }
     }
     rebuildHitPages();
@@ -114,16 +121,22 @@ void DocumentSearch::recountAll() {
 }
 
 void DocumentSearch::recount(const std::vector<size_t>& pages) {
-    if (prepared.isEmpty()) {
+    if (terms.empty()) {
         return;
     }
     counts.resize(index.pageCount(), 0);
+    if (parsed.isValid()) {
+        found.resize(counts.size());
+    }
     std::vector<size_t> shown;
     for (const size_t page: pages) {
         if (page >= counts.size()) {
             continue;
         }
-        counts[page] = index.count(page, prepared);
+        counts[page] = index.count(page, terms);
+        if (parsed.isValid()) {
+            found[page] = termsOn(page);
+        }
         if (places.erase(page) > 0) {
             shown.push_back(page);  // (placed again right away: its marks do not blink)
         }
@@ -196,7 +209,7 @@ const std::vector<DocumentSearch::Place>* DocumentSearch::placesOn(size_t page, 
     if (auto it = places.find(page); it != places.end()) {
         return &it->second;
     }
-    if (prepared.isEmpty() || page >= counts.size() || (counts[page] == 0 && index.known(page))) {
+    if (terms.empty() || page >= counts.size() || (counts[page] == 0 && index.known(page))) {
         return &NO_PLACES;
     }
     if (!ask) {
@@ -230,7 +243,7 @@ void DocumentSearch::placeWanted() {
 }
 
 void DocumentSearch::place(size_t page) {
-    if (prepared.isEmpty() || page >= counts.size()) {
+    if (terms.empty() || page >= counts.size()) {
         return;
     }
     std::vector<Place> found;
@@ -250,7 +263,7 @@ void DocumentSearch::place(size_t page) {
             waiting.insert(page);  // (placed when it is read)
             return;
         }
-        for (const auto& m: textmatch::find(layout->text, prepared)) {
+        for (const auto& m: textmatch::find(layout->text, terms)) {
             add(layout->rects(m.start, m.end));
         }
     }
@@ -260,7 +273,7 @@ void DocumentSearch::place(size_t page) {
         if (page < doc->getPageCount()) {
             for (const ElementText& piece: elementTexts(*doc->getPage(page))) {
                 const auto s = textmatch::simplify(piece.shown);
-                for (const auto& m: textmatch::find(s.text, prepared)) {
+                for (const auto& m: textmatch::find(s.text, terms)) {
                     add(elementRects(piece, s.origin[static_cast<size_t>(m.start)],
                                      s.origin[static_cast<size_t>(m.end - 1)] + 1));
                 }
@@ -375,9 +388,15 @@ void DocumentSearch::jumpToHit(size_t page, int hit) {
 void DocumentSearch::pageMoved(size_t page, int delta) {
     if (delta > 0) {
         counts.insert(counts.begin() + static_cast<std::ptrdiff_t>(std::min(page, counts.size())),
-                      prepared.isEmpty() ? 0 : index.count(page, prepared));
+                      terms.empty() ? 0 : index.count(page, terms));
+        if (parsed.isValid()) {
+            found.insert(found.begin() + static_cast<std::ptrdiff_t>(std::min(page, found.size())), termsOn(page));
+        }
     } else if (page < counts.size()) {
         counts.erase(counts.begin() + static_cast<std::ptrdiff_t>(page));
+        if (page < found.size()) {
+            found.erase(found.begin() + static_cast<std::ptrdiff_t>(page));
+        }
     }
     // The places of the pages behind it move along
     std::map<size_t, std::vector<Place>> moved;
@@ -406,6 +425,45 @@ void DocumentSearch::pageMoved(size_t page, int delta) {
     rebuildHitPages();
     ++rev;
     Q_EMIT changed();
+}
+
+std::vector<char> DocumentSearch::termsOn(size_t page) {
+    std::vector<char> on(parsed.terms().size(), 0);
+    for (size_t t = 0; t < on.size(); ++t) {
+        on[t] = index.contains(page, parsed.terms()[t].textTerm()) ? 1 : 0;
+    }
+    return on;
+}
+
+bool DocumentSearch::matches(QStringView name) const {
+    if (!parsed.isValid()) {
+        return total > 0;
+    }
+    const auto inName = parsed.matchName(name).found;
+    return parsed.evaluate([&](size_t t) {
+        return inName[t] || std::any_of(found.begin(), found.end(), [t](const std::vector<char>& on) {
+                   return t < on.size() && on[t];
+               });
+    });
+}
+
+bool DocumentSearch::expressionOn(size_t page, const std::vector<char>& inName) const {
+    return page < found.size() &&
+           parsed.evaluate([&](size_t t) { return inName[t] || (t < found[page].size() && found[page][t]); });
+}
+
+std::vector<DocumentSearch::PageHits> DocumentSearch::matchingPages(QStringView name) const {
+    if (!parsed.isValid()) {
+        return withHits;
+    }
+    const auto inName = parsed.matchName(name).found;
+    std::vector<PageHits> out;
+    for (const PageHits& h: withHits) {
+        if (expressionOn(h.page, inName)) {
+            out.push_back(h);
+        }
+    }
+    return out.empty() ? withHits : out;
 }
 
 std::vector<QRectF> DocumentSearch::findOnPage(Document& document, size_t pageNo, const std::string& utf8) {

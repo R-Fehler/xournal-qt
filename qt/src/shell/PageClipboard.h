@@ -31,9 +31,9 @@ public:
     void copy(DocumentSession& session, const std::vector<size_t>& pages, bool withPdf = true);
     bool isEmpty() const { return pages.empty(); }
     size_t size() const { return pages.size(); }
-    /// New copies of the pages, ready to be inserted into `target`. `keptIn`: the merged PDF their PDF pages were
-    /// added to (empty: none were added).
-    std::vector<PageRef> pagesFor(DocumentSession& target, fs::path* keptIn = nullptr) const;
+    /// New copies of the pages, ready to be inserted into `target`. `addedToMergedPdf`: their PDF pages were added to
+    /// the target's merged PDF (it is written in the background).
+    std::vector<PageRef> pagesFor(DocumentSession& target, bool* addedToMergedPdf = nullptr) const;
 
     /// Resolution of PDF pages turned into image backgrounds.
     static constexpr double IMAGE_DPI = 200;

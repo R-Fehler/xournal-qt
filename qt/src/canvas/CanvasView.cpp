@@ -77,6 +77,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     // (the rendered pages are kept by CanvasMemory: the PDF cache only serves edits of the visible ones)
     pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
+    pdfCachePages = session.getDocument()->getPdfPageCount();
     registerListener(&session);
     session.setXournalView(this);
     session.setZoomControl(&zoomControl);
@@ -738,8 +739,8 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
 }
 
 bool CanvasView::tapAt(QPointF viewPos) {
-    // A task's check box in a Markdown text: switched
-    if (CanvasPage* page = pageAt(viewPos)) {
+    // A task's check box in a Markdown text: switched (not in a document shown for reading only)
+    if (CanvasPage* page = readingOnly ? nullptr : pageAt(viewPos)) {
         if (const auto idx = indexOf(page)) {
             const QRectF r = pageViewRect(*idx);
             const double zoom = viewController.zoom();
@@ -1027,7 +1028,7 @@ bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle s
     if (QClipboard* cb = QGuiApplication::clipboard(); cb->supportsSelection()) {
         cb->setText(QString::fromStdString(pdfSelection->getSelectedText()), QClipboard::Selection);
     }
-    if (mark && pdfTextMode != PdfTextMode::Select) {
+    if (mark && pdfTextMode != PdfTextMode::Select && !readingOnly) {
         markPdfText(pdfTextMode);  // the tool marks right away: no extra tap
         return true;
     }
@@ -1044,7 +1045,7 @@ bool CanvasView::finishPdfSelection(CanvasPage& page, XojPdfPageSelectionStyle s
 
 bool CanvasView::markPdfText(PdfTextMode mode) {
     // Port of PdfFloatingToolbox::createStrokes: marker strokes over the selected text lines.
-    if (!hasPdfTextSelection() || mode == PdfTextMode::Select) {
+    if (!hasPdfTextSelection() || mode == PdfTextMode::Select || readingOnly) {
         return false;
     }
     const auto textRects = pdfSelection->getSelectedTextRects();
@@ -1506,6 +1507,16 @@ void CanvasView::updateVisibility() {
 
 // --- memory ----------------------------------------------------------------------------------------------------------
 
+void CanvasView::setReadingOnly(bool on) {
+    if (on == readingOnly) {
+        return;
+    }
+    readingOnly = on;
+    if (on) {
+        endTextEditing();  // (a text being typed when the document became the reference: kept, as when it is left)
+    }
+}
+
 void CanvasView::setShown(bool value) {
     shown = value;
     if (shown) {
@@ -1680,7 +1691,11 @@ PdfCache* CanvasView::rasterPdfCache(bool background) const {
     return backgroundPdfCache ? backgroundPdfCache.get() : pdfCache.get();
 }
 
-void CanvasView::recreatePdfCache() {
+XojPdfPageSPtr CanvasView::rasterPendingPdfPage(size_t number) const { return session.pendingPdfPage(number); }
+
+void CanvasView::recreatePdfCache() { replacePdfCache(true); }
+
+void CanvasView::replacePdfCache(bool rerender) {
     // The old ones may still be in use by a render: they go with the view (empty)
     evictPdfCache({});
     retiredPdfCaches.push_back(std::move(pdfCache));
@@ -1693,8 +1708,14 @@ void CanvasView::recreatePdfCache() {
     }
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
+    const size_t before = std::exchange(pdfCachePages, session.getDocument()->getPdfPageCount());
     for (auto& p: pages) {
-        p->rerenderPage();
+        // (a page drawn again goes to the queue of the pages in view: all of them there would make the pages the
+        // reader waits for wait behind every page of the document)
+        const PageRef& page = p->getPage();
+        if (rerender || (page->getBackgroundType().isPdfPage() && page->getPdfPageNr() >= before)) {
+            p->rerenderPage();
+        }
     }
 }
 
@@ -1727,8 +1748,9 @@ void CanvasView::documentChanged(DocumentChangeType type) {
         recreatePdfCache();
         rebuildPages();
     } else if (type == DOCUMENT_CHANGE_PDF_BOOKMARKS) {
-        // Another background PDF was loaded (pasted PDF pages joined the merged PDF): the caches hold the old one
-        recreatePdfCache();
+        // Another background PDF was loaded: the caches hold the old one. When pasted PDF pages joined the merged
+        // PDF, the pages keep their pictures (their PDF pages are the same, with the same numbers).
+        replacePdfCache(!session.pdfKeepsPictures());
     }
 }
 

@@ -683,6 +683,106 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Settings → Storage → Clean-up still removes everything (also `preview-stamps.pack`); switching the cache to
       the app cache moves it along.
 
+## Saving in the background (qt/background-save)
+- [ ] Open a long PDF (pgfmanual, or a lecture of several hundred pages), write a few strokes, save it as a hybrid
+      PDF, then write more and press Ctrl+S: the window stays usable while it saves (scroll, write, turn pages). The
+      tab title and the window title say "saving…"; the dot (●/•) stays until the save is done, then goes.
+- [ ] Write a stroke *while* it says "saving…": when the save is done, the dot stays (that stroke is not in the file
+      yet). Undo that stroke: the dot goes (the file holds the document as it is now). Redo, Ctrl+S: saved.
+- [ ] Ctrl+S twice quickly on a long hybrid PDF: it saves twice at most, one after the other (no error), and the
+      last strokes are in the file (close and reopen).
+- [ ] Ctrl+S on a big `.xopp` (many pages of ink): the window does not freeze.
+- [ ] Close the tab (✕) while it says "saving…": nothing is asked, the tab closes once the save is done. Quit the app
+      (window close / Ctrl+Q) while it saves: the window stays until the save is done, then closes (or asks about
+      other documents with changes). Reopen: everything is there.
+- [ ] Save to a place that cannot be written (a read-only folder, a full SD card): an error says why, the dot stays,
+      and closing the tab asks about the unsaved changes.
+- [ ] A document with pasted PDF pages: delete a pasted page, Ctrl+S, and right away (while it saves) undo the
+      deletion: the page shows its PDF page. Close and reopen: all pages there, with their text (search finds it).
+- [ ] Paste PDF pages from another PDF while a document with a large merged PDF saves: the paste may wait a moment,
+      then both are in the file after the next save; nothing refers to the cache (close, reopen from another
+      folder view or after clearing `~/.cache/xournal-qt/pasted-pages`).
+- [ ] Paste a page from another PDF into a long PDF (pgfmanual, a lecture of hundreds of pages) and into the large
+      scan: the page is there at once and shows its PDF page; the window does not freeze (it used to for seconds).
+      Its thumbnail may be white for a few seconds. Search finds its text a little later. Undo and redo the paste
+      right away: fine. Ctrl+S right after the paste: saves once the page is in the merged PDF; close and reopen:
+      the page is there with its text.
+- [ ] Kill the app (`kill -TERM <pid>`) while it saves a long hybrid PDF: at the next start the document is offered
+      for recovery with the latest strokes, and the hybrid PDF is either the old or the new version (it opens).
+- [ ] (Fix) Paste a PDF page from another PDF into a document that has a background PDF (best: the large scan):
+      the pasted page shows its PDF page on the canvas right away (it used to stay blank for a while), a second
+      paste from a third PDF too; the other pages do not flicker or re-render.
+
+## Fuzzy search (qt/fuzzy-search)
+- [ ] The library's search field has a "Fuzzy" button, off. Hover (or press and hold on touch): the tooltip is a
+      short table of the syntax. Off, the search is as before (`kalman | lqr` finds nothing unless that text is there).
+- [ ] Turn it on and type part of a document's name with letters left out (`lctr` for "Lecture"): it is found, first
+      of all, with the matched letters orange and underlined on the card. Better matches come first (letters at word
+      starts, in a row).
+- [ ] `kalman filter` finds documents that have both words anywhere (also on different pages); in the extended search
+      (the pages button) a document shows the pages with both words, or all pages with hits when no page has both.
+- [ ] `a | b` finds either; `a b | c` is a and (b or c); `(a b) | c` groups; `!draft` drops documents with "draft" in
+      the name, the folder or the text; `!archive` drops everything in a folder "Archive".
+- [ ] `'word'` finds the whole word only, `^pre` names starting with "pre" (in text: words starting with it),
+      `ing$` the ends. A term in a folder's name finds its documents (`uni lect` for Uni/Lecture 3).
+- [ ] Type `(kalman` or `kalman |`: a short red hint appears next to the field and the text is searched as plain
+      text; complete the expression and the hint goes.
+- [ ] Open a result, a page of it or a snippet card: the document opens with the same terms marked (all of `a | b`),
+      and the search bar steps through them. Edit the query there: it stays fuzzy; clear it: the next search is
+      plain.
+- [ ] Close and start the app again: "Fuzzy" is still on. A second window shows it on too; turning it off in one
+      turns it off in both.
+- [ ] The tab overview (Ctrl+Shift+F) has the same "Fuzzy" button, in the same state as the library's. Open a few
+      documents: `lecture !draft` marks the documents that match (title or text), the matched letters of the titles
+      are highlighted, a document found by its title alone says "In the name"; with the pages button, a document shows
+      the pages on which the whole expression holds. "Names" with Fuzzy on matches the titles fuzzily.
+- [ ] A big library (thousands of documents): typing in the fuzzy search stays as responsive as the plain one.
+
+## Reference mode (qt/reference-view)
+
+- [ ] Two canvases side by side (the reference for reading only): writing with the pen on the notes and moving on
+      across the divider into the reference: the stroke stays on the notes, the reference does not scroll under it;
+      the next stroke on the reference scrolls it. The same with the mouse.
+- [ ] On the reference, pen, highlighter, eraser, text and shape tools scroll it like the hand (a tap on a link
+      shows the link); nothing is ever written, erased or marked there, and the tab of the reference gets no "●".
+- [ ] A two-finger tap on the reference undoes nothing (a two-finger tap on the notes still undoes there).
+- [ ] "Open as reference" from the tab strip's menu of another tab (press and hold / right click), from the book icon
+      on a card of the tab overview (Ctrl+Shift+E), and from the menu of a card in the library and in Recent: the
+      document appears beside the current one (on the left), fitted to its half, with a small book in its tab. An
+      untouched new document stays open for the notes. The notes have a thin blue frame.
+- [ ] Drag the divider's grip with a finger and with the pen: both halves follow; it stops at a fifth of the width.
+      Restart the app: the divider is where it was left.
+- [ ] Switch to another tab and back: each tab shows its own reference (or none). The home screen hides it.
+- [ ] The reference's pill: the page counter (tap it, type a number, Enter: that page), fit width, swap sides (the
+      notes on the left for a left hand; remembered), swap roles (the reference becomes the notes and the other way
+      round, nothing is drawn again), × (the split closes, the tab stays). Closing the reference's tab also closes
+      the split.
+- [ ] Scroll the reference with a finger (fling), the pen, the mouse wheel and the touchpad (with momentum); pinch
+      and Ctrl+wheel zoom only the reference; a double tap zooms into a column. The notes do not move meanwhile.
+- [ ] PDF text in the reference: with the PDF text tool (even in highlight mode) drag over a line, or press and hold
+      a word: the copy button appears in its pill; tap it and paste into the notes (Ctrl+V after a tap on the notes).
+      The same with the lasso: select strokes in the reference, copy, paste in the notes.
+- [ ] A link in the reference (a table of contents): tap it, "Go to page" goes there in the reference; back with
+      Alt+Left after a tap on the reference's pill.
+- [ ] Keys: after a tap on the reference (or its pill) Ctrl+C, Ctrl++ / Ctrl+-, Ctrl+0 and Alt+Left act on the
+      reference; after a tap on the notes they act on the notes again. Ctrl+Z undoes in the notes (unless the
+      reference is written in, see below).
+- [ ] Full screen (F11): the split stays, the tool square starts over the notes; with the tool bar docked left, right
+      and at the top nothing overlaps.
+- [ ] The pen button in the reference's pill: on (highlighted), the reference is written in with the tool in hand
+      (pen, highlighter, eraser, text, lasso that moves), its tab gets its "●", Ctrl+Z / Ctrl+Y (and a two-finger
+      tap on it) undo there while it was the last one written on; a tap on the notes and Ctrl+Z undoes in the notes.
+      A stroke that begins on either side stays on that side across the divider. Off: for reading again. Each tab
+      remembers it for its reference; a new reference, and the notes after "swap roles", start for reading. Save
+      the reference from its own tab (or when closing it / quitting, which asks).
+- [ ] The grid button in the reference's pill: the pages of the reference fill its half (the notes and their page
+      sidebar stay as they are); scroll it with a finger and the touchpad; a tap on a page goes there and closes the
+      grid; the button closes it too. The page sidebar never shows the reference's pages.
+- [ ] With `XQT_PERF=1` and a long PDF as the reference beside the notes: scroll the reference and the notes in
+      turn; both show sharp pages quickly, neither waits behind the other's pages rendered in advance. Swap roles:
+      no page goes blurry or is drawn again. Switch to a third tab and back: the reference's pages near where it
+      was read are still there.
+
 ## Presentation and horizontal scrolling (qt/present)
 - [ ] Page number jump: with a document open, type `12` on the keyboard (no text being written): "Go to page: 12
       of N" appears over the page; Enter goes to page 12 (a number past the end goes to the last page), Escape or a
@@ -729,3 +829,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] A document with pages of different sizes (A4 and 16:9): each fills the screen when it is shown.
 - [ ] Performance: page quickly through a long PDF while presenting: each page arrives sharp (drawn in advance),
       no grey or blurry page on arrival.
+- [ ] With a reference beside the notes: tap the reference, type `4` Enter: the reference goes to page 4, the
+      notes stay. Scrolling sideways, ← → page the side that was tapped last. The reference pill's fit width fits
+      the reference's current page. Present (F5): the notes alone fill the screen; after Escape, Escape the
+      reference is back beside them.

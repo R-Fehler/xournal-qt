@@ -36,12 +36,17 @@ class DocumentCanvasItem: public QQuickItem {
     Q_PROPERTY(qreal contentHeight READ contentHeight NOTIFY viewportChanged)
     Q_PROPERTY(qreal contentX READ contentX NOTIFY viewportChanged)
     Q_PROPERTY(qreal contentY READ contentY NOTIFY viewportChanged)
+    /// The view is shown for reading only (the reference beside the document of a tab, CanvasView::setReadingOnly).
+    Q_PROPERTY(bool readingOnly READ readingOnly WRITE setReadingOnly NOTIFY readingOnlyChanged)
 public:
     explicit DocumentCanvasItem(QQuickItem* parent = nullptr);
     ~DocumentCanvasItem() override;
 
     QObject* view() const;
     void setView(QObject* view);
+
+    bool readingOnly() const { return reading; }
+    void setReadingOnly(bool on);
 
     qreal contentWidth() const;
     qreal contentHeight() const;
@@ -62,6 +67,7 @@ public:
 Q_SIGNALS:
     void viewChanged();
     void viewportChanged();
+    void readingOnlyChanged();
 
 protected:
     QSGNode* updatePaintNode(QSGNode* old, UpdatePaintNodeData*) override;
@@ -80,6 +86,11 @@ private:
     void takeKeyboardFocus();
     void updateSelectionNode(QSGNode* root, double zoom, double dpr);
     bool claims(QPointF scenePos) const;
+    /// Another canvas of the window holds the pen, the mouse or the touch (`grab` of that canvas): a stroke that began
+    /// there stays there, also where it crosses this canvas.
+    bool heldByAnother(bool DocumentCanvasItem::*grab) const;
+    /// Another canvas of the process shows this view (while two canvases swap their views).
+    bool shownByAnother(const xqt::CanvasView* v) const;
     void updateViewGeometry();
 
     QPointer<xqt::CanvasView> canvasView;
@@ -89,6 +100,7 @@ private:
     bool mouseGrab = false;
     bool touchSessionOwned = false;
     bool viewReplaced = false;
+    bool reading = false;
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
     std::atomic<int> shownPreviews{0};
     std::atomic<int> mostTiles{0};

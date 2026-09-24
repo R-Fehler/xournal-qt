@@ -56,6 +56,8 @@ void writeAtomically(QPDF& pdf, const fs::path& target) {
     try {
         QPDFWriter w(pdf, tmp.string().c_str());
         w.setObjectStreamMode(qpdf_o_generate);  // smaller: object streams
+        // The streams as they are (decoding and compressing them again took half of the time: 9 s for 1,300 pages)
+        w.setDecodeLevel(qpdf_dl_none);
         w.write();
     } catch (...) {
         std::error_code ec;

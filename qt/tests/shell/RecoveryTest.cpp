@@ -4,8 +4,13 @@
  * @license GNU GPLv2 or later
  */
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <csignal>
+#include <functional>
+#include <future>
 #include <memory>
+#include <thread>
 
 #include <QCoreApplication>
 #include <QDir>
@@ -22,6 +27,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "session/MergedPdf.h"
+#include "session/PdfPageKeeper.h"
 #include "shell/SessionRecovery.h"
 #include "shell/TabManager.h"
 #include "undo/InsertUndoAction.h"
@@ -282,6 +288,7 @@ fs::path crashAfterPasting(const fs::path& doc, const fs::path& other) {
         a.copyPages({0});
         EXPECT_TRUE(a.openPath(QString::fromStdString(doc.string())));
         EXPECT_EQ(a.pastePages(0), 1);
+        a.tabManager().currentSession()->waitForSaves();  // (the merged PDF is written in the background)
         cached = a.tabManager().currentSession()->getDocument()->getPdfFilepath();
         EXPECT_TRUE(MergedPdf::inCache(cached));
         EXPECT_EQ(SessionRecovery::emergencySaveAll(), 1);
@@ -327,4 +334,57 @@ TEST_F(RecoveryTest, pastedPdfPagesAreRecoveredAndTheirCachedPdfCleanedUp) {
     ASSERT_EQ(c.recoveryItems().size(), 1);
     c.recover(false);
     EXPECT_FALSE(fs::exists(cached)) << "the recovery was declined";
+}
+
+// A crash while a document is saved in the background: the emergency save still writes it (it is modified until the
+// file is written), and the save itself finishes.
+TEST_F(RecoveryTest, emergencySaveDuringABackgroundSave) {
+    using namespace std::chrono_literals;
+    AppController a;
+    a.startSession({});
+    ASSERT_TRUE(a.openPath(QString::fromStdString(doc.string())));
+    DocumentSession& s = *a.tabManager().session(0);
+    const size_t before = elementCount(s);
+    scribble(s);
+    std::promise<void> release;
+    std::shared_future<void> released = release.get_future().share();
+    std::atomic<int> held{0};
+    PdfPageKeeper::stopSaveAt = [&](int step) {
+        if (step == 1) {
+            ++held;
+            released.wait_for(10s);
+        }
+        return false;
+    };
+    bool finished = false;
+    s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, [&](const DocumentSession::SaveResult& r) {
+                            EXPECT_TRUE(r.ok) << r.error;
+                            finished = true;
+                        }});
+    auto waitFor = [](const std::function<bool()>& done) {
+        const auto until = std::chrono::steady_clock::now() + 20s;
+        while (!done() && std::chrono::steady_clock::now() < until) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+            std::this_thread::sleep_for(1ms);
+        }
+        return done();
+    };
+    ASSERT_TRUE(waitFor([&] { return held == 1; })) << "the save is writing";
+    scribble(s);  // (edited meanwhile)
+    EXPECT_EQ(SessionRecovery::emergencySaveAll(), 1);
+    const fs::path emergency = DocumentSession::emergencyPath(Util::getPid(), s.serial());
+    auto saved = DocumentSession::loadFile(emergency);
+    ASSERT_TRUE(saved.document) << saved.error;
+    EXPECT_EQ(saved.document->getPage(0)->getSelectedLayer()->getElements().size(), before + 2)
+            << "the document as it is now";
+    release.set_value();
+    const bool done = waitFor([&] { return finished; });
+    PdfPageKeeper::stopSaveAt = nullptr;
+    ASSERT_TRUE(done);
+    auto file = DocumentSession::loadFile(doc);
+    ASSERT_TRUE(file.document);
+    EXPECT_EQ(file.document->getPage(0)->getSelectedLayer()->getElements().size(), before + 1)
+            << "the save wrote the state it started with";
+    EXPECT_TRUE(s.isModified());
+    fs::remove(emergency);
 }

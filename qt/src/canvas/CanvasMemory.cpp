@@ -77,6 +77,9 @@ void CanvasMemory::plan() {
     }
     std::vector<View> order = views;
     std::stable_sort(order.begin(), order.end(), [](const View& a, const View& b) { return a.used > b.used; });
+    // After the one in use, the others in sight (the reference beside the notes) keep their pages before those in
+    // the background, used longest ago giving up first among each
+    std::stable_partition(order.begin() + 1, order.end(), [](const View& v) { return v.view->isShown(); });
     const qint64 pages = pagesLimit();
     const auto share = static_cast<qint64>(static_cast<double>(pages) * (order.size() > 1 ? CURRENT_SHARE : 1.0));
     qint64 left = pages - order.front().view->planCache(share);

@@ -13,6 +13,8 @@
  */
 #pragma once
 
+#include <deque>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,6 +27,7 @@
 
 #include "control/Control.h"
 #include "control/zoom/ZoomControl.h"
+#include "pdf/base/XojPdfPage.h"
 #include "undo/UndoRedoHandler.h"  // for UndoRedoListener
 
 #include "HeadlessViews.h"
@@ -37,6 +40,7 @@ namespace xqt {
 
 class DocumentSearch;
 class PdfPageKeeper;
+struct PdfMerge;
 
 class AppContext;
 
@@ -72,7 +76,38 @@ public:
     struct SaveResult {
         bool ok = false;
         std::string error;
+        std::string exportError;  ///< SaveRequest::exportXopp failed (the save itself may have succeeded)
     };
+    enum class SaveKind {
+        Save,        ///< to the document's file: its .xopp, or its hybrid PDF. Requires hasFilePath().
+        SaveAs,      ///< as .xopp to `target`; the document takes this path ("Save as")
+        Hybrid,      ///< as a hybrid PDF to `target` (see saveAsHybrid)
+        ExportXopp,  ///< only exportXopp to `target` (the document's state and saved point stay)
+    };
+    struct SaveRequest {
+        SaveKind kind = SaveKind::Save;
+        fs::path target;
+        /// A hybrid PDF: also export the .xopp for Xournal++ here (exportXopp), from the same state.
+        fs::path exportXopp;
+        /// Called on this thread when the file is written, or when that failed.
+        std::function<void(const SaveResult&)> done;
+    };
+    /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
+    /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the
+    /// document can be edited meanwhile. It counts as saved only if nothing changed since that copy, and it stays
+    /// modified until the file is written (isSaving()). One save at a time: a save asked for while one runs follows
+    /// it (several plain saves in a row: one). The merged PDF of pasted pages is written first (on the worker, its
+    /// crash-safe steps as before), then the copy is taken.
+    void saveInBackground(SaveRequest request);
+    /// A save runs or waits.
+    bool isSaving() const;
+    /// Wait (blocking this thread) until the running and waiting saves are done; false if the last one failed.
+    bool waitForSaves();
+    /// The merged PDF must not change while a save writes it: pasting waits for that part (usually well under a
+    /// second).
+    void waitForPdfWork();
+    bool pdfWorkRunning() const;
+    /// save(), saveAs(), saveAsHybrid(): the same, waiting for the result (tests, library moves).
     /// Save to the document's path (as .xopp). Requires hasFilePath().
     SaveResult save();
     /// Save to a new path; the document takes this path ("Save as").
@@ -91,6 +126,8 @@ public:
     /// Export for Xournal++: a plain `xopp` next to the hybrid PDF with the base pages as its PDF (the merged-PDF
     /// rules of qt/pdf-pages: "name.pdf" if free, else ".name.pages.pdf"). The document keeps its file.
     SaveResult exportXopp(const fs::path& xopp);
+    /// saveInBackground, waiting for its result.
+    SaveResult saveNow(SaveRequest request);
     /// Where exportXopp puts the PDF for this .xopp.
     static fs::path exportPdfFor(const fs::path& xopp);
     /// Write a document that is not open in a session (e.g. a library document being moved) to `target` (.xopp),
@@ -142,8 +179,18 @@ public:
     // --- PDF pages from other PDFs (MergedPdf.h) ----------------------------------------------------------------
     /// Add PDF pages from another PDF (a PDF in memory) to the document's merged background PDF, which is made from
     /// its own PDF the first time and becomes its background. Returns the number of the first of them in it, or npos
-    /// if that failed (`error`). The numbers of the other pages stay.
+    /// if that failed (`error`). The numbers of the other pages stay. The merged PDF is written in the background
+    /// (seconds for a long PDF): pages with these numbers are drawn from `pdf` until then (pendingPdfPage); if it
+    /// fails, they get their PDF page as an image and pdfPagesFailed() says why.
     size_t addPdfPages(const std::string& pdf, std::string& error);
+    /// A PDF page that is still being added to the merged PDF (any thread; nullptr: none).
+    XojPdfPageSPtr pendingPdfPage(size_t number) const;
+    /// PDF pages are being added to the merged PDF.
+    bool mergingPdfPages() const;
+    /// Wait (blocking) until they are (and a save before them is done): e.g. before pages are copied.
+    void waitForMerges();
+    /// (PdfPageKeeper) Write this merge after the ones before it, before the saves that wait.
+    void queueMerge(std::shared_ptr<PdfMerge> merge);
     /// The page numbers in the background PDF stay valid while this does not change (a save dropped unused pages
     /// of the merged PDF and renumbered the pages).
     quint64 pdfNumbering() const;
@@ -152,6 +199,12 @@ public:
     /// The PDF the document annotates for the user: its background PDF, or while the merged PDF of a document that
     /// was never saved is in the cache, the PDF it was made from (empty if none).
     fs::path annotatedPdf() const;
+    /// Load this PDF as the background, whose pages that the document shows look the same as in the one it has now
+    /// (pages added to it, or a copy of it): the views swap their PDF without drawing those pages again. False if it
+    /// did not load (Document::getLastErrorMsg).
+    bool loadPdfKeepingPictures(const fs::path& pdf);
+    /// Within loadPdfKeepingPictures (for the views).
+    bool pdfKeepsPictures() const { return keepingPictures; }
 
     // --- view side --------------------------------------------------------------------------------------------
     /// The view showing this session (nullptr: headless). Not owned.
@@ -234,6 +287,10 @@ public:
 
 Q_SIGNALS:
     void modifiedChanged(bool modified);
+    /// isSaving() changed.
+    void savingChanged(bool saving);
+    /// Pasted PDF pages could not be added to the merged PDF (they show their PDF page as an image instead).
+    void pdfPagesFailed(const QString& error);
     void undoRedoStateChanged();
     /// A page change was undone (or redone): its text ("Insert page", ...).
     void pageActionUndone(const QString& text, bool undone);
@@ -256,10 +313,25 @@ private:
     void updatePageActions();
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
-    SaveResult saveImpl(fs::path target);
-    SaveResult saveHybridImpl(const fs::path& target);
-    /// Write the .xopp (the file only).
-    SaveResult writeXopp(const fs::path& target);
+
+    // Saving in the background (DocumentSave.cpp): a save goes through steps, on this thread or on a worker.
+    struct SaveTask;
+    void startNextSave();
+    void beginSave();
+    void beginMerge();
+    /// Pages were pasted while this save had not copied the document yet: the merges first, then it starts again.
+    bool yieldToMerges();
+    void planFiles();
+    void takeSnapshot();
+    void finishWrite();
+    void finishSave(SaveResult result);
+    /// Run `work` on a worker, then `then` on this thread.
+    void onWorker(std::function<void()> work, std::function<void()> then);
+    /// Run `then` on this thread from the event loop.
+    void postStep(std::function<void()> then);
+    void resumeSave(quint64 stage);
+    void updateModified();
+    void updateSaving();
 
     // UndoRedoListener
     void undoRedoChanged() override;
@@ -279,6 +351,19 @@ private:
     SessionScrollHandler scrollHandler;
     size_t currentPage = 0;
     bool lastModified = false;
+
+    std::unique_ptr<SaveTask> saveTask;  ///< the save that runs
+    std::deque<SaveRequest> saveQueue;   ///< the saves after it
+    std::deque<std::shared_ptr<PdfMerge>> mergeQueue;  ///< pasted PDF pages to merge (before the saves)
+    quint64 saveStage = 0;               ///< the step of the running save (a stale resume is ignored)
+    bool lastSaving = false;
+    /// The saved point of the undo stack is the state a running save copied: modified until it is written.
+    bool saveUnconfirmed = false;
+    /// The last save failed after the saved point was moved: modified until a save succeeds.
+    bool saveFailed = false;
+    bool destroying = false;
+    bool keepingPictures = false;
+    SaveResult lastSaveResult;
 
     QTimer autosaveTimer;
     fs::path lastAutosaveFile;

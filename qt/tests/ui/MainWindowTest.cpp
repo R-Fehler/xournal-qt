@@ -4,7 +4,10 @@
  * @license GNU GPLv2 or later
  */
 #include <filesystem>
+#include <atomic>
+#include <chrono>
 #include <functional>
+#include <future>
 #include <memory>
 
 #include <QCoreApplication>
@@ -64,6 +67,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
+#include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
@@ -1118,6 +1122,57 @@ TEST_F(HomeScreenTest, theLibrarySearchCanBeLimitedToNames) {
     EXPECT_FALSE(library->property("namesOnly").toBool()) << "the full search again";
 }
 
+// "Fuzzy" in the library search: fzf's syntax, names matched fuzzily with their matched letters highlighted, a hint
+// for an expression that is not valid. An app-wide setting, off by default.
+TEST_F(HomeScreenTest, theLibrarySearchHasAFuzzyToggle) {
+    auto* button = find<QQuickItem>("librarySearchFuzzy");
+    ASSERT_NE(button, nullptr);
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    EXPECT_FALSE(button->property("checked").toBool());
+    library->setSearchQuery("lctr");
+    EXPECT_EQ(gridCount(), 0) << "not fuzzy: no such text";
+
+    click(button);
+    EXPECT_TRUE(library->fuzzySearch());
+    EXPECT_TRUE(button->property("checked").toBool());
+    ASSERT_TRUE(waitFor([&] { return gridCount() == 1; }));
+    QQuickItem* name = nullptr;
+    until([&] {
+        QQuickItem* c = card(0);
+        if (!c) {
+            return false;
+        }
+        for (auto* item: c->findChildren<QQuickItem*>()) {
+            if (item->objectName() == "cardName") {
+                name = item;
+            }
+        }
+        return name != nullptr;
+    });
+    ASSERT_NE(name, nullptr);
+    EXPECT_TRUE(name->property("text").toString().contains("<font")) << name->property("text").toString().toStdString();
+    EXPECT_EQ(name->property("textFormat").toInt(), 4) << "Text.StyledText";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(800);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    auto* hint = find<QQuickItem>("librarySyntaxHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->isVisible());
+    library->setSearchQuery("(lecture");
+    until([&] { return hint->isVisible(); });
+    EXPECT_TRUE(hint->isVisible()) << "a ( that is not closed";
+    EXPECT_FALSE(hint->property("text").toString().isEmpty());
+
+    click(button);
+    EXPECT_FALSE(library->fuzzySearch()) << "off again";
+    until([&] { return !hint->isVisible(); });
+    EXPECT_FALSE(hint->isVisible());
+    library->setSearchQuery("");
+}
+
 // The library has a button for the settings (no tool bar there, and not everybody has a keyboard at hand).
 TEST_F(HomeScreenTest, theSettingsOpenFromTheLibrary) {
     auto* button = find<QQuickItem>("homeSettingsButton");
@@ -1404,6 +1459,7 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
     };
     ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
     wait(100);
+    controller->selectTool("pen");  // (the tool is app-wide: an earlier test in the same process may have left another)
     ASSERT_EQ(controller->tool(), "pen");
     draw();
     EXPECT_FALSE(controller->modified()) << "read-only: the pen does not write";
@@ -3142,6 +3198,82 @@ TEST_F(MainWindowTest, tabOverviewHasTheExtendedAndTheNameSearch) {
     EXPECT_FALSE(overview->property("extendedView").toBool()) << "no pages to show for names";
 }
 
+// The overview's search has the library's "Fuzzy" toggle (the same setting): fzf's syntax over the titles and the text.
+TEST_F(MainWindowTest, tabOverviewHasTheFuzzySearch) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));  // page i: "p<i+1>"
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));  // "Xournal", "Page 2"
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    QObject* overview = find("tabOverview");
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    auto* toggle = find<QQuickItem>("overviewSearchFuzzy");
+    ASSERT_NE(toggle, nullptr);
+    EXPECT_FALSE(toggle->property("checked").toBool());
+    click(toggle);
+    EXPECT_TRUE(library->fuzzySearch()) << "the library's setting";
+
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    auto* field = find<QQuickItem>("overviewSearchField");
+    auto search = [&](const char* text) {
+        field->setProperty("text", QString::fromUtf8(text));
+        QMetaObject::invokeMethod(overview, "runSearch", Q_ARG(QVariant, QString::fromUtf8(text)));
+        EXPECT_TRUE(waitFor([&] {
+            return !tabs->index(0, 0).data(xqt::TabManager::SearchRunningRole).toBool() &&
+                   !tabs->index(1, 0).data(xqt::TabManager::SearchRunningRole).toBool();
+        }));
+    };
+    auto matches = [&](int row) { return tabs->index(row, 0).data(xqt::TabManager::SearchMatchRole).toBool(); };
+    search("p1 | xournal");
+    EXPECT_TRUE(matches(0));
+    EXPECT_TRUE(matches(1));
+    EXPECT_EQ(tabs->index(0, 0).data(xqt::TabManager::SearchHitsRole).toInt(), 3) << "p1, p10, p11";
+    search("p1 !xournal");
+    EXPECT_TRUE(matches(0));
+    EXPECT_FALSE(matches(1));
+    // A term in the title: every page with the other term; its letters are highlighted
+    search("p1 pgs");
+    EXPECT_TRUE(matches(0));
+    EXPECT_FALSE(matches(1));
+    const QVariantList pages = tabs->index(0, 0).data(xqt::TabManager::HitPagesRole).toList();
+    ASSERT_EQ(pages.size(), 3);
+    const QString title = tabs->index(0, 0).data(xqt::TabManager::TitleRole).toString();
+    QVariantMap name;
+    QMetaObject::invokeMethod(controller.get(), "fuzzyName", Q_RETURN_ARG(QVariantMap, name),
+                              Q_ARG(QString, QStringLiteral("p1 pgs")), Q_ARG(QString, title));
+    EXPECT_FALSE(name.value("match").toBool()) << "p1 is not in the title " << title.toStdString();
+    EXPECT_FALSE(name.value("marks").toList().isEmpty()) << "pgs is";
+    QQuickItem* shown = nullptr;
+    until([&] {
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (i->objectName() == "overviewTitle" && i->property("text").toString().contains("<font")) {
+                shown = i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(window->contentItem());
+        return shown != nullptr;
+    });
+    EXPECT_NE(shown, nullptr) << "the title with its matched letters";
+
+    // Not valid: a hint, and the plain text
+    auto* hint = find<QQuickItem>("overviewSyntaxHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->isVisible());
+    search("(p1");
+    until([&] { return hint->isVisible(); });
+    EXPECT_TRUE(hint->isVisible());
+    EXPECT_FALSE(matches(0));
+
+    click(toggle);
+    EXPECT_FALSE(library->fuzzySearch());
+    search("p1 | xournal");
+    EXPECT_FALSE(matches(0)) << "plain: that text is nowhere";
+    EXPECT_FALSE(hint->isVisible());
+}
+
 TEST_F(MainWindowTest, searchShortcutsForAllDocumentsAndTheLibrary) {
     controller->newDocument();
     QObject* overview = find("tabOverview");
@@ -3990,6 +4122,7 @@ TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     // Ctrl+S: the hybrid PDF again, with the new stroke
     drawStroke(*s, 2);
     key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);  // (saved in the background)
     EXPECT_FALSE(controller->modified());
     auto reopened = xqt::DocumentSession::loadFile(fs::path(dir.filePath("lecture.notes.pdf").toStdString()));
     ASSERT_TRUE(reopened.document);
@@ -4002,6 +4135,7 @@ TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     settings->set("hybridExportXopp", true);
     drawStroke(*s, 0);
     key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);
     settings->set("hybridExportXopp", false);
     const fs::path xopp = dir.filePath("lecture.notes.xopp").toStdString();
     ASSERT_TRUE(fs::exists(xopp));
@@ -4050,6 +4184,7 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     EXPECT_TRUE(controller->savesWithoutDialog());
     EXPECT_EQ(controller->suggestedHybridFile().toLocalFile(), pdf);
     key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);  // (saved in the background)
     settings->set("hybridIntoPdf", false);
     EXPECT_FALSE(controller->modified());
     EXPECT_TRUE(controller->isHybrid());
@@ -4096,6 +4231,106 @@ TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
     EXPECT_TRUE(controller->modified());
     controller->undo();
     EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u);
+}
+
+namespace {
+/// Holds a save on its worker just before it writes the .xopp (PdfPageKeeper::stopSaveAt, step 1) until released.
+struct HeldSave {
+    HeldSave() {
+        xqt::PdfPageKeeper::stopSaveAt = [this](int step) {
+            if (step == 1) {
+                ++entered;
+                released.wait_for(std::chrono::seconds(10));
+            }
+            return false;
+        };
+    }
+    ~HeldSave() {
+        release();
+        xqt::PdfPageKeeper::stopSaveAt = nullptr;
+    }
+    void release() {
+        if (!done.exchange(true)) {
+            promise.set_value();
+        }
+    }
+    std::atomic<int> entered{0};
+    std::atomic<bool> done{false};
+    std::promise<void> promise;
+    std::shared_future<void> released = promise.get_future().share();
+};
+
+size_t strokesIn(const QString& file) {
+    auto loaded = xqt::DocumentSession::loadFile(file.toStdString());
+    return loaded.document ? strokesOn(*loaded.document, 0) : 0;
+}
+}  // namespace
+
+// Ctrl+S saves in the background: the window says "saving…" and keeps the modified dot until the file is written,
+// and it stays usable meanwhile (a page added then is not in the file, and the document stays modified).
+TEST_F(MainWindowTest, ctrlSSavesInTheBackground) {
+    QTemporaryDir dir;
+    const QString file = dir.filePath("notes.xopp");
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(file)));
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    HeldSave held;
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return held.entered == 1; }, 5000);
+    ASSERT_EQ(held.entered, 1);
+    EXPECT_TRUE(controller->saving());
+    EXPECT_TRUE(controller->modified()) << "the dot stays until the file is written";
+    EXPECT_TRUE(window->title().contains(QString::fromUtf8("saving…"))) << window->title().toStdString();
+    EXPECT_TRUE(tabs->index(0, 0).data(xqt::TabManager::SavingRole).toBool());
+    const int pages = controller->pageCount();
+    key(Qt::Key_N, Qt::ControlModifier);  // the window goes on
+    EXPECT_EQ(controller->pageCount(), pages + 1);
+    held.release();
+    until([&] { return !controller->saving(); }, 10000);
+    EXPECT_FALSE(controller->saving());
+    EXPECT_FALSE(window->title().contains(QString::fromUtf8("saving…")));
+    EXPECT_TRUE(controller->modified()) << "the page added meanwhile is not saved";
+    EXPECT_EQ(strokesIn(file), 1u);
+    EXPECT_EQ(xqt::DocumentSession::loadFile(file.toStdString()).document->getPageCount(), static_cast<size_t>(pages));
+}
+
+// Closing a tab or the window while a document is saved: they wait for the save (the window stays usable), then
+// close; the file is complete.
+TEST_F(MainWindowTest, closingWaitsForARunningSave) {
+    QTemporaryDir dir;
+    const QString first = dir.filePath("first.xopp"), second = dir.filePath("second.xopp");
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(first)));
+    controller->newDocument();
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(second)));
+    ASSERT_EQ(controller->tabCount(), 2);
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    {
+        HeldSave held;
+        key(Qt::Key_S, Qt::ControlModifier);
+        until([&] { return held.entered == 1; }, 5000);
+        ASSERT_EQ(held.entered, 1);
+        QMetaObject::invokeMethod(window, "requestCloseTab", Q_ARG(QVariant, 1));
+        wait(200);
+        EXPECT_EQ(controller->tabCount(), 2) << "the tab waits for its save";
+        EXPECT_FALSE(find("unsavedDialog")->property("visible").toBool()) << "nothing to ask: it is being saved";
+        held.release();
+        until([&] { return controller->tabCount() == 1; }, 10000);
+        EXPECT_EQ(controller->tabCount(), 1);
+        EXPECT_EQ(strokesIn(second), 1u);
+    }
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    HeldSave held;
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return held.entered == 1; }, 5000);
+    ASSERT_EQ(held.entered, 1);
+    QMetaObject::invokeMethod(window, "closeWindow");
+    wait(200);
+    EXPECT_TRUE(window->isVisible()) << "the window waits for the save";
+    EXPECT_FALSE(find("unsavedDialog")->property("visible").toBool());
+    held.release();
+    until([&] { return !window->isVisible(); }, 10000);
+    EXPECT_FALSE(window->isVisible()) << "closed once it was written";
+    EXPECT_EQ(strokesIn(first), 1u);
 }
 
 // --- qt/present: page number jump, 16:9 pages, horizontal scrolling, presentation --------------------------------

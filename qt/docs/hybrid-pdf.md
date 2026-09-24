@@ -200,7 +200,8 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    has our marker. After a save in the app the clean copy of the new version is made in the background, so the
    next open of that file does not wait for it.
 
-   **Not fast enough for a long PDF:** the save runs on the UI thread, like the `.xopp` save, and blocks the window
-   for about 6 s at 1,300 pages (1 s at 50 pages). Next step: write in the background (the drawing and the `.xopp`
-   under the document's lock first, then qpdf on a worker; the saved state of the undo stack taken at the start).
-   qpdf has no incremental save; appending an incremental update ourselves would make saves of long PDFs cheap.
+   The save used to run on the UI thread and blocked the window for about 6 s at 1,300 pages (1 s at 50 pages).
+   Since `qt/background-save` it runs in the background (DocumentSave.cpp): the document's pages are copied on the UI
+   thread (a few milliseconds), the drawing, the `.xopp` and qpdf work on that copy on a worker, and the undo stack's
+   saved point is the copied state. The whole save still takes as long; the window stays usable. qpdf has no
+   incremental save; appending an incremental update ourselves would make saves of long PDFs cheap.

@@ -11,7 +11,9 @@
  *    priority, a PDF instance of their own), nearest first, once scrolling paused. A page rendered at another zoom
  *    is shown scaled meanwhile; near ones are rendered again at the new zoom, far ones when they come near;
  *  - the other documents keep what they have while the rest of the limit holds it; when it does not, the one used
- *    longest ago gives up its pages first, those farthest from where it was read first.
+ *    longest ago gives up its pages first, those farthest from where it was read first. Documents in sight (the
+ *    reference beside the notes, a document in another window) come before those in the background, and never give
+ *    up their visible pages.
  * A plan is made shortly after the reader stopped scrolling or zooming, switched documents or the limit changed.
  *
  * @license GNU GPLv2 or later

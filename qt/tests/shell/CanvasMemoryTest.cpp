@@ -348,3 +348,44 @@ TEST_F(CanvasMemoryTest, benchZoomSettle) {
     }
     view->setShown(false);
 }
+
+// Reference mode: two documents are in sight at once. The one beside the notes keeps its pages before a document in
+// the background does, even when that one was used after it.
+TEST_F(CanvasMemoryTest, aDocumentInSightKeepsItsPagesBeforeOneInTheBackground) {
+    AppController c;
+    CanvasView* reference = openPages(c, 20);
+    CanvasView* background = openPages(c, 20);
+    CanvasView* notes = openPages(c, 20);
+    const qint64 page = pageBytes(notes);
+    CanvasMemory::instance().setLimit(page * 30);  // pages: 27; the one in use: 18
+    // Shown in a canvas item: it sets the view's size, which looks at the visible pages
+    auto show = [](CanvasView* v) {
+        v->setShown(true);
+        v->getViewController().setViewSize(QSizeF(800, 1000));
+        processEvents(20);
+    };
+    show(reference);  // (beside the notes from now on)
+    CanvasMemory::instance().planNow();
+    settle(c);
+    show(background);  // (a tab looked at meanwhile)
+    CanvasMemory::instance().planNow();
+    settle(c);
+    background->setShown(false);
+    const qint64 referenceHeld = reference->bufferBytes();
+    ASSERT_GT(referenceHeld, 4 * page);
+    show(notes);
+    CanvasMemory::instance().planNow();
+    settle(c);
+    EXPECT_EQ(reference->bufferBytes(), referenceHeld) << "the document in sight gave up its pages";
+    EXPECT_LT(background->bufferBytes(), referenceHeld) << "the one in the background kept more";
+    EXPECT_LE(CanvasMemory::instance().bytes(), page * 30);
+    // Both documents in sight have their visible pages
+    for (CanvasView* v: {notes, reference}) {
+        const auto [first, last] = v->visiblePages();
+        for (size_t i = first; i <= last; ++i) {
+            EXPECT_TRUE(rendered(v, i)) << "page " << i + 1;
+        }
+    }
+    reference->setShown(false);
+    notes->setShown(false);
+}

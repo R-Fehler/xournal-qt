@@ -4,8 +4,13 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <atomic>
 #include <chrono>
+#include <cstdlib>
+#include <future>
+#include <thread>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -14,8 +19,10 @@
 #include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QJSValue>
 #include <QUrl>
 #include <cairo-pdf.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gtest/gtest.h>
 
 #include "control/xojfile/LoadHandler.h"
@@ -29,6 +36,12 @@
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/TabManager.h"
+#include "render/RenderService.h"
+#include "session/AppContext.h"
+
+#include "CanvasMemory.h"
+#include "CanvasPage.h"
+#include "CanvasView.h"
 
 #include "AppController.h"
 
@@ -63,11 +76,16 @@ void annotate(const fs::path& pdf, const fs::path& xopp) {
 }
 
 /// Whether the PDF page the document's page shows has this text (the search's own function).
+/// (once the pasted PDF pages are in the merged PDF: that is written in the background)
 bool pageHasText(DocumentSession& s, size_t page, const char* text) {
+    s.waitForSaves();
     return !DocumentSearch::findOnPage(*s.getDocument(), page, text).empty();
 }
 
-fs::path backgroundOf(DocumentSession& s) { return s.getDocument()->getPdfFilepath(); }
+fs::path backgroundOf(DocumentSession& s) {
+    s.waitForSaves();
+    return s.getDocument()->getPdfFilepath();
+}
 
 /// The .pdf files in a folder (hidden ones too).
 std::vector<std::string> pdfsIn(const fs::path& dir) {
@@ -80,6 +98,43 @@ std::vector<std::string> pdfsIn(const fs::path& dir) {
     std::sort(out.begin(), out.end());
     return out;
 }
+
+bool waitFor(const std::function<bool()>& done, int ms = 20000) {
+    QElapsedTimer t;
+    t.start();
+    while (!done()) {
+        if (t.elapsed() > ms) {
+            return false;
+        }
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    return true;
+}
+
+/// Holds the first write of a merged PDF by a save (on its worker) until released.
+struct HeldPdfWrite {
+    HeldPdfWrite() {
+        PdfPageKeeper::stopSaveAt = [this](int step) {
+            if (step == 0 && writes++ == 0) {
+                released.wait_for(std::chrono::seconds(10));
+            }
+            return false;
+        };
+    }
+    ~HeldPdfWrite() {
+        release();
+        PdfPageKeeper::stopSaveAt = nullptr;
+    }
+    void release() {
+        if (!done.exchange(true)) {
+            promise.set_value();
+        }
+    }
+    std::atomic<int> writes{0};
+    std::atomic<bool> done{false};
+    std::promise<void> promise;
+    std::shared_future<void> released = promise.get_future().share();
+};
 
 class PastedPdfPages: public ::testing::Test {
 protected:
@@ -265,6 +320,7 @@ TEST_F(PastedPdfPages, severalPastesFromSeveralPdfsGoIntoOneFile) {
     c.tabManager().setCurrentIndex(0);
     ASSERT_EQ(c.pastePages(5), 1);
 
+    s.waitForSaves();  // (the merged PDF is written in the background)
     EXPECT_EQ(pdfsIn(MergedPdf::cacheFolder()).size(), cachedBefore.size() + 1) << "one merged PDF until saved";
     ASSERT_TRUE(c.save());
     EXPECT_EQ(pdfsIn(MergedPdf::cacheFolder()), cachedBefore);
@@ -563,4 +619,422 @@ TEST_F(PastedPdfPages, aSaveStoppedAtAnyStepLeavesAMatchingPair) {
         EXPECT_EQ(backgroundOf(current(c)), root / ".lecture.pages.pdf");
         EXPECT_EQ(pdfsIn(root), (std::vector<std::string>{".lecture.pages.pdf", "lecture.pdf", "other.pdf", "third.pdf"}));
     }
+}
+
+// While a save writes the merged PDF on its worker, the document can be edited: a deleted page that comes back
+// through undo keeps its PDF page (the save plans again), and the saved files show it.
+TEST_F(PastedPdfPages, anUndoWhileTheMergedPdfIsWrittenIsSavedRight) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({0, 1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    ASSERT_EQ(c.pastePages(1), 2);  // lectureone, pastedalpha, pastedbeta, lecturetwo, lecturethree
+    ASSERT_TRUE(c.save());
+    ASSERT_TRUE(c.deletePages({1}));  // pastedalpha: the next save drops its PDF page
+    HeldPdfWrite held;
+    bool finished = false;
+    DocumentSession::SaveResult result;
+    s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, [&](const DocumentSession::SaveResult& r) {
+                            result = r;
+                            finished = true;
+                        }});
+    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }));
+    c.undoPages();  // pastedalpha comes back while its PDF page is being dropped
+    EXPECT_TRUE(pageHasText(s, 1, "pastedalpha"));
+    held.release();
+    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(result.ok) << result.error;
+    EXPECT_FALSE(s.isModified());
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "pastedalpha", "pastedbeta", "lecturetwo", "lecturethree"}));
+    EXPECT_TRUE(pageHasText(s, 1, "pastedalpha"));
+    EXPECT_TRUE(pageHasText(s, 2, "pastedbeta"));
+    EXPECT_EQ(pdfsIn(root), (std::vector<std::string>{".lecture.pages.pdf", "lecture.pdf", "other.pdf", "third.pdf"}));
+}
+
+// Pages pasted while a save writes the merged PDF: the paste waits for that write, and the save then puts their PDF
+// pages next to the document too (never a .xopp that refers to the cache).
+TEST_F(PastedPdfPages, pagesPastedWhileTheMergedPdfIsWrittenGoNextToTheDocumentToo) {
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});  // pastedbeta
+    c.newDocument();
+    const int fresh = c.tabManager().currentIndex();
+    DocumentSession& s = current(c);
+    ASSERT_EQ(c.pastePages(1), 1);
+    const fs::path cached = backgroundOf(s);
+    ASSERT_TRUE(MergedPdf::inCache(cached));
+    ASSERT_TRUE(open(c, root / "third.pdf"));
+    c.copyPages({0});  // pastedgamma
+    c.tabManager().setCurrentIndex(fresh);
+    ASSERT_EQ(&current(c), &s);
+
+    HeldPdfWrite held;
+    bool finished = false;
+    DocumentSession::SaveResult result;
+    s.saveInBackground({DocumentSession::SaveKind::SaveAs, root / "fresh.xopp", {},
+                        [&](const DocumentSession::SaveResult& r) {
+                            result = r;
+                            finished = true;
+                        }});
+    ASSERT_TRUE(waitFor([&] { return held.writes == 1; }));
+    std::thread releaser([&] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        held.release();
+    });
+    ASSERT_EQ(c.pastePages(2), 1);  // (waits for the merged PDF to be written)
+    releaser.join();
+    EXPECT_TRUE(pageHasText(s, 2, "pastedgamma"));
+    ASSERT_TRUE(waitFor([&] { return finished; }));
+    ASSERT_TRUE(result.ok) << result.error;
+    EXPECT_FALSE(s.isModified());
+    EXPECT_EQ(backgroundOf(s), root / "fresh.pdf");
+    EXPECT_FALSE(fs::exists(cached));
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "fresh.xopp", WORDS),
+              (std::vector<std::string>{"", "pastedbeta", "pastedgamma"}));
+    EXPECT_TRUE(pageHasText(s, 1, "pastedbeta"));
+    EXPECT_TRUE(pageHasText(s, 2, "pastedgamma"));
+}
+
+namespace {
+/// Whether the canvas has drawn the page with dark ink (text) in its upper part (a pasted page shows its PDF text
+/// there; a page drawn without it is white). Its raster at the view's zoom.
+bool canvasShowsText(CanvasView* view, size_t page) {
+    CanvasPage* p = view->getPage(page);
+    const auto info = p->bufferInfo();
+    if (!info.valid) {
+        return false;
+    }
+    const QImage tile = p->composeTile(QRect(QPoint(0, 0), info.pixelSize));
+    for (int y = 0; y < tile.height() / 4; ++y) {
+        for (int x = 0; x < tile.width() / 2; ++x) {
+            if (qGray(tile.pixel(x, y)) < 100) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+}  // namespace
+
+// A page pasted from another PDF into a document with a PDF shows its PDF page on the canvas at once. It stayed blank
+// for a while: loading the merged PDF re-rendered every page of the document, at the priority of the pages in view,
+// and the pasted page waited behind them all.
+TEST_F(PastedPdfPages, aPastedPageIsDrawnOnTheCanvasAtOnce) {
+    std::vector<std::string> words;
+    for (int i = 0; i < 300; ++i) {
+        words.push_back("longpage" + std::to_string(i + 1));
+    }
+    makeTextPdf(root / "long.pdf", words);
+    annotate(root / "long.pdf", root / "long.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});  // pastedbeta
+    ASSERT_TRUE(open(c, root / "long.xopp"));
+    const int lecture = c.tabManager().currentIndex();
+    CanvasView* view = c.tabManager().currentView();
+    view->getViewController().setViewSize(QSizeF(800, 2400));  // (pages 1 to 3 in view)
+    view->setShown(true);
+    // Room for a dozen rendered pages (not the whole document in advance)
+    const QSizeF pageSize = view->pageViewRect(0).size();
+    CanvasMemory::instance().setLimit(static_cast<qint64>(pageSize.width() * pageSize.height() * 4 * 12));
+    struct RestoreLimit {
+        ~RestoreLimit() { CanvasMemory::instance().setLimit(CanvasMemory::defaultLimit()); }
+    } restoreLimit;
+    RenderService* renders = c.context().getRenderService();
+    auto settled = [&] {
+        renders->waitForIdle();
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    };
+    ASSERT_TRUE(waitFor([&] {
+        settled();
+        return canvasShowsText(view, 0) && canvasShowsText(view, 1);
+    }));
+    auto far = [&] { return view->getPage(120)->bufferInfo().valid; };
+    ASSERT_FALSE(far()) << "a page far from the view is not drawn";
+    for (const size_t at: {1, 2}) {
+        SCOPED_TRACE("paste " + std::to_string(at));
+        if (at == 2) {  // the second one from another PDF: the merged PDF grows again
+            ASSERT_TRUE(open(c, root / "third.pdf"));
+            c.copyPages({0});  // pastedgamma
+            c.tabManager().setCurrentIndex(lecture);
+            view->setShown(true);
+            view->getViewController().scrollToPage(0);  // (drawn again as the window does when it shows the tab)
+            ASSERT_TRUE(waitFor([&] {
+                settled();
+                return canvasShowsText(view, 0);
+            }));
+        }
+        QElapsedTimer t;
+        t.start();
+        ASSERT_EQ(c.pastePages(static_cast<int>(at)), 1);
+        ASSERT_TRUE(pageHasText(current(c), at, at == 1 ? "pastedbeta" : "pastedgamma"));
+        const bool shown = waitFor(
+                [&] {
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+                    return canvasShowsText(view, at);
+                },
+                20000);
+        EXPECT_TRUE(shown);
+        const qint64 ms = t.elapsed();
+        std::cout << "paste " << at << ": the pasted page drawn after " << ms << " ms\n";
+        EXPECT_FALSE(far()) << "the pages of the document are not drawn again (the pasted page waited for them)";
+        EXPECT_LT(ms, 600) << "drawn at once";
+        settled();
+    }
+}
+
+// XQT_BENCH_PASTE=<pdf> (or "generate": a scan of about 120 MB is made): how long a paste of a page from another PDF
+// blocks the window, three times in a row (XQT_PASTE_TIMES=1 prints the steps).
+TEST_F(PastedPdfPages, benchPasteIntoALargePdf) {
+    const char* source = std::getenv("XQT_BENCH_PASTE");
+    if (!source) {
+        GTEST_SKIP() << "set XQT_BENCH_PASTE=<pdf> or XQT_BENCH_PASTE=generate";
+    }
+    fs::path scan = source;
+    if (std::string(source) == "generate") {
+        // Pages of noise as JPEG, like a scan (40 pages, one JPEG of about 3 MB each)
+        scan = root / "scan.pdf";
+        const int w = 1654, h = 2339;  // (A4 at 200 dpi)
+        GdkPixbuf* noise = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, w, h);
+        guchar* px = gdk_pixbuf_get_pixels(noise);
+        const int stride = gdk_pixbuf_get_rowstride(noise);
+        uint32_t seed = 12345;
+        for (int y = 0; y < h; ++y) {
+            for (int x = 0; x < w * 3; ++x) {
+                seed = seed * 1664525u + 1013904223u;
+                px[y * stride + x] = static_cast<guchar>(seed >> 24);
+            }
+        }
+        gchar* jpeg = nullptr;
+        gsize jpegSize = 0;
+        ASSERT_TRUE(gdk_pixbuf_save_to_buffer(noise, &jpeg, &jpegSize, "jpeg", nullptr, "quality", "85", nullptr));
+        g_object_unref(noise);
+        cairo_surface_t* pdf = cairo_pdf_surface_create(scan.string().c_str(), 595, 842);
+        cairo_t* cr = cairo_create(pdf);
+        for (int page = 0; page < 40; ++page) {
+            cairo_surface_t* img = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
+            unsigned char* copy = static_cast<unsigned char*>(g_memdup2(jpeg, jpegSize));
+            cairo_surface_set_mime_data(img, CAIRO_MIME_TYPE_JPEG, copy, jpegSize, g_free, copy);
+            cairo_save(cr);
+            cairo_scale(cr, 595.0 / w, 842.0 / h);
+            cairo_set_source_surface(cr, img, 0, 0);
+            cairo_paint(cr);
+            cairo_restore(cr);
+            cairo_show_page(cr);
+            cairo_surface_destroy(img);
+        }
+        cairo_destroy(cr);
+        cairo_surface_destroy(pdf);
+        g_free(jpeg);
+    }
+    std::cout << scan << ": " << fs::file_size(scan) / (1024 * 1024) << " MB\n";
+    const fs::path copy = root / "large.pdf";
+    fs::copy_file(scan, copy, fs::copy_options::overwrite_existing);
+    annotate(copy, root / "large.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    ASSERT_TRUE(open(c, root / "large.xopp"));
+    for (int i = 0; i < 3; ++i) {
+        if (i > 0) {
+            ASSERT_TRUE(open(c, root / (i == 1 ? "third.pdf" : "other.pdf")));
+            c.copyPages({0});
+            ASSERT_TRUE(open(c, root / "large.xopp"));  // (shows its tab)
+        }
+        QElapsedTimer t;
+        t.start();
+        ASSERT_EQ(c.pastePages(1), 1);
+        const qint64 blocked = t.elapsed();
+        // The longest time the event loop did not run until it is merged (the merged PDF is loaded on this thread)
+        QElapsedTimer gap;
+        gap.start();
+        qint64 longest = 0;
+        while (current(c).mergingPdfPages() && t.elapsed() < 120000) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+            longest = std::max(longest, gap.restart());
+        }
+        std::cout << "paste " << i + 1 << ": the window blocked " << blocked << " ms, merged in the background after "
+                  << t.elapsed() << " ms (the event loop blocked at most " << longest << " ms meanwhile)\n";
+    }
+    QElapsedTimer t;
+    t.start();
+    ASSERT_TRUE(c.save());
+    std::cout << "save: " << t.elapsed() << " ms (merged PDF next to the document)\n";
+}
+
+namespace {
+/// Holds the merges of pasted PDF pages on their worker until released.
+struct HeldMerge {
+    HeldMerge() {
+        PdfPageKeeper::beforeMergeWritten = [this] {
+            ++entered;
+            released.wait_for(std::chrono::seconds(10));
+        };
+    }
+    ~HeldMerge() {
+        release();
+        PdfPageKeeper::beforeMergeWritten = nullptr;
+    }
+    void release() {
+        if (!done.exchange(true)) {
+            promise.set_value();
+        }
+    }
+    std::atomic<int> entered{0};
+    std::atomic<bool> done{false};
+    std::promise<void> promise;
+    std::shared_future<void> released = promise.get_future().share();
+};
+}  // namespace
+
+// Pasting a page from another PDF into a long PDF does not wait for the merged PDF to be written (qpdf writes the
+// whole file: seconds for a long PDF); the window goes on.
+TEST_F(PastedPdfPages, aPasteDoesNotWaitForTheMergedPdf) {
+    std::vector<std::string> words;
+    for (int i = 0; i < 1500; ++i) {
+        words.push_back("longpage" + std::to_string(i + 1));
+    }
+    makeTextPdf(root / "long.pdf", words);
+    annotate(root / "long.pdf", root / "long.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    ASSERT_TRUE(open(c, root / "long.xopp"));
+    DocumentSession& s = current(c);
+    QElapsedTimer t;
+    t.start();
+    ASSERT_EQ(c.pastePages(1), 1);
+    const qint64 paste = t.elapsed();
+    ASSERT_TRUE(waitFor([&] { return !s.mergingPdfPages(); }));
+    const qint64 merged = t.elapsed();
+    std::cout << "paste into 1,500 pages: the window blocked " << paste << " ms, merged after " << merged << " ms\n";
+    EXPECT_LT(paste, merged * 35 / 100) << "the paste waits for the merged PDF";
+    EXPECT_TRUE(pageHasText(s, 1, "pastedbeta"));
+    EXPECT_TRUE(pageHasText(s, 2, "longpage2"));
+}
+
+// While the merged PDF is written, the canvas draws the pasted page from the pasted PDF (not "PDF background
+// missing"), and undo and redo of the paste work; afterwards the page is the merged PDF's.
+TEST_F(PastedPdfPages, aPastedPageIsDrawnAndUndoneWhileItIsMerged) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});  // pastedbeta
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    CanvasView* view = c.tabManager().currentView();
+    view->getViewController().setViewSize(QSizeF(800, 2400));
+    view->setShown(true);
+    RenderService* renders = c.context().getRenderService();
+    HeldMerge held;
+    ASSERT_EQ(c.pastePages(1), 1);
+    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }));
+    ASSERT_TRUE(waitFor([&] {
+        renders->waitForIdle();
+        return canvasShowsText(view, 1);
+    })) << "drawn from the pasted PDF meanwhile";
+    EXPECT_TRUE(s.mergingPdfPages());
+    c.undoPages();
+    EXPECT_EQ(s.getDocument()->getPageCount(), 3u);
+    c.redoPages();
+    ASSERT_EQ(s.getDocument()->getPageCount(), 4u);
+    EXPECT_EQ(s.getDocument()->getPage(1)->getPdfPageNr(), 3u);
+    held.release();
+    ASSERT_TRUE(waitFor([&] { return !s.mergingPdfPages(); }));
+    EXPECT_TRUE(pageHasText(s, 1, "pastedbeta"));
+    ASSERT_TRUE(waitFor([&] {
+        renders->waitForIdle();
+        return canvasShowsText(view, 1);
+    }));
+    ASSERT_TRUE(c.save());
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"}));
+}
+
+// A save asked for right after a paste waits for the merged PDF (the saved .xopp never refers to PDF pages that are
+// not in its PDF); Ctrl+S does not block meanwhile.
+TEST_F(PastedPdfPages, aSaveRightAfterAPasteWaitsForTheMerge) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    HeldMerge held;
+    ASSERT_EQ(c.pastePages(1), 1);
+    ASSERT_TRUE(waitFor([&] { return held.entered == 1; }));
+    bool saved = false;
+    ASSERT_TRUE(c.saveInBackground(QJSValue()));
+    s.saveInBackground({DocumentSession::SaveKind::Save, {}, {}, [&](const DocumentSession::SaveResult& r) {
+                            EXPECT_TRUE(r.ok) << r.error;
+                            saved = true;
+                        }});
+    QElapsedTimer t;
+    t.start();
+    while (t.elapsed() < 200) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    }
+    EXPECT_FALSE(saved) << "waits for the merge";
+    EXPECT_TRUE(s.isSaving());
+    held.release();
+    ASSERT_TRUE(waitFor([&] { return saved; }));
+    EXPECT_FALSE(s.isModified());
+    EXPECT_EQ(backgroundOf(s), root / ".lecture.pages.pdf");
+    EXPECT_EQ(wordsAsUpstreamLoadsThem(root / "lecture.xopp", WORDS),
+              (std::vector<std::string>{"lectureone", "pastedbeta", "lecturetwo", "lecturethree"}));
+}
+
+// A merge that cannot be written (the cache folder is read-only): the pasted page gets its PDF page as an image,
+// and the window says why.
+TEST_F(PastedPdfPages, aFailedMergeKeepsThePastedPageAsAnImage) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    QSignalSpy messages(&c, &AppController::message);
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    DocumentSession& s = current(c);
+    const fs::path cache = MergedPdf::cacheFolder();
+    fs::create_directories(cache);
+    fs::permissions(cache, fs::perms::owner_read | fs::perms::owner_exec);
+    ASSERT_EQ(c.pastePages(1), 1);
+    s.waitForSaves();
+    fs::permissions(cache, fs::perms::owner_all);
+    const PageRef page = s.getDocument()->getPage(1);
+    EXPECT_TRUE(page->getBackgroundType().isImagePage()) << "its PDF page as an image";
+    ASSERT_EQ(messages.count(), 1);
+    EXPECT_TRUE(messages.first().at(0).toString().contains("Pasting PDF pages failed"));
+    EXPECT_EQ(backgroundOf(s), root / "lecture.pdf") << "the document keeps its PDF";
+    ASSERT_TRUE(c.save());
+    auto reopened = DocumentSession::loadFile(root / "lecture.xopp");
+    ASSERT_TRUE(reopened.document);
+    EXPECT_TRUE(reopened.document->getPage(1)->getBackgroundType().isImagePage());
+}
+
+// Export as PDF right after a paste (its merged PDF still being written): the exported page shows the pasted PDF
+// page, with its text.
+TEST_F(PastedPdfPages, anExportRightAfterAPasteHasThePastedPage) {
+    annotate(root / "lecture.pdf", root / "lecture.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});
+    ASSERT_TRUE(open(c, root / "lecture.xopp"));
+    auto held = std::make_unique<HeldMerge>();
+    ASSERT_EQ(c.pastePages(1), 1);
+    ASSERT_TRUE(waitFor([&] { return held->entered == 1; }));
+    std::thread releaser([&] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        held->release();
+    });
+    const fs::path exported = root / "exported.pdf";
+    ASSERT_TRUE(c.exportPdf(QUrl::fromLocalFile(QString::fromStdString(exported.string()))));
+    releaser.join();
+    held.reset();
+    auto loaded = DocumentSession::loadFile(exported);
+    ASSERT_TRUE(loaded.document);
+    ASSERT_EQ(loaded.document->getPageCount(), 4u);
+    EXPECT_FALSE(DocumentSearch::findOnPage(*loaded.document, 1, "pastedbeta").empty());
 }

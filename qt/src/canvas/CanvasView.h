@@ -89,6 +89,14 @@ public:
     void setDevicePixelRatio(double dpr);
     double devicePixelRatio() const { return dpr; }
 
+    // --- reading only (the reference beside the document of a tab) ---------------------------------------------
+    /// Shown for reading only: every tool but the select tools (elements, PDF text) scrolls, as the hand does; a
+    /// selection can be made and copied but not moved, changed or deleted; PDF text is selected, never marked;
+    /// taps follow links, they do not switch the check boxes of Markdown tasks; no undo from gestures. Nothing
+    /// lands in the document.
+    void setReadingOnly(bool on);
+    bool isReadingOnly() const { return readingOnly; }
+
     // --- memory (CanvasMemory) --------------------------------------------------------------------------------
     /// Shown in a window (DocumentCanvasItem): scrolling in it makes it the current view of CanvasMemory.
     void setShown(bool shown);
@@ -119,10 +127,14 @@ public:
     size_t getCurrentPage() const override;
     void layerChanged(size_t page) override;
     void recreatePdfCache() override;
+    /// `rerender`: every page is drawn again (the PDF may look different); else the pages keep their pictures and only
+    /// those that show a PDF page the old PDF did not have are drawn (pasted pages joined the merged PDF).
+    void replacePdfCache(bool rerender);
 
     // --- RasterHost (rasterParams is called from render threads) -----------------------------------------------
     Document* rasterDocument() const override;
     PdfCache* rasterPdfCache(bool background) const override;
+    XojPdfPageSPtr rasterPendingPdfPage(size_t number) const override;
     RasterParams rasterParams() const override;
     void rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rectangle<double>> area) override;
 
@@ -341,8 +353,10 @@ private:
     mutable bool backgroundPdfLoaded = false;
     /// Replaced PDF caches: a render may still use them (they go with the view)
     std::vector<std::shared_ptr<PdfCache>> retiredPdfCaches;
+    size_t pdfCachePages = 0;  ///< the pages of the PDF of `pdfCache`
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
+    bool readingOnly = false;
     std::pair<size_t, size_t> window{1, 0};
     int visibilityDelay = 8;
     QElapsedTimer sinceVisibility;
