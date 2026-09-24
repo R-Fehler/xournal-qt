@@ -4182,3 +4182,58 @@ TEST_F(MainWindowTest, typingAPageNumberJumpsToThePage) {
     QMetaObject::invokeMethod(dialog, "close");
     ASSERT_TRUE(waitOpened(dialog, false));
 }
+
+// A 16:9 slide in the New document and the Insert pages dialogs: choosing it turns the page to landscape, and the
+// pages are 960 x 540 points (PowerPoint's 13.33 x 7.5 in), a plain page size in the .xopp.
+TEST_F(MainWindowTest, sixteenByNinePagesForPresenting) {
+    const int slide = controller->settingsModel()->property("paperFormats").toStringList().indexOf("16:9 (presentation)");
+    ASSERT_GE(slide, 0);
+    auto sizeOf = [&](int page) {
+        auto* s = controller->tabManager().currentSession();
+        const PageRef p = s->getDocument()->getPage(static_cast<size_t>(page));
+        return QSizeF(p->getWidth(), p->getHeight());
+    };
+    QObject* newDialog = find("newDocumentDialog");
+    ASSERT_NE(newDialog, nullptr);
+    QMetaObject::invokeMethod(newDialog, "open");
+    ASSERT_TRUE(waitOpened(newDialog, true));
+    auto* paperBox = findItem("paperBox");
+    if (!paperBox) {
+        paperBox = find<QQuickItem>("paperBox");
+    }
+    ASSERT_NE(paperBox, nullptr);
+    newDialog->setProperty("landscape", false);
+    paperBox->setProperty("currentIndex", slide);
+    QMetaObject::invokeMethod(paperBox, "activated", Q_ARG(int, slide));
+    EXPECT_TRUE(newDialog->property("landscape").toBool()) << "a slide is landscape";
+    const int tabs = controller->tabCount();
+    QMetaObject::invokeMethod(newDialog, "create");
+    ASSERT_TRUE(waitOpened(newDialog, false));
+    ASSERT_EQ(controller->tabCount(), tabs + 1);
+    EXPECT_EQ(sizeOf(0), QSizeF(960, 540));
+
+    // Inserted after an A4 page
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    settings->set("paperFormat", settings->paperFormats().indexOf("A4"));
+    settings->set("landscape", false);
+    controller->newDocument();
+    ASSERT_NEAR(sizeOf(0).width(), 595.3, 0.1);
+    QObject* insert = find("insertPagesDialog");
+    ASSERT_NE(insert, nullptr);
+    QMetaObject::invokeMethod(insert, "openAt", Q_ARG(QVariant, QVariant::fromValue(1)));
+    ASSERT_TRUE(waitOpened(insert, true));
+    auto* insertBox = findItem("insertPaperBox");
+    if (!insertBox) {
+        insertBox = find<QQuickItem>("insertPaperBox");
+    }
+    ASSERT_NE(insertBox, nullptr);
+    EXPECT_FALSE(insert->property("landscape").toBool());
+    insertBox->setProperty("currentIndex", slide + 1);
+    QMetaObject::invokeMethod(insertBox, "activated", Q_ARG(int, slide + 1));
+    EXPECT_TRUE(insert->property("landscape").toBool());
+    QMetaObject::invokeMethod(insert, "insert");
+    ASSERT_TRUE(waitOpened(insert, false));
+    ASSERT_EQ(controller->pageCount(), 2);
+    EXPECT_EQ(sizeOf(1), QSizeF(960, 540));
+}

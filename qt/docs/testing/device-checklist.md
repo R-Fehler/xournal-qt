@@ -688,3 +688,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       of N" appears over the page; Enter goes to page 12 (a number past the end goes to the last page), Escape or a
       tap on the page cancels, Backspace takes a digit back, the number pad works too. Alt+Left goes back to where
       you were. Typing digits into a text on the page, a Markdown box, the search field or a dialog does not open it.
+- [ ] 16:9 pages: New document → Paper "16:9 (presentation)": it switches to Landscape by itself; the pages are
+      wide slides (PowerPoint's 13.33 × 7.5 in). Insert pages… after an A4 page with "16:9 (presentation)": the new
+      pages are slides, the A4 page stays. Save and open the `.xopp` in upstream Xournal++: the same page sizes.
