@@ -879,3 +879,20 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       (mouse), in the library and in the tab overview: the fuzzy search's help opens (the button does not toggle),
       scrolls with a finger, and closes with a tap outside or Escape. Its typo sentence follows the setting in
       Settings → Search, which has a "Help" button that opens the same help.
+
+## Android APK (qt/android-apk)
+Build and install as in [../android.md](../android.md) (`qt/scripts/android-build.sh`, then
+`adb install -r build-android/android-build/build/outputs/apk/debug/android-build-debug.apk`). With a mouse and a
+keyboard on the phone.
+- [ ] The APK installs (adb or opening the file); "Xournal Qt" with the app icon is in the launcher.
+- [ ] It starts without crashing and shows the library "Default" (empty the first time). The first start may take a
+      while (fontconfig scans the system fonts); the second start is quicker.
+- [ ] New document → Create: a page appears, the document is in the library, and it is still there after closing and
+      starting the app again.
+- [ ] Draw with the mouse: strokes appear, undo/redo work. The pen colours and widths change the strokes.
+- [ ] Text tool: a text box shows real letters (no boxes), also ä ö ü ß; the page thumbnail shows the same text.
+- [ ] A PDF pushed into the library folder (`adb push file.pdf /storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default/`)
+      appears in the library and opens; its pages render, text included.
+- [ ] Settings open; the tool bar icons are drawn (not empty squares).
+- [ ] Fold and unfold the phone, and put the app in split screen: it keeps running, the page stays visible.
+- [ ] `adb logcat --pid=$(adb shell pidof org.xournalqt.app)` shows no crash (a crash: note the backtrace).
