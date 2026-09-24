@@ -1,14 +1,12 @@
 #include "TextMatch.h"
 
+#include <algorithm>
+
+#include <QList>
+
 namespace xqt::textmatch {
 
 namespace {
-inline char16_t fold(char16_t c) {
-    if (c < 0x80) {
-        return c >= u'A' && c <= u'Z' ? static_cast<char16_t>(c + 32) : c;
-    }
-    return static_cast<char16_t>(QChar::toCaseFolded(static_cast<char32_t>(c)));
-}
 
 /// The letters of a ligature (nullptr: none)
 inline QStringView ligature(char16_t c) {
@@ -73,9 +71,23 @@ qsizetype matchAt(QStringView t, qsizetype j, QStringView q) {
     return j;
 }
 
-/// Calls f(start, end) for each match
+/// A letter or digit (of a word)
+inline bool wordChar(QChar c) { return c.isLetterOrNumber(); }
+
+/// The match [a, b) lies where `bounds` want it
+inline bool inBounds(QStringView t, qsizetype a, qsizetype b, unsigned bounds) {
+    if ((bounds & WordStart) && a > 0 && wordChar(t[a - 1])) {
+        return false;
+    }
+    if ((bounds & WordEnd) && b < t.size() && wordChar(t[b])) {
+        return false;
+    }
+    return true;
+}
+
+/// Calls f(start, end) for each match; f returns false to stop
 template <typename F>
-void scan(QStringView t, QStringView q, F&& f) {
+void scan(QStringView t, QStringView q, unsigned bounds, F&& f) {
     if (q.isEmpty()) {
         return;
     }
@@ -88,8 +100,10 @@ void scan(QStringView t, QStringView q, F&& f) {
     while (j < n) {
         const char16_t c = data[j];
         if (c == q0 || c == upper || (c >= 0x80 && (fold(c) == q0 || (ligatureStart && !ligature(c).isEmpty())))) {
-            if (const qsizetype end = matchAt(t, j, q); end > j) {
-                f(j, end);
+            if (const qsizetype end = matchAt(t, j, q); end > j && (bounds == Anywhere || inBounds(t, j, end, bounds))) {
+                if (!f(j, end)) {
+                    return;
+                }
                 j = end;
                 continue;
             }
@@ -113,16 +127,92 @@ QString prepare(const QString& query) {
     return out;
 }
 
-std::vector<Span> find(QStringView text, QStringView query) {
+std::vector<Span> find(QStringView text, QStringView query, unsigned bounds) {
     std::vector<Span> out;
-    scan(text, query, [&](qsizetype a, qsizetype b) { out.push_back({a, b}); });
+    scan(text, query, bounds, [&](qsizetype a, qsizetype b) {
+        out.push_back({a, b});
+        return true;
+    });
     return out;
 }
 
-int count(QStringView text, QStringView query) {
+int count(QStringView text, QStringView query, unsigned bounds) {
     int n = 0;
-    scan(text, query, [&](qsizetype, qsizetype) { ++n; });
+    scan(text, query, bounds, [&](qsizetype, qsizetype) {
+        ++n;
+        return true;
+    });
     return n;
+}
+
+bool contains(QStringView text, QStringView query, unsigned bounds) {
+    bool found = false;
+    scan(text, query, bounds, [&](qsizetype, qsizetype) {
+        found = true;
+        return false;
+    });
+    return found;
+}
+
+std::vector<Span> find(QStringView text, const std::vector<Term>& terms) {
+    if (terms.size() == 1) {
+        return find(text, terms.front().text, terms.front().bounds);
+    }
+    std::vector<Span> all;
+    for (const Term& t: terms) {
+        scan(text, t.text, t.bounds, [&](qsizetype a, qsizetype b) {
+            all.push_back({a, b});
+            return true;
+        });
+    }
+    std::sort(all.begin(), all.end(), [](const Span& a, const Span& b) {
+        return a.start != b.start ? a.start < b.start : a.end > b.end;
+    });
+    std::vector<Span> out;
+    out.reserve(all.size());
+    for (const Span& s: all) {
+        if (out.empty() || s.start >= out.back().end) {
+            out.push_back(s);
+        }
+    }
+    return out;
+}
+
+int count(QStringView text, const std::vector<Term>& terms) {
+    if (terms.size() == 1) {
+        return count(text, terms.front().text, terms.front().bounds);
+    }
+    // Only a text with matches of several terms needs them placed (they may overlap)
+    int found = 0, total = 0;
+    for (const Term& t: terms) {
+        if (const int n = count(text, t.text, t.bounds); n > 0) {
+            ++found;
+            total += n;
+        }
+    }
+    return found > 1 ? static_cast<int>(find(text, terms).size()) : total;
+}
+
+QString encode(const std::vector<Term>& terms) {
+    QString out;
+    for (const Term& t: terms) {
+        if (!out.isEmpty()) {
+            out += QChar(0x1e);
+        }
+        out += QChar(u'0' + static_cast<char16_t>(t.bounds & Word));
+        out += t.text;
+    }
+    return out;
+}
+
+std::vector<Term> decode(QStringView encoded) {
+    std::vector<Term> out;
+    for (const QStringView part: encoded.split(QChar(0x1e))) {
+        if (part.size() >= 2 && part[0] >= u'0' && part[0] <= u'3') {
+            out.push_back({part.sliced(1).toString(), static_cast<unsigned>(part[0].unicode() - u'0')});
+        }
+    }
+    return out;
 }
 
 Simplified simplify(QStringView original) {

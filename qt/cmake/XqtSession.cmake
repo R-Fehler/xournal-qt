@@ -17,6 +17,10 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentTextIndex.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextMatch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextMatch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyMatch.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyMatch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyQuery.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyQuery.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
@@ -77,6 +81,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentSearchTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/FuzzyQueryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/MergedPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/HybridPdfTest.cpp)
     target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
