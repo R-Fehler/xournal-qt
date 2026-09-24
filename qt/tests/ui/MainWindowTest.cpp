@@ -174,6 +174,12 @@ protected:
                           item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         wait(50);
     }
+    /// Until the window drew its next frame: layouts changed meanwhile are done, the items are where they are shown
+    void nextFrame() {
+        QSignalSpy drawn(window, &QQuickWindow::frameSwapped);
+        window->update();
+        drawn.wait(5000);
+    }
     /// Types text into the focused item (QTest::keyClicks is for widgets only).
     void type(const char* text) {
         for (const char* c = text; *c; ++c) {
@@ -3225,15 +3231,14 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     // Scrolling moves the text under the pill, so the pill goes along (a little, the word stays in view)
     const double pan = std::max(10.0, std::min(40.0, textY - 20));
     view->getViewController().panBy(QPointF(0, -pan));
-    wait(60);
+    until([&] { return std::abs(bar->y() - (barY - pan)) <= 3; }, 5000);
     EXPECT_NEAR(controller->pdfSelectionBox().y(), textY - pan, 2);
     EXPECT_NEAR(bar->y(), barY - pan, 3) << "the actions stay at the text";
     EXPECT_FALSE(bar->property("away").toBool()) << "still in view";
 
     // Far away: the pill waits at the top of the canvas, the knobs are out of the way
     controller->jumpToPage(controller->pageCount() - 1);
-    wait(80);
-    until([&] { return bar->property("away").toBool(); });
+    until([&] { return bar->property("away").toBool(); }, 5000);
     EXPECT_TRUE(bar->property("away").toBool()) << "the text is out of sight";
     EXPECT_TRUE(bar->isVisible()) << "but the actions stay, the text is still selected";
     EXPECT_LT(bar->y(), canvasItem->mapToScene(QPointF(0, 0)).y() + 40) << "at the top edge";
@@ -3245,9 +3250,11 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
                 << "no knobs while the text is away";
     }
 
-    // The way back brings it into view again
+    // The way back brings it into view again (the pill's row, which the button joined, laid out first: it is
+    // clicked where it is shown)
+    nextFrame();
     click(back);
-    until([&] { return !bar->property("away").toBool(); });
+    until([&] { return !bar->property("away").toBool(); }, 5000);
     EXPECT_FALSE(bar->property("away").toBool());
     const QRectF box = controller->pdfSelectionBox();
     EXPECT_GE(box.y(), 0);
