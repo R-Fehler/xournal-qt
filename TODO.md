@@ -179,6 +179,8 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   Markdown box flowing over pages. Editing and inking continue there, in a new tab, with the `.md` left as it was.
   Plain `.md` files are edited as text; ink is never stored in a `.md`.
 - Build on the live-rendering editor of the Markdown boxes, and on UI patterns from the reference editors.
+- **"New Markdown file"** in the library's New menu, next to "New document", once the editor is shipped
+  (the author, 2026-09-24). It creates `name.md` in the current folder and opens it in the editor.
 
 ### Horizontal scrolling and a presentation mode (the author, 2026-09-24; `qt/present`, started 2026-09-24)
 - [ ] **Horizontal scrolling mode**: pages side by side, each fit to the window height by default.
