@@ -1,7 +1,8 @@
 /*
  * xournal-qt: what the app hands to the system: a file to the app the system opens it with, a file to show in the
  * file manager, a library to open in a window of its own (another process), a file for the trash, files to share
- * (the file manager on the desktop; the share sheet on Android and iOS later) or to paste elsewhere (the clipboard).
+ * (the file manager on the desktop; the share sheet on Android and iOS later) or to paste elsewhere (the clipboard);
+ * and what it asks the system for: Android's "All files access" for libraries in the shared storage.
  *
  * Everything goes through one object that tests replace (setInstance), so no test starts an app, a file manager or
  * a window.
@@ -40,6 +41,19 @@ public:
     /// Move a file or folder to the desktop trash (QFile::moveToTrash). Every trash of the app goes through here,
     /// so tests never fill the user's trash.
     virtual bool moveToTrash(const QString& path);
+
+    /// Each library opens in a window of its own (another process: the desktop). On Android there is one window,
+    /// and it switches to the other library (AppController::switchLibrary).
+    virtual bool librariesInOwnWindows();
+    /// A folder the app can read and write only with "All files access" (Android's MANAGE_EXTERNAL_STORAGE): one in
+    /// the shared storage, outside the app's own folders. Never on the desktop.
+    virtual bool needsAllFilesAccess(const QString& folder);
+    /// The app has "All files access" (Android 11 and newer: Environment.isExternalStorageManager(); before: the
+    /// storage permission). Always on the desktop.
+    virtual bool hasAllFilesAccess();
+    /// Ask for it: Android shows the system's settings page for it (the app goes to the background and comes back
+    /// when the user returns). False if there is nothing to ask (the desktop) or it could not be shown.
+    virtual bool requestAllFilesAccess();
 
     /// There is a file manager to show files in (not on Android).
     static bool canShowInFileManager();

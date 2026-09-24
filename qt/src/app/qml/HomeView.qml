@@ -89,6 +89,12 @@ Rectangle {
         if (item && item.isLibrary) openLibraryFolder(item.path)
         else if (item) app.openListed([item.path])
     }
+    /// "Open a folder as library…": the folder picker. On Android a folder of the phone's storage can be a library
+    /// only with "All files access": explained and asked for first (then the picker opens, see onPickLibraryFolder).
+    function pickLibraryFolder() {
+        if (app.storageAccess) openLibraryDialog.open()
+        else storageAccessDialog.ask("")
+    }
     /// A folder as library: this one's home screen, else a window of its own (raised if it is open already)
     function openLibraryFolder(path) {
         if (app.library.available && path === app.library.rootPath) {
@@ -178,6 +184,11 @@ Rectangle {
     Connections {
         target: app.recent
         function onError(text) { errorDialog.text = text; errorDialog.open() }
+    }
+    Connections {
+        target: app
+        function onStorageAccessNeeded(folder) { storageAccessDialog.ask(folder) }
+        function onPickLibraryFolder() { openLibraryDialog.open() }
     }
 
     ColumnLayout {
@@ -368,8 +379,15 @@ Rectangle {
                         onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
                     }
                     MenuSeparator {}
-                    MenuItem { text: qsTr("New library… (new window)"); onTriggered: newLibraryDialog.open() }
-                    MenuItem { text: qsTr("Open a folder as library… (new window)"); onTriggered: openLibraryDialog.open() }
+                    MenuItem {
+                        text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
+                        onTriggered: newLibraryDialog.open()
+                    }
+                    MenuItem {
+                        objectName: "openFolderAsLibraryItem"
+                        text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
+                        onTriggered: home.pickLibraryFolder()
+                    }
                     MenuItem {
                         text: qsTr("Show in file manager")
                         enabled: app.library.available
@@ -1265,7 +1283,7 @@ Rectangle {
         }
         MenuItem {
             objectName: "openAsLibraryItem"
-            text: qsTr("Open as library (new window)")
+            text: app.libraryWindows ? qsTr("Open as library (new window)") : qsTr("Open as library")
             visible: !home.menuMany && home.menuFolder && home.menuModel === app.library
             height: visible ? implicitHeight : 0
             onTriggered: app.openLibraryAt(home.menuPath)
@@ -1546,6 +1564,42 @@ Rectangle {
         }
     }
 
+    // Android: why "All files access" is asked for, before the system's page for it
+    Dialog {
+        id: storageAccessDialog
+        objectName: "storageAccessDialog"
+        property string folder: ""  // then opened as library ("": the folder picker)
+        function ask(path) { folder = path; open() }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Allow access to your files?")
+        width: Math.min(parent ? parent.width - 32 : 520, 520)
+        Label {
+            width: storageAccessDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("To use a folder of the phone's storage as a library (for example one that Syncthing, "
+                       + "FolderSync or Autosync keeps in sync), Xournal Qt needs \u201cAll files access\u201d. It then "
+                       + "works with the folder as on a computer: its documents, previews and search, and changes "
+                       + "other apps make are seen at once. It only reads and writes the folders you open as a "
+                       + "library.")
+                  + "\n\n" + qsTr("Android shows its settings page next: turn on the switch for Xournal Qt, then "
+                                   + "come back.")
+        }
+        footer: DialogButtonBox {
+            Button {
+                text: qsTr("Not now")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "storageAccessContinue"
+                text: qsTr("Continue")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: app.requestStorageAccess(folder)
+    }
+
     Dialog {
         id: newLibraryDialog
         parent: Overlay.overlay
@@ -1568,7 +1622,8 @@ Rectangle {
                 wrapMode: Text.Wrap
                 font.pixelSize: 12
                 color: "#6b6f75"
-                text: qsTr("A library is a folder in Documents/Xournal_Libraries. It opens in a new window.")
+                text: app.libraryWindows ? qsTr("A library is a folder in Documents/Xournal_Libraries. It opens in a new window.")
+                                         : qsTr("A library is a folder in Documents/Xournal_Libraries.")
             }
         }
         standardButtons: Dialog.Ok | Dialog.Cancel

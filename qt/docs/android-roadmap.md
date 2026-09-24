@@ -79,10 +79,12 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   every unknown file type.
 - (E) **Writing back**: a document opened from another app is a copy; changes do not go back to the original (e.g.
   a PDF in a cloud app). A later step could keep the URI grant (`takePersistableUriPermission`) and offer "Save back".
-- (E) **Libraries anywhere** (VISION): a library folder chosen by the user means a SAF tree URI
-  (`ACTION_OPEN_DOCUMENT_TREE`); the library code (`qt/src/shell/Library*`) scans with `std::filesystem`. Today
-  "Open a folder as library" with a picked folder only explains that it cannot be done yet. Other libraries (New
-  library, the Libraries menu) start another process, which Android does not do either.
+- Done (`qt/android-libraries`): **libraries in the shared storage** (VISION: libraries anywhere) with "All files
+  access": a picked folder's tree URI is mapped to its path, and the window switches to another library instead of
+  starting a process (android.md). Open: folders only a cloud app's provider offers (`content://` trees of Nextcloud,
+  Drive, OneDrive) stay out; they would need a library that reads through SAF. Google Play restricts
+  `MANAGE_EXTERNAL_STORAGE`: a Play build would need another way (SAF trees, or Play's exception for file managers
+  and document apps).
 - (E) **"Show in file manager"** has no Android equivalent; hide it. "Open externally" becomes an intent with a
   `FileProvider` URI (the provider is already in the manifest).
 - (E) **Printing** calls `lp`; on Android use the print framework or hide Print.

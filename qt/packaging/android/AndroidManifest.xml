@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!-- xournal-qt: the Android manifest. Qt's template (Qt 6.11, src/android/templates) with the app's own settings:
-     no permissions yet (documents live in the app's own folders, see qt/docs/android.md), a resizable activity for
+     "All files access" for libraries in the shared storage (below), a resizable activity for
      split screen, pop-up windows, DeX and the Fold's two screens, and an optional stylus. The activity is Qt's with
      the handling of files from other apps (src/org/xournalqt/app/XournalActivity.java): "Open with" and the share
      sheet for PDFs, Xournal++ files, Markdown and text files and images. The %%INSERT_...%% markers are filled in by
@@ -10,9 +10,15 @@
     android:installLocation="auto"
     android:versionCode="-- %%INSERT_VERSION_CODE%% --"
     android:versionName="-- %%INSERT_VERSION_NAME%% --">
-    <!-- No permissions: without the marker of Qt's template for permissions, androiddeployqt adds none of the ones its modules
-         ask for by default (INTERNET for Qt Network, WRITE_EXTERNAL_STORAGE). The app needs neither yet: it reads and
-         writes its own folders only, and Qt Network is there for the local socket. -->
+    <!-- Only these permissions: without the marker of Qt's template for permissions, androiddeployqt adds none of the
+         ones its modules ask for by default (INTERNET for Qt Network, WRITE_EXTERNAL_STORAGE); Qt Network is there for
+         the local socket. "All files access" is asked for only when the user opens a folder of the shared storage as
+         a library (with an explanation first, see qt/docs/android.md): libraries in folders that sync apps
+         (Syncthing, FolderSync) keep, read by their paths like on the desktop. Before Android 11 the storage
+         permission does the same. (Google Play restricts MANAGE_EXTERNAL_STORAGE; fine for sideloading and F-Droid.) -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <!-- %%INSERT_FEATURES -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen.multitouch" android:required="false" />
@@ -30,6 +36,7 @@
         android:enableOnBackInvokedCallback="false"
         android:allowBackup="true"
         android:fullBackupOnly="false"
+        android:requestLegacyExternalStorage="true"
         android:resizeableActivity="true">
         <activity
             android:name="org.xournalqt.app.XournalActivity"

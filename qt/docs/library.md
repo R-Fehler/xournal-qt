@@ -8,7 +8,8 @@ A **library** is a plain folder of documents that a window works in, like a work
   works.
 - The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
-  as library…". A window never shows two libraries.
+  as library…". A window never shows two libraries. On Android there is one window: it switches to the other library
+  (the open tabs stay), and a folder of the phone's storage needs "All files access" ([android.md](android.md)).
 - The Downloads folder is offered there too, as a quick library: all downloaded papers at once. Like every library
   it keeps its cache (previews, search index) in `.xournal_library/` folders, so opening it again is as fast as
   any other library. A note in the library says that its files are

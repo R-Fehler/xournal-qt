@@ -400,8 +400,27 @@ public:
     Q_INVOKABLE bool openSearchHitInPassage(const QString& path, const QString& query, int passage);
     /// The libraries in the standard folder: [{ name, path, current }]
     Q_INVOKABLE QVariantList libraries() const;
-    /// Open a folder as library in a new window (another process: one library per window).
+    /// Open a folder as library in a new window (another process: one library per window). On Android (one window,
+    /// SystemApps::librariesInOwnWindows) this window switches to it (switchLibrary). A folder picked through Android's
+    /// picker (content://) is opened by its path in the shared storage (ContentFiles::sharedStoragePath), which needs
+    /// "All files access"; a folder there without it is asked for first (storageAccessNeeded).
     Q_INVOKABLE void openLibrary(const QUrl& folder);
+    /// This window works in another library from now on (Android: there is one window). The open tabs stay; the
+    /// library is remembered and opened at the next start (rememberedLibrary).
+    void switchLibrary(const fs::path& root);
+    /// The library the window worked in last (Android: opened at start instead of the default; empty: none).
+    QString rememberedLibrary() const;
+    /// Android: the app may read and write the shared storage ("All files access"), so a folder there can be a
+    /// library; true where no such permission exists (the desktop).
+    Q_PROPERTY(bool storageAccess READ storageAccess NOTIFY storageAccessChanged)
+    bool storageAccess() const;
+    /// Libraries open in windows of their own (the desktop; on Android the window switches).
+    Q_PROPERTY(bool libraryWindows READ libraryWindows CONSTANT)
+    bool libraryWindows() const;
+    /// After the explanation (storageAccessNeeded, or before the folder picker): show the system's page for "All
+    /// files access". When the app is back with it, `thenOpen` is opened as library, or ("") the folder picker is
+    /// shown (pickLibraryFolder); without it, a message says what is possible.
+    Q_INVOKABLE void requestStorageAccess(const QString& thenOpen);
     /// The same by its path (a folder of the library, a library of the Recent grid).
     Q_INVOKABLE void openLibraryAt(const QString& folder) { openLibrary(QUrl::fromLocalFile(folder)); }
     /// New library in the standard folder, opened in a new window. False if the name is taken or invalid.
@@ -830,6 +849,12 @@ Q_SIGNALS:
     void pageChanged();
     /// Messages from the core (XojMsgBox) and file errors, shown by QML.
     void message(const QString& title, const QString& text, bool error);
+    /// This folder can be a library only with "All files access": the window explains why it is asked for, then
+    /// calls requestStorageAccess.
+    void storageAccessNeeded(const QString& folder);
+    void storageAccessChanged();
+    /// "All files access" was just given for opening a folder as library: show the folder picker again.
+    void pickLibraryFolder();
     /// The window should come to the front (e.g. another instance handed over files).
     void raiseRequested();
     void recoveryChanged();
@@ -1052,4 +1077,9 @@ private:
                                                      const fs::path& target) const;
     QTimer textCheckTimer;  ///< (programs write in steps: looked at a moment after the last change)
     QPointer<xqt::DocumentSession> askingTextChange;
+    /// requestStorageAccess: the system's page is shown (the app went to the background for it)
+    bool awaitingStorageAccess = false;
+    bool leftForStorageAccess = false;
+    QString afterStorageAccess;
+    void storageAccessAnswered();
 };

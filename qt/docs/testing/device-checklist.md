@@ -1222,3 +1222,15 @@ with "Uni sample" stays).
       Settings → Storage shows "Keep the cache in the app's cache folder" on. The default library "Default" with
       "Uni sample": its old `.xournal_library` folders are gone after the first start, and the search still finds
       text at once (moved, not read again).
+- [ ] Put a folder with documents into the phone's storage (a computer over USB, or `adb push Uni
+      /sdcard/Documents/`). Library menu ▾ → "Open a folder as library…": a dialog explains "All files access";
+      "Not now" closes it and nothing else happens. Again → Continue: Android's page "All files access" for Xournal
+      Qt opens; turn it on, go back: the folder picker opens by itself. Pick `Documents/Uni` → "Use this folder" →
+      Allow: the window shows the library "Uni" with its folders and documents; open one, draw, save.
+- [ ] The library menu and Recent list "Uni" (Recent: a folder card with the library mark). Tap the default library
+      in the menu: the window switches back (tabs stay open); tap "Uni" in Recent: back to Uni.
+- [ ] Close the app (swipe away) and start it: it opens with "Uni" again.
+- [ ] Settings → Apps → Xournal Qt → Permissions (or "Special app access" → "All files access"): turn it off, start
+      the app: it opens the default library (it cannot read Uni). Tap "Uni" in Recent: the explanation comes again.
+- [ ] In the folder picker, pick a folder of Google Drive or Nextcloud (left menu): a message says it is not in the
+      phone's storage; nothing else changes.

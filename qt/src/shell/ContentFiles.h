@@ -20,6 +20,19 @@ namespace xqt::ContentFiles {
 
 /// A URL that is no local file but can be read through Qt (Android: content://).
 bool isForeign(const QUrl& url);
+
+/// Where Android's shared storage is (StorageRoots{} on a phone; tests use folders of their own).
+struct StorageRoots {
+    QString primary = QStringLiteral("/storage/emulated/0");  ///< the internal shared storage ("primary")
+    QString volumes = QStringLiteral("/storage");             ///< SD cards and USB drives: <volumes>/<volume id>
+};
+/// The real path of a folder (or file) picked through Android's system picker, if it is in the shared storage: a
+/// tree or document URI of the external storage provider ("content://com.android.externalstorage.documents/tree/
+/// primary%3ADocuments%2FUni" is "/storage/emulated/0/Documents/Uni"; "home:" is the Documents folder, "<volume
+/// id>:" an SD card) or of the Downloads provider ("downloads", "raw:<path>"). Empty for everything else (a cloud
+/// app's provider, a URI that is no folder of these) and when that path does not exist. Only useful with "All files
+/// access" (the app can read the path then; SystemApps::hasAllFilesAccess).
+QString sharedStoragePath(const QUrl& url, const StorageRoots& roots = {});
 /// What QFile opens for a URL: the path of a local file, else the URL itself.
 QString sourceOf(const QUrl& url);
 /// A file name made safe from a name another app gives (no folders, not hidden, not empty).

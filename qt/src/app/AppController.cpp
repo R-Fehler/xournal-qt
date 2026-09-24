@@ -1,5 +1,7 @@
 #include "AppController.h"
 
+#include <utility>
+
 #include <QPointer>
 #include <QThreadPool>
 #include <QTimer>
@@ -1585,7 +1587,9 @@ void AppController::newDocument() {
 
 void AppController::setLibraryRoot(const fs::path& root) {
     auto lib = std::make_unique<Library>(root);
-    journalFile = journalFileFor(*lib);
+    // One window for all libraries (Android): one journal, whichever library it shows
+    journalFile = SystemApps::instance().librariesInOwnWindows() ? journalFileFor(*lib)
+                                                                 : SessionRecovery::defaultJournalFile();
     // A folder opened as a library outside the standard folder: in the Recent grid, to find it again
     if (!lib->isInLibrariesFolder()) {
         recent->addLibrary(lib->root());
@@ -1750,20 +1754,90 @@ QVariantList AppController::libraries() const {
 }
 
 void AppController::openLibrary(const QUrl& folder) {
-    if (ContentFiles::isForeign(folder)) {  // (Android's folder picker: no path to scan)
-        Q_EMIT message(tr("Open a folder as library"),
-                       tr("This folder can only be read through Android's file picker, so it cannot be a library "
-                          "yet. \u201cImport a folder\u201d copies it into this library."),
-                       false);
-        return;
+    SystemApps& apps = SystemApps::instance();
+    QString dir;
+    if (ContentFiles::isForeign(folder)) {
+        // Android's folder picker: a folder of the shared storage has a path, readable with "All files access"
+        dir = ContentFiles::sharedStoragePath(folder);
+        if (dir.isEmpty()) {
+            Q_EMIT message(tr("Open a folder as library"),
+                           tr("This folder is not in the phone's storage (it belongs to another app, e.g. a cloud "
+                              "app), so it cannot be a library. Sync apps like Syncthing or FolderSync can keep it "
+                              "in a folder of the storage, which can. \u201cImport a folder\u201d copies it into this "
+                              "library."),
+                           false);
+            return;
+        }
+    } else {
+        dir = xqt::localPathOf(folder);
     }
-    const QString dir = xqt::localPathOf(folder);
     if (library->library() && Library(fs::path(dir.toStdString())).root() == library->library()->root()) {
         setHomeVisible(true);  // this one
         return;
     }
+    if (apps.needsAllFilesAccess(dir) && !apps.hasAllFilesAccess()) {
+        Q_EMIT storageAccessNeeded(dir);  // (explained, then asked for: requestStorageAccess)
+        return;
+    }
+    if (!apps.librariesInOwnWindows()) {
+        if (!QFileInfo(dir).isDir()) {
+            Q_EMIT message(tr("Open a folder as library"), tr("The folder %1 is not there (any more).").arg(dir), true);
+            return;
+        }
+        switchLibrary(fs::path(dir.toStdString()));
+        return;
+    }
     // One library per window: another process (it becomes the single instance of that library).
-    SystemApps::instance().startLibraryWindow(dir);
+    apps.startLibraryWindow(dir);
+}
+
+void AppController::switchLibrary(const fs::path& root) {
+    setLibraryRoot(root);
+    app->getSettings()->getCustomElement("xournalQt").setString("library", root.string());
+    app->getSettings()->customSettingsChanged();
+    setHomeVisible(true);
+}
+
+QString AppController::rememberedLibrary() const {
+    std::string root;
+    app->getSettings()->getCustomElement("xournalQt").getString("library", root);
+    return QString::fromStdString(root);
+}
+
+bool AppController::storageAccess() const { return SystemApps::instance().hasAllFilesAccess(); }
+
+bool AppController::libraryWindows() const { return SystemApps::instance().librariesInOwnWindows(); }
+
+void AppController::requestStorageAccess(const QString& thenOpen) {
+    afterStorageAccess = thenOpen;
+    if (SystemApps::instance().hasAllFilesAccess()) {
+        storageAccessAnswered();  // (given meanwhile)
+        return;
+    }
+    if (!SystemApps::instance().requestAllFilesAccess()) {
+        return;
+    }
+    awaitingStorageAccess = true;
+    leftForStorageAccess = false;
+    // The answer is there when the app is active again after the system's page (applicationStateChanged)
+}
+
+void AppController::storageAccessAnswered() {
+    awaitingStorageAccess = false;
+    Q_EMIT storageAccessChanged();
+    const QString then = std::exchange(afterStorageAccess, QString());
+    if (!SystemApps::instance().hasAllFilesAccess()) {
+        Q_EMIT message(tr("Open a folder as library"),
+                       tr("Without \u201cAll files access\u201d the app can only use its own folders. \u201cImport a "
+                          "folder\u201d copies a folder into this library instead."),
+                       false);
+        return;
+    }
+    if (then.isEmpty()) {
+        Q_EMIT pickLibraryFolder();
+    } else {
+        openLibraryAt(then);
+    }
 }
 
 bool AppController::createLibrary(const QString& name) {
@@ -1852,6 +1926,14 @@ void AppController::startSession(const QStringList& files) {
 }
 
 void AppController::applicationStateChanged(Qt::ApplicationState state) {
+    if (awaitingStorageAccess) {
+        // Back from the system's page for "All files access" (after having left for it)
+        if (state != Qt::ApplicationActive) {
+            leftForStorageAccess = true;
+        } else if (leftForStorageAccess) {
+            storageAccessAnswered();
+        }
+    }
 #ifdef Q_OS_ANDROID
     const bool background = state == Qt::ApplicationSuspended || state == Qt::ApplicationInactive;
 #else
