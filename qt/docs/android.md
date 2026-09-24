@@ -122,6 +122,9 @@ per-folder packs, the search index, and the folder watcher that sees what the sy
   library outside `Xournal_Libraries` is in the Recent grid, as on the desktop, and "New library…" and the libraries
   of the library menu switch the same way. One session journal for all of them (`session.json`).
 - The system picker (`content://`) stays for opening and importing single files and for "Import a folder".
+- Conflict copies that sync apps leave (Syncthing's `.sync-conflict-…`, "(conflicted copy)", …) are a badge on
+  their document's card, with "compare / keep one" (library.md). Android has no trash for files: what is not kept
+  is deleted, after a question.
 - What a sync app changes is seen as on the desktop: the library's folder watcher shows new and changed files, and
   an open document whose file changes is read again (or, with unsaved changes, the window asks; library.md,
   "Changed by another program").

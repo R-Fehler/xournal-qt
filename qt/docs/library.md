@@ -116,6 +116,29 @@ the document uses as its background from then on. Their text stays searchable an
 
 Code: `qt/src/shell/DocumentFiles.*`; the merged PDF: `qt/src/session/MergedPdf.*` (qpdf), `PdfPageKeeper.*`.
 
+### Conflict copies of sync apps
+When a document changed in two places before a sync app could pass the change on, the app keeps both: the other
+version is a **conflict copy** next to it, named its own way (`qt/src/shell/SyncConflicts.*`):
+
+| App | Conflict copy of `notes.xopp` |
+| --- | --- |
+| Syncthing | `notes.sync-conflict-20240312-101530-ABCDEFG.xopp` |
+| Dropbox | `notes (conflicted copy).xopp`, `notes (Anna's conflicted copy 2024-03-12).xopp`, `(Case Conflict)`, `(Selective Sync Conflict)` |
+| Nextcloud, ownCloud (desktop clients) | `notes (conflicted copy 2024-03-12 101530).xopp`, translated (`(Konflikt …)`, `(copie en conflit …)`, …); older ownCloud `notes_conflict-20240312-101530.xopp` |
+| Seafile | `notes (SFConflict anna@example.org 2024-03-12-10-15-30).xopp` |
+| OneDrive | `notes-DESKTOP-AB12CDE.xopp` (Windows' default computer names only) |
+| others (FolderSync, Autosync, …) | a word for "conflict" in parentheses before the extension |
+
+- The library shows a conflict copy as a **conflict of its document**, not as a document of its own: an orange badge
+  "Conflict" ("2 conflicts") on the document's card. A copy counts only when its document is in the same folder
+  (`Essay (conflict theory).pdf` alone is a document). Copies of any file of a document count (the PDF of a
+  `.xopp` + PDF pair too). They are not in the search index. (`DocumentFiles::scan`, `DocumentItem::conflicts`.)
+- The badge opens **"Sync conflict"**: the document and each copy with the app, when it was changed and its size.
+  **Compare** opens both side by side: the document as the tab, the copy as its reference (the reference view).
+  **Keep the document** moves the copy to the trash; **Keep this copy** moves the document's file of that kind to
+  the trash and gives the copy its name (a `.xopp` copy keeps the PDF next to it). Where there is no trash (Android)
+  the file is deleted, after a question. An open tab of the document then reads the file again (below).
+
 ### Changed by another program
 An open document whose files another program changes (a sync app bringing a newer version, Xournal++, a PDF viewer
 that saves annotations) is handled as a Markdown file is ([md-editor.md](md-editor.md), "Changed by another

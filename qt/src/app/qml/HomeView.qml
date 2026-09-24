@@ -826,6 +826,8 @@ Rectangle {
                         kind: model.kind
                         fileIcon: model.fileIcon
                         hits: model.hits
+                        conflicts: model.conflicts ? model.conflicts.length : 0
+                        onConflictsRequested: conflictDialog.show(model.path)
                         snippet: model.snippet
                         itemCount: model.itemCount
                         hitPages: home.extendedView ? model.hitPageList : []
@@ -1849,6 +1851,137 @@ Rectangle {
     }
 
     NewDocumentDialog { id: newDocumentDialog }
+
+    // Sync conflicts of a document (the badge on its card): compare side by side, or keep one (the other goes to the
+    // trash; where there is none, deleted after asking)
+    Dialog {
+        id: conflictDialog
+        objectName: "conflictDialog"
+        property string documentPath: ""
+        property var items: []  // app.library.conflictsOf: the document first, then its conflict copies
+        function show(path) {
+            documentPath = path
+            items = app.library.conflictsOf(path)
+            if (items.length > 1) open()
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Sync conflict")
+        width: Math.min(parent ? parent.width - 32 : 560, 560)
+        height: Math.min(implicitHeight, parent ? parent.height - 64 : 800)
+        standardButtons: Dialog.Close
+        contentItem: Flickable {
+            implicitHeight: conflictColumn.implicitHeight
+            contentHeight: conflictColumn.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            ColumnLayout {
+                id: conflictColumn
+                width: parent.width
+                spacing: 12
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    text: qsTr("A sync app found this document changed in two places and kept both versions. Compare "
+                               + "them side by side, then keep one; the other goes to the trash.")
+                          + (app.library.canTrash ? "" : " " + qsTr("(There is no trash here: it is deleted.)"))
+                }
+                Repeater {
+                    model: conflictDialog.items
+                    delegate: Frame {
+                        id: conflictRow
+                        required property var modelData
+                        Layout.fillWidth: true
+                        ColumnLayout {
+                            width: parent.width
+                            spacing: 4
+                            Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WrapAnywhere
+                                font.weight: Font.DemiBold
+                                text: conflictRow.modelData.original ? qsTr("This document: %1").arg(conflictRow.modelData.name)
+                                                                     : conflictRow.modelData.name
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.Wrap
+                                font.pixelSize: 12
+                                color: "#5f6368"
+                                text: {
+                                    const d = conflictRow.modelData
+                                    let parts = []
+                                    if (!d.original && d.app) parts.push(qsTr("Conflict copy of %1").arg(d.app))
+                                    else if (!d.original) parts.push(qsTr("Conflict copy"))
+                                    parts.push(qsTr("changed %1").arg(d.modified.toLocaleString(Qt.locale(), Locale.ShortFormat)))
+                                    parts.push(home.sizeText(d.size))
+                                    return parts.join(" · ")
+                                }
+                            }
+                            Flow {
+                                Layout.fillWidth: true
+                                visible: !conflictRow.modelData.original
+                                spacing: 8
+                                Button {
+                                    objectName: "conflictCompareButton"
+                                    text: qsTr("Compare")
+                                    onClicked: {
+                                        conflictDialog.close()
+                                        app.compareConflict(conflictDialog.documentPath, conflictRow.modelData.path)
+                                    }
+                                }
+                                Button {
+                                    objectName: "conflictKeepDocumentButton"
+                                    text: qsTr("Keep the document")
+                                    onClicked: conflictConfirm.ask(conflictRow.modelData.path, false,
+                                                                   conflictRow.modelData.name)
+                                }
+                                Button {
+                                    objectName: "conflictKeepCopyButton"
+                                    text: qsTr("Keep this copy")
+                                    onClicked: conflictConfirm.ask(conflictRow.modelData.path, true,
+                                                                   conflictDialog.items[0].name)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Keep one: without a trash (Android), what goes is deleted - asked first
+    Dialog {
+        id: conflictConfirm
+        objectName: "conflictConfirm"
+        property string copyPath: ""
+        property bool keepCopy: false
+        property string goes: ""
+        function ask(path, keep, goesName) {
+            copyPath = path
+            keepCopy = keep
+            goes = goesName
+            if (app.library.canTrash) resolve()
+            else open()
+        }
+        function resolve() {
+            if (app.library.resolveConflict(copyPath, keepCopy)) {
+                conflictDialog.show(conflictDialog.documentPath)  // (more copies: still listed)
+                if (conflictDialog.items.length < 2) conflictDialog.close()
+            }
+        }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Delete %1?").arg(goes)
+        width: Math.min(parent ? parent.width - 32 : 480, 480)
+        standardButtons: Dialog.Cancel | Dialog.Ok
+        Label {
+            width: conflictConfirm.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("There is no trash on this device: %1 is deleted and cannot be brought back.").arg(conflictConfirm.goes)
+        }
+        onAccepted: resolve()
+    }
 
     Dialog {
         id: errorDialog

@@ -536,6 +536,9 @@ public:
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
     /// new document stays, to write the notes in). Without a document open: opened as the document.
     Q_INVOKABLE bool openAsReference(const QString& path);
+    /// A document and a conflict copy of it (a sync app's, SyncConflicts.h) side by side: the document as the tab, the
+    /// copy as its reference.
+    Q_INVOKABLE bool compareConflict(const QString& document, const QString& copy);
     QObject* referenceObject() const;
     xqt::ReferenceMode& reference() const { return *referenceMode; }
     /// Ctrl+S: while the reference has the keys and is written in, it is saved (true). When it needs a file first,

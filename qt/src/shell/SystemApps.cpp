@@ -46,6 +46,14 @@ bool SystemApps::canShowInFileManager() {
 #endif
 }
 
+bool SystemApps::canTrash() {
+#ifdef Q_OS_ANDROID
+    return false;
+#else
+    return true;
+#endif
+}
+
 bool SystemApps::openWithSystemApp(const QString& path) {
     return QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }

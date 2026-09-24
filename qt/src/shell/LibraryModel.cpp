@@ -1,4 +1,5 @@
 #include "LibraryModel.h"
+#include "SyncConflicts.h"
 #include "ContentFiles.h"
 
 #include "DocumentPlaces.h"
@@ -21,6 +22,7 @@
 #include "session/FuzzyQuery.h"
 #include "MdSnippets.h"
 #include "Previews.h"
+#include "SystemApps.h"
 
 namespace xqt {
 
@@ -716,6 +718,13 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             }
             return list;
         }
+        case ConflictsRole: {
+            QStringList list;
+            for (const fs::path& c: r.item.conflicts) {
+                list << qstr(c);
+            }
+            return list;
+        }
         default:
             return {};
     }
@@ -748,7 +757,8 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {HitPassageBaseRole, "hitPassageBase"},
             {SizeRole, "size"},
             {FileIconRole, "fileIcon"},
-            {NameMarksRole, "nameMarks"}};
+            {NameMarksRole, "nameMarks"},
+            {ConflictsRole, "conflicts"}};
 }
 
 void LibraryModel::setShowFilter(const ShowFilter& f) {
@@ -1167,6 +1177,89 @@ bool LibraryModel::trashPaths(const QStringList& paths) {
         Q_EMIT error(errors.join('\n'));
     }
     return errors.isEmpty();
+}
+
+bool LibraryModel::canTrash() { return SystemApps::canTrash(); }
+
+QVariantList LibraryModel::conflictsOf(const QString& path) const {
+    const fs::path file = toPath(path);
+    const auto listing = DocumentFiles::scan(file.parent_path(), DocumentFiles::AllFiles);
+    auto describe = [](const fs::path& f) {
+        const QFileInfo info(qstr(f));
+        return QVariantMap{{"path", qstr(f)},
+                           {"name", QString::fromStdString(f.filename().string())},
+                           {"modified", info.lastModified()},
+                           {"size", info.size()}};
+    };
+    QVariantList list;
+    for (const DocumentItem& item: listing.items) {
+        if (!item.has(file) || item.conflicts.empty()) {
+            continue;
+        }
+        QVariantMap own = describe(item.main());
+        own["original"] = true;
+        list.append(own);
+        for (const fs::path& c: item.conflicts) {
+            QVariantMap m = describe(c);
+            if (const auto conflict = SyncConflicts::parse(c.filename().string())) {
+                m["app"] = QString::fromStdString(conflict->app);
+                m["when"] = QString::fromStdString(conflict->when);
+                m["original"] = false;
+                m["of"] = QString::fromStdString(conflict->original);
+            }
+            list.append(m);
+        }
+    }
+    return list;
+}
+
+bool LibraryModel::resolveConflict(const QString& conflictPath, bool keepCopy) {
+    const fs::path copy = toPath(conflictPath);
+    const auto conflict = SyncConflicts::parse(copy.filename().string());
+    std::error_code ec;
+    if (!conflict || !fs::exists(copy, ec)) {
+        Q_EMIT error(tr("%1 is not there any more.").arg(qstr(copy.filename())));
+        return false;
+    }
+    const fs::path original = copy.parent_path() / conflict->original;
+    // What goes: to the trash, or deleted where there is none (the window asked)
+    auto remove = [this](const fs::path& f) {
+        if (SystemApps::canTrash()) {
+            if (!SystemApps::instance().moveToTrash(qstr(f))) {
+                Q_EMIT error(tr("Could not move %1 to the trash.").arg(qstr(f.filename())));
+                return false;
+            }
+            return true;
+        }
+        std::error_code rec;
+        if (!fs::remove(f, rec) || rec) {
+            Q_EMIT error(tr("Could not delete %1.").arg(qstr(f.filename())));
+            return false;
+        }
+        return true;
+    };
+    DocumentFiles::Result r;
+    if (!keepCopy) {
+        if (!remove(copy)) {
+            return false;
+        }
+    } else {
+        if (fs::exists(original, ec) && !remove(original)) {
+            return false;
+        }
+        fs::rename(copy, original, ec);
+        if (ec) {
+            Q_EMIT error(tr("Could not rename %1: %2").arg(qstr(copy.filename()), QString::fromStdString(ec.message())));
+            return false;
+        }
+        r.ok = true;
+        r.moved.emplace_back(copy, original);
+        if (onFilesChanged) {
+            onFilesChanged(r);  // (a tab of the copy follows it; one of the document reads the file again)
+        }
+    }
+    refresh();
+    return true;
 }
 
 int LibraryModel::rowOf(const QString& path) const {

@@ -1250,3 +1250,11 @@ with "Uni sample" stays).
         (Keep mine / Reload).
       - On the phone, look into the synced folder on the computer: no `.xournal_library` folders and no
         `.name.autosave.xopp` files come over from the phone.
+- [ ] Sync conflicts (desktop, or the phone with a synced folder): make a conflict copy by hand next to a document,
+      e.g. `cp notes.xopp "notes.sync-conflict-20240312-101530-ABCDEFG.xopp"` and change one of them. The library
+      shows one card "notes" with an orange "Conflict" badge, no second card. Tap the badge: "Sync conflict" lists
+      both with "Syncthing" and their times. Compare: both side by side. Keep the document: the copy goes to the
+      trash (Android: a question "Delete …?" first), the badge is gone. With another copy: Keep this copy: the
+      document's old file goes, the copy is now `notes.xopp`.
+- [ ] With Syncthing on the Fold 7 and the computer: edit the same document on both while one is offline, then let
+      them sync: the conflict badge appears on the phone (and the copy on the computer).

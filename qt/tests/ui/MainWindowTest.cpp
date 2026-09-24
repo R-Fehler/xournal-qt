@@ -1966,6 +1966,48 @@ protected:
 };
 }  // namespace
 
+// A sync app's conflict copy is a badge on its document's card (not a card of its own); the badge opens "compare /
+// keep one", and keeping the document moves the copy to the trash.
+TEST_F(HomeScreenFilterTest, aSyncConflictIsABadgeOnItsDocument) {
+    const fs::path copy = root / "notes.sync-conflict-20240312-101530-ABCDEFG.xopp";
+    fs::copy_file(root / "notes.xopp", copy);
+    controller->libraryModel()->setProperty("folder", QString());
+    QMetaObject::invokeMethod(controller->libraryModel(), "refresh");
+    wait(100);
+    EXPECT_EQ(gridCount(), 3) << "no card of its own";
+    QQuickItem* notes = card(rowOf("notes.xopp"));
+    ASSERT_NE(notes, nullptr);
+    QQuickItem* badge = child(notes, "conflictBadge");
+    ASSERT_NE(badge, nullptr);
+    EXPECT_TRUE(badge->isVisible());
+    EXPECT_FALSE(child(card(rowOf("lecture.pdf")), "conflictBadge")->isVisible());
+    click(badge);
+    auto* dialog = find<QObject>("conflictDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(controller->tabCount(), 0) << "the badge does not open the document";
+    EXPECT_EQ(dialog->property("items").toList().size(), 2);
+    // (the buttons are delegates of a Repeater: found in the tree of items, not of objects)
+    std::function<QQuickItem*(QQuickItem*)> button = [&](QQuickItem* item) -> QQuickItem* {
+        if (item->objectName() == "conflictKeepDocumentButton" && item->isVisible()) {
+            return item;
+        }
+        for (QQuickItem* c: item->childItems()) {
+            if (QQuickItem* found = button(c)) {
+                return found;
+            }
+        }
+        return nullptr;
+    };
+    click(button(window->contentItem()));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(fake.trashed, QStringList{QString::fromStdString(copy.string())});
+    EXPECT_FALSE(fs::exists(copy));
+    EXPECT_TRUE(fs::exists(root / "notes.xopp"));
+    wait(50);
+    EXPECT_FALSE(child(card(rowOf("notes.xopp")), "conflictBadge")->isVisible());
+}
+
 TEST_F(HomeScreenFilterTest, theShowButtonChoosesTheKindsOfFilesShown) {
     ASSERT_EQ(gridCount(), 3) << "Physics, lecture, notes: text and other files are not shown by default";
     auto* button = find<QQuickItem>("showButton");

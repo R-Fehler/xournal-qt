@@ -48,6 +48,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ContentFiles.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ContentFiles.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SyncConflicts.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SyncConflicts.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/GridSelection.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.cpp
@@ -218,6 +220,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ExternalChangesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SyncConflictsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp

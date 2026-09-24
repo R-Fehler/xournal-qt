@@ -2226,6 +2226,13 @@ bool AppController::openAsReference(const QString& path) {
     return true;
 }
 
+bool AppController::compareConflict(const QString& document, const QString& copy) {
+    if (!openPath(document)) {
+        return false;
+    }
+    return openAsReference(copy);
+}
+
 void AppController::closeTab(int index) {
     if (flow && flowSession == tabs->session(index)) {
         endTextFlow(true);

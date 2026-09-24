@@ -57,6 +57,8 @@ public:
 
     /// There is a file manager to show files in (not on Android).
     static bool canShowInFileManager();
+    /// There is a trash (QFile::moveToTrash; not on Android, where the app deletes after asking).
+    static bool canTrash();
     /// share() works here (not on Android yet).
     static bool canShare();
 
