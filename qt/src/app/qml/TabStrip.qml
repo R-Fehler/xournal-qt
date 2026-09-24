@@ -134,6 +134,7 @@ Rectangle {
                 required property int index
                 required property string title
                 required property bool modified
+                required property bool saving
                 required property bool current
                 readonly property bool shown: current && !app.homeVisible
                 width: Math.min(260, Math.max(140, titleLabel.implicitWidth + 70))
@@ -213,7 +214,8 @@ Rectangle {
                         Layout.fillWidth: true
                         Layout.leftMargin: 12
                         Layout.topMargin: 4
-                        text: (tab.modified ? "● " : "") + tab.title
+                        // (the dot stays until the file is written)
+                        text: (tab.modified ? "● " : "") + tab.title + (tab.saving ? " — " + qsTr("saving…") : "")
                         elide: Text.ElideMiddle
                         color: tab.shown ? "#202124" : "#5f6368"
                         font.weight: tab.shown ? Font.DemiBold : Font.Normal

@@ -4,7 +4,10 @@
  * @license GNU GPLv2 or later
  */
 #include <filesystem>
+#include <atomic>
+#include <chrono>
 #include <functional>
+#include <future>
 #include <memory>
 
 #include <QCoreApplication>
@@ -60,6 +63,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
+#include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
 #include "shell/LibraryModel.h"
@@ -3673,6 +3677,7 @@ TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     // Ctrl+S: the hybrid PDF again, with the new stroke
     drawStroke(*s, 2);
     key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);  // (saved in the background)
     EXPECT_FALSE(controller->modified());
     auto reopened = xqt::DocumentSession::loadFile(fs::path(dir.filePath("lecture.notes.pdf").toStdString()));
     ASSERT_TRUE(reopened.document);
@@ -3685,6 +3690,7 @@ TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     settings->set("hybridExportXopp", true);
     drawStroke(*s, 0);
     key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);
     settings->set("hybridExportXopp", false);
     const fs::path xopp = dir.filePath("lecture.notes.xopp").toStdString();
     ASSERT_TRUE(fs::exists(xopp));
@@ -3733,6 +3739,7 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     EXPECT_TRUE(controller->savesWithoutDialog());
     EXPECT_EQ(controller->suggestedHybridFile().toLocalFile(), pdf);
     key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);  // (saved in the background)
     settings->set("hybridIntoPdf", false);
     EXPECT_FALSE(controller->modified());
     EXPECT_TRUE(controller->isHybrid());
@@ -3779,4 +3786,104 @@ TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
     EXPECT_TRUE(controller->modified());
     controller->undo();
     EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u);
+}
+
+namespace {
+/// Holds a save on its worker just before it writes the .xopp (PdfPageKeeper::stopSaveAt, step 1) until released.
+struct HeldSave {
+    HeldSave() {
+        xqt::PdfPageKeeper::stopSaveAt = [this](int step) {
+            if (step == 1) {
+                ++entered;
+                released.wait_for(std::chrono::seconds(10));
+            }
+            return false;
+        };
+    }
+    ~HeldSave() {
+        release();
+        xqt::PdfPageKeeper::stopSaveAt = nullptr;
+    }
+    void release() {
+        if (!done.exchange(true)) {
+            promise.set_value();
+        }
+    }
+    std::atomic<int> entered{0};
+    std::atomic<bool> done{false};
+    std::promise<void> promise;
+    std::shared_future<void> released = promise.get_future().share();
+};
+
+size_t strokesIn(const QString& file) {
+    auto loaded = xqt::DocumentSession::loadFile(file.toStdString());
+    return loaded.document ? strokesOn(*loaded.document, 0) : 0;
+}
+}  // namespace
+
+// Ctrl+S saves in the background: the window says "saving…" and keeps the modified dot until the file is written,
+// and it stays usable meanwhile (a page added then is not in the file, and the document stays modified).
+TEST_F(MainWindowTest, ctrlSSavesInTheBackground) {
+    QTemporaryDir dir;
+    const QString file = dir.filePath("notes.xopp");
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(file)));
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    HeldSave held;
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return held.entered == 1; }, 5000);
+    ASSERT_EQ(held.entered, 1);
+    EXPECT_TRUE(controller->saving());
+    EXPECT_TRUE(controller->modified()) << "the dot stays until the file is written";
+    EXPECT_TRUE(window->title().contains(QString::fromUtf8("saving…"))) << window->title().toStdString();
+    EXPECT_TRUE(tabs->index(0, 0).data(xqt::TabManager::SavingRole).toBool());
+    const int pages = controller->pageCount();
+    key(Qt::Key_N, Qt::ControlModifier);  // the window goes on
+    EXPECT_EQ(controller->pageCount(), pages + 1);
+    held.release();
+    until([&] { return !controller->saving(); }, 10000);
+    EXPECT_FALSE(controller->saving());
+    EXPECT_FALSE(window->title().contains(QString::fromUtf8("saving…")));
+    EXPECT_TRUE(controller->modified()) << "the page added meanwhile is not saved";
+    EXPECT_EQ(strokesIn(file), 1u);
+    EXPECT_EQ(xqt::DocumentSession::loadFile(file.toStdString()).document->getPageCount(), static_cast<size_t>(pages));
+}
+
+// Closing a tab or the window while a document is saved: they wait for the save (the window stays usable), then
+// close; the file is complete.
+TEST_F(MainWindowTest, closingWaitsForARunningSave) {
+    QTemporaryDir dir;
+    const QString first = dir.filePath("first.xopp"), second = dir.filePath("second.xopp");
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(first)));
+    controller->newDocument();
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(second)));
+    ASSERT_EQ(controller->tabCount(), 2);
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    {
+        HeldSave held;
+        key(Qt::Key_S, Qt::ControlModifier);
+        until([&] { return held.entered == 1; }, 5000);
+        ASSERT_EQ(held.entered, 1);
+        QMetaObject::invokeMethod(window, "requestCloseTab", Q_ARG(QVariant, 1));
+        wait(200);
+        EXPECT_EQ(controller->tabCount(), 2) << "the tab waits for its save";
+        EXPECT_FALSE(find("unsavedDialog")->property("visible").toBool()) << "nothing to ask: it is being saved";
+        held.release();
+        until([&] { return controller->tabCount() == 1; }, 10000);
+        EXPECT_EQ(controller->tabCount(), 1);
+        EXPECT_EQ(strokesIn(second), 1u);
+    }
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    HeldSave held;
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return held.entered == 1; }, 5000);
+    ASSERT_EQ(held.entered, 1);
+    QMetaObject::invokeMethod(window, "closeWindow");
+    wait(200);
+    EXPECT_TRUE(window->isVisible()) << "the window waits for the save";
+    EXPECT_FALSE(find("unsavedDialog")->property("visible").toBool());
+    held.release();
+    until([&] { return !window->isVisible(); }, 10000);
+    EXPECT_FALSE(window->isVisible()) << "closed once it was written";
+    EXPECT_EQ(strokesIn(first), 1u);
 }

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <QColor>
+#include <QJSValue>
 #include <QMetaObject>
 #include <QObject>
 #include <QRectF>
@@ -84,6 +85,10 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* view READ view NOTIFY documentChanged)
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
+    /// The current document is being saved (in the background; it stays modified until the file is written).
+    Q_PROPERTY(bool saving READ saving NOTIFY savingChanged)
+    /// A document of this window is being saved.
+    Q_PROPERTY(bool anySaving READ anySaving NOTIFY anySavingChanged)
     Q_PROPERTY(bool hasFilePath READ hasFilePath NOTIFY titleChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
@@ -186,6 +191,8 @@ public:
     QObject* view() const;
     QString title() const;
     bool modified() const;
+    bool saving() const;
+    bool anySaving() const;
     bool hasFilePath() const;
     bool canUndo() const;
     bool canRedo() const;
@@ -382,8 +389,22 @@ public:
     Q_INVOKABLE QString tabTitle(int index) const;
     /// Indices of tabs with unsaved changes.
     Q_INVOKABLE QVariantList modifiedTabs() const;
+    /// The tab's document is being saved.
+    Q_INVOKABLE bool tabSaving(int index) const;
+    /// Call `then(index)` once the tab's document is saved (at once if it is not being saved): with the index it has
+    /// then. Not called if the tab was closed meanwhile.
+    Q_INVOKABLE void whenSaved(int index, const QJSValue& then);
+    /// Call `then()` once no document of this window is being saved (at once if none is).
+    Q_INVOKABLE void whenAllSaved(const QJSValue& then);
 
     // --- current document ---
+    /// Save the current document in the background (the window stays usable; errors come as message()). `then()`
+    /// is called after it was written, with its tab current again. False if it could not start.
+    Q_INVOKABLE bool saveInBackground(const QJSValue& then = QJSValue());
+    Q_INVOKABLE bool saveAsInBackground(const QUrl& url, const QJSValue& then = QJSValue());
+    Q_INVOKABLE bool saveAsHybridInBackground(const QUrl& url, const QJSValue& then = QJSValue());
+    Q_INVOKABLE void exportXoppInBackground(const QUrl& url);
+    /// The same, waiting until the file is written (tests): whether that worked.
     Q_INVOKABLE bool save();
     Q_INVOKABLE bool saveAs(const QUrl& url);
     // Hybrid PDF (qt/docs/hybrid-pdf.md)
@@ -555,6 +576,8 @@ Q_SIGNALS:
     void homeVisibleChanged();
     void titleChanged();
     void modifiedChanged();
+    void savingChanged();
+    void anySavingChanged();
     void undoRedoChanged();
     void toolChanged();
     void zoomChanged();
@@ -603,8 +626,16 @@ Q_SIGNALS:
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
-    /// After the document was saved as a hybrid PDF: the .xopp for Xournal++ (setting), the library.
-    void afterHybridSave();
+    enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };
+    /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
+    bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then);
+    /// Wait for the current document's saves; false if the last one failed.
+    bool waitForSave();
+    /// `then` from QML, after a save: with the saved document's tab current (from the event loop).
+    std::function<void(bool)> callWhenSaved(const QJSValue& then);
+    /// After a hybrid PDF was saved: its clean copy in the background, the library.
+    void afterHybridSave(xqt::DocumentSession& s);
+    std::vector<QJSValue> whenAllSavedCalls;
     /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
     void applyMarkdownText();
     /// Editing beside the page: the page's text, or the text box at a point.
