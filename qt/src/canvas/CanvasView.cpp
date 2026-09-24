@@ -1669,6 +1669,21 @@ void CanvasView::setShown(bool value) {
     }
 }
 
+void CanvasView::pageRendered(const CanvasPage* page) {
+    const auto [from, to] = window;
+    if (from > to) {
+        return;  // (no plan yet)
+    }
+    const auto index = indexOf(page);
+    if (!index || (*index >= from && *index <= to)) {
+        return;
+    }
+    if (const auto [first, last] = visiblePages(); *index >= first && *index <= last) {
+        return;  // (in view: the next plan counts it)
+    }
+    CanvasMemory::instance().replan();
+}
+
 qint64 CanvasView::bufferBytes() const {
     qint64 sum = 0;
     for (const auto& p: pages) {

@@ -52,9 +52,16 @@ qint64 pageBytes(CanvasView* view) {
     return static_cast<qint64>(std::ceil(s.width())) * static_cast<qint64>(std::ceil(s.height())) * 4;
 }
 
+/// Until nothing is rendered and no plan waits (a render that landed after a plan asks for another one)
 void settle(AppController& c) {
-    c.context().getRenderService()->waitForIdle();
-    processEvents(20);
+    for (int round = 0; round < 10; ++round) {
+        c.context().getRenderService()->waitForIdle();
+        processEvents(20);
+        if (!CanvasMemory::instance().planPending()) {
+            return;
+        }
+        CanvasMemory::instance().planNow();
+    }
 }
 
 bool rendered(CanvasView* view, size_t page) { return view->getPage(page)->bufferInfo().valid; }
@@ -91,6 +98,28 @@ TEST_F(CanvasMemoryTest, theCurrentDocumentRendersAheadMoreThanBehind) {
     }
     EXPECT_LE(CanvasMemory::instance().bytes(), pageBytes(view) * 12);
     EXPECT_FALSE(c.context().getRenderService()->hasWork(RenderService::Priority::Preload));
+}
+
+// A render asked for before a plan (the pages first in view when a document opens at another page) may land after
+// that plan left its page out: the page must not stay rendered beyond the limit until the reader scrolls again.
+TEST_F(CanvasMemoryTest, aPageRenderedAfterThePlanLeftItOutIsGivenUpAgain) {
+    AppController c;
+    CanvasView* view = openPages(c, 20);
+    view->setShown(true);
+    CanvasMemory::instance().setLimit(pageBytes(view) * 12);
+    CanvasMemory::instance().planNow();
+    settle(c);
+    ASSERT_GT(view->cacheWindow().first, 1u);
+    // (the render the first view of the document asked for, landing late)
+    view->getPage(0)->getRaster().ensureRendered(false);
+    c.context().getRenderService()->waitForIdle();
+    processEvents(20);
+    settle(c);
+    EXPECT_FALSE(rendered(view, 0)) << "outside the window of the plan";
+    for (size_t i = 0; i < view->pageCount(); ++i) {
+        const auto [first, last] = view->cacheWindow();
+        EXPECT_EQ(rendered(view, i), i >= first && i <= last) << "page " << i + 1;
+    }
 }
 
 TEST_F(CanvasMemoryTest, atTheStartTheRestGoesToThePagesAfter) {

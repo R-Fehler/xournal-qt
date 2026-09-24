@@ -55,11 +55,16 @@ public:
     void remove(CanvasView* view);
     /// The reader uses this view (scrolled, zoomed, switched to it): it becomes the current one; a plan follows.
     void used(CanvasView* view);
+    /// Something changed what a view holds outside its plan (a render landed late): plan again shortly, without
+    /// making it the current view.
+    void replan() { planTimer.start(); }
     /// Plan right away (tests)
     void planNow();
     /// Rendered pages of all views (bytes)
     qint64 bytes() const;
     void setPlanDelay(int ms) { planTimer.setInterval(ms); }
+    /// A plan is waiting for the reader to pause (tests)
+    bool planPending() const { return planTimer.isActive(); }
 
 Q_SIGNALS:
     void limitChanged();
