@@ -40,6 +40,9 @@
 #include "shell/Thumbnails.h"
 #include "DocumentCanvasItem.h"
 #include "session/AppContext.h"
+#ifdef Q_OS_ANDROID
+#include "AndroidSetup.h"
+#endif
 
 Q_IMPORT_QML_PLUGIN(XournalQtPlugin)
 
@@ -53,6 +56,10 @@ int main(int argc, char* argv[]) {
     // A QApplication (not only QGuiApplication): the platform theme (e.g. KDE Plasma) then provides its native,
     // resizable file dialogs for QtQuick.Dialogs instead of Qt's built-in QML fallback.
     QApplication qapp(argc, argv);
+#ifdef Q_OS_ANDROID
+    // Folders, resources and fonts for the core (GLib, fontconfig), before anything reads them.
+    xqt::android::prepareEnvironment();
+#endif
     // The program icon (the desktop file gives it to the window when installed; this covers the build tree)
     QGuiApplication::setWindowIcon(QIcon::fromTheme(
             "xournal-qt", QIcon(QString::fromStdString((xqt::AppContext::defaultResourceDir() / "icons" / "xournal-qt.svg").string()))));
@@ -94,8 +101,13 @@ int main(int argc, char* argv[]) {
     xqt::SingleInstance instance(library && !library->isDefault()
                                          ? QString("xournal-qt-%1-%2").arg(getuid()).arg(QString::fromStdString(library->key()))
                                          : QString());
+    // Android starts one activity of the app anyway (launchMode singleTop).
+#ifdef Q_OS_ANDROID
+    const bool independent = true;
+#else
     const bool independent = qEnvironmentVariableIsSet("XQT_NO_SINGLE_INSTANCE") ||
                              qEnvironmentVariableIsSet("XQT_SCREENSHOT") || offscreen;
+#endif
     if (!independent) {
         if (instance.sendToRunningInstance(files)) {
             return 0;
@@ -115,7 +127,11 @@ int main(int argc, char* argv[]) {
             controller.openPath(f);
         }
     } else {
+#ifndef Q_OS_ANDROID
+        // Not on Android yet: the handlers replace the system's, and a crash would then leave no backtrace in
+        // logcat (see qt/docs/android-roadmap.md).
         xqt::SessionRecovery::installCrashHandlers();
+#endif
         controller.startSession(files);
     }
     QObject::connect(&instance, &xqt::SingleInstance::filesRequested, &controller, &AppController::openPaths);

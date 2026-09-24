@@ -1,0 +1,17 @@
+{
+  "$comment": "C dependencies of xournal-qt for builds through vcpkg (Android). The desktop build does not use this file. See docs/android.md.",
+  "name": "xournal-qt",
+  "version-string": "0.1.0",
+  "builtin-baseline": "dc1232a6e05dcc49703091e83743e3b4df9b9b7c",
+  "dependencies": [
+    "zlib",
+    { "name": "glib", "default-features": false },
+    { "name": "cairo", "default-features": false, "features": ["fontconfig", "freetype"] },
+    "pango",
+    { "name": "poppler", "default-features": false, "features": ["glib", "cairo", "zlib"] },
+    { "name": "gdk-pixbuf", "default-features": false, "features": ["png", "jpeg"] },
+    "libxml2",
+    { "name": "libzip", "default-features": false },
+    { "name": "qpdf", "default-features": false }
+  ]
+}

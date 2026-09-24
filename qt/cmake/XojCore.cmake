@@ -5,20 +5,7 @@
 
 include(${CMAKE_CURRENT_LIST_DIR}/XojSources.cmake)
 
-find_package(ZLIB REQUIRED)
-find_package(Threads REQUIRED)
-pkg_check_modules(XOJ_DEPS REQUIRED IMPORTED_TARGET
-    "glib-2.0 >= 2.32.0" gio-2.0 gthread-2.0 cairo cairo-pdf cairo-svg pangocairo
-    "poppler-glib >= 0.41.0" gdk-pixbuf-2.0 "libxml-2.0 >= 2.0.0" "libzip >= 1.0.1")
-
-find_package(qpdf QUIET)
-if(NOT qpdf_FOUND)
-    pkg_search_module(qpdf REQUIRED "libqpdf >= 10.6.0")
-    add_library(xoj_qpdf INTERFACE)
-    target_link_libraries(xoj_qpdf INTERFACE ${qpdf_LIBRARIES})
-    target_include_directories(xoj_qpdf INTERFACE ${qpdf_INCLUDE_DIRS})
-    add_library(qpdf::libqpdf ALIAS xoj_qpdf)
-endif()
+include(${CMAKE_CURRENT_LIST_DIR}/XojDeps.cmake)
 
 # --- generated config headers (same templates as upstream) ---------------------------------------------------------
 set(XOJ_CONFIG_DIR "${CMAKE_BINARY_DIR}/xoj-config")
@@ -33,7 +20,22 @@ set(DEV_PRINT_CONFIG_FILE "print-config.ini")
 set(DEV_METADATA_FILE "metadata.ini")
 set(DEV_ERRORLOG_DIR "errorlogs")
 set(ENABLE_QPDF ON)
-set(ENABLE_FLOAT_FROM_CHARS ON)
+# Floating point std::from_chars (fast .xopp parsing) where the C++ library has it: not in the NDK's libc++, where
+# upstream falls back to g_ascii_strtod (the same check as upstream's CMakeLists.txt).
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles([[
+    #include <charconv>
+    int main() {
+        const char s[] = "7.38";
+        double v{};
+        return std::from_chars(s, s + 4, v).ec != std::errc{};
+    }
+]] XQT_HAVE_FLOAT_FROM_CHARS)
+if(XQT_HAVE_FLOAT_FROM_CHARS)
+    set(ENABLE_FLOAT_FROM_CHARS ON)
+else()
+    set(ENABLE_FLOAT_FROM_CHARS OFF)
+endif()
 set(ENABLE_AUDIO OFF)
 set(ENABLE_PLUGINS OFF)
 set(ENABLE_X11 OFF)
@@ -65,7 +67,7 @@ target_compile_definitions(xoj-defaults INTERFACE
     GLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_40)
 target_compile_options(xoj-defaults INTERFACE -Wall -Wreturn-type -Wuninitialized -Wunused-value -Wunused-variable)
 target_compile_features(xoj-defaults INTERFACE cxx_std_20)
-target_link_libraries(xoj-defaults INTERFACE PkgConfig::XOJ_DEPS qpdf::libqpdf ZLIB::ZLIB Threads::Threads)
+target_link_libraries(xoj-defaults INTERFACE xoj::deps)
 
 add_library(xoj-util STATIC
     ${XOJ_UTIL_SOURCES}
@@ -92,6 +94,13 @@ set_target_properties(xoj-render PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 # The core is Qt-free: no moc/uic/rcc scanning.
 set_target_properties(xoj-util xoj-core PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 
+enable_testing()
+
+# Desktop only (not on Android): the headless CLI, the image diff tool and the golden tests that use both.
+if(NOT XQT_BUILD_CLI)
+    return()
+endif()
+
 # Headless CLI (mirrors upstream's export options; used by the golden tests)
 add_executable(xournal-qt-cli "${CMAKE_CURRENT_LIST_DIR}/../cli/main.cpp")
 target_link_libraries(xournal-qt-cli PRIVATE xoj-core)
@@ -100,10 +109,9 @@ set_target_properties(xournal-qt-cli PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC 
 
 # Developer tools and tests
 add_executable(xoj-imgdiff "${CMAKE_CURRENT_LIST_DIR}/../tools/imgdiff.cpp")
-target_link_libraries(xoj-imgdiff PRIVATE PkgConfig::XOJ_DEPS)
+target_link_libraries(xoj-imgdiff PRIVATE xoj::deps)
 set_target_properties(xoj-imgdiff PROPERTIES AUTOMOC OFF RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
-enable_testing()
 set(XQT_GOLDEN_ENV "QT_CLI=$<TARGET_FILE:xournal-qt-cli>;IMGDIFF=$<TARGET_FILE:xoj-imgdiff>")
 # Routine run (part of plain `ctest`): a few representative fixtures at 72 dpi, a few seconds.
 add_test(NAME golden-quick
