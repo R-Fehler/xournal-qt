@@ -72,6 +72,7 @@ MarkdownEditor::MarkdownEditor(CanvasView& view, DocumentSession& session, size_
     } else {
         md.beginBox(pageNo, style, x, y);
     }
+    plain = md.boxStyle().plain || (md.text().empty() && style.plain);
     parts = md.parts();
     PageRef tapped;
     {
@@ -443,8 +444,11 @@ void MarkdownEditor::edit(size_t from, size_t to, const std::string& with, EditK
     to = std::clamp(to, from, text.size());
     // Undo in the text being written: typing goes together (up to a space or a line)
     const bool typing = kind == EditKind::Typing && from == to && with.find_first_of(" \n") == std::string::npos;
-    if (!(typing && lastWasTyping)) {
-        undoStack.push_back({text, caret});
+    if (typing && lastWasTyping && !undoStack.empty() && undoStack.back().removed.empty() &&
+        undoStack.back().at + undoStack.back().inserted.size() == from) {
+        undoStack.back().inserted += with;
+    } else {
+        undoStack.push_back({from, text.substr(from, to - from), with, caret});
     }
     lastWasTyping = typing;
     redoStack.clear();
@@ -479,13 +483,25 @@ void MarkdownEditor::undoEdit(bool redo) {
     if (from.empty()) {
         return;
     }
-    to.push_back({md.text(), caret});
-    const Snapshot s = std::move(from.back());
+    Change c = std::move(from.back());
     from.pop_back();
-    caret = anchor = std::min(s.caret, s.text.size());
+    std::string text = md.text();
+    if (redo) {
+        text.replace(std::min(c.at, text.size()), c.removed.size(), c.inserted);
+        caret = anchor = std::min(c.at + c.inserted.size(), text.size());
+    } else {
+        text.replace(std::min(c.at, text.size()), c.inserted.size(), c.removed);
+        caret = anchor = std::min(c.caretBefore, text.size());
+    }
+    to.push_back(std::move(c));
     lastWasTyping = false;
-    md.update(s.text);
+    md.update(text);
     changed(false);
+}
+
+void MarkdownEditor::setCursorPosition(size_t offset) {
+    preedit.clear();
+    moveCursor(offset, false);
 }
 
 void MarkdownEditor::setFontSize(double size) {
@@ -511,6 +527,19 @@ bool MarkdownEditor::tap(CanvasPage& onPage, double x, double y) {
         if (r.contains(x, y)) {
             preedit.clear();
             caret = anchor = hit(i, x, y);
+            lastWasTyping = false;
+            changed(false);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool MarkdownEditor::tapAnywhere(CanvasPage& onPage, double x, double y) {
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (view.canvasPageOf(parts[i].page.get()) == &onPage) {
+            preedit.clear();
+            caret = anchor = parts[i].box ? hit(i, x, y) : parts[i].part.begin;
             lastWasTyping = false;
             changed(false);
             return true;
@@ -626,6 +655,12 @@ void MarkdownEditor::newLine(bool soft) {
     const size_t from = std::min(caret, anchor);
     const size_t ls = lineStart(t, from);
     const std::string line = t.substr(ls, from - ls);
+    if (plain) {
+        // Plain text: a line, indented as this one (as Ghostwriter and most editors do)
+        const size_t indent = line.find_first_not_of(" \t");
+        insert("\n" + line.substr(0, indent == std::string::npos ? line.size() : indent), EditKind::Other);
+        return;
+    }
     // In a code block: a line, indented as this one
     const md::Document doc = md::parse(t);
     const auto spans = md::topLevelSpans(t, doc);
@@ -679,6 +714,25 @@ void MarkdownEditor::newLine(bool soft) {
     }
 }
 
+size_t MarkdownEditor::emptyItemMark() const {
+    using namespace md::text;
+    if (plain) {
+        return std::string::npos;
+    }
+    const std::string& t = md.text();
+    const size_t ls = lineStart(t, caret);
+    if (caret != ls + lineAt(t, ls).size()) {
+        return std::string::npos;  // (only with the cursor at the end of the line)
+    }
+    const std::string line = t.substr(ls, caret - ls);
+    std::smatch m;
+    if (!std::regex_search(line, m, linePrefix()) || !m[2].matched || m[2].str()[0] == '#' ||
+        static_cast<size_t>(m[0].length()) != line.size()) {
+        return std::string::npos;
+    }
+    return ls + static_cast<size_t>(m[1].length());
+}
+
 void MarkdownEditor::wrap(const std::string& before, const std::string& after) {
     const size_t from = std::min(caret, anchor);
     const size_t to = std::max(caret, anchor);
@@ -711,6 +765,23 @@ void MarkdownEditor::indent(bool in) {
     const std::string& t = md.text();
     const size_t ls = lineStart(t, caret);
     const size_t at = caret;
+    if (plain) {
+        if (in) {
+            insert("\t", EditKind::Other);  // (plain text: a tab where the cursor is)
+        } else if (ls < t.size() && t[ls] == '\t') {
+            edit(ls, ls + 1, "");
+            moveCursor(at > ls ? at - 1 : ls, false);
+        } else {
+            const size_t spaces = std::min<size_t>(4, lineAt(t, ls).find_first_not_of(' ') == std::string_view::npos
+                                                                  ? lineAt(t, ls).size()
+                                                                  : lineAt(t, ls).find_first_not_of(' '));
+            if (spaces > 0) {
+                edit(ls, ls + spaces, "");
+                moveCursor(at >= ls + spaces ? at - spaces : ls, false);
+            }
+        }
+        return;
+    }
     if (in) {
         edit(ls, ls, "  ");
         moveCursor(at + 2, false);
@@ -743,6 +814,7 @@ bool MarkdownEditor::wantsKeyEvent(const QKeyEvent* e) const {
             case Qt::Key_1:
             case Qt::Key_2:
             case Qt::Key_3:
+                return !plain;
             case Qt::Key_Left:
             case Qt::Key_Right:
             case Qt::Key_Home:
@@ -798,6 +870,8 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
         case Qt::Key_Backspace:
             if (hasSelection()) {
                 removeSelection();
+            } else if (const size_t mark = emptyItemMark(); mark != std::string::npos) {
+                edit(mark, caret, "");  // an empty list item or quote line: its mark goes at once (as in Ghostwriter)
             } else if (caret > 0) {
                 edit(ctrl ? wordBoundary(caret, false) : prevChar(caret), caret, "");
             }
@@ -840,15 +914,34 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                     }
                 }
                 return true;
-            case Qt::Key_V:
-                insert(QGuiApplication::clipboard()->text().toStdString(), EditKind::Other);
+            case Qt::Key_V: {
+                std::string pasted = QGuiApplication::clipboard()->text().toStdString();
+                pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());  // (the text's lines end in "\n")
+                insert(pasted, EditKind::Other);
                 return true;
+            }
             case Qt::Key_Z:
                 undoEdit(shift);
                 return true;
             case Qt::Key_Y:
                 undoEdit(true);
                 return true;
+            case Qt::Key_B:
+            case Qt::Key_I:
+            case Qt::Key_E:
+            case Qt::Key_K:
+            case Qt::Key_0:
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+                if (plain) {
+                    return false;  // (plain text: no Markdown marks)
+                }
+                break;
+            default:
+                break;
+        }
+        switch (e->key()) {
             case Qt::Key_B:
                 wrap("**", "**");
                 return true;

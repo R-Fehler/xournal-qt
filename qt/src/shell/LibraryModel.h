@@ -234,6 +234,9 @@ public:
     Q_INVOKABLE QVariantList folderList() const;
     /// A free path for a new document "<name>.xopp" in the current folder.
     Q_INVOKABLE QString newDocumentPath(const QString& name) const;
+    /// A free path for a new text file in the current folder: "name.md" / "name.txt" (`extension` with its dot),
+    /// "name (2).md", ... ("Untitled" for an empty or invalid name). Empty without a library.
+    Q_INVOKABLE QString newTextFilePath(const QString& name, const QString& extension) const;
     /// The row shows this file (tests, QML)
     Q_INVOKABLE int rowOf(const QString& path) const;
     /// Whether a URL points into the library (drops from the grid itself move instead of copy).

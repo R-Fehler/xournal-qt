@@ -1,13 +1,12 @@
 /*
- * xournal-qt: a Markdown file (.md) shown as a document, read-only for now (the .md editor comes later and replaces
- * this).
- *
- * A text or code file is shown the same way, as one fenced code block (monospaced, highlighted by its extension).
+ * xournal-qt: a Markdown file (.md) or a text file as a document (qt/docs/md-editor.md).
  *
  * The file's text is the page's Markdown text of a new document of plain A4 pages: it flows over the pages as a
  * Markdown text written on a page does (MdPaginate.h, MarkdownSession.h), each page holding its part in a box at the
- * page margins. The document is never written back to the file. The library's preview of a .md is the first page of
- * this document.
+ * page margins. Edited, the text is written back to the file (DocumentSession::setTextFile, TextFile.h), never as a
+ * .xopp. The library's preview of a .md is the first page of this document.
+ *
+ * A text or code file shown read-only is one fenced code block (monospaced, highlighted by its extension).
  *
  * @license GNU GPLv2 or later
  */
@@ -24,6 +23,11 @@
 
 class Document;
 
+namespace xqt {
+class DocumentSession;
+class TextFile;
+}  // namespace xqt
+
 namespace xqt::MarkdownFile {
 
 /// At most this much of a file is read (a longer one: its start, cut at the end of a line).
@@ -31,6 +35,8 @@ constexpr size_t MAX_BYTES = 2 * 1024 * 1024;
 /// Plain A4 pages (points)
 constexpr double PAGE_WIDTH = 595.276;
 constexpr double PAGE_HEIGHT = 841.89;
+/// How high the text may go on a continuous page (DocumentSession::isTextContinuous): as high as it is.
+constexpr double CONTINUOUS_FRAME = 1e9;
 
 /// The text of a Markdown file (UTF-8, without a byte order mark): at most `maxBytes` of it, cut at the end of a
 /// line. Empty if it cannot be read. `cut`: whether the file is longer.
@@ -45,9 +51,28 @@ std::string plainText(const std::string& text, const std::string& language);
 
 /// How the text of a Markdown file is drawn.
 md::Style style();
+/// How the text of this file is drawn while it is edited: a Markdown file as style(); a plain text file as it is,
+/// monospaced (plainStyle()).
+md::Style style(const TextFile& file);
+md::Style plainStyle();
 
-/// A new document showing `source` on plain A4 pages (at most `maxPages`; the rest is left out). Any thread.
+/// The document that edits a text file: its text on plain A4 pages, or on one continuous page as high as the text
+/// (at least A4).
+std::unique_ptr<Document> textDocument(const TextFile& file, bool continuous = false);
+/// The height of a continuous page for a text as high as `textHeight`.
+double continuousHeight(double textHeight);
+/// Switch a text file's document between pages and one continuous page: its pages are made anew from the text
+/// (the text written on the canvas ends first; the undo history starts anew, the text stays as it is).
+void relayout(DocumentSession& session, bool continuous);
+/// The pages of a text file's document get this text (one undo step, as an edit): e.g. the file as it is on disk
+/// now. Text written on the canvas ends first.
+void setText(DocumentSession& session, const std::string& text);
+
+/// A new document showing `source` on plain A4 pages (at most `maxPages`; the rest is left out), drawn in `style`
+/// (a plain text: style.plain). Any thread.
 std::unique_ptr<Document> document(const std::string& source, size_t maxPages = static_cast<size_t>(-1));
+std::unique_ptr<Document> document(const std::string& source, const md::Style& style,
+                                   size_t maxPages = static_cast<size_t>(-1));
 
 /// Where the part of the text on each page of a document made by document() begins (bytes of the text), from its
 /// pages as they are now.

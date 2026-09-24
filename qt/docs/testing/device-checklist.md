@@ -915,3 +915,48 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] The tab's context menu → Share…: that tab comes to the front with the Share choices. A PDF card in the library
       (or Recent) → Share…: the PDF itself (shown / copied), and "For Xournal++" exports without opening a tab. A
       notes card (or a PDF with its `.xopp`) → Share…: it opens, then the Share choices for it.
+
+## Markdown and text editor (qt/md-editor)
+- [ ] Open a `.md` from the library: no read-only note, no ink tools in the tool bar. Tap (pen, mouse or finger)
+      anywhere on a page: the cursor is there, the block under it shows its Markdown, the others stay formatted.
+      Type, press Enter in a list (the next item), Backspace right after an empty `- ` (the mark goes at once).
+      A drag with the pen or the mouse selects; a finger drag scrolls.
+- [ ] Type on page 3 of a long file until a page is added; delete until it goes again. Undo (Ctrl+Z and the undo
+      button) goes back word by word, not the whole edit at once.
+- [ ] The tab shows the unsaved dot; typing back to the saved text removes it. Ctrl+S: no dialog, the dot goes, the
+      library card shows the new text. Open the file in another editor: only what you typed changed (a Windows
+      file keeps `\r\n`, a file without a newline at its end stays so; `git diff` shows only your lines).
+- [ ] Close the tab with unsaved changes: the usual question; "Save" writes the `.md`, no `.xopp` appears.
+- [ ] Change the open file in another editor and save there, with no changes in the app: the tab shows the new
+      text within a second (a note says so), the cursor stays. With changes in the app: a dialog "Changed in
+      another app": Reload shows the other version (Undo brings yours back), Keep mine keeps yours (saving writes
+      over it).
+- [ ] Kill the app (`kill -9`) with an unsaved `.md`: at the next start the recovery offers it by its name;
+      recovered, the tab is the `.md` with your text, modified; the file on disk is unchanged until you save.
+- [ ] A `.md` that is not UTF-8 (e.g. Latin-1) or read-only on disk opens read-only with a note saying why.
+- [ ] Open a `.txt` (the library's "Show" → Text and code, or Open): monospaced lines as they are, `**` and `#`
+      shown as typed, no highlighting. Type, Enter (the new line keeps the indentation), Tab (a tab), Ctrl+B does
+      nothing. A long `.txt` flows over pages; Ctrl+S writes it back (line ends as they were).
+- [ ] Open a `.py` or `.tex` (Show → Text and code): read-only with highlighting, the note has "Edit anyway" (and ⋮
+      too). Tap it: a warning that the app does not know the format; Cancel keeps it read-only, OK shows it as
+      plain text to edit, in the same tab. Close and open it again: editable at once, no warning. Another file
+      asks again.
+- [ ] "Open externally" (the arrow-out-of-a-box button in the tool bar, ⋮, and the library card menu of a `.md`,
+      `.txt`, code file or image): the file opens in its system app (e.g. Kate / a code editor). With unsaved
+      changes in a `.md`: asked "Save before opening it elsewhere?"; Save and open saves, then opens. Change and
+      save it in the other app, come back to the window: the tab shows the new text. A `.xopp` or PDF has no such
+      button or entry.
+- [ ] With a `.md` open, press and hold (or right-click) the layout button: "Text on pages" is checked. Choose "Text
+      on one continuous page": one long page, no page breaks; typing new paragraphs makes it longer. Open another
+      `.md`: continuous as well. Back to "Text on pages": A4 pages again, the text unchanged, no unsaved dot.
+      Watch typing speed in a long file on the continuous page (it lays out the whole text per key).
+- [ ] In a `.md`, "Edit as notes" (the notebook-with-pen button, or ⋮): a new tab "name.xopp" next to it with the
+      same pages; write on them with the pen, and the text tool edits the Markdown text there. Close it: asked to
+      save; Save suggests `name.xopp` next to the `.md`. The `.md` is unchanged, and the library shows two cards
+      (MD and the notes).
+- [ ] Library: the new button (file with a plus) opens a menu: New document… (as before), New Markdown file…, New
+      text file…. "New Markdown file…", type a name, Enter: `name.md` appears in the current folder, opens, and you
+      can type at once. The same name again gives "name (2).md".
+- [ ] Share… on an open `.md` (⋮ or the tab menu) and on a `.md` / `.txt` card: only "The file itself" and "Copy the
+      file" (no PDF with notes, no Xournal++ copy); with unsaved changes it saves first. ⋮ of a `.md` has no "Save
+      as…".

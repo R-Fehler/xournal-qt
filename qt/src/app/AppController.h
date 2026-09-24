@@ -17,11 +17,13 @@
 #include <QColor>
 #include <QJSValue>
 #include <QMetaObject>
+#include <QFileSystemWatcher>
 #include <QObject>
 #include <QPointer>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
@@ -99,6 +101,19 @@ class AppController: public QObject {
     /// The current document shows a file it is not (a Markdown file, read-only for now; an image to write on): what
     /// the note over the canvas says about it ("": nothing to say).
     Q_PROPERTY(QString shownFileNote READ shownFileNote NOTIFY titleChanged)
+    /// The current document is a text file (qt/docs/md-editor.md): "markdown" or "plain" ("" if not).
+    Q_PROPERTY(QString textDocument READ textDocument NOTIFY titleChanged)
+    /// ... and it is edited (not shown read-only).
+    Q_PROPERTY(bool textEditable READ textEditable NOTIFY titleChanged)
+    /// The current document is another text file (code, LaTeX, JSON, ...) shown read-only: it can be edited as plain
+    /// text after a warning (editAnyway).
+    Q_PROPERTY(bool canEditAnyway READ canEditAnyway NOTIFY titleChanged)
+    /// The current document is a file the app does not keep as a .xopp or PDF (a .md, a text file, an image to write
+    /// on): "Open externally" hands it to its app.
+    Q_PROPERTY(bool canOpenExternally READ canOpenExternally NOTIFY titleChanged)
+    /// Text files are shown on one continuous page (growing with the text) instead of A4 pages. A setting for all
+    /// text documents; switching it lays the current one out again.
+    Q_PROPERTY(bool textContinuous READ textContinuous WRITE setTextContinuous NOTIFY textLayoutChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
@@ -214,6 +229,31 @@ public:
     bool anySaving() const;
     bool hasFilePath() const;
     QString shownFileNote() const;
+    QString textDocument() const;
+    bool textEditable() const;
+    bool canEditAnyway() const;
+    /// Edit the text file shown read-only as plain text: the first time for a file the window warns first
+    /// (editAnywayWarning), and "OK" calls this again with `confirmed`. From then on the file opens for editing.
+    Q_INVOKABLE bool editAnyway(bool confirmed = false);
+    bool canOpenExternally() const;
+    bool textContinuous() const;
+    void setTextContinuous(bool on);
+    /// Hand the current document's file to the app the system has for it (SystemApps). Unsaved changes are the
+    /// window's business (it asks to save first). When the file comes back changed, the tab reads it again.
+    Q_INVOKABLE bool openExternally();
+    /// "Edit as notes": the current .md as a new document of notes, in a new tab: its text as the page's Markdown text
+    /// flowing over pages, to write on with the pen. The .md stays as it is; saving suggests "name.xopp" next to it
+    /// (the library shows the two as two documents: they go their own ways).
+    Q_INVOKABLE bool editAsNotes();
+    /// The file "Open externally" hands over for a library card's path ("" for notes and PDFs): the Markdown, text or
+    /// other file, the image a .xopp annotates.
+    Q_INVOKABLE QString externalFileOf(const QString& path) const;
+    /// Look whether the text files of the open tabs changed on disk (another program): an unmodified one is read
+    /// again, a modified one is asked about (textChangedOnDisk). Also done when the window becomes active.
+    Q_INVOKABLE void checkTextFiles();
+    /// The answer to textChangedOnDisk for the current tab: read the file again (the changes here are lost; undo
+    /// brings them back), or keep the text here (saving writes over the file).
+    Q_INVOKABLE void resolveTextChange(bool reload);
     bool canUndo() const;
     bool canRedo() const;
     QString tool() const;
@@ -339,6 +379,9 @@ public:
     /// "paperFormat", "landscape"). With a name and a library, it is saved at once in the library's current folder
     /// as "<name>.xopp"; else it is a new unsaved document.
     Q_INVOKABLE bool createDocument(const QString& name, bool inLibrary);
+    /// "New Markdown file" / "New text file": an empty "name.md" / "name.txt" (`extension`: ".md" or ".txt") in the
+    /// library's current folder, opened for writing (the cursor in it).
+    Q_INVOKABLE bool createTextFile(const QString& name, const QString& extension);
     /// Open a document found by the library search, with the search active on its first hit.
     Q_INVOKABLE bool openSearchHit(const QString& path, const QString& query);
     /// The same, at a page (0-based) with hits: its first hit is the current one.
@@ -512,6 +555,9 @@ public:
     Q_INVOKABLE bool shareForXournal(const QUrl& folder, const QString& file = QString());
     /// A file as it is (a library card's PDF): shared or copied.
     Q_INVOKABLE bool shareFile(const QString& path, bool toClipboard);
+    /// The text file Share… offers as it is: the current document's (a .md, a text file; "" if it is none), or for a
+    /// library card's path the file itself if it is a Markdown or text file. Never a PDF with notes for those.
+    Q_INVOKABLE QString sharedTextFile(const QString& path = QString()) const;
     /// Files onto the clipboard, to paste them into another app (SystemApps::copyToClipboard).
     Q_INVOKABLE bool copyToClipboard(const QStringList& files);
     /// The folder the "For Xournal++" dialog starts in: the one chosen last, else the documents folder.
@@ -730,6 +776,12 @@ Q_SIGNALS:
     void sharedForXournal(const QStringList& files, const QString& text);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
+    /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
+    /// (resolveTextChange).
+    void textChangedOnDisk(const QString& name);
+    void textLayoutChanged();
+    /// "Edit anyway" for a file not accepted before: the window warns (OK: editAnyway(true)).
+    void editAnywayWarning(const QString& name);
 
 private:
     /// The last query fuzzyName() parsed
@@ -737,6 +789,8 @@ private:
     mutable std::shared_ptr<const xqt::FuzzyQuery> fuzzyParsed;
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// The current document is a text file: its pages follow its text (no page operations, no ink, no images).
+    bool textPagesFixed() const;
     /// Presenting: the view that presents (the current one; another tab takes it over)
     bool presentingOn = false;
     QPointer<xqt::CanvasView> presentedView;
@@ -830,4 +884,16 @@ private:
     void applyPdfTextMode();
     void storeToolbarColors(const QVariantList& colors);
     std::vector<QMetaObject::Connection> currentConnections;
+
+    // --- text files (AppTextFiles.cpp) ---
+    /// Open a Markdown or text file as a text document (editable when it can be). nullptr: not such a file.
+    std::unique_ptr<xqt::DocumentSession> openTextFile(const fs::path& file, std::string& error);
+    /// Watch the files of the open text documents (changes by other programs).
+    void watchTextFiles();
+    void checkTextFile(xqt::DocumentSession* s);
+    /// The text file's new bytes are shown (the cursor stays where it was, as far as it can).
+    void reloadText(xqt::DocumentSession* s, std::string bytes);
+    std::unique_ptr<QFileSystemWatcher> textWatcher;
+    QTimer textCheckTimer;  ///< (programs write in steps: looked at a moment after the last change)
+    QPointer<xqt::DocumentSession> askingTextChange;
 };

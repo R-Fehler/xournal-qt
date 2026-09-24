@@ -504,11 +504,29 @@ Rectangle {
                 }
             }
 
+            // New: a document of notes, a Markdown file or a text file (in the current folder)
             IconButton {
                 objectName: "newDocumentButton"
                 iconName: "xqt-file-plus"
-                tip: qsTr("New document")
-                onClicked: newDocumentDialog.open()
+                tip: qsTr("New document, Markdown file or text file")
+                onClicked: Popups.openAt(newMenu)
+                Menu {
+                    id: newMenu
+                    objectName: "newMenu"
+                    MenuItem { objectName: "newDocumentItem"; text: qsTr("New document…"); onTriggered: newDocumentDialog.open() }
+                    MenuItem {
+                        objectName: "newMarkdownItem"
+                        text: qsTr("New Markdown file…")
+                        enabled: app.library.available
+                        onTriggered: { textFileDialog.extension = ".md"; textFileDialog.open() }
+                    }
+                    MenuItem {
+                        objectName: "newTextItem"
+                        text: qsTr("New text file…")
+                        enabled: app.library.available
+                        onTriggered: { textFileDialog.extension = ".txt"; textFileDialog.open() }
+                    }
+                }
             }
             IconButton {
                 objectName: "importButton"
@@ -1243,15 +1261,18 @@ Rectangle {
         }
         MenuItem {
             objectName: "openWithSystemAppItem"
-            text: qsTr("Open with the system app")
-            visible: !home.menuMany && (home.menuKind === "other" || home.menuKind === "text")
+            text: qsTr("Open externally")
+            // Markdown, text and other files, images: in the app the system has for them (not notes and PDFs)
+            readonly property string file: !home.menuMany && ["md", "image", "text", "other"].indexOf(home.menuKind) >= 0
+                                           ? app.externalFileOf(home.menuPath) : ""
+            visible: file !== ""
             height: visible ? implicitHeight : 0
-            onTriggered: app.openWithSystemApp(home.menuPath)
+            onTriggered: app.openWithSystemApp(file)
         }
         MenuItem {
             objectName: "shareCardItem"
             text: qsTr("Share…")
-            visible: !home.menuMany && !home.menuFolder && (home.menuKind === "pdf" || home.menuKind === "notes")
+            visible: !home.menuMany && !home.menuFolder && ["pdf", "notes", "md", "text"].indexOf(home.menuKind) >= 0
             height: visible ? implicitHeight : 0
             onTriggered: home.shareRequested(home.menuPath)
         }
@@ -1332,6 +1353,34 @@ Rectangle {
         }
         standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: if (folderField.text.trim() !== "") app.library.createFolder(folderField.text)
+    }
+
+    // "New Markdown file" / "New text file": its name (made in the current folder and opened to write in)
+    Dialog {
+        id: textFileDialog
+        objectName: "textFileDialog"
+        property string extension: ".md"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: extension === ".md" ? qsTr("New Markdown file") : qsTr("New text file")
+        width: Math.min(parent ? parent.width * 0.9 : 440, 440)
+        onAboutToShow: { textFileField.text = ""; textFileField.forceActiveFocus() }
+        RowLayout {
+            width: textFileDialog.availableWidth
+            TextField {
+                id: textFileField
+                objectName: "textFileName"
+                Layout.fillWidth: true
+                placeholderText: qsTr("Name (Untitled)")
+                selectByMouse: true
+                Keys.onReturnPressed: textFileDialog.accept()
+                Keys.onEnterPressed: textFileDialog.accept()
+            }
+            Label { text: textFileDialog.extension; color: "#5f6368" }
+        }
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: app.createTextFile(textFileField.text, extension)
     }
 
     // Where to copy / move documents and folders: a folder of this library or of another one.

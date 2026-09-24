@@ -28,7 +28,7 @@ A **library** is a plain folder of documents that a window works in, like a work
   pair is one card that opens the hybrid PDF (such pairs look into the PDF; lone PDFs do not). A `.xopp` changed more
   than a minute after the hybrid PDF (edited in Xournal++) is listed as a document of its own beside it.
   Its search text is its pages' text plus its text elements.
-- **Markdown files** (`.md`) are documents: a card with a preview of their start, opened read-only for now (below).
+- **Markdown files** (`.md`) are documents: a card with a preview of their start, opened for editing (below).
 - **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
   with a thumbnail. `name.xopp` next to `name.jpg` is one document, like a PDF and its `.xopp`: it opens as the `.xopp`
   (the image is the background of its page). A `.xopp` next to a PDF of its name belongs to the PDF; of several
@@ -63,13 +63,12 @@ A **library** is a plain folder of documents that a window works in, like a work
 - **Trash** moves the files (or the folder) to the desktop trash.
 
 ### Markdown files and images, opened
-- A **Markdown file** opens read-only for now (the `.md` editor comes later and replaces this): a new document of
-  plain A4 pages with the file's text as the page's Markdown text flowing over them (`qt/src/canvas/MarkdownFile.*`,
-  drawn by our Markdown renderer), titled with the file name. A note at the bottom left of the page view says it is
-  read-only (× closes it for this tab). Nothing writes on it: pen, highlighter, eraser, text and select tools
-  scroll like the hand (a tap still follows a link), Markdown editing and pasting do nothing (page operations of
-  the sidebar still work; they would be saved as a `.xopp`). The document is never written back to the `.md`. Of a
-  file over 2 MB the first 2 MB are shown (the note says so). Opening it again shows its tab.
+- A **Markdown file** opens for editing ([md-editor.md](md-editor.md)): a new document of plain A4 pages with the
+  file's text as the page's Markdown text flowing over them (`qt/src/canvas/MarkdownFile.*`, drawn by our Markdown
+  renderer), titled with the file name. It is written in on its pages, and saving writes the text back to the file
+  (never a `.xopp`). A file that is not UTF-8, is over 2 MB (then its first 2 MB are shown) or cannot be written
+  opens read-only as before: a note at the bottom left of the page view says why (× closes it for this tab), and
+  nothing writes on it. Opening it again shows its tab.
 - An **image** opens as a new document with one page that has the image as its background (upstream's image
   background), as big as the image fits into A4's long side, titled with the file name, with a note that saving
   keeps it next to the image; nothing is written until it is saved. "Save" suggests `photo.xopp` next to `photo.jpg`, and the library then shows the two as one card (above),
@@ -407,7 +406,9 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     first one, which opening the card makes current, in orange), a long passage cut to a few lines around its
     first hit. Tapping a card opens the file at that passage with the search active. The cells are taller; − / + (also Ctrl+wheel, pinch) make them smaller or bigger, in
     both views. Texts shorter than 4 characters are searched on Enter.
-  - New document: name, background, paper size, orientation. It is saved at once in the current folder.
+  - New (the file with a plus): "New document…" (name, background, paper size, orientation; it is saved at once in
+    the current folder), "New Markdown file…" and "New text file…" (an empty `name.md` / `name.txt` there, opened to
+    write in: [md-editor.md](md-editor.md)).
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders
     from the file manager. They are copied.
   - New folder
@@ -427,8 +428,8 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     the subfolder is a library with a key and settings of its own, starts with the cache in its folders and indexes
     its documents once.)
   - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder,
-    Open with the system app (text and other files), Share… (PDFs and notes, see hybrid-pdf.md), Show in file manager, Remove
-    from list, Move to trash)
+    Open externally (Markdown, text and other files, images: [md-editor.md](md-editor.md)), Share… (see
+    hybrid-pdf.md; a text file: the file itself), Show in file manager, Remove from list, Move to trash)
 - **Other files** (Office files and the rest, shown with "All other files"): a card with an icon of their type (a
   document, spreadsheet, slides, archive, audio, video or image file, by extension and MIME type; else a plain file),
   the extension as badge, the whole file name, size and date. A tap opens it with the app the system has for it

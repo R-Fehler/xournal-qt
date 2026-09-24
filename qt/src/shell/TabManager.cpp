@@ -437,7 +437,7 @@ int TabManager::indexOfFile(const fs::path& path) const {
 
 bool TabManager::isPristine(int index) const {
     const DocumentSession* s = session(index);
-    return s && !s->hasFilePath() && !s->isModified() && !s->getUndoRedoHandler()->canUndo() &&
+    return s && !s->hasFilePath() && s->shownFile().empty() && !s->isModified() && !s->getUndoRedoHandler()->canUndo() &&
            !s->getUndoRedoHandler()->canRedo() && s->getDocument()->getPdfFilepath().empty();
 }
 

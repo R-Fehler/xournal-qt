@@ -1,6 +1,7 @@
 #include "MarkdownSession.h"
 
 #include <algorithm>
+#include <cmath>
 #include <mutex>
 #include <shared_mutex>
 
@@ -20,6 +21,7 @@
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
 
+#include "MarkdownFile.h"
 #include "MdBox.h"
 #include "MdPaginate.h"
 #include "TextFlow.h"
@@ -82,11 +84,11 @@ std::string pageTextOf(const PageRef& page) {
     return box ? box->getText() : std::string();
 }
 
-/// Where the page's text goes on a page: its box (width) and how high it may go.
-md::Frame frameOf(const PageRef& page) {
+/// Where the page's text goes on a page: its box (width) and how high it may go (a continuous page: no end).
+md::Frame frameOf(const PageRef& page, bool continuous = false) {
     const TextFlow::Style m = TextFlow::styleFor(page, TextFlow::Style{});
     return {std::max(50.0, page->getWidth() - m.leftMargin - m.rightMargin),
-            std::max(50.0, page->getHeight() - 2 * TextFlow::MARGIN)};
+            continuous ? MarkdownFile::CONTINUOUS_FRAME : std::max(50.0, page->getHeight() - 2 * TextFlow::MARGIN)};
 }
 }  // namespace
 
@@ -288,12 +290,15 @@ void MarkdownSession::removePage(const PageRef& page) {
 
 double MarkdownSession::distribute(const std::string& source) {
     Document* doc = session.getDocument();
+    const bool continuous = session.textFile() && session.isTextContinuous();
     const auto frame = [&](size_t i) {
         std::shared_lock lock(*doc);
-        return frameOf(i < chain.size() ? chain[i].page : chain.back().page);  // (new pages are like the last one)
+        return frameOf(i < chain.size() ? chain[i].page : chain.back().page, continuous);  // (new pages: like the last)
     };
-    const md::Pagination pages =
-            md::paginate(source, style, frame, split.parts.empty() ? nullptr : &split, &splitText);
+    // (a continuous page: all of it, nothing to split or lay out here)
+    const md::Pagination pages = continuous ? md::onePage(source, style)
+                                            : md::paginate(source, style, frame, split.parts.empty() ? nullptr : &split,
+                                                           &splitText);
     ranges = pages.parts;
     // More pages: added after the text's last page
     while (chain.size() < pages.slices.size()) {
@@ -323,7 +328,30 @@ double MarkdownSession::distribute(const std::string& source) {
     }
     split = pages;
     splitText = source;
+    if (continuous) {
+        fitContinuousPage();
+    }
     return pages.overflow;
+}
+
+void MarkdownSession::fitContinuousPage() {
+    // A continuous page is as high as its text (at least A4): it grows and shrinks with it
+    Page& p = chain.front();
+    double height = 0;
+    {
+        std::shared_lock lock(*session.getDocument());
+        height = MarkdownFile::continuousHeight(p.box ? md::contentHeight(*p.box) : 0);
+        if (std::abs(height - p.page->getHeight()) < 1) {
+            return;
+        }
+    }
+    {
+        std::unique_lock lock(*session.getDocument());
+        p.page->setSize(p.page->getWidth(), height);
+    }
+    if (const size_t index = indexOf(p.page); index != npos) {
+        session.firePageSizeChanged(index);
+    }
 }
 
 double MarkdownSession::overflow(const Page& p) const {
@@ -342,11 +370,16 @@ double MarkdownSession::update(const std::string& source) {
     if (pageText) {
         if (source != last) {
             last = source;
-            return distribute(source);
+            const double over = distribute(source);
+            if (session.textFile()) {
+                session.textEdited();  // (a text file: modified or not, by its text)
+            }
+            return over;
         }
+        const bool continuous = session.textFile() && session.isTextContinuous();
         return md::paginate(source, style, [&](size_t i) {
                    std::shared_lock lock(*session.getDocument());
-                   return frameOf(chain[std::min(i, chain.size() - 1)].page);
+                   return frameOf(chain[std::min(i, chain.size() - 1)].page, continuous);
                }).overflow;
     }
     if (source != last) {
@@ -449,6 +482,9 @@ void MarkdownSession::cancel() {
         changedOnPage(p.page);
     }
     end();
+    if (session.textFile()) {
+        session.textEdited();
+    }
 }
 
 void MarkdownSession::end() {

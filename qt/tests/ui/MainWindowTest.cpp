@@ -913,6 +913,38 @@ TEST_F(HomeScreenTest, startsOnTheLibraryAndOpensDocuments) {
     EXPECT_EQ(controller->recentModel()->property("count").toInt(), 1);
 }
 
+TEST_F(HomeScreenTest, newMarkdownAndTextFilesAreMadeInTheFolderAndOpened) {
+    for (const char* item: {"newMarkdownItem", "newTextItem"}) {
+        click(find<QQuickItem>("newDocumentButton"));
+        QObject* menu = find("newMenu");
+        ASSERT_TRUE(waitOpened(menu, true));
+        click(findItem(item));
+        QObject* dialog = find("textFileDialog");
+        ASSERT_NE(dialog, nullptr);
+        ASSERT_TRUE(waitOpened(dialog, true));
+        type("Ideas");
+        key(Qt::Key_Return);
+        EXPECT_TRUE(waitOpened(dialog, false));
+        wait(50);
+        type("First line");
+        ASSERT_TRUE(controller->save());
+        controller->setHomeVisible(true);
+        wait(50);
+    }
+    EXPECT_EQ(controller->tabCount(), 2);
+    for (const char* name: {"Ideas.md", "Ideas.txt"}) {
+        std::ifstream in(root / name, std::ios::binary);
+        ASSERT_TRUE(in) << name;
+        EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()), "First line")
+                << name;
+    }
+    // A name that is taken: the next free one
+    EXPECT_TRUE(controller->createTextFile("Ideas", ".md"));
+    EXPECT_TRUE(fs::exists(root / "Ideas (2).md"));
+    EXPECT_EQ(controller->title(), "Ideas (2).md");
+    EXPECT_EQ(controller->textDocument(), "markdown");
+}
+
 TEST_F(HomeScreenTest, severalDocumentsAreSelectedAndMovedIntoAFolder) {
     ASSERT_EQ(gridCount(), 3);
     click(card(rowOf("lecture.pdf")), Qt::ControlModifier);
@@ -942,6 +974,10 @@ TEST_F(HomeScreenTest, severalDocumentsAreSelectedAndMovedIntoAFolder) {
 
 TEST_F(HomeScreenTest, newDocumentIsSavedInTheLibrary) {
     click(find<QQuickItem>("newDocumentButton"));
+    QObject* menu = find("newMenu");
+    ASSERT_NE(menu, nullptr);
+    ASSERT_TRUE(waitOpened(menu, true));
+    click(findItem("newDocumentItem"));
     QObject* dialog = find("newDocumentDialog");
     ASSERT_NE(dialog, nullptr);
     ASSERT_TRUE(waitOpened(dialog, true));
@@ -1495,7 +1531,7 @@ TEST_F(HomeScreenMarkdownTest, extendedSearchShowsSnippetCardsAndOpensTheFileThe
     }
     EXPECT_EQ(headings, "Lecture 3 › Kalman filter");
 
-    // The second card: the file opens at its page, with the search on its hit, and says it is read-only
+    // The second card: the file opens at its page, with the search on its hit, to be edited (no read-only note)
     QMetaObject::invokeMethod(strip, "positionViewAtIndex", Q_ARG(int, 1), Q_ARG(int, 0));  // (ListView.Beginning)
     wait(100);
     QQuickItem* second = itemAt(strip, 1);
@@ -1508,7 +1544,9 @@ TEST_F(HomeScreenMarkdownTest, extendedSearchShowsSnippetCardsAndOpensTheFileThe
     wait(50);
     auto* note = find<QQuickItem>("shownFileNote");
     ASSERT_NE(note, nullptr);
-    EXPECT_TRUE(note->isVisible());
+    EXPECT_FALSE(note->isVisible());
+    EXPECT_EQ(controller->textDocument(), "markdown");
+    EXPECT_TRUE(controller->textEditable());
 }
 
 TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
@@ -1528,12 +1566,165 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
     controller->selectTool("pen");  // (the tool is app-wide: an earlier test in the same process may have left another)
     ASSERT_EQ(controller->tool(), "pen");
     draw();
-    EXPECT_FALSE(controller->modified()) << "read-only: the pen does not write";
-    EXPECT_EQ(controller->beginMarkdown(0), "");
+    EXPECT_FALSE(controller->modified()) << "a text file: the pen puts the cursor into the text, it does not write";
+    EXPECT_EQ(controller->beginMarkdown(0), "") << "(it is written on its pages, not beside them)";
     controller->newDocument();
     wait(100);
     draw();
     EXPECT_TRUE(controller->modified()) << "(a new document is written on)";
+}
+
+TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsWrittenInAndSavedBack) {
+    const fs::path file = root / "kalman.md";
+    std::string original;
+    {
+        std::ifstream in(file, std::ios::binary);
+        original.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    EXPECT_FALSE(findItem("eraserButton")->isVisible()) << "no ink tools for a text file";
+    auto* canvas = find<QQuickItem>("canvas");
+    click(canvas);  // the cursor goes where the page was clicked
+    type("Hello");
+    EXPECT_TRUE(controller->modified());
+    ASSERT_TRUE(controller->save());
+    std::string saved;
+    {
+        std::ifstream in(file, std::ios::binary);
+        saved.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    const size_t at = saved.find("Hello");
+    ASSERT_NE(at, std::string::npos);
+    EXPECT_EQ(saved.substr(0, at) + saved.substr(at + 5), original) << "only the typed text is new";
+    EXPECT_FALSE(controller->modified());
+    EXPECT_FALSE(fs::exists(root / "kalman.xopp"));
+
+    // Changed by another app while it has changes here: asked, and reloaded
+    type("X");
+    std::ofstream(file, std::ios::binary) << "# Changed elsewhere\n";
+    controller->checkTextFiles();
+    auto* dialog = find<QObject>("textChangedDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(find<QQuickItem>("textReloadButton"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_FALSE(controller->modified());
+    EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Changed elsewhere\n");
+    // Without changes here it is read again without asking
+    std::ofstream(file, std::ios::binary) << "# Third\n";
+    controller->checkTextFiles();
+    wait(50);
+    EXPECT_FALSE(dialog->property("visible").toBool());
+    EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Third\n");
+}
+
+TEST_F(HomeScreenMarkdownTest, aTxtFileIsEditedAsPlainText) {
+    const fs::path file = root / "todo.txt";
+    std::ofstream(file, std::ios::binary) << "# not a heading\n**not bold**\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    EXPECT_EQ(controller->textDocument(), "plain");
+    EXPECT_TRUE(controller->textEditable());
+    EXPECT_FALSE(find<QQuickItem>("shownFileNote")->isVisible());
+    click(find<QQuickItem>("canvas"));
+    key(Qt::Key_End, Qt::ControlModifier);
+    type("done");
+    ASSERT_TRUE(controller->save());
+    std::ifstream in(file, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()),
+              "# not a heading\n**not bold**\ndone");
+}
+
+TEST_F(HomeScreenMarkdownTest, textFilesAreOnPagesOrOnOneContinuousPage) {
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
+    wait(100);
+    EXPECT_FALSE(controller->textContinuous()) << "pages by default";
+    EXPECT_GT(controller->pageCount(), 2);
+    auto* layout = find<QQuickItem>("layoutButton");
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
+                      layout->mapToScene(QPointF(layout->width() / 2, layout->height() / 2)).toPoint());
+    auto* menu = find<QObject>("layoutMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* continuous = nullptr;
+    for (auto* c: menu->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "textContinuousItem") {
+            continuous = c;
+        }
+    }
+    ASSERT_NE(continuous, nullptr);
+    ASSERT_TRUE(continuous->isVisible());
+    click(continuous);
+    wait(50);
+    EXPECT_TRUE(controller->textContinuous());
+    EXPECT_EQ(controller->pageCount(), 1);
+    EXPECT_FALSE(controller->modified());
+    // Another text file opens the same way (a setting); notes are not affected
+    const fs::path other = root / "other.md";
+    std::ofstream(other, std::ios::binary) << "# Other\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(other.string())));
+    wait(50);
+    EXPECT_TRUE(controller->textContinuous());
+    controller->setTextContinuous(false);
+    EXPECT_FALSE(controller->textContinuous());
+    controller->setCurrentTab(0);
+    wait(50);
+    EXPECT_TRUE(controller->textContinuous()) << "the other tab stays as it was laid out";
+    controller->setTextContinuous(false);
+    EXPECT_GT(controller->pageCount(), 2);
+}
+
+TEST_F(HomeScreenMarkdownTest, otherTextFilesAreEditedOnlyAfterAWarning) {
+    const fs::path file = root / "script.py";
+    std::ofstream(file, std::ios::binary) << "def f():\r\n    return 1\r\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    EXPECT_EQ(controller->textDocument(), "") << "read-only, as before";
+    EXPECT_TRUE(controller->canEditAnyway());
+    auto* button = find<QQuickItem>("editAnywayButton");
+    ASSERT_NE(button, nullptr);
+    ASSERT_TRUE(button->isVisible());
+    auto* dialog = find<QObject>("editAnywayDialog");
+    ASSERT_NE(dialog, nullptr);
+    // Cancel: it stays read-only
+    click(button);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    QMetaObject::invokeMethod(dialog, "reject");
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(controller->textDocument(), "");
+    // OK: edited as plain text, in the same tab
+    click(button);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    QMetaObject::invokeMethod(dialog, "accept");
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(controller->textDocument(), "plain");
+    EXPECT_TRUE(controller->textEditable());
+    EXPECT_EQ(controller->tabCount(), 1);
+    EXPECT_EQ(controller->title(), "script.py");
+    click(find<QQuickItem>("canvas"));
+    key(Qt::Key_End, Qt::ControlModifier);
+    type("# end");
+    ASSERT_TRUE(controller->save());
+    {
+        std::ifstream in(file, std::ios::binary);
+        EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()),
+                  "def f():\r\n    return 1\r\n# end");
+    }
+    // Opened again later: edited at once, no warning (once per file)
+    controller->closeTab(0);
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(50);
+    EXPECT_EQ(controller->textDocument(), "plain");
+    EXPECT_FALSE(dialog->property("visible").toBool());
+    // Another file is asked about again
+    const fs::path other = root / "data.json";
+    std::ofstream(other, std::ios::binary) << "{}\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(other.string())));
+    wait(50);
+    EXPECT_EQ(controller->textDocument(), "");
+    EXPECT_FALSE(controller->editAnyway());
+    ASSERT_TRUE(waitOpened(dialog, true));
+    QMetaObject::invokeMethod(dialog, "reject");
 }
 
 namespace {
@@ -1647,10 +1838,82 @@ TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManage
     EXPECT_TRUE(openWith->isVisible());
     click(child(menu, "showInFileManagerItem"));
     EXPECT_EQ(fake.shown, QStringList{docx});
-    // A document has no "Open with the system app"
+    // A document has no "Open externally"
     click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
     ASSERT_TRUE(waitOpened(menu, true));
     EXPECT_FALSE(child(menu, "openWithSystemAppItem")->isVisible());
+}
+
+TEST_F(HomeScreenFilterTest, textFilesAndImagesOpenExternally) {
+    // A read-only text file: the button in the tool bar hands it over
+    const QString py = QString::fromStdString((root / "kalman.py").string());
+    ASSERT_TRUE(controller->openPath(py));
+    wait(50);
+    auto* button = findItem("openExternallyButton");
+    ASSERT_NE(button, nullptr);
+    ASSERT_TRUE(button->isVisible());
+    click(button);
+    EXPECT_EQ(fake.opened, QStringList{py});
+
+    // A .md with unsaved changes: asked to save first; saved, then handed over
+    const fs::path md = root / "draft.md";
+    std::ofstream(md, std::ios::binary) << "# Draft\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(md.string())));
+    wait(50);
+    click(find<QQuickItem>("canvas"));
+    type("x");
+    ASSERT_TRUE(controller->modified());
+    click(findItem("openExternallyButton"));
+    auto* dialog = find<QObject>("externalSaveDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(fake.opened.size(), 1) << "not before it is saved";
+    click(find<QQuickItem>("externalSaveButton"));
+    until([&] { return fake.opened.size() == 2; });
+    ASSERT_EQ(fake.opened.size(), 2);
+    EXPECT_EQ(fake.opened.last(), QString::fromStdString(md.string()));
+    EXPECT_FALSE(controller->modified());
+    // The other app changes it: shown as it is when the window is looked at again
+    std::ofstream(md, std::ios::binary) << "# Draft, edited elsewhere\n";
+    controller->checkTextFiles();
+    EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Draft, edited elsewhere\n");
+
+    // Notes have no "Open externally"
+    controller->newDocument();
+    wait(50);
+    EXPECT_FALSE(findItem("openExternallyButton")->isVisible());
+    EXPECT_EQ(controller->externalFileOf(QString::fromStdString((root / "notes.xopp").string())), "");
+    EXPECT_EQ(controller->externalFileOf(QString::fromStdString((root / "lecture.pdf").string())), "");
+    EXPECT_EQ(controller->externalFileOf(py), py);
+    EXPECT_EQ(controller->externalFileOf(QString::fromStdString(md.string())), QString::fromStdString(md.string()));
+}
+
+TEST_F(HomeScreenFilterTest, aTextDocumentIsSharedAsTheFileItself) {
+    const fs::path md = root / "share.md";
+    std::ofstream(md, std::ios::binary) << "# Share\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(md.string())));
+    wait(50);
+    click(find<QQuickItem>("canvas"));
+    type("x");
+    ASSERT_TRUE(controller->modified());
+    auto* dialog = find<QObject>("shareDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QString()));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_FALSE(findItem("sharePdfChoice")->isVisible()) << "no PDF with notes for a text file";
+    EXPECT_FALSE(findItem("shareXournalChoice")->isVisible());
+    ASSERT_TRUE(findItem("shareTextFileChoice")->isVisible());
+    click(findItem("shareTextFileChoice"));
+    until([&] { return !fake.shared.isEmpty(); });
+    EXPECT_EQ(fake.shared, QStringList{QString::fromStdString(md.string())});
+    EXPECT_FALSE(controller->modified()) << "saved first";
+    EXPECT_FALSE(fs::exists(root / "share.pdf"));
+    EXPECT_FALSE(fs::exists(root / "share.xopp"));
+    EXPECT_EQ(controller->shareStep(), "text");
+    EXPECT_FALSE(controller->sharePdfCopy(QUrl(), true));
+    // No Save as (with its file types) for a text file: it is saved as itself
+    EXPECT_FALSE(controller->saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "share.pdf").string()))));
+    EXPECT_FALSE(fs::exists(root / "share.pdf"));
 }
 
 TEST_F(HomeScreenFilterTest, aFolderOpensAsALibraryInAWindowOfItsOwn) {

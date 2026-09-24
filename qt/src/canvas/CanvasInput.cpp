@@ -29,6 +29,7 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "MarkdownEditor.h"
 #include "session/DocumentSession.h"
 
 namespace xqt {
@@ -98,7 +99,7 @@ void CanvasInput::startPenHold(const Event& event) {
 
 bool CanvasInput::penHoldTool() const {
     const ToolType tool = view.getSession().getToolHandler()->getToolType();
-    return tool == TOOL_PEN || tool == TOOL_HIGHLIGHTER || tool == TOOL_HAND;
+    return (tool == TOOL_PEN || tool == TOOL_HIGHLIGHTER || tool == TOOL_HAND) && !view.textMode();
 }
 
 void CanvasInput::penHeld() {
@@ -449,6 +450,18 @@ bool CanvasInput::actionStart(const Event& event) {
     this->sequenceStartPage = currentPage;
     this->pressViewPos = event.viewPos;
     this->pressTimeMs = monotonicMs();
+    // A text file edited: the pen and the mouse put the cursor into the text, whatever the tool (a drag selects)
+    if (view.textMode() && toolType != TOOL_HAND) {
+        this->textPress = true;
+        if ((event.state & GDK_CONTROL_MASK) && view.tapAt(event.viewPos)) {
+            return true;  // Ctrl + click: a link is followed (as in text editors)
+        }
+        if (currentPage) {
+            const QPointF p = pageCoordinates(*currentPage, event.viewPos);
+            view.textPress(*currentPage, p.x(), p.y());
+        }
+        return true;
+    }
     // A read-only document (a Markdown file shown): every tool is the hand. A document shown for reading only (the
     // reference beside another one): every tool but the select tools, which select to copy.
     const bool readingTool = isSelectToolType(toolType) || xoj::tool::isPdfSelectionTool(toolType);
@@ -535,6 +548,14 @@ bool CanvasInput::actionMotion(const Event& event) {
         return true;
     }
 
+    if (this->textPress) {
+        if (MarkdownEditor* editor = view.getMarkdownEditor(); editor && this->deviceClassPressed) {
+            const QPointF p = pageCoordinates(editor->getPage(), event.viewPos);
+            editor->mouseMoved(p.x(), p.y());  // select
+        }
+        this->updateLastEvent(event);
+        return true;
+    }
     if (toolHandler->getToolType() == TOOL_HAND || this->readOnlyPress) {
         if (this->deviceClassPressed) {
             this->handleScrollEvent(event);
@@ -615,6 +636,11 @@ bool CanvasInput::actionMotion(const Event& event) {
 
 bool CanvasInput::actionEnd(const Event& event) {
     ToolHandler* toolHandler = view.getSession().getToolHandler();
+    if (std::exchange(this->textPress, false)) {
+        this->sequenceStartPage = nullptr;
+        this->inputRunning = false;
+        return false;
+    }
     if (std::exchange(this->readOnlyPress, false)) {
         // A read-only document: nothing was written; a tap may be a link
         if (monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&

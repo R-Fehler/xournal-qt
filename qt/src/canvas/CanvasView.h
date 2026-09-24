@@ -259,6 +259,17 @@ public:
     void startMarkdown(size_t page, bool pageText, double x, double y);
     /// A tap with the text tool at a page position (points).
     void startText(CanvasPage& page, double x, double y);
+
+    // --- a text file edited (DocumentSession::setTextFile, qt/docs/md-editor.md) ---
+    /// The document is a text file that is edited here (not for reading only): every press with the pen or the mouse
+    /// puts the cursor into its text (whatever the tool), a drag selects; a finger scrolls, and its tap puts the
+    /// cursor there too.
+    bool textMode() const;
+    /// A press in text mode (page coordinates): the cursor goes there (the editor starts if needed).
+    void textPress(CanvasPage& page, double x, double y);
+    /// Text mode and no cursor yet: the editor starts at the top of the current page (keys typed go there). True if
+    /// there is an editor now.
+    bool ensureTextEditor();
     void endTextEditing();
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;

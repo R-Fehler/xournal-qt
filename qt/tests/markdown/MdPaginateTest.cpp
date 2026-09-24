@@ -316,3 +316,81 @@ TEST(MdPaginate, splittingAfterAChangeIsTheSameAsSplittingAll) {
     shorter.erase(before.parts[1].begin, before.parts[3].begin - before.parts[1].begin);
     EXPECT_EQ(paginate(shorter, style(), frame, &before, &text).slices, paginate(shorter, style(), frame).slices);
 }
+
+// --- plain text (a .txt edited): no Markdown, lines as they are -----------------------------------------------------
+
+namespace {
+Style plainStyle() {
+    Style s = style();
+    s.family = "Monospace";
+    s.plain = true;
+    return s;
+}
+std::string plainLines(int n) {
+    std::string s;
+    for (int i = 0; i < n; ++i) {
+        s += i % 7 == 3 ? "\n" : "# line " + std::to_string(i) + " with **stars**, `ticks` and - a dash\n";
+    }
+    return s;
+}
+}  // namespace
+
+TEST(MdPlain, aPlainTextIsLaidOutLineByLineWithoutFormatting) {
+    const std::string source = std::string(PLAIN_MARKER) + "\n# not a heading\n**not bold**\n\n- not a list\n";
+    const Document doc = parse(source);
+    ASSERT_TRUE(doc.plain);
+    ASSERT_EQ(doc.root.children.size(), 6u) << "the marker, four lines, the empty last line";
+    const Layout lay = layout(doc, plainStyle());
+    std::vector<std::string> texts;
+    for (const Item& it: lay.items) {
+        ASSERT_EQ(it.kind, Item::Kind::Text) << "no rules, fills or check boxes";
+        texts.emplace_back(pango_layout_get_text(it.layout.get()));
+        for (const SourceMap& m: it.sources) {
+            EXPECT_EQ(m.flags, 0) << "no formatting";
+        }
+    }
+    EXPECT_EQ(texts, (std::vector<std::string>{"# not a heading", "**not bold**", "", "- not a list", ""}));
+    // Every line as high as the others (an empty one too): no heading sizes, no paragraph spacing. The empty line
+    // after the last line break takes room only with the cursor on it.
+    EXPECT_EQ(lay.items.back().height, 0);
+    EXPECT_NEAR(lay.height, 4 * lay.items[0].height, 0.01);
+    for (size_t i = 1; i + 1 < lay.items.size(); ++i) {
+        EXPECT_NEAR(lay.items[i].height, lay.items[0].height, 0.01) << i;
+        EXPECT_NEAR(lay.items[i].y, lay.items[i - 1].y + lay.items[i - 1].height, 0.01) << i;
+    }
+    // While written: the line with the cursor is the raw item, its text exactly its source
+    const size_t cursor = source.find("not bold") + 2;
+    const Layout editing = layout(doc, plainStyle(), source, cursor);
+    ASSERT_GE(editing.rawItem, 0);
+    EXPECT_EQ(source.substr(editing.rawBegin, editing.rawEnd - editing.rawBegin), "**not bold**");
+    const Layout atEnd = layout(doc, plainStyle(), source, source.size());
+    EXPECT_EQ(atEnd.rawItem, static_cast<int>(atEnd.items.size()) - 1);
+    EXPECT_NEAR(atEnd.height, 5 * lay.items[0].height, 0.01);
+}
+
+TEST(MdPlain, aPlainTextFlowsOntoPagesAndJoinsAgain) {
+    const std::string text = plainLines(80);
+    const Pagination p = paginate(text, plainStyle(), small);
+    ASSERT_GE(p.slices.size(), 3u);
+    EXPECT_EQ(join(p.slices), text);
+    for (size_t i = 0; i < p.slices.size(); ++i) {
+        EXPECT_TRUE(isPlain(p.slices[i])) << "every page is plain text: " << i;
+        EXPECT_EQ(continues(p.slices[i]), i > 0);
+        const Layout l = layout(parse(p.slices[i]), plainStyle());
+        EXPECT_LE(l.height, small(0).height + 0.5) << i << "\n" << p.slices[i] << "\nitems " << l.items.size()
+                                                   << " first h " << (l.items.empty() ? 0 : l.items[0].height);
+    }
+    // A line longer than a page is split within it, and joined again
+    std::string longLine;
+    for (int i = 0; i < 400; ++i) {
+        longLine += "word" + std::to_string(i) + " ";
+    }
+    const std::string text2 = "start\n" + longLine + "\nend";
+    const Pagination q = paginate(text2, plainStyle(), small);
+    ASSERT_GE(q.slices.size(), 2u);
+    EXPECT_EQ(join(q.slices), text2) << "no newline added at the end, none lost";
+    // An empty plain text is a page with its marker (and a line for the cursor)
+    const Pagination e = paginate("", plainStyle(), small);
+    ASSERT_EQ(e.slices.size(), 1u);
+    EXPECT_EQ(join(e.slices), "");
+}

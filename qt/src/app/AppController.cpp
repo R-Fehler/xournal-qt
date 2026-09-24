@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <fstream>
 #include <limits>
 
 #include <shared_mutex>
@@ -77,6 +78,7 @@
 #include "TextFlow.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
+#include "session/TextFile.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
 #include "shell/PageFilterModel.h"
@@ -225,6 +227,9 @@ void AppController::makeTabs() {
         }
     });
     connect(tabs.get(), &TabManager::countChanged, this, [this] {
+        if (textWatcher) {
+            watchTextFiles();  // (a text file closed)
+        }
         if (tabs->count() == 0) {
             if (isSecondary()) {
                 Q_EMIT closeWindowRequested();  // the last document went away with its window
@@ -424,6 +429,7 @@ void AppController::shutdown() {
 }
 
 DocumentSession* AppController::session() const { return tabs->currentSession(); }
+bool AppController::textPagesFixed() const { return session() && session()->textFile() && !session()->hasFilePath(); }
 CanvasView* AppController::canvas() const { return tabs->currentView(); }
 
 bool AppController::textFlowActive() const { return flow && flow->active(); }
@@ -512,8 +518,8 @@ QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     endTextFlow(true);
     // The document with the keys: the reference while it is written in, else the notes
     DocumentSession* target = editedReference() ? &editedReference()->getSession() : session();
-    if (!target || target->isReadOnly()) {
-        return {};  // (a Markdown file shown read-only: not edited here)
+    if (!target || target->isReadOnly() || target->textFile()) {
+        return {};  // (a text file is written on its pages; one shown read-only is not edited at all)
     }
     mdSession = target;
     markdown = std::make_unique<MarkdownSession>(*mdSession);
@@ -636,8 +642,12 @@ void AppController::currentTabChanged() {
                                              &AppController::zoomChanged));
     }
     updatePresentedView();  // (another tab: it presents now)
+    if (session() && session()->textFile()) {
+        QTimer::singleShot(0, this, [this, s = QPointer<DocumentSession>(session())] { checkTextFile(s); });
+    }
     Q_EMIT documentChanged();
     Q_EMIT titleChanged();
+    Q_EMIT textLayoutChanged();
     Q_EMIT modifiedChanged();
     Q_EMIT savingChanged();
     Q_EMIT undoRedoChanged();
@@ -672,12 +682,18 @@ bool AppController::cutSelection() {
     return canvas() && canvas()->cutSelection();
 }
 bool AppController::pasteElements() {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     if (CanvasView* r = editedReference()) {
         return !r->getSession().isReadOnly() && r->pasteElements();
     }
     return canvas() && !session()->isReadOnly() && canvas()->pasteElements();
 }
 bool AppController::pasteAt(qreal x, qreal y) {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     return canvas() && !session()->isReadOnly() && canvas()->pasteElements(QPointF(x, y));
 }
 bool AppController::canPaste() const {
@@ -701,6 +717,9 @@ void AppController::selectAllOnPage() {
     }
 }
 bool AppController::insertImage(const QUrl& url) {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     QFile f(url.toLocalFile());
     if (!canvas() || !f.open(QIODevice::ReadOnly)) {
         return false;
@@ -771,6 +790,9 @@ void AppController::cutPages(const QList<int>& list) {
 }
 
 int AppController::pastePages(int position) {
+    if (textPagesFixed()) {
+        return 0;  // (a text file: its pages are its text)
+    }
     if (!session() || pageClipboard->isEmpty()) {
         return 0;
     }
@@ -810,6 +832,9 @@ int AppController::pastePages(int position) {
 }
 
 bool AppController::deletePages(const QList<int>& list) {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     if (!session()) {
         return false;
     }
@@ -828,6 +853,9 @@ bool AppController::deletePages(const QList<int>& list) {
 }
 
 bool AppController::movePages(const QList<int>& list, int target) {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     if (!session() || target < 0) {
         return false;
     }
@@ -856,6 +884,9 @@ bool AppController::movePages(const QList<int>& list, int target) {
 }
 
 void AppController::duplicatePages(const QList<int>& list) {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (!session()) {
         return;
     }
@@ -1127,19 +1158,24 @@ QString AppController::shownFileNote() const {
         return {};
     }
     const QString name = QString::fromStdString(file.filename().string());
-    if (DocumentFiles::isMarkdownFile(file)) {
+    if (const TextFile* text = session()->textFile()) {
+        if (session()->isEditableText()) {
+            return {};  // (edited: nothing to say)
+        }
+        const QString why = text->isTooBig() ? tr("it is bigger than %1 MB").arg(TextFile::MAX_EDIT_BYTES / (1024 * 1024))
+                            : !text->isUtf8() ? tr("it is not UTF-8 text")
+                                              : tr("the file cannot be written");
         std::error_code ec;
         const bool cut = fs::file_size(file, ec) > MarkdownFile::MAX_BYTES && !ec;
-        return tr("Read-only for now: %1 is shown as it is formatted, to read and search (a Markdown editor comes "
-                  "later).")
-                       .arg(name) +
+        return tr("Read-only: %1 is shown to read and search, as %2.").arg(name, why) +
                (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
                     : QString());
     }
     if (DocumentFiles::isTextFile(file)) {
         std::error_code ec;
         const bool cut = fs::file_size(file, ec) > MarkdownFile::MAX_BYTES && !ec;
-        return tr("Read-only: %1 is shown as plain text, to read and search. Open it with another app to edit it.")
+        return tr("Read-only: %1 is shown to read and search. \"Edit anyway\" edits it here as plain text; \"Open "
+                  "externally\" opens it in its app.")
                        .arg(name) +
                (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
                     : QString());
@@ -1834,7 +1870,17 @@ void AppController::reopenTabs(const std::vector<std::pair<fs::path, int>>& last
     for (size_t i = 0; i < last.size(); ++i) {
         const auto& [file, page] = last[i];
         bool opened = false;
-        if (auto it = recovered.find(i); it != recovered.end()) {
+        if (auto it = recovered.find(i); it != recovered.end() && it->second.first.extension() == ".text") {
+            // A text file: opened as itself, with the text it had (unsaved)
+            std::ifstream in(it->second.first, std::ios::binary);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            std::error_code ec;
+            if (in && fs::exists(file, ec) && openPath(QString::fromStdString(file.string())) &&
+                tabs->currentSession()->isEditableText()) {
+                MarkdownFile::setText(*tabs->currentSession(), text);
+                opened = true;
+            }
+        } else if (auto it = recovered.find(i); it != recovered.end()) {
             auto result = DocumentSession::loadFile(it->second.first);
             if (result.document) {
                 const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
@@ -2025,21 +2071,32 @@ bool AppController::openPath(const QString& path) {
     if (shown && !DocumentFiles::itemOf(file).xopp.empty()) {
         return openPath(QString::fromStdString(DocumentFiles::itemOf(file).xopp.string()));
     }
-    auto result = shown ? loadShownFile(file) : DocumentSession::loadFile(file);
-    if (!result.document) {
+    // A Markdown file: its text, edited (written back to it)
+    std::string textError;
+    std::unique_ptr<DocumentSession> textSession = openTextFile(file, textError);
+    if (!textSession && !textError.empty()) {
+        Q_EMIT message(tr("Cannot open file"), QString::fromStdString(textError), true);
+        return false;
+    }
+    auto result = textSession ? DocumentSession::LoadResult{} : shown ? loadShownFile(file) : DocumentSession::loadFile(file);
+    if (!textSession && !result.document) {
         Q_EMIT message(tr("Cannot open file"), QString::fromStdString(result.error), true);
         return false;
     }
     const std::vector<std::string> hybridChanged = result.hybridChanged;
     // An untouched new document is replaced instead of keeping an empty tab around.
     const int pristine = replacePristine && tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
-    auto opened = std::make_unique<DocumentSession>(*app, std::move(result.document));
-    if (shown) {
+    auto opened = textSession ? std::move(textSession) : std::make_unique<DocumentSession>(*app, std::move(result.document));
+    if (shown && !opened->textFile()) {
         opened->setShownFile(file, !DocumentFiles::isImageFile(file));
     }
+    const bool isText = opened->textFile() != nullptr;
     tabs->addTab(std::move(opened));
     if (pristine >= 0) {
         tabs->closeTab(pristine);
+    }
+    if (isText) {
+        watchTextFiles();
     }
     app->getSettings()->setLastOpenPath(fs::path(path.toStdString()).parent_path());
     recent->add(file);
@@ -2097,7 +2154,10 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
     if (!s) {
         return false;
     }
-    if (way == SaveWay::Save && !s->hasFilePath()) {
+    if (s->textFile() && !s->hasFilePath() && way != SaveWay::Save) {
+        return false;  // (a text file is saved as itself: no other name, no hybrid PDF, no .xopp)
+    }
+    if (way == SaveWay::Save && !s->hasFilePath() && !s->isEditableText()) {
         // "Save notes into the PDF itself": an annotated PDF is saved into it, as a hybrid PDF
         if (!savesWithoutDialog(s)) {
             return false;
@@ -2205,7 +2265,10 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
                 app->getSettings()->setLastSavePath(target.parent_path());
                 recent->add(saved.getFilePath());
             }
-            if (saved.isHybrid()) {
+            if (saved.textFile() && !saved.hasFilePath()) {
+                library->refresh();  // (the library reads the text file again: its card, its index entry)
+                watchTextFiles();
+            } else if (saved.isHybrid()) {
                 if (choice == "update") {
                     // The .xopp for Xournal++ from now on: its PDF may be the one the document shows pages from
                     DocumentItem item;
@@ -2404,8 +2467,8 @@ bool AppController::savesWithoutDialog(const DocumentSession* s) const {
     if (!s) {
         return false;
     }
-    if (s->hasFilePath()) {
-        return true;
+    if (s->hasFilePath() || s->isEditableText()) {
+        return true;  // (a text file is written back to itself)
     }
     const fs::path pdf = s->annotatedPdf();
     return !pdf.empty() && settingOn(app->getSettings(), "hybridIntoPdf") && !HybridPdf::inCache(pdf) &&
@@ -2526,6 +2589,9 @@ QString AppController::shareStep() const {
     if (!s) {
         return {};
     }
+    if (s->textFile() && !s->hasFilePath()) {
+        return QStringLiteral("text");  // (a text file is shared as itself: sharedTextFile)
+    }
     if (s->isHybrid()) {
         return s->isModified() || s->isSaving() ? QStringLiteral("save") : QStringLiteral("share");
     }
@@ -2583,7 +2649,7 @@ bool AppController::sharePdf(bool toClipboard) {
 
 bool AppController::sharePdfCopy(const QUrl& target, bool toClipboard) {
     DocumentSession* s = session();
-    if (!s) {
+    if (!s || (s->textFile() && !s->hasFilePath())) {  // (a text file: never as a PDF or .xopp)
         return false;
     }
     fs::path copy(target.toLocalFile().toStdString());
@@ -2605,7 +2671,8 @@ bool AppController::sharePdfCopy(const QUrl& target, bool toClipboard) {
 bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
     const fs::path dir(folder.toLocalFile().toStdString());
     DocumentSession* s = file.isEmpty() ? session() : nullptr;
-    if (dir.empty() || (file.isEmpty() && !s)) {
+    if (dir.empty() || (file.isEmpty() && !s) ||
+        (s && s->textFile() && !s->hasFilePath())) {  // (a text file: never as a PDF or .xopp)
         return false;
     }
     fs::path document = s ? (s->hasFilePath() ? s->getFilePath() : s->annotatedPdf()) : fs::path(file.toStdString());
@@ -2725,6 +2792,11 @@ void AppController::undo() {
     if (!session()) {
         return;
     }
+    if (MarkdownEditor* editor = canvas() && canvas()->textMode() ? canvas()->getMarkdownEditor() : nullptr;
+        editor && editor->canUndo()) {
+        editor->undo();  // a text file: the text being written, step by step (not the whole edit at once)
+        return;
+    }
     session()->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
     endMarkdown(true);                   // (as is the Markdown being written beside the page)
     if (canUndo()) {
@@ -2738,6 +2810,11 @@ void AppController::redo() {
         return;
     }
     if (!session()) {
+        return;
+    }
+    if (MarkdownEditor* editor = canvas() && canvas()->textMode() ? canvas()->getMarkdownEditor() : nullptr;
+        editor && editor->canRedo()) {
+        editor->redo();
         return;
     }
     session()->clearSelectionEndText();
@@ -2922,6 +2999,9 @@ void AppController::zoomOut() {
 }
 
 void AppController::addPageAfterCurrent() {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (session()) {
         session()->insertNewPage(session()->getCurrentPageNo() + 1);
     }
@@ -3003,6 +3083,9 @@ void AppController::clearNavigation() {
 
 // Upstream's page operations work on the current page: select the page first.
 bool AppController::insertPages(int position, int background, int paper, bool landscape, int count) {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     DocumentSession* s = session();
     const auto& types = app->getPageTypes()->getPageTypes();
     if (!s || background < 0 || background >= static_cast<int>(types.size()) || count < 1) {
@@ -3051,6 +3134,9 @@ bool AppController::pagesHavePdfBackground(const QList<int>& pages) const {
 }
 
 bool AppController::changePageBackground(const QList<int>& pages, int background) {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     DocumentSession* s = session();
     const auto& types = app->getPageTypes()->getPageTypes();
     if (!s || background < 0 || background >= static_cast<int>(types.size())) {
@@ -3110,6 +3196,9 @@ QVariantMap AppController::currentPageFormat() const {
 }
 
 void AppController::insertPageBefore(int index) {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (session()) {
         goToPage(index);
         session()->insertNewPage(static_cast<size_t>(std::max(0, index)));
@@ -3117,6 +3206,9 @@ void AppController::insertPageBefore(int index) {
 }
 
 void AppController::insertPageAfter(int index) {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (session()) {
         goToPage(index);
         session()->insertNewPage(static_cast<size_t>(index) + 1);
@@ -3124,6 +3216,9 @@ void AppController::insertPageAfter(int index) {
 }
 
 void AppController::duplicatePage(int index) {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (session()) {
         goToPage(index);
         session()->duplicatePage();
@@ -3131,6 +3226,9 @@ void AppController::duplicatePage(int index) {
 }
 
 void AppController::deletePage(int index) {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (session()) {
         goToPage(index);
         session()->deletePage();
@@ -3138,6 +3236,9 @@ void AppController::deletePage(int index) {
 }
 
 void AppController::movePageUp(int index) {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (session()) {
         goToPage(index);
         session()->movePageTowardsBeginning();
@@ -3145,6 +3246,9 @@ void AppController::movePageUp(int index) {
 }
 
 void AppController::movePageDown(int index) {
+    if (textPagesFixed()) {
+        return;  // (a text file: its pages are its text)
+    }
     if (session()) {
         goToPage(index);
         session()->movePageTowardsEnd();
@@ -3224,6 +3328,9 @@ bool AppController::exportPdf(const QUrl& url) {
 }
 
 bool AppController::addChapter(int page, const QString& title, int level) {
+    if (textPagesFixed()) {
+        return false;  // (a text file: its pages are its text)
+    }
     DocumentSession* s = session();
     if (!s || title.trimmed().isEmpty()) {
         return false;

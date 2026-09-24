@@ -32,6 +32,7 @@ Style styleOf(const Text& text) {
     s.color = text.getColor();
     s.color.alpha = 0xff;
     s.width = text.getWrap() > 0 ? text.getWrap() : DEFAULT_WIDTH;
+    s.plain = isPlain(text.getText());  // (a plain text's pages go on as plain text)
     return s;
 }
 

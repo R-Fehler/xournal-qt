@@ -60,6 +60,9 @@ struct Pagination {
 Pagination paginate(const std::string& source, Style style, const std::function<Frame(size_t)>& frame,
                     const Pagination* before = nullptr, const std::string* beforeSource = nullptr);
 
+/// The whole text on one page (a continuous page): its one slice (a plain text: with its marker), not laid out.
+Pagination onePage(const std::string& source, const Style& style);
+
 /// The text again from the slices of consecutive pages (with what of it each holds, if `parts` is given).
 std::string join(const std::vector<std::string>& slices, std::vector<Part>* parts = nullptr);
 

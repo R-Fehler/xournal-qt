@@ -515,7 +515,7 @@ TEST_F(LibraryFilesTest, markdownTextIsIndexedWithoutItsSyntaxAndFoundWithItsHea
     EXPECT_EQ(again.search("smoothing").size(), 1u);
 }
 
-TEST_F(LibraryFilesTest, aMarkdownFileOpensReadOnlyAndAHitAtItsPassage) {
+TEST_F(LibraryFilesTest, aMarkdownFileOpensForEditingAndAHitAtItsPassage) {
     writeFile(root / "notes.md", longMarkdown());
     const auto before = fs::last_write_time(root / "notes.md");
     AppController c;
@@ -523,13 +523,13 @@ TEST_F(LibraryFilesTest, aMarkdownFileOpensReadOnlyAndAHitAtItsPassage) {
     DocumentSession* s = c.tabManager().currentSession();
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->shownFile(), root / "notes.md");
-    EXPECT_FALSE(s->hasFilePath()) << "never written back";
+    EXPECT_FALSE(s->hasFilePath()) << "never a .xopp";
     EXPECT_EQ(c.title(), "notes.md");
     EXPECT_FALSE(c.modified());
     EXPECT_GT(s->getDocument()->getPageCount(), 2u);
-    EXPECT_TRUE(c.shownFileNote().startsWith("Read-only")) << c.shownFileNote().toStdString();
-    EXPECT_EQ(s->suggestSavePath().extension(), ".xopp");
-    EXPECT_NE(s->suggestSavePath().parent_path(), root) << "not a .xopp next to the Markdown file";
+    EXPECT_TRUE(c.shownFileNote().isEmpty()) << "edited: no note " << c.shownFileNote().toStdString();
+    EXPECT_TRUE(s->isEditableText());
+    EXPECT_EQ(s->suggestSavePath(), root / "notes.md") << "saved as itself";
     // Opened again: the same tab
     ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
     EXPECT_EQ(c.tabManager().count(), 1);
@@ -552,6 +552,46 @@ TEST_F(LibraryFilesTest, aMarkdownFileOpensReadOnlyAndAHitAtItsPassage) {
     EXPECT_EQ(s->search().currentOnPage(), page40 == page ? 1 : 0) << "the hit of paragraph 40 comes before it";
     EXPECT_EQ(s->search().hitCount(), 4);
     EXPECT_EQ(fs::last_write_time(root / "notes.md"), before);
+}
+
+TEST_F(LibraryFilesTest, editAsNotesMakesNotesFromTheMarkdownFileAndLeavesIt) {
+    writeFile(root / "lecture.md", longMarkdown());
+    const auto before = fs::last_write_time(root / "lecture.md");
+    AppController c;
+    c.setLibraryRoot(root);
+    ASSERT_TRUE(c.openPath(qstr(root / "lecture.md")));
+    DocumentSession* md = c.tabManager().currentSession();
+    ASSERT_TRUE(c.editAsNotes());
+    ASSERT_EQ(c.tabManager().count(), 2);
+    DocumentSession* notes = c.tabManager().currentSession();
+    ASSERT_NE(notes, md);
+    EXPECT_EQ(notes->textFile(), nullptr) << "notes, not a text file";
+    EXPECT_FALSE(notes->hasFilePath());
+    EXPECT_TRUE(notes->isModified()) << "its content is nowhere else yet: closing asks";
+    EXPECT_FALSE(c.tabManager().isPristine(c.tabManager().currentIndex()));
+    EXPECT_EQ(c.title(), "lecture.xopp");
+    EXPECT_EQ(notes->suggestSavePath(), root / "lecture.xopp") << "next to the .md";
+    EXPECT_EQ(notes->getDocument()->getPageCount(), md->getDocument()->getPageCount());
+    EXPECT_EQ(MarkdownFile::pageStarts(*notes->getDocument()), MarkdownFile::pageStarts(*md->getDocument()));
+    EXPECT_FALSE(c.editAsNotes()) << "only from a .md";
+    // Saved: a .xopp next to the .md, which is left as it was; the library shows two documents
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(qstr(root / "lecture.xopp"))));
+    EXPECT_FALSE(notes->isModified());
+    EXPECT_TRUE(fs::exists(root / "lecture.xopp"));
+    EXPECT_EQ(fs::last_write_time(root / "lecture.md"), before);
+    const auto listing = DocumentFiles::scan(root);
+    int mds = 0, xopps = 0;
+    for (const auto& item: listing.items) {
+        mds += !item.md.empty();
+        xopps += !item.xopp.empty();
+    }
+    EXPECT_EQ(mds, 1);
+    EXPECT_EQ(xopps, 1);
+    EXPECT_EQ(listing.items.size(), 2u) << "two cards: they go their own ways";
+    // Opened again, the .xopp has the Markdown text on its pages (drawn formatted) and the .md is still a text file
+    auto loaded = DocumentSession::loadFile(root / "lecture.xopp");
+    ASSERT_NE(loaded.document, nullptr);
+    EXPECT_EQ(MarkdownFile::pageStarts(*loaded.document), MarkdownFile::pageStarts(*md->getDocument()));
 }
 
 TEST_F(LibraryFilesTest, anImageOpensAsAPageToWriteOnAndIsSavedAsItsXopp) {

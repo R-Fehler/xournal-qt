@@ -40,6 +40,7 @@ namespace xqt {
 
 class DocumentSearch;
 class PdfPageKeeper;
+class TextFile;
 struct PdfMerge;
 
 class AppContext;
@@ -174,6 +175,40 @@ public:
     const fs::path& shownFile() const { return shownPath; }
     /// It shows a Markdown or text file read-only (not saved as a .xopp): the canvas does not write on it.
     bool isReadOnly() const;
+
+    // --- a text file edited (TextFile.h, qt/docs/md-editor.md) -------------------------------------------------
+    /// This document is the text of a file (a .md, a .txt, another text file): its pages hold the text as the page's
+    /// Markdown text (MarkdownFile.h), and saving writes the text back to the file (never a .xopp). A text file that
+    /// cannot be edited (not UTF-8, too big, not writable, or another text file not accepted for editing) is shown
+    /// read-only (isReadOnly). The session takes ownership; the file becomes the shown file.
+    void setTextFile(std::unique_ptr<TextFile> file, bool readOnly);
+    TextFile* textFile() const { return text.get(); }
+    /// It is a text file that is edited (not read-only).
+    bool isEditableText() const;
+    /// The text the pages hold now (the parts of the page's Markdown text joined). `lock`: under the document's read
+    /// lock (not in a crash handler).
+    std::string currentText(bool lock = true) const;
+    /// The text changed (the pages' boxes): the modified state follows.
+    void textEdited();
+    /// The text is on one continuous page that grows with it (else on pages; MarkdownFile::relayout switches).
+    bool isTextContinuous() const { return textContinuous; }
+    void setTextContinuous(bool on) { textContinuous = on; }
+    /// The text file changed on disk since it was read or written (by another program). `bytes`: what it holds now.
+    /// Not while a save runs (asked again after it).
+    bool textChangedOnDisk(std::string& bytes);
+    /// Keep the text as it is although the file changed on disk (the next save writes over it): no more questions
+    /// about that version.
+    void keepTextOverDisk();
+    /// The file's new bytes are the text now (after the pages were given its text): not modified.
+    void textReloaded(std::string bytes);
+    /// A new document made from another file ("Edit as notes" of a .md): saving suggests `file` (e.g. "name.xopp" next
+    /// to the .md), the tab is titled so, and it counts as modified until it is saved (its content is nowhere else).
+    void setMadeFrom(const fs::path& suggestion);
+    /// Where the text of a tab is written for crash recovery (autosave, crash): plain text files in the cache.
+    static fs::path textAutosavePath(qint64 pid, quint64 serial);
+    static fs::path textEmergencyPath(qint64 pid, quint64 serial);
+    /// Write the text to its autosave file if it changed since the last one.
+    SaveResult autosaveText();
     bool isModified() const;
     const fs::path& getLastAutosaveFile() const { return lastAutosaveFile; }
     /// Unique number of this session in this process (names its autosave and emergency files).
@@ -347,6 +382,7 @@ private:
     void resumeSave(quint64 stage);
     void updateModified();
     void updateSaving();
+    void beginTextSave();
 
     // UndoRedoListener
     void undoRedoChanged() override;
@@ -393,6 +429,12 @@ private:
     /// Opened from a hybrid PDF: the page of its clean copy each page was (annotations of other apps on pages with a
     /// generated background are kept from there). Forgotten when the pages of the background PDF may be renumbered.
     std::unordered_map<const XojPage*, std::pair<std::weak_ptr<XojPage>, size_t>> hybridBase;
+    std::unique_ptr<TextFile> text;  ///< a text file edited (or shown read-only)
+    bool textModified = false;
+    bool textContinuous = false;
+    fs::path madeSuggestion;  ///< setMadeFrom
+    bool madeUnsaved = false;
+    std::string lastAutosavedText;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };
 

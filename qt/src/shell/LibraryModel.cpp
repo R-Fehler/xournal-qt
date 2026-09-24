@@ -974,6 +974,24 @@ QString LibraryModel::newDocumentPath(const QString& name) const {
     return qstr(dir / (DocumentFiles::uniqueName(dir, base) + ".xopp"));
 }
 
+QString LibraryModel::newTextFilePath(const QString& name, const QString& extension) const {
+    if (!lib) {
+        return {};
+    }
+    const std::string base = name.trimmed().isEmpty() || !DocumentFiles::validName(name.trimmed().toStdString())
+                                     ? std::string("Untitled")
+                                     : name.trimmed().toStdString();
+    const fs::path dir = currentDir();
+    const std::string ext = extension.toStdString();
+    std::error_code ec;
+    // (a .md takes a name like every document: not next to a .xopp or PDF of that name)
+    std::string stem = ext == ".md" ? DocumentFiles::uniqueName(dir, base) : base;
+    for (int i = 2; fs::exists(dir / (stem + ext), ec); ++i) {
+        stem = base + " (" + std::to_string(i) + ")";
+    }
+    return qstr(dir / (stem + ext));
+}
+
 void LibraryModel::selectionUpdated() {
     if (!rows.empty()) {
         Q_EMIT dataChanged(index(0), index(count() - 1), {SelectedRole});

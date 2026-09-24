@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <memory>
@@ -36,6 +37,7 @@
 #include "util/Util.h"
 
 #include "AppController.h"
+#include "MarkdownFile.h"
 #include "config-test.h"
 
 using namespace xqt;
@@ -215,6 +217,37 @@ TEST_F(RecoveryTest, unsavedChangesAreRecoveredAfterACrash) {
     EXPECT_EQ(elementCount(*b.tabManager().session(1)), 1u);
     EXPECT_TRUE(SessionRecovery::findCandidates(*SessionRecovery::readJournal(SessionRecovery::defaultJournalFile()))
                         .empty());
+}
+
+TEST_F(RecoveryTest, aTextFileIsRecoveredWithItsText) {
+    const fs::path md = fs::path(tmp.filePath("text.md").toStdString());
+    std::ofstream(md, std::ios::binary) << "# Saved\r\n";
+    {
+        AppController a;
+        a.startSession({});
+        ASSERT_TRUE(a.openPath(QString::fromStdString(md.string())));
+        MarkdownFile::setText(*a.tabManager().session(0), "# Unsaved changes\n");
+        EXPECT_TRUE(a.tabManager().session(0)->isModified());
+        EXPECT_EQ(SessionRecovery::emergencySaveAll(), 1);
+    }
+    markJournalCrashed();
+    AppController b;
+    b.startSession({});
+    ASSERT_EQ(b.recoveryItems().size(), 1);
+    EXPECT_EQ(b.recoveryItems()[0].toMap()["title"].toString(), "text.md");
+    b.recover(true);
+    ASSERT_EQ(b.tabCount(), 1);
+    DocumentSession* s = b.tabManager().session(0);
+    EXPECT_TRUE(s->isEditableText());
+    EXPECT_EQ(s->currentText(), "# Unsaved changes\n");
+    EXPECT_TRUE(s->isModified());
+    std::ifstream in(md, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()), "# Saved\r\n")
+            << "the file itself is written only by saving";
+    ASSERT_TRUE(b.save());
+    std::ifstream again(md, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(again), std::istreambuf_iterator<char>()),
+              "# Unsaved changes\r\n");
 }
 
 TEST_F(RecoveryTest, discardingReopensTheSavedFiles) {

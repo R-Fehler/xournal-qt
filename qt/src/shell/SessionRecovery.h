@@ -36,6 +36,7 @@ public:
         qint64 pid = 0;
         quint64 serial = 0;
         int page = 0;
+        bool text = false;  ///< a text file edited (DocumentSession::setTextFile): its recovery files hold the text
     };
     struct Journal {
         qint64 pid = 0;
