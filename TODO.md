@@ -103,8 +103,14 @@ is built.
 ## Ready after a short plan: platform
 
 ### `qt/windows-build`: first Windows build (merged 2026-09-24; `~/xournal_qt_workspace/samples/xournal-qt-windows-x64.zip`; next steps in `qt/docs/windows-roadmap.md`)
-- [~] First feedback from a Surface Pro 8 with Windows 11 (the author, 2026-09-24): "works great". Two bugs, being
-  fixed on `qt/windows-build`:
+- [~] First feedback from a Surface Pro 8 with Windows 11 (the author, 2026-09-24): "works great". Two bugs:
+  - Fixed (merged 2026-09-24): Downloads opened by its path (`LocalUrl`). `XQT_LOG_INPUT` and
+    `xournal-qt-debug.bat` are in the zip.
+  - Pressure: the input log shows real pen events (wmpointer, Stylus, Pressure capability) and the canvas uses the
+    pressure, but the values span only 0.82–0.98 even for light strokes (first 5 samples per stroke logged). Open:
+    whether Windows or the Surface compresses the range, or our mapping flattens it. Next: a full log
+    (`XQT_LOG_INPUT=2`) and a pressure calibration in Settings → Pen.
+  Original notes:
   - Pen pressure is constant. There will be an `XQT_LOG_INPUT=1` log and a `xournal-qt-debug.bat` in the zip.
   - "Open Downloads as a quick library" fails with "cannot open c//": a file URL built by hand. The whole app is
     being checked for such URL and path conversions.
