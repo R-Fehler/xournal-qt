@@ -393,6 +393,19 @@
     other than the top, nothing saved when Android sends the app to the background.
   - The desktop tool bar no longer fits in 1600 px (it scrolls, as in narrow windows).
 
+- **Libraries in synced folders, `qt/android-libraries` (2026-09-25, awaiting on-device test).**
+  - Android: "All files access" asked with an explanation when a folder is to become a library; picked tree URIs
+    of the shared storage (primary, SD cards, Downloads) map to real paths; the one window switches libraries.
+    The library cache defaults to the app cache (existing `.xournal_library` folders move there once).
+  - All platforms: open `.xopp`, hybrid and annotated PDFs follow changes other programs make to their files
+    (reload in place when unchanged, else Reload / Keep mine); the app's own saves never count.
+  - Sync conflict copies (Syncthing, Dropbox, Nextcloud/ownCloud, Seafile, OneDrive, generic) next to their
+    document are a "Conflict" badge on its card: Compare side by side, keep one (the other to the trash; on
+    Android deleted after a question).
+  - Autosave when the app goes to the background (Android: also when inactive); on Android autosaves live in the
+    app cache.
+  - Checked on the emulator only. Left: see TODO.md, `qt/android-libraries`.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

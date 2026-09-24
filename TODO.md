@@ -88,7 +88,8 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         Search. It explains the syntax with examples.
       - Whole matching words are marked; `'exact`, `^` and `$` keep their meaning.
    5. ~~fuzzy search~~: `qt/fuzzy-search`, merged 2026-09-24 (see ROADMAP). Follow-ups: hit-page pictures mark `^`/`$`/`'word'` terms as plain substrings; the document search bar shows no sign that it is in fuzzy mode.
-3. **Android:** ~~`qt/android-apk`~~, ~~`qt/android-basics`~~ merged 2026-09-24; `qt/android-libraries` running.
+3. **Android:** ~~`qt/android-apk`~~, ~~`qt/android-basics`~~, ~~`qt/android-libraries`~~ merged. Next: the author's
+   tests on the Fold 7, then `qt/docs/android-roadmap.md` (Save as to a picked place, a compact tool bar).
 4. **The `.md` editor:** ~~`qt/md-editor`~~ merged 2026-09-24. Left: images in `<name>.assets/`, math, vaults.
 5. **Windows:** ~~`qt/windows-build`~~ merged 2026-09-24; `qt/windows-feel` is the author's, on the Surface.
 6. **PDF as the document:** ~~`qt/pdf-incremental`~~ and ~~`qt/pdf-only`~~ merged 2026-09-24.
@@ -119,7 +120,16 @@ is built.
   MSVC + vcpkg way is the fallback.
 - Pushing only `qt/windows-build`, and only with the author's go.
 
-### `qt/android-libraries` (the author, 2026-09-24; started 2026-09-25)
+### `qt/android-libraries` (the author, 2026-09-24; merged 2026-09-25)
+- Left (found on the emulator):
+  - [ ] Some texts on Android miss the opening quote “ and the dash — ("Default — this window", the start of the
+    all-files explanation), while the message dialog shows them. Probably the symbol fallback font from
+    `qt/android-basics` (a DejaVu subset) taking over for these characters.
+  - [ ] After a reload the tab strip does not scroll to the current tab.
+  - [ ] A Recent card drawn while access was missing stays blank until it is redrawn.
+  - [ ] "Show in file manager" still appears in the library menu on Android.
+  - [ ] Google Play needs another way than `MANAGE_EXTERNAL_STORAGE` (later).
+- Not verified: the Fold 7 with a real Syncthing/Autosync folder; Android 10 and older; SD-card and Downloads paths.
 - **Libraries in folders kept in sync by other apps** (Syncthing, Autosync, FolderSync mirror into real folders in
   shared storage; the providers' own apps only offer `content://`).
   - **"All files access"** (`MANAGE_EXTERNAL_STORAGE`) with a short explanation of why it is asked for. Real paths
