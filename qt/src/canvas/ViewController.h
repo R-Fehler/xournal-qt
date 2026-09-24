@@ -94,6 +94,37 @@ public:
     void fling(QPointF velocityPxPerMs);
     void stopMomentum();
 
+    // --- scrolling sideways (the layout's horizontal mode) and presenting -------------------------------------
+    /// A fit that is kept when the view changes size: sideways the rows fill the height, presenting the page
+    /// fills the screen. Zooming by hand ends it.
+    enum class Fit { None, Height, Page };
+    Fit keptFit() const { return kept; }
+    /// Zoom so that all rows fill the height of the view (sideways: "fit to the window height"), and keep it.
+    void fitHeight();
+    /// Presenting: zoom so that the page fills the screen (as much as its shape allows), show it, and keep that.
+    void fitPresentedPage(size_t page);
+    /// What a new view or layout starts with: sideways the height, else the width of the page.
+    void fitDefault(std::optional<size_t> page = std::nullopt);
+    /// Scrolling sideways, come to rest on whole pages (their group: a column, a pair) after a drag, a fling or a
+    /// wheel. `maxStep`: a swipe goes at most this many pages on (0: as far as it flies).
+    void setSnapping(bool snap, int maxStep = 0);
+    bool snapping() const { return snap && layout->horizontal(); }
+    /// A scroll delta (wheel, touchpad): sideways, what cannot scroll up or down scrolls left or right.
+    QPointF scrollDelta(QPointF delta) const;
+    /// A drag (finger, hand tool) or a touchpad scroll ended with this velocity (content px/ms): momentum, or when
+    /// snapping, on to the page it comes to rest on (animated, the momentum carried along).
+    void endScroll(QPointF velocity);
+    /// Sideways: the previous / next group of pages (animated; several steps in a row add up). False otherwise.
+    bool stepPages(int delta);
+    /// The group of the current page fits into the view: a wheel notch goes a page on when snapping.
+    bool groupFitsView() const;
+    /// Scrolling to rest on a page (tests)
+    bool isAnimating() const { return animating; }
+    /// The group the view is at or on its way to (sideways)
+    size_t currentGroup() const;
+    /// Sideways: the scroll position a group rests at (the lowest and highest; the same when it fits the view).
+    std::pair<double, double> restRange(size_t group) const;
+
     /// The layout changed (pages inserted/deleted/resized): keep the view valid.
     void layoutChanged();
 
@@ -115,6 +146,23 @@ private:
     void placeAnchor(const Anchor& a, QPointF viewPos);
     void clamp();
     void stepMomentum();
+    void stepAnimation();
+    /// Move to a scroll position in a short ease-out, starting with the velocity (scroll px/ms) it had
+    void animateTo(QPointF target, QPointF startVelocity = {});
+    /// The group whose resting place is closest to a scroll position
+    size_t groupNear(double scrollX) const;
+    /// Presenting: the zoom at which the page fills the view
+    double presentedZoom(size_t page) const;
+    /// Show a group at its resting place right away
+    void placeGroup(size_t group);
+
+    Fit kept = Fit::None;
+    bool snap = false;
+    int snapMaxStep = 0;
+    bool animating = false;
+    QPointF animFrom, animTo, animVelocity;
+    double animDuration = 0;
+    std::optional<size_t> animGroup;  ///< the group the animation goes to
 
     const DocumentLayout* layout;
     double z = 1.0;

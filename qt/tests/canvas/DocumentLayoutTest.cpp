@@ -92,6 +92,94 @@ TEST(DocumentLayout, bookWithASingleCoverPage) {
     EXPECT_EQ(l.nearestPage(QPointF(P + 10, P + 10), 1), 0u) << "empty cell before the cover";
 }
 
+// Scrolling sideways: the pages side by side in one row, the view steps through them one by one.
+TEST(DocumentLayout, sidewaysInOneRow) {
+    Pages pages(std::vector<QSizeF>(5, QSizeF(100, 150)));
+    DocumentLayout::Config cfg;
+    cfg.horizontal = true;
+    const auto l = pages.layout(cfg);
+    EXPECT_EQ(l.rows(), 1u);
+    EXPECT_EQ(l.columns(), 5u);
+    for (size_t i = 0; i < 5; ++i) {
+        EXPECT_EQ(l.pageRect(i, 2), QRectF(P + i * (200 + B), P, 200, 300)) << "page " << i;
+    }
+    EXPECT_EQ(l.contentSize(2), QSizeF(2 * P + 1000 + 4 * B, 2 * P + 300));
+    EXPECT_EQ(l.groupCount(), 5u);
+    EXPECT_EQ(l.groupOf(3), 3u);
+    EXPECT_EQ(l.groupRect(3, 2), l.pageRect(3, 2));
+    // Only the pages in the rectangle are "in view" (not the whole row)
+    const auto [first, last] = l.pagesIn(QRectF(P + 200 + B + 50, 0, 250, 400), 2);
+    EXPECT_EQ(first, 1u);
+    EXPECT_EQ(last, 2u);
+    EXPECT_EQ(l.nearestPage(QPointF(P + 4 * (200 + B) + 10, 50), 2), 4u);
+    EXPECT_EQ(l.pageAt(l.pageRect(2, 2).center(), 2), 2u);
+    EXPECT_FALSE(l.pageAt(QPointF(P + 200 + B / 2, 50), 2)) << "between two pages";
+    EXPECT_DOUBLE_EQ(l.fitHeightZoom(600), (600 - 2 * P) / 150) << "the page fills the height";
+    EXPECT_DOUBLE_EQ(l.fitWidthZoom(600, 2), 600 / (100 + 20.0)) << "one page fills the width";
+}
+
+// With more rows the pages go down a column first, then on to the next column (upstream's vertical layout with
+// fixed rows): the reading order stays along the strip.
+TEST(DocumentLayout, sidewaysInRows) {
+    Pages pages(std::vector<QSizeF>(7, QSizeF(100, 150)));
+    DocumentLayout::Config cfg;
+    cfg.horizontal = true;
+    cfg.rows = 3;
+    const auto l = pages.layout(cfg);
+    EXPECT_EQ(l.rows(), 3u);
+    EXPECT_EQ(l.columns(), 3u);
+    EXPECT_EQ(l.pageRect(4, 1), QRectF(P + 100 + B, P + 150 + B, 100, 150)) << "column 1, row 1";
+    EXPECT_EQ(l.pageRect(6, 1).topLeft(), QPointF(P + 2 * (100 + B), P)) << "the last column is begun at the top";
+    EXPECT_EQ(l.groupCount(), 3u);
+    EXPECT_EQ(l.groupPages(1), (std::pair<size_t, size_t>{3, 5}));
+    EXPECT_EQ(l.groupPages(2), (std::pair<size_t, size_t>{6, 6}));
+    const auto [first, last] = l.pagesIn(QRectF(P + 100 + B + 10, 0, 50, 50), 1);
+    EXPECT_EQ(first, 3u) << "the whole column";
+    EXPECT_EQ(last, 5u);
+    EXPECT_EQ(l.nearestPage(QPointF(P + 100 + B + 50, P + 2 * (150 + B) + 20), 1), 5u);
+    EXPECT_EQ(l.nearestPage(QPointF(P + 2 * (100 + B) + 50, P + 2 * (150 + B) + 20), 1), 6u) << "empty: the last";
+    EXPECT_DOUBLE_EQ(l.fitHeightZoom(1000), (1000 - 2 * P - 2 * B) / 450) << "all three rows in the height";
+
+    cfg.rows = 20;
+    EXPECT_EQ(pages.layout(cfg).rows(), 7u) << "no more rows than pages";
+}
+
+// Paired pages scrolling sideways: the pairs stay side by side (a book opened page by page), the cover alone.
+TEST(DocumentLayout, sidewaysBook) {
+    Pages pages(std::vector<QSizeF>(5, QSizeF(100, 150)));
+    DocumentLayout::Config cfg;
+    cfg.horizontal = true;
+    cfg.paired = true;
+    cfg.pairsOffset = 1;
+    const auto l = pages.layout(cfg);
+    EXPECT_EQ(l.rows(), 1u);
+    EXPECT_EQ(l.columns(), 6u) << "cover | 1 2 | 3 4";
+    EXPECT_EQ(l.groupRect(0, 1), l.pageRect(0, 1)) << "the cover alone";
+    EXPECT_DOUBLE_EQ(l.pageRect(1, 1).left() - l.pageRect(0, 1).right(), B);
+    EXPECT_DOUBLE_EQ(l.pageRect(2, 1).left() - l.pageRect(1, 1).right(), DocumentLayout::PAIR_GAP);
+    EXPECT_EQ(l.groupCount(), 3u);
+    EXPECT_EQ(l.groupOf(0), 0u);
+    EXPECT_EQ(l.groupOf(2), 1u);
+    EXPECT_EQ(l.groupPages(1), (std::pair<size_t, size_t>{1, 2}));
+    EXPECT_EQ(l.groupRect(1, 1), l.pageRect(1, 1).united(l.pageRect(2, 1)));
+    EXPECT_DOUBLE_EQ(l.fitWidthZoom(1000, 3), std::min((1000 - DocumentLayout::PAIR_GAP) / 220,
+                                                       (1000 - 2 * P - DocumentLayout::PAIR_GAP - 4) / 200))
+            << "the pair fills the width";
+}
+
+// Presenting: no margin around the pages, a page can fill the screen
+TEST(DocumentLayout, noMargins) {
+    Pages pages(std::vector<QSizeF>(3, QSizeF(960, 540)));
+    DocumentLayout::Config cfg;
+    cfg.horizontal = true;
+    cfg.noMargins = true;
+    const auto l = pages.layout(cfg);
+    EXPECT_EQ(l.padding(), 0.0);
+    EXPECT_EQ(l.pageRect(0, 2), QRectF(0, 0, 1920, 1080));
+    EXPECT_EQ(l.pageRect(1, 2).left(), 1920 + B);
+    EXPECT_DOUBLE_EQ(l.fitHeightZoom(1080), 2.0);
+}
+
 TEST(DocumentLayout, viewFollowsTheColumnSettings) {
     QTemporaryDir tmp;
     AppContext app(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(tmp.filePath("settings.xml").toStdString()), 1);

@@ -42,6 +42,7 @@
 #include <qpdf/QPDFPageObjectHelper.hh>
 #include <qpdf/QPDFWriter.hh>
 
+#include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Point.h"
@@ -4236,4 +4237,100 @@ TEST_F(MainWindowTest, sixteenByNinePagesForPresenting) {
     ASSERT_TRUE(waitOpened(insert, false));
     ASSERT_EQ(controller->pageCount(), 2);
     EXPECT_EQ(sizeOf(1), QSizeF(960, 540));
+}
+
+// Scrolling sideways from the layout menu: the pages in a row, ‹ › in the pill and the arrow keys go from page to
+// page; kept in upstream's settings (viewFixedRows, viewRows) and ours (snapPages).
+TEST_F(MainWindowTest, pagesSideBySideScrollSideways) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    auto settle = [&] { until([&] { return !vc.isAnimating(); }, 2000); };
+    auto* previous = find<QQuickItem>("previousPageButton");
+    auto* next = find<QQuickItem>("nextPageButton");
+    ASSERT_NE(previous, nullptr);
+    ASSERT_NE(next, nullptr);
+    EXPECT_FALSE(next->isVisible()) << "not while the pages go down";
+
+    // From the layout menu (press and hold on the layout button)
+    auto* layoutMenu = find<QObject>("layoutMenu");
+    auto* layoutButton = find<QQuickItem>("layoutButton");
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
+                      layoutButton->mapToScene(QPointF(layoutButton->width() / 2, layoutButton->height() / 2)).toPoint());
+    ASSERT_TRUE(waitOpened(layoutMenu, true));
+    QQuickItem* sideways = findItem("sidewaysItem");
+    if (!sideways) {
+        sideways = find<QQuickItem>("sidewaysItem");
+    }
+    ASSERT_NE(sideways, nullptr);
+    QMetaObject::invokeMethod(sideways, "triggered");
+    QMetaObject::invokeMethod(layoutMenu, "close");
+    ASSERT_TRUE(waitOpened(layoutMenu, false));
+    wait(50);
+    EXPECT_TRUE(controller->horizontalScrolling());
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    EXPECT_TRUE(s->getSettings()->isViewFixedRows()) << "upstream's setting";
+    ASSERT_TRUE(view->documentLayout().horizontal());
+    EXPECT_EQ(view->documentLayout().rows(), 1u);
+    EXPECT_NEAR(vc.zoom(), view->documentLayout().fitHeightZoom(vc.viewSize().height()), 1e-6) << "fit to the height";
+    EXPECT_TRUE(next->isVisible()) << "the pill has ‹ ›";
+    EXPECT_TRUE(previous->isVisible());
+    ASSERT_EQ(controller->pageNumber(), 1);
+
+    click(next);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 2);
+    key(Qt::Key_Right);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 3);
+    key(Qt::Key_PageDown);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 4);
+    key(Qt::Key_PageUp);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 3);
+    click(previous);
+    settle();
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 2);
+    key(Qt::Key_End);
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), controller->pageCount());
+    key(Qt::Key_Home);
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 1);
+    // The number jump too
+    key(Qt::Key_5);
+    key(Qt::Key_Return);
+    wait(30);
+    EXPECT_EQ(controller->pageNumber(), 5);
+    EXPECT_NEAR(vc.scrollPosition().x(), vc.restRange(view->documentLayout().groupOf(4)).first, 1)
+            << "the page where it rests";
+
+    // Two rows; snapping off
+    controller->setViewRows(2);
+    wait(30);
+    EXPECT_EQ(view->documentLayout().rows(), 2u);
+    EXPECT_EQ(find<QQuickItem>("columnsLabel")->property("text").toString(), "2") << "the menu counts rows now";
+    controller->setSnapPages(false);
+    EXPECT_FALSE(vc.snapping());
+    EXPECT_FALSE(controller->snapPages());
+
+    // Back to pages going down
+    controller->setViewRows(1);
+    controller->setSnapPages(true);
+    controller->setHorizontalScrolling(false);
+    wait(30);
+    EXPECT_FALSE(view->documentLayout().horizontal());
+    EXPECT_FALSE(s->getSettings()->isViewFixedRows());
+    EXPECT_FALSE(next->isVisible());
+    key(Qt::Key_Right);
+    EXPECT_EQ(controller->pageNumber(), 5) << "the arrow keys are not for pages going down";
 }

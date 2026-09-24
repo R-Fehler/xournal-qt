@@ -835,6 +835,49 @@ void AppController::setPairsOffset(int offset) {
     }
 }
 
+bool AppController::horizontalScrolling() const { return app->getSettings()->isViewFixedRows(); }
+int AppController::viewRows() const { return std::max(1, app->getSettings()->getViewRows()); }
+bool AppController::snapPages() const { return CanvasView::snapSetting(*app->getSettings()); }
+
+void AppController::setHorizontalScrolling(bool on) {
+    if (on != horizontalScrolling()) {
+        // Upstream's "fixed rows", filled column by column (its vertical layout): the same pages side by side
+        app->getSettings()->setViewFixedRows(on);
+        app->getSettings()->setViewLayoutVert(on);
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+void AppController::setViewRows(int rows) {
+    rows = std::clamp(rows, 1, 8);
+    if (rows != viewRows()) {
+        app->getSettings()->setViewRows(rows);
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+void AppController::setSnapPages(bool snap) {
+    if (snap != snapPages()) {
+        app->getSettings()->getCustomElement("xournalQt").setBool("snapPages", snap);  // (see CanvasView::snapSetting)
+        app->getSettings()->customSettingsChanged();
+        Q_EMIT app->settingsChanged();
+        Q_EMIT viewLayoutChanged();
+    }
+}
+
+void AppController::previousPage() {
+    if (canvas() && session() && !canvas()->getViewController().stepPages(-1) && session()->getCurrentPageNo() > 0) {
+        goToPage(static_cast<int>(session()->getCurrentPageNo()) - 1);
+    }
+}
+void AppController::nextPage() {
+    if (canvas() && session() && !canvas()->getViewController().stepPages(1)) {
+        goToPage(static_cast<int>(session()->getCurrentPageNo()) + 1);
+    }
+}
+void AppController::firstPage() { goToPage(0); }
+void AppController::lastPage() { goToPage(pageCount() - 1); }
+
 int AppController::searchHitPageCount() const {
     return session() ? static_cast<int>(session()->search().pages().size()) : 0;
 }
@@ -2141,7 +2184,9 @@ void AppController::fitWidth() {
 }
 
 void AppController::fitHeight() {
-    if (canvas() && session()) {
+    if (canvas() && session() && canvas()->documentLayout().horizontal()) {
+        canvas()->getViewController().fitHeight();  // sideways: all rows, and kept
+    } else if (canvas() && session()) {
         canvas()->getViewController().fitPage(session()->getCurrentPageNo(), false);
     }
 }

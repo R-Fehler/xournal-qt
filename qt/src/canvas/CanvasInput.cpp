@@ -78,6 +78,9 @@ CanvasInput::CanvasInput(CanvasView& view, QObject* parent): QObject(parent), vi
     penHoldTimer.setSingleShot(true);
     penHoldTimer.setInterval(LONG_PRESS_MS);
     connect(&penHoldTimer, &QTimer::timeout, this, [this] { penHeld(); });
+    wheelSnapTimer.setSingleShot(true);
+    wheelSnapTimer.setInterval(180);
+    connect(&wheelSnapTimer, &QTimer::timeout, this, [this] { this->view.getViewController().endScroll({}); });
 }
 
 void CanvasInput::startPenHold(const Event& event) {
@@ -611,6 +614,8 @@ bool CanvasInput::actionEnd(const Event& event) {
         if (monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
             std::hypot(event.viewPos.x() - pressViewPos.x(), event.viewPos.y() - pressViewPos.y()) <= TAP_SLOP_PX / 2) {
             view.tapAt(event.viewPos);
+        } else if (view.getViewController().snapping()) {
+            view.getViewController().endScroll({});  // (dragged: to rest on a page)
         }
         this->sequenceStartPage = nullptr;
         this->inputRunning = false;
@@ -645,6 +650,10 @@ bool CanvasInput::actionEnd(const Event& event) {
     if (tapTool && !view.getSelection() && monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
         std::hypot(event.viewPos.x() - pressViewPos.x(), event.viewPos.y() - pressViewPos.y()) <= TAP_SLOP_PX / 2) {
         view.tapAt(event.viewPos);
+    }
+
+    if (tt == TOOL_HAND && view.getViewController().snapping()) {
+        view.getViewController().endScroll({});  // the hand dragged the pages: to rest on one
     }
 
     draggingGeometryTool = false;
@@ -974,12 +983,19 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                     lastTapMs = now;
                     lastTapPos = touchSessionStartPos;
                 }
-            } else if (velocitySamples.size() >= 2) {
-                const auto& a = velocitySamples.front();
-                const auto& b = velocitySamples.back();
-                const double dt = b.t - a.t;
-                if (dt > 5.0 && now - b.t < 50.0) {
-                    vc.fling((b.pos - a.pos) / dt);
+            } else {
+                QPointF v;
+                if (velocitySamples.size() >= 2) {
+                    const auto& a = velocitySamples.front();
+                    const auto& b = velocitySamples.back();
+                    const double dt = b.t - a.t;
+                    if (dt > 5.0 && now - b.t < 50.0) {
+                        v = (b.pos - a.pos) / dt;
+                    }
+                }
+                // Momentum, or when snapping to pages (sideways, presenting) on to the page it comes to rest on
+                if (!v.isNull() || vc.snapping()) {
+                    vc.endScroll(v);
                 }
             }
         }
@@ -998,15 +1014,31 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
         vc.zoomBy(std::pow(1.0015, e->angleDelta().y()), viewPos);
         return true;
     }
-    const QPointF delta =
-            !e->pixelDelta().isNull() ? QPointF(e->pixelDelta()) : QPointF(e->angleDelta()) / 120.0 * 48.0;
+    // (scrolling sideways, what cannot scroll up or down scrolls left or right)
+    const QPointF delta = vc.scrollDelta(!e->pixelDelta().isNull() ? QPointF(e->pixelDelta())
+                                                                    : QPointF(e->angleDelta()) / 120.0 * 48.0);
     const double now = monotonicMs();
 
     switch (e->phase()) {
         case Qt::NoScrollPhase:
+            if (vc.snapping() && vc.groupFitsView()) {
+                // Snapping to pages: a notch of the wheel (120) is a page
+                const QPointF notches = vc.scrollDelta(!e->angleDelta().isNull() ? QPointF(e->angleDelta())
+                                                                                 : QPointF(e->pixelDelta()) * 2.5);
+                wheelPages += notches.x();
+                while (std::abs(wheelPages) >= 120.0) {
+                    const int step = wheelPages > 0 ? -1 : 1;  // (up / left: back)
+                    wheelPages += step * 120.0;
+                    vc.stepPages(step);
+                }
+                break;
+            }
             // Mouse wheel (no gesture phases): plain scrolling.
             vc.stopMomentum();
             vc.panBy(delta);
+            if (vc.snapping()) {
+                wheelSnapTimer.start();  // (within a zoomed-in page: to rest once the wheel stops)
+            }
             break;
         case Qt::ScrollBegin:
             // Fingers on the touchpad: stop a running fling.
@@ -1025,8 +1057,11 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
             }
             break;
         case Qt::ScrollMomentum:
-            // The platform generates the momentum itself (macOS): just follow it.
-            vc.panBy(delta);
+            // The platform generates the momentum itself (macOS): just follow it (when snapping, the view is on its
+            // way to a page already).
+            if (!vc.snapping()) {
+                vc.panBy(delta);
+            }
             break;
         case Qt::ScrollEnd: {
             // Fingers lifted: continue with the recent velocity (like GTK's kinetic scrolling on touchpads).
@@ -1035,6 +1070,7 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
                 wheelSamples.push_back({now, delta});
             }
             // Only if the fingers were still moving when lifted.
+            QPointF v;
             if (wheelSamples.size() >= 2 && now - wheelSamples.back().t < 60.0) {
                 const double dt = wheelSamples.back().t - wheelSamples.front().t;
                 QPointF distance;
@@ -1042,8 +1078,11 @@ bool CanvasInput::wheelEvent(QWheelEvent* e, QPointF viewPos) {
                     distance += wheelSamples[i].delta;  // the first delta happened before the first timestamp
                 }
                 if (dt > 5.0) {
-                    vc.fling(distance / dt);
+                    v = distance / dt;
                 }
+            }
+            if (!v.isNull() || vc.snapping()) {
+                vc.endScroll(v);  // momentum, or on to the page it comes to rest on
             }
             wheelSamples.clear();
             break;

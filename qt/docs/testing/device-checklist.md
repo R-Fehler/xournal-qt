@@ -696,3 +696,19 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       and tap it again: the slide fills the width. Scrolling back keeps the zoom (fit width is not re-applied by
       itself). With two pages side by side the row in view fills the width. Double tap on a zoomed-in page: back to
       that page's width.
+- [ ] Scroll sideways: press and hold (or right click) the layout button in the page / zoom pill → "Scroll
+      sideways". The pages stand side by side, each as high as the window; the pill shows ‹ 3 / 40 ›. ‹ › go to the
+      previous / next page with a short slide, and so do ← → and Page Up / Down (Home / End: first / last page);
+      tapping › several times quickly goes that many pages on smoothly.
+- [ ] With "Stop on whole pages" (on by default): a finger swipe goes to the next or previous page; a slow drag of
+      less than half a page springs back, more than half goes on; a strong fling goes on several pages and still
+      stops on one. Two fingers on the touchpad (sideways or up / down) do the same; the mouse wheel goes one page
+      per notch. The pages are sharp when they arrive (the next and previous pages are drawn in advance): watch
+      for blurry pages while paging quickly through a PDF.
+- [ ] Turn "Stop on whole pages" off: swiping, the touchpad and the wheel (up / down scrolls sideways) scroll freely
+      with momentum, as the pages going down do.
+- [ ] Layout menu → Rows +: two rows of pages (pages 1 and 2 above each other, then 3 and 4, …), both rows fit the
+      height; "Two pages side by side" and "Book" keep the pairs side by side. Resize the window: the pages fit the
+      height again, on the same page. Pinch or Ctrl+wheel zoom: the zoom stays when the window is resized.
+- [ ] Close and start the app again: the sideways layout, rows and "Stop on whole pages" are kept.
+      Switch back ("Scroll sideways" off): pages go down as before, on the same page.

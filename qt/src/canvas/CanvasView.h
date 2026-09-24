@@ -47,6 +47,7 @@
 #include "GeometryToolLayer.h"
 
 class EditSelection;
+class Settings;
 class PdfCache;
 class PdfElemSelection;
 
@@ -69,6 +70,8 @@ public:
     RenderService& getRenderService() const { return renderService; }
     ViewController& getViewController() { return viewController; }
     const DocumentLayout& documentLayout() const { return layout; }
+    /// Scrolling sideways comes to rest on whole pages (setting "snapPages" of ours, default on)
+    static bool snapSetting(Settings& settings);
 
     size_t pageCount() const { return pages.size(); }
     CanvasPage* getPage(size_t index) const { return pages[index].get(); }
@@ -301,6 +304,11 @@ private:
     void cancelRenders();
     void refreshLayout();
     DocumentLayout::Config layoutConfig() const;
+    /// Lay out again after the layout settings changed, keeping the current page in view
+    void relayout();
+    /// Snapping to pages (the setting, or presenting)
+    void applyScrolling();
+    bool presenting = false;
     void updateVisibility();
     /// The page the view was sent to: the current one while it can be seen, until the view is scrolled or zoomed
     std::optional<size_t> jumpedPage;

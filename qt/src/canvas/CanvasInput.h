@@ -177,6 +177,10 @@ private:
         QPointF delta;
     };
     std::vector<WheelSample> wheelSamples;
+    /// Snapping to pages: wheel notches not yet turned into a page (120 each), and the pause after wheel scrolling
+    /// within a zoomed-in page before it comes to rest
+    double wheelPages = 0;
+    QTimer wheelSnapTimer;
 };
 
 }  // namespace xqt

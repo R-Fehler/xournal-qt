@@ -124,13 +124,12 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     // Column layout changed in the settings: lay out again, keep the current page in view.
     connect(&session.getApp(), &AppContext::settingsChanged, this, [this] {
+        applyScrolling();
         if (layoutConfig() != layout.getConfig()) {
-            const size_t page = this->session.getCurrentPageNo();
-            refreshLayout();
-            viewController.fitWidth(page);
-            viewController.scrollToPage(page);
+            relayout();
         }
     });
+    applyScrolling();
 
     updateRenderParams();
     CanvasMemory::instance().add(this);
@@ -230,10 +229,42 @@ void CanvasView::rebuildPages() {
 }
 
 DocumentLayout::Config CanvasView::layoutConfig() const {
-    // Upstream's view settings (viewColumns, showPairedPages, numPairsOffset).
+    DocumentLayout::Config c;
+    if (presenting) {
+        // One page after the other, each filling the screen
+        c.horizontal = true;
+        c.noMargins = true;
+        return c;
+    }
+    // Upstream's view settings (viewColumns, showPairedPages, numPairsOffset; sideways: viewFixedRows, viewRows).
     const Settings* s = session.getSettings();
-    return {static_cast<size_t>(std::max(1, s->getViewColumns())), s->isShowPairedPages(),
-            static_cast<size_t>(std::max(0, s->getPairsOffset()))};
+    c.columns = static_cast<size_t>(std::max(1, s->getViewColumns()));
+    c.paired = s->isShowPairedPages();
+    c.pairsOffset = static_cast<size_t>(std::max(0, s->getPairsOffset()));
+    c.horizontal = s->isViewFixedRows();
+    c.rows = static_cast<size_t>(std::max(1, s->getViewRows()));
+    return c;
+}
+
+bool CanvasView::snapSetting(Settings& settings) {
+    bool snap = true;
+    settings.getCustomElement("xournalQt").getBool("snapPages", snap);
+    return snap;
+}
+
+void CanvasView::applyScrolling() {
+    viewController.setSnapping(presenting || snapSetting(*session.getSettings()), presenting ? 1 : 0);
+}
+
+void CanvasView::relayout() {
+    const size_t page = session.getCurrentPageNo();
+    refreshLayout();
+    if (presenting) {
+        viewController.fitPresentedPage(page);
+        return;
+    }
+    viewController.fitDefault(page);
+    viewController.scrollToPage(page);
 }
 
 // --- selection (port of upstream XournalView) ------------------------------------------------------------------

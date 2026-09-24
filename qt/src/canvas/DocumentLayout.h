@@ -10,6 +10,11 @@
  * Pages are placed row by row (upstream's default horizontal layout with a fixed number of columns, see
  * LayoutMapper): `columns` per row; with paired pages the column count is even and the two pages of a pair meet in
  * the middle, `pairsOffset` empty slots before the first page (1: the cover stands alone, like a book).
+ * Scrolling sideways (`horizontal`) places them column by column instead, in `rows` rows (upstream's vertical layout
+ * with fixed rows): the document is one wide strip, a pair of pages stays side by side.
+ *
+ * A "group" is what the view steps through: a row of pages, or scrolling sideways a column (a pair of columns with
+ * paired pages). Its pages are consecutive.
  *
  * @license GNU GPLv2 or later
  */
@@ -29,11 +34,16 @@ class Document;
 
 namespace xqt {
 
-/// Upstream settings: viewColumns, showPairedPages, numPairsOffset.
+/// Upstream settings: viewColumns, showPairedPages, numPairsOffset; scrolling sideways: viewFixedRows (with
+/// viewLayoutVert), viewRows.
 struct DocumentLayoutConfig {
     size_t columns = 1;
     bool paired = false;
     size_t pairsOffset = 0;
+    bool horizontal = false;
+    size_t rows = 1;
+    /// No margin around the pages (presenting: a page fills the screen)
+    bool noMargins = false;
     bool operator==(const DocumentLayoutConfig&) const = default;
 };
 
@@ -55,6 +65,16 @@ public:
     QSizeF pageSize(size_t page) const { return sizes[page]; }
     size_t columns() const { return cols; }
     size_t rows() const { return rowCount; }
+    bool horizontal() const { return config.horizontal; }
+    /// The margin around the pages (pixels)
+    double padding() const { return config.noMargins ? 0.0 : PADDING; }
+
+    size_t groupCount() const;
+    size_t groupOf(size_t page) const;
+    /// The pages of a group (first, last)
+    std::pair<size_t, size_t> groupPages(size_t group) const;
+    /// The pages of a group, from the top left of the first to the bottom right of the last (content).
+    QRectF groupRect(size_t group, double zoom) const;
 
     QRectF pageRect(size_t page, double zoom) const;
     QSizeF contentSize(double zoom) const;
@@ -64,12 +84,14 @@ public:
     size_t nearestPage(QPointF content, double zoom) const;
     /// Range of pages in the rows intersecting a content rectangle (pages are placed row by row).
     std::pair<size_t, size_t> pagesIn(const QRectF& content, double zoom) const;
-    /// Zoom at which the row of a page (the page alone in one column) fits into the view width: upstream's
-    /// fit-to-width, but for the page in view rather than the widest one (a wide page elsewhere in the document
-    /// does not make the others small).
+    /// Zoom at which the group of a page (its row; scrolling sideways its column or pair) fits into the view width:
+    /// upstream's fit-to-width, but for the page in view rather than the widest one (a wide page elsewhere in the
+    /// document does not make the others small).
     double fitWidthZoom(double viewWidth, size_t page) const;
-    /// The pages of the row of `page`, from the left edge of the first to the right edge of the last (content).
-    QRectF rowSpan(size_t page, double zoom) const;
+    /// The pages of the group of `page`, from the left edge of the first to the right edge of the last (content).
+    QRectF rowSpan(size_t page, double zoom) const { return groupRect(groupOf(page), zoom); }
+    /// Zoom at which all rows fit into the view height (scrolling sideways: "fit to the window height").
+    double fitHeightZoom(double viewHeight) const;
 
 private:
     struct Cell {
@@ -83,8 +105,10 @@ private:
     double gapAfterColumn(size_t col) const;
     /// Where a page lies in its column (points: it grows with the zoom): centered, or pushed to its pair.
     double offsetInColumn(size_t page) const;
-    /// The pages in the row of `page` (first, last)
-    std::pair<size_t, size_t> rowPages(size_t page) const;
+    /// The place (slot, counting the empty ones before the first page) at a cell
+    size_t slotOf(size_t col, size_t row) const;
+    /// Columns in a group (scrolling sideways: 2 for pairs)
+    size_t groupColumns() const { return config.paired ? 2 : 1; }
 
     Config config;
     std::vector<QSizeF> sizes;

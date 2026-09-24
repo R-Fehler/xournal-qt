@@ -841,10 +841,15 @@ ApplicationWindow {
                     id: layoutMenu
                     objectName: "layoutMenu"
                     MenuItem {
-                        text: qsTr("One page per row")
+                        objectName: "onePageItem"
+                        text: app.horizontalScrolling ? qsTr("Pages in one row") : qsTr("One page per row")
                         checkable: true
-                        checked: app.viewColumns === 1 && !app.pairedPages
-                        onTriggered: { app.pairedPages = false; app.viewColumns = 1 }
+                        checked: !app.pairedPages && (app.horizontalScrolling ? app.viewRows === 1 : app.viewColumns === 1)
+                        onTriggered: {
+                            app.pairedPages = false
+                            if (app.horizontalScrolling) app.viewRows = 1
+                            else app.viewColumns = 1
+                        }
                     }
                     MenuItem {
                         text: qsTr("Two pages side by side")
@@ -859,27 +864,52 @@ ApplicationWindow {
                         onTriggered: { app.viewColumns = 2; app.pairsOffset = 1; app.pairedPages = true }
                     }
                     MenuSeparator {}
-                    // N columns
+                    // N columns (scrolling sideways: N rows)
                     RowLayout {
                         width: parent ? parent.width : implicitWidth
-                        Label { text: qsTr("Columns"); Layout.leftMargin: 16; Layout.fillWidth: true }
+                        readonly property bool rows: app.horizontalScrolling
+                        readonly property int count: rows ? app.viewRows : app.viewColumns
+                        function setCount(n) {
+                            if (rows) { app.viewRows = n; return }
+                            app.pairedPages = false
+                            app.viewColumns = n
+                        }
+                        Label { text: parent.rows ? qsTr("Rows") : qsTr("Columns"); Layout.leftMargin: 16; Layout.fillWidth: true }
                         ToolButton {
+                            objectName: "fewerColumnsButton"
                             text: "−"; font.pixelSize: 20
-                            enabled: app.viewColumns > 1
-                            onClicked: { app.pairedPages = false; app.viewColumns = app.viewColumns - 1 }
+                            enabled: parent.count > 1
+                            onClicked: parent.setCount(parent.count - 1)
                         }
                         Label {
                             objectName: "columnsLabel"
-                            text: app.viewColumns
+                            text: parent.count
                             font.weight: Font.DemiBold
                             horizontalAlignment: Text.AlignHCenter
                             Layout.minimumWidth: 20
                         }
                         ToolButton {
+                            objectName: "moreColumnsButton"
                             text: "+"; font.pixelSize: 20
-                            enabled: app.viewColumns < 8
-                            onClicked: { app.pairedPages = false; app.viewColumns = app.viewColumns + 1 }
+                            enabled: parent.count < 8
+                            onClicked: parent.setCount(parent.count + 1)
                         }
+                    }
+                    MenuSeparator {}
+                    MenuItem {
+                        objectName: "sidewaysItem"
+                        text: qsTr("Scroll sideways")
+                        checkable: true
+                        checked: app.horizontalScrolling
+                        onTriggered: app.horizontalScrolling = !app.horizontalScrolling
+                    }
+                    MenuItem {
+                        objectName: "snapPagesItem"
+                        text: qsTr("Stop on whole pages")
+                        enabled: app.horizontalScrolling
+                        checkable: true
+                        checked: app.snapPages
+                        onTriggered: app.snapPages = !app.snapPages
                     }
                 }
             }
@@ -892,7 +922,33 @@ ApplicationWindow {
                 icon.width: 22; icon.height: 22
                 onClicked: pageGrid.open()
             }
-            Label { text: app.pageNumber + " / " + app.pageCount; color: "#505050"; Layout.rightMargin: 6 }
+            // Scrolling sideways: the previous and the next page on either side of the page number
+            IconButton {
+                objectName: "previousPageButton"
+                visible: app.horizontalScrolling
+                iconName: "xqt-chevron-left"
+                tip: qsTr("Previous page (←, Page Up)")
+                implicitWidth: 36; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                enabled: app.pageNumber > 1
+                onClicked: app.previousPage()
+            }
+            Label {
+                objectName: "pageNumberLabel"
+                text: app.pageNumber + " / " + app.pageCount
+                color: "#505050"
+                Layout.rightMargin: app.horizontalScrolling ? 0 : 6
+            }
+            IconButton {
+                objectName: "nextPageButton"
+                visible: app.horizontalScrolling
+                iconName: "xqt-chevron-right"
+                tip: qsTr("Next page (→, Page Down)")
+                implicitWidth: 36; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                enabled: app.pageNumber < app.pageCount
+                onClicked: app.nextPage()
+            }
             ToolSeparator {}
             ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }
             ToolButton {
@@ -1741,6 +1797,12 @@ ApplicationWindow {
     DigitKey { digit: 7 }
     DigitKey { digit: 8 }
     DigitKey { digit: 9 }
+    // Scrolling sideways: the arrow keys and Page Up / Down go from page to page (a text being typed keeps them)
+    readonly property bool sidewaysKeys: toolKeys && app.horizontalScrolling
+    Shortcut { sequences: ["Left", "PgUp"]; enabled: win.sidewaysKeys; onActivated: app.previousPage() }
+    Shortcut { sequences: ["Right", "PgDown"]; enabled: win.sidewaysKeys; onActivated: app.nextPage() }
+    Shortcut { sequence: "Home"; enabled: win.sidewaysKeys; onActivated: app.firstPage() }
+    Shortcut { sequence: "End"; enabled: win.sidewaysKeys; onActivated: app.lastPage() }
 
     Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.selectTool("eraser") }
     Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.selectTool("highlighter") }
