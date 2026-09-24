@@ -119,6 +119,8 @@ set(XQT_QML_FILES
     src/app/qml/HomeView.qml
     src/app/qml/DocumentCard.qml
     src/app/qml/NewDocumentDialog.qml
+    src/app/qml/DocumentModeCards.qml
+    src/app/qml/DocumentModeDialog.qml
     src/app/qml/BackgroundPreview.qml
     src/app/qml/HighlightColors.qml
     src/app/qml/BackgroundChooser.qml
@@ -224,6 +226,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CanvasMemoryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PastedPdfPagesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PdfOnlyModeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PdfPrintingTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")

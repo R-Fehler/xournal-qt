@@ -1134,3 +1134,38 @@ counts the pictures of the tool drawn; it should stay 0 while moving and turning
       "edited in another app" question comes, and after "Keep the Xournal data" the next save writes the file anew.
 - [ ] Pull the power (or kill the app with `kill -9`) during a save of a long PDF: the file still opens in every
       viewer as it was before that save; a hidden `.name.pdf.….part` file next to it goes away with a later save.
+
+## PDF-only mode (qt/pdf-only)
+
+The question at the first start:
+- [ ] Start the app on a device where it ran before (your own install): a dialog asks "How do you want to keep your
+      documents?" once, with two cards. "PDF files (like Drawboard PDF, GoodNotes, Xodo)" is chosen to start with and
+      says "Recommended for most people"; "Xournal++ files (like Xournal++)" says "Recommended if you also use
+      Xournal++". A line under them says it can be changed in Settings → Documents.
+- [ ] Escape and a tap beside the dialog do not close it; a tap on the other card chooses it; "Continue" closes it.
+      Quit and start again: not asked again. After a crash, the recovery question comes after this one.
+- [ ] Settings → Documents shows the same two cards at the top, with the mode in effect chosen. A tap changes it at
+      once. In PDF files mode "Save notes into the PDF itself" is not shown (it is always so).
+- [ ] The cards are readable and tappable on the phone (Android) and on the Surface at 200 %.
+
+Working in PDF files mode (choose "PDF files", or Settings → Documents):
+- [ ] Library → New document: it appears as `name.pdf` (one card); write, Ctrl+S; open it in Okular or Acrobat: the
+      ink is there. No other file appears in the folder (`ls -la`, hidden files too).
+- [ ] A new tab (Ctrl+N), write, Ctrl+S: the Save as dialog starts on "PDF with notes", with a `.pdf` name.
+- [ ] Open a plain PDF, write on it, Ctrl+S: no dialog; a note says "Your notes are saved in name.pdf …" (only the
+      first time ever). The folder has only `name.pdf` (no `.xopp`, no `name.original.pdf`). Open it in other PDF
+      apps: the pages look as before, with the ink on top. `~/.cache/xournal-qt/originals/` holds the original.
+- [ ] Write more, Ctrl+S: fast, and `grep -c startxref name.pdf` grows by one per save.
+- [ ] Copy pages from another PDF, paste them into it, Ctrl+S: still only `name.pdf` in the folder (no
+      `.name.pages.pdf`, `.name.next.pdf`); the pasted pages' text is searchable after reopening.
+- [ ] Open a photo, write on it, Ctrl+S: Save as suggests `photo.pdf`; move the photo away and open `photo.pdf`: the
+      picture is still there.
+- [ ] Open an existing `.xopp`, write, Ctrl+S: it stays a `.xopp`. Share → "For Xournal++" still exports a pair into
+      a chosen folder.
+- [ ] Autosave (Settings → Documents, every minute): write on a saved PDF with notes, wait over a minute: no
+      `.name.autosave.xopp` appears next to it; `~/.cache/xournal-qt/autosaves/` has a `…autosave.xopp`. Kill the app
+      (`kill -9`), start it: the recovery question offers the PDF; recover, Ctrl+S: saved into the PDF.
+- [ ] Switch back to "Xournal++ files": a plain PDF's notes ask for a place again (`.xopp` / `name.notes.pdf`), as
+      before.
+- [ ] Windows: annotate a PDF that the library shows (its preview visible), Ctrl+S: saved without an error. If an
+      error "could not rename" comes, note it (see hybrid-pdf.md, "PDF-only mode").

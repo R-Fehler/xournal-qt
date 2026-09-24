@@ -553,3 +553,77 @@ identically to the full write (no pixel differs). veraPDF 1.28.2 passes the arch
 times (PDF/A-3b); pgfmanual's archive PDF is not PDF/A with or without increments (its source is not, and the file
 does not claim it). MuPDF (`mutool` is not installed; the `qt/mupdf` branch was not merged for this) and pdf.js (not
 installed; it needs a download) were not tried.
+
+## PDF-only mode (`qt/pdf-only`)
+
+The author decided (2026-09-24, TODO.md "a PDF-only mode") that people can work with PDFs only, the Drawboard way:
+every document is a single PDF, with no sidecars.
+
+### The setting and the first-start question
+
+- `documentMode` in the `xournalQt` part of `settings.xml` (`session/DocumentMode.h`): `pdf` ("PDF files") or `xopp`
+  ("Xournal++ files", the behaviour before). While it is not stored the app works as Xournal++ files.
+- The first start of the main window where it is not stored asks once (`DocumentModeDialog.qml`): "How do you want to
+  keep your documents?", two cards (`DocumentModeCards.qml`):
+  - **PDF files** (like Drawboard PDF, GoodNotes, Xodo): every document is one PDF that any app opens; notes on a
+    PDF are saved into that PDF, nothing else is written next to the files. *Recommended for most people*; chosen
+    to start with.
+  - **Xournal++ files** (like Xournal++): `.xopp` notes next to their PDFs, fully compatible with Xournal++.
+    *Recommended if you also use Xournal++*.
+
+  A line says it can be changed in Settings → Documents and that copies for Xournal++ stay available through
+  Share → "For Xournal++". Only **Continue** closes it (Escape and a tap outside do not); the choice is stored then.
+  Existing installs are asked too. After a crash the recovery question follows it.
+- Settings → Documents shows the same cards at the top ("Keep documents as"); a tap changes the mode at once. In PDF
+  files mode the switch "Save notes into the PDF itself" is hidden: it is always so.
+- Tests and scripts: `XQT_DOCUMENT_MODE=xopp|pdf` stands in for a choice that is not stored and keeps the question
+  away (a stored choice wins). The UI tests set `xopp` in `tests/ui/main.cpp`; `FirstStartTest` unsets it to test the
+  question, and the tests of PDF files mode store the mode and set it back.
+
+### What PDF files mode does
+
+- **New documents** are PDFs with notes: the library's New document saves `name.pdf` at once
+  (`AppController::createDocument`); a new tab's Save as starts on "PDF with notes" with `name.pdf`
+  (`AppController::saveFormat`, also used by the window's Save as for every document: a hybrid PDF stays a PDF, a
+  `.xopp` a `.xopp`, everything without a file of its own takes the mode's type).
+- **Annotating a PDF writes into that PDF.** Ctrl+S (and closing with Save) saves without a dialog, as with "Save notes
+  into the PDF itself": there is no "where to save the .xopp" step. The first save turns the plain PDF into a PDF with
+  notes (written in full, atomically: a temporary file renamed over it); from then on Ctrl+S appends incremental
+  updates (above). Save as suggests the PDF itself.
+  - *The original pages are never rewritten*: their content streams are copied as they are (`qpdf_dl_none`), our ink
+    is annotations on top (`PdfOnlyMode.annotatingAPdfSavesIntoItThenAppends` compares the raw content streams of
+    every page before and after both saves).
+  - *No `name.original.pdf`* next to it (nothing is written next to the files). Instead the original is kept once in
+    the app cache, `~/.cache/xournal-qt/originals/<hash of its path>/name.pdf`, as a hard link where the file system
+    allows (it costs nothing: the file is replaced by a rename, so the link keeps the original bytes), else a copy.
+    Entries older than 30 days are removed at the next such save. No UI; it is a safety net for a writer bug.
+  - *A one-time notice* after the first time notes go into a PDF of the user's: "Your notes are saved in
+    lecture.pdf. Its pages stay as they were; other PDF apps show the notes as annotations." (a snackbar, setting
+    `pdfOnlyIntoPdfNoticed`). Not a dialog before the save: the user chose PDF files with that explanation at the first
+    start, and a question on every first save of a PDF would be friction the chosen mode is meant to remove. The notice
+    makes sure nobody is surprised that the PDF itself changed.
+- **Pasted pages go into the PDF.** A PDF with notes never writes `.name.pages.pdf` or `.name.next.pdf`: pasted
+  PDF pages live in the merged PDF in the cache until the save copies them into the file (as for every hybrid PDF).
+  The paste note says "it goes into the PDF when saved".
+- **Images are inside.** An image written on (`photo.png` opened) is saved as `photo.pdf`; on every save of a PDF with
+  notes in this mode, an image file shown as a page background becomes an attached image of the embedded `.xopp`
+  (embedded in the PDF), so the PDF does not depend on the image file. Images inserted on pages were always inside
+  the `.xopp` data.
+- **Autosave and recovery stay in the app cache.** Upstream (and Xournal++ files mode) autosaves a saved document as
+  `.name.autosave.xopp` next to it; in PDF files mode every autosave goes to `~/.cache/xournal-qt/autosaves/<pid>-<tab
+  serial>.autosave.xopp`, the name unsaved tabs always had (`DocumentSession::autosavePath`). Recovery after a crash
+  looks there for saved documents too (`SessionRecovery::findCandidates`, whatever the mode is now), recovers the
+  document as its PDF, and its next save writes into it. Crash (emergency) saves were already in the cache; so are the
+  clean copies, the merged PDFs of pasted pages and the kept originals.
+- **Existing `.xopp` files keep their format**: they open and save as `.xopp` (with their sidecars, which are part of
+  that format); Save as starts on `.xopp` for them. Save as → "PDF with notes" and its old-`.xopp` question work as
+  before.
+- **Xournal++ files mode** is exactly the behaviour before the question existed.
+- Not changed by the mode: Share (a hybrid PDF, "For Xournal++" exports into a chosen folder), the archive export, the
+  "edited in another app" check, and the explicit per-document "Keep it updated for Xournal++" and the global "also
+  write a .xopp" setting (both write a `.xopp` next to the PDF because the user asked for it).
+- **Windows, not verified:** the first save renames the new file over the user's PDF. The document itself reads its
+  pages from a copy in the cache before that (as before), but another program or a preview worker of the app that
+  has the PDF open without `FILE_SHARE_DELETE` makes the rename fail on Windows; the save then reports an error and
+  the file stays as it was. Incremental saves rename over the file too. A retry, or `ReplaceFileW`, may be needed
+  there.

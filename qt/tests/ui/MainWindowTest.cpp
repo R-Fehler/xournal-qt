@@ -3,6 +3,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <filesystem>
 #include <atomic>
 #include <chrono>
@@ -71,6 +72,7 @@
 #include "session/DocumentSession.h"
 #include "session/FuzzyQuery.h"
 #include "session/IncrementalPdf.h"
+#include "session/DocumentMode.h"
 #include "session/HybridPdf.h"
 #include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
@@ -175,6 +177,25 @@ protected:
         QTest::mouseClick(window, Qt::LeftButton, m,
                           item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         wait(50);
+    }
+    /// Scrolls the flickable (a ScrollView's) that holds `item` so that the item is shown (to be clicked).
+    void scrollIntoView(QQuickItem* item) {
+        ASSERT_NE(item, nullptr);
+        QQuickItem* flick = item->parentItem();
+        while (flick && !flick->inherits("QQuickFlickable")) {
+            flick = flick->parentItem();
+        }
+        if (!flick) {
+            return;
+        }
+        auto* content = flick->property("contentItem").value<QQuickItem*>();
+        if (!content) {
+            return;
+        }
+        const qreal y = item->mapToItem(content, QPointF(0, 0)).y();
+        const qreal maxY = std::max(0.0, flick->property("contentHeight").toReal() - flick->height());
+        flick->setProperty("contentY", std::clamp(y - flick->height() / 3, 0.0, maxY));
+        nextFrame();
     }
     /// Until the window drew its next frame: layouts changed meanwhile are done, the items are where they are shown
     void nextFrame() {
@@ -4591,6 +4612,7 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     auto* toggle = findItem("hybridIntoPdfSwitch");
     ASSERT_NE(toggle, nullptr);
     until([&] { return toggle->isVisible(); });
+    scrollIntoView(toggle);
     click(toggle);
     EXPECT_TRUE(settings->get("hybridIntoPdf").toBool());
     QObject* explanation = find("intoPdfExplanation");
@@ -5744,4 +5766,155 @@ TEST_F(HomeScreenFilterTest, shareFromALibraryCard) {
     EXPECT_EQ(fake.shared, QStringList{withNotes});
     EXPECT_FALSE(xqt::HybridPdf::hasEarlierRevisions(hybrid));
     EXPECT_TRUE(xqt::HybridPdf::isHybrid(hybrid));
+}
+
+// --- the document mode (PDF files or Xournal++ files; session/DocumentMode.h) ---------------------------------------
+
+// Every UI test runs with XQT_DOCUMENT_MODE=xopp (tests/ui/main.cpp): the first-start question never comes up in
+// front of what a test clicks, and nothing is stored by it.
+TEST_F(MainWindowTest, theFirstStartQuestionStaysAwayInTests) {
+    Settings& settings = *controller->context().getSettings();
+    EXPECT_EQ(xqt::DocumentMode::stored(settings), xqt::DocumentMode::Mode::Unset);
+    EXPECT_FALSE(controller->askDocumentMode());
+    EXPECT_EQ(controller->documentMode(), "xopp");
+    EXPECT_FALSE(controller->pdfOnly());
+    QObject* dialog = find("documentModeDialog");
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_FALSE(dialog->property("visible").toBool());
+}
+
+namespace {
+/// A first start: no document mode stored, XQT_DOCUMENT_MODE not set.
+class FirstStartTest: public MainWindowTest {
+protected:
+    void SetUp() override {
+        before = qgetenv("XQT_DOCUMENT_MODE");
+        qunsetenv("XQT_DOCUMENT_MODE");
+        MainWindowTest::SetUp();
+    }
+    void TearDown() override {
+        forget();
+        MainWindowTest::TearDown();
+        qputenv("XQT_DOCUMENT_MODE", before);
+    }
+    void prepareController() override {
+        forget();  // (also an install that had the app before the question: nothing stored)
+        controller->newDocument();
+    }
+    void forget() { xqt::DocumentMode::store(*controller->context().getSettings(), xqt::DocumentMode::Mode::Unset); }
+    xqt::DocumentMode::Mode stored() const { return xqt::DocumentMode::stored(*controller->context().getSettings()); }
+    QByteArray before;
+};
+}  // namespace
+
+// The first start asks how to keep documents: two cards (PDF files, Xournal++ files) with what each means, the
+// recommendation chosen to start with and marked, and a line that it can be changed later. Only "Continue" closes it;
+// then the choice is stored and not asked again.
+TEST_F(FirstStartTest, asksOnceHowToKeepDocuments) {
+    QObject* dialog = find("documentModeDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true)) << "asked at the first start";
+    EXPECT_TRUE(controller->askDocumentMode());
+    auto* pdf = findItem("documentModePdfCard");
+    auto* xopp = findItem("documentModeXoppCard");
+    ASSERT_NE(pdf, nullptr);
+    ASSERT_NE(xopp, nullptr);
+    EXPECT_EQ(pdf->property("text").toString(), "PDF files");
+    EXPECT_TRUE(pdf->property("subtitle").toString().contains("Drawboard PDF"));
+    EXPECT_EQ(pdf->property("badge").toString(), "Recommended for most people");
+    EXPECT_EQ(xopp->property("text").toString(), "Xournal++ files");
+    EXPECT_EQ(xopp->property("badge").toString(), "Recommended if you also use Xournal++");
+    EXPECT_TRUE(pdf->property("chosen").toBool()) << "the recommendation, to start with";
+    EXPECT_FALSE(xopp->property("chosen").toBool());
+    EXPECT_LT(pdf->mapToScene(QPointF(0, 0)).y(), xopp->mapToScene(QPointF(0, 0)).y()) << "the recommendation first";
+
+    key(Qt::Key_Escape);
+    wait(100);
+    EXPECT_TRUE(dialog->property("visible").toBool()) << "only Continue closes it";
+    click(xopp);
+    EXPECT_TRUE(xopp->property("chosen").toBool());
+    EXPECT_FALSE(pdf->property("chosen").toBool());
+    EXPECT_EQ(stored(), xqt::DocumentMode::Mode::Unset) << "stored on Continue";
+    click(findItem("documentModeContinue"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(stored(), xqt::DocumentMode::Mode::Xopp);
+    EXPECT_FALSE(controller->askDocumentMode()) << "asked once";
+    EXPECT_FALSE(controller->pdfOnly());
+    EXPECT_EQ(controller->documentMode(), "xopp");
+}
+
+TEST_F(FirstStartTest, continuingTakesTheRecommendation) {
+    QObject* dialog = find("documentModeDialog");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(findItem("documentModeContinue"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(stored(), xqt::DocumentMode::Mode::Pdf);
+    EXPECT_TRUE(controller->pdfOnly());
+    EXPECT_EQ(controller->saveFormat(), "pdf") << "a new document is saved as a PDF with notes";
+}
+
+// Settings → Documents shows the two cards; a tap changes the mode at once. In PDF files mode "Save notes into the PDF
+// itself" is not offered (it is always so).
+TEST_F(MainWindowTest, settingsChangeTheDocumentMode) {
+    Settings& s = *controller->context().getSettings();
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("documentsTab"));
+    auto* cards = findItem("documentModeCards");
+    ASSERT_NE(cards, nullptr);
+    until([&] { return cards->isVisible(); });
+    auto* pdf = findItem("documentModePdfCard");
+    auto* xopp = findItem("documentModeXoppCard");
+    auto* intoPdf = findItem("hybridIntoPdfSwitch");
+    ASSERT_NE(pdf, nullptr);
+    ASSERT_NE(intoPdf, nullptr);
+    EXPECT_TRUE(xopp->property("chosen").toBool()) << "the mode in effect (the tests': Xournal++ files)";
+    EXPECT_TRUE(intoPdf->isVisible());
+    click(pdf);
+    EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Pdf);
+    EXPECT_TRUE(controller->pdfOnly());
+    EXPECT_TRUE(pdf->property("chosen").toBool());
+    EXPECT_FALSE(xopp->property("chosen").toBool());
+    until([&] { return !intoPdf->isVisible(); });
+    EXPECT_FALSE(intoPdf->isVisible()) << "always so in PDF files mode";
+    click(xopp);
+    EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Xopp);
+    EXPECT_FALSE(controller->pdfOnly());
+    EXPECT_TRUE(xopp->property("chosen").toBool());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);  // (the tests share the config folder)
+}
+
+// PDF files mode in the window: Save as starts on "PDF with notes" for a new document; Ctrl+S on an annotated PDF
+// writes the notes into it without a dialog, and the first time a note says so.
+TEST_F(MainWindowTest, pdfFilesModeSavesIntoThePdf) {
+    Settings& s = *controller->context().getSettings();
+    xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Pdf);
+    QObject* dialog = find("saveDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(window, "setUpSaveDialog", Q_ARG(QVariant, QVariant(QString())));
+    auto* filter = dialog->property("selectedNameFilter").value<QObject*>();
+    ASSERT_NE(filter, nullptr);
+    EXPECT_EQ(filter->property("index").toInt(), 1) << "PDF with notes";
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".pdf"));
+
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 2);
+    ASSERT_TRUE(controller->openPath(pdf));
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving() && !controller->modified(); }, 20000);
+    EXPECT_FALSE(dialog->property("visible").toBool()) << "no dialog";
+    EXPECT_FALSE(controller->modified());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(pdf.toStdString())));
+    EXPECT_EQ(QDir(dir.path()).entryList(QDir::Files | QDir::Hidden), QStringList{"lecture.pdf"});
+    auto* snackbarText = findItem("snackbarText");
+    ASSERT_NE(snackbarText, nullptr);
+    until([&] { return snackbarText->property("text").toString().startsWith("Your notes are saved in lecture.pdf"); });
+    EXPECT_TRUE(snackbarText->property("text").toString().startsWith("Your notes are saved in lecture.pdf"))
+            << snackbarText->property("text").toString().toStdString();
+    xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);  // (the tests share the config folder)
 }

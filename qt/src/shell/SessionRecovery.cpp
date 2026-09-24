@@ -299,11 +299,17 @@ std::vector<SessionRecovery::Candidate> SessionRecovery::findCandidates(const Jo
         const fs::path autosave = t.text           ? DocumentSession::textAutosavePath(t.pid, t.serial)
                                   : t.file.empty() ? DocumentSession::unnamedAutosavePath(t.pid, t.serial)
                                                    : DocumentSession::namedAutosavePath(t.file);
+        // A saved document autosaved into the app cache (PDF files mode, DocumentMode.h), under the tab's name
+        const fs::path cached = !t.text && !t.file.empty() ? DocumentSession::unnamedAutosavePath(t.pid, t.serial)
+                                                           : fs::path();
         const fs::path emergency = t.text ? DocumentSession::textEmergencyPath(t.pid, t.serial)
                                           : DocumentSession::emergencyPath(t.pid, t.serial);
         const QDateTime saved = fileExists(t.file) ? modificationTime(t.file) : QDateTime();
         Candidate best;
-        for (const fs::path& f: {emergency, autosave}) {
+        for (const fs::path& f: {emergency, autosave, cached}) {
+            if (f.empty()) {
+                continue;
+            }
             if (!fileExists(f)) {
                 continue;
             }

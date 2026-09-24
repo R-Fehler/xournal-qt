@@ -235,9 +235,13 @@ bool AppController::editAsNotes() {
     tabs->addTab(std::move(notes));  // (next to the .md)
     setHomeVisible(false);
     Q_EMIT titleChanged();
+    fs::path suggested = xopp;
+    if (pdfOnly()) {
+        suggested = fs::path(suggestedHybridFile().toLocalFile().toStdString());  // (a PDF with notes)
+    }
     Q_EMIT pageActionDone(tr("Notes made from %1: write on them; saving suggests %2 next to it")
                                   .arg(QString::fromStdString(md.filename().string()),
-                                       QString::fromStdString(xopp.filename().string())),
+                                       QString::fromStdString(suggested.filename().string())),
                           false);
     return true;
 }

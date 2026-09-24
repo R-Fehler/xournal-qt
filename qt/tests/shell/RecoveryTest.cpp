@@ -25,7 +25,11 @@
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
+#include "control/settings/Settings.h"
+#include "session/AppContext.h"
+#include "session/DocumentMode.h"
 #include "session/DocumentSearch.h"
+#include "session/HybridPdf.h"
 #include "session/DocumentSession.h"
 #include "session/MergedPdf.h"
 #include "session/PdfPageKeeper.h"
@@ -217,6 +221,65 @@ TEST_F(RecoveryTest, unsavedChangesAreRecoveredAfterACrash) {
     EXPECT_EQ(elementCount(*b.tabManager().session(1)), 1u);
     EXPECT_TRUE(SessionRecovery::findCandidates(*SessionRecovery::readJournal(SessionRecovery::defaultJournalFile()))
                         .empty());
+}
+
+// PDF files mode (DocumentMode.h): the autosave of a saved PDF with notes is in the app cache, not next to it; after a
+// crash it is offered, recovered as that PDF, and saved into it.
+TEST_F(RecoveryTest, pdfFilesModeAutosavesInTheCacheAndRecovers) {
+    ASSERT_TRUE(QDir(tmp.path()).mkdir("pdf-only"));
+    const QString folder = tmp.filePath("pdf-only");
+    const fs::path pdf = fs::path((folder + "/lecture.pdf").toStdString());
+    {
+        cairo_surface_t* surface = cairo_pdf_surface_create(pdf.string().c_str(), 595, 842);
+        cairo_t* cr = cairo_create(surface);
+        cairo_show_page(cr);
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+    }
+    const auto pdfMode = [](AppController& c, DocumentMode::Mode m) { DocumentMode::store(*c.context().getSettings(), m); };
+    fs::path autosave;
+    {
+        AppController a;
+        pdfMode(a, DocumentMode::Mode::Pdf);
+        a.startSession({});
+        ASSERT_TRUE(a.openPath(QString::fromStdString(pdf.string())));
+        DocumentSession& s = *a.tabManager().session(0);
+        scribble(s);
+        ASSERT_TRUE(a.save());
+        ASSERT_TRUE(s.isHybrid());
+        scribble(s);
+        ASSERT_TRUE(s.autosave().ok);
+        autosave = s.getLastAutosaveFile();
+        EXPECT_EQ(autosave.parent_path(), Util::getAutosaveFilepath().parent_path()) << "the app cache";
+        EXPECT_EQ(QDir(folder).entryList(QDir::Files | QDir::Hidden), QStringList{"lecture.pdf"})
+                << "nothing next to the PDF";
+        fs::last_write_time(autosave, fs::last_write_time(pdf) + std::chrono::seconds(2));
+        // "crash": no shutdown(), the journal stays unclean (and the autosave stays)
+    }
+    markJournalCrashed();
+    ASSERT_TRUE(fs::exists(autosave));
+    AppController b;
+    pdfMode(b, DocumentMode::Mode::Pdf);
+    b.startSession({});
+    ASSERT_EQ(b.recoveryItems().size(), 1);
+    EXPECT_EQ(b.recoveryItems()[0].toMap()["title"].toString(), "lecture.pdf");
+    b.recover(true);
+    ASSERT_EQ(b.tabCount(), 1);
+    DocumentSession* recovered = b.tabManager().session(0);
+    EXPECT_EQ(recovered->getFilePath(), pdf);
+    EXPECT_TRUE(recovered->isModified());
+    EXPECT_EQ(elementCount(*recovered), 2u);
+    ASSERT_TRUE(b.save());
+    EXPECT_TRUE(HybridPdf::isHybrid(pdf));
+    EXPECT_EQ(QDir(folder).entryList(QDir::Files | QDir::Hidden), QStringList{"lecture.pdf"});
+    auto reopened = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(reopened.document);
+    EXPECT_EQ(reopened.document->getPage(0)->getSelectedLayer()->getElements().size(), 2u);
+
+    // Xournal++ files mode: next to the document, as upstream
+    pdfMode(b, DocumentMode::Mode::Xopp);
+    EXPECT_EQ(recovered->autosavePath(), DocumentSession::namedAutosavePath(pdf));
+    DocumentMode::store(*b.context().getSettings(), DocumentMode::Mode::Unset);
 }
 
 TEST_F(RecoveryTest, aTextFileIsRecoveredWithItsText) {

@@ -18,6 +18,7 @@
 #include "model/Document.h"
 #include "model/XojPage.h"
 #include "session/AppContext.h"
+#include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
@@ -75,6 +76,46 @@ TEST_F(SettingsModelTest, valuesReachUpstreamSettingsAndAreClamped) {
     EXPECT_EQ(s->getAutosaveTimeout(), 60);
     EXPECT_GE(changed.count(), 5);
     EXPECT_EQ(appChanged.count(), changed.count());
+}
+
+// How documents are kept (DocumentMode.h): not chosen yet, it works as Xournal++ files and the window asks; a choice
+// is stored in settings.xml; XQT_DOCUMENT_MODE stands in for a choice not stored (tests) and keeps the question away.
+TEST_F(SettingsModelTest, documentMode) {
+    const QByteArray env = qgetenv("XQT_DOCUMENT_MODE");
+    qunsetenv("XQT_DOCUMENT_MODE");
+    Settings& s = *app->getSettings();
+    EXPECT_EQ(DocumentMode::stored(s), DocumentMode::Mode::Unset) << "a new install, and one from before the question";
+    EXPECT_TRUE(DocumentMode::shouldAsk(s));
+    EXPECT_FALSE(DocumentMode::pdfOnly(s)) << "as before, until chosen";
+    EXPECT_EQ(model->get("documentMode").toString(), "xopp");
+
+    qputenv("XQT_DOCUMENT_MODE", "pdf");
+    EXPECT_FALSE(DocumentMode::shouldAsk(s)) << "the environment stands in for the choice";
+    EXPECT_TRUE(DocumentMode::pdfOnly(s));
+    EXPECT_EQ(DocumentMode::stored(s), DocumentMode::Mode::Unset) << "nothing stored";
+    qunsetenv("XQT_DOCUMENT_MODE");
+
+    EXPECT_TRUE(model->set("documentMode", "pdf"));
+    EXPECT_EQ(DocumentMode::stored(s), DocumentMode::Mode::Pdf);
+    EXPECT_TRUE(DocumentMode::pdfOnly(s));
+    EXPECT_FALSE(DocumentMode::shouldAsk(s));
+    model->set("documentMode", "something else");
+    EXPECT_EQ(model->get("documentMode").toString(), "pdf") << "ignored";
+    qputenv("XQT_DOCUMENT_MODE", "xopp");
+    EXPECT_TRUE(DocumentMode::pdfOnly(s)) << "a stored choice wins over the environment";
+    qunsetenv("XQT_DOCUMENT_MODE");
+
+    // Stored in settings.xml: read back by the next start
+    model.reset();
+    app.reset();
+    app = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR),
+                                       fs::path(tmp.filePath("settings.xml").toStdString()), 1);
+    model = std::make_unique<SettingsModel>(*app);
+    EXPECT_EQ(DocumentMode::stored(*app->getSettings()), DocumentMode::Mode::Pdf);
+    EXPECT_FALSE(DocumentMode::shouldAsk(*app->getSettings()));
+    if (!env.isNull()) {
+        qputenv("XQT_DOCUMENT_MODE", env);
+    }
 }
 
 TEST_F(SettingsModelTest, fuzzyTypoToleranceReachesTheSearch) {

@@ -55,6 +55,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
+#include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
@@ -122,6 +123,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+    connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     loadCustomWidths();
     SettingsModel::applyPreviewMemory(*app->getSettings());
     SettingsModel::applyCanvasMemory(*app->getSettings());
@@ -183,6 +185,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+    connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
@@ -821,7 +824,12 @@ int AppController::pastePages(int position) {
         // Once per paste: where the PDF pages went (a new file next to the document)
         const fs::path place = session()->mergedPdfPlace();  // (in the cache until it is saved)
         const QString where = QString::fromStdString(place.filename().string());
-        if (place.empty()) {
+        if (session()->isHybrid() || (!session()->hasFilePath() && pdfOnly())) {
+            // (a PDF with notes: the pages go into it)
+            note = n == 1 ? tr("Page pasted. Its PDF text stays searchable: it goes into the PDF when saved.")
+                          : tr("%1 pages pasted. Their PDF text stays searchable: they go into the PDF when saved.")
+                                    .arg(n);
+        } else if (place.empty()) {
             note = n == 1 ? tr("Page pasted. Its PDF text stays searchable: it is saved next to the document.")
                           : tr("%1 pages pasted. Their PDF text stays searchable: they are saved next to the document.")
                                     .arg(n);
@@ -1188,7 +1196,7 @@ QString AppController::shownFileNote() const {
                     : QString());
     }
     fs::path xopp = file;
-    xopp.replace_extension(".xopp");
+    xopp.replace_extension(pdfOnly() ? ".pdf" : ".xopp");  // (PDF files mode: a PDF with notes, the image inside)
     return tr("%1 is the background of this new page. Saving keeps what you write as %2 next to it.")
             .arg(name, QString::fromStdString(xopp.filename().string()));
 }
@@ -1602,14 +1610,25 @@ bool AppController::createDocument(const QString& name, bool inLibrary) {
     if (!inLibrary || !library->available()) {
         return true;
     }
-    const QString path = library->newDocumentPath(name);
-    auto r = created->saveAs(fs::path(path.toStdString()));
+    fs::path path(library->newDocumentPath(name).toStdString());
+    DocumentSession::SaveResult r;
+    if (pdfOnly()) {
+        // PDF files mode: a new document is "name.pdf", a PDF with notes (the name is free for every document type)
+        path.replace_extension(".pdf");
+        r = created->saveAsHybrid(path);
+    } else {
+        r = created->saveAs(path);
+    }
     if (!r.ok) {
         Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
         return false;
     }
     recent->add(created->getFilePath());
-    library->refresh();
+    if (created->isHybrid()) {
+        afterHybridSave(*created);  // (with the library's refresh)
+    } else {
+        library->refresh();
+    }
     Q_EMIT titleChanged();
     return true;
 }
@@ -2146,6 +2165,8 @@ bool AppController::openPath(const QString& path) {
 
 namespace {
 bool settingOn(Settings* settings, const char* key);
+/// PDF files mode: the one-time notice after notes first went into a PDF of the user's was shown
+constexpr const char* NOTICE_KEY = "pdfOnlyIntoPdfNoticed";
 }  // namespace
 
 namespace {
@@ -2208,6 +2229,16 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
             choice = QStringLiteral("keep");
         }
     }
+    // PDF files mode: a PDF of the user's gets notes for the first time (they go into it). Said once, afterwards.
+    bool firstIntoPdf = false;
+    if (way == SaveWay::Hybrid && pdfOnly()) {
+        std::error_code ec;
+        fs::path pdf = target;
+        if (lowerExtension(pdf) != ".pdf") {
+            pdf += ".pdf";
+        }
+        firstIntoPdf = fs::exists(pdf, ec) && !HybridPdf::isHybrid(pdf) && !settingOn(app->getSettings(), NOTICE_KEY);
+    }
     QString keptBecause;
     if (choice != "keep") {
         // The .xopp open in another tab (another window of this process): closed if it has no unsaved changes; with
@@ -2253,7 +2284,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
         request.exportXopp = xopp;
     }
     QPointer<DocumentSession> guard(s);
-    request.done = [this, guard, way, target, previous, choice, keptBecause,
+    request.done = [this, guard, way, target, previous, choice, keptBecause, firstIntoPdf,
                     then = std::move(then)](const DocumentSession::SaveResult& r) {
         if (!guard) {
             return;
@@ -2299,6 +2330,15 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
                 }
                 if (!keptBecause.isEmpty()) {
                     Q_EMIT message(tr("The .xopp was kept"), keptBecause, false);
+                }
+                if (firstIntoPdf) {
+                    app->getSettings()->getCustomElement("xournalQt").setBool(NOTICE_KEY, true);
+                    app->getSettings()->customSettingsChanged();
+                    Q_EMIT pageActionDone(
+                            tr("Your notes are saved in %1. Its pages stay as they were; other PDF apps show the notes "
+                               "as annotations.")
+                                    .arg(QString::fromStdString(saved.getFilePath().filename().string())),
+                            false);
                 }
             } else {
                 handOverToLibrary(saved);
@@ -2368,6 +2408,35 @@ QString AppController::oldXoppToAsk() const {
         return {};
     }
     return QString::fromStdString(s->getFilePath().filename().string());
+}
+
+QString AppController::documentMode() const {
+    return DocumentMode::nameOf(DocumentMode::effective(*app->getSettings()));
+}
+
+void AppController::setDocumentMode(const QString& mode) {
+    const DocumentMode::Mode m = DocumentMode::fromName(mode);
+    if (m == DocumentMode::Mode::Unset) {
+        return;
+    }
+    // (stored also when it is the mode in effect already: the question is not asked again)
+    DocumentMode::store(*app->getSettings(), m);
+    Q_EMIT app->settingsChanged();  // (every window; the settings sheet reads it again)
+}
+
+bool AppController::pdfOnly() const { return DocumentMode::pdfOnly(*app->getSettings()); }
+
+bool AppController::askDocumentMode() const { return !isSecondary() && DocumentMode::shouldAsk(*app->getSettings()); }
+
+QString AppController::saveFormat() const {
+    const DocumentSession* s = session();
+    if (s && s->isHybrid()) {
+        return QStringLiteral("pdf");
+    }
+    if (s && s->hasFilePath()) {
+        return QStringLiteral("xopp");  // (a .xopp stays one unless the type is changed in the dialog)
+    }
+    return pdfOnly() ? QStringLiteral("pdf") : QStringLiteral("xopp");
 }
 
 std::vector<std::pair<AppController*, DocumentSession*>> AppController::tabsWithFile(const fs::path& file,
@@ -2479,8 +2548,9 @@ bool AppController::savesWithoutDialog(const DocumentSession* s) const {
     if (s->hasFilePath() || s->isEditableText()) {
         return true;  // (a text file is written back to itself)
     }
+    // Notes on a PDF go into it: the setting "Save notes into the PDF itself", and always in PDF files mode
     const fs::path pdf = s->annotatedPdf();
-    return !pdf.empty() && settingOn(app->getSettings(), "hybridIntoPdf") && !HybridPdf::inCache(pdf) &&
+    return !pdf.empty() && (settingOn(app->getSettings(), "hybridIntoPdf") || pdfOnly()) && !HybridPdf::inCache(pdf) &&
            !MergedPdf::inCache(pdf);
 }
 
@@ -2492,8 +2562,9 @@ QUrl AppController::suggestedHybridFile() const {
     if (session()->isHybrid()) {
         target = session()->getFilePath();
     } else if (const fs::path pdf = session()->annotatedPdf(); !pdf.empty() && !HybridPdf::inCache(pdf)) {
-        target = settingOn(app->getSettings(), "hybridIntoPdf") ? pdf
-                                                                 : pdf.parent_path() / (pdf.stem().string() + ".notes.pdf");
+        target = settingOn(app->getSettings(), "hybridIntoPdf") || pdfOnly()
+                         ? pdf
+                         : pdf.parent_path() / (pdf.stem().string() + ".notes.pdf");
     } else {
         target = fs::path(suggestedSaveFile().toLocalFile().toStdString());
         target.replace_extension(".pdf");
