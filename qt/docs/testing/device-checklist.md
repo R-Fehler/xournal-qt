@@ -580,3 +580,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       the page says it is read-only for now. Scroll, zoom, search (Ctrl+F) in it. Close it: no question about saving,
       and the `.md` is unchanged. Write on it with the pen, then close: it asks to save (as a `.xopp`, not next to the
       `.md`).
+- [ ] Tap an image card (a whiteboard photo): it opens as one page with the photo as background, titled `photo.jpg`,
+      with a note that saving keeps it as `photo.xopp`. Write on it, save: the dialog suggests `photo.xopp` next to the
+      photo. Back in the library the two are one card ("IMG ✎") that opens what you wrote. The same with a photo from
+      the phone taken upright (it stays upright after saving and opening again, also in Xournal++) and a `.heic`.

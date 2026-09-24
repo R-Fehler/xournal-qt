@@ -13,8 +13,9 @@
 #include <QElapsedTimer>
 #include <QColor>
 #include <QImage>
-#include <QImageWriter>
+#include <QBuffer>
 #include <QTemporaryDir>
+#include <QUrl>
 #include <gtest/gtest.h>
 
 #include "model/BackgroundImage.h"
@@ -97,6 +98,21 @@ void makeXoppWithAttachedImage(const fs::path& xopp, const fs::path& png) {
     page->setBackgroundType(PageType(PageTypeFormat::Image));
     doc.addPage(page);
     ASSERT_TRUE(DocumentSession::writeDocument(doc, xopp).ok);
+}
+
+/// A JPEG `w` x `h` taken sideways: its orientation tag (EXIF, "turn by 90°") says how it is shown upright.
+void makeSidewaysPhoto(const fs::path& p, int w, int h) {
+    QImage img(w, h, QImage::Format_RGB32);
+    img.fill(Qt::darkGreen);
+    QByteArray jpeg;
+    QBuffer buffer(&jpeg);
+    buffer.open(QIODevice::WriteOnly);
+    ASSERT_TRUE(img.save(&buffer, "JPEG"));
+    // APP1 "Exif": a big-endian TIFF header and one entry, Orientation (0x0112) = 6
+    const char exif[] = "\xFF\xE1\x00\x22" "Exif\x00\x00" "MM\x00\x2A\x00\x00\x00\x08"
+                        "\x00\x01" "\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00" "\x00\x00\x00\x00";
+    jpeg.insert(2, QByteArray(exif, sizeof(exif) - 1));
+    std::ofstream(p, std::ios::binary).write(jpeg.constData(), jpeg.size());
 }
 
 /// Dark pixels (text) in a part of an image.
@@ -338,14 +354,7 @@ TEST_F(LibraryFilesTest, theLibraryShowsWhatKindEachDocumentIs) {
 TEST_F(LibraryFilesTest, markdownFilesShowTheirFirstPageAndImagesAThumbnail) {
     writeFile(root / "notes.md", "# Kalman filter\n\nPrediction and **update**.\n\n- one\n- two\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```cpp\nint x = 1;\n```\n");
     makeImage(root / "wide.png", 800, 400, Qt::black);
-    // A photo taken sideways: its orientation tag turns it upright
-    {
-        QImage img(80, 40, QImage::Format_RGB32);
-        img.fill(Qt::black);
-        QImageWriter writer(QString::fromStdString((root / "photo.jpg").string()));
-        writer.setTransformation(QImageIOHandler::TransformationRotate90);
-        ASSERT_TRUE(writer.write(img));
-    }
+    makeSidewaysPhoto(root / "photo.jpg", 80, 40);  // its orientation tag turns it upright
     PreviewCache::setLibrary(CacheLocation(root));
 
     const QImage md = PreviewCache::preview(DocumentFiles::itemOf(root / "notes.md"));
@@ -479,4 +488,53 @@ TEST_F(LibraryFilesTest, aMarkdownFileOpensReadOnlyAndAHitAtItsPassage) {
     EXPECT_EQ(s->search().currentOnPage(), page40 == page ? 1 : 0) << "the hit of paragraph 40 comes before it";
     EXPECT_EQ(s->search().hitCount(), 4);
     EXPECT_EQ(fs::last_write_time(root / "notes.md"), before);
+}
+
+TEST_F(LibraryFilesTest, anImageOpensAsAPageToWriteOnAndIsSavedAsItsXopp) {
+    makeImage(root / "photo.png", 800, 600);
+    // A photo taken sideways (turned by its orientation tag), and a WebP: stored with the document
+    makeSidewaysPhoto(root / "turned.jpg", 80, 40);
+    const bool webp = DocumentFiles::isImageFile(root / "board.webp");
+    if (webp) {
+        makeImage(root / "board.webp", 60, 30);
+    }
+    AppController c;
+    c.setLibraryRoot(root);
+    ASSERT_TRUE(c.openPath(qstr(root / "photo.png")));
+    DocumentSession* s = c.tabManager().currentSession();
+    ASSERT_EQ(s->getDocument()->getPageCount(), 1u);
+    PageRef page = s->getDocument()->getPage(0);
+    EXPECT_TRUE(page->getBackgroundType().isImagePage());
+    EXPECT_NE(page->getBackgroundImage().getPixbuf(), nullptr);
+    EXPECT_NEAR(page->getWidth(), 841.89, 0.01);
+    EXPECT_NEAR(page->getHeight(), 841.89 * 0.75, 0.01);
+    EXPECT_EQ(c.title(), "photo.png");
+    EXPECT_FALSE(c.modified());
+    EXPECT_TRUE(c.shownFileNote().contains("photo.xopp")) << c.shownFileNote().toStdString();
+    EXPECT_EQ(c.suggestedSaveFile(), QUrl::fromLocalFile(qstr(root / "photo.xopp"))) << "next to it, not elsewhere";
+    ASSERT_TRUE(c.openPath(qstr(root / "photo.png")));
+    EXPECT_EQ(c.tabManager().count(), 1) << "its tab";
+
+    // Saved next to it: one document with it, which refers to it by its path (nothing copied)
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(qstr(root / "photo.xopp"))));
+    EXPECT_EQ(c.shownFileNote(), "");
+    EXPECT_EQ(DocumentFiles::itemOf(root / "photo.png").xopp, root / "photo.xopp");
+    EXPECT_EQ(backgroundImageOf(root / "photo.xopp"), root / "photo.png");
+    EXPECT_TRUE(DocumentFiles::imageAttachmentsOf(root / "photo.xopp").empty());
+    // The card opens the .xopp now, also from the image
+    ASSERT_TRUE(c.openPath(qstr(root / "photo.png")));
+    EXPECT_EQ(c.tabManager().count(), 1);
+
+    // Turned upright, stored with the document
+    ASSERT_TRUE(c.openPath(qstr(root / "turned.jpg")));
+    s = c.tabManager().currentSession();
+    EXPECT_GT(s->getDocument()->getPage(0)->getHeight(), s->getDocument()->getPage(0)->getWidth()) << "upright";
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(qstr(root / "turned.xopp"))));
+    EXPECT_EQ(DocumentFiles::imageAttachmentsOf(root / "turned.xopp").size(), 1u);
+    EXPECT_TRUE(hasBackgroundImage(root / "turned.xopp"));
+    EXPECT_EQ(DocumentFiles::itemOf(root / "turned.jpg").xopp, root / "turned.xopp");
+    if (webp) {
+        ASSERT_TRUE(c.openPath(qstr(root / "board.webp")));
+        EXPECT_TRUE(c.tabManager().currentSession()->getDocument()->getPage(0)->getBackgroundType().isImagePage());
+    }
 }

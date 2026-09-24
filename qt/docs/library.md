@@ -55,6 +55,13 @@ A **library** is a plain folder of documents that a window works in, like a work
   changes are not saved to the file. The document is never written back to the `.md`; it can be written on, and
   "Save as" makes a `.xopp` of it (under the default name, not next to the `.md`). Of a file over 2 MB the first
   2 MB are shown (the note says so). Opening it again shows its tab.
+- An **image** opens as a new document with one page that has the image as its background (upstream's image
+  background), as big as the image fits into A4's long side, titled with the file name; nothing is written until it
+  is saved. "Save" suggests `photo.xopp` next to `photo.jpg`, and the library then shows the two as one card (above),
+  which opens the `.xopp`. A PNG or JPEG that needs no turning is used by its path, as upstream refers to background
+  images (the `.xopp` stays small); any other image (WebP, HEIC, a photo turned upright by its orientation tag, which
+  upstream would show sideways) is stored with the `.xopp` as a PNG of at most 4096 px (`photo.xopp.bg_1.png`,
+  upstream's attached image). Code: `qt/src/canvas/ImageFile.*`.
 - A library search hit in a Markdown file opens it with the search active: at the page of the passage with the hit
   (a snippet card, below: its first hit there is the current one).
 

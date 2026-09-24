@@ -56,6 +56,7 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "ImageFile.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MarkdownSession.h"
@@ -1606,6 +1607,10 @@ DocumentSession::LoadResult loadShownFile(const fs::path& file) {
         result.document = MarkdownFile::document(MarkdownFile::read(file));
         return result;
     }
+    if (DocumentFiles::isImageFile(file)) {
+        result.document = ImageFile::document(file, result.error);
+        return result;
+    }
     result.error =
             AppController::tr("\"%1\" cannot be opened.").arg(QString::fromStdString(file.string())).toStdString();
     return result;
@@ -2349,7 +2354,10 @@ QUrl AppController::suggestedSaveFile() const {
     fs::path suggested = session()->suggestSavePath();
     // A document that was never saved and does not annotate a PDF belongs in the library of this window. Upstream
     // suggests the folder something was saved to last, which is shared by all libraries and windows.
-    if (!session()->hasFilePath() && session()->annotatedPdf().empty() && library->available()) {
+    // (An image to write on: its .xopp next to it, so the library pairs them.)
+    const fs::path shown = session()->shownFile();
+    if (!session()->hasFilePath() && session()->annotatedPdf().empty() && library->available() &&
+        (shown.empty() || DocumentFiles::isMarkdownFile(shown))) {
         suggested = fs::path(library->rootPath().toStdString()) / suggested.filename();
     }
     return QUrl::fromLocalFile(QString::fromStdString(suggested.string()));
