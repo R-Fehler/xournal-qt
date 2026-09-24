@@ -8,8 +8,10 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <future>
+#include <iostream>
 #include <memory>
 #include <thread>
 
@@ -332,4 +334,55 @@ TEST_F(BackgroundSaveTest, closingWaitsForARunningSave) {
     s.reset();  // (waits for the save)
     releaser.join();
     EXPECT_EQ(strokesIn(tmpPath("closed.xopp")), 40u * 60 + 1);
+}
+
+// XQT_BENCH_HYBRID=<pdf>: notes on every 25th page (as HybridPdfTest.benchSaveAndOpen); how long saving it as a hybrid
+// PDF blocks the window: the whole save when it ran on this thread (as before), the longest time the event loop did
+// not run in the background (now); then Ctrl+S after an edit, the same.
+TEST_F(BackgroundSaveTest, benchHybridSaveBlock) {
+    const char* source = std::getenv("XQT_BENCH_HYBRID");
+    if (!source) {
+        GTEST_SKIP() << "set XQT_BENCH_HYBRID=<pdf>";
+    }
+    auto loaded = DocumentSession::loadFile(source);
+    ASSERT_TRUE(loaded.document);
+    Document& doc = *loaded.document;
+    for (size_t i = 0; i < doc.getPageCount(); i += 25) {
+        Layer* layer = doc.getPage(i)->getSelectedLayer();
+        for (int k = 0; k < 20; ++k) {
+            auto s = std::make_unique<Stroke>();
+            s->setWidth(1.41);
+            for (int j = 0; j < 60; ++j) {
+                s->addPoint(Point(60 + j * 6, 100 + k * 20 + 5 * std::sin(j / 3.0), 1 + (j % 10) / 5.0));
+            }
+            s->getBoundingBox();
+            layer->addElement(std::move(s));
+        }
+    }
+    DocumentSession s(*app, std::move(loaded.document));
+    addStroke(s, 0);
+    QElapsedTimer t;
+    t.start();
+    ASSERT_TRUE(s.saveAsHybrid(tmpPath("sync.pdf")).ok);  // (waits here: what the window did before)
+    const qint64 sync = t.elapsed();
+    auto inBackground = [&](DocumentSession::SaveRequest request) {
+        bool finished = false;
+        request.done = [&](const DocumentSession::SaveResult& r) {
+            EXPECT_TRUE(r.ok) << r.error;
+            finished = true;
+        };
+        LoopWatch watch;
+        watch.run([&] { s.saveInBackground(std::move(request)); }, [&] { return finished; });
+        return watch;
+    };
+    addStroke(s, 1);
+    const LoopWatch first = inBackground({DocumentSession::SaveKind::Hybrid, tmpPath("background.pdf"), {}, {}});
+    addStroke(s, 2);
+    const LoopWatch again = inBackground({DocumentSession::SaveKind::Save, {}, {}, {}});
+    std::cout << source << ", " << s.getDocument()->getPageCount() << " pages\n"
+              << "  save as hybrid PDF on the UI thread (before): the window blocked " << sync << " ms\n"
+              << "  in the background (now): " << first.totalMs << " ms, the event loop blocked at most "
+              << first.longestMs << " ms\n"
+              << "  Ctrl+S after an edit: " << again.totalMs << " ms, the event loop blocked at most "
+              << again.longestMs << " ms\n";
 }
