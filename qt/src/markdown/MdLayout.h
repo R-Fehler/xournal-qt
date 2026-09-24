@@ -109,6 +109,8 @@ struct LinkHit {
     double height = 0;
 };
 std::optional<LinkHit> linkAt(const Layout& layout, double x, double y);
+/// Every link of a layout where it is drawn: a box per line it is on (box coordinates). For the links of a PDF.
+std::vector<LinkHit> linkBoxes(const Layout& layout);
 /// The check box at a point (box coordinates; a little around it counts), if any.
 std::optional<Layout::CheckBox> checkBoxAt(const Layout& layout, double x, double y);
 /// The text with a task's mark switched: "[ ]" <-> "[x]" (`mark`: the offset of the " " / "x").

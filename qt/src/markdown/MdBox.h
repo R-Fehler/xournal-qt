@@ -50,6 +50,8 @@ double contentHeight(const Text& text);
 xoj::util::Rectangle<double> boxRect(const Text& text);
 /// The link drawn at a point of the page, if any (page coordinates).
 std::optional<LinkHit> linkAt(const Text& text, double x, double y);
+/// Every link of a box where it is drawn (page coordinates; see linkBoxes of a layout).
+std::vector<LinkHit> linkBoxes(const Text& text);
 /// The check box of a task drawn at a point of the page (page coordinates): its mark's offset in the box's text.
 std::optional<size_t> checkBoxAt(const Text& text, double x, double y);
 /// Where a text is shown in a box (case-insensitive; page coordinates): as the box is drawn, also while it is written

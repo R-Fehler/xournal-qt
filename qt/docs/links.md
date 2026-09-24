@@ -198,3 +198,18 @@ The author accepted the plan with its proposals:
   - **Deviation:** the PDF's `/ID` is not used. A link does not carry it (the format has no key for it), so there
     is nothing to compare; the name and the page's text cover the cases seen so far. A `pdfid=` key could be added
     to the fragment later.
+
+### 5. The hybrid PDF (`HybridPdf.cpp`: `linkFor`, `annotateLinks`; `md::linkBoxes`; test `HybridPdfTest.linksOf…`)
+- Saving a PDF with notes writes each link of the Markdown boxes and link markers as a `/Link` annotation over the
+  link text (a box per line it is on), so other viewers follow it:
+  - a link to a PDF: `/GoToR` with `/F` the PDF relative to the hybrid PDF and `/D [page /Fit]`, `/NewWindow true`
+    (the `pdfpage=` of a plain PDF, else `page=`; a hybrid PDF's pages are its document's pages);
+  - a link to a `.xopp` with its PDF next to it (`lecture.xopp` + `lecture.pdf`): `/GoToR` to that PDF, at the
+    link's PDF page (a notes page inserted there has no PDF page: then the page number, which may be off);
+  - a web or mail address: `/URI`;
+  - a `.md`, a `.xopp` without a PDF, a place in this document: no annotation (other viewers could not open them).
+- Paths are resolved from the hybrid PDF's folder. The annotations are ours (`/NM (xopp:p1-link1)` and the private
+  key): removed and written again with the rest on every save, in the clean copy never shown, and never reported as
+  changed by another app (they are made from the text).
+- Not handled: a base PDF page that is rotated or has a crop box moved from the origin gets the link boxes offset
+  by the crop box only (the ink uses the full placement matrix).

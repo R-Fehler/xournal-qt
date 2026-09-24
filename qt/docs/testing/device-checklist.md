@@ -1016,3 +1016,7 @@ and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages do
       from its new folder and a dialog offers "Update the link"; Yes changes the link in `a.md`.
 - [ ] A link to a file that is nowhere (`[x](missing.xopp)`): "Document not found … Locate it?" → Open → pick a
       file: the link now points there and it opens.
+- [ ] In a note with a link marker to the lecture (and a Markdown box with `[web](https://example.org)`), Save as
+      → "PDF with notes": open the PDF in Okular or Firefox: the marker's text is a link; clicking it opens
+      `lecture.pdf` at the linked page (Okular may ask first), the web link opens the browser. Open the PDF in the app
+      again: no "changed in another app" question; save again: the links are still there once each.
