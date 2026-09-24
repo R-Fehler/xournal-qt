@@ -1,6 +1,6 @@
 # Links between documents: design draft
 
-Status: **design agreed 2026-09-24** (the author: "the link plan is sound"); built as `qt/links` after the running blocks. Goal (the author's words): link to
+Status: **design agreed 2026-09-24** (the author: "the link plan is sound"); **built in `qt/links`** (see "What is built" at the end for what was built and where it differs). Goal (the author's words): link to
 another document, optionally to a page or a chapter; if it is a chapter, keep its page as a fallback for when the
 name changes. When the link is followed, choose between a new tab and reference view.
 
