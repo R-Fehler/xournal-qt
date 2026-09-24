@@ -116,7 +116,33 @@ md::Style plainStyle() {
 
 md::Style style(const TextFile& file) { return file.kind() == TextFile::Kind::Plain ? plainStyle() : style(); }
 
-std::unique_ptr<Document> textDocument(const TextFile& file) { return document(file.text(), style(file)); }
+namespace {
+std::unique_ptr<Document> continuousDocument(const std::string& source, const md::Style& s);
+}  // namespace
+
+std::unique_ptr<Document> textDocument(const TextFile& file, bool continuous) {
+    return continuous ? continuousDocument(file.text(), style(file)) : document(file.text(), style(file));
+}
+
+double continuousHeight(double textHeight) { return std::max(PAGE_HEIGHT, textHeight + 2 * TextFlow::MARGIN); }
+
+void relayout(DocumentSession& session, bool continuous) {
+    if (!session.textFile()) {
+        return;
+    }
+    session.clearSelectionEndText();  // (the text being written ends: its pages are made anew)
+    const std::string text = session.currentText();
+    session.setTextContinuous(continuous);
+    const md::Style s = style(*session.textFile());
+    std::unique_ptr<Document> made = continuous ? continuousDocument(text, s) : document(text, s);
+    std::vector<PageRef> pages;
+    for (size_t i = 0; i < made->getPageCount(); ++i) {
+        pages.push_back(made->getPage(i));
+    }
+    session.applyPageOrder(pages, {});
+    session.getUndoRedoHandler()->clearContents();  // (the steps before refer to the pages that went)
+    session.textEdited();
+}
 
 void setText(DocumentSession& session, const std::string& text) {
     MarkdownSession md(session);
@@ -159,6 +185,34 @@ std::unique_ptr<Document> document(const std::string& source, const md::Style& s
     }
     return doc;
 }
+
+namespace {
+std::unique_ptr<Document> continuousDocument(const std::string& source, const md::Style& s) {
+    md::installRenderer();
+    auto doc = std::make_unique<Document>(&handler());
+    const md::Frame f{frame().width, CONTINUOUS_FRAME};
+    const md::Pagination pages = md::onePage(source, s);
+    auto page = std::make_shared<XojPage>(PAGE_WIDTH, PAGE_HEIGHT);
+    page->setBackgroundType(PageType(PageTypeFormat::Plain));
+    page->setBackgroundColor(Colors::white);
+    auto* layer = new Layer();
+    layer->setName(std::string(xoj::markdown::LAYER_NAME));
+    page->getLayers().insert(page->getLayers().begin(), layer);
+    auto box = std::make_unique<Text>();
+    box->setTransformation(xoj::util::Matrix::TRANSLATION(TextFlow::MARGIN, TextFlow::MARGIN));
+    box->setFont(XojFont(s.family, s.size));
+    box->setColor(s.color);
+    box->setWrap(f.width);
+    box->setText(pages.slices.empty() ? std::string() : pages.slices.front());  // (all of it: one page)
+    Text* added = box.get();
+    layer->addElement(std::move(box));
+    added->getBoundingBox();
+    page->setSelectedLayerId(2);
+    page->setSize(PAGE_WIDTH, continuousHeight(md::contentHeight(*added)));
+    doc->addPage(std::move(page));
+    return doc;
+}
+}  // namespace
 
 std::vector<size_t> pageStarts(Document& doc) {
     std::vector<std::string> slices;

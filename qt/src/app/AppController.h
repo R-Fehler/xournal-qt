@@ -111,6 +111,9 @@ class AppController: public QObject {
     /// The current document is a file the app does not keep as a .xopp or PDF (a .md, a text file, an image to write
     /// on): "Open externally" hands it to its app.
     Q_PROPERTY(bool canOpenExternally READ canOpenExternally NOTIFY titleChanged)
+    /// Text files are shown on one continuous page (growing with the text) instead of A4 pages. A setting for all
+    /// text documents; switching it lays the current one out again.
+    Q_PROPERTY(bool textContinuous READ textContinuous WRITE setTextContinuous NOTIFY textLayoutChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
@@ -233,6 +236,8 @@ public:
     /// (editAnywayWarning), and "OK" calls this again with `confirmed`. From then on the file opens for editing.
     Q_INVOKABLE bool editAnyway(bool confirmed = false);
     bool canOpenExternally() const;
+    bool textContinuous() const;
+    void setTextContinuous(bool on);
     /// Hand the current document's file to the app the system has for it (SystemApps). Unsaved changes are the
     /// window's business (it asks to save first). When the file comes back changed, the tab reads it again.
     Q_INVOKABLE bool openExternally();
@@ -722,6 +727,7 @@ Q_SIGNALS:
     /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
     /// (resolveTextChange).
     void textChangedOnDisk(const QString& name);
+    void textLayoutChanged();
     /// "Edit anyway" for a file not accepted before: the window warns (OK: editAnyway(true)).
     void editAnywayWarning(const QString& name);
 

@@ -15,6 +15,7 @@
 #include <QGuiApplication>
 
 #include "AppController.h"
+#include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
@@ -88,12 +89,16 @@ std::unique_ptr<DocumentSession> AppController::openTextFile(const fs::path& fil
     // Edited when it can be written back as it was: UTF-8, not too big, a file we may write
     const bool editable = text->editable() && QFileInfo(QString::fromStdString(file.string())).isWritable();
     std::unique_ptr<Document> doc;
+    bool continuous = false;
+    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", continuous);
+    continuous = continuous && editable;
     if (editable) {
-        doc = MarkdownFile::textDocument(*text);
+        doc = MarkdownFile::textDocument(*text, continuous);
     } else {
         doc = MarkdownFile::document(markdown ? MarkdownFile::read(file) : MarkdownFile::readAsPlainText(file));
     }
     auto session = std::make_unique<DocumentSession>(*app, std::move(doc));
+    session->setTextContinuous(continuous);
     session->setTextFile(std::move(text), !editable);
     return session;
 }
@@ -129,8 +134,11 @@ bool AppController::editAnyway(bool confirmed) {
     accept(file);
     // The tab shows it as a plain text to edit now (in the place of the read-only one)
     const size_t page = session()->getCurrentPageNo();
-    auto doc = MarkdownFile::textDocument(*text);
+    bool continuous = false;
+    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", continuous);
+    auto doc = MarkdownFile::textDocument(*text, continuous);
     auto edited = std::make_unique<DocumentSession>(*app, std::move(doc));
+    edited->setTextContinuous(continuous);
     edited->setTextFile(std::move(text), false);
     const int old = tabs->currentIndex();
     tabs->addTab(std::move(edited));
@@ -142,6 +150,29 @@ bool AppController::editAnyway(bool confirmed) {
     watchTextFiles();
     Q_EMIT titleChanged();
     return true;
+}
+
+bool AppController::textContinuous() const {
+    if (const DocumentSession* s = session(); s && s->isEditableText()) {
+        return s->isTextContinuous();  // (the current text document as it is laid out)
+    }
+    bool on = false;
+    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", on);
+    return on;
+}
+
+void AppController::setTextContinuous(bool on) {
+    bool stored = false;
+    app->getSettings()->getCustomElement("xournalQt").getBool("textContinuous", stored);
+    if (on != stored) {
+        app->getSettings()->getCustomElement("xournalQt").setBool("textContinuous", on);
+        app->getSettings()->customSettingsChanged();
+    }
+    // The current text document follows (the others when they are opened again)
+    if (DocumentSession* s = session(); s && s->isEditableText() && s->isTextContinuous() != on) {
+        MarkdownFile::relayout(*s, on);
+    }
+    Q_EMIT textLayoutChanged();
 }
 
 bool AppController::canOpenExternally() const {

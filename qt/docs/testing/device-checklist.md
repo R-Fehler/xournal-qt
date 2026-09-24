@@ -910,3 +910,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       changes in a `.md`: asked "Save before opening it elsewhere?"; Save and open saves, then opens. Change and
       save it in the other app, come back to the window: the tab shows the new text. A `.xopp` or PDF has no such
       button or entry.
+- [ ] With a `.md` open, press and hold (or right-click) the layout button: "Text on pages" is checked. Choose "Text
+      on one continuous page": one long page, no page breaks; typing new paragraphs makes it longer. Open another
+      `.md`: continuous as well. Back to "Text on pages": A4 pages again, the text unchanged, no unsaved dot.
+      Watch typing speed in a long file on the continuous page (it lays out the whole text per key).

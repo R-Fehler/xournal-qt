@@ -1599,6 +1599,44 @@ TEST_F(HomeScreenMarkdownTest, aTxtFileIsEditedAsPlainText) {
               "# not a heading\n**not bold**\ndone");
 }
 
+TEST_F(HomeScreenMarkdownTest, textFilesAreOnPagesOrOnOneContinuousPage) {
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
+    wait(100);
+    EXPECT_FALSE(controller->textContinuous()) << "pages by default";
+    EXPECT_GT(controller->pageCount(), 2);
+    auto* layout = find<QQuickItem>("layoutButton");
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
+                      layout->mapToScene(QPointF(layout->width() / 2, layout->height() / 2)).toPoint());
+    auto* menu = find<QObject>("layoutMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* continuous = nullptr;
+    for (auto* c: menu->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "textContinuousItem") {
+            continuous = c;
+        }
+    }
+    ASSERT_NE(continuous, nullptr);
+    ASSERT_TRUE(continuous->isVisible());
+    click(continuous);
+    wait(50);
+    EXPECT_TRUE(controller->textContinuous());
+    EXPECT_EQ(controller->pageCount(), 1);
+    EXPECT_FALSE(controller->modified());
+    // Another text file opens the same way (a setting); notes are not affected
+    const fs::path other = root / "other.md";
+    std::ofstream(other, std::ios::binary) << "# Other\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(other.string())));
+    wait(50);
+    EXPECT_TRUE(controller->textContinuous());
+    controller->setTextContinuous(false);
+    EXPECT_FALSE(controller->textContinuous());
+    controller->setCurrentTab(0);
+    wait(50);
+    EXPECT_TRUE(controller->textContinuous()) << "the other tab stays as it was laid out";
+    controller->setTextContinuous(false);
+    EXPECT_GT(controller->pageCount(), 2);
+}
+
 TEST_F(HomeScreenMarkdownTest, otherTextFilesAreEditedOnlyAfterAWarning) {
     const fs::path file = root / "script.py";
     std::ofstream(file, std::ios::binary) << "def f():\r\n    return 1\r\n";

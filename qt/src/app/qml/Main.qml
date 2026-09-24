@@ -942,6 +942,26 @@ ApplicationWindow {
                 Menu {
                     id: layoutMenu
                     objectName: "layoutMenu"
+                    // A text file (.md, .txt): A4 pages, or one continuous page that grows with the text
+                    MenuItem {
+                        objectName: "textPagesItem"
+                        visible: win.textDoc && app.textEditable
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Text on pages")
+                        checkable: true
+                        checked: !app.textContinuous
+                        onTriggered: app.textContinuous = false
+                    }
+                    MenuItem {
+                        objectName: "textContinuousItem"
+                        visible: win.textDoc && app.textEditable
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Text on one continuous page")
+                        checkable: true
+                        checked: app.textContinuous
+                        onTriggered: app.textContinuous = true
+                    }
+                    MenuSeparator { visible: win.textDoc && app.textEditable; height: visible ? implicitHeight : 0 }
                     MenuItem {
                         objectName: "onePageItem"
                         text: app.horizontalScrolling ? qsTr("Pages in one row") : qsTr("One page per row")

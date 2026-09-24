@@ -108,6 +108,8 @@ private:
     void removePage(const PageRef& page);
     size_t indexOf(const PageRef& page) const;
     void changedOnPage(const PageRef& page);
+    /// A text file on one continuous page: the page is as high as the text.
+    void fitContinuousPage();
     void end();
 
     DocumentSession& session;

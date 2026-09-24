@@ -175,6 +175,9 @@ public:
     std::string currentText(bool lock = true) const;
     /// The text changed (the pages' boxes): the modified state follows.
     void textEdited();
+    /// The text is on one continuous page that grows with it (else on pages; MarkdownFile::relayout switches).
+    bool isTextContinuous() const { return textContinuous; }
+    void setTextContinuous(bool on) { textContinuous = on; }
     /// The text file changed on disk since it was read or written (by another program). `bytes`: what it holds now.
     /// Not while a save runs (asked again after it).
     bool textChangedOnDisk(std::string& bytes);
@@ -408,6 +411,7 @@ private:
     std::unordered_map<const XojPage*, std::pair<std::weak_ptr<XojPage>, size_t>> hybridBase;
     std::unique_ptr<TextFile> text;  ///< a text file edited (or shown read-only)
     bool textModified = false;
+    bool textContinuous = false;
     std::string lastAutosavedText;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };

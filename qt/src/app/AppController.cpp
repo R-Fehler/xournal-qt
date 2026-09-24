@@ -645,6 +645,7 @@ void AppController::currentTabChanged() {
     }
     Q_EMIT documentChanged();
     Q_EMIT titleChanged();
+    Q_EMIT textLayoutChanged();
     Q_EMIT modifiedChanged();
     Q_EMIT savingChanged();
     Q_EMIT undoRedoChanged();

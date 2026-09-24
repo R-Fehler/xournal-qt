@@ -20,6 +20,20 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
 - Undo / redo (Ctrl+Z / Ctrl+Shift+Z and the undo button) go step by step through the text being written (a word,
   a line break, a deletion). The editor keeps changes, not copies of the text, so a long file stays cheap.
 
+## Pages or one continuous page
+Text files are on A4 pages by default (the native feel; the pagination of the Markdown boxes). The layout menu of
+the page / zoom pill (press and hold, or right-click, the layout button) has **Text on pages** and **Text on one
+continuous page**: the whole text on one page of A4 width that grows and shrinks with it (at least A4 high), with
+no page breaks. It is a setting for all text files (`textContinuous` in the `xournalQt` part of the settings);
+switching it lays the current text document out again (the text being written ends and its undo history starts
+anew, the text stays as it is); other open text documents keep their layout until they are opened again. The menu
+shows how the current one is laid out. Print and PDF export print what is shown (one long page when continuous).
+
+The continuous page does not split the text (`md::onePage`), but its whole text is laid out again on every key
+(twice: as drawn and as written): fine for notes, noticeably slower than pages for long files
+(`XQT_BENCH_TEXT=1 xqt-canvas-tests --gtest_filter='TextDocumentTest.bench*'` measures it). The fix is a layout cache
+per block in `md::layout`.
+
 ## Plain text (`.txt`)
 A `.txt` opens as plain text, like a notepad: no Markdown, no highlighting. Every line is shown as it is, in a
 monospaced font (10 pt, so columns line up and code or LaTeX reads as written), wrapped at the page's width, and

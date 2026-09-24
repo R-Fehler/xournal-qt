@@ -35,6 +35,8 @@ constexpr size_t MAX_BYTES = 2 * 1024 * 1024;
 /// Plain A4 pages (points)
 constexpr double PAGE_WIDTH = 595.276;
 constexpr double PAGE_HEIGHT = 841.89;
+/// How high the text may go on a continuous page (DocumentSession::isTextContinuous): as high as it is.
+constexpr double CONTINUOUS_FRAME = 1e9;
 
 /// The text of a Markdown file (UTF-8, without a byte order mark): at most `maxBytes` of it, cut at the end of a
 /// line. Empty if it cannot be read. `cut`: whether the file is longer.
@@ -54,8 +56,14 @@ md::Style style();
 md::Style style(const TextFile& file);
 md::Style plainStyle();
 
-/// The document that edits a text file: its text on plain A4 pages.
-std::unique_ptr<Document> textDocument(const TextFile& file);
+/// The document that edits a text file: its text on plain A4 pages, or on one continuous page as high as the text
+/// (at least A4).
+std::unique_ptr<Document> textDocument(const TextFile& file, bool continuous = false);
+/// The height of a continuous page for a text as high as `textHeight`.
+double continuousHeight(double textHeight);
+/// Switch a text file's document between pages and one continuous page: its pages are made anew from the text
+/// (the text written on the canvas ends first; the undo history starts anew, the text stays as it is).
+void relayout(DocumentSession& session, bool continuous);
 /// The pages of a text file's document get this text (one undo step, as an edit): e.g. the file as it is on disk
 /// now. Text written on the canvas ends first.
 void setText(DocumentSession& session, const std::string& text);

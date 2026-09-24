@@ -384,6 +384,14 @@ Pagination paginate(const std::string& source, Style style, const std::function<
     return out;
 }
 
+Pagination onePage(const std::string& source, const Style& style) {
+    const std::string prefix = style.plain ? std::string(PLAIN_MARKER) + "\n" : std::string();
+    Pagination out;
+    out.slices.push_back(prefix + source);
+    out.parts.push_back({0, source.size(), prefix.size(), 0});
+    return out;
+}
+
 std::string join(const std::vector<std::string>& slices, std::vector<Part>* parts) {
     std::string out;
     if (parts) {

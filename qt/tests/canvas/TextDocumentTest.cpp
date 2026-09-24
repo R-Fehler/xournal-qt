@@ -6,6 +6,7 @@
  * @license GNU GPLv2 or later
  */
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -31,6 +32,7 @@
 #include "TextFlow.h"
 #include "model/Layer.h"
 #include "model/Text.h"
+#include "model/XojPage.h"
 
 using namespace xqt;
 
@@ -77,11 +79,12 @@ protected:
         writeFile(p, bytes);
         return p;
     }
-    void open(const fs::path& p, TextFile::Kind kind = TextFile::Kind::Markdown) {
+    void open(const fs::path& p, TextFile::Kind kind = TextFile::Kind::Markdown, bool continuous = false) {
         auto text = std::make_unique<TextFile>();
         std::string error;
         ASSERT_TRUE(text->load(p, kind, error)) << error;
-        session = std::make_unique<DocumentSession>(*app, MarkdownFile::textDocument(*text));
+        session = std::make_unique<DocumentSession>(*app, MarkdownFile::textDocument(*text, continuous));
+        session->setTextContinuous(continuous);
         session->setTextFile(std::move(text), false);
         view = std::make_unique<CanvasView>(*session);
         view->getViewController().setViewSize(QSizeF(900, 1400));
@@ -287,4 +290,69 @@ TEST_F(TextDocumentTest, aPlainTextFileIsWrittenAsItIsWithoutMarkdown) {
     const std::string line5 = "    line 5: **not bold**, # not a heading, - not a list";
     expected.insert(expected.find(line5) + line5.size(), "\r\n    next\tx");
     EXPECT_EQ(readFile(p), expected);
+}
+
+TEST_F(TextDocumentTest, aContinuousPageGrowsWithTheTextAndSwitchesToPagesAndBack) {
+    const std::string bytes = longMarkdown("\n");
+    const fs::path p = file("cont.md", bytes);
+    open(p, TextFile::Kind::Markdown, true);
+    ASSERT_EQ(session->getDocument()->getPageCount(), 1u);
+    const double height = session->getDocument()->getPage(0)->getHeight();
+    EXPECT_GT(height, 3 * MarkdownFile::PAGE_HEIGHT) << "one page as high as the text";
+    EXPECT_EQ(session->currentText(), bytes);
+    // Typing lines makes it higher, taking them away lower again
+    cursorBefore("The end.");
+    for (int i = 0; i < 10; ++i) {
+        type("x");
+        key(Qt::Key_Return, "\r");  // (a paragraph each)
+    }
+    EXPECT_EQ(session->getDocument()->getPageCount(), 1u);
+    EXPECT_GT(session->getDocument()->getPage(0)->getHeight(), height + 100);
+    while (view->getMarkdownEditor()->canUndo()) {
+        view->getMarkdownEditor()->undo();
+    }
+    EXPECT_NEAR(session->getDocument()->getPage(0)->getHeight(), height, 1);
+    EXPECT_FALSE(session->isModified());
+    ASSERT_TRUE(session->save().ok);
+    EXPECT_EQ(readFile(p), bytes);
+    // On pages, and back: the same text, not modified
+    MarkdownFile::relayout(*session, false);
+    EXPECT_EQ(view->getMarkdownEditor(), nullptr) << "the text being written ends";
+    EXPECT_GT(session->getDocument()->getPageCount(), 3u);
+    EXPECT_NEAR(session->getDocument()->getPage(0)->getHeight(), MarkdownFile::PAGE_HEIGHT, 0.01);
+    EXPECT_EQ(session->currentText(), bytes);
+    EXPECT_FALSE(session->isModified());
+    EXPECT_FALSE(session->isTextContinuous());
+    cursorBefore("Paragraph 30");
+    type("x");
+    EXPECT_GT(session->getDocument()->getPageCount(), 3u) << "pages stay pages while typing";
+    MarkdownFile::relayout(*session, true);
+    EXPECT_EQ(session->getDocument()->getPageCount(), 1u);
+    EXPECT_TRUE(session->isModified()) << "the text typed before stays";
+    std::string expected = bytes;
+    expected.insert(expected.find("Paragraph 30"), "x");
+    EXPECT_EQ(session->currentText(), expected);
+}
+
+// XQT_BENCH_TEXT=1: typing into a long .md on pages and on one continuous page (which lays out all of the text on
+// every key: see qt/docs/md-editor.md)
+TEST_F(TextDocumentTest, benchTyping) {
+    if (!qEnvironmentVariableIsSet("XQT_BENCH_TEXT")) {
+        GTEST_SKIP() << "XQT_BENCH_TEXT not set";
+    }
+    for (bool continuous: {false, true}) {
+        const fs::path p = file(continuous ? "b1.md" : "b2.md", longMarkdown("\n") + longMarkdown("\n"));
+        QElapsedTimer t;
+        t.start();
+        open(p, TextFile::Kind::Markdown, continuous);
+        const qint64 opened = t.restart();
+        cursorBefore("Paragraph 30");
+        const qint64 started = t.restart();
+        type("abcdefghijklmnopqrst");
+        const qint64 typed = t.elapsed();
+        std::cerr << (continuous ? "continuous" : "pages") << ": open " << opened << " ms, start " << started
+                  << " ms, 20 keys " << typed << " ms, pages " << session->getDocument()->getPageCount() << "\n";
+        view.reset();
+        session.reset();
+    }
 }
