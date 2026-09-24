@@ -184,6 +184,10 @@
     `.xopp` stays the default.
   - Measured on 1,321 pages with notes on 53: save 5.6 s (on the UI thread; background saving is a follow-up);
     first open 5.5 s (clean copy), cached 0.5 s; 10.3 MB, the same as our PDF export.
+- **PDF pages rendered once for the screen scale, `qt/pdf-hidpi` (2026-09-24).** `PdfBackgroundView` asked the PDF
+  cache for zoom × device scale, and the cache's similar surface applied the device scale again: on a 2x screen,
+  4x the pixels (about 100 MB per cached page at fit width), then scaled down. It was found by the MuPDF
+  experiment. A one-line tagged seam in upstream's file (ADR-0002); upstream has the same bug.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
