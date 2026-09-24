@@ -221,8 +221,10 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   first, with a test. Likely cause: the page is drawn against the old PDF before the merged PDF is loaded, and it is
   not drawn again afterwards.
 - [ ] **A touch on the "pages with hits" filter can make the maximized window half as high** (old, flaky, probably
-  touch only, KWin). Does not reproduce off-screen. Next time: run with `XQT_LOG_WINDOW=1` and look at what comes
-  just before the change.
+  touch only, KWin). Also seen with the page grid button in the page / zoom pill. Does not reproduce off-screen.
+  Both taps change what is under the finger (an overlay opens, or the list is filtered); suspect a touch whose item
+  disappears or moves mid-touch, with the rest of the touch taken by KWin as a window gesture. Next time: run with
+  `XQT_LOG_WINDOW=1` and look for a touch cancel, or an odd touch end, just before the resize.
 
 ### Flaky tests
 - [ ] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
