@@ -352,6 +352,14 @@
     default to 5 s.
   - Three app bugs fixed on the way: pages rendered after the memory plan stayed above the limit; a page whose
     preview arrived by another route was never stored as a sketch; two sketch writers shared one `.part` file.
+- **Setsquare and compass on the GPU, `qt/geometry-gpu` (2026-09-24, awaiting on-device test).**
+  `GeometryToolPicture` draws the tool once in its own coordinates, with upstream's views unchanged; the angle
+  display is a small separate picture. A `GeometryNode` in the scene graph moves, turns and sizes it with a transform,
+  and the page is no longer repainted. A new size, zoom or scale is drawn again 150 ms after it settles; textures are
+  capped at 4096 px, with a sharp part drawn on top for large tools.
+  - Measured at DPR 2: moving a 15 cm setsquare 12.1 → 0.07 ms per frame, turning 23.3 → 0.48 ms, sizing
+    43.4 → 0.07 ms.
+  - Behaviour change: a line being drawn shows under the tool, not over it.
   318 KiB.
 
 ## Backlog (decide later)
