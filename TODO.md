@@ -262,7 +262,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   as the fallback, and `pdfpage=` for pages of annotated PDFs. A tap offers a new tab, reference view or "here".
   In-app renames rewrite the links, backed by the index's backlinks. Built as `qt/links` after the running blocks.
 
-### Archive export (the author, 2026-09-24; `qt/archive-export`, started 2026-09-24)
+### Archive export (the author, 2026-09-24; `qt/archive-export`, merged 2026-09-24)
 - [ ] **"Export for the archive…"** per document (⋮ and Share), with a short explanation in the dialog of what it
   means: a PDF/A-3 file meant to stay readable for decades in any PDF viewer, with the ink flattened into the pages
   so no viewer can hide or lose it, and the full Xournal data embedded so the app can still open it for editing.
@@ -274,8 +274,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
-1. [ ] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs**, first. It starts after
-   `qt/archive-export` is merged, since both change `HybridPdf`.
+1. [~] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (started 2026-09-24).
    - Ctrl+S appends only what changed (standard PDF incremental update, ISO 32000): the changed layer annotations
      or ink streams, the embedded `.xopp`, the catalog marker, and a new cross-reference section matching the file's
      style (a table, or a stream after an xref stream) with `/Prev`. The original pages are never rewritten. This is
