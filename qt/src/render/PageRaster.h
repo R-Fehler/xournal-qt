@@ -24,6 +24,7 @@
 #include <cairo.h>
 
 #include "model/PageRef.h"
+#include "pdf/base/XojPdfPage.h"
 #include "util/Rectangle.h"
 #include "view/Mask.h"
 
@@ -52,6 +53,9 @@ public:
     virtual PdfCache* rasterPdfCache(bool background = false) const = 0;
     virtual RasterParams rasterParams() const = 0;
     virtual bool rasterMarkAudioStrokes() const { return false; }
+    /// A PDF page that is not in the document's PDF yet (pasted pages being merged, see PdfPageKeeper): drawn from
+    /// this one meanwhile (any thread; nullptr: none).
+    virtual XojPdfPageSPtr rasterPendingPdfPage(size_t) const { return nullptr; }
     /// Called on the UI thread when (part of) the buffer changed. `area` in page coordinates, nullopt = whole page.
     virtual void rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rectangle<double>> area) = 0;
 };

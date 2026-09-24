@@ -682,3 +682,33 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       `previews.pack` is written. Then edit page 4 and save: `previews.pack` is left alone; edit page 2: it is written.
 - [ ] Settings → Storage → Clean-up still removes everything (also `preview-stamps.pack`); switching the cache to
       the app cache moves it along.
+
+## Saving in the background (qt/background-save)
+- [ ] Open a long PDF (pgfmanual, or a lecture of several hundred pages), write a few strokes, save it as a hybrid
+      PDF, then write more and press Ctrl+S: the window stays usable while it saves (scroll, write, turn pages). The
+      tab title and the window title say "saving…"; the dot (●/•) stays until the save is done, then goes.
+- [ ] Write a stroke *while* it says "saving…": when the save is done, the dot stays (that stroke is not in the file
+      yet). Undo that stroke: the dot goes (the file holds the document as it is now). Redo, Ctrl+S: saved.
+- [ ] Ctrl+S twice quickly on a long hybrid PDF: it saves twice at most, one after the other (no error), and the
+      last strokes are in the file (close and reopen).
+- [ ] Ctrl+S on a big `.xopp` (many pages of ink): the window does not freeze.
+- [ ] Close the tab (✕) while it says "saving…": nothing is asked, the tab closes once the save is done. Quit the app
+      (window close / Ctrl+Q) while it saves: the window stays until the save is done, then closes (or asks about
+      other documents with changes). Reopen: everything is there.
+- [ ] Save to a place that cannot be written (a read-only folder, a full SD card): an error says why, the dot stays,
+      and closing the tab asks about the unsaved changes.
+- [ ] A document with pasted PDF pages: delete a pasted page, Ctrl+S, and right away (while it saves) undo the
+      deletion: the page shows its PDF page. Close and reopen: all pages there, with their text (search finds it).
+- [ ] Paste PDF pages from another PDF while a document with a large merged PDF saves: the paste may wait a moment,
+      then both are in the file after the next save; nothing refers to the cache (close, reopen from another
+      folder view or after clearing `~/.cache/xournal-qt/pasted-pages`).
+- [ ] Paste a page from another PDF into a long PDF (pgfmanual, a lecture of hundreds of pages) and into the large
+      scan: the page is there at once and shows its PDF page; the window does not freeze (it used to for seconds).
+      Its thumbnail may be white for a few seconds. Search finds its text a little later. Undo and redo the paste
+      right away: fine. Ctrl+S right after the paste: saves once the page is in the merged PDF; close and reopen:
+      the page is there with its text.
+- [ ] Kill the app (`kill -TERM <pid>`) while it saves a long hybrid PDF: at the next start the document is offered
+      for recovery with the latest strokes, and the hybrid PDF is either the old or the new version (it opens).
+- [ ] (Fix) Paste a PDF page from another PDF into a document that has a background PDF (best: the large scan):
+      the pasted page shows its PDF page on the canvas right away (it used to stay blank for a while), a second
+      paste from a third PDF too; the other pages do not flicker or re-render.

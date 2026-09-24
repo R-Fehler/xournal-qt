@@ -16,7 +16,8 @@ ApplicationWindow {
     // what it gets when it is not maximized, and what the tests use
     visibility: app.startMaximized ? Window.Maximized : Window.Windowed
     title: app.homeVisible ? (app.library.available ? app.library.name + " — Xournal Qt" : "Xournal Qt")
-                           : (app.modified ? "• " : "") + app.title + " — Xournal Qt"
+                           : (app.modified ? "• " : "") + app.title + (app.saving ? " (" + qsTr("saving…") + ")" : "")
+                             + " — Xournal Qt"
     Material.theme: Material.Light
     Material.accent: Material.Indigo
     color: "#5f6368"
@@ -130,14 +131,20 @@ ApplicationWindow {
     }
     function saveOrAsk(then) {
         if (app.savesWithoutDialog()) {
-            if (app.save() && then) then()
+            // In the background: the window stays usable; `then` runs once the file is written (with its tab
+            // current), not at all if that failed (a message says why)
+            app.saveInBackground(then ? then : null)
         } else {
             openSaveDialog(then)
         }
     }
 
-    // Close a tab; unsaved changes are asked about first (with that tab shown).
+    // Close a tab; unsaved changes are asked about first (with that tab shown). A tab being saved waits for its save.
     function requestCloseTab(index) {
+        if (app.tabSaving(index)) {
+            app.whenSaved(index, function(i) { requestCloseTab(i) })
+            return
+        }
         if (!app.tabModified(index)) {
             app.closeTab(index)
             return
@@ -145,8 +152,12 @@ ApplicationWindow {
         app.currentTab = index
         withSavedChanges(function() { app.closeTab(app.currentTab) })
     }
-    // Close every document; unsaved changes are asked about one by one.
+    // Close every document; unsaved changes are asked about one by one (after the saves that run).
     function closeAllTabs() {
+        if (app.anySaving) {
+            app.whenAllSaved(function() { closeAllTabs() })
+            return
+        }
         const pending = app.modifiedTabs()
         if (pending.length === 0) {
             app.closeAllTabs()
@@ -155,8 +166,17 @@ ApplicationWindow {
         app.currentTab = pending[0]
         withSavedChanges(function() { app.closeTab(app.currentTab); closeAllTabs() })
     }
-    // Quitting: go through the tabs with unsaved changes one by one.
+    // Quitting: the saves that run finish first (the window stays usable meanwhile), then the tabs with unsaved
+    // changes are asked about one by one.
+    property bool waitingToClose: false
     function closeWindow() {
+        if (app.anySaving) {
+            if (!waitingToClose) {
+                waitingToClose = true
+                app.whenAllSaved(function() { waitingToClose = false; closeWindow() })
+            }
+            return
+        }
         const pending = app.modifiedTabs()
         if (pending.length === 0) {
             quitting = true
@@ -168,7 +188,7 @@ ApplicationWindow {
     }
 
     onClosing: function(close) {
-        if (!quitting && app.modifiedTabs().length > 0) {
+        if (!quitting && (app.modifiedTabs().length > 0 || app.anySaving)) {
             close.accepted = false
             closeWindow()
             return
@@ -1276,7 +1296,7 @@ ApplicationWindow {
         defaultSuffix: "xopp"
         nameFilters: [qsTr("Xournal++ files (*.xopp)")]
         onAccepted: {
-            if (app.saveAs(selectedFile) && afterSave) afterSave()
+            app.saveAsInBackground(selectedFile, afterSave)
             afterSave = null
         }
         onRejected: afterSave = null
@@ -1291,7 +1311,7 @@ ApplicationWindow {
         defaultSuffix: "pdf"
         nameFilters: [qsTr("PDF with Xournal data (*.pdf)")]
         onAccepted: {
-            if (app.saveAsHybrid(selectedFile) && afterSave) afterSave()
+            app.saveAsHybridInBackground(selectedFile, afterSave)
             afterSave = null
         }
         onRejected: afterSave = null
@@ -1302,7 +1322,7 @@ ApplicationWindow {
         fileMode: FileDialog.SaveFile
         defaultSuffix: "xopp"
         nameFilters: [qsTr("Xournal++ files (*.xopp)")]
-        onAccepted: app.exportXopp(selectedFile)
+        onAccepted: app.exportXoppInBackground(selectedFile)
     }
     // A hybrid PDF whose ink another app changed: keep ours, or take theirs as plain annotations
     Dialog {
@@ -1374,6 +1394,7 @@ ApplicationWindow {
 
     Dialog {
         id: unsavedDialog
+        objectName: "unsavedDialog"
         anchors.centerIn: parent
         modal: true
         title: qsTr("Unsaved changes")

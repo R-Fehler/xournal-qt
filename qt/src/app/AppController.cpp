@@ -2,6 +2,7 @@
 
 #include <QPointer>
 #include <QThreadPool>
+#include <QTimer>
 
 #include <algorithm>
 #include <cstdio>
@@ -177,6 +178,28 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
 void AppController::makeTabs() {
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
+    connect(tabs.get(), &TabManager::pdfPagesFailed, this, [this](const QString& error) {
+        Q_EMIT message(tr("Pasting PDF pages failed"),
+                       tr("The pasted pages show their PDF page as a picture (its text cannot be searched).\n\n%1")
+                               .arg(error),
+                       true);
+    });
+    connect(tabs.get(), &TabManager::savingChanged, this, [this] {
+        Q_EMIT anySavingChanged();
+        if (!tabs->anySaving() && !whenAllSavedCalls.empty()) {
+            // (from the event loop: a call may close tabs)
+            QTimer::singleShot(0, this, [this] {
+                if (tabs->anySaving()) {
+                    return;  // (another save started meanwhile: they wait for it too)
+                }
+                auto calls = std::move(whenAllSavedCalls);
+                whenAllSavedCalls.clear();
+                for (QJSValue& f: calls) {
+                    f.call();
+                }
+            });
+        }
+    });
     connect(tabs.get(), &TabManager::countChanged, this, [this] {
         if (tabs->count() == 0) {
             if (isSecondary()) {
@@ -356,6 +379,10 @@ void AppController::windowClosed() {
 }
 
 void AppController::shutdown() {
+    // Saves that run are finished first (the window waited for them already; this is the last resort)
+    for (int i = 0; i < tabs->count(); ++i) {
+        tabs->session(i)->waitForSaves();
+    }
     // The image workers draw with Qt: they must be done before the application takes its plugins away
     PreviewProvider::shutdown();
     HitPageProvider::shutdown();
@@ -532,6 +559,7 @@ void AppController::currentTabChanged() {
     if (DocumentSession* s = session()) {
         currentConnections.push_back(
                 connect(s, &DocumentSession::modifiedChanged, this, &AppController::modifiedChanged));
+        currentConnections.push_back(connect(s, &DocumentSession::savingChanged, this, &AppController::savingChanged));
         currentConnections.push_back(
                 connect(s, &DocumentSession::undoRedoStateChanged, this, &AppController::undoRedoChanged));
         currentConnections.push_back(
@@ -583,6 +611,7 @@ void AppController::currentTabChanged() {
     Q_EMIT documentChanged();
     Q_EMIT titleChanged();
     Q_EMIT modifiedChanged();
+    Q_EMIT savingChanged();
     Q_EMIT undoRedoChanged();
     Q_EMIT zoomChanged();
     Q_EMIT pageChanged();
@@ -699,7 +728,7 @@ int AppController::pastePages(int position) {
         const QList<int> sel = pages->selectedPages();
         position = (sel.isEmpty() ? static_cast<int>(session()->getCurrentPageNo()) : sel.last()) + 1;
     }
-    fs::path keptIn;  // PDF pages from another PDF: the document's merged PDF
+    bool keptIn = false;  // PDF pages from another PDF: in the document's merged PDF
     auto copies = pageClipboard->pagesFor(*session(), &keptIn);
     const int n = static_cast<int>(copies.size());
     session()->insertPages(copies, static_cast<size_t>(position));
@@ -709,7 +738,7 @@ int AppController::pastePages(int position) {
     }
     pages->selectPages(pasted);
     QString note = n == 1 ? tr("Page pasted") : tr("%1 pages pasted").arg(n);
-    if (!keptIn.empty()) {
+    if (keptIn) {
         // Once per paste: where the PDF pages went (a new file next to the document)
         const fs::path place = session()->mergedPdfPlace();  // (in the cache until it is saved)
         const QString where = QString::fromStdString(place.filename().string());
@@ -932,6 +961,8 @@ QString AppController::title() const {
     return session() ? QString::fromStdString(session()->getDisplayName()) : QString();
 }
 bool AppController::modified() const { return session() && session()->isModified(); }
+bool AppController::saving() const { return session() && session()->isSaving(); }
+bool AppController::anySaving() const { return tabs->anySaving(); }
 bool AppController::hasFilePath() const { return session() && session()->hasFilePath(); }
 
 QString AppController::shownFileNote() const {
@@ -1725,6 +1756,38 @@ QString AppController::tabTitle(int index) const {
     return tabs->session(index) ? QString::fromStdString(tabs->session(index)->getDisplayName()) : QString();
 }
 
+bool AppController::tabSaving(int index) const { return tabs->session(index) && tabs->session(index)->isSaving(); }
+
+void AppController::whenSaved(int index, const QJSValue& then) {
+    DocumentSession* s = tabs->session(index);
+    if (!s || !s->isSaving()) {
+        QTimer::singleShot(0, this, [then, index]() mutable { then.call({index}); });
+        return;
+    }
+    QPointer<DocumentSession> guard(s);
+    auto connection = std::make_shared<QMetaObject::Connection>();
+    *connection = connect(s, &DocumentSession::savingChanged, this, [this, guard, then, connection](bool saving) {
+        if (saving) {
+            return;
+        }
+        disconnect(*connection);
+        // (from the event loop: the call may close the tab)
+        QTimer::singleShot(0, this, [this, guard, then]() mutable {
+            if (const int i = guard ? tabs->indexOf(guard) : -1; i >= 0) {
+                then.call({i});
+            }
+        });
+    });
+}
+
+void AppController::whenAllSaved(const QJSValue& then) {
+    if (!tabs->anySaving()) {
+        QTimer::singleShot(0, this, [then]() mutable { then.call(); });
+        return;
+    }
+    whenAllSavedCalls.push_back(then);
+}
+
 QVariantList AppController::modifiedTabs() const {
     QVariantList list;
     for (int i = 0; i < tabs->count(); ++i) {
@@ -1831,26 +1894,134 @@ bool AppController::openPath(const QString& path) {
     return true;
 }
 
+namespace {
+bool settingOn(Settings* settings, const char* key);
+}  // namespace
 
-bool AppController::save() {
-    if (!session()) {
+bool AppController::startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then) {
+    DocumentSession* s = session();
+    if (!s) {
         return false;
     }
-    if (!session()->hasFilePath()) {
+    if (way == SaveWay::Save && !s->hasFilePath()) {
         // "Save notes into the PDF itself": an annotated PDF is saved into it, as a hybrid PDF
-        return savesWithoutDialog() &&
-               saveAsHybrid(QUrl::fromLocalFile(QString::fromStdString(session()->annotatedPdf().string())));
+        if (!savesWithoutDialog()) {
+            return false;
+        }
+        return startSave(SaveWay::Hybrid, s->annotatedPdf(), std::move(then));
     }
-    auto r = session()->save();
-    if (!r.ok) {
-        Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
-    } else if (session()->isHybrid()) {
-        afterHybridSave();  // (the library index reads a hybrid PDF itself)
-    } else {
-        handOverToLibrary(*session());
+    DocumentSession::SaveRequest request;
+    switch (way) {
+        case SaveWay::Save:
+            request.kind = DocumentSession::SaveKind::Save;
+            break;
+        case SaveWay::SaveAs:
+            request.kind = DocumentSession::SaveKind::SaveAs;
+            break;
+        case SaveWay::Hybrid:
+            request.kind = DocumentSession::SaveKind::Hybrid;
+            break;
+        case SaveWay::ExportXopp:
+            request.kind = DocumentSession::SaveKind::ExportXopp;
+            break;
     }
-    Q_EMIT titleChanged();
-    return r.ok;
+    request.target = target;
+    const bool hybrid = way == SaveWay::Hybrid || (way == SaveWay::Save && s->isHybrid());
+    if (hybrid && settingOn(app->getSettings(), "hybridExportXopp")) {
+        // "On every save of a hybrid PDF, also write a .xopp for Xournal++": from the same state, in the same job
+        fs::path xopp = way == SaveWay::Save ? s->getFilePath() : target;
+        if (way != SaveWay::Save && xopp.extension() != ".pdf") {
+            xopp += ".pdf";
+        }
+        xopp.replace_extension(".xopp");
+        request.exportXopp = xopp;
+    }
+    QPointer<DocumentSession> guard(s);
+    request.done = [this, guard, way, target, then = std::move(then)](const DocumentSession::SaveResult& r) {
+        if (!guard) {
+            return;
+        }
+        DocumentSession& saved = *guard;
+        if (!r.ok) {
+            Q_EMIT message(way == SaveWay::ExportXopp ? tr("Export failed") : tr("Saving failed"),
+                           QString::fromStdString(r.error), true);
+        } else if (way == SaveWay::ExportXopp) {
+            library->refresh();
+            Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(target.filename().string())), false);
+        } else {
+            if (way != SaveWay::Save) {
+                app->getSettings()->setLastSavePath(target.parent_path());
+                recent->add(saved.getFilePath());
+            }
+            if (saved.isHybrid()) {
+                afterHybridSave(saved);  // (the library index reads a hybrid PDF itself)
+                if (!r.exportError.empty()) {
+                    Q_EMIT message(tr("Export for Xournal++ failed"), QString::fromStdString(r.exportError), true);
+                }
+            } else {
+                handOverToLibrary(saved);
+                if (way == SaveWay::SaveAs) {
+                    library->refresh();  // a new document in the library
+                }
+            }
+        }
+        Q_EMIT titleChanged();
+        if (then) {
+            then(r.ok);
+        }
+    };
+    s->saveInBackground(std::move(request));
+    return true;
+}
+
+bool AppController::waitForSave() {
+    DocumentSession* s = session();
+    return s && s->waitForSaves();
+}
+
+std::function<void(bool)> AppController::callWhenSaved(const QJSValue& then) {
+    if (!then.isCallable()) {
+        return {};
+    }
+    QPointer<DocumentSession> guard(session());
+    return [this, guard, then](bool ok) {
+        if (!ok) {
+            return;  // (the message says why; the document stays open and modified)
+        }
+        // From the event loop (a call may close the tab), with the saved document's tab current (the window's flows
+        // go on with the current tab)
+        QTimer::singleShot(0, this, [this, guard, then]() mutable {
+            const int i = guard ? tabs->indexOf(guard) : -1;
+            if (i < 0) {
+                return;
+            }
+            tabs->setCurrentIndex(i);
+            then.call();
+        });
+    };
+}
+
+bool AppController::saveInBackground(const QJSValue& then) { return startSave(SaveWay::Save, {}, callWhenSaved(then)); }
+
+bool AppController::saveAsInBackground(const QUrl& url, const QJSValue& then) {
+    return startSave(SaveWay::SaveAs, fs::path(url.toLocalFile().toStdString()), callWhenSaved(then));
+}
+
+bool AppController::saveAsHybridInBackground(const QUrl& url, const QJSValue& then) {
+    return startSave(SaveWay::Hybrid, fs::path(url.toLocalFile().toStdString()), callWhenSaved(then));
+}
+
+void AppController::exportXoppInBackground(const QUrl& url) {
+    fs::path xopp(url.toLocalFile().toStdString());
+    if (xopp.extension() != ".xopp") {
+        xopp += ".xopp";
+    }
+    startSave(SaveWay::ExportXopp, xopp, {});
+}
+
+bool AppController::save() {
+    bool ok = false;
+    return startSave(SaveWay::Save, {}, [&ok](bool r) { ok = r; }) && (waitForSave(), ok);
 }
 
 void AppController::handOverToLibrary(DocumentSession& s) {
@@ -1904,33 +2075,15 @@ QUrl AppController::suggestedHybridFile() const {
 }
 
 bool AppController::saveAsHybrid(const QUrl& url) {
-    if (!session()) {
-        return false;
-    }
-    const fs::path target(url.toLocalFile().toStdString());
-    auto r = session()->saveAsHybrid(target);
-    if (!r.ok) {
-        Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
-    } else {
-        app->getSettings()->setLastSavePath(target.parent_path());
-        recent->add(session()->getFilePath());
-        afterHybridSave();
-    }
-    Q_EMIT titleChanged();
-    return r.ok;
+    bool ok = false;
+    return startSave(SaveWay::Hybrid, fs::path(url.toLocalFile().toStdString()), [&ok](bool r) { ok = r; }) &&
+           (waitForSave(), ok);
 }
 
-void AppController::afterHybridSave() {
+void AppController::afterHybridSave(DocumentSession& s) {
     // The clean copy of the new version, in the background: opening it again (also the library's index and preview)
     // does not have to make it (seconds for a long PDF)
-    QThreadPool::globalInstance()->start([file = session()->getFilePath()] { HybridPdf::open(file); });
-    if (settingOn(app->getSettings(), "hybridExportXopp")) {
-        fs::path xopp = session()->getFilePath();
-        xopp.replace_extension(".xopp");
-        if (auto r = session()->exportXopp(xopp); !r.ok) {
-            Q_EMIT message(tr("Export for Xournal++ failed"), QString::fromStdString(r.error), true);
-        }
-    }
+    QThreadPool::globalInstance()->start([file = s.getFilePath()] { HybridPdf::open(file); });
     library->refresh();
 }
 
@@ -1944,21 +2097,12 @@ QUrl AppController::suggestedXoppExport() const {
 }
 
 bool AppController::exportXopp(const QUrl& url) {
-    if (!session()) {
-        return false;
-    }
     fs::path xopp(url.toLocalFile().toStdString());
     if (xopp.extension() != ".xopp") {
         xopp += ".xopp";
     }
-    auto r = session()->exportXopp(xopp);
-    if (!r.ok) {
-        Q_EMIT message(tr("Export failed"), QString::fromStdString(r.error), true);
-        return false;
-    }
-    library->refresh();
-    Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(xopp.filename().string())), false);
-    return true;
+    bool ok = false;
+    return startSave(SaveWay::ExportXopp, xopp, [&ok](bool r) { ok = r; }) && (waitForSave(), ok);
 }
 
 bool AppController::importHybridChanges() {
@@ -1983,23 +2127,9 @@ void AppController::keepHybridData() {
 }
 
 bool AppController::saveAs(const QUrl& url) {
-    if (!session()) {
-        return false;
-    }
-    const fs::path target(url.toLocalFile().toStdString());
-    auto r = session()->saveAs(target);
-    if (!r.ok) {
-        Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
-    } else {
-        app->getSettings()->setLastSavePath(target.parent_path());
-        recent->add(session()->getFilePath());
-        if (!session()->isHybrid()) {
-            handOverToLibrary(*session());  // (the library index reads a hybrid PDF itself)
-        }
-        library->refresh();  // a new document in the library
-    }
-    Q_EMIT titleChanged();
-    return r.ok;
+    bool ok = false;
+    return startSave(SaveWay::SaveAs, fs::path(url.toLocalFile().toStdString()), [&ok](bool r) { ok = r; }) &&
+           (waitForSave(), ok);
 }
 
 void AppController::undo() {
@@ -2472,6 +2602,7 @@ bool AppController::exportPdf(const QUrl& url) {
         return false;
     }
     session()->clearSelectionEndText();  // everything back in the document
+    session()->waitForMerges();          // (pages pasted just now: their PDF pages)
     fs::path target(url.toLocalFile().toStdString());
     if (target.extension() != ".pdf") {
         target += ".pdf";
@@ -2570,6 +2701,7 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
         return false;
     }
     s->clearSelectionEndText();
+    s->waitForMerges();  // (pages pasted just now: their PDF pages)
     // What is printed: the document as a PDF, or the PDF it annotates as it is
     QTemporaryDir temporary;
     if (!temporary.isValid()) {

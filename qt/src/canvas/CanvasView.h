@@ -112,10 +112,14 @@ public:
     size_t getCurrentPage() const override;
     void layerChanged(size_t page) override;
     void recreatePdfCache() override;
+    /// `rerender`: every page is drawn again (the PDF may look different); else the pages keep their pictures and only
+    /// those that show a PDF page the old PDF did not have are drawn (pasted pages joined the merged PDF).
+    void replacePdfCache(bool rerender);
 
     // --- RasterHost (rasterParams is called from render threads) -----------------------------------------------
     Document* rasterDocument() const override;
     PdfCache* rasterPdfCache(bool background) const override;
+    XojPdfPageSPtr rasterPendingPdfPage(size_t number) const override;
     RasterParams rasterParams() const override;
     void rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rectangle<double>> area) override;
 
@@ -324,6 +328,7 @@ private:
     mutable bool backgroundPdfLoaded = false;
     /// Replaced PDF caches: a render may still use them (they go with the view)
     std::vector<std::shared_ptr<PdfCache>> retiredPdfCaches;
+    size_t pdfCachePages = 0;  ///< the pages of the PDF of `pdfCache`
     std::vector<std::unique_ptr<CanvasPage>> pages;
     bool shown = false;
     std::pair<size_t, size_t> window{1, 0};

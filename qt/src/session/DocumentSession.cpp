@@ -39,6 +39,7 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "AppContext.h"
+#include "DocumentSaveTask.h"
 #include "DocumentSearch.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
@@ -202,7 +203,8 @@ void DocumentSession::init() {
 
     autosaveTimer.setSingleShot(false);
     connect(&autosaveTimer, &QTimer::timeout, this, [this] {
-        if (undoRedo->isChangedAutosave()) {
+        // (not while a save writes the merged PDF: the autosave would refer to a file that is being moved)
+        if (undoRedo->isChangedAutosave() && !pdfWorkRunning()) {
             autosave();
         }
     });
@@ -219,6 +221,10 @@ void DocumentSession::init() {
 }
 
 DocumentSession::~DocumentSession() {
+    // A save that runs (or waits) is finished first: closing never loses it. Nobody hears of it any more.
+    destroying = true;
+    blockSignals(true);
+    waitForSaves();
     for (const auto& b: retainedBases) {
         HybridPdf::release(b);
     }
@@ -643,10 +649,7 @@ void DocumentSession::undoRedoChanged() {
     actions.enableAction(Action::UNDO, undoRedo->canUndo());
     actions.enableAction(Action::REDO, undoRedo->canRedo());
     Q_EMIT undoRedoStateChanged();
-    if (const bool modified = isModified(); modified != lastModified) {
-        lastModified = modified;
-        Q_EMIT modifiedChanged(modified);
-    }
+    updateModified();
 }
 
 void DocumentSession::undoRedoPageChanged(PageRef page) {
@@ -809,7 +812,16 @@ void DocumentSession::setShownFile(const fs::path& file, bool readOnly) {
 
 size_t DocumentSession::addPdfPages(const std::string& pdf, std::string& error) { return pdfPages->add(pdf, error); }
 
+XojPdfPageSPtr DocumentSession::pendingPdfPage(size_t number) const { return pdfPages->pendingPage(number); }
+
 fs::path DocumentSession::annotatedPdf() const { return pdfPages->annotatedPdf(); }
+
+bool DocumentSession::loadPdfKeepingPictures(const fs::path& pdf) {
+    keepingPictures = true;
+    const bool ok = doc->readPdfKeepingOutline(pdf);  // (the same pages: the same outline)
+    keepingPictures = false;
+    return ok;
+}
 
 quint64 DocumentSession::pdfNumbering() const { return pdfPages->numbering(); }
 
@@ -830,7 +842,14 @@ std::string DocumentSession::getDisplayName() const {
     return _("Untitled");
 }
 
-bool DocumentSession::isModified() const { return undoRedo->isChanged(); }
+bool DocumentSession::isModified() const { return undoRedo->isChanged() || saveUnconfirmed || saveFailed; }
+
+void DocumentSession::updateModified() {
+    if (const bool modified = isModified(); modified != lastModified) {
+        lastModified = modified;
+        Q_EMIT modifiedChanged(modified);
+    }
+}
 
 void DocumentSession::updatePreview(Document& document) {
     Document* doc = &document;
@@ -873,86 +892,6 @@ void DocumentSession::updatePreview(Document& document) {
     doc->unlock();
 }
 
-auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
-    Util::safeReplaceExtension(target, "xopp");
-    // xournal-qt: the merged PDF of pasted PDF pages goes next to it, compacted. A renumbered one that replaces the
-    // file the saved .xopp refers to is written under another name first: the .xopp is written referring to that,
-    // then the PDF gets its name and the .xopp is written again. A crash at any point leaves a matching pair.
-    pdfPages->beforeSave(target);
-    auto stop = [](int step) { return PdfPageKeeper::stopSaveAt && PdfPageKeeper::stopSaveAt(step); };
-    if (stop(1)) {
-        return {false, "stopped (test)"};
-    }
-    SaveResult r = writeXopp(target);
-    if (r.ok && pdfPages->hasStaged()) {
-        if (stop(2)) {
-            return {false, "stopped (test)"};
-        }
-        pdfPages->commitStaged();
-        if (stop(3)) {
-            return {false, "stopped (test)"};
-        }
-        r = writeXopp(target);
-    }
-    if (!r.ok) {
-        return r;
-    }
-    if (stop(4)) {
-        return {false, "stopped (test)"};
-    }
-    hybridBase.clear();  // (the PDF pages may have been renumbered)
-    pdfPages->finishStaged();  // (the file under the other name: no .xopp refers to it now)
-    shownPath.clear();         // (it is this .xopp now)
-    shownReadOnly = false;
-    // Port of Control::resetSavedStatus
-    undoRedo->documentSaved();
-    undoRedoChanged();
-    Q_EMIT filePathChanged();
-    return {true, {}};
-}
-
-auto DocumentSession::writeXopp(const fs::path& target) -> SaveResult {
-    // Port of SaveJob::save
-    updatePreview(*doc);
-    SaveHandler h;
-
-    doc->lock_shared();
-    h.prepareSave(doc.get(), target);
-    doc->unlock_shared();
-
-    const bool createBackup = doc->shouldCreateBackupOnSave();
-    if (createBackup) {
-        try {
-            // The backup must be created for the target: this is the file that will be written.
-            Util::safeRenameFile(target, fs::path{target} += "~");
-        } catch (const fs::filesystem_error& fe) {
-            g_warning("Could not create backup! Failed with %s", fe.what());
-            return {false, FS(_F("Save file error, can't backup: {1}") % std::string(fe.what()))};
-        }
-    }
-
-    h.saveTo(target);
-
-    doc->lock();
-    h.updateDocumentInfo(doc.get());
-    doc->setFilepath(target);
-    doc->unlock();
-
-    if (!h.getErrorMessage().empty()) {
-        return {false, FS(_F("Save file error: {1}") % h.getErrorMessage())};
-    }
-    if (createBackup) {
-        try {
-            fs::remove(fs::path{target} += "~");
-        } catch (const fs::filesystem_error& fe) {
-            g_warning("Could not delete backup! Failed with %s", fe.what());
-        }
-    } else {
-        doc->setCreateBackupOnSave(true);
-    }
-    return {true, {}};
-}
-
 auto DocumentSession::writeDocument(Document& doc, const fs::path& target) -> SaveResult {
     updatePreview(doc);
     doc.lock();
@@ -984,85 +923,7 @@ void DocumentSession::relocate(const fs::path& xopp, const fs::path& pdf) {
     Q_EMIT filePathChanged();
 }
 
-auto DocumentSession::save() -> SaveResult {
-    clearSelectionEndText();  // like upstream's Control::saveImpl: the selected elements go back first
-    if (!hasFilePath()) {
-        return {false, _("The document has no file name yet (use \"Save as\").")};
-    }
-    if (isHybrid()) {
-        return saveHybridImpl(getFilePath());
-    }
-    return saveImpl(getFilePath());
-}
-
 bool DocumentSession::isHybrid() const { return hasExtension(getFilePath(), ".pdf"); }
-
-auto DocumentSession::saveAsHybrid(fs::path target) -> SaveResult {
-    clearSelectionEndText();
-    if (!hasExtension(target, ".pdf")) {
-        target += ".pdf";
-    }
-    return saveHybridImpl(target);
-}
-
-auto DocumentSession::saveHybridImpl(const fs::path& target) -> SaveResult {
-    updatePreview(*doc);
-    fs::path bg;
-    {
-        std::shared_lock lock(*doc);
-        bg = doc->getPdfFilepath();
-    }
-    std::error_code ec;
-    const bool exists = fs::exists(target, ec);
-    if (exists && !HybridPdf::isHybrid(target)) {
-        // A PDF of the user's becomes a hybrid PDF (notes saved into the PDF itself): its original is kept once
-        fs::path original = target;
-        original.replace_extension(".original.pdf");
-        if (!fs::exists(original, ec)) {
-            fs::copy_file(target, original, ec);
-            if (ec) {
-                return {false, FS(_F("Could not keep the original PDF as \"{1}\": {2}") % original.u8string() %
-                                  ec.message())};
-            }
-        }
-    }
-    if (exists && !bg.empty() && fs::exists(bg, ec) && fs::equivalent(bg, target, ec)) {
-        // The pages come from the file that is written: from a copy of it from now on (the same pages and numbers)
-        const fs::path copy = HybridPdf::cacheFolder() / ("own-" + std::to_string(Util::getPid()) + "-" +
-                                                          std::to_string(serialNo)) / "base.pdf";
-        fs::create_directories(copy.parent_path(), ec);
-        fs::copy_file(target, copy, fs::copy_options::overwrite_existing, ec);
-        if (ec || !doc->readPdf(copy, /*initPages=*/false, /*attachToDocument=*/false)) {
-            return {false, FS(_F("Could not copy the PDF \"{1}\" before writing into it: {2}") % target.u8string() %
-                              (ec ? ec.message() : doc->getLastErrorMsg()))};
-        }
-        HybridPdf::retain(copy);
-        retainedBases.push_back(copy);
-        bg = copy;
-    }
-    HybridPdf::BasePageOf baseOf;
-    if (!hybridBase.empty() && (HybridPdf::inCache(bg) || MergedPdf::inCache(bg))) {
-        baseOf = [this](const XojPage* page) {
-            auto it = hybridBase.find(page);
-            return it != hybridBase.end() && it->second.first.lock().get() == page ? it->second.second : npos;
-        };
-    }
-    const auto r = HybridPdf::write(*doc, target, baseOf);
-    if (!r.ok) {
-        return {false, FS(_F("Could not write the hybrid PDF \"{1}\": {2}") % target.u8string() % r.error)};
-    }
-    if (HybridPdf::inCache(bg)) {
-        HybridPdf::touch(bg);  // (still used)
-    }
-    doc->lock();
-    doc->setFilepath(target);
-    doc->unlock();
-    hybridChanges.clear();  // (written anew from the document)
-    undoRedo->documentSaved();
-    undoRedoChanged();
-    Q_EMIT filePathChanged();
-    return {true, {}};
-}
 
 bool DocumentSession::importHybridChanges(std::string& error) {
     if (!isHybrid() || hybridChanges.empty()) {
@@ -1125,26 +986,6 @@ fs::path DocumentSession::exportPdfFor(const fs::path& xopp) {
         return pair;  // (the library shows the two as one document)
     }
     return MergedPdf::sidecarOf(xopp);
-}
-
-auto DocumentSession::exportXopp(const fs::path& xopp) -> SaveResult {
-    clearSelectionEndText();
-    updatePreview(*doc);
-    const auto r = HybridPdf::exportXopp(*doc, xopp, exportPdfFor(xopp));
-    if (!r.ok) {
-        return {false, FS(_F("Could not export \"{1}\": {2}") % xopp.u8string() % r.error)};
-    }
-    return {true, {}};
-}
-
-auto DocumentSession::saveAs(fs::path target) -> SaveResult {
-    clearSelectionEndText();
-    // Like Control::saveImpl(saveAs=true): the document takes the new path before saving (the location of an
-    // attached background PDF is derived from it).
-    doc->lock();
-    doc->setFilepath(target);
-    doc->unlock();
-    return saveImpl(std::move(target));
 }
 
 auto DocumentSession::autosave() -> SaveResult {

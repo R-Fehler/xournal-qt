@@ -90,6 +90,8 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             return QString::fromStdString(s->getDisplayName());
         case ModifiedRole:
             return s->isModified();
+        case SavingRole:
+            return s->isSaving();
         case FilePathRole:
             return QString::fromStdString(s->getFilePath().string());
         case CurrentRole:
@@ -159,7 +161,11 @@ QHash<int, QByteArray> TabManager::roleNames() const {
     return {{TitleRole, "title"},         {ModifiedRole, "modified"},     {FilePathRole, "filePath"},
             {CurrentRole, "current"},     {ThumbnailRole, "thumbnail"}, {PageCountRole, "pageCount"},
             {SearchHitsRole, "searchHits"}, {SearchRunningRole, "searchRunning"}, {HitPagesRole, "hitPages"},
-            {SketchRole, "sketch"}};
+            {SketchRole, "sketch"},       {SavingRole, "saving"}};
+}
+
+bool TabManager::anySaving() const {
+    return std::any_of(tabs.begin(), tabs.end(), [](const Tab& t) { return t.session->isSaving(); });
 }
 
 int TabManager::rowOf(const DocumentSession* s) const {
@@ -187,6 +193,11 @@ int TabManager::addTab(std::unique_ptr<DocumentSession> session) {
 void TabManager::listenTo(Tab& tab) {
     DocumentSession* s = tab.session.get();
     connect(s, &DocumentSession::modifiedChanged, this, [this, s] { tabDataChanged(s, {ModifiedRole, ThumbnailRole}); });
+    connect(s, &DocumentSession::pdfPagesFailed, this, &TabManager::pdfPagesFailed);
+    connect(s, &DocumentSession::savingChanged, this, [this, s] {
+        tabDataChanged(s, {SavingRole});
+        Q_EMIT savingChanged();
+    });
     connect(s, &DocumentSession::filePathChanged, this,
             [this, s] { tabDataChanged(s, {TitleRole, FilePathRole, ThumbnailRole}); });
     const quint64 id = ThumbnailProvider::registerSession(s);
@@ -237,6 +248,7 @@ std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
     backgroundChanged(old);
     Q_EMIT currentIndexChanged();
     Q_EMIT currentTabChanged();
+    Q_EMIT savingChanged();
     return tab;
 }
 
@@ -270,11 +282,16 @@ void TabManager::closeTab(int index) {
         backgroundChanged(-1);
         Q_EMIT currentTabChanged();
     }
-    // Destroy after the UI switched away from it (and after running thumbnail renders of it finished).
+    // Destroy after the UI switched away from it (and after running thumbnail renders of it finished). A save that
+    // runs is finished first (the UI waits for it before it closes a tab; this is the last resort), then its autosave
+    // is not needed any more.
     ThumbnailProvider::unregisterSession(tab.session.get());
+    disconnect(tab.session.get(), nullptr, this, nullptr);
+    tab.session->waitForSaves();
     tab.session->deleteAutosaveFile();
     tab.view.reset();
     tab.session.reset();
+    Q_EMIT savingChanged();
 }
 
 void TabManager::moveTab(int from, int to) {

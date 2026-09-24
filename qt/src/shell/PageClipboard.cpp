@@ -5,62 +5,15 @@
 #include <shared_mutex>
 #include <vector>
 
-#include <cairo.h>
-#include <gio/gio.h>
-
-#include "model/BackgroundImage.h"
 #include "model/Document.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "session/MergedPdf.h"
+#include "session/PdfPageKeeper.h"
 #include "util/Util.h"
 
 namespace xqt {
-
-namespace {
-cairo_status_t appendPng(void* closure, const unsigned char* data, unsigned int length) {
-    auto* buffer = static_cast<std::vector<unsigned char>*>(closure);
-    buffer->insert(buffer->end(), data, data + length);
-    return CAIRO_STATUS_SUCCESS;
-}
-
-/// The PDF page as an (attached) image background of the page.
-bool pdfToImageBackground(XojPage& page, const XojPdfPage& pdf) {
-    const double scale = PageClipboard::IMAGE_DPI / 72.0;
-    const int w = std::max(1, static_cast<int>(page.getWidth() * scale));
-    const int h = std::max(1, static_cast<int>(page.getHeight() * scale));
-    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
-    cairo_t* cr = cairo_create(surface);
-    cairo_set_source_rgb(cr, 1, 1, 1);
-    cairo_paint(cr);
-    cairo_scale(cr, scale, scale);
-    pdf.render(cr);
-    cairo_destroy(cr);
-    std::vector<unsigned char> png;
-    const bool ok = cairo_surface_write_to_png_stream(surface, appendPng, &png) == CAIRO_STATUS_SUCCESS;
-    cairo_surface_destroy(surface);
-    if (!ok) {
-        return false;
-    }
-    GBytes* bytes = g_bytes_new(png.data(), png.size());
-    GInputStream* stream = g_memory_input_stream_new_from_bytes(bytes);
-    g_bytes_unref(bytes);
-    BackgroundImage img;
-    GError* error = nullptr;
-    img.loadFile(stream, fs::path("pasted-pdf-page.png"), &error);
-    g_object_unref(stream);
-    if (error) {
-        g_warning("Could not convert the PDF page: %s", error->message);
-        g_error_free(error);
-        return false;
-    }
-    img.setAttach(true);  // stored in the .xopp
-    page.setBackgroundImage(img);
-    page.setBackgroundType(PageType(PageTypeFormat::Image));
-    return true;
-}
-}  // namespace
 
 namespace {
 std::string stampOf(const fs::path& p) {
@@ -76,6 +29,23 @@ std::string stampOf(const fs::path& p) {
 
 void PageClipboard::copy(DocumentSession& session, const std::vector<size_t>& indices, bool withPdf) {
     Document& doc = *session.getDocument();
+    if (withPdf) {
+        // Pages pasted just now from another PDF: their PDF pages are taken along once they are in the merged PDF
+        bool pending = false;
+        {
+            std::shared_lock lock(doc);
+            for (size_t i: indices) {
+                if (i < doc.getPageCount()) {
+                    const PageRef page = doc.getPage(i);
+                    pending = pending || (page->getBackgroundType().isPdfPage() &&
+                                          page->getPdfPageNr() >= doc.getPdfPageCount());
+                }
+            }
+        }
+        if (pending) {
+            session.waitForMerges();
+        }
+    }
     std::vector<size_t> numbers;  // the PDF pages to take along
     {
         std::shared_lock lock(doc);
@@ -116,7 +86,7 @@ void PageClipboard::copy(DocumentSession& session, const std::vector<size_t>& in
     }
 }
 
-std::vector<PageRef> PageClipboard::pagesFor(DocumentSession& target, fs::path* keptIn) const {
+std::vector<PageRef> PageClipboard::pagesFor(DocumentSession& target, bool* addedToMergedPdf) const {
     Document& doc = *target.getDocument();
     fs::path targetPdf;
     {
@@ -147,9 +117,8 @@ std::vector<PageRef> PageClipboard::pagesFor(DocumentSession& target, fs::path* 
                 merged.first = first;
             }
         }
-        if (first != npos && keptIn) {
-            std::shared_lock lock(doc);
-            *keptIn = doc.getPdfFilepath();
+        if (first != npos && addedToMergedPdf) {
+            *addedToMergedPdf = true;
         }
     }
     std::vector<PageRef> result;
@@ -158,7 +127,7 @@ std::vector<PageRef> PageClipboard::pagesFor(DocumentSession& target, fs::path* 
         if (copy->getBackgroundType().isPdfPage() && !samePdf) {
             if (first != npos && pdfIndex[i] != npos) {
                 copy->setBackgroundPdfPageNr(first + pdfIndex[i]);
-            } else if (!pdfPages[i] || !pdfToImageBackground(*copy, *pdfPages[i])) {
+            } else if (!pdfPages[i] || !PdfPageKeeper::toImageBackground(*copy, *pdfPages[i], IMAGE_DPI)) {
                 copy->setBackgroundType(PageType(PageTypeFormat::Plain));  // the annotations at least
             }
         }

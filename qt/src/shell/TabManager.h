@@ -40,7 +40,9 @@ public:
                  /// [{ page, count, aspect, thumbnail, rects: [normalized hit rects, at most 50] }]
                  HitPagesRole,
                  /// URL of the sketch of the current page (PageSketches), shown under the thumbnail; may be empty
-                 SketchRole };
+                 SketchRole,
+                 /// The document is being saved (in the background)
+                 SavingRole };
 
     explicit TabManager(AppContext& app, QObject* parent = nullptr);
     ~TabManager() override;
@@ -75,6 +77,10 @@ public:
     bool isPristine(int index) const;
 
     DocumentSession* session(int index) const;
+    /// The tab of this session, or -1.
+    int indexOf(const DocumentSession* s) const { return rowOf(s); }
+    /// A document of this list is being saved.
+    bool anySaving() const;
     CanvasView* view(int index) const;
     DocumentSession* currentSession() const { return session(current); }
     CanvasView* currentView() const { return view(current); }
@@ -87,6 +93,10 @@ Q_SIGNALS:
     void countChanged();
     /// The current tab is now another document (index change, or the current tab was closed or replaced).
     void currentTabChanged();
+    /// A document started or finished saving.
+    void savingChanged();
+    /// Pasted PDF pages could not be added to a document's merged PDF (DocumentSession::pdfPagesFailed).
+    void pdfPagesFailed(const QString& error);
 
 private:
     /// The tab reports to this list (and stops reporting to the one it came from).
