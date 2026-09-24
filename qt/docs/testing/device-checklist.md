@@ -1053,3 +1053,33 @@ the Surface or another Windows 10/11 machine. See [../windows.md](../windows.md)
 - [ ] Settings stay after a restart (`%LOCALAPPDATA%\xournal-qt`); caches are in `%LOCALAPPDATA%\cache\xournal-qt`.
 - [ ] Kill the program in the Task Manager with an unsaved document: at the next start it offers to recover it.
 - [ ] `bin\xournal-qt-cli.exe some.xopp --create-pdf out.pdf` in a terminal writes the PDF.
+
+## Archive export (qt/archive-export)
+
+- [ ] Take a lecture PDF with notes (pen with pressure, a highlighter over its text, a text box, a Markdown link to
+      another PDF, an inserted ruled page). ⋮ → "Export for the archive…": the dialog explains what an archive PDF is
+      and offers "Next to the document, as lecture.archive.pdf" or a folder. Export (with an unsaved stroke): the
+      window stays usable, then "lecture.archive.pdf is a PDF/A-3b file"; "Show in folder" shows it selected. The tab
+      still has its unsaved change (the dot). Open `lecture.archive.pdf` in Okular,
+      Firefox and Acrobat: the ink looks as in the app, the highlighter lets the text show through, and the ink can
+      not be hidden (Okular: "Show annotations" off changes nothing; Acrobat's comment list has only the link). The
+      link opens the other PDF.
+- [ ] Acrobat (Reader is enough): the file opens with the blue "PDF/A" bar ("This file claims compliance with the
+      PDF/A standard"); Attachments shows `document.xopp`. File → Properties: the title is the lecture's.
+- [ ] Open `lecture.archive.pdf` in xournal-qt: every stroke is editable, and none is shown twice (erase one: nothing
+      stays behind). Ctrl+S, open it in Okular again: the stroke is gone there too, and Acrobat still says PDF/A.
+- [ ] Share… (⋮, the tab menu, a PDF card in the library) → "For the archive (PDF/A)" opens the same dialog. From a
+      card, choose "In a folder I choose…": the archive appears there without a tab opening.
+- [ ] Export a PDF whose fonts are not embedded (`pdffonts file.pdf` shows "no" under "emb"; old PDFs with
+      Helvetica or Times often are): the report says "not PDF/A" with the font names, and the file still opens
+      everywhere; Acrobat shows no PDF/A bar for it.
+- [ ] Library menu → "Export library as archive…" on a real library (with subfolders, a lecture PDF with its
+      `.xopp`, a hybrid PDF, `.md` notes, images, a Word file): choose a folder outside the library (a folder inside
+      it is refused with a message). A progress dialog counts the files; the window stays usable. At the end the
+      summary; "Show in file manager" shows the new folder "<library> archive <date>" with the same subfolders, a
+      PDF per document, the other files as they were, and README.txt. The library is unchanged (no new files there).
+- [ ] In the archive folder, open a note that links to a lecture (in Okular or Acrobat): the link opens the lecture's
+      archive PDF at the right page.
+- [ ] Start it on a big library and press Cancel: it stops after the current file, the summary says "cancelled", and
+      the README says the archive is incomplete.
+- [ ] With a folder open in the library, "Only this folder" archives that folder and its subfolders only.

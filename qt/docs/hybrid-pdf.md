@@ -270,3 +270,142 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
      URI list). From a library card, the PDF is loaded and exported on a worker, without opening a tab.
    "Export as .xopp for Xournal++…" (next to the hybrid PDF) left the ⋮ menu: the one-time export is Share's, and
    the `.xopp` kept beside the PDF is "Keep it updated for Xournal++" (or the global setting).
+
+## Archive PDF (`qt/archive-export`)
+
+The author asked for an export meant for keeping (TODO.md, "Archive export"): a **PDF/A-3b** file that stays readable
+for decades in any PDF viewer, with the ink merged into the pages so no viewer can hide or lose it, and the full
+Xournal data embedded so xournal-qt still opens it for editing.
+
+### The file (`HybridPdf::writeArchive`, `qt/src/session/ArchivePdf.*`; tests `ArchivePdfTest` in `HybridPdfTest.cpp`)
+
+It is a hybrid PDF with three differences:
+
+1. **The ink is page content, not annotations.** Each visible layer is drawn by cairo exactly as for a hybrid PDF's
+   `/AP`, and placed as a Form XObject (`/XqtInkN` in the page's resources, the same `/Matrix`: crop box, rotation
+   undone; the transparency group not isolated, so the highlighter multiplies) by a content stream appended **after**
+   the page's own streams, which stay untouched: `/Contents [ (q) <the page's own streams> (Q q /XqtInk1 Do Q …) ]`,
+   like upstream's PDF export (QPdfExport). Every viewer draws it as part of the page.
+   - **Reopening stays fully editable.** Both added streams carry our private key `/XournalQt` in their stream
+     dictionary; the second lists the XObjects it adds (`/XObjects [/XqtInk1 …]`) and the layers it draws
+     (`/Layers [(xopp:p1-l1) …]`). The reader's clean copy (the background) removes exactly those two streams and
+     those XObjects (`unflatten`), so the background is the original page, pixel for pixel, and the strokes come from
+     the embedded `.xopp` only: erasing one and saving removes it from the page and from the data. The page's
+     resources get their own copy when written (a shared dictionary is never changed for other pages).
+   - Content another app appended **after** ours stays in the background; it keeps a plain `q`/`Q` around the page's
+     own content (in place of our marked ones), so it is drawn where it was. The marker lists the layers merged in
+     (`/Flattened`); one whose stream is gone (another app rewrote the page's content as one stream) is reported like
+     a changed annotation ("edited in another app"; importing keeps the other app's page as it is).
+2. **Links stay `/Link` annotations** (`/URI`, `/GoToR`, as in a hybrid PDF), with the print flag (PDF/A wants it on
+   every annotation). They are the only annotations of ours.
+3. **PDF/A-3b** (`ArchivePdf::conform`, run on the assembled file):
+   - The `document.xopp` (and attached background images) are **associated files** of the document: the catalog's
+     `/AF` array, `/AFRelationship /Source` (images `/Supplement`), MIME type `application/x-xopp` (it is gzipped
+     XML, so not `+xml`), `/Params /ModDate`, `/F` and `/UF`. Embedded files of the source PDF become associated files
+     too (`/Unspecified`, a MIME type if they had none).
+   - An **sRGB output intent** (`/GTS_PDFA1`) with its ICC profile embedded: Graeme W. Gill's sRGB profile from
+     ArgyllCMS, version 2.2, 3,268 bytes, public domain (MIT in TeX Live's copy; see `qt/resources/icc/README.md`),
+     compiled into the app (`XqtSession.cmake` writes it as a byte array). A version 2 profile is accepted by every
+     PDF/A part and validator.
+   - **XMP metadata** (unfiltered: qpdf leaves metadata streams uncompressed) with the same title, author, subject,
+     keywords, creator (`xournal-qt <version>`), producer and dates as the rebuilt document information dictionary
+     (dates in UTC, `D:…+00'00'` and `…+00:00`), and `pdfaid:part 3`, `pdfaid:conformance B` **only when every check
+     passed**. The title is the source PDF's, else the file name without `.archive.pdf`.
+   - Written with a document `/ID`, never encrypted, at least PDF 1.7, an end of line before every `endstream`
+     (veraPDF's rule 6.1.7.1-2), object streams (allowed from PDF/A-2 on). Streams with an LZW filter are decoded and
+     compressed again.
+   - The marker says `/Version 2 /Archive true` (older builds refuse it instead of showing the ink twice); hybrid PDFs
+     stay version 1.
+   - **A hybrid PDF never claims PDF/A.** Its annotations and attachment are not PDF/A, so when its source PDF was
+     PDF/A the writer removes the PDF/A identification (`pdfaid:part`, `conformance`, `amd`, `rev`, as elements or
+     attributes) from the XMP metadata it keeps; the rest of the metadata and an output intent (which alone claims
+     nothing) stay. The same for the base pages exported for Xournal++. Silent: the UI says nothing about it.
+   - **Saving an archive PDF again in the app** (Ctrl+S after opening it) writes an archive PDF again (the file's
+     marker decides); the clean copy has no output intent, `/AF` or metadata of ours left, so a hybrid PDF written
+     from it never claims PDF/A.
+
+### What is checked, what is repaired
+
+The source PDF's pages are walked (content streams, resources, Form XObjects, patterns, Type 3 glyphs, annotation
+appearances). The file is always written; when a check fails, it has no PDF/A identification and the report lists
+why ("not PDF/A: the source PDF has fonts that are not embedded: Helvetica"). Compliance is never claimed when a
+check failed.
+
+- **Not PDF/A (reported):** fonts without `/FontFile*` (also the standard 14), DeviceCMYK colours (operators `k`/`K`,
+  colour spaces, images, shadings, inline images, group spaces) without `/DefaultCMYK` (the output intent is RGB),
+  annotations other than links and pop-ups without an appearance, form buttons whose appearance has no states,
+  sound/movie/screen/3D/rich media/file attachment annotations, PostScript XObjects, reference XObjects, streams
+  stored in other files, inline images with LZW or smoothing.
+- **Repaired (the pages look the same):** JavaScript (`/Names /JavaScript`, an `/OpenAction` script), `/AA` of the
+  catalog, pages, annotations and form fields, actions PDF/A forbids (launch, sound, movie, hide, named actions other
+  than the four page moves, …) and every action of a form field: removed ("JavaScript and actions PDF/A does not
+  allow were removed"). Hidden annotations: removed. Annotations: the print flag set, text notes no zoom/no
+  rotate, appearance states other than the normal one removed. Images: `/Interpolate false`, no `/Alternates`,
+  `/OPI`. Graphics states: no transfer functions or halftones. Fonts: `/CharSet` and `/CIDSet` removed (optional,
+  and often wrong in subsets). Forms: no `/NeedAppearances`, no XFA. Optional content configurations get a name
+  and lose `/AS`. Page-level output intents, `/Perms` and `/Requirements` are removed.
+- **Not checked** (veraPDF would find them): `.notdef` glyphs referenced by text, the insides of font programs
+  (widths, cmaps), ICC profiles inside the source PDF, implementation limits, and the rarer rules. In a sample of
+  19 PDFs from the system's documentation, every file our check called PDF/A-3b passed veraPDF, and every file it
+  did not failed veraPDF for the reasons listed (the files that also used `.notdef` glyphs used CMYK too).
+
+### Export for the archive (per document)
+
+- **⋮ → Export for the archive…** (not for Markdown and text files) and **Share… → For the archive (PDF/A)** (the tab
+  menu and a library card's Share too) open a dialog that says what it means, in the author's words: "A PDF made for
+  keeping (PDF/A-3). It stays readable for decades in any PDF viewer. Your ink is merged into the pages, so no
+  viewer can hide or lose it. The full Xournal data is embedded, so this app can still open it for editing."
+- Where it goes: **next to the document as `name.archive.pdf`** (the default; `lecture.notes.pdf` gives
+  `lecture.archive.pdf`; an archive PDF itself gets `name.archive (2).pdf`, never its own file), or **in a folder I
+  choose…** (a folder dialog; the same name there). A document without a file yet only has the folder. An existing
+  file of that name is replaced (it is the archive of the same document).
+- It runs in the background ("Writing the archive PDF…"): the current document through the save machinery
+  (`SaveKind::ExportArchive`, `DocumentSession::exportArchive`): its state now, unsaved changes included; the document
+  keeps its file, its changes and its saved point. A library card's document is loaded and written on a worker
+  without a tab (`AppController::exportArchive(target, file)`).
+- Afterwards a report: "name.archive.pdf is a PDF/A-3b file …", or "… was written … It is not PDF/A, because:" with
+  the reasons, plus a grey line with what was changed to conform, and **Show in folder** (the file manager, where
+  sharing works).
+- Tests: `MainWindowTest.exportForTheArchive` (the dialog's text and default, the report, the file with the unsaved
+  stroke, the document still modified, Share's entry, a folder, a card's document).
+
+### Export library as archive (`qt/src/shell/LibraryArchive.*`; tests `LibraryArchiveTest`, `HomeScreenTest.exportLibraryAsArchive`)
+
+- **Library menu → Export library as archive…**: a dialog explains it (every document an archive PDF, other files
+  copied as they are, a README, a new folder, the library unchanged) and offers **the whole library** or **only this
+  folder** (with its subfolders; when a folder is open). Then a folder dialog.
+- Everything goes into a **new folder "<name> archive <YYYY-MM-DD>"** (" (2)" when it exists) inside the chosen one,
+  so nothing there is overwritten; `<name>` is the library's (or the folder's). A chosen folder inside the library is
+  refused ("The archive never goes into the library itself"); nothing is ever written into the library.
+- The folder structure is kept. The documents are the library's cards (`DocumentFiles::scanRecursive` with all files):
+  a `.xopp` alone, a `.xopp` with its PDF, a hybrid PDF (with its exported `.xopp`), a plain PDF, and a `.xopp` over
+  an image. Each is loaded like a card (`DocumentSession::loadFile`) and written as `<name>.pdf` (not `.archive.pdf`
+  there: the whole folder is the archive; " (2)" when two documents of a folder share a name). The image a `.xopp`
+  annotates is copied too. Markdown, images, text and all other files are copied as they are, with their times.
+  Hidden files and folders (the library's `.xournal_library`) are not.
+- **Links** between documents lead to their archive PDFs: `HybridPdf::LinkMap` reads each link from the document's own
+  folder, and a linked document of the export (its `.xopp` or its PDF) becomes a `/GoToR` to its archive PDF, at the
+  document's page (`page=`; archive pages are document pages).
+- A **README.txt** in the new folder: what the files are (PDF/A-3, the ink in the pages), how to edit again (open the
+  PDF in xournal-qt; `document.xopp` is an attachment), that other files are copied, the counts, the files that are
+  not PDF/A with the reasons, the ones that failed, and "incomplete" when it was cancelled.
+- It runs on a worker thread of the global pool at low priority, one file after the other, with a progress dialog
+  ("3 of 12 · Lectures/lecture.xopp") and **Cancel** (looked at between files; what was written stays, with the
+  README). At the end a summary: "N archived (N of them PDF/A-3b), N copied, N not PDF/A, N failed", the reasons,
+  and **Show in file manager**. A document whose PDF is missing, or that cannot be read, is listed as failed and the
+  rest goes on.
+
+### Validation
+
+- The tests: `qpdf --check` passes; poppler draws each page like our PDF export (mean difference < 0.5/255, < 0.2 %
+  of the pixels off); the embedded `.xopp` opens as the same document; the background of the reopened file is the
+  original PDF pixel for pixel; erasing a stroke and saving removes it from the page and the data; another app's
+  appended content stays; the associated file, output intent (the profile's bytes), XMP (identification, title and
+  dates matching the document information) are there; a source PDF with Helvetica not embedded and CMYK colours is
+  written without the identification and both reasons are reported; JavaScript and a smoothed image are repaired.
+- **veraPDF** (the reference validator, Java; a test tool only, never run by the app): CI (Linux) downloads its
+  greenfield CLI from Maven Central (`org.verapdf.apps:greenfield-apps`, checked by SHA-1), runs `ArchivePdfTest`
+  with `XQT_ARCHIVE_SAMPLES=<folder>` (the tests copy their archive PDFs that claim PDF/A there) and fails when one
+  of them is not PDF/A-3b. Locally: `java -cp greenfield-apps-1.28.2.jar org.verapdf.apps.GreenfieldCliWrapper
+  --flavour 3b --format text <files>`; `XQT_ARCHIVE_SOURCE=<pdf>` makes `ArchivePdfTest.archiveOfAGivenPdf` write
+  an archive of any PDF (with a stroke on page 1) and print its report, to compare with veraPDF.

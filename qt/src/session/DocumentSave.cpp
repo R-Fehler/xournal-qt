@@ -239,6 +239,10 @@ auto DocumentSession::saveAsHybrid(fs::path target) -> SaveResult {
     return saveNow({SaveKind::Hybrid, std::move(target), {}, {}});
 }
 
+auto DocumentSession::exportArchive(const fs::path& pdf) -> SaveResult {
+    return saveNow({SaveKind::ExportArchive, pdf, {}, {}});
+}
+
 auto DocumentSession::exportXopp(const fs::path& xopp) -> SaveResult {
     return saveNow({SaveKind::ExportXopp, xopp, {}, {}});
 }
@@ -365,7 +369,8 @@ void DocumentSession::beginSave() {
             t.target = t.request.target;
             t.expectedBg = backgroundOf(*doc);
             return takeSnapshot();
-        case SaveKind::ExportHybrid: {
+        case SaveKind::ExportHybrid:
+        case SaveKind::ExportArchive: {
             t.target = t.request.target;
             if (!hasExtension(t.target, ".pdf")) {
                 t.target += ".pdf";
@@ -493,7 +498,7 @@ void DocumentSession::takeSnapshot() {
         return;  // (its copy would show pages whose PDF pages are not in the file yet)
     }
     SaveTask& t = *saveTask;
-    const bool exporting = t.request.kind == SaveKind::ExportXopp || t.request.kind == SaveKind::ExportHybrid;
+    const bool exporting = isExport(t.request.kind);
     if (!exporting && backgroundOf(*doc) != t.expectedBg) {
         return planFiles();  // pages were pasted meanwhile: their PDF goes next to the document too
     }
@@ -547,8 +552,9 @@ void DocumentSession::takeSnapshot() {
         t.snapshotTaken = true;
         updateModified();
     }
+    const bool archive = t.request.kind == SaveKind::ExportArchive;
     onWorker(
-            [&t, exporting] {
+            [&t, exporting, archive] {
                 t.preview = previewOf(t.previewPage, t.previewPdf);
                 if (t.preview) {
                     std::unique_lock lock(*t.snapshot);
@@ -579,6 +585,15 @@ void DocumentSession::takeSnapshot() {
                             auto it = t.baseOf.find(page);
                             return it != t.baseOf.end() ? it->second : npos;
                         };
+                    }
+                    if (archive) {
+                        const auto r = HybridPdf::writeArchive(*t.snapshot, t.target, baseOf, t.pdfPageCount);
+                        t.result = r.ok ? SaveResult{true, {}, {}, r.pdfa, r.notPdfA, r.adjusted}
+                                        : SaveResult{false,
+                                                     FS(_F("Could not write the archive PDF \"{1}\": {2}") %
+                                                        t.target.u8string() % r.error),
+                                                     {}};
+                        return;
                     }
                     const auto r = HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount,
                                                     exporting ? fs::path() : t.request.recordExport);
@@ -669,7 +684,7 @@ void DocumentSession::beginTextSave() {
 
 void DocumentSession::finishWrite() {
     SaveTask& t = *saveTask;
-    if (t.request.kind == SaveKind::ExportXopp || t.request.kind == SaveKind::ExportHybrid) {
+    if (isExport(t.request.kind)) {
         return finishSave(t.result);
     }
     const bool ok = t.result.ok;
@@ -716,7 +731,7 @@ void DocumentSession::finishSave(SaveResult result) {
         saveFailed = !result.ok;  // (the saved point is the copy's state, which is not in the file then)
     }
     lastSaveResult = result;
-    if (result.ok && task->request.kind != SaveKind::ExportXopp && task->request.kind != SaveKind::ExportHybrid) {
+    if (result.ok && !isExport(task->request.kind)) {
         madeUnsaved = false;  // (made from a .md: it is in its own file now)
         Q_EMIT filePathChanged();
     }

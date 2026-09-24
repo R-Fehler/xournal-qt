@@ -62,6 +62,7 @@
 #include "shell/MdSnippets.h"
 #include "shell/Previews.h"
 #include "shell/Library.h"
+#include "shell/LibraryArchive.h"
 #include "shell/LibraryModel.h"
 #include "shell/DocumentChapters.h"
 #include "shell/LayersModel.h"
@@ -77,6 +78,7 @@
 #include "session/FuzzyQuery.h"
 #include "session/TextMatch.h"
 #include "TextFlow.h"
+#include "session/ArchivePdf.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
 #include "session/TextFile.h"
@@ -2744,6 +2746,152 @@ bool AppController::shareForXournal(const QUrl& folder, const QString& file) {
         });
     });
     return true;
+}
+
+fs::path AppController::archiveSource(const QString& file) const {
+    if (!file.isEmpty()) {
+        return fs::path(file.toStdString());
+    }
+    DocumentSession* s = session();
+    if (!s) {
+        return {};
+    }
+    fs::path document = s->hasFilePath() ? s->getFilePath() : s->annotatedPdf();
+    if (HybridPdf::inCache(document) || MergedPdf::inCache(document)) {
+        document.clear();
+    }
+    return document;
+}
+
+QUrl AppController::suggestedArchiveFile(const QString& file) const {
+    const fs::path document = archiveSource(file);
+    if (document.empty()) {
+        return {};
+    }
+    return QUrl::fromLocalFile(QString::fromStdString(ArchivePdf::suggestedFile(document).string()));
+}
+
+QUrl AppController::archiveFileIn(const QUrl& folder, const QString& file) const {
+    const fs::path dir(folder.toLocalFile().toStdString());
+    fs::path document = archiveSource(file);
+    if (dir.empty()) {
+        return {};
+    }
+    if (document.empty()) {
+        const DocumentSession* s = session();
+        document = fs::path(s ? s->getDisplayName() : std::string("Untitled"));
+        document.replace_extension(".xopp");
+    }
+    return QUrl::fromLocalFile(QString::fromStdString(ArchivePdf::suggestedFile(dir / document.filename()).string()));
+}
+
+namespace {
+QStringList toStringList(const std::vector<std::string>& v) {
+    QStringList out;
+    for (const auto& s: v) {
+        out << QString::fromStdString(s);
+    }
+    return out;
+}
+}  // namespace
+
+void AppController::archiveDone(const fs::path& target, bool ok, const std::string& error, bool pdfa,
+                                const std::vector<std::string>& notPdfA, const std::vector<std::string>& adjusted) {
+    archiveRunning = std::max(0, archiveRunning - 1);
+    Q_EMIT archiveExportsChanged();
+    if (!ok) {
+        Q_EMIT message(tr("Export failed"), QString::fromStdString(error), true);
+        return;
+    }
+    library->refresh();  // (it may be in the library)
+    Q_EMIT archiveExported(QString::fromStdString(target.string()), pdfa, toStringList(notPdfA),
+                           toStringList(adjusted));
+}
+
+bool AppController::exportArchive(const QUrl& target, const QString& file) {
+    fs::path out(target.toLocalFile().toStdString());
+    if (out.empty()) {
+        return false;
+    }
+    if (lowerExtension(out) != ".pdf") {
+        out += ".pdf";
+    }
+    QPointer<AppController> self(this);
+    if (!file.isEmpty()) {
+        // A library card's document, not open: loaded and written on a worker
+        const fs::path document(file.toStdString());
+        std::error_code ec;
+        if (fs::exists(out, ec) && fs::equivalent(out, document, ec)) {
+            Q_EMIT message(tr("Export failed"), tr("The archive PDF cannot be written over the document itself."), true);
+            return false;
+        }
+        ++archiveRunning;
+        Q_EMIT archiveExportsChanged();
+        Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
+        QThreadPool::globalInstance()->start([self, document, out] {
+            HybridPdf::Result r;
+            auto loaded = DocumentSession::loadFile(document);
+            if (!loaded.document) {
+                r.error = loaded.error;
+            } else {
+                r = HybridPdf::writeArchive(*loaded.document, out);
+            }
+            QMetaObject::invokeMethod(QCoreApplication::instance(), [self, out, r] {
+                if (self) {
+                    self->archiveDone(out, r.ok, r.error, r.pdfa, r.notPdfA, r.adjusted);
+                }
+            });
+        });
+        return true;
+    }
+    DocumentSession* s = session();
+    if (!s || (s->textFile() && !s->hasFilePath())) {
+        return false;  // (a text file is shared as itself)
+    }
+    DocumentSession::SaveRequest request;
+    request.kind = DocumentSession::SaveKind::ExportArchive;
+    request.target = out;
+    request.done = [self, out](const DocumentSession::SaveResult& r) {
+        if (self) {
+            self->archiveDone(out, r.ok, r.error, r.pdfa, r.notPdfA, r.adjusted);
+        }
+    };
+    ++archiveRunning;
+    Q_EMIT archiveExportsChanged();
+    s->saveInBackground(std::move(request));
+    Q_EMIT pageActionDone(tr("Writing the archive PDF…"), false);
+    return true;
+}
+
+QObject* AppController::libraryArchiveObject() const {
+    if (!libraryArchiveTask) {
+        const_cast<AppController*>(this)->libraryArchiveTask = std::make_unique<LibraryArchive>();
+    }
+    return libraryArchiveTask.get();
+}
+
+bool AppController::exportLibraryArchive(const QUrl& into, bool currentFolderOnly) {
+    if (!library || !library->available()) {
+        return false;
+    }
+    libraryArchiveObject();
+    const fs::path root(library->rootPath().toStdString());
+    const QString folder = library->folder();
+    const bool sub = currentFolderOnly && !folder.isEmpty();
+    const fs::path source = sub ? root / fs::path(folder.toStdString()) : root;
+    const std::string name = sub ? source.filename().string() : library->name().toStdString();
+    std::string error;
+    if (!libraryArchiveTask->start(source, fs::path(into.toLocalFile().toStdString()), root, name, error)) {
+        Q_EMIT message(tr("Export failed"), QString::fromStdString(error), true);
+        return false;
+    }
+    return true;
+}
+
+void AppController::cancelLibraryArchive() {
+    if (libraryArchiveTask) {
+        libraryArchiveTask->cancel();
+    }
 }
 
 bool AppController::shareFile(const QString& path, bool toClipboard) {

@@ -36,6 +36,8 @@ class XojPage;
 namespace xqt::HybridPdf {
 
 constexpr int FORMAT_VERSION = 1;
+/// An archive PDF (writeArchive): its ink is in the page content, not in annotations (older readers must refuse it).
+constexpr int ARCHIVE_FORMAT_VERSION = 2;
 /// The name of the embedded Xournal document.
 constexpr const char* DATA_NAME = "document.xopp";
 /// The /NM of our annotations starts with this.
@@ -46,6 +48,19 @@ struct Result {
     std::string error;
     size_t pages = 0;        ///< pages written
     size_t annotations = 0;  ///< our annotations written
+    // --- an archive PDF (writeArchive)
+    size_t flattened = 0;             ///< layers merged into the page content
+    bool pdfa = false;                ///< it carries the PDF/A-3b identification
+    std::vector<std::string> notPdfA;   ///< why not (for the user; empty when pdfa)
+    std::vector<std::string> adjusted;  ///< what was changed in the source PDF to conform
+};
+
+/// Where the links of an archive written into another folder lead (the library export): links are read from the
+/// document's own folder `from`; a linked document that is archived too (`archived` gives its archive PDF, else an
+/// empty path) is linked there, at the page of the document.
+struct LinkMap {
+    fs::path from;
+    std::function<fs::path(const fs::path&)> archived;
 };
 
 /// The page of the background PDF a page of the document was when it was opened from a hybrid PDF (npos: none).
@@ -61,6 +76,13 @@ using BasePageOf = std::function<size_t(const XojPage*)>;
 Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {}, size_t pdfPageCount = npos,
              const fs::path& xoppExport = {});
 
+/// Write the document as an archive PDF (PDF/A-3b, ArchivePdf.h): the base pages with the ink merged into their
+/// content, links as /Link annotations, the .xopp embedded as the file's source data, the marker (so the app opens it
+/// again like a hybrid PDF). The result says whether it is PDF/A and, if not, why. Saving such a file again in the
+/// app (write) keeps it an archive PDF.
+Result writeArchive(Document& doc, const fs::path& target, const BasePageOf& baseOf = {}, size_t pdfPageCount = npos,
+                    const LinkMap& links = {});
+
 /// Export for Xournal++: a plain `xopp` whose background is `pdf`, the document's base pages in document order (the
 /// hybrid PDF without our annotations and data). The document keeps its own files. `attached`: `pdf` is upstream's
 /// attached PDF of the .xopp ("name.xopp.bg.pdf", referred to as domain "attach", "bg.pdf"; not written when no page
@@ -73,6 +95,8 @@ fs::path xoppExportOf(const fs::path& pdf);
 
 /// Whether this PDF carries our marker (remembered by path, size and time).
 bool isHybrid(const fs::path& pdf);
+/// Whether it is an archive PDF (writeArchive; remembered likewise).
+bool isArchive(const fs::path& pdf);
 
 struct Opened {
     std::unique_ptr<Document> document;  ///< nullptr: not opened (`error`)

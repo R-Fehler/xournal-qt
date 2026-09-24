@@ -48,6 +48,26 @@ jobs:
         # The tests run off-screen and in their own configuration and cache folders (see their main.cpp).
         run: ctest --test-dir build -j "$(nproc)" --output-on-failure --timeout 300
 
+      - name: Validate archive PDFs with veraPDF
+        # Archive PDFs (qt/docs/hybrid-pdf.md, "Archive PDF") must be PDF/A-3b. veraPDF, the reference validator, is a
+        # test tool only: the app never runs it. The tests write their archive PDFs that claim PDF/A into a folder.
+        env:
+          VERAPDF_VERSION: 1.28.2
+          VERAPDF_SHA1: 7484fd844c7f2fc5c7f554f25511e2a1b2a7dc00
+        run: |
+          apt-get install -y --no-install-recommends default-jre-headless curl
+          jar="greenfield-apps-$VERAPDF_VERSION.jar"
+          curl -fsSL -o "$jar" "https://repo1.maven.org/maven2/org/verapdf/apps/greenfield-apps/$VERAPDF_VERSION/$jar"
+          echo "$VERAPDF_SHA1  $jar" | sha1sum -c -
+          QT_QPA_PLATFORM=offscreen XQT_ARCHIVE_SAMPLES="$PWD/archive-samples" \
+            build/xqt-session-tests --gtest_filter='ArchivePdfTest.*'
+          ls archive-samples
+          java -cp "$jar" org.verapdf.apps.GreenfieldCliWrapper --flavour 3b --format text -v archive-samples/*.pdf \
+            | tee verapdf.txt
+          if grep -q '^FAIL' verapdf.txt || ! grep -q '^PASS' verapdf.txt; then
+            echo "veraPDF: an archive PDF is not PDF/A-3b"; exit 1
+          fi
+
       - name: Keep the test output of a failed run
         if: failure()
         uses: actions/upload-artifact@v4
@@ -56,4 +76,6 @@ jobs:
           path: |
             build/Testing/**
             build/**/*.log
+            verapdf.txt
+            archive-samples/**
           if-no-files-found: ignore
