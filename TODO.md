@@ -53,8 +53,10 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         app starts without them. Match them by file name, size and time like the index, or keep a copy in the
         root's dot folder that the clean-up leaves alone.
    2. ~~`qt/document-search`~~: merged 2026-09-24 (see ROADMAP);
-   3. `.md` files and images in the library and its index, with snippet cards in the extended search:
-      `qt/library-files`, started 2026-09-24;
+   3. ~~`.md` files and images in the library~~: `qt/library-files`, merged 2026-09-24 (see ROADMAP). Follow-ups:
+      - [ ] Page operations on a read-only `.md` still work, and saving them makes a `.xopp` under the default name.
+      - [ ] A `.md` changed by another program is only picked up at the next library refresh.
+      - [ ] Snippet cards are small by default (9–11 px text); −/+ zooms them.
    4. the "Show" file type filter and the handling of other files;
    5. fuzzy search behind its toggle.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
