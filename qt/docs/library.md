@@ -156,7 +156,14 @@ A cache folder holds a few **packs**, one file each, split by how often they cha
 - `previews.pack`: the first-page previews (PNG, 360 px wide, drawn like the page thumbnails, of the title page; a
   Markdown file: its first page as it opens, an image: the image scaled down and turned upright by its orientation tag),
   each with the size and time of the document's files and its title page, so a changed document gets a new
-  preview. Not compressed again (PNG is). A folder's pack is read when its first card is shown and kept in memory
+  preview. A document saved again is drawn again and compared with its stored preview (the PNG, else the pixels):
+  when it looks the same (a later page was edited), `previews.pack` is not written (0.3–0.6 MB that a sync client
+  would upload on every save); the new stamp goes into `preview-stamps.pack` instead, a few bytes per document
+  (its new stamp and the one in `previews.pack` it was compared with; ignored when that does not match). The next
+  time `previews.pack` is written for any reason, it takes the new stamps and `preview-stamps.pack` is removed.
+  (Not kept in `notes.pack`: a preview is drawn when its card is shown, often long after the index wrote
+  `notes.pack`, which would then be written twice, and the index would depend on the previews.)
+  Not compressed again (PNG is). A folder's pack is read when its first card is shown and kept in memory
   (up to 48 MB of previews; the folders used least recently go first); new previews are written a few seconds
   later. Renamed or moved in the app, a document takes its preview along. Previews of documents outside a library
   (recent files) are PNG files in `~/.cache/xournal-qt/previews`.

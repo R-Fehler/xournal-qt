@@ -486,7 +486,7 @@ bool LibraryIndex::writeChanged() {
         const fs::path dir = where.dirOf(job.folder);
         if (job.docs.empty()) {
             // Its last document is gone: its cache folder goes too (unless something else is in it)
-            for (const QString& pack: {NOTES_PACK, PDF_TEXT_PACK, QStringLiteral("previews")}) {
+            for (const QString& pack: {NOTES_PACK, PDF_TEXT_PACK, PreviewCache::PACK, PreviewCache::STAMPS_PACK}) {
                 Packs::remove(dir, pack);
             }
             if (Packs::removeIfOnlyOurs(dir)) {
