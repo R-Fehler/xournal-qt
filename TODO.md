@@ -61,7 +61,11 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
       - [ ] Page operations on a read-only `.md` still work, and saving them makes a `.xopp` under the default name.
       - [ ] A `.md` changed by another program is only picked up at the next library refresh.
       - [ ] Snippet cards are small by default (9–11 px text); −/+ zooms them.
-   4. the "Show" file type filter and the handling of other files: `qt/library-filter`, started 2026-09-24;
+   4. ~~the "Show" filter and other files~~: `qt/library-filter`, merged 2026-09-24 (see ROADMAP). Follow-ups:
+      - [ ] "Only PDFs with notes" checks each lone PDF for being hybrid on the UI thread (qpdf, cached per file
+        version). Not measured on the Uni library; move it to the index (a hybrid flag in the entry).
+      - [ ] Dropping a file of a hidden kind into the library gives the old "not a document the library shows"
+        error; it should say which filter hides it.
    5. fuzzy search behind its toggle: `qt/fuzzy-search`, started 2026-09-24.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
    branches are open.
@@ -98,7 +102,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - [ ] Every open tab reads its PDF text 2 s after opening, even if it is never searched. Consider starting on
     the first search only for documents outside a library.
   - [ ] The tab overview places hits only on the first 24 pages with hits of each document.
-- [~] **Recent libraries, and opening a subfolder as a library** (decided 2026-09-24, in `qt/library-filter`).
+- [x] **Recent libraries, and opening a subfolder as a library** (merged 2026-09-24, `qt/library-filter`).
   - Folders opened as a library outside `Xournal_Libraries` show in the Recent grid, as a folder with a library
     badge; tapping one opens that library in its own window.
   - A folder card in the library grid gets "Open as library" in its context menu, opening a new window.
@@ -137,7 +141,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [x] **`.md` files and images in the library and its search index, with snippet cards**: merged as
   `qt/library-files` on 2026-09-24 (see ROADMAP). Other text files (`.txt`, `.org`, code) follow in
   `qt/library-filter`.
-- [~] **File type filter in the library** (decided 2026-09-23; being built in `qt/library-filter`): a "Show" button next to the sort button opens a
+- [x] **File type filter in the library** (merged 2026-09-24, `qt/library-filter`): a "Show" button next to the sort button opens a
   popup with toggles. The same filter applies to search results.
 
   | Toggle | Default | What it shows |
@@ -148,7 +152,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   | Images (`.png`, `.jpg`, `.heic`, ...) | on | Photos of whiteboards and scans. Preview, and "annotate": a new `.xopp` with the image as its page background (upstream supports image backgrounds) |
   | Text and code (`.txt`, `.tex`, `.py`, ...) | off | Plain-text preview. Indexed only below a size limit |
   | All other files | off | Office files and the like: a generic icon, "Open with the system app" and "Show in file manager" |
-- [~] **What the app does with other files** (decided 2026-09-23; being built in `qt/library-filter`):
+- [x] **What the app does with other files** (merged 2026-09-24, `qt/library-filter`):
   - It edits only what it renders well, which is `.md` and plain `.txt`, through the Markdown editor in plain mode.
   - Code and LaTeX get a read-only preview and "Open with…", but no editor. A code editor in a notes app keeps
     growing and never catches up with a real one.
