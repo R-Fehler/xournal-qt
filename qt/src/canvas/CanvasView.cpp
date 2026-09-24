@@ -127,7 +127,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         if (layoutConfig() != layout.getConfig()) {
             const size_t page = this->session.getCurrentPageNo();
             refreshLayout();
-            viewController.fitWidth();
+            viewController.fitWidth(page);
             viewController.scrollToPage(page);
         }
     });
@@ -630,7 +630,7 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
                                                    column->height()));
         return;
     }
-    viewController.fitWidth();
+    viewController.fitWidth(*idx);
 }
 
 bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {

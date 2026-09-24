@@ -64,8 +64,12 @@ public:
     size_t nearestPage(QPointF content, double zoom) const;
     /// Range of pages in the rows intersecting a content rectangle (pages are placed row by row).
     std::pair<size_t, size_t> pagesIn(const QRectF& content, double zoom) const;
-    /// Zoom at which a whole row fits into the view width (upstream fit-to-width for one column).
-    double fitWidthZoom(double viewWidth) const;
+    /// Zoom at which the row of a page (the page alone in one column) fits into the view width: upstream's
+    /// fit-to-width, but for the page in view rather than the widest one (a wide page elsewhere in the document
+    /// does not make the others small).
+    double fitWidthZoom(double viewWidth, size_t page) const;
+    /// The pages of the row of `page`, from the left edge of the first to the right edge of the last (content).
+    QRectF rowSpan(size_t page, double zoom) const;
 
 private:
     struct Cell {
@@ -77,6 +81,10 @@ private:
     size_t rowAt(double y, double zoom) const;
     size_t colAt(double x, double zoom) const;
     double gapAfterColumn(size_t col) const;
+    /// Where a page lies in its column (points: it grows with the zoom): centered, or pushed to its pair.
+    double offsetInColumn(size_t page) const;
+    /// The pages in the row of `page` (first, last)
+    std::pair<size_t, size_t> rowPages(size_t page) const;
 
     Config config;
     std::vector<QSizeF> sizes;

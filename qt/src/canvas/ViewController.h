@@ -68,7 +68,13 @@ public:
 
     void setZoom(double zoom, QPointF viewAnchor);
     void zoomBy(double factor, QPointF viewAnchor) { setZoom(z * factor, viewAnchor); }
-    void fitWidth();
+    /// Zoom so that the page (its row, with several columns) fills the width of the view, and centre it; without a
+    /// page: the one in the middle of the view. Not kept: the zoom stays when another page comes into view.
+    void fitWidth(std::optional<size_t> page = std::nullopt);
+    /// The zoom at which `page` (its row) fills the width of the view (upstream's fit-to-width for that page).
+    double fitWidthZoom(size_t page) const { return layout->fitWidthZoom(view.width(), page); }
+    /// The page in the middle of the view (the closest one).
+    size_t pageInView() const;
     /// Zoom so that the page fills the height of the view, or the whole page fits (and scroll to it).
     void fitPage(size_t page, bool wholePage);
     /// Zoom so that a part of a page (a column of text, say) fills the view, and show it.

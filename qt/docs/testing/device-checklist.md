@@ -691,3 +691,8 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] 16:9 pages: New document → Paper "16:9 (presentation)": it switches to Landscape by itself; the pages are
       wide slides (PowerPoint's 13.33 × 7.5 in). Insert pages… after an A4 page with "16:9 (presentation)": the new
       pages are slides, the A4 page stays. Save and open the `.xopp` in upstream Xournal++: the same page sizes.
+- [ ] Fit width follows the page in view: in an A4 document, paste or insert a 16:9 page; on an A4 page, tap the
+      zoom button (fit width): the A4 page fills the width (not smaller because of the slide). Scroll to the slide
+      and tap it again: the slide fills the width. Scrolling back keeps the zoom (fit width is not re-applied by
+      itself). With two pages side by side the row in view fills the width. Double tap on a zoomed-in page: back to
+      that page's width.

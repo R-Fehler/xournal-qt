@@ -60,14 +60,39 @@ double DocumentLayout::rowY(size_t row, double zoom) const {
     return PADDING + rowPrefix[row] * zoom + static_cast<double>(row) * PADDING_BETWEEN;
 }
 
+double DocumentLayout::offsetInColumn(size_t page) const {
+    const Cell c = cellOf(page);
+    const double free = colWidth[c.col] - sizes[page].width();
+    // Pairs meet in the middle (left page to the right of its cell, right page to the left); else centered.
+    return !config.paired ? free / 2.0 : (c.col % 2 == 0 ? free : 0.0);
+}
+
 QRectF DocumentLayout::pageRect(size_t page, double zoom) const {
     const Cell c = cellOf(page);
     const QSizeF s = sizes[page] * zoom;
-    const double free = colWidth[c.col] * zoom - s.width();
-    // Pairs meet in the middle (left page to the right of its cell, right page to the left); else centered.
-    const double dx = !config.paired ? free / 2.0 : (c.col % 2 == 0 ? free : 0.0);
+    const double dx = offsetInColumn(page) * zoom;
     const double dy = (rowHeight[c.row] * zoom - s.height()) / 2.0;
     return QRectF(QPointF(colX(c.col, zoom) + dx, rowY(c.row, zoom) + dy), s);
+}
+
+std::pair<size_t, size_t> DocumentLayout::rowPages(size_t page) const {
+    const size_t row = cellOf(page).row;
+    const size_t n = sizes.size();
+    const size_t first = std::clamp(row * cols, offset, offset + n - 1) - offset;
+    const size_t last = std::clamp(row * cols + cols - 1, offset, offset + n - 1) - offset;
+    return {first, last};
+}
+
+QRectF DocumentLayout::rowSpan(size_t page, double zoom) const {
+    if (sizes.empty()) {
+        return {};
+    }
+    const auto [first, last] = rowPages(std::min(page, sizes.size() - 1));
+    QRectF span = pageRect(first, zoom);
+    for (size_t i = first + 1; i <= last; ++i) {
+        span = span.united(pageRect(i, zoom));
+    }
+    return span;
 }
 
 QSizeF DocumentLayout::contentSize(double zoom) const {
@@ -141,15 +166,25 @@ std::pair<size_t, size_t> DocumentLayout::pagesIn(const QRectF& content, double 
     return {first, last};
 }
 
-double DocumentLayout::fitWidthZoom(double viewWidth) const {
-    if (sizes.empty() || colPrefix[cols] <= 0) {
+double DocumentLayout::fitWidthZoom(double viewWidth, size_t page) const {
+    if (sizes.empty()) {
+        return 0;
+    }
+    // The pages of the row, from the left edge of the first to the right edge of the last: their widths and the
+    // room left in their columns grow with the zoom (points), the gaps between the columns do not (pixels).
+    const auto [first, last] = rowPages(std::min(page, sizes.size() - 1));
+    const size_t c0 = cellOf(first).col, c1 = cellOf(last).col;
+    const double left = colPrefix[c0] + offsetInColumn(first);
+    const double right = colPrefix[c1] + offsetInColumn(last) + sizes[last].width();
+    const double width = right - left;
+    if (width <= 0) {
         return 0;
     }
     // Upstream ZoomControl: viewport width / (page width + 20); for several columns the whole row with its gaps,
     // but never wider than the view.
-    const double gaps = gapPrefix[cols - 1];
-    const double upstream = (viewWidth - gaps) / (colPrefix[cols] + 20.0);
-    const double exact = (viewWidth - 2 * PADDING - gaps - 4) / colPrefix[cols];  // a little air: no scroll bar
+    const double gaps = gapPrefix[c1] - gapPrefix[c0];
+    const double upstream = (viewWidth - gaps) / (width + 20.0);
+    const double exact = (viewWidth - 2 * PADDING - gaps - 4) / width;  // a little air: no scroll bar
     return cols == 1 ? upstream : std::min(upstream, exact);
 }
 

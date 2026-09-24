@@ -2135,8 +2135,8 @@ void AppController::setSize(int s) {
 }
 
 void AppController::fitWidth() {
-    if (canvas()) {
-        canvas()->getViewController().fitWidth();
+    if (canvas() && session()) {
+        canvas()->getViewController().fitWidth(session()->getCurrentPageNo());
     }
 }
 

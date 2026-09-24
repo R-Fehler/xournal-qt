@@ -53,7 +53,7 @@ TEST(DocumentLayout, singleColumnLikeUpstream) {
     EXPECT_EQ(l.pageRect(0, 2), QRectF(P, P, 200, 400));
     EXPECT_EQ(l.pageRect(1, 2), QRectF(P + 50, P + 400 + B, 100, 200)) << "centered in the column";
     EXPECT_EQ(l.contentSize(2), QSizeF(2 * P + 200, 2 * P + 600 + B));
-    EXPECT_DOUBLE_EQ(l.fitWidthZoom(600), 600.0 / (100 + 20)) << "upstream: width / (page width + 20)";
+    EXPECT_DOUBLE_EQ(l.fitWidthZoom(600, 0), 600.0 / (100 + 20)) << "upstream: width / (page width + 20)";
 }
 
 TEST(DocumentLayout, columns) {
@@ -69,7 +69,7 @@ TEST(DocumentLayout, columns) {
     EXPECT_EQ(last, 5u);
     EXPECT_EQ(l.pageAt(l.pageRect(5, 1).center(), 1), 5u);
     EXPECT_EQ(l.nearestPage(QPointF(P + 250, P + 2 * (150 + B) + 50), 1), 6u) << "empty cell: the last page";
-    EXPECT_DOUBLE_EQ(l.fitWidthZoom(1000), (1000 - 2 * B) / (300 + 20.0));
+    EXPECT_DOUBLE_EQ(l.fitWidthZoom(1000, 0), (1000 - 2 * B) / (300 + 20.0));
 }
 
 TEST(DocumentLayout, pairedPagesMeetInTheMiddle) {
@@ -108,6 +108,42 @@ TEST(DocumentLayout, viewFollowsTheColumnSettings) {
     const double z = view.getViewController().zoom();
     EXPECT_EQ(view.documentLayout().pageRect(0, z).top(), view.documentLayout().pageRect(2, z).top()) << "one row";
     EXPECT_LE(view.documentLayout().contentSize(z).width(), 1200.0 + 1) << "fits the width";
+}
+
+// "Fit the width" fits the page in view, not the widest page of the document: after a 16:9 slide was pasted into
+// an A4 document, the A4 pages still fill the width (the columns stay as wide as upstream makes them).
+TEST(DocumentLayout, fitWidthFitsThePageInView) {
+    const QSizeF a4(595.27559, 841.88976), slide(960, 540);
+    Pages pages({a4, a4, slide, a4});
+    const auto l = pages.layout({});
+    DocumentLayout layout = l;
+    ViewController vc(&layout);
+    vc.setViewSize(QSizeF(800, 600));
+    const double onA4 = 800 / (a4.width() + 20);  // upstream: width / (page width + 20)
+    EXPECT_NEAR(vc.zoom(), onA4, 1e-6) << "opened on an A4 page";
+    EXPECT_NEAR(vc.fitWidthZoom(2), 800 / (slide.width() + 20), 1e-6);
+
+    vc.scrollToPage(2);
+    vc.fitWidth();
+    EXPECT_NEAR(vc.zoom(), 800 / (slide.width() + 20), 1e-6) << "on the slide: the slide's width";
+    const QRectF slideRect = layout.pageRect(2, vc.zoom()).translated(vc.contentOrigin());
+    EXPECT_GE(slideRect.left(), 0);
+    EXPECT_LE(slideRect.right(), 800) << "all of it in view";
+
+    vc.scrollToPage(3);
+    vc.fitWidth();
+    EXPECT_NEAR(vc.zoom(), onA4, 1e-6) << "back on an A4 page: its width";
+    const QRectF a4Rect = layout.pageRect(3, vc.zoom()).translated(vc.contentOrigin());
+    EXPECT_NEAR(a4Rect.center().x(), 400, 1) << "in the middle, though the column is as wide as the slide";
+
+    // Two pages side by side: the row in view, with its gap
+    DocumentLayout two = pages.layout({2, false, 0});
+    ViewController vc2(&two);
+    vc2.setViewSize(QSizeF(1200, 600));
+    const double rowPts = two.pageRect(1, 1).right() - two.pageRect(0, 1).left() - B;  // (at zoom 1, minus the gap)
+    EXPECT_NEAR(vc2.fitWidthZoom(0), std::min((1200 - B) / (rowPts + 20), (1200 - 2 * P - B - 4) / rowPts), 1e-6)
+            << "the first row: two A4 pages";
+    EXPECT_LT(vc2.fitWidthZoom(2), vc2.fitWidthZoom(0)) << "the second row holds the slide: wider";
 }
 
 TEST(PdfLinks, linksAreFoundAtTheirPlace) {

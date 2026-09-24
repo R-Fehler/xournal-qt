@@ -29,7 +29,7 @@ void ViewController::setViewSize(QSizeF size) {
     view = size;
     if (!initialized) {
         initialized = true;
-        fitWidth();
+        fitWidth(pendingPage.value_or(0));
         if (pendingPage) {  // requested before the view had a size (e.g. a restored tab)
             const size_t page = *pendingPage;
             pendingPage.reset();
@@ -100,16 +100,30 @@ void ViewController::setZoom(double zoom, QPointF viewAnchor) {
     Q_EMIT changed();
 }
 
-void ViewController::fitWidth() {
+size_t ViewController::pageInView() const {
+    if (layout->pageCount() == 0) {
+        return 0;
+    }
+    return layout->nearestPage(viewToContent(QPointF(view.width() / 2, view.height() / 2)), z);
+}
+
+void ViewController::fitWidth(std::optional<size_t> page) {
     jumped = true;
-    // Upstream ZoomControl fit-to-width: (viewport width) / (page width + 20), for all columns
-    const double fit = layout->fitWidthZoom(view.width());
-    if (fit <= 0 || view.isEmpty()) {
+    if (view.isEmpty() || layout->pageCount() == 0) {
+        return;
+    }
+    // Upstream ZoomControl fit-to-width: (viewport width) / (page width + 20), for the page in view (its row)
+    const size_t p = std::min(page.value_or(pageInView()), layout->pageCount() - 1);
+    const double fit = fitWidthZoom(p);
+    if (fit <= 0) {
         return;
     }
     const Anchor a = anchorAt(QPointF(view.width() / 2, 0));
     z = std::clamp(fit, minZoom(), maxZoom());
     placeAnchor(a, QPointF(view.width() / 2, 0));
+    // Its column may be wider (a wider page elsewhere): the row in the middle
+    scrollPos.setX(layout->rowSpan(p, z).center().x() - view.width() / 2);
+    clamp();
     settleTimer.start();
     Q_EMIT zoomChanged();
     Q_EMIT changed();
