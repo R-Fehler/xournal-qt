@@ -119,6 +119,20 @@ is built.
   MSVC + vcpkg way is the fallback.
 - Pushing only `qt/windows-build`, and only with the author's go.
 
+### `qt/android-libraries` (the author, 2026-09-24; starts after `qt/android-basics`)
+- **Libraries in folders kept in sync by other apps** (Syncthing, Autosync, FolderSync mirror into real folders in
+  shared storage; the providers' own apps only offer `content://`).
+  - **"All files access"** (`MANAGE_EXTERNAL_STORAGE`) with a short explanation of why it is asked for. Real paths
+    in shared storage, so a library at, e.g., `Documents/Uni` works exactly as on the desktop (per-folder packs,
+    index, file watching). Fine for sideloading and F-Droid; Google Play restricts it, to be revisited for Play.
+  - **"Open a folder as library"** for shared-storage folders, with the existing recent-libraries list. The system
+    picker (`content://`) stays for opening and importing single files only.
+  - **The cache defaults to the app cache on Android**, so sync apps do not upload cache files.
+  - **External changes to open PDF and `.xopp` documents** (all platforms): reload when unchanged, otherwise ask, as
+    the `.md` editor does.
+  - **Sync conflict files** (`.sync-conflict-…`, `… (conflicted copy)`, `… (Konflikt …)`, and so on) are shown as
+    conflicts of their document, with "compare / keep one", not as separate documents.
+
 ### `qt/android-basics` (the author tested the APK on the Fold 7, 2026-09-24; started)
 - "Feels the snappiest of all platforms: scrolling, fast movements, the general feel." The problems:
   - no "Open with" or Share target;
