@@ -1,5 +1,7 @@
 #include "AppController.h"
 
+#include <QThreadPool>
+
 #include <algorithm>
 #include <limits>
 
@@ -1669,6 +1671,9 @@ bool AppController::saveAsHybrid(const QUrl& url) {
 }
 
 void AppController::afterHybridSave() {
+    // The clean copy of the new version, in the background: opening it again (also the library's index and preview)
+    // does not have to make it (seconds for a long PDF)
+    QThreadPool::globalInstance()->start([file = session()->getFilePath()] { HybridPdf::open(file); });
     if (settingOn(app->getSettings(), "hybridExportXopp")) {
         fs::path xopp = session()->getFilePath();
         xopp.replace_extension(".xopp");

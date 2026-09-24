@@ -179,3 +179,26 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
      embedded document, and it is read again when the file changes (the index keys it by the hybrid PDF itself,
      not by the clean copy). A hybrid PDF with its exported `.xopp` is one card that opens the hybrid PDF (only
      checked when `.name.pages.pdf` exists, so listing folders stays cheap). No "has notes" badge yet.
+4. **Measurements** (2026-09-24, the 2-in-1 while other builds ran, load 2–5; `XQT_BENCH_HYBRID=<pdf>` runs
+   `HybridPdfTest.benchSaveAndOpen`, `XQT_HYBRID_TIMES=1` prints the steps). Notes on every 25th page: 20 pressure
+   strokes, a highlighter and a text.
+
+   | | 50 pages (first 50 of pgfmanual, 982 KB), 2 noted | 1,321 pages (pgfmanual, 9.9 MB), 53 noted |
+   | --- | --- | --- |
+   | our PDF export (upstream's qpdf overlay) | 1.1 s, 1,002 KB | 6.5 s, 10,182 KB |
+   | hybrid PDF | 1.1 s, 967 KB | 5.6 s, 10,321 KB |
+   | open the hybrid PDF, clean copy made | 1.1 s | 5.5 s |
+   | open it again (clean copy cached) | 0.11 s | 0.5 s |
+   | open the plain PDF, for comparison | 0.11 s | 0.7 s |
+   | save again from the clean copy | 1.0 s | 7.1 s |
+
+   Steps of a 1,321-page save: drawing and the `.xopp` 0.45 s, the base pages (qpdf resolves every page) 1.3 s,
+   the 53 annotations 0.55 s, writing 3–3.8 s. Writing leaves the PDF's streams as they are (`qpdf_dl_none`;
+   decoding and compressing them again doubled the time), and the PDF is only stripped of our annotations when it
+   has our marker. After a save in the app the clean copy of the new version is made in the background, so the
+   next open of that file does not wait for it.
+
+   **Not fast enough for a long PDF:** the save runs on the UI thread, like the `.xopp` save, and blocks the window
+   for about 6 s at 1,300 pages (1 s at 50 pages). Next step: write in the background (the drawing and the `.xopp`
+   under the document's lock first, then qpdf on a worker; the saved state of the undo stack taken at the start).
+   qpdf has no incremental save; appending an incremental update ourselves would make saves of long PDFs cheap.

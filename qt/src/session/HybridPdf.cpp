@@ -22,6 +22,7 @@
 #endif
 #include <cairo-pdf.h>
 #include <cairo.h>
+#include <QtGlobal>
 #include <glib.h>
 #include <qpdf/Buffer.hh>
 #include <qpdf/QPDF.hh>
@@ -67,6 +68,21 @@ constexpr const char* CHECK_NAME = "changed.txt";
 constexpr double MARGIN = 2.0;  ///< around a layer's elements (pt)
 
 // --- small helpers ------------------------------------------------------------------------------------------------
+
+/// XQT_HYBRID_TIMES=1: the time of each step of writing and opening, on stderr (for measuring).
+struct Steps {
+    Steps(): on(qEnvironmentVariableIsSet("XQT_HYBRID_TIMES")), last(std::chrono::steady_clock::now()) {}
+    void operator()(const char* step) {
+        if (on) {
+            const auto now = std::chrono::steady_clock::now();
+            std::fprintf(stderr, "hybrid-pdf: %-28s %8.1f ms\n", step,
+                         std::chrono::duration<double, std::milli>(now - last).count());
+            last = now;
+        }
+    }
+    bool on;
+    std::chrono::steady_clock::time_point last;
+};
 
 std::string stampOf(const fs::path& p) {
     std::error_code ec;
@@ -117,6 +133,9 @@ void writePdfTo(QPDF& pdf, const fs::path& target) {
     try {
         QPDFWriter w(pdf, tmp.string().c_str());
         w.setObjectStreamMode(qpdf_o_generate);
+        // The streams of the PDF as they are (decoding and compressing them again doubled the time); new streams
+        // without a filter are still compressed
+        w.setDecodeLevel(qpdf_dl_none);
         w.write();
     } catch (...) {
         fs::remove(tmp, ec);
@@ -534,20 +553,22 @@ std::vector<QPDFObjectHandle> basePages(QPDF& out, QPDF& drawn, const Prepared& 
             } else {
                 h = page.shallowCopyPage().getObjectHandle();  // (a page shown twice)
             }
-            // Its own array of annotations (ours are added to it; a page shown twice gets copies of the others)
-            QPDFObjectHandle annots = h.getKey("/Annots");
-            QPDFObjectHandle mine = QPDFObjectHandle::newArray();
-            if (annots.isArray()) {
-                for (int i = 0; i < annots.getArrayNItems(); ++i) {
-                    QPDFObjectHandle a = annots.getArrayItem(i);
-                    if (h.getObjGen() != page.getObjectHandle().getObjGen() && a.isDictionary()) {
-                        a = out.makeIndirectObject(a.shallowCopy());
-                        a.replaceKey("/P", h);
+            if (h.getObjGen() != page.getObjectHandle().getObjGen()) {
+                // A page shown twice: its own copies of the other annotations
+                QPDFObjectHandle annots = h.getKey("/Annots");
+                if (annots.isArray()) {
+                    QPDFObjectHandle mine = QPDFObjectHandle::newArray();
+                    for (int i = 0; i < annots.getArrayNItems(); ++i) {
+                        QPDFObjectHandle a = annots.getArrayItem(i);
+                        if (a.isDictionary()) {
+                            a = out.makeIndirectObject(a.shallowCopy());
+                            a.replaceKey("/P", h);
+                        }
+                        mine.appendItem(a);
                     }
-                    mine.appendItem(a);
+                    h.replaceKey("/Annots", mine);
                 }
             }
-            h.replaceKey("/Annots", mine);
             order.push_back(h);
         } else {
             helper.addPage(drawnPages.at(spec.drawnPage), false);
@@ -657,12 +678,16 @@ QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const st
         annot.replaceKey(MARKER, mark);
         hashes.replaceKey("/" + nm, QPDFObjectHandle::newString(hashOf(annot)));
         annot = out.makeIndirectObject(annot);
-        QPDFObjectHandle annots = pageObj.getKey("/Annots");
-        if (!annots.isArray()) {
-            annots = QPDFObjectHandle::newArray();
-            pageObj.replaceKey("/Annots", annots);
+        // A new array of the page's annotations (its old one may be shared with another page)
+        QPDFObjectHandle old = pageObj.getKey("/Annots");
+        QPDFObjectHandle annots = QPDFObjectHandle::newArray();
+        if (old.isArray()) {
+            for (int i = 0; i < old.getArrayNItems(); ++i) {
+                annots.appendItem(old.getArrayItem(i));
+            }
         }
         annots.appendItem(annot);
+        pageObj.replaceKey("/Annots", annots);
     }
     return hashes;
 }
@@ -670,15 +695,19 @@ QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const st
 /// The PDF with the base pages (and, `hybrid`, our annotations, data and marker), written to `target`.
 Result assemble(const Prepared& prep, const fs::path& target, bool hybrid) {
     Result r;
+    Steps step;
     QPDF out;
     out.setSuppressWarnings(true);
     const bool fromBg = std::any_of(prep.pages.begin(), prep.pages.end(), [](auto& p) { return p.pdfPage != npos; });
     if (fromBg) {
         out.processFile(prep.bg.string().c_str());
-        strip(out);
+        if (out.getRoot().hasKey(MARKER)) {
+            strip(out);  // (a hybrid PDF as the background; a PDF without our marker has no annotations of ours)
+        }
     } else {
         out.emptyPDF();
     }
+    step("open and strip the PDF");
     // A hybrid PDF is never a merged PDF the app may rewrite; the base pages exported for Xournal++ are one (Own: the
     // next export replaces it)
     MergedPdf::mark(out, hybrid ? MergedPdf::Kind::None : MergedPdf::Kind::Own);
@@ -690,9 +719,11 @@ Result assemble(const Prepared& prep, const fs::path& target, bool hybrid) {
     }
     const std::vector<QPDFObjectHandle> order = basePages(out, drawn, prep);
     r.pages = order.size();
+    step("base pages");
     if (hybrid) {
         QPDFObjectHandle hashes = annotate(out, drawn, prep, order);
         r.annotations = prep.annots.size();
+        step("annotations");
         addEmbedded(out, DATA_NAME, prep.xopp, "The Xournal++ document of this PDF (xournal-qt hybrid PDF)");
         QPDFObjectHandle files = QPDFObjectHandle::newArray();
         for (const auto& [name, data]: prep.extras) {
@@ -714,7 +745,9 @@ Result assemble(const Prepared& prep, const fs::path& target, bool hybrid) {
     }
     info.replaceKey("/Producer", QPDFObjectHandle::newString(std::string(PROJECT_STRING) + " + QPDF " + QPDF_VERSION));
     info.replaceKey("/ModDate", QPDFObjectHandle::newString(pdfDateNow()));
+    step("annotations, data, marker");
     writePdfTo(out, target);
+    step("write");
     r.ok = true;
     return r;
 }
@@ -813,7 +846,9 @@ Result write(Document& doc, const fs::path& target) {
     Result r;
     try {
         WorkDir work;
+        Steps step;
         const Prepared prep = prepare(doc, target.filename().string(), work.path);
+        step("draw and write the .xopp");
         if (!prep.error.empty()) {
             r.error = prep.error;
             return r;
