@@ -274,9 +274,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   fails now and then under load: 1 of 8 and 0 of 16 after `qt/present`, and once in the full suite; 0 of 16 on a
   build from before it. It is timing-sensitive, and whether `qt/present` made it more likely is not settled.
 
-- [~] `LibraryTest.renamedAndMovedDocumentsKeepTheirIndex` (the known race in `qt/docs/releasing.md`) failed 1 of 4
-  runs on 2026-09-24, under load with the Android build. The fix of its cause, taking over an entry with the same
-  size and time, is being done as `qt/index-rename-race`.
+- [x] `LibraryTest.renamedAndMovedDocumentsKeepTheirIndex` failed 1 of 4 runs on 2026-09-24 under load. Fixed in
+  `qt/index-rename-race`: an update still running when the app moved a folder replaced the entry of a document
+  that vanished under it with an empty one; now such an entry stays for the move, and a document without an entry
+  takes over a gone one with the same size, time and name or content sample. 40 of 40 under load; the CI retry is
+  gone.
 
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF

@@ -129,7 +129,8 @@ state in `~/.config/xournal-qt/libraries/<key of the library>/library.json`:
 - in the folders (the default): the hidden `.xournal_library/` in each folder;
 - in the app cache (recommended for folders that sync clients upload): the same cache folders under
   `~/.cache/xournal-qt/libraries/<key of the library>/<folder in the library>/.xournal_library/`, so the library's
-  folders get no files of the app. Documents moved by another program are found again by name, size and time.
+  folders get no files of the app. Documents moved by another program are found again by size and time (see the
+  search index below).
   (A subfolder opened as a library of its own has its own setting and cache there.)
 
 Switching moves the packs from one place to the other. Folders that cannot be written keep their cache in the app
@@ -146,7 +147,9 @@ A cache folder holds a few **packs**, one file each, split by how often they cha
 - `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`, `md`, `image`), name, the size and time of
   its `.xopp` (a Markdown file, an image alone: of that file), the PDF it uses (relative to the folder when it is in
   the library; next to it: its name) with that PDF's size and time, and per page which PDF page it shows, the text
-  of its text elements and its shape. Small; written again when a `.xopp` in the folder is saved.
+  of its text elements and its shape, and a sample of its own file (a hash of the size and of the first and last
+  64 KB) that tells two files with the same size and time apart. Small; written again when a `.xopp` in the folder
+  is saved.
   - A Markdown file has no pages: its entry has the text of its passages (headings, paragraphs, list items, table
     rows, code blocks), read through md4c without the Markdown syntax, which of them are headings (a hit shows the
     headings above it), and the targets of its links and `[[wiki links]]` (for backlinks later). Reading it is cheap
@@ -202,9 +205,15 @@ a time:
 - renamed or moved in the app (also whole folders): the entries move along; only a pair's `.xopp`, which is written
   again with the new path of its PDF, is read again (without PDF text). A moved folder takes its cache folders
   along;
-- moved or renamed by another program: a folder keeps its cache; a document moved into another folder is found
-  again by its name, size and time (nothing is read). A renamed document takes over the PDF text of the entry of
-  the same file (same size and time), only the `.xopp` is read;
+- moved or renamed by another program: a folder keeps its cache; a document without an entry takes over the entry
+  of a file that is gone (in any folder) whose own file has the same size and time (a `.xopp`, a Markdown file, an
+  image, a text file; a PDF alone: the PDF) and either the same name or the same sample (entries written before
+  the sample only by name): nothing is read, whatever it is called now. If the PDF it uses changed, only that is
+  read again. Otherwise a renamed `.xopp` takes over the PDF text of an entry of the same PDF (same size and time),
+  only the `.xopp` is read. So the order does not matter when the library looks at a folder before the app has told
+  the index about a move it made (the file system watcher) — the move then finds nothing left to do;
+- a document that is moved while the index is looking at it (found on disk, then gone): its entry stays as it was,
+  for the move;
 - a document that is gone: its entry is removed;
 - an older index format: everything is read once.
 

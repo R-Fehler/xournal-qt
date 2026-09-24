@@ -95,4 +95,4 @@ The machine is a slow 2-in-1, so every build and test run costs real time.
 [VISION.md](VISION.md) (goals) · [TODO.md](TODO.md) (open tasks) · [FORK.md](FORK.md) (branches, fork rules) · [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md) (what exists, what is planned,
 what was measured) · [qt/docs/adr/](qt/docs/adr/) (why the fork is built this way) ·
 [qt/docs/markdown-boxes.md](qt/docs/markdown-boxes.md) · [qt/docs/library.md](qt/docs/library.md) ·
-[qt/docs/releasing.md](qt/docs/releasing.md) (CI, packages, the known flaky test)
+[qt/docs/releasing.md](qt/docs/releasing.md) (CI, packages)
