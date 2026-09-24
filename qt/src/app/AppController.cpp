@@ -1,5 +1,7 @@
 #include "AppController.h"
 
+#include <QPointer>
+
 #include <algorithm>
 #include <limits>
 
@@ -42,6 +44,7 @@
 #include "PenHover.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
+#include "session/DocumentTextIndex.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
@@ -117,6 +120,11 @@ AppController::AppController(QObject* parent): QObject(parent) {
     makeTabs();
     ownLibrary = std::make_unique<LibraryModel>();
     library = ownLibrary.get();
+    // Open documents take the PDF text the library index read before (their search has all counts at once)
+    DocumentTextIndex::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& pdf) {
+        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
+        return index ? index->knownPdfText(pdf) : std::map<int, QString>();
+    });
     library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
     ownRecent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
     recent = ownRecent.get();
@@ -1549,9 +1557,18 @@ bool AppController::save() {
     auto r = session()->save();
     if (!r.ok) {
         Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
+    } else {
+        handOverToLibrary(*session());
     }
     Q_EMIT titleChanged();
     return r.ok;
+}
+
+void AppController::handOverToLibrary(DocumentSession& s) {
+    // Its library entry from the document in memory: the index does not read the file again
+    if (LibraryIndex* index = library->searchIndex()) {
+        index->documentSaved(s.getFilePath(), *s.getDocument(), s.search().textIndex().pdfTexts());
+    }
 }
 
 bool AppController::saveAs(const QUrl& url) {
@@ -1565,6 +1582,7 @@ bool AppController::saveAs(const QUrl& url) {
     } else {
         app->getSettings()->setLastSavePath(target.parent_path());
         recent->add(session()->getFilePath());
+        handOverToLibrary(*session());
         library->refresh();  // a new document in the library
     }
     Q_EMIT titleChanged();

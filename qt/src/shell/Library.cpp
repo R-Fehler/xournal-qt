@@ -518,35 +518,46 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     std::shared_lock lock(doc);
     e->pdf = doc.getPdfFilepath();
     e->pdfStamp = fileStamp(e->pdf);
+    fillPages(*e, doc, donorFor(*e, previous), true);
+    return e;
+}
+
+LibraryIndex::EntryPtr LibraryIndex::donorFor(const Entry& e, const EntryPtr& previous) const {
     // PDF text read before: from this document's last entry, or another one with this PDF (e.g. the PDF of a
     // document that just got its .xopp, or that was moved by another program).
+    if (e.pdfStamp.isEmpty()) {
+        return nullptr;
+    }
+    if (previous && previous->pdf == e.pdf && previous->pdfStamp == e.pdfStamp) {
+        return previous;
+    }
     EntryPtr donor;
-    if (!e->pdfStamp.isEmpty()) {
-        if (previous && previous->pdf == e->pdf && previous->pdfStamp == e->pdfStamp) {
-            donor = previous;
-        } else {
-            std::lock_guard entriesLock(mtx);
-            for (const auto& [folder, f]: folders) {
-                for (const auto& [name, other]: f.docs) {
-                    if (other->pdfStamp == e->pdfStamp && (other->pdf == e->pdf || !donor)) {
-                        donor = other;  // the same size and time: the same file (renamed), preferably the same path
-                    }
-                }
+    std::lock_guard entriesLock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [name, other]: f.docs) {
+            if (other->pdfStamp == e.pdfStamp && (other->pdf == e.pdf || !donor)) {
+                donor = other;  // the same size and time: the same file (renamed), preferably the same path
             }
         }
     }
+    return donor;
+}
+
+bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, bool readMissing) {
     const size_t pdfPages = doc.getPdfPageCount();
     for (size_t i = 0; i < doc.getPageCount(); ++i) {
         PageRef page = doc.getPage(i);
         const bool pdfPage = page->getBackgroundType().isPdfPage() && page->getPdfPageNr() < pdfPages;
         const int pdfNr = pdfPage ? static_cast<int>(page->getPdfPageNr()) : -1;  // (a shorter new PDF version)
-        e->pdfPage.push_back(pdfNr);
-        if (pdfNr >= 0 && !e->pdfText.count(pdfNr)) {
+        e.pdfPage.push_back(pdfNr);
+        if (pdfNr >= 0 && !e.pdfText.count(pdfNr)) {
             if (donor && donor->pdfText.count(pdfNr)) {
-                e->pdfText[pdfNr] = donor->pdfText.at(pdfNr);
+                e.pdfText[pdfNr] = donor->pdfText.at(pdfNr);
+            } else if (!readMissing) {
+                return false;
             } else if (XojPdfPageSPtr pdf = doc.getPdfPage(static_cast<size_t>(pdfNr))) {
                 const XojPdfRectangle all(0, 0, pdf->getWidth(), pdf->getHeight());
-                e->pdfText[pdfNr] = simplified(QString::fromStdString(pdf->selectText(all, XojPdfPageSelectionStyle::Linear)));
+                e.pdfText[pdfNr] = simplified(QString::fromStdString(pdf->selectText(all, XojPdfPageSelectionStyle::Linear)));
                 ++pdfRead;
             }
         }
@@ -558,10 +569,51 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
                 }
             }
         }
-        e->elementText << simplified(elements);
-        e->aspects.push_back(page->getWidth() > 0 ? page->getHeight() / page->getWidth() : 0);
+        e.elementText << simplified(elements);
+        e.aspects.push_back(page->getWidth() > 0 ? page->getHeight() / page->getWidth() : 0);
     }
-    return e;
+    return true;
+}
+
+bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std::map<int, QString>& pdfText) {
+    const DocumentItem item = DocumentFiles::itemOf(file);
+    if (discarded || !item.valid() || item.xopp.empty() || !where.contains(item.main())) {
+        return false;
+    }
+    EntryPtr previous;
+    {
+        std::lock_guard lock(mtx);
+        auto f = folders.find(item.main().parent_path());
+        if (f == folders.end() || !f->second.loaded) {
+            return false;  // (its packs are read first: the next update reads it)
+        }
+        previous = find(item.main());
+    }
+    auto e = std::make_shared<Entry>();
+    e->file = item.main();
+    e->kind = QStringLiteral("xopp");
+    e->name = QString::fromStdString(item.name());
+    e->xoppStamp = fileStamp(item.xopp);
+    std::shared_lock lock(doc);
+    e->pdf = doc.getPdfFilepath();
+    e->pdfStamp = fileStamp(e->pdf);
+    // The PDF text the open document knows, and what the index knew before
+    auto known = std::make_shared<Entry>();
+    known->pdfText = pdfText;
+    if (const EntryPtr donor = donorFor(*e, previous)) {
+        known->pdfText.insert(donor->pdfText.begin(), donor->pdfText.end());
+    }
+    if (e->pdfStamp.isEmpty() && !e->pdf.empty()) {
+        return false;
+    }
+    if (!fillPages(*e, doc, known, false)) {
+        return false;  // (PDF text that is not known yet: the next update reads it)
+    }
+    lock.unlock();
+    std::lock_guard entriesLock(mtx);
+    put(e);
+    ++handedOver;
+    return true;
 }
 
 LibraryIndex::EntryPtr LibraryIndex::movedHere(const DocumentItem& item, std::multimap<std::string, EntryPtr>& orphans,
@@ -847,6 +899,24 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
         return a.count > b.count;
     });
     return hits;
+}
+
+std::map<int, QString> LibraryIndex::knownPdfText(const fs::path& pdf) const {
+    std::map<int, QString> out;
+    const QString stamp = fileStamp(pdf);
+    if (stamp.isEmpty()) {
+        return out;
+    }
+    const fs::path wanted = pdf.lexically_normal();
+    std::lock_guard lock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [name, e]: f.docs) {
+            if (e->pdfStamp == stamp && e->pdf.lexically_normal() == wanted) {
+                out.insert(e->pdfText.begin(), e->pdfText.end());  // (the texts are shared, not copied)
+            }
+        }
+    }
+    return out;
 }
 
 int LibraryIndex::pageCount(const fs::path& file) const {

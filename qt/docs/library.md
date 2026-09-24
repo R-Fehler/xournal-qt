@@ -113,7 +113,9 @@ a time:
 - a document that is gone: its entry is removed;
 - an older index format: everything is read once.
 
-Unsaved changes of open documents are not in the index (it reads the files).
+Unsaved changes of open documents are not in the index (it reads the files). A document saved in the app hands its
+entry over (made from the document in memory and the PDF text its search knows), so the index does not read the
+saved `.xopp` again.
 
 The pages with hits of the extended search are drawn on demand (`HitPages.*`): the last 12 documents used stay
 loaded, drawn pages stay in memory (up to 128 MB) without marks, and the marks are painted into the page image.

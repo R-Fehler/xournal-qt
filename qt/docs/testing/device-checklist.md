@@ -527,3 +527,5 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       hits follow.
 - [ ] Tab overview → search all documents: the counts per document come at once for the documents of the library;
       the extended view marks the hits on the first pages.
+- [ ] Save a document of the library after adding a text: the library search finds the new text at once and the
+      library shows no indexing progress for it.

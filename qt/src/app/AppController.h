@@ -626,6 +626,8 @@ private:
     std::unique_ptr<xqt::PageClipboard> ownPageClipboard;
     xqt::PageClipboard* pageClipboard = nullptr;  ///< the main window's: pages can be pasted into any window
     std::vector<size_t> pageList(const QList<int>& pages) const;
+    /// A saved document's entry for the library index, from memory (see LibraryIndex::documentSaved).
+    void handOverToLibrary(xqt::DocumentSession& s);
     // The main window owns these; the other windows use the same ones (one library and one list of recent files).
     std::unique_ptr<xqt::SettingsModel> ownSettingsView;
     std::unique_ptr<xqt::LibraryModel> ownLibrary;
