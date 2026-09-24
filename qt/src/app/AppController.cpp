@@ -55,6 +55,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
+#include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
@@ -122,6 +123,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+    connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     loadCustomWidths();
     SettingsModel::applyPreviewMemory(*app->getSettings());
     SettingsModel::applyCanvasMemory(*app->getSettings());
@@ -183,6 +185,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
+    connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
@@ -2368,6 +2371,35 @@ QString AppController::oldXoppToAsk() const {
         return {};
     }
     return QString::fromStdString(s->getFilePath().filename().string());
+}
+
+QString AppController::documentMode() const {
+    return DocumentMode::nameOf(DocumentMode::effective(*app->getSettings()));
+}
+
+void AppController::setDocumentMode(const QString& mode) {
+    const DocumentMode::Mode m = DocumentMode::fromName(mode);
+    if (m == DocumentMode::Mode::Unset) {
+        return;
+    }
+    // (stored also when it is the mode in effect already: the question is not asked again)
+    DocumentMode::store(*app->getSettings(), m);
+    Q_EMIT app->settingsChanged();  // (every window; the settings sheet reads it again)
+}
+
+bool AppController::pdfOnly() const { return DocumentMode::pdfOnly(*app->getSettings()); }
+
+bool AppController::askDocumentMode() const { return !isSecondary() && DocumentMode::shouldAsk(*app->getSettings()); }
+
+QString AppController::saveFormat() const {
+    const DocumentSession* s = session();
+    if (s && s->isHybrid()) {
+        return QStringLiteral("pdf");
+    }
+    if (s && s->hasFilePath()) {
+        return QStringLiteral("xopp");  // (a .xopp stays one unless the type is changed in the dialog)
+    }
+    return pdfOnly() ? QStringLiteral("pdf") : QStringLiteral("xopp");
 }
 
 std::vector<std::pair<AppController*, DocumentSession*>> AppController::tabsWithFile(const fs::path& file,

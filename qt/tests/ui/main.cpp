@@ -23,6 +23,9 @@ int main(int argc, char* argv[]) {
     qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
     qputenv("XDG_CACHE_HOME", (home.path() + "/cache").toUtf8());
     qputenv("XQT_RESOURCE_DIR", XQT_BUILD_RESOURCE_DIR);
+    // The first start asks how to keep documents (DocumentMode.h): the tests work with Xournal++ files unless they set
+    // another mode, and the question stays away (the tests of the question unset this)
+    qputenv("XQT_DOCUMENT_MODE", "xopp");
     // No hover on the controls: the pointer rests where a test last clicked, and a button that appears under it
     // opened its tool tip 600 ms later, over whatever the test clicked next (a test slowed down by load missed it).
     qputenv("QT_QUICK_CONTROLS_HOVER_ENABLED", "0");

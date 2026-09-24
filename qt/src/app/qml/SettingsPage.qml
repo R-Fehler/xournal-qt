@@ -358,6 +358,18 @@ Popup {
                     width: parent.width - 48
                     x: 24
                     spacing: 10
+                    SectionTitle { text: qsTr("Keep documents as") }
+                    DocumentModeCards {
+                        objectName: "documentModeCards"
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: 640
+                        mode: app.documentMode
+                        onPicked: function(mode) { app.documentMode = mode }
+                    }
+                    Hint {
+                        text: qsTr("Documents you have keep their format: a .xopp stays a .xopp until you save it as a "
+                                   + "PDF with notes (Save as…). Copies for Xournal++: Share → “For Xournal++”.")
+                    }
                     SectionTitle { text: qsTr("Start") }
                     SwitchRow { key: "restoreSession"; text: qsTr("Reopen the documents of the last session") }
                     SwitchRow { key: "resumeAtLastPage"; text: qsTr("Open documents where they were left off") }
@@ -380,6 +392,7 @@ Popup {
                     }
                     RowLayout {
                         Layout.fillWidth: true
+                        visible: !app.pdfOnly  // (PDF files: notes always go into the PDF itself)
                         Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap

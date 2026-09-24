@@ -28,6 +28,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSave.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentMode.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentMode.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSaveTask.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.cpp

@@ -1134,3 +1134,16 @@ counts the pictures of the tool drawn; it should stay 0 while moving and turning
       "edited in another app" question comes, and after "Keep the Xournal data" the next save writes the file anew.
 - [ ] Pull the power (or kill the app with `kill -9`) during a save of a long PDF: the file still opens in every
       viewer as it was before that save; a hidden `.name.pdf.….part` file next to it goes away with a later save.
+
+## PDF-only mode (qt/pdf-only)
+
+The question at the first start:
+- [ ] Start the app on a device where it ran before (your own install): a dialog asks "How do you want to keep your
+      documents?" once, with two cards. "PDF files (like Drawboard PDF, GoodNotes, Xodo)" is chosen to start with and
+      says "Recommended for most people"; "Xournal++ files (like Xournal++)" says "Recommended if you also use
+      Xournal++". A line under them says it can be changed in Settings → Documents.
+- [ ] Escape and a tap beside the dialog do not close it; a tap on the other card chooses it; "Continue" closes it.
+      Quit and start again: not asked again. After a crash, the recovery question comes after this one.
+- [ ] Settings → Documents shows the same two cards at the top, with the mode in effect chosen. A tap changes it at
+      once. In PDF files mode "Save notes into the PDF itself" is not shown (it is always so).
+- [ ] The cards are readable and tappable on the phone (Android) and on the Surface at 200 %.

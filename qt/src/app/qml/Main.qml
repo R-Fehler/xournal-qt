@@ -103,7 +103,8 @@ ApplicationWindow {
         unsavedDialog.open()
     }
     /// Save as, with the type: "xopp" (Xournal notes), "pdf" (a PDF with notes, editable: a hybrid PDF), or "" for
-    /// the document's own (a hybrid PDF stays a PDF; everything else, new documents too, is a .xopp).
+    /// the document's own (app.saveFormat(): a hybrid PDF stays a PDF, a .xopp a .xopp; new documents, annotated PDFs
+    /// and images are PDFs with notes in PDF files mode, else .xopp).
     function openSaveDialog(then, format) {
         if (win.textDoc && app.textEditable) {
             app.saveInBackground(then ? then : null)  // (a text file is saved as itself: no file types)
@@ -114,7 +115,7 @@ ApplicationWindow {
         saveDialog.open()
     }
     function setUpSaveDialog(format) {
-        const pdf = format === "pdf" || (format !== "xopp" && app.isHybrid)
+        const pdf = format === "pdf" || (format !== "xopp" && app.saveFormat() === "pdf")
         // .xopp: upstream Xournal++'s suggestion, next to the annotated PDF ("lecture.pdf" -> "lecture.xopp"), else
         // the document's own path, else the default name in the library / the last used folder. PDF: the document's
         // own hybrid PDF, "lecture.notes.pdf" for an annotated PDF, else the .xopp suggestion as .pdf.
@@ -2137,7 +2138,15 @@ ApplicationWindow {
             }
         }
     }
-    Component.onCompleted: if (app.recoveryItems.length > 0) recoveryDialog.open()
+    // The first start asks which way to keep documents (PDF files or Xournal++ files); then the recovery question
+    DocumentModeDialog {
+        id: documentModeDialog
+        onChosen: if (app.recoveryItems.length > 0) recoveryDialog.open()
+    }
+    Component.onCompleted: {
+        if (app.askDocumentMode()) documentModeDialog.open()
+        else if (app.recoveryItems.length > 0) recoveryDialog.open()
+    }
 
     Dialog {
         id: closeAllDialog

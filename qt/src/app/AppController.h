@@ -207,6 +207,11 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* reference READ referenceObject CONSTANT)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
+    /// How documents are kept (session/DocumentMode.h): "xopp" (Xournal++ files) or "pdf" (PDF files: every document
+    /// one PDF with notes). Written by the first-start question and Settings → Documents (stored at once).
+    Q_PROPERTY(QString documentMode READ documentMode WRITE setDocumentMode NOTIFY documentModeChanged)
+    /// The mode in effect is "PDF files".
+    Q_PROPERTY(bool pdfOnly READ pdfOnly NOTIFY documentModeChanged)
 public:
     explicit AppController(QObject* parent = nullptr);
     /// A window of its own: the settings, tools, library and rendering of the main window, own tabs.
@@ -520,6 +525,15 @@ public:
     /// The document was saved as "name.xopp" and Save as writes it as a PDF with notes now: the name of that .xopp
     /// if the window asks what happens to it (the setting "hybridOldXopp" is "ask"), else "".
     Q_INVOKABLE QString oldXoppToAsk() const;
+    // --- the document mode (qt/docs/hybrid-pdf.md, "PDF-only mode") ---
+    QString documentMode() const;
+    void setDocumentMode(const QString& mode);
+    bool pdfOnly() const;
+    /// The first start (of the main window) asks which way to work: nothing chosen yet, and XQT_DOCUMENT_MODE unset.
+    Q_INVOKABLE bool askDocumentMode() const;
+    /// Save as: the type the dialog starts on, "pdf" (PDF with notes) or "xopp". A hybrid PDF stays a PDF, a .xopp a
+    /// .xopp; other documents (new ones, annotated PDFs, images) take the mode's: "pdf" in PDF files mode.
+    Q_INVOKABLE QString saveFormat() const;
     Q_INVOKABLE void exportXoppInBackground(const QUrl& url);
     /// The same, waiting until the file is written (tests): whether that worked.
     Q_INVOKABLE bool save();
@@ -793,6 +807,7 @@ Q_SIGNALS:
     /// The window should come to the front (e.g. another instance handed over files).
     void raiseRequested();
     void recoveryChanged();
+    void documentModeChanged();
     void searchChanged();
     void viewLayoutChanged();
     void presentingChanged();

@@ -16,6 +16,7 @@
 #include "control/settings/SettingsEnums.h"
 #include "control/tools/StrokeStabilizerEnum.h"
 #include "session/AppContext.h"
+#include "session/DocumentMode.h"
 #include "session/FuzzyQuery.h"
 #include "session/WordMatch.h"
 #include "shell/Thumbnails.h"
@@ -186,6 +187,14 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                                choice == "trash" || choice == "update" || choice == "keep" ? choice.toStdString()
                                                                                            : std::string("ask"));
             s.customSettingsChanged();
+        });
+    // How documents are kept (DocumentMode.h): "xopp" (Xournal++ files: .xopp next to their PDFs) or "pdf" (PDF files:
+    // every document one PDF with notes). Asked at the first start; while not chosen, "xopp".
+    add("documentMode", [&s] { return QVariant(DocumentMode::nameOf(DocumentMode::effective(s))); },
+        [&s](const QVariant& v) {
+            if (const auto mode = DocumentMode::fromName(v.toString()); mode != DocumentMode::Mode::Unset) {
+                DocumentMode::store(s, mode);
+            }
         });
     add("canvasMemory", [&s] { return QVariant(canvasMemory(s)); },
         [&s](const QVariant& v) {

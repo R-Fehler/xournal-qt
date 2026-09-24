@@ -119,6 +119,8 @@ set(XQT_QML_FILES
     src/app/qml/HomeView.qml
     src/app/qml/DocumentCard.qml
     src/app/qml/NewDocumentDialog.qml
+    src/app/qml/DocumentModeCards.qml
+    src/app/qml/DocumentModeDialog.qml
     src/app/qml/BackgroundPreview.qml
     src/app/qml/HighlightColors.qml
     src/app/qml/BackgroundChooser.qml
