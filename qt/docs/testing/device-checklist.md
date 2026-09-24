@@ -560,6 +560,35 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Save a document of the library after adding a text: the library search finds the new text at once and the
       library shows no indexing progress for it.
 
+## Hybrid PDF (qt/hybrid-pdf)
+- [ ] Open a lecture PDF, write with pressure, highlight a line of its text, add a text box, add a ruled page. More →
+      Save as hybrid PDF…: it suggests `lecture.notes.pdf` next to the lecture. Save. The tab is called
+      `lecture.notes.pdf`; `lecture.pdf` is unchanged (size and date).
+- [ ] Open `lecture.notes.pdf` in other PDF apps: **Acrobat, Preview (macOS/iPad), Xodo, Drawboard, Chrome (pdf.js
+      in Chrome/Firefox), Okular, Evince**. For each note: the ink looks like in xournal-qt (pressure widths, not one
+      width per stroke); the highlighter is see-through and the text under it stays readable (multiply); the text
+      box and the ruled page show; the lecture's own bookmarks and links still work. Note which apps differ.
+- [ ] In those apps: select a stroke layer (one annotation per layer and page), move it, delete another, add a
+      comment of your own, save. Reopen in xournal-qt: it says the PDF was edited in another app. "Keep the Xournal
+      data": the ink is where it was, your comment shows; save, reopen in the other app: the comment is still there.
+      Do it again and choose "Import": the moved ink shows where the other app put it (not editable), Undo brings the
+      editable layer back.
+- [ ] Which apps keep the attachment `document.xopp` when they save (the file opens in xournal-qt with editable
+      strokes afterwards), and which drop it (it then opens as a plain PDF with the ink as annotations)? Which save
+      incrementally (file only grows) and which rewrite it?
+- [ ] Ctrl+S on the hybrid PDF saves it again without asking (the date changes); close and reopen: all strokes are
+      editable, layers and text boxes as they were.
+- [ ] More → Export as .xopp for Xournal++…: `lecture.notes.xopp` appears (and hidden `.lecture.notes.pages.pdf`).
+      Open it in upstream Xournal++ if installed: the pages and the ink show once, not twice. In the library the
+      hybrid PDF and its `.xopp` are one card, which opens the hybrid PDF.
+- [ ] Settings → Documents: turn on "Save notes into the PDF itself": an explanation shows once (not when turned
+      off and on again). Open another PDF, write, Ctrl+S: no dialog; the PDF itself now has the notes, and
+      `name.original.pdf` next to it is the old file. Write more, Ctrl+S again: `name.original.pdf` does not change.
+- [ ] Turn on "also write a .xopp for Xournal++": every Ctrl+S on a hybrid PDF also writes `name.xopp`.
+- [ ] A `.xopp` document and an unsaved new document still save as `.xopp` with Ctrl+S / Save as (nothing changed).
+- [ ] Library search finds a word of a hybrid PDF's pages and a word of one of its text boxes.
+- [ ] Time Ctrl+S on a hybrid PDF of a long PDF (several hundred pages) with notes on a few pages: acceptable?
+
 ## Markdown files and images in the library (qt/library-files)
 - [ ] Open a `.xopp` with an image as page background stored with it (upstream: page background → image, "attach";
       next to it `name.xopp.bg_1.png`), rename it in the library, move it into a folder, copy it to another library:
@@ -576,10 +605,10 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Search the library for a word of a Markdown file (in a heading, a paragraph, a list, a table, a code block): the
       file is found, with the text around the hit on its card. Its Markdown syntax (`**`, `#`, link targets) is not
       found. Edit the file in another editor and save: after a moment the new text is found, the old one not.
-- [ ] Tap a Markdown card: it opens as A4 pages with the text formatted, the tab titled `notes.md`, and a note over
-      the page says it is read-only for now. Scroll, zoom, search (Ctrl+F) in it. Close it: no question about saving,
-      and the `.md` is unchanged. Write on it with the pen, then close: it asks to save (as a `.xopp`, not next to the
-      `.md`).
+- [ ] Tap a Markdown card: it opens as A4 pages with the text formatted, the tab titled `notes.md`, and a note at the
+      bottom left says it is read-only for now. Scroll, zoom, search (Ctrl+F) in it. Try to write with the pen, the
+      highlighter and the text tool: nothing is written, the page scrolls instead, a tap on a link still opens it.
+      Close it: no question about saving, and the `.md` is unchanged.
 - [ ] Tap an image card (a whiteboard photo): it opens as one page with the photo as background, titled `photo.jpg`,
       with a note that saving keeps it as `photo.xopp`. Write on it, save: the dialog suggests `photo.xopp` next to the
       photo. Back in the library the two are one card ("IMG ✎") that opens what you wrote. The same with a photo from

@@ -23,6 +23,9 @@ A **library** is a plain folder of documents that a window works in, like a work
 ## Documents on disk
 - `name.xopp` next to `name.pdf` is **one** document, and it opens as the `.xopp`. A lone `.xopp` (or `.xoj`) or a
   lone PDF is one document too. Older `name.pdf.xopp` files pair with `name.pdf`.
+- A **hybrid PDF** (`qt/docs/hybrid-pdf.md`) is one document, a PDF that carries its `.xopp`. Next to its `.xopp`
+  export for Xournal++ (`name.xopp` with a hidden `.name.pages.pdf`) the pair is one card that opens the hybrid PDF.
+  Its search text is its pages' text plus its text elements.
 - **Markdown files** (`.md`) are documents: a card with a preview of their start, opened read-only for now (below).
 - **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
   with a thumbnail. `name.xopp` next to `name.jpg` is one document, like a PDF and its `.xopp`: it opens as the `.xopp`
@@ -30,7 +33,8 @@ A **library** is a plain folder of documents that a window works in, like a work
   images of one name, the first of `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`, `.heif` pairs (the extension written in
   lower or upper case).
 - Cards show what a document is: "PDF", "MD", "IMG" ("✎": with its `.xopp`). The library model has a kind per row
-  (`notes`, `pdf`, `md`, `image`) for a filter by kind.
+  (`notes`, `pdf`, `md`, `image`) for a filter by kind; a hybrid PDF is `pdf`, with the row's `hybrid` flag set when
+  it is known from the listing (next to its `.xopp` export; a lone hybrid PDF is not looked into when listing).
 - These files are never shown:
   - `name.xopp.bg.pdf`, an attached PDF. It belongs to its `.xopp` and travels with it.
   - `.name.pages.pdf`, the merged PDF of a `.xopp` with PDF pages pasted from other PDFs (below). It belongs to its
@@ -53,9 +57,10 @@ A **library** is a plain folder of documents that a window works in, like a work
 - A **Markdown file** opens read-only for now (the `.md` editor comes later and replaces this): a new document of
   plain A4 pages with the file's text as the page's Markdown text flowing over them (`qt/src/canvas/MarkdownFile.*`,
   drawn by our Markdown renderer), titled with the file name. A note at the bottom left of the page view says it is
-  read-only and that changes are not saved to the file (× closes it for this tab). The document is never written back to the `.md`; it can be written on, and
-  "Save as" makes a `.xopp` of it (under the default name, not next to the `.md`). Of a file over 2 MB the first
-  2 MB are shown (the note says so). Opening it again shows its tab.
+  read-only (× closes it for this tab). Nothing writes on it: pen, highlighter, eraser, text and select tools
+  scroll like the hand (a tap still follows a link), Markdown editing and pasting do nothing (page operations of
+  the sidebar still work; they would be saved as a `.xopp`). The document is never written back to the `.md`. Of a
+  file over 2 MB the first 2 MB are shown (the note says so). Opening it again shows its tab.
 - An **image** opens as a new document with one page that has the image as its background (upstream's image
   background), as big as the image fits into A4's long side, titled with the file name, with a note that saving
   keeps it next to the image; nothing is written until it is saved. "Save" suggests `photo.xopp` next to `photo.jpg`, and the library then shows the two as one card (above),

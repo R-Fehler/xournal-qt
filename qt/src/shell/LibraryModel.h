@@ -90,9 +90,12 @@ public:
         HitPageListRole,
         /// Search: image URL of the pages with hits marked (append "/<page>")
         HitPageBaseRole,
-        /// What the document is: "notes" (a .xopp alone), "pdf" (with or without its .xopp), "md", "image" (with or
-        /// without its .xopp); folders: ""
+        /// What the document is: "notes" (a .xopp alone), "pdf" (with or without its .xopp; also a hybrid PDF), "md",
+        /// "image" (with or without its .xopp); folders: ""
         KindRole,
+        /// A hybrid PDF with its .xopp export (one card that opens the PDF). A lone hybrid PDF is not looked into
+        /// when listing: false.
+        HybridRole,
         /// Search in a Markdown file: its passages with hits, [{ passage, count, headings }] (headings: the path of
         /// the headings above it, "Lecture 3 › Kalman filter")
         HitPassageListRole,

@@ -37,12 +37,20 @@ QPDFObjectHandle info(QPDF& pdf) {
     return i;
 }
 
+}  // namespace
+
 void mark(QPDF& pdf, Kind kind) {
+    if (kind == Kind::None) {
+        QPDFObjectHandle i = pdf.getTrailer().getKey("/Info");
+        if (i.isDictionary() && i.hasKey(MARK)) {
+            i.removeKey(MARK);
+        }
+        return;
+    }
     info(pdf).replaceKey(MARK, QPDFObjectHandle::newName(kind == Kind::Own ? "/Own" : "/WithSource"));
     info(pdf).replaceKey("/Producer", QPDFObjectHandle::newString("xournal-qt (pages of a document)"));
 }
 
-/// Write the PDF to a temporary file next to `target`, then rename it over `target`.
 void writeAtomically(QPDF& pdf, const fs::path& target) {
     fs::path tmp = target.parent_path() / ("." + target.filename().string() + ".part");
     try {
@@ -61,7 +69,6 @@ void writeAtomically(QPDF& pdf, const fs::path& target) {
         throw std::runtime_error("Could not write \"" + target.string() + "\": " + ec.message());
     }
 }
-}  // namespace
 
 fs::path sidecarOf(const fs::path& xopp) {
     fs::path stem = xopp.filename();

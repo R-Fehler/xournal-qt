@@ -511,6 +511,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return r.isFolder || r.hit.pageHits.empty() ? QString() : HitPageProvider::baseUrl(r.item, query);
         case KindRole:
             return r.isFolder ? QString() : QString::fromLatin1(r.item.kindName());
+        case HybridRole:
+            return !r.isFolder && r.item.hybrid;
         case HitPassageListRole: {
             QVariantList passages;
             passages.reserve(static_cast<qsizetype>(r.hit.blockHits.size()));
@@ -548,6 +550,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {HitPageListRole, "hitPageList"},
             {HitPageBaseRole, "hitPageBase"},
             {KindRole, "kind"},
+            {HybridRole, "hybrid"},
             {HitPassageListRole, "hitPassageList"},
             {HitPassageBaseRole, "hitPassageBase"}};
 }

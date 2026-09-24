@@ -26,8 +26,12 @@ struct DocumentItem {
     fs::path pdf;    ///< the PDF with the same name next to it, or empty
     fs::path md;     ///< a Markdown file (alone), or empty
     fs::path image;  ///< an image (alone, or with the .xopp of the same name that annotates it), or empty
-    /// The file to open: the .xopp, else the PDF, the Markdown file, the image.
-    const fs::path& main() const { return !xopp.empty() ? xopp : !pdf.empty() ? pdf : !md.empty() ? md : image; }
+    /// The PDF is a hybrid PDF and the .xopp its export for Xournal++ (hybrid-pdf.md): the PDF is the document.
+    bool hybrid = false;
+    /// The file to open: the .xopp (not the export of a hybrid PDF), else the PDF, the Markdown file, the image.
+    const fs::path& main() const {
+        return !xopp.empty() && !hybrid ? xopp : !pdf.empty() ? pdf : !md.empty() ? md : image;
+    }
     fs::path folder() const { return main().parent_path(); }
     /// The name shown for it: the file name without extension.
     std::string name() const;

@@ -19,6 +19,8 @@
 
 #include "filesystem.h"
 
+class QPDF;
+
 namespace xqt::MergedPdf {
 
 enum class Kind {
@@ -52,6 +54,11 @@ Result extract(const fs::path& pdf, const std::vector<size_t>& pages, std::strin
 /// Write `target`: the pages of `base` (none if it is empty) followed by the pages of `addition` (a PDF in memory),
 /// marked as a merged PDF of this kind. `base` may be `target`.
 Result append(const fs::path& base, const std::string& addition, const fs::path& target, Kind kind);
+/// Give a PDF the mark of this kind (None: remove the mark).
+void mark(QPDF& pdf, Kind kind);
+/// Write the PDF to a temporary file next to `target`, then rename it over `target` (throws on failure).
+void writeAtomically(QPDF& pdf, const fs::path& target);
+
 /// Write `target` with only these pages of `source` (ascending numbers), keeping its mark. `source` may be `target`.
 Result keepOnly(const fs::path& source, const std::vector<size_t>& pages, const fs::path& target);
 

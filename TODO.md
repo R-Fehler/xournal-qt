@@ -21,9 +21,28 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
 1b. **PDF writing with qpdf, high priority (the author, 2026-09-24):**
    1. ~~`qt/pdf-pages`~~: merged 2026-09-24 (see ROADMAP). Follow-ups: the merge runs on the UI thread (about 0.2 s
       per paste on a 117 MB scan); the `.next.pdf` step relies on Linux rename semantics (check before Windows).
-   2. `qt/hybrid-pdf`: started 2026-09-24 (worktree `../xournal_qt-hybrid-pdf`). Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
-   - Experiment `qt/mupdf`, started 2026-09-24: a MuPDF backend next to poppler, measured, with a short pdfium
-     check. Findings go to `qt/docs/pdf-engine-experiment.md`.
+   2. ~~`qt/hybrid-pdf`~~: merged 2026-09-24 (see ROADMAP). Follow-ups:
+      - [~] Save in the background: a 1,300-page hybrid save blocks the window for about 6 s. `qt/background-save`,
+        started 2026-09-24, also covering the paste merge (0.2 s per paste on a 117 MB scan).
+      - [ ] The round trip in other viewers (the author): Acrobat, Preview, Xodo, Drawboard, Chrome/pdf.js,
+        Firefox, Okular, Evince, with the sample `~/xournal_qt_workspace/samples/hybrid-sample.pdf`. See the
+        device checklist.
+      - [ ] Not handled yet: a page deleted in another app; encrypted, rotated or cropped source PDFs (in code,
+        untested); audio attachments; a "has notes" badge. Writing into the PDF itself renames over the file
+        while it is read, which may fail on Windows. Design agreed: [qt/docs/hybrid-pdf.md](qt/docs/hybrid-pdf.md).
+   - Experiment `qt/mupdf`, done 2026-09-24: branch `qt/mupdf` (not merged), findings in
+     `qt/docs/pdf-engine-experiment.md` on that branch.
+     - The MuPDF backend works in the app behind `-DXQT_WITH_MUPDF=ON` + `XQT_PDF_BACKEND=mupdf`.
+     - Faster than poppler at 1x (2x on text, 4.5x on scans), scales with threads (4.3x poppler on text, 13x on
+       scans with 4 threads), text 2–3x faster. Not faster on text at 4x, slower on scans at 4x, about 2x the
+       memory.
+     - pdfium links easily and has the features, but it has one global lock and no gain from threads.
+     - Found on the way and fixed in master-qt: PDF pages were rendered at 4x the pixels on 2x screens
+       (`qt/pdf-hidpi`).
+     - [?] **Engine decision (the author):** MuPDF (AGPL) or stay on poppler? Proposal: retest with MuPDF 1.26
+       (the roadmap's vendored version; 1.19 is from 2021) after the HiDPI fix, then decide.
+     - [ ] `PdfCache` holds its lock for a whole render, so the visible pages of one view are drawn one after
+       another, whatever the engine. Worth fixing before comparing engines in the app.
 2. **Library track**, in this order, because each step builds on the one before:
    1. ~~the per-folder index format~~ `qt/library-index`: merged 2026-09-24 (see ROADMAP). Follow-ups:
       - [?] **Previews: in the folders or always in the app cache?** A pack is rewritten whole, so a new preview
@@ -34,7 +53,8 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         app starts without them. Match them by file name, size and time like the index, or keep a copy in the
         root's dot folder that the clean-up leaves alone.
    2. ~~`qt/document-search`~~: merged 2026-09-24 (see ROADMAP);
-   3. `.md` files and images in the library and its index, with snippet cards in the extended search;
+   3. `.md` files and images in the library and its index, with snippet cards in the extended search:
+      `qt/library-files`, started 2026-09-24;
    4. the "Show" file type filter and the handling of other files;
    5. fuzzy search behind its toggle.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
@@ -194,6 +214,11 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     tap away.
 - [?] **Vaults** (Obsidian, Zettlr, foam): open a vault folder as a library; resolve `[[wikilinks]]` and
   Markdown links by file name; backlinks later.
+
+### Flaky tests
+- [ ] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
+  `-j6` load (2026-09-24), at the check after "the way back brings it into view again". It passed 3 of 3 alone.
+  The wait for the scroll back is probably too short under load.
 
 ### Platform research
 Done 2026-09-24: [qt/docs/platform-research.md](qt/docs/platform-research.md) covers native libraries and PDF

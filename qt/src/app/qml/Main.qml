@@ -107,8 +107,26 @@ ApplicationWindow {
         }
         exportDialog.open()
     }
+    function openHybridDialog(then) {
+        // A hybrid PDF: any PDF app shows it with the notes, and xournal-qt opens it with everything editable
+        const suggestion = app.suggestedHybridFile().toString()
+        hybridDialog.afterSave = then
+        if (suggestion !== "") {
+            hybridDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
+            hybridDialog.selectedFile = suggestion
+        }
+        hybridDialog.open()
+    }
+    function openXoppExportDialog() {
+        const suggestion = app.suggestedXoppExport().toString()
+        if (suggestion !== "") {
+            xoppExportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
+            xoppExportDialog.selectedFile = suggestion
+        }
+        xoppExportDialog.open()
+    }
     function saveOrAsk(then) {
-        if (app.hasFilePath) {
+        if (app.savesWithoutDialog()) {
             if (app.save() && then) then()
         } else {
             openSaveDialog(then)
@@ -639,6 +657,18 @@ ApplicationWindow {
                 Menu {
                     id: moreMenu
                     MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
+                    MenuItem {
+                        objectName: "saveHybridItem"
+                        text: qsTr("Save as hybrid PDF…")
+                        onTriggered: openHybridDialog(null)
+                    }
+                    MenuItem {
+                        objectName: "exportXoppItem"
+                        visible: app.isHybrid
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Export as .xopp for Xournal++…")
+                        onTriggered: openXoppExportDialog()
+                    }
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
                     MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
                     MenuItem { text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
@@ -1249,6 +1279,70 @@ ApplicationWindow {
         onRejected: afterSave = null
     }
 
+    FileDialog {
+        id: hybridDialog
+        objectName: "hybridDialog"
+        property var afterSave: null
+        title: qsTr("Save as hybrid PDF")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "pdf"
+        nameFilters: [qsTr("PDF with Xournal data (*.pdf)")]
+        onAccepted: {
+            if (app.saveAsHybrid(selectedFile) && afterSave) afterSave()
+            afterSave = null
+        }
+        onRejected: afterSave = null
+    }
+    FileDialog {
+        id: xoppExportDialog
+        title: qsTr("Export as .xopp for Xournal++")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "xopp"
+        nameFilters: [qsTr("Xournal++ files (*.xopp)")]
+        onAccepted: app.exportXopp(selectedFile)
+    }
+    // A hybrid PDF whose ink another app changed: keep ours, or take theirs as plain annotations
+    Dialog {
+        id: hybridEditedDialog
+        objectName: "hybridEditedDialog"
+        property string file: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(520, parent ? parent.width - 32 : 520)
+        title: qsTr("Edited in another app")
+        closePolicy: Popup.NoAutoClose
+        Label {
+            width: hybridEditedDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("This PDF was edited in another app: its ink differs from the Xournal data.") + "\n\n"
+                  + qsTr("Keep the Xournal data: the next save writes the ink from it again, and the other app's "
+                         + "changes to it are dropped. Import: the changed ink stays as the other app left it, as "
+                         + "plain annotations (shown, not editable here), and the layers it stood for are emptied "
+                         + "(Undo brings them back).")
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "hybridKeepButton"
+                text: qsTr("Keep the Xournal data")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                objectName: "hybridImportButton"
+                text: qsTr("Import the other app's changes")
+                DialogButtonBox.buttonRole: DialogButtonBox.ApplyRole
+                onClicked: { app.importHybridChanges(); hybridEditedDialog.close() }
+            }
+        }
+        onAccepted: app.keepHybridData()
+    }
+    Connections {
+        target: app
+        function onHybridEditedElsewhere(file) {
+            hybridEditedDialog.file = file
+            hybridEditedDialog.open()
+        }
+    }
     FileDialog {
         id: exportDialog
         title: qsTr("Export as PDF")

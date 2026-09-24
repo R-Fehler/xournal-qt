@@ -122,7 +122,7 @@ Popup {
             TabButton { text: qsTr("Pen"); width: implicitWidth }
             TabButton { objectName: "touchTab"; text: qsTr("Touch"); width: implicitWidth }
             TabButton { text: qsTr("Stabilizer"); width: implicitWidth }
-            TabButton { text: qsTr("Documents"); width: implicitWidth }
+            TabButton { objectName: "documentsTab"; text: qsTr("Documents"); width: implicitWidth }
             TabButton { text: qsTr("New pages"); width: implicitWidth }
             TabButton { objectName: "storageTab"; text: qsTr("Storage"); width: implicitWidth }
             TabButton { objectName: "shortcutsTab"; text: qsTr("Shortcuts"); width: implicitWidth }
@@ -357,6 +357,34 @@ Popup {
                     SectionTitle { text: qsTr("Start") }
                     SwitchRow { key: "restoreSession"; text: qsTr("Reopen the documents of the last session") }
                     SwitchRow { key: "resumeAtLastPage"; text: qsTr("Open documents where they were left off") }
+                    SectionTitle { text: qsTr("Hybrid PDF") }
+                    Hint {
+                        text: qsTr("A hybrid PDF (More → Save as hybrid PDF…) shows your notes in any PDF app and "
+                                   + "opens here with everything editable.")
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Save notes into the PDF itself")
+                        }
+                        Switch {
+                            objectName: "hybridIntoPdfSwitch"
+                            checked: (sheet.s.revision, sheet.s.get("hybridIntoPdf"))
+                            onToggled: {
+                                sheet.s.set("hybridIntoPdf", checked)
+                                if (checked && !sheet.s.get("hybridIntoPdfExplained")) {
+                                    sheet.s.set("hybridIntoPdfExplained", true)
+                                    intoPdfExplanation.open()
+                                }
+                            }
+                        }
+                    }
+                    SwitchRow {
+                        key: "hybridExportXopp"
+                        text: qsTr("On every save of a hybrid PDF, also write a .xopp for Xournal++")
+                    }
                     SectionTitle { text: qsTr("Autosave") }
                     SwitchRow { key: "autosaveEnabled"; text: qsTr("Save a backup of unsaved changes regularly") }
                     SliderRow {
@@ -605,6 +633,27 @@ Popup {
                     }
                 }
             }
+        }
+    }
+
+    // Shown once, when "Save notes into the PDF itself" is turned on
+    Dialog {
+        id: intoPdfExplanation
+        objectName: "intoPdfExplanation"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, parent ? parent.width - 32 : 480)
+        title: qsTr("Notes in the PDF itself")
+        standardButtons: Dialog.Ok
+        Label {
+            width: intoPdfExplanation.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("Saving an annotated PDF now writes your notes into that PDF, as in Xodo or Drawboard: "
+                       + "Ctrl+S saves it without asking. Other PDF apps show the notes as annotations, and xournal-qt "
+                       + "opens them with everything editable.") + "\n\n"
+                  + qsTr("The first time a PDF gets notes, its original is kept next to it as “name.original.pdf”. "
+                         + "Turned off, notes go into a new file “name.notes.pdf” and the PDF is left alone.")
         }
     }
 
