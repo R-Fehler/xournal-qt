@@ -103,6 +103,9 @@ is built.
 ## Ready after a short plan: platform
 
 ### `qt/android-apk`: first APK
+Tooling (2026-09-24, in the author's home, no sudo): JDK 17 in `~/.local/jdk-17`; Android command-line tools and
+NDK r27c (27.2.12479018) in `~/Android/Sdk`; Qt 6.11.3 desktop (host) and `android_arm64_v8a` in `~/Qt` through
+`aqtinstall` (`~/.local/bin/aqt`). The block itself comes after the `.md` editor, at the author's wish.
 Research is already done in `../cross-platform-qt-research/` (03-android-plan, 05-qfield-reference,
 06-risks). Keep the current PDF engine (poppler/cairo).
 - [ ] vcpkg manifest and toolchain-agnostic dependency lookup, following QField (`../QField`).
