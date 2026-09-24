@@ -351,6 +351,16 @@ Item {
                     focusPolicy: Qt.NoFocus
                     onClicked: app.reference.swapRoles()
                 }
+                // Its tab right after the notes' and shown alone: Ctrl+Tab / Ctrl+Shift+Tab go between the two
+                IconButton {
+                    objectName: "referencePopOutButton"
+                    iconName: "xqt-pop-out"
+                    tip: qsTr("Show as a tab")
+                    implicitWidth: 40; implicitHeight: 40
+                    icon.width: 22; icon.height: 22
+                    focusPolicy: Qt.NoFocus
+                    onClicked: app.reference.popOut()
+                }
                 IconButton {
                     objectName: "referenceCloseButton"
                     iconName: "xqt-close"

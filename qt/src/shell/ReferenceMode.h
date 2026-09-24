@@ -101,6 +101,10 @@ public:
     Q_INVOKABLE void swapSides() { setOnLeft(!onLeft()); }
     /// The reference becomes the main document of the tab, and the main document its reference.
     Q_INVOKABLE void swapRoles();
+    /// "Show as a tab": the reference's tab moves right after the current tab (unless it is beside it already), the
+    /// split closes (the pair is not kept), and the reference's tab becomes the current one. Ctrl+Tab and
+    /// Ctrl+Shift+Tab then go between the two.
+    Q_INVOKABLE void popOut();
     Q_INVOKABLE void fitWidth();
     Q_INVOKABLE void zoomIn();
     Q_INVOKABLE void zoomOut();

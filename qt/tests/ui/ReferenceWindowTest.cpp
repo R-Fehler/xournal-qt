@@ -306,6 +306,53 @@ TEST_F(ReferenceWindowTest, closingTheReferenceTabClosesTheSplit) {
     EXPECT_FALSE(findItem("mainFrame")->isVisible());
 }
 
+// "Show as a tab": the reference's tab comes right after the notes and fills the window; Ctrl+Shift+Tab goes back
+TEST_F(ReferenceWindowTest, thePillPopsTheReferenceOutIntoATabNextToTheNotes) {
+    controller->newDocument();  // A (notes), C (reference), B: the new one after A
+    controller->setCurrentTab(0);
+    ASSERT_EQ(controller->tabCount(), 3);
+    auto* a = tabs().session(0);
+    auto* b = tabs().session(1);
+    auto* c = tabs().session(2);
+    ref().showTab(2);
+    wait(50);
+    auto* button = findItem("referencePopOutButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_EQ(button->property("tip").toString(), QString("Show as a tab"));
+    click(button);
+    EXPECT_EQ(tabs().indexOf(a), 0);
+    EXPECT_EQ(tabs().indexOf(c), 1) << "the reference is right after the notes";
+    EXPECT_EQ(tabs().indexOf(b), 2);
+    EXPECT_EQ(controller->currentTab(), 1);
+    EXPECT_FALSE(reference->isVisible()) << "the split is closed";
+    EXPECT_FALSE(findItem("mainFrame")->isVisible());
+    EXPECT_EQ(main->property("view").value<QObject*>(), tabs().view(1)) << "the reference fills the window";
+    key(Qt::Key_Backtab, Qt::ControlModifier | Qt::ShiftModifier);
+    EXPECT_EQ(controller->currentTab(), 0) << "Ctrl+Shift+Tab: back to the notes";
+    EXPECT_FALSE(reference->isVisible());
+    key(Qt::Key_Tab, Qt::ControlModifier);
+    EXPECT_EQ(controller->currentTab(), 1) << "Ctrl+Tab: the reference again";
+}
+
+TEST_F(ReferenceWindowTest, poppingOutAnAdjacentReferenceMovesNoTabAndKeepsFullScreen) {
+    ref().showTab(1);
+    wait(50);
+    window->setProperty("fullScreenMode", true);
+    wait(200);
+    QSignalSpy moved(&tabs(), &QAbstractItemModel::rowsMoved);
+    click(findItem("referencePopOutButton"));
+    EXPECT_EQ(moved.count(), 0) << "already beside the notes";
+    EXPECT_EQ(controller->currentTab(), 1);
+    EXPECT_FALSE(reference->isVisible());
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "full screen stays";
+    auto* dots = findItem("fullScreenTabDots");
+    ASSERT_NE(dots, nullptr);
+    EXPECT_TRUE(findItem("fullScreenTabs")->isVisible());
+    EXPECT_EQ(dots->property("currentIndex").toInt(), 1);
+    window->setProperty("fullScreenMode", false);
+    wait(200);
+}
+
 TEST_F(ReferenceWindowTest, thePageButtonGoesToAPage) {
     for (int i = 0; i < 5; ++i) {
         tabs().session(1)->insertNewPage(1);
