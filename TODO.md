@@ -62,7 +62,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
       - [ ] A `.md` changed by another program is only picked up at the next library refresh.
       - [ ] Snippet cards are small by default (9–11 px text); −/+ zooms them.
    4. the "Show" file type filter and the handling of other files: `qt/library-filter`, started 2026-09-24;
-   5. fuzzy search behind its toggle.
+   5. fuzzy search behind its toggle: `qt/fuzzy-search`, started 2026-09-24.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
    branches are open.
 4. **The `.md` editor:** `.md` documents, images in `<name>.assets/`, math, vaults. It is the biggest design
@@ -105,7 +105,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [x] **A library index per folder**: decided 2026-09-23 and merged as `qt/library-index` on 2026-09-24. Design,
   measurements and follow-ups: ROADMAP, [qt/docs/library.md](qt/docs/library.md), and "Order of work" above. The
   open question there is where previews go.
-- [ ] **Fuzzy search with logical operators**, modelled on fzf; clone `junegunn/fzf` as a reference.
+- [~] **Fuzzy search with logical operators** (`qt/fuzzy-search`), modelled on fzf; clone `junegunn/fzf` as a reference.
   - **Decided (2026-09-23): opt in, behind a toggle button** in the search bar. Without the toggle, search works
     as it does today.
   - *Proposal for the syntax when the toggle is on:* fzf's extended syntax:
