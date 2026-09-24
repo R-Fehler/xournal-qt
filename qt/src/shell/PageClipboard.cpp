@@ -23,7 +23,7 @@ std::string stampOf(const fs::path& p) {
         return {};
     }
     const auto time = fs::last_write_time(p, ec);
-    return std::to_string(size) + ":" + std::to_string(time.time_since_epoch().count());
+    return std::to_string(size) + ":" + std::to_string(static_cast<long long>(time.time_since_epoch().count()));
 }
 }  // namespace
 

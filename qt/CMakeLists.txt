@@ -30,21 +30,28 @@ endif()
 # Absolute path of the upstream Xournal++ sources inside this fork.
 set(XOJ_UPSTREAM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." CACHE INTERNAL "")
 
-option(XQT_BUILD_SPIKES "Build experimental spikes (qt/spikes)" ON)
+# Android (see docs/android.md): the app only. Tests, the CLI and the spikes are desktop tools.
+if(ANDROID)
+    set(_xqt_desktop OFF)
+else()
+    set(_xqt_desktop ON)
+endif()
+option(XQT_BUILD_SPIKES "Build experimental spikes (qt/spikes)" ${_xqt_desktop})
 option(XQT_BUILD_CORE "Build the Qt-free Xournal++ core libraries and CLI" ON)
+option(XQT_BUILD_TESTS "Build the unit tests (downloads GoogleTest if not installed)" ${_xqt_desktop})
+option(XQT_BUILD_CLI "Build the headless CLI and the golden tests" ${_xqt_desktop})
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Quick QuickControls2 Test
+set(_xqt_qt_test)
+if(XQT_BUILD_TESTS)
+    set(_xqt_qt_test Test)
+endif()
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Network PrintSupport Quick QuickControls2 ${_xqt_qt_test}
     OPTIONAL_COMPONENTS DBus)  # DBus: "Show in file manager" on Linux (SystemApps.cpp)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(XQT_CAIRO REQUIRED IMPORTED_TARGET cairo)
-pkg_check_modules(XQT_GLIB REQUIRED IMPORTED_TARGET glib-2.0)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
 # glib/gio headers use "signals" as an identifier: never use Qt's keyword macros.
 add_compile_definitions(QT_NO_KEYWORDS)
-
-option(XQT_BUILD_TESTS "Build the unit tests (downloads GoogleTest if not installed)" ON)
 
 if(XQT_BUILD_CORE)
     include(cmake/XojCore.cmake)
@@ -54,9 +61,14 @@ if(XQT_BUILD_CORE)
     include(cmake/XqtMarkdown.cmake)
     include(cmake/XqtSession.cmake)
     include(cmake/XqtApp.cmake)
-    include(cmake/XqtPackage.cmake)
+    if(NOT ANDROID)
+        include(cmake/XqtPackage.cmake)
+    endif()
 endif()
 
 if(XQT_BUILD_SPIKES)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(XQT_CAIRO REQUIRED IMPORTED_TARGET cairo)
+    pkg_check_modules(XQT_GLIB REQUIRED IMPORTED_TARGET glib-2.0)
     add_subdirectory(spikes/inkpad)
 endif()
