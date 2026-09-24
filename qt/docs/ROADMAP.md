@@ -382,6 +382,17 @@
     link where possible), with no UI yet.
   - Left: the rename over a PDF held open by another program on Windows; a UI to restore the kept original.
 
+- **Android basics, `qt/android-basics` (2026-09-24, awaiting on-device test).** "Open with" and the share sheet
+  for PDF, `.xopp`/`.xoj`, `.md`/`.txt` and images: received files are copied in the background into the library's
+  "Opened" folder and opened as a tab (`ContentFiles`, `XournalActivity`, `singleTask`). Import files and folders,
+  Open… and Insert image through Android's pickers. Draw with the finger (all platforms): a tool bar toggle and
+  Settings → Touch; on by default on Android devices without a stylus. Markdown code colours on Android
+  (KSyntaxHighlighting 6.30.0 built by `android-build.sh ksyntax`). Phone UI: tab strip below the status bar,
+  narrow home screen, a bundled DejaVu Sans subset for symbols, the new-document dialog above the keyboard.
+  - Left (android-roadmap.md): Save as / export to a picked place (`content://`), a compact tool bar, safe areas
+    other than the top, nothing saved when Android sends the app to the background.
+  - The desktop tool bar no longer fits in 1600 px (it scrolls, as in narrow windows).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

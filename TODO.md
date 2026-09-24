@@ -88,7 +88,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         Search. It explains the syntax with examples.
       - Whole matching words are marked; `'exact`, `^` and `$` keep their meaning.
    5. ~~fuzzy search~~: `qt/fuzzy-search`, merged 2026-09-24 (see ROADMAP). Follow-ups: hit-page pictures mark `^`/`$`/`'word'` terms as plain substrings; the document search bar shows no sign that it is in fuzzy mode.
-3. **Android:** ~~`qt/android-apk`~~ merged 2026-09-24; `qt/android-basics` running, then `qt/android-libraries`.
+3. **Android:** ~~`qt/android-apk`~~, ~~`qt/android-basics`~~ merged 2026-09-24; `qt/android-libraries` running.
 4. **The `.md` editor:** ~~`qt/md-editor`~~ merged 2026-09-24. Left: images in `<name>.assets/`, math, vaults.
 5. **Windows:** ~~`qt/windows-build`~~ merged 2026-09-24; `qt/windows-feel` is the author's, on the Surface.
 6. **PDF as the document:** ~~`qt/pdf-incremental`~~ and ~~`qt/pdf-only`~~ merged 2026-09-24.
@@ -119,7 +119,7 @@ is built.
   MSVC + vcpkg way is the fallback.
 - Pushing only `qt/windows-build`, and only with the author's go.
 
-### `qt/android-libraries` (the author, 2026-09-24; starts after `qt/android-basics`)
+### `qt/android-libraries` (the author, 2026-09-24; started 2026-09-25)
 - **Libraries in folders kept in sync by other apps** (Syncthing, Autosync, FolderSync mirror into real folders in
   shared storage; the providers' own apps only offer `content://`).
   - **"All files access"** (`MANAGE_EXTERNAL_STORAGE`) with a short explanation of why it is asked for. Real paths
@@ -133,7 +133,7 @@ is built.
   - **Sync conflict files** (`.sync-conflict-…`, `… (conflicted copy)`, `… (Konflikt …)`, and so on) are shown as
     conflicts of their document, with "compare / keep one", not as separate documents.
 
-### `qt/android-basics` (the author tested the APK on the Fold 7, 2026-09-24; started)
+### `qt/android-basics` (the author tested the APK on the Fold 7, 2026-09-24; merged 2026-09-24, APK in samples)
 - "Feels the snappiest of all platforms: scrolling, fast movements, the general feel." The problems:
   - no "Open with" or Share target;
   - opening and importing files and folders fails (`content://`);
