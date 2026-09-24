@@ -833,3 +833,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       notes stay. Scrolling sideways, ← → page the side that was tapped last. The reference pill's fit width fits
       the reference's current page. Present (F5): the notes alone fill the screen; after Escape, Escape the
       reference is back beside them.
+- [ ] Full screen (editing) with several documents open: a slim bar at the top centre shows one dot per document
+      (the current one filled, a small orange mark on unsaved ones). Tap it: all open documents. Swipe left / right
+      along the bar with a finger: the next / previous document, its title shows for a moment. Swiping on the page
+      never switches documents. With one document, while presenting or with the search bar open, the bar is
+      hidden; it does not cover the tool square or the page / zoom pill, and spans a reference split in the middle.
+      With more than 12 documents it shows "3 / 17".

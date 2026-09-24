@@ -1578,6 +1578,116 @@ ApplicationWindow {
         property alias text: messageLabel.text
         Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }
     }
+    // Full screen (editing): the open documents as dots in a slim bar at the top; a tap shows them all, a swipe along
+    // the bar goes to the next or previous one (only on the bar: the pages keep every touch)
+    Rectangle {
+        id: fullScreenTabs
+        objectName: "fullScreenTabs"
+        visible: win.fullScreenMode && !app.presenting && !app.homeVisible && app.tabs.count > 1
+                 && !searchBar.visible
+        z: 59
+        // at the top, in the middle of the window (over the notes and a reference beside them alike)
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: 0
+        height: 26  // (thin to look at, a finger's height to touch)
+        width: Math.max(120, (tabDots.visible ? tabDots.implicitWidth : tabCountLabel.implicitWidth) + 36)
+        radius: 13
+        color: "#b3303134"
+        readonly property bool manyTabs: app.tabs.count > 12
+        PageIndicator {
+            id: tabDots
+            objectName: "fullScreenTabDots"
+            anchors.centerIn: parent
+            visible: !fullScreenTabs.manyTabs
+            count: app.tabs.count
+            currentIndex: app.currentTab
+            interactive: false
+            padding: 0
+            spacing: 7
+            delegate: Item {
+                required property int index
+                implicitWidth: 9
+                implicitHeight: 9
+                // (read again when a document is changed or another one comes to the front)
+                readonly property bool unsaved: (app.modified, app.currentTab, app.tabModified(index))
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: index === tabDots.currentIndex ? "#ffffff" : "transparent"
+                    border.width: 1.5
+                    border.color: "#e8eaed"
+                }
+                Rectangle {  // not saved: a small orange mark
+                    visible: parent.unsaved
+                    width: 5; height: 5; radius: 2.5
+                    x: parent.width - 3; y: -2
+                    color: "#ffb74d"
+                }
+            }
+        }
+        Label {
+            id: tabCountLabel
+            objectName: "fullScreenTabCount"
+            anchors.centerIn: parent
+            visible: fullScreenTabs.manyTabs
+            text: (app.currentTab + 1) + " / " + app.tabs.count
+            color: "#ffffff"
+            font.pixelSize: 13
+        }
+        TapHandler { onTapped: tabOverview.open() }
+        DragHandler {
+            id: tabSwipe
+            target: null
+            yAxis.enabled: false
+            onActiveChanged: {
+                if (active) return
+                const dx = centroid.position.x - centroid.pressPosition.x
+                if (Math.abs(dx) < 30) return
+                if (dx < 0) app.nextTab()
+                else app.previousTab()
+                tabToast.show()
+            }
+        }
+        ToolTip.visible: tabHover.hovered
+        ToolTip.text: qsTr("Open documents: tap for all of them, swipe for the next or previous one")
+        ToolTip.delay: 800
+        HoverHandler { id: tabHover }
+    }
+    // The document swiped to: its title, for a moment
+    Rectangle {
+        id: tabToast
+        objectName: "fullScreenTabToast"
+        z: 59
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: fullScreenTabs.height + 8
+        visible: opacity > 0 && win.fullScreenMode
+        opacity: 0
+        width: Math.min(tabToastText.implicitWidth + 28, parent.width - 160)
+        height: 32
+        radius: 16
+        color: "#e6303134"
+        Label {
+            id: tabToastText
+            objectName: "fullScreenTabToastText"
+            anchors.centerIn: parent
+            width: Math.min(implicitWidth, parent.width - 28)
+            elide: Text.ElideMiddle
+            text: app.title
+            color: "#ffffff"
+            font.pixelSize: 14
+        }
+        function show() {
+            toastFade.stop()
+            opacity = 1
+            toastFade.start()
+        }
+        SequentialAnimation {
+            id: toastFade
+            PauseAnimation { duration: 1200 }
+            NumberAnimation { target: tabToast; property: "opacity"; to: 0; duration: 500 }
+        }
+    }
+
     // Presenting: the page number, for a moment after each page change (and when it starts)
     Rectangle {
         id: presentIndicator

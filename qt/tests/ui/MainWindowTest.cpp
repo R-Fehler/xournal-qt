@@ -4696,3 +4696,83 @@ TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
     EXPECT_FALSE(controller->presenting());
     EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "the second Escape leaves full screen";
 }
+
+// Full screen (editing): a slim bar at the top shows the tabs as dots; a tap opens the overview of the documents, a
+// swipe along it goes to the next or previous document (its title shows for a moment). Not with one tab, not while
+// presenting; with many tabs "3 / 17" instead of dots.
+TEST_F(MainWindowTest, fullScreenTabDotsSwitchDocuments) {
+    auto* bar = find<QQuickItem>("fullScreenTabs");
+    ASSERT_NE(bar, nullptr);
+    key(Qt::Key_F11);
+    ASSERT_TRUE(window->property("fullScreenMode").toBool());
+    wait(50);
+    EXPECT_FALSE(bar->isVisible()) << "one tab: nothing to switch";
+
+    controller->newDocument();
+    controller->newDocument();
+    wait(50);
+    ASSERT_EQ(controller->tabCount(), 3);
+    ASSERT_EQ(controller->currentTab(), 2);
+    ASSERT_TRUE(bar->isVisible());
+    auto* dots = find<QQuickItem>("fullScreenTabDots");
+    ASSERT_NE(dots, nullptr);
+    EXPECT_TRUE(dots->isVisible());
+    EXPECT_EQ(dots->property("count").toInt(), 3);
+    EXPECT_EQ(dots->property("currentIndex").toInt(), 2);
+    EXPECT_GE(bar->height(), 24) << "big enough for a finger";
+    EXPECT_LT(bar->mapToScene(QPointF(0, bar->height())).y(), 40) << "at the top";
+    auto* square = find<QQuickItem>("quickToolSquare");
+    const QRectF barRect(bar->mapToScene(QPointF(0, 0)), bar->size());
+    const QRectF squareRect(square->mapToScene(QPointF(0, 0)), square->size());
+    EXPECT_FALSE(barRect.intersects(squareRect)) << "not over the tool square";
+
+    // A swipe along the bar: the next / previous document, and its title for a moment
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    auto swipe = [&](int dx) {
+        const QPoint from = bar->mapToScene(QPointF(bar->width() / 2, bar->height() / 2)).toPoint();
+        QTest::touchEvent(window, finger).press(0, from);
+        for (int i = 1; i <= 8; ++i) {
+            QTest::touchEvent(window, finger).move(0, from + QPoint(dx * i / 8, 0));
+            wait(10);
+        }
+        QTest::touchEvent(window, finger).release(0, from + QPoint(dx, 0));
+        wait(80);
+    };
+    swipe(90);  // to the right: back
+    EXPECT_EQ(controller->currentTab(), 1);
+    auto* toast = find<QQuickItem>("fullScreenTabToast");
+    ASSERT_NE(toast, nullptr);
+    EXPECT_TRUE(toast->isVisible()) << "the title shows";
+    EXPECT_EQ(find<QQuickItem>("fullScreenTabToastText")->property("text").toString(), controller->title());
+    swipe(-90);  // to the left: on
+    EXPECT_EQ(controller->currentTab(), 2);
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "still full screen";
+
+    // A tap: the overview of the open documents
+    QObject* overview = find("tabOverview");
+    click(bar);
+    ASSERT_TRUE(waitOpened(overview, true));
+    QMetaObject::invokeMethod(overview, "close");
+    ASSERT_TRUE(waitOpened(overview, false));
+
+    // Not while presenting
+    controller->setPresenting(true);
+    wait(30);
+    EXPECT_FALSE(bar->isVisible());
+    controller->setPresenting(false);
+    wait(30);
+    EXPECT_TRUE(bar->isVisible());
+
+    // Many tabs: a count instead of dots
+    for (int i = 0; i < 14; ++i) {
+        controller->newDocument();
+    }
+    wait(50);
+    ASSERT_EQ(controller->tabCount(), 17);
+    EXPECT_FALSE(dots->isVisible());
+    auto* count = find<QQuickItem>("fullScreenTabCount");
+    ASSERT_NE(count, nullptr);
+    EXPECT_TRUE(count->isVisible());
+    EXPECT_EQ(count->property("text").toString(), "17 / 17");
+    key(Qt::Key_F11);
+}
