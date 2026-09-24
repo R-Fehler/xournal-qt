@@ -4156,7 +4156,7 @@ size_t strokesOn(Document& doc, size_t pageNo) {
 }
 }  // namespace
 
-// More → Save as hybrid PDF…: an annotated PDF gets "name.notes.pdf"; then Ctrl+S writes the hybrid PDF again, and
+// Save as → PDF with notes: an annotated PDF gets "name.notes.pdf"; then Ctrl+S writes the hybrid PDF again, and
 // More offers the .xopp for Xournal++ (also on every save, a setting). In the library the two are one document.
 TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     QTemporaryDir dir;
@@ -4165,7 +4165,6 @@ TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     ASSERT_TRUE(controller->openPath(pdf));
     xqt::DocumentSession* s = controller->tabManager().currentSession();
     drawStroke(*s, 1);
-    ASSERT_NE(find("saveHybridItem"), nullptr);
     ASSERT_NE(find("exportXoppItem"), nullptr);  // (in the More menu, shown for a hybrid PDF: isHybrid)
     EXPECT_FALSE(controller->isHybrid());
     EXPECT_FALSE(controller->savesWithoutDialog()) << "Ctrl+S asks where (as before)";
@@ -4255,6 +4254,85 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     EXPECT_TRUE(controller->isHybrid());
     EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(pdf.toStdString())));
     EXPECT_TRUE(QFile::exists(dir.filePath("lecture.original.pdf")));
+}
+
+// Save as offers both formats in one dialog: "Xournal notes (.xopp)", the default for new documents, and "PDF with
+// notes, editable (.pdf)", the default for a document that is a hybrid PDF already. The extension typed wins over the
+// chosen type; the file name follows the type. There is no separate "Save as hybrid PDF…" any more, and "Export as
+// plain PDF…" says that it flattens.
+TEST_F(MainWindowTest, saveAsOffersXoppAndPdfWithNotes) {
+    EXPECT_EQ(find("saveHybridItem"), nullptr) << "replaced by the type in Save as";
+    auto* exportItem = find("exportPdfItem");
+    ASSERT_NE(exportItem, nullptr);
+    EXPECT_EQ(exportItem->property("text").toString(), QString::fromUtf8("Export as plain PDF…"));
+    QObject* dialog = find("saveDialog");
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->property("nameFilters").toStringList().size(), 2);
+    auto filterIndex = [&] {
+        auto* filter = dialog->property("selectedNameFilter").value<QObject*>();
+        return filter ? filter->property("index").toInt() : -1;
+    };
+    auto setUp = [&](const char* format) {
+        QMetaObject::invokeMethod(window, "setUpSaveDialog", Q_ARG(QVariant, QVariant(QString(format))));
+    };
+
+    // A new document: .xopp
+    setUp("");
+    EXPECT_EQ(filterIndex(), 0);
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".xopp"));
+    EXPECT_EQ(dialog->property("defaultSuffix").toString(), "xopp");
+    // Choosing the PDF type: the name follows
+    auto* filter = dialog->property("selectedNameFilter").value<QObject*>();
+    ASSERT_NE(filter, nullptr);
+    filter->setProperty("index", 1);
+    EXPECT_EQ(dialog->property("defaultSuffix").toString(), "pdf");
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".pdf"));
+    filter->setProperty("index", 0);
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".xopp"));
+    // It opens (the window's own dialog off-screen), and closes without saving
+    QMetaObject::invokeMethod(window, "openSaveDialog", Q_ARG(QVariant, QVariant()), Q_ARG(QVariant, QVariant("pdf")));
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_TRUE(dialog->property("visible").toBool());
+    EXPECT_EQ(filterIndex(), 1);
+    QMetaObject::invokeMethod(dialog, "reject");
+    until([&] { return !dialog->property("visible").toBool(); });
+    EXPECT_FALSE(controller->anySaving());
+
+    // The typed extension wins; without one, the chosen type
+    QTemporaryDir dir;
+    const auto url = [&](const char* name) { return QUrl::fromLocalFile(dir.filePath(name)); };
+    EXPECT_TRUE(controller->savesAsPdf(url("a.pdf"), false));
+    EXPECT_FALSE(controller->savesAsPdf(url("a.xopp"), true));
+    EXPECT_TRUE(controller->savesAsPdf(url("a"), true));
+    EXPECT_FALSE(controller->savesAsPdf(url("a"), false));
+    EXPECT_EQ(controller->fileForFormat(url("a.xopp"), true), url("a.pdf"));
+    EXPECT_EQ(controller->fileForFormat(url("a.pdf"), false), url("a.xopp"));
+    makeLecturePdf(dir.filePath("lecture.pdf"), 1);
+    EXPECT_EQ(controller->fileForFormat(url("lecture.xopp"), true), url("lecture.notes.pdf"))
+            << "never over another PDF by default";
+
+    // Saving with the PDF type chosen: a hybrid PDF; the next Save as offers the PDF first, with its own name
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("notes"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(dir.filePath("notes.pdf").toStdString())));
+    setUp("");
+    EXPECT_EQ(filterIndex(), 1);
+    EXPECT_EQ(dialog->property("selectedFile").toUrl().toLocalFile().toStdString(),
+              url("notes.pdf").toLocalFile().toStdString());
+    setUp("xopp");
+    EXPECT_EQ(filterIndex(), 0);
+    EXPECT_EQ(dialog->property("selectedFile").toUrl().toLocalFile().toStdString(),
+              url("notes.xopp").toLocalFile().toStdString());
+
+    // And back to .xopp with the Xournal type
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("notes.xopp"))),
+                              Q_ARG(QVariant, QVariant(false)), Q_ARG(QVariant, QVariant()));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_FALSE(controller->isHybrid());
+    EXPECT_TRUE(QFile::exists(dir.filePath("notes.xopp")));
 }
 
 // Settings → Search: the fuzzy search's toggle (the same setting as the search fields' button, both ways) and its typo

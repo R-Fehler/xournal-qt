@@ -57,7 +57,7 @@ A hybrid PDF is a normal PDF with four additions:
 
 ## How it appears in the app
 
-- **"Save as hybrid PDF…"** for any document. For an annotated PDF it suggests `lecture.notes.pdf`, or
+- **Save as… with the type "PDF with notes, editable (.pdf)"** (it was "Save as hybrid PDF…" first) for any document. For an annotated PDF it suggests `lecture.notes.pdf`, or
   `lecture.pdf` itself when the setting "Save notes into the PDF itself" is on; the original is then kept once as
   `lecture.original.pdf`.
 - **Export plain `.xopp` for Xournal++**: once (menu), or automatically on each save (a setting per document or
@@ -163,8 +163,8 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
      and survives a save; a moved and a deleted annotation of ours are reported, and importing them empties those
      layers (undo brings them back); notes saved into the PDF itself keep `name.original.pdf` byte for byte; the
      `.xopp` export opens as the same document with a base PDF without annotations.
-3. **UI** (done).
-   - More → **Save as hybrid PDF…** for any document. The suggestion: the document's own hybrid PDF; for an
+3. **UI** (done; the flow around it changed in `qt/hybrid-flow`, below).
+   - More → **Save as hybrid PDF…** for any document (now a type in Save as…). The suggestion: the document's own hybrid PDF; for an
      annotated PDF `name.notes.pdf` next to it, or the PDF itself with the setting on; for other documents the
      `.xopp` suggestion as `.pdf` (`name.notes.pdf` if a PDF of that name exists). Once saved as hybrid, the title
      is the PDF and Ctrl+S writes it again.
@@ -205,3 +205,15 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    thread (a few milliseconds), the drawing, the `.xopp` and qpdf work on that copy on a worker, and the undo stack's
    saved point is the copied state. The whole save still takes as long; the window stays usable. qpdf has no
    incremental save; appending an incremental update ourselves would make saves of long PDFs cheap.
+
+## The flow around it (`qt/hybrid-flow`)
+
+1. **Save as with a type.** One Save as dialog (⋮ → Save as…, Ctrl+Shift+S, and Ctrl+S of a document without a
+   file) with two file types: "Xournal notes (.xopp)" and "PDF with notes, editable (.pdf)". New documents start on
+   `.xopp` (decided above), a document that is a hybrid PDF already starts on the PDF with its own name. The name
+   follows the type (`AppController::fileForFormat`: the suggestion of one type becomes the other's; else the
+   extension is swapped, and a `.pdf` taken by another PDF becomes `name.notes.pdf`). The extension typed wins over
+   the chosen type (`savesAsPdf`): `x.pdf` is a PDF with notes, `x.xopp` a `.xopp`; no extension: the type. The
+   separate "Save as hybrid PDF…" entry is gone. "Export as PDF…" is now "Export as plain PDF…" (the notes drawn
+   into the pages, nothing editable). The `.xopp` suggestion of a hybrid PDF is `name.xopp` (not upstream's
+   `name.pdf.xopp`).

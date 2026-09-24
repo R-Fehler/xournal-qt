@@ -5,6 +5,7 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <limits>
 
@@ -2271,6 +2272,69 @@ QUrl AppController::suggestedHybridFile() const {
     return QUrl::fromLocalFile(QString::fromStdString(target.string()));
 }
 
+namespace {
+std::string lowerExtension(const fs::path& p) {
+    std::string ext = p.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+    return ext;
+}
+}  // namespace
+
+bool AppController::savesAsPdf(const QUrl& file, bool pdfChosen) const {
+    const std::string ext = lowerExtension(fs::path(file.toLocalFile().toStdString()));
+    if (ext == ".pdf") {
+        return true;
+    }
+    if (ext == ".xopp" || ext == ".xoj") {
+        return false;
+    }
+    return pdfChosen;
+}
+
+QUrl AppController::fileForFormat(const QUrl& file, bool pdf) const {
+    fs::path p(file.toLocalFile().toStdString());
+    if (p.empty() || !p.has_filename()) {
+        return file;
+    }
+    const QUrl pdfSuggestion = suggestedHybridFile(), xoppSuggestion = [&] {
+        fs::path x(suggestedSaveFile().toLocalFile().toStdString());
+        if (!x.empty()) {
+            x.replace_extension(".xopp");  // (the suggestion of a hybrid PDF is the PDF itself)
+        }
+        return QUrl::fromLocalFile(QString::fromStdString(x.string()));
+    }();
+    // The name was not changed: the other type's suggestion
+    if (pdf && file == xoppSuggestion && !pdfSuggestion.isEmpty()) {
+        return pdfSuggestion;
+    }
+    if (!pdf && file == pdfSuggestion && !xoppSuggestion.isEmpty()) {
+        return xoppSuggestion;
+    }
+    const std::string ext = lowerExtension(p);
+    if (pdf) {
+        if (ext == ".pdf") {
+            return file;
+        }
+        if (ext == ".xopp" || ext == ".xoj") {
+            p.replace_extension();
+        }
+        p += ".pdf";
+        std::error_code ec;
+        if (fs::exists(p, ec) && !HybridPdf::isHybrid(p) && !(session() && session()->getFilePath() == p)) {
+            p.replace_extension(".notes.pdf");  // (never over another PDF by default)
+        }
+    } else {
+        if (ext == ".xopp") {
+            return file;
+        }
+        if (ext == ".pdf" || ext == ".xoj") {
+            p.replace_extension();
+        }
+        p += ".xopp";
+    }
+    return QUrl::fromLocalFile(QString::fromStdString(p.string()));
+}
+
 bool AppController::saveAsHybrid(const QUrl& url) {
     bool ok = false;
     return startSave(SaveWay::Hybrid, fs::path(url.toLocalFile().toStdString()), [&ok](bool r) { ok = r; }) &&
@@ -2986,6 +3050,11 @@ QUrl AppController::suggestedSaveFile() const {
         return {};
     }
     fs::path suggested = session()->suggestSavePath();
+    if (session()->isHybrid()) {
+        // A hybrid PDF saved as a .xopp: "notes.pdf" -> "notes.xopp" (not upstream's "notes.pdf.xopp")
+        suggested = session()->getFilePath();
+        suggested.replace_extension(".xopp");
+    }
     // A document that was never saved and does not annotate a PDF belongs in the library of this window. Upstream
     // suggests the folder something was saved to last, which is shared by all libraries and windows.
     // (An image to write on: its .xopp next to it, so the library pairs them.)

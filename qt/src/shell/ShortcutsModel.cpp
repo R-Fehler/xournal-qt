@@ -31,7 +31,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"open", tr("Open…"), document, standard(QKeySequence::Open)},
             {"save", tr("Save"), document, standard(QKeySequence::Save)},
             {"saveAs", tr("Save as…"), document, standard(QKeySequence::SaveAs)},
-            {"export", tr("Export as PDF…"), document, {"Ctrl+E"}},
+            {"export", tr("Export as plain PDF…"), document, {"Ctrl+E"}},
             {"print", tr("Print…"), document, standard(QKeySequence::Print)},
             {"closeTab", tr("Close the document"), document, standard(QKeySequence::Close)},
             {"quit", tr("Quit"), document, standard(QKeySequence::Quit)},

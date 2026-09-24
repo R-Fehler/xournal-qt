@@ -879,3 +879,10 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       (mouse), in the library and in the tab overview: the fuzzy search's help opens (the button does not toggle),
       scrolls with a finger, and closes with a tap outside or Escape. Its typo sentence follows the setting in
       Settings → Search, which has a "Help" button that opens the same help.
+
+## Hybrid PDF flow and Share (qt/hybrid-flow)
+- [ ] ⋮ → Save as… (and Ctrl+Shift+S) on a new document: one dialog with the file types "Xournal notes (.xopp)"
+      (chosen) and "PDF with notes, editable (.pdf)". Switch the type: the name's extension follows (in KDE's
+      dialog too). Save as PDF: the tab title is the `.pdf`, Ctrl+S writes it again, and Save as… now starts on the
+      PDF type with its own name. Type `x.pdf` with the .xopp type chosen: it is saved as a PDF (the typed extension
+      wins). There is no "Save as hybrid PDF…" in ⋮ any more; "Export as plain PDF…" (Ctrl+E) still flattens.

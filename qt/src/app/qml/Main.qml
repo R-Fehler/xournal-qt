@@ -100,16 +100,31 @@ ApplicationWindow {
         afterDiscardCheck = action
         unsavedDialog.open()
     }
-    function openSaveDialog(then) {
-        // Upstream Xournal++ suggestion: next to the annotated PDF ("lecture.pdf" -> "lecture.xopp"), else the
-        // document's own path, else the default name in the last used folder.
-        const suggestion = app.suggestedSaveFile().toString()
+    /// Save as, with the type: "xopp" (Xournal notes), "pdf" (a PDF with notes, editable: a hybrid PDF), or "" for
+    /// the document's own (a hybrid PDF stays a PDF; everything else, new documents too, is a .xopp).
+    function openSaveDialog(then, format) {
+        setUpSaveDialog(format || "")
         saveDialog.afterSave = then
+        saveDialog.open()
+    }
+    function setUpSaveDialog(format) {
+        const pdf = format === "pdf" || (format !== "xopp" && app.isHybrid)
+        // .xopp: upstream Xournal++'s suggestion, next to the annotated PDF ("lecture.pdf" -> "lecture.xopp"), else
+        // the document's own path, else the default name in the library / the last used folder. PDF: the document's
+        // own hybrid PDF, "lecture.notes.pdf" for an annotated PDF, else the .xopp suggestion as .pdf.
+        const suggestion = (pdf ? app.suggestedHybridFile() : app.suggestedSaveFile()).toString()
+        saveDialog.settingUp = true
+        saveDialog.selectedNameFilter.index = pdf ? 1 : 0
         if (suggestion !== "") {
             saveDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-            saveDialog.selectedFile = suggestion
+            saveDialog.selectedFile = pdf ? suggestion : app.fileForFormat(suggestion, false)
         }
-        saveDialog.open()
+        saveDialog.settingUp = false
+    }
+    /// The Save as dialog was accepted: as a PDF with notes or as a .xopp (the extension typed wins)
+    function saveChosen(url, pdfChosen, then) {
+        if (app.savesAsPdf(url, pdfChosen)) app.saveAsHybridInBackground(url, then ? then : null)
+        else app.saveAsInBackground(url, then ? then : null)
     }
     function openExportDialog() {
         const suggestion = app.suggestedExportFile().toString()
@@ -118,16 +133,6 @@ ApplicationWindow {
             exportDialog.selectedFile = suggestion
         }
         exportDialog.open()
-    }
-    function openHybridDialog(then) {
-        // A hybrid PDF: any PDF app shows it with the notes, and xournal-qt opens it with everything editable
-        const suggestion = app.suggestedHybridFile().toString()
-        hybridDialog.afterSave = then
-        if (suggestion !== "") {
-            hybridDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
-            hybridDialog.selectedFile = suggestion
-        }
-        hybridDialog.open()
     }
     function openXoppExportDialog() {
         const suggestion = app.suggestedXoppExport().toString()
@@ -697,18 +702,15 @@ ApplicationWindow {
                     id: moreMenu
                     MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem {
-                        objectName: "saveHybridItem"
-                        text: qsTr("Save as hybrid PDF…")
-                        onTriggered: openHybridDialog(null)
-                    }
-                    MenuItem {
                         objectName: "exportXoppItem"
                         visible: app.isHybrid
                         height: visible ? implicitHeight : 0
                         text: qsTr("Export as .xopp for Xournal++…")
                         onTriggered: openXoppExportDialog()
                     }
-                    MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
+                    // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type of
+                    // Save as)
+                    MenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); onTriggered: openExportDialog() }
                     MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
                     MenuItem { text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     MenuSeparator {}
@@ -1234,32 +1236,26 @@ ApplicationWindow {
     }
     FileDialog {
         id: saveDialog
+        objectName: "saveDialog"
         property var afterSave: null
+        property bool settingUp: false
+        readonly property bool pdfChosen: selectedNameFilter.index === 1
         title: qsTr("Save as")
         fileMode: FileDialog.SaveFile
-        defaultSuffix: "xopp"
-        nameFilters: [qsTr("Xournal++ files (*.xopp)")]
+        defaultSuffix: pdfChosen ? "pdf" : "xopp"
+        nameFilters: [qsTr("Xournal notes (*.xopp)"), qsTr("PDF with notes, editable (*.pdf)")]
+        // The name follows the chosen type (native dialogs may do that themselves; then this changes nothing)
+        onPdfChosenChanged: {
+            if (!settingUp && selectedFile.toString() !== "")
+                selectedFile = app.fileForFormat(selectedFile, pdfChosen)
+        }
         onAccepted: {
-            app.saveAsInBackground(selectedFile, afterSave)
+            win.saveChosen(selectedFile, pdfChosen, afterSave)
             afterSave = null
         }
         onRejected: afterSave = null
     }
 
-    FileDialog {
-        id: hybridDialog
-        objectName: "hybridDialog"
-        property var afterSave: null
-        title: qsTr("Save as hybrid PDF")
-        fileMode: FileDialog.SaveFile
-        defaultSuffix: "pdf"
-        nameFilters: [qsTr("PDF with Xournal data (*.pdf)")]
-        onAccepted: {
-            app.saveAsHybridInBackground(selectedFile, afterSave)
-            afterSave = null
-        }
-        onRejected: afterSave = null
-    }
     FileDialog {
         id: xoppExportDialog
         title: qsTr("Export as .xopp for Xournal++")
@@ -1312,7 +1308,7 @@ ApplicationWindow {
     }
     FileDialog {
         id: exportDialog
-        title: qsTr("Export as PDF")
+        title: qsTr("Export as plain PDF")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "pdf"
         nameFilters: [qsTr("PDF (*.pdf)")]

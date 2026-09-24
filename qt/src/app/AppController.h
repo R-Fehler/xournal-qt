@@ -469,10 +469,17 @@ public:
     Q_INVOKABLE bool saveAs(const QUrl& url);
     // Hybrid PDF (qt/docs/hybrid-pdf.md)
     bool isHybrid() const;
-    /// "Save as hybrid PDF…": the document's own hybrid PDF; for an annotated PDF "name.notes.pdf" next to it, or the
+    /// Save as → "PDF with notes": the document's own hybrid PDF; for an annotated PDF "name.notes.pdf" next to it, or the
     /// PDF itself with the setting "Save notes into the PDF itself"; else the .xopp suggestion as .pdf.
     Q_INVOKABLE QUrl suggestedHybridFile() const;
     Q_INVOKABLE bool saveAsHybrid(const QUrl& url);
+    /// Save as: whether `file` is written as a PDF with notes (hybrid) or as a .xopp. The extension typed wins (.pdf;
+    /// .xopp, .xoj); without one, the type chosen in the dialog (`pdfChosen`).
+    Q_INVOKABLE bool savesAsPdf(const QUrl& file, bool pdfChosen) const;
+    /// Save as: the file name for the other type (the dialog's name follows the chosen type). The suggestion for one
+    /// type becomes the suggestion for the other; else the extension is swapped (a .pdf that is taken by another PDF:
+    /// "name.notes.pdf").
+    Q_INVOKABLE QUrl fileForFormat(const QUrl& file, bool pdf) const;
     /// Save writes without asking: the document has a file, or it is an annotated PDF and the notes go into it.
     Q_INVOKABLE bool savesWithoutDialog() const;
     /// "Export as .xopp for Xournal++…": "name.xopp" next to the hybrid PDF.

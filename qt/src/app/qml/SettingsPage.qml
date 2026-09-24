@@ -363,8 +363,8 @@ Popup {
                     SwitchRow { key: "resumeAtLastPage"; text: qsTr("Open documents where they were left off") }
                     SectionTitle { text: qsTr("Hybrid PDF") }
                     Hint {
-                        text: qsTr("A hybrid PDF (More → Save as hybrid PDF…) shows your notes in any PDF app and "
-                                   + "opens here with everything editable.")
+                        text: qsTr("A PDF with notes (Save as… → \"PDF with notes, editable\") shows your notes in "
+                                   + "any PDF app and opens here with everything editable.")
                     }
                     RowLayout {
                         Layout.fillWidth: true
