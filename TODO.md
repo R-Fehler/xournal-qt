@@ -102,6 +102,12 @@ is built.
 
 ## Ready after a short plan: platform
 
+### `qt/windows-build`: first Windows build (the author, 2026-09-24; started)
+- GitHub Actions on a Windows runner with MSYS2 UCRT64 (upstream Xournal++'s toolchain; the C libraries and Qt 6
+  come prebuilt), started by hand or by a push to the branch. It produces a zip, with an installer later. QField's
+  MSVC + vcpkg way is the fallback.
+- Pushing only `qt/windows-build`, and only with the author's go.
+
 ### `qt/android-apk`: first APK (merged 2026-09-24; `~/xournal_qt_workspace/samples/xournal-qt-debug-arm64.apk`; see `qt/docs/android.md` and `qt/docs/android-roadmap.md`)
 Tooling (2026-09-24, in the author's home, no sudo): JDK 17 in `~/.local/jdk-17`; Android command-line tools and
 NDK r27c (27.2.12479018) in `~/Android/Sdk`; Qt 6.11.2 desktop (host, `gcc_64`) and `android_arm64_v8a` in `~/Qt` (2 GB) through
