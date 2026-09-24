@@ -241,6 +241,10 @@ public:
     /// Hand the current document's file to the app the system has for it (SystemApps). Unsaved changes are the
     /// window's business (it asks to save first). When the file comes back changed, the tab reads it again.
     Q_INVOKABLE bool openExternally();
+    /// "Edit as notes": the current .md as a new document of notes, in a new tab: its text as the page's Markdown text
+    /// flowing over pages, to write on with the pen. The .md stays as it is; saving suggests "name.xopp" next to it
+    /// (the library shows the two as two documents: they go their own ways).
+    Q_INVOKABLE bool editAsNotes();
     /// The file "Open externally" hands over for a library card's path ("" for notes and PDFs): the Markdown, text or
     /// other file, the image a .xopp annotates.
     Q_INVOKABLE QString externalFileOf(const QString& path) const;

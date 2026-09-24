@@ -914,3 +914,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       on one continuous page": one long page, no page breaks; typing new paragraphs makes it longer. Open another
       `.md`: continuous as well. Back to "Text on pages": A4 pages again, the text unchanged, no unsaved dot.
       Watch typing speed in a long file on the continuous page (it lays out the whole text per key).
+- [ ] In a `.md`, "Edit as notes" (the notebook-with-pen button, or ⋮): a new tab "name.xopp" next to it with the
+      same pages; write on them with the pen, and the text tool edits the Markdown text there. Close it: asked to
+      save; Save suggests `name.xopp` next to the `.md`. The `.md` is unchanged, and the library shows two cards
+      (MD and the notes).

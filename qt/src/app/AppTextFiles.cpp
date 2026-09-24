@@ -188,6 +188,27 @@ bool AppController::openExternally() {
     return openWithSystemApp(QString::fromStdString(session()->shownFile().string()));
 }
 
+bool AppController::editAsNotes() {
+    DocumentSession* s = session();
+    if (!s || !s->textFile() || s->hasFilePath() || s->textFile()->kind() != TextFile::Kind::Markdown) {
+        return false;
+    }
+    const fs::path md = s->textFile()->path();
+    const std::string text = s->currentText();  // (as it is here, saved or not)
+    auto notes = std::make_unique<DocumentSession>(*app, MarkdownFile::document(text, MarkdownFile::style()));
+    fs::path xopp = md;
+    xopp.replace_extension(".xopp");
+    notes->setMadeFrom(xopp);
+    tabs->addTab(std::move(notes));  // (next to the .md)
+    setHomeVisible(false);
+    Q_EMIT titleChanged();
+    Q_EMIT pageActionDone(tr("Notes made from %1: write on them; saving suggests %2 next to it")
+                                  .arg(QString::fromStdString(md.filename().string()),
+                                       QString::fromStdString(xopp.filename().string())),
+                          false);
+    return true;
+}
+
 QString AppController::externalFileOf(const QString& path) const {
     const DocumentItem item = DocumentFiles::itemOf(fs::path(path.toStdString()), DocumentFiles::AllFiles);
     if (!item.valid() || !item.pdf.empty()) {

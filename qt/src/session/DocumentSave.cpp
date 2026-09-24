@@ -687,6 +687,7 @@ void DocumentSession::finishSave(SaveResult result) {
     }
     lastSaveResult = result;
     if (result.ok && task->request.kind != SaveKind::ExportXopp) {
+        madeUnsaved = false;  // (made from a .md: it is in its own file now)
         Q_EMIT filePathChanged();
     }
     undoRedoChanged();  // (the undo actions and the modified state)

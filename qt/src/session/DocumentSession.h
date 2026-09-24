@@ -186,6 +186,9 @@ public:
     void keepTextOverDisk();
     /// The file's new bytes are the text now (after the pages were given its text): not modified.
     void textReloaded(std::string bytes);
+    /// A new document made from another file ("Edit as notes" of a .md): saving suggests `file` (e.g. "name.xopp" next
+    /// to the .md), the tab is titled so, and it counts as modified until it is saved (its content is nowhere else).
+    void setMadeFrom(const fs::path& suggestion);
     /// Where the text of a tab is written for crash recovery (autosave, crash): plain text files in the cache.
     static fs::path textAutosavePath(qint64 pid, quint64 serial);
     static fs::path textEmergencyPath(qint64 pid, quint64 serial);
@@ -412,6 +415,8 @@ private:
     std::unique_ptr<TextFile> text;  ///< a text file edited (or shown read-only)
     bool textModified = false;
     bool textContinuous = false;
+    fs::path madeSuggestion;  ///< setMadeFrom
+    bool madeUnsaved = false;
     std::string lastAutosavedText;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };

@@ -308,6 +308,14 @@ ApplicationWindow {
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
             IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
             // A .md, a text file, an image: in the app the system has for it (a code editor, …)
+            // A .md: a copy as notes (a .xopp) to write on with the pen; the .md stays as it is
+            IconButton {
+                objectName: "editAsNotesButton"
+                visible: app.textDocument === "markdown"
+                iconName: "xqt-notebook-pen"
+                tip: qsTr("Edit as notes: a copy to write on with the pen (saved as a .xopp; the .md stays)")
+                onClicked: app.editAsNotes()
+            }
             IconButton {
                 objectName: "openExternallyButton"
                 visible: app.canOpenExternally
@@ -737,6 +745,13 @@ ApplicationWindow {
                         height: visible ? implicitHeight : 0
                         text: qsTr("Export as .xopp for Xournal++…")
                         onTriggered: openXoppExportDialog()
+                    }
+                    MenuItem {
+                        objectName: "editAsNotesItem"
+                        visible: app.textDocument === "markdown"
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Edit as notes (to write on with the pen)")
+                        onTriggered: app.editAsNotes()
                     }
                     MenuItem {
                         objectName: "openExternallyItem"

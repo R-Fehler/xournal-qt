@@ -760,6 +760,9 @@ fs::path DocumentSession::suggestSavePath() const {
     if (text && !hasFilePath()) {
         return text->path();  // (a text file is saved as itself)
     }
+    if (!hasFilePath() && !madeSuggestion.empty()) {
+        return madeSuggestion;  // (made from another file: next to it)
+    }
     Settings* settings = getSettings();
     fs::path background;
     {
@@ -937,6 +940,9 @@ std::string DocumentSession::getDisplayName() const {
     if (!shownPath.empty()) {
         return char_cast(shownPath.filename().u8string().c_str());
     }
+    if (!madeSuggestion.empty()) {
+        return char_cast(madeSuggestion.filename().u8string().c_str());
+    }
     return _("Untitled");
 }
 
@@ -944,7 +950,14 @@ bool DocumentSession::isModified() const {
     if (text && !hasFilePath()) {
         return textModified;  // (the text differs from the file's)
     }
-    return undoRedo->isChanged() || saveUnconfirmed || saveFailed;
+    return undoRedo->isChanged() || saveUnconfirmed || saveFailed || madeUnsaved;
+}
+
+void DocumentSession::setMadeFrom(const fs::path& suggestion) {
+    madeSuggestion = suggestion;
+    madeUnsaved = true;
+    updateModified();
+    Q_EMIT filePathChanged();
 }
 
 void DocumentSession::updateModified() {

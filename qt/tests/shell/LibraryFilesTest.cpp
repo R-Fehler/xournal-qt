@@ -513,6 +513,46 @@ TEST_F(LibraryFilesTest, aMarkdownFileOpensForEditingAndAHitAtItsPassage) {
     EXPECT_EQ(fs::last_write_time(root / "notes.md"), before);
 }
 
+TEST_F(LibraryFilesTest, editAsNotesMakesNotesFromTheMarkdownFileAndLeavesIt) {
+    writeFile(root / "lecture.md", longMarkdown());
+    const auto before = fs::last_write_time(root / "lecture.md");
+    AppController c;
+    c.setLibraryRoot(root);
+    ASSERT_TRUE(c.openPath(qstr(root / "lecture.md")));
+    DocumentSession* md = c.tabManager().currentSession();
+    ASSERT_TRUE(c.editAsNotes());
+    ASSERT_EQ(c.tabManager().count(), 2);
+    DocumentSession* notes = c.tabManager().currentSession();
+    ASSERT_NE(notes, md);
+    EXPECT_EQ(notes->textFile(), nullptr) << "notes, not a text file";
+    EXPECT_FALSE(notes->hasFilePath());
+    EXPECT_TRUE(notes->isModified()) << "its content is nowhere else yet: closing asks";
+    EXPECT_FALSE(c.tabManager().isPristine(c.tabManager().currentIndex()));
+    EXPECT_EQ(c.title(), "lecture.xopp");
+    EXPECT_EQ(notes->suggestSavePath(), root / "lecture.xopp") << "next to the .md";
+    EXPECT_EQ(notes->getDocument()->getPageCount(), md->getDocument()->getPageCount());
+    EXPECT_EQ(MarkdownFile::pageStarts(*notes->getDocument()), MarkdownFile::pageStarts(*md->getDocument()));
+    EXPECT_FALSE(c.editAsNotes()) << "only from a .md";
+    // Saved: a .xopp next to the .md, which is left as it was; the library shows two documents
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(qstr(root / "lecture.xopp"))));
+    EXPECT_FALSE(notes->isModified());
+    EXPECT_TRUE(fs::exists(root / "lecture.xopp"));
+    EXPECT_EQ(fs::last_write_time(root / "lecture.md"), before);
+    const auto listing = DocumentFiles::scan(root);
+    int mds = 0, xopps = 0;
+    for (const auto& item: listing.items) {
+        mds += !item.md.empty();
+        xopps += !item.xopp.empty();
+    }
+    EXPECT_EQ(mds, 1);
+    EXPECT_EQ(xopps, 1);
+    EXPECT_EQ(listing.items.size(), 2u) << "two cards: they go their own ways";
+    // Opened again, the .xopp has the Markdown text on its pages (drawn formatted) and the .md is still a text file
+    auto loaded = DocumentSession::loadFile(root / "lecture.xopp");
+    ASSERT_NE(loaded.document, nullptr);
+    EXPECT_EQ(MarkdownFile::pageStarts(*loaded.document), MarkdownFile::pageStarts(*md->getDocument()));
+}
+
 TEST_F(LibraryFilesTest, anImageOpensAsAPageToWriteOnAndIsSavedAsItsXopp) {
     makeImage(root / "photo.png", 800, 600);
     // A photo taken sideways (turned by its orientation tag), and a WebP: stored with the document
