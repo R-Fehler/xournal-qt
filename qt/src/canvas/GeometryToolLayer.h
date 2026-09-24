@@ -7,6 +7,9 @@
  * usual. Pen and left button always draw: on the tool and just around it the line follows the nearest edge - the
  * three edges of the setsquare, the circle of the compass - so it works like a real ruler.
  *
+ * The canvas shows it over its page as pictures of its own (GeometryToolPicture): moving, turning and sizing it move
+ * those on the GPU, and the page itself is not drawn again for it.
+ *
  * It lies on one page of the document. The canvas makes its pages anew now and then (pages inserted, deleted or
  * moved, a document read again, the view closed): it tells the layer before a page of its goes and after the pages
  * changed, and the tool is put back onto the page it lies on - or aside, when that page is gone.
@@ -32,6 +35,7 @@ namespace xqt {
 
 class CanvasPage;
 class CanvasView;
+class GeometryToolPicture;
 
 class GeometryToolLayer {
 public:
@@ -52,6 +56,8 @@ public:
     std::optional<GeometryToolType> type() const;
     /// The canvas page it lies on (none if it is not out, or put aside).
     CanvasPage* page() const { return onPage; }
+    /// Draws it for the canvas (none if it is not out).
+    GeometryToolPicture* picture() const { return drawing.get(); }
 
     // The canvas pages change under it (see above)
     /// This canvas page goes (with the views on it).
@@ -118,11 +124,12 @@ public:
 private:
     void place(CanvasPage& page);
     void remove();
-    /// Tell the tool's view where it is now (and draw the tool anew only when its size changed).
-    void changed(bool resized);
+    /// It moved, turned or changed its size: the canvas shows it anew.
+    void changed();
 
     CanvasView& view;
     std::unique_ptr<GeometryTool> tool;
+    std::unique_ptr<GeometryToolPicture> drawing;
     CanvasPage* onPage = nullptr;
     /// The page of the document it lies on (outlives the canvas pages)
     std::weak_ptr<XojPage> onDocumentPage;

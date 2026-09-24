@@ -8,7 +8,7 @@ XQT_PERF=1 build-release/xournal-qt 2> /tmp/xqt-perf.log
 
 ```
 xqt-perf 1.0 s: input mouse 312 (claimed 0, hit test 0.05/0.31 ms) touch 0 pen 0 | scroll 312 -> visibility 61
-(0.42/2.10 ms) | frames 59 sync 3.1/18.4 ms | tiles 480 previews 7 | sharp 2 after 180/240 ms
+(0.42/2.10 ms) | frames 59 sync 3.1/18.4 ms | tiles 480 previews 7 | geometry 0 (displays 0) | sharp 2 after 180/240 ms
 ```
 
 Per second:
@@ -23,6 +23,10 @@ Per second:
   there, and it blocks the UI thread), average and worst.
 - **tiles**: page tiles composed and uploaded (256 x 256 px each), **previews** the page previews uploaded for pages
   that are not rendered yet.
+- **geometry**: pictures of the setsquare or compass drawn (the canvas moves, turns and sizes them on the GPU; they are
+  drawn anew only for a new size or zoom, once that has been stable for 150 ms), and in brackets its small angle
+  display, drawn anew when the angle it shows changes. Moving and turning the tool should draw no picture and no
+  page tile.
 - **sharp**: pages in view that got their render at the zoom they are shown at, and how long they waited for it
   (average and worst) since the view last asked for it, that is since scrolling or zooming stopped. After a Ctrl+wheel
   zoom this includes the 300 ms the renders wait for the zoom to be stable; after a pinch it does not (lifting the

@@ -83,6 +83,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasMemory.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/GeometryToolLayer.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/GeometryToolLayer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/GeometryToolPicture.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/GeometryToolPicture.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PenHover.h
@@ -126,6 +128,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/CanvasReplayTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/DocumentLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/GeometryToolPictureTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextFlowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownEditorTest.cpp

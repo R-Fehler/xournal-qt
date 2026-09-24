@@ -20,6 +20,8 @@
 #include <QQmlEngine>
 #include <QNativeGestureEvent>
 #include <QQuickWindow>
+#include <QSGClipNode>
+#include <QSGGeometry>
 #include <QSGSimpleRectNode>
 #include <QSGSimpleTextureNode>
 #include <QSGTransformNode>
@@ -32,6 +34,8 @@
 #include "CanvasPage.h"
 #include "Perf.h"
 #include "CanvasView.h"
+#include "GeometryToolLayer.h"
+#include "GeometryToolPicture.h"
 #include "TextEditor.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
@@ -41,6 +45,11 @@ constexpr int TILE = 256;
 /// Tiles composed and uploaded in one frame (about 0.26 MB each)
 constexpr int TILES_WHILE_MOVING = 12;
 constexpr int TILES_WHEN_STILL = 64;
+/// The picture of the setsquare or compass: at most this many pixels a side (64 MB); a bigger one is drawn smaller,
+/// with the part in view drawn sharp once it rests
+constexpr double MAX_PICTURE = 4096;
+/// A new size or zoom of the setsquare or compass is drawn anew when it has not changed for this long (ms)
+constexpr int GEOMETRY_SETTLES_MS = 150;
 
 class TileNode final: public QSGSimpleTextureNode {
 public:
@@ -119,6 +128,94 @@ public:
     QSize pixelSize;
 };
 
+/// A rectangular clip (the page of the setsquare or compass: it is cut at the page's edges, as when it was drawn into
+/// the page).
+class PageClipNode final: public QSGClipNode {
+public:
+    PageClipNode(): geometry(QSGGeometry::defaultAttributes_Point2D(), 4) {
+        setGeometry(&geometry);
+        setIsRectangular(true);
+    }
+    void setRect(const QRectF& r) {
+        if (r == clipRect()) {
+            return;
+        }
+        setClipRect(r);
+        QSGGeometry::updateRectGeometry(&geometry, r);
+        markDirty(QSGNode::DirtyGeometry);
+    }
+
+private:
+    QSGGeometry geometry;
+};
+
+/// The setsquare or compass over its page: pictures of it under transforms (see GeometryToolPicture). Moving, turning
+/// and sizing it change the transforms; the pictures are drawn anew only for a new size or zoom, once that is stable.
+class GeometryNode final: public QSGTransformNode {
+public:
+    GeometryNode() {
+        clip = new PageClipNode;
+        appendChildNode(clip);
+        body = new QSGTransformNode;
+        clip->appendChildNode(body);
+        displayAt = new QSGTransformNode;
+        clip->appendChildNode(displayAt);
+    }
+    /// Show the picture of an image (a new texture), in its rect; null image: none
+    void show(QQuickWindow* window, QSGTransformNode* parent, TileNode*& node, xqt::GeometryToolPicture::Image image,
+              std::atomic<qint64>& pixels) {
+        if (image.image.isNull()) {
+            drop(parent, node);
+            return;
+        }
+        const bool fresh = !node;
+        if (fresh) {
+            node = new TileNode;
+            node->setFiltering(QSGTexture::Linear);
+        }
+        QSGTexture* previous = node->texture();
+        node->setTexture(window->createTextureFromImage(image.image));
+        delete previous;
+        node->setRect(image.rect);
+        pixels += static_cast<qint64>(image.image.width()) * image.image.height();
+        if (fresh) {  // (only with a texture: the software renderer crashes on texture nodes without one)
+            if (parent == body && node == patch && base) {
+                parent->insertChildNodeAfter(node, base);  // the sharp part over the whole
+            } else if (parent == body && node == base && patch) {
+                parent->insertChildNodeBefore(node, patch);
+            } else {
+                parent->appendChildNode(node);
+            }
+        }
+    }
+    void drop(QSGTransformNode* parent, TileNode*& node) {
+        if (node) {
+            parent->removeChildNode(node);
+            delete node;
+            node = nullptr;
+        }
+    }
+    void clear() {
+        drop(body, base);
+        drop(body, patch);
+        drop(displayAt, display);
+        of = 0;
+    }
+    PageClipNode* clip;
+    QSGTransformNode* body;       ///< the tool's own coordinates (points), at the height its pictures were drawn for
+    QSGTransformNode* displayAt;  ///< the middle of the angle display, upright
+    TileNode* base = nullptr;     ///< the whole tool (at most MAX_PICTURE pixels a side)
+    TileNode* patch = nullptr;    ///< a big tool at a high zoom: the part in view, sharp (once it rests)
+    TileNode* display = nullptr;
+    quint64 of = 0;  ///< whose pictures these are (GeometryToolPicture::serial)
+    double baseHeight = 0;
+    double baseScale = 0;
+    QRectF patchRect;  ///< own coordinates
+    double patchScale = 0;
+    std::string displayText;
+    double displayScale = 0;
+};
+
 // Containers are (identity) transform nodes, not plain QSGNodes: Qt Quick's software backend re-resolves a changed
 // node's transform and clip from its parent, and only records them for transform/clip/opacity nodes. Under a plain
 // parent a re-positioned page would lose the item's position.
@@ -127,12 +224,15 @@ public:
     CanvasRootNode() {
         pagesRoot = new QSGTransformNode;
         appendChildNode(pagesRoot);
+        geometry = new GeometryNode;
+        appendChildNode(geometry);
         selectionRoot = new QSGTransformNode;
         appendChildNode(selectionRoot);
         hover = new QSGSimpleRectNode(QRectF(), QColor(0x1d, 0x2b, 0x8f));
         appendChildNode(hover);
     }
     QSGTransformNode* pagesRoot;
+    GeometryNode* geometry;  ///< the setsquare or compass, over the pages and under the selection
     QSGTransformNode* selectionRoot;  ///< the selection (EditSelection::paint), above the pages
     TileNode* selection = nullptr;
     quint64 selectionRevision = ~quint64(0);
@@ -169,6 +269,12 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     // Proximity events are only delivered to the application object.
     qApp->installEventFilter(this);
     allCanvases().push_back(this);
+    geometryTimer.setSingleShot(true);
+    geometryTimer.setInterval(GEOMETRY_SETTLES_MS);
+    connect(&geometryTimer, &QTimer::timeout, this, [this] {
+        geometrySettled = true;
+        update();
+    });
 }
 
 DocumentCanvasItem::~DocumentCanvasItem() {
@@ -594,6 +700,116 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
     root->selection->setRect(root->selectionRegion.translated(pageOrigin));
 }
 
+void DocumentCanvasItem::updateGeometryNode(QSGNode* rootNode, double zoom, double dpr) {
+    GeometryNode* g = static_cast<CanvasRootNode*>(rootNode)->geometry;
+    const xqt::GeometryToolLayer& layer = canvasView->geometryTool();
+    xqt::GeometryToolPicture* picture = layer.picture();
+    xqt::CanvasPage* page = layer.visible() ? layer.page() : nullptr;
+    const auto index = page ? canvasView->indexOf(page) : std::nullopt;
+    const auto [first, last] = canvasView->visiblePages();
+    if (!picture || !index || *index < first || *index > last) {
+        g->clear();  // (its textures go; it is drawn anew when it comes into view)
+        geometryStats.shown = false;
+        return;
+    }
+    if (g->of != picture->serial()) {  // another tool
+        g->clear();
+        g->of = picture->serial();
+    }
+    const GeometryToolType type = picture->type();
+    const double toolHeight = layer.height();
+    const double rotation = layer.rotation();
+    const QPointF middle = layer.middle();
+    const QRectF r = canvasView->pageViewRect(*index);
+    const QPointF pageAt(snap(r.x(), dpr), snap(r.y(), dpr));
+    const double wanted = zoom * dpr;
+
+    // Nothing changed for a moment (neither the tool, nor the zoom, nor the scroll position): a new size or zoom is
+    // drawn anew. Until then the pictures are scaled on the GPU.
+    const std::array<double, 10> key{toolHeight, rotation, middle.x(), middle.y(), zoom,
+                                     dpr,        pageAt.x(), pageAt.y(), width(), height()};
+    if (key != lastGeometryKey) {
+        lastGeometryKey = key;
+        geometrySettled = false;
+        QMetaObject::invokeMethod(this, [this] { geometryTimer.start(); }, Qt::QueuedConnection);
+    }
+    const bool settled = geometrySettled;
+
+    // The whole tool, in its own coordinates
+    const QRectF bounds = xqt::GeometryToolPicture::bounds(type, toolHeight);
+    const double baseScale = std::min(wanted, MAX_PICTURE / std::max(bounds.width(), bounds.height()));
+    if (!g->base || (settled && (g->baseHeight != toolHeight || g->baseScale != baseScale))) {
+        g->drop(g->body, g->patch);
+        g->show(window(), g->body, g->base, picture->body(toolHeight, baseScale), statPixels);
+        g->baseHeight = toolHeight;
+        g->baseScale = baseScale;
+        ++geometryStats.bodies;
+    }
+    QMatrix4x4 m;
+    m.translate(static_cast<float>(pageAt.x()), static_cast<float>(pageAt.y()));
+    m.scale(static_cast<float>(zoom));
+    m.translate(static_cast<float>(middle.x()), static_cast<float>(middle.y()));
+    m.rotate(static_cast<float>(rotation * 180 / M_PI), 0, 0, 1);
+    m.scale(static_cast<float>(toolHeight / g->baseHeight));  // (a new size: drawn anew once it is stable)
+    g->body->setMatrix(m);
+    g->clip->setRect(QRectF(pageAt, r.size()));
+
+    // A big tool at a high zoom is drawn smaller than it is shown: once it rests, the part of it in view is drawn sharp
+    // over that. It is in the tool's own coordinates, so it stays right while the tool moves on (only a part that comes
+    // into view is not sharp until it rests again).
+    if (baseScale < wanted) {
+        const QRectF inView = QRectF(0, 0, width(), height()).intersected(QRectF(pageAt, r.size()));
+        if (settled && !inView.isEmpty()) {
+            const double most = MAX_PICTURE / wanted;  // points a side
+            auto limited = [&](QRectF part) {
+                part = part.intersected(bounds);
+                const QPointF c = part.center();
+                part.setWidth(std::min(part.width(), most));
+                part.setHeight(std::min(part.height(), most));
+                part.moveCenter(c);
+                return part;
+            };
+            const QRectF needed = limited(m.inverted().mapRect(inView));
+            if (!needed.isEmpty() && (!g->patch || g->patchScale != wanted || !g->patchRect.contains(needed))) {
+                const double margin = 128 / wanted;
+                const QRectF part = limited(needed.adjusted(-margin, -margin, margin, margin));
+                auto image = picture->body(toolHeight, wanted, part);
+                g->patchRect = image.rect;
+                g->patchScale = wanted;
+                g->show(window(), g->body, g->patch, std::move(image), statPixels);
+                ++geometryStats.bodies;
+            }
+        }
+    } else {
+        g->drop(g->body, g->patch);
+    }
+
+    // The angle display: upright, drawn anew when its number changes
+    const double displayScale = settled || !g->display ? wanted : g->displayScale;
+    std::string text = xqt::GeometryToolPicture::displayText(rotation);
+    if (!g->display || text != g->displayText || displayScale != g->displayScale) {
+        g->show(window(), g->displayAt, g->display, picture->display(toolHeight, rotation, displayScale), statPixels);
+        g->displayText = std::move(text);
+        g->displayScale = displayScale;
+        ++geometryStats.displays;
+    }
+    const QPointF c = xqt::GeometryToolPicture::displayCentre(type, toolHeight);
+    const QPointF displayMiddle = middle + QPointF(c.x() * std::cos(rotation) - c.y() * std::sin(rotation),
+                                                   c.x() * std::sin(rotation) + c.y() * std::cos(rotation));
+    // Its middle on a whole device pixel: its picture is drawn on whole pixels around it, so the number is sharp
+    const QPointF displayAt = pageAt + displayMiddle * zoom;
+    QMatrix4x4 d;
+    d.translate(static_cast<float>(snap(displayAt.x(), dpr)), static_cast<float>(snap(displayAt.y(), dpr)));
+    d.scale(static_cast<float>(zoom));
+    g->displayAt->setMatrix(d);
+
+    geometryStats.shown = true;
+    geometryStats.body = m;
+    geometryStats.display = d;
+    geometryStats.scale = g->baseScale;
+    geometryStats.sharpPart = g->patch != nullptr;
+}
+
 void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, double scale) {
     auto* node = static_cast<PageNode*>(pageNode);
     const xqt::DocumentSearch& search = canvasView->getSession().search();
@@ -647,6 +863,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             delete node;
         }
         root->pages.clear();
+        root->geometry->clear();
         viewReplaced = false;
     }
     if (!canvasView) {
@@ -800,6 +1017,7 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     if (more) {  // the next frame composes further tiles
         QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
     }
+    updateGeometryNode(root, zoom, dpr);
     updateSelectionNode(root, zoom, dpr);
 
     if (auto h = input ? input->hoverPosition() : std::nullopt) {

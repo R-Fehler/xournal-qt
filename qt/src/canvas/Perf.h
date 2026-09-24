@@ -5,13 +5,15 @@
  * second while something happens:
  *
  *   xqt-perf 1.0 s: input mouse 312 (claimed 0, hit test 0.05/0.31 ms) touch 0 pen 0 | scroll 312 -> visibility 61
- *   (0.42/2.10 ms) | frames 59 sync 3.1/18.4 ms | tiles 480 previews 7 | sharp 2 after 180/240 ms
+ *   (0.42/2.10 ms) | frames 59 sync 3.1/18.4 ms | tiles 480 previews 7 | geometry 0 (displays 0) | sharp 2 after
+ *   180/240 ms
  *
  * Counts per second: the events the canvas filter saw (and how long the hit test of the item under the pointer took,
  * average/worst), the scroll changes and how many of them led to a visibility update (the current page, the models,
  * the sidebar), the frames of the canvas with the time of their scene graph sync, the page tiles and previews
- * uploaded in them, and the pages in view that got their render at the zoom they are shown at, with how long they
- * waited for it after the view last asked (after a zoom, this includes the wait for the zoom to be stable).
+ * uploaded in them, the pictures of the setsquare or compass drawn (and of its angle display), and the pages in view
+ * that got their render at the zoom they are shown at, with how long they waited for it after the view last asked
+ * (after a zoom, this includes the wait for the zoom to be stable).
  *
  * @license GNU GPLv2 or later
  */
@@ -41,6 +43,8 @@ public:
         Frames,
         Tiles,
         Previews,
+        GeometryPictures,  ///< the setsquare or compass drawn anew (its body; on a new size or zoom)
+        GeometryDisplays,  ///< its angle display drawn anew (while it turns)
         CounterCount
     };
     enum Timing { HitTest, VisibilityTime, CurrentPageTime, SyncTime, SharpTime, TimingCount };
