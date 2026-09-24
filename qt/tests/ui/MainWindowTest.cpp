@@ -2898,12 +2898,16 @@ TEST_F(MainWindowTest, sidebarPagesShowTheirSketchAndGetSharpWhenTheListSlowsDow
     ASSERT_NE(sharp, nullptr);
     until([&] { return sketch->property("source").toUrl().toString().startsWith("image://sketch/"); });
     EXPECT_TRUE(sketch->property("source").toUrl().toString().startsWith("image://sketch/"));
+    until([&] { return sharp->property("source").toUrl().toString().startsWith("image://thumbnail/"); });
     EXPECT_TRUE(sharp->property("source").toUrl().toString().startsWith("image://thumbnail/"));
 
     // Racing to the end: the pages that come into view have their sketch only
     auto* race = list->property("race").value<QObject*>();
     ASSERT_NE(race, nullptr);
-    // (it calms down 150 ms after the last move: not while this test is slow under load)
+    // The test says when the list races, not the speed of this machine: the watch neither looks at the moves (on
+    // its way to the end the list moves more than once, and a small move a moment after the jump is no race) nor
+    // calms down 150 ms after the last one (a test slowed down by load takes longer)
+    race->property("moves").value<QObject*>()->setProperty("enabled", false);
     race->property("calm").value<QObject*>()->setProperty("interval", 60000);
     race->setProperty("racing", true);
     const int last = controller->pageCount() - 1;
