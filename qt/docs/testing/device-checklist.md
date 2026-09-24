@@ -839,3 +839,24 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       never switches documents. With one document, while presenting or with the search bar open, the bar is
       hidden; it does not cover the tool square or the page / zoom pill, and spans a reference split in the middle.
       With more than 12 documents it shows "3 / 17".
+
+## Fuzzy search in text (qt/fuzzy-text)
+- [ ] Open a PDF with the word "turbine" in its text, search with Fuzzy on (from the library or the tab overview):
+      `tbine` finds it, `turbnie` (letters swapped), `trbine` (one left out) and `turbime` (one wrong) too; the whole
+      word "turbine" is marked on the canvas, in the sidebar and in the page grid, and the count matches the marks.
+- [ ] Short terms stay strict: `tb` finds only what contains "tb" (as before); `tbn` does not mark "turbine".
+- [ ] In the library with Fuzzy on, `tbine` lists the documents with "turbine" in their text. Search `turbine`:
+      documents with "turbine" or "turbines" come before those that only have a typo like "turbnie". The card's snippet shows "turbine", the pages button shows the page, and its
+      picture marks the whole word "turbine" (also `^turb` marks only word starts now, `'turbine'` whole words).
+- [ ] A Markdown file with "turbine" in a passage: `tbine` shows its snippet card with "turbine" marked; opening it
+      marks the same word in the document.
+- [ ] A big library: turning Fuzzy on, the first fuzzy search is not noticeably slower than the next ones (the words
+      are prepared in the background); typing stays as responsive as the plain search.
+- [ ] Settings → Search (a new tab after Documents): the "Fuzzy search" switch is in the same state as the "Fuzzy"
+      button of the library's search field; switch it there, the button follows, and the other way round.
+- [ ] Typo tolerance "Off": `turbnie` no longer finds "turbine" (`tbine` still does). "Up to 2 letters":
+      `trasnfromation` finds "transformation"; back to "1 letter" (the default) it does not.
+- [ ] Hover the "Fuzzy" button: a one-line tooltip that mentions the help. Long press it (touch) or right-click it
+      (mouse), in the library and in the tab overview: the fuzzy search's help opens (the button does not toggle),
+      scrolls with a finger, and closes with a tap outside or Escape. Its typo sentence follows the setting in
+      Settings → Search, which has a "Help" button that opens the same help.

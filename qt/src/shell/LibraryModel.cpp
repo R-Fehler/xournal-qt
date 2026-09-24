@@ -99,6 +99,9 @@ void LibraryModel::openCache() {
     idx = std::make_unique<LibraryIndex>(lib->root(), where);
     connect(idx.get(), &LibraryIndex::progress, this, [this] {
         Q_EMIT indexChanged();
+        if (fuzzy && !idx->busy()) {
+            idx->prepareWords();  // (the words of the text, for fuzzy terms)
+        }
         if (!query.isEmpty() && !searchTimer.isActive()) {
             searchTimer.start();  // new text: search again (not on every document)
         }
@@ -267,6 +270,9 @@ void LibraryModel::setFuzzySearch(bool on) {
     if (on != fuzzy) {
         fuzzy = on;
         Q_EMIT fuzzySearchChanged();
+        if (fuzzy && idx) {
+            idx->prepareWords();
+        }
         if (!query.isEmpty()) {
             Q_EMIT searchChanged();  // (its hint)
             rebuild();
@@ -363,10 +369,13 @@ std::vector<LibraryModel::Row> LibraryModel::fuzzyRows(const FuzzyQuery& parsed)
             }
         }
     }
-    // fzf's score of the names first, then the hits in the text, then the newest
+    // fzf's score of the names first, then exact hits in the text before fuzzy ones, then the hits, then the newest
     auto ranked = [](const Row& a, const Row& b) {
         if (a.hit.nameScore != b.hit.nameScore) {
             return a.hit.nameScore > b.hit.nameScore;
+        }
+        if (a.hit.fuzzyOnly != b.hit.fuzzyOnly) {
+            return b.hit.fuzzyOnly;  // exact words in the text before words that only match fuzzily
         }
         if (a.hit.count != b.hit.count) {
             return a.hit.count > b.hit.count;

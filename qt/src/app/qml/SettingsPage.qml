@@ -1,4 +1,5 @@
-// Settings: a large modal sheet with sections (pen, touch, stabilizer, documents, new pages, storage, shortcuts).
+// Settings: a large modal sheet with sections (pen, touch, stabilizer, documents, search, new pages, storage,
+// shortcuts).
 // The values are upstream Xournal++'s settings (settings.xml keys); they apply immediately and are saved when the
 // sheet closes. "Storage" is about the cache of the library of this window (a setting of the library).
 import QtQuick
@@ -29,6 +30,8 @@ Popup {
     }
 
     background: Rectangle { color: "#fafafa"; radius: 14 }
+
+    FuzzyHelp { id: fuzzyHelp; objectName: "settingsFuzzyHelp" }
 
     // --- rows -----------------------------------------------------------------------------------------------------
     component SectionTitle: Label {
@@ -123,6 +126,7 @@ Popup {
             TabButton { objectName: "touchTab"; text: qsTr("Touch"); width: implicitWidth }
             TabButton { text: qsTr("Stabilizer"); width: implicitWidth }
             TabButton { objectName: "documentsTab"; text: qsTr("Documents"); width: implicitWidth }
+            TabButton { objectName: "searchTab"; text: qsTr("Search"); width: implicitWidth }
             TabButton { text: qsTr("New pages"); width: implicitWidth }
             TabButton { objectName: "storageTab"; text: qsTr("Storage"); width: implicitWidth }
             TabButton { objectName: "shortcutsTab"; text: qsTr("Shortcuts"); width: implicitWidth }
@@ -422,6 +426,76 @@ Popup {
                         }
                     }
                     Hint { text: qsTr("%F is the date (2026-09-19), %H-%M the time.") }
+                    Item { Layout.preferredHeight: 16 }
+                }
+            }
+
+            // --- Search: the fuzzy search (its toggle is the one in the search fields: app.library.fuzzySearch) ---
+            ScrollView {
+                contentWidth: availableWidth
+                ColumnLayout {
+                    width: parent.width - 48
+                    x: 24
+                    spacing: 10
+                    RowLayout {
+                        Layout.fillWidth: true
+                        SectionTitle { text: qsTr("Fuzzy search") }
+                        Button {
+                            objectName: "fuzzyHelpButton"
+                            Layout.topMargin: 18
+                            flat: true
+                            text: qsTr("Help: syntax and examples")
+                            onClicked: fuzzyHelp.open()
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Fuzzy search in the library and the tab overview (the \"Fuzzy\" button "
+                                       + "next to their search fields)")
+                        }
+                        Switch {
+                            objectName: "fuzzySearchSwitch"
+                            checked: app.library.fuzzySearch
+                            onToggled: app.library.fuzzySearch = checked
+                        }
+                    }
+                    Hint {
+                        text: qsTr("Names match when their letters come in this order (like fzf). In the text of "
+                                   + "the documents, a word of three or more letters matches when it has the letters "
+                                   + "close together (tbine finds \"turbine\"), or with a typo; the whole word is "
+                                   + "marked. Shorter words are found as they are typed.")
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Typo tolerance in text")
+                        }
+                        ComboBox {
+                            id: typos
+                            objectName: "fuzzyTyposCombo"
+                            Layout.preferredWidth: 360
+                            model: [
+                                { text: qsTr("Off"), value: 0 },
+                                { text: qsTr("1 letter, in words of 5+ letters"), value: 1 },
+                                { text: qsTr("Up to 2 letters, in words of 8+ letters"), value: 2 }
+                            ]
+                            textRole: "text"
+                            valueRole: "value"
+                            currentIndex: (sheet.s.revision, count, indexOfValue(sheet.s.get("fuzzyTypos")))
+                            onActivated: sheet.s.set("fuzzyTypos", currentValue)
+                        }
+                    }
+                    Hint {
+                        text: qsTr("A typo is one letter swapped with the next, left out, added or wrong: with 1, "
+                                   + "turbnie, trbine and turbime find \"turbine\". With 2, words of 8 or more "
+                                   + "letters may have two (trasnfromation finds \"transformation\"), shorter ones "
+                                   + "one. Documents with the word as typed come first.")
+                    }
                     Item { Layout.preferredHeight: 16 }
                 }
             }

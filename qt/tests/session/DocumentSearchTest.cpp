@@ -23,6 +23,7 @@
 #include "session/DocumentSession.h"
 #include "session/DocumentTextIndex.h"
 #include "session/TextMatch.h"
+#include "session/Vocabulary.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
@@ -366,6 +367,70 @@ TEST_F(DocumentSearchTest, countsAndMarksAgreeAcrossLineBreaks) {
     EXPECT_EQ(s->search().textIndex().pdfPagesRead(), pages) << "each page's text read once";
 }
 
+// Fuzzy terms match whole words (WordMatch.h), counted from the pages' vocabularies and marked in their text: the
+// count and the marks agree, and the whole word is marked.
+TEST_F(DocumentSearchTest, fuzzyWordsAreCountedAndMarkedWhole) {
+    const int pages = 3;
+    auto s = open(makeLinesPdf(tmp, pages));
+    // A text element on the first page, edited in memory (unsaved): its words are searched too
+    auto text = std::make_unique<Text>();
+    text->setText("Turbine blades, two turbines and a tur- bine");
+    text->move(60, 400);
+    const Text* raw = text.get();
+    auto page = s->getDocument()->getPage(0);
+    Layer* layer = page->getSelectedLayer();
+    s->getDocument()->lock();
+    layer->addElement(std::move(text));
+    s->getDocument()->unlock();
+    s->getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+
+    struct Case {
+        const char* query;
+        int onFirst;   ///< hits on the first page
+        int perPage;   ///< on each other page
+    };
+    for (const Case& c: {Case{"evry", 2, 2},        // every (letters left out)
+                         Case{"hyphnated", 1, 1},   // hyphen- ated: one word
+                         Case{"frst", 1, 1},        // ﬁrst: a ligature
+                         Case{"pge", 4, 4},         // page, page, PAGE, page
+                         Case{"brokne", 1, 1},      // broken (swapped letters)
+                         Case{"tbine", 3, 0},       // the text element: Turbine, turbines, tur- bine (read as a
+                                                    // word broken at a line end)
+                         Case{"evry | tbine", 5, 2},
+                         Case{"evry 'the", 2 + 4, 2 + 4},  // with a substring: "the" in The, the, the, The
+                         Case{"tb", 0, 0}}) {         // too short: a substring, as before
+        s->search().setQuery(QString::fromUtf8(c.query), false, true);
+        ASSERT_TRUE(waitForCounts(s->search())) << c.query;
+        EXPECT_EQ(s->search().countOn(0), c.onFirst) << c.query;
+        EXPECT_EQ(s->search().countOn(1), c.perPage) << c.query;
+        const auto hits = placedHits(s->search());
+        EXPECT_EQ(static_cast<int>(hits.size()), s->search().hitCount()) << c.query << ": marked as counted";
+    }
+    EXPECT_EQ(s->search().countCorrections(), 0) << "no page was marked differently than counted";
+
+    // The whole word is marked: as the plain search marks the word itself
+    auto rects = [&](const char* query, bool fuzzy) {
+        s->search().setQuery(QString::fromUtf8(query), false, fuzzy);
+        std::vector<QRectF> out;
+        for (const auto& h: placedHits(s->search())) {
+            out.push_back(h.rect);
+        }
+        return out;
+    };
+    const auto fuzzyEvery = rects("evry", true);
+    ASSERT_EQ(fuzzyEvery.size(), static_cast<size_t>(2 * pages));
+    EXPECT_EQ(fuzzyEvery, rects("every", false));
+    EXPECT_EQ(rects("hyphnated", true), rects("hyphenated", false)) << "on both lines";
+    EXPECT_EQ(rects("frst", true), rects("first", false));
+
+    // An edit changes the words of its page: counted again
+    s->search().setQuery(QStringLiteral("tbine"), false, true);
+    ASSERT_TRUE(waitForCounts(s->search()));
+    EXPECT_EQ(s->search().hitCount(), 3);
+    s->getUndoRedoHandler()->undo();
+    ASSERT_TRUE(waitFor([&] { return s->search().hitCount() == 0; }));
+}
+
 // The PDF text is read in the background, from the current page outwards, and the counts grow meanwhile.
 TEST_F(DocumentSearchTest, pdfTextIsReadInTheBackground) {
     const int pages = 40;
@@ -497,6 +562,20 @@ TEST_F(DocumentSearchTest, benchSearch) {
         std::cout << "  typed \"" << q.toStdString() << "\": " << scan << " ms, " << s.search().hitCount()
                   << " hits on " << s.search().pages().size() << " pages\n";
     }
+    // The same with the fuzzy search: fuzzy terms match words (the first one prepares the words of the pages)
+    for (const QString& q: {QStringLiteral("pgfkeys"), QStringLiteral("pgfkeys"), QStringLiteral("pgfkyes"),
+                            QStringLiteral("nde"), QStringLiteral("tikz !node"), QStringLiteral("pgfkeys | shdng")}) {
+        QElapsedTimer k;
+        k.start();
+        s.search().setQuery(q, true, true);
+        const double scan = k.nsecsElapsed() / 1e6;
+        std::cout << "  fuzzy \"" << q.toStdString() << "\": " << scan << " ms, " << s.search().hitCount()
+                  << " hits on " << s.search().pages().size() << " pages\n";
+        s.search().setQuery(QString(), false);
+    }
+    std::cout << "  vocabularies of the pages " << index.vocabularyBytes() / 1024 << " KiB, dictionary "
+              << words::dictionarySize() << " words, " << words::dictionaryBytes() / 1024 << " KiB\n";
+    s.search().setQuery("pgfkeys", false);
     // Marks: the pages with hits, placed one after the other (the pages in view are a handful)
     QElapsedTimer m;
     m.start();
@@ -512,9 +591,12 @@ TEST_F(DocumentSearchTest, benchSearch) {
               << s.search().countCorrections() << " pages marked differently than counted; kept layouts "
               << index.layoutBytes() / 1024 << " KiB\n";
     EXPECT_EQ(s.search().countCorrections(), 0);
-    // Many hits on every page (line breaks, hyphens, ligatures of the manual's text): the marks as counted
-    for (const QString& q: {QStringLiteral("the"), QStringLiteral("fi"), QStringLiteral("node")}) {
-        s.search().setQuery(q, false);
+    // Many hits on every page (line breaks, hyphens, ligatures of the manual's text): the marks as counted, also of
+    // fuzzy terms (words)
+    for (const QString& q: {QStringLiteral("the"), QStringLiteral("fi"), QStringLiteral("node"), QStringLiteral("~nde"),
+                            QStringLiteral("~pgfkyes | the")}) {
+        const bool fuzzy = q.startsWith(u'~');
+        s.search().setQuery(fuzzy ? q.mid(1) : q, false, fuzzy);
         int counted = 0, marked = 0, n = 0;
         for (const auto& h: std::vector<DocumentSearch::PageHits>(s.search().pages())) {
             counted += h.count;

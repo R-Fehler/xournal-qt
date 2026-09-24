@@ -4,6 +4,8 @@
 
 #include <QList>
 
+#include "WordMatch.h"
+
 namespace xqt::textmatch {
 
 namespace {
@@ -92,6 +94,18 @@ void scan(QStringView t, QStringView q, unsigned bounds, F&& f) {
     if (q.isEmpty()) {
         return;
     }
+    if (bounds & Fuzzy) {
+        // Word by word: a hit is a whole word that matches
+        const wordmatch::Rule rule(q, typosOf(bounds));
+        QString word;
+        qsizetype j = 0;
+        for (;;) {
+            const qsizetype start = detail::nextWord(t, j, word);
+            if (start < 0 || (rule.match(word) != wordmatch::None && !f(start, j))) {
+                return;
+            }
+        }
+    }
     const char16_t q0 = q[0].unicode();
     const char16_t upper = q0 >= u'a' && q0 <= u'z' ? static_cast<char16_t>(q0 - 32) : q0;
     const bool ligatureStart = q0 == u'f' || q0 == u's';
@@ -113,6 +127,38 @@ void scan(QStringView t, QStringView q, unsigned bounds, F&& f) {
     }
 }
 }  // namespace
+
+namespace detail {
+qsizetype nextWord(QStringView t, qsizetype& j, QString& word) {
+    word.clear();
+    const qsizetype n = t.size();
+    while (j < n && !wordChar(t[j])) {
+        ++j;
+    }
+    if (j >= n) {
+        return -1;
+    }
+    const qsizetype start = j;
+    while (j < n) {
+        const char16_t c = t[j].unicode();
+        if (wordChar(t[j])) {
+            if (const QStringView letters = ligature(c); !letters.isEmpty()) {
+                word += letters;
+            } else {
+                word += QChar(fold(c));
+            }
+            ++j;
+        } else if (c == u'-' && lineBreakHyphen(t, j)) {
+            j += 2;  // "hyphen- ated": one word
+        } else if (c == 0x00AD && j + 1 < n && wordChar(t[j + 1])) {
+            ++j;  // a soft hyphen
+        } else {
+            break;
+        }
+    }
+    return start;
+}
+}  // namespace detail
 
 QString prepare(const QString& query) {
     const QString s = query.simplified();
@@ -211,7 +257,7 @@ QString encode(const std::vector<Term>& terms) {
         if (!out.isEmpty()) {
             out += QChar(0x1e);
         }
-        out += QChar(u'0' + static_cast<char16_t>(t.bounds & Word));
+        out += QChar(u'0' + static_cast<char16_t>(t.bounds & (Word | Fuzzy | FuzzyTypos)));
         out += t.text;
     }
     return out;
@@ -220,7 +266,7 @@ QString encode(const std::vector<Term>& terms) {
 std::vector<Term> decode(QStringView encoded) {
     std::vector<Term> out;
     for (const QStringView part: encoded.split(QChar(0x1e))) {
-        if (part.size() >= 2 && part[0] >= u'0' && part[0] <= u'3') {
+        if (part.size() >= 2 && part[0] >= u'0' && part[0].unicode() <= u'0' + (Word | Fuzzy | FuzzyTypos)) {
             out.push_back({part.sliced(1).toString(), static_cast<unsigned>(part[0].unicode() - u'0')});
         }
     }

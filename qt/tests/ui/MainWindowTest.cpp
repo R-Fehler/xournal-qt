@@ -10,6 +10,8 @@
 #include <future>
 #include <memory>
 
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <QCoreApplication>
 #include <cmath>
 
@@ -66,6 +68,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/FuzzyQuery.h"
 #include "session/HybridPdf.h"
 #include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
@@ -1171,6 +1174,68 @@ TEST_F(HomeScreenTest, theLibrarySearchHasAFuzzyToggle) {
     until([&] { return !hint->isVisible(); });
     EXPECT_FALSE(hint->isVisible());
     library->setSearchQuery("");
+}
+
+// The fuzzy search's help: a long press on the "Fuzzy" button (which does not toggle it then), a right click, or the
+// help button in Settings → Search; it tells the typo tolerance as it is set, and closes with Escape.
+TEST_F(HomeScreenTest, theFuzzySearchButtonOpensItsHelp) {
+    auto* button = find<QQuickItem>("librarySearchFuzzy");
+    ASSERT_NE(button, nullptr);
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    QObject* help = find("librarySearchFuzzyHelp");
+    ASSERT_NE(help, nullptr);
+
+    // A long press
+    const QPoint center = button->mapToScene(QPointF(button->width() / 2, button->height() / 2)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, center);
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, center);
+    ASSERT_TRUE(waitOpened(help, true)) << "opened by a long press";
+    EXPECT_FALSE(library->fuzzySearch()) << "not toggled by it";
+    auto* rows = findItem("fuzzyHelpRows");
+    ASSERT_NE(rows, nullptr);
+    EXPECT_EQ(rows->property("count").toInt(), 11) << "the syntax, a row each";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(800);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    settings->set("fuzzyTypos", 0);
+    EXPECT_TRUE(help->property("typoText").toString().contains("not tolerated"));
+    settings->set("fuzzyTypos", 1);
+    EXPECT_TRUE(help->property("typoText").toString().contains("5 or more"));
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(help, false));
+
+    // A right click
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, center);
+    ASSERT_TRUE(waitOpened(help, true)) << "opened by a right click";
+    EXPECT_FALSE(library->fuzzySearch());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(help, false));
+    click(button);
+    EXPECT_TRUE(library->fuzzySearch()) << "a tap still toggles";
+    EXPECT_FALSE(help->property("visible").toBool());
+    library->setFuzzySearch(false);
+
+    // From Settings → Search
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("searchTab"));
+    auto* helpButton = findItem("fuzzyHelpButton");
+    ASSERT_NE(helpButton, nullptr);
+    until([&] { return helpButton->isVisible(); });
+    click(helpButton);
+    QObject* fromSettings = find("settingsFuzzyHelp");
+    ASSERT_NE(fromSettings, nullptr);
+    ASSERT_TRUE(waitOpened(fromSettings, true));
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(fromSettings, false));
+    EXPECT_TRUE(sheet->property("visible").toBool()) << "back in the settings";
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
 }
 
 // The library has a button for the settings (no tool bar there, and not everybody has a keyboard at hand).
@@ -4190,6 +4255,46 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     EXPECT_TRUE(controller->isHybrid());
     EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(pdf.toStdString())));
     EXPECT_TRUE(QFile::exists(dir.filePath("lecture.original.pdf")));
+}
+
+// Settings → Search: the fuzzy search's toggle (the same setting as the search fields' button, both ways) and its typo
+// tolerance, which the next query takes.
+TEST_F(MainWindowTest, settingsSearchTabSetsTheFuzzySearch) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    settings->set("fuzzyTypos", 1);
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("searchTab"));
+    auto* toggle = findItem("fuzzySearchSwitch");
+    ASSERT_NE(toggle, nullptr);
+    until([&] { return toggle->isVisible(); });
+    EXPECT_FALSE(toggle->property("checked").toBool());
+    click(toggle);
+    EXPECT_TRUE(library->fuzzySearch()) << "the search fields' setting";
+    library->setFuzzySearch(false);  // (as the button in a search field does)
+    until([&] { return !toggle->property("checked").toBool(); });
+    EXPECT_FALSE(toggle->property("checked").toBool()) << "and back";
+
+    auto* combo = findItem("fuzzyTyposCombo");
+    ASSERT_NE(combo, nullptr);
+    EXPECT_EQ(combo->property("currentIndex").toInt(), 1) << "one typo by default";
+    combo->forceActiveFocus();
+    key(Qt::Key_Down);
+    until([&] { return settings->get("fuzzyTypos").toInt() == 2; });
+    EXPECT_EQ(settings->get("fuzzyTypos").toInt(), 2);
+    EXPECT_EQ(xqt::FuzzyQuery::typoTolerance(), 2);
+    const auto terms = xqt::FuzzyQuery::textTerms("trasnfromation", true);
+    EXPECT_EQ(xqt::textmatch::count(u"the transformation", terms), 1) << "two typos in a long word";
+    settings->set("fuzzyTypos", 0);
+    until([&] { return combo->property("currentIndex").toInt() == 0; });
+    EXPECT_EQ(combo->property("currentIndex").toInt(), 0);
+    EXPECT_EQ(xqt::FuzzyQuery::typoTolerance(), 0);
+    settings->set("fuzzyTypos", 1);
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
 }
 
 // A hybrid PDF whose ink another app moved: the window says so and offers to keep ours or import theirs.

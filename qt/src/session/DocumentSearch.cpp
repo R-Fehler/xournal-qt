@@ -72,6 +72,7 @@ void DocumentSearch::setQuery(const QString& query, bool jump, bool fuzzy) {
     fuzzyMode = fuzzy && !query.isEmpty();
     parsed = fuzzyMode ? FuzzyQuery(query) : FuzzyQuery();
     terms = FuzzyQuery::textTerms(query, fuzzyMode);
+    prepareTerms();
     found.clear();
     ++generation;
     places.clear();
@@ -103,12 +104,29 @@ void DocumentSearch::setQuery(const QString& query, bool jump, bool fuzzy) {
     }
 }
 
+void DocumentSearch::prepareTerms() {
+    std::vector<textmatch::Term> all;
+    if (parsed.isValid()) {
+        for (const FuzzyQuery::Term& t: parsed.terms()) {
+            all.push_back(t.textTerm());
+        }
+    }
+    const auto fuzzy = [](const std::vector<textmatch::Term>& list) {
+        return std::any_of(list.begin(), list.end(), [](const auto& t) { return (t.bounds & textmatch::Fuzzy) != 0; });
+    };
+    if (fuzzy(terms) || fuzzy(all)) {
+        index.prepareWords();  // (then the words are matched at once)
+    }
+    counted = words::Terms(terms);
+    queryTerms = words::Terms(std::move(all));
+}
+
 void DocumentSearch::recountAll() {
     counts.assign(index.pageCount(), 0);
     found.assign(parsed.isValid() ? counts.size() : 0, {});
     if (!terms.empty()) {
         for (size_t i = 0; i < counts.size(); ++i) {
-            counts[i] = index.count(i, terms);
+            counts[i] = index.count(i, counted);
             if (parsed.isValid()) {
                 found[i] = termsOn(i);
             }
@@ -133,7 +151,7 @@ void DocumentSearch::recount(const std::vector<size_t>& pages) {
         if (page >= counts.size()) {
             continue;
         }
-        counts[page] = index.count(page, terms);
+        counts[page] = index.count(page, counted);
         if (parsed.isValid()) {
             found[page] = termsOn(page);
         }
@@ -388,7 +406,7 @@ void DocumentSearch::jumpToHit(size_t page, int hit) {
 void DocumentSearch::pageMoved(size_t page, int delta) {
     if (delta > 0) {
         counts.insert(counts.begin() + static_cast<std::ptrdiff_t>(std::min(page, counts.size())),
-                      terms.empty() ? 0 : index.count(page, terms));
+                      terms.empty() ? 0 : index.count(page, counted));
         if (parsed.isValid()) {
             found.insert(found.begin() + static_cast<std::ptrdiff_t>(std::min(page, found.size())), termsOn(page));
         }
@@ -430,7 +448,7 @@ void DocumentSearch::pageMoved(size_t page, int delta) {
 std::vector<char> DocumentSearch::termsOn(size_t page) {
     std::vector<char> on(parsed.terms().size(), 0);
     for (size_t t = 0; t < on.size(); ++t) {
-        on[t] = index.contains(page, parsed.terms()[t].textTerm()) ? 1 : 0;
+        on[t] = index.contains(page, queryTerms, t) ? 1 : 0;
     }
     return on;
 }

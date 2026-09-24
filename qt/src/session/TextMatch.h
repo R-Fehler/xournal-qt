@@ -13,7 +13,9 @@
  *  - matches do not overlap; a '\n' is never matched (the pieces of a page's text are joined with it: a hit does not
  *    run from one text box into the next).
  * The fuzzy search (FuzzyQuery.h) matches text through it too: a term can ask for a match at the start or the end of
- * a word (Bounds), and several terms are found at once (the hits of all of them, in order, without overlaps).
+ * a word (Bounds), and several terms are found at once (the hits of all of them, in order, without overlaps). A fuzzy
+ * term (Bounds::Fuzzy) matches whole words, word by word (WordMatch.h): the words of the text are read by words(),
+ * and a hit is a word that matches, from its first to its last character.
  *
  * @license GNU GPLv2 or later
  */
@@ -47,7 +49,15 @@ enum Bounds : unsigned {
     WordStart = 1,          ///< at the start of a word (the character before it is none of a word)
     WordEnd = 2,            ///< at the end of a word
     Word = WordStart | WordEnd,  ///< a whole word (or words)
+    /// The words that match the term fuzzily (WordMatch.h: its letters in this order, or with a typo); the hit is the
+    /// whole word. The term is one word (letters and digits only). The typos it tolerates are in the bits of
+    /// FuzzyTypos (typosOf()).
+    Fuzzy = 4,
+    FuzzyTypos = 8 | 16,
 };
+/// The typo tolerance of a fuzzy term (WordMatch.h: 0 none, 1, 2), and its bits.
+inline int typosOf(unsigned bounds) { return static_cast<int>((bounds & FuzzyTypos) >> 3); }
+inline unsigned typoBits(int typos) { return (static_cast<unsigned>(typos) << 3) & FuzzyTypos; }
 /// The matches of `query` (prepare()d) in `text`, in order.
 std::vector<Span> find(QStringView text, QStringView query, unsigned bounds = Anywhere);
 /// Their number (without collecting them).
@@ -71,6 +81,12 @@ std::vector<Span> merged(std::vector<Span> spans);
 QString encode(const std::vector<Term>& terms);
 std::vector<Term> decode(QStringView encoded);
 
+/// Calls f(start, end, word) for each word of `text`, in order: a run of letters and digits, case folded,
+/// ligatures written out, a word broken at a line end ("hyphen- ated") and a soft hyphen in it joined; [start, end) is
+/// where it is in the text. `word` is valid during the call. The words the fuzzy search matches (a hit is one of them).
+template <typename F>
+void words(QStringView text, F&& f);
+
 /// A text simplified (whitespace runs to one space, trimmed: QString::simplified), with where each of its characters
 /// came from: `origin[i]` is the index in the original text of character i (and origin[size] the end of the last one).
 struct Simplified {
@@ -78,5 +94,23 @@ struct Simplified {
     std::vector<qsizetype> origin;
 };
 Simplified simplify(QStringView original);
+
+namespace detail {
+/// words(): the next word from `j` on into `word` (cleared first); returns its start (-1: none), `j` is after it.
+qsizetype nextWord(QStringView text, qsizetype& j, QString& word);
+}  // namespace detail
+
+template <typename F>
+void words(QStringView text, F&& f) {
+    QString word;
+    qsizetype j = 0;
+    for (;;) {
+        const qsizetype start = detail::nextWord(text, j, word);
+        if (start < 0) {
+            return;
+        }
+        f(start, j, QStringView(word));
+    }
+}
 
 }  // namespace xqt::textmatch

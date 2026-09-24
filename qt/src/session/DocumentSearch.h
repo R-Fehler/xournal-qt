@@ -115,6 +115,7 @@ Q_SIGNALS:
     void finished();
 
 private:
+    void prepareTerms();
     void recount(const std::vector<size_t>& pages);
     void recountAll();
     void rebuildHitPages();
@@ -135,6 +136,8 @@ private:
     bool fuzzyMode = false;
     FuzzyQuery parsed;                    ///< the query, when fuzzy
     std::vector<textmatch::Term> terms;   ///< what is counted and marked (empty: nothing searched)
+    words::Terms counted;                 ///< `terms`, prepared for counting
+    words::Terms queryTerms;              ///< a valid fuzzy query: all its terms (textTerm()), prepared
     std::vector<int> counts;        ///< per page
     std::vector<std::vector<char>> found;  ///< a valid fuzzy query: per page, which of its terms are on it
     std::vector<PageHits> withHits;

@@ -31,6 +31,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <QCborMap>
@@ -43,6 +44,7 @@
 #include "filesystem.h"
 #include "DocumentFiles.h"
 #include "LibraryCache.h"
+#include "session/Vocabulary.h"
 
 class Document;
 class QThreadPool;
@@ -164,6 +166,8 @@ public:
         std::vector<BlockHits> blockHits;  ///< a Markdown file: the passages with matches, in order
         int nameScore = 0;               ///< fuzzy search: fzf's score of the name and folder path (0: not in them)
         std::vector<int> nameMarks;      ///< fuzzy search: the characters of the name that matched
+        bool fuzzyOnly = false;          ///< fuzzy search: its hits in the text are all words that only match
+                                         ///< fuzzily (WordMatch.h: ranked after documents with exact ones)
     };
     /// The text of the pages of this PDF read before (by PDF page, 0-based), if it was read from the file as it is now
     /// (same size and time): an open document takes it for its search instead of reading it again.
@@ -181,9 +185,16 @@ public:
     /// the expression holds with each term found in its name or folder path (fzf's matching, relative to the library)
     /// or in its text (TextMatch). Its count is the hits of the terms that are not negated; its pages (passages of a
     /// Markdown file) are those with hits on which the expression holds, a term counting as found on a page when the
-    /// page, the name or the folder path has it - or, if it holds on none, all pages with hits. Ordered by the score
-    /// of the name, then the count.
+    /// page, the name or the folder path has it - or, if it holds on none, all pages with hits. Fuzzy terms match
+    /// words (WordMatch.h), counted from the vocabularies of the pages (made at the first such search, kept until the
+    /// document changes). Ordered by the score of the name, then documents with exact hits in the text before those
+    /// whose words only match fuzzily, then the count.
     std::vector<Hit> search(const FuzzyQuery& query) const;
+    /// Memory of the kept vocabularies (tests, measurements).
+    size_t vocabularyBytes() const;
+    /// Make the vocabularies of all documents in the background (the fuzzy search is on: its first search does not
+    /// wait for them). Documents that have them are skipped.
+    void prepareWords();
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
 
@@ -224,6 +235,12 @@ private:
         bool upToDate(const DocumentItem& item) const;
     };
     using EntryPtr = std::shared_ptr<const Entry>;
+    /// The vocabularies of an entry: per passage (a Markdown or text file), else per page (Vocabulary.h).
+    struct EntryWords {
+        std::vector<words::Vocabulary> units;
+    };
+    /// Of these entries: kept ones, the others made now (then only these are kept).
+    std::vector<std::shared_ptr<const EntryWords>> wordsOf(const std::vector<EntryPtr>& entries) const;
     /// The documents directly in one folder, as in its packs.
     struct Folder {
         bool loaded = false;                   ///< its packs were read
@@ -266,6 +283,10 @@ private:
     std::unique_ptr<WriteScheduler> scheduler;
     mutable std::mutex mtx;
     std::mutex writeMtx;
+    mutable std::mutex wordsMtx;
+    std::atomic<bool> wordsQueued{false};
+    /// The vocabularies of the entries searched last (with the entry, so an entry gone is not taken for a new one)
+    mutable std::unordered_map<const Entry*, std::pair<EntryPtr, std::shared_ptr<const EntryWords>>> wordCache;
     std::map<fs::path, Folder> folders;  ///< by folder
     bool firstRun = true;                ///< (the worker's) the stored packs of all folders are read once
     std::atomic<quint64> generation{0};

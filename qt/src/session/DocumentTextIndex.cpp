@@ -162,6 +162,86 @@ std::vector<QRectF> elementRects(const ElementText& piece, qsizetype start, qsiz
     return out;
 }
 
+// --- a reader of the text of PDF pages -------------------------------------------------------------------------
+
+namespace {
+/// The text of a poppler page and the box of each of its characters
+PdfPageLayout layoutOf(PopplerPage* page) {
+    char* raw = poppler_page_get_text(page);
+    PopplerRectangle* rects = nullptr;
+    guint n = 0;
+    poppler_page_get_text_layout(page, &rects, &n);  // (the text of the page is built once for both)
+    std::vector<double> boxes;
+    boxes.reserve(4 * n);
+    for (guint i = 0; i < n; ++i) {
+        boxes.insert(boxes.end(), {rects[i].x1, rects[i].y1, rects[i].x2, rects[i].y2});
+    }
+    g_free(rects);
+    PdfPageLayout l = PdfPageLayout::from(raw ? raw : "", boxes.data(), n);
+    g_free(raw);
+    return l;
+}
+
+PopplerDocument* openPdf(const fs::path& file) {
+    gchar* uri = g_filename_to_uri(file.c_str(), nullptr, nullptr);
+    GError* error = nullptr;
+    PopplerDocument* doc = uri ? poppler_document_new_from_file(uri, nullptr, &error) : nullptr;
+    g_free(uri);
+    if (error) {
+        g_error_free(error);
+    }
+    return doc;
+}
+}  // namespace
+
+PdfLayoutReader::PdfLayoutReader(fs::path pdf): file(std::move(pdf)) {}
+
+PdfLayoutReader::~PdfLayoutReader() {
+    if (doc) {
+        g_object_unref(doc);
+    }
+}
+
+PdfPageLayout PdfLayoutReader::layout(int nr) {
+    if (!doc && !failed) {
+        doc = openPdf(file);
+        failed = !doc;
+    }
+    if (!doc || nr < 0 || nr >= poppler_document_get_n_pages(doc)) {
+        return {};
+    }
+    PopplerPage* page = poppler_document_get_page(doc, nr);
+    if (!page) {
+        return {};
+    }
+    PdfPageLayout l = layoutOf(page);
+    g_object_unref(page);
+    return l;
+}
+
+std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms) {
+    std::vector<QRectF> out;
+    if (terms.empty()) {
+        return out;
+    }
+    if (pdf && page.getBackgroundType().isPdfPage()) {
+        const PdfPageLayout layout = pdf->layout(static_cast<int>(page.getPdfPageNr()));
+        for (const auto& m: textmatch::find(layout.text, terms)) {
+            const auto rects = layout.rects(m.start, m.end);
+            out.insert(out.end(), rects.begin(), rects.end());
+        }
+    }
+    for (const ElementText& piece: elementTexts(page)) {
+        const auto s = textmatch::simplify(piece.shown);
+        for (const auto& m: textmatch::find(s.text, terms)) {
+            const auto rects = elementRects(piece, s.origin[static_cast<size_t>(m.start)],
+                                            s.origin[static_cast<size_t>(m.end - 1)] + 1);
+            out.insert(out.end(), rects.begin(), rects.end());
+        }
+    }
+    return out;
+}
+
 // --- the worker ------------------------------------------------------------------------------------------------
 
 struct DocumentTextIndex::Worker {
@@ -192,13 +272,7 @@ struct DocumentTextIndex::Worker {
     }
     bool open() {
         if (!doc && !openFailed) {
-            gchar* uri = g_filename_to_uri(file.c_str(), nullptr, nullptr);
-            GError* error = nullptr;
-            doc = uri ? poppler_document_new_from_file(uri, nullptr, &error) : nullptr;
-            g_free(uri);
-            if (error) {
-                g_error_free(error);
-            }
+            doc = openPdf(file);
             openFailed = !doc;  // (e.g. with a password: its text is not searched)
         }
         return doc != nullptr;
@@ -273,22 +347,13 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
         if (w->open() && nr < poppler_document_get_n_pages(w->doc)) {
             PopplerPage* page = poppler_document_get_page(w->doc, nr);
             if (page) {
-                char* raw = poppler_page_get_text(page);
                 if (layout) {
-                    PopplerRectangle* rects = nullptr;
-                    guint n = 0;
-                    poppler_page_get_text_layout(page, &rects, &n);  // (the text of the page is built once for both)
-                    std::vector<double> boxes;
-                    boxes.reserve(4 * n);
-                    for (guint i = 0; i < n; ++i) {
-                        boxes.insert(boxes.end(), {rects[i].x1, rects[i].y1, rects[i].x2, rects[i].y2});
-                    }
-                    g_free(rects);
-                    pageLayout = std::make_shared<PdfPageLayout>(PdfPageLayout::from(raw ? raw : "", boxes.data(), n));
+                    pageLayout = std::make_shared<PdfPageLayout>(layoutOf(page));
                 } else {
+                    char* raw = poppler_page_get_text(page);
                     text = QString::fromUtf8(raw ? raw : "").simplified();
+                    g_free(raw);
                 }
-                g_free(raw);
                 g_object_unref(page);
             }
         }
@@ -366,6 +431,7 @@ void DocumentTextIndex::rebuild() {
     if (!worker || file != pdf || pdfText.size() != pdfPages) {
         pdf = file;
         pdfText.assign(pdfPages, QString());
+        pdfWords.assign(pdfPages, nullptr);
         pdfKnown.assign(pdfPages, 0);
         layouts.clear();
         if (worker) {
@@ -413,7 +479,10 @@ void DocumentTextIndex::refresh(size_t index) {
             joined += piece.shown.simplified();
         }
     }
-    page.elements = std::move(joined);
+    if (joined != page.elements) {
+        page.elements = std::move(joined);
+        page.words.reset();
+    }
     page.dirty = false;
     if (pdfNr != page.pdf) {
         page.pdf = pdfNr;
@@ -448,31 +517,72 @@ int DocumentTextIndex::count(size_t page, QStringView query) {
 }
 
 int DocumentTextIndex::count(size_t page, const std::vector<textmatch::Term>& terms) {
+    return terms.empty() ? 0 : count(page, words::Terms(terms));
+}
+
+int DocumentTextIndex::count(size_t page, const words::Terms& terms) {
     if (page >= pages.size() || terms.empty()) {
         return 0;
     }
     if (pages[page].dirty) {
         refresh(page);
     }
-    const Page& p = pages[page];
-    int n = textmatch::count(p.elements, terms);
-    if (p.pdf >= 0 && pdfKnown[static_cast<size_t>(p.pdf)]) {
-        n += textmatch::count(pdfText[static_cast<size_t>(p.pdf)], terms);
+    const bool fuzzy = terms.fuzzy();
+    const int nr = pages[page].pdf;
+    int n = terms.count({pages[page].elements}, fuzzy ? elementWords(page) : nullptr);
+    if (nr >= 0 && pdfKnown[static_cast<size_t>(nr)]) {
+        n += terms.count({pdfText[static_cast<size_t>(nr)]}, fuzzy ? pdfWordsOf(nr) : nullptr);
     }
     return n;
 }
 
 bool DocumentTextIndex::contains(size_t page, const textmatch::Term& term) {
+    return contains(page, words::Terms({term}), 0);
+}
+
+bool DocumentTextIndex::contains(size_t page, const words::Terms& terms, size_t i) {
     if (page >= pages.size()) {
         return false;
     }
     if (pages[page].dirty) {
         refresh(page);
     }
-    const Page& p = pages[page];
-    return textmatch::contains(p.elements, term.text, term.bounds) ||
-           (p.pdf >= 0 && pdfKnown[static_cast<size_t>(p.pdf)] &&
-            textmatch::contains(pdfText[static_cast<size_t>(p.pdf)], term.text, term.bounds));
+    const bool fuzzy = terms.fuzzy();
+    const int nr = pages[page].pdf;
+    return terms.contains(i, {pages[page].elements}, fuzzy ? elementWords(page) : nullptr) ||
+           (nr >= 0 && pdfKnown[static_cast<size_t>(nr)] &&
+            terms.contains(i, {pdfText[static_cast<size_t>(nr)]}, fuzzy ? pdfWordsOf(nr) : nullptr));
+}
+
+void DocumentTextIndex::prepareWords() {
+    for (size_t i = 0; i < pages.size(); ++i) {
+        if (pages[i].dirty) {
+            refresh(i);
+        }
+        elementWords(i);
+    }
+    for (size_t nr = 0; nr < pdfText.size(); ++nr) {
+        if (pdfKnown[nr]) {
+            pdfWordsOf(static_cast<int>(nr));
+        }
+    }
+}
+
+const words::Vocabulary* DocumentTextIndex::elementWords(size_t page) {
+    Page& p = pages[page];
+    if (!p.words) {
+        p.words = std::make_shared<const words::Vocabulary>(std::initializer_list<QStringView>{p.elements});
+    }
+    return p.words.get();
+}
+
+const words::Vocabulary* DocumentTextIndex::pdfWordsOf(int nr) {
+    auto& w = pdfWords[static_cast<size_t>(nr)];
+    if (!w) {
+        w = std::make_shared<const words::Vocabulary>(
+                std::initializer_list<QStringView>{pdfText[static_cast<size_t>(nr)]});
+    }
+    return w.get();
 }
 
 std::map<int, QString> DocumentTextIndex::pdfTexts() const {
@@ -535,6 +645,7 @@ void DocumentTextIndex::setPdfText(int nr, QString text, std::vector<size_t>& ch
         return;
     }
     pdfText[static_cast<size_t>(nr)] = std::move(text);
+    pdfWords[static_cast<size_t>(nr)].reset();
     known = 1;
     for (size_t i = 0; i < pages.size(); ++i) {
         if (pages[i].pdf == nr) {
@@ -617,6 +728,17 @@ size_t DocumentTextIndex::textBytes() const {
         bytes += sizeof(Page) + static_cast<size_t>(p.elements.capacity()) * 2;
     }
     return bytes + pdfKnown.size();
+}
+
+size_t DocumentTextIndex::vocabularyBytes() const {
+    size_t bytes = 0;
+    for (const auto& w: pdfWords) {
+        bytes += w ? w->bytes() : 0;
+    }
+    for (const Page& p: pages) {
+        bytes += p.words ? p.words->bytes() : 0;
+    }
+    return bytes;
 }
 
 size_t DocumentTextIndex::layoutBytes() const {

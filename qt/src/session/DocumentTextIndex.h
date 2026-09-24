@@ -36,12 +36,14 @@
 #include <QTimer>
 
 #include "TextMatch.h"
+#include "Vocabulary.h"
 
 #include "model/DocumentListener.h"
 #include "filesystem.h"
 
 class Text;
 class XojPage;
+struct _PopplerDocument;
 
 namespace xqt {
 
@@ -56,6 +58,28 @@ struct PdfPageLayout {
     /// Read from a poppler page's text (UTF-8) and the box of each of its characters (x1, y1, x2, y2 each).
     static PdfPageLayout from(const char* utf8, const double* boxes, size_t count);
 };
+
+/// The text and character boxes of the pages of a PDF file, read with a poppler instance of its own (the pictures of
+/// the library's pages with hits mark hits where the search of an open document marks them). One thread at a time.
+class PdfLayoutReader {
+public:
+    explicit PdfLayoutReader(fs::path pdf);
+    ~PdfLayoutReader();
+    PdfLayoutReader(const PdfLayoutReader&) = delete;
+    PdfLayoutReader& operator=(const PdfLayoutReader&) = delete;
+    /// Of a page (0-based); empty if it cannot be read.
+    PdfPageLayout layout(int pdfPage);
+
+private:
+    fs::path file;
+    ::_PopplerDocument* doc = nullptr;
+    bool failed = false;
+};
+
+/// Where the matches of `terms` (TextMatch.h) are on a page of a document: in its PDF text (`pdf` reads it; may be
+/// null) and in the texts of its text elements, as the search of an open document places them. The caller holds the
+/// document lock (shared).
+std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms);
 
 /// A piece of text shown by a text element of a page: a plain text whole, a Markdown box per text of its layout.
 struct ElementText {
@@ -100,8 +124,16 @@ public:
     int count(size_t page, QStringView query);
     /// Hits of several terms (TextMatch.h: overlapping hits of different terms count once).
     int count(size_t page, const std::vector<textmatch::Term>& terms);
+    /// The same, for terms prepared once for all pages: fuzzy terms (words) are counted from the vocabularies of
+    /// the page's texts (Vocabulary.h, made when first needed and kept until the text changes).
+    int count(size_t page, const words::Terms& terms);
+    /// Make the vocabularies of all pages whose text is known (before fuzzy terms are prepared: their words are
+    /// matched at once then, not one by one).
+    void prepareWords();
     /// A term is on the page (in the text known so far).
     bool contains(size_t page, const textmatch::Term& term);
+    /// Term `i` of `terms` is on the page.
+    bool contains(size_t page, const words::Terms& terms, size_t i);
     /// The PDF page a page shows (-1: none).
     int pdfPageOf(size_t page) const { return page < pages.size() ? pages[page].pdf : -1; }
     /// The PDF text known by page number (for the library index when the document is saved).
@@ -112,8 +144,9 @@ public:
     /// the reading of text that is missing. The last LAYOUTS pages are kept.
     const PdfPageLayout* layout(int pdfPage, bool urgent = false);
     static constexpr size_t LAYOUTS = 48;
-    /// Memory of the kept text (bytes; tests, measurements).
+    /// Memory of the kept text (bytes; tests, measurements), and of the vocabularies of its pages.
     size_t textBytes() const;
+    size_t vocabularyBytes() const;
     size_t layoutBytes() const;
 
     /// The page the reader is at: missing text is read from there outwards.
@@ -143,7 +176,11 @@ private:
         int pdf = -1;       ///< the PDF page it shows
         QString elements;   ///< the texts of its text elements, simplified, joined by '\n'
         bool dirty = true;  ///< read it from the document again
+        std::shared_ptr<const words::Vocabulary> words;  ///< of `elements` (null: not made yet)
     };
+    /// The vocabularies of a page's texts (made if needed)
+    const words::Vocabulary* elementWords(size_t page);
+    const words::Vocabulary* pdfWordsOf(int pdfPage);
     struct Worker;
     void rebuild();
     void refresh(size_t page);
@@ -158,6 +195,7 @@ private:
     fs::path pdf;
     std::vector<Page> pages;
     std::vector<QString> pdfText;  ///< by PDF page
+    std::vector<std::shared_ptr<const words::Vocabulary>> pdfWords;  ///< by PDF page, of its text (null: not made)
     std::vector<char> pdfKnown;
     size_t unknownPages = 0;
     bool started = false;
