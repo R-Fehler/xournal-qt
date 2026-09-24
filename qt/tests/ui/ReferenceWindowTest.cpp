@@ -508,3 +508,40 @@ TEST_F(ReferenceWindowTest, theEditSwitchLetsThePenWriteInTheReference) {
     wait(50);
     EXPECT_EQ(elements(1), 1u);
 }
+
+TEST_F(ReferenceWindowTest, theGridOfTheReferenceShowsItsPagesInItsHalf) {
+    for (int i = 0; i < 7; ++i) {
+        tabs().session(1)->insertNewPage(1);
+    }
+    ref().showTab(1);
+    wait(100);
+    auto* gridButton = findItem("referenceGridButton");
+    ASSERT_NE(gridButton, nullptr);
+    click(gridButton);
+    auto* grid = findItem("referenceGrid");
+    ASSERT_NE(grid, nullptr);
+    EXPECT_TRUE(grid->isVisible());
+    EXPECT_EQ(sceneRect(grid), sceneRect(reference)) << "the grid takes the reference's half, not the notes'";
+    auto* gridView = findItem("referenceGridView");
+    until([&] { return gridView->property("count").toInt() == 8; });
+    EXPECT_EQ(gridView->property("count").toInt(), 8);
+    EXPECT_FALSE(findItem("pageGrid")->isVisible()) << "the notes' page grid stays closed";
+    EXPECT_EQ(qobject_cast<QAbstractItemModel*>(controller->pagesModel())->rowCount(), 1)
+            << "the page sidebar shows the notes";
+
+    // A tap on a page: the reference goes there, the grid closes
+    QQuickItem* cell = nullptr;
+    QMetaObject::invokeMethod(gridView, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, cell), Q_ARG(int, 2));
+    ASSERT_NE(cell, nullptr);
+    click(cell);
+    wait(200);
+    EXPECT_EQ(ref().pageNumber(), 3);
+    EXPECT_FALSE(grid->isVisible());
+    EXPECT_EQ(controller->pageNumber(), 1);
+
+    // The button closes it as well
+    click(gridButton);
+    EXPECT_TRUE(grid->isVisible());
+    click(gridButton);
+    EXPECT_FALSE(grid->isVisible());
+}

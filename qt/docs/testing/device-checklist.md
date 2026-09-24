@@ -750,3 +750,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       A stroke that begins on either side stays on that side across the divider. Off: for reading again. Each tab
       remembers it for its reference; a new reference, and the notes after "swap roles", start for reading. Save
       the reference from its own tab (or when closing it / quitting, which asks).
+- [ ] The grid button in the reference's pill: the pages of the reference fill its half (the notes and their page
+      sidebar stay as they are); scroll it with a finger and the touchpad; a tap on a page goes there and closes the
+      grid; the button closes it too. The page sidebar never shows the reference's pages.

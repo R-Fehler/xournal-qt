@@ -22,6 +22,7 @@
 #include <QRectF>
 #include <QString>
 
+#include <memory>
 #include <vector>
 
 class Settings;
@@ -30,6 +31,7 @@ namespace xqt {
 
 class CanvasView;
 class DocumentSession;
+class PagesModel;
 class TabManager;
 
 class ReferenceMode final: public QObject {
@@ -51,6 +53,10 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
+    /// The pages of the reference, for its page grid (xqt::PagesModel; the page sidebar keeps the main document's).
+    /// It follows the reference only while the grid is shown (pagesShown): its previews come first then.
+    Q_PROPERTY(QObject* pages READ pagesModel CONSTANT)
+    Q_PROPERTY(bool pagesShown READ pagesShown WRITE setPagesShown NOTIFY pagesShownChanged)
     /// The share of the width for the main document (the divider), 0.2 ... 0.8.
     Q_PROPERTY(double ratio READ ratio WRITE setRatio NOTIFY layoutChanged)
     /// The reference is on the left of the main document (else on the right).
@@ -63,6 +69,9 @@ public:
     ~ReferenceMode() override;
 
     QObject* view() const;
+    QObject* pagesModel() const;
+    bool pagesShown() const { return gridShown; }
+    void setPagesShown(bool shown);
     CanvasView* canvas() const;
     bool active() const;
     int tab() const;
@@ -113,6 +122,7 @@ Q_SIGNALS:
     void selectionChanged();
     void navigationChanged();
     void layoutChanged();
+    void pagesShownChanged();
     /// A link was tapped in the reference: uri (external) or page of the reference; rect in its canvas coordinates.
     void linkTapped(const QString& uri, int page, QRectF rect);
     /// An external link should be opened (AppController::openLink).
@@ -127,9 +137,11 @@ private:
     TabManager& tabs;
     Settings* settings;
     QPointer<CanvasView> shownView;
+    std::unique_ptr<PagesModel> pages;
     DocumentSession* shownSession = nullptr;
     std::vector<QMetaObject::Connection> connections;
     bool focus = false;
+    bool gridShown = false;
 };
 
 }  // namespace xqt

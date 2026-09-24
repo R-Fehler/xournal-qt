@@ -281,3 +281,28 @@ TEST(ReferenceMode, undoActsOnTheReferenceBeingWrittenInWhileItHasTheFocus) {
     EXPECT_EQ(elements(notes), 0u);
     EXPECT_EQ(elements(book), 1u);
 }
+
+TEST(ReferenceMode, theGridListsThePagesOfTheReferenceWhileItIsShown) {
+    ThreeTabs t;
+    for (int i = 0; i < 4; ++i) {
+        t.tabs().session(2)->insertNewPage(1);
+    }
+    auto* pages = qobject_cast<QAbstractItemModel*>(t.ref().pagesModel());
+    ASSERT_NE(pages, nullptr);
+    t.ref().setPagesShown(true);
+    EXPECT_FALSE(t.ref().pagesShown()) << "no reference: no grid";
+    t.ref().showTab(2);
+    t.ref().setPagesShown(true);
+    EXPECT_TRUE(t.ref().pagesShown());
+    EXPECT_EQ(pages->rowCount(), 5);
+    auto* mainPages = qobject_cast<QAbstractItemModel*>(t.c.pagesModel());
+    EXPECT_EQ(mainPages->rowCount(), 1) << "the page sidebar keeps the notes' pages";
+    t.ref().goToPage(3);
+    EXPECT_EQ(t.ref().pageNumber(), 4);
+    t.ref().setPagesShown(false);
+    EXPECT_EQ(pages->rowCount(), 0) << "it follows nothing while it is not shown";
+    // Closing the reference closes its grid
+    t.ref().setPagesShown(true);
+    t.ref().close();
+    EXPECT_FALSE(t.ref().pagesShown());
+}

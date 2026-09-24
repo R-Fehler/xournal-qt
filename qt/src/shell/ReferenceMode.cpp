@@ -6,6 +6,9 @@
 #include "control/settings/Settings.h"
 
 #include "CanvasView.h"
+#include "PageSketches.h"
+#include "PagesModel.h"
+#include "Thumbnails.h"
 #include "TabManager.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
@@ -17,7 +20,7 @@ const char* const CUSTOM = "xournalQt";  // our settings (in upstream's settings
 }  // namespace
 
 ReferenceMode::ReferenceMode(TabManager& tabs, Settings* settings, QObject* parent):
-        QObject(parent), tabs(tabs), settings(settings) {
+        QObject(parent), tabs(tabs), settings(settings), pages(std::make_unique<PagesModel>()) {
     connect(&tabs, &TabManager::currentTabChanged, this, &ReferenceMode::update);
     connect(&tabs, &TabManager::referencesChanged, this, &ReferenceMode::update);
     connect(&tabs, &TabManager::countChanged, this, &ReferenceMode::update);
@@ -31,6 +34,23 @@ ReferenceMode::~ReferenceMode() {
     for (auto& c: connections) {
         disconnect(c);
     }
+    pages->setSession(nullptr);
+}
+
+QObject* ReferenceMode::pagesModel() const { return pages.get(); }
+
+void ReferenceMode::setPagesShown(bool shown) {
+    shown = shown && shownSession;
+    if (shown == gridShown) {
+        return;
+    }
+    gridShown = shown;
+    pages->setSession(shown ? shownSession : nullptr);
+    if (!shown && tabs.currentSession()) {
+        // (the grid made the reference's previews come first; the main document's again)
+        PageSketches::instance().focus(ThumbnailProvider::idOf(tabs.currentSession()));
+    }
+    Q_EMIT pagesShownChanged();
 }
 
 void ReferenceMode::update() {
@@ -50,6 +70,11 @@ void ReferenceMode::update() {
     }
     shownView = v;
     shownSession = s;
+    if (!s) {
+        setPagesShown(false);
+    } else if (gridShown) {
+        pages->setSession(s);
+    }
     if (v && s) {
         connections.push_back(connect(s, &DocumentSession::currentPageChanged, this, &ReferenceMode::pageChanged));
         connections.push_back(connect(s, &DocumentSession::filePathChanged, this, &ReferenceMode::changed));

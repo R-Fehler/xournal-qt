@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtQuick.Window
 import XournalQt.Canvas
 
 Item {
@@ -104,6 +105,75 @@ Item {
             }
         }
 
+        // The pages of the reference, in its half (the page sidebar keeps showing the notes): a tap goes there
+        Rectangle {
+            id: referenceGrid
+            objectName: "referenceGrid"
+            anchors.fill: parent
+            visible: app.reference.pagesShown && split.active
+            color: "#eef0f3"
+            onVisibleChanged: if (visible) Qt.callLater(function() {
+                referenceGridView.positionViewAtIndex(Math.max(0, app.reference.pageNumber - 1), GridView.Center)
+            })
+            GridView {
+                id: referenceGridView
+                objectName: "referenceGridView"
+                anchors.fill: parent
+                anchors.margins: 8
+                anchors.bottomMargin: 76  // (the pill)
+                clip: true
+                model: app.reference.pages
+                readonly property int columns: Math.max(1, Math.round(width / 170))
+                readonly property real aspect: Math.min(2, Math.max(0.4, app.reference.pages.typicalAspect))
+                cellWidth: Math.floor(width / columns)
+                cellHeight: Math.round((cellWidth - 16) * aspect) + 32
+                boundsBehavior: Flickable.StopAtBounds
+                delegate: Item {
+                    id: refCell
+                    objectName: "referenceGridPage"
+                    required property int pageIndex
+                    required property string thumbnail
+                    required property string sketch
+                    required property bool current
+                    width: referenceGridView.cellWidth
+                    height: referenceGridView.cellHeight
+                    Rectangle {
+                        id: refFrame
+                        x: 8
+                        y: 6
+                        width: parent.width - 16
+                        height: parent.height - 32
+                        color: "#ffffff"
+                        border.width: refCell.current ? 3 : 1
+                        border.color: refCell.current ? Material.accentColor : "#c9ccd1"
+                        PagePicture {
+                            anchors.fill: parent
+                            anchors.margins: refFrame.border.width
+                            sketch: refCell.sketch
+                            thumbnail: refCell.thumbnail
+                            sourceWidth: Math.ceil(refFrame.width * Screen.devicePixelRatio / 128) * 128
+                        }
+                    }
+                    Label {
+                        anchors.top: refFrame.bottom
+                        anchors.topMargin: 3
+                        anchors.horizontalCenter: refFrame.horizontalCenter
+                        text: refCell.pageIndex + 1
+                        font.pixelSize: 12
+                        font.weight: refCell.current ? Font.DemiBold : Font.Normal
+                        color: "#5f6368"
+                    }
+                    TapHandler {
+                        onTapped: {
+                            app.reference.goToPage(refCell.pageIndex)
+                            app.reference.pagesShown = false
+                        }
+                    }
+                }
+                TouchpadMomentum { flickable: referenceGridView }
+            }
+        }
+
         // The pill of the reference: small, at its bottom
         Pane {
             id: referencePill
@@ -158,6 +228,16 @@ Item {
                             Label { text: "/ " + app.reference.pageCount; color: "#6b6f75" }
                         }
                     }
+                }
+                IconButton {
+                    objectName: "referenceGridButton"
+                    iconName: "xqt-pages-grid"
+                    tip: qsTr("All pages of the reference")
+                    checked: app.reference.pagesShown
+                    implicitWidth: 40; implicitHeight: 40
+                    icon.width: 22; icon.height: 22
+                    focusPolicy: Qt.NoFocus
+                    onClicked: { referencePill.focusReference(); app.reference.pagesShown = !app.reference.pagesShown }
                 }
                 ToolSeparator {}
                 // Write in the reference too (with the tool in hand; its own undo), or only read it
