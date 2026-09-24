@@ -235,6 +235,16 @@
   - Seam: `Document::readPdfKeepingOutline` (ADR-0002).
   - Measured on pgfmanual: a hybrid save blocks the window for at most 0.8 ms (before: 5.3 s); a paste 1–22 ms
     (before: 9.7 s).
+- **Fuzzy search, `qt/fuzzy-search` (2026-09-24, awaiting on-device test).** See [library.md](library.md), "Fuzzy
+  search".
+  - A "Fuzzy" toggle in the library search and the tab overview; off by default, app-wide.
+  - fzf's extended syntax plus parentheses: a space is AND, `|` is OR (tighter), `!` is NOT, and `'exact`,
+    `'word'`, `^prefix`, `suffix$`, `^equal$` narrow a term.
+  - Names and folder paths use a port of fzf's FuzzyMatchV2 (MIT; fzf's own score table passes), with the matched
+    letters marked. Text uses substring terms through `TextMatch`.
+  - A document matches when the expression holds over its name and text; a page is listed when it holds on that
+    page.
+  - Measured on 3,000 `.md` files with 12 MB of text: 20–200 ms per search under load.
   318 KiB.
 
 ## Backlog (decide later)
