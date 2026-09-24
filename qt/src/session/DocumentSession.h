@@ -115,12 +115,12 @@ public:
     fs::path documentFile() const;
     /// Title for the tab: file name, or "Untitled" / the PDF name / the shown file's name for unsaved documents.
     std::string getDisplayName() const;
-    /// The file this new document shows without being that file: a Markdown file shown read-only (MarkdownFile.h), an
-    /// image to write on (ImageFile.h). It is never written: saving asks for a .xopp (see suggestSavePath), and once
-    /// saved the document is that .xopp. Empty: none.
-    void setShownFile(const fs::path& file);
+    /// The file this new document shows without being that file: a Markdown file shown read-only (MarkdownFile.h), a
+    /// text or code file shown read-only as plain text (`readOnly`), an image to write on (ImageFile.h). It is never
+    /// written: saving asks for a .xopp (see suggestSavePath), and once saved the document is that .xopp. Empty: none.
+    void setShownFile(const fs::path& file, bool readOnly = false);
     const fs::path& shownFile() const { return shownPath; }
-    /// It shows a Markdown file read-only (not saved as a .xopp): the canvas does not write on it.
+    /// It shows a Markdown or text file read-only (not saved as a .xopp): the canvas does not write on it.
     bool isReadOnly() const;
     bool isModified() const;
     const fs::path& getLastAutosaveFile() const { return lastAutosaveFile; }
@@ -283,6 +283,7 @@ private:
     QTimer autosaveTimer;
     fs::path lastAutosaveFile;
     fs::path shownPath;
+    bool shownReadOnly = false;  ///< (a Markdown or text file)
     quint64 serialNo = 0;
     std::unique_ptr<PdfPageKeeper> pdfPages;
     std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)

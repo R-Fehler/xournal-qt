@@ -948,6 +948,14 @@ QString AppController::shownFileNote() const {
                (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
                     : QString());
     }
+    if (DocumentFiles::isTextFile(file)) {
+        std::error_code ec;
+        const bool cut = fs::file_size(file, ec) > MarkdownFile::MAX_BYTES && !ec;
+        return tr("Read-only: %1 is shown as plain text, to read and search. Open it with another app to edit it.")
+                       .arg(name) +
+               (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
+                    : QString());
+    }
     fs::path xopp = file;
     xopp.replace_extension(".xopp");
     return tr("%1 is the background of this new page. Saving keeps what you write as %2 next to it.")
@@ -1691,18 +1699,19 @@ QVariantList AppController::modifiedTabs() const {
 }
 
 namespace {
-/// A new document made from a Markdown file (MarkdownFile.h) or an image (ImageFile.h): it shows the file and is
-/// never written back to it.
+/// A new document made from a Markdown file (MarkdownFile.h), a text file (as plain text) or an image (ImageFile.h):
+/// it shows the file and is never written back to it.
 DocumentSession::LoadResult loadShownFile(const fs::path& file) {
     DocumentSession::LoadResult result;
-    if (DocumentFiles::isMarkdownFile(file)) {
+    if (DocumentFiles::isMarkdownFile(file) || DocumentFiles::isTextFile(file)) {
         std::error_code ec;
         if (!fs::is_regular_file(file, ec)) {
             result.error =
                     AppController::tr("\"%1\" cannot be read.").arg(QString::fromStdString(file.string())).toStdString();
             return result;
         }
-        result.document = MarkdownFile::document(MarkdownFile::read(file));
+        result.document = MarkdownFile::document(DocumentFiles::isTextFile(file) ? MarkdownFile::readAsPlainText(file)
+                                                                                 : MarkdownFile::read(file));
         return result;
     }
     if (DocumentFiles::isImageFile(file)) {
@@ -1726,7 +1735,8 @@ bool AppController::openPath(const QString& path) {
     }
     // A Markdown file, an image: a new document made from it (the file is not written); an image with its .xopp:
     // the .xopp
-    const bool shown = DocumentFiles::isMarkdownFile(file) || DocumentFiles::isImageFile(file);
+    const bool shown =
+            DocumentFiles::isMarkdownFile(file) || DocumentFiles::isImageFile(file) || DocumentFiles::isTextFile(file);
     if (shown && !DocumentFiles::itemOf(file).xopp.empty()) {
         return openPath(QString::fromStdString(DocumentFiles::itemOf(file).xopp.string()));
     }
@@ -1740,7 +1750,7 @@ bool AppController::openPath(const QString& path) {
     const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
     auto opened = std::make_unique<DocumentSession>(*app, std::move(result.document));
     if (shown) {
-        opened->setShownFile(file);
+        opened->setShownFile(file, !DocumentFiles::isImageFile(file));
     }
     tabs->addTab(std::move(opened));
     if (pristine >= 0) {
@@ -2595,7 +2605,7 @@ QUrl AppController::suggestedSaveFile() const {
     // (An image to write on: its .xopp next to it, so the library pairs them.)
     const fs::path shown = session()->shownFile();
     if (!session()->hasFilePath() && session()->annotatedPdf().empty() && library->available() &&
-        (shown.empty() || DocumentFiles::isMarkdownFile(shown))) {
+        (shown.empty() || DocumentFiles::isMarkdownFile(shown) || DocumentFiles::isTextFile(shown))) {
         suggested = fs::path(library->rootPath().toStdString()) / suggested.filename();
     }
     return QUrl::fromLocalFile(QString::fromStdString(suggested.string()));

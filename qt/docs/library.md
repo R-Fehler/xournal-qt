@@ -75,6 +75,12 @@ A **library** is a plain folder of documents that a window works in, like a work
   images (the `.xopp` stays small); any other image (WebP, HEIC, a photo turned upright by its orientation tag, which
   upstream would show sideways) is stored with the `.xopp` as a PNG of at most 4096 px (`photo.xopp.bg_1.png`,
   upstream's attached image). Code: `qt/src/canvas/ImageFile.*`.
+- A **text or code file** opens read-only the same way, as plain text: its text is one fenced code block of the page's
+  Markdown text (monospaced, highlighted by its extension where KSyntaxHighlighting knows it; `.txt` and the like
+  plain; the fence is longer than any run of backticks in the file, so nothing in it ends the block), flowing over A4
+  pages, titled with the file name, with the read-only note. There is no editor for them ("Open with the system app"
+  in the card's menu edits them elsewhere). Its card is the first page as it opens (the first lines). An opened text
+  file is in the Recent grid like a document. Code: `MarkdownFile::readAsPlainText`.
 - A library search hit in a Markdown file opens it with the search active: at the page of the passage with the hit
   (a snippet card, below: its first hit there is the current one).
 

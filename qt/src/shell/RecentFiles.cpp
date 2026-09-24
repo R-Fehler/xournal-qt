@@ -89,7 +89,8 @@ void RecentFiles::refresh() {
     std::vector<Row> newRows;
     std::set<fs::path> seen;  // a .xopp and its PDF are one document
     for (const auto& e: load()) {
-        const DocumentItem item = DocumentFiles::itemOf(e.path);
+        // (a text file opened in the app too; other files are opened with other apps and not listed)
+        const DocumentItem item = DocumentFiles::itemOf(e.path, DocumentFiles::TextFiles);
         if (item.valid() && seen.insert(item.main()).second) {
             newRows.push_back({item, e.opened});
         }
@@ -163,9 +164,9 @@ QStringList RecentFiles::pathsFor(int row) const {
 void RecentFiles::removePaths(const QStringList& paths) {
     std::set<fs::path> gone;
     for (const QString& p: paths) {
-        const DocumentItem item = DocumentFiles::itemOf(fs::path(p.toStdString()));
+        const DocumentItem item = DocumentFiles::itemOf(fs::path(p.toStdString()), DocumentFiles::TextFiles);
         gone.insert(fs::path(p.toStdString()));
-        for (const fs::path& f: {item.xopp, item.pdf, item.md, item.image}) {
+        for (const fs::path& f: {item.xopp, item.pdf, item.md, item.image, item.other}) {
             gone.insert(f);
         }
     }

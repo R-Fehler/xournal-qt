@@ -2,6 +2,8 @@
  * xournal-qt: a Markdown file (.md) shown as a document, read-only for now (the .md editor comes later and replaces
  * this).
  *
+ * A text or code file is shown the same way, as one fenced code block (monospaced, highlighted by its extension).
+ *
  * The file's text is the page's Markdown text of a new document of plain A4 pages: it flows over the pages as a
  * Markdown text written on a page does (MdPaginate.h, MarkdownSession.h), each page holding its part in a box at the
  * page margins. The document is never written back to the file. The library's preview of a .md is the first page of
@@ -33,6 +35,13 @@ constexpr double PAGE_HEIGHT = 841.89;
 /// The text of a Markdown file (UTF-8, without a byte order mark): at most `maxBytes` of it, cut at the end of a
 /// line. Empty if it cannot be read. `cut`: whether the file is longer.
 std::string read(const fs::path& file, size_t maxBytes = MAX_BYTES, bool* cut = nullptr);
+
+/// A text or code file as a Markdown text that shows it as it is: one fenced code block (a fence longer than any run
+/// of backticks in it), in the language of its extension for highlighting (none for .txt and the like). At most
+/// `maxBytes` of it, cut at the end of a line (`cut`: whether the file is longer).
+std::string readAsPlainText(const fs::path& file, size_t maxBytes = MAX_BYTES, bool* cut = nullptr);
+/// The Markdown text that shows `text` as it is (see readAsPlainText).
+std::string plainText(const std::string& text, const std::string& language);
 
 /// How the text of a Markdown file is drawn.
 md::Style style();

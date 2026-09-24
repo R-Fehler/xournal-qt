@@ -13,7 +13,14 @@
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
+#include "session/DocumentSearch.h"
+#include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
+#include "shell/Previews.h"
+#include "shell/RecentFiles.h"
+#include "shell/TabManager.h"
+#include "AppController.h"
+#include "MarkdownFile.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
 
@@ -32,6 +39,14 @@ std::vector<std::string> files(const std::vector<DocumentItem>& items) {
         n.push_back(i.main().filename().string());
     }
     return n;
+}
+
+void waitFor(const std::function<bool()>& cond, int ms = 5000) {
+    QElapsedTimer t;
+    t.start();
+    while (!cond() && t.elapsed() < ms) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
 }
 
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
@@ -309,4 +324,50 @@ TEST_F(LibraryFilterTest, searchFindsTextFilesByTheirTextAndOtherFilesByTheirNam
     model.setSearchQuery("");
     model.setSearchQuery("predict");
     EXPECT_EQ(model.count(), 0);
+}
+
+TEST_F(LibraryFilterTest, aTextFileOpensReadOnlyAsPlainText) {
+    // A code file with a fence of its own in it (a Markdown code example in a Python string)
+    const std::string code = "def predict(state):\n    doc = \"\"\"\n```\nnot the end\n````\n\"\"\"\n"
+                             "    return state  # needle\n";
+    writeFile(root / "kalman.py", code);
+    const auto before = fs::last_write_time(root / "kalman.py");
+    const std::string source = MarkdownFile::readAsPlainText(root / "kalman.py");
+    EXPECT_EQ(source, "`````py\n" + code + "`````\n") << "one code block, its fence longer than any in it";
+    EXPECT_EQ(MarkdownFile::plainText("a", ""), "```\na\n```\n");
+
+    AppController c;
+    ASSERT_TRUE(c.openPath(qstr(root / "kalman.py")));
+    DocumentSession* s = c.tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->shownFile(), root / "kalman.py");
+    EXPECT_TRUE(s->isReadOnly());
+    EXPECT_EQ(c.title(), "kalman.py");
+    EXPECT_FALSE(c.modified());
+    EXPECT_TRUE(c.shownFileNote().startsWith("Read-only")) << c.shownFileNote().toStdString();
+    EXPECT_NE(s->suggestSavePath().parent_path(), root) << "not a .xopp next to the text file";
+    // Its text is searched, as it is shown
+    s->search().setQuery("not the end", false);
+    waitFor([&] { return !s->search().isRunning() && s->search().hitCount() > 0; });
+    EXPECT_EQ(s->search().hitCount(), 1);
+    ASSERT_TRUE(c.openPath(qstr(root / "kalman.py")));
+    EXPECT_EQ(c.tabManager().count(), 1) << "opened again: its tab";
+    EXPECT_EQ(fs::last_write_time(root / "kalman.py"), before) << "never written";
+    // In the recent files (other files are not: they open in other apps)
+    auto* recent = qobject_cast<RecentFiles*>(c.recentModel());
+    ASSERT_NE(recent, nullptr);
+    ASSERT_GE(recent->count(), 1);
+    EXPECT_EQ(recent->data(recent->index(0), RecentFiles::KindRole).toString(), "text");
+
+    // A card with its first lines
+    const QImage preview = PreviewCache::preview(DocumentFiles::itemOf(root / "kalman.py", DocumentFiles::TextFiles));
+    ASSERT_FALSE(preview.isNull());
+    EXPECT_EQ(preview.width(), PreviewCache::WIDTH);
+    int dark = 0;
+    for (int y = 0; y < preview.height() / 4; ++y) {
+        for (int x = 0; x < preview.width(); ++x) {
+            dark += qGray(preview.pixel(x, y)) < 128 ? 1 : 0;
+        }
+    }
+    EXPECT_GT(dark, 20) << "its text at the top";
 }
