@@ -994,6 +994,28 @@ void makeLongTextPdf(const std::string& file, int pages) {
 }
 }  // namespace
 
+// The author: with a search, the page grid kept jumping back to the start while scrolling down. The hit places of
+// the pages scrolled into view arrive as search updates, and each one moved the grid to the current hit's page.
+TEST_F(MainWindowTest, thePageGridStaysWhereItIsScrolledWhileSearchResultsArrive) {
+    QTemporaryDir tmp;
+    const std::string pdf = tmp.filePath("long.pdf").toStdString();
+    makeLongTextPdf(pdf, 120);
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(pdf)));
+    controller->setSearchQuery("search");
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 120 * 3 && !controller->searchRunning(); }, 8000));
+    ASSERT_GT(controller->searchCurrent(), 0) << "a current hit, near the start";
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    until([&] { return grid->isVisible(); });
+    wait(300);
+    const qreal far = grid->property("contentHeight").toReal() * 0.6;
+    ASSERT_GT(far, grid->height());
+    grid->setProperty("contentY", far);  // scrolled down, away from the current hit
+    wait(1200);  // the pages now in view get their hit places
+    EXPECT_NEAR(grid->property("contentY").toReal(), far, 1.0) << "the grid stays where it was scrolled";
+}
+
 // Typing on while the search for what was typed before still runs: the field used to be set back to the text of
 // that search whenever its results came in (the field's text was bound to the query), and the letters typed
 // meanwhile were gone. Whatever is typed stays; the results are those of the text in the field.

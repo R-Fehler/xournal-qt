@@ -24,6 +24,7 @@ Rectangle {
 
     function open() {
         visible = true
+        shownHit = app.searchCurrent > 0 ? app.searchQuery + "#" + app.searchCurrent : ""  // (opens at it already)
         const row = app.filteredPages.rowOf(app.pages.currentPage)
         if (row >= 0) {
             grid.currentIndex = row
@@ -46,13 +47,18 @@ Rectangle {
         if (keep >= 0) grid.positionViewAtIndex(keep, GridView.Center)
     }
 
-    // Stepping through search hits (Enter in the search bar) moves the grid along.
+    // Stepping through search hits (Enter in the search bar) moves the grid along. Only a new current hit does:
+    // other search updates (hit places arriving for the pages scrolled into view) must not pull the grid back.
+    property string shownHit: ""
     Connections {
         target: app
         enabled: pageGrid.visible
         function onSearchChanged() {
+            const hit = app.searchCurrent > 0 ? app.searchQuery + "#" + app.searchCurrent : ""
+            if (hit === pageGrid.shownHit) return
+            pageGrid.shownHit = hit
             const row = app.filteredPages.rowOf(app.pageNumber - 1)
-            if (app.searchCurrent > 0 && row >= 0) grid.positionViewAtIndex(row, GridView.Contain)
+            if (hit !== "" && row >= 0) grid.positionViewAtIndex(row, GridView.Contain)
         }
     }
 
