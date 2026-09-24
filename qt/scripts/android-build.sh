@@ -141,8 +141,14 @@ ksyntax() {
 }
 
 apk() {
+    # The ccache first on PATH (the toolchain's program search found an old /bin/ccache before ~/.local/bin; ccache
+    # before 4.7 served stale objects across worktrees)
+    local ccache_arg=()
+    if command -v ccache >/dev/null; then
+        ccache_arg=(-DXQT_CCACHE="$(command -v ccache)")
+    fi
     # The preset (qt/CMakePresets.json) with this script's paths, which may come from the environment.
-    heavy cmake --preset android-arm64-debug -S "$qt_dir" -B "$build" \
+    heavy cmake --preset android-arm64-debug -S "$qt_dir" -B "$build" "${ccache_arg[@]}" \
         -DCMAKE_TOOLCHAIN_FILE="$QT_ANDROID/lib/cmake/Qt6/qt.toolchain.cmake" \
         -DQT_HOST_PATH="$QT_HOST" \
         -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
