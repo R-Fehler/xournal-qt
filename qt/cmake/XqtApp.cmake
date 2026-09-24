@@ -71,14 +71,17 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
-# "Show in file manager" on Linux: org.freedesktop.FileManager1 over D-Bus, when Qt has D-Bus (not on Android)
-if(TARGET Qt6::DBus AND NOT ANDROID)
+# "Show in file manager" on Linux: org.freedesktop.FileManager1 over D-Bus, when Qt has D-Bus (not on Android; Qt
+# on Windows and macOS has D-Bus too, but the file manager is reached another way there, see SystemApps.cpp)
+if(TARGET Qt6::DBus AND NOT ANDROID AND NOT WIN32 AND NOT APPLE)
     target_link_libraries(xqt-shell PUBLIC Qt6::DBus)
     target_compile_definitions(xqt-shell PRIVATE XQT_HAVE_DBUS)
 endif()
@@ -156,6 +159,13 @@ target_include_directories(xournal-qt PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../src/a
 target_link_libraries(xournal-qt PRIVATE Qt6::Widgets Qt6::Quick Qt6::QuickControls2 xqt-quick xqt-shell xqt-uiplugin)
 target_compile_definitions(xournal-qt PRIVATE XQT_VERSION="${PROJECT_VERSION}")
 set_target_properties(xournal-qt PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+if(WIN32)
+    # A GUI program (no console window), and what it sets up before the core starts (docs/windows.md).
+    set_target_properties(xournal-qt PROPERTIES WIN32_EXECUTABLE TRUE)
+    target_sources(xournal-qt PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsSetup.h
+        ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsSetup.cpp)
+endif()
 
 if(XQT_BUILD_TESTS)
     add_executable(xqt-quick-tests
@@ -196,7 +206,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CanvasMemoryTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PastedPdfPagesTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PastedPdfPagesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PdfPrintingTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

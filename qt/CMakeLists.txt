@@ -53,6 +53,12 @@ qt_standard_project_setup(REQUIRES 6.5)
 # glib/gio headers use "signals" as an identifier: never use Qt's keyword macros.
 add_compile_definitions(QT_NO_KEYWORDS)
 
+# Windows with MinGW (MSYS2, see docs/windows.md): big translation units (AppController, the QML cache) have more
+# sections than COFF allows by default.
+if(MINGW)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-Wa,-mbig-obj>")
+endif()
+
 if(XQT_BUILD_CORE)
     include(cmake/XojCore.cmake)
     if(XQT_BUILD_TESTS)

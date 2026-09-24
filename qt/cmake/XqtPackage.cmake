@@ -8,6 +8,15 @@ install(TARGETS xournal-qt RUNTIME DESTINATION bin)
 install(FILES "${XQT_BUILD_RESOURCE_DIR}/pagetemplates.ini" DESTINATION share/xournal-qt)
 install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR}/icons" DESTINATION share/xournal-qt)
 
+# Windows: the program folder (bin/, share/) is what gets zipped, after windeployqt and the MinGW DLLs have been
+# added (qt/scripts/windows-deploy.sh, docs/windows.md). No desktop files and no .deb there.
+if(WIN32)
+    if(TARGET xournal-qt-cli)
+        install(TARGETS xournal-qt-cli RUNTIME DESTINATION bin)
+    endif()
+    return()
+endif()
+
 # Desktop integration
 install(FILES "${XQT_PACKAGING_DIR}/xournal-qt.desktop" DESTINATION share/applications)
 install(FILES "${XQT_PACKAGING_DIR}/xournal-qt.xml" DESTINATION share/mime/packages)

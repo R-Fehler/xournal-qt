@@ -151,7 +151,11 @@ void writePdfTo(QPDF& pdf, const fs::path& target) {
 std::string pdfDateNow() {
     std::time_t now = std::time(nullptr);
     std::tm tm{};
+#ifdef _WIN32
+    gmtime_s(&tm, &now);
+#else
     gmtime_r(&now, &tm);
+#endif
     char buf[32];
     std::strftime(buf, sizeof buf, "D:%Y%m%d%H%M%SZ", &tm);
     return buf;
