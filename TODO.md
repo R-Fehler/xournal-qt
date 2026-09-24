@@ -45,14 +45,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
        another, whatever the engine. Worth fixing before comparing engines in the app.
 2. **Library track**, in this order, because each step builds on the one before:
    1. ~~the per-folder index format~~ `qt/library-index`: merged 2026-09-24 (see ROADMAP). Follow-ups:
-      - [ ] **Previews are rewritten only when the first page's image changes** (decided 2026-09-24; after
-        `qt/library-filter`, which works in `Previews.cpp`).
-        - Today a preview is valid only for the files' size and time (`Previews.cpp:83`). So every save draws it
-          again and rewrites the folder's whole `previews.pack`, 0.3–0.6 MB on OneDrive, even when page 1 did not
-          change.
-        - Fix: after a save, draw page 1 and compare. If the image is the same, write nothing to `previews.pack`;
-          keep "valid for this version" in `notes.pack`, which is written on every save anyway. Previews stay in
-          the folders.
+      - [x] Previews are rewritten only when the first page's image changes (`qt/preview-writes`, merged 2026-09-24).
       - [ ] Reading positions are keyed by the library's path, so a library folder renamed or moved outside the
         app starts without them. Match them by file name, size and time like the index, or keep a copy in the
         root's dot folder that the clean-up leaves alone.

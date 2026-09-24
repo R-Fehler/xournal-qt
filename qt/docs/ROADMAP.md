@@ -219,6 +219,10 @@
   reads PDF text could still release a poppler document while the program's statics were torn down: about 1 in 20
   exits under load crashed, and the crash handler took that for a real crash. It is now drained from a
   QCoreApplication post routine; 0 of 240 runs crash.
+- **Preview writes, `qt/preview-writes` (2026-09-24).** A changed document's first page is drawn again and compared
+  with the stored preview. If it looks the same, only a tiny `preview-stamps.pack` records the new version, and
+  `previews.pack` stays untouched until it is written anyway. Editing page 3: 1.1 KiB written instead of about
+  318 KiB.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
