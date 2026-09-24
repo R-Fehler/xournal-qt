@@ -315,6 +315,8 @@ public:
     Q_INVOKABLE QVariantList libraries() const;
     /// Open a folder as library in a new window (another process: one library per window).
     Q_INVOKABLE void openLibrary(const QUrl& folder);
+    /// The same by its path (a folder of the library, a library of the Recent grid).
+    Q_INVOKABLE void openLibraryAt(const QString& folder) { openLibrary(QUrl::fromLocalFile(folder)); }
     /// New library in the standard folder, opened in a new window. False if the name is taken or invalid.
     Q_INVOKABLE bool createLibrary(const QString& name);
     /// The file manager with the file selected (a folder: opened), see SystemApps.h.

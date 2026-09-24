@@ -1343,6 +1343,10 @@ void AppController::newDocument() {
 void AppController::setLibraryRoot(const fs::path& root) {
     auto lib = std::make_unique<Library>(root);
     journalFile = journalFileFor(*lib);
+    // A folder opened as a library outside the standard folder: in the Recent grid, to find it again
+    if (!lib->isInLibrariesFolder()) {
+        recent->addLibrary(lib->root());
+    }
     library->setLibrary(std::move(lib));
 }
 

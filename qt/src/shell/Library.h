@@ -62,6 +62,8 @@ public:
     const fs::path& root() const { return rootDir; }
     QString name() const;
     bool isDefault() const;
+    /// In the standard folder of libraries ("<Documents>/Xournal_Libraries", any depth).
+    bool isInLibrariesFolder() const;
     /// The Downloads folder or a folder in it: files there are often cleaned up (the UI warns before importing).
     bool isTemporary() const;
     /// Short hash of the root (one instance and one session journal per library).

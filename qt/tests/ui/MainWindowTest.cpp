@@ -16,6 +16,7 @@
 #include <QElapsedTimer>
 #include <iostream>
 #include <QFile>
+#include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QClipboard>
@@ -1496,6 +1497,33 @@ TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManage
     click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
     ASSERT_TRUE(waitOpened(menu, true));
     EXPECT_FALSE(child(menu, "openWithSystemAppItem")->isVisible());
+}
+
+TEST_F(HomeScreenFilterTest, recentLibrariesOpenAgain) {
+    QObject* menu = find("homeItemMenu");
+    // A library opened before is in the Recent grid: a folder with the library mark; a tap opens it again
+    QTemporaryDir other;
+    const QString otherPath = other.path();
+    auto* recent = qobject_cast<xqt::RecentFiles*>(controller->recentModel());
+    recent->addLibrary(fs::path(otherPath.toStdString()));
+    find<QQuickItem>("homeView")->setProperty("page", 1);
+    wait(100);
+    auto* recentGrid = find<QQuickItem>("recentGrid");
+    ASSERT_EQ(recentGrid->property("count").toInt(), 1);
+    QQuickItem* libraryCard = itemAt(recentGrid, 0);
+    ASSERT_NE(libraryCard, nullptr);
+    EXPECT_TRUE(child(libraryCard, "libraryMark")->isVisible());
+    EXPECT_EQ(child(libraryCard, "cardName")->property("text").toString(), QFileInfo(otherPath).fileName());
+    click(libraryCard);
+    EXPECT_EQ(fake.libraries, QStringList{otherPath});
+    // Its menu: no rename, copy, move or trash of a whole library from here
+    click(child(libraryCard, "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "renameItem")->isVisible());
+    EXPECT_FALSE(child(menu, "trashItem")->isVisible());
+    EXPECT_FALSE(child(menu, "moveToItem")->isVisible());
+    QMetaObject::invokeMethod(menu, "close");
+    recent->clear();
 }
 
 TEST_F(MainWindowTest, tabsCloseOnlyOnPurposeAndAllAtOnce) {

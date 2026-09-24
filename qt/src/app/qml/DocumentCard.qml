@@ -17,6 +17,8 @@ Item {
     property string subtitle
     property string preview
     property bool isFolder: false
+    /// A folder opened as a library (Recent): the folder with a library mark
+    property bool isLibrary: false
     property int itemCount: 0
     property bool hasPdf: false
     property bool hasXopp: false
@@ -111,12 +113,32 @@ Item {
                     implicitHeight: 36
                 }
                 Image {
+                    id: folderIcon
                     visible: card.isFolder
                     anchors.centerIn: parent
                     source: app.iconUrl("xqt-folder")
                     readonly property int iconSize: Math.min(96, previewBox.width * 0.45)
                     sourceSize: Qt.size(iconSize, iconSize)
                     opacity: 0.8
+                }
+                // A library: its mark on the folder
+                Rectangle {
+                    objectName: "libraryMark"
+                    visible: card.isLibrary
+                    readonly property int size: Math.round(folderIcon.iconSize * 0.5)
+                    x: folderIcon.x + folderIcon.width - size * 0.7
+                    y: folderIcon.y + folderIcon.height - size * 0.8
+                    width: size
+                    height: size
+                    radius: size / 2
+                    color: "#ffffff"
+                    border.width: 1
+                    border.color: "#c5cae9"
+                    Image {
+                        anchors.centerIn: parent
+                        source: app.iconUrl("xqt-library")
+                        sourceSize: Qt.size(parent.size * 0.62, parent.size * 0.62)
+                    }
                 }
                 // Another file: the icon of its type
                 Image {
@@ -391,7 +413,7 @@ Item {
             z: 2
             width: 44
             height: 44
-            visible: card.selected || card.selectionMode || hover.hovered
+            visible: !card.isLibrary && (card.selected || card.selectionMode || hover.hovered)
             onClicked: card.toggleRequested()
             contentItem: Item {
                 Rectangle {

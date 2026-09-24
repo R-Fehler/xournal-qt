@@ -71,6 +71,11 @@ bool Library::isTemporary() const {
 
 QString Library::name() const { return QString::fromStdString(rootDir.filename().string()); }
 
+bool Library::isInLibrariesFolder() const {
+    const fs::path folder = normalized(librariesFolder());
+    return rootDir != folder && DocumentFiles::remap(rootDir, folder, "/") != rootDir;
+}
+
 bool Library::isDefault() const { return rootDir == normalized(defaultRoot()); }
 
 std::string Library::key() const { return hashOf(rootDir.string(), 12).toStdString(); }

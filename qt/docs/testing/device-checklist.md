@@ -655,3 +655,9 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Import a folder with `.docx` and `.py` files while "All other files" / "Text and code" are off: only the
       documents come along. With them on: they come along too.
 - [ ] Android (later): "Show in file manager" is not in the card menu; tapping an Office file offers the apps for it.
+- [ ] Open a folder outside `Documents/Xournal_Libraries` as library ("Open a folder as library…", or
+      `xournal-qt ~/some/folder`, or Dolphin's action): in any window's Recent grid it is a folder card with the
+      library mark, its name and path, among the recent documents by time. Tap it in another window: that library's
+      window comes to the front (no second window). Close that window and tap again: it opens. Its menu has no
+      Rename, Copy, Move or Trash. Delete or rename the folder in Dolphin: it drops out of Recent. Libraries in
+      `Xournal_Libraries` (Default, …) do not appear there.

@@ -35,7 +35,8 @@ auto RecentFiles::load() const -> std::vector<Entry> {
         const QJsonObject o = v.toObject();
         const QString path = o["path"].toString();
         if (!path.isEmpty()) {
-            entries.push_back({fs::path(path.toStdString()), QDateTime::fromString(o["opened"].toString(), Qt::ISODate)});
+            entries.push_back({fs::path(path.toStdString()), QDateTime::fromString(o["opened"].toString(), Qt::ISODate),
+                               o["library"].toBool()});
         }
     }
     return entries;
@@ -46,7 +47,11 @@ void RecentFiles::store(const std::vector<Entry>& entries) const {
     fs::create_directories(storeFile.parent_path(), ec);
     QJsonArray files;
     for (const auto& e: entries) {
-        files.append(QJsonObject{{"path", qstr(e.path)}, {"opened", e.opened.toString(Qt::ISODate)}});
+        QJsonObject o{{"path", qstr(e.path)}, {"opened", e.opened.toString(Qt::ISODate)}};
+        if (e.library) {
+            o["library"] = true;
+        }
+        files.append(o);
     }
     // Written next to it and renamed (no QSaveFile: its sync to disk can stall the UI for a moment).
     const fs::path tmp = fs::path(storeFile) += ".part";
@@ -63,6 +68,21 @@ void RecentFiles::add(const fs::path& file) {
     auto entries = load();  // another window may have added files
     std::erase_if(entries, [&](const Entry& e) { return e.path == p; });
     entries.insert(entries.begin(), {p, QDateTime::currentDateTime()});
+    if (entries.size() > MAX_ENTRIES) {
+        entries.resize(MAX_ENTRIES);
+    }
+    store(entries);
+    refresh();
+}
+
+void RecentFiles::addLibrary(const fs::path& folder) {
+    fs::path p = fs::absolute(folder).lexically_normal();
+    if (!p.has_filename() && p.has_parent_path() && p != p.root_path()) {
+        p = p.parent_path();  // "a/b/" -> "a/b"
+    }
+    auto entries = load();
+    std::erase_if(entries, [&](const Entry& e) { return e.path == p; });
+    entries.insert(entries.begin(), {p, QDateTime::currentDateTime(), true});
     if (entries.size() > MAX_ENTRIES) {
         entries.resize(MAX_ENTRIES);
     }
@@ -89,15 +109,22 @@ void RecentFiles::refresh() {
     std::vector<Row> newRows;
     std::set<fs::path> seen;  // a .xopp and its PDF are one document
     for (const auto& e: load()) {
+        if (e.library) {
+            std::error_code ec;
+            if (fs::is_directory(e.path, ec) && seen.insert(e.path).second) {
+                newRows.push_back({{}, e.opened, e.path});
+            }
+            continue;
+        }
         // (a text file opened in the app too; other files are opened with other apps and not listed)
         const DocumentItem item = DocumentFiles::itemOf(e.path, DocumentFiles::TextFiles);
         if (item.valid() && seen.insert(item.main()).second) {
-            newRows.push_back({item, e.opened});
+            newRows.push_back({item, e.opened, {}});
         }
     }
     std::set<fs::path> shown;
     for (const auto& r: newRows) {
-        shown.insert(r.item.main());
+        shown.insert(r.path());
     }
     const bool dropped = selection.keepOnly(shown);
     beginResetModel();
@@ -116,14 +143,23 @@ void RecentFiles::selectionUpdated() {
     Q_EMIT selectionChanged();
 }
 
+void RecentFiles::dropLibraries() {
+    for (const auto& r: rows) {
+        if (!r.library.empty()) {
+            selection.paths.erase(r.library);
+        }
+    }
+}
+
 void RecentFiles::select(int row, int modifiers) {
     selection.click(row, Qt::KeyboardModifiers(modifiers), count(),
-                    [this](int i) { return rows[static_cast<size_t>(i)].item.main(); });
+                    [this](int i) { return rows[static_cast<size_t>(i)].path(); });
+    dropLibraries();
     selectionUpdated();
 }
 
 void RecentFiles::toggleSelected(int row) {
-    if (row >= 0 && row < count()) {
+    if (row >= 0 && row < count() && rows[static_cast<size_t>(row)].library.empty()) {
         selection.toggle(rows[static_cast<size_t>(row)].item.main());
         selectionUpdated();
     }
@@ -131,7 +167,9 @@ void RecentFiles::toggleSelected(int row) {
 
 void RecentFiles::selectAll() {
     for (const auto& r: rows) {
-        selection.paths.insert(r.item.main());
+        if (r.library.empty()) {
+            selection.paths.insert(r.item.main());
+        }
     }
     selectionUpdated();
 }
@@ -146,8 +184,8 @@ void RecentFiles::clearSelection() {
 QStringList RecentFiles::selectedPaths() const {
     QStringList list;
     for (const auto& r: rows) {
-        if (selection.contains(r.item.main())) {
-            list << qstr(r.item.main());
+        if (selection.contains(r.path())) {
+            list << qstr(r.path());
         }
     }
     return list;
@@ -157,7 +195,7 @@ QStringList RecentFiles::pathsFor(int row) const {
     if (row < 0 || row >= count()) {
         return {};
     }
-    const fs::path p = rows[static_cast<size_t>(row)].item.main();
+    const fs::path p = rows[static_cast<size_t>(row)].path();
     return selection.contains(p) ? selectedPaths() : QStringList{qstr(p)};
 }
 
@@ -181,9 +219,11 @@ void RecentFiles::remove(int row) {
     if (row < 0 || row >= count()) {
         return;
     }
-    const DocumentItem item = rows[static_cast<size_t>(row)].item;
+    const Row& r = rows[static_cast<size_t>(row)];
+    const DocumentItem item = r.item;
+    const fs::path library = r.library;
     auto entries = load();
-    std::erase_if(entries, [&](const Entry& e) { return item.has(e.path); });
+    std::erase_if(entries, [&](const Entry& e) { return library.empty() ? item.has(e.path) : e.path == library; });
     store(entries);
     refresh();
 }
@@ -194,8 +234,8 @@ void RecentFiles::clear() {
 }
 
 bool RecentFiles::rename(int row, const QString& name) {
-    if (row < 0 || row >= count()) {
-        return false;
+    if (row < 0 || row >= count() || !rows[static_cast<size_t>(row)].library.empty()) {
+        return false;  // (a library is not renamed from here)
     }
     const auto r = DocumentFiles::rename(rows[static_cast<size_t>(row)].item, name.trimmed().toStdString());
     if (!r.ok) {
@@ -213,8 +253,8 @@ bool RecentFiles::rename(int row, const QString& name) {
 }
 
 bool RecentFiles::trash(int row) {
-    if (row < 0 || row >= count()) {
-        return false;
+    if (row < 0 || row >= count() || !rows[static_cast<size_t>(row)].library.empty()) {
+        return false;  // (a library is never trashed from here)
     }
     const auto r = DocumentFiles::trash(rows[static_cast<size_t>(row)].item);
     if (!r.ok) {
@@ -237,13 +277,41 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
         return {};
     }
     const Row& r = rows[static_cast<size_t>(i.row())];
+    if (!r.library.empty()) {
+        switch (role) {
+            case NameRole:
+                return QString::fromStdString(r.library.filename().string());
+            case PathRole:
+                return qstr(r.library);
+            case OpenedRole:
+                return r.opened;
+            case KindRole:
+                return QStringLiteral("library");
+            case IsLibraryRole:
+                return true;
+            case HasPdfRole:
+            case HasXoppRole:
+            case SelectedRole:
+                return false;
+            case PreviewRole:
+                return QString();
+            case LastPageRole:
+                return -1;
+            case LocationRole:
+                break;  // (below: the folder's own path)
+            default:
+                return {};
+        }
+    }
     switch (role) {
         case NameRole:
             return QString::fromStdString(r.item.name());
         case PathRole:
             return qstr(r.item.main());
+        case IsLibraryRole:
+            return false;
         case LocationRole: {
-            QString folder = qstr(r.item.folder());
+            QString folder = qstr(r.library.empty() ? r.item.folder() : r.library);
             const QString home = QDir::homePath();
             if (folder == home || folder.startsWith(home + '/')) {
                 folder = '~' + folder.mid(home.size());
@@ -272,7 +340,7 @@ QVariant RecentFiles::data(const QModelIndex& i, int role) const {
 QHash<int, QByteArray> RecentFiles::roleNames() const {
     return {{NameRole, "name"},     {PathRole, "path"},     {LocationRole, "location"}, {PreviewRole, "preview"},
             {OpenedRole, "opened"}, {HasPdfRole, "hasPdf"}, {HasXoppRole, "hasXopp"},   {SelectedRole, "selected"}, {LastPageRole, "lastPage"},
-            {KindRole, "kind"}};
+            {KindRole, "kind"}, {IsLibraryRole, "isLibrary"}};
 }
 
 }  // namespace xqt

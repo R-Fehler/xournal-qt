@@ -273,7 +273,13 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
     from the file manager. They are copied.
   - New folder
 - **Recent**: the documents opened lately that still exist (the list is shared by all windows:
-  `recent.json` in the config folder).
+  `recent.json` in the config folder), and the folders opened as a library that are not in
+  `<Documents>/Xournal_Libraries` ("Open a folder as library…", `xournal-qt <folder>`, the file manager's action),
+  mixed with the documents by when they were opened (`"library": true` in the list). A library's card is a folder
+  with a library mark, its name and path; a tap opens it in a window of its own like "Open a folder as library…" (a
+  window of that library that is open already comes to the front; this window's own library: its home screen). Its
+  menu has Open library, Show in file manager and Remove from this list; it is never selected, renamed, moved or
+  trashed from here. A folder that is gone drops out. The "Show" filter does not apply to the Recent grid.
 - **On a card**:
   - tap: open (a folder: enter it; another file (not a document or text): its app, below)
   - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder,

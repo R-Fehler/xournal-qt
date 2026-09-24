@@ -82,7 +82,17 @@ Rectangle {
     }
     function openRecentRow(index) {
         const item = recentGrid.itemAtIndex(index)
-        if (item) app.openListed([item.path])
+        if (item && item.isLibrary) openLibraryFolder(item.path)
+        else if (item) app.openListed([item.path])
+    }
+    /// A folder as library: this one's home screen, else a window of its own (raised if it is open already)
+    function openLibraryFolder(path) {
+        if (app.library.available && path === app.library.rootPath) {
+            app.homeVisible = true
+            page = 0
+        } else {
+            app.openLibraryAt(path)
+        }
     }
     readonly property var currentModel: page === 0 ? app.library : app.recent
     readonly property int selectionCount: currentModel.selectionCount
@@ -101,7 +111,9 @@ Rectangle {
     /// Open documents (folders among them are left out; a single folder is entered).
     function openAll(paths, model) {
         const docs = app.library.documentsIn(paths)
-        if (docs.length === 0 && paths.length === 1 && model === app.library) {
+        if (docs.length === 0 && paths.length === 1 && model === app.recent) {
+            openLibraryFolder(paths[0])  // (a library of the Recent grid)
+        } else if (docs.length === 0 && paths.length === 1 && model === app.library) {
             app.library.folder = app.library.relativeFolder(paths[0])
         } else if (docs.length > 0) {
             if (model === app.library && home.searching && docs.length === 1) app.openSearchHit(docs[0], lib.searchQuery)
@@ -1012,8 +1024,10 @@ Rectangle {
                         name: model.name
                         path: model.path
                         preview: model.preview
+                        isFolder: model.isLibrary
+                        isLibrary: model.isLibrary
                         hasPdf: model.hasPdf
-                        lastRead: home.formatDate(model.opened)
+                        lastRead: model.isLibrary ? "" : home.formatDate(model.opened)
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
                         kind: model.kind
@@ -1148,20 +1162,21 @@ Rectangle {
         objectName: "homeItemMenu"
         MenuItem {
             text: home.menuMany ? qsTr("Open %1").arg(home.countText(home.menuPaths.length))
+                                : home.menuKind === "library" ? qsTr("Open library")
                                 : home.menuFolder ? qsTr("Open folder") : qsTr("Open")
             onTriggered: home.openAll(home.menuPaths, home.menuModel)
         }
         MenuItem {
             objectName: "selectItem"
             text: qsTr("Select")
-            visible: !home.menuMany && home.menuModel && home.menuModel.selectionCount === 0
+            visible: !home.menuMany && home.menuModel && home.menuModel.selectionCount === 0 && home.menuKind !== "library"
             height: visible ? implicitHeight : 0
             onTriggered: home.menuModel.toggleSelected(home.menuRow)
         }
         MenuItem {
             objectName: "renameItem"
             text: qsTr("Rename…")
-            visible: !home.menuMany
+            visible: !home.menuMany && home.menuKind !== "library"
             height: visible ? implicitHeight : 0
             onTriggered: renameDialog.open()
         }
@@ -1169,12 +1184,16 @@ Rectangle {
             objectName: "copyToItem"
             text: qsTr("Copy to…")
             enabled: app.library.available
+            visible: home.menuKind !== "library"
+            height: visible ? implicitHeight : 0
             onTriggered: home.askTransfer(home.menuPaths, true)
         }
         MenuItem {
             objectName: "moveToItem"
             text: qsTr("Move to…")
             enabled: app.library.available
+            visible: home.menuKind !== "library"
+            height: visible ? implicitHeight : 0
             onTriggered: home.askTransfer(home.menuPaths, false)
         }
         MenuItem {
@@ -1209,7 +1228,13 @@ Rectangle {
             height: visible ? implicitHeight : 0
             onTriggered: app.recent.removePaths(home.menuPaths)
         }
-        MenuItem { text: qsTr("Move to trash…"); onTriggered: home.askTrash(home.menuModel, home.menuPaths) }
+        MenuItem {
+            objectName: "trashItem"
+            text: qsTr("Move to trash…")
+            visible: home.menuKind !== "library"  // (a library is never trashed from the Recent grid)
+            height: visible ? implicitHeight : 0
+            onTriggered: home.askTrash(home.menuModel, home.menuPaths)
+        }
     }
 
     Dialog {
