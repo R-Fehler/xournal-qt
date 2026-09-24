@@ -16,6 +16,7 @@
 #include <QElapsedTimer>
 #include <iostream>
 #include <QFile>
+#include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QClipboard>
@@ -70,6 +71,7 @@
 #include "shell/RecentFiles.h"
 #include "shell/Previews.h"
 #include "shell/SettingsModel.h"
+#include "shell/SystemApps.h"
 #include "shell/TabManager.h"
 #include "shell/PageSketches.h"
 #include "shell/Thumbnails.h"
@@ -1409,6 +1411,159 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
     wait(100);
     draw();
     EXPECT_TRUE(controller->modified()) << "(a new document is written on)";
+}
+
+namespace {
+/// Records what would be handed to the system (nothing is started).
+struct FakeSystemApps: xqt::SystemApps {
+    QStringList opened, shown, libraries;
+    bool openWithSystemApp(const QString& path) override {
+        opened << path;
+        return true;
+    }
+    bool showInFileManager(const QString& path) override {
+        shown << path;
+        return true;
+    }
+    bool startLibraryWindow(const QString& folder) override {
+        libraries << folder;
+        return true;
+    }
+};
+
+/// A library with a text file and an Office file next to the documents.
+class HomeScreenFilterTest: public HomeScreenTest {
+protected:
+    void prepareController() override {
+        xqt::SystemApps::setInstance(&fake);
+        ASSERT_TRUE(tmp.isValid());
+        root = fs::path(tmp.path().toStdString());
+        std::ofstream(root / "report.docx") << "PK";
+        std::ofstream(root / "kalman.py") << "def predict(state):\n    return state\n";
+        HomeScreenTest::prepareController();
+    }
+    void TearDown() override {
+        HomeScreenTest::TearDown();
+        xqt::SystemApps::setInstance(nullptr);
+    }
+    /// A child of an item or popup by its objectName
+    static QQuickItem* child(QObject* parent, const char* name) {
+        for (auto* c: parent->findChildren<QQuickItem*>()) {
+            if (c->objectName() == name) {
+                return c;
+            }
+        }
+        return nullptr;
+    }
+    FakeSystemApps fake;
+};
+}  // namespace
+
+TEST_F(HomeScreenFilterTest, theShowButtonChoosesTheKindsOfFilesShown) {
+    ASSERT_EQ(gridCount(), 3) << "Physics, lecture, notes: text and other files are not shown by default";
+    auto* button = find<QQuickItem>("showButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_FALSE(button->property("checked").toBool());
+    click(button);
+    QObject* popup = find("showPopup");
+    ASSERT_NE(popup, nullptr);
+    ASSERT_TRUE(waitOpened(popup, true));
+    EXPECT_TRUE(child(popup, "showNotes")->property("checked").toBool());
+    EXPECT_FALSE(child(popup, "showOther")->property("checked").toBool());
+    EXPECT_FALSE(child(popup, "showOnlyPdfsWithNotes")->property("checked").toBool());
+
+    click(child(popup, "showOther"));
+    EXPECT_EQ(gridCount(), 4);
+    EXPECT_TRUE(button->property("checked").toBool()) << "marked while not the default";
+    click(child(popup, "showText"));
+    EXPECT_EQ(gridCount(), 5);
+    EXPECT_TRUE(popup->property("opened").toBool()) << "stays open for more toggles";
+    // The Office file: an icon of its type, its extension, its size
+    wait(100);
+    QQuickItem* docx = card(rowOf("report.docx"));
+    ASSERT_NE(docx, nullptr);
+    EXPECT_TRUE(child(docx, "fileTypeIcon")->isVisible());
+    EXPECT_EQ(child(docx, "kindBadgeText")->property("text").toString(), "DOCX");
+    EXPECT_EQ(child(docx, "cardName")->property("text").toString(), "report.docx");
+    EXPECT_EQ(child(card(rowOf("kalman.py")), "kindBadgeText")->property("text").toString(), "PY");
+
+    // Only PDFs with notes: the lone PDF goes
+    click(child(popup, "showOnlyPdfsWithNotes"));
+    EXPECT_EQ(gridCount(), 4);
+    EXPECT_LT(rowOf("lecture.pdf"), 0);
+    click(child(popup, "showDefaults"));
+    EXPECT_EQ(gridCount(), 3);
+    EXPECT_FALSE(button->property("checked").toBool());
+}
+
+TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManager) {
+    QMetaObject::invokeMethod(controller->libraryModel(), "setShown", Q_ARG(QString, "other"), Q_ARG(bool, true));
+    wait(50);
+    ASSERT_EQ(gridCount(), 4);
+    const QString docx = QString::fromStdString((root / "report.docx").string());
+    click(card(rowOf("report.docx")));
+    EXPECT_EQ(fake.opened, QStringList{docx}) << "a tap hands it to its app";
+    EXPECT_EQ(controller->tabCount(), 0);
+    EXPECT_TRUE(controller->homeVisible());
+
+    // Its menu: open with the system app, show in the file manager
+    click(child(card(rowOf("report.docx")), "cardMenuButton"));
+    QObject* menu = find("homeItemMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* openWith = child(menu, "openWithSystemAppItem");
+    ASSERT_NE(openWith, nullptr);
+    EXPECT_TRUE(openWith->isVisible());
+    click(child(menu, "showInFileManagerItem"));
+    EXPECT_EQ(fake.shown, QStringList{docx});
+    // A document has no "Open with the system app"
+    click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "openWithSystemAppItem")->isVisible());
+}
+
+TEST_F(HomeScreenFilterTest, aFolderOpensAsALibraryInAWindowOfItsOwn) {
+    // The menu of a folder card: "Open as library" opens it in a window of its own
+    click(child(card(rowOf("Physics")), "cardMenuButton"));
+    QObject* menu = find("homeItemMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* openAsLibrary = child(menu, "openAsLibraryItem");
+    ASSERT_NE(openAsLibrary, nullptr);
+    ASSERT_TRUE(openAsLibrary->isVisible());
+    click(openAsLibrary);
+    EXPECT_EQ(fake.libraries, QStringList{QString::fromStdString((root / "Physics").string())});
+    EXPECT_TRUE(waitOpened(menu, false));
+    // A document's menu has none
+    click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "openAsLibraryItem")->isVisible());
+    QMetaObject::invokeMethod(menu, "close");
+}
+
+TEST_F(HomeScreenFilterTest, recentLibrariesOpenAgain) {
+    QObject* menu = find("homeItemMenu");
+    // A library opened before is in the Recent grid: a folder with the library mark; a tap opens it again
+    QTemporaryDir other;
+    const QString otherPath = other.path();
+    auto* recent = qobject_cast<xqt::RecentFiles*>(controller->recentModel());
+    recent->addLibrary(fs::path(otherPath.toStdString()));
+    find<QQuickItem>("homeView")->setProperty("page", 1);
+    wait(100);
+    auto* recentGrid = find<QQuickItem>("recentGrid");
+    ASSERT_EQ(recentGrid->property("count").toInt(), 1);
+    QQuickItem* libraryCard = itemAt(recentGrid, 0);
+    ASSERT_NE(libraryCard, nullptr);
+    EXPECT_TRUE(child(libraryCard, "libraryMark")->isVisible());
+    EXPECT_EQ(child(libraryCard, "cardName")->property("text").toString(), QFileInfo(otherPath).fileName());
+    click(libraryCard);
+    EXPECT_EQ(fake.libraries, QStringList{otherPath});
+    // Its menu: no rename, copy, move or trash of a whole library from here
+    click(child(libraryCard, "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "renameItem")->isVisible());
+    EXPECT_FALSE(child(menu, "trashItem")->isVisible());
+    EXPECT_FALSE(child(menu, "moveToItem")->isVisible());
+    QMetaObject::invokeMethod(menu, "close");
+    recent->clear();
 }
 
 TEST_F(MainWindowTest, tabsCloseOnlyOnPurposeAndAllAtOnce) {

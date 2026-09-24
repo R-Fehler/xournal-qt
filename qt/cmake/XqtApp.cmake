@@ -67,11 +67,18 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentPlaces.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
+# "Show in file manager" on Linux: org.freedesktop.FileManager1 over D-Bus, when Qt has D-Bus (not on Android)
+if(TARGET Qt6::DBus AND NOT ANDROID)
+    target_link_libraries(xqt-shell PUBLIC Qt6::DBus)
+    target_compile_definitions(xqt-shell PRIVATE XQT_HAVE_DBUS)
+endif()
 
 # The QML UI as a static QML module (XournalQt), used by the app and by the UI tests.
 set(XQT_QML_FILES
@@ -168,6 +175,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilterTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecentLibrariesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCacheTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp

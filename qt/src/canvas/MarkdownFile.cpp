@@ -1,6 +1,7 @@
 #include "MarkdownFile.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <shared_mutex>
 
@@ -57,6 +58,38 @@ std::string read(const fs::path& file, size_t maxBytes, bool* cut) {
         text.erase(0, 3);  // a byte order mark
     }
     return text;
+}
+
+std::string plainText(const std::string& text, const std::string& language) {
+    // A fence longer than every run of backticks in the text, so no line of it closes the block
+    size_t longest = 0, run = 0;
+    for (char c: text) {
+        run = c == '`' ? run + 1 : 0;
+        longest = std::max(longest, run);
+    }
+    const std::string fence(std::max<size_t>(3, longest + 1), '`');
+    std::string source = fence + language + "\n" + text;
+    if (!text.empty() && text.back() != '\n') {
+        source += '\n';
+    }
+    return source + fence + "\n";
+}
+
+std::string readAsPlainText(const fs::path& file, size_t maxBytes, bool* cut) {
+    std::string language = file.extension().string();
+    if (!language.empty()) {
+        language.erase(0, 1);
+    } else {
+        language = file.filename().string();  // "Makefile", "Dockerfile"
+    }
+    std::string lower = language;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (lower == "txt" || lower == "text" || lower == "log" || lower == "readme" || lower == "license" ||
+        lower == "copying" || lower == "authors" || lower == "todo" ||
+        language.find_first_of("` \t") != std::string::npos) {
+        language.clear();  // plain text: no highlighting
+    }
+    return plainText(read(file, maxBytes, cut), language);
 }
 
 md::Style style() {

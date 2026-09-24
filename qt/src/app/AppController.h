@@ -315,8 +315,11 @@ public:
     Q_INVOKABLE QVariantList libraries() const;
     /// Open a folder as library in a new window (another process: one library per window).
     Q_INVOKABLE void openLibrary(const QUrl& folder);
+    /// The same by its path (a folder of the library, a library of the Recent grid).
+    Q_INVOKABLE void openLibraryAt(const QString& folder) { openLibrary(QUrl::fromLocalFile(folder)); }
     /// New library in the standard folder, opened in a new window. False if the name is taken or invalid.
     Q_INVOKABLE bool createLibrary(const QString& name);
+    /// The file manager with the file selected (a folder: opened), see SystemApps.h.
     Q_INVOKABLE void showInFileManager(const QString& path);
 
     // --- start and recovery ---
@@ -380,6 +383,12 @@ public:
     Q_INVOKABLE bool openPath(const QString& path);
     /// Open several files (e.g. from the command line or another instance).
     Q_INVOKABLE void openPaths(const QStringList& paths);
+    /// Open what the home screen lists: documents and text files as tabs, other files with the system app.
+    Q_INVOKABLE void openListed(const QStringList& paths);
+    /// Open a file with the app the system has for it (SystemApps.h).
+    Q_INVOKABLE bool openWithSystemApp(const QString& path);
+    /// There is a file manager to show files in (not on Android).
+    bool canShowInFileManager() const;
     Q_INVOKABLE void openUrls(const QList<QUrl>& urls);
     /// Close a tab without asking (QML asks about unsaved changes first). The last tab is replaced by a new one.
     Q_INVOKABLE void closeTab(int index);
@@ -486,6 +495,7 @@ public:
     Q_INVOKABLE void toggleSetsquare() { toggleGeometryTool("setsquare"); }
     Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
     /// Which one lies on the page ("" if none).
+    Q_PROPERTY(bool canShowInFileManager READ canShowInFileManager CONSTANT)
     Q_PROPERTY(QString geometryTool READ geometryTool NOTIFY toolChanged)
     QString geometryTool() const;
     /// The setsquare / compass is put aside for a moment (its pill stays, small; a tap brings it back).

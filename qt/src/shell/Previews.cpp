@@ -278,11 +278,14 @@ QImage render(const DocumentItem& item) {
     if (item.xopp.empty() && !item.image.empty()) {
         return ImageFile::read(item.image, PreviewCache::WIDTH);  // an image alone: a thumbnail of it
     }
-    if (!item.md.empty()) {
-        // A Markdown file: its title page as it opens (enough of its text for the pages up to it)
+    if (!item.md.empty() || item.kind() == DocumentItem::Kind::Text) {
+        // A Markdown file: its title page as it opens (enough of its text for the pages up to it); a text file the
+        // same, as plain text
         const size_t title = static_cast<size_t>(std::max(0, titleOf(item)));
         const size_t bytes = std::min(MarkdownFile::MAX_BYTES, (title + 1) * 16384);
-        auto doc = MarkdownFile::document(MarkdownFile::read(item.md, bytes), title + 1);
+        auto doc = MarkdownFile::document(item.md.empty() ? MarkdownFile::readAsPlainText(item.other, bytes)
+                                                          : MarkdownFile::read(item.md, bytes),
+                                          title + 1);
         return ThumbnailProvider::renderDocument(*doc, std::min(title, doc->getPageCount() - 1), PreviewCache::WIDTH);
     }
     auto loaded = DocumentSession::loadFile(item.main());
@@ -440,7 +443,7 @@ void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves
             }
             continue;
         }
-        const DocumentItem item = DocumentFiles::itemOf(to);
+        const DocumentItem item = DocumentFiles::itemOf(to, DocumentFiles::TextFiles);
         if (!item.valid() || item.main() != to) {
             continue;
         }
@@ -536,7 +539,7 @@ QQuickImageResponse* PreviewProvider::requestImageResponse(const QString& id, co
                                 .toStdString());
     pool().start([response, file] {
         QImage img;
-        if (const DocumentItem item = DocumentFiles::itemOf(file); item.valid()) {
+        if (const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles); item.valid()) {
             img = PreviewCache::preview(item);
         }
         QMetaObject::invokeMethod(

@@ -5,11 +5,13 @@
 #include <QDateTime>
 
 #include <algorithm>
+#include <map>
 #include <set>
 
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QMimeDatabase>
 #include <QPointer>
 #include <QThreadPool>
 
@@ -25,12 +27,16 @@ fs::path toPath(const QString& s) { return fs::path(s.toStdString()); }
 
 QDateTime modifiedOf(const DocumentItem& item) {
     QDateTime t;
-    for (const fs::path& f: {item.xopp, item.pdf, item.md, item.image}) {
+    for (const fs::path& f: {item.xopp, item.pdf, item.md, item.image, item.other}) {
         if (!f.empty()) {
             t = std::max(t, QFileInfo(qstr(f)).lastModified());
         }
     }
     return t;
+}
+bool isOtherKind(const DocumentItem& item) {
+    const auto k = item.kind();
+    return k == DocumentItem::Kind::Text || k == DocumentItem::Kind::Other;
 }
 }  // namespace
 
@@ -59,6 +65,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     query.clear();
     cacheUsage = {-1, 0};
     cachesRemoved = false;
+    filter = lib ? lib->showFilter() : ShowFilter();
     if (lib) {
         DocumentPlaces::setLibrary(lib->root(), lib->placesFile());
         openCache();
@@ -81,6 +88,7 @@ void LibraryModel::setLibrary(std::unique_ptr<Library> library) {
     Q_EMIT folderChanged();
     Q_EMIT searchChanged();
     Q_EMIT cacheChanged();
+    Q_EMIT showChanged();
     refresh();
 }
 
@@ -267,8 +275,9 @@ void LibraryModel::refresh() {
         currentFolder.clear();  // the folder is gone
         Q_EMIT folderChanged();
     }
-    // The whole library: search index, previews, folders to watch.
-    auto all = DocumentFiles::scanRecursive(lib->root());
+    // The whole library: search index (with the text files when they are shown; other files are found by their
+    // names), previews, folders to watch.
+    auto all = DocumentFiles::scanRecursive(lib->root(), filter.text ? DocumentFiles::TextFiles : DocumentFiles::Documents);
     idx->update(all);
     QThreadPool::globalInstance()->start([all] { PreviewCache::prune(all); });
     auto folders = DocumentFiles::foldersRecursive(lib->root());
@@ -309,23 +318,38 @@ void LibraryModel::watchFolders(const std::vector<fs::path>& folders) {
 void LibraryModel::rebuild() {
     std::vector<Row> newRows;
     if (lib) {
-        auto itemRow = [this](const DocumentItem& item) {
+        const unsigned include = filter.include();
+        auto itemRow = [](const DocumentItem& item) {
             Row r;
             r.path = item.main();
             r.item = item;
             r.name = QString::fromStdString(item.name());
             r.modified = modifiedOf(item);
+            if (isOtherKind(item)) {
+                std::error_code ec;
+                const auto size = fs::file_size(item.other, ec);
+                r.size = ec ? -1 : static_cast<qint64>(size);
+                r.icon = fileIconOf(item.other);
+            }
             return r;
         };
-        auto folderRow = [](const fs::path& f) {
+        auto folderRow = [this, include](const fs::path& f) {
             Row r;
             r.isFolder = true;
             r.path = f;
             r.name = QString::fromStdString(f.filename().string());
             r.modified = QFileInfo(qstr(f)).lastModified();
-            const auto inside = DocumentFiles::scan(f);
-            r.itemCount = static_cast<int>(inside.folders.size() + inside.items.size());
+            const auto inside = DocumentFiles::scan(f, include);
+            r.itemCount = static_cast<int>(inside.folders.size() +
+                                           std::count_if(inside.items.begin(), inside.items.end(),
+                                                         [this](const DocumentItem& i) { return filter.shows(i); }));
             return r;
+        };
+        // The documents of the library that are shown
+        auto allShown = [this, include] {
+            auto all = DocumentFiles::scanRecursive(lib->root(), include);
+            std::erase_if(all, [this](const DocumentItem& i) { return !filter.shows(i); });
+            return all;
         };
         if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty() && onlyNames) {
             // Names only: the folders (not in the flat list, which shows no folders), then the documents
@@ -339,7 +363,7 @@ void LibraryModel::rebuild() {
                 }
             }
             std::vector<Row> docRows;
-            for (const auto& item: DocumentFiles::scanRecursive(lib->root())) {
+            for (const auto& item: allShown()) {
                 Row r = itemRow(item);
                 if (LibraryIndex::simplified(r.name).contains(q, Qt::CaseInsensitive)) {
                     r.hit.inName = true;
@@ -359,27 +383,47 @@ void LibraryModel::rebuild() {
                     newRows.push_back(std::move(r));
                 }
             }
+            // (other files are not in the index: found by their names, after the documents found by theirs)
+            std::vector<Row> otherRows;
+            if (filter.other) {
+                for (const auto& item: DocumentFiles::scanRecursive(lib->root(), DocumentFiles::OtherFiles)) {
+                    if (item.kind() == DocumentItem::Kind::Other &&
+                        LibraryIndex::simplified(QString::fromStdString(item.name())).contains(q, Qt::CaseInsensitive)) {
+                        Row r = itemRow(item);
+                        r.hit.file = item.main();
+                        r.hit.inName = true;
+                        otherRows.push_back(std::move(r));
+                    }
+                }
+            }
             for (auto& hit: idx->search(query)) {
-                const DocumentItem item = DocumentFiles::itemOf(hit.file);
-                if (item.valid()) {
+                const DocumentItem item = DocumentFiles::itemOf(hit.file, include);
+                if (item.valid() && filter.shows(item)) {
+                    if (!hit.inName && !otherRows.empty()) {
+                        std::move(otherRows.begin(), otherRows.end(), std::back_inserter(newRows));
+                        otherRows.clear();
+                    }
                     Row r = itemRow(item);
                     r.hit = std::move(hit);
                     newRows.push_back(std::move(r));
                 }
             }
+            std::move(otherRows.begin(), otherRows.end(), std::back_inserter(newRows));
         } else {
             std::vector<Row> folderRows, docRows;
             if (flatView) {
-                for (const auto& item: DocumentFiles::scanRecursive(lib->root())) {
+                for (const auto& item: allShown()) {
                     docRows.push_back(itemRow(item));
                 }
             } else {
-                const auto listing = DocumentFiles::scan(currentDir());
+                const auto listing = DocumentFiles::scan(currentDir(), include);
                 for (const auto& f: listing.folders) {
                     folderRows.push_back(folderRow(f));
                 }
                 for (const auto& item: listing.items) {
-                    docRows.push_back(itemRow(item));
+                    if (filter.shows(item)) {
+                        docRows.push_back(itemRow(item));
+                    }
                 }
             }
             if (sortKey == "read") {
@@ -467,7 +511,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return QString::fromStdString(rel);
         }
         case PreviewRole:
-            return r.isFolder ? QString() : PreviewCache::url(r.item);
+            // (other files have none: an icon of their type)
+            return r.isFolder || r.item.kind() == DocumentItem::Kind::Other ? QString() : PreviewCache::url(r.item);
         case ModifiedRole:
             return r.modified;
         case HasPdfRole:
@@ -523,6 +568,18 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
         }
         case HitPassageBaseRole:
             return r.isFolder || r.hit.blockHits.empty() ? QString() : MdSnippetProvider::baseUrl(r.item, query);
+        case SizeRole:
+            if (r.isFolder) {
+                return -1;
+            }
+            if (r.size < 0) {
+                std::error_code ec;
+                const auto size = fs::file_size(r.path, ec);
+                return ec ? qint64(-1) : static_cast<qint64>(size);
+            }
+            return r.size;
+        case FileIconRole:
+            return r.icon;
         default:
             return {};
     }
@@ -552,7 +609,98 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {KindRole, "kind"},
             {HybridRole, "hybrid"},
             {HitPassageListRole, "hitPassageList"},
-            {HitPassageBaseRole, "hitPassageBase"}};
+            {HitPassageBaseRole, "hitPassageBase"},
+            {SizeRole, "size"},
+            {FileIconRole, "fileIcon"}};
+}
+
+void LibraryModel::setShowFilter(const ShowFilter& f) {
+    if (f == filter) {
+        return;
+    }
+    const bool indexChanges = f.text != filter.text;
+    filter = f;
+    if (lib) {
+        lib->setShowFilter(filter);
+    }
+    Q_EMIT showChanged();
+    if (indexChanges) {
+        refresh();  // text files come into the index, or go
+    } else {
+        rebuild();
+    }
+}
+
+QVariantMap LibraryModel::show() const {
+    return {{"notes", filter.notes},   {"pdfs", filter.pdfs}, {"onlyPdfsWithNotes", filter.onlyPdfsWithNotes},
+            {"markdown", filter.markdown}, {"images", filter.images}, {"text", filter.text},
+            {"other", filter.other}};
+}
+
+void LibraryModel::setShown(const QString& key, bool shown) {
+    ShowFilter f = filter;
+    bool* flags[] = {&f.notes, &f.pdfs, &f.onlyPdfsWithNotes, &f.markdown, &f.images, &f.text, &f.other};
+    const char* keys[] = {"notes", "pdfs", "onlyPdfsWithNotes", "markdown", "images", "text", "other"};
+    for (size_t i = 0; i < std::size(keys); ++i) {
+        if (key == QLatin1String(keys[i])) {
+            *flags[i] = shown;
+            setShowFilter(f);
+            return;
+        }
+    }
+}
+
+void LibraryModel::resetShown() { setShowFilter(ShowFilter()); }
+
+QString LibraryModel::fileIconOf(const fs::path& file) {
+    if (DocumentFiles::isTextFile(file)) {
+        return QStringLiteral("xqt-file-code");
+    }
+    // The common ones by their extension (the MIME database of a system can be changed by an office suite)
+    static const std::map<QString, QString> known{
+            {"doc", "xqt-file-doc"},           {"docx", "xqt-file-doc"},         {"odt", "xqt-file-doc"},
+            {"rtf", "xqt-file-doc"},           {"pages", "xqt-file-doc"},        {"epub", "xqt-file-doc"},
+            {"xls", "xqt-file-spreadsheet"},   {"xlsx", "xqt-file-spreadsheet"}, {"ods", "xqt-file-spreadsheet"},
+            {"numbers", "xqt-file-spreadsheet"}, {"ppt", "xqt-file-slides"},     {"pptx", "xqt-file-slides"},
+            {"odp", "xqt-file-slides"},        {"key", "xqt-file-slides"},       {"zip", "xqt-file-archive"},
+            {"7z", "xqt-file-archive"},        {"rar", "xqt-file-archive"},      {"tar", "xqt-file-archive"},
+            {"gz", "xqt-file-archive"},        {"tgz", "xqt-file-archive"},      {"bz2", "xqt-file-archive"},
+            {"xz", "xqt-file-archive"}};
+    if (auto it = known.find(QString::fromStdString(file.extension().string()).mid(1).toLower()); it != known.end()) {
+        return it->second;
+    }
+    static const QMimeDatabase db;
+    const QMimeType type = db.mimeTypeForFile(qstr(file), QMimeDatabase::MatchExtension);
+    const QString name = type.name(), generic = type.genericIconName();
+    if (generic == QLatin1String("x-office-spreadsheet") || name.contains(QLatin1String("spreadsheet")) ||
+        name == QLatin1String("text/csv")) {
+        return QStringLiteral("xqt-file-spreadsheet");
+    }
+    if (generic == QLatin1String("x-office-presentation") || name.contains(QLatin1String("presentation"))) {
+        return QStringLiteral("xqt-file-slides");
+    }
+    if (generic == QLatin1String("x-office-document") || name.contains(QLatin1String("wordprocessing")) ||
+        name.contains(QLatin1String("msword")) || name.contains(QLatin1String("opendocument.text")) ||
+        name == QLatin1String("application/rtf") || name == QLatin1String("application/epub+zip")) {
+        return QStringLiteral("xqt-file-doc");
+    }
+    if (generic == QLatin1String("package-x-generic") || name.contains(QLatin1String("zip")) ||
+        name.contains(QLatin1String("compressed")) || name.contains(QLatin1String("-tar"))) {
+        return QStringLiteral("xqt-file-archive");
+    }
+    if (name.startsWith(QLatin1String("audio/"))) {
+        return QStringLiteral("xqt-file-audio");
+    }
+    if (name.startsWith(QLatin1String("video/"))) {
+        return QStringLiteral("xqt-file-video");
+    }
+    if (name.startsWith(QLatin1String("image/"))) {
+        return QStringLiteral("xqt-file-image");
+    }
+    if (name.startsWith(QLatin1String("text/"))) {
+        return QStringLiteral("xqt-file-code");
+    }
+    return QStringLiteral("xqt-file");
 }
 
 void LibraryModel::filesMoved(const DocumentFiles::Result& r) {
@@ -653,12 +801,13 @@ void LibraryModel::copyInBackground(std::vector<fs::path> files, fs::path target
     ++importJobs;
     Q_EMIT importingChanged();
     QPointer<LibraryModel> self(this);
-    // Copying (large PDFs) and rewriting .xopp files in the background.
-    QThreadPool::globalInstance()->start([self, files, target] {
+    // Copying (large PDFs) and rewriting .xopp files in the background. Text and other files too when they are
+    // shown.
+    QThreadPool::globalInstance()->start([self, files, target, include = filter.include()] {
         int imported = 0;
         QStringList errors;
         for (const auto& f: files) {
-            const auto r = DocumentFiles::import(f, target);
+            const auto r = DocumentFiles::import(f, target, include);
             imported += r.documents;
             if (!r.error.empty()) {
                 errors << QString::fromStdString(r.error);
@@ -810,7 +959,7 @@ bool LibraryModel::transferTo(const QStringList& paths, const QString& folder, b
     for (const auto& f: files) {
         std::error_code ec;
         const auto r = fs::is_directory(f, ec) ? DocumentFiles::moveFolder(f, target)
-                                               : DocumentFiles::move(DocumentFiles::itemOf(f), target);
+                                               : DocumentFiles::move(DocumentFiles::itemOf(f, DocumentFiles::AllFiles), target);
         if (!r.ok) {
             errors << QString::fromStdString(r.error);
             continue;
@@ -833,7 +982,7 @@ bool LibraryModel::trashPaths(const QStringList& paths) {
         const fs::path f = toPath(p);
         std::error_code ec;
         const auto r = fs::is_directory(f, ec) ? DocumentFiles::trashFolder(f)
-                                               : DocumentFiles::trash(DocumentFiles::itemOf(f));
+                                               : DocumentFiles::trash(DocumentFiles::itemOf(f, DocumentFiles::AllFiles));
         if (!r.ok) {
             errors << QString::fromStdString(r.error);
         } else if (onFilesChanged) {

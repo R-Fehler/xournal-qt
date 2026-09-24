@@ -1,6 +1,7 @@
 #include "Library.h"
 
 #include <algorithm>
+#include <functional>
 #include <set>
 #include <shared_mutex>
 
@@ -70,6 +71,11 @@ bool Library::isTemporary() const {
 
 QString Library::name() const { return QString::fromStdString(rootDir.filename().string()); }
 
+bool Library::isInLibrariesFolder() const {
+    const fs::path folder = normalized(librariesFolder());
+    return rootDir != folder && DocumentFiles::remap(rootDir, folder, "/") != rootDir;
+}
+
 bool Library::isDefault() const { return rootDir == normalized(defaultRoot()); }
 
 std::string Library::key() const { return hashOf(rootDir.string(), 12).toStdString(); }
@@ -89,16 +95,46 @@ CacheLocation::Mode Library::cacheMode() const {
                    : CacheLocation::Mode::Folders;
 }
 
-void Library::setCacheMode(CacheLocation::Mode mode) const {
-    const fs::path file = configDir() / "library.json";
+namespace {
+/// Change the settings of a library in its "library.json" (the others stay as they are).
+void changeSettings(const fs::path& file, const fs::path& root, const std::function<void(QJsonObject&)>& change) {
     QJsonObject settings = settingsOf(file);
-    settings["root"] = QString::fromStdString(rootDir.string());  // (for people looking at the folder)
-    settings["cache"] = mode == CacheLocation::Mode::AppCache ? "app" : "folders";
+    settings["root"] = QString::fromStdString(root.string());  // (for people looking at the folder)
+    change(settings);
     QSaveFile f(QString::fromStdString(file.string()));
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(settings).toJson());
         f.commit();
     }
+}
+}  // namespace
+
+void Library::setCacheMode(CacheLocation::Mode mode) const {
+    changeSettings(configDir() / "library.json", rootDir, [mode](QJsonObject& settings) {
+        settings["cache"] = mode == CacheLocation::Mode::AppCache ? "app" : "folders";
+    });
+}
+
+ShowFilter Library::showFilter() const {
+    const QJsonObject show = settingsOf(configDir() / "library.json").value("show").toObject();
+    ShowFilter f;
+    auto read = [&](const char* key, bool& value) { value = show.value(QLatin1String(key)).toBool(value); };
+    read("notes", f.notes);
+    read("pdfs", f.pdfs);
+    read("onlyPdfsWithNotes", f.onlyPdfsWithNotes);
+    read("markdown", f.markdown);
+    read("images", f.images);
+    read("text", f.text);
+    read("other", f.other);
+    return f;
+}
+
+void Library::setShowFilter(const ShowFilter& f) const {
+    changeSettings(configDir() / "library.json", rootDir, [&f](QJsonObject& settings) {
+        settings["show"] = QJsonObject{{"notes", f.notes},   {"pdfs", f.pdfs}, {"onlyPdfsWithNotes", f.onlyPdfsWithNotes},
+                                       {"markdown", f.markdown}, {"images", f.images}, {"text", f.text},
+                                       {"other", f.other}};
+    });
 }
 
 fs::path Library::placesFile() const {
@@ -140,7 +176,8 @@ QString documentStamp(const DocumentItem& item) {
     QString stamp;
     const fs::path none;
     for (const fs::path& f: {item.xopp, item.pdf, item.xopp.empty() ? none : DocumentFiles::attachmentOf(item.xopp),
-                             item.xopp.empty() ? none : DocumentFiles::pagesOf(item.xopp), item.md, item.image}) {
+                             item.xopp.empty() ? none : DocumentFiles::pagesOf(item.xopp), item.md, item.image,
+                             item.other}) {
         if (!f.empty()) {
             stamp += fileStamp(f) + ';';
         }
@@ -164,12 +201,19 @@ QString ownStamp(const DocumentItem& item) {
     }
     return item.pdf.empty() ? fileStamp(item.main()) : QString();
 }
-/// The kind of an entry: what it read ("xopp" also for .xoj, "pdf", "md", "image").
+/// The kind of an entry: what it read ("xopp" also for .xoj, "pdf", "md", "image", "text").
 QString entryKind(const DocumentItem& item) {
     if (!item.xopp.empty()) {
         return QStringLiteral("xopp");
     }
-    return !item.pdf.empty() ? QStringLiteral("pdf") : !item.md.empty() ? QStringLiteral("md") : QStringLiteral("image");
+    return !item.pdf.empty()   ? QStringLiteral("pdf")
+           : !item.md.empty()  ? QStringLiteral("md")
+           : !item.other.empty() ? QStringLiteral("text")
+                                 : QStringLiteral("image");
+}
+/// Entries without pages: a Markdown file, a text file, an image
+bool pageless(const QString& kind) {
+    return kind == QLatin1String("md") || kind == QLatin1String("text") || kind == QLatin1String("image");
 }
 }  // namespace
 
@@ -269,6 +313,8 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
         notes.insert(QStringLiteral("levels"), levels);
         notes.insert(QStringLiteral("links"), QCborArray::fromStringList(e.links));
         notes.insert(QStringLiteral("wikiLinks"), QCborArray::fromStringList(e.wikiLinks));
+    } else if (e.kind == QLatin1String("text")) {
+        notes.insert(QStringLiteral("blocks"), QCborArray::fromStringList(e.blockText));
     }
     return notes;
 }
@@ -320,6 +366,11 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
         }
         for (const auto& l: notes.value(QStringLiteral("wikiLinks")).toArray()) {
             e->wikiLinks << l.toString();
+        }
+    } else if (e->kind == QLatin1String("text")) {
+        for (const auto& b: notes.value(QStringLiteral("blocks")).toArray()) {
+            e->blockText << b.toString();
+            e->blockLevel.push_back(0);
         }
     }
     if (e->showsPdfPages()) {
@@ -566,6 +617,22 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
         }
         for (const md::LinkTarget& l: md::linksOf(doc)) {
             (l.wiki ? e->wikiLinks : e->links) << QString::fromStdString(l.target);
+        }
+        return e;
+    }
+    if (!item.other.empty()) {
+        // A text file: its text (a big one: its name)
+        ++docsRead;
+        QFile f(qstr(item.other));
+        if (f.size() <= TEXT_LIMIT && f.open(QIODevice::ReadOnly)) {
+            QByteArray bytes = f.readAll();
+            if (bytes.startsWith("\xEF\xBB\xBF")) {
+                bytes.remove(0, 3);
+            }
+            if (!bytes.contains('\0')) {  // (not text after all)
+                e->blockText << simplified(QString::fromUtf8(bytes));
+                e->blockLevel.push_back(0);
+            }
         }
         return e;
     }
@@ -876,7 +943,7 @@ void LibraryIndex::applyMoves(const std::vector<std::pair<fs::path, fs::path>>& 
             }
             continue;
         }
-        const DocumentItem item = DocumentFiles::itemOf(to);
+        const DocumentItem item = DocumentFiles::itemOf(to, DocumentFiles::TextFiles);
         if (!item.valid() || item.main() != to) {
             continue;  // (the PDF of a pair: the .xopp's move takes care of it)
         }
@@ -945,6 +1012,9 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
             const int level = e->blockLevel[static_cast<size_t>(b)];
             if (const int n = count(e->blockText[b]); n > 0) {
                 h.count += n;
+                if (e->kind != QLatin1String("md")) {
+                    continue;  // a text file: its hits and the text around the first one
+                }
                 ++h.pages;
                 QStringList path;
                 for (const auto& [l, text]: headings) {
@@ -1010,7 +1080,7 @@ std::map<int, QString> LibraryIndex::knownPdfText(const fs::path& pdf) const {
 int LibraryIndex::pageCount(const fs::path& file) const {
     std::lock_guard lock(mtx);
     const EntryPtr e = find(file);
-    return e && e->kind != QLatin1String("md") && e->kind != QLatin1String("image") ? e->pageCount() : -1;
+    return e && !pageless(e->kind) ? e->pageCount() : -1;
 }
 
 QString LibraryIndex::simplified(const QString& text) { return text.simplified(); }

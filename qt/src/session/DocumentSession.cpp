@@ -768,7 +768,7 @@ fs::path DocumentSession::suggestSavePath() const {
         }
         return suggested;
     }
-    if (!hasFilePath() && !shownPath.empty() && background.empty() && !hasExtension(shownPath, ".md")) {
+    if (!hasFilePath() && !shownPath.empty() && background.empty() && !shownReadOnly) {
         // An image: its .xopp next to it (one document with it in the library)
         fs::path suggested = shownPath;
         suggested.replace_extension(".xopp");
@@ -798,11 +798,12 @@ fs::path DocumentSession::documentFile() const {
 }
 
 bool DocumentSession::isReadOnly() const {
-    return !shownPath.empty() && hasExtension(shownPath, ".md") && !hasFilePath();
+    return !shownPath.empty() && shownReadOnly && !hasFilePath();
 }
 
-void DocumentSession::setShownFile(const fs::path& file) {
+void DocumentSession::setShownFile(const fs::path& file, bool readOnly) {
     shownPath = file;
+    shownReadOnly = readOnly || hasExtension(file, ".md");
     Q_EMIT filePathChanged();
 }
 
@@ -902,6 +903,7 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     hybridBase.clear();  // (the PDF pages may have been renumbered)
     pdfPages->finishStaged();  // (the file under the other name: no .xopp refers to it now)
     shownPath.clear();         // (it is this .xopp now)
+    shownReadOnly = false;
     // Port of Control::resetSavedStatus
     undoRedo->documentSaved();
     undoRedoChanged();

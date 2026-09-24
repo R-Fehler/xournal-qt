@@ -52,7 +52,7 @@ fs::path folderOf(DocumentSession& session) {
         }
     }
     const QByteArray key = QByteArray::fromStdString(file.string()) + '\n' +
-                           documentStamp(DocumentFiles::itemOf(file)).toUtf8() + '\n' +
+                           documentStamp(DocumentFiles::itemOf(file, DocumentFiles::TextFiles)).toUtf8() + '\n' +
                            QByteArray::fromStdString(pdf.string()) + '|' + fileStamp(pdf).toUtf8();
     const QString name =
             QString::fromLatin1(QCryptographicHash::hash(key, QCryptographicHash::Sha1).toHex().left(24));
@@ -233,7 +233,7 @@ void PageSketches::seedTitlePage(quint64 id) {
     if (!s || s->isModified() || s->documentFile().empty()) {
         return;
     }
-    const DocumentItem item = DocumentFiles::itemOf(s->documentFile());
+    const DocumentItem item = DocumentFiles::itemOf(s->documentFile(), DocumentFiles::TextFiles);
     const size_t pages = s->getDocument()->getPageCount();
     if (!item.valid() || pages == 0) {
         return;
