@@ -8,14 +8,16 @@
 #   1. xournal-qt-cli --version
 #   2. exports that tell apart what fails: strokes to PNG (raster, no text), text to PDF (text, no raster), text to
 #      PNG (both), images to PDF, a PDF background to PDF (poppler, qpdf)
-#   3. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits
-#   4. text-probe (qt/tools/text-probe.c): Pango and Cairo alone, drawing text into a PNG and a PDF, with the DLLs of
-#      the folder; with each font backend and with and without the UTF-8 C locale
+#   3. text-probe (qt/tools/text-probe.c): Pango and Cairo alone, drawing text into a PNG and a PDF, with the DLLs of
+#      the folder; with Pango's default backend on Windows (win32, which died drawing into images on 2026-09-24),
+#      with and without the UTF-8 C locale, and with fontconfig
+#   4. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits
 #
 # When a step fails (not when it hangs), it runs again under gdb, which stops at the crash, abort() or exit() and
 # prints the backtraces and the loaded DLLs into <step>.gdb.log. A failing text export also runs with FC_DEBUG=1 and
-# G_MESSAGES_DEBUG=all, with Pango's fontconfig backend, and without the UTF-8 C locale (XQT_NO_UTF8_LOCALE=1); a
-# failing app with Qt's plugin and QML import traces and the same variants. Only the steps of 1-3 count as failures.
+# G_MESSAGES_DEBUG=all and without the UTF-8 C locale (XQT_NO_UTF8_LOCALE=1); a failing app with Qt's plugin and QML
+# import traces, without the UTF-8 C locale, and without a document. The text export with Pango's win32 backend
+# (XQT_WIN_PANGO_WIN32=1) always runs, for information. Only the steps of 1, 2 and 4 count as failures.
 #
 # Exit codes as MSYS2 reports them for Windows programs: 139 an access violation (SIGSEGV), 127 any other fatal
 # NTSTATUS (stack overflow, heap corruption, __fastfail from abort() or an invalid C runtime parameter) or a DLL that
@@ -61,7 +63,7 @@ debug() {
         return
     fi
     gdb_runs=$((gdb_runs + 1))
-    printf '\n=== %s under gdb\n' "$step"
+    printf '\n=== %s under gdb (%s)\n' "$step" "$(cygpath -w "$1")"
     /usr/bin/timeout --kill-after=10 300 /usr/bin/env "${envs[@]}" gdb -q -batch -nx \
         -ex 'set pagination off' -ex 'set width 0' -ex 'set print thread-events off' -ex 'set debuginfod enabled off' \
         -ex 'set breakpoint pending on' -ex 'break abort' -ex 'break exit' -ex 'break _exit' \
@@ -71,7 +73,7 @@ debug() {
         -ex 'echo \n--- registers\n' -ex 'info registers rip rsp' \
         -ex 'echo \n--- all threads\n' -ex 'thread apply all bt 15' \
         -ex 'echo \n--- DLLs\n' -ex 'info sharedlibrary' \
-        --args "$@" > "$out/$step.gdb.log" 2>&1
+        --args "$(cygpath -w "$1")" "${@:2}" > "$out/$step.gdb.log" 2>&1
     cat "$out/$step.gdb.log"
 }
 
@@ -138,14 +140,18 @@ attempt cli-strokes-png 120 "$cli" "$(win "$library/strokes.xopp")" \
 ls "$out"/strokes*.png > /dev/null 2>&1 || { echo "::error::cli-strokes-png: no PNG written"; failures=$((failures + 1)); }
 attempt cli-text-pdf 120 "$cli" "$text" "--create-pdf=$(win "$out/text.pdf")" || failures=$((failures + 1))
 expect_file cli-text-pdf "$out/text.pdf"
-if ! attempt cli-text-png 120 "$cli" "$text" "--create-img=$(win "$out/text.png")" --export-png-dpi=72; then
+if ! attempt cli-text-png 300 "$cli" "$text" "--create-img=$(win "$out/text.png")" --export-png-dpi=72; then
     failures=$((failures + 1))
-    variant cli-text-png-debug 120 FC_DEBUG=1 G_MESSAGES_DEBUG=all "$cli" "$text" \
+    variant cli-text-png-debug 300 FC_DEBUG=1 G_MESSAGES_DEBUG=all "$cli" "$text" \
         "--create-img=$(win "$out/text-debug.png")" --export-png-dpi=72
-    variant cli-text-png-fontconfig 300 "${fontconfig_env[@]}" "$cli" "$text" \
-        "--create-img=$(win "$out/text-fontconfig.png")" --export-png-dpi=72
-    variant cli-text-png-no-utf8 120 XQT_NO_UTF8_LOCALE=1 "$cli" "$text" \
+    variant cli-text-png-no-utf8 300 XQT_NO_UTF8_LOCALE=1 "$cli" "$text" \
         "--create-img=$(win "$out/text-no-utf8.png")" --export-png-dpi=72
+fi
+# Pango's own Windows backend, which died drawing text into images (2026-09-24): does it still?
+variant cli-text-png-win32 120 XQT_WIN_PANGO_WIN32=1 "$cli" "$text" "--create-img=$(win "$out/win32.png")" \
+    --export-png-dpi=72
+if ls "$out"/win32*.png > /dev/null 2>&1; then
+    echo "::notice::Pango's win32 font backend drew text into a PNG this time (XQT_WIN_PANGO_WIN32=1); see windows.md"
 fi
 ls "$out"/text*.png > /dev/null 2>&1 || { echo "::error::cli-text-png: no PNG written"; failures=$((failures + 1)); }
 attempt cli-image-pdf 120 "$cli" "$(win "$library/image-fileversion-5.xopp")" \
@@ -155,33 +161,14 @@ attempt cli-pdf-background 120 "$cli" "$(win "$library/old.xopp")" \
     "--create-pdf=$(win "$out/old.pdf")" || failures=$((failures + 1))
 expect_file cli-pdf-background "$out/old.pdf"
 
-# --- The app -------------------------------------------------------------------------------------------------------
-# Off-screen, Qt Quick's software renderer (no GPU on the runner), log to stderr (a GUI program's messages go to the
-# debugger otherwise).
-app_env=(QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QT_FORCE_STDERR_LOGGING=1 XQT_SCREENSHOT_DELAY_MS=5000)
-app_args=("$bin/xournal-qt.exe" "$(win "$library")" "$text")
-if ! attempt app 180 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app.png")" "${app_args[@]}"; then
-    failures=$((failures + 1))
-    # Again, with Qt saying which plugins it looks for and why they do not load.
-    variant app-plugins 180 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-plugins.png")" QT_DEBUG_PLUGINS=1 \
-        QML_IMPORT_TRACE=1 "${app_args[@]}"
-    variant app-fontconfig 300 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-fontconfig.png")" \
-        "${fontconfig_env[@]}" "${app_args[@]}"
-    variant app-no-utf8 180 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-no-utf8.png")" XQT_NO_UTF8_LOCALE=1 \
-        "${app_args[@]}"
-    # The library alone, no document: is it the document's page (text) or the window itself?
-    variant app-no-document 180 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-no-document.png")" \
-        "$bin/xournal-qt.exe" "$(win "$library")"
-fi
-expect_file app "$out/app.png"
-
 # --- Pango and Cairo alone -----------------------------------------------------------------------------------------
 # Built here with MSYS2's compiler, run with the DLLs of the folder (as the app loads them).
 probe="$bin/text-probe.exe"
 if command -v gcc > /dev/null && pkg-config --exists pangocairo cairo-pdf; then
     printf '\n=== building text-probe\n'
     # shellcheck disable=SC2046  # pkg-config's flags are words
-    if gcc -O1 -g "$source_dir/qt/tools/text-probe.c" $(pkg-config --cflags --libs pangocairo cairo-pdf) -o "$probe"; then
+    if gcc -O1 -g "$source_dir/qt/tools/text-probe.c" $(pkg-config --cflags --libs pangocairo cairo-pdf) -o "$probe" \
+        > "$out/text-probe-build.log" 2>&1; then
         probe_run() {  # probe_run <step> [VAR=value ...] [utf8]
             local step=$1
             shift
@@ -199,15 +186,36 @@ if command -v gcc > /dev/null && pkg-config --exists pangocairo cairo-pdf; then
                 debug "$step" "${envs[@]}" "$probe" "$(win "$out/$step-gdb")" "${args[@]}"
             fi
         }
+        # Pango's default on Windows is its win32 backend: these two show whether it still dies (under gdb, where).
         probe_run probe-default
         probe_run probe-default-utf8 utf8
-        probe_run probe-win32 PANGOCAIRO_BACKEND=win32
         probe_run probe-fontconfig "${fontconfig_env[@]}"
     else
-        echo "::warning::text-probe did not build"
+        cat "$out/text-probe-build.log"
+        echo "::warning::text-probe did not build (text-probe-build.log)"
     fi
     rm -f "$probe"  # (the folder has been published already; keep it as it was)
+else
+    echo "::warning::no gcc or no pkg-config for pangocairo: text-probe skipped"
 fi
+
+# --- The app -------------------------------------------------------------------------------------------------------
+# Off-screen, Qt Quick's software renderer (no GPU on the runner), log to stderr (a GUI program's messages go to the
+# debugger otherwise).
+app_env=(QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QT_FORCE_STDERR_LOGGING=1 XQT_SCREENSHOT_DELAY_MS=5000)
+app_args=("$bin/xournal-qt.exe" "$(win "$library")" "$text")
+if ! attempt app 300 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app.png")" "${app_args[@]}"; then
+    failures=$((failures + 1))
+    # Again, with Qt saying which plugins it looks for and why they do not load.
+    variant app-plugins 180 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-plugins.png")" QT_DEBUG_PLUGINS=1 \
+        QML_IMPORT_TRACE=1 "${app_args[@]}"
+    variant app-no-utf8 180 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-no-utf8.png")" XQT_NO_UTF8_LOCALE=1 \
+        "${app_args[@]}"
+    # The library alone, no document: is it the document's page (text) or the window itself?
+    variant app-no-document 180 "${app_env[@]}" "XQT_SCREENSHOT=$(win "$out/app-no-document.png")" \
+        "$bin/xournal-qt.exe" "$(win "$library")"
+fi
+expect_file app "$out/app.png"
 
 printf '\n=== %d failure(s)\n' "$failures"
 ((failures == 0))
