@@ -125,6 +125,7 @@ set(XQT_QML_FILES
     src/app/qml/LayerList.qml
     src/app/qml/PagePicture.qml
     src/app/qml/RaceWatch.qml
+    src/app/qml/ReferenceSplit.qml
     src/app/qml/Popups.js)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
@@ -162,7 +163,8 @@ if(XQT_BUILD_TESTS)
     # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
     add_executable(xqt-ui-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/main.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
         GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
