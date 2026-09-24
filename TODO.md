@@ -103,6 +103,11 @@ is built.
 ## Ready after a short plan: platform
 
 ### `qt/windows-build`: first Windows build (merged 2026-09-24; `~/xournal_qt_workspace/samples/xournal-qt-windows-x64.zip`; next steps in `qt/docs/windows-roadmap.md`)
+- [~] First feedback from a Surface Pro 8 with Windows 11 (the author, 2026-09-24): "works great". Two bugs, being
+  fixed on `qt/windows-build`:
+  - Pen pressure is constant. There will be an `XQT_LOG_INPUT=1` log and a `xournal-qt-debug.bat` in the zip.
+  - "Open Downloads as a quick library" fails with "cannot open c//": a file URL built by hand. The whole app is
+    being checked for such URL and path conversions.
 - GitHub Actions on a Windows runner with MSYS2 UCRT64 (upstream Xournal++'s toolchain; the C libraries and Qt 6
   come prebuilt), started by hand or by a push to the branch. It produces a zip, with an installer later. QField's
   MSVC + vcpkg way is the fallback.
