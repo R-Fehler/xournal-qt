@@ -1334,7 +1334,8 @@ Rectangle {
         id: importDialog
         title: qsTr("Import into the library")
         fileMode: FileDialog.OpenFiles
-        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf *.md *.png *.jpg *.jpeg *.webp *.heic *.heif)"),
+                      qsTr("All files (*)")]
         onAccepted: {
             const files = selectedFiles, folder = app.library.flat || home.searching ? "" : app.library.folder
             home.confirmImport(app.library.temporary, function() { app.library.importUrls(files, folder) })

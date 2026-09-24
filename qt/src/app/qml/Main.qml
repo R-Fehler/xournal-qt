@@ -1229,7 +1229,9 @@ ApplicationWindow {
         id: openDialog
         title: qsTr("Open document or PDF")
         currentFolder: app.openFolder()
-        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("Xournal++ files (*.xopp *.xoj)"), qsTr("PDF files (*.pdf)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf *.md *.png *.jpg *.jpeg *.webp *.heic *.heif)"),
+                      qsTr("Xournal++ files (*.xopp *.xoj)"), qsTr("PDF files (*.pdf)"), qsTr("Markdown files (*.md)"),
+                      qsTr("Images (*.png *.jpg *.jpeg *.webp *.heic *.heif)"), qsTr("All files (*)")]
         fileMode: FileDialog.OpenFiles
         onAccepted: app.openUrls(selectedFiles)
     }

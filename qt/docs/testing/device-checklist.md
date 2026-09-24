@@ -590,3 +590,4 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       A PDF or `.xopp` result next to it still shows its pages. Tap the second card: the file opens at the page of
       that passage, with that hit current in the search bar (e.g. "2 / 2"), and the read-only note at the bottom left.
       Swipe the row sideways with a finger.
+- [ ] "Open" (Ctrl+O) and the library's "Import" offer Markdown files and images among the documents.
