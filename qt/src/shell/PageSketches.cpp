@@ -506,7 +506,12 @@ void PageSketches::next() {
             const bool sOk = s && s->revision == job.revision && s->image.width() == sl;
             const bool pOk = v && v->revision == job.revision && v->image.width() == pl;
             if (sOk && (!job.preview || pOk)) {
-                continue;  // made from a sharp thumbnail meanwhile
+                // Made from a sharp thumbnail meanwhile (or by a draw that began before the document had its file):
+                // as saved, its preview still goes to disk
+                if (pOk && !file.empty() && !stored) {
+                    jobs.push_front(Job{job.session, job.pageId, job.revision, true, true});
+                }
+                continue;
             }
             if (v && v->revision == job.revision && v->image.width() >= target) {
                 from = v->image;

@@ -4,6 +4,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
 #include <iostream>
 #include <memory>
 
@@ -27,9 +28,12 @@
 #include "util/PathUtil.h"
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfDocument.h"
+#include "render/RenderService.h"
+#include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "shell/PageSketches.h"
 #include "CanvasMemory.h"
+#include "CanvasPage.h"
 #include "CanvasView.h"
 #include "shell/PagesModel.h"
 #include "shell/TabManager.h"
@@ -430,6 +434,33 @@ TEST_F(Sketches, changedPagesAreStoredOnceTheDocumentIsSaved) {
     EXPECT_NE(now, saved) << "the file changed: another folder";
     EXPECT_EQ(storedFiles(now), 4u);
     EXPECT_NE(contentOf(now / "0.jpg"), before) << "the page as saved now";
+}
+
+// A page waiting for its sketch when the document is saved may get its preview another way before its turn (its
+// sharp thumbnail, drawn for the sidebar; or a draw from before the save): then it is stored all the same.
+TEST_F(Sketches, aPreviewThatArrivesWhileItsPageWaitsIsStoredAsWell) {
+    QTemporaryDir dir;
+    AppController c;
+    c.newDocument();
+    c.insertPages(1, 0, -1, false, 3);
+    DocumentSession* s = c.tabManager().currentSession();
+    // The sketches wait while a page in view is rendered: here for as long as the test says
+    RenderService* render = c.context().getRenderService();
+    render->blockRerenderZoom(std::chrono::milliseconds(60000));
+    CanvasView* view = c.tabManager().currentView();
+    view->getPage(0)->deleteViewBuffer();
+    view->getPage(0)->getRaster().ensureRendered(false);
+    ASSERT_TRUE(RenderService::visiblePagesBusy());
+    ASSERT_TRUE(c.saveAs(QUrl::fromLocalFile(dir.filePath("doc.xopp"))));
+    processEvents(100);  // (the sketches plan: every page waits)
+    const quint64 id = ThumbnailProvider::idOf(s);
+    QImage sharp(1200, 1697, QImage::Format_RGB32);
+    sharp.fill(Qt::white);
+    PageSketches::instance().offer(id, s->pageId(1), s->pageRevision(1), sharp);
+    ASSERT_FALSE(PageSketches::instance().preview(id, s->pageId(1)).isNull()) << "the sharp one gave the preview";
+    render->unblockRerenderZoom();
+    ASSERT_TRUE(sketched());
+    EXPECT_EQ(storedFiles(PageSketches::instance().diskFolder(id)), 4u) << "every page, also the one offered";
 }
 
 TEST_F(Sketches, theStoredPreviewsUsedLongestAgoGoFirst) {
