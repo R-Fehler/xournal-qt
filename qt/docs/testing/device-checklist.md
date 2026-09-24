@@ -507,3 +507,8 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       document open, it first asks to save it. After OK: no `.xournal_library/` left in the library (a file of your
       own put into one beforehand stays, with its folder), and the app is closed. Open the library again: the cache
       is built again, the cards still show where you were in each document.
+
+## Fast search in open documents (qt/document-search)
+- [ ] Ctrl+F in a long PDF, type a word quickly, key by key, then pause and type on: every letter stays in the field
+      (it used to be set back to the text searched before whenever results came in). The count is that of the text in
+      the field. The same in the tab overview's search and in the library's search.
