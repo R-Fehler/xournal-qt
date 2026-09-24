@@ -76,3 +76,11 @@ if(libzip_FOUND AND TARGET libzip::zip)
     target_link_libraries(xoj-deps INTERFACE libzip::zip)
 endif()
 target_link_libraries(xoj-deps INTERFACE qpdf::libqpdf ZLIB::ZLIB Threads::Threads)
+
+# gettext (upstream's _() through <libintl.h>): part of the C library on Linux and Android, libintl on Windows
+# (MSYS2: mingw-w64-*-gettext-runtime, a dependency of glib).
+if(WIN32)
+    find_package(Intl REQUIRED)
+    target_include_directories(xoj-deps INTERFACE ${Intl_INCLUDE_DIRS})
+    target_link_libraries(xoj-deps INTERFACE ${Intl_LIBRARIES})
+endif()

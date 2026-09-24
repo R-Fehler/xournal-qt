@@ -9,6 +9,8 @@
 #include <shared_mutex>
 
 #include <QElapsedTimer>
+#include <optional>
+
 #include <QCoreApplication>
 #include <QThread>
 #include <QThreadPool>
@@ -24,6 +26,7 @@
 #include "DocumentSession.h"
 #include "MdBox.h"
 #include "TextMatch.h"
+#include "util/PathUtil.h"
 
 namespace xqt {
 
@@ -183,10 +186,10 @@ PdfPageLayout layoutOf(PopplerPage* page) {
 }
 
 PopplerDocument* openPdf(const fs::path& file) {
-    gchar* uri = g_filename_to_uri(file.c_str(), nullptr, nullptr);
+    // (Util::toUri: a path is wchar_t on Windows, and glib wants UTF-8 file names there)
+    const std::optional<std::string> uri = Util::toUri(file);
     GError* error = nullptr;
-    PopplerDocument* doc = uri ? poppler_document_new_from_file(uri, nullptr, &error) : nullptr;
-    g_free(uri);
+    PopplerDocument* doc = uri ? poppler_document_new_from_file(uri->c_str(), nullptr, &error) : nullptr;
     if (error) {
         g_error_free(error);
     }

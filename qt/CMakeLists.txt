@@ -53,6 +53,21 @@ qt_standard_project_setup(REQUIRES 6.5)
 # glib/gio headers use "signals" as an identifier: never use Qt's keyword macros.
 add_compile_definitions(QT_NO_KEYWORDS)
 
+# Windows with MinGW (MSYS2, see docs/windows.md): big translation units (AppController, the QML cache) have more
+# sections than COFF allows by default. And MinGW's C library headers hide M_PI, the POSIX names and more under strict
+# ISO C++ (__STRICT_ANSI__), which upstream's code uses: compile as gnu++20 there, as upstream Xournal++ does on MSYS2.
+# The stack of every thread is 8 MB, as on Linux, not MinGW's 2 MB (a reservation of address space, not memory): the
+# core, Pango and the render workers were only ever run with Linux's.
+if(MINGW)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-Wa,-mbig-obj>")
+    set(CMAKE_CXX_EXTENSIONS ON)
+    add_link_options("LINKER:--stack,8388608")
+endif()
+# <windows.h> must not define min and max macros, whichever header includes it first.
+if(WIN32)
+    add_compile_definitions(NOMINMAX)
+endif()
+
 if(XQT_BUILD_CORE)
     include(cmake/XojCore.cmake)
     if(XQT_BUILD_TESTS)

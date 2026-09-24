@@ -13,9 +13,10 @@ PageFilterModel::PageFilterModel(PagesModel& pages, QObject* parent): QSortFilte
                     invalidateRowsFilter();
                 }
             });
-    for (auto sig: {&QAbstractItemModel::rowsInserted, &QAbstractItemModel::rowsRemoved}) {
-        connect(this, sig, this, &PageFilterModel::countChanged);
-    }
+    // One connect per signal, not a loop over member pointers: with MinGW a signal's address kept in a variable can
+    // be the DLL import thunk's, which Qt does not recognise as the signal ("signal not found", no connection).
+    connect(this, &QAbstractItemModel::rowsInserted, this, &PageFilterModel::countChanged);
+    connect(this, &QAbstractItemModel::rowsRemoved, this, &PageFilterModel::countChanged);
     connect(this, &QAbstractItemModel::modelReset, this, &PageFilterModel::countChanged);
     connect(this, &QAbstractItemModel::layoutChanged, this, &PageFilterModel::countChanged);
 }

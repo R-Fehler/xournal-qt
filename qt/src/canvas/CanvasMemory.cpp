@@ -2,9 +2,16 @@
 
 #include <algorithm>
 
-#include <unistd.h>
-
 #include "CanvasView.h"
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace xqt {
 
@@ -14,12 +21,21 @@ CanvasMemory& CanvasMemory::instance() {
 }
 
 qint64 CanvasMemory::systemMemory() {
+#ifdef _WIN32
+    MEMORYSTATUSEX status{};
+    status.dwLength = sizeof(status);
+    if (!GlobalMemoryStatusEx(&status) || status.ullTotalPhys == 0) {
+        return qint64(8) * 1024 * 1024 * 1024;
+    }
+    return static_cast<qint64>(status.ullTotalPhys);
+#else
     const long pages = sysconf(_SC_PHYS_PAGES);
     const long size = sysconf(_SC_PAGE_SIZE);
     if (pages <= 0 || size <= 0) {
         return qint64(8) * 1024 * 1024 * 1024;
     }
     return static_cast<qint64>(pages) * size;
+#endif
 }
 
 qint64 CanvasMemory::defaultLimit() { return systemMemory() / 4; }

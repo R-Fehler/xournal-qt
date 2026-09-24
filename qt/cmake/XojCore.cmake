@@ -106,6 +106,9 @@ add_executable(xournal-qt-cli "${CMAKE_CURRENT_LIST_DIR}/../cli/main.cpp")
 target_link_libraries(xournal-qt-cli PRIVATE xoj-core)
 set_target_properties(xournal-qt-cli PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+if(WIN32)  # Pango's fontconfig backend, as in the app (docs/windows.md)
+    target_sources(xournal-qt-cli PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsFonts.cpp")
+endif()
 
 # Developer tools and tests
 add_executable(xoj-imgdiff "${CMAKE_CURRENT_LIST_DIR}/../tools/imgdiff.cpp")

@@ -9,6 +9,13 @@
 
 #include "PageRaster.h"
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace xqt {
 
 namespace {
@@ -64,6 +71,8 @@ RenderService::RenderService(int threads, int background) {
             sched_param param{};
             param.sched_priority = 0;
             pthread_setschedparam(pthread_self(), SCHED_IDLE, &param);  // (only when a core is idle)
+#elif defined(_WIN32)
+            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_IDLE);
 #endif
             workerLoop(true);
         });

@@ -15,8 +15,6 @@
 #include <QJsonObject>
 #include <QSaveFile>
 
-#include <unistd.h>
-
 #include "control/xojfile/SaveHandler.h"
 #include "model/Document.h"
 #include "session/DocumentSession.h"
@@ -24,6 +22,14 @@
 #include "util/Util.h"
 
 #include "TabManager.h"
+
+#ifdef _WIN32
+// Last: <windows.h> defines macros (min, max, ERROR, ...) that the headers above must not see.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace xqt {
 
@@ -40,18 +46,36 @@ bool fileExists(const fs::path& p) {
     return !p.empty() && fs::exists(p, ec);
 }
 
-extern "C" void xqtFatalSignal(int sig) {
+/// Saves the unsaved documents once, whichever handler comes first (on Windows a crash can reach both the
+/// exception filter and a signal handler).
+void emergencySaveOnce(const char* what, long code) {
     static std::atomic<int> entered{0};
     if (entered++ == 0) {
-        std::cerr << "\n[xournal-qt] Fatal signal " << sig << ": saving unsaved documents for recovery...\n";
+        std::cerr << "\n[xournal-qt] " << what << " " << code << ": saving unsaved documents for recovery...\n";
         const int n = SessionRecovery::emergencySaveAll();
         std::cerr << "[xournal-qt] " << n << " document(s) saved to " << Util::getAutosaveFilepath().parent_path()
                   << "; they are offered for recovery at the next start.\n";
     }
+}
+
+extern "C" void xqtFatalSignal(int sig) {
+    emergencySaveOnce("Fatal signal", sig);
     // Default handling (core dump for crashes, exit for SIGTERM/SIGINT).
     std::signal(sig, SIG_DFL);
     std::raise(sig);
 }
+
+#ifdef _WIN32
+// Windows reports crashes (access violations, stack overflows, ...) as structured exceptions. MinGW's runtime turns
+// some of them into signals through its own filter; this one comes first and hands on to it afterwards.
+LPTOP_LEVEL_EXCEPTION_FILTER previousExceptionFilter = nullptr;
+
+LONG WINAPI xqtUnhandledException(EXCEPTION_POINTERS* info) {
+    emergencySaveOnce("Fatal exception",
+                      info && info->ExceptionRecord ? static_cast<long>(info->ExceptionRecord->ExceptionCode) : 0);
+    return previousExceptionFilter ? previousExceptionFilter(info) : EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
 }  // namespace
 
 SessionRecovery::SessionRecovery(TabManager& tabs, fs::path journalFile, QObject* parent):
@@ -244,9 +268,27 @@ bool SessionRecovery::processAlive(qint64 pid) {
         return true;
     }
     // Same program? (pids are reused)
+#ifdef _WIN32
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (!process) {
+        return false;
+    }
+    DWORD exitCode = 0;
+    std::wstring image(32768, L'\0');  // (the longest path Windows has)
+    auto size = static_cast<DWORD>(image.size());
+    const bool running = GetExitCodeProcess(process, &exitCode) && exitCode == STILL_ACTIVE &&
+                         QueryFullProcessImageNameW(process, 0, image.data(), &size);
+    CloseHandle(process);
+    if (!running) {
+        return false;
+    }
+    const std::string name =
+            QFileInfo(QString::fromWCharArray(image.data(), static_cast<qsizetype>(size))).fileName().toStdString();
+#else
     std::ifstream comm("/proc/" + std::to_string(pid) + "/comm");
     std::string name;
     std::getline(comm, name);
+#endif
     return name.rfind("xournal-qt", 0) == 0 || name.rfind("xqt-", 0) == 0;
 }
 
@@ -278,9 +320,15 @@ std::vector<SessionRecovery::Candidate> SessionRecovery::findCandidates(const Jo
 }
 
 void SessionRecovery::installCrashHandlers() {
-    for (int sig: {SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGBUS, SIGTERM, SIGINT}) {
+    for (int sig: {SIGSEGV, SIGABRT, SIGFPE, SIGILL, SIGTERM, SIGINT}) {
         std::signal(sig, xqtFatalSignal);
     }
+#ifdef SIGBUS  // (not on Windows)
+    std::signal(SIGBUS, xqtFatalSignal);
+#endif
+#ifdef _WIN32
+    previousExceptionFilter = SetUnhandledExceptionFilter(xqtUnhandledException);
+#endif
 }
 
 int SessionRecovery::emergencySaveAll() {

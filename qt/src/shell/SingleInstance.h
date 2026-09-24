@@ -22,6 +22,10 @@ public:
     explicit SingleInstance(QString key = {}, QObject* parent = nullptr);
     ~SingleInstance() override;
 
+    /// Who runs this process, for socket names that are per user: the uid on Unix, the user name on Windows (local
+    /// sockets are named pipes there, which all users of the machine share).
+    static QString userId();
+
     /// Try to hand the files to a running instance. Returns true if one received them (this process should exit).
     bool sendToRunningInstance(const QStringList& absolutePaths, int timeoutMs = 1000);
     /// Become the primary instance: listen for other instances.

@@ -27,8 +27,6 @@
 
 #include <optional>
 
-#include <unistd.h>
-
 #include "AppController.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
@@ -42,6 +40,9 @@
 #include "session/AppContext.h"
 #ifdef Q_OS_ANDROID
 #include "AndroidSetup.h"
+#endif
+#ifdef Q_OS_WIN
+#include "WindowsSetup.h"
 #endif
 
 Q_IMPORT_QML_PLUGIN(XournalQtPlugin)
@@ -59,6 +60,10 @@ int main(int argc, char* argv[]) {
 #ifdef Q_OS_ANDROID
     // Folders, resources and fonts for the core (GLib, fontconfig), before anything reads them.
     xqt::android::prepareEnvironment();
+#endif
+#ifdef Q_OS_WIN
+    // UTF-8 for std::filesystem's narrow strings, GLib's cache folder, fontconfig (see qt/docs/windows.md).
+    xqt::windows::prepareEnvironment();
 #endif
     // The program icon (the desktop file gives it to the window when installed; this covers the build tree)
     QGuiApplication::setWindowIcon(QIcon::fromTheme(
@@ -99,7 +104,7 @@ int main(int argc, char* argv[]) {
     // One instance per library: a second start hands its files to the running window (as tabs) and exits.
     // Off-screen runs (tests, screenshots) are always independent.
     xqt::SingleInstance instance(library && !library->isDefault()
-                                         ? QString("xournal-qt-%1-%2").arg(getuid()).arg(QString::fromStdString(library->key()))
+                                         ? QString("xournal-qt-%1-%2").arg(xqt::SingleInstance::userId()).arg(QString::fromStdString(library->key()))
                                          : QString());
     // Android starts one activity of the app anyway (launchMode singleTop).
 #ifdef Q_OS_ANDROID

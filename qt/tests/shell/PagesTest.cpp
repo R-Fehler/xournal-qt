@@ -407,6 +407,23 @@ TEST(Pages, filterShowsOnlyPagesWithHits) {
     EXPECT_EQ(filter->count(), 11);
 }
 
+TEST(Pages, filterCountFollowsInsertedAndDeletedPages) {
+    AppController c;
+    c.newDocument();
+    auto* filter = qobject_cast<PageFilterModel*>(c.filteredPagesModel());
+    ASSERT_NE(filter, nullptr);
+    const int before = filter->count();
+    QSignalSpy count(filter, &PageFilterModel::countChanged);
+    DocumentSession* s = c.tabManager().currentSession();
+    s->insertPage(std::make_shared<XojPage>(595.0, 842.0), 1);
+    EXPECT_EQ(filter->count(), before + 1);
+    EXPECT_GE(count.size(), 1) << "rowsInserted must reach countChanged (the page sidebar's count)";
+    count.clear();
+    c.deletePage(1);
+    EXPECT_EQ(filter->count(), before);
+    EXPECT_GE(count.size(), 1) << "rowsRemoved must reach countChanged";
+}
+
 TEST(Pages, typicalAspectFollowsTheDocument) {
     AppController c;
     c.newDocument();

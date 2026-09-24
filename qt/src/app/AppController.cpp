@@ -68,6 +68,7 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "shell/PdfPrinting.h"
 #include "ImageFile.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
@@ -3610,6 +3611,16 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
         Q_EMIT pageActionDone(tr("Written to %1").arg(QFileInfo(printer.outputFileName()).fileName()), false);
         return true;
     }
+#ifdef Q_OS_WIN
+    // No spooler that takes a PDF: the pages go through Qt's print engine, as images.
+    QString error;
+    if (!xqt::printPdfAsImages(QString::fromStdString(file.string()), printer, &error)) {
+        Q_EMIT message(tr("Printing failed"), error, true);
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("Sent to %1").arg(printer.printerName()), false);
+    return true;
+#else
     // Send the PDF to the printer as it is (printing it ourselves would turn it into pixels)
     QStringList arguments{"-d", printer.printerName(), "-n", QString::number(std::max(1, printer.copyCount()))};
     if (printer.printRange() == QPrinter::PageRange && printer.fromPage() > 0) {
@@ -3630,6 +3641,7 @@ bool AppController::printDocument(bool withAnnotations, const QString& range) {
     }
     Q_EMIT pageActionDone(tr("Sent to %1").arg(printer.printerName()), false);
     return true;
+#endif
 }
 
 QUrl AppController::suggestedSaveFile() const {
