@@ -102,10 +102,15 @@ the library is zipped to be sent. Until the library is opened again nothing is c
 positions are kept.
 
 A cache folder holds a few **packs**, one file each, split by how often they change:
-- `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`), name, the size and time of its `.xopp`, the
-  PDF it uses (relative to the folder when it is in the library; next to it: its name) with that PDF's size and
-  time, and per page which PDF page it shows, the text of its text elements and its shape. Small; written again
-  when a `.xopp` in the folder is saved.
+- `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`, `md`, `image`), name, the size and time of
+  its `.xopp` (a Markdown file, an image alone: of that file), the PDF it uses (relative to the folder when it is in
+  the library; next to it: its name) with that PDF's size and time, and per page which PDF page it shows, the text
+  of its text elements and its shape. Small; written again when a `.xopp` in the folder is saved.
+  - A Markdown file has no pages: its entry has the text of its passages (headings, paragraphs, list items, table
+    rows, code blocks), read through md4c without the Markdown syntax, which of them are headings (a hit shows the
+    headings above it), and the targets of its links and `[[wiki links]]` (for backlinks later). Reading it is cheap
+    (plain text, no PDF step); of a file over 2 MB only the start is read (cut at a line end), as it opens.
+  - An image has no text: its entry has its name only.
 - `pdf-text.pack`: per document, the text of the PDF pages it shows, tied to the PDF's size and time. Big; written
   only when a PDF changed or a document came or went. A document with over 1 MB of PDF text gets a file of its own,
   `pdf-text-<hash>.pack`, written only when that text changes.

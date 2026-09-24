@@ -26,6 +26,8 @@
 #include "session/TextMatch.h"
 #include "util/PathUtil.h"
 
+#include "MarkdownFile.h"
+#include "MdPassages.h"
 #include "Previews.h"
 
 namespace xqt {
@@ -254,10 +256,21 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
         text.append(e.elementText[i]);
         aspects.append(e.aspects[static_cast<size_t>(i)]);
     }
-    return QCborMap{{QStringLiteral("kind"), e.kind},       {QStringLiteral("name"), e.name},
-                    {QStringLiteral("xopp"), e.xoppStamp},  {QStringLiteral("pdf"), pdf},
-                    {QStringLiteral("pdfStamp"), e.pdfStamp}, {QStringLiteral("pdfPages"), pdfPages},
-                    {QStringLiteral("text"), text},         {QStringLiteral("aspects"), aspects}};
+    QCborMap notes{{QStringLiteral("kind"), e.kind},       {QStringLiteral("name"), e.name},
+                   {QStringLiteral("xopp"), e.xoppStamp},  {QStringLiteral("pdf"), pdf},
+                   {QStringLiteral("pdfStamp"), e.pdfStamp}, {QStringLiteral("pdfPages"), pdfPages},
+                   {QStringLiteral("text"), text},         {QStringLiteral("aspects"), aspects}};
+    if (e.kind == QLatin1String("md")) {
+        QCborArray levels;
+        for (int level: e.blockLevel) {
+            levels.append(level);
+        }
+        notes.insert(QStringLiteral("blocks"), QCborArray::fromStringList(e.blockText));
+        notes.insert(QStringLiteral("levels"), levels);
+        notes.insert(QStringLiteral("links"), QCborArray::fromStringList(e.links));
+        notes.insert(QStringLiteral("wikiLinks"), QCborArray::fromStringList(e.wikiLinks));
+    }
+    return notes;
 }
 
 namespace {
@@ -291,6 +304,23 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
         e->pdfPage.push_back(static_cast<int>(pdfPages[i].toInteger(-1)));
         e->elementText << texts[i].toString();
         e->aspects.push_back(aspects[i].toDouble());
+    }
+    if (e->kind == QLatin1String("md")) {
+        const QCborArray blocks = notes.value(QStringLiteral("blocks")).toArray();
+        const QCborArray levels = notes.value(QStringLiteral("levels")).toArray();
+        if (blocks.size() != levels.size()) {
+            return nullptr;
+        }
+        for (qsizetype i = 0; i < blocks.size(); ++i) {
+            e->blockText << blocks[i].toString();
+            e->blockLevel.push_back(static_cast<int>(levels[i].toInteger()));
+        }
+        for (const auto& l: notes.value(QStringLiteral("links")).toArray()) {
+            e->links << l.toString();
+        }
+        for (const auto& l: notes.value(QStringLiteral("wikiLinks")).toArray()) {
+            e->wikiLinks << l.toString();
+        }
     }
     if (e->showsPdfPages()) {
         const QCborMap t = text.toMap();
@@ -526,9 +556,22 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     e->kind = entryKind(item);
     e->name = QString::fromStdString(item.name());
     e->xoppStamp = ownStamp(item);
+    if (!item.md.empty()) {
+        // Plain text: its passages through md4c, without the syntax
+        ++docsRead;
+        const md::Document doc = md::parse(MarkdownFile::read(item.md));
+        for (const md::Passage& p: md::passages(doc)) {
+            e->blockText << simplified(QString::fromStdString(p.text));
+            e->blockLevel.push_back(p.kind == md::Passage::Kind::Heading ? p.level : 0);
+        }
+        for (const md::LinkTarget& l: md::linksOf(doc)) {
+            (l.wiki ? e->wikiLinks : e->links) << QString::fromStdString(l.target);
+        }
+        return e;
+    }
     if (item.xopp.empty() && item.pdf.empty()) {
         ++docsRead;
-        return e;  // a Markdown file, an image: its name
+        return e;  // an image: its name
     }
     auto loaded = DocumentSession::loadFile(item.main());
     ++docsRead;
@@ -894,6 +937,26 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
             }
             return static_cast<int>(found.size());
         };
+        // A Markdown file: its passages, each with the headings above it
+        std::vector<std::pair<int, QString>> headings;
+        for (qsizetype b = 0; b < e->blockText.size(); ++b) {
+            const int level = e->blockLevel[static_cast<size_t>(b)];
+            if (const int n = count(e->blockText[b]); n > 0) {
+                h.count += n;
+                ++h.pages;
+                QStringList path;
+                for (const auto& [l, text]: headings) {
+                    path << (text.size() > 40 ? text.left(39) + QStringLiteral("…") : text);
+                }
+                h.blockHits.push_back({static_cast<int>(b), n, path.join(QStringLiteral(" › "))});
+            }
+            if (level > 0) {
+                while (!headings.empty() && headings.back().first >= level) {
+                    headings.pop_back();
+                }
+                headings.emplace_back(level, e->blockText[b]);
+            }
+        }
         for (int p = 0; p < e->pageCount(); ++p) {
             int n = 0;
             if (const int pdfNr = e->pdfPage[static_cast<size_t>(p)]; pdfNr >= 0) {

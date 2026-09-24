@@ -15,6 +15,11 @@
  * file name, in two packs: "notes" (small, written again when a .xopp is saved) and "pdf-text" (big, written when
  * a PDF changed). Opening a library reads the packs of all its folders and merges them.
  *
+ * A Markdown file's entry (in "notes") has the text of its passages (headings, paragraphs, list items, table rows,
+ * code blocks; read through md4c, without the Markdown syntax; the start of a huge file, see MarkdownFile.h), which
+ * of them are headings (for the heading path of a hit), and its links and wiki links. An image's entry has its name
+ * only.
+ *
  * @license GNU GPLv2 or later
  */
 #pragma once
@@ -133,14 +138,21 @@ public:
         int count = 0;       ///< matches on the page
         double aspect = 0;   ///< height / width of the page (0: unknown)
     };
+    /// A passage of a Markdown file with matches (MdPassages.h).
+    struct BlockHits {
+        int block = 0;       ///< the passage (0-based, in the order of md::passages)
+        int count = 0;       ///< matches in it
+        QString headings;    ///< the headings above it: "Lecture 3 › Kalman filter › Prediction"
+    };
     struct Hit {
         fs::path file;       ///< the document's main file
         int count = 0;       ///< matches in the text
-        int pages = 0;       ///< pages with matches
+        int pages = 0;       ///< pages with matches (a Markdown file: passages)
         int firstPage = -1;  ///< first page with a match (0-based)
         bool inName = false;
         QString snippet;     ///< text around the first match
         std::vector<PageHits> pageHits;  ///< the pages with matches, in order
+        std::vector<BlockHits> blockHits;  ///< a Markdown file: the passages with matches, in order
     };
     /// The text of the pages of this PDF read before (by PDF page, 0-based), if it was read from the file as it is now
     /// (same size and time): an open document takes it for its search instead of reading it again.
@@ -181,6 +193,11 @@ private:
         std::vector<int> pdfPage;        ///< per page: the PDF page it shows (-1: none)
         QStringList elementText;         ///< per page: the text of its text elements (simplified)
         std::vector<double> aspects;     ///< per page: height / width
+        // A Markdown file (no pages): its text, read through md4c without the syntax
+        QStringList blockText;           ///< per passage (MdPassages.h): its text (simplified)
+        std::vector<int> blockLevel;     ///< per passage: a heading's level (0: not a heading)
+        QStringList links;               ///< link targets (for backlinks)
+        QStringList wikiLinks;           ///< [[wiki link]] targets
         int pageCount() const { return static_cast<int>(elementText.size()); }
         bool showsPdfPages() const;
         /// Nothing changed since it was read.

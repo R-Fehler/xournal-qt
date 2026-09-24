@@ -6,6 +6,8 @@
  */
 #include <fstream>
 
+#include <QCborArray>
+#include <QCborMap>
 #include <QColor>
 #include <QImage>
 #include <QImageWriter>
@@ -21,6 +23,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/Library.h"
+#include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
 #include "shell/Previews.h"
 
@@ -355,4 +358,60 @@ TEST_F(LibraryFilesTest, aMarkdownFileFlowsOverA4Pages) {
     EXPECT_TRUE(cut);
     EXPECT_EQ(MarkdownFile::read(root / "long.md", 100, &cut), "abc\ndef\nghi\n");
     EXPECT_FALSE(cut);
+}
+
+TEST_F(LibraryFilesTest, markdownTextIsIndexedWithoutItsSyntaxAndFoundWithItsHeadings) {
+    writeFile(root / "Uni" / "lecture3.md", "# Lecture 3\n\n"
+                                            "Intro with a [link](https://example.org) and [[Kalman filter]].\n\n"
+                                            "## Kalman filter\n\n"
+                                            "### Prediction\n\n"
+                                            "The **prediction** step: predict the state.\n\n"
+                                            "- a prediction in a list\n\n"
+                                            "## Update\n\n"
+                                            "No hit here.\n");
+    makeImage(root / "Uni" / "whiteboard.png", 20, 20);
+    {
+        LibraryIndex index(root);
+        index.update(DocumentFiles::scanRecursive(root));
+        index.waitForDone();
+        EXPECT_EQ(index.documentsRead(), 2);
+        EXPECT_EQ(index.pdfPagesRead(), 0);
+
+        auto hits = index.search("prediction");
+        ASSERT_EQ(hits.size(), 1u);
+        const auto& h = hits[0];
+        EXPECT_EQ(h.file, root / "Uni" / "lecture3.md");
+        EXPECT_EQ(h.count, 3);
+        EXPECT_FALSE(h.snippet.isEmpty());
+        EXPECT_TRUE(h.pageHits.empty());
+        ASSERT_EQ(h.blockHits.size(), 3u);
+        EXPECT_EQ(h.blockHits[0].headings, "Lecture 3 › Kalman filter") << "a heading: the headings above it";
+        EXPECT_EQ(h.blockHits[1].headings, "Lecture 3 › Kalman filter › Prediction");
+        EXPECT_EQ(h.blockHits[1].count, 1);
+        EXPECT_EQ(h.blockHits[2].block, h.blockHits[1].block + 1);
+        EXPECT_TRUE(index.search("**prediction").empty()) << "no Markdown syntax";
+        EXPECT_TRUE(index.search("example.org").empty()) << "a link's target is not its text";
+        ASSERT_EQ(index.search("whiteboard").size(), 1u) << "an image by its name";
+        index.flush();
+    }
+    // In the notes pack of its folder, with its links: read back, nothing is read again
+    const auto notes = Packs::read(root / "Uni" / DocumentFiles::META_DIR, LibraryIndex::NOTES_PACK, LibraryIndex::FORMAT);
+    ASSERT_TRUE(notes.has_value());
+    const QCborMap md = notes->value(QStringLiteral("lecture3.md")).toMap();
+    EXPECT_EQ(md.value(QStringLiteral("kind")).toString(), "md");
+    EXPECT_EQ(md.value(QStringLiteral("links")).toArray().toVariantList(), QVariantList{"https://example.org"});
+    EXPECT_EQ(md.value(QStringLiteral("wikiLinks")).toArray().toVariantList(), QVariantList{"Kalman filter"});
+    LibraryIndex again(root);
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.documentsRead(), 0);
+    EXPECT_EQ(again.search("prediction").size(), 1u);
+
+    // Changed: read again
+    writeFile(root / "Uni" / "lecture3.md", "# Lecture 3\n\nNow about smoothing.\n");
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.documentsRead(), 1);
+    EXPECT_TRUE(again.search("prediction").empty());
+    EXPECT_EQ(again.search("smoothing").size(), 1u);
 }

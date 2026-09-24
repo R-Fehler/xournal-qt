@@ -218,16 +218,19 @@ public:
                 flag = Link;
                 links.push_back(static_cast<int>(doc.links.size()));
                 doc.links.push_back(attributeText(static_cast<MD_SPAN_A_DETAIL*>(detail)->href));
+                doc.wikiLinks.push_back(false);
                 break;
             case MD_SPAN_IMG:
                 flag = Image;
                 links.push_back(static_cast<int>(doc.links.size()));
                 doc.links.push_back(attributeText(static_cast<MD_SPAN_IMG_DETAIL*>(detail)->src));
+                doc.wikiLinks.push_back(false);
                 break;
             case MD_SPAN_WIKILINK:
                 flag = Link;
                 links.push_back(static_cast<int>(doc.links.size()));
                 doc.links.push_back(attributeText(static_cast<MD_SPAN_WIKILINK_DETAIL*>(detail)->target));
+                doc.wikiLinks.push_back(true);
                 break;
         }
         spans.push_back(flag);

@@ -573,3 +573,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Rename, move, copy and trash a Markdown file card; import a folder with `.md` files and images: they come along.
 - [ ] The card of a Markdown file shows its first page as an A4 page with the text formatted (headings, lists,
       tables, code). An image card shows the image; a phone photo taken upright is upright, also a `.heic`.
+- [ ] Search the library for a word of a Markdown file (in a heading, a paragraph, a list, a table, a code block): the
+      file is found, with the text around the hit on its card. Its Markdown syntax (`**`, `#`, link targets) is not
+      found. Edit the file in another editor and save: after a moment the new text is found, the old one not.
