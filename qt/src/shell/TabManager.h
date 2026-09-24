@@ -63,6 +63,8 @@ public:
         std::unique_ptr<CanvasView> view;
         /// Reference mode: the document of another tab shown beside this one (for reading), or none
         DocumentSession* reference = nullptr;
+        /// ... and whether it is written in there (off: for reading only)
+        bool referenceEditable = false;
     };
 
     /// Adds a tab after the current one and makes it current. Returns its index.
@@ -97,6 +99,9 @@ public:
     /// The current tab's document and its reference change places: the reference becomes the current tab, with the
     /// document it was shown beside as its reference.
     void swapReference();
+    /// Whether tab `index` writes in its reference (the edit switch of the reference's pill; off for a new one).
+    bool referenceEditable(int index) const;
+    void setReferenceEditable(int index, bool on);
 
     /// The picture of a tab may be another one now (its title page was chosen).
     void thumbnailChanged(const DocumentSession* s) { tabDataChanged(s, {ThumbnailRole}); }

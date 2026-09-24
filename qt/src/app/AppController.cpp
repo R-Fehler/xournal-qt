@@ -638,8 +638,19 @@ bool AppController::copySelection() {
     }
     return canvas() && canvas()->copySelection();
 }
-bool AppController::cutSelection() { return canvas() && canvas()->cutSelection(); }
+CanvasView* AppController::editedReference() const {
+    return referenceMode->focused() && referenceMode->editing() ? referenceMode->canvas() : nullptr;
+}
+bool AppController::cutSelection() {
+    if (CanvasView* r = editedReference()) {
+        return r->cutSelection();
+    }
+    return canvas() && canvas()->cutSelection();
+}
 bool AppController::pasteElements() {
+    if (CanvasView* r = editedReference()) {
+        return !r->getSession().isReadOnly() && r->pasteElements();
+    }
     return canvas() && !session()->isReadOnly() && canvas()->pasteElements();
 }
 bool AppController::pasteAt(qreal x, qreal y) {
@@ -650,17 +661,19 @@ bool AppController::canPaste() const {
     return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal"));
 }
 void AppController::deleteSelection() {
-    if (canvas()) {
+    if (CanvasView* r = editedReference()) {
+        r->deleteSelection();
+    } else if (canvas()) {
         canvas()->deleteSelection();
     }
 }
 void AppController::selectAllOnPage() {
-    if (canvas()) {
+    if (CanvasView* target = editedReference() ? editedReference() : canvas()) {
         if (app->getToolHandler()->getToolType() != TOOL_SELECT_RECT &&
             app->getToolHandler()->getToolType() != TOOL_SELECT_REGION) {
             selectTool("selectRegion");  // so that the selection can be moved right away
         }
-        canvas()->selectAllOnPage();
+        target->selectAllOnPage();
     }
 }
 bool AppController::insertImage(const QUrl& url) {
@@ -2169,6 +2182,10 @@ bool AppController::saveAs(const QUrl& url) {
 }
 
 void AppController::undo() {
+    if (editedReference()) {
+        referenceMode->undo();  // (the canvas last written on has the keys)
+        return;
+    }
     if (!session()) {
         return;
     }
@@ -2180,6 +2197,10 @@ void AppController::undo() {
 }
 
 void AppController::redo() {
+    if (editedReference()) {
+        referenceMode->redo();
+        return;
+    }
     if (!session()) {
         return;
     }

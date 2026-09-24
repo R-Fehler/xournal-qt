@@ -9,6 +9,13 @@
 #include <gtest/gtest.h>
 
 #include "control/settings/Settings.h"
+#include "model/Document.h"
+#include "model/Layer.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
+#include "model/XojPage.h"
+#include "undo/InsertUndoAction.h"
+#include "undo/UndoRedoHandler.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "shell/ReferenceMode.h"
@@ -206,4 +213,71 @@ TEST(ReferenceMode, keysActOnTheReferenceWhileItHasTheFocus) {
     // Without a reference nothing has the focus there
     t.ref().close();
     EXPECT_FALSE(t.ref().focused());
+}
+
+namespace {
+/// A stroke on the first page, as one undo step
+void scribble(DocumentSession& s) {
+    auto page = s.getDocument()->getPage(0);
+    auto stroke = std::make_unique<Stroke>();
+    stroke->setWidth(1.41);
+    stroke->addPoint(Point(10, 10, 1));
+    stroke->addPoint(Point(50, 40, 1));
+    const Stroke* raw = stroke.get();
+    Layer* layer = page->getSelectedLayer();
+    layer->addElement(std::move(stroke));
+    s.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+}
+size_t elements(DocumentSession& s) { return s.getDocument()->getPage(0)->getSelectedLayer()->getElements().size(); }
+}  // namespace
+
+TEST(ReferenceMode, writingInTheReferenceIsSwitchedOnPerReference) {
+    ThreeTabs t;
+    t.ref().showTab(2);
+    EXPECT_FALSE(t.ref().editing()) << "for reading only at first";
+    QSignalSpy changed(&t.ref(), &ReferenceMode::changed);
+    t.ref().setEditing(true);
+    EXPECT_TRUE(t.ref().editing());
+    EXPECT_GE(changed.count(), 1);
+    // Another tab, another reference: its own switch
+    t.c.setCurrentTab(1);
+    t.ref().showTab(2);
+    EXPECT_FALSE(t.ref().editing());
+    t.c.setCurrentTab(0);
+    EXPECT_TRUE(t.ref().editing()) << "each tab remembers it for its reference";
+    // Another reference: for reading again
+    t.ref().showTab(1);
+    EXPECT_FALSE(t.ref().editing());
+    t.ref().setEditing(true);
+    t.ref().swapRoles();
+    EXPECT_FALSE(t.ref().editing()) << "the notes that became the reference are for reading at first";
+    t.ref().setEditing(true);
+    t.ref().close();
+    EXPECT_FALSE(t.ref().editing());
+}
+
+TEST(ReferenceMode, undoActsOnTheReferenceBeingWrittenInWhileItHasTheFocus) {
+    ThreeTabs t;
+    t.ref().showTab(2);
+    DocumentSession& notes = *t.tabs().session(0);
+    DocumentSession& book = *t.tabs().session(2);
+    scribble(notes);
+    scribble(book);
+    t.ref().setFocused(true);
+    t.c.undo();  // for reading only: undo stays with the notes
+    EXPECT_EQ(elements(notes), 0u);
+    EXPECT_EQ(elements(book), 1u);
+    t.c.redo();
+    EXPECT_EQ(elements(notes), 1u);
+
+    t.ref().setEditing(true);
+    t.c.undo();
+    EXPECT_EQ(elements(book), 0u) << "undo did not act on the reference being written in";
+    EXPECT_EQ(elements(notes), 1u);
+    t.c.redo();
+    EXPECT_EQ(elements(book), 1u);
+    t.ref().setFocused(false);  // a tap on the notes
+    t.c.undo();
+    EXPECT_EQ(elements(notes), 0u);
+    EXPECT_EQ(elements(book), 1u);
 }

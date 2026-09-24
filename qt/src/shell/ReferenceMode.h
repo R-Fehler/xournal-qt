@@ -8,7 +8,8 @@
  * of the application, the same for every tab.
  *
  * Keys: the window's shortcuts act on the main document; while the reference has the focus (a tap on it or on its
- * pill), copying, zooming, fitting the width and going back and forth act on the reference (AppController).
+ * pill), copying, zooming, fitting the width and going back and forth act on the reference (AppController); while it
+ * is also written in (the edit switch), undo, redo, cut, paste, delete and select all as well.
  *
  * @license GNU GPLv2 or later
  */
@@ -42,6 +43,8 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
+    /// The reference is written in (the edit switch of its pill, per tab; off: for reading only).
+    Q_PROPERTY(bool editing READ editing WRITE setEditing NOTIFY changed)
     /// The reference has the keyboard focus (set by the window: a tap on it or on its pill).
     Q_PROPERTY(bool focused READ focused WRITE setFocused NOTIFY focusedChanged)
     /// Elements or PDF text are selected in the reference (to copy them).
@@ -68,6 +71,8 @@ public:
     int pageCount() const;
     int zoomPercent() const;
     bool focused() const;
+    bool editing() const;
+    void setEditing(bool on);
     void setFocused(bool on);
     bool hasSelection() const;
     bool canGoBack() const;
@@ -96,6 +101,9 @@ public:
     /// Copy what is selected in the reference (PDF text, else elements). False if nothing is selected.
     Q_INVOKABLE bool copy();
     Q_INVOKABLE void clearSelection();
+    /// Undo / redo in the reference (while it is written in).
+    void undo();
+    void redo();
 
 Q_SIGNALS:
     void changed();

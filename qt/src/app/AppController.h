@@ -657,6 +657,9 @@ Q_SIGNALS:
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// The reference while it has the keys and is written in (its edit switch), else nullptr: then undo, cut,
+    /// paste, delete and select all act on it.
+    xqt::CanvasView* editedReference() const;
     enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };
     /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
     bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then);

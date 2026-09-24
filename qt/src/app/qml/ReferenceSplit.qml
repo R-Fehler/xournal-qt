@@ -1,8 +1,8 @@
 // Reference mode: the canvas area of the window, split in two when the current tab shows another document beside
 // its own (app.reference). The main canvas (Main.qml's `canvas`) takes mainX / mainWidth; the reference is a plain
-// canvas for reading on the other side, behind a divider that can be dragged, with a small pill of its own: the page
-// (a tap: go to a page), fit width, swap sides, swap roles, close. The main document has a thin frame, so it is
-// always clear which side is written in.
+// canvas for reading on the other side (or for writing too, with the edit switch of its pill), behind a divider that
+// can be dragged, with a small pill of its own: the page (a tap: go to a page), edit, fit width, swap sides, swap
+// roles, close. The main document has a thin frame, so it is always clear which side is the notes.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -57,7 +57,8 @@ Item {
             anchors.fill: parent
             clip: true
             focus: true
-            readingOnly: true
+            // For reading, unless the edit switch of its pill is on (per tab)
+            readingOnly: !app.reference.editing
             view: split.active ? app.reference.view : null
         }
 
@@ -159,6 +160,18 @@ Item {
                     }
                 }
                 ToolSeparator {}
+                // Write in the reference too (with the tool in hand; its own undo), or only read it
+                IconButton {
+                    objectName: "referenceEditButton"
+                    iconName: "xopp-tool-pencil"
+                    tip: app.reference.editing ? qsTr("Writing in the reference: tap for reading only")
+                                               : qsTr("Write in the reference")
+                    checked: app.reference.editing
+                    implicitWidth: 40; implicitHeight: 40
+                    icon.width: 22; icon.height: 22
+                    focusPolicy: Qt.NoFocus
+                    onClicked: { referencePill.focusReference(); app.reference.editing = !app.reference.editing }
+                }
                 IconButton {
                     objectName: "referenceCopyButton"
                     visible: app.reference.hasSelection

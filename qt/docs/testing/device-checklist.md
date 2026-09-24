@@ -740,6 +740,13 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] A link in the reference (a table of contents): tap it, "Go to page" goes there in the reference; back with
       Alt+Left after a tap on the reference's pill.
 - [ ] Keys: after a tap on the reference (or its pill) Ctrl+C, Ctrl++ / Ctrl+-, Ctrl+0 and Alt+Left act on the
-      reference; after a tap on the notes they act on the notes again. Ctrl+Z always undoes in the notes.
+      reference; after a tap on the notes they act on the notes again. Ctrl+Z undoes in the notes (unless the
+      reference is written in, see below).
 - [ ] Full screen (F11): the split stays, the tool square starts over the notes; with the tool bar docked left, right
       and at the top nothing overlaps.
+- [ ] The pen button in the reference's pill: on (highlighted), the reference is written in with the tool in hand
+      (pen, highlighter, eraser, text, lasso that moves), its tab gets its "●", Ctrl+Z / Ctrl+Y (and a two-finger
+      tap on it) undo there while it was the last one written on; a tap on the notes and Ctrl+Z undoes in the notes.
+      A stroke that begins on either side stays on that side across the divider. Off: for reading again. Each tab
+      remembers it for its reference; a new reference, and the notes after "swap roles", start for reading. Save
+      the reference from its own tab (or when closing it / quitting, which asks).

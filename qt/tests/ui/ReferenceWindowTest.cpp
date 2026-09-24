@@ -457,3 +457,54 @@ TEST_F(ReferenceWindowTest, itWorksInFullScreenAndWithTheToolBarAtASide) {
     window->setProperty("fullScreenMode", false);
     wait(200);
 }
+
+TEST_F(ReferenceWindowTest, theEditSwitchLetsThePenWriteInTheReference) {
+    ref().showTab(1);
+    wait(100);
+    controller->selectTool("pen");
+    auto elements = [&](int tab) {
+        return tabs().session(tab)->getDocument()->getPage(0)->getSelectedLayer()->getElements().size();
+    };
+    auto* edit = findItem("referenceEditButton");
+    ASSERT_NE(edit, nullptr);
+    EXPECT_FALSE(edit->property("checked").toBool());
+    click(edit);
+    EXPECT_TRUE(ref().editing());
+    EXPECT_TRUE(edit->property("checked").toBool()) << "the switch shows that the reference is written in";
+    EXPECT_FALSE(reference->property("readingOnly").toBool());
+    EXPECT_FALSE(tabs().view(1)->isReadingOnly());
+
+    const QPoint a = reference->mapToScene(QPointF(reference->width() / 2, 200)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, a + QPoint(0, 6 * i));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(0, 60));
+    wait(50);
+    EXPECT_EQ(elements(1), 1u) << "the pen did not write in the reference";
+    EXPECT_TRUE(tabs().data(tabs().index(1), xqt::TabManager::ModifiedRole).toBool()) << "its tab has its dot";
+    // A stroke from the reference across the divider stays in the reference
+    const QPoint b = reference->mapToScene(QPointF(reference->width() - 60, 300)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, b);
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, b + QPoint(20 * i, 0));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, b + QPoint(200, 0));
+    wait(50);
+    EXPECT_EQ(elements(1), 2u);
+    EXPECT_EQ(elements(0), 0u) << "the stroke went over to the notes";
+    // Ctrl+Z undoes in the canvas that was written on
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(elements(1), 1u);
+    EXPECT_EQ(elements(0), 0u);
+
+    // Switched off: for reading again
+    click(edit);
+    EXPECT_FALSE(ref().editing());
+    EXPECT_TRUE(tabs().view(1)->isReadingOnly());
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    QTest::mouseMove(window, a + QPoint(0, 60));
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(0, 60));
+    wait(50);
+    EXPECT_EQ(elements(1), 1u);
+}

@@ -363,6 +363,7 @@ void TabManager::setReference(int index, int reference) {
     }
     DocumentSession* ref = reference >= 0 ? tabs[static_cast<size_t>(reference)].session.get() : nullptr;
     if (std::exchange(tabs[static_cast<size_t>(index)].reference, ref) != ref) {
+        tabs[static_cast<size_t>(index)].referenceEditable = false;  // (another reference: for reading at first)
         referenceMarksChanged();
         Q_EMIT referencesChanged();
     }
@@ -375,7 +376,9 @@ void TabManager::swapReference() {
     }
     // The pair is the same, the other way round (and the other tab no longer shows it beside itself twice)
     tabs[static_cast<size_t>(ref)].reference = tabs[static_cast<size_t>(current)].session.get();
+    tabs[static_cast<size_t>(ref)].referenceEditable = false;  // (the notes shown for reading at first)
     tabs[static_cast<size_t>(current)].reference = nullptr;
+    tabs[static_cast<size_t>(current)].referenceEditable = false;
     const int old = current;
     current = ref;
     backgroundChanged(old);
@@ -384,11 +387,24 @@ void TabManager::swapReference() {
     Q_EMIT currentTabChanged();
 }
 
+bool TabManager::referenceEditable(int index) const {
+    return index >= 0 && index < count() && tabs[static_cast<size_t>(index)].reference &&
+           tabs[static_cast<size_t>(index)].referenceEditable;
+}
+
+void TabManager::setReferenceEditable(int index, bool on) {
+    if (index >= 0 && index < count() && tabs[static_cast<size_t>(index)].reference &&
+        std::exchange(tabs[static_cast<size_t>(index)].referenceEditable, on) != on) {
+        Q_EMIT referencesChanged();
+    }
+}
+
 void TabManager::forgetReferencesTo(const DocumentSession* s) {
     bool changed = false;
     for (Tab& t: tabs) {
         if (t.reference == s) {
             t.reference = nullptr;
+            t.referenceEditable = false;
             changed = true;
         }
     }

@@ -8,6 +8,7 @@
 #include "CanvasView.h"
 #include "TabManager.h"
 #include "session/DocumentSession.h"
+#include "undo/UndoRedoHandler.h"
 
 namespace xqt {
 
@@ -82,6 +83,27 @@ QObject* ReferenceMode::view() const { return shownView.data(); }
 CanvasView* ReferenceMode::canvas() const { return shownView.data(); }
 bool ReferenceMode::active() const { return !shownView.isNull(); }
 bool ReferenceMode::focused() const { return focus && active(); }
+bool ReferenceMode::editing() const { return active() && tabs.referenceEditable(tabs.currentIndex()); }
+
+void ReferenceMode::setEditing(bool on) {
+    if (active()) {
+        tabs.setReferenceEditable(tabs.currentIndex(), on);  // (update() tells the window)
+    }
+}
+
+void ReferenceMode::undo() {
+    if (shownSession && editing() && shownSession->getUndoRedoHandler()->canUndo()) {
+        shownSession->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
+        shownSession->getUndoRedoHandler()->undo();
+    }
+}
+
+void ReferenceMode::redo() {
+    if (shownSession && editing() && shownSession->getUndoRedoHandler()->canRedo()) {
+        shownSession->clearSelectionEndText();
+        shownSession->getUndoRedoHandler()->redo();
+    }
+}
 
 int ReferenceMode::tab() const { return shownSession ? tabs.indexOf(shownSession) : -1; }
 
