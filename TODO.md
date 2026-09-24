@@ -219,7 +219,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [ ] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
   pages, for documents meant to be presented.
 
-### Reference mode (the author, 2026-09-24; `qt/reference-view`, started 2026-09-24)
+### Reference mode (the author, 2026-09-24; `qt/reference-view`, merged 2026-09-24)
 - [~] **A second document beside the current one, in the same tab**, for reading while writing notes.
   - A draggable divider splits the canvas area. The main document has a thin highlight border. Sides can be
     swapped for left or right hand. Works in full screen.
@@ -231,6 +231,10 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     with the current tool and its own undo. It is remembered per tab.
   - **The page grid for the reference** (a grid button in its pill), but **no page sidebar** for it: space is
     limited, and the sidebar keeps showing the main document.
+  - Merged 2026-09-24. Follow-up in progress (the author): full text selection and context menus on the reference,
+    as on the main canvas.
+    - Copy always; Highlight, Underline, Strike through and Paste only when editing is on.
+    - The lasso bar, the canvas context menu, Markdown when editable, and Ctrl+S saving the focused reference.
   - The reference is another open tab ("Open as reference" in the tab overview, the tab menu and the library and
     Recent card menus); the tab strip marks it.
 
