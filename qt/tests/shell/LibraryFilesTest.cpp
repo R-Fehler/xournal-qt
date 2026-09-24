@@ -699,8 +699,16 @@ TEST_F(LibraryFilesTest, aReceivedFileIsCopiedIntoTheOpenedFolderOnceAndOpened) 
     c.setLibraryRoot(library);
     QSignalSpy note(&c, &AppController::pageActionDone);
     QSignalSpy errors(&c, &AppController::message);
+    QSignalSpy done(&c, &AppController::filesReceived);
+    // (in the background: the number opened comes with filesReceived)
+    auto receive = [&](const QStringList& files) {
+        done.clear();
+        c.receiveFiles(files);
+        waitFor([&] { return done.count() > 0; });
+        return done.isEmpty() ? -1 : done.first().first().toInt();
+    };
 
-    EXPECT_EQ(c.receiveFiles({qstr(outside / "Lecture 1.xopp"), qstr(outside / "board.png"), qstr(outside / "todo.md"),
+    EXPECT_EQ(receive({qstr(outside / "Lecture 1.xopp"), qstr(outside / "board.png"), qstr(outside / "todo.md"),
                               qstr(outside / "notes.txt")}),
               4);
     const fs::path opened = library / "Opened";
@@ -716,7 +724,7 @@ TEST_F(LibraryFilesTest, aReceivedFileIsCopiedIntoTheOpenedFolderOnceAndOpened) 
 
     // The same file again: the copy there is opened, not copied a second time; another file of that name is copied
     // under a free name
-    EXPECT_EQ(c.receiveFiles({qstr(outside / "Lecture 1.xopp")}), 1);
+    EXPECT_EQ(receive({qstr(outside / "Lecture 1.xopp")}), 1);
     EXPECT_FALSE(fs::exists(opened / "Lecture 1 (2).xopp"));
     writeFile(root / "Elsewhere" / "Lecture 1.xopp", "");  // (the folder)
     DocumentHandler handler;
@@ -724,16 +732,16 @@ TEST_F(LibraryFilesTest, aReceivedFileIsCopiedIntoTheOpenedFolderOnceAndOpened) 
     doc.addPage(std::make_shared<XojPage>(400, 300));
     doc.addPage(std::make_shared<XojPage>(400, 300));
     ASSERT_TRUE(DocumentSession::writeDocument(doc, root / "Elsewhere" / "Lecture 1.xopp").ok);
-    EXPECT_EQ(c.receiveFiles({qstr(root / "Elsewhere" / "Lecture 1.xopp")}), 1);
+    EXPECT_EQ(receive({qstr(root / "Elsewhere" / "Lecture 1.xopp")}), 1);
     EXPECT_TRUE(fs::exists(opened / "Lecture 1 (2).xopp"));
 
     // Something that cannot be read: said so, nothing opened
     errors.clear();
-    EXPECT_EQ(c.receiveFiles({qstr(outside / "missing.pdf")}), 0);
+    EXPECT_EQ(receive({qstr(outside / "missing.pdf")}), 0);
     EXPECT_EQ(errors.count(), 1);
     // Text shared without a file
     errors.clear();
-    EXPECT_EQ(c.receiveFiles({"xournal-qt:shared-text"}), 0);
+    EXPECT_EQ(receive({"xournal-qt:shared-text"}), 0);
     EXPECT_EQ(errors.count(), 1);
 }
 
