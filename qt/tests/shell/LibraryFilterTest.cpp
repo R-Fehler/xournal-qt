@@ -18,6 +18,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/Previews.h"
 #include "shell/RecentFiles.h"
+#include "shell/SystemApps.h"
 #include "shell/TabManager.h"
 #include "AppController.h"
 #include "MarkdownFile.h"
@@ -59,6 +60,23 @@ std::vector<std::string> rowNames(const LibraryModel& m) {
     }
     return n;
 }
+
+/// Records what would be handed to the system (nothing is started).
+struct FakeSystemApps: SystemApps {
+    QStringList opened, shown, libraries;
+    bool openWithSystemApp(const QString& path) override {
+        opened << path;
+        return true;
+    }
+    bool showInFileManager(const QString& path) override {
+        shown << path;
+        return true;
+    }
+    bool startLibraryWindow(const QString& folder) override {
+        libraries << folder;
+        return true;
+    }
+};
 
 class LibraryFilterTest: public ::testing::Test {
 protected:
@@ -370,4 +388,32 @@ TEST_F(LibraryFilterTest, aTextFileOpensReadOnlyAsPlainText) {
         }
     }
     EXPECT_GT(dark, 20) << "its text at the top";
+}
+
+TEST_F(LibraryFilterTest, otherFilesOpenWithTheSystemAppAndShowInTheFileManager) {
+    FakeSystemApps fake;
+    SystemApps::setInstance(&fake);
+    writeFile(root / "report.docx", "PK");
+    writeFile(root / "notes.txt", "hello\n");
+    AppController c;
+    // A tap on a card (one or several): other files go to their app, text files open as tabs
+    c.openListed({qstr(root / "report.docx"), qstr(root / "notes.txt")});
+    EXPECT_EQ(fake.opened, QStringList{qstr(root / "report.docx")});
+    EXPECT_EQ(c.tabManager().count(), 1);
+    EXPECT_EQ(c.title(), "notes.txt");
+    // Found by its name in the search
+    EXPECT_TRUE(c.openSearchHit(qstr(root / "report.docx"), "report"));
+    EXPECT_EQ(fake.opened.size(), 2);
+    EXPECT_EQ(c.tabManager().count(), 1);
+    // From the card's menu, also for a text file
+    EXPECT_TRUE(c.openWithSystemApp(qstr(root / "notes.txt")));
+    EXPECT_EQ(fake.opened.last(), qstr(root / "notes.txt"));
+    EXPECT_FALSE(c.openWithSystemApp(qstr(root / "gone.docx")));
+    c.showInFileManager(qstr(root / "report.docx"));
+    EXPECT_EQ(fake.shown, QStringList{qstr(root / "report.docx")});
+    EXPECT_TRUE(c.canShowInFileManager());
+    // The command line (or another start handing files over) does not start other apps
+    c.openPaths({qstr(root / "report.docx")});
+    EXPECT_EQ(fake.opened.size(), 3);
+    SystemApps::setInstance(nullptr);
 }

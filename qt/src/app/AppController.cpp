@@ -79,6 +79,7 @@
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SettingsModel.h"
+#include "shell/SystemApps.h"
 #include "shell/TabManager.h"
 
 using namespace xqt;
@@ -1376,7 +1377,19 @@ bool AppController::createDocument(const QString& name, bool inLibrary) {
     return true;
 }
 
+namespace {
+/// A file the home screen lists that the app does not open itself (an Office file, ...)
+bool isOtherFile(const QString& path) {
+    const fs::path file(path.toStdString());
+    std::error_code ec;
+    return DocumentFiles::isOtherFile(file) && fs::is_regular_file(file, ec);
+}
+}  // namespace
+
 bool AppController::openSearchHit(const QString& path, const QString& query) {
+    if (isOtherFile(path)) {
+        return openWithSystemApp(path);  // (found by its name)
+    }
     if (!openPath(path)) {
         return false;
     }
@@ -1485,7 +1498,7 @@ void AppController::openLibrary(const QUrl& folder) {
         return;
     }
     // One library per window: another process (it becomes the single instance of that library).
-    QProcess::startDetached(QCoreApplication::applicationFilePath(), {dir});
+    SystemApps::instance().startLibraryWindow(dir);
 }
 
 bool AppController::createLibrary(const QString& name) {
@@ -1502,9 +1515,29 @@ bool AppController::createLibrary(const QString& name) {
     return true;
 }
 
-void AppController::showInFileManager(const QString& path) {
-    const QFileInfo info(path);
-    QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? path : info.absolutePath()));
+void AppController::showInFileManager(const QString& path) { SystemApps::instance().showInFileManager(path); }
+
+bool AppController::canShowInFileManager() const { return SystemApps::canShowInFileManager(); }
+
+bool AppController::openWithSystemApp(const QString& path) {
+    if (!QFileInfo::exists(path)) {
+        return false;
+    }
+    if (!SystemApps::instance().openWithSystemApp(path)) {
+        Q_EMIT message(tr("Cannot open file"), tr("No app is set up to open %1.").arg(QFileInfo(path).fileName()), true);
+        return false;
+    }
+    return true;
+}
+
+void AppController::openListed(const QStringList& paths) {
+    for (const QString& p: paths) {
+        if (isOtherFile(p)) {
+            openWithSystemApp(p);
+        } else {
+            openPath(p);
+        }
+    }
 }
 
 void AppController::filesChanged(const DocumentFiles::Result& r) {
