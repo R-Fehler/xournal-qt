@@ -24,7 +24,9 @@ A **library** is a plain folder of documents that a window works in, like a work
 - `name.xopp` next to `name.pdf` is **one** document, and it opens as the `.xopp`. A lone `.xopp` (or `.xoj`) or a
   lone PDF is one document too. Older `name.pdf.xopp` files pair with `name.pdf`.
 - A **hybrid PDF** (`qt/docs/hybrid-pdf.md`) is one document, a PDF that carries its `.xopp`. Next to its `.xopp`
-  export for Xournal++ (`name.xopp` with a hidden `.name.pages.pdf`) the pair is one card that opens the hybrid PDF.
+  export for Xournal++ (`name.xopp` with a hidden `.name.pages.pdf`), or the `.xopp` it was saved from and kept, the
+  pair is one card that opens the hybrid PDF (such pairs look into the PDF; lone PDFs do not). A `.xopp` changed more
+  than a minute after the hybrid PDF (edited in Xournal++) is listed as a document of its own beside it.
   Its search text is its pages' text plus its text elements.
 - **Markdown files** (`.md`) are documents: a card with a preview of their start, opened read-only for now (below).
 - **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
@@ -416,7 +418,8 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     the subfolder is a library with a key and settings of its own, starts with the cache in its folders and indexes
     its documents once.)
   - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder,
-    Open with the system app (text and other files), Show in file manager, Remove from list, Move to trash)
+    Open with the system app (text and other files), Share… (PDFs and notes, see hybrid-pdf.md), Show in file manager, Remove
+    from list, Move to trash)
 - **Other files** (Office files and the rest, shown with "All other files"): a card with an icon of their type (a
   document, spreadsheet, slides, archive, audio, video or image file, by extension and MIME type; else a plain file),
   the extension as badge, the whole file name, size and date. A tap opens it with the app the system has for it

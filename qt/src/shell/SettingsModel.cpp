@@ -154,6 +154,23 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 s.customSettingsChanged();
             });
     }
+    // A document saved as "name.xopp" is saved as a hybrid PDF: what happens to the .xopp ("ask" each time, the
+    // default; "trash", "update": kept up to date for Xournal++, "keep": left as it is)
+    add("hybridOldXopp",
+        [&s] {
+            std::string v;
+            s.getCustomElement("xournalQt").getString("hybridOldXopp", v);
+            return QVariant(v == "trash" || v == "update" || v == "keep" ? QString::fromStdString(v)
+                                                                         : QStringLiteral("ask"));
+        },
+        [&s](const QVariant& v) {
+            const QString choice = v.toString();
+            s.getCustomElement("xournalQt")
+                    .setString("hybridOldXopp",
+                               choice == "trash" || choice == "update" || choice == "keep" ? choice.toStdString()
+                                                                                           : std::string("ask"));
+            s.customSettingsChanged();
+        });
     add("canvasMemory", [&s] { return QVariant(canvasMemory(s)); },
         [&s](const QVariant& v) {
             const int maxMb = static_cast<int>(CanvasMemory::maxLimit() / (1024 * 1024));

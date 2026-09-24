@@ -30,7 +30,8 @@ struct DocumentItem {
     fs::path pdf;    ///< the PDF with the same name next to it, or empty
     fs::path md;     ///< a Markdown file (alone), or empty
     fs::path image;  ///< an image (alone, or with the .xopp of the same name that annotates it), or empty
-    /// The PDF is a hybrid PDF and the .xopp its export for Xournal++ (hybrid-pdf.md): the PDF is the document.
+    /// The PDF is a hybrid PDF and the .xopp its export for Xournal++, or the .xopp it was, kept (hybrid-pdf.md): the
+    /// PDF is the document. A .xopp changed well after the PDF (edited in Xournal++) is a document of its own instead.
     bool hybrid = false;
     /// A text or code file, or any other file the library lists (alone), or empty.
     fs::path other;

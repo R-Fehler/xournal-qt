@@ -8,9 +8,14 @@ Rectangle {
     id: bar
     property string text
     property bool undoable: false
-    function show(message, canUndo) {
+    /// Another action instead of Undo (e.g. "Copy"), and what it does
+    property string actionText: ""
+    property var action: null
+    function show(message, canUndo, actionName, actionCall) {
         text = message
         undoable = canUndo
+        actionText = actionName || ""
+        action = actionCall || null
         visible = true
         hideTimer.restart()
     }
@@ -42,10 +47,21 @@ Rectangle {
                 bar.visible = false
             }
         }
+        Button {
+            objectName: "snackbarAction"
+            visible: bar.actionText !== "" && !bar.undoable
+            text: bar.actionText
+            flat: true
+            Material.foreground: "#8ab4f8"
+            onClicked: {
+                if (bar.action) bar.action()
+                bar.visible = false
+            }
+        }
     }
     Timer {
         id: hideTimer
-        interval: bar.text.length > 60 ? 9000 : 5000  // time to read a longer note
+        interval: bar.text.length > 60 || bar.actionText !== "" ? 9000 : 5000  // time to read a longer note
         onTriggered: bar.visible = false
     }
 }
