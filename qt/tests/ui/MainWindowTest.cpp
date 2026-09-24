@@ -1499,6 +1499,24 @@ TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManage
     EXPECT_FALSE(child(menu, "openWithSystemAppItem")->isVisible());
 }
 
+TEST_F(HomeScreenFilterTest, aFolderOpensAsALibraryInAWindowOfItsOwn) {
+    // The menu of a folder card: "Open as library" opens it in a window of its own
+    click(child(card(rowOf("Physics")), "cardMenuButton"));
+    QObject* menu = find("homeItemMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* openAsLibrary = child(menu, "openAsLibraryItem");
+    ASSERT_NE(openAsLibrary, nullptr);
+    ASSERT_TRUE(openAsLibrary->isVisible());
+    click(openAsLibrary);
+    EXPECT_EQ(fake.libraries, QStringList{QString::fromStdString((root / "Physics").string())});
+    EXPECT_TRUE(waitOpened(menu, false));
+    // A document's menu has none
+    click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "openAsLibraryItem")->isVisible());
+    QMetaObject::invokeMethod(menu, "close");
+}
+
 TEST_F(HomeScreenFilterTest, recentLibrariesOpenAgain) {
     QObject* menu = find("homeItemMenu");
     // A library opened before is in the Recent grid: a folder with the library mark; a tap opens it again

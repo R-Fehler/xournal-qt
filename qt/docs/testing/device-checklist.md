@@ -661,3 +661,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       window comes to the front (no second window). Close that window and tap again: it opens. Its menu has no
       Rename, Copy, Move or Trash. Delete or rename the folder in Dolphin: it drops out of Recent. Libraries in
       `Xournal_Libraries` (Default, …) do not appear there.
+- [ ] In the library's folder view, a folder card's menu (⋮, right click, press and hold) has "Open as library (new
+      window)": a new window opens with that folder as library, its cards appear at once with their previews, and
+      the search finds its documents without "Indexing for search" running through them again.

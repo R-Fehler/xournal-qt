@@ -282,6 +282,11 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
   trashed from here. A folder that is gone drops out. The "Show" filter does not apply to the Recent grid.
 - **On a card**:
   - tap: open (a folder: enter it; another file (not a document or text): its app, below)
+  - a folder's menu: "Open as library (new window)" opens that folder as a library of its own, in another window
+    (another process, as "Open a folder as library…"). Its documents' caches are already in its folders
+    (`.xournal_library/`), so nothing is indexed again. (Not so when the library keeps its cache in the app cache:
+    the subfolder is a library with a key and settings of its own, starts with the cache in its folders and indexes
+    its documents once.)
   - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder,
     Open with the system app (text and other files), Show in file manager, Remove from list, Move to trash)
 - **Other files** (Office files and the rest, shown with "All other files"): a card with an icon of their type (a

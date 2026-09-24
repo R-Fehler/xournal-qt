@@ -1167,6 +1167,13 @@ Rectangle {
             onTriggered: home.openAll(home.menuPaths, home.menuModel)
         }
         MenuItem {
+            objectName: "openAsLibraryItem"
+            text: qsTr("Open as library (new window)")
+            visible: !home.menuMany && home.menuFolder && home.menuModel === app.library
+            height: visible ? implicitHeight : 0
+            onTriggered: app.openLibraryAt(home.menuPath)
+        }
+        MenuItem {
             objectName: "selectItem"
             text: qsTr("Select")
             visible: !home.menuMany && home.menuModel && home.menuModel.selectionCount === 0 && home.menuKind !== "library"
