@@ -4,6 +4,19 @@ What the first Windows build (`qt/windows-build`, see [windows.md](windows.md)) 
 only proves that the app builds on GitHub Actions, runs from a portable folder and passes a smoke test. Items are
 observed (O) on a machine or expected (E) from the code and the research in `../cross-platform-qt-research/`.
 
+## Text
+
+- (O) **Pango's win32 backend dies drawing text into an image surface** (CI smoke test, 2026-09-24: exit code 127, a
+  fatal NTSTATUS without a message; into a PDF it works). The app uses the fontconfig backend instead
+  ([windows.md](windows.md), "Text and fonts"). To do: get the backtrace (the smoke test runs `text-probe` with
+  Pango's default under gdb), reproduce it with MSYS2's Pango and Cairo alone, and report it upstream (Pango or
+  Cairo's DirectWrite font code). Then `XQT_WIN_PANGO_WIN32=1` tries the win32 backend again; the smoke test says
+  when it works.
+- (E) **Font fallback**: fontconfig does not know DirectWrite's fallback lists; check CJK, Arabic, emoji and math
+  symbols in text boxes and Markdown.
+- (E) **First start**: measure the font cache build on the Surface (a scan of `C:\Windows\Fonts` and the user's
+  fonts), and whether the background warm-up hides it.
+
 ## Pen and touch (the Surface)
 
 - (E) **Windows Ink**: Qt 6 reads the pen through `WM_POINTER` (Windows Ink) by default, as `QTabletEvent`s with

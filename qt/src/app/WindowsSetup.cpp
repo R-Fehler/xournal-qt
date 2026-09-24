@@ -1,7 +1,9 @@
 #include "WindowsSetup.h"
 
 #include <clocale>
+#include <cstdlib>
 #include <iostream>
+#include <string>
 
 #include <QDir>
 #include <QStandardPaths>
@@ -13,6 +15,8 @@
 #endif
 #include <windows.h>
 
+#include "WindowsFonts.h"
+
 namespace xqt::windows {
 
 namespace {
@@ -20,9 +24,10 @@ void setIfUnset(const wchar_t* name, const QString& value) {
     if (value.isEmpty() || GetEnvironmentVariableW(name, nullptr, 0) > 0) {
         return;
     }
-    // The process environment, which GLib reads (g_getenv is GetEnvironmentVariableW on Windows).
+    // _wputenv: the process environment, which GLib reads (g_getenv is GetEnvironmentVariableW on Windows), and the
+    // C library's copy, which getenv() reads.
     const QString native = QDir::toNativeSeparators(value);
-    SetEnvironmentVariableW(name, reinterpret_cast<const wchar_t*>(native.utf16()));
+    _wputenv((std::wstring(name) + L"=" + native.toStdWString()).c_str());
 }
 }  // namespace
 
@@ -37,6 +42,11 @@ void prepareEnvironment() {
     setIfUnset(L"XDG_CONFIG_HOME", QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation));
     setIfUnset(L"XDG_DATA_HOME", QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation));
     setIfUnset(L"XDG_CACHE_HOME", QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation));
+    // Text: Pango's fontconfig backend (its Windows one dies drawing into images, see WindowsFonts.h), with the font
+    // cache built in the background while the window comes up.
+    if (useFontconfig()) {
+        warmUpFonts();
+    }
 }
 
 }  // namespace xqt::windows

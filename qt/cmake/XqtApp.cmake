@@ -164,7 +164,9 @@ if(WIN32)
     set_target_properties(xournal-qt PROPERTIES WIN32_EXECUTABLE TRUE)
     target_sources(xournal-qt PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsSetup.h
-        ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsSetup.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsSetup.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsFonts.h
+        ${CMAKE_CURRENT_LIST_DIR}/../src/app/WindowsFonts.cpp)
 endif()
 
 if(XQT_BUILD_TESTS)

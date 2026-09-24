@@ -45,6 +45,10 @@
 
 #include "filesystem.h"
 
+#ifdef _WIN32
+#include "../src/app/WindowsFonts.h"
+#endif
+
 namespace {
 
 void throwIfMissingPdfFileName(const LoadHandler& loader) {
@@ -213,6 +217,8 @@ int main(int argc, char* argv[]) {
     if (!g_getenv("XQT_NO_UTF8_LOCALE")) {
         setlocale(LC_CTYPE, ".UTF-8");
     }
+    // Text with Pango's fontconfig backend: its Windows one dies drawing into images (PNG export).
+    xqt::windows::useFontconfig();
 #endif
     std::cout.imbue(std::locale());
 

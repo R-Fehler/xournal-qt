@@ -13,7 +13,9 @@ namespace xqt::windows {
 ///   path with an umlaut would be read in the ANSI code page and point to another file;
 /// - XDG_CONFIG_HOME, XDG_DATA_HOME and XDG_CACHE_HOME, which GLib reads on Windows too, point to Qt's generic
 ///   folders (%LOCALAPPDATA%, and %LOCALAPPDATA%\cache for the caches: GLib's own default for the cache is the
-///   Internet Explorer cache folder). Variables that are already set are left alone.
+///   Internet Explorer cache folder). Variables that are already set are left alone;
+/// - Pango draws text with its fontconfig backend and a configuration of the app's own (WindowsFonts.h), and the
+///   font cache is loaded, or built on the first start, on a background thread.
 void prepareEnvironment();
 
 }  // namespace xqt::windows
