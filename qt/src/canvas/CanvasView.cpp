@@ -77,6 +77,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     // (the rendered pages are kept by CanvasMemory: the PDF cache only serves edits of the visible ones)
     pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
+    pdfCachePages = session.getDocument()->getPdfPageCount();
     registerListener(&session);
     session.setXournalView(this);
     session.setZoomControl(&zoomControl);
@@ -1603,7 +1604,9 @@ PdfCache* CanvasView::rasterPdfCache(bool background) const {
     return backgroundPdfCache ? backgroundPdfCache.get() : pdfCache.get();
 }
 
-void CanvasView::recreatePdfCache() {
+void CanvasView::recreatePdfCache() { replacePdfCache(true); }
+
+void CanvasView::replacePdfCache(bool rerender) {
     // The old ones may still be in use by a render: they go with the view (empty)
     evictPdfCache({});
     retiredPdfCaches.push_back(std::move(pdfCache));
@@ -1616,8 +1619,14 @@ void CanvasView::recreatePdfCache() {
     }
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
+    const size_t before = std::exchange(pdfCachePages, session.getDocument()->getPdfPageCount());
     for (auto& p: pages) {
-        p->rerenderPage();
+        // (a page drawn again goes to the queue of the pages in view: all of them there would make the pages the
+        // reader waits for wait behind every page of the document)
+        const PageRef& page = p->getPage();
+        if (rerender || (page->getBackgroundType().isPdfPage() && page->getPdfPageNr() >= before)) {
+            p->rerenderPage();
+        }
     }
 }
 
@@ -1650,8 +1659,9 @@ void CanvasView::documentChanged(DocumentChangeType type) {
         recreatePdfCache();
         rebuildPages();
     } else if (type == DOCUMENT_CHANGE_PDF_BOOKMARKS) {
-        // Another background PDF was loaded (pasted PDF pages joined the merged PDF): the caches hold the old one
-        recreatePdfCache();
+        // Another background PDF was loaded: the caches hold the old one. When pasted PDF pages joined the merged
+        // PDF, the pages keep their pictures (their PDF pages are the same, with the same numbers).
+        replacePdfCache(!session.pdfKeepsPictures());
     }
 }
 

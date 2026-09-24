@@ -89,9 +89,9 @@ bool PdfPageKeeper::switchTo(const fs::path& pdf, std::string& error) {
             return false;
         }
     }
-    Document* doc = session.getDocument();
-    if (!doc->readPdf(pdf, /*initPages=*/false, /*attachToDocument=*/false)) {
-        error = doc->getLastErrorMsg();
+    // (its pages are those of the document's PDF, with the same numbers, and the added ones)
+    if (!session.loadPdfKeepingPictures(pdf)) {
+        error = session.getDocument()->getLastErrorMsg();
         return false;
     }
     return true;

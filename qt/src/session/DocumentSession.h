@@ -179,6 +179,12 @@ public:
     /// The PDF the document annotates for the user: its background PDF, or while the merged PDF of a document that
     /// was never saved is in the cache, the PDF it was made from (empty if none).
     fs::path annotatedPdf() const;
+    /// Load this PDF as the background, whose pages that the document shows look the same as in the one it has now
+    /// (pages added to it, or a copy of it): the views swap their PDF without drawing those pages again. False if it
+    /// did not load (Document::getLastErrorMsg).
+    bool loadPdfKeepingPictures(const fs::path& pdf);
+    /// Within loadPdfKeepingPictures (for the views).
+    bool pdfKeepsPictures() const { return keepingPictures; }
 
     // --- view side --------------------------------------------------------------------------------------------
     /// The view showing this session (nullptr: headless). Not owned.
@@ -330,6 +336,7 @@ private:
     /// The last save failed after the saved point was moved: modified until a save succeeds.
     bool saveFailed = false;
     bool destroying = false;
+    bool keepingPictures = false;
     SaveResult lastSaveResult;
 
     QTimer autosaveTimer;

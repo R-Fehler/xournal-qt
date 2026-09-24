@@ -364,7 +364,7 @@ void DocumentSession::planFiles() {
                         return planFiles();  // (pages were pasted meanwhile)
                     }
                     if (!t.ownCopy.empty()) {
-                        if (!doc->readPdf(t.ownCopy, /*initPages=*/false, /*attachToDocument=*/false)) {
+                        if (!loadPdfKeepingPictures(t.ownCopy)) {  // (a copy of the same file)
                             return finishSave({false,
                                                FS(_F("Could not copy the PDF \"{1}\" before writing into it: {2}") %
                                                   t.target.u8string() % doc->getLastErrorMsg()),

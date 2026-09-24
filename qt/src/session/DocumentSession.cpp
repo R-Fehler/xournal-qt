@@ -794,6 +794,13 @@ size_t DocumentSession::addPdfPages(const std::string& pdf, std::string& error) 
 
 fs::path DocumentSession::annotatedPdf() const { return pdfPages->annotatedPdf(); }
 
+bool DocumentSession::loadPdfKeepingPictures(const fs::path& pdf) {
+    keepingPictures = true;
+    const bool ok = doc->readPdf(pdf, /*initPages=*/false, /*attachToDocument=*/false);
+    keepingPictures = false;
+    return ok;
+}
+
 quint64 DocumentSession::pdfNumbering() const { return pdfPages->numbering(); }
 
 fs::path DocumentSession::mergedPdfPlace() const { return pdfPages->placeFor(getFilePath()); }

@@ -611,3 +611,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       folder view or after clearing `~/.cache/xournal-qt/pasted-pages`).
 - [ ] Kill the app (`kill -TERM <pid>`) while it saves a long hybrid PDF: at the next start the document is offered
       for recovery with the latest strokes, and the hybrid PDF is either the old or the new version (it opens).
+- [ ] (Fix) Paste a PDF page from another PDF into a document that has a background PDF (best: the large scan):
+      the pasted page shows its PDF page on the canvas right away (it used to stay blank for a while), a second
+      paste from a third PDF too; the other pages do not flicker or re-render.

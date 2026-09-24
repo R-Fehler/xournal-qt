@@ -9,6 +9,7 @@
 #include <future>
 #include <thread>
 #include <fstream>
+#include <iostream>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -32,6 +33,12 @@
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/TabManager.h"
+#include "render/RenderService.h"
+#include "session/AppContext.h"
+
+#include "CanvasMemory.h"
+#include "CanvasPage.h"
+#include "CanvasView.h"
 
 #include "AppController.h"
 
@@ -680,4 +687,92 @@ TEST_F(PastedPdfPages, pagesPastedWhileTheMergedPdfIsWrittenGoNextToTheDocumentT
               (std::vector<std::string>{"", "pastedbeta", "pastedgamma"}));
     EXPECT_TRUE(pageHasText(s, 1, "pastedbeta"));
     EXPECT_TRUE(pageHasText(s, 2, "pastedgamma"));
+}
+
+namespace {
+/// Whether the canvas has drawn the page with dark ink (text) in its upper part (a pasted page shows its PDF text
+/// there; a page drawn without it is white). Its raster at the view's zoom.
+bool canvasShowsText(CanvasView* view, size_t page) {
+    CanvasPage* p = view->getPage(page);
+    const auto info = p->bufferInfo();
+    if (!info.valid) {
+        return false;
+    }
+    const QImage tile = p->composeTile(QRect(QPoint(0, 0), info.pixelSize));
+    for (int y = 0; y < tile.height() / 4; ++y) {
+        for (int x = 0; x < tile.width() / 2; ++x) {
+            if (qGray(tile.pixel(x, y)) < 100) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+}  // namespace
+
+// A page pasted from another PDF into a document with a PDF shows its PDF page on the canvas at once. It stayed blank
+// for a while: loading the merged PDF re-rendered every page of the document, at the priority of the pages in view,
+// and the pasted page waited behind them all.
+TEST_F(PastedPdfPages, aPastedPageIsDrawnOnTheCanvasAtOnce) {
+    std::vector<std::string> words;
+    for (int i = 0; i < 300; ++i) {
+        words.push_back("longpage" + std::to_string(i + 1));
+    }
+    makeTextPdf(root / "long.pdf", words);
+    annotate(root / "long.pdf", root / "long.xopp");
+    AppController c;
+    ASSERT_TRUE(open(c, root / "other.pdf"));
+    c.copyPages({1});  // pastedbeta
+    ASSERT_TRUE(open(c, root / "long.xopp"));
+    const int lecture = c.tabManager().currentIndex();
+    CanvasView* view = c.tabManager().currentView();
+    view->getViewController().setViewSize(QSizeF(800, 2400));  // (pages 1 to 3 in view)
+    view->setShown(true);
+    // Room for a dozen rendered pages (not the whole document in advance)
+    const QSizeF pageSize = view->pageViewRect(0).size();
+    CanvasMemory::instance().setLimit(static_cast<qint64>(pageSize.width() * pageSize.height() * 4 * 12));
+    struct RestoreLimit {
+        ~RestoreLimit() { CanvasMemory::instance().setLimit(CanvasMemory::defaultLimit()); }
+    } restoreLimit;
+    RenderService* renders = c.context().getRenderService();
+    auto settled = [&] {
+        renders->waitForIdle();
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+    };
+    ASSERT_TRUE(waitFor([&] {
+        settled();
+        return canvasShowsText(view, 0) && canvasShowsText(view, 1);
+    }));
+    auto far = [&] { return view->getPage(120)->bufferInfo().valid; };
+    ASSERT_FALSE(far()) << "a page far from the view is not drawn";
+    for (const size_t at: {1, 2}) {
+        SCOPED_TRACE("paste " + std::to_string(at));
+        if (at == 2) {  // the second one from another PDF: the merged PDF grows again
+            ASSERT_TRUE(open(c, root / "third.pdf"));
+            c.copyPages({0});  // pastedgamma
+            c.tabManager().setCurrentIndex(lecture);
+            view->setShown(true);
+            view->getViewController().scrollToPage(0);  // (drawn again as the window does when it shows the tab)
+            ASSERT_TRUE(waitFor([&] {
+                settled();
+                return canvasShowsText(view, 0);
+            }));
+        }
+        QElapsedTimer t;
+        t.start();
+        ASSERT_EQ(c.pastePages(static_cast<int>(at)), 1);
+        ASSERT_TRUE(pageHasText(current(c), at, at == 1 ? "pastedbeta" : "pastedgamma"));
+        const bool shown = waitFor(
+                [&] {
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+                    return canvasShowsText(view, at);
+                },
+                20000);
+        EXPECT_TRUE(shown);
+        const qint64 ms = t.elapsed();
+        std::cout << "paste " << at << ": the pasted page drawn after " << ms << " ms\n";
+        EXPECT_FALSE(far()) << "the pages of the document are not drawn again (the pasted page waited for them)";
+        EXPECT_LT(ms, 600) << "drawn at once";
+        settled();
+    }
 }
