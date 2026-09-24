@@ -215,6 +215,15 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [?] **Vaults** (Obsidian, Zettlr, foam): open a vault folder as a library; resolve `[[wikilinks]]` and
   Markdown links by file name; backlinks later.
 
+### Bugs
+- [~] **A PDF page pasted into a document that has a PDF stays blank on the canvas** (only the previews show it).
+  Pasting into a `.xopp` without a PDF works. Given to `qt/background-save`, which reworks that paste path; to fix
+  first, with a test. Likely cause: the page is drawn against the old PDF before the merged PDF is loaded, and it is
+  not drawn again afterwards.
+- [ ] **A touch on the "pages with hits" filter can make the maximized window half as high** (old, flaky, probably
+  touch only, KWin). Does not reproduce off-screen. Next time: run with `XQT_LOG_WINDOW=1` and look at what comes
+  just before the change.
+
 ### Flaky tests
 - [ ] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
   `-j6` load (2026-09-24), at the check after "the way back brings it into view again". It passed 3 of 3 alone.
