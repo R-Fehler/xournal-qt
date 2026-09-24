@@ -262,6 +262,17 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   as the fallback, and `pdfpage=` for pages of annotated PDFs. A tap offers a new tab, reference view or "here".
   In-app renames rewrite the links, backed by the index's backlinks. Built as `qt/links` after the running blocks.
 
+### Archive export (the author, 2026-09-24; after `qt/links`)
+- [ ] **"Export for the archive…"** per document (⋮ and Share), with a short explanation in the dialog of what it
+  means: a PDF/A-3 file meant to stay readable for decades in any PDF viewer, with the ink flattened into the pages
+  so no viewer can hide or lose it, and the full Xournal data embedded so the app can still open it for editing.
+  - PDF/A-3b: fonts embedded (report source PDFs that cannot comply instead of claiming it), an output colour
+    profile, XMP metadata, and the embedded `.xopp` marked as the source data (`/AFRelationship /Source`).
+  - Validation with veraPDF in CI on sample files, as a test tool only.
+- [ ] **"Export library as archive…"** in the library menu: every document of the library (or the current folder)
+  exported as an archive PDF into a chosen folder, keeping the folder structure. Other files are copied as they are,
+  and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
+
 ### Bugs
 - [x] **A PDF page pasted into a document that has a PDF showed late on the canvas**: fixed in `qt/background-save`.
 - [x] **Fit width uses the widest page, not the current one** (fixed in `qt/present`) (the author, 2026-09-24): after pasting a 16:9 page
