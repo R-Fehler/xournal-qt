@@ -10,6 +10,7 @@
 #include <gtest/gtest.h>
 
 #include "shell/Library.h"
+#include "shell/LocalUrl.h"
 #include "shell/RecentFiles.h"
 #include "shell/SystemApps.h"
 #include "AppController.h"
@@ -139,4 +140,42 @@ TEST_F(RecentLibrariesTest, aWindowsLibraryBecomesRecentAndOpensInAWindowOfItsOw
         recent->clear();
     }
     SystemApps::setInstance(nullptr);
+}
+
+// Windows (2026-09-24): "Downloads folder (quick library)" answered "cannot open c//". The menu made the URL as
+// "file://" + path, and with a drive letter that is a host: "file://C:/Users/x/Downloads" is the network path
+// //c/Users/x/Downloads to toLocalFile().
+TEST_F(RecentLibrariesTest, aWindowsPathOpensItsLibraryHoweverItBecameAUrl) {
+    EXPECT_EQ(QUrl("file://C:/Users/x/Downloads").toLocalFile(), "//c/Users/x/Downloads") << "what went wrong";
+    FakeSystemApps fake;
+    SystemApps::setInstance(&fake);
+    {
+        AppController c;
+        c.openLibrary(QUrl("file://C:/Users/x/Downloads"));  // made by hand
+        c.openLibrary(QUrl("C:/Users/x/Other"));             // a path where a URL was expected
+        c.openLibraryAt(qstr(root / "Third"));               // a path, as the menu passes it now
+        c.openLibrary(QUrl::fromLocalFile(qstr(root / "Fourth")));
+        EXPECT_EQ(fake.libraries, (QStringList{"C:/Users/x/Downloads", "C:/Users/x/Other", qstr(root / "Third"),
+                                               qstr(root / "Fourth")}));
+#ifdef Q_OS_WIN  // (elsewhere "C:/..." is a relative path)
+        c.openLibraryAt("C:/Users/x/Fifth");
+        EXPECT_EQ(fake.libraries.last(), "C:/Users/x/Fifth");
+#endif
+    }
+    SystemApps::setInstance(nullptr);
+}
+
+TEST(LocalUrl, localPathsOfFileUrls) {
+    using xqt::localPathOf;
+    EXPECT_EQ(localPathOf(QUrl()), "");
+    EXPECT_EQ(localPathOf(QUrl::fromLocalFile("/home/x/a b.xopp")), "/home/x/a b.xopp");
+    EXPECT_EQ(localPathOf(QUrl("file:///home/x/%C3%9Cbung.pdf")), QString::fromUtf8("/home/x/\xc3\x9c" "bung.pdf"));
+    EXPECT_EQ(localPathOf(QUrl("file://C:/Users/x/Downloads")), "C:/Users/x/Downloads");
+    EXPECT_EQ(localPathOf(QUrl("file://c/Users/x")), "C:/Users/x");
+    EXPECT_EQ(localPathOf(QUrl("C:/Users/x/Documents/a.xopp")), "C:/Users/x/Documents/a.xopp");
+    EXPECT_EQ(localPathOf(QUrl("file://server/share/a.pdf")), "//server/share/a.pdf") << "a network path stays one";
+#ifdef Q_OS_WIN
+    EXPECT_EQ(localPathOf(QUrl::fromLocalFile("C:/Users/x/Downloads")), "C:/Users/x/Downloads");
+    EXPECT_EQ(localPathOf(QUrl::fromLocalFile("C:\\Users\\x\\Downloads")), "C:/Users/x/Downloads");
+#endif
 }

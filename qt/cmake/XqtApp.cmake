@@ -77,6 +77,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/RecentFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SystemApps.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LocalUrl.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LocalUrl.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h

@@ -2005,6 +2005,36 @@ TEST_F(HomeScreenFilterTest, recentLibrariesOpenAgain) {
     recent->clear();
 }
 
+// Windows (2026-09-24): the Downloads entry of the library menu made its URL as "file://" + path, which with a drive
+// letter is a network path ("cannot open c//"). The entry hands over the path itself now.
+TEST_F(HomeScreenFilterTest, theLibraryMenuOpensTheDownloadsFolderByItsPath) {
+    QTemporaryDir dl;
+    const QString config = qEnvironmentVariable("XDG_CONFIG_HOME");
+    fs::create_directories(config.toStdString());
+    {
+        QFile dirs(config + "/user-dirs.dirs");
+        ASSERT_TRUE(dirs.open(QIODevice::WriteOnly));
+        dirs.write(("XDG_DOWNLOAD_DIR=\"" + dl.path().toStdString() + "\"\n").c_str());
+    }
+    QObject* menu = find("libraryMenu");
+    ASSERT_NE(menu, nullptr);
+    QMetaObject::invokeMethod(menu, "open");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QObject* downloads = nullptr;
+    for (auto* item: menu->findChildren<QQuickItem*>()) {
+        if (item->objectName() == "libraryMenuEntry" &&
+            item->property("modelData").toMap().value("downloads").toBool()) {
+            downloads = item;
+        }
+    }
+    ASSERT_NE(downloads, nullptr) << "the Downloads folder is in the menu";
+    QMetaObject::invokeMethod(downloads, "triggered");
+    ASSERT_FALSE(fake.libraries.isEmpty());
+    EXPECT_EQ(fake.libraries.last(), dl.path());
+    QMetaObject::invokeMethod(menu, "close");
+    QFile::remove(config + "/user-dirs.dirs");
+}
+
 TEST_F(MainWindowTest, tabsCloseOnlyOnPurposeAndAllAtOnce) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     controller->newDocument();

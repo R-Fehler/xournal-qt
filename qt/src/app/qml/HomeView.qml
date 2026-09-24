@@ -330,6 +330,7 @@ Rectangle {
                         model: libraryMenu.libraries
                         delegate: MenuItem {
                             id: libraryItem
+                            objectName: "libraryMenuEntry"
                             required property var modelData
                             readonly property bool current: modelData.current
                             readonly property string label: modelData.downloads ? qsTr("Downloads folder (quick library)") : modelData.name
@@ -341,7 +342,8 @@ Rectangle {
                                 color: libraryItem.current ? "#e8eaf6" : (libraryItem.highlighted ? "#f1f3f4" : "transparent")
                             }
                             // This library: just the home screen; another: a new window (one library per window)
-                            onTriggered: current ? (app.homeVisible = true) : app.openLibrary("file://" + modelData.path)
+                            // (a path, not "file://" + path: on Windows that makes the drive letter a host)
+                            onTriggered: current ? (app.homeVisible = true) : app.openLibraryAt(modelData.path)
                         }
                         // after the heading
                         onObjectAdded: function(index, object) { libraryMenu.insertItem(index + 1, object) }
