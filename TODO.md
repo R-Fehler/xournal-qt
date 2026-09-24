@@ -216,6 +216,9 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     to that page. The number jump is useful in normal mode too.
   - Switch back and forth between present and edit from full screen, and start it from the normal tool bar.
   - Writing on slides while presenting follows from full screen (the tool square stays).
+- [~] **Switching tabs in full screen (editing)** (the author, 2026-09-24; queued in `qt/present`): a slim bar at the
+  top centre with one dot per tab (`PageIndicator`; "3 / 17" with many tabs). A tap opens the tab overview, and a
+  horizontal swipe on the bar switches to the previous or next tab. Hidden with one tab and while presenting.
 - [ ] **16:9 pages**: a PowerPoint-like 16:9 landscape paper size when creating a new `.xopp` and when inserting
   pages, for documents meant to be presented.
 
