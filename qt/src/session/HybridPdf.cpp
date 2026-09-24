@@ -679,7 +679,9 @@ Result assemble(const Prepared& prep, const fs::path& target, bool hybrid) {
     } else {
         out.emptyPDF();
     }
-    MergedPdf::mark(out, MergedPdf::Kind::None);  // (a hybrid PDF is never a merged PDF the app may rewrite)
+    // A hybrid PDF is never a merged PDF the app may rewrite; the base pages exported for Xournal++ are one (Own: the
+    // next export replaces it)
+    MergedPdf::mark(out, hybrid ? MergedPdf::Kind::None : MergedPdf::Kind::Own);
     QPDF drawn;
     drawn.setSuppressWarnings(true);
     if (!prep.drawn.empty()) {

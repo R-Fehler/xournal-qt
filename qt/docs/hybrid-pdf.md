@@ -132,3 +132,32 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    - Tests: `qpdf --check` (through `QPDFJob`) passes; each page drawn by poppler (with annotations) matches our PDF
      export of the same document (mean difference < 0.5/255, < 0.2 % of the pixels off); the embedded document
      opens. `XQT_HYBRID_SAMPLE=<file>` makes the first test copy its hybrid PDF there (a sample for other apps).
+2. **Reader** (done). `DocumentSession::loadFile` opens a PDF with the marker as its embedded document
+   (`HybridPdf::open`); the marker is looked up with qpdf (about 20 ms for a 1,300-page PDF, remembered by path,
+   size and time), so ordinary PDFs open as before. The clean copy (`~/.cache/xournal-qt/hybrid-pdf/<hash of the
+   path>-<size>-<time>/base.pdf`, with the extracted `document.xopp` and a `changed.txt`) is made once per version
+   of the file and is the document's background PDF; the file path of the document is the hybrid PDF, so the tab,
+   recent files and Ctrl+S use it. Library, previews and search load it the same way.
+   - Our annotations are removed from the clean copy; annotations of other apps stay in it (poppler shows them)
+     and are written again on save.
+   - The clean copy carries the merged-PDF mark `Own` of `qt/pdf-pages`, so "Save as" `.xopp` from a hybrid PDF
+     puts its pages next to the `.xopp` (`name.pdf` or `.name.pages.pdf`) instead of referring into the cache.
+   - The cache: a document retains the clean copy it uses (in this process); opening a file removes the clean
+     copies of its other versions (older than a minute) and every entry not used for a day. Each save touches the
+     entry in use.
+   - The hash check: each annotation of ours whose hash differs, or that is missing, is reported
+     (`LoadResult::hybridChanged`). `DocumentSession::importHybridChanges` takes the other app's version: a clean
+     copy that keeps those annotations as plain ones (`/NM (imported:…)`, without our key) becomes the background,
+     and the layers they stood for are emptied, undoably. A page removed in another app is not handled: the
+     embedded document then refers to base pages by their old numbers.
+   - Saving (`save()` of a document whose file is a `.pdf`, `saveAsHybrid`) writes the hybrid PDF from the
+     document. Writing into a user's PDF that is not hybrid yet keeps `name.original.pdf` once, and the document
+     takes its pages from a copy in the cache from then on (the file it read them from changes).
+   - `.xopp` stays the format of "Save as" and of every document that was not saved as a hybrid PDF; autosaves and
+     crash saves stay `.xopp` files.
+   - Tests: a written file opens as the same document as a `.xopp` round trip gives (pages, sizes, backgrounds and
+     the PDF text on each page, layers, strokes with pressure, colours and tools, texts); saved again after a
+     change; a plain PDF and "Save as" `.xopp` behave as before; a comment added with qpdf stays in the clean copy
+     and survives a save; a moved and a deleted annotation of ours are reported, and importing them empties those
+     layers (undo brings them back); notes saved into the PDF itself keep `name.original.pdf` byte for byte; the
+     `.xopp` export opens as the same document with a base PDF without annotations.

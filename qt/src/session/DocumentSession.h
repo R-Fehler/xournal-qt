@@ -50,8 +50,12 @@ public:
         bool attachedPdfMissing = false;
         int fileVersion = 0;
         bool isNewerFileVersion() const;
+        /// A hybrid PDF (HybridPdf.h): the document is its embedded document, the file path is the PDF.
+        bool hybrid = false;
+        /// A hybrid PDF whose annotations of ours another app changed, moved or deleted (their names)
+        std::vector<std::string> hybridChanged;
     };
-    /// Load a .xopp, .xoj or .pdf file (a PDF gets one page per PDF page). Does not touch any session, so it may
+    /// Load a .xopp, .xoj or .pdf file (a PDF gets one page per PDF page; a hybrid PDF is its embedded document). Does not touch any session, so it may
     /// run on a worker thread before the tab is created.
     static LoadResult loadFile(const fs::path& path, bool attachPdf = false);
 
@@ -72,6 +76,22 @@ public:
     SaveResult save();
     /// Save to a new path; the document takes this path ("Save as").
     SaveResult saveAs(fs::path target);
+    /// Save as a hybrid PDF (HybridPdf.h); the document takes this path, and save() writes it again. Writing into a
+    /// PDF that is not a hybrid PDF yet (the PDF the document annotates) keeps a copy "name.original.pdf" once.
+    SaveResult saveAsHybrid(fs::path target);
+    /// The document is saved as a hybrid PDF (its file is a .pdf).
+    bool isHybrid() const;
+    /// A hybrid PDF with annotations of ours changed in another app (see LoadResult::hybridChanged).
+    void setHybridChanges(std::vector<std::string> names) { hybridChanges = std::move(names); }
+    const std::vector<std::string>& getHybridChanges() const { return hybridChanges; }
+    /// Take the other app's version of those annotations: they stay in the PDF as plain annotations (shown by the
+    /// background), and the layers they stood for are emptied (undoable). False if that failed (`error`).
+    bool importHybridChanges(std::string& error);
+    /// Export for Xournal++: a plain `xopp` next to the hybrid PDF with the base pages as its PDF (the merged-PDF
+    /// rules of qt/pdf-pages: "name.pdf" if free, else ".name.pages.pdf"). The document keeps its file.
+    SaveResult exportXopp(const fs::path& xopp);
+    /// Where exportXopp puts the PDF for this .xopp.
+    static fs::path exportPdfFor(const fs::path& xopp);
     /// Write a document that is not open in a session (e.g. a library document being moved) to `target` (.xopp),
     /// with a new preview; the document takes this path.
     static SaveResult writeDocument(Document& doc, const fs::path& target);
@@ -228,6 +248,7 @@ private:
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
     SaveResult saveImpl(fs::path target);
+    SaveResult saveHybridImpl(const fs::path& target);
     /// Write the .xopp (the file only).
     SaveResult writeXopp(const fs::path& target);
 
@@ -254,6 +275,8 @@ private:
     fs::path lastAutosaveFile;
     quint64 serialNo = 0;
     std::unique_ptr<PdfPageKeeper> pdfPages;
+    std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)
+    std::vector<std::string> hybridChanges;
     std::unique_ptr<DocumentSearch> searcher;  // last: it listens to this session
 };
 
