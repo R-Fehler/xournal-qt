@@ -620,3 +620,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       that passage, with that hit current in the search bar (e.g. "2 / 2"), and the read-only note at the bottom left.
       Swipe the row sideways with a finger.
 - [ ] "Open" (Ctrl+O) and the library's "Import" offer Markdown files and images among the documents.
+
+## Page grid while searching (qt/grid-search-scroll)
+- [ ] A long PDF, search a word with many hits, open the page grid (filter on and off) and scroll down slowly and
+      fast: the grid stays where you scroll. Enter in the search bar still moves the grid to the next hit.
