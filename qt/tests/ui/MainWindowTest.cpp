@@ -1407,6 +1407,7 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
     };
     ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
     wait(100);
+    controller->selectTool("pen");  // (the tool is app-wide: an earlier test in the same process may have left another)
     ASSERT_EQ(controller->tool(), "pen");
     draw();
     EXPECT_FALSE(controller->modified()) << "read-only: the pen does not write";
