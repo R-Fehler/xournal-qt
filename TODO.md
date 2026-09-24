@@ -94,9 +94,10 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - [ ] Every open tab reads its PDF text 2 s after opening, even if it is never searched. Consider starting on
     the first search only for documents outside a library.
   - [ ] The tab overview places hits only on the first 24 pages with hits of each document.
-- [?] **Recent libraries, and libraries anywhere.** Keep a list of recently opened library folders on the home
-  screen. "Open a folder as library…" already exists, so this is small.
-  *Proposal:* yes. Also add "New library…" with a free location instead of only under `Xournal_Libraries`.
+- [~] **Recent libraries, and opening a subfolder as a library** (decided 2026-09-24, in `qt/library-filter`).
+  - Folders opened as a library outside `Xournal_Libraries` show in the Recent grid, as a folder with a library
+    badge; tapping one opens that library in its own window.
+  - A folder card in the library grid gets "Open as library" in its context menu, opening a new window.
 - [?] **A library index per folder.** Each folder gets its own dot folder with the index and cache of its own
   files only. The app merges them when a parent folder is opened. Opening a subfolder as a library is then
   instant, and moving a folder carries its index along.
