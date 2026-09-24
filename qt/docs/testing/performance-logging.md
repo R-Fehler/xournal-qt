@@ -36,3 +36,9 @@ What the numbers say:
 - `sharp` high after a zoom or a jump: the page in view waits for its render (a heavy page, or other work in front
   of it); pages rendered in advance, previews and thumbnails wait while a page in view is rendered.
 - `mouse` high with a large `hit test` worst time: the hit test of the item under the pointer is expensive.
+
+## Window changes (`XQT_LOG_WINDOW=1`)
+`XQT_LOG_WINDOW=1 xournal-qt` writes a line on stderr for every change of a window's state (maximized, full
+screen, ...), size and position, for the touch and mouse presses on it, and for what the app itself asks of the
+window ("app asks: ..."). A change with no "app asks" line just before it came from the compositor. It was added
+for a flaky bug where a touch on the "pages with hits" filter made the maximized window half as high.

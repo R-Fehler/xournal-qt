@@ -518,6 +518,41 @@ TEST_F(MainWindowTest, pageGridCanShowOnlyPagesWithHits) {
     EXPECT_EQ(controller->pageNumber(), 10);
 }
 
+TEST_F(MainWindowTest, theHitsFilterLeavesTheWindowAsItIs) {
+    // The author: pressing "N pages with hits" (sidebar or page grid) made the maximized window half as high
+    window->showMaximized();
+    until([&] { return window->visibility() == QWindow::Maximized; });
+    wait(1700);  // (past the settling of the window state)
+    const QRect before = window->geometry();
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    controller->setSearchQuery("p1");
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 3 && !controller->searchRunning(); }));
+    wait(100);
+    ASSERT_EQ(window->visibility(), QWindow::Maximized);
+    const auto clickChip = [&](QQuickItem* root) {
+        QQuickItem* chip = nullptr;
+        for (auto* c: root->findChildren<QQuickItem*>("searchFilterChip")) {
+            if (c->isVisible()) {
+                chip = c;
+            }
+        }
+        if (!chip) {
+            return;  // (the sidebar is hidden in a narrow window)
+        }
+        const QPointF p = chip->mapToScene(QPointF(chip->width() / 2, chip->height() / 2));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, p.toPoint());
+        wait(200);
+    };
+    clickChip(window->contentItem());  // the sidebar's
+    EXPECT_EQ(window->visibility(), QWindow::Maximized) << "sidebar chip";
+    EXPECT_EQ(window->geometry(), before) << "sidebar chip";
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    wait(200);
+    clickChip(find<QQuickItem>("pageGrid"));
+    EXPECT_EQ(window->visibility(), QWindow::Maximized) << "grid chip";
+    EXPECT_EQ(window->geometry(), before) << "grid chip";
+}
+
 TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     for (int i = 0; i < 80; ++i) {

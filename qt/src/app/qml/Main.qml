@@ -41,6 +41,7 @@ ApplicationWindow {
             // for maximized once more.
             if (visibility === Window.Windowed && windowedVisibility === Window.Maximized && !remaximized) {
                 remaximized = true
+                app.logWindow("maximized again (the compositor gave back the normal size)")
                 showMaximized()
             }
         } else if (!fullScreenMode && (visibility === Window.Windowed || visibility === Window.Maximized)) {
@@ -61,12 +62,14 @@ ApplicationWindow {
         if (fullScreenMode) {
             leavingFullScreenTimer.stop()
             leavingFullScreen = false
+            app.logWindow("full screen")
             showFullScreen()
         } else {
             quickTools.close()
             leavingFullScreen = true
             remaximized = false
             leavingFullScreenTimer.restart()
+            app.logWindow("leave full screen to " + (windowedVisibility === Window.Maximized ? "maximized" : "normal"))
             if (windowedVisibility === Window.Maximized) showMaximized()
             else showNormal()
         }
@@ -182,7 +185,7 @@ ApplicationWindow {
             win.close()
         }
         function onRaiseRequested() {
-            if (win.visibility === Window.Minimized) win.showNormal()
+            if (win.visibility === Window.Minimized) { app.logWindow("raise from minimized"); win.showNormal() }
             win.raise()
             win.requestActivate()
         }
