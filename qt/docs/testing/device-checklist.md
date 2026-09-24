@@ -688,4 +688,8 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       plain.
 - [ ] Close and start the app again: "Fuzzy" is still on. A second window shows it on too; turning it off in one
       turns it off in both.
+- [ ] The tab overview (Ctrl+Shift+F) has the same "Fuzzy" button, in the same state as the library's. Open a few
+      documents: `lecture !draft` marks the documents that match (title or text), the matched letters of the titles
+      are highlighted, a document found by its title alone says "In the name"; with the pages button, a document shows
+      the pages on which the whole expression holds. "Names" with Fuzzy on matches the titles fuzzily.
 - [ ] A big library (thousands of documents): typing in the fuzzy search stays as responsive as the plain one.

@@ -286,6 +286,12 @@ Opening a hit (a card, a page, a snippet card) searches the document with the sa
 document's search bar it stays a fuzzy search until the bar is cleared. The pictures of the pages mark every term
 that is not negated (poppler's search, so `^`, `$` and `'word'` are marked as substrings there).
 
+**The tab overview** ("search all documents", Ctrl+Shift+F) has the same button and setting: a document (its
+title, and the text of its search index) is marked when the expression holds, its title's matched letters are
+highlighted, a card found only by its title says "In the name", one whose hits the expression excludes "No match",
+and its row of pages (the extended view) lists the pages on which the expression holds, as in the library. "Names"
+there with the toggle on: the expression over the titles alone.
+
 The query is parsed once per search (`qt/src/session/FuzzyQuery.*`, fzf's port in `FuzzyMatch.*`), each text is
 scanned once per term. Measured on a generated library of 3,000 Markdown files (~12 MB of text, six of them ~2 MB)
 on the development machine while it was busy with other builds: the index search takes 28–55 ms for a plain word,

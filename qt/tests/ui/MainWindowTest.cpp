@@ -3192,6 +3192,82 @@ TEST_F(MainWindowTest, tabOverviewHasTheExtendedAndTheNameSearch) {
     EXPECT_FALSE(overview->property("extendedView").toBool()) << "no pages to show for names";
 }
 
+// The overview's search has the library's "Fuzzy" toggle (the same setting): fzf's syntax over the titles and the text.
+TEST_F(MainWindowTest, tabOverviewHasTheFuzzySearch) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));  // page i: "p<i+1>"
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));  // "Xournal", "Page 2"
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    QObject* overview = find("tabOverview");
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    auto* toggle = find<QQuickItem>("overviewSearchFuzzy");
+    ASSERT_NE(toggle, nullptr);
+    EXPECT_FALSE(toggle->property("checked").toBool());
+    click(toggle);
+    EXPECT_TRUE(library->fuzzySearch()) << "the library's setting";
+
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    auto* field = find<QQuickItem>("overviewSearchField");
+    auto search = [&](const char* text) {
+        field->setProperty("text", QString::fromUtf8(text));
+        QMetaObject::invokeMethod(overview, "runSearch", Q_ARG(QVariant, QString::fromUtf8(text)));
+        EXPECT_TRUE(waitFor([&] {
+            return !tabs->index(0, 0).data(xqt::TabManager::SearchRunningRole).toBool() &&
+                   !tabs->index(1, 0).data(xqt::TabManager::SearchRunningRole).toBool();
+        }));
+    };
+    auto matches = [&](int row) { return tabs->index(row, 0).data(xqt::TabManager::SearchMatchRole).toBool(); };
+    search("p1 | xournal");
+    EXPECT_TRUE(matches(0));
+    EXPECT_TRUE(matches(1));
+    EXPECT_EQ(tabs->index(0, 0).data(xqt::TabManager::SearchHitsRole).toInt(), 3) << "p1, p10, p11";
+    search("p1 !xournal");
+    EXPECT_TRUE(matches(0));
+    EXPECT_FALSE(matches(1));
+    // A term in the title: every page with the other term; its letters are highlighted
+    search("p1 pgs");
+    EXPECT_TRUE(matches(0));
+    EXPECT_FALSE(matches(1));
+    const QVariantList pages = tabs->index(0, 0).data(xqt::TabManager::HitPagesRole).toList();
+    ASSERT_EQ(pages.size(), 3);
+    const QString title = tabs->index(0, 0).data(xqt::TabManager::TitleRole).toString();
+    QVariantMap name;
+    QMetaObject::invokeMethod(controller.get(), "fuzzyName", Q_RETURN_ARG(QVariantMap, name),
+                              Q_ARG(QString, QStringLiteral("p1 pgs")), Q_ARG(QString, title));
+    EXPECT_FALSE(name.value("match").toBool()) << "p1 is not in the title " << title.toStdString();
+    EXPECT_FALSE(name.value("marks").toList().isEmpty()) << "pgs is";
+    QQuickItem* shown = nullptr;
+    until([&] {
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (i->objectName() == "overviewTitle" && i->property("text").toString().contains("<font")) {
+                shown = i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(window->contentItem());
+        return shown != nullptr;
+    });
+    EXPECT_NE(shown, nullptr) << "the title with its matched letters";
+
+    // Not valid: a hint, and the plain text
+    auto* hint = find<QQuickItem>("overviewSyntaxHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->isVisible());
+    search("(p1");
+    until([&] { return hint->isVisible(); });
+    EXPECT_TRUE(hint->isVisible());
+    EXPECT_FALSE(matches(0));
+
+    click(toggle);
+    EXPECT_FALSE(library->fuzzySearch());
+    search("p1 | xournal");
+    EXPECT_FALSE(matches(0)) << "plain: that text is nowhere";
+    EXPECT_FALSE(hint->isVisible());
+}
+
 TEST_F(MainWindowTest, searchShortcutsForAllDocumentsAndTheLibrary) {
     controller->newDocument();
     QObject* overview = find("tabOverview");

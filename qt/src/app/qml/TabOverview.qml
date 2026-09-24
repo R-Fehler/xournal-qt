@@ -1,11 +1,13 @@
 // Overview of all open documents (tabs) as a grid of cards with the current page of each: tap a card to switch to
 // it, × to close it, + for a new document. Keyboard: arrows, Enter, Delete, Escape.
 // The search field searches all open documents: documents with hits are marked; opening one shows its hits (the
-// document's own search, from its current page on).
+// document's own search, from its current page on). "Fuzzy" in the field: fzf's syntax, as in the library (the same
+// app-wide toggle): a document is marked when the expression holds with the terms in its title or text.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import "Fuzzy.js" as Fuzzy
 
 Popup {
     id: overview
@@ -40,12 +42,17 @@ Popup {
     /// The reduced search: the names of the open documents only, not their text
     property bool namesOnly: false
     readonly property bool extendedView: extended && searching && !namesOnly
+    /// The fuzzy search (shared with the library)
+    readonly property bool fuzzy: app.library.fuzzySearch
     onNamesOnlyChanged: runSearch(searchField.text)
+    onFuzzyChanged: if (searching) runSearch(searchField.text)
 
     /// Search the text of the open documents - or, names only, nothing (the names are compared right here)
     function runSearch(text) { app.searchAllTabs(namesOnly ? "" : text) }
     function nameMatches(title) {
-        return searching && title.toLowerCase().indexOf(searchField.text.trim().toLowerCase()) >= 0
+        if (!searching) return false
+        if (fuzzy) return app.fuzzyName(searchField.text, title).match
+        return title.toLowerCase().indexOf(searchField.text.trim().toLowerCase()) >= 0
     }
 
     function activate(index) {
@@ -153,6 +160,23 @@ Popup {
                         color: "#6b6f75"
                         font.pixelSize: 12
                     }
+                    // Fuzzy search: an expression that is not valid is searched as plain text, and says why
+                    Label {
+                        id: syntaxHint
+                        objectName: "overviewSyntaxHint"
+                        readonly property string hint: overview.fuzzy ? app.fuzzyHint(searchField.text) : ""
+                        visible: hint !== ""
+                        Layout.maximumWidth: 150
+                        text: hint
+                        elide: Text.ElideRight
+                        color: "#b3261e"
+                        font.pixelSize: 12
+                        ToolTip.visible: syntaxHover.hovered
+                        ToolTip.text: qsTr("%1 - searched as plain text").arg(hint)
+                        ToolTip.delay: 300
+                        HoverHandler { id: syntaxHover }
+                    }
+                    FuzzyToggle { objectName: "overviewSearchFuzzy" }
                     // The reduced search: names only (as in the library)
                     ToolButton {
                         id: namesOnlyButton
@@ -252,13 +276,19 @@ Popup {
                 required property int pageCount
                 required property int searchHits
                 required property bool searchRunning
+                required property bool searchMatch
                 required property var hitPages
                 width: grid.cellWidth
                 height: grid.cellHeight
                 readonly property bool highlighted: GridView.isCurrentItem && grid.activeFocus
                 // Searching: documents without hits step back (names only: those whose name does not match).
                 readonly property bool hit: overview.namesOnly ? overview.nameMatches(title)
-                                                               : overview.searching && searchHits > 0
+                                                               : overview.searching
+                                                                 && (overview.fuzzy ? searchMatch : searchHits > 0)
+                /// Fuzzy search: the letters of the title its query matched
+                readonly property var titleMarks: overview.fuzzy && overview.searching
+                                                  ? app.fuzzyName(searchField.text, title).marks : []
+                readonly property string markedTitle: Fuzzy.marked(title, titleMarks, "#c2410c")
                 opacity: overview.searching && !hit && (overview.namesOnly || !searchRunning) ? 0.45 : 1
 
                 Rectangle {
@@ -310,8 +340,10 @@ Popup {
                                 color: Material.accentColor
                             }
                             Label {
+                                objectName: "overviewTitle"
                                 Layout.fillWidth: true
-                                text: cell.title
+                                text: cell.markedTitle !== "" ? cell.markedTitle : cell.title
+                                textFormat: cell.markedTitle !== "" ? Text.StyledText : Text.AutoText
                                 elide: Text.ElideMiddle
                                 font.weight: cell.current ? Font.DemiBold : Font.Normal
                             }
@@ -336,10 +368,12 @@ Popup {
                                     font.weight: cell.hit ? Font.DemiBold : Font.Normal
                                     color: cell.hit ? "#7a5200" : "#6b6f75"
                                     text: overview.namesOnly ? (cell.hit ? qsTr("In the name") : qsTr("No hits"))
+                                          : overview.fuzzy && !cell.hit && !cell.searchRunning ? qsTr("No match")
                                           : cell.searchHits > 0
                                           ? (cell.searchHits === 1 ? qsTr("1 hit") : qsTr("%1 hits").arg(cell.searchHits))
                                             + (cell.searchRunning ? "…" : "")
-                                          : (cell.searchRunning ? qsTr("Searching…") : qsTr("No hits"))
+                                          : cell.searchRunning ? qsTr("Searching…")
+                                          : cell.hit ? qsTr("In the name") : qsTr("No hits")
                                 }
                             }
                         }

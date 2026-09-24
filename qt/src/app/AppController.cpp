@@ -868,8 +868,29 @@ void AppController::clearSearch() {
 
 void AppController::searchAllTabs(const QString& query) {
     for (int i = 0; i < tabs->count(); ++i) {
-        tabs->session(i)->search().setQuery(query, false);
+        tabs->session(i)->search().setQuery(query, false, library->fuzzySearch());
     }
+}
+
+QVariantMap AppController::fuzzyName(const QString& query, const QString& name) const {
+    if (query != fuzzyText || !fuzzyParsed) {
+        fuzzyText = query;  // (parsed once per query, not per card)
+        fuzzyParsed = std::make_shared<FuzzyQuery>(query);
+    }
+    const FuzzyQuery& q = *fuzzyParsed;
+    if (!q.isValid()) {
+        return {{"match", name.contains(query.trimmed(), Qt::CaseInsensitive)}, {"marks", QVariantList()}};
+    }
+    const FuzzyQuery::NameMatch m = q.matchName(name);
+    QVariantList marks;
+    for (const int p: m.positions) {
+        marks.append(p);
+    }
+    return {{"match", q.evaluate([&](size_t t) { return m.found[t] != 0; })}, {"marks", marks}};
+}
+
+QString AppController::fuzzyHint(const QString& query) const {
+    return query.trimmed().isEmpty() ? QString() : FuzzyQuery(query).hint();
 }
 
 void AppController::openSearchResult(int index) {
