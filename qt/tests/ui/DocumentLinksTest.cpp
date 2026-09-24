@@ -116,7 +116,8 @@ protected:
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
         }
     }
-    void until(const std::function<bool()>& done, int ms = 2000) {
+    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
+    void until(const std::function<bool()>& done, int ms = 5000) {
         QElapsedTimer t;
         t.start();
         while (!done() && t.elapsed() < ms) {

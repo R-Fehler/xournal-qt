@@ -136,7 +136,7 @@ protected:
         };
         QElapsedTimer t;
         t.start();
-        while (!done() && t.elapsed() < 2000) {
+        while (!done() && t.elapsed() < 5000) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
         }
         return done();
@@ -161,7 +161,8 @@ protected:
         return walk(window->contentItem());
     }
     /// Waits until something is true (animations, delegates of a list, a popup fading out).
-    void until(const std::function<bool()>& done, int ms = 1500) {
+    /// (returns as soon as it is true: the time is for a machine slowed down by other work)
+    void until(const std::function<bool()>& done, int ms = 5000) {
         QElapsedTimer t;
         t.start();
         while (!done() && t.elapsed() < ms) {
@@ -1024,7 +1025,7 @@ TEST_F(MainWindowTest, shortSearchTextsWaitForEnter) {
     EXPECT_EQ(controller->searchQuery(), "p1");
     EXPECT_GT(controller->searchHitCount() + (controller->searchRunning() ? 1 : 0), 0);
     type("0 x");  // "p10 x": long enough
-    wait(400);
+    until([&] { return controller->searchQuery() == "p10 x"; });  // (once the typing paused)
     EXPECT_EQ(controller->searchQuery(), "p10 x");
 }
 
@@ -1396,7 +1397,7 @@ TEST_F(HomeScreenTest, searchFindsFoldersAndOpensThem) {
     ASSERT_NE(field, nullptr);
     field->forceActiveFocus();
     type("physics");
-    wait(400);
+    until([&] { return controller->libraryModel()->property("searchQuery").toString() == "physics"; });
     ASSERT_EQ(controller->libraryModel()->property("searchQuery").toString(), "physics");
     ASSERT_GE(gridCount(), 1);
     auto* first = card(0);
