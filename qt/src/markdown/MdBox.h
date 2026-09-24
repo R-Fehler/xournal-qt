@@ -55,6 +55,11 @@ std::optional<size_t> checkBoxAt(const Text& text, double x, double y);
 /// Where a text is shown in a box (case-insensitive; page coordinates): as the box is drawn, also while it is written
 /// on the page (see setWritingCursor).
 std::vector<Rect> findText(const Text& text, const std::string& search);
+/// The texts a box shows, one per text of its layout, as it is drawn (also while it is written on the page): what
+/// the search of the document searches.
+std::vector<std::string> shownTexts(const Text& text);
+/// Where bytes [from, to) of its shown text `index` are drawn (page coordinates): a rectangle per line.
+std::vector<Rect> shownRects(const Text& text, size_t index, int from, int to);
 /// A box written on the page is drawn with the block of the cursor as its source (layout() with `active`): the
 /// cursor's offset in the box's text, NO_SOURCE when it is not written any more. Any thread may read it.
 void setWritingCursor(const Text& text, size_t active);

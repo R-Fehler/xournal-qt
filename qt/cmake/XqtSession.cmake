@@ -13,6 +13,10 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSession.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentSearch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentTextIndex.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentTextIndex.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextMatch.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextMatch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HeadlessViews.h

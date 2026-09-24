@@ -563,14 +563,20 @@ void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, d
         node->searchRoot->removeChildNode(child);
         delete child;
     }
-    const auto& hits = search.hits();
-    auto it = std::lower_bound(hits.begin(), hits.end(), pageIndex,
-                               [](const xqt::DocumentSearch::Hit& h, size_t p) { return h.page < p; });
-    for (; it != hits.end() && it->page == pageIndex; ++it) {
-        const bool current = static_cast<int>(it - hits.begin()) == search.currentHit();
-        const QRectF r(it->rect.x() * scale, it->rect.y() * scale, it->rect.width() * scale, it->rect.height() * scale);
-        node->searchRoot->appendChildNode(new QSGSimpleRectNode(
-                r.adjusted(-1, -1, 1, 1), current ? QColor(255, 120, 0, 150) : QColor(255, 210, 0, 110)));
+    const auto* places = search.placesOn(pageIndex);  // (asked for if not known: drawn when they are)
+    if (!places) {
+        return;
+    }
+    const int current = search.currentPage() == pageIndex ? search.currentOnPage() : -1;
+    for (size_t i = 0; i < places->size(); ++i) {
+        const QColor color = static_cast<int>(i) == current ? QColor(255, 120, 0, 150) : QColor(255, 210, 0, 110);
+        for (const QRectF& rect: {(*places)[i].rect, (*places)[i].more}) {
+            if (rect.isNull()) {
+                continue;
+            }
+            const QRectF r(rect.x() * scale, rect.y() * scale, rect.width() * scale, rect.height() * scale);
+            node->searchRoot->appendChildNode(new QSGSimpleRectNode(r.adjusted(-1, -1, 1, 1), color));
+        }
     }
 }
 

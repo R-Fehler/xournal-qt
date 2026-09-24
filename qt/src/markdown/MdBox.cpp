@@ -131,16 +131,52 @@ void setWritingCursor(const Text& text, size_t active) {
     }
 }
 
-std::vector<Rect> findText(const Text& text, const std::string& search) {
-    const auto& shift = text.getTransformation().shift;
+namespace {
+/// The layout a box is drawn with: while it is written on the page, as the editor draws it.
+const Layout& shownLayout(const Text& text) {
     size_t active = NO_SOURCE;
-    if (text.isInEditing()) {  // (written on the page: drawn as the editor draws it)
+    if (text.isInEditing()) {
         std::lock_guard lock(writing().mtx);
         if (auto it = writing().cursors.find(&text); it != writing().cursors.end()) {
             active = it->second;
         }
     }
-    auto found = findText(cachedLayout(text.getText(), styleOf(text), active), search);
+    return cachedLayout(text.getText(), styleOf(text), active);
+}
+}  // namespace
+
+std::vector<std::string> shownTexts(const Text& text) {
+    std::vector<std::string> texts;
+    for (const Item& it: shownLayout(text).items) {
+        if (it.kind == Item::Kind::Text && it.layout) {
+            texts.emplace_back(pango_layout_get_text(it.layout.get()));
+        }
+    }
+    return texts;
+}
+
+std::vector<Rect> shownRects(const Text& text, size_t index, int from, int to) {
+    const auto& shift = text.getTransformation().shift;
+    size_t i = 0;
+    for (const Item& it: shownLayout(text).items) {
+        if (it.kind != Item::Kind::Text || !it.layout) {
+            continue;
+        }
+        if (i++ == index) {
+            auto rects = textRects(it, from, to);
+            for (Rect& r: rects) {
+                r.x += shift.x;
+                r.y += shift.y;
+            }
+            return rects;
+        }
+    }
+    return {};
+}
+
+std::vector<Rect> findText(const Text& text, const std::string& search) {
+    const auto& shift = text.getTransformation().shift;
+    auto found = findText(shownLayout(text), search);
     for (Rect& r: found) {
         r.x += shift.x;
         r.y += shift.y;

@@ -58,6 +58,7 @@
 
 #include "AppController.h"
 #include "TextFlow.h"
+#include "../SearchHits.h"
 #include "config-test.h"
 
 namespace {
@@ -2412,8 +2413,9 @@ TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {
     QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
     session->search().setQuery("Test", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
     const QPointF onWord =
             view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
@@ -2473,8 +2475,9 @@ TEST_F(MainWindowTest, theSelectedPdfTextTakesItsHandlesAndActionsAlong) {
     QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
     session->search().setQuery("Test", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
     const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
     ASSERT_TRUE(controller->selectPdfTextAt(onWord.x(), onWord.y()));
@@ -2531,8 +2534,9 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     QSignalSpy searched(&session->search(), &xqt::DocumentSearch::finished);
     session->search().setQuery("Test", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
     const QPointF onWord = view->pageViewRect(0).topLeft() + hit.center() * view->getViewController().zoom();
     const QPoint onWordInWindow = canvasItem->mapToScene(onWord).toPoint();

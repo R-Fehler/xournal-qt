@@ -512,3 +512,18 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Ctrl+F in a long PDF, type a word quickly, key by key, then pause and type on: every letter stays in the field
       (it used to be set back to the text searched before whenever results came in). The count is that of the text in
       the field. The same in the tab overview's search and in the library's search.
+- [ ] Open a long PDF of the library (e.g. a manual of a thousand pages) and press Ctrl+F right away: while typing,
+      the count and the marks in the sidebar come with every key (no "Searching…"); the canvas scrolls to the first
+      hit from the current page on, and its marks are there. Enter / Shift+Enter step through the hits, also onto
+      pages far away: each is marked where the word is.
+- [ ] The same with a long PDF that is not in the library (e.g. from Downloads opened with "Open"): the count grows
+      for a few seconds ("…" behind it), scrolling and drawing stay smooth meanwhile, the hits near the current page
+      come first. Search again later: all counts at once.
+- [ ] A phrase across a line break of the PDF (the last word of a line and the first of the next) is found and marked
+      on both lines; a word broken with a hyphen at a line end is found when typed without the hyphen. The count
+      next to the field matches the marks on the pages.
+- [ ] Write a text or a Markdown box with a searched word while the search is open: after a moment the count and
+      the marks include it (without saving); undo takes it away again. Delete, insert and move pages: the pages with
+      hits follow.
+- [ ] Tab overview → search all documents: the counts per document come at once for the documents of the library;
+      the extended view marks the hits on the first pages.

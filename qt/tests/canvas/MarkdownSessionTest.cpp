@@ -18,6 +18,7 @@
 #include "model/XojPage.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
+#include "../SearchHits.h"
 #include "session/DocumentSession.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
@@ -368,7 +369,7 @@ void searchFor(DocumentSession& s, const QString& text) {
 void expectHitsOnDrawnWords(DocumentSession& s, const std::string& word, size_t pages) {
     const auto drawn = drawnWords(*s.getDocument(), word);
     searchFor(s, QString::fromStdString(word));
-    const auto& hits = s.search().hits();
+    const auto hits = xqt::test::placedHits(s.search());
     ASSERT_EQ(hits.size(), drawn.size());
     std::set<size_t> onPages;
     for (const auto& [page, rect]: drawn) {

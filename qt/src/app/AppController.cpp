@@ -539,7 +539,7 @@ void AppController::setSearchQuery(const QString& query) {
     }
 }
 int AppController::searchHitCount() const {
-    return session() ? static_cast<int>(session()->search().hits().size()) : 0;
+    return session() ? session()->search().hitCount() : 0;
 }
 int AppController::searchCurrent() const { return session() ? session()->search().currentHit() + 1 : 0; }
 bool AppController::searchRunning() const { return session() && session()->search().isRunning(); }
@@ -705,18 +705,7 @@ void AppController::setPairsOffset(int offset) {
 }
 
 int AppController::searchHitPageCount() const {
-    if (!session()) {
-        return 0;
-    }
-    int pages = 0;
-    size_t last = std::numeric_limits<size_t>::max();
-    for (const auto& h: session()->search().hits()) {  // ordered by page
-        if (h.page != last) {
-            ++pages;
-            last = h.page;
-        }
-    }
-    return pages;
+    return session() ? static_cast<int>(session()->search().pages().size()) : 0;
 }
 void AppController::searchNext() {
     if (session()) {

@@ -122,6 +122,32 @@ the search changed.
 
 Code: `qt/src/shell/Library.*` (library, search index), `Previews.*`, `LibraryModel.*`, `RecentFiles.*`.
 
+## Search in an open document
+The search of an open document (Ctrl+F, and the tab overview's search over all open documents) works on a text index
+of the document (`qt/src/session/DocumentTextIndex.*`), kept while the document is open:
+- the PDF text per PDF page, simplified like the library index's. On opening it is taken from the library index when
+  that read this PDF as it is now (same size and time): the search has all counts at once. Otherwise it is read once
+  in the background (2 s after opening, or at the first search), from the current page outwards, only while the
+  canvas has no page in view to render, with a poppler instance of its own (the canvas never waits for it);
+- per page the text its text elements show (visible layers; Markdown boxes as drawn), from the document in memory:
+  unsaved edits, undo and redo are searched; a changed page is read again once the edits pause, pages that come, go
+  or move take their text along.
+
+A search has two steps (`DocumentSearch.*`): a string scan over the index counts the hits of every page (about 7 ms
+for the 1,300 pages of the pgf manual, on each key typed) - the count, "n pages with hits", the marks in the sidebar
+and the page grid and the counts in the tab overview come from it at once. Where the hits are drawn is computed
+only for the pages shown (canvas, thumbnails in view, the first pages of the overview) and the page of the current
+hit, from the text and the box of each character that poppler gives for the page (read on demand before any other
+work; the last 48 pages are kept). Both steps match the same text with the same matcher (`TextMatch.*`:
+case-insensitive, whitespace runs as one space - so a phrase across a line break is found -, ligatures as their
+letters, a word broken at a line end with a hyphen found whole), so the count and the marks agree.
+
+Measured on the pgf manual (1,321 pages, 2026-09-24): before, poppler searched every page on the UI thread for every
+query, 3.3–3.8 s per query and up to 57 ms per event loop pass; now the counts of a document in a library are there
+in about 10 ms, a document read for the first time has all counts after about 6 s in the background (the first hits
+after 0.1 s) with at most 0.3 ms per event loop pass, and each key typed costs about 7 ms. The index takes 6.6 MB
+for the manual's text, the kept character boxes about 4 MB, the worker's poppler instance about 8 MB.
+
 ## Home screen
 - It is the first tab (library icon and name). It is shown when no document is open, and closing the last tab
   returns to it. Ctrl+Shift+L toggles it. Ctrl+Tab goes back to the document.

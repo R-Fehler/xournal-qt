@@ -32,6 +32,8 @@ class TabManager final: public QAbstractListModel {
 public:
     /// Hit marks on one page preview of the extended search (a one-letter search has hundreds)
     static constexpr int MAX_PAGE_HITS = 50;
+    /// The pages with hits of a document whose hits are placed for the overview (the first ones).
+    static constexpr int PLACED_HIT_PAGES = 24;
     enum Roles { TitleRole = Qt::UserRole + 1, ModifiedRole, FilePathRole, CurrentRole, ThumbnailRole, PageCountRole,
                  SearchHitsRole, SearchRunningRole,
                  /// The pages with search hits, for the extended search of the overview:

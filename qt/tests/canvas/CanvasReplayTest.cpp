@@ -52,6 +52,7 @@
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "PenHover.h"
+#include "../SearchHits.h"
 #include "config-test.h"
 #include "TextEditor.h"
 
@@ -1773,8 +1774,9 @@ TEST_F(CanvasReplayTest, aLongPressSelectsTheWordOfThePdfAndTheHandlesWidenIt) {
     QSignalSpy searched(&session->search(), &DocumentSearch::finished);
     session->search().setQuery("Test", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
 
     const QPointF onWord = viewPos(0, hit.center());
@@ -1817,8 +1819,9 @@ TEST_F(CanvasReplayTest, pdfTextIsHighlightedByDraggingOverIt) {
     QSignalSpy searched(&session->search(), &DocumentSearch::finished);
     session->search().setQuery("Test PDF", false);
     ASSERT_TRUE(searched.wait(3000));
-    ASSERT_FALSE(session->search().hits().empty());
-    const QRectF hit = session->search().hits().front().rect;
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_FALSE(placed.empty());
+    const QRectF hit = placed.front().rect;
     session->search().clear();
 
     auto dragOver = [&] {

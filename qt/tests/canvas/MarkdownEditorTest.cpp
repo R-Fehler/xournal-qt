@@ -23,6 +23,7 @@
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
+#include "../SearchHits.h"
 #include "session/DocumentSession.h"
 
 #include "CanvasPage.h"
@@ -190,13 +191,12 @@ TEST_F(MarkdownEditorTest, searchHitsFollowTheTextAsItIsDrawnWhileWriting) {
     type("# Title\nSome **strong** needle");
     const auto m = TextFlow::styleFor(session->getDocument()->getPage(0), TextFlow::Style{});
     const auto hitOf = [&] {
-        QSignalSpy finished(&session->search(), &DocumentSearch::finished);
         if (session->search().query() != "needle") {
             session->search().setQuery("needle", false);
         }
-        EXPECT_TRUE(finished.wait(3000));
-        EXPECT_EQ(session->search().hits().size(), 1u);
-        return session->search().hits().empty() ? QRectF() : session->search().hits()[0].rect;
+        const auto hits = xqt::test::placedHits(session->search());
+        EXPECT_EQ(hits.size(), 1u);
+        return hits.empty() ? QRectF() : hits[0].rect;
     };
     // The paragraph with the cursor: its source, "Some **strong** needle", is drawn
     const std::string& text = editor.text();
@@ -220,9 +220,14 @@ TEST_F(MarkdownEditorTest, searchHitsFollowTheTextAsItIsDrawnWhileWriting) {
                                         "needle");
     ASSERT_EQ(formatted.size(), 1u);
     EXPECT_LT(formatted[0].x, hit.x() - 5) << "(\"strong \" is drawn before it, not \"**strong** \")";
-    QSignalSpy finished(&session->search(), &DocumentSearch::finished);
-    ASSERT_TRUE(finished.wait(3000)) << "searched again";
-    ASSERT_EQ(session->search().hits().size(), 1u);
-    EXPECT_NEAR(session->search().hits()[0].rect.x(), formatted[0].x, 0.01);
-    EXPECT_NEAR(session->search().hits()[0].rect.y(), formatted[0].y, 0.01);
+    // Searched again once the edit is read (the marks move there)
+    QElapsedTimer waited;
+    waited.start();
+    while (std::abs(hitOf().x() - formatted[0].x) > 0.01 && waited.elapsed() < 3000) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    }
+    const auto hits = xqt::test::placedHits(session->search());
+    ASSERT_EQ(hits.size(), 1u);
+    EXPECT_NEAR(hits[0].rect.x(), formatted[0].x, 0.01);
+    EXPECT_NEAR(hits[0].rect.y(), formatted[0].y, 0.01);
 }
