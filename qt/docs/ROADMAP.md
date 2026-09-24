@@ -264,6 +264,17 @@
     to full-screen editing.
   - A full-screen tab bar of dots (`PageIndicator`): a tap opens the overview, a swipe switches tabs.
   - With a reference open, page keys act on the side that has the keys, and presenting shows the notes alone.
+- **Fuzzy search in text, `qt/fuzzy-text` (2026-09-24, awaiting on-device test).**
+  - With Fuzzy on, a plain term of 3+ letters matches text word by word (`WordMatch`): a word that contains it, a
+    word that starts with its first letter and has all its letters in order with at most ⌊n/2⌋ others between
+    them, or a typo (optimal string alignment) for terms of 5+ letters.
+  - Per-page vocabularies make it fast: 1.7–7.8 ms per key on pgfmanual instead of 54–75 ms.
+  - Hit-page pictures mark whole words and `^`/`$`/`'word'` like the canvas does.
+  - Settings → Search: the fuzzy switch and the typo tolerance (off / 1 letter for 5+ / 2 letters for 8+). A help
+    sheet opens on a long press or right click of the Fuzzy button.
+- **Reference mode follow-up (2026-09-24):** the notes' scroll bars, text knobs, text pill, selection bar and
+  context pill are shared components, instantiated for both canvases; copy only while reading. Markdown and Ctrl+S
+  work in the reference when editing is on. Fit width never needs a horizontal scroll bar.
   318 KiB.
 
 ## Backlog (decide later)

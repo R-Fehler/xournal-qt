@@ -33,7 +33,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
       - [ ] Not handled yet: a page deleted in another app; encrypted, rotated or cropped source PDFs (in code,
         untested); audio attachments; a "has notes" badge. Writing into the PDF itself renames over the file
         while it is read, which may fail on Windows.
-   3. `qt/hybrid-flow` (decided 2026-09-24; starts after `qt/present` and `qt/reference-view`):
+   3. `qt/hybrid-flow` (decided 2026-09-24; started 2026-09-24):
       - **Save as with a format choice:** "Xournal notes (.xopp)" or "PDF with notes, editable (.pdf)", replacing the
         separate "Save as hybrid PDF…" entry. "Export as PDF" stays for a plain, flattened PDF.
       - **When a saved `.xopp` becomes a hybrid PDF, ask once** what happens to the old `.xopp`:
@@ -76,7 +76,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         version). Not measured on the Uni library; move it to the index (a hybrid flag in the entry).
       - [ ] Dropping a file of a hidden kind into the library gives the old "not a document the library shows"
         error; it should say which filter hides it.
-   6. `qt/fuzzy-text` (the author, 2026-09-24; started): fuzzy matching in document text, per word.
+   6. ~~`qt/fuzzy-text`~~: merged 2026-09-24 (see ROADMAP). Left: the first fuzzy search of a big open document builds its vocabularies on the UI thread (about 160 ms for 1,300 pages).
       - Today only names are fuzzy; `tbine` does not find "turbine" in a PDF.
       - A term matches a single word fuzzily (fzf's algorithm within one word, with a minimum score), through a
         word list per document and page, so it stays fast.
@@ -234,8 +234,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     with the current tool and its own undo. It is remembered per tab.
   - **The page grid for the reference** (a grid button in its pill), but **no page sidebar** for it: space is
     limited, and the sidebar keeps showing the main document.
-  - Merged 2026-09-24. Follow-up in progress (the author): full text selection and context menus on the reference,
-    as on the main canvas.
+  - Merged 2026-09-24, with the follow-up (full text selection and context menus, shared with the main canvas).
     - Copy always; Highlight, Underline, Strike through and Paste only when editing is on.
     - The lasso bar, the canvas context menu, Markdown when editable, and Ctrl+S saving the focused reference.
   - The reference is another open tab ("Open as reference" in the tab overview, the tab menu and the library and
