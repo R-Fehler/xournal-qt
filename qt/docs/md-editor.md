@@ -98,6 +98,12 @@ titled `name.xopp`, counts as unsaved until it is saved (closing asks), and savi
 ways (the `.md` is edited as text, the `.xopp` with ink and its own Markdown text), so neither is the other's
 background, unlike a PDF or an image and its `.xopp`.
 
+## Share
+Share… (⋮, the tab menu, a `.md` or text file card in the library) offers a text file as **the file itself**:
+shown in the file manager, or copied to the clipboard as a file; unsaved changes are saved first. There is no "PDF
+with notes" and no "For Xournal++" for a text file, and no Save as (with its file types): a text file is saved as
+itself (the library's Rename and Copy give it another name).
+
 ## Changed by another program
 The file is watched (and looked at when the window becomes active again and when its tab is shown). If another
 program changed it (its bytes differ from what was read or saved last; our own saves are not changes):

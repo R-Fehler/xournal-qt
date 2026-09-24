@@ -84,6 +84,8 @@ public:
         SaveAs,      ///< as .xopp to `target`; the document takes this path ("Save as")
         Hybrid,      ///< as a hybrid PDF to `target` (see saveAsHybrid)
         ExportXopp,  ///< only exportXopp to `target` (the document's state and saved point stay)
+        /// A copy as a hybrid PDF at `target` (to share): the document keeps its file, state and saved point.
+        ExportHybrid,
     };
     struct SaveRequest {
         SaveKind kind = SaveKind::Save;
@@ -92,6 +94,12 @@ public:
         fs::path exportXopp;
         /// Called on this thread when the file is written, or when that failed.
         std::function<void(const SaveResult&)> done;
+        /// A hybrid PDF: the .xopp for Xournal++ this document keeps up to date on every save (recorded in the file,
+        /// see xoppExport()); empty: none. Usually the same as exportXopp.
+        fs::path recordExport;
+        /// ExportXopp: the PDF is upstream's attached PDF of the .xopp, "name.xopp.bg.pdf" (a copy for Xournal++ that
+        /// travels as a pair), not the export's name.pdf / .name.pages.pdf.
+        bool attachedPdf = false;
     };
     /// Save without blocking the window. What the writers need is taken from the document at once on this thread (a
     /// copy of its pages, under its read lock); the heavy file work (the gzip XML, qpdf) runs on a worker, and the
@@ -118,6 +126,13 @@ public:
     SaveResult saveAsHybrid(fs::path target);
     /// The document is saved as a hybrid PDF (its file is a .pdf).
     bool isHybrid() const;
+    /// A hybrid PDF: the .xopp for Xournal++ it keeps up to date on every save ("Keep it updated for Xournal++",
+    /// SaveRequest::recordExport; read from the file the first time). Empty: none.
+    fs::path xoppExport() const;
+    /// The document's background PDF is one of `files` (they are about to be removed or written over, e.g. the
+    /// sidecars of the .xopp it was): it takes its pages from a copy in the app cache from now on (a hard link where
+    /// possible), the same pages under the same numbers. False if that failed (`error`).
+    bool detachBackground(const std::vector<fs::path>& files, std::string& error);
     /// A hybrid PDF with annotations of ours changed in another app (see LoadResult::hybridChanged).
     void setHybridChanges(std::vector<std::string> names) { hybridChanges = std::move(names); }
     const std::vector<std::string>& getHybridChanges() const { return hybridChanges; }
@@ -409,6 +424,8 @@ private:
     std::unique_ptr<PdfPageKeeper> pdfPages;
     std::vector<fs::path> retainedBases;  ///< clean copies of hybrid PDFs this document uses (HybridPdf::retain)
     std::vector<std::string> hybridChanges;
+    /// xoppExport(), known for this file
+    mutable fs::path xoppExportFor, xoppExportPath;
     /// Opened from a hybrid PDF: the page of its clean copy each page was (annotations of other apps on pages with a
     /// generated background are kept from there). Forgotten when the pages of the background PDF may be renumbered.
     std::unordered_map<const XojPage*, std::pair<std::weak_ptr<XojPage>, size_t>> hybridBase;

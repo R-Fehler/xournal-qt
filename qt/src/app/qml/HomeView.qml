@@ -43,6 +43,8 @@ Rectangle {
     /// "Open a file" (the window's file dialog)
     signal openFileRequested()
     signal settingsRequested()
+    /// Share… of a PDF or notes card (a PDF: the file itself, or a copy for Xournal++; notes: opened first)
+    signal shareRequested(string path)
 
     function formatDate(d) {
         if (!d || isNaN(d.getTime())) return ""
@@ -1266,6 +1268,13 @@ Rectangle {
             visible: file !== ""
             height: visible ? implicitHeight : 0
             onTriggered: app.openWithSystemApp(file)
+        }
+        MenuItem {
+            objectName: "shareCardItem"
+            text: qsTr("Share…")
+            visible: !home.menuMany && !home.menuFolder && ["pdf", "notes", "md", "text"].indexOf(home.menuKind) >= 0
+            height: visible ? implicitHeight : 0
+            onTriggered: home.shareRequested(home.menuPath)
         }
         MenuItem {
             objectName: "showInFileManagerItem"

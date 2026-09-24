@@ -1044,6 +1044,55 @@ void DocumentSession::relocate(const fs::path& xopp, const fs::path& pdf) {
 
 bool DocumentSession::isHybrid() const { return hasExtension(getFilePath(), ".pdf"); }
 
+fs::path DocumentSession::xoppExport() const {
+    if (!isHybrid()) {
+        return {};
+    }
+    if (const fs::path file = getFilePath(); xoppExportFor != file) {
+        xoppExportPath = HybridPdf::xoppExportOf(file);
+        xoppExportFor = file;
+    }
+    return xoppExportPath;
+}
+
+bool DocumentSession::detachBackground(const std::vector<fs::path>& files, std::string& error) {
+    fs::path bg;
+    {
+        std::shared_lock lock(*doc);
+        bg = doc->getPdfFilepath();
+    }
+    std::error_code ec;
+    if (bg.empty() || !fs::exists(bg, ec) ||
+        std::none_of(files.begin(), files.end(), [&](const fs::path& f) {
+            std::error_code eec;
+            return fs::exists(f, eec) && fs::equivalent(f, bg, eec);
+        })) {
+        return true;
+    }
+    static std::atomic<unsigned> counter{0};
+    const fs::path copy = HybridPdf::cacheFolder() /
+                          ("moved-" + std::to_string(Util::getPid()) + "-" + std::to_string(serialNo) + "-" +
+                           std::to_string(++counter)) /
+                          "base.pdf";
+    fs::create_directories(copy.parent_path(), ec);
+    fs::create_hard_link(bg, copy, ec);  // (no copying of a long PDF; the file keeps its data when it goes)
+    if (ec) {
+        ec.clear();
+        fs::copy_file(bg, copy, fs::copy_options::overwrite_existing, ec);
+    }
+    if (ec) {
+        error = FS(_F("Could not copy the PDF \"{1}\": {2}") % bg.u8string() % ec.message());
+        return false;
+    }
+    if (!loadPdfKeepingPictures(copy)) {  // (the same file)
+        error = FS(_F("Could not copy the PDF \"{1}\": {2}") % bg.u8string() % doc->getLastErrorMsg());
+        return false;
+    }
+    HybridPdf::retain(copy);
+    retainedBases.push_back(copy);
+    return true;
+}
+
 bool DocumentSession::importHybridChanges(std::string& error) {
     if (!isHybrid() || hybridChanges.empty()) {
         return false;

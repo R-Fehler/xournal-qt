@@ -176,6 +176,18 @@ void AppController::setTextContinuous(bool on) {
     Q_EMIT textLayoutChanged();
 }
 
+QString AppController::sharedTextFile(const QString& path) const {
+    if (!path.isEmpty()) {
+        const fs::path file(path.toStdString());
+        return DocumentFiles::isMarkdownFile(file) || DocumentFiles::isTextFile(file) ? path : QString();
+    }
+    const DocumentSession* s = session();
+    if (!s || s->hasFilePath() || !(s->textFile() || DocumentFiles::isTextFile(s->shownFile()))) {
+        return {};
+    }
+    return QString::fromStdString(s->shownFile().string());
+}
+
 bool AppController::canOpenExternally() const {
     const DocumentSession* s = session();
     return s && !s->hasFilePath() && !s->shownFile().empty();

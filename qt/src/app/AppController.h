@@ -472,6 +472,7 @@ public:
     Q_INVOKABLE bool openWithSystemApp(const QString& path);
     /// There is a file manager to show files in (not on Android).
     bool canShowInFileManager() const;
+    bool canShare() const;
     Q_INVOKABLE void openUrls(const QList<QUrl>& urls);
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
     /// new document stays, to write the notes in). Without a document open: opened as the document.
@@ -505,22 +506,62 @@ public:
     /// is called after it was written, with its tab current again. False if it could not start.
     Q_INVOKABLE bool saveInBackground(const QJSValue& then = QJSValue());
     Q_INVOKABLE bool saveAsInBackground(const QUrl& url, const QJSValue& then = QJSValue());
-    Q_INVOKABLE bool saveAsHybridInBackground(const QUrl& url, const QJSValue& then = QJSValue());
+    /// As a PDF with notes (hybrid). `oldXopp`: what happens to the .xopp the document was saved as, after the PDF is
+    /// written: "trash" (with its files: its attached or pages PDF, background images; the PDF it annotates stays),
+    /// "update" (a .xopp for Xournal++, written again on every save of this document: recorded in the PDF), "keep"
+    /// (left as it is); "" or "ask": the setting "hybridOldXopp" ("ask" there: kept). `remember`: store it as the
+    /// setting (the dialog's "Don't ask again").
+    Q_INVOKABLE bool saveAsHybridInBackground(const QUrl& url, const QJSValue& then = QJSValue(),
+                                              const QString& oldXopp = QString(), bool remember = false);
+    /// The document was saved as "name.xopp" and Save as writes it as a PDF with notes now: the name of that .xopp
+    /// if the window asks what happens to it (the setting "hybridOldXopp" is "ask"), else "".
+    Q_INVOKABLE QString oldXoppToAsk() const;
     Q_INVOKABLE void exportXoppInBackground(const QUrl& url);
     /// The same, waiting until the file is written (tests): whether that worked.
     Q_INVOKABLE bool save();
     Q_INVOKABLE bool saveAs(const QUrl& url);
     // Hybrid PDF (qt/docs/hybrid-pdf.md)
     bool isHybrid() const;
-    /// "Save as hybrid PDF…": the document's own hybrid PDF; for an annotated PDF "name.notes.pdf" next to it, or the
+    /// Save as → "PDF with notes": the document's own hybrid PDF; for an annotated PDF "name.notes.pdf" next to it, or the
     /// PDF itself with the setting "Save notes into the PDF itself"; else the .xopp suggestion as .pdf.
     Q_INVOKABLE QUrl suggestedHybridFile() const;
-    Q_INVOKABLE bool saveAsHybrid(const QUrl& url);
+    Q_INVOKABLE bool saveAsHybrid(const QUrl& url, const QString& oldXopp = QString());
+    /// Save as: whether `file` is written as a PDF with notes (hybrid) or as a .xopp. The extension typed wins (.pdf;
+    /// .xopp, .xoj); without one, the type chosen in the dialog (`pdfChosen`).
+    Q_INVOKABLE bool savesAsPdf(const QUrl& file, bool pdfChosen) const;
+    /// Save as: the file name for the other type (the dialog's name follows the chosen type). The suggestion for one
+    /// type becomes the suggestion for the other; else the extension is swapped (a .pdf that is taken by another PDF:
+    /// "name.notes.pdf").
+    Q_INVOKABLE QUrl fileForFormat(const QUrl& file, bool pdf) const;
     /// Save writes without asking: the document has a file, or it is an annotated PDF and the notes go into it.
     Q_INVOKABLE bool savesWithoutDialog() const;
     /// "Export as .xopp for Xournal++…": "name.xopp" next to the hybrid PDF.
     Q_INVOKABLE QUrl suggestedXoppExport() const;
     Q_INVOKABLE bool exportXopp(const QUrl& url);
+    // --- Share (qt/docs/hybrid-pdf.md) ---
+    /// What "Share → PDF with notes" does with the current document: "share" (its file as it is: a hybrid PDF without
+    /// unsaved changes, a PDF without notes), "save" (saved first: a hybrid PDF with changes, notes that go into the
+    /// PDF itself), "ask" (a .xopp: saved as a PDF with notes, or a PDF copy), "saveAs" (no file yet: Save as).
+    Q_INVOKABLE QString shareStep() const;
+    /// The steps "share" and "save": then the PDF goes to the system (SystemApps::share: the file manager on the
+    /// desktop) or, `toClipboard`, onto the clipboard. False for the other steps (the window asks).
+    Q_INVOKABLE bool sharePdf(bool toClipboard);
+    /// A PDF with notes as a copy at `target` (empty: in the app cache), the document keeps its file and format; then
+    /// shared or copied.
+    Q_INVOKABLE bool sharePdfCopy(const QUrl& target, bool toClipboard);
+    /// "For Xournal++ (.xopp + PDF)": a one-time export into `folder`, never the document's own folder, as
+    /// "name.xopp" + "name.xopp.bg.pdf" (upstream's attached PDF; a free name there), then shared. `file`: that PDF
+    /// (a library card) instead of the current document.
+    Q_INVOKABLE bool shareForXournal(const QUrl& folder, const QString& file = QString());
+    /// A file as it is (a library card's PDF): shared or copied.
+    Q_INVOKABLE bool shareFile(const QString& path, bool toClipboard);
+    /// The text file Share… offers as it is: the current document's (a .md, a text file; "" if it is none), or for a
+    /// library card's path the file itself if it is a Markdown or text file. Never a PDF with notes for those.
+    Q_INVOKABLE QString sharedTextFile(const QString& path = QString()) const;
+    /// Files onto the clipboard, to paste them into another app (SystemApps::copyToClipboard).
+    Q_INVOKABLE bool copyToClipboard(const QStringList& files);
+    /// The folder the "For Xournal++" dialog starts in: the one chosen last, else the documents folder.
+    Q_INVOKABLE QUrl shareFolder() const;
     /// After hybridEditedElsewhere: take the other app's version of the changed annotations (or keep ours).
     Q_INVOKABLE bool importHybridChanges();
     Q_INVOKABLE void keepHybridData();
@@ -602,6 +643,8 @@ public:
     Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
     /// Which one lies on the page ("" if none).
     Q_PROPERTY(bool canShowInFileManager READ canShowInFileManager CONSTANT)
+    /// Share → "PDF with notes" works here (SystemApps::canShare).
+    Q_PROPERTY(bool canShare READ canShare CONSTANT)
     Q_PROPERTY(QString geometryTool READ geometryTool NOTIFY toolChanged)
     QString geometryTool() const;
     /// The setsquare / compass is put aside for a moment (its pill stays, small; a tap brings it back).
@@ -729,6 +772,8 @@ Q_SIGNALS:
     void markdownBoxRequested(int page, double x, double y);
     /// The hybrid PDF just opened was edited in another app: its ink differs from the Xournal data.
     void hybridEditedElsewhere(const QString& file);
+    /// Files were exported for Xournal++ and shown (`text` says where): the window offers to copy them.
+    void sharedForXournal(const QStringList& files, const QString& text);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
     /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
@@ -758,16 +803,26 @@ private:
     /// paste, delete and select all act on it.
     xqt::CanvasView* editedReference() const;
     bool savesWithoutDialog(const xqt::DocumentSession* s) const;
-    enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };
+    /// ExportHybrid: a hybrid PDF copy (to share); ShareXopp: the export for Xournal++ with an attached PDF.
+    enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp, ExportHybrid, ShareXopp };
+    /// Hand files to the system (share), or put them on the clipboard.
+    bool handOver(const QStringList& files, bool toClipboard);
+    fs::path lastShareFolder;
     /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
+    /// `oldXopp`: see saveAsHybridInBackground.
     bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,
-                   xqt::DocumentSession* document = nullptr);
+                   xqt::DocumentSession* document = nullptr, const QString& oldXopp = QString());
     /// Wait for the current document's saves; false if the last one failed.
     bool waitForSave();
     /// `then` from QML, after a save: with the saved document's tab current (from the event loop).
     std::function<void(bool)> callWhenSaved(const QJSValue& then);
     /// After a hybrid PDF was saved: its clean copy in the background, the library.
     void afterHybridSave(xqt::DocumentSession& s);
+    /// The .xopp a document was saved as goes to the trash, now that its hybrid PDF `pdf` holds everything.
+    void trashOldXopp(xqt::DocumentSession& s, const fs::path& xopp, const fs::path& pdf);
+    /// Tabs of this process other than `except` that have `file` open (with the window that has them).
+    std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsWithFile(const fs::path& file,
+                                                                               const xqt::DocumentSession* except) const;
     std::vector<QJSValue> whenAllSavedCalls;
     /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
     void applyMarkdownText();

@@ -25,6 +25,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QClipboard>
+#include <QMimeData>
 #include <QPointer>
 #include <QSignalSpy>
 #include <QQmlContext>
@@ -1729,7 +1730,16 @@ TEST_F(HomeScreenMarkdownTest, otherTextFilesAreEditedOnlyAfterAWarning) {
 namespace {
 /// Records what would be handed to the system (nothing is started).
 struct FakeSystemApps: xqt::SystemApps {
-    QStringList opened, shown, libraries;
+    QStringList opened, shown, libraries, trashed, shared;
+    bool share(const QStringList& files) override {
+        shared << files;
+        return true;
+    }
+    /// (removed instead: never the user's trash)
+    bool moveToTrash(const QString& path) override {
+        trashed << path;
+        return QFileInfo(path).isDir() ? QDir(path).removeRecursively() : QFile::remove(path);
+    }
     bool openWithSystemApp(const QString& path) override {
         opened << path;
         return true;
@@ -1876,6 +1886,34 @@ TEST_F(HomeScreenFilterTest, textFilesAndImagesOpenExternally) {
     EXPECT_EQ(controller->externalFileOf(QString::fromStdString((root / "lecture.pdf").string())), "");
     EXPECT_EQ(controller->externalFileOf(py), py);
     EXPECT_EQ(controller->externalFileOf(QString::fromStdString(md.string())), QString::fromStdString(md.string()));
+}
+
+TEST_F(HomeScreenFilterTest, aTextDocumentIsSharedAsTheFileItself) {
+    const fs::path md = root / "share.md";
+    std::ofstream(md, std::ios::binary) << "# Share\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(md.string())));
+    wait(50);
+    click(find<QQuickItem>("canvas"));
+    type("x");
+    ASSERT_TRUE(controller->modified());
+    auto* dialog = find<QObject>("shareDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QString()));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_FALSE(findItem("sharePdfChoice")->isVisible()) << "no PDF with notes for a text file";
+    EXPECT_FALSE(findItem("shareXournalChoice")->isVisible());
+    ASSERT_TRUE(findItem("shareTextFileChoice")->isVisible());
+    click(findItem("shareTextFileChoice"));
+    until([&] { return !fake.shared.isEmpty(); });
+    EXPECT_EQ(fake.shared, QStringList{QString::fromStdString(md.string())});
+    EXPECT_FALSE(controller->modified()) << "saved first";
+    EXPECT_FALSE(fs::exists(root / "share.pdf"));
+    EXPECT_FALSE(fs::exists(root / "share.xopp"));
+    EXPECT_EQ(controller->shareStep(), "text");
+    EXPECT_FALSE(controller->sharePdfCopy(QUrl(), true));
+    // No Save as (with its file types) for a text file: it is saved as itself
+    EXPECT_FALSE(controller->saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "share.pdf").string()))));
+    EXPECT_FALSE(fs::exists(root / "share.pdf"));
 }
 
 TEST_F(HomeScreenFilterTest, aFolderOpensAsALibraryInAWindowOfItsOwn) {
@@ -4391,7 +4429,7 @@ size_t strokesOn(Document& doc, size_t pageNo) {
 }
 }  // namespace
 
-// More → Save as hybrid PDF…: an annotated PDF gets "name.notes.pdf"; then Ctrl+S writes the hybrid PDF again, and
+// Save as → PDF with notes: an annotated PDF gets "name.notes.pdf"; then Ctrl+S writes the hybrid PDF again, and
 // More offers the .xopp for Xournal++ (also on every save, a setting). In the library the two are one document.
 TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     QTemporaryDir dir;
@@ -4400,8 +4438,7 @@ TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
     ASSERT_TRUE(controller->openPath(pdf));
     xqt::DocumentSession* s = controller->tabManager().currentSession();
     drawStroke(*s, 1);
-    ASSERT_NE(find("saveHybridItem"), nullptr);
-    ASSERT_NE(find("exportXoppItem"), nullptr);  // (in the More menu, shown for a hybrid PDF: isHybrid)
+    ASSERT_NE(find("shareItem"), nullptr);  // (in the More menu: Share… for Xournal++ replaced "Export as .xopp")
     EXPECT_FALSE(controller->isHybrid());
     EXPECT_FALSE(controller->savesWithoutDialog()) << "Ctrl+S asks where (as before)";
 
@@ -4490,6 +4527,369 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     EXPECT_TRUE(controller->isHybrid());
     EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(pdf.toStdString())));
     EXPECT_TRUE(QFile::exists(dir.filePath("lecture.original.pdf")));
+}
+
+// Save as offers both formats in one dialog: "Xournal notes (.xopp)", the default for new documents, and "PDF with
+// notes, editable (.pdf)", the default for a document that is a hybrid PDF already. The extension typed wins over the
+// chosen type; the file name follows the type. There is no separate "Save as hybrid PDF…" any more, and "Export as
+// plain PDF…" says that it flattens.
+TEST_F(MainWindowTest, saveAsOffersXoppAndPdfWithNotes) {
+    EXPECT_EQ(find("saveHybridItem"), nullptr) << "replaced by the type in Save as";
+    auto* exportItem = find("exportPdfItem");
+    ASSERT_NE(exportItem, nullptr);
+    EXPECT_EQ(exportItem->property("text").toString(), QString::fromUtf8("Export as plain PDF…"));
+    QObject* dialog = find("saveDialog");
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->property("nameFilters").toStringList().size(), 2);
+    auto filterIndex = [&] {
+        auto* filter = dialog->property("selectedNameFilter").value<QObject*>();
+        return filter ? filter->property("index").toInt() : -1;
+    };
+    auto setUp = [&](const char* format) {
+        QMetaObject::invokeMethod(window, "setUpSaveDialog", Q_ARG(QVariant, QVariant(QString(format))));
+    };
+
+    // A new document: .xopp
+    setUp("");
+    EXPECT_EQ(filterIndex(), 0);
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".xopp"));
+    EXPECT_EQ(dialog->property("defaultSuffix").toString(), "xopp");
+    // Choosing the PDF type: the name follows
+    auto* filter = dialog->property("selectedNameFilter").value<QObject*>();
+    ASSERT_NE(filter, nullptr);
+    filter->setProperty("index", 1);
+    EXPECT_EQ(dialog->property("defaultSuffix").toString(), "pdf");
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".pdf"));
+    filter->setProperty("index", 0);
+    EXPECT_TRUE(dialog->property("selectedFile").toUrl().toLocalFile().endsWith(".xopp"));
+    // It opens (the window's own dialog off-screen), and closes without saving
+    QMetaObject::invokeMethod(window, "openSaveDialog", Q_ARG(QVariant, QVariant()), Q_ARG(QVariant, QVariant("pdf")));
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_TRUE(dialog->property("visible").toBool());
+    EXPECT_EQ(filterIndex(), 1);
+    QMetaObject::invokeMethod(dialog, "reject");
+    until([&] { return !dialog->property("visible").toBool(); });
+    EXPECT_FALSE(controller->anySaving());
+
+    // The typed extension wins; without one, the chosen type
+    QTemporaryDir dir;
+    const auto url = [&](const char* name) { return QUrl::fromLocalFile(dir.filePath(name)); };
+    EXPECT_TRUE(controller->savesAsPdf(url("a.pdf"), false));
+    EXPECT_FALSE(controller->savesAsPdf(url("a.xopp"), true));
+    EXPECT_TRUE(controller->savesAsPdf(url("a"), true));
+    EXPECT_FALSE(controller->savesAsPdf(url("a"), false));
+    EXPECT_EQ(controller->fileForFormat(url("a.xopp"), true), url("a.pdf"));
+    EXPECT_EQ(controller->fileForFormat(url("a.pdf"), false), url("a.xopp"));
+    makeLecturePdf(dir.filePath("lecture.pdf"), 1);
+    EXPECT_EQ(controller->fileForFormat(url("lecture.xopp"), true), url("lecture.notes.pdf"))
+            << "never over another PDF by default";
+
+    // Saving with the PDF type chosen: a hybrid PDF; the next Save as offers the PDF first, with its own name
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("notes"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(dir.filePath("notes.pdf").toStdString())));
+    setUp("");
+    EXPECT_EQ(filterIndex(), 1);
+    EXPECT_EQ(dialog->property("selectedFile").toUrl().toLocalFile().toStdString(),
+              url("notes.pdf").toLocalFile().toStdString());
+    setUp("xopp");
+    EXPECT_EQ(filterIndex(), 0);
+    EXPECT_EQ(dialog->property("selectedFile").toUrl().toLocalFile().toStdString(),
+              url("notes.xopp").toLocalFile().toStdString());
+
+    // And back to .xopp with the Xournal type
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("notes.xopp"))),
+                              Q_ARG(QVariant, QVariant(false)), Q_ARG(QVariant, QVariant()));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_FALSE(controller->isHybrid());
+    EXPECT_TRUE(QFile::exists(dir.filePath("notes.xopp")));
+}
+
+namespace {
+/// Uses a fake for the system while it lives.
+struct UseSystemApps {
+    explicit UseSystemApps(xqt::SystemApps& apps) { xqt::SystemApps::setInstance(&apps); }
+    ~UseSystemApps() { xqt::SystemApps::setInstance(nullptr); }
+};
+}  // namespace
+
+// A document saved as "name.xopp" and then as a PDF with notes asks once what happens to the .xopp: to the trash (the
+// default), kept up to date for Xournal++, or kept as it is. "Don't ask again" stores the choice, which Settings →
+// Documents shows and changes. The .xopp open in another tab without changes: that tab is closed.
+TEST_F(MainWindowTest, savingAXoppAsPdfAsksWhatHappensToIt) {
+    FakeSystemApps fake;
+    UseSystemApps use(fake);
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    settings->set("hybridOldXopp", "ask");  // (the tests share the config folder)
+    QTemporaryDir dir;
+    const auto url = [&](const char* name) { return QUrl::fromLocalFile(dir.filePath(name)); };
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    drawStroke(*s, 0);
+    ASSERT_TRUE(controller->saveAs(url("notes.xopp")));
+    EXPECT_EQ(controller->oldXoppToAsk(), "notes.xopp");
+    // The same .xopp in another tab, unchanged
+    {
+        auto other = xqt::DocumentSession::loadFile(dir.filePath("notes.xopp").toStdString());
+        ASSERT_TRUE(other.document);
+        controller->tabManager().addTab(
+                std::make_unique<xqt::DocumentSession>(controller->context(), std::move(other.document)));
+        controller->tabManager().setCurrentIndex(controller->tabManager().indexOf(s));
+    }
+    ASSERT_EQ(controller->tabCount(), 2);
+
+    QObject* dialog = find("oldXoppDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("notes.pdf"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    ASSERT_TRUE(waitOpened(dialog, true)) << "asked before anything is written";
+    EXPECT_FALSE(QFile::exists(dir.filePath("notes.pdf")));
+    EXPECT_TRUE(find("oldXoppTrash")->property("checked").toBool()) << "the trash is the default";
+    click(find<QQuickItem>("oldXoppSave"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    until([&] { return !controller->anySaving() && !QFile::exists(dir.filePath("notes.xopp")); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(dir.filePath("notes.pdf").toStdString())));
+    EXPECT_FALSE(QFile::exists(dir.filePath("notes.xopp")));
+    EXPECT_TRUE(fake.trashed.contains(dir.filePath("notes.xopp")));
+    EXPECT_EQ(controller->tabCount(), 1) << "the other tab of it is closed";
+    EXPECT_EQ(controller->tabManager().currentSession(), s);
+    auto* snackbarText = findItem("snackbarText");
+    ASSERT_NE(snackbarText, nullptr);
+    EXPECT_TRUE(snackbarText->property("text").toString().contains("moved to the trash"));
+    EXPECT_EQ(settings->get("hybridOldXopp").toString(), "ask") << "asked again next time";
+
+    // Keep it as it is, and don't ask again
+    controller->newDocument();
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    ASSERT_TRUE(controller->saveAs(url("other.xopp")));
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("other.pdf"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(find<QQuickItem>("oldXoppKeep"));
+    click(find<QQuickItem>("oldXoppDontAsk"));
+    click(find<QQuickItem>("oldXoppSave"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(QFile::exists(dir.filePath("other.xopp"))) << "kept";
+    EXPECT_EQ(settings->get("hybridOldXopp").toString(), "keep") << "stored";
+
+    // Not asked now
+    controller->newDocument();
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    ASSERT_TRUE(controller->saveAs(url("third.xopp")));
+    EXPECT_EQ(controller->oldXoppToAsk(), "");
+    QMetaObject::invokeMethod(window, "saveChosen", Q_ARG(QVariant, QVariant(url("third.pdf"))),
+                              Q_ARG(QVariant, QVariant(true)), Q_ARG(QVariant, QVariant()));
+    wait(100);
+    EXPECT_FALSE(dialog->property("visible").toBool());
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(QFile::exists(dir.filePath("third.xopp")));
+
+    // Settings → Documents shows the choice and goes back to asking
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("documentsTab"));
+    auto* row = findItem("hybridOldXoppRow");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    QQuickItem* combo = nullptr;
+    for (QQuickItem* c: row->childItems()) {
+        if (c->inherits("QQuickComboBox")) {
+            combo = c;
+        }
+    }
+    ASSERT_NE(combo, nullptr);
+    EXPECT_EQ(combo->property("currentValue").toString(), "keep");
+    settings->set("hybridOldXopp", "ask");
+    wait(50);
+    EXPECT_EQ(combo->property("currentValue").toString(), "ask");
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
+// "Keep it updated for Xournal++": the .xopp the document was is written again from the PDF's notes, now and on
+// every save (its PDF: the pages, hidden beside it); the annotated PDF itself is left alone. Removed by the user, it
+// is not written again.
+TEST_F(MainWindowTest, theOldXoppIsKeptUpdatedForXournalpp) {
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 3);
+    ASSERT_TRUE(controller->openPath(pdf));
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    drawStroke(*s, 0);
+    const QUrl xoppUrl = QUrl::fromLocalFile(dir.filePath("lecture.xopp"));
+    ASSERT_TRUE(controller->saveAs(xoppUrl));
+    const fs::path xopp = xoppUrl.toLocalFile().toStdString();
+    const fs::path notes = dir.filePath("lecture.notes.pdf").toStdString();
+    EXPECT_EQ(controller->suggestedHybridFile().toLocalFile().toStdString(), notes.string());
+
+    ASSERT_TRUE(controller->saveAsHybrid(QUrl::fromLocalFile(QString::fromStdString(notes.string())), "update"));
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_EQ(xqt::HybridPdf::xoppExportOf(notes), xopp) << "recorded in the PDF";
+    auto exported = xqt::DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(exported.document) << exported.error;
+    EXPECT_EQ(strokesOn(*exported.document, 0), 1u);
+    EXPECT_EQ(exported.document->getPdfFilepath(), fs::path(dir.filePath(".lecture.pages.pdf").toStdString()));
+    {
+        QFile f(pdf);
+        ASSERT_TRUE(f.open(QIODevice::ReadOnly));
+        EXPECT_FALSE(f.readAll().contains("XournalQt")) << "the lecture itself is left alone";
+    }
+
+    // On every save
+    drawStroke(*s, 2);
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);
+    exported = xqt::DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(exported.document);
+    EXPECT_EQ(strokesOn(*exported.document, 2), 1u);
+    EXPECT_EQ(xqt::HybridPdf::xoppExportOf(notes), xopp);
+
+    // Removed: no more
+    fs::remove(xopp);
+    drawStroke(*s, 1);
+    key(Qt::Key_S, Qt::ControlModifier);
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_FALSE(fs::exists(xopp));
+    EXPECT_EQ(xqt::HybridPdf::xoppExportOf(notes), fs::path());
+}
+
+// Share… → "PDF with notes": a PDF as it is, a hybrid PDF saved first when changed, handed to the system (the file
+// manager); or onto the clipboard as a file URL, the PDF's bytes and its path. A .xopp is never turned into a PDF
+// unasked: the window asks, or a PDF copy is written and the document stays as it is.
+TEST_F(MainWindowTest, sharingThePdfWithNotes) {
+    FakeSystemApps fake;
+    UseSystemApps use(fake);
+    EXPECT_EQ(controller->shareStep(), "saveAs") << "a new document: Save as first";
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 2);
+    ASSERT_TRUE(controller->openPath(pdf));
+    EXPECT_EQ(controller->shareStep(), "share") << "a PDF without notes: itself";
+    ASSERT_TRUE(controller->sharePdf(false));
+    ASSERT_EQ(fake.shared, QStringList{pdf});
+
+    // Through the window: ⋮ → Share… → PDF with notes
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    const QString notes = dir.filePath("lecture.notes.pdf");
+    drawStroke(*s, 0);
+    ASSERT_TRUE(controller->saveAsHybrid(QUrl::fromLocalFile(notes)));
+    drawStroke(*s, 1);
+    EXPECT_EQ(controller->shareStep(), "save");
+    QObject* dialog = find("shareDialog");
+    ASSERT_NE(dialog, nullptr);
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QVariant(QString())));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(find<QQuickItem>("sharePdfChoice"));
+    until([&] { return fake.shared.size() == 2; }, 20000);
+    EXPECT_EQ(fake.shared.value(1), notes) << "saved first, then shown";
+    EXPECT_FALSE(controller->modified());
+    ASSERT_TRUE(waitOpened(dialog, false));
+
+    // The clipboard
+    ASSERT_TRUE(controller->sharePdf(true));
+    const QMimeData* data = QGuiApplication::clipboard()->mimeData();
+    ASSERT_NE(data, nullptr);
+    ASSERT_TRUE(data->hasUrls());
+    EXPECT_EQ(data->urls().value(0).toLocalFile(), notes);
+    EXPECT_TRUE(data->hasFormat("text/uri-list"));
+    EXPECT_TRUE(data->data("application/pdf").startsWith("%PDF"));
+    EXPECT_TRUE(data->text().contains(notes));
+    auto* snackbarText = findItem("snackbarText");
+    ASSERT_NE(snackbarText, nullptr);
+    EXPECT_TRUE(snackbarText->property("text").toString().startsWith("PDF copied"));
+
+    // A .xopp: asked; a PDF copy leaves the document as it is
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(dir.filePath("lecture.xopp"))));
+    EXPECT_EQ(controller->shareStep(), "ask");
+    QMetaObject::invokeMethod(window, "sharePdfOf", Q_ARG(QVariant, QVariant(QString())), Q_ARG(QVariant, QVariant(false)));
+    QObject* ask = find("shareXoppDialog");
+    ASSERT_NE(ask, nullptr);
+    ASSERT_TRUE(waitOpened(ask, true));
+    QMetaObject::invokeMethod(ask, "close");
+    ASSERT_TRUE(waitOpened(ask, false));
+    ASSERT_TRUE(controller->sharePdfCopy(QUrl::fromLocalFile(dir.filePath("copy.pdf")), false));
+    until([&] { return fake.shared.size() == 3; }, 20000);
+    EXPECT_EQ(fake.shared.value(2), dir.filePath("copy.pdf"));
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(dir.filePath("copy.pdf").toStdString())));
+    EXPECT_FALSE(controller->isHybrid());
+    EXPECT_EQ(controller->title(), "lecture.xopp");
+    // Copied: a PDF copy in the cache
+    ASSERT_TRUE(controller->sharePdfCopy(QUrl(), true));
+    until([&] { return !controller->anySaving(); }, 20000);
+    data = QGuiApplication::clipboard()->mimeData();
+    ASSERT_TRUE(data && data->hasUrls());
+    const QString cached = data->urls().value(0).toLocalFile();
+    EXPECT_TRUE(cached.endsWith("lecture.pdf")) << cached.toStdString();
+    EXPECT_FALSE(cached.startsWith(dir.path())) << "not next to the document";
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(cached.toStdString())));
+    EXPECT_EQ(controller->title(), "lecture.xopp");
+}
+
+// Share… → "For Xournal++": a one-time export into a folder the user chooses, never the document's own, as
+// "name.xopp" + "name.xopp.bg.pdf", then shown; the note offers to copy both. Also from the tab and library card menus.
+TEST_F(MainWindowTest, sharingForXournalpp) {
+    FakeSystemApps fake;
+    UseSystemApps use(fake);
+    EXPECT_NE(find("shareCardItem"), nullptr);  // (the tab menu has "Share…" too: shareTabItem, in each tab)
+    QTemporaryDir dir, out;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 3);
+    ASSERT_TRUE(controller->openPath(pdf));
+    drawStroke(*controller->tabManager().currentSession(), 1);
+    const QString notes = dir.filePath("lecture.notes.pdf");
+    ASSERT_TRUE(controller->saveAsHybrid(QUrl::fromLocalFile(notes)));
+
+    EXPECT_FALSE(controller->shareForXournal(QUrl::fromLocalFile(dir.path()))) << "never next to the document";
+    EXPECT_FALSE(QFile::exists(dir.filePath("lecture.xopp")));
+    QObject* messageDialog = find("messageDialog");
+    ASSERT_NE(messageDialog, nullptr);
+    ASSERT_TRUE(waitOpened(messageDialog, true)) << "says why";
+    EXPECT_TRUE(messageDialog->property("title").toString().contains("another folder"));
+    QMetaObject::invokeMethod(messageDialog, "close");
+    ASSERT_TRUE(waitOpened(messageDialog, false));
+
+    ASSERT_TRUE(controller->shareForXournal(QUrl::fromLocalFile(out.path())));
+    until([&] { return fake.shared.size() == 2; }, 20000);
+    const QString xopp = out.filePath("lecture.xopp"), bg = out.filePath("lecture.xopp.bg.pdf");
+    EXPECT_EQ(fake.shared, (QStringList{xopp, bg}));
+    auto exported = xqt::DocumentSession::loadFile(xopp.toStdString());
+    ASSERT_TRUE(exported.document) << exported.error;
+    EXPECT_TRUE(exported.document->isAttachPdf());
+    EXPECT_EQ(exported.document->getPdfFilepath(), fs::path(bg.toStdString()));
+    EXPECT_EQ(exported.document->getPageCount(), 3u);
+    EXPECT_EQ(strokesOn(*exported.document, 1), 1u);
+    EXPECT_EQ(controller->title(), "lecture.notes.pdf") << "the document stays as it is";
+    // The note's "Copy": both files onto the clipboard
+    auto* action = findItem("snackbarAction");
+    ASSERT_NE(action, nullptr);
+    until([&] { return action->isVisible(); });
+    EXPECT_EQ(action->property("text").toString(), "Copy");
+    click(action);  // (the message about the document's folder was closed above)
+    const QMimeData* data = QGuiApplication::clipboard()->mimeData();
+    ASSERT_TRUE(data && data->hasUrls());
+    EXPECT_EQ(data->urls().size(), 2);
+    EXPECT_EQ(data->urls().value(0).toLocalFile().toStdString(), xopp.toStdString());
+
+    // Again: a free name
+    ASSERT_TRUE(controller->shareForXournal(QUrl::fromLocalFile(out.path())));
+    until([&] { return fake.shared.size() == 4; }, 20000);
+    EXPECT_TRUE(QFile::exists(out.filePath("lecture (2).xopp")));
+
+    // A library card's PDF, not open: loaded and exported in the background
+    QTemporaryDir cardOut;
+    ASSERT_TRUE(controller->shareForXournal(QUrl::fromLocalFile(cardOut.path()), notes));
+    until([&] { return fake.shared.size() == 6; }, 20000);
+    auto fromCard = xqt::DocumentSession::loadFile(cardOut.filePath("lecture.xopp").toStdString());
+    ASSERT_TRUE(fromCard.document) << fromCard.error;
+    EXPECT_EQ(strokesOn(*fromCard.document, 1), 1u);
 }
 
 // Settings → Search: the fuzzy search's toggle (the same setting as the search fields' button, both ways) and its typo
@@ -5115,4 +5515,30 @@ TEST_F(MainWindowTest, fullScreenTabDotsSwitchDocuments) {
     EXPECT_TRUE(count->isVisible());
     EXPECT_EQ(count->property("text").toString(), "17 / 17");
     key(Qt::Key_F11);
+}
+
+// Share… on a library card: a PDF is shared as it is (without opening it); a card of notes opens, then the Share
+// choices are for that document.
+TEST_F(HomeScreenFilterTest, shareFromALibraryCard) {
+    QObject* home = find("homeView");
+    ASSERT_NE(home, nullptr);
+    QObject* dialog = find("shareDialog");
+    ASSERT_NE(dialog, nullptr);
+    const QString pdf = QString::fromStdString((root / "lecture.pdf").string());
+    QMetaObject::invokeMethod(home, "shareRequested", Q_ARG(QString, pdf));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(dialog->property("file").toString(), pdf);
+    click(find<QQuickItem>("sharePdfChoice"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(fake.shared, QStringList{pdf});
+    EXPECT_EQ(controller->tabCount(), 0) << "not opened";
+
+    const QString notes = QString::fromStdString((root / "notes.xopp").string());
+    QMetaObject::invokeMethod(home, "shareRequested", Q_ARG(QString, notes));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(dialog->property("file").toString(), QString());
+    EXPECT_EQ(controller->title(), "notes.xopp") << "opened, shared as the open document";
+    EXPECT_EQ(controller->shareStep(), "ask");
+    QMetaObject::invokeMethod(dialog, "close");
+    ASSERT_TRUE(waitOpened(dialog, false));
 }

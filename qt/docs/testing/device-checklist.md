@@ -880,6 +880,42 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       scrolls with a finger, and closes with a tap outside or Escape. Its typo sentence follows the setting in
       Settings → Search, which has a "Help" button that opens the same help.
 
+## Hybrid PDF flow and Share (qt/hybrid-flow)
+- [ ] ⋮ → Save as… (and Ctrl+Shift+S) on a new document: one dialog with the file types "Xournal notes (.xopp)"
+      (chosen) and "PDF with notes, editable (.pdf)". Switch the type: the name's extension follows (in KDE's
+      dialog too). Save as PDF: the tab title is the `.pdf`, Ctrl+S writes it again, and Save as… now starts on the
+      PDF type with its own name. Type `x.pdf` with the .xopp type chosen: it is saved as a PDF (the typed extension
+      wins). There is no "Save as hybrid PDF…" in ⋮ any more; "Export as plain PDF…" (Ctrl+E) still flattens.
+- [ ] A new document saved as `notes.xopp`, then Save as… → "PDF with notes": a question "This document was saved
+      as notes.xopp" with "Move notes.xopp to the trash" (chosen), "Keep it updated for Xournal++", "Keep it as it
+      is" and "Don't ask again". Cancel: nothing is written. Save: `notes.pdf` is written, `notes.xopp` is in the
+      desktop trash (restore it from there), a note says so, and the library shows one card `notes`.
+- [ ] `lecture.pdf` with notes saved as `lecture.xopp`, then Save as… PDF (`lecture.notes.pdf`) with "Keep it
+      updated for Xournal++": `lecture.xopp` opens in Xournal++ with the notes; write more, Ctrl+S, reopen it in
+      Xournal++: the new ink is there. Close and reopen `lecture.notes.pdf` in xournal-qt, write, Ctrl+S: still
+      updated. Delete `lecture.xopp`, save again: it does not come back. `lecture.pdf` itself never changes.
+- [ ] With pasted PDF pages in a `.xopp` (it has a hidden `.name.pages.pdf`), save it as a PDF with the trash
+      choice: the pages keep showing, later saves work, and both files are in the trash.
+- [ ] "Keep it as it is" next to the PDF of the same name (`notes.xopp` + `notes.pdf`): the library shows one card
+      "notes" (PDF) that opens the PDF with notes. Edit `notes.xopp` in Xournal++ and save it: after a refresh the
+      library shows two cards "notes", the PDF and the `.xopp`, each opening its own file.
+- [ ] "Keep it as it is" with "Don't ask again": the next document is not asked, its `.xopp` stays. Settings →
+      Documents → Hybrid PDF shows "Keep it as it is"; set it to "Ask each time": asked again.
+- [ ] ⋮ → Share… on a PDF with notes that has unsaved changes → "PDF with notes": it is saved, then Dolphin opens
+      with the file selected. Drag it into an email or chat; the other side sees the notes.
+- [ ] Share… → "Copy the PDF with notes": a note "PDF copied". Paste into Dolphin (a copy of the file appears),
+      into Telegram / a browser upload field / a chat app: the PDF is attached. Paste into a text editor: its path.
+- [ ] Share… on a `.xopp` document → "PDF with notes": asked "Save as PDF with notes…" or "Save a PDF copy…".
+      The copy leaves the tab as the `.xopp` (title, unsaved changes); Save as goes through the .xopp question.
+      "Copy the PDF with notes" on a `.xopp` does not ask: the clipboard gets a PDF copy from the app cache.
+- [ ] Share… → "For Xournal++": a folder dialog. Choosing the document's own folder: refused with a message.
+      Another folder: `name.xopp` and `name.xopp.bg.pdf` appear there, Dolphin shows both selected, the note offers
+      "Copy". Open that `.xopp` in upstream Xournal++ (also after moving both files elsewhere): all pages with their
+      PDF pages and the notes, editable. A second export into the same folder is "name (2).xopp".
+- [ ] The tab's context menu → Share…: that tab comes to the front with the Share choices. A PDF card in the library
+      (or Recent) → Share…: the PDF itself (shown / copied), and "For Xournal++" exports without opening a tab. A
+      notes card (or a PDF with its `.xopp`) → Share…: it opens, then the Share choices for it.
+
 ## Markdown and text editor (qt/md-editor)
 - [ ] Open a `.md` from the library: no read-only note, no ink tools in the tool bar. Tap (pen, mouse or finger)
       anywhere on a page: the cursor is there, the block under it shows its Markdown, the others stay formatted.
@@ -921,3 +957,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Library: the new button (file with a plus) opens a menu: New document… (as before), New Markdown file…, New
       text file…. "New Markdown file…", type a name, Enter: `name.md` appears in the current folder, opens, and you
       can type at once. The same name again gives "name (2).md".
+- [ ] Share… on an open `.md` (⋮ or the tab menu) and on a `.md` / `.txt` card: only "The file itself" and "Copy the
+      file" (no PDF with notes, no Xournal++ copy); with unsaved changes it saves first. ⋮ of a `.md` has no "Save
+      as…".

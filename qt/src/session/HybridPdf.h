@@ -56,11 +56,20 @@ using BasePageOf = std::function<size_t(const XojPage*)>;
 /// PDF. `baseOf`: a page with a generated background keeps the annotations other apps put on that page of the
 /// background PDF (the clean copy of the hybrid PDF it was opened from). `pdfPageCount`: the pages of the background
 /// PDF, for a document whose PDF is not loaded (a copy of an open document written on a worker; npos: the document's).
-Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {}, size_t pdfPageCount = npos);
+/// `xoppExport`: this document keeps a .xopp for Xournal++ there up to date (recorded in the marker, see
+/// xoppExportOf; relative to the PDF when it is in its folder or below).
+Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {}, size_t pdfPageCount = npos,
+             const fs::path& xoppExport = {});
 
 /// Export for Xournal++: a plain `xopp` whose background is `pdf`, the document's base pages in document order (the
-/// hybrid PDF without our annotations and data). The document keeps its own files.
-Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount = npos);
+/// hybrid PDF without our annotations and data). The document keeps its own files. `attached`: `pdf` is upstream's
+/// attached PDF of the .xopp ("name.xopp.bg.pdf", referred to as domain "attach", "bg.pdf"; not written when no page
+/// shows a PDF page), so Xournal++ opens the two as one document wherever they are put.
+Result exportXopp(Document& doc, const fs::path& xopp, const fs::path& pdf, size_t pdfPageCount = npos,
+                  bool attached = false);
+
+/// The .xopp for Xournal++ that this hybrid PDF keeps up to date on every save (write's `xoppExport`; empty: none).
+fs::path xoppExportOf(const fs::path& pdf);
 
 /// Whether this PDF carries our marker (remembered by path, size and time).
 bool isHybrid(const fs::path& pdf);

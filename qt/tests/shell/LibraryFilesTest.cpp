@@ -4,6 +4,8 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <functional>
 
@@ -25,6 +27,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/HybridPdf.h"
 #include "shell/TabManager.h"
 #include "AppController.h"
 #include "shell/DocumentFiles.h"
@@ -234,6 +237,44 @@ TEST_F(LibraryFilesTest, attachedBackgroundImagesTravelWithTheirXopp) {
     // Its files: trashed together
     const auto files = DocumentFiles::filesOf(DocumentFiles::itemOf(root / "Whiteboard.xopp"));
     EXPECT_NE(std::find(files.begin(), files.end(), root / "Whiteboard.xopp.bg_1.png"), files.end());
+}
+
+// A .xopp kept next to the hybrid PDF of its name ("Keep it as it is" when it was saved as a PDF with notes): the
+// card opens the hybrid PDF, as for its export, also without ".name.pages.pdf". Changed after the PDF (edited in
+// Xournal++ afterwards), it is not hidden: the two are listed as two documents.
+TEST_F(LibraryFilesTest, aXoppKeptNextToItsHybridPdfDoesNotHideIt) {
+    makeNotes(root / "notes.xopp");
+    {
+        DocumentHandler handler;
+        Document doc(&handler);
+        doc.addPage(std::make_shared<XojPage>(400, 300));
+        ASSERT_TRUE(HybridPdf::write(doc, root / "notes.pdf").ok);
+    }
+    const auto pdfTime = fs::last_write_time(root / "notes.pdf");
+    fs::last_write_time(root / "notes.xopp", pdfTime - std::chrono::minutes(5));  // (the old .xopp, kept)
+    ASSERT_FALSE(fs::exists(root / ".notes.pages.pdf"));
+    auto listed = DocumentFiles::scan(root).items;
+    ASSERT_EQ(listed.size(), 1u);
+    EXPECT_TRUE(listed[0].hybrid);
+    EXPECT_EQ(listed[0].main(), root / "notes.pdf") << "the card opens the hybrid PDF, not the stale .xopp";
+    EXPECT_EQ(listed[0].xopp, root / "notes.xopp") << "(which travels with it)";
+    EXPECT_EQ(DocumentFiles::itemOf(root / "notes.xopp").main(), root / "notes.pdf");
+    EXPECT_EQ(DocumentFiles::itemOf(root / "notes.pdf").main(), root / "notes.pdf");
+
+    // A plain PDF with its .xopp stays the pair that opens the .xopp
+    makeNotes(root / "lecture.xopp");
+    writeFile(root / "lecture.pdf", "%PDF-1.4 not really\n");
+    EXPECT_EQ(DocumentFiles::itemOf(root / "lecture.pdf").main(), root / "lecture.xopp");
+
+    // Edited after the PDF: two documents
+    fs::last_write_time(root / "notes.xopp", pdfTime + std::chrono::minutes(5));
+    listed = DocumentFiles::scan(root).items;
+    std::vector<std::string> mains = names(listed);
+    std::sort(mains.begin(), mains.end());
+    EXPECT_EQ(mains, (std::vector<std::string>{"lecture.xopp", "notes.pdf", "notes.xopp"}));
+    EXPECT_EQ(DocumentFiles::itemOf(root / "notes.xopp").main(), root / "notes.xopp");
+    EXPECT_TRUE(DocumentFiles::itemOf(root / "notes.xopp").pdf.empty());
+    EXPECT_TRUE(DocumentFiles::itemOf(root / "notes.pdf").xopp.empty());
 }
 
 TEST_F(LibraryFilesTest, markdownFilesAndImagesAreDocuments) {

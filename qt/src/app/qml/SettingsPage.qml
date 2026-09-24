@@ -363,8 +363,8 @@ Popup {
                     SwitchRow { key: "resumeAtLastPage"; text: qsTr("Open documents where they were left off") }
                     SectionTitle { text: qsTr("Hybrid PDF") }
                     Hint {
-                        text: qsTr("A hybrid PDF (More → Save as hybrid PDF…) shows your notes in any PDF app and "
-                                   + "opens here with everything editable.")
+                        text: qsTr("A PDF with notes (Save as… → \"PDF with notes, editable\") shows your notes in "
+                                   + "any PDF app and opens here with everything editable.")
                     }
                     RowLayout {
                         Layout.fillWidth: true
@@ -388,6 +388,17 @@ Popup {
                     SwitchRow {
                         key: "hybridExportXopp"
                         text: qsTr("On every save of a hybrid PDF, also write a .xopp for Xournal++")
+                    }
+                    ComboRow {
+                        objectName: "hybridOldXoppRow"
+                        key: "hybridOldXopp"
+                        text: qsTr("A document saved as a .xopp is saved as a PDF with notes: its .xopp")
+                        options: [
+                            { text: qsTr("Ask each time"), value: "ask" },
+                            { text: qsTr("Move it to the trash"), value: "trash" },
+                            { text: qsTr("Keep it updated for Xournal++"), value: "update" },
+                            { text: qsTr("Keep it as it is"), value: "keep" }
+                        ]
                     }
                     SectionTitle { text: qsTr("Autosave") }
                     SwitchRow { key: "autosaveEnabled"; text: qsTr("Save a backup of unsaved changes regularly") }

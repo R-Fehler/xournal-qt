@@ -57,7 +57,7 @@ A hybrid PDF is a normal PDF with four additions:
 
 ## How it appears in the app
 
-- **"Save as hybrid PDF…"** for any document. For an annotated PDF it suggests `lecture.notes.pdf`, or
+- **Save as… with the type "PDF with notes, editable (.pdf)"** (it was "Save as hybrid PDF…" first) for any document. For an annotated PDF it suggests `lecture.notes.pdf`, or
   `lecture.pdf` itself when the setting "Save notes into the PDF itself" is on; the original is then kept once as
   `lecture.original.pdf`.
 - **Export plain `.xopp` for Xournal++**: once (menu), or automatically on each save (a setting per document or
@@ -163,8 +163,8 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
      and survives a save; a moved and a deleted annotation of ours are reported, and importing them empties those
      layers (undo brings them back); notes saved into the PDF itself keep `name.original.pdf` byte for byte; the
      `.xopp` export opens as the same document with a base PDF without annotations.
-3. **UI** (done).
-   - More → **Save as hybrid PDF…** for any document. The suggestion: the document's own hybrid PDF; for an
+3. **UI** (done; the flow around it changed in `qt/hybrid-flow`, below).
+   - More → **Save as hybrid PDF…** for any document (now a type in Save as…). The suggestion: the document's own hybrid PDF; for an
      annotated PDF `name.notes.pdf` next to it, or the PDF itself with the setting on; for other documents the
      `.xopp` suggestion as `.pdf` (`name.notes.pdf` if a PDF of that name exists). Once saved as hybrid, the title
      is the PDF and Ctrl+S writes it again.
@@ -205,3 +205,68 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
    thread (a few milliseconds), the drawing, the `.xopp` and qpdf work on that copy on a worker, and the undo stack's
    saved point is the copied state. The whole save still takes as long; the window stays usable. qpdf has no
    incremental save; appending an incremental update ourselves would make saves of long PDFs cheap.
+
+## The flow around it (`qt/hybrid-flow`)
+
+1. **Save as with a type.** One Save as dialog (⋮ → Save as…, Ctrl+Shift+S, and Ctrl+S of a document without a
+   file) with two file types: "Xournal notes (.xopp)" and "PDF with notes, editable (.pdf)". New documents start on
+   `.xopp` (decided above), a document that is a hybrid PDF already starts on the PDF with its own name. The name
+   follows the type (`AppController::fileForFormat`: the suggestion of one type becomes the other's; else the
+   extension is swapped, and a `.pdf` taken by another PDF becomes `name.notes.pdf`). The extension typed wins over
+   the chosen type (`savesAsPdf`): `x.pdf` is a PDF with notes, `x.xopp` a `.xopp`; no extension: the type. The
+   separate "Save as hybrid PDF…" entry is gone. "Export as PDF…" is now "Export as plain PDF…" (the notes drawn
+   into the pages, nothing editable). The `.xopp` suggestion of a hybrid PDF is `name.xopp` (not upstream's
+   `name.pdf.xopp`).
+2. **The old `.xopp`.** Saving a document that was saved as `name.xopp` as a PDF with notes asks once, before
+   anything is written, what happens to `name.xopp`:
+   - **Move it to the trash** (the default; the PDF now holds everything). After the PDF is written, the `.xopp`
+     goes to the desktop trash with the files that belong to it alone (the library's trash:
+     `DocumentFiles::trash` with its attached PDF, `.name.pages.pdf` and background images, plus a `name.pdf` of
+     only pasted pages made for it). The PDF it annotates stays. When the document shows its pages from one of
+     those files, it takes them from a copy in the app cache first (`DocumentSession::detachBackground`, a hard
+     link where possible: the same pages under the same numbers).
+   - **Keep it updated for Xournal++**: the `.xopp` is written again from the PDF's notes now (with its PDF by the
+     export's rules: `name.pdf` if free, else the hidden `.name.pages.pdf`) and on every save of this document.
+     This is per document: the hybrid PDF records it in its marker (`/XoppExport`, relative to the PDF when it is
+     beside it or below; `HybridPdf::xoppExportOf`, `DocumentSession::xoppExport`), so it survives closing and
+     reopening. Deleting that `.xopp` ends it (a save no longer writes it or records it). The global setting "On
+     every save of a hybrid PDF, also write a .xopp" stays as it was.
+   - **Keep it as it is**: not touched, not updated. Kept beside the hybrid PDF of its name (`notes.xopp` next to
+     the new `notes.pdf`), the library shows one card that opens the hybrid PDF, as for its export: every same-name
+     pair of a `.xopp` and a PDF looks into the PDF (`HybridPdf::isHybrid`, remembered per file version; lone PDFs
+     are not looked into, and the library index does not record it). A `.xopp` changed more than a minute after the
+     PDF (edited in Xournal++ afterwards; an export is written right after the PDF) is not hidden: the two are listed
+     as two documents, each opening its own file.
+
+   The dialog has **"Don't ask again"**, which stores the choice in the setting `hybridOldXopp` (`ask`, `trash`,
+   `update`, `keep`); Settings → Documents → Hybrid PDF shows it and sets it back to "Ask each time". Cancel
+   writes nothing. Only `.xopp` files are asked about (`.xoj` ones are left alone).
+   If the `.xopp` is open in another tab of this process: without unsaved changes that tab is closed; with changes
+   the `.xopp` is kept as it is and a message says why. (Another process, e.g. a library's window, is not seen.)
+   All trashing of the app now goes through `SystemApps::moveToTrash`, so tests never fill the user's trash.
+3. **Share…** (⋮ → Share…, the tab menu, and the menu of a PDF or notes card in the library or Recent; a card of
+   notes, also a PDF with its `.xopp`, is opened first and shared as the open document) offers three things:
+   - **PDF with notes (opens in any app)**: the hybrid PDF itself, saved first when it has changes; a PDF without
+     notes as it is; notes that go into the PDF itself are saved first. On the desktop the file manager then shows
+     it, selected (`SystemApps::share`: `ShowItems` over D-Bus, `explorer /select,`, `open -R`); Android and iOS
+     will open the share sheet (false there for now). A document without a file opens Save as on the PDF type and
+     shares after the save. A `.xopp` is never turned into a PDF unasked: the window offers **Save as PDF with
+     notes…** (the document becomes the PDF; the old-.xopp question applies) or **Save a PDF copy…** (a hybrid PDF
+     written from the document, `SaveKind::ExportHybrid`, never over the PDF it shows; the document keeps its file,
+     format and unsaved changes).
+   - **Copy the PDF with notes** (the author, 2026-09-24): the same PDF onto the clipboard, to paste it into another
+     app or a chat (`SystemApps::copyToClipboard`): its URL as `text/uri-list` (Dolphin, browsers, Telegram and
+     most chat apps take a pasted file that way) and as GNOME's `x-special/gnome-copied-files`, the PDF's bytes as
+     `application/pdf` up to 50 MB, and the path as text. "PDF copied: paste it into another app". A `.xopp` is
+     not asked about here: a PDF copy is written into the app cache (`~/.cache/xournal-qt/share/name.pdf`) and
+     copied; the document stays as it is.
+   - **For Xournal++ (.xopp + PDF)**: a one-time export into a folder the user chooses, never the document's own
+     folder (there the library would take it for the document), as `name.xopp` + `name.xopp.bg.pdf`: upstream's
+     attached PDF (`<background type="pdf" domain="attach" filename="bg.pdf">`, which upstream's `LoadHandler`
+     resolves as the `.xopp`'s path + `.bg.pdf`), so the pair opens with its pages right wherever it is moved
+     together (tested with the LoadHandler, also after moving both). Its PDF is the base pages in document order,
+     page *i* of the `.xopp` showing page *i*; no PDF is written when no page shows a PDF page. A name taken there
+     becomes "name (2)". Then the file manager shows the files, and the note offers **Copy** (both files as a
+     URI list). From a library card, the PDF is loaded and exported on a worker, without opening a tab.
+   "Export as .xopp for Xournal++…" (next to the hybrid PDF) left the ⋮ menu: the one-time export is Share's, and
+   the `.xopp` kept beside the PDF is "Keep it updated for Xournal++" (or the global setting).

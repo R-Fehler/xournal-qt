@@ -275,6 +275,17 @@
 - **Reference mode follow-up (2026-09-24):** the notes' scroll bars, text knobs, text pill, selection bar and
   context pill are shared components, instantiated for both canvases; copy only while reading. Markdown and Ctrl+S
   work in the reference when editing is on. Fit width never needs a horizontal scroll bar.
+- **Hybrid PDF flow and Share, `qt/hybrid-flow` (2026-09-24, awaiting on-device test).**
+  - Save as offers "Xournal notes (.xopp)" or "PDF with notes, editable (.pdf)". "Export as plain PDF…" stays.
+  - Saving a `.xopp` as a PDF with notes asks once about the `.xopp`: trash it (the default), keep it updated
+    (recorded in the PDF as `/XoppExport`), or keep it. "Don't ask again" can be undone in Settings → Documents.
+  - Share (⋮, tab menu, cards) offers:
+    - PDF with notes, shown in the file manager;
+    - copy to the clipboard (uri-list, the PDF bytes up to 50 MB, and the path);
+    - for Xournal++: a one-time export of `name.xopp` + `name.xopp.bg.pdf` into a chosen folder, checked with
+      upstream's loader.
+  - Trashing goes through `SystemApps::moveToTrash`.
+  - A `.xopp` kept next to its hybrid PDF opens the PDF; one edited more than 60 s later is listed separately.
   318 KiB.
 
 ## Backlog (decide later)
