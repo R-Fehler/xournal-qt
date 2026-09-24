@@ -11,6 +11,8 @@
 #include <cmath>
 
 #include <QDir>
+#include <fstream>
+
 #include <QElapsedTimer>
 #include <iostream>
 #include <QFile>
@@ -62,6 +64,7 @@
 #include "session/HybridPdf.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
+#include "shell/MdSnippets.h"
 #include "shell/LibraryModel.h"
 #include "shell/PagesModel.h"
 #include "shell/RecentFiles.h"
@@ -87,6 +90,7 @@ protected:
         engine->addImageProvider("sketch", new xqt::SketchProvider);
         engine->addImageProvider("preview", new xqt::PreviewProvider);
         engine->addImageProvider("hitpage", new xqt::HitPageProvider);
+        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
         engine->rootContext()->setContextProperty("app", controller.get());
         engine->loadFromModule("XournalQt", "Main");
         ASSERT_FALSE(engine->rootObjects().isEmpty());
@@ -1283,6 +1287,106 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     const int columns = grid()->property("columns").toInt();
     click(find<QQuickItem>("zoomInButton"));
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
+}
+
+namespace {
+/// A library with a Markdown file: "needle" in a paragraph under "Lecture 3 › Kalman filter" and far down in it.
+class HomeScreenMarkdownTest: public HomeScreenTest {
+protected:
+    void prepareController() override {
+        ASSERT_TRUE(tmp.isValid());
+        root = fs::path(tmp.path().toStdString());
+        std::string text = "# Lecture 3\n\n## Kalman filter\n\nThe needle is here.\n\n";
+        for (int i = 0; i < 100; ++i) {
+            text += "Paragraph " + std::to_string(i) + " about the prediction step of the filter.\n\n";
+        }
+        text += "## Update\n\nAnother needle at the end.\n";
+        std::ofstream(root / "kalman.md") << text;
+        controller->setLibraryRoot(root);
+        qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
+    }
+};
+}  // namespace
+
+TEST_F(HomeScreenMarkdownTest, extendedSearchShowsSnippetCardsAndOpensTheFileThere) {
+    auto* lib = controller->libraryModel();
+    QElapsedTimer t;
+    t.start();
+    while (lib->property("indexing").toBool() && t.elapsed() < 5000) {
+        wait(20);
+    }
+    ASSERT_EQ(gridCount(), 1);
+    click(find<QQuickItem>("extendedSearchButton"));
+    auto* field = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(field, nullptr);
+    field->forceActiveFocus();
+    type("needle");
+    key(Qt::Key_Return);
+    wait(100);
+    QQuickItem* md = card(rowOf("kalman.md"));
+    ASSERT_NE(md, nullptr);
+    QQuickItem* strip = nullptr;
+    QQuickItem* pages = nullptr;
+    for (auto* c: md->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "hitPassageStrip") {
+            strip = c;
+        } else if (c->objectName() == "hitPageStrip") {
+            pages = c;
+        }
+    }
+    ASSERT_NE(strip, nullptr);
+    EXPECT_TRUE(strip->isVisible());
+    EXPECT_FALSE(pages->isVisible()) << "cards, not pages";
+    ASSERT_EQ(strip->property("count").toInt(), 2);
+    wait(100);
+    QQuickItem* first = itemAt(strip, 0);
+    ASSERT_NE(first, nullptr);
+    QString headings;
+    for (auto* c: first->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "hitPassageHeadings") {
+            headings = c->property("text").toString();
+        }
+    }
+    EXPECT_EQ(headings, "Lecture 3 › Kalman filter");
+
+    // The second card: the file opens at its page, with the search on its hit, and says it is read-only
+    QMetaObject::invokeMethod(strip, "positionViewAtIndex", Q_ARG(int, 1), Q_ARG(int, 0));  // (ListView.Beginning)
+    wait(100);
+    QQuickItem* second = itemAt(strip, 1);
+    ASSERT_NE(second, nullptr);
+    click(second);
+    EXPECT_FALSE(controller->homeVisible());
+    EXPECT_EQ(controller->title(), "kalman.md");
+    EXPECT_GT(controller->pageNumber(), 1);
+    EXPECT_EQ(controller->searchQuery(), "needle");
+    wait(50);
+    auto* note = find<QQuickItem>("shownFileNote");
+    ASSERT_NE(note, nullptr);
+    EXPECT_TRUE(note->isVisible());
+}
+
+TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
+    auto draw = [&] {
+        auto* canvas = find<QQuickItem>("canvas");
+        const QPoint from = canvas->mapToScene(QPointF(canvas->width() * 0.4, canvas->height() * 0.4)).toPoint();
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 10; ++i) {
+            QTest::mouseMove(window, from + QPoint(8 * i, 5 * i));
+            wait(10);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, from + QPoint(80, 50));
+        wait(50);
+    };
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
+    wait(100);
+    ASSERT_EQ(controller->tool(), "pen");
+    draw();
+    EXPECT_FALSE(controller->modified()) << "read-only: the pen does not write";
+    EXPECT_EQ(controller->beginMarkdown(0), "");
+    controller->newDocument();
+    wait(100);
+    draw();
+    EXPECT_TRUE(controller->modified()) << "(a new document is written on)";
 }
 
 TEST_F(MainWindowTest, tabsCloseOnlyOnPurposeAndAllAtOnce) {

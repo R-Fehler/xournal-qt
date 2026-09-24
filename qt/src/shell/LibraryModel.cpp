@@ -14,6 +14,7 @@
 #include <QThreadPool>
 
 #include "HitPages.h"
+#include "MdSnippets.h"
 #include "Previews.h"
 
 namespace xqt {
@@ -24,7 +25,7 @@ fs::path toPath(const QString& s) { return fs::path(s.toStdString()); }
 
 QDateTime modifiedOf(const DocumentItem& item) {
     QDateTime t;
-    for (const fs::path& f: {item.xopp, item.pdf}) {
+    for (const fs::path& f: {item.xopp, item.pdf, item.md, item.image}) {
         if (!f.empty()) {
             t = std::max(t, QFileInfo(qstr(f)).lastModified());
         }
@@ -508,6 +509,20 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
         }
         case HitPageBaseRole:
             return r.isFolder || r.hit.pageHits.empty() ? QString() : HitPageProvider::baseUrl(r.item, query);
+        case KindRole:
+            return r.isFolder ? QString() : QString::fromLatin1(r.item.kindName());
+        case HybridRole:
+            return !r.isFolder && r.item.hybrid;
+        case HitPassageListRole: {
+            QVariantList passages;
+            passages.reserve(static_cast<qsizetype>(r.hit.blockHits.size()));
+            for (const auto& h: r.hit.blockHits) {
+                passages.append(QVariantMap{{"passage", h.block}, {"count", h.count}, {"headings", h.headings}});
+            }
+            return passages;
+        }
+        case HitPassageBaseRole:
+            return r.isFolder || r.hit.blockHits.empty() ? QString() : MdSnippetProvider::baseUrl(r.item, query);
         default:
             return {};
     }
@@ -533,7 +548,11 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {LastReadRole, "lastRead"},
             {LastPageRole, "lastPage"},
             {HitPageListRole, "hitPageList"},
-            {HitPageBaseRole, "hitPageBase"}};
+            {HitPageBaseRole, "hitPageBase"},
+            {KindRole, "kind"},
+            {HybridRole, "hybrid"},
+            {HitPassageListRole, "hitPassageList"},
+            {HitPassageBaseRole, "hitPassageBase"}};
 }
 
 void LibraryModel::filesMoved(const DocumentFiles::Result& r) {
@@ -832,7 +851,7 @@ bool LibraryModel::trashPaths(const QStringList& paths) {
 int LibraryModel::rowOf(const QString& path) const {
     const fs::path p = toPath(path);
     for (size_t i = 0; i < rows.size(); ++i) {
-        if (rows[i].path == p || rows[i].item.pdf == p || rows[i].item.xopp == p) {
+        if (rows[i].path == p || rows[i].item.has(p)) {
             return static_cast<int>(i);
         }
     }

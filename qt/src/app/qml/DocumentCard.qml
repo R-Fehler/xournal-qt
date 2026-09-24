@@ -3,7 +3,8 @@
 // right click, the ⋮ button or press and hold (without moving) for the menu; press and hold, then move to drag it
 // (with the other selected items) onto a folder (when `dragOverlay` is set).
 // Extended library search (`stripHeight` > 0): below the title, the pages with hits (marked), side by side;
-// tapping one opens the document at that page.
+// tapping one opens the document at that page. A Markdown file shows a card per passage with hits instead: the
+// passage drawn as it is formatted, the headings above it on top; tapping one opens the file there.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -19,6 +20,8 @@ Item {
     property int itemCount: 0
     property bool hasPdf: false
     property bool hasXopp: false
+    /// "notes", "pdf", "md", "image" (a PDF or an image with its .xopp: "pdf" / "image" and hasXopp)
+    property string kind
     /// When it was last read in this app (formatted; "": never) and at which page (0-based; -1: not known)
     property string lastRead
     property int lastPage: -1
@@ -38,7 +41,11 @@ Item {
     property var hitPages: []
     property string hitPageBase
     property int stripHeight: 0
+    /// Markdown: the passages with hits, [{ passage, count, headings }], and their image URL base
+    property var hitPassages: []
+    property string hitPassageBase
     signal pageActivated(int page)
+    signal passageActivated(int passage)
     /// A tap or click (with the keyboard modifiers of a click)
     signal activated(int modifiers)
     signal toggleRequested()
@@ -103,21 +110,26 @@ Item {
                     sourceSize: Qt.size(iconSize, iconSize)
                     opacity: 0.8
                 }
-                // "PDF" for documents with a PDF (annotated or not)
+                // "PDF" for documents with a PDF (annotated or not), "MD" for Markdown files, "IMG" for images
                 Rectangle {
                     id: pdfBadge
-                    visible: card.hasPdf
+                    objectName: "kindBadge"
+                    readonly property string label: card.hasPdf || card.kind === "pdf" ? qsTr("PDF")
+                                                    : card.kind === "md" ? qsTr("MD")
+                                                    : card.kind === "image" ? qsTr("IMG") : ""
+                    visible: !card.isFolder && label !== ""
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 6
                     radius: 4
-                    color: "#d93025"
+                    color: card.kind === "md" ? "#455a64" : card.kind === "image" ? "#00897b" : "#d93025"
                     width: pdfLabel.implicitWidth + 8
                     height: 16
                     Label {
                         id: pdfLabel
+                        objectName: "kindBadgeText"
                         anchors.centerIn: parent
-                        text: card.hasXopp ? qsTr("PDF ✎") : qsTr("PDF")
+                        text: card.hasXopp ? pdfBadge.label + " ✎" : pdfBadge.label
                         font.pixelSize: 10
                         font.weight: Font.Bold
                         color: "#ffffff"
@@ -127,7 +139,7 @@ Item {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 6
-                    anchors.topMargin: card.hasPdf ? 26 : 6
+                    anchors.topMargin: pdfBadge.visible ? 26 : 6
                     count: card.hits
                 }
                 // Last read in this app, and at which page - a tag like "PDF", in the accent of "Last page"
@@ -216,11 +228,79 @@ Item {
                     onClicked: card.menuRequested(this, width / 2, height)
                 }
             }
+            // A Markdown file: the passages with hits, as snippet cards
+            ListView {
+                id: passageStrip
+                objectName: "hitPassageStrip"
+                visible: card.stripHeight > 0 && card.hitPassages.length > 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: card.stripHeight
+                orientation: ListView.Horizontal
+                spacing: 6
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                model: visible ? card.hitPassages : []
+                cacheBuffer: Math.max(0, width)
+                ScrollBar.horizontal: ScrollBar { height: 6 }
+                delegate: AbstractButton {
+                    id: passageCard
+                    required property var modelData
+                    objectName: "hitPassage"
+                    width: Math.round(Math.max(120, Math.min(passageStrip.height * 1.8, passageStrip.width * 0.9)))
+                    height: passageStrip.height - 8
+                    onClicked: card.passageActivated(modelData.passage)
+                    contentItem: Rectangle {
+                        color: "#ffffff"
+                        border.width: passageCard.hovered ? 2 : 1
+                        border.color: passageCard.hovered ? Material.accentColor : "#d5d8dc"
+                        radius: 4
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 4
+                            spacing: 2
+                            Label {
+                                objectName: "hitPassageHeadings"
+                                Layout.fillWidth: true
+                                Layout.rightMargin: 22
+                                visible: text !== ""
+                                text: passageCard.modelData.headings
+                                elide: Text.ElideLeft
+                                font.pixelSize: 10
+                                font.italic: true
+                                color: "#5f6368"
+                            }
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                clip: true
+                                Image {
+                                    anchors.fill: parent
+                                    asynchronous: true
+                                    fillMode: Image.PreserveAspectFit
+                                    horizontalAlignment: Image.AlignLeft
+                                    verticalAlignment: Image.AlignTop
+                                    source: card.active && card.hitPassageBase !== ""
+                                            ? card.hitPassageBase + "/" + passageCard.modelData.passage : ""
+                                    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
+                                }
+                            }
+                        }
+                        HitBadge {
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 3
+                            count: passageCard.modelData.count
+                        }
+                    }
+                    background: null
+                }
+            }
             // The pages with hits
             ListView {
                 id: strip
                 objectName: "hitPageStrip"
-                visible: card.stripHeight > 0
+                visible: card.stripHeight > 0 && card.hitPassages.length === 0
                 Layout.fillWidth: true
                 Layout.preferredHeight: card.stripHeight
                 orientation: ListView.Horizontal

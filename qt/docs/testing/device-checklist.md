@@ -589,3 +589,34 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Library search finds a word of a hybrid PDF's pages and a word of one of its text boxes.
 - [ ] Time Ctrl+S on a hybrid PDF of a long PDF (several hundred pages) with notes on a few pages: acceptable?
 
+## Markdown files and images in the library (qt/library-files)
+- [ ] Open a `.xopp` with an image as page background stored with it (upstream: page background → image, "attach";
+      next to it `name.xopp.bg_1.png`), rename it in the library, move it into a folder, copy it to another library:
+      each time it opens with its background image, and no `.bg_1.png` is left behind at the old place. Trash takes
+      the image along.
+- [ ] Put `notes.md`, `board.png`, `photo.jpg` and a phone photo `.heic` (if Qt can read it here) into a library
+      folder: each is a card ("MD", "IMG"), also in "All documents" and in "Recent" once opened. A `.txt` stays hidden.
+- [ ] Rename `photo` in the library while `photo.xopp` is next to `photo.jpg` (one card, "IMG ✎"): both files get
+      the new name, and the `.xopp` still shows the photo. Move it into a folder and copy it to another library: the
+      same. Trash takes both.
+- [ ] Rename, move, copy and trash a Markdown file card; import a folder with `.md` files and images: they come along.
+- [ ] The card of a Markdown file shows its first page as an A4 page with the text formatted (headings, lists,
+      tables, code). An image card shows the image; a phone photo taken upright is upright, also a `.heic`.
+- [ ] Search the library for a word of a Markdown file (in a heading, a paragraph, a list, a table, a code block): the
+      file is found, with the text around the hit on its card. Its Markdown syntax (`**`, `#`, link targets) is not
+      found. Edit the file in another editor and save: after a moment the new text is found, the old one not.
+- [ ] Tap a Markdown card: it opens as A4 pages with the text formatted, the tab titled `notes.md`, and a note at the
+      bottom left says it is read-only for now. Scroll, zoom, search (Ctrl+F) in it. Try to write with the pen, the
+      highlighter and the text tool: nothing is written, the page scrolls instead, a tap on a link still opens it.
+      Close it: no question about saving, and the `.md` is unchanged.
+- [ ] Tap an image card (a whiteboard photo): it opens as one page with the photo as background, titled `photo.jpg`,
+      with a note that saving keeps it as `photo.xopp`. Write on it, save: the dialog suggests `photo.xopp` next to the
+      photo. Back in the library the two are one card ("IMG ✎") that opens what you wrote. The same with a photo from
+      the phone taken upright (it stays upright after saving and opening again, also in Xournal++) and a `.heic`.
+- [ ] Extended library search (pages button) for a word in Markdown files: a Markdown result shows a row of cards
+      instead of pages, each the paragraph / list item / table row / code block with the hit, formatted, the headings
+      above it in small italics, the first hit orange, the others yellow; a long code block is cut around its hit.
+      A PDF or `.xopp` result next to it still shows its pages. Tap the second card: the file opens at the page of
+      that passage, with that hit current in the search bar (e.g. "2 / 2"), and the read-only note at the bottom left.
+      Swipe the row sideways with a finger.
+- [ ] "Open" (Ctrl+O) and the library's "Import" offer Markdown files and images among the documents.

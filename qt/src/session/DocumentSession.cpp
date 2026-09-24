@@ -768,6 +768,12 @@ fs::path DocumentSession::suggestSavePath() const {
         }
         return suggested;
     }
+    if (!hasFilePath() && !shownPath.empty() && background.empty() && !hasExtension(shownPath, ".md")) {
+        // An image: its .xopp next to it (one document with it in the library)
+        fs::path suggested = shownPath;
+        suggested.replace_extension(".xopp");
+        return suggested;
+    }
     std::shared_lock lock(*doc);
     fs::path suggested = doc->createSaveFoldername(settings->getLastSavePath());
     suggested /= doc->createSaveFilename(Document::XOPP, settings->getDefaultSaveName());
@@ -784,7 +790,20 @@ fs::path DocumentSession::getFilePath() const {
 
 fs::path DocumentSession::documentFile() const {
     const fs::path file = getFilePath();
-    return file.empty() ? annotatedPdf() : file;
+    if (!file.empty()) {
+        return file;
+    }
+    const fs::path pdf = annotatedPdf();
+    return pdf.empty() ? shownPath : pdf;
+}
+
+bool DocumentSession::isReadOnly() const {
+    return !shownPath.empty() && hasExtension(shownPath, ".md") && !hasFilePath();
+}
+
+void DocumentSession::setShownFile(const fs::path& file) {
+    shownPath = file;
+    Q_EMIT filePathChanged();
 }
 
 size_t DocumentSession::addPdfPages(const std::string& pdf, std::string& error) { return pdfPages->add(pdf, error); }
@@ -803,6 +822,9 @@ std::string DocumentSession::getDisplayName() const {
     lock.unlock();
     if (auto pdf = annotatedPdf(); !pdf.empty()) {
         return char_cast(pdf.filename().u8string().c_str());
+    }
+    if (!shownPath.empty()) {
+        return char_cast(shownPath.filename().u8string().c_str());
     }
     return _("Untitled");
 }
@@ -879,6 +901,7 @@ auto DocumentSession::saveImpl(fs::path target) -> SaveResult {
     }
     hybridBase.clear();  // (the PDF pages may have been renumbered)
     pdfPages->finishStaged();  // (the file under the other name: no .xopp refers to it now)
+    shownPath.clear();         // (it is this .xopp now)
     // Port of Control::resetSavedStatus
     undoRedo->documentSaved();
     undoRedoChanged();

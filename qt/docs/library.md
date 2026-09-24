@@ -4,7 +4,8 @@ A **library** is a plain folder of documents that a window works in, like a work
 (process) shows one library. Two libraries mean two windows.
 
 - `xournal-qt` opens the default library `<Documents>/Xournal_Libraries/Default` and creates it if needed.
-- `xournal-qt <folder> [files…]` opens a folder as library. Any folder with PDFs and `.xopp` files works.
+- `xournal-qt <folder> [files…]` opens a folder as library. Any folder with PDFs, `.xopp`, Markdown files or images
+  works.
 - The library menu (▾ next to the library name) lists the libraries in `<Documents>/Xournal_Libraries`. The one of
   this window is highlighted; choosing another one opens it in a new window, as do "New library…" and "Open a folder
   as library…". A window never shows two libraries.
@@ -25,20 +26,50 @@ A **library** is a plain folder of documents that a window works in, like a work
 - A **hybrid PDF** (`qt/docs/hybrid-pdf.md`) is one document, a PDF that carries its `.xopp`. Next to its `.xopp`
   export for Xournal++ (`name.xopp` with a hidden `.name.pages.pdf`) the pair is one card that opens the hybrid PDF.
   Its search text is its pages' text plus its text elements.
+- **Markdown files** (`.md`) are documents: a card with a preview of their start, opened read-only for now (below).
+- **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
+  with a thumbnail. `name.xopp` next to `name.jpg` is one document, like a PDF and its `.xopp`: it opens as the `.xopp`
+  (the image is the background of its page). A `.xopp` next to a PDF of its name belongs to the PDF; of several
+  images of one name, the first of `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`, `.heif` pairs (the extension written in
+  lower or upper case).
+- Cards show what a document is: "PDF", "MD", "IMG" ("✎": with its `.xopp`). The library model has a kind per row
+  (`notes`, `pdf`, `md`, `image`) for a filter by kind; a hybrid PDF is `pdf`, with the row's `hybrid` flag set when
+  it is known from the listing (next to its `.xopp` export; a lone hybrid PDF is not looked into when listing).
 - These files are never shown:
   - `name.xopp.bg.pdf`, an attached PDF. It belongs to its `.xopp` and travels with it.
   - `.name.pages.pdf`, the merged PDF of a `.xopp` with PDF pages pasted from other PDFs (below). It belongs to its
     `.xopp` and travels with it.
+  - `name.xopp.bg_1.png`, …: page background images stored with a `.xopp` (upstream's attached images). They belong
+    to their `.xopp` and travel with it (rename, move, copy, trash).
   - hidden files: autosaves, `.xournal_library`
   - backups (`~`)
 - **Rename / move** rename or move both files. The `.xopp` is loaded and written again with upstream's LoadHandler and
-  SaveHandler, so its PDF reference (relative to the `.xopp`) points to the new place. Open tabs and the recent list
-  follow the new paths.
+  SaveHandler, so its PDF reference (relative to the `.xopp`) points to the new place; the same for the image a
+  `.xopp` annotates. Open tabs and the recent list follow the new paths.
 - **Import / copy** copy a `.xopp` together with the PDF it uses. That PDF is stored as `name.pdf` next to the copy,
-  even if it came from somewhere else. A PDF brings the `.xopp` next to it along. A folder is copied with its whole
-  folder structure (also empty subfolders) and all documents in it. Other files and hidden folders (`.git`, …) stay
-  behind. A name that is taken becomes "name (2)".
+  even if it came from somewhere else. A PDF brings the `.xopp` next to it along, as does an image. A folder is
+  copied with its whole folder structure (also empty subfolders) and all documents in it (also Markdown files and
+  images). Other files and hidden folders (`.git`, …) stay behind. A name that is taken becomes "name (2)": taken by
+  any document (`.xopp`, PDF, `.md`, image), so a moved `.xopp` never pairs with an image or PDF that was there.
 - **Trash** moves the files (or the folder) to the desktop trash.
+
+### Markdown files and images, opened
+- A **Markdown file** opens read-only for now (the `.md` editor comes later and replaces this): a new document of
+  plain A4 pages with the file's text as the page's Markdown text flowing over them (`qt/src/canvas/MarkdownFile.*`,
+  drawn by our Markdown renderer), titled with the file name. A note at the bottom left of the page view says it is
+  read-only (× closes it for this tab). Nothing writes on it: pen, highlighter, eraser, text and select tools
+  scroll like the hand (a tap still follows a link), Markdown editing and pasting do nothing (page operations of
+  the sidebar still work; they would be saved as a `.xopp`). The document is never written back to the `.md`. Of a
+  file over 2 MB the first 2 MB are shown (the note says so). Opening it again shows its tab.
+- An **image** opens as a new document with one page that has the image as its background (upstream's image
+  background), as big as the image fits into A4's long side, titled with the file name, with a note that saving
+  keeps it next to the image; nothing is written until it is saved. "Save" suggests `photo.xopp` next to `photo.jpg`, and the library then shows the two as one card (above),
+  which opens the `.xopp`. A PNG or JPEG that needs no turning is used by its path, as upstream refers to background
+  images (the `.xopp` stays small); any other image (WebP, HEIC, a photo turned upright by its orientation tag, which
+  upstream would show sideways) is stored with the `.xopp` as a PNG of at most 4096 px (`photo.xopp.bg_1.png`,
+  upstream's attached image). Code: `qt/src/canvas/ImageFile.*`.
+- A library search hit in a Markdown file opens it with the search active: at the page of the passage with the hit
+  (a snippet card, below: its first hit there is the current one).
 
 ### PDF pages pasted from another PDF
 A `.xopp` has one background PDF, and its pages refer to page numbers in it (that is the format, and it stays
@@ -94,14 +125,20 @@ the library is zipped to be sent. Until the library is opened again nothing is c
 positions are kept.
 
 A cache folder holds a few **packs**, one file each, split by how often they change:
-- `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`), name, the size and time of its `.xopp`, the
-  PDF it uses (relative to the folder when it is in the library; next to it: its name) with that PDF's size and
-  time, and per page which PDF page it shows, the text of its text elements and its shape. Small; written again
-  when a `.xopp` in the folder is saved.
+- `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`, `md`, `image`), name, the size and time of
+  its `.xopp` (a Markdown file, an image alone: of that file), the PDF it uses (relative to the folder when it is in
+  the library; next to it: its name) with that PDF's size and time, and per page which PDF page it shows, the text
+  of its text elements and its shape. Small; written again when a `.xopp` in the folder is saved.
+  - A Markdown file has no pages: its entry has the text of its passages (headings, paragraphs, list items, table
+    rows, code blocks), read through md4c without the Markdown syntax, which of them are headings (a hit shows the
+    headings above it), and the targets of its links and `[[wiki links]]` (for backlinks later). Reading it is cheap
+    (plain text, no PDF step); of a file over 2 MB only the start is read (cut at a line end), as it opens.
+  - An image has no text: its entry has its name only.
 - `pdf-text.pack`: per document, the text of the PDF pages it shows, tied to the PDF's size and time. Big; written
   only when a PDF changed or a document came or went. A document with over 1 MB of PDF text gets a file of its own,
   `pdf-text-<hash>.pack`, written only when that text changes.
-- `previews.pack`: the first-page previews (PNG, 360 px wide, drawn like the page thumbnails, of the title page),
+- `previews.pack`: the first-page previews (PNG, 360 px wide, drawn like the page thumbnails, of the title page; a
+  Markdown file: its first page as it opens, an image: the image scaled down and turned upright by its orientation tag),
   each with the size and time of the document's files and its title page, so a changed document gets a new
   preview. Not compressed again (PNG is). A folder's pack is read when its first card is shown and kept in memory
   (up to 48 MB of previews; the folders used least recently go first); new previews are written a few seconds
@@ -147,6 +184,11 @@ Unsaved changes of open documents are not in the index (it reads the files). A d
 entry over (made from the document in memory and the PDF text its search knows), so the index does not read the
 saved `.xopp` again.
 
+The snippet cards of Markdown files are drawn on demand as well (`MdSnippets.*`, image provider
+`image://mdsnippet`): the file is read and parsed as the index reads it (the last 8 files stay parsed), the passage
+alone is laid out (`md::snippet`, `qt/src/markdown/MdPassages.*`), and the hits are found in its text with the
+index's matcher and marked where their source is drawn (`md::sourceRects`), so the card and the count agree.
+
 The pages with hits of the extended search are drawn on demand (`HitPages.*`): the last 12 documents used stay
 loaded, drawn pages stay in memory (up to 128 MB) without marks, and the marks are painted into the page image.
 Measured on a 300-page text PDF: 3–13 ms per page (13 ms with ~700 marks of a one-letter search), 1–2 ms when only
@@ -188,7 +230,11 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
   - search: folders whose name matches (tap one to open it), then documents whose name or text matches
   - extended search (the pages button next to the search field): each result also shows its pages with hits,
     marked, in a row under the title (swipe or scroll sideways); tapping a page opens the document at that page
-    with the search active. The cells are taller; − / + (also Ctrl+wheel, pinch) make them smaller or bigger, in
+    with the search active. A Markdown file shows a row of **snippet cards** instead: per passage with hits (a
+    paragraph, a list item, a table row under its header, a code block) the passage drawn by our Markdown renderer,
+    the headings above it on top (*Lecture 3 › Kalman filter › Prediction*), the hits marked like on the pages (the
+    first one, which opening the card makes current, in orange), a long passage cut to a few lines around its
+    first hit. Tapping a card opens the file at that passage with the search active. The cells are taller; − / + (also Ctrl+wheel, pinch) make them smaller or bigger, in
     both views. Texts shorter than 4 characters are searched on Enter.
   - New document: name, background, paper size, orientation. It is saved at once in the current folder.
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders

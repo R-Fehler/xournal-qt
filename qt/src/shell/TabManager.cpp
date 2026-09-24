@@ -319,7 +319,10 @@ void TabManager::backgroundChanged(int oldCurrent) {
 
 int TabManager::indexOfFile(const fs::path& path) const {
     for (size_t i = 0; i < tabs.size(); ++i) {
-        const fs::path p = tabs[i].session->getFilePath();
+        fs::path p = tabs[i].session->getFilePath();
+        if (p.empty()) {
+            p = tabs[i].session->shownFile();  // (a Markdown file shown, an image to write on)
+        }
         if (p.empty()) {
             continue;
         }

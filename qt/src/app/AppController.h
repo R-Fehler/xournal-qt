@@ -87,6 +87,9 @@ class AppController: public QObject {
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY modifiedChanged)
     Q_PROPERTY(bool hasFilePath READ hasFilePath NOTIFY titleChanged)
+    /// The current document shows a file it is not (a Markdown file, read-only for now; an image to write on): what
+    /// the note over the canvas says about it ("": nothing to say).
+    Q_PROPERTY(QString shownFileNote READ shownFileNote NOTIFY titleChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
@@ -189,6 +192,7 @@ public:
     QString title() const;
     bool modified() const;
     bool hasFilePath() const;
+    QString shownFileNote() const;
     bool canUndo() const;
     bool canRedo() const;
     QString tool() const;
@@ -304,6 +308,9 @@ public:
     Q_INVOKABLE bool openSearchHit(const QString& path, const QString& query);
     /// The same, at a page (0-based) with hits: its first hit is the current one.
     Q_INVOKABLE bool openSearchHitAt(const QString& path, const QString& query, int page);
+    /// The same for a Markdown file, at a passage with hits (0-based, see md::passages): its first hit there is the
+    /// current one.
+    Q_INVOKABLE bool openSearchHitInPassage(const QString& path, const QString& query, int passage);
     /// The libraries in the standard folder: [{ name, path, current }]
     Q_INVOKABLE QVariantList libraries() const;
     /// Open a folder as library in a new window (another process: one library per window).

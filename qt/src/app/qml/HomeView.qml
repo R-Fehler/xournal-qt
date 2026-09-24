@@ -754,13 +754,19 @@ Rectangle {
                         lastRead: model.lastRead ? home.formatDate(model.lastRead) : ""
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
+                        kind: model.kind
                         hits: model.hits
                         snippet: model.snippet
                         itemCount: model.itemCount
                         hitPages: home.extendedView ? model.hitPageList : []
                         hitPageBase: model.hitPageBase
+                        hitPassages: home.extendedView ? model.hitPassageList : []
+                        hitPassageBase: model.hitPassageBase
                         stripHeight: home.extendedView && !model.isFolder ? libraryGrid.stripHeight : 0
                         onPageActivated: function(pageNo) { app.openSearchHitAt(model.path, home.lib.searchQuery, pageNo) }
+                        onPassageActivated: function(passage) {
+                            app.openSearchHitInPassage(model.path, home.lib.searchQuery, passage)
+                        }
                         width: libraryGrid.cellWidth
                         height: libraryGrid.cellHeight
                         active: home.visible
@@ -938,6 +944,7 @@ Rectangle {
                         lastRead: home.formatDate(model.opened)
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
+                        kind: model.kind
                         width: recentGrid.cellWidth
                         height: recentGrid.cellHeight
                         active: home.visible
@@ -1327,7 +1334,8 @@ Rectangle {
         id: importDialog
         title: qsTr("Import into the library")
         fileMode: FileDialog.OpenFiles
-        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf *.md *.png *.jpg *.jpeg *.webp *.heic *.heif)"),
+                      qsTr("All files (*)")]
         onAccepted: {
             const files = selectedFiles, folder = app.library.flat || home.searching ? "" : app.library.folder
             home.confirmImport(app.library.temporary, function() { app.library.importUrls(files, folder) })
