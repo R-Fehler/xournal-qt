@@ -171,6 +171,12 @@ public:
     bool pasteElements(std::optional<QPointF> viewPos = std::nullopt);
     /// Text from the clipboard as a text element.
     bool pasteText(const QString& content, std::optional<QPointF> viewPos = std::nullopt);
+    /// A copied link (links::MIME, "Copy link") pasted on the page: a link marker, a small Markdown text box in the
+    /// page's Markdown layer holding "[🔗 title](link)" (relative to this document; readable in Xournal++). With
+    /// elements selected, it goes next to them (at their top right: "this sketch links to …"); else where it was
+    /// pasted, or in the middle of the visible part of the current page. One undo step (a Markdown layer made for it
+    /// is one more). False when the clipboard holds no link.
+    bool pasteLinkMarker(std::optional<QPointF> viewPos = std::nullopt);
     /// Select everything on the active layer of the current page (Control::selectAllOnPage).
     void selectAllOnPage();
     /// Insert an image (file contents: PNG, JPEG, ...) on the current page, in the middle of its visible part and
@@ -244,6 +250,8 @@ public:
     /// Go to a page and remember where the view was.
     void jumpToPage(size_t page);
     bool canGoBack() const { return !backStack.empty(); }
+    /// How many places Back can go to in this view (a link from another document came in at this depth).
+    size_t backDepth() const { return backStack.size(); }
     bool canGoForward() const { return !forwardStack.empty(); }
     bool navigateBack();
     bool navigateForward();

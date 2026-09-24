@@ -112,7 +112,8 @@ public:
     Q_INVOKABLE void goToPage(int index);
     Q_INVOKABLE void navigateBack();
     Q_INVOKABLE void navigateForward();
-    /// Follow a link tapped in the reference: a page of it, or an external link (openExternal).
+    /// Follow a link tapped in the reference: a page of it, a link to a document (openDocumentLink), or an external
+    /// link (openExternal).
     Q_INVOKABLE void followLink(const QString& uri, int page);
     /// Copy what is selected in the reference (PDF text, else elements). False if nothing is selected.
     Q_INVOKABLE bool copy();
@@ -155,6 +156,8 @@ Q_SIGNALS:
     void linkTapped(const QString& uri, int page, QRectF rect);
     /// An external link should be opened (AppController::openLink).
     void openExternal(const QString& uri);
+    /// A link to a document was tapped in the reference, which holds it in `from` (AppController follows it).
+    void openDocumentLink(const QString& uri, const QString& from);
     /// Something was copied from the reference (the window says so).
     void copied(const QString& what);
     /// PDF text was selected or unselected in the reference; selected: where (its canvas coordinates).

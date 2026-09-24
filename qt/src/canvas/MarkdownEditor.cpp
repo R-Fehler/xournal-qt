@@ -1,4 +1,5 @@
 #include "MarkdownEditor.h"
+#include "session/DocumentLink.h"
 
 #include <algorithm>
 #include <cctype>
@@ -7,6 +8,7 @@
 #include <shared_mutex>
 
 #include <QClipboard>
+#include <QMimeData>
 #include <QGuiApplication>
 #include <QInputMethodEvent>
 #include <QKeyEvent>
@@ -915,6 +917,11 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                 }
                 return true;
             case Qt::Key_V: {
+                // A copied link (Copy link): as a Markdown link relative to this document
+                if (const auto link = links::fromMime(QGuiApplication::clipboard()->mimeData())) {
+                    insert(links::markdownFor(*link, session.documentFile()).toStdString(), EditKind::Other);
+                    return true;
+                }
                 std::string pasted = QGuiApplication::clipboard()->text().toStdString();
                 pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());  // (the text's lines end in "\n")
                 insert(pasted, EditKind::Other);

@@ -1,5 +1,7 @@
 #include "ReferenceMode.h"
 
+#include "session/DocumentLink.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -295,7 +297,11 @@ void ReferenceMode::navigateForward() {
 }
 
 void ReferenceMode::followLink(const QString& uri, int page) {
-    if (!uri.isEmpty()) {
+    const bool wiki = uri.startsWith(QLatin1String("[[")) && uri.endsWith(QLatin1String("]]"));
+    if (!uri.isEmpty() && (wiki || links::isDocumentLink(uri))) {
+        Q_EMIT openDocumentLink(uri, shownSession ? QString::fromStdString(shownSession->documentFile().string())
+                                                  : QString());
+    } else if (!uri.isEmpty()) {
         Q_EMIT openExternal(uri);
     } else {
         goToPage(page);

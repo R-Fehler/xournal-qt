@@ -1,6 +1,6 @@
 # Links between documents: design draft
 
-Status: **design agreed 2026-09-24** (the author: "the link plan is sound"); built as `qt/links` after the running blocks. Goal (the author's words): link to
+Status: **design agreed 2026-09-24** (the author: "the link plan is sound"); **built in `qt/links`** (see "What is built" at the end for what was built and where it differs). Goal (the author's words): link to
 another document, optionally to a page or a chapter; if it is a chapter, keep its page as a fallback for when the
 name changes. When the link is followed, choose between a new tab and reference view.
 
@@ -96,3 +96,120 @@ The author accepted the plan with its proposals:
 3. Making links: "Copy link" everywhere, pasting into Markdown and markers, drag and drop.
 4. The library: outgoing links in the index, backlinks, rewriting on rename and move, the fallback search.
 5. The hybrid PDF: `GoToR` link annotations.
+
+## What is built (`qt/links`)
+
+### 1. The link format (`qt/src/session/DocumentLink.*`, tests `DocumentLinkTest`)
+- `links::parse` reads a Markdown link target: a path (or a `file://` URL) of a file the app opens as a document
+  (`.xopp`, `.xoj`, `.pdf`, `.md`, `.txt`, images, `.tex`, …). Web and mail addresses, other schemes, other files
+  (`/home/x.sh`: a tap never opens anything else on the computer), upstream's `#Page:12` and a bare `#anchor` are
+  not links to documents (so `example.org/page` stays a web address). A path of `<…>` and percent-escapes (`%20`) are read as Markdown writes
+  them. A target without a path but with a place (`#page=5`, `#chapter=…`) points into the same document.
+- The fragment: `chapter=`, `heading=`, `page=`, `pdfpage=`, `line=`, and **`text=`**, the page's fingerprint (its
+  first five words, normalised, at most 48 characters), written only for a page that shows no PDF page. Unknown keys
+  (`zoom=`, …) are left out. A plain fragment is a heading of a `.md` (`note.md#blade-design`), else a chapter.
+- `links::parseWiki` reads `[[note#heading]]` (the name is looked up later: it has no extension).
+- `links::write` writes the fragment in the order chapter, heading, page, pdfpage, line, text, and escapes what a
+  Markdown link cannot hold (space, `%`, `#`, `?`, parentheses, brackets, `<` `>`; in values also `&`, `=`, `+`).
+  Letters beyond ASCII stay as they are (`Übung%203.xopp`). `links::markdown` gives `[title](link)`.
+- Paths are relative to the folder of the document that holds the link (`links::relativePath`, `resolvePath`).
+- Where a link leads (`links::resolve`, on a list of the target's chapters and pages): the chapter by its title,
+  then by its normalised title (case folded, only letters and digits); the PDF page (`pdfpage=`); the page number,
+  checked against the fingerprint (the nearest page with that text, an earlier one on a tie). What was not found
+  gives the note: "Chapter "Correction" not found, opened page 12", "PDF page 9 not found, opened page 1", "Page 99
+  not found, opened page 30".
+- In a Markdown text (`links::resolveInText`): the heading whose slug (GitHub's: lower case, punctuation dropped,
+  spaces to `-`) is the link's (a heading written as text, as Obsidian does, is slugged first), else the line, with
+  "Heading "…" not found, opened line 40".
+
+### 2. Following links (`qt/src/app/AppLinks.cpp`, `qt/src/shell/DocumentLinks.*`, tests `DocumentLinksTest` in `-L ui`)
+- A tap on a link in a Markdown box or a `.md` (as before: a finger, the mouse or the pen with the hand or a select
+  tool; Ctrl + click in a `.md`) that leads to another document shows the popup with the document's name and the
+  place ("kalman.xopp, chapter "Prediction step""), **Open in a new tab**, **Open as reference**, **Open here** and
+  **Remember my choice**. Remembered, a tap opens the document at once; Settings → Documents → Links → "A link to
+  another document opens" (`linkOpening` in the `xournalQt` part of the settings: `ask`, `tab`, `reference`,
+  `here`) changes it back. A link into the same document (`#page=5`, a link to its own file) goes there without
+  asking; a web address still shows "Open".
+- The file: the path relative to the document holding the link (a new document: relative to the library); a PDF
+  with its `.xopp` opens as the `.xopp`, as in the library. A wiki link's name is looked for next to the document
+  (with `.md` added), then in the library index by file name (`LibraryIndex::filesNamed`; a `.md` first, then the
+  closest folder). A file that is not there: "Document not found" (the search for a moved file is step 4).
+- An open document is switched to (its tab), not opened twice. The place is looked up in it
+  (`DocumentLinks::placeIn`: the chapters of its contents, its pages; a `.md` by heading and line); a note says what
+  was not found.
+- "Open here" opens the document in place of the current one, which closes if it has no unsaved changes (with
+  changes it stays open behind). Back opens it again, at the page it was left at, in place of the other.
+- Back and Forward (Alt+Left/Right, the ← → pill) go across documents: a followed link is remembered with where it
+  came from; Back first goes through the places jumped to in the document since the link was followed, then back to
+  the document the link was in (its tab, or its file opened again), and Forward returns.
+- A link in the reference opens in a new tab (resolved from the reference's own file).
+- Markdown boxes keep whether a link is a `[[wiki link]]` (`md::LinkHit::wiki`), so a tap looks the name up.
+
+### 3. Making links (`AppLinks.cpp`, `CanvasView::pasteLinkMarker`, `links::toMime`)
+- **Copy link**: the page menu of the sidebar and the page grid ("Copy a link to this page"), ⋮ → "Copy link to
+  this page", the contents in the sidebar (press and hold or right-click a chapter → "Copy link to this chapter"),
+  a library card's menu ("Copy link"; also on search results), and a page with hits in the extended search (press
+  and hold or right-click → "Copy link to this page"). The page of a document that is not open is linked from the
+  library index (its PDF page, or its text for the fingerprint: `LibraryIndex::linkPages`).
+- The clipboard holds the link three ways: the app's own format `application/x-xournalqt-link` (the title and the
+  link with the target's absolute path), Markdown `[kalman, page 4](/abs/Lectures/kalman.xopp#page=4&text=…)` as
+  text for other apps, and an HTML link to the `file://` URI for rich text editors. (Not a `text/uri-list`: a file
+  manager would take that as a file to paste.) Titles: "kalman, page 4", "kalman, Prediction step", "kalman".
+  A document without a file yet copies "#Page:12", upstream's link within it, as before.
+- **Pasting** into Markdown being written on the page, into a `.md`, or beside the page (the panel) inserts
+  `[title](link)` with the path relative to that document (a new document without a file: the absolute path).
+- **Pasting on a page** (Ctrl+V, the paste of the context pill) makes a **link marker**: a small Markdown text box in
+  the page's Markdown layer (made if needed) holding `[🔗 title](link)`, in the link color, as wide as its text.
+  Xournal++ shows it as that text. It goes where it was pasted, or in the middle of the visible page; with elements
+  selected, at their top right ("this sketch links to …"). One undo step (plus one for a Markdown layer made for
+  it). A tap on it follows the link like any link in a Markdown box.
+- **Not built: dragging** a card, a page or a chapter onto the page. The library is a screen of its own (never beside
+  a page), and dragging a page in the sidebar or the grid moves it; a drop target on the canvas for these would need
+  a new drag source in each list. Copy link and paste do the same in two steps.
+
+### 4. The library: links in the index, backlinks, rewriting, the search for a moved file
+(`qt/src/shell/LinkRewrite.*`, `DocumentLinks::backlinks` / `findMoved`, `AppLinks.cpp`; tests `LinkRewrite.*` in
+`-L shell`, `DocumentLinksTest` in `-L ui`)
+- **Outgoing links in the index**: besides a Markdown file's links (as before), a `.xopp`'s entry in `notes.pack`
+  now has the links and wiki links of its Markdown boxes and link markers (`links`, `wikiLinks`). An entry of notes
+  written before has no `links` key: its `.xopp` is read once more (only the `.xopp`: its PDF text is kept), no
+  format change. Entries converted from the layout before the packs learn their links when the `.xopp` is saved.
+  `LibraryIndex::linkSources` lists them.
+- **Backlinks**: ⋮ → **Linked from…** lists the documents of the library whose links lead to the current one (a
+  link to any of its files: the PDF of a `.xopp` counts; a wiki link by its name); a tap opens one.
+- **Rewritten after a rename or move in the app** (the library's Rename, Move to…, dragging onto a folder; also
+  whole folders): `LinkRewrite::plan` finds the links that point elsewhere now - links to what moved, and the
+  relative links of a moved document itself - and writes each anew relative to where it is (the fragment stays; a
+  wiki link to a renamed document gets the new name). Only link targets change: `](…)`, `](<…>)`, `[id]: …`,
+  `[[…]]`; the rest of the text stays byte for byte.
+  - Open documents change through themselves, with undo (a `.xopp`'s texts as text edits, a `.md` as one edit of
+    its text), and are saved when they had no unsaved changes (so the file has the new link too); with unsaved
+    changes they keep the change until they are saved.
+  - The others in the background: a `.md` through its text file (`TextFile`: byte for byte where nothing changed,
+    written atomically), a `.xopp` loaded and written again. Then the note **"Updated N links"**, and the library
+    reads them again. A hybrid PDF and an old `.xoj` that are not open are left as they are (said in the code; not
+    in the note).
+- **A link whose file is gone** (moved outside the app): the library index is asked for a document of that file
+  name (the closest to the linking document; a PDF with its `.xopp` by its name without the extension), then for a
+  page with the link's fingerprint. Found, it opens (at the place the link says) and the window asks **"The linked
+  document was moved … Update the link to point there?"**; Yes rewrites the link in the document it was followed
+  from (through it, with undo). Not found: **"Document not found … Locate it?"**, a file dialog, and the link is
+  written anew to the chosen file and followed.
+  - **Deviation:** the PDF's `/ID` is not used. A link does not carry it (the format has no key for it), so there
+    is nothing to compare; the name and the page's text cover the cases seen so far. A `pdfid=` key could be added
+    to the fragment later.
+
+### 5. The hybrid PDF (`HybridPdf.cpp`: `linkFor`, `annotateLinks`; `md::linkBoxes`; test `HybridPdfTest.linksOf…`)
+- Saving a PDF with notes writes each link of the Markdown boxes and link markers as a `/Link` annotation over the
+  link text (a box per line it is on), so other viewers follow it:
+  - a link to a PDF: `/GoToR` with `/F` the PDF relative to the hybrid PDF and `/D [page /Fit]`, `/NewWindow true`
+    (the `pdfpage=` of a plain PDF, else `page=`; a hybrid PDF's pages are its document's pages);
+  - a link to a `.xopp` with its PDF next to it (`lecture.xopp` + `lecture.pdf`): `/GoToR` to that PDF, at the
+    link's PDF page (a notes page inserted there has no PDF page: then the page number, which may be off);
+  - a web or mail address: `/URI`;
+  - a `.md`, a `.xopp` without a PDF, a place in this document: no annotation (other viewers could not open them).
+- Paths are resolved from the hybrid PDF's folder. The annotations are ours (`/NM (xopp:p1-link1)` and the private
+  key): removed and written again with the rest on every save, in the clean copy never shown, and never reported as
+  changed by another app (they are made from the text).
+- Not handled: a base PDF page that is rotated or has a crop box moved from the origin gets the link boxes offset
+  by the crop box only (the ink uses the full placement matrix).

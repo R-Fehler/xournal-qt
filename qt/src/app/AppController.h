@@ -59,6 +59,9 @@ class ReferenceMode;
 namespace DocumentFiles {
 struct Result;
 }
+namespace LinkRewrite {
+struct Change;
+}
 }  // namespace xqt
 class Palette;
 
@@ -622,8 +625,18 @@ public:
     Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
     /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.
     Q_INVOKABLE bool addChapter(int page, const QString& title, int level);
-    /// Puts a link to a page ("#Page:12") into the clipboard: pasted into a text it becomes a tappable link.
+    /// "Copy link" (qt/docs/links.md): a link to a page of the current document (-1: the current page) onto the
+    /// clipboard, as the app's own format, Markdown and HTML (links::toMime). Pasted into a Markdown text it becomes
+    /// `[title](link)` relative to that document, on a page a link marker. A document without a file yet: "#Page:12",
+    /// a link within it, as before.
     Q_INVOKABLE void copyPageLink(int page);
+    /// The same for a chapter of the contents (its title, its page).
+    Q_INVOKABLE void copyChapterLink(int page, const QString& title);
+    /// The same for a document of the library (a card, a search hit), or a page of it (0-based; -1: the document).
+    Q_INVOKABLE bool copyDocumentLink(const QString& path, int page = -1);
+    /// The clipboard holds a link (Copy link): its Markdown for the Markdown text being written beside the page
+    /// (relative to the current document), else "".
+    Q_INVOKABLE QString clipboardLinkMarkdown() const;
     /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
     Q_INVOKABLE void requestPrint(const QList<int>& pages) { Q_EMIT printRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);
@@ -688,8 +701,28 @@ public:
     /// Print: makes a PDF (with what was written on it, or the background PDF alone) and hands it to the system's
     /// print dialog. `range`: "" for everything, else e.g. "2-5" or "3".
     Q_INVOKABLE bool printDocument(bool withAnnotations, const QString& range);
-    /// Open an external link (from a PDF) in the browser / its application.
+    /// Open an external link (from a PDF) in the browser / its application. A link to a document (links::parse,
+    /// "[[wiki]]") is followed in a new tab.
     Q_INVOKABLE void openLink(const QString& uri);
+
+    // --- links between documents (qt/docs/links.md; AppLinks.cpp) ---
+    /// About a tapped link (a Markdown link target, "[[a wiki link]]"): { document: it leads to a document, name: the
+    /// file's name ("" for this document), place: "page 12", "chapter …", found: the file is there, here: it is
+    /// this document }.
+    Q_INVOKABLE QVariantMap documentLink(const QString& uri) const;
+    /// Follow a link to a document from the current one: "tab" (switches to it when it is open), "reference" (beside
+    /// the current document) or "here" (in place of the current document, which closes when it has no unsaved
+    /// changes; Back opens it again). The place is looked up (DocumentLinks::placeIn); what was not found is said.
+    /// False when it is no link to a document or the file is not found.
+    Q_INVOKABLE bool followDocumentLink(const QString& uri, const QString& how);
+    /// "Linked from": the documents of the library whose links lead to the current one (the index's links):
+    /// [{ name, path, folder (relative to the library) }].
+    Q_INVOKABLE QVariantList backlinks() const;
+    /// After linkTargetFound: the link is written anew in the document it was followed from, to the file found
+    /// (through that document, with undo; saved when it had no unsaved changes).
+    Q_INVOKABLE bool updateFoundLink();
+    /// After linkTargetMissing: the file the link means, chosen by the reader. The link is written anew, then followed.
+    Q_INVOKABLE bool relinkTo(const QUrl& file);
     /// Call before quitting: writes settings.
     Q_INVOKABLE void shutdown();
 
@@ -756,6 +789,11 @@ Q_SIGNALS:
     void contextRequested(QPointF viewPos);
     /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.
     void linkTapped(const QString& uri, int page, QRectF rect);
+    /// A followed link's file was gone; a document of that name (or with that page's text) was found elsewhere in the
+    /// library and opened: the window offers to update the link (updateFoundLink).
+    void linkTargetFound(const QString& name, const QString& folder);
+    /// A followed link's file is gone and nothing like it is in the library: the window offers to locate it (relinkTo).
+    void linkTargetMissing(const QString& name);
     void copiedPagesChanged();
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
@@ -894,6 +932,49 @@ private:
     /// The text file's new bytes are shown (the cursor stays where it was, as far as it can).
     void reloadText(xqt::DocumentSession* s, std::string bytes);
     std::unique_ptr<QFileSystemWatcher> textWatcher;
+
+    // --- links between documents (AppLinks.cpp) ---
+    /// A link followed from the document `from` (the file holding the link; empty: the current document).
+    bool followDocumentLinkFrom(const QString& uri, const QString& how, const fs::path& from);
+    /// Back and forward across documents: a place in a document (its tab while it is open, else its file).
+    struct DocPlace {
+        QPointer<xqt::DocumentSession> session;
+        fs::path file;
+        int page = 0;
+    };
+    /// A link followed from one document to another (`here`: in place of it). `depth`: how many places Back had in
+    /// the view it arrived in (going back beyond them goes back to `from`).
+    struct DocJump {
+        DocPlace from;
+        DocPlace to;
+        bool here = false;
+        size_t depth = 0;
+    };
+    std::vector<DocJump> docBack, docForward;
+    bool isCurrentPlace(const DocPlace& place) const;
+    /// The jump Back / Forward would take now (nullptr: the view's own places).
+    const DocJump* backJump() const;
+    const DocJump* forwardJump() const;
+    /// Show a place: its tab, else its file opened again, at its page (`replacing`: the current tab goes if it has
+    /// no unsaved changes). False when it cannot be shown.
+    bool showPlace(const DocPlace& place, bool replacing);
+    bool navigateDocuments(bool back);
+    /// A link whose file was gone: where it was followed from, as written, and the file found or chosen instead.
+    struct Relink {
+        QPointer<xqt::DocumentSession> source;
+        QString written;
+        QString how;
+        fs::path target;
+    } relink;
+    /// Write links anew in an open document (through it, with undo; saved when it had no unsaved changes). Returns
+    /// how many were changed.
+    int rewriteOpenDocument(xqt::DocumentSession& s, const std::vector<xqt::LinkRewrite::Change>& changes);
+    /// After documents were renamed or moved in the app: the links to them, and their own relative links, are
+    /// written anew (open documents through themselves, the others in the background), with a note.
+    void rewriteLinksAfter(const std::vector<std::pair<fs::path, fs::path>>& moves);
+    /// The change of a link as written in `source` to lead to `target`.
+    std::vector<xqt::LinkRewrite::Change> relinkChange(const xqt::DocumentSession* source, const QString& written,
+                                                     const fs::path& target) const;
     QTimer textCheckTimer;  ///< (programs write in steps: looked at a moment after the last change)
     QPointer<xqt::DocumentSession> askingTextChange;
 };

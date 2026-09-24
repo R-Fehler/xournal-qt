@@ -771,6 +771,8 @@ ApplicationWindow {
                     id: moreMenu
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
+                    MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
+                    MenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); onTriggered: backlinksDialog.show() }
                     MenuItem {
                         objectName: "editAsNotesItem"
                         visible: app.textDocument === "markdown"
@@ -1277,44 +1279,106 @@ ApplicationWindow {
         }
     }
 
-    // A tapped PDF link: open it / go to the page (not at once: a tap can be a mistake).
+    // A tapped link: open it / go to the page (not at once: a tap can be a mistake). A link to a document
+    // (qt/docs/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings).
     Popup {
         id: linkPopup
         objectName: "linkPopup"
         property string uri
         property int page: -1
+        property var doc: null  // app.documentLink(uri) of a link to a document, else null
         padding: 6
+        function follow(how) {
+            if (linkRemember.checked) app.settings.set("linkOpening", how)
+            const uri = linkPopup.uri
+            linkPopup.close()
+            app.followDocumentLink(uri, how)
+        }
         Connections {
             target: app
             function onLinkTapped(uri, page, rect) {
+                const info = uri !== "" ? app.documentLink(uri) : null
+                if (info && info.document && info.found && !info.here) {
+                    const how = (app.settings.revision, app.settings.get("linkOpening"))
+                    if (how !== "ask") {
+                        app.followDocumentLink(uri, how)
+                        return
+                    }
+                }
+                if (info && info.document && info.here) {  // (a place in this document: no need to ask)
+                    app.followDocumentLink(uri, "here")
+                    return
+                }
                 linkPopup.uri = uri
                 linkPopup.page = page
+                linkPopup.doc = info && info.document ? info : null
+                linkRemember.checked = false
                 linkPopup.x = Math.max(8, Math.min(canvas.x + rect.x, win.width - linkPopup.width - 8))
                 linkPopup.y = canvas.y + rect.y + rect.height + 6
-                if (linkPopup.y + 60 > win.height) linkPopup.y = canvas.y + rect.y - 60
+                if (linkPopup.y + 120 > win.height) linkPopup.y = canvas.y + rect.y - (linkPopup.doc ? 120 : 60)
                 linkPopup.open()
             }
         }
-        RowLayout {
-            spacing: 4
-            Image { source: app.iconUrl("xqt-link"); sourceSize.width: 18; sourceSize.height: 18; Layout.leftMargin: 6 }
-            Label {
-                visible: linkPopup.uri !== ""
-                text: linkPopup.uri
-                elide: Text.ElideMiddle
-                Layout.maximumWidth: 320
-            }
-            Button {
-                objectName: "linkButton"
-                flat: true
-                text: linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
-                                                                              : qsTr("Page not in this document")
-                enabled: linkPopup.uri !== "" || linkPopup.page >= 0
-                onClicked: {
-                    if (linkPopup.uri !== "") app.openLink(linkPopup.uri)
-                    else app.jumpToPage(linkPopup.page)
-                    linkPopup.close()
+        ColumnLayout {
+            spacing: 2
+            RowLayout {
+                spacing: 4
+                Image { source: app.iconUrl("xqt-link"); sourceSize.width: 18; sourceSize.height: 18; Layout.leftMargin: 6 }
+                Label {
+                    objectName: "linkLabel"
+                    visible: linkPopup.uri !== ""
+                    text: !linkPopup.doc ? linkPopup.uri
+                          : !linkPopup.doc.found ? qsTr("%1 was not found").arg(linkPopup.doc.name)
+                          : linkPopup.doc.place !== "" ? qsTr("%1, %2").arg(linkPopup.doc.name).arg(linkPopup.doc.place)
+                                                       : linkPopup.doc.name
+                    elide: Text.ElideMiddle
+                    Layout.maximumWidth: 320
+                    Layout.rightMargin: linkPopup.doc ? 6 : 0
                 }
+                Button {
+                    objectName: "linkButton"
+                    visible: !linkPopup.doc
+                    flat: true
+                    text: linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
+                                                                                  : qsTr("Page not in this document")
+                    enabled: linkPopup.uri !== "" || linkPopup.page >= 0
+                    onClicked: {
+                        if (linkPopup.uri !== "") app.openLink(linkPopup.uri)
+                        else app.jumpToPage(linkPopup.page)
+                        linkPopup.close()
+                    }
+                }
+            }
+            RowLayout {
+                visible: !!linkPopup.doc && linkPopup.doc.found
+                spacing: 0
+                Button {
+                    objectName: "linkNewTab"
+                    flat: true
+                    text: qsTr("Open in a new tab")
+                    onClicked: linkPopup.follow("tab")
+                }
+                Button {
+                    objectName: "linkAsReference"
+                    flat: true
+                    text: qsTr("Open as reference")
+                    onClicked: linkPopup.follow("reference")
+                }
+                Button {
+                    objectName: "linkHere"
+                    flat: true
+                    text: qsTr("Open here")
+                    onClicked: linkPopup.follow("here")
+                }
+            }
+            CheckBox {
+                id: linkRemember
+                objectName: "linkRemember"
+                visible: !!linkPopup.doc && linkPopup.doc.found
+                text: qsTr("Remember my choice")
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("Links open this way from now on (Settings → Documents)")
             }
         }
     }
@@ -1634,6 +1698,15 @@ ApplicationWindow {
             hybridEditedDialog.file = file
             hybridEditedDialog.open()
         }
+        function onLinkTargetFound(name, folder) {
+            linkFoundDialog.file = name
+            linkFoundDialog.folder = folder
+            linkFoundDialog.open()
+        }
+        function onLinkTargetMissing(name) {
+            linkMissingDialog.file = name
+            linkMissingDialog.open()
+        }
         function onEditAnywayWarning(name) {
             editAnywayDialog.file = name
             editAnywayDialog.open()
@@ -1696,6 +1769,83 @@ ApplicationWindow {
                        + "stay as they are). For more, open it externally in an editor made for it.")
         }
         onAccepted: app.editAnyway(true)
+    }
+    // "Linked from": the documents of the library that link to this one (qt/docs/links.md)
+    Dialog {
+        id: backlinksDialog
+        objectName: "backlinksDialog"
+        property var items: []
+        function show() { items = app.backlinks(); open() }
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(460, parent ? parent.width - 32 : 460)
+        title: qsTr("Linked from")
+        standardButtons: Dialog.Close
+        ColumnLayout {
+            width: backlinksDialog.availableWidth
+            Label {
+                visible: backlinksDialog.items.length === 0
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                opacity: 0.7
+                text: qsTr("No document of the library links to this one.")
+            }
+            Repeater {
+                model: backlinksDialog.items
+                delegate: ItemDelegate {
+                    required property var modelData
+                    objectName: "backlink"
+                    Layout.fillWidth: true
+                    text: modelData.folder !== "" ? modelData.name + "  —  " + modelData.folder : modelData.name
+                    onClicked: { backlinksDialog.close(); app.openPath(modelData.path) }
+                }
+            }
+        }
+    }
+    // A followed link's file was gone: found elsewhere (update the link?) or not at all (locate it?)
+    Dialog {
+        id: linkFoundDialog
+        objectName: "linkFoundDialog"
+        property string file: ""
+        property string folder: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, parent ? parent.width - 32 : 480)
+        title: qsTr("The linked document was moved")
+        standardButtons: Dialog.Yes | Dialog.No
+        Label {
+            width: linkFoundDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("It was found as \u201c%1\u201d in %2 and opened. Update the link to point there?")
+                  .arg(linkFoundDialog.file).arg(linkFoundDialog.folder !== "" ? linkFoundDialog.folder : qsTr("the library"))
+        }
+        onAccepted: app.updateFoundLink()
+    }
+    Dialog {
+        id: linkMissingDialog
+        objectName: "linkMissingDialog"
+        property string file: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, parent ? parent.width - 32 : 480)
+        title: qsTr("Document not found")
+        standardButtons: Dialog.Open | Dialog.Cancel
+        Label {
+            width: linkMissingDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("\u201c%1\u201d is not where the link says, and nothing like it is in the library. Locate it? "
+                       + "The link then points to the file you choose.").arg(linkMissingDialog.file)
+        }
+        onAccepted: locateLinkDialog.open()
+    }
+    FileDialog {
+        id: locateLinkDialog
+        title: qsTr("Locate the linked document")
+        currentFolder: app.openFolder()
+        onAccepted: app.relinkTo(selectedFile)
     }
     // A text file changed on disk (another program) while it has changes here: which version stays
     Dialog {

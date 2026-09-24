@@ -361,6 +361,18 @@ Popup {
                     SectionTitle { text: qsTr("Start") }
                     SwitchRow { key: "restoreSession"; text: qsTr("Reopen the documents of the last session") }
                     SwitchRow { key: "resumeAtLastPage"; text: qsTr("Open documents where they were left off") }
+                    SectionTitle { text: qsTr("Links") }
+                    ComboRow {
+                        objectName: "linkOpeningRow"
+                        key: "linkOpening"
+                        text: qsTr("A link to another document opens")
+                        options: [
+                            { text: qsTr("Ask each time"), value: "ask" },
+                            { text: qsTr("In a new tab"), value: "tab" },
+                            { text: qsTr("As reference, beside this one"), value: "reference" },
+                            { text: qsTr("Here, in place of this one"), value: "here" }
+                        ]
+                    }
                     SectionTitle { text: qsTr("Hybrid PDF") }
                     Hint {
                         text: qsTr("A PDF with notes (Save as… → \"PDF with notes, editable\") shows your notes in "

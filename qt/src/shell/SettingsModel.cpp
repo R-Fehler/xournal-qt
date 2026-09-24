@@ -140,6 +140,22 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.getCustomElement("xournalQt").setBool("resumeAtLastPage", v.toBool());
             s.customSettingsChanged();
         });
+    // A tapped link to another document (qt/docs/links.md): "ask" (the default: a popup offers the three), or opened
+    // at once in a new "tab", as the "reference" or "here" (in place of the current document)
+    add("linkOpening",
+        [&s] {
+            std::string v;
+            s.getCustomElement("xournalQt").getString("linkOpening", v);
+            return QVariant(v == "tab" || v == "reference" || v == "here" ? QString::fromStdString(v)
+                                                                          : QStringLiteral("ask"));
+        },
+        [&s](const QVariant& v) {
+            const QString how = v.toString();
+            s.getCustomElement("xournalQt")
+                    .setString("linkOpening", how == "tab" || how == "reference" || how == "here" ? how.toStdString()
+                                                                                                 : std::string("ask"));
+            s.customSettingsChanged();
+        });
     // Hybrid PDFs (qt/docs/hybrid-pdf.md): notes of an annotated PDF go into the PDF itself (off: "name.notes.pdf");
     // whether that was explained; a .xopp for Xournal++ written next to a hybrid PDF on every save
     for (const char* key: {"hybridIntoPdf", "hybridIntoPdfExplained", "hybridExportXopp"}) {

@@ -55,6 +55,8 @@
 #include "view/background/BackgroundFlags.h"
 #include "view/background/BackgroundView.h"
 
+#include "DocumentLink.h"
+#include "MdBox.h"
 #include "MergedPdf.h"
 #include "config.h"
 
@@ -252,7 +254,8 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
             const std::string nm = nameOfAnnot(a);
             seen.insert(nm);
             auto it = expected.find(nm);
-            if (it == expected.end() || it->second != hashOf(a)) {
+            const bool link = a.getKey("/Subtype").isName() && a.getKey("/Subtype").getName() == "/Link";
+            if (!link && (it == expected.end() || it->second != hashOf(a))) {  // (links are written from the text)
                 changed.push_back(nm);
             }
             if (keep.count(nm)) {
@@ -268,7 +271,7 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
         }
     }
     for (const auto& [nm, hash]: expected) {
-        if (!seen.count(nm)) {
+        if (!seen.count(nm) && nm.find("-link") == std::string::npos) {
             changed.push_back(nm);  // deleted in another app
         }
     }
@@ -366,10 +369,58 @@ struct AnnotSpec {
     std::string text;
 };
 
+/// A link of a Markdown box as a PDF /Link (qt/docs/links.md): a web address (/URI), or another PDF at a page (/GoToR).
+struct LinkSpec {
+    size_t page = 0;
+    double x0 = 0, y0 = 0, x1 = 0, y1 = 0;  ///< where it is drawn (page coordinates, y down)
+    std::string uri;                         ///< a web or mail address, or
+    std::string file;                        ///< a PDF, relative to the PDF written
+    int destPage = 0;                        ///< its page (0-based)
+};
+
+/// Where a link of a Markdown box leads for other PDF viewers, from the PDF written in `folder`: a web address, or a
+/// PDF and its page (a .xopp with its PDF next to it: that PDF, at the linked PDF page). False: nothing a viewer can
+/// open (a .md, a lone .xopp, a place in this document).
+bool linkFor(const md::LinkHit& hit, const fs::path& folder, LinkSpec& spec) {
+    const QString target = QString::fromStdString(hit.target);
+    if (!hit.wiki && (target.startsWith(QLatin1String("http://")) || target.startsWith(QLatin1String("https://")) ||
+                      target.startsWith(QLatin1String("mailto:")))) {
+        spec.uri = hit.target;
+        return true;
+    }
+    const auto link = hit.wiki ? std::optional<links::Link>() : links::parse(target);
+    if (!link || link->path.isEmpty()) {
+        return false;
+    }
+    fs::path file = links::resolvePath(folder, link->path);
+    std::string ext = file.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::error_code ec;
+    bool pdfPages = false;  // the page is a page of that PDF (not of a document of notes over it)
+    if (ext == ".xopp" || ext == ".xoj") {
+        file.replace_extension(".pdf");
+        pdfPages = true;
+    } else if (ext != ".pdf") {
+        return false;
+    }
+    if (!fs::exists(file, ec)) {
+        return false;
+    }
+    const bool hybrid = !pdfPages && isHybrid(file);  // (its pages are the pages of its document)
+    int page = link->page > 0 ? link->page : 1;
+    if (link->pdfPage > 0 && !hybrid) {
+        page = link->pdfPage;
+    }
+    spec.file = links::relativePath(folder / "x.pdf", file).toStdString();
+    spec.destPage = page - 1;
+    return true;
+}
+
 struct Prepared {
     fs::path bg;
     std::vector<PageSpec> pages;
     std::vector<AnnotSpec> annots;
+    std::vector<LinkSpec> links;
     std::string drawn;  ///< a PDF (cairo): the generated base pages and the appearance of each annotation
     std::string xopp;
     std::vector<std::pair<std::string, std::string>> extras;  ///< files next to the .xopp (attached images)
@@ -378,7 +429,7 @@ struct Prepared {
 
 /// Everything that needs the document: under its shared lock (and briefly its lock).
 Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work, const BasePageOf& baseOf,
-                 size_t pdfPageCount, bool attach = false) {
+                 size_t pdfPageCount, bool attach = false, const fs::path& linkFolder = {}) {
     Prepared out;
     {
         std::shared_lock lock(doc);
@@ -451,10 +502,25 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
                             a.width = s->getWidth();
                         }
                     } else if (e->getType() == ELEMENT_TEXT) {
+                        const auto* text = static_cast<const Text*>(e);
                         if (!a.text.empty()) {
                             a.text += "\n";
                         }
-                        a.text += static_cast<const Text*>(e)->getText();
+                        a.text += text->getText();
+                        if (text->isMarkdown() && !linkFolder.empty()) {
+                            // Its links, for other viewers (/Link annotations)
+                            for (const md::LinkHit& hit: md::linkBoxes(*text)) {
+                                LinkSpec link;
+                                if (linkFor(hit, linkFolder, link)) {
+                                    link.page = i;
+                                    link.x0 = hit.x;
+                                    link.y0 = hit.y;
+                                    link.x1 = hit.x + hit.width;
+                                    link.y1 = hit.y + hit.height;
+                                    out.links.push_back(std::move(link));
+                                }
+                            }
+                        }
                     }
                     if (!colored) {
                         a.color = e->getColor();
@@ -633,10 +699,64 @@ QPDFObjectHandle colorArray(Color c) {
     return a;
 }
 
+/// The links of the Markdown boxes as /Link annotations (ours: removed and written again with the rest), with their
+/// hashes in `hashes`.
+void annotateLinks(QPDF& out, const Prepared& prep, const std::vector<QPDFObjectHandle>& order, QPDFObjectHandle hashes) {
+    std::map<size_t, int> perPage;
+    for (const LinkSpec& l: prep.links) {
+        QPDFObjectHandle pageObj = order.at(l.page);
+        QPDFPageObjectHelper page(pageObj);
+        const double h = prep.pages[l.page].height;
+        // Page coordinates (y down) onto the base page, as the drawing is placed (its crop box)
+        const QPDFObjectHandle::Rectangle crop = page.getCropBox().getArrayAsRectangle();
+        const QPDFObjectHandle::Rectangle r(crop.llx + l.x0, crop.lly + (h - l.y1), crop.llx + l.x1, crop.lly + (h - l.y0));
+        QPDFObjectHandle annot = QPDFObjectHandle::newDictionary();
+        annot.replaceKey("/Type", QPDFObjectHandle::newName("/Annot"));
+        annot.replaceKey("/Subtype", QPDFObjectHandle::newName("/Link"));
+        QPDFObjectHandle rect = QPDFObjectHandle::newArray();
+        for (double v: {r.llx, r.lly, r.urx, r.ury}) {
+            rect.appendItem(real1(v));
+        }
+        annot.replaceKey("/Rect", rect);
+        annot.replaceKey("/Border", QPDFObjectHandle::parse("[0 0 0]"));
+        const std::string nm = std::string(NAME_PREFIX) + "p" + std::to_string(l.page + 1) + "-link" +
+                               std::to_string(++perPage[l.page]);
+        annot.replaceKey("/NM", QPDFObjectHandle::newUnicodeString(nm));
+        annot.replaceKey("/P", pageObj);
+        QPDFObjectHandle action = QPDFObjectHandle::newDictionary();
+        if (!l.uri.empty()) {
+            action.replaceKey("/S", QPDFObjectHandle::newName("/URI"));
+            action.replaceKey("/URI", QPDFObjectHandle::newString(l.uri));
+        } else {
+            action.replaceKey("/S", QPDFObjectHandle::newName("/GoToR"));
+            action.replaceKey("/F", QPDFObjectHandle::newUnicodeString(l.file));
+            QPDFObjectHandle dest = QPDFObjectHandle::newArray();
+            dest.appendItem(QPDFObjectHandle::newInteger(l.destPage));
+            dest.appendItem(QPDFObjectHandle::newName("/Fit"));
+            action.replaceKey("/D", dest);
+            action.replaceKey("/NewWindow", QPDFObjectHandle::newBool(true));
+        }
+        annot.replaceKey("/A", action);
+        annot.replaceKey(MARKER, QPDFObjectHandle::newDictionary());
+        hashes.replaceKey("/" + nm, QPDFObjectHandle::newString(hashOf(annot)));
+        annot = out.makeIndirectObject(annot);
+        QPDFObjectHandle old = pageObj.getKey("/Annots");
+        QPDFObjectHandle annots = QPDFObjectHandle::newArray();
+        if (old.isArray()) {
+            for (int i = 0; i < old.getArrayNItems(); ++i) {
+                annots.appendItem(old.getArrayItem(i));
+            }
+        }
+        annots.appendItem(annot);
+        pageObj.replaceKey("/Annots", annots);
+    }
+}
+
 /// Our annotations onto the base pages; returns the marker's /Annots (name -> hash).
 QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const std::vector<QPDFObjectHandle>& order) {
     QPDFObjectHandle hashes = QPDFObjectHandle::newDictionary();
     if (prep.annots.empty()) {
+        annotateLinks(out, prep, order, hashes);
         return hashes;
     }
     std::vector<QPDFPageObjectHelper> drawnPages = QPDFPageDocumentHelper(drawn).getAllPages();
@@ -716,6 +836,7 @@ QPDFObjectHandle annotate(QPDF& out, QPDF& drawn, const Prepared& prep, const st
         annots.appendItem(annot);
         pageObj.replaceKey("/Annots", annots);
     }
+    annotateLinks(out, prep, order, hashes);
     return hashes;
 }
 
@@ -879,7 +1000,8 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf, si
     try {
         WorkDir work;
         Steps step;
-        const Prepared prep = prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount);
+        const Prepared prep =
+                prepare(doc, target.filename().string(), work.path, baseOf, pdfPageCount, false, target.parent_path());
         step("draw and write the .xopp");
         if (!prep.error.empty()) {
             r.error = prep.error;

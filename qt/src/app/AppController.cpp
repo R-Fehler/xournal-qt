@@ -197,6 +197,9 @@ void AppController::makeTabs() {
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
     referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
     connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
+    connect(referenceMode.get(), &ReferenceMode::openDocumentLink, this, [this](const QString& uri, const QString& from) {
+        followDocumentLinkFrom(uri, QStringLiteral("tab"), fs::path(from.toStdString()));
+    });
     connect(referenceMode.get(), &ReferenceMode::copied, this, [this](const QString& what) {
         Q_EMIT pageActionDone(what, false);
     });
@@ -1788,6 +1791,7 @@ void AppController::filesChanged(const DocumentFiles::Result& r) {
     }
     recent->refresh();
     Q_EMIT titleChanged();
+    rewriteLinksAfter(r.moved);  // (AppLinks.cpp)
 }
 
 void AppController::startSession(const QStringList& files) {
@@ -3059,26 +3063,30 @@ void AppController::jumpToPage(int index) {
         canvas()->jumpToPage(static_cast<size_t>(index));
     }
 }
-bool AppController::canGoBack() const { return canvas() && canvas()->canGoBack(); }
-bool AppController::canGoForward() const { return canvas() && canvas()->canGoForward(); }
+// (across documents: AppLinks.cpp)
+bool AppController::canGoBack() const { return (canvas() && canvas()->canGoBack()) || backJump(); }
+bool AppController::canGoForward() const { return (canvas() && canvas()->canGoForward()) || forwardJump(); }
 void AppController::navigateBack() {
     if (referenceMode->focused()) {
         referenceMode->navigateBack();
-    } else if (canvas()) {
+    } else if (!navigateDocuments(true) && canvas()) {
         canvas()->navigateBack();
     }
 }
 void AppController::navigateForward() {
     if (referenceMode->focused()) {
         referenceMode->navigateForward();
-    } else if (canvas()) {
+    } else if (!navigateDocuments(false) && canvas()) {
         canvas()->navigateForward();
     }
 }
 void AppController::clearNavigation() {
+    docBack.clear();
+    docForward.clear();
     if (canvas()) {
         canvas()->clearNavigation();
     }
+    Q_EMIT navigationChanged();
 }
 
 // Upstream's page operations work on the current page: select the page first.
@@ -3269,6 +3277,10 @@ QUrl AppController::openFolder() const {
 }
 
 void AppController::openLink(const QString& uri) {
+    if (documentLink(uri).value("document").toBool()) {
+        followDocumentLink(uri, QStringLiteral("tab"));  // (a link to a document: never handed to the system)
+        return;
+    }
     QUrl url(uri);
     if (const QString host = uri.section(QLatin1Char('/'), 0, 0);
         url.scheme().isEmpty() && !uri.startsWith(QLatin1Char('/')) && !uri.contains(QLatin1Char(':')) &&
@@ -3365,11 +3377,7 @@ bool AppController::addChapter(int page, const QString& title, int level) {
     return true;
 }
 
-void AppController::copyPageLink(int page) {
-    const int number = page >= 0 ? page + 1 : pageNumber();
-    QGuiApplication::clipboard()->setText(QString::fromStdString(xoj::util::pageLinkText(number)));
-    Q_EMIT pageActionDone(tr("Link to page %1 copied").arg(number), false);
-}
+// (Copy link to other places: AppLinks.cpp)
 
 bool AppController::pdfTextIsSelected() const { return canvas() && canvas()->hasPdfTextSelection(); }
 

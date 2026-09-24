@@ -1,6 +1,7 @@
 #include "MdLayout.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <unordered_map>
@@ -130,6 +131,7 @@ public:
             return runPlain(doc);
         }
         out.links = doc.links;
+        out.wikiLinks = doc.wikiLinks;
         const auto& blocks = doc.root.children;
         out.blocks.resize(blocks.size());
         continuedListStart = continuationStart(doc);
@@ -907,6 +909,8 @@ std::optional<LinkHit> linkAt(const Layout& layout, double x, double y) {
                 }
                 LinkHit hit;
                 hit.target = layout.links[static_cast<size_t>(span.link)];
+                hit.wiki = static_cast<size_t>(span.link) < layout.wikiLinks.size() &&
+                           layout.wikiLinks[static_cast<size_t>(span.link)];
                 hit.x = it.x + a.x / static_cast<double>(PANGO_SCALE);
                 hit.y = it.y + a.y / static_cast<double>(PANGO_SCALE);
                 hit.width = (b.x + b.width - a.x) / static_cast<double>(PANGO_SCALE);
@@ -916,6 +920,50 @@ std::optional<LinkHit> linkAt(const Layout& layout, double x, double y) {
         }
     }
     return std::nullopt;
+}
+
+std::vector<LinkHit> linkBoxes(const Layout& layout) {
+    std::vector<LinkHit> out;
+    for (const Item& it: layout.items) {
+        if (it.kind != Item::Kind::Text || it.links.empty()) {
+            continue;
+        }
+        const char* text = pango_layout_get_text(it.layout.get());
+        for (const LinkSpan& span: it.links) {
+            if (span.link < 0 || span.link >= static_cast<int>(layout.links.size()) || span.end <= span.start) {
+                continue;
+            }
+            // Character by character: one box per line the link is on
+            std::vector<LinkHit> lines;
+            for (int i = span.start; i < span.end; i = static_cast<int>(g_utf8_next_char(text + i) - text)) {
+                PangoRectangle r;
+                pango_layout_index_to_pos(it.layout.get(), i, &r);
+                const double x0 = it.x + std::min(r.x, r.x + r.width) / static_cast<double>(PANGO_SCALE);
+                const double x1 = it.x + std::max(r.x, r.x + r.width) / static_cast<double>(PANGO_SCALE);
+                const double y = it.y + r.y / static_cast<double>(PANGO_SCALE);
+                const double h = r.height / static_cast<double>(PANGO_SCALE);
+                if (!lines.empty() && std::abs(lines.back().y - y) < 0.01) {
+                    LinkHit& l = lines.back();
+                    const double right = std::max(l.x + l.width, x1);
+                    l.x = std::min(l.x, x0);
+                    l.width = right - l.x;
+                    l.height = std::max(l.height, h);
+                    continue;
+                }
+                LinkHit l;
+                l.target = layout.links[static_cast<size_t>(span.link)];
+                l.wiki = static_cast<size_t>(span.link) < layout.wikiLinks.size() &&
+                         layout.wikiLinks[static_cast<size_t>(span.link)];
+                l.x = x0;
+                l.y = y;
+                l.width = x1 - x0;
+                l.height = h;
+                lines.push_back(std::move(l));
+            }
+            out.insert(out.end(), lines.begin(), lines.end());
+        }
+    }
+    return out;
 }
 
 std::optional<Layout::CheckBox> checkBoxAt(const Layout& layout, double x, double y) {

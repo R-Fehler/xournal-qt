@@ -988,3 +988,46 @@ Three documents open: A (notes), B, C, in this order; in A, "Open as reference" 
 - [ ] In full screen: split with a reference, tap "Show as a tab": still full screen, the reference fills it, the tab
       dots at the top mark C; a swipe along the dots goes back to A.
 - [ ] An undocked window with its own tabs: the pop out stays within that window.
+
+## Links between documents (qt/links)
+Make a folder with a lecture (`Lectures/kalman.xopp` with a chapter "Prediction step" on page 4, "Start a chapter
+here…" in the page menu) and a note `Notes/a.md` with `[Kalman](../Lectures/kalman.xopp#chapter=Prediction%20step&page=2)`
+and `[[b#Part two]]` (a `Notes/b.md` with a heading "## Part two" a few pages down).
+- [ ] In `a.md`, tap the link with a finger (or Ctrl+click with the mouse or pen): a popup with "kalman.xopp, chapter
+      "Prediction step"" and Open in a new tab / Open as reference / Open here / Remember my choice. The pen with
+      the pen tool does not open it (in a `.xopp`'s Markdown box it keeps writing).
+- [ ] "Open in a new tab": the lecture opens at page 4 (the chapter, not page 2). Alt+Left (or ← in the pill) goes
+      back to `a.md`, Alt+Right forward to the lecture. The same link again switches to the open tab.
+- [ ] "Open as reference": the lecture beside the note, at page 4.
+- [ ] "Open here" with "Remember my choice": the note's tab goes, the lecture is in its place; Back brings the note
+      back. The next tap opens at once, no popup. Settings → Documents → Links → "Ask each time" brings the popup
+      back.
+- [ ] Rename the chapter in the lecture, tap the link again: page 2 opens with the note "Chapter "Prediction step"
+      not found, opened page 2".
+- [ ] `[[b#Part two]]` opens `b.md` at the page with "Part two".
+- [ ] In the lecture, the page sidebar's page menu → "Copy a link to this page", open a note and press Ctrl+V on its
+      page (nothing selected): a small blue "🔗 kalman, page 3" appears where the view is; a tap on it (hand tool
+      or finger) offers to open the lecture there. Undo removes it. Open the note in Xournal++: it shows
+      `[🔗 kalman, page 3](../Lectures/kalman.xopp#page=3…)` as text.
+- [ ] Select a sketch (lasso), Ctrl+V the link: the marker sits at the sketch's top right.
+- [ ] Write Markdown on a page (or in a `.md`), Ctrl+V the link: `[kalman, page 3](../Lectures/kalman.xopp#page=3)`,
+      relative to that document. The same in the editor beside the page.
+- [ ] Contents sidebar: press and hold a chapter → "Copy link to this chapter"; ⋮ → "Copy link to this page"; a
+      library card's menu → "Copy link"; a page with hits in the extended library search, press and hold → "Copy
+      link to this page". Paste each into a text editor of another app: a Markdown link with the full path.
+- [ ] Open the lecture, ⋮ → "Linked from…": `a.md` and the note with the marker are listed; a tap opens one.
+- [ ] Close everything but the library. Rename the lecture in the library ("Kalman filter"): a note "Updated N links"
+      comes; `a.md` (opened in the app or in a text editor) now links to `../Lectures/Kalman%20filter.xopp#…` and
+      nothing else in it changed (`git diff` or `diff` against a copy: only those links). The marker in the note
+      follows too (open it in Xournal++: the new path). Move `a.md` into a subfolder: its own links become
+      `../../Lectures/…`.
+- [ ] With `a.md` open and unchanged, rename the lecture again: the link changes in the open tab, it is saved, and
+      Ctrl+Z brings the old link back.
+- [ ] Move the lecture into another folder with the file manager, then tap the link in `a.md`: the lecture opens
+      from its new folder and a dialog offers "Update the link"; Yes changes the link in `a.md`.
+- [ ] A link to a file that is nowhere (`[x](missing.xopp)`): "Document not found … Locate it?" → Open → pick a
+      file: the link now points there and it opens.
+- [ ] In a note with a link marker to the lecture (and a Markdown box with `[web](https://example.org)`), Save as
+      → "PDF with notes": open the PDF in Okular or Firefox: the marker's text is a link; clicking it opens
+      `lecture.pdf` at the linked page (Okular may ask first), the web link opens the browser. Open the PDF in the app
+      again: no "changed in another app" question; save again: the links are still there once each.

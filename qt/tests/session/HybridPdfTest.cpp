@@ -36,6 +36,7 @@
 #include "model/Document.h"
 #include "model/Font.h"
 #include "model/Layer.h"
+#include "model/MarkdownText.h"
 #include "model/PageType.h"
 #include "model/Point.h"
 #include "model/Stroke.h"
@@ -833,4 +834,72 @@ TEST_F(HybridPdfTest, aPageShownTwiceHasItsOwnAnnotations) {
     auto loaded = DocumentSession::loadFile(out);
     ASSERT_TRUE(loaded.document);
     EXPECT_EQ(describe(*loaded.document), describeAsXopp(*doc, path("reference.xopp")));
+}
+
+TEST_F(HybridPdfTest, linksOfMarkdownBoxesBecomeLinksOtherViewersFollow) {
+    // A lecture PDF with its notes, and a document of notes that links to it (a Markdown box on page 1)
+    makeTextPdf(path("lecture.pdf"), {"lectureone", "lecturetwo", "lecturethree"});
+    {
+        auto loaded = DocumentSession::loadFile(path("lecture.pdf"));
+        ASSERT_TRUE(loaded.document);
+        ASSERT_TRUE(DocumentSession::writeDocument(*loaded.document, path("lecture.xopp")).ok);
+    }
+    Document doc(nullptr);
+    auto page = std::make_shared<XojPage>(595, 842);
+    auto* markdown = new Layer();
+    markdown->setName(std::string(xoj::markdown::LAYER_NAME));
+    page->getLayers().insert(page->getLayers().begin(), markdown);
+    auto box = std::make_unique<Text>();
+    box->setText("See [the lecture](lecture.xopp#page=3&pdfpage=2), [the PDF](lecture.pdf#page=3), "
+                 "[the web](https://example.org/x) and [notes](other.md#heading=a).");
+    box->setFont(XojFont("Sans", 10));
+    box->setWrap(400);
+    box->setTransformation(xoj::util::Matrix::TRANSLATION(56, 56));
+    markdown->addElement(std::move(box));
+    doc.addPage(page);
+    const fs::path out = path("notes.pdf");
+    const auto r = HybridPdf::write(doc, out);
+    ASSERT_TRUE(r.ok) << r.error;
+
+    QPDF pdf;
+    pdf.processFile(out.string().c_str());
+    std::vector<std::string> actions;
+    for (auto& p: QPDFPageDocumentHelper(pdf).getAllPages()) {
+        QPDFObjectHandle annots = p.getObjectHandle().getKey("/Annots");
+        for (int i = 0; annots.isArray() && i < annots.getArrayNItems(); ++i) {
+            QPDFObjectHandle a = annots.getArrayItem(i);
+            if (a.getKey("/Subtype").getName() != "/Link") {
+                continue;
+            }
+            QPDFObjectHandle act = a.getKey("/A");
+            const QPDFObjectHandle::Rectangle rect = a.getKey("/Rect").getArrayAsRectangle();
+            EXPECT_GT(rect.urx, rect.llx);
+            EXPECT_GT(rect.lly, 700) << "near the top of the page (PDF space: y up)";
+            if (act.getKey("/S").getName() == "/URI") {
+                actions.push_back("URI " + act.getKey("/URI").getStringValue());
+            } else {
+                actions.push_back(act.getKey("/S").getName() + " " + act.getKey("/F").getUTF8Value() + " " +
+                                  std::to_string(act.getKey("/D").getArrayItem(0).getIntValue()));
+            }
+        }
+    }
+    EXPECT_EQ(actions, (std::vector<std::string>{"/GoToR lecture.pdf 1", "/GoToR lecture.pdf 2",
+                                                 "URI https://example.org/x"}))
+            << "the .xopp's PDF at its PDF page; the PDF at its page; not the .md";
+
+    // They are ours: not reported as changed, and written again (not twice) on the next save
+    auto opened = HybridPdf::open(out);
+    ASSERT_TRUE(opened.document) << opened.error;
+    EXPECT_TRUE(opened.changed.empty());
+    ASSERT_TRUE(HybridPdf::write(*opened.document, out).ok);
+    QPDF again;
+    again.processFile(out.string().c_str());
+    int count = 0;
+    for (auto& p: QPDFPageDocumentHelper(again).getAllPages()) {
+        QPDFObjectHandle annots = p.getObjectHandle().getKey("/Annots");
+        for (int i = 0; annots.isArray() && i < annots.getArrayNItems(); ++i) {
+            count += annots.getArrayItem(i).getKey("/Subtype").getName() == "/Link";
+        }
+    }
+    EXPECT_EQ(count, 3);
 }

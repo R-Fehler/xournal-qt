@@ -46,6 +46,8 @@
 #include "filesystem.h"
 #include "DocumentFiles.h"
 #include "LibraryCache.h"
+#include "LinkRewrite.h"
+#include "session/DocumentLink.h"
 #include "session/Vocabulary.h"
 
 class Document;
@@ -202,6 +204,17 @@ public:
     void prepareWords();
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
+    /// The indexed documents whose file name is `name`, case ignored (links whose path is gone, wiki links). With
+    /// `withoutExtension`, `name` has no extension ("turbines" finds "turbines.md", "Turbines.xopp").
+    std::vector<fs::path> filesNamed(const QString& name, bool withoutExtension = false) const;
+    /// The pages of an indexed document, for a link to one of them (DocumentLink.h): the PDF page each shows
+    /// (1-based, 0: none) and the text of its text elements. Empty when it is not indexed or has no pages.
+    std::vector<links::Page> linkPages(const fs::path& file) const;
+    /// The links every indexed document holds (Markdown files; Markdown boxes and link markers of notes): for
+    /// backlinks and for rewriting links after a move (LinkRewrite.h). Documents without links are left out.
+    std::vector<LinkRewrite::Source> linkSources() const;
+    /// The indexed documents with a page whose text (of its text elements) has this fingerprint (DocumentLink.h).
+    std::vector<fs::path> filesWithPageText(const QString& fingerprint) const;
 
     /// Format of the stored entries (packs of another one are read anew).
     static constexpr int FORMAT = 4;
@@ -236,6 +249,9 @@ private:
         std::vector<int> blockLevel;     ///< per passage: a heading's level (0: not a heading)
         QStringList links;               ///< link targets (for backlinks)
         QStringList wikiLinks;           ///< [[wiki link]] targets
+        /// The links of its Markdown boxes were read (notes indexed before links were: read again once, without
+        /// their PDF text)
+        bool linksRead = true;
         int pageCount() const { return static_cast<int>(elementText.size()); }
         bool showsPdfPages() const;
         /// Nothing changed since it was read.
