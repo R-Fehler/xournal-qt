@@ -1607,7 +1607,8 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
     Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
-    Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: saveOrAsk(null) }
+    // (the reference, while it has the keys and is written in)
+    Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }
     Shortcut { sequences: win.keysOf("saveAs"); enabled: docKeys; onActivated: openSaveDialog(null) }
     Shortcut { sequences: win.keysOf("open"); onActivated: openDialog.open() }
     // Ctrl+N adds a page (what one needs while writing), Ctrl+Shift+N a document

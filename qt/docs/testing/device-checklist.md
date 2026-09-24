@@ -796,3 +796,6 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Markdown in the reference: with the pen button on, tap a Markdown text box of the reference with the text tool:
       the panel beside the pages edits the reference's text (its tab gets the "●"); for reading, the text tool only
       scrolls there and Ctrl+M (Markdown) still writes in the notes.
+- [ ] Ctrl+S after writing in the reference (pen button on, last tap on the reference): the reference is saved (its
+      "●" goes), the notes keep theirs. A new, never saved reference: its tab comes forward and asks where to save.
+      For reading (pen button off), Ctrl+S saves the notes as before.

@@ -850,3 +850,39 @@ TEST_F(ReferenceWindowTest, markdownIsWrittenInTheReferenceWhenItIsWrittenIn) {
     EXPECT_TRUE(book->isModified()) << "the Markdown text did not go into the reference";
     controller->setTextMarkdown(false);
 }
+
+TEST_F(ReferenceWindowTest, ctrlSSavesTheReferenceWhenItIsWrittenIn) {
+    QTemporaryDir tmp;
+    const QString notesFile = tmp.filePath("notes.xopp"), bookFile = tmp.filePath("book.xopp");
+    ASSERT_TRUE(QFile::copy(fixturePath(u8"load/layers.xopp"), notesFile));
+    ASSERT_TRUE(QFile::copy(fixturePath(u8"load/layers.xopp"), bookFile));
+    ASSERT_TRUE(controller->openPath(notesFile));
+    ASSERT_TRUE(controller->openAsReference(bookFile));
+    wait(100);
+    auto* notes = tabs().currentSession();
+    auto* book = tabs().session(ref().tab());
+    notes->insertNewPage(1);
+    book->insertNewPage(1);
+    ASSERT_TRUE(notes->isModified());
+    ASSERT_TRUE(book->isModified());
+    controller->selectTool("hand");
+    ref().setEditing(true);
+    click(reference);
+    ASSERT_TRUE(ref().focused());
+    key(Qt::Key_S, Qt::ControlModifier);
+    book->waitForSaves();
+    until([&] { return !book->isModified(); }, 3000);
+    EXPECT_FALSE(book->isModified()) << "Ctrl+S did not save the reference being written in";
+    EXPECT_TRUE(notes->isModified()) << "the notes were saved instead";
+    EXPECT_EQ(controller->tabManager().currentSession(), notes);
+
+    // For reading: Ctrl+S saves the notes
+    ref().setEditing(false);
+    book->insertNewPage(1);
+    click(reference);
+    key(Qt::Key_S, Qt::ControlModifier);
+    notes->waitForSaves();
+    until([&] { return !notes->isModified(); }, 3000);
+    EXPECT_FALSE(notes->isModified());
+    EXPECT_TRUE(book->isModified());
+}

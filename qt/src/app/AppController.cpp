@@ -1992,17 +1992,18 @@ namespace {
 bool settingOn(Settings* settings, const char* key);
 }  // namespace
 
-bool AppController::startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then) {
-    DocumentSession* s = session();
+bool AppController::startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,
+                              DocumentSession* document) {
+    DocumentSession* s = document ? document : session();
     if (!s) {
         return false;
     }
     if (way == SaveWay::Save && !s->hasFilePath()) {
         // "Save notes into the PDF itself": an annotated PDF is saved into it, as a hybrid PDF
-        if (!savesWithoutDialog()) {
+        if (!savesWithoutDialog(s)) {
             return false;
         }
-        return startSave(SaveWay::Hybrid, s->annotatedPdf(), std::move(then));
+        return startSave(SaveWay::Hybrid, s->annotatedPdf(), std::move(then), s);
     }
     DocumentSession::SaveRequest request;
     switch (way) {
@@ -2135,14 +2136,29 @@ bool settingOn(Settings* settings, const char* key) {
 
 bool AppController::isHybrid() const { return session() && session()->isHybrid(); }
 
-bool AppController::savesWithoutDialog() const {
-    if (!session()) {
+bool AppController::savesWithoutDialog() const { return savesWithoutDialog(session()); }
+
+bool AppController::saveReferenceInHand() {
+    CanvasView* r = editedReference();
+    if (!r) {
+        return false;  // (the notes)
+    }
+    DocumentSession& s = r->getSession();
+    if (!savesWithoutDialog(&s)) {
+        tabs->setCurrentIndex(tabs->indexOf(&s));  // it needs a file: asked for in its own tab
         return false;
     }
-    if (session()->hasFilePath()) {
+    return startSave(SaveWay::Save, {}, {}, &s);
+}
+
+bool AppController::savesWithoutDialog(const DocumentSession* s) const {
+    if (!s) {
+        return false;
+    }
+    if (s->hasFilePath()) {
         return true;
     }
-    const fs::path pdf = session()->annotatedPdf();
+    const fs::path pdf = s->annotatedPdf();
     return !pdf.empty() && settingOn(app->getSettings(), "hybridIntoPdf") && !HybridPdf::inCache(pdf) &&
            !MergedPdf::inCache(pdf);
 }

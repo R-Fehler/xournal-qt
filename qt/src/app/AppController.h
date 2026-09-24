@@ -412,6 +412,10 @@ public:
     Q_INVOKABLE bool openAsReference(const QString& path);
     QObject* referenceObject() const;
     xqt::ReferenceMode& reference() const { return *referenceMode; }
+    /// Ctrl+S: while the reference has the keys and is written in, it is saved (true). When it needs a file first,
+    /// its tab becomes the current one and false is returned (the window then asks for the file as for any
+    /// document); false as well when the notes are meant.
+    Q_INVOKABLE bool saveReferenceInHand();
     /// Close a tab without asking (QML asks about unsaved changes first). The last tab is replaced by a new one.
     Q_INVOKABLE void closeTab(int index);
     Q_INVOKABLE void moveTab(int from, int to);
@@ -670,9 +674,11 @@ private:
     /// The reference while it has the keys and is written in (its edit switch), else nullptr: then undo, cut,
     /// paste, delete and select all act on it.
     xqt::CanvasView* editedReference() const;
+    bool savesWithoutDialog(const xqt::DocumentSession* s) const;
     enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp };
     /// Start saving the current document (see saveInBackground); `then(ok)` after it was written or failed.
-    bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then);
+    bool startSave(SaveWay way, const fs::path& target, std::function<void(bool)> then,
+                   xqt::DocumentSession* document = nullptr);
     /// Wait for the current document's saves; false if the last one failed.
     bool waitForSave();
     /// `then` from QML, after a save: with the saved document's tab current (from the event loop).
