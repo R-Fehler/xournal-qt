@@ -102,7 +102,7 @@ is built.
 
 ## Ready after a short plan: platform
 
-### `qt/android-apk`: first APK
+### `qt/android-apk`: first APK (started 2026-09-24; limited to 4 build jobs at low priority, so other agents keep working)
 Tooling (2026-09-24, in the author's home, no sudo): JDK 17 in `~/.local/jdk-17`; Android command-line tools and
 NDK r27c (27.2.12479018) in `~/Android/Sdk`; Qt 6.11.2 desktop (host, `gcc_64`) and `android_arm64_v8a` in `~/Qt` (2 GB) through
 `aqtinstall` (`~/.local/bin/aqt`); 6.11.3 was not fully mirrored yet. Installed 2026-09-24. The block itself comes after the `.md` editor, at the author's wish.
