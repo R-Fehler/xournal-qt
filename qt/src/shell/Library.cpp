@@ -518,7 +518,9 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     }
     Document& doc = *loaded.document;
     std::shared_lock lock(doc);
-    e->pdf = doc.getPdfFilepath();
+    // A hybrid PDF: its pages are those of the file itself (read from the clean copy in the app cache, whose name
+    // changes with every version of the file)
+    e->pdf = loaded.hybrid ? item.main() : doc.getPdfFilepath();
     e->pdfStamp = fileStamp(e->pdf);
     // PDF text read before: from this document's last entry, or another one with this PDF (e.g. the PDF of a
     // document that just got its .xopp, or that was moved by another program).

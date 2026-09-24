@@ -57,6 +57,7 @@
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "TextFlow.h"
+#include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
@@ -1543,6 +1544,7 @@ bool AppController::openPath(const QString& path) {
         Q_EMIT message(tr("Cannot open file"), QString::fromStdString(result.error), true);
         return false;
     }
+    const std::vector<std::string> hybridChanged = result.hybridChanged;
     // An untouched new document is replaced instead of keeping an empty tab around.
     const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
     tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
@@ -1579,19 +1581,150 @@ bool AppController::openPath(const QString& path) {
                                w.join('\n'),
                        false);
     }
+    if (!hybridChanged.empty() && tabs->currentSession()) {
+        // A hybrid PDF whose ink was moved, changed or deleted in another app: the window asks what to keep
+        tabs->currentSession()->setHybridChanges(hybridChanged);
+        Q_EMIT hybridEditedElsewhere(QString::fromStdString(file.filename().string()));
+    }
     return true;
 }
 
 bool AppController::save() {
-    if (!session() || !session()->hasFilePath()) {
+    if (!session()) {
         return false;
+    }
+    if (!session()->hasFilePath()) {
+        // "Save notes into the PDF itself": an annotated PDF is saved into it, as a hybrid PDF
+        return savesWithoutDialog() &&
+               saveAsHybrid(QUrl::fromLocalFile(QString::fromStdString(session()->annotatedPdf().string())));
     }
     auto r = session()->save();
     if (!r.ok) {
         Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
+    } else if (session()->isHybrid()) {
+        afterHybridSave();
     }
     Q_EMIT titleChanged();
     return r.ok;
+}
+
+namespace {
+bool settingOn(Settings* settings, const char* key) {
+    bool on = false;
+    settings->getCustomElement("xournalQt").getBool(key, on);
+    return on;
+}
+}  // namespace
+
+bool AppController::isHybrid() const { return session() && session()->isHybrid(); }
+
+bool AppController::savesWithoutDialog() const {
+    if (!session()) {
+        return false;
+    }
+    if (session()->hasFilePath()) {
+        return true;
+    }
+    const fs::path pdf = session()->annotatedPdf();
+    return !pdf.empty() && settingOn(app->getSettings(), "hybridIntoPdf") && !HybridPdf::inCache(pdf) &&
+           !MergedPdf::inCache(pdf);
+}
+
+QUrl AppController::suggestedHybridFile() const {
+    if (!session()) {
+        return {};
+    }
+    fs::path target;
+    if (session()->isHybrid()) {
+        target = session()->getFilePath();
+    } else if (const fs::path pdf = session()->annotatedPdf(); !pdf.empty() && !HybridPdf::inCache(pdf)) {
+        target = settingOn(app->getSettings(), "hybridIntoPdf") ? pdf
+                                                                 : pdf.parent_path() / (pdf.stem().string() + ".notes.pdf");
+    } else {
+        target = fs::path(suggestedSaveFile().toLocalFile().toStdString());
+        target.replace_extension(".pdf");
+        std::error_code ec;
+        if (fs::exists(target, ec) && !HybridPdf::isHybrid(target)) {
+            target.replace_extension(".notes.pdf");  // (never over another PDF by default)
+        }
+    }
+    return QUrl::fromLocalFile(QString::fromStdString(target.string()));
+}
+
+bool AppController::saveAsHybrid(const QUrl& url) {
+    if (!session()) {
+        return false;
+    }
+    const fs::path target(url.toLocalFile().toStdString());
+    auto r = session()->saveAsHybrid(target);
+    if (!r.ok) {
+        Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
+    } else {
+        app->getSettings()->setLastSavePath(target.parent_path());
+        recent->add(session()->getFilePath());
+        afterHybridSave();
+    }
+    Q_EMIT titleChanged();
+    return r.ok;
+}
+
+void AppController::afterHybridSave() {
+    if (settingOn(app->getSettings(), "hybridExportXopp")) {
+        fs::path xopp = session()->getFilePath();
+        xopp.replace_extension(".xopp");
+        if (auto r = session()->exportXopp(xopp); !r.ok) {
+            Q_EMIT message(tr("Export for Xournal++ failed"), QString::fromStdString(r.error), true);
+        }
+    }
+    library->refresh();
+}
+
+QUrl AppController::suggestedXoppExport() const {
+    if (!session() || !session()->hasFilePath()) {
+        return {};
+    }
+    fs::path xopp = session()->getFilePath();
+    xopp.replace_extension(".xopp");
+    return QUrl::fromLocalFile(QString::fromStdString(xopp.string()));
+}
+
+bool AppController::exportXopp(const QUrl& url) {
+    if (!session()) {
+        return false;
+    }
+    fs::path xopp(url.toLocalFile().toStdString());
+    if (xopp.extension() != ".xopp") {
+        xopp += ".xopp";
+    }
+    auto r = session()->exportXopp(xopp);
+    if (!r.ok) {
+        Q_EMIT message(tr("Export failed"), QString::fromStdString(r.error), true);
+        return false;
+    }
+    library->refresh();
+    Q_EMIT pageActionDone(tr("Exported to %1").arg(QString::fromStdString(xopp.filename().string())), false);
+    return true;
+}
+
+bool AppController::importHybridChanges() {
+    if (!session()) {
+        return false;
+    }
+    std::string error;
+    if (!session()->importHybridChanges(error)) {
+        if (!error.empty()) {
+            Q_EMIT message(tr("Import failed"), QString::fromStdString(error), true);
+        }
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("The other app's ink is kept as plain annotations"), false);
+    return true;
+}
+
+void AppController::keepHybridData() {
+    if (session()) {
+        session()->setHybridChanges({});
+    }
 }
 
 bool AppController::saveAs(const QUrl& url) {
@@ -2061,7 +2194,10 @@ QUrl AppController::suggestedExportFile() const {
         return {};
     }
     fs::path target;
-    if (session()->hasFilePath()) {
+    if (session()->isHybrid()) {
+        target = session()->getFilePath();
+        target = target.parent_path() / (target.stem().string() + "_export.pdf");  // never the hybrid PDF itself
+    } else if (session()->hasFilePath()) {
         target = session()->getFilePath();
         target.replace_extension(".pdf");
     } else if (const fs::path pdf = session()->annotatedPdf(); !pdf.empty()) {

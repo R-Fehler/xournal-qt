@@ -22,8 +22,10 @@ namespace xqt {
 struct DocumentItem {
     fs::path xopp;  ///< the .xopp / .xoj, or empty
     fs::path pdf;   ///< the PDF with the same name next to it, or empty
-    /// The file to open: the .xopp, else the PDF.
-    const fs::path& main() const { return xopp.empty() ? pdf : xopp; }
+    /// The PDF is a hybrid PDF and the .xopp its export for Xournal++ (hybrid-pdf.md): the PDF is the document.
+    bool hybrid = false;
+    /// The file to open: the .xopp, else the PDF (a hybrid PDF also with its .xopp).
+    const fs::path& main() const { return xopp.empty() || hybrid ? pdf : xopp; }
     fs::path folder() const { return main().parent_path(); }
     /// The name shown for it: the file name without extension.
     std::string name() const;

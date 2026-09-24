@@ -126,6 +126,20 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.getCustomElement("xournalQt").setBool("resumeAtLastPage", v.toBool());
             s.customSettingsChanged();
         });
+    // Hybrid PDFs (qt/docs/hybrid-pdf.md): notes of an annotated PDF go into the PDF itself (off: "name.notes.pdf");
+    // whether that was explained; a .xopp for Xournal++ written next to a hybrid PDF on every save
+    for (const char* key: {"hybridIntoPdf", "hybridIntoPdfExplained", "hybridExportXopp"}) {
+        add(key,
+            [&s, key] {
+                bool on = false;
+                s.getCustomElement("xournalQt").getBool(key, on);
+                return QVariant(on);
+            },
+            [&s, key](const QVariant& v) {
+                s.getCustomElement("xournalQt").setBool(key, v.toBool());
+                s.customSettingsChanged();
+            });
+    }
     add("canvasMemory", [&s] { return QVariant(canvasMemory(s)); },
         [&s](const QVariant& v) {
             const int maxMb = static_cast<int>(CanvasMemory::maxLimit() / (1024 * 1024));

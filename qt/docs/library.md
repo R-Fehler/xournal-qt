@@ -22,6 +22,9 @@ A **library** is a plain folder of documents that a window works in, like a work
 ## Documents on disk
 - `name.xopp` next to `name.pdf` is **one** document, and it opens as the `.xopp`. A lone `.xopp` (or `.xoj`) or a
   lone PDF is one document too. Older `name.pdf.xopp` files pair with `name.pdf`.
+- A **hybrid PDF** (`qt/docs/hybrid-pdf.md`) is one document, a PDF that carries its `.xopp`. Next to its `.xopp`
+  export for Xournal++ (`name.xopp` with a hidden `.name.pages.pdf`) the pair is one card that opens the hybrid PDF.
+  Its search text is its pages' text plus its text elements.
 - These files are never shown:
   - `name.xopp.bg.pdf`, an attached PDF. It belongs to its `.xopp` and travels with it.
   - `.name.pages.pdf`, the merged PDF of a `.xopp` with PDF pages pasted from other PDFs (below). It belongs to its

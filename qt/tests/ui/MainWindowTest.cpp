@@ -29,9 +29,22 @@
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 #include <cairo-pdf.h>
+#include <qpdf/DLL.h>
+#if QPDF_MAJOR_VERSION == 11
+#define POINTERHOLDER_TRANSITION 4
+#endif
+#include <qpdf/QPDF.hh>
+#include <qpdf/QPDFObjectHandle.hh>
+#include <qpdf/QPDFPageDocumentHelper.hh>
+#include <qpdf/QPDFPageObjectHelper.hh>
+#include <qpdf/QPDFWriter.hh>
 
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/Point.h"
+#include "model/Stroke.h"
+#include "undo/InsertUndoAction.h"
+#include "undo/UndoRedoHandler.h"
 #include "model/Text.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
@@ -46,6 +59,8 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/HybridPdf.h"
+#include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
 #include "shell/LibraryModel.h"
 #include "shell/PagesModel.h"
@@ -3488,4 +3503,186 @@ TEST_F(MainWindowTest, textModeTypesThePageText) {
     wait(300);
     click(find<QQuickItem>("textFlowCancel"));
     EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
+}
+
+// --- Hybrid PDF (qt/docs/hybrid-pdf.md) -----------------------------------------------------------------------------
+
+namespace {
+void makeLecturePdf(const QString& file, int pages) {
+    cairo_surface_t* s = cairo_pdf_surface_create(file.toUtf8().constData(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    cairo_set_font_size(cr, 24);
+    for (int i = 0; i < pages; ++i) {
+        cairo_move_to(cr, 72, 100);
+        cairo_show_text(cr, ("lecturepage" + std::to_string(i + 1)).c_str());
+        cairo_show_page(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+
+/// A stroke on a page of the current document, through the undo stack (the document is changed).
+void drawStroke(xqt::DocumentSession& s, size_t pageNo) {
+    auto page = s.getDocument()->getPage(pageNo);
+    auto stroke = std::make_unique<Stroke>();
+    stroke->setWidth(2);
+    stroke->setColor(Color(0xffcc0000U));
+    stroke->addPoint(Point(100, 100, 1.0));
+    stroke->addPoint(Point(200, 180, 3.0));
+    const Stroke* raw = stroke.get();
+    Layer* layer = page->getSelectedLayer();
+    s.getDocument()->lock();
+    layer->addElement(std::move(stroke));
+    s.getDocument()->unlock();
+    s.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, raw));
+}
+
+size_t strokesOn(Document& doc, size_t pageNo) {
+    size_t n = 0;
+    for (const Layer* l: doc.getPage(pageNo)->getLayers()) {
+        for (const auto& e: l->getElementsView()) {
+            n += e->getType() == ELEMENT_STROKE;
+        }
+    }
+    return n;
+}
+}  // namespace
+
+// More → Save as hybrid PDF…: an annotated PDF gets "name.notes.pdf"; then Ctrl+S writes the hybrid PDF again, and
+// More offers the .xopp for Xournal++ (also on every save, a setting). In the library the two are one document.
+TEST_F(MainWindowTest, savedAsHybridPdfCtrlSKeepsItHybrid) {
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 3);
+    ASSERT_TRUE(controller->openPath(pdf));
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    drawStroke(*s, 1);
+    ASSERT_NE(find("saveHybridItem"), nullptr);
+    ASSERT_NE(find("exportXoppItem"), nullptr);  // (in the More menu, shown for a hybrid PDF: isHybrid)
+    EXPECT_FALSE(controller->isHybrid());
+    EXPECT_FALSE(controller->savesWithoutDialog()) << "Ctrl+S asks where (as before)";
+
+    const QUrl suggestion = controller->suggestedHybridFile();
+    EXPECT_EQ(suggestion.toLocalFile(), dir.filePath("lecture.notes.pdf"));
+    ASSERT_TRUE(controller->saveAsHybrid(suggestion));
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_FALSE(controller->modified());
+    EXPECT_EQ(controller->title(), "lecture.notes.pdf");
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(dir.filePath("lecture.notes.pdf").toStdString())));
+    const QByteArray original = [&] {
+        QFile f(pdf);
+        f.open(QIODevice::ReadOnly);
+        return f.readAll();
+    }();
+    EXPECT_FALSE(original.contains("XournalQt")) << "the lecture itself is left alone";
+
+    // Ctrl+S: the hybrid PDF again, with the new stroke
+    drawStroke(*s, 2);
+    key(Qt::Key_S, Qt::ControlModifier);
+    EXPECT_FALSE(controller->modified());
+    auto reopened = xqt::DocumentSession::loadFile(fs::path(dir.filePath("lecture.notes.pdf").toStdString()));
+    ASSERT_TRUE(reopened.document);
+    EXPECT_TRUE(reopened.hybrid);
+    EXPECT_EQ(strokesOn(*reopened.document, 2), 1u);
+
+    // A .xopp for Xournal++ on every save
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    EXPECT_FALSE(settings->get("hybridExportXopp").toBool()) << "off by default";
+    settings->set("hybridExportXopp", true);
+    drawStroke(*s, 0);
+    key(Qt::Key_S, Qt::ControlModifier);
+    settings->set("hybridExportXopp", false);
+    const fs::path xopp = dir.filePath("lecture.notes.xopp").toStdString();
+    ASSERT_TRUE(fs::exists(xopp));
+    EXPECT_TRUE(fs::exists(dir.filePath(".lecture.notes.pages.pdf").toStdString())) << "its PDF, hidden";
+    auto exported = xqt::DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(exported.document) << exported.error;
+    EXPECT_EQ(strokesOn(*exported.document, 0), 1u);
+    const auto item = xqt::DocumentFiles::itemOf(xopp);
+    EXPECT_TRUE(item.hybrid);
+    EXPECT_EQ(item.main(), fs::path(dir.filePath("lecture.notes.pdf").toStdString())) << "one card: the hybrid PDF";
+    EXPECT_TRUE(controller->suggestedExportFile().toLocalFile().endsWith("lecture.notes_export.pdf"))
+            << "Export as PDF never overwrites the hybrid PDF";
+}
+
+// "Save notes into the PDF itself" (off by default) explains itself once; then Ctrl+S on an annotated PDF writes the
+// notes into it without asking, keeping "name.original.pdf".
+TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    EXPECT_FALSE(settings->get("hybridIntoPdf").toBool()) << "off by default";
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("documentsTab"));
+    auto* toggle = findItem("hybridIntoPdfSwitch");
+    ASSERT_NE(toggle, nullptr);
+    until([&] { return toggle->isVisible(); });
+    click(toggle);
+    EXPECT_TRUE(settings->get("hybridIntoPdf").toBool());
+    QObject* explanation = find("intoPdfExplanation");
+    ASSERT_NE(explanation, nullptr);
+    EXPECT_TRUE(waitOpened(explanation, true)) << "explained the first time";
+    QMetaObject::invokeMethod(explanation, "close");
+    ASSERT_TRUE(waitOpened(explanation, false));
+    click(toggle);
+    click(toggle);
+    wait(100);
+    EXPECT_FALSE(explanation->property("visible").toBool()) << "only once";
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 2);
+    ASSERT_TRUE(controller->openPath(pdf));
+    drawStroke(*controller->tabManager().currentSession(), 0);
+    EXPECT_TRUE(controller->savesWithoutDialog());
+    EXPECT_EQ(controller->suggestedHybridFile().toLocalFile(), pdf);
+    key(Qt::Key_S, Qt::ControlModifier);
+    settings->set("hybridIntoPdf", false);
+    EXPECT_FALSE(controller->modified());
+    EXPECT_TRUE(controller->isHybrid());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(pdf.toStdString())));
+    EXPECT_TRUE(QFile::exists(dir.filePath("lecture.original.pdf")));
+}
+
+// A hybrid PDF whose ink another app moved: the window says so and offers to keep ours or import theirs.
+TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
+    QTemporaryDir dir;
+    const QString pdf = dir.filePath("lecture.pdf");
+    makeLecturePdf(pdf, 2);
+    const QString hybrid = dir.filePath("lecture.notes.pdf");
+    {
+        auto loaded = xqt::DocumentSession::loadFile(pdf.toStdString());
+        ASSERT_TRUE(loaded.document);
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setWidth(2);
+        stroke->addPoint(Point(100, 100, 1.0));
+        stroke->addPoint(Point(200, 180, 3.0));
+        loaded.document->getPage(0)->getSelectedLayer()->addElement(std::move(stroke));
+        ASSERT_TRUE(xqt::HybridPdf::write(*loaded.document, hybrid.toStdString()).ok);
+    }
+    {  // another app moves our ink
+        QPDF q;
+        q.processFile(hybrid.toUtf8().constData());
+        auto annots = QPDFPageDocumentHelper(q).getAllPages().at(0).getAnnotations();
+        ASSERT_EQ(annots.size(), 1u);
+        annots[0].getObjectHandle().replaceKey("/Rect", QPDFObjectHandle::parse("[300 300 400 400]"));
+        QPDFWriter w(q, (hybrid + ".tmp").toUtf8().constData());
+        w.write();
+        QFile::remove(hybrid);
+        QFile::rename(hybrid + ".tmp", hybrid);
+    }
+    QObject* dialog = find("hybridEditedDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(controller->openPath(hybrid));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u) << "the Xournal data until the choice";
+    click(findItem("hybridImportButton"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(strokesOn(*s->getDocument(), 0), 0u) << "the other app's version, as a plain annotation";
+    EXPECT_TRUE(controller->modified());
+    controller->undo();
+    EXPECT_EQ(strokesOn(*s->getDocument(), 0), 1u);
 }

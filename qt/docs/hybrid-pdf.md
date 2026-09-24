@@ -161,3 +161,21 @@ Code: `qt/src/session/HybridPdf.*` (qpdf and cairo), tests in `qt/tests/session/
      and survives a save; a moved and a deleted annotation of ours are reported, and importing them empties those
      layers (undo brings them back); notes saved into the PDF itself keep `name.original.pdf` byte for byte; the
      `.xopp` export opens as the same document with a base PDF without annotations.
+3. **UI** (done).
+   - More → **Save as hybrid PDF…** for any document. The suggestion: the document's own hybrid PDF; for an
+     annotated PDF `name.notes.pdf` next to it, or the PDF itself with the setting on; for other documents the
+     `.xopp` suggestion as `.pdf` (`name.notes.pdf` if a PDF of that name exists). Once saved as hybrid, the title
+     is the PDF and Ctrl+S writes it again.
+   - Settings → Documents → Hybrid PDF: **Save notes into the PDF itself** (off; turning it on explains it once:
+     Ctrl+S on an annotated PDF then writes into it without asking, keeping `name.original.pdf` the first time) and
+     **On every save of a hybrid PDF, also write a .xopp for Xournal++** (off).
+   - More → **Export as .xopp for Xournal++…** (shown for a hybrid PDF): `name.xopp` next to it, its PDF
+     `.name.pages.pdf` (the hybrid PDF has the name `name.pdf`); written again by the next export. Deviation: the
+     automatic export is one global setting, not per document or library.
+   - Export as PDF of a hybrid PDF suggests `name_export.pdf`, never the file itself.
+   - Opening a hybrid PDF whose ink another app changed asks: **Keep the Xournal data** (the next save writes it
+     again) or **Import the other app's changes** (plain annotations; the layers emptied, undoable).
+   - Library: a hybrid PDF is one card; its search text is the text of its pages plus the text elements of the
+     embedded document, and it is read again when the file changes (the index keys it by the hybrid PDF itself,
+     not by the clean copy). A hybrid PDF with its exported `.xopp` is one card that opens the hybrid PDF (only
+     checked when `.name.pages.pdf` exists, so listing folders stays cheap). No "has notes" badge yet.

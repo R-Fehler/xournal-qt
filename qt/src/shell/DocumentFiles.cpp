@@ -11,6 +11,7 @@
 
 #include "model/Document.h"
 #include "session/DocumentSession.h"
+#include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
 
 namespace xqt {
@@ -235,6 +236,16 @@ std::string DocumentItem::name() const {
 
 namespace DocumentFiles {
 
+namespace {
+/// A .xopp exported from the hybrid PDF next to it: its PDF pages are in ".name.pages.pdf" (the hybrid PDF has the
+/// name). Only then is the PDF looked into, so listing folders stays cheap.
+void markHybrid(DocumentItem& item) {
+    item.hybrid = !item.xopp.empty() && !item.pdf.empty() && fileExists(pagesOf(item.xopp)) &&
+                  HybridPdf::isHybrid(item.pdf);
+}
+}  // namespace
+
+
 bool isDocumentFile(const fs::path& file) { return isXopp(file) || isPdf(file); }
 
 fs::path attachmentOf(const fs::path& xopp) {
@@ -288,6 +299,7 @@ Listing scan(const fs::path& dir) {
         if (pdf != pdfs.end()) {
             item.pdf = pdf->second;
             pdfs.erase(pdf);
+            markHybrid(item);
         }
         l.items.push_back(std::move(item));
     }
@@ -343,6 +355,7 @@ DocumentItem itemOf(const fs::path& file) {
         } else if (const std::string plain = withoutPdfSuffix(stem); !plain.empty() && fileExists(dir / stem)) {
             item.pdf = dir / stem;
         }
+        markHybrid(item);
         return item;
     }
     if (isPdf(file)) {
@@ -353,6 +366,7 @@ DocumentItem itemOf(const fs::path& file) {
                 break;
             }
         }
+        markHybrid(item);
         return item;
     }
     return {};
