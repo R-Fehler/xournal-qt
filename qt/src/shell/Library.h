@@ -10,8 +10,9 @@
  * (tied to the PDF the document uses and its size / modification time) and, per page, which PDF page it shows and
  * the text of its text elements. When only the .xopp changed (annotations, text elements, pages moved), it is read
  * again but the PDF text is kept; PDF text is read only for PDF pages not seen before, or when the PDF changed.
- * Documents renamed or moved by the app keep their entries; moved by another program, they are found again by
- * name, size and time. Everything happens in the background. Each folder stores the entries of its documents, by
+ * Documents renamed or moved by the app keep their entries; moved or renamed by another program (or seen under
+ * their new names before the app told the index about the move), they are found again by size and time, with the
+ * same name or the same content (a sample of the file). Everything happens in the background. Each folder stores the entries of its documents, by
  * file name, in two packs: "notes" (small, written again when a .xopp is saved) and "pdf-text" (big, written when
  * a PDF changed). Opening a library reads the packs of all its folders and merges them.
  *
@@ -224,6 +225,8 @@ private:
         QString xoppStamp;               ///< of the .xopp, the Markdown file, the image alone ("": a PDF alone)
         fs::path pdf;                    ///< the PDF it uses (next to it, elsewhere, attached; "": none)
         QString pdfStamp;
+        QString sample;                  ///< a hash of the start and end of its main file ("": not known, entries
+                                         ///< of older versions): tells two files with the same size and time apart
         std::map<int, QString> pdfText;  ///< simplified text of the PDF pages it shows
         std::vector<int> pdfPage;        ///< per page: the PDF page it shows (-1: none)
         QStringList elementText;         ///< per page: the text of its text elements (simplified)
@@ -255,7 +258,8 @@ private:
 
     void run(std::vector<DocumentItem> items, quint64 generation);
     void applyMoves(const std::vector<std::pair<fs::path, fs::path>>& moves);
-    /// Read a document; PDF text is taken from `previous` or another entry with the same PDF where possible.
+    /// Read a document; PDF text is taken from `previous` or another entry with the same PDF where possible. Null
+    /// when it could not be read because it is gone (moved meanwhile: its entry stays for the move).
     std::shared_ptr<Entry> read(const DocumentItem& item, const EntryPtr& previous);
     /// An entry with the PDF text of `e`'s PDF (the same size and time): `previous`, else any (the lock is not held).
     EntryPtr donorFor(const Entry& e, const EntryPtr& previous) const;
@@ -269,8 +273,10 @@ private:
     /// Set or drop the entry of a document; its folder's packs are written later (the lock is held).
     void put(const EntryPtr& e);
     void erase(const fs::path& file);
-    /// An entry of a file that is gone, with this name and the same files (moved by another program).
-    EntryPtr movedHere(const DocumentItem& item, std::multimap<std::string, EntryPtr>& orphans, bool& collected);
+    /// An entry of a file that is gone whose files have the same size and time as this document's, taken over under
+    /// its path (moved or renamed by another program, or by the app before the index was told): one with the same
+    /// name, else one with the same sample (without a sample: only by name). Orphans by kind and stamp.
+    EntryPtr movedHere(const DocumentItem& item, std::multimap<QString, EntryPtr>& orphans, bool& collected);
     /// Returns whether everything could be written.
     bool writeChanged();
     /// Remove `dir` and its parents while they are empty folders in the library's folder in the app cache.

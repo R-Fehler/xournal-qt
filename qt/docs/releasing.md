@@ -39,18 +39,6 @@ when one of the jobs failed.
 
 A build without a tag: start the workflow by hand ("Run workflow"); it uses the version from `qt/CMakeLists.txt`.
 
-## Known flaky test
-
-`LibraryTest.renamedAndMovedDocumentsKeepTheirIndex` fails about once in 13 runs (3 of 40 measured), here and in a
-container. It guards that renaming or moving a document in the library does not read its PDF text again: the library
-model moves the files on a worker, and its file system watcher can ask the index to look at the folder again before
-the move has been told to it (`LibraryIndex::moved`), so the document is sometimes indexed anew. The results stay
-right; it only costs time. The workflows therefore give every test one more try (`--repeat until-pass:2`).
-
-A fix for the cause: when the index finds no entry for a document, look for a known entry whose files have the same
-size and time and take that one over under the new path, instead of reading the document again. Then the order of the
-two messages does not matter any more and the retry can go.
-
 ## Which package for which system
 
 The fork needs Qt 6.5 or newer, cairo, pango, poppler-glib, libzip, qpdf and gdk-pixbuf, and optionally

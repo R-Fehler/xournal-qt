@@ -213,6 +213,28 @@ QString entryKind(const DocumentItem& item) {
            : !item.other.empty() ? QStringLiteral("text")
                                  : QStringLiteral("image");
 }
+/// A hash of the start and end of a file (all of a small one), with its size: two files with the same size and time
+/// are not taken for each other unless it is the same too ("": cannot be read).
+QString contentSample(const fs::path& file) {
+    constexpr qint64 PART = 64 * 1024;
+    QFile f(qstr(file));
+    if (!f.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+    const qint64 size = f.size();
+    hash.addData(QByteArray::number(size));
+    if (size <= 2 * PART) {
+        hash.addData(f.readAll());
+    } else {
+        hash.addData(f.read(PART));
+        if (!f.seek(size - PART)) {
+            return {};
+        }
+        hash.addData(f.read(PART));
+    }
+    return QString::fromLatin1(hash.result().toBase64(QByteArray::OmitTrailingEquals));
+}
 /// Entries without pages: a Markdown file, a text file, an image
 bool pageless(const QString& kind) {
     return kind == QLatin1String("md") || kind == QLatin1String("text") || kind == QLatin1String("image");
@@ -306,6 +328,9 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
                    {QStringLiteral("xopp"), e.xoppStamp},  {QStringLiteral("pdf"), pdf},
                    {QStringLiteral("pdfStamp"), e.pdfStamp}, {QStringLiteral("pdfPages"), pdfPages},
                    {QStringLiteral("text"), text},         {QStringLiteral("aspects"), aspects}};
+    if (!e.sample.isEmpty()) {
+        notes.insert(QStringLiteral("sample"), e.sample);
+    }
     if (e.kind == QLatin1String("md")) {
         QCborArray levels;
         for (int level: e.blockLevel) {
@@ -342,6 +367,7 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
         e->pdf = pdf.is_absolute() ? pdf : (folder / pdf).lexically_normal();
     }
     e->pdfStamp = notes.value(QStringLiteral("pdfStamp")).toString();
+    e->sample = notes.value(QStringLiteral("sample")).toString();
     const QCborArray pdfPages = notes.value(QStringLiteral("pdfPages")).toArray();
     const QCborArray texts = notes.value(QStringLiteral("text")).toArray();
     const QCborArray aspects = notes.value(QStringLiteral("aspects")).toArray();
@@ -609,10 +635,18 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     e->kind = entryKind(item);
     e->name = QString::fromStdString(item.name());
     e->xoppStamp = ownStamp(item);
+    e->sample = contentSample(item.main());
+    auto gone = [&] {
+        std::error_code ec;
+        return !fs::exists(item.main(), ec);
+    };
     if (!item.md.empty()) {
         // Plain text: its passages through md4c, without the syntax
-        ++docsRead;
         const md::Document doc = md::parse(MarkdownFile::read(item.md));
+        if (gone()) {
+            return nullptr;
+        }
+        ++docsRead;
         for (const md::Passage& p: md::passages(doc)) {
             e->blockText << simplified(QString::fromStdString(p.text));
             e->blockLevel.push_back(p.kind == md::Passage::Kind::Heading ? p.level : 0);
@@ -624,9 +658,12 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     }
     if (!item.other.empty()) {
         // A text file: its text (a big one: its name)
-        ++docsRead;
         QFile f(qstr(item.other));
-        if (f.size() <= TEXT_LIMIT && f.open(QIODevice::ReadOnly)) {
+        if (!f.open(QIODevice::ReadOnly) && gone()) {
+            return nullptr;
+        }
+        ++docsRead;
+        if (f.isOpen() && f.size() <= TEXT_LIMIT) {
             QByteArray bytes = f.readAll();
             if (bytes.startsWith("\xEF\xBB\xBF")) {
                 bytes.remove(0, 3);
@@ -639,10 +676,16 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
         return e;
     }
     if (item.xopp.empty() && item.pdf.empty()) {
+        if (gone()) {
+            return nullptr;
+        }
         ++docsRead;
         return e;  // an image: its name
     }
     auto loaded = DocumentSession::loadFile(item.main());
+    if (!loaded.document && gone()) {
+        return nullptr;
+    }
     ++docsRead;
     if (!loaded.document) {
         return e;  // unreadable: empty, not read again until it changes
@@ -729,6 +772,7 @@ bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std:
     e->kind = QStringLiteral("xopp");
     e->name = QString::fromStdString(item.name());
     e->xoppStamp = fileStamp(item.xopp);
+    e->sample = contentSample(item.xopp);
     std::shared_lock lock(doc);
     e->pdf = doc.getPdfFilepath();
     e->pdfStamp = fileStamp(e->pdf);
@@ -751,10 +795,18 @@ bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std:
     return true;
 }
 
-LibraryIndex::EntryPtr LibraryIndex::movedHere(const DocumentItem& item, std::multimap<std::string, EntryPtr>& orphans,
+namespace {
+/// What must be the same for a document to be the file of an entry: its kind and the size and time of its own file
+/// (a PDF alone: of the PDF). "": nothing to go by.
+QString orphanKey(const QString& kind, const QString& stamp) {
+    return stamp.isEmpty() ? QString() : kind + '|' + stamp;
+}
+}  // namespace
+
+LibraryIndex::EntryPtr LibraryIndex::movedHere(const DocumentItem& item, std::multimap<QString, EntryPtr>& orphans,
                                                bool& collected) {
     if (!collected) {
-        // Entries whose file is gone (once per update, when a document without an entry is found)
+        // Entries whose file is gone, in any folder (once per update, when a document without an entry is found)
         collected = true;
         std::vector<EntryPtr> all;
         {
@@ -767,30 +819,69 @@ LibraryIndex::EntryPtr LibraryIndex::movedHere(const DocumentItem& item, std::mu
         }
         for (const auto& e: all) {
             if (std::error_code ec; !fs::exists(e->file, ec)) {
-                orphans.emplace(e->file.filename().string(), e);
+                const bool pdfAlone = e->kind == QLatin1String("pdf");
+                if (QString key = orphanKey(e->kind, pdfAlone ? e->pdfStamp : e->xoppStamp); !key.isEmpty()) {
+                    orphans.emplace(std::move(key), e);
+                }
             }
         }
     }
     const fs::path file = item.main();
-    const auto [from, to] = orphans.equal_range(file.filename().string());
+    const QString kind = entryKind(item);
+    const QString key = orphanKey(kind, kind == QLatin1String("pdf") ? fileStamp(item.pdf) : ownStamp(item));
+    if (key.isEmpty()) {
+        return nullptr;
+    }
+    // The same size and time: the same file if it has the same name, or the same content (two different files can
+    // have the same size and time; entries without a sample are only found by their name)
+    const auto [from, to] = orphans.equal_range(key);
+    auto match = to;
+    QString sample;
     for (auto it = from; it != to; ++it) {
         const EntryPtr& old = it->second;
-        // The same file: the same size and time
-        const bool same = item.xopp.empty() && !item.pdf.empty()
-                                  ? old->xoppStamp.isEmpty() && old->pdfStamp == fileStamp(item.pdf)
-                                  : old->xoppStamp == ownStamp(item);
-        if (!same) {
+        const bool sameName = old->file.filename() == file.filename();
+        if (!old->sample.isEmpty()) {
+            if (sample.isEmpty()) {
+                sample = contentSample(file);
+            }
+            if (old->sample != sample) {
+                continue;
+            }
+        } else if (!sameName) {
             continue;
         }
-        auto e = std::make_shared<Entry>(*old);
-        e->file = file;
-        if (e->pdf.parent_path() == old->file.parent_path()) {
-            e->pdf = file.parent_path() / old->pdf.filename();  // its PDF (or attachment) came along
+        if (match == to || sameName) {
+            match = it;
+            if (sameName) {
+                break;
+            }
         }
-        orphans.erase(it);
-        return e;
     }
-    return nullptr;
+    if (match == to) {
+        return nullptr;
+    }
+    const EntryPtr old = match->second;
+    orphans.erase(match);
+    auto e = std::make_shared<Entry>(*old);
+    e->file = file;
+    e->name = QString::fromStdString(item.name());
+    // Its PDF, if it was next to it, came along (under the new name). Whether it is the same file (size and time),
+    // the caller sees (Entry::upToDate); if not, it is read, with the PDF text of the entries that still fit.
+    const fs::path oldFolder = old->file.parent_path();
+    if (old->pdf == old->file) {
+        e->pdf = file;
+    } else if (!old->pdf.empty() && old->pdf.parent_path() == oldFolder) {
+        if (old->pdf == DocumentFiles::attachmentOf(old->file)) {
+            e->pdf = DocumentFiles::attachmentOf(file);
+        } else if (old->pdf == DocumentFiles::pagesOf(old->file)) {
+            e->pdf = DocumentFiles::pagesOf(file);
+        } else if (!item.pdf.empty()) {
+            e->pdf = item.pdf;
+        } else {
+            e->pdf = file.parent_path() / old->pdf.filename();
+        }
+    }
+    return e;
 }
 
 void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
@@ -829,7 +920,7 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
     notify();
 
     std::set<fs::path> alive;
-    std::multimap<std::string, EntryPtr> orphans;
+    std::multimap<QString, EntryPtr> orphans;
     bool orphansCollected = false;
     int done = 0;
     for (const DocumentItem& item: items) {
@@ -858,10 +949,12 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
                 std::lock_guard lock(mtx);
                 put(current);
             }
-        } else {
-            auto fresh = read(item, current);
-            std::lock_guard lock(mtx);
-            put(std::move(fresh));
+        } else if (auto fresh = read(item, current)) {
+            std::error_code ec;
+            if (fs::exists(file, ec)) {
+                std::lock_guard lock(mtx);
+                put(std::move(fresh));
+            }  // else moved while it was read (its PDF perhaps missing): the entry it had goes with the move
         }
         doneCount = ++done;
         notify();
