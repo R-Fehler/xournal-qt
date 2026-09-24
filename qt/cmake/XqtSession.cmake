@@ -21,6 +21,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextMatch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/WordMatch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/WordMatch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Vocabulary.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/Vocabulary.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyMatch.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyMatch.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyQuery.h

@@ -366,6 +366,7 @@ void DocumentTextIndex::rebuild() {
     if (!worker || file != pdf || pdfText.size() != pdfPages) {
         pdf = file;
         pdfText.assign(pdfPages, QString());
+        pdfWords.assign(pdfPages, nullptr);
         pdfKnown.assign(pdfPages, 0);
         layouts.clear();
         if (worker) {
@@ -413,7 +414,10 @@ void DocumentTextIndex::refresh(size_t index) {
             joined += piece.shown.simplified();
         }
     }
-    page.elements = std::move(joined);
+    if (joined != page.elements) {
+        page.elements = std::move(joined);
+        page.words.reset();
+    }
     page.dirty = false;
     if (pdfNr != page.pdf) {
         page.pdf = pdfNr;
@@ -448,31 +452,72 @@ int DocumentTextIndex::count(size_t page, QStringView query) {
 }
 
 int DocumentTextIndex::count(size_t page, const std::vector<textmatch::Term>& terms) {
+    return terms.empty() ? 0 : count(page, words::Terms(terms));
+}
+
+int DocumentTextIndex::count(size_t page, const words::Terms& terms) {
     if (page >= pages.size() || terms.empty()) {
         return 0;
     }
     if (pages[page].dirty) {
         refresh(page);
     }
-    const Page& p = pages[page];
-    int n = textmatch::count(p.elements, terms);
-    if (p.pdf >= 0 && pdfKnown[static_cast<size_t>(p.pdf)]) {
-        n += textmatch::count(pdfText[static_cast<size_t>(p.pdf)], terms);
+    const bool fuzzy = terms.fuzzy();
+    const int nr = pages[page].pdf;
+    int n = terms.count({pages[page].elements}, fuzzy ? elementWords(page) : nullptr);
+    if (nr >= 0 && pdfKnown[static_cast<size_t>(nr)]) {
+        n += terms.count({pdfText[static_cast<size_t>(nr)]}, fuzzy ? pdfWordsOf(nr) : nullptr);
     }
     return n;
 }
 
 bool DocumentTextIndex::contains(size_t page, const textmatch::Term& term) {
+    return contains(page, words::Terms({term}), 0);
+}
+
+bool DocumentTextIndex::contains(size_t page, const words::Terms& terms, size_t i) {
     if (page >= pages.size()) {
         return false;
     }
     if (pages[page].dirty) {
         refresh(page);
     }
-    const Page& p = pages[page];
-    return textmatch::contains(p.elements, term.text, term.bounds) ||
-           (p.pdf >= 0 && pdfKnown[static_cast<size_t>(p.pdf)] &&
-            textmatch::contains(pdfText[static_cast<size_t>(p.pdf)], term.text, term.bounds));
+    const bool fuzzy = terms.fuzzy();
+    const int nr = pages[page].pdf;
+    return terms.contains(i, {pages[page].elements}, fuzzy ? elementWords(page) : nullptr) ||
+           (nr >= 0 && pdfKnown[static_cast<size_t>(nr)] &&
+            terms.contains(i, {pdfText[static_cast<size_t>(nr)]}, fuzzy ? pdfWordsOf(nr) : nullptr));
+}
+
+void DocumentTextIndex::prepareWords() {
+    for (size_t i = 0; i < pages.size(); ++i) {
+        if (pages[i].dirty) {
+            refresh(i);
+        }
+        elementWords(i);
+    }
+    for (size_t nr = 0; nr < pdfText.size(); ++nr) {
+        if (pdfKnown[nr]) {
+            pdfWordsOf(static_cast<int>(nr));
+        }
+    }
+}
+
+const words::Vocabulary* DocumentTextIndex::elementWords(size_t page) {
+    Page& p = pages[page];
+    if (!p.words) {
+        p.words = std::make_shared<const words::Vocabulary>(std::initializer_list<QStringView>{p.elements});
+    }
+    return p.words.get();
+}
+
+const words::Vocabulary* DocumentTextIndex::pdfWordsOf(int nr) {
+    auto& w = pdfWords[static_cast<size_t>(nr)];
+    if (!w) {
+        w = std::make_shared<const words::Vocabulary>(
+                std::initializer_list<QStringView>{pdfText[static_cast<size_t>(nr)]});
+    }
+    return w.get();
 }
 
 std::map<int, QString> DocumentTextIndex::pdfTexts() const {
@@ -535,6 +580,7 @@ void DocumentTextIndex::setPdfText(int nr, QString text, std::vector<size_t>& ch
         return;
     }
     pdfText[static_cast<size_t>(nr)] = std::move(text);
+    pdfWords[static_cast<size_t>(nr)].reset();
     known = 1;
     for (size_t i = 0; i < pages.size(); ++i) {
         if (pages[i].pdf == nr) {
@@ -617,6 +663,17 @@ size_t DocumentTextIndex::textBytes() const {
         bytes += sizeof(Page) + static_cast<size_t>(p.elements.capacity()) * 2;
     }
     return bytes + pdfKnown.size();
+}
+
+size_t DocumentTextIndex::vocabularyBytes() const {
+    size_t bytes = 0;
+    for (const auto& w: pdfWords) {
+        bytes += w ? w->bytes() : 0;
+    }
+    for (const Page& p: pages) {
+        bytes += p.words ? p.words->bytes() : 0;
+    }
+    return bytes;
 }
 
 size_t DocumentTextIndex::layoutBytes() const {
