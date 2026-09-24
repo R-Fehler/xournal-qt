@@ -202,6 +202,9 @@
     trash.
 - **`XQT_LOG_WINDOW=1` (2026-09-24):** logs window state, size and position changes, touches and presses, and what
   the app asks of the window, to chase the window that halves after a touch.
+- **The page grid stays where it is scrolled while searching, `qt/grid-search-scroll` (2026-09-24).** It moved to the
+  current hit on every search update. Hit places now arrive as pages scroll into view, so it jumped back while
+  scrolling. It now moves only when the current hit changes.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
