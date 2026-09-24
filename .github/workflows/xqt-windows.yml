@@ -1,0 +1,146 @@
+# xournal-qt for Windows: build the Qt frontend in MSYS2 UCRT64 (upstream Xournal++'s Windows toolchain) and
+# publish a portable folder as the artifact "xournal-qt-windows-x64" (downloaded as xournal-qt-windows-x64.zip).
+# See qt/docs/windows.md. Runs only when asked, or for pushes to the qt/windows-build branch.
+name: xournal-qt Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [qt/windows-build]
+
+concurrency:
+  group: xqt-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows x64 (MSYS2 UCRT64, Qt 6)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+      CCACHE_COMPILERCHECK: content
+    steps:
+      # Git for Windows checks out text files with CRLF by default; bash scripts must keep LF.
+      - name: Keep line endings as in the repository
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - uses: actions/checkout@v4
+
+      - name: MSYS2 UCRT64 with the build dependencies
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-ccache
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-cairo
+            mingw-w64-ucrt-x86_64-pango
+            mingw-w64-ucrt-x86_64-gdk-pixbuf2
+            mingw-w64-ucrt-x86_64-poppler
+            mingw-w64-ucrt-x86_64-qpdf
+            mingw-w64-ucrt-x86_64-libxml2
+            mingw-w64-ucrt-x86_64-libzip
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-svg
+
+      - name: What was installed
+        run: |
+          set -euo pipefail
+          echo "MSYSTEM=$MSYSTEM MINGW_PREFIX=$MINGW_PREFIX"
+          gcc --version | head -1
+          cmake --version | head -1
+          ninja --version
+          ccache --version | head -1
+          pacman -Q | grep -E 'qt6-(base|declarative|svg)|poppler|qpdf|cairo|pango|glib2|libzip|libxml2|gettext' || true
+          echo "Qt tools:"
+          ls "$MINGW_PREFIX/share/qt6/bin" 2> /dev/null || true
+          command -v windeployqt6 windeployqt-qt6 windeployqt qtpaths6 qtpaths-qt6 qtpaths || true
+
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: xqt-windows-ccache-${{ github.sha }}
+          restore-keys: xqt-windows-ccache-
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          mkdir -p build-logs
+          cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON \
+            2>&1 | tee build-logs/configure.log
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          ccache --zero-stats > /dev/null
+          # -k 0: keep going, so that one run shows every file that does not compile.
+          if ! cmake --build build -j "$(nproc)" -- -k 0 2>&1 | tee build-logs/build.log; then
+            echo "::group::The errors"
+            grep -nE 'error:|Error [0-9]|undefined reference|FAILED:' build-logs/build.log | head -200 || true
+            echo "::endgroup::"
+            {
+              echo "### Build errors"
+              echo '```'
+              grep -E 'error:|undefined reference' build-logs/build.log | sort -u | head -60 || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          ccache --show-stats || true
+
+      - name: Deploy into a portable folder
+        run: |
+          set -euo pipefail
+          bash qt/scripts/windows-deploy.sh build dist/xournal-qt 2>&1 | tee build-logs/deploy.log
+
+      - name: Publish the folder (xournal-qt-windows-x64.zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: xournal-qt-windows-x64
+          path: dist/
+          if-no-files-found: error
+
+      - name: Smoke test (CLI exports, the app off-screen)
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          bash qt/scripts/windows-smoke.sh dist/xournal-qt smoke
+
+      - name: Keep the smoke test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: smoke/
+          if-no-files-found: ignore
+
+      - name: Keep the build logs of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build-logs/
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeConfigureLog.yaml
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+            build/.ninja_log
+            build/install_manifest.txt
+          if-no-files-found: ignore
