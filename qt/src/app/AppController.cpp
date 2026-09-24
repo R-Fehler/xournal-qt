@@ -195,6 +195,7 @@ void AppController::makeTabs() {
     connect(referenceMode.get(), &ReferenceMode::copied, this, [this](const QString& what) {
         Q_EMIT pageActionDone(what, false);
     });
+
     connect(tabs.get(), &TabManager::pdfPagesFailed, this, [this](const QString& error) {
         Q_EMIT message(tr("Pasting PDF pages failed"),
                        tr("The pasted pages show their PDF page as a picture (its text cannot be searched).\n\n%1")
@@ -656,6 +657,9 @@ bool AppController::cutSelection() {
     if (CanvasView* r = editedReference()) {
         return r->cutSelection();
     }
+    if (referenceMode->focused()) {
+        return false;  // (the keys are with a reference for reading: nothing is cut, neither there nor in the notes)
+    }
     return canvas() && canvas()->cutSelection();
 }
 bool AppController::pasteElements() {
@@ -674,7 +678,7 @@ bool AppController::canPaste() const {
 void AppController::deleteSelection() {
     if (CanvasView* r = editedReference()) {
         r->deleteSelection();
-    } else if (canvas()) {
+    } else if (canvas() && !referenceMode->focused()) {
         canvas()->deleteSelection();
     }
 }

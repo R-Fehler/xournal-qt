@@ -782,3 +782,14 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       turn; both show sharp pages quickly, neither waits behind the other's pages rendered in advance. Swap roles:
       no page goes blurry or is drawn again. Switch to a third tab and back: the reference's pages near where it
       was read are still there.
+- [ ] (Follow-up) The reference has its own scroll bars (vertical; horizontal when zoomed in): drag them with a
+      finger and the pen; the notes keep theirs.
+- [ ] PDF text in the reference: press and hold a word (or right click, or the PDF text tool): its two knobs and its
+      pill appear on the reference's side and follow it while it scrolls; drag a knob: only the reference's
+      selection changes. For reading, the pill offers "Copy text" only; with the pen button on, also highlight
+      (with the colours), underline, strike through and paste here.
+- [ ] Press and hold (or right click) an empty place of the reference: for reading "Select all", "Go to page…",
+      "Fit width" (and "Copy" with a selection); with the pen button on the same pill as on the notes (Paste,
+      Select all, Image…), acting on the reference.
+- [ ] Lasso or rectangle in the reference: its bar appears above the reference's pill with Copy (and Deselect);
+      with the pen button on, also Cut, Paste and Delete.

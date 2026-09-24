@@ -3,6 +3,14 @@
 #include <algorithm>
 #include <cmath>
 
+#include <QClipboard>
+#include <QFile>
+#include <QGuiApplication>
+#include <QMimeData>
+#include <QUrl>
+
+#include "control/ToolEnums.h"
+#include "control/ToolHandler.h"
 #include "control/settings/Settings.h"
 
 #include "CanvasView.h"
@@ -84,20 +92,21 @@ void ReferenceMode::update() {
         connections.push_back(connect(v, &CanvasView::selectionChanged, this, &ReferenceMode::selectionChanged));
         connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::selectionChanged));
         connections.push_back(connect(v, &CanvasView::pdfTextSelectionCleared, this, &ReferenceMode::selectionChanged));
+        connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::pdfTextSelected));
+        connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::pdfTextSelectionChanged));
+        connections.push_back(
+                connect(v, &CanvasView::pdfTextSelectionCleared, this, &ReferenceMode::pdfTextSelectionChanged));
         connections.push_back(connect(v, &CanvasView::navigationChanged, this, &ReferenceMode::navigationChanged));
         // Links: offered as on the main canvas (a tap can be a mistake); followLink goes there
         connections.push_back(connect(v, &CanvasView::linkTapped, this, &ReferenceMode::linkTapped));
-        // A long press or right click: the word of the PDF there is selected, to copy it
-        connections.push_back(connect(v, &CanvasView::contextRequested, this, [this](QPointF viewPos) {
-            if (shownView) {
-                shownView->selectPdfTextAt(viewPos, false);
-            }
-        }));
+        // A long press or right click: the window offers what can be done there
+        connections.push_back(connect(v, &CanvasView::contextRequested, this, &ReferenceMode::contextRequested));
     }
     Q_EMIT changed();
     Q_EMIT pageChanged();
     Q_EMIT zoomChanged();
     Q_EMIT selectionChanged();
+    Q_EMIT pdfTextSelectionChanged();
     Q_EMIT navigationChanged();
     if (!active()) {
         setFocused(false);
@@ -295,6 +304,118 @@ void ReferenceMode::clearSelection() {
             shownView->clearSelection();
         }
     }
+}
+
+// --- the selections of the reference, for the same pills as the notes' (the actions of AppController) ------------
+
+bool ReferenceMode::pdfTextIsSelected() const { return shownView && shownView->hasPdfTextSelection(); }
+
+QRectF ReferenceMode::pdfSelectionEnds() const { return shownView ? shownView->pdfSelectionEnds() : QRectF(); }
+
+QRectF ReferenceMode::pdfSelectionBox() const { return shownView ? shownView->pdfSelectionBox() : QRectF(); }
+
+bool ReferenceMode::selectPdfTextAt(qreal x, qreal y) {
+    if (!shownView) {
+        return false;
+    }
+    // The same word again: its whole line (as on the notes)
+    const QPointF where(x, y);
+    const bool again = shownView->hasPdfTextSelection() &&
+                       shownView->pdfSelectionEnds().adjusted(-8, -8, 8, 8).contains(where);
+    const bool selected = shownView->selectPdfTextAt(where, again);
+    Q_EMIT pdfTextSelectionChanged();
+    return selected;
+}
+
+bool ReferenceMode::dragPdfSelection(qreal x, qreal y, bool startEnd) {
+    const bool moved = shownView && shownView->dragPdfSelection(QPointF(x, y), startEnd);
+    if (moved) {
+        Q_EMIT pdfTextSelectionChanged();
+    }
+    return moved;
+}
+
+void ReferenceMode::showPdfSelection() {
+    if (shownView) {
+        shownView->scrollToPdfSelection();
+    }
+}
+
+bool ReferenceMode::markPdfText(const QString& mode) {
+    // (for reading only the view marks nothing)
+    const CanvasView::PdfTextMode m = mode == "underline"       ? CanvasView::PdfTextMode::Underline
+                                      : mode == "strikethrough" ? CanvasView::PdfTextMode::Strikethrough
+                                                                : CanvasView::PdfTextMode::Highlight;
+    return shownView && editing() && shownView->markPdfText(m);
+}
+
+bool ReferenceMode::copyPdfText() {
+    const bool ok = shownView && shownView->copyPdfText();
+    if (ok) {
+        shownView->clearPdfTextSelection();
+        Q_EMIT copied(tr("Text copied from the reference"));
+    }
+    return ok;
+}
+
+void ReferenceMode::clearPdfTextSelection() {
+    if (shownView) {
+        shownView->clearPdfTextSelection();
+    }
+}
+
+bool ReferenceMode::copySelection() {
+    const bool ok = shownView && shownView->copySelection();
+    if (ok) {
+        Q_EMIT copied(tr("Copied from the reference"));
+    }
+    return ok;
+}
+
+bool ReferenceMode::cutSelection() { return shownView && editing() && shownView->cutSelection(); }
+
+void ReferenceMode::deleteSelection() {
+    if (shownView && editing()) {
+        shownView->deleteSelection();
+    }
+}
+
+bool ReferenceMode::pasteElements() {
+    return shownView && editing() && !shownSession->isReadOnly() && shownView->pasteElements();
+}
+
+bool ReferenceMode::pasteAt(qreal x, qreal y) {
+    return shownView && editing() && !shownSession->isReadOnly() && shownView->pasteElements(QPointF(x, y));
+}
+
+bool ReferenceMode::canPaste() const {
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal"));
+}
+
+void ReferenceMode::selectAllOnPage() {
+    if (!shownView) {
+        return;
+    }
+    ToolHandler* tools = shownSession->getToolHandler();
+    if (tools->getToolType() != TOOL_SELECT_RECT && tools->getToolType() != TOOL_SELECT_REGION) {
+        tools->selectTool(TOOL_SELECT_REGION);  // (as on the notes: the selection is at hand)
+        tools->fireToolChanged();
+    }
+    shownView->selectAllOnPage();
+}
+
+bool ReferenceMode::insertImage(const QUrl& file) {
+    QFile f(file.toLocalFile());
+    if (!shownView || !editing() || !f.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    ToolHandler* tools = shownSession->getToolHandler();
+    if (tools->getToolType() != TOOL_SELECT_RECT && tools->getToolType() != TOOL_SELECT_REGION) {
+        tools->selectTool(TOOL_SELECT_RECT);  // (so that the image can be moved and resized right away)
+        tools->fireToolChanged();
+    }
+    return shownView->insertImage(f.readAll());
 }
 
 }  // namespace xqt

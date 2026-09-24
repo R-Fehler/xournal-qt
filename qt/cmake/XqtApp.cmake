@@ -128,6 +128,9 @@ set(XQT_QML_FILES
     src/app/qml/FuzzyToggle.qml
     src/app/qml/Fuzzy.js
     src/app/qml/ReferenceSplit.qml
+    src/app/qml/CanvasScrollBars.qml
+    src/app/qml/PdfTextPill.qml
+    src/app/qml/SelectionPill.qml
     src/app/qml/Popups.js)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)

@@ -7,13 +7,15 @@ Row {
     id: row
     /// A color was chosen (it is the highlight color now).
     signal picked()
+    /// "" for the notes' pill; the reference's buttons are named "reference…"
+    property string namePrefix: ""
     spacing: 2
     Repeater {
         model: app.pdfHighlightColors
         delegate: AbstractButton {
             id: button
             required property color modelData
-            objectName: "highlightColor"
+            objectName: row.namePrefix === "" ? "highlightColor" : row.namePrefix + "HighlightColor"
             implicitWidth: 34
             implicitHeight: 40
             onClicked: {

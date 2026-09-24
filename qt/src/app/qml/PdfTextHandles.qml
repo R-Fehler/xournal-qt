@@ -1,30 +1,35 @@
 // The two knobs at the ends of selected PDF text: drag one and the selection follows, as on a phone. They appear
-// after a long press (or a right click) on text and while the "mark PDF text" tool has something selected.
+// after a long press (or a right click) on text and while the "mark PDF text" tool has something selected. Laid over
+// the canvas they belong to (the notes: target app; the reference beside them: target app.reference).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 
 Item {
     id: handles
-    objectName: "pdfTextHandles"
-    anchors.fill: canvas
-    visible: app.pdfTextIsSelected
+    objectName: namePrefix === "" ? "pdfTextHandles" : namePrefix + "PdfTextHandles"
+    /// The DocumentCanvas (a sibling of this item) and what acts on its text
+    property Item canvasItem: canvas
+    property var target: app
+    property string namePrefix: ""
+    anchors.fill: canvasItem
+    visible: target.pdfTextIsSelected
     z: 55
     /// Only the knobs take presses; everything else goes to the canvas under them (see DocumentCanvasItem).
     property bool inputTransparent: true
 
     /// Where the selection begins and ends (canvas coordinates); read again whenever it changes
     property rect ends: Qt.rect(0, 0, 0, 0)
-    function refresh() { ends = app.pdfSelectionEnds() }
+    function refresh() { ends = handles.target.pdfSelectionEnds() }
     Connections {
-        target: app
+        target: handles.target
         function onPdfTextSelectionChanged() { handles.refresh() }
         function onPdfTextModeChanged() { handles.refresh() }
         function onPageChanged() { handles.refresh() }
     }
     // The knobs sit on the text, so they go along with it whenever the view scrolls or zooms
     Connections {
-        target: canvas
+        target: handles.canvasItem
         function onViewportChanged() { handles.refresh() }
     }
     onVisibleChanged: if (visible) refresh()
@@ -52,7 +57,7 @@ Item {
             onCentroidChanged: {
                 if (!active) return
                 const p = knob.mapToItem(handles, centroid.position.x, centroid.position.y)
-                app.dragPdfSelection(p.x, p.y, knob.startEnd)
+                handles.target.dragPdfSelection(p.x, p.y, knob.startEnd)
             }
             onActiveChanged: if (!active) handles.refresh()
         }

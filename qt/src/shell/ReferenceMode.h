@@ -21,6 +21,7 @@
 #include <QPointer>
 #include <QRectF>
 #include <QString>
+#include <QUrl>
 
 #include <memory>
 #include <vector>
@@ -51,6 +52,8 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(bool focused READ focused WRITE setFocused NOTIFY focusedChanged)
     /// Elements or PDF text are selected in the reference (to copy them).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
+    /// PDF text is selected in the reference (the same name as AppController's: the pills of a canvas take either)
+    Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextSelectionChanged)
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
     Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationChanged)
     /// The pages of the reference, for its page grid (xqt::PagesModel; the page sidebar keeps the main document's).
@@ -110,6 +113,27 @@ public:
     /// Copy what is selected in the reference (PDF text, else elements). False if nothing is selected.
     Q_INVOKABLE bool copy();
     Q_INVOKABLE void clearSelection();
+
+    // --- the selections of the reference: the API of AppController that the pills of a canvas use (CanvasPills) ---
+    bool pdfTextIsSelected() const;
+    Q_INVOKABLE QRectF pdfSelectionEnds() const;
+    Q_INVOKABLE QRectF pdfSelectionBox() const;
+    Q_INVOKABLE bool selectPdfTextAt(qreal x, qreal y);
+    Q_INVOKABLE bool dragPdfSelection(qreal x, qreal y, bool startEnd);
+    Q_INVOKABLE void showPdfSelection();
+    /// Mark the selected PDF text ("highlight", "underline", "strikethrough"): only while the reference is written in.
+    Q_INVOKABLE bool markPdfText(const QString& mode);
+    Q_INVOKABLE bool copyPdfText();
+    Q_INVOKABLE void clearPdfTextSelection();
+    Q_INVOKABLE bool copySelection();
+    /// Cut, delete, paste, insert: only while the reference is written in.
+    Q_INVOKABLE bool cutSelection();
+    Q_INVOKABLE void deleteSelection();
+    Q_INVOKABLE bool pasteElements();
+    Q_INVOKABLE bool pasteAt(qreal x, qreal y);
+    Q_INVOKABLE bool canPaste() const;
+    Q_INVOKABLE void selectAllOnPage();
+    Q_INVOKABLE bool insertImage(const QUrl& file);
     /// Undo / redo in the reference (while it is written in).
     void undo();
     void redo();
@@ -129,6 +153,13 @@ Q_SIGNALS:
     void openExternal(const QString& uri);
     /// Something was copied from the reference (the window says so).
     void copied(const QString& what);
+    /// PDF text was selected or unselected in the reference; selected: where (its canvas coordinates).
+    void pdfTextSelectionChanged();
+    void pdfTextSelected(QRectF rect);
+    /// (not emitted: the pills of a canvas listen to it on AppController)
+    void pdfTextModeChanged();
+    /// A long press or right click on the reference (its canvas coordinates): the window offers what fits.
+    void contextRequested(QPointF viewPos);
 
 private:
     /// The current tab or its reference changed: follow the reference's view.

@@ -6,6 +6,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import QtQuick.Window
 import XournalQt.Canvas
@@ -34,6 +35,11 @@ Item {
         property: "focused"
         value: referenceScope.activeFocus
     }
+    /// "Go to page…" of the reference (its pill, its context pill)
+    function openPagePopup() {
+        referenceCanvas.forceActiveFocus(Qt.MouseFocusReason)
+        referencePagePopup.open()
+    }
 
     Rectangle {  // the gap: the window's background, as around the pages
         visible: split.active
@@ -61,6 +67,61 @@ Item {
             // For reading, unless the edit switch of its pill is on (per tab)
             readingOnly: !app.reference.editing
             view: split.active ? app.reference.view : null
+        }
+
+        // The same scroll bars, knobs and pills as the notes have, for the reference (app.reference acts on it; for
+        // reading only they offer copying, nothing that changes it)
+        CanvasScrollBars {
+            canvasItem: referenceCanvas
+            namePrefix: "reference"
+            hidden: referenceGrid.visible
+        }
+        PdfTextHandles {
+            canvasItem: referenceCanvas
+            target: app.reference
+            namePrefix: "reference"
+        }
+        PdfTextPill {
+            id: referencePdfTextPill
+            objectName: "referencePdfTextBar"
+            canvasItem: referenceCanvas
+            target: app.reference
+            namePrefix: "reference"
+            hidden: referenceGrid.visible
+        }
+        SelectionPill {
+            objectName: "referenceSelectionBar"
+            canvasItem: referenceCanvas
+            target: app.reference
+            namePrefix: "reference"
+            hidden: referenceGrid.visible
+            anchors.bottomMargin: 84  // (above the reference's own pill)
+        }
+        ContextPill {
+            id: referenceContextPill
+            canvasItem: referenceCanvas
+            target: app.reference
+            namePrefix: "reference"
+            onImageRequested: referenceImageDialog.open()
+            onGoToPageRequested: split.openPagePopup()
+        }
+        FileDialog {
+            id: referenceImageDialog
+            title: qsTr("Insert image")
+            nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.svg)"), qsTr("All files (*)")]
+            onAccepted: app.reference.insertImage(selectedFile)
+        }
+        // A long press or right click on the reference: on PDF text the word is selected (its pill offers paste
+        // too), elsewhere what can be done there - as on the notes
+        Connections {
+            target: app.reference
+            function onContextRequested(viewPos) {
+                if (app.reference.selectPdfTextAt(viewPos.x, viewPos.y)) {
+                    referencePdfTextPill.offerPaste(viewPos)
+                    return
+                }
+                referenceContextPill.openAt(viewPos, app.reference.pdfTextIsSelected)
+            }
         }
 
         // A tapped link: open it / go to the page (not at once: a tap can be a mistake)
