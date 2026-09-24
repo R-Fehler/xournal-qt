@@ -712,3 +712,20 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       height again, on the same page. Pinch or Ctrl+wheel zoom: the zoom stays when the window is resized.
 - [ ] Close and start the app again: the sideways layout, rows and "Stop on whole pages" are kept.
       Switch back ("Scroll sideways" off): pages go down as before, on the same page.
+- [ ] Present from the tool bar (the presentation button next to full screen), from ⋮ → "Present (F5)", or with
+      F5: the window goes full screen on black, the current page fills the screen (a 16:9 slide edge to edge on a
+      16:9 screen, an A4 page in the middle with black on both sides), no pill, no scroll bars; the tool square stays
+      and "12 / 40" shows at the bottom for a moment after each page change, then fades.
+- [ ] Keys like PowerPoint: Space, →, ↓, Page Down next; ←, ↑, Page Up, Backspace previous; Home / End; a number
+      and Enter goes to that page. A presenter remote (clicker, sending Page Up / Down) pages too.
+- [ ] Swipe with a finger: one page per swipe, even a strong one; a short slow drag springs back. Two fingers on
+      the touchpad page as well.
+- [ ] Write with the pen while presenting: the stroke stays on the page, nothing pages or moves. Tap the tool
+      square: tools and colors; "Stop presenting" ends it there. Pinch to zoom into a slide: it scrolls within the
+      slide; a double tap brings it back to the whole slide.
+- [ ] Escape ends presenting: full-screen editing, with the zoom and layout from before, on the page that was
+      presented. A second Escape leaves full screen. From full screen, the tool square → "Present" starts it
+      again; F11 there leaves full screen and presenting at once.
+- [ ] A document with pages of different sizes (A4 and 16:9): each fills the screen when it is shown.
+- [ ] Performance: page quickly through a long PDF while presenting: each page arrives sharp (drawn in advance),
+      no grey or blurry page on arrival.

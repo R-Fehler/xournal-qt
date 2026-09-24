@@ -19,7 +19,7 @@ ApplicationWindow {
                            : (app.modified ? "• " : "") + app.title + " — Xournal Qt"
     Material.theme: Material.Light
     Material.accent: Material.Indigo
-    color: "#5f6368"
+    color: app.presenting ? "#000000" : "#5f6368"  // (presenting: black around the pages, like a projector)
 
     property var afterDiscardCheck: null
     property bool sidebarShown: width >= 900
@@ -66,6 +66,7 @@ ApplicationWindow {
             showFullScreen()
         } else {
             quickTools.close()
+            app.presenting = false  // (presenting is full screen)
             leavingFullScreen = true
             remaximized = false
             leavingFullScreenTimer.restart()
@@ -81,6 +82,13 @@ ApplicationWindow {
     Connections {
         target: app
         function onHomeVisibleChanged() { if (app.homeVisible) win.fullScreenMode = false }
+    }
+
+    /// Present from the current page: full screen, a page fills it
+    function startPresenting() {
+        if (app.homeVisible) return
+        fullScreenMode = true
+        app.presenting = true
     }
 
     function withSavedChanges(action) {
@@ -651,6 +659,14 @@ ApplicationWindow {
                 tip: qsTr("Full screen (F11)")
                 onClicked: win.fullScreenMode = true
             }
+            // Present: full screen, page by page (from the current page)
+            IconButton {
+                objectName: "presentButton"
+                visible: !win.fullScreenMode
+                iconName: "xopp-presentation-mode"
+                tip: qsTr("Present (F5)")
+                onClicked: win.startPresenting()
+            }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
             IconButton {
                 objectName: "moreButton"
@@ -687,6 +703,11 @@ ApplicationWindow {
                         objectName: "hideToolbarItem"
                         text: app.toolbarHidden ? qsTr("Show the tool bar") : qsTr("Hide the tool bar")
                         onTriggered: app.toolbarHidden = !app.toolbarHidden
+                    }
+                    MenuItem {
+                        objectName: "presentItem"
+                        text: qsTr("Present (F5)")
+                        onTriggered: win.startPresenting()
                     }
                     MenuItem {
                         objectName: "fullScreenItem"
@@ -779,7 +800,8 @@ ApplicationWindow {
     Pane {
         id: viewPill
         objectName: "viewPill"
-        visible: !pageGrid.visible && !contentsOverview.visible  // also in full screen
+        // also in full screen; presenting only the page number, for a moment (presentPageIndicator)
+        visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: 28
@@ -1268,7 +1290,7 @@ ApplicationWindow {
         anchors.rightMargin: toolbarShow.visible && toolbarShow.side === "right" ? toolbarShow.width : 0
         anchors.bottom: canvas.bottom
         anchors.bottomMargin: hbar.visible ? hbar.height : 0
-        visible: canvas.contentHeight > canvas.height + 1 && !pageGrid.visible
+        visible: canvas.contentHeight > canvas.height + 1 && !pageGrid.visible && !app.presenting
         policy: ScrollBar.AlwaysOn
         padding: 6
         minimumSize: 0.05
@@ -1294,7 +1316,7 @@ ApplicationWindow {
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: vbar.visible ? vbar.width : 0
-        visible: canvas.contentWidth > canvas.width + 1 && !pageGrid.visible
+        visible: canvas.contentWidth > canvas.width + 1 && !pageGrid.visible && !app.presenting
         policy: ScrollBar.AlwaysOn
         padding: 6
         minimumSize: 0.05
@@ -1526,6 +1548,45 @@ ApplicationWindow {
         property alias text: messageLabel.text
         Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }
     }
+    // Presenting: the page number, for a moment after each page change (and when it starts)
+    Rectangle {
+        id: presentIndicator
+        objectName: "presentPageIndicator"
+        z: 90
+        visible: app.presenting && opacity > 0
+        opacity: 0
+        anchors.horizontalCenter: canvas.horizontalCenter
+        anchors.bottom: canvas.bottom
+        anchors.bottomMargin: 18
+        width: indicatorText.implicitWidth + 24
+        height: 30
+        radius: 15
+        color: "#99000000"
+        Label {
+            id: indicatorText
+            objectName: "presentPageIndicatorText"
+            anchors.centerIn: parent
+            text: app.pageNumber + " / " + app.pageCount
+            color: "#ffffff"
+            font.pixelSize: 14
+        }
+        function flash() {
+            if (!app.presenting) return
+            fade.stop()
+            opacity = 0.9
+            fade.start()
+        }
+        SequentialAnimation {
+            id: fade
+            PauseAnimation { duration: 1500 }
+            NumberAnimation { target: presentIndicator; property: "opacity"; to: 0; duration: 600 }
+        }
+        Connections {
+            target: app
+            function onPageChanged() { presentIndicator.flash() }
+            function onPresentingChanged() { if (app.presenting) presentIndicator.flash(); else presentIndicator.opacity = 0 }
+        }
+    }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {
         id: pageJump
@@ -1706,10 +1767,21 @@ ApplicationWindow {
                 height: Math.min(toolRow.implicitHeight, win.contentItem.height - 90)
             }
             Button {
+                objectName: "presentToggleButton"
+                width: parent.width
+                flat: true
+                icon.source: app.iconUrl("xopp-presentation-mode")
+                text: app.presenting ? qsTr("Stop presenting (Esc)") : qsTr("Present (F5)")
+                onClicked: {
+                    quickTools.close()
+                    app.presenting = !app.presenting
+                }
+            }
+            Button {
                 objectName: "leaveFullScreenButton"
                 width: parent.width
                 flat: true
-                text: qsTr("Leave full screen (Esc)")
+                text: qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
                 onClicked: win.fullScreenMode = false
             }
         }
@@ -1798,11 +1870,19 @@ ApplicationWindow {
     DigitKey { digit: 8 }
     DigitKey { digit: 9 }
     // Scrolling sideways: the arrow keys and Page Up / Down go from page to page (a text being typed keeps them)
-    readonly property bool sidewaysKeys: toolKeys && app.horizontalScrolling
+    readonly property bool sidewaysKeys: toolKeys && app.horizontalScrolling && !app.presenting
     Shortcut { sequences: ["Left", "PgUp"]; enabled: win.sidewaysKeys; onActivated: app.previousPage() }
     Shortcut { sequences: ["Right", "PgDown"]; enabled: win.sidewaysKeys; onActivated: app.nextPage() }
     Shortcut { sequence: "Home"; enabled: win.sidewaysKeys; onActivated: app.firstPage() }
     Shortcut { sequence: "End"; enabled: win.sidewaysKeys; onActivated: app.lastPage() }
+    // Presenting, like PowerPoint: Space, → ↓ Page Down on, ← ↑ Page Up Backspace back (Backspace deletes what is
+    // selected, if anything)
+    readonly property bool presentKeys: toolKeys && app.presenting
+    Shortcut { sequences: ["Space", "Right", "Down", "PgDown"]; enabled: win.presentKeys; onActivated: app.nextPage() }
+    Shortcut { sequences: ["Left", "Up", "PgUp"]; enabled: win.presentKeys; onActivated: app.previousPage() }
+    Shortcut { sequence: "Backspace"; enabled: win.presentKeys && !app.hasSelection; onActivated: app.previousPage() }
+    Shortcut { sequence: "Home"; enabled: win.presentKeys; onActivated: app.firstPage() }
+    Shortcut { sequence: "End"; enabled: win.presentKeys; onActivated: app.lastPage() }
 
     Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.selectTool("eraser") }
     Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.selectTool("highlighter") }
@@ -1871,7 +1951,14 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)
     Shortcut { sequences: win.keysOf("fullScreen"); enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
-    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection; onActivated: win.fullScreenMode = false }
+    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection && !app.presenting; onActivated: win.fullScreenMode = false }
+    // Presenting: F5 starts and ends it, Escape ends it (full screen stays: a second Escape leaves that too)
+    Shortcut {
+        sequences: win.keysOf("present")
+        enabled: !app.homeVisible
+        onActivated: app.presenting ? (app.presenting = false) : win.startPresenting()
+    }
+    Shortcut { sequence: "Escape"; enabled: app.presenting && !app.hasSelection; onActivated: app.presenting = false }
     Shortcut { sequences: win.keysOf("export"); enabled: docKeys; onActivated: openExportDialog() }
     Shortcut { sequences: win.keysOf("print"); enabled: docKeys; onActivated: printDialog.open() }
     Shortcut { sequences: win.keysOf("back"); enabled: docKeys; onActivated: app.navigateBack() }

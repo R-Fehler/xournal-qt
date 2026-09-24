@@ -149,6 +149,11 @@ private:
     void stepAnimation();
     /// Move to a scroll position in a short ease-out, starting with the velocity (scroll px/ms) it had
     void animateTo(QPointF target, QPointF startVelocity = {});
+    std::pair<double, double> restRangeUnclamped(size_t group) const;
+    /// The scroll positions the view can take sideways (the first and the last page can rest in the middle)
+    std::pair<double, double> scrollRangeX() const;
+    /// Where a group rests up or down: presenting in the middle, else where the view is
+    double restY(size_t group) const;
     /// The group whose resting place is closest to a scroll position
     size_t groupNear(double scrollX) const;
     /// Presenting: the zoom at which the page fills the view

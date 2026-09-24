@@ -2064,3 +2064,75 @@ TEST_F(SidewaysTest, theNextAndThePreviousPageAreDrawnInAdvance) {
     EXPECT_TRUE(ready(4));
     view->setShown(false);
 }
+
+// Presenting: a page fills the view, a swipe goes one page on however strong it is, the pen writes (it does not page)
+TEST_F(SidewaysTest, presentingAPageFillsTheViewAndASwipeGoesOnePage) {
+    for (int i = 0; i < 4; ++i) {
+        session->insertNewPage(1);
+    }
+    // A 16:9 slide among the A4 pages
+    session->getDocument()->lock();
+    session->getDocument()->getPage(3)->setSize(960, 540);
+    session->getDocument()->unlock();
+    view->pageSizeChanged(3);
+    view->getViewController().setViewSize(QSizeF(1600, 900));
+    session->setCurrentPageNo(0);  // (presenting starts on the current page)
+    view->setPresenting(true);
+    processEvents();
+    const auto& layout = view->documentLayout();
+    ASSERT_TRUE(layout.horizontal());
+    EXPECT_EQ(layout.padding(), 0.0) << "no margin";
+    EXPECT_EQ(vc().keptFit(), ViewController::Fit::Page);
+    auto fills = [&](size_t page) {
+        const QRectF r = view->pageViewRect(page);
+        return std::abs(r.height() - 900) < 0.5 || std::abs(r.width() - 1600) < 0.5;
+    };
+    auto inView = [&](size_t page) {
+        const QRectF r = view->pageViewRect(page);
+        return r.left() >= -0.5 && r.right() <= 1600.5 && r.top() >= -0.5 && r.bottom() <= 900.5;
+    };
+    EXPECT_TRUE(fills(0));
+    EXPECT_TRUE(inView(0));
+    EXPECT_NEAR(view->pageViewRect(0).center().x(), 800, 0.5) << "in the middle";
+
+    // A strong flick: one page, not more
+    const double pageStep = view->pageViewRect(1).left() - view->pageViewRect(0).left();
+    swipe(*input, touchscreen, QPointF(1200, 450), QPointF(-pageStep * 0.4, 0), 6, 6);
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 1u) << "one page per swipe";
+    EXPECT_TRUE(inView(1));
+    processEvents();
+    EXPECT_EQ(session->getCurrentPageNo(), 1u);
+
+    // The slide has another shape: it fills the screen too
+    vc().stepPages(1);
+    settle(this, vc(), *app);
+    vc().stepPages(1);
+    settle(this, vc(), *app);
+    EXPECT_EQ(vc().currentGroup(), 3u);
+    EXPECT_TRUE(fills(3));
+    EXPECT_TRUE(inView(3));
+    EXPECT_NEAR(view->pageViewRect(3).width(), 1600, 0.5) << "the 16:9 slide is as wide as the screen";
+
+    // The pen writes on the page and the view stays
+    const double x = vc().scrollPosition().x();
+    const size_t before = elementCount(3);
+    const QRectF slide = view->pageViewRect(3);
+    drawLine(3, QPointF(100, 100), QPointF(500, 300));
+    processEvents();
+    EXPECT_EQ(elementCount(3), before + 1);
+    EXPECT_DOUBLE_EQ(vc().scrollPosition().x(), x);
+    EXPECT_EQ(view->pageViewRect(3), slide);
+
+    // The window grows (full screen arrives late): it fits again, on the same page
+    vc().setViewSize(QSizeF(1920, 1080));
+    EXPECT_EQ(vc().currentGroup(), 3u);
+    EXPECT_NEAR(view->pageViewRect(3).width(), 1920, 0.5);
+
+    // Stopped: the layout and zoom from before
+    view->setPresenting(false);
+    processEvents();
+    EXPECT_FALSE(view->documentLayout().horizontal());
+    EXPECT_GT(view->documentLayout().padding(), 0.0);
+    EXPECT_EQ(session->getCurrentPageNo(), 3u);
+}

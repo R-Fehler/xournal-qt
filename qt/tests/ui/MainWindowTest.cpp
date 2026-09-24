@@ -4334,3 +4334,130 @@ TEST_F(MainWindowTest, pagesSideBySideScrollSideways) {
     key(Qt::Key_Right);
     EXPECT_EQ(controller->pageNumber(), 5) << "the arrow keys are not for pages going down";
 }
+
+// Presenting: F5 or the tool bar's button goes full screen with a page filling it; Space and the arrow keys go page
+// by page like PowerPoint, a finger swipes one page on, the pen writes; Escape goes back to editing in full screen
+// (the zoom from before), a second Escape leaves full screen.
+TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    auto settle = [&] {
+        until([&] { return !vc.isAnimating(); }, 2000);
+        wait(30);
+    };
+    const double editZoom = vc.zoom();
+    auto* pill = find<QQuickItem>("viewPill");
+    auto* square = find<QQuickItem>("quickToolSquare");
+    auto* indicator = find<QQuickItem>("presentPageIndicator");
+    ASSERT_NE(indicator, nullptr);
+
+    key(Qt::Key_F5);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "presenting is full screen";
+    ASSERT_TRUE(controller->presenting());
+    EXPECT_TRUE(view->isPresenting());
+    wait(100);
+    EXPECT_EQ(controller->pageNumber(), 1);
+    EXPECT_FALSE(pill->isVisible()) << "a clean page";
+    EXPECT_TRUE(square->isVisible()) << "the tools stay at hand";
+    EXPECT_TRUE(indicator->isVisible()) << "the page number, for a moment";
+    EXPECT_EQ(find<QQuickItem>("presentPageIndicatorText")->property("text").toString(),
+              QString("1 / %1").arg(controller->pageCount()));
+    const QRectF first = view->pageViewRect(0);
+    const QSizeF size = vc.viewSize();
+    EXPECT_TRUE(std::abs(first.height() - size.height()) < 1 || std::abs(first.width() - size.width()) < 1)
+            << "the page fills the screen";
+    EXPECT_NEAR(first.center().x(), size.width() / 2, 1);
+
+    const std::vector<std::pair<Qt::Key, int>> steps{{Qt::Key_Space, 2},    {Qt::Key_Right, 3}, {Qt::Key_Down, 4},
+                                                     {Qt::Key_PageDown, 5}, {Qt::Key_Left, 4},  {Qt::Key_Up, 3},
+                                                     {Qt::Key_PageUp, 2},   {Qt::Key_Backspace, 1}};
+    for (const auto& [k, page]: steps) {
+        key(k);
+        settle();
+        EXPECT_EQ(controller->pageNumber(), page) << "after key " << k;
+    }
+    key(Qt::Key_End);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), controller->pageCount());
+    key(Qt::Key_Home);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 1);
+    key(Qt::Key_4);
+    key(Qt::Key_Return);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 4) << "a page number and Enter";
+
+    // A finger swipes one page on
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    const QPoint from = canvasItem->mapToScene(QPointF(size.width() * 0.7, size.height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(0, from);
+    for (int i = 1; i <= 6; ++i) {
+        QTest::qWait(10);
+        QTest::touchEvent(window, finger).move(0, from - QPoint(40 * i, 0));
+    }
+    QTest::touchEvent(window, finger).release(0, from - QPoint(240, 0));
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 5) << "swiped on";
+
+    // The pen writes on the page, it does not page
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    auto strokes = [&] { return s->getDocument()->getPage(4)->getSelectedLayer()->getElementsView().size(); };
+    const size_t before = strokes();
+    const QRectF page = view->pageViewRect(4);
+    const QPoint a = canvasItem->mapToScene(page.center()).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (int i = 1; i <= 8; ++i) {
+        QTest::mouseMove(window, a + QPoint(-20 * i, 10 * i));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(-160, 80));
+    settle();
+    EXPECT_EQ(strokes(), before + 1) << "written";
+    EXPECT_EQ(controller->pageNumber(), 5) << "still on the page";
+    EXPECT_EQ(view->pageViewRect(4), page);
+
+    // Escape: editing in full screen again, with the zoom from before
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "still full screen";
+    EXPECT_FALSE(view->documentLayout().horizontal());
+    EXPECT_NEAR(vc.zoom(), editZoom, 1e-6);
+    EXPECT_EQ(controller->pageNumber(), 5);
+    EXPECT_TRUE(pill->isVisible());
+
+    // From the tools of the full screen: present, and back
+    QMetaObject::invokeMethod(find("quickTools"), "open");
+    ASSERT_TRUE(waitOpened(find("quickTools"), true));
+    QQuickItem* toggle = findItem("presentToggleButton");
+    if (!toggle) {
+        toggle = find<QQuickItem>("presentToggleButton");
+    }
+    ASSERT_NE(toggle, nullptr);
+    QMetaObject::invokeMethod(toggle, "clicked");
+    EXPECT_TRUE(controller->presenting());
+    EXPECT_EQ(controller->pageNumber(), 5) << "from the current page";
+    EXPECT_TRUE(waitOpened(find("quickTools"), false)) << "the tools close";
+    // Leaving full screen ends presenting too
+    key(Qt::Key_F11);
+    EXPECT_FALSE(window->property("fullScreenMode").toBool());
+    EXPECT_FALSE(controller->presenting());
+
+    // The tool bar's button: full screen and presenting at once
+    window->setWidth(2000);  // (room for the whole tool bar)
+    wait(100);
+    until([&] { return !window->property("leavingFullScreen").toBool(); }, 2000);
+    auto* present = findItem("presentButton");
+    ASSERT_NE(present, nullptr);
+    ASSERT_TRUE(present->isVisible());
+    click(present);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    EXPECT_TRUE(controller->presenting());
+    key(Qt::Key_Escape);
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "the second Escape leaves full screen";
+}

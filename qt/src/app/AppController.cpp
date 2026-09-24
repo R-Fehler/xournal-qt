@@ -580,6 +580,7 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
     }
+    updatePresentedView();  // (another tab: it presents now)
     Q_EMIT documentChanged();
     Q_EMIT titleChanged();
     Q_EMIT modifiedChanged();
@@ -862,6 +863,29 @@ void AppController::setSnapPages(bool snap) {
         app->getSettings()->customSettingsChanged();
         Q_EMIT app->settingsChanged();
         Q_EMIT viewLayoutChanged();
+    }
+}
+
+void AppController::setPresenting(bool on) {
+    if (on == presentingOn || (on && !canvas())) {
+        return;
+    }
+    presentingOn = on;
+    updatePresentedView();
+    Q_EMIT presentingChanged();
+}
+
+void AppController::updatePresentedView() {
+    CanvasView* wanted = presentingOn ? canvas() : nullptr;
+    if (presentedView == wanted) {
+        return;
+    }
+    if (presentedView) {
+        presentedView->setPresenting(false);
+    }
+    presentedView = wanted;
+    if (presentedView) {
+        presentedView->setPresenting(true);
     }
 }
 

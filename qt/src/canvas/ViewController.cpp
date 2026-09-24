@@ -84,8 +84,20 @@ void ViewController::setScrollPosition(QPointF pos) {
 
 void ViewController::clamp() {
     const QSizeF content = layout->contentSize(z);
-    scrollPos.setX(std::clamp(scrollPos.x(), 0.0, std::max(0.0, content.width() - view.width())));
+    const auto [minX, maxX] = scrollRangeX();
+    scrollPos.setX(std::clamp(scrollPos.x(), minX, maxX));
     scrollPos.setY(std::clamp(scrollPos.y(), 0.0, std::max(0.0, content.height() - view.height())));
+}
+
+std::pair<double, double> ViewController::scrollRangeX() const {
+    const double contentWidth = layout->contentSize(z).width();
+    double lo = 0, hi = std::max(0.0, contentWidth - view.width());
+    if (layout->horizontal() && layout->groupCount() > 0 && contentWidth >= view.width()) {
+        // Sideways, the first and the last page may rest in the middle of the view as well
+        lo = std::min(lo, restRangeUnclamped(0).first);
+        hi = std::max(hi, restRangeUnclamped(layout->groupCount() - 1).second);
+    }
+    return {lo, hi};
 }
 
 auto ViewController::anchorAt(QPointF viewPos) const -> Anchor {
@@ -412,8 +424,6 @@ void ViewController::fitPresentedPage(size_t page) {
         Q_EMIT zoomChanged();
     }
     placeGroup(layout->groupOf(page));
-    scrollPos.setY(0);
-    clamp();
     pageJump = page;
     Q_EMIT changed();
 }
@@ -442,17 +452,33 @@ QPointF ViewController::scrollDelta(QPointF delta) const {
     return QPointF(delta.x() + delta.y(), 0);  // (nothing to scroll up or down)
 }
 
-std::pair<double, double> ViewController::restRange(size_t group) const {
+std::pair<double, double> ViewController::restRangeUnclamped(size_t group) const {
     const QRectF r = layout->groupRect(group, z);
     const double pad = layout->padding();
-    const double maxX = std::max(0.0, layout->contentSize(z).width() - view.width());
     if (r.width() + 2 * pad <= view.width() + 0.5) {
-        // It fits: in the middle when it is the only whole one in view, else at the left edge (more whole pages)
-        const bool several = 2 * r.width() + DocumentLayout::PADDING_BETWEEN + 2 * pad <= view.width();
-        const double x = std::clamp(several ? r.left() - pad : r.center().x() - view.width() / 2, 0.0, maxX);
+        // It fits: in the middle when it is the only whole one in view, else at the left edge (more whole pages);
+        // presenting (no margins) always one page in the middle
+        const bool several = !layout->getConfig().noMargins &&
+                             2 * r.width() + DocumentLayout::PADDING_BETWEEN + 2 * pad <= view.width();
+        const double x = several ? r.left() - pad : r.center().x() - view.width() / 2;
         return {x, x};
     }
-    return {std::clamp(r.left() - pad, 0.0, maxX), std::clamp(r.right() + pad - view.width(), 0.0, maxX)};
+    return {r.left() - pad, r.right() + pad - view.width()};
+}
+
+std::pair<double, double> ViewController::restRange(size_t group) const {
+    const auto [lo, hi] = restRangeUnclamped(group);
+    const auto [minX, maxX] = scrollRangeX();
+    return {std::clamp(lo, minX, maxX), std::clamp(hi, minX, maxX)};
+}
+
+double ViewController::restY(size_t group) const {
+    const double maxY = std::max(0.0, layout->contentSize(z).height() - view.height());
+    if (kept != Fit::Page) {
+        return std::clamp(scrollPos.y(), 0.0, maxY);
+    }
+    // Presenting: the page in the middle (a row is as high as its highest page)
+    return std::clamp(layout->groupRect(group, z).center().y() - view.height() / 2, 0.0, maxY);
 }
 
 size_t ViewController::groupNear(double x) const {
@@ -495,7 +521,8 @@ void ViewController::placeGroup(size_t group) {
         return;
     }
     stopMomentum();
-    scrollPos.setX(restRange(std::min(group, layout->groupCount() - 1)).first);
+    group = std::min(group, layout->groupCount() - 1);
+    scrollPos = QPointF(restRange(group).first, restY(group));
     clamp();
 }
 
@@ -537,7 +564,7 @@ void ViewController::endScroll(QPointF v) {
         }
     }
     const double maxY = std::max(0.0, layout->contentSize(z).height() - view.height());
-    const double ty = std::clamp(projected.y(), 0.0, maxY);
+    const double ty = kept == Fit::Page && target != g ? restY(target) : std::clamp(projected.y(), 0.0, maxY);
     animGroup.reset();
     animateTo(QPointF(tx, ty), -v);
     if (animating) {
@@ -563,7 +590,7 @@ bool ViewController::stepPages(int delta) {
     }
     const auto [lo, hi] = restRange(to);
     const QPointF v = animating ? animVelocity : QPointF();
-    animateTo(QPointF(lo, scrollPos.y()), to == from ? QPointF() : v);
+    animateTo(QPointF(lo, restY(to)), to == from ? QPointF() : v);
     if (animating) {
         animGroup = to;
     }
@@ -574,7 +601,8 @@ void ViewController::animateTo(QPointF target, QPointF v0) {
     momentumTimer.stop();
     velocity = {};
     animating = false;
-    target.setX(std::clamp(target.x(), 0.0, std::max(0.0, layout->contentSize(z).width() - view.width())));
+    const auto [minX, maxX] = scrollRangeX();
+    target.setX(std::clamp(target.x(), minX, maxX));
     target.setY(std::clamp(target.y(), 0.0, std::max(0.0, layout->contentSize(z).height() - view.height())));
     const QPointF d = target - scrollPos;
     const double distance = std::hypot(d.x(), d.y());

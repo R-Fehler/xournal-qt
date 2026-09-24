@@ -256,6 +256,31 @@ void CanvasView::applyScrolling() {
     viewController.setSnapping(presenting || snapSetting(*session.getSettings()), presenting ? 1 : 0);
 }
 
+void CanvasView::setPresenting(bool on) {
+    if (on == presenting) {
+        return;
+    }
+    const size_t page = session.getCurrentPageNo();
+    if (on) {
+        zoomBeforePresenting = viewController.zoom();
+        fitBeforePresenting = viewController.keptFit();
+    }
+    presenting = on;
+    applyScrolling();
+    refreshLayout();
+    if (on) {
+        viewController.fitPresentedPage(page);
+        return;
+    }
+    if (fitBeforePresenting != ViewController::Fit::None || zoomBeforePresenting <= 0) {
+        viewController.fitDefault(page);
+    } else {
+        const QSizeF size = viewController.viewSize();
+        viewController.setZoom(zoomBeforePresenting, QPointF(size.width() / 2, size.height() / 2));
+    }
+    viewController.scrollToPage(page);
+}
+
 void CanvasView::relayout() {
     const size_t page = session.getCurrentPageNo();
     refreshLayout();
@@ -651,9 +676,13 @@ void CanvasView::doubleTapAt(QPointF viewPos) {
     const QRectF pageRect = pageViewRect(*idx);
     const double zoom = viewController.zoom();
     const QPointF onPage((viewPos.x() - pageRect.x()) / zoom, (viewPos.y() - pageRect.y()) / zoom);
-    // Zoomed in already: back to the whole page
+    // Zoomed in already: back to the whole page (presenting: filling the screen again)
     if (pageRect.width() > viewController.viewSize().width() * 1.05) {
-        viewController.fitPage(*idx, true);
+        if (presenting) {
+            viewController.fitPresentedPage(*idx);
+        } else {
+            viewController.fitPage(*idx, true);
+        }
         return;
     }
     if (const auto column = textColumnAt(*idx, onPage)) {

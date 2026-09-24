@@ -17,6 +17,7 @@
 #include <QColor>
 #include <QMetaObject>
 #include <QObject>
+#include <QPointer>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
@@ -161,6 +162,9 @@ class AppController: public QObject {
     Q_PROPERTY(bool horizontalScrolling READ horizontalScrolling WRITE setHorizontalScrolling NOTIFY viewLayoutChanged)
     Q_PROPERTY(int viewRows READ viewRows WRITE setViewRows NOTIFY viewLayoutChanged)
     Q_PROPERTY(bool snapPages READ snapPages WRITE setSnapPages NOTIFY viewLayoutChanged)
+    /// Presenting the current document in this window: a page fills the view, a swipe or a key goes one page on
+    /// (the window goes full screen for it, in QML)
+    Q_PROPERTY(bool presenting READ presenting WRITE setPresenting NOTIFY presentingChanged)
     /// Elements are selected on the canvas (select tools).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     // Page operations (sidebar, page grid) go onto the one undo stack of the document (these are the same as undo)
@@ -304,6 +308,8 @@ public:
     void setViewRows(int rows);
     bool snapPages() const;
     void setSnapPages(bool snap);
+    bool presenting() const { return presentingOn; }
+    void setPresenting(bool on);
     /// The previous / next page (scrolling sideways: its group, animated), the first / the last one
     Q_INVOKABLE void previousPage();
     Q_INVOKABLE void nextPage();
@@ -605,6 +611,7 @@ Q_SIGNALS:
     void recoveryChanged();
     void searchChanged();
     void viewLayoutChanged();
+    void presentingChanged();
     void pageUndoChanged();
     void selectionChanged();
     void fontChanged();
@@ -642,6 +649,10 @@ Q_SIGNALS:
 private:
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// Presenting: the view that presents (the current one; another tab takes it over)
+    bool presentingOn = false;
+    QPointer<xqt::CanvasView> presentedView;
+    void updatePresentedView();
     /// After the document was saved as a hybrid PDF: the .xopp for Xournal++ (setting), the library.
     void afterHybridSave();
     /// The text tool of the current tab makes Markdown text or not (textMarkdown, markdownFontSize).
