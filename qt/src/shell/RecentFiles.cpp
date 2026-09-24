@@ -64,7 +64,14 @@ void RecentFiles::store(const std::vector<Entry>& entries) const {
 }
 
 void RecentFiles::add(const fs::path& file) {
-    const fs::path p = fs::absolute(file).lexically_normal();
+    if (file.empty()) {
+        return;  // (a document without a file of its own)
+    }
+    std::error_code ec;
+    const fs::path p = fs::absolute(file, ec).lexically_normal();
+    if (ec) {
+        return;
+    }
     auto entries = load();  // another window may have added files
     std::erase_if(entries, [&](const Entry& e) { return e.path == p; });
     entries.insert(entries.begin(), {p, QDateTime::currentDateTime()});
@@ -76,7 +83,14 @@ void RecentFiles::add(const fs::path& file) {
 }
 
 void RecentFiles::addLibrary(const fs::path& folder) {
-    fs::path p = fs::absolute(folder).lexically_normal();
+    if (folder.empty()) {
+        return;
+    }
+    std::error_code ec;
+    fs::path p = fs::absolute(folder, ec).lexically_normal();
+    if (ec) {
+        return;
+    }
     if (!p.has_filename() && p.has_parent_path() && p != p.root_path()) {
         p = p.parent_path();  // "a/b/" -> "a/b"
     }
