@@ -65,6 +65,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/FuzzyQuery.h"
 #include "session/HybridPdf.h"
 #include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
@@ -4189,6 +4190,46 @@ TEST_F(MainWindowTest, notesGoIntoThePdfItselfIfWanted) {
     EXPECT_TRUE(controller->isHybrid());
     EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(pdf.toStdString())));
     EXPECT_TRUE(QFile::exists(dir.filePath("lecture.original.pdf")));
+}
+
+// Settings → Search: the fuzzy search's toggle (the same setting as the search fields' button, both ways) and its typo
+// tolerance, which the next query takes.
+TEST_F(MainWindowTest, settingsSearchTabSetsTheFuzzySearch) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    settings->set("fuzzyTypos", 1);
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("searchTab"));
+    auto* toggle = findItem("fuzzySearchSwitch");
+    ASSERT_NE(toggle, nullptr);
+    until([&] { return toggle->isVisible(); });
+    EXPECT_FALSE(toggle->property("checked").toBool());
+    click(toggle);
+    EXPECT_TRUE(library->fuzzySearch()) << "the search fields' setting";
+    library->setFuzzySearch(false);  // (as the button in a search field does)
+    until([&] { return !toggle->property("checked").toBool(); });
+    EXPECT_FALSE(toggle->property("checked").toBool()) << "and back";
+
+    auto* combo = findItem("fuzzyTyposCombo");
+    ASSERT_NE(combo, nullptr);
+    EXPECT_EQ(combo->property("currentIndex").toInt(), 1) << "one typo by default";
+    combo->forceActiveFocus();
+    key(Qt::Key_Down);
+    until([&] { return settings->get("fuzzyTypos").toInt() == 2; });
+    EXPECT_EQ(settings->get("fuzzyTypos").toInt(), 2);
+    EXPECT_EQ(xqt::FuzzyQuery::typoTolerance(), 2);
+    const auto terms = xqt::FuzzyQuery::textTerms("trasnfromation", true);
+    EXPECT_EQ(xqt::textmatch::count(u"the transformation", terms), 1) << "two typos in a long word";
+    settings->set("fuzzyTypos", 0);
+    until([&] { return combo->property("currentIndex").toInt() == 0; });
+    EXPECT_EQ(combo->property("currentIndex").toInt(), 0);
+    EXPECT_EQ(xqt::FuzzyQuery::typoTolerance(), 0);
+    settings->set("fuzzyTypos", 1);
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
 }
 
 // A hybrid PDF whose ink another app moved: the window says so and offers to keep ours or import theirs.

@@ -116,6 +116,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     loadCustomWidths();
     SettingsModel::applyPreviewMemory(*app->getSettings());
     SettingsModel::applyCanvasMemory(*app->getSettings());
+    SettingsModel::applyFuzzyTypos(*app->getSettings());
 
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);

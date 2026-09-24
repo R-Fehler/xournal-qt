@@ -255,6 +255,11 @@ for the manual's text, the kept character boxes about 4 MB, the worker's poppler
 default; an app-wide setting (`fuzzySearch` in the `xournalQt` part of the settings file), shared by all windows. Off,
 the search is exactly the plain one. The button's tooltip is the short help.
 
+**Settings → Search** has the same switch (the same setting: turning it on there turns the button on, and back) and
+the **typo tolerance** of fuzzy terms in text (`fuzzyTypos` in the `xournalQt` part of the settings file): *Off*;
+*1 letter, in words of 5+ letters* (the default); *up to 2 letters, in words of 8+ letters* (terms of 5-7 letters
+still one). A query takes the tolerance when it is parsed, so a changed setting counts from the next key typed.
+
 | Typed | Finds |
 | --- | --- |
 | `kalman` | names (and folder paths) with these letters in this order, best first; in text: words with these letters close together, or with a typo (`tbine` finds "turbine") |
@@ -285,7 +290,7 @@ not in the name is looked for in "folder/name" (so `uni lect` finds `Uni/Lecture
      `abc` "abacus" but not "abduct" - *fuzzy*;
   3. it is the term with a **typo**, if the term has 5 or more letters: one letter swapped with the next, left out,
      added or wrong (`turbnie`, `trbine`, `turbinne`, `turbime` find "turbine"; Damerau-Levenshtein distance, optimal
-     string alignment) - *fuzzy*. How many typos is a setting (Settings → Search, below).
+     string alignment) - *fuzzy*. How many typos is a setting (Settings → Search, above).
 
   The hit is the whole word (a word broken at a line end is one word), in the count and in the marks. fzf's score was
   tried as the threshold for rule 2 first; on a dictionary of 73,000 words it does not tell good matches from bad

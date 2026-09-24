@@ -750,3 +750,7 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       marks the same word in the document.
 - [ ] A big library: turning Fuzzy on, the first fuzzy search is not noticeably slower than the next ones (the words
       are prepared in the background); typing stays as responsive as the plain search.
+- [ ] Settings → Search (a new tab after Documents): the "Fuzzy search" switch is in the same state as the "Fuzzy"
+      button of the library's search field; switch it there, the button follows, and the other way round.
+- [ ] Typo tolerance "Off": `turbnie` no longer finds "turbine" (`tbine` still does). "Up to 2 letters":
+      `trasnfromation` finds "transformation"; back to "1 letter" (the default) it does not.

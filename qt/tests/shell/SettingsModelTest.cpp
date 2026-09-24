@@ -19,6 +19,8 @@
 #include "model/XojPage.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "session/FuzzyQuery.h"
+#include "session/TextMatch.h"
 #include "shell/SettingsModel.h"
 
 using namespace xqt;
@@ -73,6 +75,27 @@ TEST_F(SettingsModelTest, valuesReachUpstreamSettingsAndAreClamped) {
     EXPECT_EQ(s->getAutosaveTimeout(), 60);
     EXPECT_GE(changed.count(), 5);
     EXPECT_EQ(appChanged.count(), changed.count());
+}
+
+TEST_F(SettingsModelTest, fuzzyTypoToleranceReachesTheSearch) {
+    Settings* s = app->getSettings();
+    EXPECT_EQ(model->get("fuzzyTypos").toInt(), 1) << "one typo by default";
+    for (const int level: {0, 2, 1}) {
+        model->set("fuzzyTypos", level);
+        int stored = -1;
+        s->getCustomElement("xournalQt").getInt("fuzzyTypos", stored);
+        EXPECT_EQ(stored, level);
+        EXPECT_EQ(FuzzyQuery::typoTolerance(), level) << "the queries parsed from now on take it";
+        // A query with one typo (7 letters) and one with two (14 letters)
+        const auto count = [](const char* query, const char* text) {
+            return textmatch::count(QString::fromUtf8(text), FuzzyQuery::textTerms(QString::fromUtf8(query), true));
+        };
+        EXPECT_EQ(count("turbnie", "a turbine"), level >= 1 ? 1 : 0) << level;
+        EXPECT_EQ(count("trasnfromation", "a transformation"), level >= 2 ? 1 : 0) << level;
+    }
+    model->set("fuzzyTypos", 9);
+    EXPECT_EQ(model->get("fuzzyTypos").toInt(), 2) << "clamped";
+    model->set("fuzzyTypos", 1);
 }
 
 TEST_F(SettingsModelTest, penButtonsAndEraser) {

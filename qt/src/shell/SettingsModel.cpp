@@ -16,6 +16,8 @@
 #include "control/settings/SettingsEnums.h"
 #include "control/tools/StrokeStabilizerEnum.h"
 #include "session/AppContext.h"
+#include "session/FuzzyQuery.h"
+#include "session/WordMatch.h"
 #include "shell/Thumbnails.h"
 
 #include "CanvasMemory.h"
@@ -57,6 +59,14 @@ int SettingsModel::canvasMemory(Settings& s) {
 void SettingsModel::applyCanvasMemory(Settings& s) {
     CanvasMemory::instance().setLimit(static_cast<qint64>(canvasMemory(s)) * 1024 * 1024);
 }
+
+int SettingsModel::fuzzyTypos(Settings& s) {
+    int typos = wordmatch::DEFAULT_TYPOS;
+    s.getCustomElement("xournalQt").getInt("fuzzyTypos", typos);
+    return std::clamp(typos, 0, wordmatch::MAX_TYPOS);
+}
+
+void SettingsModel::applyFuzzyTypos(Settings& s) { FuzzyQuery::setTypoTolerance(fuzzyTypos(s)); }
 
 int SettingsModel::systemMemory() const { return static_cast<int>(CanvasMemory::systemMemory() / (1024 * 1024)); }
 
@@ -152,6 +162,13 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.getCustomElement("xournalQt").setInt("previewMemory", std::clamp(v.toInt(), 64, 1024));
             s.customSettingsChanged();
             applyPreviewMemory(s);
+        });
+    // The fuzzy search's typo tolerance (the toggle itself is the library model's: app.library.fuzzySearch)
+    add("fuzzyTypos", [&s] { return QVariant(fuzzyTypos(s)); },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setInt("fuzzyTypos", std::clamp(v.toInt(), 0, wordmatch::MAX_TYPOS));
+            s.customSettingsChanged();
+            applyFuzzyTypos(s);
         });
     add("snapGrid", [&s] { return QVariant(s.isSnapGrid()); }, [&s](const QVariant& v) { s.setSnapGrid(v.toBool()); });
 

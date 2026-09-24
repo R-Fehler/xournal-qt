@@ -42,6 +42,10 @@ public:
     /// Memory for rendered canvas pages (MB, setting "canvasMemory"; default a quarter of the RAM, at most a third)
     static int canvasMemory(Settings& settings);
     static void applyCanvasMemory(Settings& settings);
+    /// The fuzzy search's typo tolerance ("fuzzyTypos" in the xournalQt part: 0 none, 1 one typo in words of 5+
+    /// letters, 2 two in words of 8+; WordMatch.h), and applying it to the queries parsed from then on.
+    static int fuzzyTypos(Settings& settings);
+    static void applyFuzzyTypos(Settings& settings);
     int systemMemory() const;
 
     int revision() const { return rev; }
