@@ -46,3 +46,32 @@ What the numbers say:
 screen, ...), size and position, for the touch and mouse presses on it, and for what the app itself asks of the
 window ("app asks: ..."). A change with no "app asks" line just before it came from the compositor. It was added
 for a flaky bug where a touch on the "pages with hits" filter made the maximized window half as high.
+
+## Setsquare and compass (`XQT_BENCH_GEOMETRY=1`)
+
+`GeometryToolTest.benchMovingAndTurningTheTools` in the quick tests moves, turns and sizes a setsquare and a compass
+a step and a frame at a time, and prints the scene graph sync time per frame (the CPU work of the canvas that the UI
+thread waits for), the page tiles composed and the pixels uploaded. Run it as it is and with `QT_SCALE_FACTOR=2`:
+
+```
+XQT_BENCH_GEOMETRY=1 build-qt/xqt-quick-tests --gtest_filter='GeometryToolTest.bench*'
+QT_SCALE_FACTOR=2 XQT_BENCH_GEOMETRY=1 build-qt/xqt-quick-tests --gtest_filter='GeometryToolTest.bench*'
+```
+
+Measured on 2026-09-24 (Linux, off-screen, software scene graph, zoom 100 %), sync per frame, before and after
+`qt/geometry-gpu` (the tool as an overlay of its page, then as a node of its own moved on the GPU):
+
+| step | 100 % before | 100 % after | 200 % before | 200 % after |
+| --- | --- | --- | --- | --- |
+| setsquare 15 cm high, moved | 2.7 ms, 12 tiles | 0.02 ms, 0 tiles | 12.1 ms, 35 tiles | 0.07 ms, 0 tiles |
+| turned | 5.0 ms, 16 tiles | 0.22 ms | 23.3 ms, 45 tiles | 0.48 ms |
+| sized | 14.4 ms, 15 tiles | 0.02 ms | 43.4 ms, 51 tiles | 0.07 ms |
+| moved, 5 cm high | 1.3 ms | 0.02 ms | 4.8 ms | 0.06 ms |
+| moved, 30 cm high | 5.9 ms, 20 tiles | 0.02 ms | 27.1 ms, 63 tiles | 0.10 ms |
+| compass 15 cm across, moved | 2.3 ms | 0.02 ms | 12.9 ms | 0.11 ms |
+| turned | 4.4 ms | 0.16 ms | 25.5 ms | 0.55 ms |
+| sized | 8.1 ms | 0.02 ms | 35.6 ms | 0.13 ms |
+
+After, a step costs the same at any size: turning only draws the small angle display anew (about 0.2 to 0.5 ms), and
+a new size or zoom is drawn once, 150 ms after it stopped changing. The benchmark's whole frame time also contains the
+software renderer drawing the window on the CPU; on a GPU that is not CPU work.
