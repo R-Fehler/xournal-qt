@@ -86,6 +86,10 @@ public:
     void previous();
     /// The first hit at or after the current page becomes current (wrapping around).
     void jumpToFirstFromCurrentPage();
+    /// Hit `index` of `page` (0-based, in the order of the page's text) becomes current, once the counts are known;
+    /// if the page has fewer, the first hit after it (e.g. a hit in a place of a text that is known to be on that
+    /// page or after it).
+    void jumpToHit(size_t page, int index);
 
 Q_SIGNALS:
     /// Hits or the current hit changed.
@@ -122,6 +126,7 @@ private:
     bool pendingJump = false;
     bool jumpScrolls = true;
     size_t startPage = 0;
+    int startIndex = 0;                           ///< the hit on the start page to jump to
     quint64 rev = 0;
     quint64 generation = 0;
     int corrections = 0;

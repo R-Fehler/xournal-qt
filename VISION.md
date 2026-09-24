@@ -14,6 +14,8 @@ Qt 6 / Qt Quick frontend: tabs, libraries of documents, and touch-first controls
   (Windows) and an iPad.
 - **Speed through caching.** Rendering, previews and search are already fast because of caching. New features
   must not give that up.
+- **Self-contained.** The app works as one bundle, with no external programs or shell tools. Libraries it needs
+  are vendored (like md4c), or the feature is skipped.
 - **Stay compatible with Xournal++.** `.xopp` files keep opening in upstream, and upstream merges stay cheap.
 - **Keep the user's folders clean.** Caches, indexes and resources should not clutter a library or cause
   cloud-sync conflicts. It should always be possible to remove them.

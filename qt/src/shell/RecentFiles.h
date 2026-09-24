@@ -3,7 +3,9 @@
  *
  * The list is shared by all windows (libraries) and stored as JSON in the config folder; every change reads it
  * again first, so windows do not drop each other's entries. The grid shows the documents that still exist, one
- * entry per document (a .xopp and its PDF are one).
+ * entry per document (a .xopp and its PDF are one), and the folders opened as a library outside the standard
+ * folder of libraries that still exist, all by when they were opened. A library row is opened, shown in the file
+ * manager or removed from the list, never selected, renamed, moved or trashed from here.
  *
  * @license GNU GPLv2 or later
  */
@@ -35,7 +37,9 @@ public:
         HasPdfRole,
         HasXoppRole,
         SelectedRole,
-        LastPageRole  ///< the page the document was left at (-1: not known)
+        LastPageRole,  ///< the page the document was left at (-1: not known)
+        KindRole,      ///< "notes", "pdf", "md", "image", "text" (DocumentItem::kindName); a library: "library"
+        IsLibraryRole, ///< a folder opened as a library
     };
     static constexpr int MAX_ENTRIES = 100;
 
@@ -50,6 +54,8 @@ public:
 
     /// A document was opened or saved.
     void add(const fs::path& file);
+    /// A folder was opened as a library.
+    void addLibrary(const fs::path& folder);
     /// A file or folder has a new path.
     void remap(const fs::path& from, const fs::path& to);
     /// Files were renamed, moved or trashed (open tabs follow).
@@ -83,15 +89,20 @@ private:
     struct Entry {
         fs::path path;
         QDateTime opened;
+        bool library = false;  ///< a folder opened as a library
     };
     std::vector<Entry> load() const;
     void store(const std::vector<Entry>& entries) const;
     struct Row {
         DocumentItem item;
         QDateTime opened;
+        fs::path library;  ///< a library row: its folder
+        const fs::path& path() const { return library.empty() ? item.main() : library; }
     };
 
     void selectionUpdated();
+    /// Library rows are never selected.
+    void dropLibraries();
 
     fs::path storeFile;
     std::vector<Row> rows;

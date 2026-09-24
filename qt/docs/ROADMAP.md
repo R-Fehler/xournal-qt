@@ -184,6 +184,45 @@
     `.xopp` stays the default.
   - Measured on 1,321 pages with notes on 53: save 5.6 s (on the UI thread; background saving is a follow-up);
     first open 5.5 s (clean copy), cached 0.5 s; 10.3 MB, the same as our PDF export.
+- **PDF pages rendered once for the screen scale, `qt/pdf-hidpi` (2026-09-24).** `PdfBackgroundView` asked the PDF
+  cache for zoom × device scale, and the cache's similar surface applied the device scale again: on a 2x screen,
+  4x the pixels (about 100 MB per cached page at fit width), then scaled down. It was found by the MuPDF
+  experiment. A one-line tagged seam in upstream's file (ADR-0002); upstream has the same bug.
+- **Markdown files and images in the library, `qt/library-files` (2026-09-24, awaiting on-device test).** See
+  [library.md](library.md).
+  - `.md` files and images (`.png`, `.jpg`, `.webp`, `.heic` when Qt reads it) are library cards with badges and
+    previews. Images are turned upright by their EXIF tag.
+  - `.md` is indexed as passages (headings, paragraphs, list items, table rows, code) with heading paths, links
+    and wikilinks. It opens read-only as A4 pages, and nothing is written on it.
+  - Extended search: a `.md` result shows snippet cards (the rendered passage, its heading path, the hits marked);
+    tapping one opens the file at that passage.
+  - An image opens as a new document with it as the background; saved as `photo.xopp`, and the pair is one card.
+  - The `kind` role (`notes`/`pdf`/`md`/`image`, plus `hybrid`) is ready for the file-type filter.
+  - Fix: attached background images (`name.xopp.bg_N.png`) now travel with their `.xopp` on rename, move, copy and
+    trash.
+- **`XQT_LOG_WINDOW=1` (2026-09-24):** logs window state, size and position changes, touches and presses, and what
+  the app asks of the window, to chase the window that halves after a touch.
+- **The page grid stays where it is scrolled while searching, `qt/grid-search-scroll` (2026-09-24).** It moved to the
+  current hit on every search update. Hit places now arrive as pages scroll into view, so it jumped back while
+  scrolling. It now moves only when the current hit changes.
+- **Library "Show" filter and other files, `qt/library-filter` (2026-09-24, awaiting on-device test).**
+  - A "Show" button next to the sort button, remembered per library in `library.json`: notes, PDFs (with "only
+    PDFs with notes"), Markdown, images, text and code, all other files. It applies to the grid, folder counts
+    and search.
+  - Text and code files: a first-lines preview, opened read-only (a highlighted code block over pages), indexed up
+    to 1 MB while shown.
+  - Other files: a type icon, "Open with the system app", and "Show in file manager" (D-Bus `ShowItems` on Linux),
+    behind a fakeable `SystemApps`. Rename, move, copy and trash work on them.
+  - Recent grid: libraries opened outside `Xournal_Libraries` appear as folder cards with a library mark. A folder
+    card's menu has "Open as library (new window)".
+- **No crash at exit from the text reader, `qt/text-worker-exit` (2026-09-24).** The never-destroyed pool that
+  reads PDF text could still release a poppler document while the program's statics were torn down: about 1 in 20
+  exits under load crashed, and the crash handler took that for a real crash. It is now drained from a
+  QCoreApplication post routine; 0 of 240 runs crash.
+- **Preview writes, `qt/preview-writes` (2026-09-24).** A changed document's first page is drawn again and compared
+  with the stored preview. If it looks the same, only a tiny `preview-stamps.pack` records the new version, and
+  `previews.pack` stays untouched until it is written anyway. Editing page 3: 1.1 KiB written instead of about
+  318 KiB.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

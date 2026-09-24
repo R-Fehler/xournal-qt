@@ -104,7 +104,10 @@ void set(const fs::path& document, const char* what, qint64 value, qint64 fallba
 }
 }  // namespace
 
-fs::path keyOf(const DocumentItem& item) { return item.pdf.empty() ? item.xopp : item.pdf; }
+fs::path keyOf(const DocumentItem& item) {
+    // A PDF or an image with the .xopp that annotates it: the PDF / image (it keeps its place when the .xopp comes)
+    return !item.pdf.empty() ? item.pdf : !item.image.empty() ? item.image : item.main();
+}
 
 fs::path keyOf(const fs::path& file) {
     const DocumentItem item = DocumentFiles::itemOf(file);

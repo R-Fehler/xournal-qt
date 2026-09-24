@@ -100,7 +100,7 @@ QVariant TabManager::data(const QModelIndex& index, int role) const {
             // On its title page and saved as it is: the stored preview of the library (nothing to draw)
             // (also a PDF that has no .xopp yet)
             if (const fs::path file = s->documentFile(); !file.empty() && !s->isModified()) {
-                const DocumentItem item = DocumentFiles::itemOf(file);
+                const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles);
                 if (item.valid() && s->getCurrentPageNo() ==
                                             static_cast<size_t>(DocumentPlaces::titlePage(DocumentPlaces::keyOf(item)))) {
                     return PreviewCache::url(item);
@@ -336,7 +336,10 @@ void TabManager::backgroundChanged(int oldCurrent) {
 
 int TabManager::indexOfFile(const fs::path& path) const {
     for (size_t i = 0; i < tabs.size(); ++i) {
-        const fs::path p = tabs[i].session->getFilePath();
+        fs::path p = tabs[i].session->getFilePath();
+        if (p.empty()) {
+            p = tabs[i].session->shownFile();  // (a Markdown file shown, an image to write on)
+        }
         if (p.empty()) {
             continue;
         }

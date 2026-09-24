@@ -8,7 +8,8 @@
  * by any program takes its cache along.
  *
  * A pack is one file of such a folder with the entries of all its documents of one kind: "notes" (what the .xopp
- * files say: small, changes on every save), "pdf-text" (big, changes when a PDF does), "previews". It is CBOR,
+ * files say: small, changes on every save), "pdf-text" (big, changes when a PDF does), "previews" (with the tiny
+ * "preview-stamps", see Previews.h). It is CBOR,
  * compressed with zlib (not the previews: PNG is compressed already), behind a small header with the format number.
  * A pack is always written whole and under another name first (QSaveFile), never changed in place: sync clients
  * upload whole files anyway, and a reader never sees half a file. An entry of over 1 MB (the text of a long PDF)

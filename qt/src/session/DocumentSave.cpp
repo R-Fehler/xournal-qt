@@ -629,6 +629,8 @@ void DocumentSession::finishWrite() {
         if (ok) {
             hybridBase.clear();
             pdfPages->finishStaged();  // (the file under the other name: no .xopp refers to it now)
+            shownPath.clear();         // (a shown image, Markdown or text file: it is this .xopp now)
+            shownReadOnly = false;
         }
     } else if (ok) {
         if (const fs::path bg = t.snapshot->getPdfFilepath(); HybridPdf::inCache(bg)) {

@@ -589,6 +589,99 @@ cache on disk (and, once the whole block is in, converts the old one), which One
 - [ ] Library search finds a word of a hybrid PDF's pages and a word of one of its text boxes.
 - [ ] Time Ctrl+S on a hybrid PDF of a long PDF (several hundred pages) with notes on a few pages: acceptable?
 
+## Markdown files and images in the library (qt/library-files)
+- [ ] Open a `.xopp` with an image as page background stored with it (upstream: page background → image, "attach";
+      next to it `name.xopp.bg_1.png`), rename it in the library, move it into a folder, copy it to another library:
+      each time it opens with its background image, and no `.bg_1.png` is left behind at the old place. Trash takes
+      the image along.
+- [ ] Put `notes.md`, `board.png`, `photo.jpg` and a phone photo `.heic` (if Qt can read it here) into a library
+      folder: each is a card ("MD", "IMG"), also in "All documents" and in "Recent" once opened. A `.txt` stays hidden.
+- [ ] Rename `photo` in the library while `photo.xopp` is next to `photo.jpg` (one card, "IMG ✎"): both files get
+      the new name, and the `.xopp` still shows the photo. Move it into a folder and copy it to another library: the
+      same. Trash takes both.
+- [ ] Rename, move, copy and trash a Markdown file card; import a folder with `.md` files and images: they come along.
+- [ ] The card of a Markdown file shows its first page as an A4 page with the text formatted (headings, lists,
+      tables, code). An image card shows the image; a phone photo taken upright is upright, also a `.heic`.
+- [ ] Search the library for a word of a Markdown file (in a heading, a paragraph, a list, a table, a code block): the
+      file is found, with the text around the hit on its card. Its Markdown syntax (`**`, `#`, link targets) is not
+      found. Edit the file in another editor and save: after a moment the new text is found, the old one not.
+- [ ] Tap a Markdown card: it opens as A4 pages with the text formatted, the tab titled `notes.md`, and a note at the
+      bottom left says it is read-only for now. Scroll, zoom, search (Ctrl+F) in it. Try to write with the pen, the
+      highlighter and the text tool: nothing is written, the page scrolls instead, a tap on a link still opens it.
+      Close it: no question about saving, and the `.md` is unchanged.
+- [ ] Tap an image card (a whiteboard photo): it opens as one page with the photo as background, titled `photo.jpg`,
+      with a note that saving keeps it as `photo.xopp`. Write on it, save: the dialog suggests `photo.xopp` next to the
+      photo. Back in the library the two are one card ("IMG ✎") that opens what you wrote. The same with a photo from
+      the phone taken upright (it stays upright after saving and opening again, also in Xournal++) and a `.heic`.
+- [ ] Extended library search (pages button) for a word in Markdown files: a Markdown result shows a row of cards
+      instead of pages, each the paragraph / list item / table row / code block with the hit, formatted, the headings
+      above it in small italics, the first hit orange, the others yellow; a long code block is cut around its hit.
+      A PDF or `.xopp` result next to it still shows its pages. Tap the second card: the file opens at the page of
+      that passage, with that hit current in the search bar (e.g. "2 / 2"), and the read-only note at the bottom left.
+      Swipe the row sideways with a finger.
+- [ ] "Open" (Ctrl+O) and the library's "Import" offer Markdown files and images among the documents.
+
+## Page grid while searching (qt/grid-search-scroll)
+- [ ] A long PDF, search a word with many hits, open the page grid (filter on and off) and scroll down slowly and
+      fast: the grid stays where you scroll. Enter in the search bar still moves the grid to the next hit.
+
+## Show filter and other files (qt/library-filter)
+
+- [ ] Put into a library folder: `thesis.tex`, `kalman.py`, `notes.txt`, `Makefile`, `report.docx`, `budget.xlsx`,
+      `slides.pptx`, `archive.zip`, `song.mp3`. With the default "Show" filter none of them is a card, the folder's
+      card counts only its documents, and the library looks as before.
+- [ ] The "Show" button (funnel, next to the sort button) opens a list of toggles: Notes, PDFs with "Only PDFs with
+      notes" below it, Markdown, Images, Text and code, All other files. Turn on "Text and code": the `.tex`, `.py`,
+      `.txt` and `Makefile` are cards ("TEX", "PY", "TXT") showing their first lines in a monospaced font. The button is
+      marked. The popup stays open while toggling; a tap outside closes it.
+- [ ] Turn on "All other files": the Office files and the rest are cards with an icon of their type (document,
+      spreadsheet, slides, archive, audio), the extension as badge, the whole file name, size and date. Folder cards
+      count them now.
+- [ ] "Only PDFs with notes": lone PDFs go, PDFs with their `.xopp` stay, a hybrid PDF (also alone) stays. Turning
+      "PDFs" off greys the sub-toggle.
+- [ ] Close the window and open the library again: the filter is as you left it. Another library has its own
+      (the default one for a library never changed). "Defaults" in the popup brings the default back.
+- [ ] Tap a `.py` card: it opens read-only as A4 pages, monospaced, with colors for the code (if KSyntaxHighlighting is
+      built in), titled `kalman.py`, the read-only note at the bottom left. The pen does not write; Ctrl+F finds text
+      in it. A `.txt` has no colors. A text file with a line of backticks in it is shown whole.
+- [ ] With "Text and code" on, search the library for a word inside the `.py`: it is found, the card shows the text
+      around the hit ("Found in the text" in the extended search). Turn "Text and code" off: it is not found any more.
+      A text file over 1 MB is found by its name only.
+- [ ] With "All other files" on, search for part of `report.docx`'s name: it is found (before documents that only
+      contain the word). Its text is never searched.
+- [ ] Tap `report.docx`: LibreOffice (or the app set for it) opens it; no tab opens. Its menu (⋮, right click, press
+      and hold) has "Open with the system app" and "Show in file manager": Dolphin (or the file manager) opens the
+      folder with `report.docx` selected. A text file's menu has "Open with the system app" too (the editor set for
+      it); a PDF's has not.
+- [ ] Rename `report.docx` (the dialog shows the whole name; change it to `Report 2026.docx`), move it into a folder
+      with a `Report 2026.docx` already there (it becomes `Report 2026 (2).docx`), copy it to another library, trash
+      it. The same for a text file.
+- [ ] Import a folder with `.docx` and `.py` files while "All other files" / "Text and code" are off: only the
+      documents come along. With them on: they come along too.
+- [ ] Android (later): "Show in file manager" is not in the card menu; tapping an Office file offers the apps for it.
+- [ ] Open a folder outside `Documents/Xournal_Libraries` as library ("Open a folder as library…", or
+      `xournal-qt ~/some/folder`, or Dolphin's action): in any window's Recent grid it is a folder card with the
+      library mark, its name and path, among the recent documents by time. Tap it in another window: that library's
+      window comes to the front (no second window). Close that window and tap again: it opens. Its menu has no
+      Rename, Copy, Move or Trash. Delete or rename the folder in Dolphin: it drops out of Recent. Libraries in
+      `Xournal_Libraries` (Default, …) do not appear there.
+- [ ] In the library's folder view, a folder card's menu (⋮, right click, press and hold) has "Open as library (new
+      window)": a new window opens with that folder as library, its cards appear at once with their previews, and
+      the search finds its documents without "Indexing for search" running through them again.
+
+## Preview writes (qt/preview-writes)
+- [ ] In a library folder synced by OneDrive (cache in the folders), open a `.xopp` with a few pages, write on page 3,
+      save, go back to the library and wait ~5 s: the card shows the same preview. `ls -l --time-style=full-iso
+      <folder>/.xournal_library/`: `previews.pack` keeps its time; `notes.pack` and a small `preview-stamps.pack`
+      (well under 1 KB) are new. The sync client uploads only those.
+- [ ] Close and open the library again: the card shows its preview at once (not drawn again), `previews.pack`
+      still keeps its time.
+- [ ] Write on page 1 and save: the card shows the new first page, `previews.pack` is written again (new time) and
+      `preview-stamps.pack` is gone.
+- [ ] Make page 2 the title page ("Make it the title page" in the page grid): the card shows page 2 and
+      `previews.pack` is written. Then edit page 4 and save: `previews.pack` is left alone; edit page 2: it is written.
+- [ ] Settings → Storage → Clean-up still removes everything (also `preview-stamps.pack`); switching the cache to
+      the app cache moves it along.
 
 ## Saving in the background (qt/background-save)
 - [ ] Open a long PDF (pgfmanual, or a lecture of several hundred pages), write a few strokes, save it as a hybrid

@@ -2,12 +2,15 @@
  * xournal-qt: first-page previews of documents on disk (library and recent files grids).
  *
  * PreviewProvider is an asynchronous QML image provider ("image://preview/<id>", see url()). A preview is rendered
- * once (the document is loaded on a worker thread and its title page drawn like the page thumbnails) and stored as
- * PNG, with a stamp of the document's files (sizes, modification times) and its title page, so a changed document
+ * once (the document is loaded on a worker thread and its title page drawn like the page thumbnails; a Markdown file
+ * as it opens, see MarkdownFile.h; an image: scaled down) and stored as PNG, with a stamp of the document's files (sizes, modification times) and its title page, so a changed document
  * gets a new preview:
  *  - for the documents of the library in the "previews" pack of their folder's cache (see LibraryCache.h), by file
  *    name. A folder's pack is read when one of its previews is first wanted, and kept in memory (up to 48 MB of
- *    PNG, the folders used least recently go first). New previews are written a few seconds later, the whole pack;
+ *    PNG, the folders used least recently go first). New previews are written a few seconds later, the whole pack.
+ *    A document saved again (a new stamp) is drawn again and compared with its stored preview: when it looks the
+ *    same (a later page was edited), previews.pack is not written; its new stamp goes into the folder's small
+ *    "preview-stamps" pack instead, which is folded into previews.pack (and removed) the next time that is written;
  *  - for other documents (recent files) as PNG files in the user's cache.
  *
  * @license GNU GPLv2 or later
@@ -33,6 +36,9 @@ public:
     /// Format of the stored previews (packs of another one are dropped).
     static constexpr int FORMAT = 1;
     static const QString PACK;
+    /// Per document whose preview a newer version showed the same: that version's stamp, and the stamp in the
+    /// "previews" pack it was compared with (tiny; written instead of the "previews" pack).
+    static const QString STAMPS_PACK;
     /// The documents of the library at `location.root()` keep their previews in the caches of their folders
     /// (an invalid location: no library). What the library before has not written yet is written first.
     static void setLibrary(const CacheLocation& location);
@@ -56,9 +62,10 @@ public:
     static void setWriteDelays(int quietMs, int maxDelayMs);
     /// Where the preview of a document outside a library is stored.
     static fs::path outsideFile(const DocumentItem& item);
-    /// Packs read and written so far (tests).
+    /// Packs read and written so far (tests): "previews" packs; stamps packs.
     static int packsRead();
     static int packsWritten();
+    static int stampPacksWritten();
 };
 
 class PreviewProvider final: public QQuickAsyncImageProvider {

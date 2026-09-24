@@ -31,6 +31,7 @@
 
 #include "AppController.h"
 #include "shell/HitPages.h"
+#include "shell/MdSnippets.h"
 #include "shell/Library.h"
 #include "shell/Previews.h"
 #include "shell/SessionRecovery.h"
@@ -124,6 +125,7 @@ int main(int argc, char* argv[]) {
     engine.addImageProvider("sketch", new xqt::SketchProvider);
     engine.addImageProvider("preview", new xqt::PreviewProvider);
     engine.addImageProvider("hitpage", new xqt::HitPageProvider);
+    engine.addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
     engine.rootContext()->setContextProperty("app", &controller);
     AppController::setStartMaximized(true);
     // Undocked documents get a window of their own: the same QML, with their own controller as "app".
@@ -138,6 +140,7 @@ int main(int argc, char* argv[]) {
         }
         object->setParent(window);
         if (auto* w = qobject_cast<QQuickWindow*>(object)) {
+            AppController::watchWindow(w);
             w->show();
             w->requestActivate();
         }
@@ -146,6 +149,7 @@ int main(int argc, char* argv[]) {
             &engine, &QQmlApplicationEngine::objectCreationFailed, &qapp, [] { QCoreApplication::exit(1); },
             Qt::QueuedConnection);
     engine.loadFromModule("XournalQt", "Main");
+    AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
 
     // Developer aid: XQT_SCREENSHOT=file.png renders the window after a moment, saves it and quits.
     // XQT_SCREENSHOT_POPUP=<objectName> opens that popup first (e.g. settingsPage, tabOverview).

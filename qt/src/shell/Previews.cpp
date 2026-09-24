@@ -18,12 +18,15 @@
 #include "session/DocumentSession.h"
 #include "util/PathUtil.h"
 
+#include "ImageFile.h"
 #include "Library.h"
+#include "MarkdownFile.h"
 #include "Thumbnails.h"
 
 namespace xqt {
 
 const QString PreviewCache::PACK = QStringLiteral("previews");
+const QString PreviewCache::STAMPS_PACK = QStringLiteral("preview-stamps");
 
 namespace {
 /// PNG kept in memory at most (the folders used least recently go first)
@@ -32,13 +35,15 @@ constexpr qint64 BUDGET = 48ll * 1024 * 1024;
 constexpr qint64 BIG_PACK = 4ll * 1024 * 1024;
 
 struct Stored {
-    QString stamp;
+    QString stamp;      ///< the version of the document it shows
     QByteArray png;
+    QString packStamp;  ///< its stamp in previews.pack (older when a newer version looked the same: see STAMPS_PACK)
 };
 /// The previews of the documents directly in one folder, as in its pack.
 struct Folder {
     std::map<QString, Stored> entries;  ///< by file name
-    bool dirty = false;
+    bool dirty = false;        ///< previews.pack is to be written
+    bool stampsDirty = false;  ///< only the stamps pack is to be written
     qint64 bytes = 0;
     quint64 used = 0;
 };
@@ -51,7 +56,7 @@ struct State {
     bool discarded = false;
     WriteScheduler* scheduler = nullptr;  ///< lives on the main thread (made by setLibrary)
     std::mutex writeMtx;
-    std::atomic<int> reads{0}, writes{0};
+    std::atomic<int> reads{0}, writes{0}, stampWrites{0};
 };
 State& state() {
     static State s;
@@ -104,7 +109,7 @@ void trim(State& s, const fs::path& keep) {
     while (s.bytes > BUDGET) {
         auto oldest = s.folders.end();
         for (auto it = s.folders.begin(); it != s.folders.end(); ++it) {
-            if (!it->second.dirty && it->first != keep && (oldest == s.folders.end() || it->second.used < oldest->second.used)) {
+            if (!it->second.dirty && !it->second.stampsDirty && it->first != keep && (oldest == s.folders.end() || it->second.used < oldest->second.used)) {
                 oldest = it;
             }
         }
@@ -163,9 +168,23 @@ bool ensureLoaded(const fs::path& folder, bool big) {
                 continue;
             }
             const QCborMap e = it.value().toMap();
-            Stored stored{e.value(QStringLiteral("stamp")).toString(), e.value(QStringLiteral("png")).toByteArray()};
+            const QString stamp = e.value(QStringLiteral("stamp")).toString();
+            Stored stored{stamp, e.value(QStringLiteral("png")).toByteArray(), stamp};
             f.bytes += stored.png.size();
             f.entries[name] = std::move(stored);
+        }
+    }
+    // Previews that newer versions of their documents showed the same (only if previews.pack has what they were
+    // compared with)
+    if (auto stamps = Packs::read(dir, PreviewCache::STAMPS_PACK, PreviewCache::FORMAT)) {
+        for (auto it = stamps->cbegin(); it != stamps->cend(); ++it) {
+            const QCborMap e = it.value().toMap();
+            auto entry = f.entries.find(it.key().toString());
+            if (entry != f.entries.end() && entry->second.packStamp == e.value(QStringLiteral("of")).toString()) {
+                entry->second.stamp = e.value(QStringLiteral("stamp")).toString();
+            } else {
+                f.stampsDirty = true;  // (left over: dropped)
+            }
         }
     }
     std::lock_guard lock(s.mtx);
@@ -175,7 +194,7 @@ bool ensureLoaded(const fs::path& folder, bool big) {
     auto [it, inserted] = s.folders.try_emplace(folder, std::move(f));
     if (inserted) {
         s.bytes += it->second.bytes;
-        if (it->second.dirty) {
+        if (it->second.dirty || it->second.stampsDirty) {
             changed(s);
         }
     }
@@ -195,6 +214,53 @@ QByteArray lookup(const DocumentItem& item, const QString& stamp) {
     return it != f->second.entries.end() && it->second.stamp == stamp ? it->second.png : QByteArray();
 }
 
+/// The stored preview of a document, whatever version it shows.
+QByteArray lookupAny(const DocumentItem& item) {
+    auto& s = state();
+    std::lock_guard lock(s.mtx);
+    auto f = s.folders.find(item.folder());
+    if (f == s.folders.end()) {
+        return {};
+    }
+    auto it = f->second.entries.find(QString::fromStdString(item.main().filename().string()));
+    return it != f->second.entries.end() ? it->second.png : QByteArray();
+}
+
+/// The stored PNG `stored` shows the same as `img` (just encoded as `png`).
+bool samePicture(const QByteArray& stored, const QByteArray& png, const QImage& img) {
+    if (stored.isEmpty()) {
+        return false;
+    }
+    if (stored == png) {
+        return true;
+    }
+    QImage old;
+    return old.loadFromData(stored, "PNG") && old.size() == img.size() &&
+           old.convertToFormat(QImage::Format_ARGB32) == img.convertToFormat(QImage::Format_ARGB32);
+}
+
+/// The stored preview `png` is right for this version of the document too: only the stamps pack is written (the
+/// folder's previews.pack is left alone). Returns false if the preview changed meanwhile.
+bool confirm(const DocumentItem& item, const QString& stamp, const QByteArray& png) {
+    auto& s = state();
+    std::lock_guard lock(s.mtx);
+    auto f = s.folders.find(item.folder());
+    if (f == s.folders.end() || s.discarded) {
+        return true;  // (as store())
+    }
+    auto it = f->second.entries.find(QString::fromStdString(item.main().filename().string()));
+    if (it == f->second.entries.end() || it->second.png != png) {
+        return false;
+    }
+    if (it->second.stamp != stamp) {
+        it->second.stamp = stamp;
+        f->second.stampsDirty = true;
+        changed(s);
+    }
+    f->second.used = ++s.tick;
+    return true;
+}
+
 void store(const DocumentItem& item, const QString& stamp, const QByteArray& png) {
     auto& s = state();
     std::lock_guard lock(s.mtx);
@@ -202,7 +268,7 @@ void store(const DocumentItem& item, const QString& stamp, const QByteArray& png
     if (f == s.folders.end() || s.discarded) {
         return;  // (its pack is not in memory: it would be written without the others)
     }
-    add(s, f->second, QString::fromStdString(item.main().filename().string()), {stamp, png});
+    add(s, f->second, QString::fromStdString(item.main().filename().string()), {stamp, png, stamp});
     f->second.dirty = true;
     f->second.used = ++s.tick;
     trim(s, item.folder());
@@ -215,6 +281,7 @@ bool writeChanged() {
     struct Job {
         fs::path folder;
         std::map<QString, Stored> entries;
+        bool previews = false;  ///< previews.pack (else only the stamps pack)
     };
     std::vector<Job> jobs;
     CacheLocation location;
@@ -225,28 +292,52 @@ bool writeChanged() {
         }
         location = s.location;
         for (auto& [folder, f]: s.folders) {
+            if (!f.dirty && f.stampsDirty) {
+                // Only newer versions that look the same: their stamps go into the small pack, unless previews.pack
+                // is not where it is written (read from the other cache location: it moves now)
+                std::error_code ec;
+                f.dirty = !fs::exists(Packs::fileOf(location.dirOf(folder), PreviewCache::PACK), ec);
+            }
             if (f.dirty) {
-                jobs.push_back({folder, f.entries});  // (the PNG data is shared, not copied)
-                f.dirty = false;
+                for (auto& [name, stored]: f.entries) {
+                    stored.packStamp = stored.stamp;  // (as written now)
+                }
+            }
+            if (f.dirty || f.stampsDirty) {
+                jobs.push_back({folder, f.entries, f.dirty});  // (the PNG data is shared, not copied)
+                f.dirty = f.stampsDirty = false;
             }
         }
     }
     bool ok = true;
     for (const Job& job: jobs) {
-        QCborMap pack;
+        QCborMap pack, stamps;
         std::error_code ec;
         for (const auto& [name, stored]: job.entries) {
-            if (fs::exists(job.folder / name.toStdString(), ec)) {  // (gone meanwhile: left out)
+            if (!fs::exists(job.folder / name.toStdString(), ec)) {
+                continue;  // (gone meanwhile: left out)
+            }
+            if (job.previews) {
                 pack.insert(name, QCborMap{{QStringLiteral("stamp"), stored.stamp}, {QStringLiteral("png"), stored.png}});
+            } else if (stored.stamp != stored.packStamp) {
+                stamps.insert(name, QCborMap{{QStringLiteral("stamp"), stored.stamp}, {QStringLiteral("of"), stored.packStamp}});
             }
         }
         const fs::path dir = location.dirOf(job.folder);
+        if (!job.previews) {
+            // (a few bytes per document; previews.pack is left alone)
+            ok = Packs::write(dir, PreviewCache::STAMPS_PACK, PreviewCache::FORMAT, stamps, false) && ok;
+            ++s.stampWrites;
+            continue;
+        }
         if (pack.isEmpty()) {
             Packs::remove(dir, PreviewCache::PACK);
+            Packs::remove(dir, PreviewCache::STAMPS_PACK);
             fs::remove(dir, ec);  // (only if nothing else is in it)
         } else {
             // (PNG: compressed already)
             ok = Packs::write(dir, PreviewCache::PACK, PreviewCache::FORMAT, pack, false) && ok;
+            Packs::remove(dir, PreviewCache::STAMPS_PACK);  // (all stamps are in previews.pack now)
         }
         ++s.writes;
     }
@@ -273,6 +364,19 @@ bool inLibrary(const DocumentItem& item) {
 }
 
 QImage render(const DocumentItem& item) {
+    if (item.xopp.empty() && !item.image.empty()) {
+        return ImageFile::read(item.image, PreviewCache::WIDTH);  // an image alone: a thumbnail of it
+    }
+    if (!item.md.empty() || item.kind() == DocumentItem::Kind::Text) {
+        // A Markdown file: its title page as it opens (enough of its text for the pages up to it); a text file the
+        // same, as plain text
+        const size_t title = static_cast<size_t>(std::max(0, titleOf(item)));
+        const size_t bytes = std::min(MarkdownFile::MAX_BYTES, (title + 1) * 16384);
+        auto doc = MarkdownFile::document(item.md.empty() ? MarkdownFile::readAsPlainText(item.other, bytes)
+                                                          : MarkdownFile::read(item.md, bytes),
+                                          title + 1);
+        return ThumbnailProvider::renderDocument(*doc, std::min(title, doc->getPageCount() - 1), PreviewCache::WIDTH);
+    }
     auto loaded = DocumentSession::loadFile(item.main());
     if (!loaded.document || loaded.document->getPageCount() == 0) {
         return {};
@@ -356,13 +460,19 @@ QImage PreviewCache::preview(const DocumentItem& item) {
     if (const QByteArray png = lookup(item, stamp); !png.isEmpty() && img.loadFromData(png, "PNG")) {
         return img;  // another worker made it while we waited
     }
+    // The document changed (or its title page): drawn again. If it looks as before (e.g. a later page was
+    // edited), the stored preview is kept and only marked valid for this version, so the folder's previews.pack
+    // (big, uploaded whole by sync clients) is not written again.
+    const QByteArray before = lookupAny(item);
     img = render(item);
     if (!img.isNull()) {
         QByteArray png;
         QBuffer buffer(&png);
         buffer.open(QIODevice::WriteOnly);
         img.save(&buffer, "PNG");
-        store(item, stamp, png);
+        if (!samePicture(before, png, img) || !confirm(item, stamp, before)) {
+            store(item, stamp, png);
+        }
     }
     return img;
 }
@@ -428,7 +538,7 @@ void PreviewCache::moved(const std::vector<std::pair<fs::path, fs::path>>& moves
             }
             continue;
         }
-        const DocumentItem item = DocumentFiles::itemOf(to);
+        const DocumentItem item = DocumentFiles::itemOf(to, DocumentFiles::TextFiles);
         if (!item.valid() || item.main() != to) {
             continue;
         }
@@ -510,6 +620,7 @@ void PreviewCache::setWriteDelays(int quietMs, int maxDelayMs) {
 
 int PreviewCache::packsRead() { return state().reads.load(); }
 int PreviewCache::packsWritten() { return state().writes.load(); }
+int PreviewCache::stampPacksWritten() { return state().stampWrites.load(); }
 
 void PreviewProvider::shutdown() {
     pool().clear();
@@ -524,7 +635,7 @@ QQuickImageResponse* PreviewProvider::requestImageResponse(const QString& id, co
                                 .toStdString());
     pool().start([response, file] {
         QImage img;
-        if (const DocumentItem item = DocumentFiles::itemOf(file); item.valid()) {
+        if (const DocumentItem item = DocumentFiles::itemOf(file, DocumentFiles::TextFiles); item.valid()) {
             img = PreviewCache::preview(item);
         }
         QMetaObject::invokeMethod(

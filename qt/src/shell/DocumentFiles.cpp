@@ -5,11 +5,14 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 
 #include <QFile>
+#include <QImageReader>
 #include <QString>
 
 #include "model/Document.h"
+#include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
@@ -25,6 +28,14 @@ std::string lower(std::string s) {
 bool endsWith(const std::string& s, const std::string& suffix) {
     return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
+bool fileExists(const fs::path& p) {
+    std::error_code ec;
+    return fs::exists(p, ec);
+}
+/// "a.pdf" for the stem "a.pdf" of "a.pdf.xopp" (older Xournal++ saved annotations like that)
+std::string withoutPdfSuffix(const std::string& stem) {
+    return endsWith(lower(stem), ".pdf") ? stem.substr(0, stem.size() - 4) : std::string();
+}
 bool isAttachment(const fs::path& p) { return endsWith(lower(p.filename().string()), ".xopp.bg.pdf"); }
 bool isXopp(const fs::path& p) {
     const auto e = lower(p.extension().string());
@@ -35,9 +46,105 @@ bool isHidden(const fs::path& p) {
     const auto n = p.filename().string();
     return n.empty() || n[0] == '.';
 }
-bool fileExists(const fs::path& p) {
-    std::error_code ec;
-    return fs::exists(p, ec);
+bool isMd(const fs::path& p) { return lower(p.extension().string()) == ".md"; }
+/// "name.xopp.bg_1.png": a background image upstream stores with "name.xopp"
+bool isImageAttachment(const fs::path& p) {
+    const std::string n = lower(p.filename().string());
+    return n.find(".xopp.bg_") != std::string::npos || n.find(".xoj.bg_") != std::string::npos;
+}
+/// The image extensions the library shows, the preferred first (an image that pairs with a .xopp: the first there)
+const std::vector<std::string>& imageExtensions() {
+    static const std::vector<std::string> exts = [] {
+        std::vector<std::string> e{".png", ".jpg", ".jpeg"};
+        const auto formats = QImageReader::supportedImageFormats();
+        if (formats.contains("webp")) {
+            e.emplace_back(".webp");
+        }
+        if (formats.contains("heic") || formats.contains("heif")) {
+            e.emplace_back(".heic");
+            e.emplace_back(".heif");
+        }
+        return e;
+    }();
+    return exts;
+}
+/// The place of the image's extension in imageExtensions() (-1: no image)
+int imageRank(const fs::path& p) {
+    const auto& exts = imageExtensions();
+    const auto it = std::find(exts.begin(), exts.end(), lower(p.extension().string()));
+    return it == exts.end() ? -1 : static_cast<int>(it - exts.begin());
+}
+bool isImage(const fs::path& p) { return imageRank(p) >= 0 && !isImageAttachment(p) && !isHidden(p); }
+/// A backup ("name.xopp~", "notes.txt~")
+bool isBackup(const fs::path& p) {
+    const std::string n = p.filename().string();
+    return !n.empty() && n.back() == '~';
+}
+/// Text and code: shown as plain text (by the extension, or the name of a file without one)
+bool isText(const fs::path& p) {
+    static const std::set<std::string> exts{
+            // text, markup, data
+            ".txt", ".text", ".log", ".csv", ".tsv", ".json", ".jsonc", ".xml", ".yaml", ".yml", ".toml", ".ini",
+            ".cfg", ".conf", ".org", ".rst", ".adoc", ".asciidoc", ".textile", ".bib", ".srt", ".vtt",
+            // LaTeX
+            ".tex", ".sty", ".cls", ".bst", ".ltx",
+            // code
+            ".py", ".pyw", ".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx", ".ipp", ".m", ".mm", ".java",
+            ".kt", ".kts", ".scala", ".groovy", ".gradle", ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".rs", ".go",
+            ".rb", ".php", ".pl", ".pm", ".lua", ".r", ".jl", ".swift", ".cs", ".fs", ".hs", ".ml", ".mli", ".el",
+            ".lisp", ".clj", ".scm", ".erl", ".ex", ".exs", ".dart", ".zig", ".nim", ".v", ".sv", ".vhd", ".vhdl",
+            ".f", ".f90", ".for", ".sql", ".html", ".htm", ".css", ".scss", ".sass", ".less", ".vue", ".svelte",
+            ".qml", ".cmake", ".mk", ".sh", ".bash", ".zsh", ".fish", ".bat", ".cmd", ".ps1", ".awk", ".sed",
+            ".diff", ".patch", ".proto", ".graphql", ".glsl", ".hlsl", ".asm", ".s", ".mat", ".gp", ".plt"};
+    static const std::set<std::string> names{"makefile", "gnumakefile", "cmakelists.txt", "dockerfile", "readme",
+                                             "license", "copying", "authors", "changelog", "todo", "vagrantfile",
+                                             "gemfile", "rakefile", "procfile", "justfile"};
+    if (isHidden(p) || isBackup(p)) {
+        return false;
+    }
+    const std::string ext = lower(p.extension().string());
+    return ext.empty() ? names.count(lower(p.filename().string())) > 0 : exts.count(ext) > 0;
+}
+/// Files of the system that no one wants to see among their documents
+bool isSystemFile(const fs::path& p) {
+    const std::string n = lower(p.filename().string());
+    return n == "thumbs.db" || n == "desktop.ini" || n == "icon\r";
+}
+/// The ways an extension is written that pair an image with a .xopp: ".JPG", ".jpg" (in the order of their names, as
+/// a listing sorts them)
+std::vector<std::string> spellings(const std::string& ext) {
+    std::string upper = ext;
+    std::transform(upper.begin(), upper.end(), upper.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    return {upper, ext};
+}
+bool pairingSpelling(const fs::path& image) {
+    const std::string ext = image.extension().string();
+    const auto s = spellings(lower(ext));
+    return std::find(s.begin(), s.end(), ext) != s.end();
+}
+/// The image a .xopp with this name in `dir` annotates (empty: none)
+fs::path imageNamed(const fs::path& dir, const std::string& stem) {
+    for (const std::string& ext: imageExtensions()) {
+        for (const std::string& spelling: spellings(ext)) {
+            if (const fs::path p = dir / (stem + spelling); fileExists(p)) {
+                return p;
+            }
+        }
+    }
+    return {};
+}
+/// The PDF a .xopp belongs to (empty: none)
+fs::path pdfOf(const fs::path& xopp) {
+    const fs::path dir = xopp.parent_path();
+    const std::string stem = xopp.stem().string();
+    if (fileExists(dir / (stem + ".pdf"))) {
+        return dir / (stem + ".pdf");
+    }
+    if (const std::string plain = withoutPdfSuffix(stem); !plain.empty() && fileExists(dir / stem)) {
+        return dir / stem;
+    }
+    return {};
 }
 bool isDir(const fs::path& p) {
     std::error_code ec;
@@ -46,10 +153,6 @@ bool isDir(const fs::path& p) {
 /// `path` is `folder` or inside it (both canonical).
 bool isInside(const fs::path& path, const fs::path& folder) {
     return DocumentFiles::remap(path, folder, "/") != path;
-}
-/// "a.pdf" for the stem "a.pdf" of "a.pdf.xopp" (older Xournal++ saved annotations like that)
-std::string withoutPdfSuffix(const std::string& stem) {
-    return endsWith(lower(stem), ".pdf") ? stem.substr(0, stem.size() - 4) : std::string();
 }
 
 /// Natural order ("2" before "10"), case-insensitive.
@@ -122,17 +225,49 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
     const fs::path newXopp = item.xopp.empty() ? fs::path() : folder / (name + item.xopp.extension().string());
     fs::path newPdf = item.pdf.empty() ? fs::path() : folder / (name + ".pdf");
     fs::path pdfSource = item.pdf;
+    const fs::path newMd = item.md.empty() ? fs::path() : folder / (name + item.md.extension().string());
+    const fs::path newImage = item.image.empty() ? fs::path() : folder / (name + item.image.extension().string());
+    const fs::path newOther = item.other.empty() ? fs::path() : folder / name;  // (its whole file name)
 
-    // The .xopp must be rewritten if it uses a PDF by its path: the path changes (relative to the .xopp).
+    // The .xopp must be rewritten if it uses a PDF by its path: the path changes (relative to the .xopp). The same
+    // for the image it annotates.
     std::unique_ptr<Document> doc;
     if (!item.xopp.empty() && lower(item.xopp.extension().string()) == ".xopp") {
         auto loaded = DocumentSession::loadFile(item.xopp);
         if (!loaded.document) {
             return failure(loaded.error);
         }
-        const fs::path ref = loaded.document->getPdfFilepath();
-        if (!ref.empty() && !loaded.document->isAttachPdf()) {
-            doc = std::move(loaded.document);
+        if (!item.image.empty()) {
+            // Pages with its image (or a lost one, repaired with the image next to it) as background, by path
+            std::error_code ec;
+            for (size_t i = 0; i < loaded.document->getPageCount(); ++i) {
+                PageRef page = loaded.document->getPage(i);
+                BackgroundImage& bg = page->getBackgroundImage();
+                if (!page->getBackgroundType().isImagePage() || bg.isAttached() || bg.getFilepath().empty()) {
+                    continue;
+                }
+                if (!fileExists(bg.getFilepath()) || fs::equivalent(bg.getFilepath(), item.image, ec)) {
+                    bg.setFilepath(newImage);
+                    doc = std::move(loaded.document);
+                    loaded.document.reset();
+                    break;
+                }
+            }
+            if (doc) {
+                for (size_t i = 0; i < doc->getPageCount(); ++i) {  // (the other pages with it)
+                    BackgroundImage& bg = doc->getPage(i)->getBackgroundImage();
+                    if (doc->getPage(i)->getBackgroundType().isImagePage() && !bg.isAttached() &&
+                        (bg.getFilepath() == item.image || !fileExists(bg.getFilepath()))) {
+                        bg.setFilepath(newImage);
+                    }
+                }
+            }
+        }
+        const fs::path ref = doc ? doc->getPdfFilepath() : loaded.document->getPdfFilepath();
+        if (!ref.empty() && !(doc ? doc->isAttachPdf() : loaded.document->isAttachPdf())) {
+            if (!doc) {
+                doc = std::move(loaded.document);
+            }
             std::error_code ec;
             const bool refExists = fs::exists(ref, ec);
             const fs::path pages = DocumentFiles::pagesOf(item.xopp);
@@ -155,6 +290,8 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
     Rollback rollback;
     std::string error;
     const bool rewritten = doc != nullptr;
+    const std::vector<fs::path> oldImages =
+            item.xopp.empty() ? std::vector<fs::path>() : DocumentFiles::imageAttachmentsOf(item.xopp);
     if (!newXopp.empty()) {
         if (fileExists(newXopp)) {
             return failure("\"" + newXopp.filename().string() + "\" already exists.");
@@ -185,6 +322,28 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
                 r.moved.emplace_back(att, newAtt);
             }
         }
+        // Background images stored with it: a .xopp written again writes its own (below the old ones go)
+        if (rewritten) {
+            for (const fs::path& img: DocumentFiles::imageAttachmentsOf(newXopp)) {
+                rollback.steps.emplace_back([img] {
+                    std::error_code ec;
+                    fs::remove(img, ec);
+                });
+            }
+        } else {
+            const std::string oldName = item.xopp.filename().string();
+            for (const fs::path& img: DocumentFiles::imageAttachmentsOf(item.xopp)) {
+                const fs::path newImg =
+                        folder / (newXopp.filename().string() + img.filename().string().substr(oldName.size()));
+                if (!transfer(img, newImg, copy, error)) {
+                    return failure(error);
+                }
+                rollback.transferred(img, newImg, copy);
+                if (!copy) {
+                    r.moved.emplace_back(img, newImg);
+                }
+            }
+        }
         if (const fs::path pages = DocumentFiles::pagesOf(item.xopp); fileExists(pages)) {
             const fs::path newPages = DocumentFiles::pagesOf(newXopp);
             if (fileExists(newPages)) {
@@ -209,29 +368,76 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
             r.moved.emplace_back(item.pdf, newPdf);
         }
     }
+    for (const auto& [from, to]: {std::pair(item.md, newMd), std::pair(item.image, newImage), std::pair(item.other, newOther)}) {
+        if (!from.empty()) {
+            if (!transfer(from, to, copy, error)) {
+                return failure(error);
+            }
+            rollback.transferred(from, to, copy);
+            if (!copy) {
+                r.moved.emplace_back(from, to);
+            }
+        }
+    }
     if (!newXopp.empty() && !copy) {
         r.moved.emplace_back(item.xopp, newXopp);
         if (rewritten) {
-            // The rewritten .xopp is a new file: the old one goes last.
+            // The rewritten .xopp is a new file (with its own background images): the old one goes last.
             std::error_code ec;
+            for (const fs::path& img: oldImages) {
+                fs::remove(img, ec);
+            }
             fs::remove(item.xopp, ec);
         }
     }
     rollback.done = true;
     r.ok = true;
-    r.item = {newXopp, newPdf};
+    r.item = {newXopp, newPdf, newMd, newImage};
+    r.item.other = newOther;
     return r;
 }
 
 }  // namespace
 
 std::string DocumentItem::name() const {
+    if (xopp.empty() && pdf.empty() && md.empty() && image.empty()) {
+        return other.filename().string();  // a text or other file: its whole name ("report.docx")
+    }
     if (!xopp.empty()) {
         const std::string stem = xopp.stem().string();
         const std::string plain = withoutPdfSuffix(stem);
         return !plain.empty() && !pdf.empty() ? plain : stem;
     }
-    return pdf.stem().string();
+    return main().stem().string();
+}
+
+DocumentItem::Kind DocumentItem::kind() const {
+    if (!other.empty() && xopp.empty() && pdf.empty() && md.empty() && image.empty()) {
+        return isText(other) ? Kind::Text : Kind::Other;
+    }
+    return !pdf.empty() ? Kind::Pdf : !image.empty() ? Kind::Image : !md.empty() ? Kind::Markdown : Kind::Notes;
+}
+
+const char* DocumentItem::kindName() const {
+    switch (kind()) {
+        case Kind::Pdf:
+            return "pdf";
+        case Kind::Image:
+            return "image";
+        case Kind::Markdown:
+            return "md";
+        case Kind::Text:
+            return "text";
+        case Kind::Other:
+            return "other";
+        case Kind::Notes:
+            break;
+    }
+    return "notes";
+}
+
+bool DocumentItem::has(const fs::path& file) const {
+    return !file.empty() && (file == xopp || file == pdf || file == md || file == image || file == other);
 }
 
 namespace DocumentFiles {
@@ -245,8 +451,14 @@ void markHybrid(DocumentItem& item) {
 }
 }  // namespace
 
-
-bool isDocumentFile(const fs::path& file) { return isXopp(file) || isPdf(file); }
+bool isDocumentFile(const fs::path& file) { return isXopp(file) || isPdf(file) || isMd(file) || isImage(file); }
+bool isMarkdownFile(const fs::path& file) { return isMd(file); }
+bool isImageFile(const fs::path& file) { return isImage(file); }
+bool isTextFile(const fs::path& file) { return isText(file); }
+bool isOtherFile(const fs::path& file) {
+    return !file.empty() && !isHidden(file) && !isBackup(file) && !isSystemFile(file) && !isDocumentFile(file) &&
+           !isAttachment(file) && !isImageAttachment(file) && !isText(file);
+}
 
 fs::path attachmentOf(const fs::path& xopp) {
     fs::path p = xopp;
@@ -257,21 +469,44 @@ fs::path attachmentOf(const fs::path& xopp) {
 
 fs::path pagesOf(const fs::path& xopp) { return MergedPdf::sidecarOf(xopp); }
 
+std::vector<fs::path> imageAttachmentsOf(const fs::path& xopp) {
+    std::vector<fs::path> images;
+    const std::string prefix = xopp.filename().string() + ".bg_";
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(xopp.parent_path(), ec); !ec && it != fs::directory_iterator();
+         it.increment(ec)) {
+        const std::string name = it->path().filename().string();
+        if (name.size() > prefix.size() && name.compare(0, prefix.size(), prefix) == 0) {
+            images.push_back(it->path());
+        }
+    }
+    std::sort(images.begin(), images.end());
+    return images;
+}
+
 std::vector<fs::path> filesOf(const DocumentItem& item) {
     std::vector<fs::path> files;
     const fs::path none;
     for (const fs::path& f: {item.xopp, item.xopp.empty() ? none : attachmentOf(item.xopp),
-                             item.xopp.empty() ? none : pagesOf(item.xopp), item.pdf}) {
+                             item.xopp.empty() ? none : pagesOf(item.xopp), item.pdf, item.md, item.image,
+                             item.other}) {
         if (!f.empty() && fileExists(f)) {
             files.push_back(f);
+        }
+    }
+    if (!item.xopp.empty()) {
+        for (const fs::path& img: imageAttachmentsOf(item.xopp)) {
+            files.push_back(img);
         }
     }
     return files;
 }
 
-Listing scan(const fs::path& dir) {
+Listing scan(const fs::path& dir, unsigned include) {
     Listing l;
     std::map<std::string, fs::path> xopps, pdfs;
+    std::map<std::string, std::vector<fs::path>> images;  ///< by name
+    std::vector<fs::path> mds, others;
     std::error_code ec;
     for (auto it = fs::directory_iterator(dir, fs::directory_options::skip_permission_denied, ec);
          !ec && it != fs::directory_iterator(); it.increment(ec)) {
@@ -286,7 +521,27 @@ Listing scan(const fs::path& dir) {
             xopps[p.stem().string()] = p;
         } else if (isPdf(p)) {
             pdfs[p.stem().string()] = p;
+        } else if (isMd(p)) {
+            mds.push_back(p);
+        } else if (isImage(p)) {
+            images[p.stem().string()].push_back(p);
+        } else if (include != Documents && (isText(p) ? (include & TextFiles) != 0
+                                                      : (include & OtherFiles) != 0 && isOtherFile(p))) {
+            if (it->is_regular_file(tec)) {  // (not a socket, a device)
+                others.push_back(p);
+            }
         }
+    }
+    for (auto& [stem, list]: images) {
+        // The one a .xopp of this name annotates first (as itemOf() finds it)
+        std::sort(list.begin(), list.end(), [](const fs::path& a, const fs::path& b) {
+            const bool pa = pairingSpelling(a), pb = pairingSpelling(b);
+            if (pa != pb) {
+                return pa;
+            }
+            const int ra = imageRank(a), rb = imageRank(b);
+            return ra != rb ? ra < rb : a.filename() < b.filename();
+        });
     }
     for (auto& [stem, xopp]: xopps) {
         DocumentItem item{xopp, {}};
@@ -300,23 +555,39 @@ Listing scan(const fs::path& dir) {
             item.pdf = pdf->second;
             pdfs.erase(pdf);
             markHybrid(item);
+        } else if (auto img = images.find(stem); img != images.end() && pairingSpelling(img->second.front())) {
+            item.image = img->second.front();
+            img->second.erase(img->second.begin());
         }
         l.items.push_back(std::move(item));
     }
     for (auto& [stem, pdf]: pdfs) {
         l.items.push_back({{}, pdf});
     }
+    for (auto& md: mds) {
+        l.items.push_back({{}, {}, md});
+    }
+    for (auto& [stem, list]: images) {
+        for (auto& img: list) {
+            l.items.push_back({{}, {}, {}, img});
+        }
+    }
+    for (auto& file: others) {
+        DocumentItem item;
+        item.other = file;
+        l.items.push_back(std::move(item));
+    }
     std::sort(l.folders.begin(), l.folders.end(),
               [](const fs::path& a, const fs::path& b) { return naturalLess(a.filename().string(), b.filename().string()); });
-    std::sort(l.items.begin(), l.items.end(),
-              [](const DocumentItem& a, const DocumentItem& b) { return naturalLess(a.name(), b.name()); });
+    std::stable_sort(l.items.begin(), l.items.end(),
+                     [](const DocumentItem& a, const DocumentItem& b) { return naturalLess(a.name(), b.name()); });
     return l;
 }
 
-std::vector<DocumentItem> scanRecursive(const fs::path& dir) {
+std::vector<DocumentItem> scanRecursive(const fs::path& dir, unsigned include) {
     std::vector<DocumentItem> all;
     std::function<void(const fs::path&, int)> walk = [&](const fs::path& d, int depth) {
-        Listing l = scan(d);
+        Listing l = scan(d, include);
         std::move(l.items.begin(), l.items.end(), std::back_inserter(all));
         if (depth < 32) {  // symbolic link loops
             for (const auto& f: l.folders) {
@@ -342,18 +613,16 @@ std::vector<fs::path> foldersRecursive(const fs::path& dir) {
     return all;
 }
 
-DocumentItem itemOf(const fs::path& file) {
+DocumentItem itemOf(const fs::path& file, unsigned include) {
     if (!fileExists(file) || isDir(file)) {
         return {};
     }
     const fs::path dir = file.parent_path();
     const std::string stem = file.stem().string();
     if (isXopp(file)) {
-        DocumentItem item{file, {}};
-        if (fileExists(dir / (stem + ".pdf"))) {
-            item.pdf = dir / (stem + ".pdf");
-        } else if (const std::string plain = withoutPdfSuffix(stem); !plain.empty() && fileExists(dir / stem)) {
-            item.pdf = dir / stem;
+        DocumentItem item{file, pdfOf(file)};
+        if (item.pdf.empty()) {
+            item.image = imageNamed(dir, stem);
         }
         markHybrid(item);
         return item;
@@ -369,6 +638,27 @@ DocumentItem itemOf(const fs::path& file) {
         markHybrid(item);
         return item;
     }
+    if (isMd(file)) {
+        return {{}, {}, file};
+    }
+    if (isImage(file)) {
+        DocumentItem item{{}, {}, {}, file};
+        // With the .xopp of its name, unless that belongs to a PDF or to another image of the name
+        for (const fs::path& x: {dir / (stem + ".xopp"), dir / (stem + ".xoj")}) {
+            if (fileExists(x)) {
+                if (pdfOf(x).empty() && imageNamed(dir, stem) == file) {
+                    item.xopp = x;
+                }
+                break;
+            }
+        }
+        return item;
+    }
+    if (isText(file) ? (include & TextFiles) != 0 : (include & OtherFiles) != 0 && isOtherFile(file)) {
+        DocumentItem item;
+        item.other = file;
+        return item;
+    }
     return {};
 }
 
@@ -379,15 +669,21 @@ bool validName(const std::string& name) {
     return name.find_first_of("/\\") == std::string::npos && name.find('\0') == std::string::npos;
 }
 
-std::string uniqueName(const fs::path& folder, const std::string& stem) {
-    auto taken = [&](const std::string& n) {
-        for (const char* ext: {"", ".xopp", ".xoj", ".pdf"}) {
-            if (fileExists(folder / (n + ext))) {
-                return true;
-            }
+namespace {
+/// A document with this name is in `folder`: a .xopp, PDF, Markdown file or image (in any spelling of the extension
+/// that pairs).
+bool nameTaken(const fs::path& folder, const std::string& name) {
+    for (const char* ext: {".xopp", ".xoj", ".pdf", ".md"}) {
+        if (fileExists(folder / (name + ext))) {
+            return true;
         }
-        return false;
-    };
+    }
+    return !imageNamed(folder, name).empty();
+}
+}  // namespace
+
+std::string uniqueName(const fs::path& folder, const std::string& stem) {
+    auto taken = [&](const std::string& n) { return fileExists(folder / n) || nameTaken(folder, n); };
     if (!taken(stem)) {
         return stem;
     }
@@ -398,6 +694,29 @@ std::string uniqueName(const fs::path& folder, const std::string& stem) {
         }
     }
 }
+
+namespace {
+/// A free whole file name in `folder` for a text or other file: "name.ext", "name (2).ext", ...
+std::string uniqueFileName(const fs::path& folder, const fs::path& file) {
+    const std::string stem = file.stem().string(), ext = file.extension().string();
+    if (!fileExists(folder / file.filename())) {
+        return file.filename().string();
+    }
+    for (int i = 2;; ++i) {
+        std::string n = stem + " (" + std::to_string(i) + ")" + ext;
+        if (!fileExists(folder / n)) {
+            return n;
+        }
+    }
+}
+bool isOtherItem(const DocumentItem& item) {
+    return !item.other.empty() && item.xopp.empty() && item.pdf.empty() && item.md.empty() && item.image.empty();
+}
+/// The name a document gets in `folder` (free there)
+std::string freeNameIn(const fs::path& folder, const DocumentItem& item) {
+    return isOtherItem(item) ? uniqueFileName(folder, item.other) : uniqueName(folder, item.name());
+}
+}  // namespace
 
 Result rename(const DocumentItem& item, const std::string& newName) {
     if (!item.valid()) {
@@ -413,10 +732,8 @@ Result rename(const DocumentItem& item, const std::string& newName) {
         return r;
     }
     const fs::path folder = item.folder();
-    for (const char* ext: {".xopp", ".xoj", ".pdf"}) {
-        if (fileExists(folder / (newName + ext))) {
-            return failure("A document named \"" + newName + "\" already exists here.");
-        }
+    if (isOtherItem(item) ? fileExists(folder / newName) : nameTaken(folder, newName)) {
+        return failure("A document named \"" + newName + "\" already exists here.");
     }
     return relocate(item, folder, newName, false);
 }
@@ -435,20 +752,20 @@ Result move(const DocumentItem& item, const fs::path& folder) {
         r.item = item;
         return r;
     }
-    return relocate(item, folder, uniqueName(folder, item.name()), false);
+    return relocate(item, folder, freeNameIn(folder, item), false);
 }
 
 namespace {
 /// A folder with its subfolders; `depth` against symbolic link loops.
-Result importFolder(const fs::path& dir, const fs::path& folder, int depth) {
+Result importFolder(const fs::path& dir, const fs::path& folder, int depth, unsigned include) {
     Result r = createFolder(folder, uniqueName(folder, dir.filename().string()));
     if (!r.ok) {
         return r;
     }
     std::vector<std::string> errors;
-    const Listing l = scan(dir);
+    const Listing l = scan(dir, include);
     for (const auto& item: l.items) {
-        Result sub = relocate(item, r.folder, uniqueName(r.folder, item.name()), true);
+        Result sub = relocate(item, r.folder, freeNameIn(r.folder, item), true);
         if (sub.ok) {
             ++r.documents;
         } else {
@@ -460,7 +777,7 @@ Result importFolder(const fs::path& dir, const fs::path& folder, int depth) {
             errors.push_back("\"" + sub.string() + "\" is nested too deep.");
             continue;
         }
-        Result s = importFolder(sub, r.folder, depth + 1);
+        Result s = importFolder(sub, r.folder, depth + 1, include);
         r.documents += s.documents;
         if (!s.error.empty()) {
             errors.push_back(s.error);
@@ -473,7 +790,7 @@ Result importFolder(const fs::path& dir, const fs::path& folder, int depth) {
 }
 }  // namespace
 
-Result import(const fs::path& file, const fs::path& folder) {
+Result import(const fs::path& file, const fs::path& folder, unsigned include) {
     if (!isDir(folder)) {
         return failure("The folder does not exist.");
     }
@@ -482,13 +799,14 @@ Result import(const fs::path& file, const fs::path& folder) {
         if (isInside(fs::weakly_canonical(folder), fs::weakly_canonical(file))) {
             return failure("A folder cannot be imported into itself.");
         }
-        return importFolder(file, folder, 0);
+        return importFolder(file, folder, 0, include);
     }
-    const DocumentItem item = itemOf(file);
+    const DocumentItem item = itemOf(file, include);
     if (!item.valid()) {
-        return failure("\"" + file.filename().string() + "\" is not a PDF or Xournal document.");
+        return failure("\"" + file.filename().string() +
+                       "\" is not a document the library shows (notes, PDFs, Markdown, images).");
     }
-    Result r = relocate(item, folder, uniqueName(folder, item.name()), true);
+    Result r = relocate(item, folder, freeNameIn(folder, item), true);
     r.documents = r.ok ? 1 : 0;
     return r;
 }
@@ -622,5 +940,28 @@ fs::path remap(const fs::path& path, const fs::path& from, const fs::path& to) {
 }
 
 }  // namespace DocumentFiles
+
+bool ShowFilter::shows(const DocumentItem& item) const {
+    switch (item.kind()) {
+        case DocumentItem::Kind::Notes:
+            return notes;
+        case DocumentItem::Kind::Pdf:
+            // With notes: its .xopp, or its notes in it (a hybrid PDF; a lone one is looked into, once per version)
+            return pdfs && (!onlyPdfsWithNotes || !item.xopp.empty() || item.hybrid || HybridPdf::isHybrid(item.pdf));
+        case DocumentItem::Kind::Markdown:
+            return markdown;
+        case DocumentItem::Kind::Image:
+            return images;
+        case DocumentItem::Kind::Text:
+            return text;
+        case DocumentItem::Kind::Other:
+            return other;
+    }
+    return false;
+}
+
+unsigned ShowFilter::include() const {
+    return (text ? DocumentFiles::TextFiles : 0u) | (other ? DocumentFiles::OtherFiles : 0u);
+}
 
 }  // namespace xqt

@@ -42,6 +42,7 @@ ApplicationWindow {
             // for maximized once more.
             if (visibility === Window.Windowed && windowedVisibility === Window.Maximized && !remaximized) {
                 remaximized = true
+                app.logWindow("maximized again (the compositor gave back the normal size)")
                 showMaximized()
             }
         } else if (!fullScreenMode && (visibility === Window.Windowed || visibility === Window.Maximized)) {
@@ -62,12 +63,14 @@ ApplicationWindow {
         if (fullScreenMode) {
             leavingFullScreenTimer.stop()
             leavingFullScreen = false
+            app.logWindow("full screen")
             showFullScreen()
         } else {
             quickTools.close()
             leavingFullScreen = true
             remaximized = false
             leavingFullScreenTimer.restart()
+            app.logWindow("leave full screen to " + (windowedVisibility === Window.Maximized ? "maximized" : "normal"))
             if (windowedVisibility === Window.Maximized) showMaximized()
             else showNormal()
         }
@@ -202,7 +205,7 @@ ApplicationWindow {
             win.close()
         }
         function onRaiseRequested() {
-            if (win.visibility === Window.Minimized) win.showNormal()
+            if (win.visibility === Window.Minimized) { app.logWindow("raise from minimized"); win.showNormal() }
             win.raise()
             win.requestActivate()
         }
@@ -751,6 +754,47 @@ ApplicationWindow {
         view: app.view
     }
 
+    // A Markdown file shown read-only for now, an image to write on: what that means (closed for this tab with ×).
+    Pane {
+        id: shownFileNote
+        objectName: "shownFileNote"
+        property string closedFor: ""
+        visible: app.shownFileNote !== "" && closedFor !== app.title && !pageGrid.visible && !contentsOverview.visible
+        // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right)
+        anchors.bottom: canvas.bottom
+        anchors.left: canvas.left
+        anchors.bottomMargin: 24
+        anchors.leftMargin: 24
+        width: Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560))
+        padding: 2
+        leftPadding: 14
+        background: Rectangle {
+            radius: 12
+            color: "#f2fff8e1"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        RowLayout {
+            width: parent.width
+            spacing: 4
+            Label {
+                objectName: "shownFileNoteText"
+                Layout.fillWidth: true
+                text: app.shownFileNote
+                wrapMode: Text.Wrap
+                color: "#4a3b00"
+                font.pixelSize: 13
+            }
+            ToolButton {
+                objectName: "shownFileNoteClose"
+                text: "×"
+                font.pixelSize: 18
+                implicitWidth: 36
+                onClicked: shownFileNote.closedFor = app.title
+            }
+        }
+    }
+
     // Page and zoom status, floating over the canvas.
     Pane {
         id: viewPill
@@ -1238,7 +1282,9 @@ ApplicationWindow {
         id: openDialog
         title: qsTr("Open document or PDF")
         currentFolder: app.openFolder()
-        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf)"), qsTr("Xournal++ files (*.xopp *.xoj)"), qsTr("PDF files (*.pdf)"), qsTr("All files (*)")]
+        nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf *.md *.png *.jpg *.jpeg *.webp *.heic *.heif)"),
+                      qsTr("Xournal++ files (*.xopp *.xoj)"), qsTr("PDF files (*.pdf)"), qsTr("Markdown files (*.md)"),
+                      qsTr("Images (*.png *.jpg *.jpeg *.webp *.heic *.heif)"), qsTr("All files (*)")]
         fileMode: FileDialog.OpenFiles
         onAccepted: app.openUrls(selectedFiles)
     }

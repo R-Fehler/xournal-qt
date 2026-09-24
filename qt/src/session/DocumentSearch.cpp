@@ -82,6 +82,7 @@ void DocumentSearch::setQuery(const QString& query, bool jump) {
     pendingJump = jump && !prepared.isEmpty();
     jumpScrolls = true;
     startPage = session.getCurrentPageNo();
+    startIndex = 0;
     if (prepared.isEmpty()) {
         index.release();
     } else {
@@ -172,14 +173,17 @@ bool DocumentSearch::tryPendingJump() {
         if (!index.known(p) && !index.complete()) {
             return false;
         }
-        if (counts[p] > 0) {
+        const int skip = p == startPage ? startIndex : 0;
+        if (counts[p] > skip) {
             pendingJump = false;
-            setCurrent(p, 0, jumpScrolls);
+            startIndex = 0;
+            setCurrent(p, skip, jumpScrolls);
             return true;
         }
     }
     if (index.complete()) {
         pendingJump = false;
+        startIndex = 0;
         if (!withHits.empty()) {  // wrap around: hits only before the start page
             setCurrent(withHits.front().page, 0, jumpScrolls);
             return true;
@@ -356,8 +360,11 @@ void DocumentSearch::previous() {
     Q_EMIT changed();
 }
 
-void DocumentSearch::jumpToFirstFromCurrentPage() {
-    startPage = session.getCurrentPageNo();
+void DocumentSearch::jumpToFirstFromCurrentPage() { jumpToHit(session.getCurrentPageNo(), 0); }
+
+void DocumentSearch::jumpToHit(size_t page, int hit) {
+    startPage = page;
+    startIndex = std::max(0, hit);
     pendingJump = true;
     jumpScrolls = true;
     if (tryPendingJump()) {

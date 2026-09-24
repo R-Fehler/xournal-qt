@@ -1,5 +1,7 @@
 #include "CanvasInput.h"
 
+#include <utility>
+
 #include "PenHover.h"
 
 #include <algorithm>
@@ -444,7 +446,9 @@ bool CanvasInput::actionStart(const Event& event) {
     this->sequenceStartPage = currentPage;
     this->pressViewPos = event.viewPos;
     this->pressTimeMs = monotonicMs();
-    if (toolType == TOOL_HAND) {
+    // A read-only document (a Markdown file shown): every tool is the hand
+    this->readOnlyPress = view.getSession().isReadOnly() && toolType != TOOL_HAND;
+    if (toolType == TOOL_HAND || this->readOnlyPress) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
     }
 
@@ -522,7 +526,7 @@ bool CanvasInput::actionMotion(const Event& event) {
         return true;
     }
 
-    if (toolHandler->getToolType() == TOOL_HAND) {
+    if (toolHandler->getToolType() == TOOL_HAND || this->readOnlyPress) {
         if (this->deviceClassPressed) {
             this->handleScrollEvent(event);
         }
@@ -602,6 +606,16 @@ bool CanvasInput::actionMotion(const Event& event) {
 
 bool CanvasInput::actionEnd(const Event& event) {
     ToolHandler* toolHandler = view.getSession().getToolHandler();
+    if (std::exchange(this->readOnlyPress, false)) {
+        // A read-only document: nothing was written; a tap may be a link
+        if (monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
+            std::hypot(event.viewPos.x() - pressViewPos.x(), event.viewPos.y() - pressViewPos.y()) <= TAP_SLOP_PX / 2) {
+            view.tapAt(event.viewPos);
+        }
+        this->sequenceStartPage = nullptr;
+        this->inputRunning = false;
+        return false;
+    }
     if (EditSelection* selection = view.getSelection()) {
         selection->mouseUp();
     }

@@ -5,6 +5,7 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <cstdio>
 #include <limits>
 
 #include <shared_mutex>
@@ -21,6 +22,10 @@
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QTemporaryDir>
+#include <QElapsedTimer>
+#include <QMouseEvent>
+#include <QTouchEvent>
+#include <QWindow>
 
 #include "control/ToolEnums.h"
 #include "control/ExportHelper.h"
@@ -51,6 +56,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
+#include "shell/MdSnippets.h"
 #include "shell/Previews.h"
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
@@ -58,9 +64,13 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "ImageFile.h"
 #include "MarkdownEditor.h"
+#include "MarkdownFile.h"
 #include "MarkdownSession.h"
 #include "MdBox.h"
+#include "MdPassages.h"
+#include "session/TextMatch.h"
 #include "TextFlow.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
@@ -70,6 +80,7 @@
 #include "shell/PagesModel.h"
 #include "shell/SessionRecovery.h"
 #include "shell/SettingsModel.h"
+#include "shell/SystemApps.h"
 #include "shell/TabManager.h"
 
 using namespace xqt;
@@ -222,6 +233,91 @@ bool windowsStartMaximized = false;                  // set by main()
 
 void AppController::setStartMaximized(bool on) { windowsStartMaximized = on; }
 
+namespace {
+bool windowLogOn() {
+    static const bool on = qEnvironmentVariableIsSet("XQT_LOG_WINDOW");
+    return on;
+}
+/// On stderr like XQT_PERF (qInfo may go to the journal when stderr is not a terminal)
+template <typename... Args>
+void windowLogLine(const char* format, Args... args) {
+    std::fprintf(stderr, format, args...);
+    std::fputc('\n', stderr);
+}
+qint64 windowLogMs() {
+    static QElapsedTimer clock;
+    if (!clock.isValid()) {
+        clock.start();
+    }
+    return clock.elapsed();
+}
+QString statesText(Qt::WindowStates s) {
+    QStringList parts;
+    if (s & Qt::WindowMinimized) parts << "minimized";
+    if (s & Qt::WindowMaximized) parts << "maximized";
+    if (s & Qt::WindowFullScreen) parts << "fullscreen";
+    if (s & Qt::WindowActive) parts << "active";
+    return parts.isEmpty() ? QStringLiteral("normal") : parts.join('+');
+}
+/// Logs what happens to a window (XQT_LOG_WINDOW)
+class WindowWatcher final: public QObject {
+public:
+    explicit WindowWatcher(QWindow* w): QObject(w) {
+        w->installEventFilter(this);
+        connect(w, &QWindow::windowStateChanged, this, [w](Qt::WindowState) {
+            windowLogLine("[window %6lld ms] %p states -> %s (geometry %d,%d %dx%d)", windowLogMs(), static_cast<void*>(w),
+                  qPrintable(statesText(w->windowStates())), w->x(), w->y(), w->width(), w->height());
+        });
+    }
+    bool eventFilter(QObject* o, QEvent* e) override {
+        auto* w = static_cast<QWindow*>(o);
+        switch (e->type()) {
+            case QEvent::Resize:
+                windowLogLine("[window %6lld ms] %p resized to %dx%d (%s)", windowLogMs(), static_cast<void*>(w), w->width(),
+                      w->height(), qPrintable(statesText(w->windowStates())));
+                break;
+            case QEvent::Move:
+                windowLogLine("[window %6lld ms] %p moved to %d,%d", windowLogMs(), static_cast<void*>(w), w->x(), w->y());
+                break;
+            case QEvent::TouchBegin:
+            case QEvent::TouchEnd:
+            case QEvent::TouchCancel:
+            case QEvent::MouseButtonPress:
+            case QEvent::MouseButtonRelease: {
+                const auto* pe = static_cast<QPointerEvent*>(e);
+                const auto& points = pe->points();
+                const QPointF at = points.isEmpty() ? QPointF() : points.first().scenePosition();
+                windowLogLine("[window %6lld ms] %p %s at %.0f,%.0f (%d points)", windowLogMs(), static_cast<void*>(w),
+                      e->type() == QEvent::TouchBegin         ? "touch begin"
+                      : e->type() == QEvent::TouchEnd         ? "touch end"
+                      : e->type() == QEvent::TouchCancel      ? "touch cancel"
+                      : e->type() == QEvent::MouseButtonPress ? "mouse press"
+                                                              : "mouse release",
+                      at.x(), at.y(), static_cast<int>(points.size()));
+                break;
+            }
+            default:
+                break;
+        }
+        return false;
+    }
+};
+}  // namespace
+
+void AppController::watchWindow(QWindow* window) {
+    if (window && windowLogOn()) {
+        new WindowWatcher(window);
+        windowLogLine("[window %6lld ms] %p watched (%s, %dx%d)", windowLogMs(), static_cast<void*>(window),
+              qPrintable(statesText(window->windowStates())), window->width(), window->height());
+    }
+}
+
+void AppController::logWindow(const QString& what) const {
+    if (windowLogOn()) {
+        windowLogLine("[window %6lld ms] app asks: %s", windowLogMs(), qPrintable(what));
+    }
+}
+
 bool AppController::startMaximized() const { return windowsStartMaximized; }
 
 void AppController::setWindowFactory(std::function<void(AppController*)> factory) {
@@ -290,6 +386,7 @@ void AppController::shutdown() {
     // The image workers draw with Qt: they must be done before the application takes its plugins away
     PreviewProvider::shutdown();
     HitPageProvider::shutdown();
+    MdSnippetProvider::shutdown();
     settingsView->end();  // settings screen still open: save its changes
     if (recovery) {
         recovery->finish();  // a normal exit: reopen these tabs next time
@@ -388,8 +485,8 @@ QVariantMap AppController::takeMarkdownFromPage() {
 QString AppController::startMarkdown(int page, std::optional<QPointF> at) {
     endMarkdown(true);
     endTextFlow(true);
-    if (!session()) {
-        return {};
+    if (!session() || session()->isReadOnly()) {
+        return {};  // (a Markdown file shown read-only: not edited here)
     }
     mdSession = session();
     markdown = std::make_unique<MarkdownSession>(*mdSession);
@@ -530,8 +627,12 @@ void AppController::currentTabChanged() {
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
 bool AppController::copySelection() { return canvas() && canvas()->copySelection(); }
 bool AppController::cutSelection() { return canvas() && canvas()->cutSelection(); }
-bool AppController::pasteElements() { return canvas() && canvas()->pasteElements(); }
-bool AppController::pasteAt(qreal x, qreal y) { return canvas() && canvas()->pasteElements(QPointF(x, y)); }
+bool AppController::pasteElements() {
+    return canvas() && !session()->isReadOnly() && canvas()->pasteElements();
+}
+bool AppController::pasteAt(qreal x, qreal y) {
+    return canvas() && !session()->isReadOnly() && canvas()->pasteElements(QPointF(x, y));
+}
 bool AppController::canPaste() const {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
     return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal"));
@@ -863,6 +964,35 @@ bool AppController::modified() const { return session() && session()->isModified
 bool AppController::saving() const { return session() && session()->isSaving(); }
 bool AppController::anySaving() const { return tabs->anySaving(); }
 bool AppController::hasFilePath() const { return session() && session()->hasFilePath(); }
+
+QString AppController::shownFileNote() const {
+    const fs::path file = session() && !session()->hasFilePath() ? session()->shownFile() : fs::path();
+    if (file.empty()) {
+        return {};
+    }
+    const QString name = QString::fromStdString(file.filename().string());
+    if (DocumentFiles::isMarkdownFile(file)) {
+        std::error_code ec;
+        const bool cut = fs::file_size(file, ec) > MarkdownFile::MAX_BYTES && !ec;
+        return tr("Read-only for now: %1 is shown as it is formatted, to read and search (a Markdown editor comes "
+                  "later).")
+                       .arg(name) +
+               (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
+                    : QString());
+    }
+    if (DocumentFiles::isTextFile(file)) {
+        std::error_code ec;
+        const bool cut = fs::file_size(file, ec) > MarkdownFile::MAX_BYTES && !ec;
+        return tr("Read-only: %1 is shown as plain text, to read and search. Open it with another app to edit it.")
+                       .arg(name) +
+               (cut ? ' ' + tr("Only its first %1 MB are shown.").arg(MarkdownFile::MAX_BYTES / (1024 * 1024))
+                    : QString());
+    }
+    fs::path xopp = file;
+    xopp.replace_extension(".xopp");
+    return tr("%1 is the background of this new page. Saving keeps what you write as %2 next to it.")
+            .arg(name, QString::fromStdString(xopp.filename().string()));
+}
 bool AppController::canUndo() const { return session() && session()->getUndoRedoHandler()->canUndo(); }
 bool AppController::canRedo() const { return session() && session()->getUndoRedoHandler()->canRedo(); }
 
@@ -1244,6 +1374,10 @@ void AppController::newDocument() {
 void AppController::setLibraryRoot(const fs::path& root) {
     auto lib = std::make_unique<Library>(root);
     journalFile = journalFileFor(*lib);
+    // A folder opened as a library outside the standard folder: in the Recent grid, to find it again
+    if (!lib->isInLibrariesFolder()) {
+        recent->addLibrary(lib->root());
+    }
     library->setLibrary(std::move(lib));
 }
 
@@ -1278,7 +1412,19 @@ bool AppController::createDocument(const QString& name, bool inLibrary) {
     return true;
 }
 
+namespace {
+/// A file the home screen lists that the app does not open itself (an Office file, ...)
+bool isOtherFile(const QString& path) {
+    const fs::path file(path.toStdString());
+    std::error_code ec;
+    return DocumentFiles::isOtherFile(file) && fs::is_regular_file(file, ec);
+}
+}  // namespace
+
 bool AppController::openSearchHit(const QString& path, const QString& query) {
+    if (isOtherFile(path)) {
+        return openWithSystemApp(path);  // (found by its name)
+    }
     if (!openPath(path)) {
         return false;
     }
@@ -1304,6 +1450,47 @@ bool AppController::openSearchHitAt(const QString& path, const QString& query, i
         } else {
             s->search().setQuery(query, true);  // current: the first hit from this page on
         }
+    }
+    return true;
+}
+
+bool AppController::openSearchHitInPassage(const QString& path, const QString& query, int passage) {
+    if (!openPath(path) || !session()) {
+        return false;
+    }
+    DocumentSession* s = session();
+    // The passage in the text the document shows (read as it was, parsed as the index does), and its page
+    const std::string source = MarkdownFile::read(fs::path(path.toStdString()));
+    const std::vector<md::Passage> passages = md::passages(md::parse(source));
+    if (passage < 0 || static_cast<size_t>(passage) >= passages.size()) {
+        return openSearchHit(path, query);
+    }
+    const md::Passage& target = passages[static_cast<size_t>(passage)];
+    std::vector<size_t> starts = MarkdownFile::pageStarts(*s->getDocument());
+    if (starts.empty()) {
+        starts.push_back(0);
+    }
+    size_t page = 0;
+    for (size_t i = 0; i < starts.size(); ++i) {
+        if (starts[i] <= target.begin) {
+            page = i;
+        }
+    }
+    // The hits on that page before the passage: its first hit is the one after them
+    const QString prepared = textmatch::prepare(LibraryIndex::simplified(query));
+    int before = 0;
+    for (size_t i = 0; i < static_cast<size_t>(passage); ++i) {
+        if (passages[i].begin != md::NO_SOURCE && passages[i].begin >= starts[page]) {
+            before += textmatch::count(LibraryIndex::simplified(QString::fromStdString(passages[i].text)), prepared);
+        }
+    }
+    s->setCurrentPageNo(page);
+    s->getScrollHandler()->scrollToPage(page);  // right away; the hit follows when the search found it
+    if (!query.trimmed().isEmpty()) {
+        if (s->search().query() != query) {
+            s->search().setQuery(query, false);
+        }
+        s->search().jumpToHit(page, before);
     }
     return true;
 }
@@ -1346,7 +1533,7 @@ void AppController::openLibrary(const QUrl& folder) {
         return;
     }
     // One library per window: another process (it becomes the single instance of that library).
-    QProcess::startDetached(QCoreApplication::applicationFilePath(), {dir});
+    SystemApps::instance().startLibraryWindow(dir);
 }
 
 bool AppController::createLibrary(const QString& name) {
@@ -1363,9 +1550,29 @@ bool AppController::createLibrary(const QString& name) {
     return true;
 }
 
-void AppController::showInFileManager(const QString& path) {
-    const QFileInfo info(path);
-    QDesktopServices::openUrl(QUrl::fromLocalFile(info.isDir() ? path : info.absolutePath()));
+void AppController::showInFileManager(const QString& path) { SystemApps::instance().showInFileManager(path); }
+
+bool AppController::canShowInFileManager() const { return SystemApps::canShowInFileManager(); }
+
+bool AppController::openWithSystemApp(const QString& path) {
+    if (!QFileInfo::exists(path)) {
+        return false;
+    }
+    if (!SystemApps::instance().openWithSystemApp(path)) {
+        Q_EMIT message(tr("Cannot open file"), tr("No app is set up to open %1.").arg(QFileInfo(path).fileName()), true);
+        return false;
+    }
+    return true;
+}
+
+void AppController::openListed(const QStringList& paths) {
+    for (const QString& p: paths) {
+        if (isOtherFile(p)) {
+            openWithSystemApp(p);
+        } else {
+            openPath(p);
+        }
+    }
 }
 
 void AppController::filesChanged(const DocumentFiles::Result& r) {
@@ -1591,6 +1798,32 @@ QVariantList AppController::modifiedTabs() const {
     return list;
 }
 
+namespace {
+/// A new document made from a Markdown file (MarkdownFile.h), a text file (as plain text) or an image (ImageFile.h):
+/// it shows the file and is never written back to it.
+DocumentSession::LoadResult loadShownFile(const fs::path& file) {
+    DocumentSession::LoadResult result;
+    if (DocumentFiles::isMarkdownFile(file) || DocumentFiles::isTextFile(file)) {
+        std::error_code ec;
+        if (!fs::is_regular_file(file, ec)) {
+            result.error =
+                    AppController::tr("\"%1\" cannot be read.").arg(QString::fromStdString(file.string())).toStdString();
+            return result;
+        }
+        result.document = MarkdownFile::document(DocumentFiles::isTextFile(file) ? MarkdownFile::readAsPlainText(file)
+                                                                                 : MarkdownFile::read(file));
+        return result;
+    }
+    if (DocumentFiles::isImageFile(file)) {
+        result.document = ImageFile::document(file, result.error);
+        return result;
+    }
+    result.error =
+            AppController::tr("\"%1\" cannot be opened.").arg(QString::fromStdString(file.string())).toStdString();
+    return result;
+}
+}  // namespace
+
 bool AppController::openFile(const QUrl& url) { return openPath(url.toLocalFile()); }
 
 bool AppController::openPath(const QString& path) {
@@ -1600,7 +1833,14 @@ bool AppController::openPath(const QString& path) {
         setHomeVisible(false);
         return true;
     }
-    auto result = DocumentSession::loadFile(file);
+    // A Markdown file, an image: a new document made from it (the file is not written); an image with its .xopp:
+    // the .xopp
+    const bool shown =
+            DocumentFiles::isMarkdownFile(file) || DocumentFiles::isImageFile(file) || DocumentFiles::isTextFile(file);
+    if (shown && !DocumentFiles::itemOf(file).xopp.empty()) {
+        return openPath(QString::fromStdString(DocumentFiles::itemOf(file).xopp.string()));
+    }
+    auto result = shown ? loadShownFile(file) : DocumentSession::loadFile(file);
     if (!result.document) {
         Q_EMIT message(tr("Cannot open file"), QString::fromStdString(result.error), true);
         return false;
@@ -1608,7 +1848,11 @@ bool AppController::openPath(const QString& path) {
     const std::vector<std::string> hybridChanged = result.hybridChanged;
     // An untouched new document is replaced instead of keeping an empty tab around.
     const int pristine = tabs->isPristine(tabs->currentIndex()) ? tabs->currentIndex() : -1;
-    tabs->addTab(std::make_unique<DocumentSession>(*app, std::move(result.document)));
+    auto opened = std::make_unique<DocumentSession>(*app, std::move(result.document));
+    if (shown) {
+        opened->setShownFile(file, !DocumentFiles::isImageFile(file));
+    }
+    tabs->addTab(std::move(opened));
     if (pristine >= 0) {
         tabs->closeTab(pristine);
     }
@@ -2527,7 +2771,10 @@ QUrl AppController::suggestedSaveFile() const {
     fs::path suggested = session()->suggestSavePath();
     // A document that was never saved and does not annotate a PDF belongs in the library of this window. Upstream
     // suggests the folder something was saved to last, which is shared by all libraries and windows.
-    if (!session()->hasFilePath() && session()->annotatedPdf().empty() && library->available()) {
+    // (An image to write on: its .xopp next to it, so the library pairs them.)
+    const fs::path shown = session()->shownFile();
+    if (!session()->hasFilePath() && session()->annotatedPdf().empty() && library->available() &&
+        (shown.empty() || DocumentFiles::isMarkdownFile(shown) || DocumentFiles::isTextFile(shown))) {
         suggested = fs::path(library->rootPath().toStdString()) / suggested.filename();
     }
     return QUrl::fromLocalFile(QString::fromStdString(suggested.string()));

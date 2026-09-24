@@ -90,6 +90,7 @@ struct Block {
 struct Document {
     Block root;
     std::vector<std::string> links;  ///< link targets and image sources
+    std::vector<bool> wikiLinks;     ///< per link: it is a [[wiki link]]
 };
 
 /// Parse a Markdown text (UTF-8). Never fails: anything is some Markdown.

@@ -2,7 +2,10 @@
  * xournal-qt: the library grid (QML list model) and its file operations.
  *
  * Rows are the subfolders and documents of the current folder, all documents of the library ("flat"), or the
- * search results: folders whose name matches, then documents whose text or name matches. Changes on disk (also by other programs) are picked up by a file system watcher.
+ * search results: folders whose name matches, then documents whose text or name matches. What kinds of files are
+ * shown is the library's "Show" filter (ShowFilter, a setting of each library): it applies to the grid, the counts of
+ * the folders and the search results. Text files are in the search index when shown; other files are found by
+ * name. Changes on disk (also by other programs) are picked up by a file system watcher.
  * Renaming and moving go through DocumentFiles (a .xopp and its PDF stay together); `onFilesChanged` lets the
  * controller update open tabs and the recent files.
  *
@@ -66,6 +69,11 @@ class LibraryModel final: public QAbstractListModel {
     Q_PROPERTY(int cacheFiles READ cacheFiles NOTIFY cacheChanged)
     /// Its cache was removed: nothing is cached any more until the library is opened again
     Q_PROPERTY(bool cacheRemoved READ cacheRemoved NOTIFY cacheChanged)
+    /// Which kinds of files are shown: { notes, pdfs, onlyPdfsWithNotes, markdown, images, text, other } (bools; see
+    /// setShown)
+    Q_PROPERTY(QVariantMap show READ show NOTIFY showChanged)
+    /// The filter is not the default one (the "Show" button is marked)
+    Q_PROPERTY(bool showFiltered READ showFiltered NOTIFY showChanged)
 public:
     enum Roles {
         NameRole = Qt::UserRole + 1,
@@ -90,6 +98,21 @@ public:
         HitPageListRole,
         /// Search: image URL of the pages with hits marked (append "/<page>")
         HitPageBaseRole,
+        /// What the document is: "notes" (a .xopp alone), "pdf" (with or without its .xopp; also a hybrid PDF), "md",
+        /// "image" (with or without its .xopp); folders: ""
+        KindRole,
+        /// A hybrid PDF with its .xopp export (one card that opens the PDF). A lone hybrid PDF is not looked into
+        /// when listing: false.
+        HybridRole,
+        /// Search in a Markdown file: its passages with hits, [{ passage, count, headings }] (headings: the path of
+        /// the headings above it, "Lecture 3 › Kalman filter")
+        HitPassageListRole,
+        /// Search: image URL of the snippet cards of those passages (append "/<passage>"), see MdSnippets.h
+        HitPassageBaseRole,
+        /// Size of the document's main file in bytes (folders: -1)
+        SizeRole,
+        /// A text or other file: the icon for its type ("xqt-file-spreadsheet", ...); else ""
+        FileIconRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
@@ -169,6 +192,20 @@ public:
     /// Move documents and folders to the trash.
     Q_INVOKABLE bool trashPaths(const QStringList& paths);
 
+    const ShowFilter& showFilter() const { return filter; }
+    /// Show these kinds of files (kept as the library's setting).
+    void setShowFilter(const ShowFilter& f);
+    QVariantMap show() const;
+    bool showFiltered() const { return !filter.isDefault(); }
+    /// Show a kind of files or not: "notes", "pdfs", "onlyPdfsWithNotes", "markdown", "images", "text", "other".
+    Q_INVOKABLE void setShown(const QString& key, bool shown);
+    /// The default filter again.
+    Q_INVOKABLE void resetShown();
+    /// The icon for a file that is not a document, by its type (MIME): "xqt-file-doc", "xqt-file-spreadsheet",
+    /// "xqt-file-slides", "xqt-file-archive", "xqt-file-audio", "xqt-file-video", "xqt-file-image", "xqt-file-code",
+    /// else "xqt-file".
+    static QString fileIconOf(const fs::path& file);
+
     /// Scan the library again (after changes).
     Q_INVOKABLE void refresh();
     /// Documents were read meanwhile (when, and at which page): shown anew, sorted anew if by that.
@@ -206,6 +243,7 @@ Q_SIGNALS:
     void importingChanged();
     void selectionChanged();
     void cacheChanged();
+    void showChanged();
     void error(const QString& text);
     /// An import finished: `count` documents were added.
     void imported(int count);
@@ -218,6 +256,8 @@ private:
         QString name;
         QDateTime modified;
         int itemCount = 0;
+        qint64 size = -1;
+        QString icon;  ///< a text or other file: its type's icon
         LibraryIndex::Hit hit;
     };
     fs::path currentDir() const;
@@ -252,6 +292,7 @@ private:
     CacheFolders::Usage cacheUsage{-1, 0};
     quint64 cacheCounts = 0;  ///< (only the last count counts)
     bool cachesRemoved = false;
+    ShowFilter filter;
 };
 
 }  // namespace xqt

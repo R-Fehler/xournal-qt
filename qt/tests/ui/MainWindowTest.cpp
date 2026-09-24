@@ -14,9 +14,12 @@
 #include <cmath>
 
 #include <QDir>
+#include <fstream>
+
 #include <QElapsedTimer>
 #include <iostream>
 #include <QFile>
+#include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QClipboard>
@@ -66,11 +69,13 @@
 #include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
+#include "shell/MdSnippets.h"
 #include "shell/LibraryModel.h"
 #include "shell/PagesModel.h"
 #include "shell/RecentFiles.h"
 #include "shell/Previews.h"
 #include "shell/SettingsModel.h"
+#include "shell/SystemApps.h"
 #include "shell/TabManager.h"
 #include "shell/PageSketches.h"
 #include "shell/Thumbnails.h"
@@ -91,6 +96,7 @@ protected:
         engine->addImageProvider("sketch", new xqt::SketchProvider);
         engine->addImageProvider("preview", new xqt::PreviewProvider);
         engine->addImageProvider("hitpage", new xqt::HitPageProvider);
+        engine->addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
         engine->rootContext()->setContextProperty("app", controller.get());
         engine->loadFromModule("XournalQt", "Main");
         ASSERT_FALSE(engine->rootObjects().isEmpty());
@@ -520,6 +526,41 @@ TEST_F(MainWindowTest, pageGridCanShowOnlyPagesWithHits) {
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, c.toPoint());
     wait(50);
     EXPECT_EQ(controller->pageNumber(), 10);
+}
+
+TEST_F(MainWindowTest, theHitsFilterLeavesTheWindowAsItIs) {
+    // The author: pressing "N pages with hits" (sidebar or page grid) made the maximized window half as high
+    window->showMaximized();
+    until([&] { return window->visibility() == QWindow::Maximized; });
+    wait(1700);  // (past the settling of the window state)
+    const QRect before = window->geometry();
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    controller->setSearchQuery("p1");
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 3 && !controller->searchRunning(); }));
+    wait(100);
+    ASSERT_EQ(window->visibility(), QWindow::Maximized);
+    const auto clickChip = [&](QQuickItem* root) {
+        QQuickItem* chip = nullptr;
+        for (auto* c: root->findChildren<QQuickItem*>("searchFilterChip")) {
+            if (c->isVisible()) {
+                chip = c;
+            }
+        }
+        if (!chip) {
+            return;  // (the sidebar is hidden in a narrow window)
+        }
+        const QPointF p = chip->mapToScene(QPointF(chip->width() / 2, chip->height() / 2));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, p.toPoint());
+        wait(200);
+    };
+    clickChip(window->contentItem());  // the sidebar's
+    EXPECT_EQ(window->visibility(), QWindow::Maximized) << "sidebar chip";
+    EXPECT_EQ(window->geometry(), before) << "sidebar chip";
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    wait(200);
+    clickChip(find<QQuickItem>("pageGrid"));
+    EXPECT_EQ(window->visibility(), QWindow::Maximized) << "grid chip";
+    EXPECT_EQ(window->geometry(), before) << "grid chip";
 }
 
 TEST_F(MainWindowTest, pageGridKeepsScrollingAfterTouchpadLift) {
@@ -959,6 +1000,28 @@ void makeLongTextPdf(const std::string& file, int pages) {
 }
 }  // namespace
 
+// The author: with a search, the page grid kept jumping back to the start while scrolling down. The hit places of
+// the pages scrolled into view arrive as search updates, and each one moved the grid to the current hit's page.
+TEST_F(MainWindowTest, thePageGridStaysWhereItIsScrolledWhileSearchResultsArrive) {
+    QTemporaryDir tmp;
+    const std::string pdf = tmp.filePath("long.pdf").toStdString();
+    makeLongTextPdf(pdf, 120);
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(pdf)));
+    controller->setSearchQuery("search");
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 120 * 3 && !controller->searchRunning(); }, 8000));
+    ASSERT_GT(controller->searchCurrent(), 0) << "a current hit, near the start";
+    key(Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    auto* grid = find<QQuickItem>("pageGridView");
+    ASSERT_NE(grid, nullptr);
+    until([&] { return grid->isVisible(); });
+    wait(300);
+    const qreal far = grid->property("contentHeight").toReal() * 0.6;
+    ASSERT_GT(far, grid->height());
+    grid->setProperty("contentY", far);  // scrolled down, away from the current hit
+    wait(1200);  // the pages now in view get their hit places
+    EXPECT_NEAR(grid->property("contentY").toReal(), far, 1.0) << "the grid stays where it was scrolled";
+}
+
 // Typing on while the search for what was typed before still runs: the field used to be set back to the text of
 // that search whenever its results came in (the field's text was bound to the query), and the letters typed
 // meanwhile were gone. Whatever is typed stays; the results are those of the text in the field.
@@ -1252,6 +1315,259 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     const int columns = grid()->property("columns").toInt();
     click(find<QQuickItem>("zoomInButton"));
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
+}
+
+namespace {
+/// A library with a Markdown file: "needle" in a paragraph under "Lecture 3 › Kalman filter" and far down in it.
+class HomeScreenMarkdownTest: public HomeScreenTest {
+protected:
+    void prepareController() override {
+        ASSERT_TRUE(tmp.isValid());
+        root = fs::path(tmp.path().toStdString());
+        std::string text = "# Lecture 3\n\n## Kalman filter\n\nThe needle is here.\n\n";
+        for (int i = 0; i < 100; ++i) {
+            text += "Paragraph " + std::to_string(i) + " about the prediction step of the filter.\n\n";
+        }
+        text += "## Update\n\nAnother needle at the end.\n";
+        std::ofstream(root / "kalman.md") << text;
+        controller->setLibraryRoot(root);
+        qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
+    }
+};
+}  // namespace
+
+TEST_F(HomeScreenMarkdownTest, extendedSearchShowsSnippetCardsAndOpensTheFileThere) {
+    auto* lib = controller->libraryModel();
+    QElapsedTimer t;
+    t.start();
+    while (lib->property("indexing").toBool() && t.elapsed() < 5000) {
+        wait(20);
+    }
+    ASSERT_EQ(gridCount(), 1);
+    click(find<QQuickItem>("extendedSearchButton"));
+    auto* field = find<QQuickItem>("librarySearchField");
+    ASSERT_NE(field, nullptr);
+    field->forceActiveFocus();
+    type("needle");
+    key(Qt::Key_Return);
+    wait(100);
+    QQuickItem* md = card(rowOf("kalman.md"));
+    ASSERT_NE(md, nullptr);
+    QQuickItem* strip = nullptr;
+    QQuickItem* pages = nullptr;
+    for (auto* c: md->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "hitPassageStrip") {
+            strip = c;
+        } else if (c->objectName() == "hitPageStrip") {
+            pages = c;
+        }
+    }
+    ASSERT_NE(strip, nullptr);
+    EXPECT_TRUE(strip->isVisible());
+    EXPECT_FALSE(pages->isVisible()) << "cards, not pages";
+    ASSERT_EQ(strip->property("count").toInt(), 2);
+    wait(100);
+    QQuickItem* first = itemAt(strip, 0);
+    ASSERT_NE(first, nullptr);
+    QString headings;
+    for (auto* c: first->findChildren<QQuickItem*>()) {
+        if (c->objectName() == "hitPassageHeadings") {
+            headings = c->property("text").toString();
+        }
+    }
+    EXPECT_EQ(headings, "Lecture 3 › Kalman filter");
+
+    // The second card: the file opens at its page, with the search on its hit, and says it is read-only
+    QMetaObject::invokeMethod(strip, "positionViewAtIndex", Q_ARG(int, 1), Q_ARG(int, 0));  // (ListView.Beginning)
+    wait(100);
+    QQuickItem* second = itemAt(strip, 1);
+    ASSERT_NE(second, nullptr);
+    click(second);
+    EXPECT_FALSE(controller->homeVisible());
+    EXPECT_EQ(controller->title(), "kalman.md");
+    EXPECT_GT(controller->pageNumber(), 1);
+    EXPECT_EQ(controller->searchQuery(), "needle");
+    wait(50);
+    auto* note = find<QQuickItem>("shownFileNote");
+    ASSERT_NE(note, nullptr);
+    EXPECT_TRUE(note->isVisible());
+}
+
+TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
+    auto draw = [&] {
+        auto* canvas = find<QQuickItem>("canvas");
+        const QPoint from = canvas->mapToScene(QPointF(canvas->width() * 0.4, canvas->height() * 0.4)).toPoint();
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 10; ++i) {
+            QTest::mouseMove(window, from + QPoint(8 * i, 5 * i));
+            wait(10);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, from + QPoint(80, 50));
+        wait(50);
+    };
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
+    wait(100);
+    ASSERT_EQ(controller->tool(), "pen");
+    draw();
+    EXPECT_FALSE(controller->modified()) << "read-only: the pen does not write";
+    EXPECT_EQ(controller->beginMarkdown(0), "");
+    controller->newDocument();
+    wait(100);
+    draw();
+    EXPECT_TRUE(controller->modified()) << "(a new document is written on)";
+}
+
+namespace {
+/// Records what would be handed to the system (nothing is started).
+struct FakeSystemApps: xqt::SystemApps {
+    QStringList opened, shown, libraries;
+    bool openWithSystemApp(const QString& path) override {
+        opened << path;
+        return true;
+    }
+    bool showInFileManager(const QString& path) override {
+        shown << path;
+        return true;
+    }
+    bool startLibraryWindow(const QString& folder) override {
+        libraries << folder;
+        return true;
+    }
+};
+
+/// A library with a text file and an Office file next to the documents.
+class HomeScreenFilterTest: public HomeScreenTest {
+protected:
+    void prepareController() override {
+        xqt::SystemApps::setInstance(&fake);
+        ASSERT_TRUE(tmp.isValid());
+        root = fs::path(tmp.path().toStdString());
+        std::ofstream(root / "report.docx") << "PK";
+        std::ofstream(root / "kalman.py") << "def predict(state):\n    return state\n";
+        HomeScreenTest::prepareController();
+    }
+    void TearDown() override {
+        HomeScreenTest::TearDown();
+        xqt::SystemApps::setInstance(nullptr);
+    }
+    /// A child of an item or popup by its objectName
+    static QQuickItem* child(QObject* parent, const char* name) {
+        for (auto* c: parent->findChildren<QQuickItem*>()) {
+            if (c->objectName() == name) {
+                return c;
+            }
+        }
+        return nullptr;
+    }
+    FakeSystemApps fake;
+};
+}  // namespace
+
+TEST_F(HomeScreenFilterTest, theShowButtonChoosesTheKindsOfFilesShown) {
+    ASSERT_EQ(gridCount(), 3) << "Physics, lecture, notes: text and other files are not shown by default";
+    auto* button = find<QQuickItem>("showButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_FALSE(button->property("checked").toBool());
+    click(button);
+    QObject* popup = find("showPopup");
+    ASSERT_NE(popup, nullptr);
+    ASSERT_TRUE(waitOpened(popup, true));
+    EXPECT_TRUE(child(popup, "showNotes")->property("checked").toBool());
+    EXPECT_FALSE(child(popup, "showOther")->property("checked").toBool());
+    EXPECT_FALSE(child(popup, "showOnlyPdfsWithNotes")->property("checked").toBool());
+
+    click(child(popup, "showOther"));
+    EXPECT_EQ(gridCount(), 4);
+    EXPECT_TRUE(button->property("checked").toBool()) << "marked while not the default";
+    click(child(popup, "showText"));
+    EXPECT_EQ(gridCount(), 5);
+    EXPECT_TRUE(popup->property("opened").toBool()) << "stays open for more toggles";
+    // The Office file: an icon of its type, its extension, its size
+    wait(100);
+    QQuickItem* docx = card(rowOf("report.docx"));
+    ASSERT_NE(docx, nullptr);
+    EXPECT_TRUE(child(docx, "fileTypeIcon")->isVisible());
+    EXPECT_EQ(child(docx, "kindBadgeText")->property("text").toString(), "DOCX");
+    EXPECT_EQ(child(docx, "cardName")->property("text").toString(), "report.docx");
+    EXPECT_EQ(child(card(rowOf("kalman.py")), "kindBadgeText")->property("text").toString(), "PY");
+
+    // Only PDFs with notes: the lone PDF goes
+    click(child(popup, "showOnlyPdfsWithNotes"));
+    EXPECT_EQ(gridCount(), 4);
+    EXPECT_LT(rowOf("lecture.pdf"), 0);
+    click(child(popup, "showDefaults"));
+    EXPECT_EQ(gridCount(), 3);
+    EXPECT_FALSE(button->property("checked").toBool());
+}
+
+TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManager) {
+    QMetaObject::invokeMethod(controller->libraryModel(), "setShown", Q_ARG(QString, "other"), Q_ARG(bool, true));
+    wait(50);
+    ASSERT_EQ(gridCount(), 4);
+    const QString docx = QString::fromStdString((root / "report.docx").string());
+    click(card(rowOf("report.docx")));
+    EXPECT_EQ(fake.opened, QStringList{docx}) << "a tap hands it to its app";
+    EXPECT_EQ(controller->tabCount(), 0);
+    EXPECT_TRUE(controller->homeVisible());
+
+    // Its menu: open with the system app, show in the file manager
+    click(child(card(rowOf("report.docx")), "cardMenuButton"));
+    QObject* menu = find("homeItemMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* openWith = child(menu, "openWithSystemAppItem");
+    ASSERT_NE(openWith, nullptr);
+    EXPECT_TRUE(openWith->isVisible());
+    click(child(menu, "showInFileManagerItem"));
+    EXPECT_EQ(fake.shown, QStringList{docx});
+    // A document has no "Open with the system app"
+    click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "openWithSystemAppItem")->isVisible());
+}
+
+TEST_F(HomeScreenFilterTest, aFolderOpensAsALibraryInAWindowOfItsOwn) {
+    // The menu of a folder card: "Open as library" opens it in a window of its own
+    click(child(card(rowOf("Physics")), "cardMenuButton"));
+    QObject* menu = find("homeItemMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* openAsLibrary = child(menu, "openAsLibraryItem");
+    ASSERT_NE(openAsLibrary, nullptr);
+    ASSERT_TRUE(openAsLibrary->isVisible());
+    click(openAsLibrary);
+    EXPECT_EQ(fake.libraries, QStringList{QString::fromStdString((root / "Physics").string())});
+    EXPECT_TRUE(waitOpened(menu, false));
+    // A document's menu has none
+    click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "openAsLibraryItem")->isVisible());
+    QMetaObject::invokeMethod(menu, "close");
+}
+
+TEST_F(HomeScreenFilterTest, recentLibrariesOpenAgain) {
+    QObject* menu = find("homeItemMenu");
+    // A library opened before is in the Recent grid: a folder with the library mark; a tap opens it again
+    QTemporaryDir other;
+    const QString otherPath = other.path();
+    auto* recent = qobject_cast<xqt::RecentFiles*>(controller->recentModel());
+    recent->addLibrary(fs::path(otherPath.toStdString()));
+    find<QQuickItem>("homeView")->setProperty("page", 1);
+    wait(100);
+    auto* recentGrid = find<QQuickItem>("recentGrid");
+    ASSERT_EQ(recentGrid->property("count").toInt(), 1);
+    QQuickItem* libraryCard = itemAt(recentGrid, 0);
+    ASSERT_NE(libraryCard, nullptr);
+    EXPECT_TRUE(child(libraryCard, "libraryMark")->isVisible());
+    EXPECT_EQ(child(libraryCard, "cardName")->property("text").toString(), QFileInfo(otherPath).fileName());
+    click(libraryCard);
+    EXPECT_EQ(fake.libraries, QStringList{otherPath});
+    // Its menu: no rename, copy, move or trash of a whole library from here
+    click(child(libraryCard, "cardMenuButton"));
+    ASSERT_TRUE(waitOpened(menu, true));
+    EXPECT_FALSE(child(menu, "renameItem")->isVisible());
+    EXPECT_FALSE(child(menu, "trashItem")->isVisible());
+    EXPECT_FALSE(child(menu, "moveToItem")->isVisible());
+    QMetaObject::invokeMethod(menu, "close");
+    recent->clear();
 }
 
 TEST_F(MainWindowTest, tabsCloseOnlyOnPurposeAndAllAtOnce) {
