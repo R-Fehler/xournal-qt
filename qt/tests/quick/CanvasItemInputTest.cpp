@@ -26,6 +26,7 @@
 #include "control/ToolHandler.h"
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/Stroke.h"
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
@@ -170,6 +171,45 @@ TEST_F(CanvasItemInputTest, penAndMouseDrawOnTheCanvas) {
     EXPECT_EQ(strokeCount(), 1u);
     mouseStroke(QPoint(200, 300), QPoint(500, 350));
     EXPECT_EQ(strokeCount(), 2u);
+}
+
+// The Surface Pro 8 (2026-09-24): pen strokes had one width. Here the pen's pressure must reach the stroke; the
+// mouse has none.
+TEST_F(CanvasItemInputTest, thePensPressureReachesTheStroke) {
+    auto lastStroke = [this]() -> const Stroke* {
+        const Stroke* found = nullptr;
+        for (size_t i = 0; i < session->getDocument()->getPageCount(); ++i) {
+            for (const Layer* l: session->getDocument()->getPage(i)->getLayersView()) {
+                for (const Element* e: l->getElementsView()) {
+                    if (e->getType() == ELEMENT_STROKE) {
+                        found = static_cast<const Stroke*>(e);
+                    }
+                }
+            }
+        }
+        return found;
+    };
+    const QPointF from(200, 150), to(500, 200);
+    tablet(from, Qt::LeftButton, 0.1);
+    for (int i = 1; i <= 10; ++i) {
+        tablet(from + (to - from) * (i / 10.0), Qt::LeftButton, 0.1 + 0.08 * i);
+    }
+    tablet(to, Qt::NoButton, 0.0);
+    wait(50);
+    const Stroke* pen = lastStroke();
+    ASSERT_NE(pen, nullptr);
+    ASSERT_TRUE(pen->hasPressure());
+    double lowest = 1e9, highest = 0;
+    for (size_t i = 0; i + 1 < pen->getPointCount(); ++i) {  // (the last point: the stroke's end)
+        lowest = std::min(lowest, pen->getPoint(i).z);
+        highest = std::max(highest, pen->getPoint(i).z);
+    }
+    EXPECT_GT(highest, lowest * 3) << "the width follows the pressure";
+
+    mouseStroke(QPoint(200, 300), QPoint(500, 350));
+    const Stroke* mouse = lastStroke();
+    ASSERT_NE(mouse, pen);
+    EXPECT_FALSE(mouse->hasPressure());
 }
 
 TEST_F(CanvasItemInputTest, dialogButtonWorksWithMouse) {

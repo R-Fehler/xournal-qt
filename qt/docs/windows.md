@@ -74,6 +74,33 @@ So the app and the CLI start with ([WindowsFonts.cpp](../src/app/WindowsFonts.cp
   leaves Pango's default (the win32 backend) to try it again; the smoke test does so in every run, for information,
   and `text-probe` runs Pango's default without the app around it (under gdb when it dies, for a report upstream).
 
+## Pen input
+
+Qt reads the pen through Windows Ink (`WM_POINTER`) and hands it to the app as tablet events with pressure and tilt;
+the canvas takes them in `DocumentCanvasItem::eventFilter` and `CanvasInput::tabletEvent`, as on Linux. The pressure
+sets the width when Settings → "Pressure changes the line width" is on (the default).
+
+**The Surface Pro 8 (2026-09-24): every stroke had the same width.** The path from a tablet event's pressure to the
+stroke is tested (`CanvasItemInputTest.thePensPressureReachesTheStroke`), so the question is what Windows and Qt
+send. For that there is an input log:
+
+- **`xournal-qt-debug.bat`** in the zip (next to `bin\`): double-click it, draw a few strokes with the pen (light and
+  hard), touch the page with a finger, click with the mouse, then close Xournal Qt. The log opens in Notepad; it is
+  `input-log.txt` next to the .bat. It also starts a window of its own when Xournal Qt is running already.
+- By hand, in a terminal: `set XQT_LOG_INPUT=1`, `set QT_FORCE_STDERR_LOGGING=1`, then
+  `bin\xournal-qt.exe 2> input-log.txt`.
+
+`XQT_LOG_INPUT=1` writes to stderr, for each press of the pen, a finger or the mouse, the first five moves of the
+stroke, its release and the pen's proximity: the event, the device (name, type, pointer type, capabilities),
+position, pressure, tilt, rotation, buttons, for mouse events whether they are real or made from a pen or finger,
+and what the canvas does with it ("pen, its pressure sets the width", "mouse, no pressure", "passed on"). The .bat
+adds Qt's own tablet and input device messages (`QT_LOGGING_RULES=qt.qpa.input.tablet.debug=true;...`). Off, the log
+costs one test of a flag per event.
+
+What to look for: pen strokes that arrive as `MouseButtonPress` with `type=Mouse` (the pen as a mouse: no pressure),
+`pressure=` the same in every line (Qt gives 0.5 when Windows reports no pressure for the pen), `caps=` without
+`Pressure`, or "pressure ignored" (the setting is off).
+
 ## How the build works
 
 **Toolchain: MSYS2 UCRT64**, the one upstream Xournal++ builds its Windows installer with. GLib, Cairo, Pango,
@@ -152,9 +179,11 @@ qt/scripts/windows-smoke.sh dist/xournal-qt smoke           # its smoke test
 
 ## Known limitations of this first build
 
-- **Not tested on a real machine yet**; the CI smoke test is all. The device checklist has a Windows section.
-- **Pen input** goes through Qt's Windows Ink support (`WM_POINTER`) as it comes; pressure, eraser end, palm
-  rejection and latency on the Surface are untested.
+- **Tried once on a real machine**, a Surface Pro 8 with Windows 11 (the author, 2026-09-24): it runs. Of the two
+  problems found, "Downloads folder (quick library)" failing with "cannot open c//" is fixed (a URL made as
+  "file://" + path; paths and URLs are converted with `QUrl::fromLocalFile` / `xqt::localPathOf` now).
+- **Pen pressure** did not change the width on the Surface Pro 8; see "Pen input" for the log that shows why. The
+  eraser end, palm rejection and latency are untested.
 - **No installer**, no Start menu entry, no file associations, no program icon in Explorer (the window has its icon).
 - **Not signed**: SmartScreen warns.
 - **Printing** sends images (at most 300 dpi), not the PDF: larger print jobs and no vector output on the printer.

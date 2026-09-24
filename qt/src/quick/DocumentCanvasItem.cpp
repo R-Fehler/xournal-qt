@@ -26,8 +26,10 @@
 #include <QTouchEvent>
 #include <QWheelEvent>
 
+#include "control/settings/Settings.h"
 #include "control/tools/EditSelection.h"
 #include "CanvasInput.h"
+#include "InputLog.h"
 #include "CanvasPage.h"
 #include "Perf.h"
 #include "CanvasView.h"
@@ -383,12 +385,16 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
     }
     if (watched == qApp) {
         if (e->type() == QEvent::TabletEnterProximity || e->type() == QEvent::TabletLeaveProximity) {
+            xqt::inputlog::event(e);
             input->proximityEvent(e->type() == QEvent::TabletEnterProximity);
         }
         return false;
     }
     if (watched != filteredWindow) {
         return false;
+    }
+    if (xqt::inputlog::enabled()) {
+        xqt::inputlog::event(e);
     }
     switch (e->type()) {
         case QEvent::TabletPress:
@@ -397,7 +403,16 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             auto* t = static_cast<QTabletEvent*>(e);
             xqt::Perf::add(xqt::Perf::PenEvents);
             if (!penGrab && (heldByAnother(&DocumentCanvasItem::penGrab) || !claims(t->position()))) {
+                xqt::inputlog::decision(e, false, "not on this canvas (a control, a menu, another canvas)");
                 return false;  // unaccepted: Qt synthesizes mouse events for the QML controls
+            }
+            if (xqt::inputlog::enabled()) {
+                const bool eraser = t->pointerType() == QPointingDevice::PointerType::Eraser;
+                const bool pressure = canvasView && canvasView->getSession().getSettings()->isPressureSensitivity();
+                xqt::inputlog::decision(e, true,
+                                        eraser     ? "eraser"
+                                        : pressure ? "pen, its pressure sets the width"
+                                                   : "pen, pressure ignored (\"Pressure changes the line width\" is off)");
             }
             if (e->type() == QEvent::TabletPress && t->button() == Qt::LeftButton) {
                 penGrab = true;
@@ -423,8 +438,10 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 }
             }
             if (!touchSessionOwned) {
+                xqt::inputlog::decision(e, false, "not on this canvas");
                 return false;
             }
+            xqt::inputlog::decision(e, true, "touch");
             input->touchEvent(t, [this](QPointF scenePos) { return mapFromScene(scenePos); });
             if (e->type() == QEvent::TouchEnd || e->type() == QEvent::TouchCancel) {
                 touchSessionOwned = false;
@@ -446,7 +463,16 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
             if (!mouseGrab && !inside) {
                 mouseElsewhere = m->buttons() != Qt::NoButton;
+                xqt::inputlog::decision(e, false, "not on this canvas");
                 return false;
+            }
+            if (xqt::inputlog::enabled()) {
+                const auto type = m->device() ? m->device()->type() : QInputDevice::DeviceType::Mouse;
+                xqt::inputlog::decision(e, true,
+                                        type == QInputDevice::DeviceType::Mouse ||
+                                                        type == QInputDevice::DeviceType::TouchPad
+                                                ? "mouse, no pressure"
+                                                : "mouse event made from a pen or a finger: ignored here");
             }
             if (e->type() == QEvent::MouseButtonPress) {
                 mouseGrab = true;
