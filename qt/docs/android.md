@@ -8,7 +8,8 @@ mouse and a keyboard. What is left for later is in [android-roadmap.md](android-
 
 ```sh
 qt/scripts/android-build.sh          # C dependencies (vcpkg), configure, APK
-qt/scripts/android-build.sh deps     # only the dependencies
+qt/scripts/android-build.sh deps     # only the dependencies (vcpkg, then KSyntaxHighlighting)
+qt/scripts/android-build.sh ksyntax  # only KSyntaxHighlighting
 qt/scripts/android-build.sh apk      # only configure + build (after deps)
 ```
 
@@ -27,6 +28,7 @@ Measured on the 8-thread 2-in-1 (2026-09-24), with 4 jobs:
 |---|---|
 | Dependencies, first build (55 vcpkg packages, host tools included) | about 17 min |
 | Dependencies again from the binary cache (`~/.cache/vcpkg/archives`), e.g. in a new worktree | 7 s |
+| KSyntaxHighlighting (download, ECM, the host indexer, the Android library; 2026-09-24) | about 1 min |
 | App, clean native build + APK, without ccache | 8 min 14 s (Gradle: 22 s) |
 | After changing one `.cpp` file (compile, link, Gradle) | 15 s |
 | After changing only the manifest (Gradle) | 80 s |
@@ -125,6 +127,13 @@ settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-
   target SDK 36, no permissions, resizable activity, intent filters for "Open with" and the share sheet. The APK is debug-signed
   (`QT_ANDROID_DEPLOYMENT_TYPE=Debug`, the SDK's debug keystore) while the native code is `RelWithDebInfo`, so that
   pages draw at full speed.
+- **KSyntaxHighlighting** (the colours of code blocks in Markdown): vcpkg's `syntax-highlighting` port builds
+  against vcpkg's own Qt and does not support Android, so the script builds KDE's release 6.30.0 itself
+  (`ksyntax` step, into `<build>/kf6`): ECM (CMake files), the syntax definition indexer for this machine against the
+  desktop Qt (it runs during the build), and the library for Android against the official Qt, static, with the
+  definitions inside. Two changes to its sources, made by the script: its resources are compiled without zstd
+  (`--no-zstd`; the official Qt for Android cannot read zstd resources), and its command line tool is left out.
+  The configure step passes `KF6SyntaxHighlighting_DIR`, so `XqtMarkdown.cmake` finds it as on the desktop.
 - **Resources**: page templates, palettes and icons, which the core reads as plain files, are Qt resources in the APK
   and are copied to the app's data folder at start ([AndroidSetup.cpp](../src/app/AndroidSetup.cpp)).
 - **Fonts**: vcpkg's fontconfig knows no configuration on the phone. The app writes its own `fonts.conf` at start
@@ -145,7 +154,6 @@ settings in `files/settings/xournal-qt/`, the resources in `files/share/xournal-
 | Single instance (local socket per library) | Android starts one activity (`singleTop`) |
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
 | Audio, Lua plugins, X11, gtksourceview | already off in the Qt build |
-| KSyntaxHighlighting (Markdown code colours) | optional; vcpkg's `syntax-highlighting` (KF6) depends on vcpkg's own Qt, not the official Qt for Android. Code blocks are plain for now |
 | Floating point `std::from_chars` | missing in the NDK's libc++; upstream's `g_ascii_strtod` fallback is used (the same check as upstream's CMake) |
 
 ## Checked so far (without the phone)

@@ -1109,3 +1109,5 @@ Install the debug APK (`adb install -r …/android-build-debug.apk`; the documen
       again. Settings → Touch → "Draw with the finger" shows the same state.
 - [ ] Desktop (Linux, Surface): the finger button is off at first; turned on, the touch screen draws with one finger;
       the mouse draws with the left button either way; with the pen near, a resting hand draws nothing.
+- [ ] Open a `.md` with a fenced code block (```` ```python ````): keywords, strings, numbers and comments are in
+      colour, as on the desktop.
