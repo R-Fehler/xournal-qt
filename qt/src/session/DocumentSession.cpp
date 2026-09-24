@@ -45,6 +45,9 @@
 #include "MergedPdf.h"
 #include "PageOrderUndoAction.h"
 #include "PdfPageKeeper.h"
+#include "MdBox.h"
+#include "MdPaginate.h"
+#include "TextFile.h"
 #include "config.h"  // for FILE_FORMAT_VERSION
 
 namespace xqt {
@@ -204,7 +207,9 @@ void DocumentSession::init() {
     autosaveTimer.setSingleShot(false);
     connect(&autosaveTimer, &QTimer::timeout, this, [this] {
         // (not while a save writes the merged PDF: the autosave would refer to a file that is being moved)
-        if (undoRedo->isChangedAutosave() && !pdfWorkRunning()) {
+        if (text) {
+            autosaveText();  // (a text file: its text, if it changed)
+        } else if (undoRedo->isChangedAutosave() && !pdfWorkRunning()) {
             autosave();
         }
     });
@@ -752,6 +757,9 @@ void DocumentSession::movePageTowardsEnd() {
 bool DocumentSession::hasFilePath() const { return !getFilePath().empty(); }
 
 fs::path DocumentSession::suggestSavePath() const {
+    if (text && !hasFilePath()) {
+        return text->path();  // (a text file is saved as itself)
+    }
     Settings* settings = getSettings();
     fs::path background;
     {
@@ -810,6 +818,96 @@ void DocumentSession::setShownFile(const fs::path& file, bool readOnly) {
     Q_EMIT filePathChanged();
 }
 
+// --- a text file edited --------------------------------------------------------------------------------------------
+
+void DocumentSession::setTextFile(std::unique_ptr<TextFile> file, bool readOnly) {
+    text = std::move(file);
+    shownPath = text ? text->path() : fs::path();
+    shownReadOnly = readOnly || !text;
+    textModified = false;
+    lastAutosavedText = text ? text->text() : std::string();
+    updateModified();
+    Q_EMIT filePathChanged();
+}
+
+bool DocumentSession::isEditableText() const { return text && !hasFilePath() && !shownReadOnly; }
+
+std::string DocumentSession::currentText(bool lock) const {
+    // The pages' parts of the page's Markdown text, from the first page on (MarkdownFile.h)
+    std::vector<std::string> slices;
+    std::shared_lock<Document> guard(*doc, std::defer_lock);
+    if (lock) {
+        guard.lock();
+    }
+    for (size_t i = 0; i < doc->getPageCount(); ++i) {
+        const Layer* layer = md::markdownLayer(doc->getPage(i));
+        const Text* box = layer ? md::pageBoxOf(*layer, TextFile::PAGE_MARGIN, TextFile::PAGE_MARGIN) : nullptr;
+        std::string slice = box ? box->getText() : std::string();
+        if (i > 0 && !md::continues(slice)) {
+            break;  // (the text ends before this page)
+        }
+        slices.push_back(std::move(slice));
+    }
+    return md::join(slices);
+}
+
+void DocumentSession::textEdited() { updateModified(); }
+
+bool DocumentSession::textChangedOnDisk(std::string& bytes) {
+    if (!text || hasFilePath() || isSaving()) {
+        return false;
+    }
+    return text->changedOnDisk(&bytes);
+}
+
+void DocumentSession::keepTextOverDisk() {
+    if (text) {
+        text->setStamp(TextFile::stampOf(text->path()));
+    }
+}
+
+void DocumentSession::textReloaded(std::string bytes) {
+    if (!text) {
+        return;
+    }
+    text->setBytes(std::move(bytes));
+    text->setStamp(TextFile::stampOf(text->path()));
+    lastAutosavedText = text->text();
+    updateModified();
+}
+
+fs::path DocumentSession::textAutosavePath(qint64 pid, quint64 serial) {
+    fs::path p = Util::getAutosaveFilepath();
+    p.replace_filename(std::to_string(pid) + "-" + std::to_string(serial) + ".autosave.text");
+    return p;
+}
+
+fs::path DocumentSession::textEmergencyPath(qint64 pid, quint64 serial) {
+    fs::path p = Util::getAutosaveFilepath();
+    p.replace_filename(std::to_string(pid) + "-" + std::to_string(serial) + ".emergency.text");
+    return p;
+}
+
+auto DocumentSession::autosaveText() -> SaveResult {
+    if (!text || !isModified()) {
+        return {true, {}, {}};
+    }
+    const std::string now = currentText();
+    if (now == lastAutosavedText) {
+        return {true, {}, {}};
+    }
+    const fs::path target = textAutosavePath(Util::getPid(), serialNo);
+    std::error_code ec;
+    fs::create_directories(target.parent_path(), ec);
+    std::string error;
+    if (!TextFile::writeAtomically(target, now, error)) {
+        return {false, FS(_F("Error while autosaving: {1}") % error), {}};
+    }
+    lastAutosavedText = now;
+    setLastAutosaveFile(target);
+    return {true, {}, {}};
+}
+
 size_t DocumentSession::addPdfPages(const std::string& pdf, std::string& error) { return pdfPages->add(pdf, error); }
 
 XojPdfPageSPtr DocumentSession::pendingPdfPage(size_t number) const { return pdfPages->pendingPage(number); }
@@ -842,9 +940,17 @@ std::string DocumentSession::getDisplayName() const {
     return _("Untitled");
 }
 
-bool DocumentSession::isModified() const { return undoRedo->isChanged() || saveUnconfirmed || saveFailed; }
+bool DocumentSession::isModified() const {
+    if (text && !hasFilePath()) {
+        return textModified;  // (the text differs from the file's)
+    }
+    return undoRedo->isChanged() || saveUnconfirmed || saveFailed;
+}
 
 void DocumentSession::updateModified() {
+    if (text && !hasFilePath()) {
+        textModified = currentText() != text->text();
+    }
     if (const bool modified = isModified(); modified != lastModified) {
         lastModified = modified;
         Q_EMIT modifiedChanged(modified);

@@ -1,13 +1,12 @@
 /*
- * xournal-qt: a Markdown file (.md) shown as a document, read-only for now (the .md editor comes later and replaces
- * this).
- *
- * A text or code file is shown the same way, as one fenced code block (monospaced, highlighted by its extension).
+ * xournal-qt: a Markdown file (.md) or a text file as a document (qt/docs/md-editor.md).
  *
  * The file's text is the page's Markdown text of a new document of plain A4 pages: it flows over the pages as a
  * Markdown text written on a page does (MdPaginate.h, MarkdownSession.h), each page holding its part in a box at the
- * page margins. The document is never written back to the file. The library's preview of a .md is the first page of
- * this document.
+ * page margins. Edited, the text is written back to the file (DocumentSession::setTextFile, TextFile.h), never as a
+ * .xopp. The library's preview of a .md is the first page of this document.
+ *
+ * A text or code file shown read-only is one fenced code block (monospaced, highlighted by its extension).
  *
  * @license GNU GPLv2 or later
  */
@@ -23,6 +22,11 @@
 #include "MdLayout.h"
 
 class Document;
+
+namespace xqt {
+class DocumentSession;
+class TextFile;
+}  // namespace xqt
 
 namespace xqt::MarkdownFile {
 
@@ -45,6 +49,14 @@ std::string plainText(const std::string& text, const std::string& language);
 
 /// How the text of a Markdown file is drawn.
 md::Style style();
+/// How the text of this file is drawn while it is edited.
+md::Style style(const TextFile& file);
+
+/// The document that edits a text file: its text on plain A4 pages.
+std::unique_ptr<Document> textDocument(const TextFile& file);
+/// The pages of a text file's document get this text (one undo step, as an edit): e.g. the file as it is on disk
+/// now. Text written on the canvas ends first.
+void setText(DocumentSession& session, const std::string& text);
 
 /// A new document showing `source` on plain A4 pages (at most `maxPages`; the rest is left out). Any thread.
 std::unique_ptr<Document> document(const std::string& source, size_t maxPages = static_cast<size_t>(-1));

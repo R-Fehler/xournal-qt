@@ -182,8 +182,9 @@ SessionRecovery::Journal SessionRecovery::currentJournal() const {
     auto add = [&j](const TabManager& list) {
         for (int i = 0; i < list.count(); ++i) {
             const DocumentSession* s = list.session(i);
-            j.tabs.push_back({s->hasFilePath() ? s->getFilePath() : fs::path(), j.pid, s->serial(),
-                              static_cast<int>(s->getCurrentPageNo())});
+            const bool text = s->textFile() && !s->hasFilePath();  // (a text file: reopened as itself)
+            j.tabs.push_back({s->hasFilePath() ? s->getFilePath() : (text ? s->shownFile() : fs::path()), j.pid,
+                              s->serial(), static_cast<int>(s->getCurrentPageNo()), text});
         }
     };
     add(tabs);
@@ -199,7 +200,8 @@ bool SessionRecovery::writeJournal(const Journal& journal, const fs::path& file)
         tabs.append(QJsonObject{{"file", QString::fromStdString(t.file.string())},
                                 {"pid", t.pid},
                                 {"serial", static_cast<qint64>(t.serial)},
-                                {"page", t.page}});
+                                {"page", t.page},
+                                {"text", t.text}});
     }
     const QJsonObject root{
             {"pid", journal.pid}, {"clean", journal.clean}, {"current", journal.current}, {"tabs", tabs}};
@@ -228,7 +230,8 @@ std::optional<SessionRecovery::Journal> SessionRecovery::readJournal(const fs::p
     for (const QJsonValue& v: root.value("tabs").toArray()) {
         const QJsonObject t = v.toObject();
         j.tabs.push_back({fs::path(t.value("file").toString().toStdString()), t.value("pid").toInteger(),
-                          static_cast<quint64>(t.value("serial").toInteger()), t.value("page").toInt()});
+                          static_cast<quint64>(t.value("serial").toInteger()), t.value("page").toInt(),
+                          t.value("text").toBool()});
     }
     return j;
 }
@@ -251,11 +254,14 @@ std::vector<SessionRecovery::Candidate> SessionRecovery::findCandidates(const Jo
     std::vector<Candidate> result;
     for (size_t i = 0; i < journal.tabs.size(); ++i) {
         const TabRecord& t = journal.tabs[i];
-        const fs::path autosave = t.file.empty() ? DocumentSession::unnamedAutosavePath(t.pid, t.serial)
-                                                 : DocumentSession::namedAutosavePath(t.file);
+        const fs::path autosave = t.text           ? DocumentSession::textAutosavePath(t.pid, t.serial)
+                                  : t.file.empty() ? DocumentSession::unnamedAutosavePath(t.pid, t.serial)
+                                                   : DocumentSession::namedAutosavePath(t.file);
+        const fs::path emergency = t.text ? DocumentSession::textEmergencyPath(t.pid, t.serial)
+                                          : DocumentSession::emergencyPath(t.pid, t.serial);
         const QDateTime saved = fileExists(t.file) ? modificationTime(t.file) : QDateTime();
         Candidate best;
-        for (const fs::path& f: {DocumentSession::emergencyPath(t.pid, t.serial), autosave}) {
+        for (const fs::path& f: {emergency, autosave}) {
             if (!fileExists(f)) {
                 continue;
             }
@@ -282,6 +288,14 @@ int SessionRecovery::emergencySaveAll() {
     for (auto& slot: registry) {
         const DocumentSession* s = slot.load();
         if (!s || !s->isModified()) {
+            continue;
+        }
+        if (s->textFile() && !s->hasFilePath()) {
+            // A text file: its text (no locking, as below)
+            const std::string text = s->currentText(false);
+            std::ofstream out(DocumentSession::textEmergencyPath(Util::getPid(), s->serial()), std::ios::binary);
+            out.write(text.data(), static_cast<std::streamsize>(text.size()));
+            saved += out.good() ? 1 : 0;
             continue;
         }
         const fs::path target = DocumentSession::emergencyPath(Util::getPid(), s->serial());

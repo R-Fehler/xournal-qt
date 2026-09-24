@@ -1494,7 +1494,7 @@ TEST_F(HomeScreenMarkdownTest, extendedSearchShowsSnippetCardsAndOpensTheFileThe
     }
     EXPECT_EQ(headings, "Lecture 3 › Kalman filter");
 
-    // The second card: the file opens at its page, with the search on its hit, and says it is read-only
+    // The second card: the file opens at its page, with the search on its hit, to be edited (no read-only note)
     QMetaObject::invokeMethod(strip, "positionViewAtIndex", Q_ARG(int, 1), Q_ARG(int, 0));  // (ListView.Beginning)
     wait(100);
     QQuickItem* second = itemAt(strip, 1);
@@ -1507,7 +1507,9 @@ TEST_F(HomeScreenMarkdownTest, extendedSearchShowsSnippetCardsAndOpensTheFileThe
     wait(50);
     auto* note = find<QQuickItem>("shownFileNote");
     ASSERT_NE(note, nullptr);
-    EXPECT_TRUE(note->isVisible());
+    EXPECT_FALSE(note->isVisible());
+    EXPECT_EQ(controller->textDocument(), "markdown");
+    EXPECT_TRUE(controller->textEditable());
 }
 
 TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
@@ -1527,12 +1529,57 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsNotWrittenOn) {
     controller->selectTool("pen");  // (the tool is app-wide: an earlier test in the same process may have left another)
     ASSERT_EQ(controller->tool(), "pen");
     draw();
-    EXPECT_FALSE(controller->modified()) << "read-only: the pen does not write";
-    EXPECT_EQ(controller->beginMarkdown(0), "");
+    EXPECT_FALSE(controller->modified()) << "a text file: the pen puts the cursor into the text, it does not write";
+    EXPECT_EQ(controller->beginMarkdown(0), "") << "(it is written on its pages, not beside them)";
     controller->newDocument();
     wait(100);
     draw();
     EXPECT_TRUE(controller->modified()) << "(a new document is written on)";
+}
+
+TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsWrittenInAndSavedBack) {
+    const fs::path file = root / "kalman.md";
+    std::string original;
+    {
+        std::ifstream in(file, std::ios::binary);
+        original.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    EXPECT_FALSE(findItem("eraserButton")->isVisible()) << "no ink tools for a text file";
+    auto* canvas = find<QQuickItem>("canvas");
+    click(canvas);  // the cursor goes where the page was clicked
+    type("Hello");
+    EXPECT_TRUE(controller->modified());
+    ASSERT_TRUE(controller->save());
+    std::string saved;
+    {
+        std::ifstream in(file, std::ios::binary);
+        saved.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    const size_t at = saved.find("Hello");
+    ASSERT_NE(at, std::string::npos);
+    EXPECT_EQ(saved.substr(0, at) + saved.substr(at + 5), original) << "only the typed text is new";
+    EXPECT_FALSE(controller->modified());
+    EXPECT_FALSE(fs::exists(root / "kalman.xopp"));
+
+    // Changed by another app while it has changes here: asked, and reloaded
+    type("X");
+    std::ofstream(file, std::ios::binary) << "# Changed elsewhere\n";
+    controller->checkTextFiles();
+    auto* dialog = find<QObject>("textChangedDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(find<QQuickItem>("textReloadButton"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_FALSE(controller->modified());
+    EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Changed elsewhere\n");
+    // Without changes here it is read again without asking
+    std::ofstream(file, std::ios::binary) << "# Third\n";
+    controller->checkTextFiles();
+    wait(50);
+    EXPECT_FALSE(dialog->property("visible").toBool());
+    EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Third\n");
 }
 
 namespace {

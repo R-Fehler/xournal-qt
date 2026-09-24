@@ -52,6 +52,9 @@ public:
     bool contains(double x, double y) const override;
     /// A press on a page (page coordinates): on the text, the cursor goes there (true); elsewhere nothing (false).
     bool tap(CanvasPage& page, double x, double y);
+    /// A press anywhere on a page of the text (a text file edited: TextFile), not only on the text: the cursor goes
+    /// to the nearest place of the text on that page (true); false if the text is not on that page.
+    bool tapAnywhere(CanvasPage& page, double x, double y);
     /// A press on a check box of the text being written (page coordinates): it is switched (the cursor stays).
     bool toggleCheckBox(CanvasPage& page, double x, double y);
     void mousePressed(double x, double y) override;
@@ -80,6 +83,13 @@ public:
     /// The cursor and the other end of the selection (source offsets).
     size_t cursorPosition() const { return caret; }
     size_t anchorPosition() const { return anchor; }
+    /// Put the cursor at a source offset (e.g. where it was before the text was read again).
+    void setCursorPosition(size_t offset);
+    /// Undo and redo in the text being written (Ctrl+Z / Ctrl+Shift+Z).
+    bool canUndo() const { return !undoStack.empty(); }
+    bool canRedo() const { return !redoStack.empty(); }
+    void undo() { undoEdit(false); }
+    void redo() { undoEdit(true); }
 
 private:
     using Part = MarkdownSession::PagePart;
@@ -115,6 +125,9 @@ private:
 
     // --- keys -----------------------------------------------------------------------------------------------------
     void newLine(bool soft);
+    /// The cursor at the end of a list item or quote line with nothing but its mark: where the mark begins (npos:
+    /// not so).
+    size_t emptyItemMark() const;
     void wrap(const std::string& before, const std::string& after);
     void setPrefix(const std::string& prefix);
     void indent(bool in);
@@ -135,13 +148,18 @@ private:
     size_t caret = 0;
     size_t anchor = 0;
     std::string preedit;          ///< the input method's text not yet typed
-    struct Snapshot {
-        std::string text;
-        size_t caret = 0;
+    /// A change of the text: source[at, at + removed.size()) was `removed` and is `inserted` since (whole texts
+    /// would be too much for a long file).
+    struct Change {
+        size_t at = 0;
+        std::string removed;
+        std::string inserted;
+        size_t caretBefore = 0;
     };
-    std::vector<Snapshot> undoStack;
-    std::vector<Snapshot> redoStack;
+    std::vector<Change> undoStack;
+    std::vector<Change> redoStack;
     bool lastWasTyping = false;
+    bool plain = false;  ///< plain text (a .txt): no Markdown keys
     QRectF lastArea;
 };
 

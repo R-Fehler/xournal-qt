@@ -474,7 +474,7 @@ TEST_F(LibraryFilesTest, markdownTextIsIndexedWithoutItsSyntaxAndFoundWithItsHea
     EXPECT_EQ(again.search("smoothing").size(), 1u);
 }
 
-TEST_F(LibraryFilesTest, aMarkdownFileOpensReadOnlyAndAHitAtItsPassage) {
+TEST_F(LibraryFilesTest, aMarkdownFileOpensForEditingAndAHitAtItsPassage) {
     writeFile(root / "notes.md", longMarkdown());
     const auto before = fs::last_write_time(root / "notes.md");
     AppController c;
@@ -482,13 +482,13 @@ TEST_F(LibraryFilesTest, aMarkdownFileOpensReadOnlyAndAHitAtItsPassage) {
     DocumentSession* s = c.tabManager().currentSession();
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->shownFile(), root / "notes.md");
-    EXPECT_FALSE(s->hasFilePath()) << "never written back";
+    EXPECT_FALSE(s->hasFilePath()) << "never a .xopp";
     EXPECT_EQ(c.title(), "notes.md");
     EXPECT_FALSE(c.modified());
     EXPECT_GT(s->getDocument()->getPageCount(), 2u);
-    EXPECT_TRUE(c.shownFileNote().startsWith("Read-only")) << c.shownFileNote().toStdString();
-    EXPECT_EQ(s->suggestSavePath().extension(), ".xopp");
-    EXPECT_NE(s->suggestSavePath().parent_path(), root) << "not a .xopp next to the Markdown file";
+    EXPECT_TRUE(c.shownFileNote().isEmpty()) << "edited: no note " << c.shownFileNote().toStdString();
+    EXPECT_TRUE(s->isEditableText());
+    EXPECT_EQ(s->suggestSavePath(), root / "notes.md") << "saved as itself";
     // Opened again: the same tab
     ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
     EXPECT_EQ(c.tabManager().count(), 1);

@@ -106,6 +106,8 @@ depend on the zoom, so lines break at the same places on the canvas, in the thum
 Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`), `qt/src/canvas/MarkdownSession.*`
 (editing, pages), `qt/src/canvas/MarkdownEditor.*` (on the page), `qt/src/app/qml/MarkdownPanel.qml` (beside it). The parser is md4c (vendored, `qt/3rdparty/md4c`).
 
+`.md` files are edited the same way, on their own pages: [md-editor.md](md-editor.md).
+
 ## Not yet
 - Images.
 - Flattening into Text mode.

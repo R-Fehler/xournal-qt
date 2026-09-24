@@ -53,6 +53,7 @@
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PdfPageKeeper.h"
+#include "TextFile.h"
 
 namespace xqt {
 
@@ -330,6 +331,9 @@ void DocumentSession::updateSaving() {
 
 void DocumentSession::beginSave() {
     SaveTask& t = *saveTask;
+    if (text && !hasFilePath() && (t.request.kind == SaveKind::Save || t.request.kind == SaveKind::SaveAs)) {
+        return beginTextSave();  // a text file: its text, never a .xopp
+    }
     switch (t.request.kind) {
         case SaveKind::Save:
             if (!hasFilePath()) {
@@ -600,6 +604,39 @@ void DocumentSession::takeSnapshot() {
                 }
             },
             [this] { finishWrite(); });
+}
+
+void DocumentSession::beginTextSave() {
+    SaveTask& t = *saveTask;
+    if (shownReadOnly) {
+        return finishSave({false, _("This file is shown read-only."), {}});
+    }
+    t.textSave = true;
+    t.target = t.request.kind == SaveKind::SaveAs ? t.request.target : text->path();
+    t.text = currentText();  // (the pages as they are now; editing goes on meanwhile)
+    t.textBytes = text->encode(t.text);
+    onWorker(
+            [&t] {
+                std::string error;
+                if (!TextFile::writeAtomically(t.target, t.textBytes, error)) {
+                    t.result = {false, FS(_F("Could not write \"{1}\": {2}") % t.target.u8string() % error), {}};
+                    return;
+                }
+                t.result = {true, {}, {}};
+            },
+            [this] {
+                SaveTask& t = *saveTask;
+                if (t.result.ok) {
+                    text->written(t.target, t.text, std::move(t.textBytes));
+                    shownPath = text->path();
+                    if (lastAutosavedText != t.text) {
+                        lastAutosavedText = t.text;
+                    }
+                    deleteAutosaveFile();  // (older than the file now)
+                }
+                updateModified();
+                finishSave(t.result);
+            });
 }
 
 void DocumentSession::finishWrite() {

@@ -443,8 +443,11 @@ void MarkdownEditor::edit(size_t from, size_t to, const std::string& with, EditK
     to = std::clamp(to, from, text.size());
     // Undo in the text being written: typing goes together (up to a space or a line)
     const bool typing = kind == EditKind::Typing && from == to && with.find_first_of(" \n") == std::string::npos;
-    if (!(typing && lastWasTyping)) {
-        undoStack.push_back({text, caret});
+    if (typing && lastWasTyping && !undoStack.empty() && undoStack.back().removed.empty() &&
+        undoStack.back().at + undoStack.back().inserted.size() == from) {
+        undoStack.back().inserted += with;
+    } else {
+        undoStack.push_back({from, text.substr(from, to - from), with, caret});
     }
     lastWasTyping = typing;
     redoStack.clear();
@@ -479,13 +482,25 @@ void MarkdownEditor::undoEdit(bool redo) {
     if (from.empty()) {
         return;
     }
-    to.push_back({md.text(), caret});
-    const Snapshot s = std::move(from.back());
+    Change c = std::move(from.back());
     from.pop_back();
-    caret = anchor = std::min(s.caret, s.text.size());
+    std::string text = md.text();
+    if (redo) {
+        text.replace(std::min(c.at, text.size()), c.removed.size(), c.inserted);
+        caret = anchor = std::min(c.at + c.inserted.size(), text.size());
+    } else {
+        text.replace(std::min(c.at, text.size()), c.inserted.size(), c.removed);
+        caret = anchor = std::min(c.caretBefore, text.size());
+    }
+    to.push_back(std::move(c));
     lastWasTyping = false;
-    md.update(s.text);
+    md.update(text);
     changed(false);
+}
+
+void MarkdownEditor::setCursorPosition(size_t offset) {
+    preedit.clear();
+    moveCursor(offset, false);
 }
 
 void MarkdownEditor::setFontSize(double size) {
@@ -511,6 +526,19 @@ bool MarkdownEditor::tap(CanvasPage& onPage, double x, double y) {
         if (r.contains(x, y)) {
             preedit.clear();
             caret = anchor = hit(i, x, y);
+            lastWasTyping = false;
+            changed(false);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool MarkdownEditor::tapAnywhere(CanvasPage& onPage, double x, double y) {
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (view.canvasPageOf(parts[i].page.get()) == &onPage) {
+            preedit.clear();
+            caret = anchor = parts[i].box ? hit(i, x, y) : parts[i].part.begin;
             lastWasTyping = false;
             changed(false);
             return true;
@@ -679,6 +707,25 @@ void MarkdownEditor::newLine(bool soft) {
     }
 }
 
+size_t MarkdownEditor::emptyItemMark() const {
+    using namespace md::text;
+    if (plain) {
+        return std::string::npos;
+    }
+    const std::string& t = md.text();
+    const size_t ls = lineStart(t, caret);
+    if (caret != ls + lineAt(t, ls).size()) {
+        return std::string::npos;  // (only with the cursor at the end of the line)
+    }
+    const std::string line = t.substr(ls, caret - ls);
+    std::smatch m;
+    if (!std::regex_search(line, m, linePrefix()) || !m[2].matched || m[2].str()[0] == '#' ||
+        static_cast<size_t>(m[0].length()) != line.size()) {
+        return std::string::npos;
+    }
+    return ls + static_cast<size_t>(m[1].length());
+}
+
 void MarkdownEditor::wrap(const std::string& before, const std::string& after) {
     const size_t from = std::min(caret, anchor);
     const size_t to = std::max(caret, anchor);
@@ -798,6 +845,8 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
         case Qt::Key_Backspace:
             if (hasSelection()) {
                 removeSelection();
+            } else if (const size_t mark = emptyItemMark(); mark != std::string::npos) {
+                edit(mark, caret, "");  // an empty list item or quote line: its mark goes at once (as in Ghostwriter)
             } else if (caret > 0) {
                 edit(ctrl ? wordBoundary(caret, false) : prevChar(caret), caret, "");
             }
@@ -840,9 +889,12 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                     }
                 }
                 return true;
-            case Qt::Key_V:
-                insert(QGuiApplication::clipboard()->text().toStdString(), EditKind::Other);
+            case Qt::Key_V: {
+                std::string pasted = QGuiApplication::clipboard()->text().toStdString();
+                pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());  // (the text's lines end in "\n")
+                insert(pasted, EditKind::Other);
                 return true;
+            }
             case Qt::Key_Z:
                 undoEdit(shift);
                 return true;

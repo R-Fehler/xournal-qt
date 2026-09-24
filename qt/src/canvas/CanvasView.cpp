@@ -54,6 +54,7 @@
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
 #include "MarkdownEditor.h"
+#include "MarkdownFile.h"
 #include "MdBox.h"
 #include "Perf.h"
 #include "TextEditor.h"
@@ -119,7 +120,8 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     // Another tool ends the text editing (upstream: ToolHandler listener).
     connect(&session.getApp(), &AppContext::activeToolChanged, this, [this] {
-        if ((textEditor || markdownEditor) && this->session.getToolHandler()->getToolType() != TOOL_TEXT) {
+        if ((textEditor || markdownEditor) && this->session.getToolHandler()->getToolType() != TOOL_TEXT &&
+            !textMode()) {  // (a text file is written whatever the tool)
             endTextEditing();
         }
     });
@@ -758,6 +760,15 @@ bool CanvasView::tapAt(QPointF viewPos) {
         Q_EMIT linkTapped(link->uri, link->page, link->viewRect);
         return true;
     }
+    // A text file edited: a tap puts the cursor there
+    if (CanvasPage* page = textMode() ? pageAt(viewPos) : nullptr) {
+        if (const auto idx = indexOf(page)) {
+            const QRectF r = pageViewRect(*idx);
+            const double zoom = viewController.zoom();
+            textPress(*page, (viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom);
+            return true;
+        }
+    }
     return false;
 }
 
@@ -1321,8 +1332,44 @@ bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     return box && box == md::boxAt(*layer, x, y);
 }
 
+bool CanvasView::textMode() const { return session.isEditableText() && !readingOnly; }
+
+void CanvasView::textPress(CanvasPage& page, double x, double y) {
+    if (markdownEditor && (markdownEditor->toggleCheckBox(page, x, y) || markdownEditor->tapAnywhere(page, x, y))) {
+        return;
+    }
+    const auto idx = indexOf(&page);
+    if (!idx) {
+        return;
+    }
+    if (!markdownEditor && toggleMarkdownCheckBox(page, x, y)) {
+        return;
+    }
+    startMarkdown(*idx, true, x, y);
+}
+
+bool CanvasView::ensureTextEditor() {
+    if (markdownEditor) {
+        return true;
+    }
+    if (!textMode()) {
+        return false;
+    }
+    startMarkdown(std::min(session.getCurrentPageNo(), session.getDocument()->getPageCount() - 1), true,
+                  TextFlow::MARGIN, TextFlow::MARGIN);
+    return markdownEditor != nullptr;
+}
+
 void CanvasView::startMarkdown(size_t pageNo, bool pageText, double x, double y) {
     endTextEditing();
+    if (textMode()) {
+        // A text file: as it was opened (its boxes' style wins where there are boxes)
+        markdownEditor = std::make_unique<MarkdownEditor>(*this, session, pageNo, true, x, y,
+                                                          MarkdownFile::style(*session.textFile()));
+        Q_EMIT textEditingChanged(true);
+        Q_EMIT updateRequested();
+        return;
+    }
     md::Style style;
     // The text tool's font (the family: its name may have a style, e.g. "Sans Bold") and color, the Markdown size
     PangoFontDescription* d = pango_font_description_from_string(session.getSettings()->getFont().getName().c_str());

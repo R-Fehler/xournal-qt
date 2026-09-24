@@ -79,6 +79,8 @@ ApplicationWindow {
     /// No tool bar: in full screen, or when it was put away - the small tool square takes over
     readonly property bool noToolbar: fullScreenMode || app.toolbarHidden
     readonly property bool verticalTools: sideToolbar || noToolbar
+    /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
+    readonly property bool textDoc: app.textDocument !== ""
     readonly property int toolColumns: noToolbar ? 6 : 2
     Connections {
         target: app
@@ -297,11 +299,12 @@ ApplicationWindow {
             IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
             IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
             IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
-            ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
-            IconButton { iconName: "xopp-tool-pencil"; tip: qsTr("Pen"); checked: app.tool === "pen"; onClicked: app.selectTool("pen") }
-            IconButton { iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
+            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
+            IconButton { visible: !win.textDoc; iconName: "xopp-tool-pencil"; tip: qsTr("Pen"); checked: app.tool === "pen"; onClicked: app.selectTool("pen") }
+            IconButton { visible: !win.textDoc; iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
             // The eraser: a tap takes it; tapped again, held or right-clicked, it offers how it erases
             IconButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "eraserButton"
                 iconName: "xopp-tool-eraser"
                 tip: qsTr("Eraser (tap again or hold: how it erases)")
@@ -330,8 +333,9 @@ ApplicationWindow {
                     EraserItem { objectName: "eraserWhiteout"; text: qsTr("Whiteout (paints white)"); mode: "whiteout" }
                 }
             }
-            IconButton { iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
+            IconButton { visible: !win.textDoc; iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
             IconButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "textButton"
                 iconName: "xopp-tool-text"
                 tip: app.textMarkdown ? qsTr("Markdown text (tap to write; tap a text to edit it; hold for the font)")
@@ -388,6 +392,7 @@ ApplicationWindow {
                 }
             }
             IconButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "pdfTextButton"
                 readonly property var icons: ({ "highlight": "xopp-select-pdf-text-ht", "underline": "xqt-underline",
                                                 "strikethrough": "xqt-strikethrough", "select": "xopp-select-pdf-text-area" })
@@ -436,6 +441,7 @@ ApplicationWindow {
             }
             // Writing on the page with the keyboard: the text mode or Markdown (the one used last; hold for both)
             IconButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 id: writeButton
                 objectName: "textModeButton"
                 property bool markdownMode: false
@@ -483,10 +489,11 @@ ApplicationWindow {
                     function onVisibleChanged() { if (markdownPanel.visible) writeButton.markdownMode = true }
                 }
             }
-            IconButton { objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
-            IconButton { objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
-            IconButton { objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
+            IconButton { visible: !win.textDoc; objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
+            IconButton { visible: !win.textDoc; objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
+            IconButton { visible: !win.textDoc; objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
             IconButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "shapeButton"
                 readonly property var icons: ({
                     "line": "xopp-draw-line", "rectangle": "xopp-draw-rect", "ellipse": "xopp-draw-ellipse",
@@ -542,11 +549,12 @@ ApplicationWindow {
                     }
                 }
             }
-            ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
+            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             // The preset colors: tap to use; press and hold / right click to remove; + adds one.
             Repeater {
                 model: app.toolbarColors
                 delegate: AbstractButton {
+                    visible: !win.textDoc
                     id: swatch
                     required property color modelData
                     required property int index
@@ -578,6 +586,7 @@ ApplicationWindow {
                 }
             }
             AbstractButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "addColorButton"
                 implicitWidth: 40
                 implicitHeight: 44
@@ -596,10 +605,11 @@ ApplicationWindow {
                     }
                 }
             }
-            ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
+            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             Repeater {
                 model: [ { size: 1, dot: 6 }, { size: 2, dot: 10 }, { size: 3, dot: 15 }, { size: 4, dot: 21 } ]
                 delegate: AbstractButton {
+                    visible: !win.textDoc
                     required property var modelData
                     objectName: "sizeButton" + modelData.size
                     implicitWidth: 40
@@ -621,6 +631,7 @@ ApplicationWindow {
             }
             // The fifth width: the tool's own, adjustable (tap it again or press and hold)
             AbstractButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 id: customSizeButton
                 objectName: "customSizeButton"
                 implicitWidth: 40
@@ -658,6 +669,7 @@ ApplicationWindow {
             }
             Item { Layout.fillWidth: !win.verticalTools; Layout.fillHeight: win.verticalTools; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1 }
             IconButton {
+                visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "addPageButton"
                 iconName: "xopp-page-add"
                 tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
@@ -669,7 +681,7 @@ ApplicationWindow {
                     onTapped: insertPagesDialog.openAt(app.pageNumber)
                 }
             }
-            ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
+            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
             IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
             // Full screen (F11). Not inside full screen itself: the tools there end with "Leave full screen"
             IconButton {
@@ -695,9 +707,11 @@ ApplicationWindow {
                 onClicked: Popups.openAt(moreMenu)
                 Menu {
                     id: moreMenu
-                    MenuItem { text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
+                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem {
                         objectName: "saveHybridItem"
+                        visible: !win.textDoc
+                        height: visible ? implicitHeight : 0
                         text: qsTr("Save as hybrid PDF…")
                         onTriggered: openHybridDialog(null)
                     }
@@ -710,11 +724,11 @@ ApplicationWindow {
                     }
                     MenuItem { text: qsTr("Export as PDF…"); onTriggered: openExportDialog() }
                     MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
-                    MenuItem { text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
+                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     MenuSeparator {}
-                    MenuItem { text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
-                    MenuItem { text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
-                    MenuItem { text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
+                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
+                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
+                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
                     MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
                     MenuSeparator {}
@@ -1309,6 +1323,43 @@ ApplicationWindow {
             hybridEditedDialog.file = file
             hybridEditedDialog.open()
         }
+        function onTextChangedOnDisk(name) {
+            textChangedDialog.file = name
+            textChangedDialog.open()
+        }
+    }
+    // A text file changed on disk (another program) while it has changes here: which version stays
+    Dialog {
+        id: textChangedDialog
+        objectName: "textChangedDialog"
+        property string file: ""
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(520, parent ? parent.width - 32 : 520)
+        title: qsTr("Changed in another app")
+        closePolicy: Popup.NoAutoClose
+        Label {
+            width: textChangedDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("%1 was changed by another app, and it has changes here that are not saved.").arg(textChangedDialog.file)
+                  + "\n\n" + qsTr("Reload: the file as it is now is shown (Undo brings your changes back). Keep mine: "
+                                 + "your version stays, and saving writes over the other app's changes.")
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "textKeepButton"
+                text: qsTr("Keep mine")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "textReloadButton"
+                text: qsTr("Reload")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: app.resolveTextChange(true)
+        onRejected: app.resolveTextChange(false)
     }
     FileDialog {
         id: exportDialog

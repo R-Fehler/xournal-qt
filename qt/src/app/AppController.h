@@ -17,11 +17,13 @@
 #include <QColor>
 #include <QJSValue>
 #include <QMetaObject>
+#include <QFileSystemWatcher>
 #include <QObject>
 #include <QPointer>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
@@ -99,6 +101,10 @@ class AppController: public QObject {
     /// The current document shows a file it is not (a Markdown file, read-only for now; an image to write on): what
     /// the note over the canvas says about it ("": nothing to say).
     Q_PROPERTY(QString shownFileNote READ shownFileNote NOTIFY titleChanged)
+    /// The current document is a text file (qt/docs/md-editor.md): "markdown" or "plain" ("" if not).
+    Q_PROPERTY(QString textDocument READ textDocument NOTIFY titleChanged)
+    /// ... and it is edited (not shown read-only).
+    Q_PROPERTY(bool textEditable READ textEditable NOTIFY titleChanged)
     /// The document is saved as a hybrid PDF (Ctrl+S writes it again).
     Q_PROPERTY(bool isHybrid READ isHybrid NOTIFY titleChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
@@ -214,6 +220,14 @@ public:
     bool anySaving() const;
     bool hasFilePath() const;
     QString shownFileNote() const;
+    QString textDocument() const;
+    bool textEditable() const;
+    /// Look whether the text files of the open tabs changed on disk (another program): an unmodified one is read
+    /// again, a modified one is asked about (textChangedOnDisk). Also done when the window becomes active.
+    Q_INVOKABLE void checkTextFiles();
+    /// The answer to textChangedOnDisk for the current tab: read the file again (the changes here are lost; undo
+    /// brings them back), or keep the text here (saving writes over the file).
+    Q_INVOKABLE void resolveTextChange(bool reload);
     bool canUndo() const;
     bool canRedo() const;
     QString tool() const;
@@ -688,6 +702,9 @@ Q_SIGNALS:
     void hybridEditedElsewhere(const QString& file);
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
+    /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep
+    /// (resolveTextChange).
+    void textChangedOnDisk(const QString& name);
 
 private:
     /// The last query fuzzyName() parsed
@@ -695,6 +712,8 @@ private:
     mutable std::shared_ptr<const xqt::FuzzyQuery> fuzzyParsed;
     xqt::DocumentSession* session() const;
     xqt::CanvasView* canvas() const;
+    /// The current document is a text file: its pages follow its text (no page operations, no ink, no images).
+    bool textPagesFixed() const;
     /// Presenting: the view that presents (the current one; another tab takes it over)
     bool presentingOn = false;
     QPointer<xqt::CanvasView> presentedView;
@@ -778,4 +797,16 @@ private:
     void applyPdfTextMode();
     void storeToolbarColors(const QVariantList& colors);
     std::vector<QMetaObject::Connection> currentConnections;
+
+    // --- text files (AppTextFiles.cpp) ---
+    /// Open a Markdown or text file as a text document (editable when it can be). nullptr: not such a file.
+    std::unique_ptr<xqt::DocumentSession> openTextFile(const fs::path& file, std::string& error);
+    /// Watch the files of the open text documents (changes by other programs).
+    void watchTextFiles();
+    void checkTextFile(xqt::DocumentSession* s);
+    /// The text file's new bytes are shown (the cursor stays where it was, as far as it can).
+    void reloadText(xqt::DocumentSession* s, std::string bytes);
+    std::unique_ptr<QFileSystemWatcher> textWatcher;
+    QTimer textCheckTimer;  ///< (programs write in steps: looked at a moment after the last change)
+    QPointer<xqt::DocumentSession> askingTextChange;
 };

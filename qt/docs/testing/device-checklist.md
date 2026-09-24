@@ -879,3 +879,22 @@ cache on disk (and, once the whole block is in, converts the old one), which One
       (mouse), in the library and in the tab overview: the fuzzy search's help opens (the button does not toggle),
       scrolls with a finger, and closes with a tap outside or Escape. Its typo sentence follows the setting in
       Settings → Search, which has a "Help" button that opens the same help.
+
+## Markdown and text editor (qt/md-editor)
+- [ ] Open a `.md` from the library: no read-only note, no ink tools in the tool bar. Tap (pen, mouse or finger)
+      anywhere on a page: the cursor is there, the block under it shows its Markdown, the others stay formatted.
+      Type, press Enter in a list (the next item), Backspace right after an empty `- ` (the mark goes at once).
+      A drag with the pen or the mouse selects; a finger drag scrolls.
+- [ ] Type on page 3 of a long file until a page is added; delete until it goes again. Undo (Ctrl+Z and the undo
+      button) goes back word by word, not the whole edit at once.
+- [ ] The tab shows the unsaved dot; typing back to the saved text removes it. Ctrl+S: no dialog, the dot goes, the
+      library card shows the new text. Open the file in another editor: only what you typed changed (a Windows
+      file keeps `\r\n`, a file without a newline at its end stays so; `git diff` shows only your lines).
+- [ ] Close the tab with unsaved changes: the usual question; "Save" writes the `.md`, no `.xopp` appears.
+- [ ] Change the open file in another editor and save there, with no changes in the app: the tab shows the new
+      text within a second (a note says so), the cursor stays. With changes in the app: a dialog "Changed in
+      another app": Reload shows the other version (Undo brings yours back), Keep mine keeps yours (saving writes
+      over it).
+- [ ] Kill the app (`kill -9`) with an unsaved `.md`: at the next start the recovery offers it by its name;
+      recovered, the tab is the `.md` with your text, modified; the file on disk is unchanged until you save.
+- [ ] A `.md` that is not UTF-8 (e.g. Latin-1) or read-only on disk opens read-only with a note saying why.

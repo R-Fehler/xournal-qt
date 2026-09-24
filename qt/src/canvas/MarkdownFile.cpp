@@ -15,11 +15,16 @@
 #include "model/XojPage.h"
 #include "util/Matrix.h"
 
+#include "MarkdownSession.h"
 #include "MdBox.h"
 #include "MdPaginate.h"
 #include "TextFlow.h"
+#include "session/DocumentSession.h"
+#include "session/TextFile.h"
 
 namespace xqt::MarkdownFile {
+
+static_assert(TextFile::PAGE_MARGIN == TextFlow::MARGIN, "the session finds the page's text at the margins");
 
 namespace {
 /// Receives the events of the documents made here until a session owns them. It has no listeners.
@@ -99,6 +104,17 @@ md::Style style() {
     s.color = Colors::black;
     s.width = frame().width;
     return s;
+}
+
+md::Style style(const TextFile& /*file*/) { return style(); }
+
+std::unique_ptr<Document> textDocument(const TextFile& file) { return document(file.text()); }
+
+void setText(DocumentSession& session, const std::string& text) {
+    MarkdownSession md(session);
+    md.begin(0, session.textFile() ? style(*session.textFile()) : style());
+    md.update(text);
+    md.finish();
 }
 
 std::unique_ptr<Document> document(const std::string& source, size_t maxPages) {

@@ -48,6 +48,9 @@ struct DocumentSession::SaveTask {
     xoj::util::CairoSurfaceSPtr preview;
     bool xoppWritten = false;
     bool commitTried = false, committed = false;
+    // --- or a text file (DocumentSession::beginTextSave): the text and the bytes written for it
+    bool textSave = false;
+    std::string text, textBytes;
     // --- or pasted PDF pages joining the merged PDF
     std::shared_ptr<PdfMerge> merge;
     // --- the step that runs

@@ -342,7 +342,11 @@ double MarkdownSession::update(const std::string& source) {
     if (pageText) {
         if (source != last) {
             last = source;
-            return distribute(source);
+            const double over = distribute(source);
+            if (session.textFile()) {
+                session.textEdited();  // (a text file: modified or not, by its text)
+            }
+            return over;
         }
         return md::paginate(source, style, [&](size_t i) {
                    std::shared_lock lock(*session.getDocument());
@@ -449,6 +453,9 @@ void MarkdownSession::cancel() {
         changedOnPage(p.page);
     }
     end();
+    if (session.textFile()) {
+        session.textEdited();
+    }
 }
 
 void MarkdownSession::end() {
