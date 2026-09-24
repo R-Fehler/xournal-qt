@@ -21,7 +21,10 @@ void PdfBackgroundView::draw(cairo_t* cr) const {
         double scaleY;
         cairo_surface_get_device_scale(cairo_get_target(cr), &scaleX, &scaleY);
         xoj_assert(scaleX == scaleY);
-        double pixelsPerPageUnit = matrix.xx * scaleX;
+        // xournal-qt: the cache's buffer is a surface similar to the target, which applies the device scale itself;
+        // multiplying it in here as well rendered the PDF at scaleX^2 the pixels on a HiDPI screen.
+        double pixelsPerPageUnit = matrix.xx;
+        (void)scaleX;
         pdfCache->render(cr, pageNo, pixelsPerPageUnit, pageWidth, pageHeight);
     } else {
         g_warning("PdfBackgroundView::draw Missing pdf cache: cannot render the pdf page");
