@@ -76,6 +76,12 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
         version). Not measured on the Uni library; move it to the index (a hybrid flag in the entry).
       - [ ] Dropping a file of a hidden kind into the library gives the old "not a document the library shows"
         error; it should say which filter hides it.
+   6. `qt/fuzzy-text` (the author, 2026-09-24; started): fuzzy matching in document text, per word.
+      - Today only names are fuzzy; `tbine` does not find "turbine" in a PDF.
+      - A term matches a single word fuzzily (fzf's algorithm within one word, with a minimum score), through a
+        word list per document and page, so it stays fast.
+      - A one-letter tolerance for words of five or more letters (swapped, missing, extra or wrong letter).
+      - Whole matching words are marked; `'exact`, `^` and `$` keep their meaning.
    5. ~~fuzzy search~~: `qt/fuzzy-search`, merged 2026-09-24 (see ROADMAP). Follow-ups: hit-page pictures mark `^`/`$`/`'word'` terms as plain substrings; the document search bar shows no sign that it is in fuzzy mode.
 3. **Android:** `qt/android-apk`. Its build changes touch CMake for everyone, so start it when few other
    branches are open.
