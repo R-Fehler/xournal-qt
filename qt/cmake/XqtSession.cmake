@@ -77,6 +77,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/DocumentLayout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ViewController.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScreenCalibration.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScreenCalibration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasView.h
@@ -137,7 +139,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextFlowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownEditorTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScreenCalibrationTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")

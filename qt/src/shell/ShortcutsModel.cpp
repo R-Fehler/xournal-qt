@@ -59,6 +59,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"zoomIn", tr("Zoom in"), view, standard(QKeySequence::ZoomIn)},
             {"zoomOut", tr("Zoom out"), view, standard(QKeySequence::ZoomOut)},
             {"fitWidth", tr("Fit the width"), view, {"Ctrl+0"}},
+            // (Ctrl+0 fits the width here, as it long has; 1:1 as in image and drawing programs)
+            {"realSize", tr("Real size (100 %, as large as the paper)"), view, {"Ctrl+1"}},
             {"fullScreen", tr("Full screen"), view, {"F11"}},
             {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
             {"back", tr("Back"), view, standard(QKeySequence::Back)},

@@ -1178,6 +1178,11 @@ ApplicationWindow {
                     id: fitMenu
                     objectName: "fitMenu"
                     MenuItem { text: qsTr("Fit the width (Ctrl+0)"); onTriggered: app.fitWidth() }
+                    MenuItem {
+                        objectName: "realSizeItem"
+                        text: qsTr("Real size, 100 % (Ctrl+1)")
+                        onTriggered: app.zoomToRealSize()
+                    }
                     MenuItem { text: qsTr("Fit the height"); onTriggered: app.fitHeight() }
                     MenuItem {
                         objectName: "fitPageItem"
@@ -2799,6 +2804,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }
     Shortcut { sequences: win.keysOf("zoomOut"); enabled: docKeys; onActivated: app.zoomOut() }
     Shortcut { sequences: win.keysOf("fitWidth"); enabled: docKeys; onActivated: app.fitWidth() }
+    Shortcut { sequences: win.keysOf("realSize"); enabled: docKeys; onActivated: app.zoomToRealSize() }
     Shortcut { sequences: win.keysOf("quit"); onActivated: win.close() }
     ShortcutSheet {
         id: shortcutSheet

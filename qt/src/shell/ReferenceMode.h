@@ -108,6 +108,8 @@ public:
     Q_INVOKABLE void fitWidth();
     Q_INVOKABLE void zoomIn();
     Q_INVOKABLE void zoomOut();
+    /// 100 %: the pages as large as the paper (ScreenCalibration.h)
+    Q_INVOKABLE void zoomToRealSize();
     /// Go to a page of the reference (0-based), remembering the place for "back".
     Q_INVOKABLE void goToPage(int index);
     Q_INVOKABLE void navigateBack();

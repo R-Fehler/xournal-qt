@@ -61,6 +61,7 @@
 #include "canvas/CanvasPage.h"
 #include "markdown/MdBox.h"
 #include "canvas/PenHover.h"
+#include "canvas/ScreenCalibration.h"
 #include "canvas/MarkdownEditor.h"
 #include "canvas/TextEditor.h"
 #include "render/RenderService.h"
@@ -443,6 +444,107 @@ TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {
     const QByteArray xml = f.readAll();
     EXPECT_TRUE(xml.contains("name=\"pressureMultiplier\" value=\"2.5")) << xml.left(400).toStdString();
     EXPECT_TRUE(xml.contains("name=\"autosaveTimeout\" value=\"7\""));
+}
+
+// Settings -> Display: a ruler on the screen that the slider (or a drag, with the mouse or a finger) stretches until
+// it matches a real one; saved, it calibrates this screen (only this one), and 100 % (Ctrl+1) is the real size from
+// then on.
+TEST_F(MainWindowTest, theScreenIsCalibratedInTheSettings) {
+    namespace SC = xqt::ScreenCalibration;
+    Settings& settings = *controller->context().getSettings();
+    const auto display = SC::displayOf(window->screen(), window->devicePixelRatio());
+    ASSERT_FALSE(display.key.isEmpty());
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    const double defaultDpi = SC::defaultPpi(display) / display.dpr;
+    EXPECT_DOUBLE_EQ(vc.zoom100(), defaultDpi / 72.0) << "not calibrated: what the screen says (or 96 dpi)";
+    EXPECT_FALSE(SC::storedPpi(settings, display.key).has_value());
+
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("displayTab"));
+    QQuickItem* ruler = findItem("calibrationRuler");
+    QQuickItem* slider = findItem("calibrationSlider");
+    ASSERT_NE(ruler, nullptr);
+    ASSERT_NE(slider, nullptr);
+    until([&] { return ruler->isVisible() && slider->isVisible(); });
+    nextFrame();
+    EXPECT_NEAR(ruler->property("dpi").toDouble(), defaultDpi, 1e-6);
+    EXPECT_NEAR(ruler->property("pixelsPerCm").toDouble(), defaultDpi / 2.54, 1e-6);
+
+    // The slider stretches the ruler
+    const double before = ruler->property("dpi").toDouble();
+    click(slider);  // (the middle of the slider: (40 + 400) / 2 dpi)
+    const double moved = ruler->property("dpi").toDouble();
+    EXPECT_NE(moved, before);
+    EXPECT_NEAR(moved, slider->property("value").toDouble(), 1e-6);
+    EXPECT_NEAR(moved, 220.0, 15.0);
+    EXPECT_NEAR(ruler->property("pixelsPerCm").toDouble(), moved / 2.54, 1e-6);
+
+    // ... and so does a drag on the ruler, from its 0 mark: 10 % further out is 10 % more pixels per inch
+    const double zeroX = ruler->property("zeroX").toDouble();
+    const QPointF grab = ruler->mapToScene(QPointF(zeroX + 200, ruler->height() / 2));
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, grab.toPoint());
+    for (int step = 1; step <= 5; ++step) {
+        QTest::mouseMove(window, (grab + QPointF(4 * step, 0)).toPoint());
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, (grab + QPointF(20, 0)).toPoint());
+    wait(50);
+    const double dragged = ruler->property("dpi").toDouble();
+    EXPECT_NEAR(dragged, moved * 1.1, moved * 0.01);
+
+    // ... and a finger (Android): from 220 px to 200 px, a tenth shorter
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    const QPoint touch = ruler->mapToScene(QPointF(zeroX + 220, ruler->height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(1, touch);
+    for (int step = 1; step <= 5; ++step) {
+        QTest::touchEvent(window, finger).move(1, touch - QPoint(4 * step, 0));
+    }
+    QTest::touchEvent(window, finger).release(1, touch - QPoint(20, 0));
+    wait(50);
+    const double touched = ruler->property("dpi").toDouble();
+    EXPECT_NEAR(touched, dragged * 200.0 / 220.0, dragged * 0.01);
+    EXPECT_FALSE(SC::storedPpi(settings, display.key).has_value()) << "nothing is stored before it is saved";
+    EXPECT_DOUBLE_EQ(vc.zoom100(), defaultDpi / 72.0);
+
+    // Saved: for this screen, as the panel's pixels per inch; the view takes it at once
+    const double zoom = vc.zoom();
+    QQuickItem* save = findItem("calibrationSave");
+    scrollIntoView(save);
+    click(save);
+    ASSERT_TRUE(SC::storedPpi(settings, display.key).has_value());
+    EXPECT_NEAR(*SC::storedPpi(settings, display.key), touched * display.dpr, 0.01);
+    std::string stored;
+    settings.getCustomElement("xournalQt").getString("screenCalibration", stored);
+    EXPECT_EQ(QString::fromStdString(stored).count('='), 1) << "one screen: " << stored;
+    EXPECT_NEAR(vc.zoom100(), touched / 72.0, 1e-3);
+    EXPECT_DOUBLE_EQ(vc.zoom(), zoom) << "the page stays as large as it was; only what is called 100 % changes";
+    EXPECT_EQ(controller->zoomPercent(), static_cast<int>(std::lround(zoom / vc.zoom100() * 100)));
+
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    QFile file(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/xournal-qt/settings.xml");
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+    EXPECT_TRUE(file.readAll().contains("screenCalibration")) << "written when the sheet closes";
+
+    // Real size: Ctrl+1
+    key(Qt::Key_1, Qt::ControlModifier);
+    EXPECT_EQ(controller->zoomPercent(), 100);
+    EXPECT_NEAR(vc.zoom(), touched / 72.0, 1e-3);
+
+    // Back to what the screen says
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    QQuickItem* reset = findItem("calibrationReset");
+    scrollIntoView(reset);
+    click(reset);
+    EXPECT_FALSE(SC::storedPpi(settings, display.key).has_value());
+    EXPECT_NEAR(ruler->property("dpi").toDouble(), defaultDpi, 1e-6);
+    EXPECT_DOUBLE_EQ(vc.zoom100(), defaultDpi / 72.0);
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
 }
 
 namespace {

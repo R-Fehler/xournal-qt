@@ -420,6 +420,9 @@ void DocumentCanvasItem::updateViewGeometry() {
     }
     if (window()) {
         canvasView->setDevicePixelRatio(window()->effectiveDevicePixelRatio());
+        // (before the size: a view shown for the first time fits its page at the zoom of this screen)
+        canvasView->setDisplay(xqt::ScreenCalibration::displayOf(window()->screen(),
+                                                                 window()->effectiveDevicePixelRatio()));
     }
     canvasView->getViewController().setViewSize(size());
 }
@@ -436,10 +439,13 @@ void DocumentCanvasItem::itemChange(ItemChange change, const ItemChangeData& val
         if (filteredWindow) {
             filteredWindow->removeEventFilter(this);
         }
+        disconnect(screenConnection);
         filteredWindow = value.window;
         if (filteredWindow) {
             // Runs before QQuickWindow::event() and thus before Qt Quick's delivery agent.
             filteredWindow->installEventFilter(this);
+            screenConnection = connect(filteredWindow, &QWindow::screenChanged, this,
+                                       &DocumentCanvasItem::updateViewGeometry);
             updateViewGeometry();
         }
     } else if (change == ItemDevicePixelRatioHasChanged) {

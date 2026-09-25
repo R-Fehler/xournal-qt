@@ -719,6 +719,8 @@ public:
     /// Zoom to this (around the middle of the view), e.g. back to what it was.
     Q_INVOKABLE void setZoomPercent(int percent);
     Q_INVOKABLE void zoomOut();
+    /// 100 %: the pages as large as the paper, after the screen's calibration (Settings -> Screen)
+    Q_INVOKABLE void zoomToRealSize();
     Q_INVOKABLE void addPageAfterCurrent();
 
     // --- pages of the current document (index: 0-based page) ---
