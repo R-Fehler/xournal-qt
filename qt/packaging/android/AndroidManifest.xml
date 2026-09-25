@@ -28,6 +28,8 @@
         android:xlargeScreens="true"
         android:normalScreens="true"
         android:smallScreens="true" />
+    <!-- hasFragileUserData: uninstalling asks whether to keep the app's data (settings, reading positions, recent
+         files; the libraries themselves are in Documents/Xournal_Libraries, see qt/docs/android.md). -->
     <application
         android:name="org.qtproject.qt.android.bindings.QtApplication"
         android:hardwareAccelerated="true"
@@ -37,6 +39,7 @@
         android:allowBackup="true"
         android:fullBackupOnly="false"
         android:requestLegacyExternalStorage="true"
+        android:hasFragileUserData="true"
         android:resizeableActivity="true">
         <activity
             android:name="org.xournalqt.app.XournalActivity"

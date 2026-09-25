@@ -1296,6 +1296,9 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] **Uninstall and install again (emulator only):** `adb uninstall org.xournalqt.app`, install the APK: the
       offer comes; Continue → allow: the libraries in `Documents/Xournal_Libraries` open again with their
       documents (Recent and reading positions are gone with the app's data, as expected).
+- [ ] Uninstall from the launcher (long press → Uninstall, emulator or a test device): Android asks whether to keep
+      the app's data ("Keep … of app data"). Kept and installed again: the settings, Recent and reading positions
+      are back.
 - [ ] **Downloads:** without "All files access" the library menu still lists "Downloads folder (quick library)";
       tapping it explains and asks for the access; with it, the phone's `Download` folder opens with its PDFs.
 - [ ] **The author's Fold 7:** only `adb install -r` over the installed app (never uninstall, never clear its data).
