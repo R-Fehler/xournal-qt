@@ -12,6 +12,8 @@
 
 #include "session/TextFile.h"
 
+#include "../FailingWrites.h"
+
 using namespace xqt;
 
 namespace {
@@ -114,6 +116,28 @@ TEST_F(TextFileTest, savingWritesAtomicallyAndOwnSavesAreNotChangesOnDisk) {
     }
     EXPECT_EQ(files, 1u);
 }
+
+#ifndef _WIN32
+// A save that cannot be written whole (a full disk: here a file size limit) fails and leaves the file as it was. Qt
+// 6.7's QSaveFile::commit() alone did not notice the short write and put the cut file in place.
+TEST_F(TextFileTest, aSaveThatDoesNotFitLeavesTheFileAsItWas) {
+    const fs::path p = file("full.md", "# Kept\n");
+    std::string error;
+    bool ok = true;
+    {
+        test::FileSizeLimit full(4);
+        ok = TextFile::writeAtomically(p, std::string(1000, 'x'), error);  // (less than the write buffer)
+    }
+    EXPECT_FALSE(ok);
+    EXPECT_FALSE(error.empty());
+    EXPECT_EQ(readFile(p), "# Kept\n");
+    size_t files = 0;
+    for ([[maybe_unused]] const auto& e: fs::directory_iterator(p.parent_path())) {
+        ++files;
+    }
+    EXPECT_EQ(files, 1u) << "no temporary file left";
+}
+#endif
 
 TEST_F(TextFileTest, notUtf8OrTooBigIsNotEditable) {
     TextFile latin = load(file("latin.txt", "caf\xE9\n"));

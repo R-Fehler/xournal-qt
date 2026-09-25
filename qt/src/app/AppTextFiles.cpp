@@ -68,7 +68,9 @@ void accept(const fs::path& file) {
     QSaveFile f(QString::fromStdString(acceptedStore().string()));
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(QJsonArray::fromStringList(list)).toJson(QJsonDocument::Compact));
-        f.commit();
+        if (f.flush()) {  // (see LibraryCache.cpp, writeFile)
+            f.commit();
+        }
     }
 }
 /// An "other" text file (code, LaTeX, JSON, ...): not a .md, not a .txt.

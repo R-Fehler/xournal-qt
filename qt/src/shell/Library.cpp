@@ -123,7 +123,9 @@ void changeSettings(const fs::path& file, const fs::path& root, const std::funct
     QSaveFile f(QString::fromStdString(file.string()));
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(settings).toJson());
-        f.commit();
+        if (f.flush()) {  // (see LibraryCache.cpp, writeFile)
+            f.commit();
+        }
     }
 }
 }  // namespace

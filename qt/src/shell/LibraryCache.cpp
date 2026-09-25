@@ -67,7 +67,9 @@ std::optional<QCborMap> readFile(const fs::path& file, const QString& pack, int 
 
 bool writeFile(const fs::path& file, const QByteArray& data) {
     QSaveFile f(qstr(file));  // written under another name, then renamed: whole or not at all
-    return f.open(QIODevice::WriteOnly) && f.write(data) == data.size() && f.commit();
+    // flush() before commit(): Qt 6.7's commit() does not notice a short write (a full disk, a file size limit) and
+    // renames the cut file over the old one; flush() reports it (fixed in Qt 6.8). Without commit() nothing is renamed.
+    return f.open(QIODevice::WriteOnly) && f.write(data) == data.size() && f.flush() && f.commit();
 }
 
 /// Files of the entries that have one: "<pack>-<16 hex digits>.pack"
