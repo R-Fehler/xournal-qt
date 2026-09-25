@@ -1425,3 +1425,12 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       tap covers again. Close and reopen the file: covered again (peeking is not saved).
 - [ ] A page with notes has an eye button beside the page number: it hides all notes of the page (thumbnail too) and
       shows them again. The layer panel does not list the notes.
+
+## Markdown out of a PDF text document, other viewers (qt/docs/user/markdown-from-pdf.md)
+
+Once `qt/md-pdf` is released, with a PDF text document that has an image:
+- [ ] Chrome and Edge (Windows' default PDF viewer): is there an attachments list, and can `name.md` be saved from it?
+- [ ] Adobe Acrobat Reader on Android and iPad: attachments listed and saved?
+- [ ] Acrobat Reader and Firefox: saving an image keeps the `name.assets/` part of its name, or only the file name?
+- [ ] The saved `name.md` with its `name.assets` folder opens with the images in Obsidian and VS Code.
+Update the table in the user doc with the results.
