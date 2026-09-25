@@ -418,6 +418,16 @@
     (Download). "Show in file manager" is hidden on Android.
   - Checked on the emulator (move, uninstall/reinstall); not yet on the Fold 7.
 
+- **CI green on Debian 13, qpdf 12 built with the app, `qt/ci-green` (2026-09-25).** qpdf 12.4.1 is downloaded
+  (pinned by SHA-256) and linked statically on the Linux desktop (`qt/cmake/XqtQpdf.cmake`; `XQT_SYSTEM_QPDF` for
+  distros, Android and Windows, which have 12.x); qpdf older than 12 is no longer supported. Incremental saves work
+  on qpdf 12 (a reserved object number was a null on 12, so every save fell back to a full write).
+  - pgfmanual on qpdf 12: full write 1.4 s (hybrid) / 3.3 s (archive), Ctrl+S appended 0.12–0.18 s, reopen 0.34 s.
+    +2:13 min for a clean build (seconds with ccache), +1.9 MB binary, +0.9 MB `.deb`, no `libqpdf` dependency.
+  - Also fixed: names sort naturally and case-insensitively in any locale; `QSaveFile` saves on a full disk fail
+    instead of cutting the file (Qt 6.7); tests inject failed writes in ways that fail for root too; two UI tests
+    wait for menus to close.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
