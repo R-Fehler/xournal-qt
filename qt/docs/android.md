@@ -247,7 +247,7 @@ never in the repository.
 |---|---|
 | Tests, the CLI (`xournal-qt-cli`, `xoj-imgdiff`), the golden tests, the spikes | desktop tools (`XQT_BUILD_TESTS/CLI/SPIKES` default OFF on Android) |
 | `.deb` packaging (`XqtPackage.cmake`) | replaced by `XqtAndroid.cmake` |
-| D-Bus ("Show in file manager") | no Qt D-Bus on Android (already optional) |
+| D-Bus ("Show in file manager") | no Qt D-Bus on Android (already optional); the menu items are hidden, as no intent opens a folder in the Files app reliably |
 | Single instance (local socket per library) | Android starts one activity (`singleTop`) |
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
 | Audio, Lua plugins, X11, gtksourceview | already off in the Qt build |

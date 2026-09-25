@@ -1305,6 +1305,8 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       "Phone storage" with Documents, Download, … (not Android's picker). "Use this folder" is off at the top. Tap
       Download → "Use this folder": the window shows the Download folder as library (the Downloads note on top).
       ↑ goes up again; Cancel changes nothing. Without the access the explanation comes first, then the list.
+- [ ] The library menu ▾ has no "Show in file manager" on Android (nor a card's menu, nor the summary of "Export
+      library as archive"); on the desktop it is still there.
 - [ ] **The author's Fold 7:** only `adb install -r` over the installed app (never uninstall, never clear its data).
       Before: note the number of files in the app's library (`adb shell find /sdcard/Android/data/org.xournalqt.app/
       files/Documents -type f | wc -l`). Go through the offer and the move. After: the same number of files under

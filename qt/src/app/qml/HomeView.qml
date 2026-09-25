@@ -393,9 +393,13 @@ Rectangle {
                         text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
                         onTriggered: home.pickLibraryFolder()
                     }
+                    // (not on Android: there is no file manager the app could show a folder in reliably)
                     MenuItem {
+                        objectName: "libraryShowInFileManagerItem"
                         text: qsTr("Show in file manager")
                         enabled: app.library.available
+                        visible: app.canShowInFileManager
+                        height: visible ? implicitHeight : 0
                         onTriggered: app.showInFileManager(app.library.rootPath)
                     }
                     MenuItem {
@@ -1923,6 +1927,7 @@ Rectangle {
             Button {
                 objectName: "libraryArchiveShow"
                 text: qsTr("Show in file manager")
+                visible: app.canShowInFileManager
                 flat: true
                 onClicked: { app.showInFileManager(libraryArchiveSummary.summary.target); libraryArchiveSummary.close() }
             }

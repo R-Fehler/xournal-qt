@@ -90,7 +90,9 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   Drive, OneDrive) stay out; they would need a library that reads through SAF. Google Play restricts
   `MANAGE_EXTERNAL_STORAGE`: a Play build would need another way (SAF trees, or Play's exception for file managers
   and document apps).
-- (E) **"Show in file manager"** has no Android equivalent; hide it. "Open externally" becomes an intent with a
+- Done (`qt/android-storage`): **"Show in file manager"** is hidden on Android (library menu, cards, the archive
+  summary): Android has no intent that opens a folder in the Files app reliably (the DocumentsUI and Samsung's My
+  Files take different ones). Open: "Open externally" becomes an intent with a
   `FileProvider` URI (the provider is already in the manifest).
 - (E) **Printing** calls `lp`; on Android use the print framework or hide Print.
 
