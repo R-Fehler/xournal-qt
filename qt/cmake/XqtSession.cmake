@@ -5,6 +5,11 @@ set(XQT_BUILD_RESOURCE_DIR "${CMAKE_BINARY_DIR}/share/xournal-qt")
 configure_file("${XOJ_UPSTREAM_DIR}/resources-templates/pagetemplates.ini.in"
     "${XQT_BUILD_RESOURCE_DIR}/pagetemplates.ini" COPYONLY)
 file(COPY "${XOJ_UPSTREAM_DIR}/palettes" DESTINATION "${XQT_BUILD_RESOURCE_DIR}")
+# The colour emoji font and its license (qt/resources/fonts/README.md): a file that fontconfig reads, <resources>/fonts
+foreach(_xqt_font XqtEmoji.ttf LICENSE-NotoColorEmoji.txt)
+    configure_file("${CMAKE_CURRENT_LIST_DIR}/../resources/fonts/${_xqt_font}" "${XQT_BUILD_RESOURCE_DIR}/fonts/${_xqt_font}"
+        COPYONLY)
+endforeach()
 
 # The sRGB profile of archive PDFs (qt/resources/icc/README.md), compiled in as bytes
 set(XQT_SRGB_ICC "${CMAKE_CURRENT_LIST_DIR}/../resources/icc/sRGB.icc")

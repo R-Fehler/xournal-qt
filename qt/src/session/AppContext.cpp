@@ -12,6 +12,7 @@
 #include "util/PathUtil.h"
 #include "util/Util.h"
 
+#include "EmojiFont.h"
 #include "MdBox.h"
 #include "config-dev.h"  // for SETTINGS_XML_FILE
 
@@ -20,6 +21,13 @@ namespace xqt {
 AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderThreads):
         resourceDir(std::move(resourceDir)) {
     md::installRenderer();  // Markdown boxes are drawn formatted (on the canvas, in thumbnails, exports, ...)
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN)
+    // The colour emoji font that comes with the app, for Pango (Windows and Android have it in the fonts.conf they
+    // write at start: WindowsSetup.cpp, AndroidSetup.cpp)
+    if (!emoji::fontRegistered()) {
+        emoji::registerFont((this->resourceDir / "fonts" / emoji::FONT_FILE).string());
+    }
+#endif
     searchPath.addSearchDirectory(this->resourceDir);
     if (settingsFile.empty()) {
         settingsFile = Util::getConfigFile(SETTINGS_XML_FILE);

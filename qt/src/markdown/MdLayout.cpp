@@ -11,6 +11,7 @@
 
 #include "util/StringUtils.h"
 
+#include "EmojiFont.h"
 #include "MdHighlight.h"
 #include "MdMath.h"
 #include "MdText.h"
@@ -1317,7 +1318,7 @@ void draw(cairo_t* cr, const Layout& layout) {
                 break;
             case Item::Kind::Text:
                 cairo_move_to(cr, it.x, it.y);
-                pango_cairo_show_layout(cr, it.layout.get());
+                emoji::showLayout(cr, it.layout.get());  // (colour emoji sharp in PDFs)
                 break;
         }
     }

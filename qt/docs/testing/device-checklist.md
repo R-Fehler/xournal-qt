@@ -1346,3 +1346,12 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
+
+## Emoji (qt/emoji)
+
+- [ ] A Markdown box and a text box with `😄 👩‍💻 🇩🇪 👍🏽 ❤️` (copied from a web page): each shows as one colour
+      picture, the same on every system (the app's Noto Color Emoji), also on a system without an emoji font.
+- [ ] Export as PDF and as the hybrid PDF, open in Okular and evince: the emoji are in colour and sharp at 400 %.
+      Print (Ctrl+P) to a PDF file: the same. The page's thumbnail and the sidebar previews show them.
+- [ ] A `.md` file with emoji, on pages and on one continuous page: the same.
+- [ ] Windows and Android: the same box shows its emoji in colour (Noto's pictures, not Segoe's or Android's).

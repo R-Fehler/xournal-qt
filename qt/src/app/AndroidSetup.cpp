@@ -13,6 +13,8 @@
 #include <QStandardPaths>
 #include <QtGlobal>
 
+#include "EmojiFont.h"
+
 namespace xqt::android {
 
 namespace {
@@ -53,8 +55,9 @@ void copyResources(const QString& from, const QString& to) {
 
 /// fontconfig has no configuration on Android (vcpkg's build points at its own build prefix). Ours lists Android's
 /// font folders, an app folder for fonts of the user's own, and maps the generic families Xournal++ uses ("Sans" is
-/// the default text font) to Android's standard fonts.
-void writeFontConfig(const QString& file, const QString& cacheDir, const QString& userFonts) {
+/// the default text font) to Android's standard fonts. The app's own fonts (<resources>/fonts: the emoji font,
+/// EmojiFont.h) come with their rules (there is no conf.d: fontconfig's rule for scaling bitmap fonts is among them).
+void writeFontConfig(const QString& file, const QString& cacheDir, const QString& userFonts, const QString& appFonts) {
     const QString conf = QStringLiteral(R"(<?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <!-- Written by xournal-qt at every start (AndroidSetup.cpp) -->
@@ -62,6 +65,7 @@ void writeFontConfig(const QString& file, const QString& cacheDir, const QString
   <dir>/system/fonts</dir>
   <dir>/product/fonts</dir>
   <dir>%1</dir>
+  <dir>%3</dir>
   <cachedir>%2</cachedir>
   <alias binding="same"><family>Sans</family><prefer><family>Roboto</family><family>Noto Sans</family></prefer></alias>
   <alias binding="same"><family>sans-serif</family><prefer><family>Roboto</family><family>Noto Sans</family></prefer></alias>
@@ -73,9 +77,10 @@ void writeFontConfig(const QString& file, const QString& cacheDir, const QString
     <test qual="all" name="family" compare="not_eq"><string>sans-serif</string></test>
     <edit name="family" mode="append_last"><string>sans-serif</string></edit>
   </match>
-</fontconfig>
+%4</fontconfig>
 )")
-                                 .arg(userFonts.toHtmlEscaped(), cacheDir.toHtmlEscaped());
+                                 .arg(userFonts.toHtmlEscaped(), cacheDir.toHtmlEscaped(), appFonts.toHtmlEscaped(),
+                                      QString::fromStdString(emoji::fontconfigRules(true)));
     QFile f(file);
     if (f.open(QIODevice::ReadOnly) && f.readAll() == conf.toUtf8()) {
         return;
@@ -127,7 +132,7 @@ void prepareEnvironment() {
     QDir().mkpath(fontCache);
     QDir().mkpath(userFonts);
     const QString fontsConf = data + "/fonts.conf";
-    writeFontConfig(fontsConf, fontCache, userFonts);
+    writeFontConfig(fontsConf, fontCache, userFonts, resources + "/fonts");
     setIfUnset("FONTCONFIG_FILE", fontsConf);
     // GIO: no modules and no D-Bus session on Android.
     setIfUnset("GIO_USE_VFS", QStringLiteral("local"));
