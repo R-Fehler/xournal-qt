@@ -333,7 +333,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
 
 ### Ideas round of 2026-09-25/26 (the author)
-- First wave, started 2026-09-26: `qt/emoji` (bundled colour emoji font, `:smile:` completion, paste) ·
+- First wave, started 2026-09-26 (merged so far: calibration, annotations-md, sticky-notes): `qt/emoji` (bundled colour emoji font, `:smile:` completion, paste) ·
   `qt/self-reference` (the same document in the reference view, page subsets) · `qt/calibration` (1 cm on screen
   = 1 cm, per screen) · `qt/sticky-notes` (opaque, resizable, ink and text attached, cover mode for self-testing) ·
   `qt/annotations-md` (stage 1: live Annotations panel + "Export as Markdown"; stage 2 "keep updated" later).

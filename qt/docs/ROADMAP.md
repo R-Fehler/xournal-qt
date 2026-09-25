@@ -445,6 +445,16 @@
 - **Handwriting recognition research, `qt/hwr-research` (2026-09-26).** `qt/docs/research/handwriting-recognition.md`;
   decisions for the author in TODO.md.
 
+- **Annotations panel and "Export as Markdown", `qt/annotations-md` (2026-09-26, stage 1).** A side bar panel lists a
+  document's highlights (with their PDF text), PDF comments, text and Markdown boxes, margin handwriting (picture
+  crops of stroke groups) and links by page; a tap jumps there, a filter by kind, only changed pages are read
+  again. The export writes `name.annotations.md` (headings from the outline, links back to the pages); handwriting
+  as page links until Markdown draws images. Stage 2 (keep a marked section updated) is designed, not built.
+- **Sticky notes, `qt/sticky-notes` (2026-09-26).** Opaque, coloured, resizable notes that the pen, text and eraser
+  write on (clipped to the note); move and resize carry the content along (resize clips, never scales); cover mode
+  for self-testing (the pen does nothing on it; a tap peeks, on screen only); per page hide/show; drawn in exports
+  and the hybrid PDF as they look. Upstream Xournal++ opens the files (checked with its binary).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
