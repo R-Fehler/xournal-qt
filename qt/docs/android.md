@@ -191,6 +191,19 @@ runs low; the library then reads its documents once again.
 - **Folders**: `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `HOME` and `TMPDIR` point to
   the app's own folders before GLib first reads them, so upstream's `Util::getConfigFolder()` and friends work.
 
+## CI build and signing
+
+`.github/workflows/xqt-android.yml` builds the same APK on GitHub Actions: started by hand (Actions → "xournal-qt
+Android" → Run workflow) or by a push to the `qt/android-build` branch. It runs `qt/scripts/android-build.sh deps`
+and `apk` with Qt 6.11.2 from aqt, NDK r27c, JDK 17 and vcpkg at the manifest's baseline. The first run builds the C
+libraries (an hour or two); they are cached for the next runs. The APK is the artifact `xournal-qt-android-arm64`.
+
+Signing: an update installs over an app only when both are signed with the same key. Without a key in the
+repository secrets the CI APK keeps a throwaway debug signature (different on every run). With the secrets
+`XQT_ANDROID_KEYSTORE` (the keystore file, base64), `XQT_ANDROID_KEYSTORE_PASSWORD` and `XQT_ANDROID_KEY_ALIAS` it is
+signed with that release key (`zipalign` + `apksigner`), so every release updates the previous one. The keystore is
+never in the repository.
+
 ## Left out or changed on Android
 
 | What | Why |

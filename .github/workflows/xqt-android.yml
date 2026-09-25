@@ -1,0 +1,143 @@
+# xournal-qt for Android: build the arm64 APK with qt/scripts/android-build.sh (vcpkg C libraries, KSyntaxHighlighting,
+# the official Qt for Android) and publish it as the artifact "xournal-qt-android-arm64" (a zip holding the .apk).
+# See qt/docs/android.md. Runs only when asked, or for pushes to the qt/android-build branch.
+#
+# Signing: with the repository secrets XQT_ANDROID_KEYSTORE (the keystore, base64), XQT_ANDROID_KEYSTORE_PASSWORD and
+# XQT_ANDROID_KEY_ALIAS the APK is signed with that release key, so that it installs as an update over earlier
+# releases; without them it keeps the runner's throwaway debug signature (fine to try, but no updates across runs).
+name: xournal-qt Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [qt/android-build]
+
+concurrency:
+  group: xqt-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android arm64 (Qt 6.11.2, NDK r27c, vcpkg)
+    runs-on: ubuntu-24.04
+    # (the first run builds the C libraries through vcpkg: about an hour or two; later runs take them from the cache)
+    timeout-minutes: 300
+    env:
+      QT_VERSION: 6.11.2
+      NDK_VERSION: 27.2.12479018
+      QT_HOST: ${{ github.workspace }}/.ci/Qt/6.11.2/gcc_64
+      QT_ANDROID: ${{ github.workspace }}/.ci/Qt/6.11.2/android_arm64_v8a
+      VCPKG_ROOT: ${{ github.workspace }}/.ci/vcpkg
+      VCPKG_BINARY_CACHE: ${{ github.workspace }}/.ci/vcpkg-archives
+      XQT_ANDROID_BUILD: ${{ github.workspace }}/.ci/build-android
+      XQT_JOBS: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build tools from Ubuntu
+        run: |
+          sudo apt-get update -q
+          # (vcpkg's autotools and meson ports; bison for gettext; gperf for fontconfig)
+          sudo apt-get install -y -q --no-install-recommends ninja-build pkg-config autoconf autoconf-archive \
+            automake libtool bison flex gperf python3-venv python3-jinja2 libgl-dev libegl-dev libxkbcommon-dev
+
+      - name: JDK 17 (the Android Gradle plugin of Qt 6.11)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Android NDK r27c and the SDK platform
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "ndk;$NDK_VERSION" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "XQT_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          # (qt/CMakePresets.json names the JDK at ~/.local/jdk-17, as on the development machine)
+          mkdir -p "$HOME/.local" && ln -sfn "$JAVA_HOME" "$HOME/.local/jdk-17"
+
+      - name: Qt cache
+        id: qt-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ci/Qt
+          key: xqt-android-qt-${{ env.QT_VERSION }}
+
+      - name: Qt for the desktop (host tools) and for Android
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          pipx install aqtinstall
+          aqt install-qt linux desktop "$QT_VERSION" linux_gcc_64 -O "$GITHUB_WORKSPACE/.ci/Qt"
+          aqt install-qt linux android "$QT_VERSION" android_arm64_v8a -O "$GITHUB_WORKSPACE/.ci/Qt"
+
+      - name: vcpkg at the manifest's baseline
+        run: |
+          set -euo pipefail
+          baseline="$(python3 -c "import json; print(json.load(open('qt/vcpkg.json'))['builtin-baseline'])")"
+          git clone -q https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" checkout -q "$baseline"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Restore the built C libraries
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/.ci/vcpkg-archives
+          key: xqt-android-vcpkg-${{ hashFiles('qt/vcpkg.json', 'qt/vcpkg/**') }}
+          restore-keys: xqt-android-vcpkg-
+
+      - name: C libraries (vcpkg) and KSyntaxHighlighting
+        run: qt/scripts/android-build.sh deps
+
+      # (kept even when a later step fails: building them is the long part)
+      - name: Keep the built C libraries
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.ci/vcpkg-archives
+          key: xqt-android-vcpkg-${{ hashFiles('qt/vcpkg.json', 'qt/vcpkg/**') }}-${{ github.run_id }}
+
+      - name: APK
+        run: qt/scripts/android-build.sh apk
+
+      - name: Sign with the release key (if the repository has one)
+        env:
+          KEYSTORE_B64: ${{ secrets.XQT_ANDROID_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.XQT_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.XQT_ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          apk="$XQT_ANDROID_BUILD/android-build/build/outputs/apk/debug/android-build-debug.apk"
+          mkdir -p dist
+          out="dist/xournal-qt-arm64.apk"
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            echo "::notice::No release key in the repository secrets: the APK keeps the debug signature of this run."
+            cp "$apk" "$out"
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$keystore"
+          tools="$ANDROID_SDK_ROOT/build-tools/36.0.0"
+          "$tools/zipalign" -f -p 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" sign --ks "$keystore" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --out "$out" "$RUNNER_TEMP/aligned.apk"
+          rm -f "$keystore"
+          "$tools/apksigner" verify --print-certs "$out" | grep -E 'Signer #1 certificate (DN|SHA-256)'
+
+      - name: What was built
+        run: |
+          ls -l dist
+          {
+            echo "### xournal-qt for Android"
+            echo "Commit \`$GITHUB_SHA\`; install with \`adb install -r xournal-qt-arm64.apk\`, or open the .apk on the phone."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish the APK (xournal-qt-android-arm64.zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: xournal-qt-android-arm64
+          path: dist/xournal-qt-arm64.apk
+          if-no-files-found: error

@@ -165,7 +165,8 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 06-risks). Keep the current PDF engine (poppler/cairo).
 - [x] vcpkg manifest and toolchain-agnostic dependency lookup, following QField (`../QField`).
 - [x] Android build: CMake preset, `AndroidManifest`, an unsigned debug APK that can be installed with `adb install`.
-- [ ] A CI job modelled on QField's, running only when asked (manual dispatch).
+- [x] A CI job, running only when asked (`.github/workflows/xqt-android.yml`, 2026-09-25; manual dispatch or a push to
+  `qt/android-build`). Signs with a release key when the repository secrets hold one.
 - [x] Start `qt/docs/android-roadmap.md` for everything about Android UI/UX. That work waits until mobile
   testing is a real concern.
 
