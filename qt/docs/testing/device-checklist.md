@@ -1352,3 +1352,12 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] A Markdown box with `$E = \hbar\omega$`: drawn as a formula with ħ (not red, not the word "hbar").
 - [ ] `a $ $ b` and a paragraph `$$ $$`: shown as written (`$ $`, `$$ $$`), not as an empty gap. The cursor moves
       through them character by character.
+- [ ] A Markdown box (or a `.md` file) with text as ChatGPT writes it: `The energy \(E = mc^2\) and (\(a\)).`, then
+      `\[` / `\int_0^1 x\,dx` / `\]` on three lines, and `\[ \sum_k k \]` on one line: drawn as formulas (the blocks
+      centered). The file keeps `\(` (open it in a text editor).
+- [ ] Writing on the page in that paragraph: it shows `\(` and `\)` as typed; a tap after a formula and typing put
+      the letters there, not two characters before. Enter after a `\[` line starts a line of the formula.
+- [ ] Stays text: `` `\(x\)` `` and a ``` block with `\(x\)`; `the \(n\)th` ("(n)th"); `see \[1\] here` ("[1]");
+      a `\[` whose `\]` comes after a blank line.
+- [ ] Search (Ctrl+F) for a word after `\(x\)`: the hit is on that word. A long `.md` with such formulas is split
+      into pages as before (never inside a formula).

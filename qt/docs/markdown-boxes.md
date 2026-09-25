@@ -97,6 +97,21 @@ dollar sign.
 An empty formula (`$ $`, `$$ $$`, only blanks or line breaks between the marks) is no formula: it is shown as it is
 written, marks and all (md4c makes a formula of the blank; MicroTeX would draw nothing).
 
+**`\( … \)` and `\[ … \]`** (as ChatGPT and other chat apps write formulas, and LaTeX) are formulas too:
+`\(x^2\)` in the text, `\[ … \]` a formula block. md4c only knows `$`, so `md::parse` gives it the text with these
+pairs as `$…$` and `$$…$$` (`qt/src/markdown/MdTexDelimiters.*`) and maps every place it reports back to the text as
+written: the file keeps `\(`, the block being written shows it, and the cursor, the search and the page splits stay
+where they belong. One pass over the lines; a pair is rewritten only
+- within a paragraph (a `\[` whose `\]` comes after a blank line stays text, and so does an unclosed one);
+- outside code (fenced and indented blocks, `` `inline` `` spans of any number of backticks) and outside a `$…$`
+  formula; `\\(` is a backslash and a "(";
+- `\[` only where it begins a line's text and `\]` only where it ends one (a full stop or comma may follow):
+  `\[1\]` inside a line is an escaped bracket, as pandoc writes them;
+- where md4c takes the `$` as a formula's mark. **Known limit:** md4c ignores a `$` right after a letter or digit
+  (opening) or right before one (closing), so `the \(n\)th` stays text ("(n)th"); punctuation around a formula is
+  fine (`(\(x\)),`). A pair next to another `$` (`\(a\)\(b\)`) or one whose `$` would close money before it
+  (`$5, so \( x \)`) stays text too.
+
 - **Drawn by MicroTeX** (vendored, `qt/3rdparty/microtex`, MIT) with the Latin Modern Math font, which is compiled
   into the program: no LaTeX, no external program, the same on Android. Formulas are paths (vector): sharp at any
   zoom, and in the PDF export and the hybrid PDF as vector drawing (not as text: the TeX is not selectable there).
@@ -111,8 +126,8 @@ written, marks and all (md4c makes a formula of the blank; MicroTeX would draw n
 - **Writing on the page**: the block with the cursor shows its Markdown, formulas included (their source in a
   monospaced font), as for the other marks; a `$$` block being written also shows the formula below its source.
   The other blocks show the formulas drawn. A tap on a drawn formula puts the cursor into its source (its start or
-  end, by the half tapped). In a `$$` block that is not closed yet, Enter starts a line of the formula (as in a code
-  block), not a new paragraph.
+  end, by the half tapped). In a `$$` (or `\[`) block that is not closed yet, Enter starts a line of the formula
+  (as in a code block), not a new paragraph.
 - **Errors**: a formula that MicroTeX cannot read is shown as its source, in red. Resting the mouse on it shows why
   (a tool tip). Nothing a formula says can crash the app: MicroTeX gets no source longer than 8,000 bytes or nested
   deeper than 64 braces, its exceptions are caught, and the crashes found by fuzzing it are fixed in the vendored copy

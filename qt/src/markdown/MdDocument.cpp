@@ -8,6 +8,7 @@
 
 #include "md4c.h"
 
+#include "MdTexDelimiters.h"
 #include "MdText.h"
 
 namespace xqt::md {
@@ -83,7 +84,12 @@ std::string attributeText(const MD_ATTRIBUTE& a) {
 
 class Builder {
 public:
-    explicit Builder(std::string_view source): source(source) { stack.push_back(&doc.root); }
+    /// `source`: the text md4c reads; `original`: the text as written, where `rewritten` (its \(…\) as $…$)
+    /// maps the places in `source` to.
+    Builder(std::string_view source, std::string_view original, const tex::Rewritten& rewritten):
+            source(source), original(original), rewritten(rewritten) {
+        stack.push_back(&doc.root);
+    }
 
     Document take() {
         computeRanges(doc.root);
@@ -120,7 +126,7 @@ public:
                 b.task = d->is_task;
                 b.checked = d->is_task && (d->task_mark == 'x' || d->task_mark == 'X');
                 if (d->is_task) {
-                    b.taskMark = d->task_mark_offset;
+                    b.taskMark = toOriginal(d->task_mark_offset);
                 }
                 break;
             }
@@ -265,8 +271,8 @@ public:
         size_t parsedAt = NO_SOURCE;
         if (text >= source.data() && text + size <= source.data() + source.size()) {
             parsedAt = static_cast<size_t>(text - source.data());
-            r.source = parsedAt;
-            r.sourceLength = size;
+            r.source = toOriginal(parsedAt);
+            r.sourceLength = toOriginal(parsedAt + size) - r.source;
             parsedEnd = parsedAt + size;
         }
         const std::string_view s(text, size);
@@ -292,7 +298,10 @@ public:
                 }
                 break;
             default:
-                r.text = std::string(s);
+                // (a "$" of a rewritten "\(" that md4c did not take as a formula's mark: the text as written)
+                r.text = std::string(r.source != NO_SOURCE && r.sourceLength != size
+                                             ? original.substr(r.source, r.sourceLength)
+                                             : s);
         }
         if (math) {  // (a formula's text: kept until its end, see endFormula)
             if (math->runs.empty()) {
@@ -333,14 +342,16 @@ private:
             r.flags |= spans[i];
         }
         r.link = links.empty() ? -1 : links.back();
-        r.source = open;
-        r.sourceLength = close + mark - open;
-        r.text = std::string(source.substr(r.source, r.sourceLength));
+        r.source = toOriginal(open);
+        r.sourceLength = toOriginal(close + mark) - r.source;
+        r.text = std::string(original.substr(r.source, r.sourceLength));
         std::replace(r.text.begin(), r.text.end(), '\n', ' ');  // (a line break in it: a space, as elsewhere)
         std::replace(r.text.begin(), r.text.end(), '\r', ' ');
         parsedEnd = std::max(parsedEnd, close + mark);
         target.runs.push_back(std::move(r));
     }
+
+    size_t toOriginal(size_t offset) const { return rewritten.changes.empty() ? offset : rewritten.toSource(offset); }
 
     /// Where text goes. The text of a tight list item comes without a paragraph: it gets one, so list items only
     /// have blocks (the text before and after a nested list are two paragraphs).
@@ -380,6 +391,8 @@ private:
     }
 
     std::string_view source;
+    std::string_view original;
+    const tex::Rewritten& rewritten;
     Document doc;
     std::vector<Block*> stack;
     std::vector<uint16_t> spans;
@@ -446,7 +459,10 @@ Document parse(std::string_view source) {
     if (isPlain(source)) {
         return parsePlain(source);
     }
-    Builder builder(source);
+    // \(…\) and \[…\] (as chat apps write formulas) as $…$ and $$…$$; the places md4c reports are mapped back
+    const tex::Rewritten rewritten = tex::rewrite(source);
+    const std::string_view parsed = rewritten.changed ? std::string_view(rewritten.text) : source;
+    Builder builder(parsed, source, rewritten);
     MD_PARSER parser{};
     parser.abi_version = 0;
     // GitHub: tables, ~~strike~~, task lists, bare web addresses; [[wiki links]] as in Obsidian / Zettlr; formulas
@@ -459,7 +475,7 @@ Document parse(std::string_view source) {
     parser.text = [](MD_TEXTTYPE t, const MD_CHAR* s, MD_SIZE n, void* u) {
         return static_cast<Builder*>(u)->text(t, s, n);
     };
-    md_parse(source.data(), static_cast<MD_SIZE>(source.size()), &parser, &builder);
+    md_parse(parsed.data(), static_cast<MD_SIZE>(parsed.size()), &parser, &builder);
     return builder.take();
 }
 
@@ -514,10 +530,12 @@ std::vector<BlockSpan> topLevelSpans(std::string_view src, const Document& doc) 
             if (b.kind == BlockKind::Heading && end < src.size() && setextUnderline(lineAt(src, end))) {
                 end = nextLine(src, end);
             }
-            // (and the "$$" after a formula at its end, on a line of its own)
-            if (b.kind == BlockKind::Paragraph && !b.runs.empty() && (b.runs.back().flags & Math) && end < src.size() &&
-                afterIndent(lineAt(src, end)).substr(0, 1) == "$") {
-                end = nextLine(src, end);
+            // (and the "$$" or "\]" after a formula at its end, on a line of its own)
+            if (b.kind == BlockKind::Paragraph && !b.runs.empty() && (b.runs.back().flags & Math) && end < src.size()) {
+                const std::string_view after = afterIndent(lineAt(src, end));
+                if (after.substr(0, 1) == "$" || after.substr(0, 2) == "\\]") {
+                    end = nextLine(src, end);
+                }
             }
         } else {
             end = nextLine(src, first);
