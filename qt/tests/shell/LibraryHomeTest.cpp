@@ -550,3 +550,34 @@ TEST_F(LibraryHomeTest, aMoveEndedBeforeItsCleanUpIsFinishedAtTheNextStart) {
     EXPECT_FALSE(fs::exists(LM::manifestFile()));
     EXPECT_EQ(readFile(shared / "Default/notes.xopp"), "xopp of notes");
 }
+
+TEST_F(LibraryHomeTest, accessGivenForAnotherFolderUsesThePhonesLibraries) {
+    // Installed again, "Not now", then the Downloads folder is opened: the access asked for there also brings back the
+    // libraries kept on the phone (the app's folder has nothing to move)
+    Library::setPlatformFolders(&phone);
+    struct Phone: FakeAndroid {
+        bool needsAllFilesAccess(const QString& folder) override { return !folder.contains("/Android/data/"); }
+    } phoneApps;
+    phoneApps.access = false;
+    SystemApps::setInstance(&phoneApps);
+    writeFile(shared / "Default/notes.xopp", "kept on the phone");
+    fs::create_directories(phone.sharedDownloads);
+    fs::create_directories(inApp / "Default");
+    AppController c;
+    c.chooseLibrariesHome();
+    c.setLibraryRoot(Library::defaultRoot());
+    ASSERT_TRUE(c.librariesInApp());
+    QSignalSpy needed(&c, &AppController::storageAccessNeeded);
+    c.openLibraryAt(qstr(phone.sharedDownloads));
+    ASSERT_EQ(needed.count(), 1);
+    c.requestStorageAccess(qstr(phone.sharedDownloads));
+    EXPECT_EQ(phoneApps.asked, 1);
+    phoneApps.access = true;  // (turned on in Android's settings)
+    c.applicationStateChanged(Qt::ApplicationInactive);
+    c.applicationStateChanged(Qt::ApplicationActive);
+    EXPECT_FALSE(c.librariesInApp());
+    EXPECT_EQ(Library::home(), Library::Home::Shared);
+    ASSERT_NE(libraryOf(c)->library(), nullptr);
+    EXPECT_EQ(libraryOf(c)->library()->root(), Library(phone.sharedDownloads).root()) << "then the folder asked for";
+    EXPECT_EQ(Library::defaultRoot(), shared / "Default");
+}

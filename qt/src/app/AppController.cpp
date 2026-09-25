@@ -1841,6 +1841,17 @@ void AppController::storageAccessAnswered() {
     awaitingStorageAccess = false;
     Q_EMIT storageAccessChanged();
     const QString then = std::exchange(afterStorageAccess, QString());
+    // Given for another reason (a folder of the storage): with nothing in the app's folder, the phone's folder of
+    // libraries is used at once, as at a start
+    if (then != MOVE_LIBRARIES && librariesInApp() && SystemApps::instance().hasAllFilesAccess() &&
+        !LibraryMigration::hasContent(Library::librariesFolder(Library::Home::App))) {
+        const bool inApp = library->library() && library->library()->isInLibrariesFolder();
+        setLibrariesMoved();
+        if (inApp) {
+            switchLibrary(Library::defaultRoot());
+        }
+        Q_EMIT librariesHomeChanged();
+    }
     if (then == MOVE_LIBRARIES) {
         if (SystemApps::instance().hasAllFilesAccess()) {
             startLibrariesMove();

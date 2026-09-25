@@ -84,7 +84,8 @@ and while the app has the access; else the app's folder (`AppController::chooseL
 - **"Not now"** keeps the libraries in the app's folder; the offer does not come at the start again, but a note on
   the home screen stays ("Libraries are inside the app and are deleted when it is uninstalled"); tapping it asks
   again. Without the access later (turned off in the settings) the app works in its own folder again and the note
-  comes back; the libraries in the phone's folder are used again as soon as the access is back.
+  comes back; the libraries in the phone's folder are used again as soon as the access is back (also when it was given for
+  another folder, e.g. the Downloads quick library, while the app's folder has nothing to move).
 - **Uninstalling** asks whether to keep the app's data (`android:hasFragileUserData`): kept, the settings, reading
   positions and recent files are there again after installing anew (and a library still in the app's folder).
 - **Installed again**: the libraries are still in `Documents/Xournal_Libraries`. The app starts in its (new, empty)
