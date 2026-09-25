@@ -543,6 +543,20 @@ one stroke on another page, as `DocumentSession::save()` waits for it:
 | Ctrl+S appended | 0.20–0.24 s, 22–23 KB | 0.18–0.36 s, 25–26 KB |
 | opened again after appending (clean copy kept) | 0.44 s (5.5 s when it is made) | 0.72 s (5.7 s) |
 
+The same with qpdf 12.4.1 as the app builds it now (2026-09-25, load 1.5–2; the table above was qpdf 10.6). qpdf 12
+reads and writes much faster; qpdf's check warns about pgfmanual's own unsorted name tree (the source has it too),
+nothing else:
+
+| qpdf 12.4.1 | hybrid PDF | archive PDF |
+| --- | --- | --- |
+| Ctrl+S written in full | 1.4 s | 3.3 s |
+| Ctrl+S appended (`benchCtrlS`) | 0.12–0.18 s, 23 KB | 0.14–0.17 s, 25–26 KB |
+| one Ctrl+S of the saved file (`benchOneSave`) | 0.16–0.21 s | 0.16–0.22 s |
+| opened again after appending (clean copy kept) | 0.34 s | 0.41 s |
+
+An appended save with qpdf 12.4: opening the file for the update 0.02 s, the `.xopp` and the new drawing 0.09 s, the
+changed page, serialising and the copy with `fsync` under 0.01 s each, the clean copy's cache entry 0.01 s.
+
 An appended save: opening the file for the update 0.08 s, the `.xopp` (the whole document, gzipped) and the new
 drawing 0.1–0.15 s, the changed page 0.01 s, the copy, update and `fsync` 0.01–0.04 s, the clean copy's cache entry
 0.02–0.06 s. The appended bytes are mostly the embedded `.xopp` (about 20 KB here), which is always written whole.
