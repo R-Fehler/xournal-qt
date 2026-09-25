@@ -117,6 +117,10 @@ jobs:
             cp "$apk" "$out"
             exit 0
           fi
+          # (a line break pasted along with a secret is not part of it)
+          KEYSTORE_PASSWORD="$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n')"
+          KEY_ALIAS="$(printf '%s' "$KEY_ALIAS" | tr -d '\r\n[:space:]')"
+          export KEYSTORE_PASSWORD
           keystore="$RUNNER_TEMP/release.jks"
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$keystore"
           tools="$ANDROID_SDK_ROOT/build-tools/36.0.0"
