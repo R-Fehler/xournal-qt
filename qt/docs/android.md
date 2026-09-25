@@ -266,4 +266,14 @@ never in the repository.
   boxes with Roboto, Noto Serif and Droid Sans Mono (no boxes), umlauts included, and a PDF through poppler. Use
   `-gpu swangle_indirect`: with `swiftshader_indirect` every other triangle of the window is missing.
 
+- `qt/android-storage` (2026-09-25, emulator): the master-qt APK with a library in its own folder (PDFs, `.xopp`
+  files, a subfolder, "Opened" from "Open with", its cache in the app cache, Recent and a reading position), then
+  the new APK over it with `adb install -r`: the offer after the document-mode question, Android's access page, the
+  move (all files identical by MD5, times kept, the old folder gone), Recent, the remembered library, the reading
+  positions and the library's config and cache folders under the new path; the same with the access given before
+  the update and libraries of the same names on the phone ("Default (2)", "Uni (2)"); uninstalled and installed
+  again: the libraries in `Documents/Xournal_Libraries` open again after the access; without the access the
+  Downloads quick library asks for it, with it the phone's Download folder opens; the in-app folder chooser picks
+  `Documents/Uni` and `Download`; no "Show in file manager" in the library menu.
+
 Not checked: the Fold 7 itself (the author's test), stylus input, the Fold's posture changes.
