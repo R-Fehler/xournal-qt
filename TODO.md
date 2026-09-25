@@ -342,6 +342,18 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   changeable in Settings, and a mix must work: existing `.md` files are never converted unasked. Split into
   `qt/md-images` (images in Markdown + the `.md`/`.assets` pair as one document), `qt/md-pdf` (the container,
   text only), later ink on Markdown pages. Not started: the author wants to discuss it first.
+  - Ink on reflowing Markdown (the author, 2026-09-26): no anchoring; the user handles it (e.g. inserts a page
+    above and moves the text on). Document the behaviour, don't engineer around it.
+  - Proposal under discussion: one model for both (a document is pages; a Markdown text is a flow over a run of
+    pages). A `.md` is a document with exactly one flow and nothing else; the PDF text document is the notes model
+    (flow + ink) inside a PDF with notes, exportable as `.md` + assets; a page break in Markdown ends the flow's
+    page.
+- [ ] **`qt/md-toolbar`** (the author, 2026-09-26): formatting tools for people who don't know Markdown syntax, in
+  the `.md` editor and for Markdown boxes: heading levels, bold/italic/strike/code, bullet, numbered and checkbox
+  lists, quote, code block, link, image, horizontal rule, math, page break, and **insert/edit table** in an
+  interactive table editor (a grid in a popup: cells, add/remove rows and columns, alignment, the current row and
+  column shown), writing a normal pipe table. A page break needs a syntax that other tools ignore or understand
+  (proposal: `<div style="page-break-after: always"></div>`, as Typora and Obsidian's PDF export use).
 - [ ] Citations: Scholar/translate on selected text; bibliography entry → library hits (fuzzy, by title and first
   page) → open in reference/tab, copy as a link; arXiv import (named by title). Networking is opt-in, and the URL is
   always shown (hover or preview) before anything is opened or downloaded. `.bib` later, after the user flow is
