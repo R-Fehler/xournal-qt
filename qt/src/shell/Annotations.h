@@ -103,8 +103,9 @@ std::vector<Item> itemsOf(const PageContent& content, size_t index, PdfLayoutRea
 /// All pages (tests, and what the panel does page by page): takes the document's read lock page by page.
 std::vector<Item> collect(Document& doc, PdfLayoutReader* pdf);
 
-/// Sticky notes (another block) plug in here: called for every page read, under the document's read lock; it appends
-/// its notes (kind Note, with their place and text). Set once at start-up; empty: none.
+/// Where sticky notes come from: called for every page read, under the document's read lock; it appends
+/// its notes (kind Note, with their place and text). By default the sticky notes of qt/sticky-notes (their texts, or
+/// "(handwriting)"); what is on a note is not listed as a box or ink of the page. Empty: no notes.
 using NoteSource = std::function<void(const XojPage& page, std::vector<Item>& notes)>;
 void setNoteSource(NoteSource source);
 

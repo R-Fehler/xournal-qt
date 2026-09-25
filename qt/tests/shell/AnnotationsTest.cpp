@@ -20,6 +20,7 @@
 #include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "session/StickyNote.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
 #include "session/DocumentTextIndex.h"
@@ -189,6 +190,29 @@ TEST(Annotations, collectsHighlightsBoxesHandwritingAndLinks) {
         EXPECT_TRUE(items[i - 1].page < items[i].page ||
                     (items[i - 1].page == items[i].page && items[i - 1].rect.top() <= items[i].rect.top() + 4));
     }
+}
+
+TEST(Annotations, aStickyNoteIsListedAsANoteNotAsItsTextOrInk) {
+    XojPage page(595, 842);
+    stroke(page.getSelectedLayer(), StrokeTool::PEN, 1.4, {{400, 700}, {450, 710}});  // the page's own handwriting
+    Layer* note = xqt::sticky::makeNote({{100, 100, 200, 150}, Color(0xfff59d), false});
+    text(note, "What is the gain?", 110, 110);
+    stroke(note, StrokeTool::PEN, 1.4, {{120, 200}, {250, 200}});
+    page.getLayers().push_back(note);  // (the page owns it)
+    Layer* inkOnly = xqt::sticky::makeNote({{100, 400, 120, 80}, Color(0xf8bbd0), true});
+    stroke(inkOnly, StrokeTool::PEN, 1.4, {{110, 420}, {200, 460}});
+    page.getLayers().push_back(inkOnly);
+
+    const auto items = an::itemsOf(an::read(page), 0, nullptr);
+    const auto notes = ofKind(items, an::Kind::Note);
+    ASSERT_EQ(notes.size(), 2u);
+    EXPECT_EQ(notes[0].text, QStringLiteral("What is the gain?"));
+    EXPECT_EQ(notes[0].rect, QRectF(100, 100, 200, 150));
+    EXPECT_EQ(notes[0].color, 0xfff59du);
+    EXPECT_EQ(notes[1].text, QStringLiteral("(handwriting)")) << "a note with ink only";
+    EXPECT_TRUE(ofKind(items, an::Kind::Text).empty()) << "the note's text is the note's, not a text box of the page";
+    ASSERT_EQ(ofKind(items, an::Kind::Ink).size(), 1u) << "only the page's own handwriting";
+    EXPECT_GT(ofKind(items, an::Kind::Ink)[0].rect.top(), 600);
 }
 
 TEST(Annotations, handwritingWrittenApartIsTwoPieces) {

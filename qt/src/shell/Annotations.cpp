@@ -27,17 +27,53 @@
 #include "LinkRewrite.h"
 #include "MdDocument.h"
 #include "session/DocumentTextIndex.h"
+#include "session/StickyNote.h"
 
 namespace xqt::annotations {
 
 namespace {
 std::mutex noteMutex;
+void stickyNotesOf(const XojPage& page, std::vector<Item>& notes);
 NoteSource& noteSource() {
-    static NoteSource source;
+    static NoteSource source = stickyNotesOf;
     return source;
 }
 
 QRectF rectOf(const xoj::util::Rectangle<double>& r) { return QRectF(r.x, r.y, r.width, r.height); }
+
+uint32_t rgbOf(Color c);
+
+/// The sticky notes of a page (qt/docs/sticky-notes.md), the NoteSource used unless another is set: a note's texts
+/// as its text, "(handwriting)" for a note with ink only.
+void stickyNotesOf(const XojPage& page, std::vector<Item>& notes) {
+    for (const Layer* layer: page.getLayersView()) {
+        if (!layer->isVisible() || !sticky::isNote(*layer)) {
+            continue;
+        }
+        const auto look = sticky::lookOf(*layer);
+        if (!look) {
+            continue;
+        }
+        QStringList texts;
+        bool ink = false;
+        const Stroke* paper = sticky::paperOf(*layer);
+        for (const Element* e: layer->getElementsView()) {
+            if (e->getType() == ELEMENT_TEXT) {
+                texts << QString::fromStdString(static_cast<const Text*>(e)->getText()).trimmed();
+            } else if (e != paper) {
+                ink = true;
+            }
+        }
+        texts.removeAll(QString());
+        Item note;
+        note.kind = Kind::Note;
+        note.rect = rectOf(look->rect);
+        note.color = rgbOf(look->color);
+        note.text = !texts.isEmpty() ? texts.join(u'\n') : ink ? QObject::tr("(handwriting)") : QString();
+        notes.push_back(std::move(note));
+    }
+}
+
 uint32_t rgbOf(Color c) { return uint32_t(c) & 0xffffffU; }
 
 /// Strokes written one after another this near (points, about 6 mm) are one piece of handwriting.
@@ -285,8 +321,8 @@ PageContent read(const XojPage& page) {
         c.pdfPage = static_cast<int>(page.getPdfPageNr());
     }
     for (const Layer* layer: page.getLayersView()) {
-        if (!layer->isVisible()) {
-            continue;
+        if (!layer->isVisible() || sticky::isNote(*layer)) {
+            continue;  // (what is on a sticky note is the note's: listed as the note, NoteSource)
         }
         for (const Element* e: layer->getElementsView()) {
             if (e->getType() == ELEMENT_TEXT) {
