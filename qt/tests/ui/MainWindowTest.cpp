@@ -6191,3 +6191,66 @@ TEST_F(LibrariesHomeWindowTest, notNowLeavesANoteThatAsksAgain) {
     EXPECT_TRUE(waitOpened(dialog, true)) << "tapping the note asks again";
     QMetaObject::invokeMethod(dialog, "close");
 }
+
+namespace {
+/// The libraries are in the phone's Documents already; the phone's storage has a Download folder with a paper.
+class FolderChooserWindowTest: public LibrariesHomeWindowTest {
+protected:
+    void prepareController() override {
+        ASSERT_TRUE(tmp.isValid());
+        const fs::path root(tmp.path().toStdString());
+        phone.appDocuments = root / "storage/Android/data/org.xournalqt.app/files/Documents";
+        phone.sharedDocuments = root / "storage/Documents";
+        phone.sharedDownloads = root / "storage/Download";
+        phone.sharedStorage = root / "storage";
+        shared = phone.sharedDocuments / "Xournal_Libraries";
+        fs::create_directories(shared / "Default");
+        fs::create_directories(phone.sharedDownloads / "Papers");
+        std::ofstream(phone.sharedDownloads / "paper.pdf") << "%PDF-1.4";
+        xqt::Library::setPlatformFolders(&phone);
+        xqt::SystemApps::setInstance(&fake);
+        controller->chooseLibrariesHome();  // (nothing to move: the phone's folder at once)
+        controller->setLibraryRoot(xqt::Library::defaultRoot());
+    }
+};
+}  // namespace
+
+// Android's folder picker refuses the Download folder: with "All files access" the app lists the folders itself.
+TEST_F(FolderChooserWindowTest, theDownloadFolderCanBeOpenedAsLibrary) {
+    auto* home = find<QObject>("homeView");
+    ASSERT_NE(home, nullptr);
+    QMetaObject::invokeMethod(home, "pickLibraryFolder");
+    QObject* chooser = find("folderChooser");
+    ASSERT_NE(chooser, nullptr);
+    ASSERT_TRUE(waitOpened(chooser, true)) << "the app's own list, not the system's picker";
+    EXPECT_FALSE(findItem("folderChooserUse")->isEnabled()) << "not the whole storage";
+    QStringList names;
+    for (const QVariant& f: chooser->property("folders").toList()) {
+        names << f.toMap().value("name").toString();
+    }
+    EXPECT_EQ(names, (QStringList{"Documents", "Download"}));
+    // (the delegates are made by the list: found in the item tree)
+    QQuickItem* download = nullptr;
+    until([&] {
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
+            if (i->objectName() == "folderChooserEntry" && i->property("text").toString() == "Download") {
+                return i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                if (QQuickItem* f = walk(c)) {
+                    return f;
+                }
+            }
+            return nullptr;
+        };
+        download = walk(window->contentItem());
+        return download != nullptr;
+    });
+    click(download);
+    EXPECT_EQ(chooser->property("folder").toString(), QString::fromStdString(phone.sharedDownloads.string()));
+    EXPECT_EQ(chooser->property("folders").toList().size(), 1) << "Papers";
+    click(findItem("folderChooserUse"));
+    ASSERT_TRUE(waitOpened(chooser, false));
+    EXPECT_EQ(controller->libraryModel()->property("rootPath").toString(),
+              QString::fromStdString(xqt::Library(phone.sharedDownloads).root().string()));
+}

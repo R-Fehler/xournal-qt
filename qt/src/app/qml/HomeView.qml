@@ -91,9 +91,11 @@ Rectangle {
     }
     /// "Open a folder as library…": the folder picker. On Android a folder of the phone's storage can be a library
     /// only with "All files access": explained and asked for first (then the picker opens, see onPickLibraryFolder).
+    /// With it, Android's picker is replaced by the app's own folder list (the picker refuses the Download folder).
     function pickLibraryFolder() {
-        if (app.storageAccess) openLibraryDialog.open()
-        else storageAccessDialog.ask("")
+        if (!app.storageAccess) storageAccessDialog.ask("")
+        else if (app.inAppFolderChooser) folderChooser.openAt(app.storageRoot)
+        else openLibraryDialog.open()
     }
     /// A folder as library: this one's home screen, else a window of its own (raised if it is open already)
     function openLibraryFolder(path) {
@@ -190,7 +192,7 @@ Rectangle {
     Connections {
         target: app
         function onStorageAccessNeeded(folder) { storageAccessDialog.ask(folder) }
-        function onPickLibraryFolder() { openLibraryDialog.open() }
+        function onPickLibraryFolder() { home.pickLibraryFolder() }
     }
 
     ColumnLayout {
@@ -1938,6 +1940,10 @@ Rectangle {
         }
     }
 
+    FolderChooser {
+        id: folderChooser
+        onChosen: function(path) { app.openLibraryAt(path) }
+    }
     FolderDialog {
         id: openLibraryDialog
         title: qsTr("Open a folder as library")

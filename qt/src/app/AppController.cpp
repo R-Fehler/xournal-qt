@@ -2131,6 +2131,36 @@ void AppController::followMovedLibraries(const std::vector<std::pair<fs::path, f
     Q_EMIT titleChanged();
 }
 
+bool AppController::inAppFolderChooser() const {
+    return !Library::platformFolders().sharedStorage.empty() && SystemApps::instance().hasAllFilesAccess();
+}
+
+QString AppController::storageRoot() const {
+    return QString::fromStdString(Library::platformFolders().sharedStorage.string());
+}
+
+QVariantList AppController::subfolders(const QString& folder) const {
+    std::vector<fs::path> dirs;
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(fs::path(folder.toStdString()), ec); !ec && it != fs::directory_iterator();
+         it.increment(ec)) {
+        std::error_code e;
+        if (it->is_directory(e) && it->path().filename().string().front() != '.') {
+            dirs.push_back(it->path());
+        }
+    }
+    std::sort(dirs.begin(), dirs.end(), [](const fs::path& a, const fs::path& b) {
+        return QString::fromStdString(a.filename().string()).compare(QString::fromStdString(b.filename().string()),
+                                                                     Qt::CaseInsensitive) < 0;
+    });
+    QVariantList list;
+    for (const auto& d: dirs) {
+        list.append(QVariantMap{{"name", QString::fromStdString(d.filename().string())},
+                                {"path", QString::fromStdString(d.string())}});
+    }
+    return list;
+}
+
 bool AppController::canShowInFileManager() const { return SystemApps::canShowInFileManager(); }
 
 bool AppController::canShare() const { return SystemApps::canShare(); }

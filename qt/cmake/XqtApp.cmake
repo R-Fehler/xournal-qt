@@ -123,6 +123,7 @@ set(XQT_QML_FILES
     src/app/qml/Snackbar.qml
     src/app/qml/SelectionMark.qml
     src/app/qml/HomeView.qml
+    src/app/qml/FolderChooser.qml
     src/app/qml/DocumentCard.qml
     src/app/qml/NewDocumentDialog.qml
     src/app/qml/DocumentModeCards.qml

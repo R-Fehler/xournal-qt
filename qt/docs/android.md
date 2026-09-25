@@ -140,7 +140,13 @@ per-folder packs, the search index, and the folder watcher that sees what the sy
   (`AppController::openLibrary`, `requestStorageAccess`; the Java side is `XournalActivity.hasAllFilesAccess` and
   `requestAllFilesAccess`.) Google Play allows this permission only to some kinds of apps; fine for sideloading and
   F-Droid, to be revisited for Play.
-- The folder is picked with Android's folder picker (Qt's `FolderDialog` is the system's `ACTION_OPEN_DOCUMENT_TREE`
+- **The in-app folder chooser** (`qt/android-storage`, [FolderChooser.qml](../src/app/qml/FolderChooser.qml)): with
+  "All files access", "Open a folder as library…" lists the folders itself, from the phone's storage down (tap a
+  folder to go in, ↑ to go up), and "Use this folder" opens the one shown. Android's picker refuses the `Download`
+  folder, the storage's root and `Android/data` by design; the app can read them by their paths. The storage root
+  itself cannot be a library. Without the access, the system's picker below is used (the access is asked for
+  first when a folder of the storage is picked).
+- Without the in-app chooser the folder is picked with Android's folder picker (Qt's `FolderDialog` is the system's `ACTION_OPEN_DOCUMENT_TREE`
   on Android and gives a `content://` tree URI, no path). A tree of the external storage provider is mapped to its
   path (`ContentFiles::sharedStoragePath`): `content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FUni`
   is `/storage/emulated/0/Documents/Uni`, `home:` is the Documents folder, `<volume id>:` an SD card

@@ -1301,6 +1301,10 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       are back.
 - [ ] **Downloads:** without "All files access" the library menu still lists "Downloads folder (quick library)";
       tapping it explains and asks for the access; with it, the phone's `Download` folder opens with its PDFs.
+- [ ] **In-app folder chooser:** with "All files access", library menu ▾ → "Open a folder as library…": a list
+      "Phone storage" with Documents, Download, … (not Android's picker). "Use this folder" is off at the top. Tap
+      Download → "Use this folder": the window shows the Download folder as library (the Downloads note on top).
+      ↑ goes up again; Cancel changes nothing. Without the access the explanation comes first, then the list.
 - [ ] **The author's Fold 7:** only `adb install -r` over the installed app (never uninstall, never clear its data).
       Before: note the number of files in the app's library (`adb shell find /sdcard/Android/data/org.xournalqt.app/
       files/Documents -type f | wc -l`). Go through the offer and the move. After: the same number of files under

@@ -465,6 +465,13 @@ public:
     Q_INVOKABLE void declineLibrariesHome();
     /// Cancel the move while it copies (nothing changes).
     Q_INVOKABLE void cancelLibrariesMove();
+    /// In-app folder chooser (Android with "All files access": the system's picker refuses the Download folder and
+    /// the storage's root): where it starts, and the folders in a folder [{ name, path }] (hidden ones left out).
+    Q_PROPERTY(bool inAppFolderChooser READ inAppFolderChooser NOTIFY storageAccessChanged)
+    bool inAppFolderChooser() const;
+    Q_PROPERTY(QString storageRoot READ storageRoot CONSTANT)
+    QString storageRoot() const;
+    Q_INVOKABLE QVariantList subfolders(const QString& folder) const;
 
     // --- start and recovery ---
     /// Start of the app: offers recovery after a crash (recoveryItems), else reopens the last tabs (setting), then
