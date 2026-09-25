@@ -362,7 +362,15 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
 - [ ] Forms (only on PDFs that have fields) and a "My signature" stamp. Cryptographic signing: backlog.
 - [ ] **OCR (Tesseract), last of this round**: photo import with cropping, a text layer in PDFs. Never automatic:
   ask before each run, with "remember my choice", and a button in Settings to forget it.
-- [ ] Handwriting search: research running (`qt/hwr-research`), no implementation yet. Linux matters most.
+- [?] **Handwriting search**: research done (`qt/docs/research/handwriting-recognition.md`, 2026-09-26). Proposal:
+  search only in v1 (top-5 word candidates with boxes into `DocumentTextIndex`, so fuzzy search and highlights work
+  as for PDF text); Linux and Android: bundled ONNX Runtime + TrOCR-small handwritten int8 (64 MB, 0.2 s per line,
+  English 97 % of words found; German only 41 %); Windows: the system recogniser (German included). No fine-tuning
+  in v1 (keep corrections, library words as extra candidates, a training text as a check). Questions for the
+  author: search-only first? train a German model once (fhswf/german_handwriting, AFL-3.0) or rely on Windows for
+  German? ML Kit on Android as an opt-in flavour or not at all? +64 MB per model in packages, or a one-time
+  download from our release page? corrections in the `.xopp` or only in the cache? defer fine-tuning?
+  Note: points in this codebase carry no time, only x, y and pressure (stroke order is there).
 - Backlog: visual text diff between PDF versions; cryptographic signing.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
