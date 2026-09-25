@@ -2410,6 +2410,20 @@ ApplicationWindow {
         target: app
         function onPageActionDone(text, undoable) { snackbar.show(text, undoable) }
     }
+    Connections {
+        target: app
+        // The annotations were exported as Markdown (the Annotations panel): open the file from here
+        function onAnnotationsExported(file, error) {
+            if (error !== "") {
+                messageDialog.title = qsTr("Export failed")
+                messageDialog.text = error
+                messageDialog.open()
+                return
+            }
+            snackbar.show(qsTr("Annotations exported to %1").arg(file.split("/").pop()), false, qsTr("Open"),
+                          function() { app.openPath(file) })
+        }
+    }
 
     Connections {
         target: app
