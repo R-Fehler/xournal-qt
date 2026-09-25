@@ -4199,6 +4199,74 @@ TEST_F(MainWindowTest, markdownBoxIsWrittenAndOpenedAgainWithTheTextTool) {
     EXPECT_EQ(xqt::md::boxOf(*layer), nullptr);
 }
 
+// Formulas in the Markdown text ($…$, $$…$$) are drawn; one that cannot be drawn is its source in red, and resting
+// the mouse on it says why.
+TEST_F(MainWindowTest, markdownFormulasAndTheErrorOfOneOnHover) {
+    controller->setMarkdownInPanel(true);
+    auto* panel = find<QQuickItem>("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    QMetaObject::invokeMethod(find<QObject>("markdownItem"), "triggered");
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    find<QQuickItem>("markdownArea")->setProperty(
+            "text", QStringLiteral("Energy $E = mc^2$ and $\\frac{a}{b}$.\n\n$$\n\\sum_{k=1}^n k = \\frac{n(n+1)}{2}\n$$"
+                                   "\n\nA broken one: $\\hline$ here.\n"));
+    wait(300);
+    click(find<QQuickItem>("markdownDone"));
+    ASSERT_FALSE(panel->isVisible());
+
+    auto* session = controller->tabManager().currentSession();
+    Layer* layer = xqt::md::markdownLayer(session->getDocument()->getPage(0));
+    ASSERT_NE(layer, nullptr);
+    const Text* box = xqt::md::boxOf(*layer);
+    ASSERT_NE(box, nullptr);
+    // Where the broken formula is drawn (page coordinates)
+    std::optional<xqt::md::Rect> broken;
+    int drawn = 0;
+    for (const auto& it: xqt::md::cachedLayout(box->getText(), xqt::md::styleOf(*box)).items) {
+        for (const auto& m: it.maths) {
+            if (m.error.empty()) {
+                ++drawn;
+            } else {
+                broken = xqt::md::textRects(it, m.start, m.start + m.length).at(0);
+            }
+        }
+    }
+    EXPECT_EQ(drawn, 3);
+    ASSERT_TRUE(broken.has_value());
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    const auto& shift = box->getTransformation().shift;
+    view->getViewController().scrollToPageRect(0, QRectF(shift.x, shift.y, 300, 200));
+    wait(200);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    const QPointF onFormula =
+            view->pageViewRect(0).topLeft() +
+            QPointF(shift.x + broken->x + broken->width / 2, shift.y + broken->y + broken->height / 2) *
+                    view->getViewController().zoom();
+    auto* tip = find<QObject>("mathErrorTip");
+    ASSERT_NE(tip, nullptr);
+    EXPECT_FALSE(tip->property("visible").toBool());
+    QTest::mouseMove(window, canvasItem->mapToScene(onFormula).toPoint());
+    until([&] { return tip->property("visible").toBool(); });
+    EXPECT_TRUE(tip->property("visible").toBool());
+    const QString tipText = tip->property("text").toString();
+    EXPECT_TRUE(tipText.contains(QStringLiteral("hline"))) << tipText.toStdString();
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(500);
+        window->grabWindow().save(
+                qEnvironmentVariable("XQT_TEST_SHOT").replace(QStringLiteral(".png"), QStringLiteral("-tip.png")));
+    }
+    // The mouse goes on: the tip goes
+    QTest::mouseMove(window, canvasItem->mapToScene(onFormula + QPointF(0, 200)).toPoint());
+    until([&] { return !tip->property("visible").toBool(); });
+    EXPECT_FALSE(tip->property("visible").toBool());
+}
+
 // Markdown text boxes: the text tool with "Markdown" places them anywhere; edited on the page (the source is shown
 // while editing), drawn formatted.
 TEST_F(MainWindowTest, markdownTextBoxesAnywhereWithTheTextTool) {

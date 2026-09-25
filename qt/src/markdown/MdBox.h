@@ -52,15 +52,18 @@ xoj::util::Rectangle<double> boxRect(const Text& text);
 std::optional<LinkHit> linkAt(const Text& text, double x, double y);
 /// Every link of a box where it is drawn (page coordinates; see linkBoxes of a layout).
 std::vector<LinkHit> linkBoxes(const Text& text);
+/// The formula drawn at a point of the page (page coordinates), if any (see mathAt of a layout; page coordinates).
+std::optional<MathHit> mathAt(const Text& text, double x, double y);
 /// The check box of a task drawn at a point of the page (page coordinates): its mark's offset in the box's text.
 std::optional<size_t> checkBoxAt(const Text& text, double x, double y);
 /// Where a text is shown in a box (case-insensitive; page coordinates): as the box is drawn, also while it is written
 /// on the page (see setWritingCursor).
 std::vector<Rect> findText(const Text& text, const std::string& search);
 /// The texts a box shows, one per text of its layout, as it is drawn (also while it is written on the page): what
-/// the search of the document searches.
+/// the search of the document searches. A formula is its source (searchText).
 std::vector<std::string> shownTexts(const Text& text);
-/// Where bytes [from, to) of its shown text `index` are drawn (page coordinates): a rectangle per line.
+/// Where bytes [from, to) of its shown text `index` are drawn (page coordinates): a rectangle per line (a part of a
+/// formula's source: the formula).
 std::vector<Rect> shownRects(const Text& text, size_t index, int from, int to);
 /// A box written on the page is drawn with the block of the cursor as its source (layout() with `active`): the
 /// cursor's offset in the box's text, NO_SOURCE when it is not written any more. Any thread may read it.

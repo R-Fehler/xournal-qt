@@ -28,9 +28,10 @@ enum RunFlag : uint16_t {
     Link = 1 << 4,
     Underline = 1 << 5,
     Image = 1 << 6,  ///< alt text of an image
-    Math = 1 << 7,
+    Math = 1 << 7,   ///< the TeX source of a formula, $…$ or $$…$$ (without the marks; drawn by MdMath)
     Html = 1 << 8,   ///< raw inline HTML (shown as it is)
     Marker = 1 << 9, ///< Markdown marks shown while editing (the source of the block being edited)
+    DisplayMath = 1 << 10,  ///< with Math: a $$…$$ formula (a centered block of its own)
 };
 
 struct Run {

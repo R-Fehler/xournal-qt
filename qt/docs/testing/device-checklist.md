@@ -1321,3 +1321,28 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       for the second save (it was appended, now through qpdf 12.4). The file opens in Okular and in the app again.
 - [ ] Library order: a folder with "notes 2", "notes 10", "Notes 3", "Makefile" (Show → text files) and
       "lecture.xopp": by name they are lecture, Makefile, notes 2, Notes 3, notes 10. The same with `LANG=C ./xournal-qt`.
+
+## Math in Markdown (qt/md-math)
+
+- [ ] A Markdown box (the writing button → Markdown) with `Energy $E = mc^2$ and $\frac{1}{2}$.`, a block
+      `$$\sum_{k=1}^n k = \frac{n(n+1)}{2}$$` on lines of its own, `$\begin{pmatrix} a & b \\ c & d \end{pmatrix}$`
+      and `$\alpha\beta\gamma$`: drawn as formulas (Latin Modern, a little bigger than the text), inline ones on
+      the text's baseline, the block centered with some room above and below. Lines with a fraction are a little
+      higher, the others are not.
+- [ ] Zoom in to 400 %: the formulas stay sharp (vector), as sharp as the text.
+- [ ] Writing on the page: the paragraph with the cursor shows `$…$` as source (monospace), the other paragraphs
+      show formulas. In a `$$` block its source is shown and the formula drawn below it; leaving the block draws it
+      in place. A tap on a drawn formula puts the cursor into it.
+- [ ] A formula that cannot be drawn (`$\hline$`): its source in red. The mouse resting on it (half a second) shows
+      "This formula cannot be drawn: …"; moving on hides it. Typing a formula half-way (`$\frac{1}{`) never crashes.
+- [ ] Money is no formula: `costs $5 and $10` stays text; `\$x\$` too.
+- [ ] Search (Ctrl+F) for `frac` or `mc^2`: the formula is marked (a block formula: the formula, not its whole line).
+      The library's search finds the TeX too.
+- [ ] The page's thumbnail and the sidebar previews show the formulas.
+- [ ] Export as PDF and as the hybrid PDF, open in Okular (or evince): the formulas are there, sharp at any zoom;
+      selecting text there does not select TeX. Print (Ctrl+P) to a PDF file: the same.
+- [ ] A `.md` file with formulas (on pages and on one continuous page): the same; a `$$` block is not split between
+      two pages.
+- [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
+- [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
+      noticeable pause.

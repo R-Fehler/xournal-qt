@@ -8,11 +8,41 @@ target_include_directories(xqt-md4c PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../3rdpart
 target_compile_definitions(xqt-md4c PUBLIC MD4C_USE_UTF8)
 set_target_properties(xqt-md4c PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF POSITION_INDEPENDENT_CODE ON)
 
+# MicroTeX (vendored, qt/3rdparty/microtex): the formulas of the Markdown text ($…$, $$…$$). Its glyphs are drawn
+# as paths from its own font data (Latin Modern Math, compiled into the binary), so it needs no font files, no
+# LaTeX and no platform backend: qt/src/markdown/MdMath.cpp draws with Cairo.
+set(XQT_MICROTEX_DIR "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/microtex")
+file(GLOB_RECURSE XQT_MICROTEX_SOURCES CONFIGURE_DEPENDS "${XQT_MICROTEX_DIR}/src/*.cpp")
+add_library(xqt-microtex STATIC ${XQT_MICROTEX_SOURCES})
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/microtex/microtexconfig.h" CONTENT
+    "#pragma once\n#define MICROTEX_VERSION_MAJOR 1\n#define MICROTEX_VERSION_MINOR 0\n#define MICROTEX_VERSION_PATCH 0\n")
+target_include_directories(xqt-microtex PUBLIC "${XQT_MICROTEX_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/microtex")
+# Glyphs as paths only (GLYPH_RENDER_TYPE_PATH); no font files looked for on disk (no HAVE_AUTO_FONT_FIND)
+target_compile_definitions(xqt-microtex PUBLIC GLYPH_RENDER_TYPE=1)
+# (C++17: it uses u8"" literals as std::string)
+set_target_properties(xqt-microtex PROPERTIES CXX_STANDARD 17 CXX_EXTENSIONS OFF AUTOMOC OFF AUTOUIC OFF AUTORCC OFF
+    POSITION_INDEPENDENT_CODE ON)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(xqt-microtex PRIVATE -w)  # (third-party code: its warnings are not ours)
+endif()
+# The math font's data (MicroTeX's .clm2 of Latin Modern Math, with the glyphs' outlines) as a C array
+set(XQT_MATH_FONT "${XQT_MICROTEX_DIR}/res/lm-math/latinmodern-math.clm2")
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/microtex/math_font.c"
+    COMMAND "${CMAKE_COMMAND}" -DINPUT=${XQT_MATH_FONT} -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/microtex/math_font.c
+            -DNAME=xqt_math_font -P "${CMAKE_CURRENT_LIST_DIR}/XqtEmbedFile.cmake"
+    DEPENDS "${XQT_MATH_FONT}" "${CMAKE_CURRENT_LIST_DIR}/XqtEmbedFile.cmake"
+    COMMENT "Math font for the Markdown formulas"
+    VERBATIM)
+target_sources(xqt-microtex PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/microtex/math_font.c")
+
 add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdDocument.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdDocument.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdLayout.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdLayout.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdMath.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdMath.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.h
@@ -22,7 +52,7 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.cpp)
 target_include_directories(xqt-markdown PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/markdown")
-target_link_libraries(xqt-markdown PUBLIC xoj-core PRIVATE xqt-md4c)
+target_link_libraries(xqt-markdown PUBLIC xoj-core PRIVATE xqt-md4c xqt-microtex)
 
 # Syntax highlighting of code blocks (optional; Debian / Ubuntu: libkf6syntaxhighlighting-dev)
 find_package(KF6SyntaxHighlighting QUIET)
@@ -40,11 +70,14 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdMathTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdBoxTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdHighlightTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPaginateTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPassagesTest.cpp)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
+    target_compile_definitions(xqt-markdown-tests PRIVATE
+        XQT_MARKDOWN_GOLDEN="${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/golden")
     set_target_properties(xqt-markdown-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
     gtest_discover_tests(xqt-markdown-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS markdown)
 endif()

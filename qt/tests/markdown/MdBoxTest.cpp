@@ -6,8 +6,10 @@
 #include <memory>
 #include <string>
 
+#include <cairo-pdf.h>
 #include <cairo.h>
 #include <gtest/gtest.h>
+#include <poppler.h>
 
 #include "model/Font.h"
 #include "model/Layer.h"
@@ -153,4 +155,50 @@ TEST_F(MdBoxTest, boxRectAndLayerLookup) {
     EXPECT_DOUBLE_EQ(r.width, 400);
     EXPECT_NEAR(r.height, contentHeight(*box), 1e-9);
     EXPECT_GT(r.height, 10);
+}
+
+TEST_F(MdBoxTest, formulasOnPagesAndInTheirPdf) {
+    // A box with formulas, drawn as the page renderer draws it (LayerView: canvas, thumbnails, PDF export, the
+    // hybrid PDF's annotations), into a PDF
+    Layer markdown;
+    markdown.setName(std::string(xoj::markdown::LAYER_NAME));
+    markdown.addElement(makeBox("Area $A = \\pi r^2$ here.\n\n$$\\int_0^1 x\\,dx = \\frac{1}{2}$$\n", 30, 40));
+    const auto* box = static_cast<const Text*>(markdown.getElements().front().get());
+
+    const std::string path = ::testing::TempDir() + "xqt-md-box-math.pdf";
+    cairo_surface_t* surface = cairo_pdf_surface_create(path.c_str(), 500, 400);
+    cairo_t* cr = cairo_create(surface);
+    xoj::view::LayerView(&markdown).draw(xoj::view::Context::createDefault(cr));
+    cairo_destroy(cr);
+    cairo_surface_finish(surface);
+    cairo_surface_destroy(surface);
+    gchar* uri = g_filename_to_uri(path.c_str(), nullptr, nullptr);
+    PopplerDocument* doc = poppler_document_new_from_file(uri, nullptr, nullptr);
+    g_free(uri);
+    ASSERT_NE(doc, nullptr);
+    PopplerPage* page = poppler_document_get_page(doc, 0);
+    gchar* text = poppler_page_get_text(page);
+    const std::string s = text;
+    g_free(text);
+    g_object_unref(page);
+    g_object_unref(doc);
+    EXPECT_NE(s.find("Area"), std::string::npos) << s;
+    EXPECT_EQ(s.find("\\pi"), std::string::npos) << s;  // the formula, not its source
+    EXPECT_EQ(s.find("frac"), std::string::npos) << s;
+
+    // The search finds the source and marks the formula, on the page
+    const auto shown = shownTexts(*box);
+    ASSERT_FALSE(shown.empty());
+    EXPECT_NE(shown[0].find("A = \\pi r^2"), std::string::npos);
+    const auto found = findText(*box, "\\pi");
+    ASSERT_EQ(found.size(), 1u);
+    EXPECT_GT(found[0].x, 30);
+    EXPECT_GE(found[0].y, 40);
+    const auto hit = mathAt(*box, found[0].x + found[0].width / 2, found[0].y + found[0].height / 2);
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_EQ(hit->span.tex, "A = \\pi r^2");
+    const int from = static_cast<int>(shown[0].find("\\pi"));
+    const auto rects = shownRects(*box, 0, from, from + 3);
+    ASSERT_EQ(rects.size(), 1u);
+    EXPECT_NEAR(rects[0].x, found[0].x, 0.01);
 }

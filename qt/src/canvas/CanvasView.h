@@ -203,6 +203,13 @@ public:
     void doubleTapAt(QPointF viewPos);
     /// A web address in a text element under this point (nothing if there is none).
     std::optional<LinkTarget> textLinkAt(QPointF viewPos) const;
+    /// A formula of a Markdown text under this point that cannot be drawn (shown as its source): why, and where it
+    /// is (view coordinates).
+    struct MathError {
+        QString error;
+        QRectF viewRect;
+    };
+    std::optional<MathError> mathErrorAt(QPointF viewPos) const;
     /// The column of text around a point of a PDF page (nothing when the page has none there).
     std::optional<QRectF> textColumnAt(size_t page, QPointF pagePoint) const;
 
