@@ -23,6 +23,8 @@
 #include <QPointF>
 #include <QPointer>
 #include <QQuickItem>
+#include <QRectF>
+#include <QString>
 #include <QTimer>
 
 namespace xqt {
@@ -44,6 +46,10 @@ class DocumentCanvasItem: public QQuickItem {
     Q_PROPERTY(qreal contentY READ contentY NOTIFY viewportChanged)
     /// The view is shown for reading only (the reference beside the document of a tab, CanvasView::setReadingOnly).
     Q_PROPERTY(bool readingOnly READ readingOnly WRITE setReadingOnly NOTIFY readingOnlyChanged)
+    /// The mouse rests on a formula of a Markdown text that cannot be drawn: why (empty: none), and where it is (item
+    /// coordinates). The window shows it as a tool tip.
+    Q_PROPERTY(QString mathError READ mathError NOTIFY mathErrorChanged)
+    Q_PROPERTY(QRectF mathErrorRect READ mathErrorRect NOTIFY mathErrorChanged)
 public:
     explicit DocumentCanvasItem(QQuickItem* parent = nullptr);
     ~DocumentCanvasItem() override;
@@ -53,6 +59,9 @@ public:
 
     bool readingOnly() const { return reading; }
     void setReadingOnly(bool on);
+
+    QString mathError() const { return mathErrorText; }
+    QRectF mathErrorRect() const { return mathErrorArea; }
 
     qreal contentWidth() const;
     qreal contentHeight() const;
@@ -96,6 +105,7 @@ Q_SIGNALS:
     void viewChanged();
     void viewportChanged();
     void readingOnlyChanged();
+    void mathErrorChanged();
 
 protected:
     QSGNode* updatePaintNode(QSGNode* old, UpdatePaintNodeData*) override;
@@ -121,6 +131,9 @@ private:
     /// Another canvas of the process shows this view (while two canvases swap their views).
     bool shownByAnother(const xqt::CanvasView* v) const;
     void updateViewGeometry();
+    /// The mouse moved without a button: the formula error under it, once it rests (hoverTimer).
+    void mouseHovers(QPointF scenePos);
+    void setMathError(const QString& error, const QRectF& rect);
 
     QPointer<xqt::CanvasView> canvasView;
     std::unique_ptr<xqt::CanvasInput> input;
@@ -131,6 +144,10 @@ private:
     bool viewReplaced = false;
     bool reading = false;
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
+    QTimer hoverTimer;            ///< the mouse rests (mouseHovers)
+    QPointF hoverScenePos;
+    QString mathErrorText;
+    QRectF mathErrorArea;
     std::atomic<int> shownPreviews{0};
     std::atomic<int> mostTiles{0};
     std::atomic<int> previewFrames{0};

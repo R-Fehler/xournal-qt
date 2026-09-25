@@ -52,6 +52,8 @@ constexpr int TILES_WHEN_STILL = 64;
 constexpr double MAX_PICTURE = 4096;
 /// A new size or zoom of the setsquare or compass is drawn anew when it has not changed for this long (ms)
 constexpr int GEOMETRY_SETTLES_MS = 150;
+/// How long the mouse rests on a formula that cannot be drawn before its error is shown.
+constexpr int HOVER_RESTS_MS = 400;
 
 class TileNode final: public QSGSimpleTextureNode {
 public:
@@ -277,6 +279,35 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
         geometrySettled = true;
         update();
     });
+    hoverTimer.setSingleShot(true);
+    hoverTimer.setInterval(HOVER_RESTS_MS);
+    connect(&hoverTimer, &QTimer::timeout, this, [this] {
+        // (only once the mouse rests: the hit test of the Markdown texts is not for every move)
+        if (auto* v = canvasView.data(); v && !mouseGrab && claims(hoverScenePos)) {
+            if (const auto hit = v->mathErrorAt(mapFromScene(hoverScenePos))) {
+                setMathError(hit->error, hit->viewRect);
+                return;
+            }
+        }
+        setMathError({}, {});
+    });
+}
+
+void DocumentCanvasItem::mouseHovers(QPointF scenePos) {
+    hoverScenePos = scenePos;
+    if (!mathErrorText.isEmpty() && !mathErrorArea.contains(mapFromScene(scenePos))) {
+        setMathError({}, {});
+    }
+    hoverTimer.start();
+}
+
+void DocumentCanvasItem::setMathError(const QString& error, const QRectF& rect) {
+    if (error == mathErrorText && rect == mathErrorArea) {
+        return;
+    }
+    mathErrorText = error;
+    mathErrorArea = rect;
+    Q_EMIT mathErrorChanged();
 }
 
 DocumentCanvasItem::~DocumentCanvasItem() {
@@ -564,8 +595,12 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             // Without the hit test of the item under the pointer: moving without a button never draws, and a drag
             // that began elsewhere (a scroll bar) stays there - the mouse sends more moves than there are frames.
             if (!mouseGrab && (m->buttons() == Qt::NoButton ? e->type() == QEvent::MouseMove : mouseElsewhere)) {
+                if (e->type() == QEvent::MouseMove && m->buttons() == Qt::NoButton) {
+                    mouseHovers(m->scenePosition());
+                }
                 return false;
             }
+            setMathError({}, {});
             const bool inside = !heldByAnother(&DocumentCanvasItem::mouseGrab) && claims(m->scenePosition());
             xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
             if (!mouseGrab && !inside) {

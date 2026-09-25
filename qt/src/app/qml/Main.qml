@@ -882,6 +882,15 @@ ApplicationWindow {
         height: referenceSplit.height
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
+
+        // The mouse rests on a formula of a Markdown text that cannot be drawn (shown as its source, in red): why
+        ToolTip {
+            objectName: "mathErrorTip"
+            visible: canvas.mathError !== ""
+            text: qsTr("This formula cannot be drawn: %1").arg(canvas.mathError)
+            x: Math.max(0, Math.min(canvas.mathErrorRect.x, canvas.width - width))
+            y: canvas.mathErrorRect.y + canvas.mathErrorRect.height + 4
+        }
     }
     // Reference mode: another document beside this one (the canvas area is split)
     ReferenceSplit {

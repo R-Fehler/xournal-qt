@@ -947,6 +947,39 @@ std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) co
     return std::nullopt;
 }
 
+std::optional<CanvasView::MathError> CanvasView::mathErrorAt(QPointF viewPos) const {
+    const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
+    if (!idx) {
+        return std::nullopt;
+    }
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    const QPointF onPage((viewPos.x() - pageRect.x()) / zoom, (viewPos.y() - pageRect.y()) / zoom);
+    Document* doc = session.getDocument();
+    std::shared_lock lock(*doc);
+    const PageRef page = doc->getPage(*idx);
+    if (!page) {
+        return std::nullopt;
+    }
+    for (const Layer* layer: page->getLayersView()) {
+        if (!layer->isVisible() || !md::isMarkdownLayer(*layer)) {
+            continue;
+        }
+        for (const Element* element: layer->getElementsView()) {
+            if (element->getType() != ELEMENT_TEXT) {
+                continue;
+            }
+            const auto hit = md::mathAt(*static_cast<const Text*>(element), onPage.x(), onPage.y());
+            if (hit && !hit->span.error.empty()) {
+                return MathError{QString::fromStdString(hit->span.error),
+                                 QRectF(pageRect.x() + hit->rect.x * zoom, pageRect.y() + hit->rect.y * zoom,
+                                        hit->rect.width * zoom, hit->rect.height * zoom)};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 // --- PDF text ----------------------------------------------------------------------------------------------------
 
 bool CanvasView::hasPdfTextSelection() const { return pdfSelection && pdfSelection->isFinalized(); }

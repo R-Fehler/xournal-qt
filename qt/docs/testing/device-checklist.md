@@ -1333,8 +1333,8 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] Writing on the page: the paragraph with the cursor shows `$…$` as source (monospace), the other paragraphs
       show formulas. In a `$$` block its source is shown and the formula drawn below it; leaving the block draws it
       in place. A tap on a drawn formula puts the cursor into it.
-- [ ] A formula that cannot be drawn (`$\hline$`): its source in red. Typing a formula half-way (`$\frac{1}{`) never
-      crashes.
+- [ ] A formula that cannot be drawn (`$\hline$`): its source in red. The mouse resting on it (half a second) shows
+      "This formula cannot be drawn: …"; moving on hides it. Typing a formula half-way (`$\frac{1}{`) never crashes.
 - [ ] Money is no formula: `costs $5 and $10` stays text; `\$x\$` too.
 - [ ] Search (Ctrl+F) for `frac` or `mc^2`: the formula is marked (a block formula: the formula, not its whole line).
       The library's search finds the TeX too.

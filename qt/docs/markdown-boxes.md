@@ -109,9 +109,10 @@ dollar sign.
   The other blocks show the formulas drawn. A tap on a drawn formula puts the cursor into its source (its start or
   end, by the half tapped). In a `$$` block that is not closed yet, Enter starts a line of the formula (as in a code
   block), not a new paragraph.
-- **Errors**: a formula that MicroTeX cannot read is shown as its source, in red. Nothing a formula says can crash
-  the app: MicroTeX gets no source longer than 8,000 bytes or nested deeper than 64 braces, its exceptions are
-  caught, and the crashes found by fuzzing it are fixed in the vendored copy (its README).
+- **Errors**: a formula that MicroTeX cannot read is shown as its source, in red. Resting the mouse on it shows why
+  (a tool tip). Nothing a formula says can crash the app: MicroTeX gets no source longer than 8,000 bytes or nested
+  deeper than 64 braces, its exceptions are caught, and the crashes found by fuzzing it are fixed in the vendored copy
+  (its README).
 - **Search**: the TeX stays searchable text. The search and the library's index search a box's texts with each
   formula's source in place of its character (`md::searchText`), and a hit inside a formula marks the formula
   (a display formula: the formula, not its whole line).
@@ -127,7 +128,7 @@ dollar sign.
   one was laid out.
 
 Code: `qt/src/markdown/MdMath.*` (MicroTeX, the recording as paths, the cache), `MdLayout.cpp` (the shapes in the
-text, `searchText`, `mathAt`).
+text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem` (the tool tip).
 
 ## How it is stored (Xournal++ compatible)
 A box is an ordinary Xournal++ text element in a layer named "Markdown" at the bottom of the page. Ink written with
@@ -152,5 +153,5 @@ Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`)
 ## Not yet
 - Images.
 - Flattening into Text mode.
-- Math: why a formula cannot be drawn (MicroTeX's error); per-formula editing inside a block (the whole block shows
-  its source, as for the other marks).
+- Math: the error of a formula on a touch screen (no mouse to rest on it); per-formula editing inside a block (the
+  whole block shows its source, as for the other marks).
