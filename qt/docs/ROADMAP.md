@@ -428,6 +428,14 @@
     instead of cutting the file (Qt 6.7); tests inject failed writes in ways that fail for root too; two UI tests
     wait for menus to close.
 
+- **Math in Markdown, `qt/md-math` (2026-09-25, awaiting on-device test).** `$…$` and `$$…$$` are rendered with
+  MicroTeX (openmath branch, vendored, MIT; Latin Modern Math compiled in), recorded as cairo paths: vector on
+  screen, in PDF export, the hybrid PDF and print. Inline formulas sit on the baseline; `$$` blocks are centred and
+  scaled to fit; errors show the source in red with the message on hover; search finds the TeX and marks the
+  formula; the block with the cursor shows its source (a `$$` block also a preview). Fuzzed: 600,000 formulas.
+  - +2.4 MB binary (1.36 MB font), 28 s build; a page of 50 formulas lays out in 4.4 ms, draws in 8.7 ms.
+  - Left: the error message on touch screens; editing per block, not per formula; `\color` outside arrays.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

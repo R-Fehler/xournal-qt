@@ -90,7 +90,7 @@ is in [qt/docs/ROADMAP.md](qt/docs/ROADMAP.md), which also has an older backlog 
    5. ~~fuzzy search~~: `qt/fuzzy-search`, merged 2026-09-24 (see ROADMAP). Follow-ups: hit-page pictures mark `^`/`$`/`'word'` terms as plain substrings; the document search bar shows no sign that it is in fuzzy mode.
 3. **Android:** ~~`qt/android-apk`~~, ~~`qt/android-basics`~~, ~~`qt/android-libraries`~~ merged. Next: the author's
    tests on the Fold 7, then `qt/docs/android-roadmap.md` (Save as to a picked place, a compact tool bar).
-4. **The `.md` editor:** ~~`qt/md-editor`~~ merged 2026-09-24; math running (`qt/md-math`). Left: images in
+4. **The `.md` editor:** ~~`qt/md-editor`~~ merged 2026-09-24; math merged (`qt/md-math`). Left: images in
    `<name>.assets/`, vaults.
 5. **Windows:** ~~`qt/windows-build`~~ merged 2026-09-24; `qt/windows-feel` is the author's, on the Surface.
 6. **PDF as the document:** ~~`qt/pdf-incremental`~~ and ~~`qt/pdf-only`~~ merged 2026-09-24.
@@ -221,7 +221,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
     and ReText (Qt); foam for wikilinks.
 - **Decided (2026-09-23): images in `.md` go in the sidecar folder `<name>.assets/`** (Typora's convention).
   Inside `.xopp`, images live in the file bundle.
-- [~] **Math with MicroTeX** (`qt/md-math`, started 2026-09-25; decided 2026-09-24), vendored (MIT, no LaTeX install, works on mobile).
+- [x] **Math with MicroTeX** (`qt/md-math`, merged 2026-09-25; decided 2026-09-24), vendored (MIT, no LaTeX install, works on mobile).
   - Syntax `$…$` inline and `$$…$$` as a block, like Obsidian, Zettlr and GitHub.
   - In Markdown boxes, the `.md` editor and the full-page mode.
   - Check first that its Qt backend is still maintained.

@@ -49,6 +49,10 @@ The machine is a slow 2-in-1, so every build and test run costs real time.
    Commit messages are plain prose: what was wrong, what changed, why.
 5. **A bug gets a failing test first.** Show it fails for the stated reason, then fix it.
 6. Keep the routine test run **under a minute**. Long suites go behind a label or an environment variable.
+7. **Vendored code must be committed whole.** A global gitignore on this machine ignores common folder names
+   (`lib/`, `env/`, `build/`, `out/`, `dist/`). After adding code under `qt/3rdparty/`, check
+   `git status --ignored qt/3rdparty` and add what is missing with `git add -f` (plus a `.gitignore` there with
+   `!name/`). A build in the worktree still works with the files uncommitted; a clean checkout does not.
 
 ## How work is organised
 
