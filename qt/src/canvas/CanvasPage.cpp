@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <shared_mutex>
 
 #include <cairo.h>
 
@@ -37,9 +38,11 @@
 
 #include "CanvasView.h"
 #include "MdBox.h"
+#include "StickyNotes.h"
 #include "TextEditor.h"
 #include "render/RenderService.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 
 using xoj::util::Rectangle;
 
@@ -100,6 +103,27 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     x /= zoom;
     y /= zoom;
 
+    // xournal-qt: sticky notes (qt/docs/sticky-notes.md). A select tool takes a note (the handle of the selected one
+    // resizes it, with any tool); the tools that write write on the note under them.
+    const ToolType toolType = h->getToolType();
+    const bool selectTool = toolType == TOOL_SELECT_RECT || toolType == TOOL_SELECT_REGION ||
+                            toolType == TOOL_SELECT_MULTILAYER_RECT || toolType == TOOL_SELECT_MULTILAYER_REGION ||
+                            toolType == TOOL_SELECT_OBJECT;
+    if (!view.isReadingOnly()) {
+        bool deselected = false;
+        if (view.notes().press(*this, x, y, selectTool, deselected)) {
+            return true;
+        }
+    }
+    sticky::leaveNoteLayer(*control.getDocument(), page);  // (the tools work on the page's own layer)
+    const bool writes = ((toolType == TOOL_PEN || toolType == TOOL_HIGHLIGHTER) &&
+                         h->getDrawingType() != DRAWING_TYPE_SPLINE) ||
+                        (toolType == TOOL_ERASER && h->getEraserType() != ERASER_TYPE_WHITEOUT) ||
+                        toolType == TOOL_TEXT;
+    if (writes && !view.isReadingOnly() && pressOnNote(x, y)) {
+        return true;
+    }
+
     if (((h->getToolType() == TOOL_PEN || h->getToolType() == TOOL_HIGHLIGHTER) &&
          h->getDrawingType() != DRAWING_TYPE_SPLINE) ||
         (h->getToolType() == TOOL_ERASER && h->getEraserType() == ERASER_TYPE_WHITEOUT)) {
@@ -134,7 +158,9 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         this->inputHandler->onButtonPressEvent(pos, zoom);
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
     } else if (h->getToolType() == TOOL_ERASER) {
-        this->eraser->erase(x, y);
+        if (eraserInNote(x, y)) {
+            this->eraser->erase(x, y);
+        }
         this->inEraser = true;
     } else if (h->getToolType() == TOOL_SELECT_RECT || h->getToolType() == TOOL_SELECT_REGION ||
                h->getToolType() == TOOL_SELECT_MULTILAYER_RECT || h->getToolType() == TOOL_SELECT_MULTILAYER_REGION) {
@@ -152,6 +178,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         }
     } else if (h->getToolType() == TOOL_TEXT) {
         view.startText(*this, x, y);
+        leaveNote();  // (the text editor keeps the note's layer for its text)
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextPress(*this, x, y);
     } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
@@ -199,6 +226,9 @@ bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggreg
             const auto& layers = page->getLayers();
             size_t layerNo = layers.size();
             for (auto l = layers.rbegin(); l != layers.rend(); l++, layerNo--) {
+                if (sticky::isNote(**l)) {
+                    continue;  // xournal-qt: a sticky note is selected whole (StickyNotes::press)
+                }
                 if (checkLayer(*l)) {
                     const auto found = as_unsigned(std::distance(l, layers.rend()));
                     if (md::isMarkdownLayer(**l)) {
@@ -278,7 +308,11 @@ bool CanvasPage::onMotionNotifyEvent(const PositionInputData& pos) {
                                                                 h->getToolType() == TOOL_TEXT && currentSequenceDeviceId) {
         editor->mouseMoved(x, y);  // drag: select text
     } else if (h->getToolType() == TOOL_ERASER && h->getEraserType() != ERASER_TYPE_WHITEOUT && this->inEraser) {
-        this->eraser->erase(x, y);
+        double ex = x;
+        double ey = y;
+        if (eraserInNote(ex, ey)) {
+            this->eraser->erase(ex, ey);
+        }
     }
     return false;
 }
@@ -302,6 +336,16 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         this->eraser->finalize();
         doc->unlock();
     }
+    leaveNote();
+    if (coverPress) {
+        // A tap on a covering note (not a stroke): it peeks, or covers again
+        const auto [cx, cy] = *coverPress;
+        coverPress.reset();
+        const double zoom = getZoom();
+        if (std::hypot(pos.x / zoom - cx, pos.y / zoom - cy) <= 8 / zoom) {
+            view.notes().tapCover(*this, cx, cy);
+        }
+    }
     if (ToolType t = control.getToolHandler()->getToolType();
         t == TOOL_SELECT_PDF_TEXT_LINEAR || t == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextRelease(*this);
@@ -310,6 +354,15 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)
         const bool aggregate = pos.isShiftDown() && view.getSelection();
         size_t layerOfFinalizedSel = this->selector->finalize(this->page, aggregate, control.getDocument());
+        if (layerOfFinalizedSel) {
+            // xournal-qt: a multi-layer selection never takes a sticky note apart (a tap selects the note)
+            std::shared_lock lock(*control.getDocument());
+            const auto layers = this->page->getLayersView();
+            if (layerOfFinalizedSel <= layers.size() && sticky::isNote(*layers[layerOfFinalizedSel - 1])) {
+                (void)this->selector->releaseElements();
+                layerOfFinalizedSel = 0;
+            }
+        }
         // xournal-qt: nothing in the selected layer: Markdown texts (in the page's layer "Markdown")
         std::optional<Layer::Index> markdownBefore;
         if (!layerOfFinalizedSel && !aggregate && !selector->userTapped(getZoom())) {
@@ -364,7 +417,61 @@ void CanvasPage::onSequenceCancelEvent(DeviceId deviceId) {
         this->eraser->finalize();
         doc->unlock();
     }
+    leaveNote();
+    coverPress.reset();
     this->selector.reset();  // (its view goes with it)
+}
+
+// --- sticky notes ------------------------------------------------------------------------------------------------
+
+bool CanvasPage::pressOnNote(double x, double y) {
+    Document* doc = view.getSession().getDocument();
+    std::optional<sticky::Look> look;
+    Layer* note = nullptr;
+    {
+        std::shared_lock lock(*doc);
+        note = sticky::noteAt(*page, x, y);
+        if (note) {
+            look = sticky::lookOf(*note);
+        }
+    }
+    if (!note || !look) {
+        return false;
+    }
+    if (look->cover) {
+        coverPress = std::make_pair(x, y);  // nothing is written on it (nor under it)
+        return true;
+    }
+    {
+        std::unique_lock lock(*doc);
+        layerBeforeNote = page->getSelectedLayerId();
+        page->setSelectedLayerId(sticky::layerIdOf(*page, note));
+    }
+    noteClip = look->rect;
+    return false;
+}
+
+void CanvasPage::leaveNote() {
+    if (layerBeforeNote) {
+        std::unique_lock lock(*view.getSession().getDocument());
+        page->setSelectedLayerId(*layerBeforeNote);
+    }
+    layerBeforeNote.reset();
+    noteClip.reset();
+}
+
+bool CanvasPage::eraserInNote(double& x, double& y) const {
+    if (!noteClip) {
+        return true;
+    }
+    const Rectangle<double>& r = *noteClip;
+    const double margin = view.getSession().getToolHandler()->getThickness() + sticky::PAPER_WIDTH + 0.5;
+    if (r.width < 2 * margin || r.height < 2 * margin) {
+        return false;
+    }
+    x = std::clamp(x, r.x + margin, r.x + r.width - margin);
+    y = std::clamp(y, r.y + margin, r.y + r.height - margin);
+    return true;
 }
 
 // --- display -----------------------------------------------------------------------------------------------------
@@ -405,7 +512,17 @@ QImage CanvasPage::composeTile(const QRect& pixelRect) {
         buffer.paintTo(cr);
         // Upstream XojPageView::paintPage: the overlays draw in page coordinates on top of the buffer.
         for (const auto& v: this->overlayViews) {
+            // xournal-qt: a stroke written on a sticky note is clipped to it while it is drawn
+            const bool clip = noteClip && inputHandler && v->isViewOf(inputHandler.get());
+            if (clip) {
+                cairo_save(cr);
+                cairo_rectangle(cr, noteClip->x, noteClip->y, noteClip->width, noteClip->height);
+                cairo_clip(cr);
+            }
             v->draw(cr);
+            if (clip) {
+                cairo_restore(cr);
+            }
         }
         cairo_destroy(cr);
         cairo_surface_destroy(surface);
@@ -493,7 +610,13 @@ void CanvasPage::drawAndDeleteToolView(xoj::view::ToolView* v, const Range& rg) 
         // Draw the inputHandler's view onto the page buffer (upstream: no re-render, no flicker).
         const bool drawn = raster->withBuffer([&](xoj::view::Mask& buffer) {
             if (auto* cr = buffer.get(); cr) {
+                cairo_save(cr);
+                if (noteClip) {  // (on a sticky note: clipped to it, as the note draws it)
+                    cairo_rectangle(cr, noteClip->x, noteClip->y, noteClip->width, noteClip->height);
+                    cairo_clip(cr);
+                }
                 v->drawWithoutDrawingAids(cr);
+                cairo_restore(cr);
                 return true;
             }
             return false;
@@ -541,7 +664,15 @@ void CanvasPage::deleteViewBuffer() { raster->releaseBuffer(); }
 
 void CanvasPage::rectChanged(Rectangle<double>& rect) { rerenderRect(rect.x, rect.y, rect.width, rect.height); }
 
-void CanvasPage::rangeChanged(Range& range) { rerenderRange(range); }
+void CanvasPage::rangeChanged(Range& range) {
+    rerenderRange(range);
+    if (view.notes().selectedPage() == this) {
+        // (a selected sticky note changed, maybe by undo: its outline and handle too)
+        Range around = range;
+        around.addPadding((StickyNotes::HANDLE_RADIUS_PX + 4) / getZoom());
+        flagDirtyRegion(around);
+    }
+}
 
 void CanvasPage::pageChanged() { rerenderPage(); }
 

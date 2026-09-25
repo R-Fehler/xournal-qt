@@ -58,12 +58,14 @@
 #include "MarkdownFile.h"
 #include "MdBox.h"
 #include "Perf.h"
+#include "StickyNotes.h"
 #include "TextEditor.h"
 #include "TextFlow.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 
 namespace xqt {
 
@@ -77,6 +79,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         session(session),
         renderService(*session.getApp().getRenderService()),
         viewController(&layout) {
+    stickyNotes = std::make_unique<StickyNotes>(*this);
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     // (the rendered pages are kept by CanvasMemory: the PDF cache only serves edits of the visible ones)
     pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
@@ -127,6 +130,11 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         if ((textEditor || markdownEditor) && this->session.getToolHandler()->getToolType() != TOOL_TEXT &&
             !textMode()) {  // (a text file is written whatever the tool)
             endTextEditing();
+        }
+        // A sticky note stays selected for the select tools; the pen (or any other tool) writes on it
+        if (stickyNotes->hasSelection() && !stickyNotes->dragging() &&
+            !isSelectToolType(this->session.getToolHandler()->getToolType())) {
+            stickyNotes->clearSelection();
         }
     });
     // Column layout changed in the settings: lay out again, keep the current page in view.
@@ -230,6 +238,7 @@ void CanvasView::cancelRenders() {
 }
 
 void CanvasView::rebuildPages() {
+    stickyNotes->pageGoing(stickyNotes->selectedPage());
     geometry.allPagesGoing();
     sharpWanted.clear();
     cancelRenders();
@@ -243,6 +252,8 @@ void CanvasView::rebuildPages() {
     pages.reserve(n);
     for (size_t i = 0; i < n; ++i) {
         pages.push_back(std::make_unique<CanvasPage>(*this, doc->getPage(i)));
+        // Xournal++ selects each page's top layer, which may be a sticky note: the page's own layer instead
+        sticky::leaveNoteLayer(*doc, pages.back()->getPage());
     }
     refreshLayout();
     geometry.pagesChanged();
@@ -315,6 +326,7 @@ void CanvasView::relayout() {
 // --- selection (port of upstream XournalView) ------------------------------------------------------------------
 
 void CanvasView::clearSelection() {
+    stickyNotes->clearSelection();
     // Deleting the EditSelection puts the elements back into their layer.
     const bool ofMarkdown = selection && markdownSelection && markdownSelection->selection == selection.get();
     selection.reset();
@@ -331,6 +343,10 @@ void CanvasView::clearSelection() {
 void CanvasView::deleteSelection(EditSelection* sel) {
     if (sel == nullptr) {
         sel = selection.get();
+        if (!sel && stickyNotes->hasSelection()) {
+            stickyNotes->deleteSelected();  // (the selection is a sticky note)
+            return;
+        }
     }
     if (sel) {
         auto undo = std::make_unique<DeleteUndoAction>(sel->getSourcePage(), false);
@@ -851,6 +867,16 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
 }
 
 bool CanvasView::tapAt(QPointF viewPos) {
+    // A covering sticky note: it peeks, or covers again
+    if (CanvasPage* page = pageAt(viewPos)) {
+        if (const auto idx = indexOf(page)) {
+            const QRectF r = pageViewRect(*idx);
+            const double zoom = viewController.zoom();
+            if (stickyNotes->tapCover(*page, (viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom)) {
+                return true;
+            }
+        }
+    }
     // A task's check box in a Markdown text: switched (not in a document shown for reading only)
     if (CanvasPage* page = readingOnly ? nullptr : pageAt(viewPos)) {
         if (const auto idx = indexOf(page)) {
@@ -1876,8 +1902,11 @@ size_t CanvasView::getCurrentPage() const { return session.getCurrentPageNo(); }
 
 void CanvasView::layerChanged(size_t page) {
     if (page < pages.size()) {
+        // Layers came or went (also by undo): the page's own layer stays the selected one, not a sticky note
+        sticky::leaveNoteLayer(*session.getDocument(), pages[page]->getPage());
         pages[page]->rerenderPage();
     }
+    stickyNotes->layersChanged();
 }
 
 PdfCache* CanvasView::rasterPdfCache(bool background) const {
@@ -2002,6 +2031,7 @@ void CanvasView::pageInserted(size_t page) {
 
 void CanvasView::pageDeleted(size_t page) {
     if (page < pages.size()) {
+        stickyNotes->pageGoing(pages[page].get());
         geometry.pageGoing(pages[page].get());
         sharpWanted.erase(pages[page].get());
         pages.erase(pages.begin() + static_cast<std::ptrdiff_t>(page));
@@ -2011,6 +2041,16 @@ void CanvasView::pageDeleted(size_t page) {
 }
 
 void CanvasView::pageSelected(size_t pageNo) {
+    {
+        PageRef current;
+        {
+            std::shared_lock lock(*session.getDocument());
+            if (pageNo < session.getDocument()->getPageCount()) {
+                current = session.getDocument()->getPage(pageNo);
+            }
+        }
+        sticky::leaveNoteLayer(*session.getDocument(), current);  // (the pen writes on the page, not on a note)
+    }
     // A selection of Markdown texts moved to another page is dropped into that page's Markdown layer (made if
     // needed): it is its selected layer for now.
     if (!selection || !markdownSelection || markdownSelection->selection != selection.get()) {

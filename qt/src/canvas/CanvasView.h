@@ -60,6 +60,7 @@ class TextEditor;
 class MarkdownEditor;
 class CanvasTextInput;
 class RenderService;
+class StickyNotes;
 
 class CanvasView final: public QObject, public XournalView, public Layout, public RasterHost, public DocumentListener {
     Q_OBJECT
@@ -246,6 +247,8 @@ public:
     /// Draw the marks of the setsquare's scale onto its page, every `spacingCm`, with the pen's color and width (one
     /// step to undo). False when there is no setsquare out.
     bool drawGeometryMarks(double spacingCm);
+    /// The sticky notes of this view: placing, the selected note, peeking, hiding (qt/docs/sticky-notes.md)
+    StickyNotes& notes() const { return *stickyNotes; }
     /// The setsquare / compass on the canvas.
     GeometryToolLayer& geometryTool() { return geometry; }
     const GeometryToolLayer& geometryTool() const { return geometry; }
@@ -332,6 +335,10 @@ Q_SIGNALS:
     void pagesChanged();
     /// A selection was made or cleared.
     void selectionChanged(bool hasSelection);
+    /// A sticky note was selected or unselected, or the selected one changed (color, cover).
+    void noteSelectionChanged();
+    /// Sticky notes came, went, were hidden or shown.
+    void notesChanged();
     /// Text editing started or ended (keyboard / input method for the canvas).
     void textEditingChanged(bool editing);
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
@@ -430,6 +437,7 @@ private:
     double markdownTextSize = 10;    ///< of this font size
     bool markdownInPanel = true;     ///< Markdown text boxes are edited beside the page
     GeometryToolLayer geometry{*this};
+    std::unique_ptr<StickyNotes> stickyNotes;
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;
     PdfTextMode pdfTextMode = PdfTextMode::Highlight;

@@ -625,6 +625,12 @@ ApplicationWindow {
                         checked: app.geometryTool === "compass"
                         onTriggered: app.toggleCompass()
                     }
+                    // A paper note on the page: write on it, move it, cover answers with it (qt/docs/sticky-notes.md)
+                    MenuItem {
+                        objectName: "stickyNoteItem"
+                        text: qsTr("Sticky note (write on it, cover with it)")
+                        onTriggered: app.insertStickyNote()
+                    }
                     MenuSeparator {}
                     // Corners of shapes and moved selections jump onto the half-centimetre grid (upstream's tool bar
                     // toggle; also in the settings)
@@ -835,6 +841,7 @@ ApplicationWindow {
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     MenuSeparator {}
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
+                    MenuItem { objectName: "insertStickyNoteItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert sticky note"); onTriggered: app.insertStickyNote() }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
@@ -1148,6 +1155,16 @@ ApplicationWindow {
                 color: "#505050"
                 Layout.rightMargin: app.horizontalScrolling ? 0 : 6
             }
+            // Only on a page with sticky notes: hide them all (to see what they cover) and show them again
+            IconButton {
+                objectName: "pageNotesButton"
+                visible: app.pageHasNotes && !win.textDoc
+                iconName: app.pageNotesHidden ? "xqt-eye-off" : "xqt-eye"
+                tip: app.pageNotesHidden ? qsTr("Show the sticky notes of this page") : qsTr("Hide the sticky notes of this page")
+                implicitWidth: 36; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                onClicked: app.pageNotesHidden = !app.pageNotesHidden
+            }
             IconButton {
                 objectName: "nextPageButton"
                 visible: app.horizontalScrolling
@@ -1273,6 +1290,14 @@ ApplicationWindow {
     SelectionPill {
         id: selectionBar
         objectName: "selectionBar"
+        canvasItem: canvas
+        hidden: pageGrid.visible
+    }
+
+    // The selected sticky note: its color, cover mode, delete.
+    NotePill {
+        id: notePill
+        objectName: "notePill"
         canvasItem: canvas
         hidden: pageGrid.visible
     }
@@ -2810,9 +2835,9 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }
     Shortcut { sequences: win.keysOf("cut"); enabled: docKeys; onActivated: app.cutSelection() }
     Shortcut { sequences: win.keysOf("paste"); enabled: docKeys; onActivated: app.pasteElements() }
-    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && app.hasSelection; onActivated: app.deleteSelection() }
+    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.deleteSelection() }
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
-    Shortcut { sequence: "Escape"; enabled: docKeys && app.hasSelection; onActivated: app.clearSelection() }
+    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.clearSelection() }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }

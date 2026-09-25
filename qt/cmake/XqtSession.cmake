@@ -65,6 +65,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.cpp
 )
 target_include_directories(xqt-session PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src" "${CMAKE_CURRENT_LIST_DIR}/../src/session")
 target_link_libraries(xqt-session PUBLIC Qt6::Core xoj-render xoj-core xqt-markdown)
@@ -108,6 +110,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasTextInput.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.cpp
 )
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)
@@ -124,10 +128,13 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/IncrementalPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BackgroundSaveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextFileTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickyNoteTest.cpp)
     target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
-    target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
+    target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
+        # upstream Xournal++ built beside the fork (as for the golden tests): StickyNoteTest opens a file with it
+        XQT_UPSTREAM_BIN="${XOJ_UPSTREAM_DIR}/../xournalpp/build/xournalpp")
     gtest_discover_tests(xqt-session-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS session
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 

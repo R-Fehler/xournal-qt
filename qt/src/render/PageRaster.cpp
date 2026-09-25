@@ -19,6 +19,16 @@ using xoj::util::Rectangle;
 
 namespace xqt {
 
+namespace {
+thread_local bool forScreen = false;
+struct ScreenDrawing {
+    ScreenDrawing() { forScreen = true; }
+    ~ScreenDrawing() { forScreen = false; }
+};
+}  // namespace
+
+bool PageRaster::drawingForScreen() { return forScreen; }
+
 PageRaster::PageRaster(RasterHost* host, RenderService* service, PageRef page):
         host(host), service(service), page(std::move(page)) {}
 
@@ -141,6 +151,7 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
     }
 
     std::shared_lock lock(*doc);
+    ScreenDrawing screen;
     localView.drawPage(this->page, cr, false, flags);
 }
 
