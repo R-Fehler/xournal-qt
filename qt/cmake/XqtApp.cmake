@@ -139,6 +139,7 @@ set(XQT_QML_FILES
     src/app/qml/TextFlowPanel.qml
     src/app/qml/MarkdownPanel.qml
     src/app/qml/EmojiSuggestions.qml
+    src/app/qml/EmojiPicker.qml
     src/app/qml/CustomWidthPopup.qml
     src/app/qml/AppendPages.qml
     src/app/qml/PageJump.qml

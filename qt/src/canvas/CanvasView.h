@@ -302,6 +302,9 @@ public:
     void refreshEmojiCompletion();
     /// A suggestion tapped: it goes in place of the shortcode.
     void chooseEmojiCompletion(int index);
+    /// An emoji (the picker) at the cursor of the text being written, in place of its selection. False if nothing is
+    /// being written.
+    bool insertAtTextCursor(const std::string& text);
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.

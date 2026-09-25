@@ -145,6 +145,9 @@ text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem
   Escape closes the list for that shortcode. Not after a letter, digit or colon (`10:30`, `std::`). An on-screen
   keyboard's word being typed counts. Code: `qt/src/canvas/EmojiCompletion.*` (the canvas), `MarkdownPanel.qml` and
   `qt/src/quick/EmojiNames.*` (beside the page), `EmojiSuggestions.qml` (the list).
+- **Picker**: the 🙂 button (in the tool bar while writing on the page, among the Markdown buttons beside it) opens
+  a search over names, tags and descriptions and the emoji by category; a tap puts one at the cursor.
+  `EmojiPicker.qml`.
 - **One character**: the cursor, Backspace and Delete go over a whole emoji sequence (Pango's grapheme clusters,
   `qt/src/markdown/Grapheme.*`; also beside the page, where Qt 6.7 splits flags).
 

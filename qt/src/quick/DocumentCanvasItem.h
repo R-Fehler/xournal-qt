@@ -76,7 +76,8 @@ public:
     QRectF emojiCompletionRect() const;
     /// A suggestion tapped: its emoji goes in place of the shortcode.
     Q_INVOKABLE void chooseEmojiCompletion(int index);
-
+    /// Text (an emoji of the picker) at the cursor of the text being written. False if none is.
+    Q_INVOKABLE bool insertText(const QString& text);
     QRectF mathErrorRect() const { return mathErrorArea; }
 
     qreal contentWidth() const;

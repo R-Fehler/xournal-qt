@@ -1582,6 +1582,16 @@ void CanvasView::chooseEmojiCompletion(int index) {
     }
 }
 
+bool CanvasView::insertAtTextCursor(const std::string& text) {
+    CanvasTextInput* editor = getTextInput();
+    if (!editor) {
+        return false;
+    }
+    editor->replaceBeforeCursor(0, text);
+    refreshEmojiCompletion();
+    return true;
+}
+
 double CanvasView::getZoom() const { return viewController.zoom(); }
 XournalppCursor* CanvasView::getCursor() const { return session.getCursor(); }
 Control* CanvasView::getControl() const { return &session; }

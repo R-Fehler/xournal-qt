@@ -728,6 +728,17 @@ void DocumentCanvasItem::chooseEmojiCompletion(int index) {
     }
 }
 
+bool DocumentCanvasItem::insertText(const QString& text) {
+    if (!canvasView || !canvasView->getTextInput()) {
+        return false;
+    }
+    QGuiApplication::inputMethod()->commit();
+    canvasView->insertAtTextCursor(text.toStdString());
+    QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
+    forceActiveFocus(Qt::OtherFocusReason);
+    return true;
+}
+
 QVariant DocumentCanvasItem::inputMethodQuery(Qt::InputMethodQuery query) const {
     xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr;
     if (!editor) {

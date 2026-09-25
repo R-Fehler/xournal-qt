@@ -6327,9 +6327,11 @@ TEST_F(FolderChooserWindowTest, theDownloadFolderCanBeOpenedAsLibrary) {
               QString::fromStdString(xqt::Library(phone.sharedDownloads).root().string()));
 }
 
-// Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one.
-TEST_F(MainWindowTest, emojiSuggestionsWhileWritingOnThePage) {
+// Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one; the emoji
+// button (shown while writing) opens the picker, whose search finds by name and puts the emoji at the cursor.
+TEST_F(MainWindowTest, emojiSuggestionsAndPickerWhileWritingOnThePage) {
     const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
+    const QString party = QString::fromUtf8("\xf0\x9f\x8e\x89");
     controller->setMarkdownInPanel(false);
     controller->setTextMarkdown(false);
     controller->selectTool("text");
@@ -6338,10 +6340,14 @@ TEST_F(MainWindowTest, emojiSuggestionsWhileWritingOnThePage) {
     ASSERT_NE(view, nullptr);
     view->getViewController().scrollToPageRect(0, QRectF(100, 250, 350, 200));
     wait(100);
+    auto* button = findItem("emojiButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_FALSE(button->isVisible()) << "only while writing";
     const QPointF at = view->pageViewRect(0).topLeft() + QPointF(150, 300) * view->getViewController().zoom();
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(at).toPoint());
     wait(50);
     ASSERT_NE(view->getTextEditor(), nullptr);
+    EXPECT_TRUE(button->isVisible());
 
     auto* list = findItem("emojiSuggestions");
     ASSERT_NE(list, nullptr);
@@ -6365,15 +6371,33 @@ TEST_F(MainWindowTest, emojiSuggestionsWhileWritingOnThePage) {
     EXPECT_EQ(view->getTextEditor()->text(), "Hi " + smiley);
     EXPECT_FALSE(list->isVisible());
 
+    click(button);
+    auto* picker = find<QObject>("emojiPicker");
+    ASSERT_NE(picker, nullptr);
+    ASSERT_TRUE(waitOpened(picker, true));
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT_PICKER")) {
+        wait(1500);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT_PICKER"));
+    }
+    find<QObject>("emojiSearch")->setProperty("text", "tada");
+    wait(50);
+    key(Qt::Key_Return);  // (the first found)
+    EXPECT_TRUE(waitOpened(picker, false));
+    ASSERT_NE(view->getTextEditor(), nullptr) << "still writing";
+    EXPECT_EQ(view->getTextEditor()->text(), "Hi " + smiley + party);
+    type("!");
+    EXPECT_EQ(view->getTextEditor()->text(), "Hi " + smiley + party + "!") << "the keys went back to the text";
     key(Qt::Key_Escape);
     EXPECT_EQ(view->getTextEditor(), nullptr);
+    EXPECT_FALSE(button->isVisible());
 }
 
-// The Markdown editor beside the page: the same suggestions (Down, Enter), and the arrows and Backspace over a whole
-// flag.
+// The Markdown editor beside the page: the same suggestions (Down, Enter), the picker, and the arrows and Backspace
+// over a whole flag.
 TEST_F(MainWindowTest, emojiInTheMarkdownEditorBesideThePage) {
     const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
     const QString flag = QString::fromUtf8("\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa");
+    const QString party = QString::fromUtf8("\xf0\x9f\x8e\x89");
     controller->setMarkdownInPanel(true);
     controller->setTextMarkdown(true);
     controller->selectTool("text");
@@ -6405,4 +6429,32 @@ TEST_F(MainWindowTest, emojiInTheMarkdownEditorBesideThePage) {
     EXPECT_EQ(area->property("cursorPosition").toInt(), 5);
     key(Qt::Key_Backspace);
     EXPECT_EQ(area->property("text").toString(), "ab") << "the whole flag";
+
+    click(findItem("markdownEmoji"));
+    auto* picker = find<QObject>("emojiPicker");
+    QObject* panelPicker = nullptr;
+    for (QObject* p: window->findChildren<QObject*>("emojiPicker")) {
+        if (p->property("opened").toBool() || p->property("visible").toBool()) {
+            panelPicker = p;
+        }
+    }
+    ASSERT_NE(picker, nullptr);
+    until([&] {
+        for (QObject* p: window->findChildren<QObject*>("emojiPicker")) {
+            if (p->property("opened").toBool()) {
+                panelPicker = p;
+                return true;
+            }
+        }
+        return false;
+    });
+    ASSERT_NE(panelPicker, nullptr);
+    for (QObject* s: window->findChildren<QObject*>("emojiSearch")) {
+        s->setProperty("text", "tada");
+    }
+    wait(50);
+    key(Qt::Key_Return);
+    EXPECT_TRUE(waitOpened(panelPicker, false));
+    EXPECT_EQ(area->property("text").toString(), "a" + party + "b");
+    EXPECT_TRUE(area->hasActiveFocus());
 }

@@ -37,6 +37,7 @@ const std::string SMILEY = "\xf0\x9f\x98\x83";                                  
 const std::string CODER = "\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x92\xbb";       // 👩‍💻 (ZWJ)
 const std::string FLAG = "\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa";                    // 🇩🇪
 const std::string THUMB = "\xf0\x9f\x91\x8d\xf0\x9f\x8f\xbd";                   // 👍🏽 (skin tone)
+const std::string PARTY = "\xf0\x9f\x8e\x89";                                   // 🎉
 
 class EmojiEditingTest: public ::testing::Test {
 protected:
@@ -249,4 +250,21 @@ TEST_F(EmojiEditingTest, completionOfTheWordAKeyboardIsTyping) {
     ASSERT_TRUE(view->emojiCompletion().active());
     view->chooseEmojiCompletion(0);
     EXPECT_EQ(m.text(), "Yes " + SMILE);
+}
+
+/// The picker: the emoji at the cursor, in place of the selection.
+TEST_F(EmojiEditingTest, pickerInsertsAtTheCursor) {
+    TextEditor& t = startTextBox();
+    type("ab");
+    key(Qt::Key_Left);
+    EXPECT_TRUE(view->insertAtTextCursor(PARTY));
+    EXPECT_EQ(t.text().toStdString(), "a" + PARTY + "b");
+    view->endTextEditing();
+    EXPECT_FALSE(view->insertAtTextCursor(PARTY)) << "nothing is being written";
+
+    MarkdownEditor& m = startMarkdown();
+    type("xyz");
+    key(Qt::Key_Left, {}, Qt::ShiftModifier);
+    EXPECT_TRUE(view->insertAtTextCursor(PARTY));
+    EXPECT_EQ(m.text(), "xy" + PARTY);
 }

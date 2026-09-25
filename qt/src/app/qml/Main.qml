@@ -467,6 +467,29 @@ ApplicationWindow {
                     }
                 }
             }
+            // Writing on the page (a text box, Markdown, a text file): the emoji picker
+            ToolButton {
+                id: emojiButton
+                objectName: "emojiButton"
+                visible: canvas.textEditing
+                text: "\u{1F642}"
+                font.family: "Xournal Qt Emoji"
+                font.pixelSize: 22
+                implicitWidth: 48
+                implicitHeight: 48
+                focusPolicy: Qt.NoFocus  // (the text being written keeps the keys)
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Emoji (or type : and a name, like :smile)")
+                ToolTip.delay: 600
+                background: Rectangle { radius: 10; color: emojiButton.pressed ? "#e8e8e8" : "transparent" }
+                onClicked: canvasEmojiPicker.open()
+                EmojiPicker {
+                    id: canvasEmojiPicker
+                    x: win.toolbarPosition === "left" ? parent.width : win.toolbarPosition === "right" ? -width : 0
+                    y: win.verticalTools ? 0 : parent.height
+                    onPicked: function(emoji) { close(); canvas.insertText(emoji) }
+                }
+            }
             IconButton {
                 visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "pdfTextButton"

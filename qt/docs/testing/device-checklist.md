@@ -1369,3 +1369,7 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] Android: Gboard, type `:smi` (the keyboard underlines it as a word being typed): the list shows; a tap on 😄
       puts the emoji there and the keyboard does not type `:smi` again.
 - [ ] Beside the page, the arrows and Backspace go over a whole flag (🇩🇪).
+- [ ] Picker: while writing on the page (text box, Markdown, `.md` file) the tool bar shows 🙂; beside the page it is
+      in the Markdown buttons. It opens a search and the emoji by category (the row on top jumps to one). Search
+      `heart`, `happy`, `flag`: a tap (or Enter: the first found) puts the emoji at the cursor, the picker closes and
+      the keys go to the text again. The button is gone when the writing ends.

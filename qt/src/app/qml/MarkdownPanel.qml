@@ -75,6 +75,11 @@ Pane {
         emojiSuggestions = []
         area.forceActiveFocus()
     }
+    function insertEmoji(e) {
+        if (area.selectedText !== "") area.remove(area.selectionStart, area.selectionEnd)
+        area.insert(area.cursorPosition, e)
+        area.forceActiveFocus()
+    }
     /// Left / Right / Backspace / Delete over a whole emoji (👩‍💻, 🇩🇪): Qt 6.7 splits flags
     function graphemeKey(event) {
         const shift = event.modifiers & Qt.ShiftModifier
@@ -231,6 +236,19 @@ Pane {
                 onClicked: panel.insertBlock("| Column | Column |\n|--------|--------|\n| | |\n")
             }
             MdButton { text: "―"; tip: qsTr("Horizontal rule (---)"); onClicked: panel.insertBlock("---\n") }
+            MdButton {
+                objectName: "markdownEmoji"
+                text: "\u{1F642}"
+                font.family: "Xournal Qt Emoji"
+                tip: qsTr("Emoji (or type : and a name, like :smile)")
+                onClicked: panelEmojiPicker.open()
+                EmojiPicker {
+                    id: panelEmojiPicker
+                    y: parent.height
+                    x: Math.min(0, panel.width - width - parent.x - 8)
+                    onPicked: function(emoji) { close(); panel.insertEmoji(emoji) }
+                }
+            }
             ToolSeparator {}
             // The size of the text (the text's font size: the drawing follows)
             RowLayout {
