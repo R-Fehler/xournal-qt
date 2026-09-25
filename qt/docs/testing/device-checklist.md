@@ -1271,3 +1271,5 @@ with the sample library stays).
       and the app starts on a system without `libqpdf28`/`libqpdf30`.
 - [ ] A PDF with notes: draw, Ctrl+S twice. `XQT_HYBRID_TIMES=1 ./xournal-qt file.pdf` prints no "written in full"
       for the second save (it was appended, now through qpdf 12.4). The file opens in Okular and in the app again.
+- [ ] Library order: a folder with "notes 2", "notes 10", "Notes 3", "Makefile" (Show → text files) and
+      "lecture.xopp": by name they are lecture, Makefile, notes 2, Notes 3, notes 10. The same with `LANG=C ./xournal-qt`.

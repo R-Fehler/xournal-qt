@@ -502,7 +502,7 @@ void LibraryModel::rebuild() {
                 }
             }
             std::stable_sort(docRows.begin(), docRows.end(), [](const Row& a, const Row& b) {
-                return QString::localeAwareCompare(a.name, b.name) < 0;
+                return DocumentFiles::namesLess(a.name, b.name);
             });
             std::move(docRows.begin(), docRows.end(), std::back_inserter(newRows));
         } else if (!q.isEmpty()) {
@@ -568,7 +568,7 @@ void LibraryModel::rebuild() {
                     if (a.first != b.first) {
                         return a.first > b.first;
                     }
-                    return QString::localeAwareCompare(a.second.name, b.second.name) < 0;
+                    return DocumentFiles::namesLess(a.second.name, b.second.name);
                 });
                 docRows.clear();
                 for (auto& [read, r]: keyed) {
@@ -580,7 +580,7 @@ void LibraryModel::rebuild() {
                 std::stable_sort(docRows.begin(), docRows.end(), newer);
             } else if (flatView) {
                 std::stable_sort(docRows.begin(), docRows.end(), [](const Row& a, const Row& b) {
-                    return QString::localeAwareCompare(a.name, b.name) < 0;
+                    return DocumentFiles::namesLess(a.name, b.name);
                 });
             }
             newRows = std::move(folderRows);
