@@ -170,6 +170,10 @@ TEST(MdTexDelimiters, WhereMd4cReadsAFormula) {
     EXPECT_EQ(rewritten("$a$ and \\(b\\)\n"), "$a$ and $b$\n");
     // A "$" that would close a formula begun by money before it: the pair stays as written
     EXPECT_EQ(rewritten("costs $5, so \\( x \\)\n"), "costs $5, so \\( x \\)\n");
+    // A pair that stays as written does not keep the others from being formulas (its "$" would have taken the
+    // one of "$ $" after it)
+    EXPECT_EQ(rewritten("\\(a\\) the \\(n\\)th and $ $, \\(b\\).\n"), "$a$ the \\(n\\)th and $ $, $b$.\n");
+    EXPECT_EQ(rewritten("the \\(n\\)th, \\( x \\) and \\(y\\)\n"), "the \\(n\\)th, $ x $ and $y$\n");
     // What md4c reads matches: formulas where they were rewritten, and nothing else
     const std::string src = "costs $5 and \\(x\\) or $10, the \\(n\\)th\n";
     const Document doc = parse(src);

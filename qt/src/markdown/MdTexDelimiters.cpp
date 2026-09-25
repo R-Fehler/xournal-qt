@@ -384,8 +384,11 @@ private:
                 keep[i] = keep[i + 1] = false;
             }
         }
-        // As md4c reads the rewritten text: each pair is a formula, and those of the source stay as they are
-        for (int attempt = 0; attempt < 2; ++attempt) {
+        // As md4c reads the rewritten text: each pair is a formula, and those of the source stay as they are. The
+        // first pair that is not (next to a letter, ...) stays as written, and the rest is read again without it:
+        // its "$" may have taken a later one's. A few rounds at most, then none of the paragraph's pairs.
+        constexpr int ROUNDS = 8;
+        for (int round = 0; round < ROUNDS; ++round) {
             std::vector<Mark> marks = sourceMarks;
             for (size_t i = 0; i < pairs.size(); ++i) {
                 if (keep[i]) {
@@ -413,9 +416,16 @@ private:
             if (all) {
                 break;
             }
-            for (size_t i = 0; i < pairs.size(); ++i) {
-                // (the second time, or when the source's formulas changed: none of them)
-                keep[i] = keep[i] && read[i] && attempt == 0 && fromSource == sourceFormulas;
+            size_t first = 0;
+            while (first < pairs.size() && (!keep[first] || read[first])) {
+                ++first;
+            }
+            if (first < pairs.size()) {
+                keep[first] = false;
+            }
+            if (first == pairs.size() || round + 1 == ROUNDS) {  // (or the source's formulas changed, by none of them)
+                std::fill(keep.begin(), keep.end(), false);
+                break;
             }
         }
         for (size_t i = 0; i < pairs.size(); ++i) {
