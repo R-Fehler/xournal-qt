@@ -1350,3 +1350,5 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 ## Math delimiters from chat apps (qt/md-tex-delims)
 
 - [ ] A Markdown box with `$E = \hbar\omega$`: drawn as a formula with ħ (not red, not the word "hbar").
+- [ ] `a $ $ b` and a paragraph `$$ $$`: shown as written (`$ $`, `$$ $$`), not as an empty gap. The cursor moves
+      through them character by character.

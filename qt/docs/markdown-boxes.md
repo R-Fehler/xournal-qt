@@ -94,6 +94,8 @@ the editor beside the page ("Size", which also changes the text being edited).
 in the box. The `$$` may stand on lines of their own. As in md4c (the parser) and GitHub, an opening `$` does not
 follow a letter or digit and a closing one is not followed by one: `costs $5 and $10` stays text, and `\$` is a
 dollar sign.
+An empty formula (`$ $`, `$$ $$`, only blanks or line breaks between the marks) is no formula: it is shown as it is
+written, marks and all (md4c makes a formula of the blank; MicroTeX would draw nothing).
 
 - **Drawn by MicroTeX** (vendored, `qt/3rdparty/microtex`, MIT) with the Latin Modern Math font, which is compiled
   into the program: no LaTeX, no external program, the same on Android. Formulas are paths (vector): sharp at any

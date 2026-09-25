@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <iterator>
+#include <optional>
 #include <utility>
 
 #include "md4c.h"
@@ -211,10 +213,11 @@ public:
                 flag = Underline;
                 break;
             case MD_SPAN_LATEXMATH:
-                flag = Math;
-                break;
             case MD_SPAN_LATEXMATH_DISPLAY:
-                flag = Math | DisplayMath;
+                flag = type == MD_SPAN_LATEXMATH ? Math : Math | DisplayMath;
+                math.emplace();
+                math->display = type == MD_SPAN_LATEXMATH_DISPLAY;
+                math->scanFrom = parsedEnd;
                 break;
             case MD_SPAN_A:
                 flag = Link;
@@ -240,6 +243,9 @@ public:
     }
 
     int leaveSpan(MD_SPANTYPE type) {
+        if ((type == MD_SPAN_LATEXMATH || type == MD_SPAN_LATEXMATH_DISPLAY) && math) {
+            endFormula();
+        }
         if (!spans.empty()) {
             spans.pop_back();
         }
@@ -256,9 +262,12 @@ public:
         }
         r.link = links.empty() ? -1 : links.back();
         // md4c passes pointers into the source, except for made-up text (line breaks, indentation, U+0000)
+        size_t parsedAt = NO_SOURCE;
         if (text >= source.data() && text + size <= source.data() + source.size()) {
-            r.source = static_cast<size_t>(text - source.data());
+            parsedAt = static_cast<size_t>(text - source.data());
+            r.source = parsedAt;
             r.sourceLength = size;
+            parsedEnd = parsedAt + size;
         }
         const std::string_view s(text, size);
         switch (type) {
@@ -285,11 +294,54 @@ public:
             default:
                 r.text = std::string(s);
         }
+        if (math) {  // (a formula's text: kept until its end, see endFormula)
+            if (math->runs.empty()) {
+                math->firstAt = parsedAt;
+            }
+            math->runs.push_back(std::move(r));
+            return 0;
+        }
         textTarget().runs.push_back(std::move(r));
         return 0;
     }
 
 private:
+    /// The end of a formula: its runs go into the text. A formula of nothing but blanks ("$ $", "$$ $$") is none:
+    /// it is text, marks and all, as they are in the source (MicroTeX would draw nothing).
+    void endFormula() {
+        Formula f = std::move(*math);
+        math.reset();
+        const bool blankOnly = std::all_of(f.runs.begin(), f.runs.end(), [](const Run& r) {
+            return r.text.find_first_not_of(" \t\r\n") == std::string::npos;
+        });
+        Block& target = textTarget();
+        if (!blankOnly) {
+            std::move(f.runs.begin(), f.runs.end(), std::back_inserter(target.runs));
+            return;
+        }
+        // Its marks: before its first text (else the first "$" after the text before it), and the next "$" after
+        // them (only blanks are between)
+        const size_t mark = f.display ? 2 : 1;
+        const size_t open = f.firstAt != NO_SOURCE && f.firstAt >= mark ? f.firstAt - mark : source.find('$', f.scanFrom);
+        const size_t close = open == std::string_view::npos ? open : source.find('$', open + mark);
+        if (close == std::string_view::npos || close + mark > source.size()) {
+            std::move(f.runs.begin(), f.runs.end(), std::back_inserter(target.runs));
+            return;
+        }
+        Run r;
+        for (size_t i = 0; i + 1 < spans.size(); ++i) {  // (the formatting around it, not the formula's)
+            r.flags |= spans[i];
+        }
+        r.link = links.empty() ? -1 : links.back();
+        r.source = open;
+        r.sourceLength = close + mark - open;
+        r.text = std::string(source.substr(r.source, r.sourceLength));
+        std::replace(r.text.begin(), r.text.end(), '\n', ' ');  // (a line break in it: a space, as elsewhere)
+        std::replace(r.text.begin(), r.text.end(), '\r', ' ');
+        parsedEnd = std::max(parsedEnd, close + mark);
+        target.runs.push_back(std::move(r));
+    }
+
     /// Where text goes. The text of a tight list item comes without a paragraph: it gets one, so list items only
     /// have blocks (the text before and after a nested list are two paragraphs).
     Block& textTarget() {
@@ -332,6 +384,15 @@ private:
     std::vector<Block*> stack;
     std::vector<uint16_t> spans;
     std::vector<int> links;
+    /// The formula being read: its runs wait for its end (endFormula)
+    struct Formula {
+        bool display = false;
+        size_t scanFrom = 0;         ///< the end of the text before it (in the parsed text)
+        size_t firstAt = NO_SOURCE;  ///< where its first text is, if it is in the parsed text
+        std::vector<Run> runs;
+    };
+    std::optional<Formula> math;
+    size_t parsedEnd = 0;  ///< the end of the last text that is in the parsed text
     size_t blockEvents = 0;
     size_t implicitAt = static_cast<size_t>(-1);
     const Block* implicitIn = nullptr;
