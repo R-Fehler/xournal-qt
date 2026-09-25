@@ -1362,3 +1362,10 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] Copy `👩‍💻🇩🇪👍🏽` from a browser, paste into a text box and into Markdown written on the page: the arrows step
       over each emoji at once, Backspace and Delete remove each whole. Copy them back out (Ctrl+C) into a browser:
       the same three emoji.
+- [ ] Completion: in a text box, in Markdown on the page, in a `.md` file and in the Markdown editor beside the page,
+      type `:smi`: a list below the cursor (😄 smile, 😃 smiley, 😏 smirk, ...). Up / Down move in it, Enter or Tab
+      (or a tap) puts the emoji in place of `:smi`, Escape closes it and typing goes on. `:s` (one letter), `10:30`
+      and `std::ve` show nothing.
+- [ ] Android: Gboard, type `:smi` (the keyboard underlines it as a word being typed): the list shows; a tap on 😄
+      puts the emoji there and the keyboard does not type `:smi` again.
+- [ ] Beside the page, the arrows and Backspace go over a whole flag (🇩🇪).

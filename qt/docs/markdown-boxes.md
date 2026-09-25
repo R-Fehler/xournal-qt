@@ -139,6 +139,14 @@ text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem
   `qt/3rdparty/gemoji`). Not in code, not in a plain text; the block with the cursor shows `:smile:`. The emoji stands
   for the whole shortcode, as an entity does (a tap on it is its start or end). Code: `qt/src/markdown/EmojiData.*`,
   `MdLayout.cpp` (`withEmoji`).
+- **Completion**: `:` and two letters (`:smi`) in a text box, in Markdown on the page, a `.md` file or the editor
+  beside the page open a list of emoji below the cursor (one-word names first: smile, smiley, smirk, then smile_cat,
+  then names with a later word, then tags). Enter, Tab or a tap put the emoji itself (not the shortcode) in the text;
+  Escape closes the list for that shortcode. Not after a letter, digit or colon (`10:30`, `std::`). An on-screen
+  keyboard's word being typed counts. Code: `qt/src/canvas/EmojiCompletion.*` (the canvas), `MarkdownPanel.qml` and
+  `qt/src/quick/EmojiNames.*` (beside the page), `EmojiSuggestions.qml` (the list).
+- **One character**: the cursor, Backspace and Delete go over a whole emoji sequence (Pango's grapheme clusters,
+  `qt/src/markdown/Grapheme.*`; also beside the page, where Qt 6.7 splits flags).
 
 ## How it is stored (Xournal++ compatible)
 A box is an ordinary Xournal++ text element in a layer named "Markdown" at the bottom of the page. Ink written with

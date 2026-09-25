@@ -1,6 +1,6 @@
 /*
  * xournal-qt: emoji while writing on the page (text boxes, Markdown): copy and paste, the cursor and deleting by
- * grapheme cluster (👩‍💻 is one character).
+ * grapheme cluster (👩‍💻 is one character), and the shortcode completion (":smi" -> 😄).
  *
  * @license GNU GPLv2 or later
  */
@@ -23,6 +23,7 @@
 #include "session/DocumentSession.h"
 
 #include "CanvasView.h"
+#include "EmojiCompletion.h"
 #include "MarkdownEditor.h"
 #include "TextEditor.h"
 #include "TextFlow.h"
@@ -36,7 +37,6 @@ const std::string SMILEY = "\xf0\x9f\x98\x83";                                  
 const std::string CODER = "\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x92\xbb";       // 👩‍💻 (ZWJ)
 const std::string FLAG = "\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa";                    // 🇩🇪
 const std::string THUMB = "\xf0\x9f\x91\x8d\xf0\x9f\x8f\xbd";                   // 👍🏽 (skin tone)
-const std::string PARTY = "\xf0\x9f\x8e\x89";                                   // 🎉
 
 class EmojiEditingTest: public ::testing::Test {
 protected:
@@ -78,11 +78,11 @@ protected:
         return *view->getMarkdownEditor();
     }
 
-    /// A key for the text being written.
+    /// A key as the canvas gives it (the suggestions first, then the editor).
     void key(Qt::Key k, const QString& text = {}, Qt::KeyboardModifiers mods = Qt::NoModifier) {
         QKeyEvent e(QEvent::KeyPress, k, mods, text);
         bool finish = false;
-        view->getTextInput()->keyPressed(&e, finish);
+        view->textKeyPressed(&e, finish);
     }
     void type(const std::string& s) {
         for (const QChar c: QString::fromStdString(s)) {
@@ -92,6 +92,13 @@ protected:
     void paste(const std::string& s) {
         QGuiApplication::clipboard()->setText(QString::fromStdString(s));
         key(Qt::Key_V, {}, Qt::ControlModifier);
+    }
+    std::vector<std::string> suggested() const {
+        std::vector<std::string> out;
+        for (const auto& c: view->emojiCompletion().suggestions()) {
+            out.emplace_back(c.name);
+        }
+        return out;
     }
 
     QTemporaryDir tmp;
@@ -162,4 +169,84 @@ TEST_F(EmojiEditingTest, markdownMovesAndDeletesByGraphemeCluster) {
     key(Qt::Key_A, {}, Qt::ControlModifier);
     key(Qt::Key_C, {}, Qt::ControlModifier);
     EXPECT_EQ(QGuiApplication::clipboard()->text().toStdString(), e.text());
+}
+
+/// ":smi" in a text box: the suggestions; Down and Enter put the second in place of the shortcode.
+TEST_F(EmojiEditingTest, textBoxCompletesShortcodes) {
+    TextEditor& e = startTextBox();
+    type("Hi :s");
+    EXPECT_FALSE(view->emojiCompletion().active()) << "two letters first";
+    type("mi");
+    ASSERT_TRUE(view->emojiCompletion().active());
+    const auto names = suggested();
+    ASSERT_GE(names.size(), 3u);
+    EXPECT_EQ(names[0], "smile");
+    EXPECT_EQ(names[1], "smiley");
+    EXPECT_LE(names.size(), EmojiCompletion::LIMIT);
+    key(Qt::Key_Down);
+    EXPECT_EQ(view->emojiCompletion().selected(), 1);
+    key(Qt::Key_Return);
+    EXPECT_EQ(e.text().toStdString(), "Hi " + SMILEY) << "no line break: Enter took the emoji";
+    EXPECT_FALSE(view->emojiCompletion().active());
+
+    // Escape closes the list for this shortcode, also while it is typed on; the next one opens it again
+    type(" :hear");
+    ASSERT_TRUE(view->emojiCompletion().active());
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(view->emojiCompletion().active());
+    EXPECT_NE(view->getTextEditor(), nullptr) << "Escape closed the list, not the text";
+    type("t");
+    EXPECT_FALSE(view->emojiCompletion().active());
+    type(" :+1");
+    EXPECT_TRUE(view->emojiCompletion().active());
+    // No list in a time
+    type(" 10:30");
+    EXPECT_FALSE(view->emojiCompletion().active());
+}
+
+/// In Markdown, Enter or a tap puts the emoji itself into the source (typed ":smile:" stays text there).
+TEST_F(EmojiEditingTest, markdownCompletesShortcodes) {
+    MarkdownEditor& e = startMarkdown();
+    type("Hi :smi");
+    ASSERT_TRUE(view->emojiCompletion().active());
+    key(Qt::Key_Return);
+    EXPECT_EQ(e.text(), "Hi " + SMILE);
+    type(" :smi");
+    view->chooseEmojiCompletion(1);  // (a tap on the second)
+    EXPECT_EQ(e.text(), "Hi " + SMILE + " " + SMILEY);
+    EXPECT_FALSE(view->emojiCompletion().active());
+    // A place elsewhere (a tap there) closes it
+    type(" :smi");
+    ASSERT_TRUE(view->emojiCompletion().active());
+    e.setCursorPosition(0);
+    view->refreshEmojiCompletion();
+    EXPECT_FALSE(view->emojiCompletion().active());
+    // Ending the writing closes it
+    e.setCursorPosition(e.text().size());
+    view->refreshEmojiCompletion();
+    EXPECT_TRUE(view->emojiCompletion().active());
+    view->endTextEditing();
+    EXPECT_FALSE(view->emojiCompletion().active());
+}
+
+/// An on-screen keyboard sends the word being typed as its own text (preedit): the list follows it, and the emoji
+/// takes its place.
+TEST_F(EmojiEditingTest, completionOfTheWordAKeyboardIsTyping) {
+    TextEditor& t = startTextBox();
+    type("Hi ");
+    QInputMethodEvent pre(QStringLiteral(":smi"), {});
+    t.inputMethodEvent(&pre);
+    view->refreshEmojiCompletion();
+    ASSERT_TRUE(view->emojiCompletion().active());
+    view->chooseEmojiCompletion(0);
+    EXPECT_EQ(t.text().toStdString(), "Hi " + SMILE);
+    view->endTextEditing();
+
+    MarkdownEditor& m = startMarkdown();
+    type("Yes ");
+    m.inputMethodEvent(&pre);
+    view->refreshEmojiCompletion();
+    ASSERT_TRUE(view->emojiCompletion().active());
+    view->chooseEmojiCompletion(0);
+    EXPECT_EQ(m.text(), "Yes " + SMILE);
 }

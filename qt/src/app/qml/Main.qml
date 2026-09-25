@@ -892,6 +892,16 @@ ApplicationWindow {
             y: canvas.mathErrorRect.y + canvas.mathErrorRect.height + 4
         }
     }
+    // ":smi" typed on the page: the emoji suggested (Up / Down / Enter go to the canvas's editor; a tap chooses).
+    // Beside the canvas, not in it: the canvas takes the presses on its own items.
+    EmojiSuggestions {
+        objectName: "emojiSuggestions"
+        model: canvas.emojiCompletions
+        current: canvas.emojiCompletionIndex
+        cursor: Qt.rect(canvas.x + canvas.emojiCompletionRect.x, canvas.y + canvas.emojiCompletionRect.y,
+                        canvas.emojiCompletionRect.width, canvas.emojiCompletionRect.height)
+        onChosen: function(index) { canvas.chooseEmojiCompletion(index) }
+    }
     // Reference mode: another document beside this one (the canvas area is split)
     ReferenceSplit {
         id: referenceSplit

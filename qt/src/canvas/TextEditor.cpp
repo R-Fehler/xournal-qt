@@ -384,6 +384,31 @@ bool TextEditor::keyPressed(const QKeyEvent* e, bool& finish) {
     return true;
 }
 
+std::string TextEditor::textBeforeCursor() const {
+    if (hasSelection()) {
+        return {};
+    }
+    const int start = cursor > 0 ? static_cast<int>(content.lastIndexOf(u'\n', cursor - 1)) + 1 : 0;
+    return (content.mid(start, cursor - start) + preedit).toStdString();
+}
+
+void TextEditor::replaceBeforeCursor(size_t bytes, const std::string& text) {
+    // (the part of the input method's text before those bytes is typed; the rest goes with them)
+    const QString before = QString::fromStdString(textBeforeCursor());
+    qsizetype n = 0;  // (those bytes as UTF-16)
+    while (n < before.size() && static_cast<size_t>(before.right(n).toUtf8().size()) < bytes) {
+        ++n;
+    }
+    const qsizetype fromPreedit = std::min<qsizetype>(n, preedit.size());
+    const QString kept = preedit.left(preedit.size() - fromPreedit);
+    preedit.clear();
+    if (n > fromPreedit) {
+        anchor = std::max(0, cursor - static_cast<int>(n - fromPreedit));
+    }
+    insert(kept + QString::fromStdString(text));
+    changed(true);
+}
+
 void TextEditor::inputMethodEvent(const QInputMethodEvent* e) {
     if (e->replacementLength() > 0) {
         const int from = std::clamp(cursor + e->replacementStart(), 0, static_cast<int>(content.size()));

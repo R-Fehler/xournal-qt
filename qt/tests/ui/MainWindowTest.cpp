@@ -6326,3 +6326,83 @@ TEST_F(FolderChooserWindowTest, theDownloadFolderCanBeOpenedAsLibrary) {
     EXPECT_EQ(controller->libraryModel()->property("rootPath").toString(),
               QString::fromStdString(xqt::Library(phone.sharedDownloads).root().string()));
 }
+
+// Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one.
+TEST_F(MainWindowTest, emojiSuggestionsWhileWritingOnThePage) {
+    const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
+    controller->setMarkdownInPanel(false);
+    controller->setTextMarkdown(false);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 250, 350, 200));
+    wait(100);
+    const QPointF at = view->pageViewRect(0).topLeft() + QPointF(150, 300) * view->getViewController().zoom();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(at).toPoint());
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+
+    auto* list = findItem("emojiSuggestions");
+    ASSERT_NE(list, nullptr);
+    type("Hi :s");
+    EXPECT_FALSE(list->isVisible());
+    type("mi");
+    until([&] { return list->isVisible(); });
+    ASSERT_TRUE(list->isVisible());
+    const QRectF cursor = canvasItem->property("emojiCompletionRect").toRectF();
+    const QPointF cursorInScene = canvasItem->mapToScene(cursor.bottomLeft());
+    const QPointF listInScene = list->mapToScene(QPointF(0, 0));
+    EXPECT_GT(listInScene.y(), cursorInScene.y()) << "below the cursor";
+    EXPECT_NEAR(listInScene.x(), cursorInScene.x(), 2);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    QQuickItem* second = nullptr;
+    until([&] { return (second = findItem("emojiSuggestion1")) != nullptr; });
+    click(second);
+    EXPECT_EQ(view->getTextEditor()->text(), "Hi " + smiley);
+    EXPECT_FALSE(list->isVisible());
+
+    key(Qt::Key_Escape);
+    EXPECT_EQ(view->getTextEditor(), nullptr);
+}
+
+// The Markdown editor beside the page: the same suggestions (Down, Enter), and the arrows and Backspace over a whole
+// flag.
+TEST_F(MainWindowTest, emojiInTheMarkdownEditorBesideThePage) {
+    const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
+    const QString flag = QString::fromUtf8("\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa");
+    controller->setMarkdownInPanel(true);
+    controller->setTextMarkdown(true);
+    controller->selectTool("text");
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* area = find<QQuickItem>("markdownArea");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    const QPointF at = view->pageViewRect(0).topLeft() + QPointF(150, 300) * view->getViewController().zoom();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(at).toPoint());
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(area->hasActiveFocus());
+
+    auto* list = findItem("markdownEmojiSuggestions");
+    ASSERT_NE(list, nullptr);
+    type("Hi :smi");
+    until([&] { return list->isVisible(); });
+    ASSERT_TRUE(list->isVisible());
+    key(Qt::Key_Down);
+    key(Qt::Key_Return);
+    EXPECT_EQ(area->property("text").toString(), "Hi " + smiley) << "no new line: Enter took the emoji";
+    EXPECT_FALSE(list->isVisible());
+
+    area->setProperty("text", "a" + flag + "b");
+    area->setProperty("cursorPosition", 5);  // (after the flag: 2 UTF-16 units per regional indicator)
+    key(Qt::Key_Left);
+    EXPECT_EQ(area->property("cursorPosition").toInt(), 1) << "over the whole flag";
+    key(Qt::Key_Right);
+    EXPECT_EQ(area->property("cursorPosition").toInt(), 5);
+    key(Qt::Key_Backspace);
+    EXPECT_EQ(area->property("text").toString(), "ab") << "the whole flag";
+}

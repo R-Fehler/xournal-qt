@@ -26,6 +26,7 @@
 #include <QRectF>
 #include <QString>
 #include <QTimer>
+#include <QVariantList>
 
 namespace xqt {
 class CanvasInput;
@@ -50,6 +51,13 @@ class DocumentCanvasItem: public QQuickItem {
     /// coordinates). The window shows it as a tool tip.
     Q_PROPERTY(QString mathError READ mathError NOTIFY mathErrorChanged)
     Q_PROPERTY(QRectF mathErrorRect READ mathErrorRect NOTIFY mathErrorChanged)
+    /// Text is being written on the canvas (a text box, Markdown): the emoji picker inserts there.
+    Q_PROPERTY(bool textEditing READ textEditing NOTIFY textEditingChanged)
+    /// The emoji suggested for the shortcode being typed (":smi"; EmojiCompletion): {emoji, name} each, the one chosen
+    /// with Up / Down, and the cursor (item coordinates; empty when there are none).
+    Q_PROPERTY(QVariantList emojiCompletions READ emojiCompletions NOTIFY emojiCompletionChanged)
+    Q_PROPERTY(int emojiCompletionIndex READ emojiCompletionIndex NOTIFY emojiCompletionChanged)
+    Q_PROPERTY(QRectF emojiCompletionRect READ emojiCompletionRect NOTIFY emojiCompletionChanged)
 public:
     explicit DocumentCanvasItem(QQuickItem* parent = nullptr);
     ~DocumentCanvasItem() override;
@@ -61,6 +69,14 @@ public:
     void setReadingOnly(bool on);
 
     QString mathError() const { return mathErrorText; }
+
+    bool textEditing() const;
+    QVariantList emojiCompletions() const;
+    int emojiCompletionIndex() const;
+    QRectF emojiCompletionRect() const;
+    /// A suggestion tapped: its emoji goes in place of the shortcode.
+    Q_INVOKABLE void chooseEmojiCompletion(int index);
+
     QRectF mathErrorRect() const { return mathErrorArea; }
 
     qreal contentWidth() const;
@@ -106,6 +122,8 @@ Q_SIGNALS:
     void viewportChanged();
     void readingOnlyChanged();
     void mathErrorChanged();
+    void textEditingChanged();
+    void emojiCompletionChanged();
 
 protected:
     QSGNode* updatePaintNode(QSGNode* old, UpdatePaintNodeData*) override;

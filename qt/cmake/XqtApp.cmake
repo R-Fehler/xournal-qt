@@ -17,7 +17,9 @@ add_library(xqt-quick STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/EmojiNames.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/EmojiNames.cpp)
 target_include_directories(xqt-quick PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src/quick)
 target_link_libraries(xqt-quick PUBLIC Qt6::Quick Qt6::Qml xqt-canvas)
 set_target_properties(xqt-quick PROPERTIES AUTOMOC ON)
@@ -136,6 +138,7 @@ set(XQT_QML_FILES
     src/app/qml/OutlineList.qml
     src/app/qml/TextFlowPanel.qml
     src/app/qml/MarkdownPanel.qml
+    src/app/qml/EmojiSuggestions.qml
     src/app/qml/CustomWidthPopup.qml
     src/app/qml/AppendPages.qml
     src/app/qml/PageJump.qml

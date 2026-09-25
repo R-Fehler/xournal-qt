@@ -64,6 +64,8 @@ public:
     void inputMethodEvent(const QInputMethodEvent* e) override;
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
     QRectF cursorRectOnPage() const override;
+    std::string textBeforeCursor() const override;
+    void replaceBeforeCursor(size_t bytes, const std::string& text) override;
 
     /// Draws the box with the cursor, the selection and the cursor (page coordinates of getPage()).
     void paint(cairo_t* cr) const;
