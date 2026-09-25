@@ -2,8 +2,8 @@
 # the official Qt for Android) and publish it as the artifact "xournal-qt-android-arm64" (a zip holding the .apk).
 # See qt/docs/android.md. Runs only when asked, or for pushes to the qt/android-build branch.
 #
-# Signing: with the repository secrets XQT_ANDROID_KEYSTORE (the keystore, base64), XQT_ANDROID_KEYSTORE_PASSWORD and
-# XQT_ANDROID_KEY_ALIAS the APK is signed with that release key, so that it installs as an update over earlier
+# Signing: with the repository secrets XQT_ANDROID_KEYSTORE (the keystore, base64) and XQT_ANDROID_KEYSTORE_PASSWORD
+# (and optionally XQT_ANDROID_KEY_ALIAS, default "xournal-qt") the APK is signed with that release key, so that it installs as an update over earlier
 # releases; without them it keeps the runner's throwaway debug signature (fine to try, but no updates across runs).
 name: xournal-qt Android
 
@@ -119,7 +119,8 @@ jobs:
           fi
           # (a line break pasted along with a secret is not part of it)
           KEYSTORE_PASSWORD="$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n')"
-          KEY_ALIAS="$(printf '%s' "$KEY_ALIAS" | tr -d '\r\n[:space:]')"
+          KEY_ALIAS="$(printf '%s' "${KEY_ALIAS:-}" | tr -d '\r\n[:space:]')"
+          KEY_ALIAS="${KEY_ALIAS:-xournal-qt}"  # (the alias of the key made for this repository; not a secret)
           export KEYSTORE_PASSWORD
           keystore="$RUNNER_TEMP/release.jks"
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$keystore"

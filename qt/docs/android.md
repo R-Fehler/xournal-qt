@@ -200,7 +200,8 @@ libraries (an hour or two); they are cached for the next runs. The APK is the ar
 
 Signing: an update installs over an app only when both are signed with the same key. Without a key in the
 repository secrets the CI APK keeps a throwaway debug signature (different on every run). With the secrets
-`XQT_ANDROID_KEYSTORE` (the keystore file, base64), `XQT_ANDROID_KEYSTORE_PASSWORD` and `XQT_ANDROID_KEY_ALIAS` it is
+`XQT_ANDROID_KEYSTORE` (the keystore file, base64) and `XQT_ANDROID_KEYSTORE_PASSWORD` (and `XQT_ANDROID_KEY_ALIAS` if
+the key's alias is not `xournal-qt`) it is
 signed with that release key (`zipalign` + `apksigner`), so every release updates the previous one. The keystore is
 never in the repository.
 
