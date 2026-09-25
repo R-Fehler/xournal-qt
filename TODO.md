@@ -344,10 +344,17 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   text only), later ink on Markdown pages. Not started: the author wants to discuss it first.
   - Ink on reflowing Markdown (the author, 2026-09-26): no anchoring; the user handles it (e.g. inserts a page
     above and moves the text on). Document the behaviour, don't engineer around it.
-  - Proposal under discussion: one model for both (a document is pages; a Markdown text is a flow over a run of
-    pages). A `.md` is a document with exactly one flow and nothing else; the PDF text document is the notes model
-    (flow + ink) inside a PDF with notes, exportable as `.md` + assets; a page break in Markdown ends the flow's
-    page.
+  - Agreed (2026-09-26): one model for both (a document is pages; a Markdown text is a flow over a run of pages).
+    A `.md` is a document with exactly one flow and nothing else; the PDF text document is the notes model (flow +
+    ink) inside a PDF with notes, exportable as `.md` + assets; a page break in Markdown
+    (`<div style="page-break-after: always"></div>`) ends the flow's page.
+  - Agreed (2026-09-26): the PDF text document also carries a plain `name.md` (rewritten on every save) and its
+    images as `name.assets/…` attachments next to the `.xopp`, so whoever gets the PDF can extract portable
+    Markdown with any PDF viewer (copying text out of a PDF would not give Markdown).
+  - Images (`qt/md-images`, after `qt/md-pdf`): drawn inline like formulas (cached); paste/drop saves the image
+    and inserts `![](name.assets/…)`; `.md` → `name.assets/` next to it (the pair is one document); PDF text
+    document → attachments inside the PDF (unpacked to the app cache while editing); Markdown boxes in a `.xopp` →
+    inside the `.xopp`. Web images are not fetched unasked (alt text + "load", URL shown first).
 - [ ] **`qt/md-toolbar`** (the author, 2026-09-26): formatting tools for people who don't know Markdown syntax, in
   the `.md` editor and for Markdown boxes: heading levels, bold/italic/strike/code, bullet, numbered and checkbox
   lists, quote, code block, link, image, horizontal rule, math, page break, and **insert/edit table** in an
