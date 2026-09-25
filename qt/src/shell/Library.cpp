@@ -1,7 +1,9 @@
 #include "Library.h"
 
 #include <algorithm>
+#include <array>
 #include <functional>
+#include <optional>
 #include <set>
 #include <shared_mutex>
 
@@ -17,6 +19,9 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QThreadPool>
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#endif
 
 #include "model/Document.h"
 #include "model/Layer.h"
@@ -56,15 +61,107 @@ fs::path normalized(const fs::path& p) {
 
 Library::Library(const fs::path& root): rootDir(normalized(root)) {}
 
-fs::path Library::librariesFolder() {
-    return fs::path(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation).toStdString()) /
-           "Xournal_Libraries";
+namespace {
+#ifdef Q_OS_ANDROID
+/// A folder of android.os.Environment: getExternalStoragePublicDirectory(<type>), or ("") the storage itself.
+fs::path environmentFolder(const char* type) {
+    QJniObject dir;
+    if (*type) {
+        dir = QJniObject::callStaticObjectMethod("android/os/Environment", "getExternalStoragePublicDirectory",
+                                                 "(Ljava/lang/String;)Ljava/io/File;",
+                                                 QJniObject::fromString(QString::fromLatin1(type)).object<jstring>());
+    } else {
+        dir = QJniObject::callStaticObjectMethod("android/os/Environment", "getExternalStorageDirectory",
+                                                 "()Ljava/io/File;");
+    }
+    if (!dir.isValid()) {
+        return {};
+    }
+    return fs::path(dir.callObjectMethod("getAbsolutePath", "()Ljava/lang/String;").toString().toStdString());
+}
+#endif
+
+struct Platform {
+    std::mutex mtx;
+    std::optional<PlatformFolders> folders;
+    Library::Home home = Library::Home::App;
+};
+Platform& platform() {
+    static Platform p;
+    return p;
+}
+}  // namespace
+
+PlatformFolders PlatformFolders::detect() {
+    PlatformFolders f;
+    f.appDocuments = fs::path(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation).toStdString());
+    f.appDownloads = fs::path(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation).toStdString());
+#ifdef Q_OS_ANDROID
+    // (the names of Environment.DIRECTORY_DOCUMENTS and DIRECTORY_DOWNLOADS; asked once)
+    static const std::array<fs::path, 3> shared{environmentFolder("Documents"), environmentFolder("Download"),
+                                                environmentFolder("")};
+    f.sharedDocuments = shared[0];
+    f.sharedDownloads = shared[1];
+    f.sharedStorage = shared[2];
+#endif
+    return f;
+}
+
+PlatformFolders Library::platformFolders() {
+    // (detected each time: the desktop's folders can change while the app runs, e.g. user-dirs.dirs)
+    {
+        auto& p = platform();
+        std::lock_guard lock(p.mtx);
+        if (p.folders) {
+            return *p.folders;
+        }
+    }
+    return PlatformFolders::detect();
+}
+
+void Library::setPlatformFolders(const PlatformFolders* folders) {
+    auto& p = platform();
+    std::lock_guard lock(p.mtx);
+    if (folders) {
+        p.folders = *folders;
+    } else {
+        p.folders.reset();
+    }
+    p.home = Home::App;
+}
+
+Library::Home Library::home() {
+    const bool shared = !platformFolders().sharedDocuments.empty();
+    auto& p = platform();
+    std::lock_guard lock(p.mtx);
+    return shared ? p.home : Home::App;
+}
+
+void Library::setHome(Home home) {
+    auto& p = platform();
+    std::lock_guard lock(p.mtx);
+    p.home = home;
+}
+
+Library::Home Library::chooseHome(const PlatformFolders& folders, bool access, bool moved) {
+    return !folders.sharedDocuments.empty() && access && moved ? Home::Shared : Home::App;
+}
+
+fs::path Library::librariesFolder() { return librariesFolder(home()); }
+
+fs::path Library::librariesFolder(Home home) {
+    const PlatformFolders f = platformFolders();
+    const bool shared = home == Home::Shared && !f.sharedDocuments.empty();
+    return (shared ? f.sharedDocuments : f.appDocuments) / "Xournal_Libraries";
 }
 
 fs::path Library::defaultRoot() { return librariesFolder() / "Default"; }
 
 fs::path Library::downloadsFolder() {
-    return fs::path(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation).toStdString());
+    // Android: the phone's Download folder, where the browser and the other apps put downloads (the app's own
+    // "Download" folder stays empty)
+    const PlatformFolders f = platformFolders();
+    return f.sharedDownloads.empty() ? f.appDownloads : f.sharedDownloads;
 }
 
 bool Library::isTemporary() const {

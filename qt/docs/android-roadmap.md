@@ -68,6 +68,11 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
 
 ## Files
 
+- Done (`qt/android-storage`): **libraries survive uninstalling.** They live in the phone's
+  `Documents/Xournal_Libraries` (with "All files access"; offered at the start, then moved there safely: copy, check,
+  switch, clean up), the Downloads quick library is the phone's `Download` folder (android.md, "Where the documents
+  are"). Open: a Play build without `MANAGE_EXTERNAL_STORAGE` would need the libraries as SAF trees; SD cards are
+  not offered as the libraries' home.
 - Done (`qt/android-basics`): **"Open…", "Import files…", "Import a folder…" and "Insert image"** read what
   Android's pickers return (`content://`) and copy it into the library (android.md).
 - (E) **Saving and exporting to a place the user picks** ("Save as", "Export as PDF", the archive export, the

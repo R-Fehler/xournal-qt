@@ -67,6 +67,7 @@
 #include "shell/Previews.h"
 #include "shell/Library.h"
 #include "shell/LibraryArchive.h"
+#include "shell/LibraryMigration.h"
 #include "shell/LibraryModel.h"
 #include "shell/DocumentChapters.h"
 #include "shell/LayersModel.h"
@@ -1746,7 +1747,10 @@ QVariantList AppController::libraries() const {
     // The Downloads folder: a quick library (all downloaded papers at once), last
     const fs::path downloads = Library(Library::downloadsFolder()).root();
     std::erase_if(dirs, [&](const fs::path& d) { return Library(d).root() == downloads; });
-    if (fs::is_directory(downloads, ec)) {
+    // (Android: the phone's Download folder, also while the app may not read it yet: tapping it asks for the access)
+    SystemApps& apps = SystemApps::instance();
+    const QString downloadsPath = QString::fromStdString(downloads.string());
+    if (fs::is_directory(downloads, ec) || (apps.needsAllFilesAccess(downloadsPath) && !apps.hasAllFilesAccess())) {
         dirs.push_back(downloads);
     }
     for (const auto& d: dirs) {
@@ -1828,10 +1832,27 @@ void AppController::requestStorageAccess(const QString& thenOpen) {
     // The answer is there when the app is active again after the system's page (applicationStateChanged)
 }
 
+namespace {
+/// requestStorageAccess's "then" for moving the libraries (moveLibrariesHome)
+const QString MOVE_LIBRARIES = QStringLiteral("xournal-qt:move-libraries");
+}  // namespace
+
 void AppController::storageAccessAnswered() {
     awaitingStorageAccess = false;
     Q_EMIT storageAccessChanged();
     const QString then = std::exchange(afterStorageAccess, QString());
+    if (then == MOVE_LIBRARIES) {
+        if (SystemApps::instance().hasAllFilesAccess()) {
+            startLibrariesMove();
+        } else {
+            Q_EMIT message(tr("Libraries stay inside the app"),
+                           tr("Without \u201cAll files access\u201d the libraries stay in the app\u2019s own folder, "
+                              "which Android deletes when the app is uninstalled. The note on the home screen asks "
+                              "again."),
+                           false);
+        }
+        return;
+    }
     if (!SystemApps::instance().hasAllFilesAccess()) {
         Q_EMIT message(tr("Open a folder as library"),
                        tr("Without \u201cAll files access\u201d the app can only use its own folders. \u201cImport a "
@@ -1861,6 +1882,254 @@ bool AppController::createLibrary(const QString& name) {
 }
 
 void AppController::showInFileManager(const QString& path) { SystemApps::instance().showInFileManager(path); }
+
+// --- where the libraries live ----------------------------------------------------------------------------------------
+
+namespace {
+const char* const LIBRARIES_HOME = "librariesHome";                  // "shared": moved to the phone's Documents
+const char* const LIBRARIES_HOME_DECLINED = "librariesHomeDeclined";  // "Not now" of the offer
+}  // namespace
+
+bool AppController::librariesInApp() const {
+    return !Library::platformFolders().sharedDocuments.empty() && Library::home() == Library::Home::App;
+}
+
+bool AppController::offerLibrariesHome() const {
+    bool declined = false;
+    app->getSettings()->getCustomElement("xournalQt").getBool(LIBRARIES_HOME_DECLINED, declined);
+    return librariesInApp() && !declined;
+}
+
+QString AppController::sharedLibrariesName() const {
+    const PlatformFolders f = Library::platformFolders();
+    const fs::path shared = Library::librariesFolder(Library::Home::Shared);
+    const fs::path shown = f.sharedStorage.empty() ? shared : shared.lexically_relative(f.sharedStorage);
+    return QString::fromStdString(shown.empty() || shown.string().rfind("..", 0) == 0 ? shared.string() : shown.string());
+}
+
+QString AppController::librariesToMove() const {
+    std::string error;
+    const auto plan = LibraryMigration::plan(Library::librariesFolder(Library::Home::App),
+                                             Library::librariesFolder(Library::Home::Shared), error);
+    if (plan.files == 0) {
+        return {};
+    }
+    const QString size = plan.bytes < 1024 * 1024 ? tr("%1 KB").arg(std::max<qint64>(1, plan.bytes / 1024))
+                                                  : tr("%1 MB").arg(QString::number(plan.bytes / (1024.0 * 1024.0), 'f', 1));
+    return (plan.files == 1 ? tr("1 file") : tr("%1 files").arg(plan.files)) + ", " + size;
+}
+
+QObject* AppController::libraryMoveObject() const {
+    if (!libraryMoveTask) {
+        auto* self = const_cast<AppController*>(this);
+        self->libraryMoveTask = std::make_unique<LibraryMove>();
+        connect(self->libraryMoveTask.get(), &LibraryMove::copied, self, &AppController::librariesCopied);
+    }
+    return libraryMoveTask.get();
+}
+
+void AppController::setLibrariesMoved() {
+    app->getSettings()->getCustomElement("xournalQt").setString(LIBRARIES_HOME, "shared");
+    app->getSettings()->customSettingsChanged();
+    app->getSettings()->save();  // (at once: the libraries are there now)
+    Library::setHome(Library::Home::Shared);
+}
+
+void AppController::chooseLibrariesHome() {
+    const PlatformFolders folders = Library::platformFolders();
+    if (folders.sharedDocuments.empty()) {
+        return;  // (the desktop: one home)
+    }
+    // A move that was switched but not cleaned up (the app was ended): its paths are followed again (that is safe
+    // to repeat), then the old copies go
+    if (auto pending = LibraryMigration::readManifest(LibraryMigration::manifestFile())) {
+        setLibrariesMoved();
+        LibraryMigration::relocateState(*pending, LibraryMigration::journalFiles());
+        followMovedLibraries(pending->pairs());
+        libraryMoveObject();
+        connect(libraryMoveTask.get(), &LibraryMove::cleanedUp, this,
+                [this, plan = *pending](const LibraryMigration::Cleanup& r) { librariesCleanedUp(plan, r, false); },
+                Qt::SingleShotConnection);
+        libraryMoveTask->startCleanup(*pending);
+    }
+    std::string home;
+    app->getSettings()->getCustomElement("xournalQt").getString(LIBRARIES_HOME, home);
+    const bool access = SystemApps::instance().hasAllFilesAccess();
+    Library::setHome(Library::chooseHome(folders, access, home == "shared"));
+    // Nothing to move (a new install, or one after the libraries were moved and the app was installed again): with
+    // the access, the phone's folder at once
+    const fs::path inApp = Library::librariesFolder(Library::Home::App);
+    if (Library::home() == Library::Home::App && access && !LibraryMigration::hasContent(inApp)) {
+        std::error_code ec;
+        fs::remove_all(inApp, ec);  // (empty folders only)
+        setLibrariesMoved();
+    }
+    Q_EMIT librariesHomeChanged();
+}
+
+void AppController::moveLibrariesHome() {
+    if (Library::platformFolders().sharedDocuments.empty() || (libraryMoveTask && libraryMoveTask->running())) {
+        return;
+    }
+    if (!SystemApps::instance().hasAllFilesAccess()) {
+        requestStorageAccess(MOVE_LIBRARIES);  // (then startLibrariesMove, see storageAccessAnswered)
+        return;
+    }
+    startLibrariesMove();
+}
+
+void AppController::declineLibrariesHome() {
+    app->getSettings()->getCustomElement("xournalQt").setBool(LIBRARIES_HOME_DECLINED, true);
+    app->getSettings()->customSettingsChanged();
+    Q_EMIT librariesHomeChanged();
+}
+
+void AppController::cancelLibrariesMove() {
+    if (libraryMoveTask && libraryMoveTask->step() != QLatin1String("clean")) {
+        libraryMoveTask->cancel();
+    }
+}
+
+void AppController::startLibrariesMove() {
+    libraryMoveObject();
+    if (libraryMoveTask->running()) {
+        return;
+    }
+    const fs::path from = Library::librariesFolder(Library::Home::App);
+    const fs::path to = Library::librariesFolder(Library::Home::Shared);
+    // What could write into the old place meanwhile: the autosaves and the journal are written first, and the
+    // library (its search index and previews) is let go until the move is done
+    autosaveAll();
+    if (recovery) {
+        recovery->writeNow();
+    }
+    libraryBeforeMove = library->library() ? library->library()->root() : fs::path();
+    libraryLetGo = !libraryBeforeMove.empty() &&
+                   DocumentFiles::remap(libraryBeforeMove, Library(from).root(), "/") != libraryBeforeMove;
+    if (libraryLetGo) {
+        library->setLibrary(nullptr);
+    }
+    std::string error;
+    LibraryMigration::Plan plan = LibraryMigration::plan(from, to, error);
+    if (!error.empty()) {
+        if (libraryLetGo) {
+            setLibraryRoot(libraryBeforeMove);
+        }
+        libraryLetGo = false;
+        Q_EMIT message(tr("Libraries stay inside the app"), QString::fromStdString(error), true);
+        return;
+    }
+    libraryMoveTask->startCopy(std::move(plan));
+}
+
+void AppController::librariesCopied(bool ok, const QString& error, const LibraryMigration::Plan& copied) {
+    LibraryMigration::Plan plan = copied;
+    std::string why;
+    if (ok && !LibraryMigration::commit(plan, why)) {
+        ok = false;
+    }
+    if (!ok) {
+        if (libraryLetGo) {
+            setLibraryRoot(libraryBeforeMove);
+        }
+        libraryLetGo = false;
+        const QString reason = why.empty() ? error : QString::fromStdString(why);
+        Q_EMIT message(tr("Libraries stay inside the app"),
+                       tr("Moving the libraries to %1 did not work: %2").arg(sharedLibrariesName(), reason) + "\n\n" +
+                               tr("Nothing was changed: they are still in the app’s own folder, and in use."),
+                       true);
+        return;
+    }
+    // The switch: the new place is complete and checked. From here on the app works there (the manifest lets the
+    // next start finish this if the app is ended now).
+    LibraryMigration::writeManifest(plan, LibraryMigration::manifestFile());
+    setLibrariesMoved();
+    LibraryMigration::relocateState(plan, LibraryMigration::journalFiles());
+    followMovedLibraries(plan.pairs());
+    if (libraryLetGo) {
+        // The library shown before, in its new place
+        fs::path root = Library::defaultRoot();
+        for (const auto& [from, to]: plan.pairs()) {
+            if (const fs::path n = DocumentFiles::remap(libraryBeforeMove, from, to); n != libraryBeforeMove) {
+                root = n;
+                break;
+            }
+        }
+        switchLibrary(root);
+    }
+    libraryLetGo = false;
+    if (recovery) {
+        recovery->writeNow();
+    }
+    Q_EMIT librariesHomeChanged();
+    connect(libraryMoveTask.get(), &LibraryMove::cleanedUp, this,
+            [this, plan](const LibraryMigration::Cleanup& r) { librariesCleanedUp(plan, r, true); },
+            Qt::SingleShotConnection);
+    libraryMoveTask->startCleanup(plan);
+}
+
+void AppController::librariesCleanedUp(const LibraryMigration::Plan& plan, const LibraryMigration::Cleanup& result,
+                                       bool report) {
+    std::error_code ec;
+    fs::remove(LibraryMigration::manifestFile(), ec);
+    Q_EMIT librariesHomeChanged();
+    if (!report && result.kept.empty()) {
+        return;
+    }
+    QString text = tr("Your libraries are now in %1 on the phone, where other apps see them and where they stay when "
+                      "the app is uninstalled.")
+                           .arg(sharedLibrariesName());
+    for (const auto& m: plan.moves) {
+        if (m.renamed) {
+            text += "\n\n" + tr("“%1” is there as “%2”: a library of that name was there already.")
+                                     .arg(QString::fromStdString(m.from.filename().string()),
+                                          QString::fromStdString(m.to.filename().string()));
+        }
+    }
+    if (!result.kept.empty()) {
+        text += "\n\n" + (result.kept.size() == 1
+                                 ? tr("1 file changed while it was moved and stayed in the app\u2019s own folder (the "
+                                      "note on the home screen offers to move it too).")
+                                 : tr("%1 files changed while they were moved and stayed in the app\u2019s own folder "
+                                      "(the note on the home screen offers to move them too).")
+                                           .arg(result.kept.size()));
+    }
+    Q_EMIT message(tr("Libraries moved"), text, false);
+}
+
+void AppController::followMovedLibraries(const std::vector<std::pair<fs::path, fs::path>>& moves) {
+    auto* settings = app->getSettings();
+    std::string remembered;
+    settings->getCustomElement("xournalQt").getString("library", remembered);
+    for (const auto& [from, to]: moves) {
+        recent->remap(from, to);
+        if (!remembered.empty()) {
+            if (fs::path n = DocumentFiles::remap(remembered, from, to); n != fs::path(remembered)) {
+                settings->getCustomElement("xournalQt").setString("library", n.string());
+                remembered = n.string();
+            }
+        }
+        if (fs::path n = DocumentFiles::remap(settings->getLastSavePath(), from, to); n != settings->getLastSavePath()) {
+            settings->setLastSavePath(n);
+        }
+        if (fs::path n = DocumentFiles::remap(settings->getLastOpenPath(), from, to); n != settings->getLastOpenPath()) {
+            settings->setLastOpenPath(n);
+        }
+        for (int i = 0; i < tabs->count(); ++i) {
+            DocumentSession* s = tabs->session(i);
+            const fs::path file = s->hasFilePath() ? s->getFilePath() : fs::path();
+            const fs::path pdf = s->getDocument()->getPdfFilepath();
+            const fs::path newFile = file.empty() ? file : DocumentFiles::remap(file, from, to);
+            const fs::path newPdf = pdf.empty() ? pdf : DocumentFiles::remap(pdf, from, to);
+            if (newFile != file || newPdf != pdf) {
+                s->relocate(newFile != file ? newFile : fs::path(), newPdf != pdf ? newPdf : fs::path());
+            }
+        }
+    }
+    settings->customSettingsChanged();
+    recent->refresh();
+    Q_EMIT titleChanged();
+}
 
 bool AppController::canShowInFileManager() const { return SystemApps::canShowInFileManager(); }
 

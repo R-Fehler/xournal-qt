@@ -1264,3 +1264,42 @@ with the sample library stays).
 - [ ] On the Fold 7, open a document (from the library, "Open with", or a new one): the hand is selected, one finger
       scrolls. Tap the pen: the finger writes. Switch to another open tab and back: the pen stays.
 - [ ] Settings -> Touch -> "Open documents with the hand" off: documents open with the tool that was chosen last.
+
+## Android storage (qt/android-storage)
+
+Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
+
+- [ ] **Update from the version before** (libraries in the app's folder, "All files access" not given): install the
+      new APK over it with `adb install -r` (never uninstall first). At the start (after "How do you want to keep
+      your documents?" and the recovery question, if they come) "Keep libraries on the phone?" explains that the
+      libraries are kept in `Documents/Xournal_Libraries`, how much will be moved, and that Android's settings page
+      comes next. Continue → the page "All files access" → turn it on → back: "Moving the libraries" shows the
+      files copied, then checked; then "Libraries moved".
+- [ ] After the move: `adb shell ls -R /sdcard/Documents/Xournal_Libraries` has every library with its PDFs,
+      `.xopp` files, subfolders and "Opened"; `/sdcard/Android/data/org.xournalqt.app/files/Documents` is empty.
+      The file times are the old ones (`adb shell stat`). The library shows at once with its previews (the cache
+      moved along), Recent lists the same documents, a document opened with "Last page" on opens at the page where
+      it was left, the title page of a card is the one chosen before.
+- [ ] Close and start again: no offer, no note; the library is the one in `Documents/Xournal_Libraries`.
+- [ ] A library of the same name in `Documents/Xournal_Libraries` before the move (e.g. `adb shell mkdir -p
+      /sdcard/Documents/Xournal_Libraries/Default && adb push some.pdf …/Default/`): the moved one is
+      "Default (2)", the message says so, the other one is untouched.
+- [ ] "Not now": the note "Libraries are inside the app and are deleted when it is uninstalled" stays at the top of
+      the library; the next start does not ask. Tapping the note asks again.
+- [ ] Continue, then on Android's page leave the switch off and come back: a message says the libraries stay
+      inside the app; the note stays.
+- [ ] Cancel while copying (a big library): nothing changes, no `.xqt-moving-…` folder is left in
+      `Documents/Xournal_Libraries`.
+- [ ] Turn "All files access" off in the settings and start: the app works in its own (empty) folder, the note is
+      back. Turn it on again and tap the note → Continue: the libraries in `Documents/Xournal_Libraries` are used
+      again (nothing to move).
+- [ ] **Uninstall and install again (emulator only):** `adb uninstall org.xournalqt.app`, install the APK: the
+      offer comes; Continue → allow: the libraries in `Documents/Xournal_Libraries` open again with their
+      documents (Recent and reading positions are gone with the app's data, as expected).
+- [ ] **Downloads:** without "All files access" the library menu still lists "Downloads folder (quick library)";
+      tapping it explains and asks for the access; with it, the phone's `Download` folder opens with its PDFs.
+- [ ] **The author's Fold 7:** only `adb install -r` over the installed app (never uninstall, never clear its data).
+      Before: note the number of files in the app's library (`adb shell find /sdcard/Android/data/org.xournalqt.app/
+      files/Documents -type f | wc -l`). Go through the offer and the move. After: the same number of files under
+      `/sdcard/Documents/Xournal_Libraries`, the sample library opens with its previews, Recent and "Last page"
+      work. If anything fails, the message says so and the old folder is still in use: nothing is lost.

@@ -59,10 +59,39 @@ Or copy the APK to the phone and open it (allow installing from the file manager
 package `org.xournalqt.app`. A document can be opened at start from adb (debug builds only):
 `adb shell am start -S -n org.xournalqt.app/.XournalActivity -e applicationArguments <path>`.
 
-**Where the documents are.** The default library is the app's own folder on the shared storage:
-`/storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default`. Files can be put
-there with `adb push <file> <that folder>/` or over USB. New documents are saved there. Uninstalling the app deletes
-this folder.
+**Where the documents are** (`qt/android-storage`). The libraries live in the phone's own
+`Documents/Xournal_Libraries` (`/storage/emulated/0/Documents/Xournal_Libraries/Default` for the default library;
+the folder comes from `Environment.getExternalStoragePublicDirectory`, [Library.cpp](../src/shell/Library.cpp)
+`PlatformFolders`). There file managers and sync apps (Syncthing) see them, and they stay when the app is uninstalled
+(VISION: the app keeps no hostage data). The app reads and writes there with "All files access", so until it has
+that, the libraries are in the app's own folder, `/storage/emulated/0/Android/data/org.xournalqt.app/files/
+Documents/Xournal_Libraries`, which Android deletes with the app. Which of the two is in use is
+`Library::home()`: the phone's folder once the libraries were moved there (the setting `librariesHome` = `shared`)
+and while the app has the access; else the app's folder (`AppController::chooseLibrariesHome`, at every start).
+- **Moving them.** At the first start, and at later starts while the libraries are in the app's folder, a dialog
+  says where they belong and asks for "All files access" ("Keep libraries on the phone?"). Continue shows
+  Android's page for the access; back with it, the libraries move in the background
+  ([LibraryMigration](../src/shell/LibraryMigration.h)): every file is copied into a hidden
+  `.xqt-moving-<name>` folder next to its place, read back and compared (size and SHA-1), and only when all of it
+  arrived do the folders get their names and the app switches over. Recent files, the library shown, the reading
+  positions and title pages, the library's settings and its cache (previews, search index), the session journal
+  (open tabs), the open tabs themselves and the last folders of the file dialogs follow. The old copies are deleted
+  last, each only if it is still the file that was copied (size and time); a file changed meanwhile stays. If the
+  app is ended before that, the next start finishes it (`library-move.json` in the config folder). A library whose
+  name is taken in the phone's folder becomes "Name (2)" (never merged); an empty one is not moved. A failure (no
+  space, a file that cannot be read, a copy that differs, a file changed during the move) removes the copies and
+  leaves the libraries where they were, in use, with a message saying so.
+- **"Not now"** keeps the libraries in the app's folder; the offer does not come at the start again, but a note on
+  the home screen stays ("Libraries are inside the app and are deleted when it is uninstalled"); tapping it asks
+  again. Without the access later (turned off in the settings) the app works in its own folder again and the note
+  comes back; the libraries in the phone's folder are used again as soon as the access is back.
+- **Installed again**: the libraries are still in `Documents/Xournal_Libraries`. The app starts in its (new, empty)
+  folder with the offer; with the access given there is nothing to move, and the phone's folder is used at once.
+- Files can be put into a library with `adb push <file> /sdcard/Documents/Xournal_Libraries/Default/` or over USB.
+- The library cache stays in the app's cache (`qt/android-libraries`): it goes with the app and is read again.
+- **Downloads.** The Downloads quick library (library menu) is the phone's `Download` folder, where browsers and
+  mail apps put files (the app's own Download folder stays empty). Without "All files access" tapping it explains
+  and asks for the access first, then opens it.
 
 **Files from other apps.** "Open with" (a PDF, a `.xopp` or `.xoj`, a `.md` or `.txt`, an image in a file
 manager, a mail or a browser's downloads) and the share sheet (one file or several) hand the app `content://` URIs.

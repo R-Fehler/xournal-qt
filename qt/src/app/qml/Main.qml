@@ -2126,6 +2126,7 @@ ApplicationWindow {
     Dialog {
         id: recoveryDialog
         objectName: "recoveryDialog"
+        onClosed: homeView.offerLibrariesHomeAtStart()
         anchors.centerIn: parent
         modal: true
         closePolicy: Popup.NoAutoClose
@@ -2161,14 +2162,19 @@ ApplicationWindow {
             }
         }
     }
-    // The first start asks which way to keep documents (PDF files or Xournal++ files); then the recovery question
+    // The first start asks which way to keep documents (PDF files or Xournal++ files); then the recovery question;
+    // then (Android) where the libraries are kept
     DocumentModeDialog {
         id: documentModeDialog
-        onChosen: if (app.recoveryItems.length > 0) recoveryDialog.open()
+        onChosen: {
+            if (app.recoveryItems.length > 0) recoveryDialog.open()
+            else homeView.offerLibrariesHomeAtStart()
+        }
     }
     Component.onCompleted: {
         if (app.askDocumentMode()) documentModeDialog.open()
         else if (app.recoveryItems.length > 0) recoveryDialog.open()
+        else homeView.offerLibrariesHomeAtStart()
     }
 
     Dialog {
