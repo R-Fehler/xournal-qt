@@ -125,6 +125,17 @@ TEST(MdMath, ManyKindsOfFormulas) {
     EXPECT_GT(matrix->ascent + matrix->descent, 2 * (letter->ascent + letter->descent));
 }
 
+// \hbar (Planck's reduced constant, common in physics texts from chat apps) is the same symbol as \hslash (U+210F):
+// MicroTeX's table only had \hslash.
+TEST(MdMath, HbarIsHslash) {
+    const auto hbar = math::formula(R"(E = \hbar\omega)", false);
+    const auto hslash = math::formula(R"(E = \hslash\omega)", false);
+    ASSERT_TRUE(hbar->ok) << hbar->error;
+    ASSERT_TRUE(hslash->ok) << hslash->error;
+    EXPECT_NEAR(hbar->width, hslash->width, 1e-6);
+    EXPECT_EQ(inkOf(*hbar, 30).pixels, inkOf(*hslash, 30).pixels);
+}
+
 TEST(MdMath, ColorsOfTheTextAndOwnColors) {
     // Without \color: the current source (the text's color); with it: its own
     const auto plain = math::formula("x", false);

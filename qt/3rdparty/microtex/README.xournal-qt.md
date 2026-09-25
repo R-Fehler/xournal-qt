@@ -29,3 +29,5 @@ Marked with `xournal-qt:`.
 - `src/core/formula.cpp`: a parsed argument that is empty is an empty atom instead of a null one. Many atoms
   dereferenced it (`\raisebox{1pt}{}`, `\reflectbox{}`, `\shoveleft{}`, …: crashes found by fuzzing with random
   formulas). A consequence: `\frac{}{x}` draws an empty numerator instead of failing.
+- `src/unimath/uni_symbol.cpp`: `\hbar` (U+210F, as unicode-math defines it; the table only had `\hslash` for that
+  character). Inserted in the name order the table's binary search needs.

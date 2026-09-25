@@ -1346,3 +1346,7 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
+
+## Math delimiters from chat apps (qt/md-tex-delims)
+
+- [ ] A Markdown box with `$E = \hbar\omega$`: drawn as a formula with ħ (not red, not the word "hbar").

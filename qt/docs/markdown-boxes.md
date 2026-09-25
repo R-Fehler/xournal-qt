@@ -100,6 +100,8 @@ dollar sign.
   zoom, and in the PDF export and the hybrid PDF as vector drawing (not as text: the TeX is not selectable there).
   They are drawn 1.2 times the size of the text around them (Latin Modern's letters are smaller than a sans
   text's; KaTeX does the same) and in its color (in a link, a quote, a heading); `\textcolor{red}{x}` colors a part.
+  MicroTeX knows unicode-math's names; `\hbar` was missing there and is added in the vendored copy (the same symbol
+  as `\hslash`, U+210F).
 - **In the text**: a formula takes the place of one character (U+FFFC) of the Pango layout, with a shape as big as
   the formula, on the text's baseline. So lines break around it, pages are split around it (never inside a
   formula, and a `$$` block keeps its `$$` lines), and a tap on it is a place in the text. A formula wider than the
