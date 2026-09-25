@@ -997,12 +997,20 @@ TEST_F(PastedPdfPages, aFailedMergeKeepsThePastedPageAsAnImage) {
     c.copyPages({1});
     ASSERT_TRUE(open(c, root / "lecture.xopp"));
     DocumentSession& s = current(c);
+    // The merged PDF cannot be written: its folder is a file when it is written (also for root, who can write into
+    // folders without write permission)
     const fs::path cache = MergedPdf::cacheFolder();
-    fs::create_directories(cache);
-    fs::permissions(cache, fs::perms::owner_read | fs::perms::owner_exec);
+    const fs::path away = cache.parent_path() / "pasted-pages.away";
+    PdfPageKeeper::beforeMergeWritten = [&] {
+        fs::rename(cache, away);
+        std::ofstream(cache) << "not a folder";
+    };
     ASSERT_EQ(c.pastePages(1), 1);
     s.waitForSaves();
-    fs::permissions(cache, fs::perms::owner_all);
+    PdfPageKeeper::beforeMergeWritten = nullptr;
+    ASSERT_TRUE(fs::is_regular_file(cache)) << "the merge was written";
+    fs::remove(cache);
+    fs::rename(away, cache);
     const PageRef page = s.getDocument()->getPage(1);
     EXPECT_TRUE(page->getBackgroundType().isImagePage()) << "its PDF page as an image";
     ASSERT_EQ(messages.count(), 1);
