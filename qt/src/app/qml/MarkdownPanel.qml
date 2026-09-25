@@ -257,6 +257,9 @@ Pane {
                         const link = app.clipboardLinkMarkdown()
                         if (area.selectedText !== "") area.remove(area.selectionStart, area.selectionEnd)
                         area.insert(area.cursorPosition, link); event.accepted = true
+                    } else if (event.matches(StandardKey.Paste)) {
+                        // Formulas as chat apps write them, \( \) and \[ \]: pasted as $ $ and $$ $$ (one undo step)
+                        event.accepted = app.pasteMarkdown(area.textDocument, area.selectionStart, area.selectionEnd)
                     }
                 }
             }

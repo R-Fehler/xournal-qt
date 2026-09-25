@@ -1434,3 +1434,22 @@ Once `qt/md-pdf` is released, with a PDF text document that has an image:
 - [ ] Acrobat Reader and Firefox: saving an image keeps the `name.assets/` part of its name, or only the file name?
 - [ ] The saved `name.md` with its `name.assets` folder opens with the images in Obsidian and VS Code.
 Update the table in the user doc with the results.
+
+## Math delimiters from chat apps (qt/md-tex-delims)
+
+- [ ] A Markdown box with `$E = \hbar\omega$`: drawn as a formula with ħ (not red, not the word "hbar").
+- [ ] `a $ $ b` and a paragraph `$$ $$`: shown as written (`$ $`, `$$ $$`), not as an empty gap. The cursor moves
+      through them character by character.
+- [ ] A Markdown box (or a `.md` file) with text as ChatGPT writes it: `The energy \(E = mc^2\) and (\(a\)).`, then
+      `\[` / `\int_0^1 x\,dx` / `\]` on three lines, and `\[ \sum_k k \]` on one line: drawn as formulas (the blocks
+      centered). The file keeps `\(` (open it in a text editor).
+- [ ] Writing on the page in that paragraph: it shows `\(` and `\)` as typed; a tap after a formula and typing put
+      the letters there, not two characters before. Enter after a `\[` line starts a line of the formula.
+- [ ] Stays text: `` `\(x\)` `` and a ``` block with `\(x\)`; `the \(n\)th` ("(n)th"); `see \[1\] here` ("[1]");
+      a `\[` whose `\]` comes after a blank line.
+- [ ] Search (Ctrl+F) for a word after `\(x\)`: the hit is on that word. A long `.md` with such formulas is split
+      into pages as before (never inside a formula).
+- [ ] Copy an answer with formulas from ChatGPT (it has `\(…\)` and `\[…\]`) and paste it (Ctrl+V) while writing
+      on the page, into a `.md` file, and into the Markdown panel beside the page: the pasted text has `$…$` and
+      `$$…$$` (formulas drawn), `the \(n\)th` stays; Ctrl+Z takes the whole paste back. Pasted into a ``` block: as
+      it is. A plain text box (not Markdown) and a `.txt` file: as it is.

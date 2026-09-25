@@ -125,6 +125,17 @@ TEST(MdMath, ManyKindsOfFormulas) {
     EXPECT_GT(matrix->ascent + matrix->descent, 2 * (letter->ascent + letter->descent));
 }
 
+// \hbar (Planck's reduced constant, common in physics texts from chat apps) is the same symbol as \hslash (U+210F):
+// MicroTeX's table only had \hslash.
+TEST(MdMath, HbarIsHslash) {
+    const auto hbar = math::formula(R"(E = \hbar\omega)", false);
+    const auto hslash = math::formula(R"(E = \hslash\omega)", false);
+    ASSERT_TRUE(hbar->ok) << hbar->error;
+    ASSERT_TRUE(hslash->ok) << hslash->error;
+    EXPECT_NEAR(hbar->width, hslash->width, 1e-6);
+    EXPECT_EQ(inkOf(*hbar, 30).pixels, inkOf(*hslash, 30).pixels);
+}
+
 TEST(MdMath, ColorsOfTheTextAndOwnColors) {
     // Without \color: the current source (the text's color); with it: its own
     const auto plain = math::formula("x", false);
@@ -595,4 +606,43 @@ TEST(MdMathText, AFormulaOverLinesKnowsItsSource) {
     EXPECT_EQ(src.substr(formula->source, formula->sourceLength), "\\sum_{k=1}^n k");
     const size_t at = src.find("k=1");
     EXPECT_FALSE(sourceRects(l, at, at + 3).empty());
+}
+
+// An empty formula ("$ $", "$$ $$", or only line breaks between the marks) is no formula: md4c makes a span of the
+// blank, which MicroTeX would draw as nothing. It is text, marks and all, with the marks' place in the source.
+TEST(MdMathText, EmptyFormulasAreText) {
+    const std::string src = "A $ $ b **$  $** c\n\n$$ $$\n\n$$\n$$\n\nand $x$ stays\n";
+    const Document doc = parse(src);
+    const auto runs = mathRuns(doc.root);
+    ASSERT_EQ(runs.size(), 1u);
+    EXPECT_EQ(runs[0]->text, "x");
+    ASSERT_EQ(doc.root.children.size(), 4u);
+    EXPECT_EQ(plainText(doc.root.children[0]), "A $ $ b $  $ c");
+    EXPECT_EQ(plainText(doc.root.children[1]), "$$ $$");
+    EXPECT_EQ(plainText(doc.root.children[2]), "$$ $$");  // (the line break as a space)
+    // Every run is where it is in the source (the cursor, the search and the pages rely on it)
+    for (size_t i = 0; i < 3; ++i) {
+        for (const xqt::md::Run& r: doc.root.children[i].runs) {
+            ASSERT_NE(r.source, NO_SOURCE) << r.text;
+            ASSERT_EQ(r.sourceLength, r.text.size()) << r.text;
+            std::string in = src.substr(r.source, r.sourceLength);
+            std::replace(in.begin(), in.end(), '\n', ' ');
+            EXPECT_EQ(in, r.text);
+        }
+    }
+    // The bold one stays bold; the block's range has its marks
+    const Block& first = doc.root.children[0];
+    const auto bold = std::find_if(first.runs.begin(), first.runs.end(),
+                                   [](const xqt::md::Run& r) { return r.text == "$  $"; });
+    ASSERT_NE(bold, first.runs.end());
+    EXPECT_TRUE(bold->flags & Strong);
+    EXPECT_EQ(doc.root.children[1].textBegin, src.find("$$ $$"));
+    EXPECT_EQ(doc.root.children[1].textEnd, src.find("$$ $$") + 5);
+    // Nothing for MicroTeX: no formula is laid out
+    const Layout l = lay(src);
+    size_t maths = 0;
+    for (const Item& it: l.items) {
+        maths += it.maths.size();
+    }
+    EXPECT_EQ(maths, 1u);
 }

@@ -800,6 +800,7 @@ const Symbol _symbols[]{
   {0x022D5, rel,     "hash"},
   {0x00302, acc,     "hat"},
   {0x02A6F, rel,     "hatapprox"},
+  {0x0210F, ord,     "hbar"},  // xournal-qt: unicode-math's \hbar (U+210F, as \hslash)
   {0x02661, ord,     "heartsuit"},
   {0x022B9, ord,     "hermitmatrix"},
   {0x02394, ord,     "hexagon"},
