@@ -455,6 +455,13 @@
   for self-testing (the pen does nothing on it; a tap peeks, on screen only); per page hide/show; drawn in exports
   and the hybrid PDF as they look. Upstream Xournal++ opens the files (checked with its binary).
 
+- **Math delimiters from chat apps, `qt/md-tex-delims` (2026-09-26).** `\( … \)` and `\[ … \]` (as ChatGPT writes
+  them) are formulas: a linear pre-pass rewrites them to `$`/`$$` for md4c outside code, and every run is mapped back
+  to the original source, so the file keeps what was typed and the cursor, search and pages stay right. Pasting
+  into Markdown converts them to `$…$` (portable to Obsidian and GitHub), one undo step. `$ $` and `$$ $$` stay text;
+  `\hbar` is ħ. `\[` counts only at a line's start and `\]` at its end (`see \[1\]` stays text); a pair next to a
+  letter (`\(n\)th`) stays as written, as md4c ignores such a `$`.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
