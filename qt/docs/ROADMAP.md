@@ -436,6 +436,15 @@
   - +2.4 MB binary (1.36 MB font), 28 s build; a page of 50 formulas lays out in 4.4 ms, draws in 8.7 ms.
   - Left: the error message on touch screens; editing per block, not per formula; `\color` outside arrays.
 
+- **Screen calibration, `qt/calibration` (2026-09-26, awaiting on-device test).** Settings → Display: a ruler in cm
+  and inch, set with a slider, −/+ or a drag (mouse or finger), stored per screen (maker, model, serial or
+  connector, size) as physical pixels per inch, so a new scaling needs no new calibration. 100 % is real size;
+  Ctrl+1 zooms to it (Ctrl+0 still fits the width). A new 100 % changes only the shown percentage and the limits.
+- **Writing button writes Markdown on the page (2026-09-26).** In its Markdown mode the button (and Ctrl+Alt+M)
+  writes the page's text on the page, formatted while typing; the source beside the page is in its menu.
+- **Handwriting recognition research, `qt/hwr-research` (2026-09-26).** `qt/docs/research/handwriting-recognition.md`;
+  decisions for the author in TODO.md.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
