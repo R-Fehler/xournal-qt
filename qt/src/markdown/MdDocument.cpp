@@ -211,8 +211,10 @@ public:
                 flag = Underline;
                 break;
             case MD_SPAN_LATEXMATH:
-            case MD_SPAN_LATEXMATH_DISPLAY:
                 flag = Math;
+                break;
+            case MD_SPAN_LATEXMATH_DISPLAY:
+                flag = Math | DisplayMath;
                 break;
             case MD_SPAN_A:
                 flag = Link;
@@ -386,8 +388,9 @@ Document parse(std::string_view source) {
     Builder builder(source);
     MD_PARSER parser{};
     parser.abi_version = 0;
-    // GitHub: tables, ~~strike~~, task lists, bare web addresses; [[wiki links]] as in Obsidian / Zettlr
-    parser.flags = MD_DIALECT_GITHUB | MD_FLAG_WIKILINKS;
+    // GitHub: tables, ~~strike~~, task lists, bare web addresses; [[wiki links]] as in Obsidian / Zettlr; formulas
+    // $…$ and $$…$$ as in Obsidian, Zettlr and GitHub (MdMath)
+    parser.flags = MD_DIALECT_GITHUB | MD_FLAG_WIKILINKS | MD_FLAG_LATEXMATHSPANS;
     parser.enter_block = [](MD_BLOCKTYPE t, void* d, void* u) { return static_cast<Builder*>(u)->enterBlock(t, d); };
     parser.leave_block = [](MD_BLOCKTYPE t, void*, void* u) { return static_cast<Builder*>(u)->leaveBlock(t); };
     parser.enter_span = [](MD_SPANTYPE t, void* d, void* u) { return static_cast<Builder*>(u)->enterSpan(t, d); };
@@ -427,6 +430,14 @@ std::vector<BlockSpan> topLevelSpans(std::string_view src, const Document& doc) 
             }
         }
         first = std::max(first, prevEnd);
+        if (b.kind == BlockKind::Paragraph && !b.runs.empty() && (b.runs.front().flags & Math)) {
+            // A formula's "$$" on a line of its own before it: the paragraph begins there
+            size_t l = prevEnd;
+            while (l < first && blank(lineAt(src, l))) {
+                l = nextLine(src, l);
+            }
+            first = std::min(first, l);
+        }
         size_t end = 0;
         if (b.kind == BlockKind::CodeBlock && b.fenced) {
             const std::string fence = fenceOf(lineAt(src, first));
@@ -440,6 +451,11 @@ std::vector<BlockSpan> topLevelSpans(std::string_view src, const Document& doc) 
         } else if (b.textEnd != NO_SOURCE && b.textEnd > first) {
             end = nextLine(src, b.textEnd - 1);
             if (b.kind == BlockKind::Heading && end < src.size() && setextUnderline(lineAt(src, end))) {
+                end = nextLine(src, end);
+            }
+            // (and the "$$" after a formula at its end, on a line of its own)
+            if (b.kind == BlockKind::Paragraph && !b.runs.empty() && (b.runs.back().flags & Math) && end < src.size() &&
+                afterIndent(lineAt(src, end)).substr(0, 1) == "$") {
                 end = nextLine(src, end);
             }
         } else {

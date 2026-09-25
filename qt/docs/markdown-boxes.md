@@ -1,8 +1,9 @@
 # Markdown boxes
 
 Write Markdown onto a page. The page shows it formatted as you type: headings, **bold** / *italic* / ~~struck~~,
-`code`, links, lists (nested, numbered, task lists), quotes, code blocks, tables and rules. The dialect is CommonMark
-with GitHub's extensions (tables, strikethrough, task lists, bare web addresses) and `[[wiki links]]`.
+`code`, links, lists (nested, numbered, task lists), quotes, code blocks, tables, rules and math formulas. The
+dialect is CommonMark with GitHub's extensions (tables, strikethrough, task lists, bare web addresses),
+`[[wiki links]]` and `$…$` / `$$…$$` formulas (as in Obsidian, Zettlr and GitHub).
 
 ## Two kinds of Markdown text, two ways of writing
 - **The page's Markdown text** starts at the top-left margin and goes to the right margin. It flows onto the next
@@ -88,6 +89,46 @@ the editor beside the page ("Size", which also changes the text being edited).
 - Code blocks with a language (```` ```python ````, `cpp`, `js`, `bash`, ...) are syntax highlighted (Kate's
   highlighter, KSyntaxHighlighting; optional at build time).
 
+## Math
+`$…$` is a formula in the text, `$$…$$` a formula block of its own (display style: big sums and fractions), centered
+in the box. The `$$` may stand on lines of their own. As in md4c (the parser) and GitHub, an opening `$` does not
+follow a letter or digit and a closing one is not followed by one: `costs $5 and $10` stays text, and `\$` is a
+dollar sign.
+
+- **Drawn by MicroTeX** (vendored, `qt/3rdparty/microtex`, MIT) with the Latin Modern Math font, which is compiled
+  into the program: no LaTeX, no external program, the same on Android. Formulas are paths (vector): sharp at any
+  zoom, and in the PDF export and the hybrid PDF as vector drawing (not as text: the TeX is not selectable there).
+  They are drawn 1.2 times the size of the text around them (Latin Modern's letters are smaller than a sans
+  text's; KaTeX does the same) and in its color (in a link, a quote, a heading); `\textcolor{red}{x}` colors a part.
+- **In the text**: a formula takes the place of one character (U+FFFC) of the Pango layout, with a shape as big as
+  the formula, on the text's baseline. So lines break around it, pages are split around it (never inside a
+  formula, and a `$$` block keeps its `$$` lines), and a tap on it is a place in the text. A formula wider than the
+  box is made smaller to fit.
+- **Writing on the page**: the block with the cursor shows its Markdown, formulas included (their source in a
+  monospaced font), as for the other marks; a `$$` block being written also shows the formula below its source.
+  The other blocks show the formulas drawn. A tap on a drawn formula puts the cursor into its source (its start or
+  end, by the half tapped). In a `$$` block that is not closed yet, Enter starts a line of the formula (as in a code
+  block), not a new paragraph.
+- **Errors**: a formula that MicroTeX cannot read is shown as its source, in red. Nothing a formula says can crash
+  the app: MicroTeX gets no source longer than 8,000 bytes or nested deeper than 64 braces, its exceptions are
+  caught, and the crashes found by fuzzing it are fixed in the vendored copy (its README).
+- **Search**: the TeX stays searchable text. The search and the library's index search a box's texts with each
+  formula's source in place of its character (`md::searchText`), and a hit inside a formula marks the formula
+  (a display formula: the formula, not its whole line).
+- **Cache**: formulas are laid out once per source (and style, inline or display) and kept as their paths in em,
+  shared by every thread that draws (the canvas, thumbnails, previews, the export). Size and color are applied when
+  drawing, so zooming and a heading's size need no new layout. The cache owns at most 16 MB (the least recently used
+  go; a formula takes 2–10 KB). MicroTeX with its font takes about 12 MB once the first formula is drawn (28 ms). A
+  page of 50 formulas: laid out in about 5 ms the first time, drawn in about 9 ms, then from the cache
+  (`MdMathText.PageOfFormulas`; `XQT_BENCH_MATH=1` prints the times). A character that the math font does not have
+  (Chinese, emoji in `\text{}`) is drawn by Pango: the first of a font takes 60–100 ms (loading it).
+- **Not supported by MicroTeX**: `\color{…}` outside arrays (use `\textcolor`), and `\newcommand` is shared by all
+  formulas (MicroTeX keeps macros globally), so a macro defined in one formula is only known in the others once that
+  one was laid out.
+
+Code: `qt/src/markdown/MdMath.*` (MicroTeX, the recording as paths, the cache), `MdLayout.cpp` (the shapes in the
+text, `searchText`, `mathAt`).
+
 ## How it is stored (Xournal++ compatible)
 A box is an ordinary Xournal++ text element in a layer named "Markdown" at the bottom of the page. Ink written with
 the pen goes on top of it, into the layer it went into before.
@@ -111,4 +152,5 @@ Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`)
 ## Not yet
 - Images.
 - Flattening into Text mode.
-- Math.
+- Math: why a formula cannot be drawn (MicroTeX's error); per-formula editing inside a block (the whole block shows
+  its source, as for the other marks).

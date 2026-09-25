@@ -114,6 +114,16 @@ std::vector<LinkHit> linkBoxes(const Text& text) {
     return boxes;
 }
 
+std::optional<MathHit> mathAt(const Text& text, double x, double y) {
+    const auto& shift = text.getTransformation().shift;
+    auto hit = mathAt(cachedLayout(text.getText(), styleOf(text)), x - shift.x, y - shift.y);
+    if (hit) {
+        hit->rect.x += shift.x;
+        hit->rect.y += shift.y;
+    }
+    return hit;
+}
+
 std::optional<size_t> checkBoxAt(const Text& text, double x, double y) {
     const auto& shift = text.getTransformation().shift;
     if (const auto box = checkBoxAt(cachedLayout(text.getText(), styleOf(text)), x - shift.x, y - shift.y)) {
@@ -160,7 +170,7 @@ std::vector<std::string> shownTexts(const Text& text) {
     std::vector<std::string> texts;
     for (const Item& it: shownLayout(text).items) {
         if (it.kind == Item::Kind::Text && it.layout) {
-            texts.emplace_back(pango_layout_get_text(it.layout.get()));
+            texts.push_back(searchText(it));  // (with the sources of its formulas)
         }
     }
     return texts;
@@ -174,7 +184,8 @@ std::vector<Rect> shownRects(const Text& text, size_t index, int from, int to) {
             continue;
         }
         if (i++ == index) {
-            auto rects = textRects(it, from, to);
+            const auto [a, b] = layoutRange(it, from, to);
+            auto rects = textRects(it, a, b);
             for (Rect& r: rects) {
                 r.x += shift.x;
                 r.y += shift.y;

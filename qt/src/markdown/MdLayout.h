@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <cairo.h>
@@ -54,6 +55,19 @@ struct SourceMap {
     uint16_t flags = 0;
 };
 
+/// A formula ($…$, $$…$$) in the text of an item: bytes [start, start + length) of its Pango layout's text. A formula
+/// is drawn in the text (MdMath) in place of one character, U+FFFC, so lines break around it and a tap on it is a
+/// place in the text; one that cannot be laid out is its source, in red, and `error` says why.
+struct MathSpan {
+    int start = 0;
+    int length = 0;
+    std::string tex;      ///< its source (searched instead of the U+FFFC)
+    bool display = false; ///< $$…$$: a centered line of its own
+    std::string error;    ///< empty when it is drawn
+    double inkX = 0;      ///< where it is drawn in its line's room (a display formula is centered in a whole line)
+    double inkWidth = 0;
+};
+
 /// One thing to draw, in box coordinates (top left of the box at 0, 0).
 struct Item {
     enum class Kind { Text, Fill, Line };
@@ -65,6 +79,7 @@ struct Item {
     xoj::util::GObjectSPtr<PangoLayout> layout;  ///< Text
     std::vector<LinkSpan> links;                  ///< Text
     std::vector<SourceMap> sources;               ///< Text
+    std::vector<MathSpan> maths;                  ///< Text: its formulas
     Color color;
     double lineWidth = 1;
     size_t block = 0;   ///< the top-level block it belongs to
@@ -126,8 +141,21 @@ struct Rect {
 /// Where a text is shown (case-insensitive; box coordinates): per match, a rectangle on each line it is drawn on
 /// (from its first to its last character there, as upstream's Text::findText does for a line).
 std::vector<Rect> findText(const Layout& layout, const std::string& search);
-/// Where bytes [from, to) of a Text item's Pango text are drawn (box coordinates): a rectangle per line.
+/// Where bytes [from, to) of a Text item's Pango text are drawn (box coordinates): a rectangle per line. A range that
+/// is a display formula is where the formula is drawn (not its whole line).
 std::vector<Rect> textRects(const Item& item, int from, int to);
+/// The text of a Text item as it is searched: its Pango text, with the source of each formula drawn in it in place
+/// of the formula's U+FFFC (the TeX stays searchable).
+std::string searchText(const Item& item);
+/// Bytes [from, to) of searchText() as bytes of the Pango text: a part of a formula's source is the whole formula.
+std::pair<int, int> layoutRange(const Item& item, int from, int to);
+/// The formula drawn at a point (box coordinates), if any: its span in its item (for the error of one that is shown
+/// as its source) and where it is.
+struct MathHit {
+    MathSpan span;
+    Rect rect;
+};
+std::optional<MathHit> mathAt(const Layout& layout, double x, double y);
 /// Where a range of the source, [begin, end), is drawn (box coordinates): a rectangle per line of each text it is in.
 /// Marks that are not drawn (a "**", a fence) have no place; text that stands for source it does not show (an
 /// entity) is marked whole.

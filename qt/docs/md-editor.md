@@ -9,7 +9,8 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
   [markdown-boxes.md](markdown-boxes.md), "Flowing onto pages"). It is written as a Markdown text on the page: the
   block with the cursor shows its Markdown (the marks dimmed), the others are shown formatted, and the pages follow
   while typing. All keys of the Markdown text written on the page work (Enter continues a list, Ctrl+B / I / E / K,
-  Ctrl+1 / 2 / 3 / 0, Tab / Shift+Tab, …).
+  Ctrl+1 / 2 / 3 / 0, Tab / Shift+Tab, …). Formulas (`$…$`, `$$…$$`) are drawn, and the block with the cursor
+  shows their source ([markdown-boxes.md](markdown-boxes.md), "Math").
 - **Whatever the tool**, the pen and the mouse put the cursor where they press, and a drag selects. A finger
   scrolls; a tap with a finger puts the cursor there too. Ctrl + click (and a finger tap) on a link follows it.
 - Typing without a cursor starts writing at the top of the page in view.
@@ -133,5 +134,5 @@ program changed it (its bytes differ from what was read or saved last; our own s
 - Typora / Obsidian's live preview (already in the Markdown boxes): the block with the cursor as source.
 
 ## Not yet
-- Math (MicroTeX), images pasted into `<name>.assets/`, Obsidian vault detection and its warnings.
+- Images pasted into `<name>.assets/`, Obsidian vault detection and its warnings.
 - "Save as" for a text file (use the library's Rename / Copy).

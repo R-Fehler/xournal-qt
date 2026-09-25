@@ -12,6 +12,7 @@
 #include "util/StringUtils.h"
 
 #include "MdHighlight.h"
+#include "MdMath.h"
 #include "MdText.h"
 
 namespace xqt::md {
@@ -25,12 +26,39 @@ constexpr Color RULE_COLOR(0xd0, 0xd7, 0xde);
 constexpr Color MUTED(0x57, 0x60, 0x6a);
 constexpr Color TABLE_HEADER_BACKGROUND(0xf6, 0xf8, 0xfa);
 constexpr Color MARKER(0x9a, 0xa0, 0xa6);
+constexpr Color MATH_ERROR(0xc6, 0x28, 0x28);  // (a formula that cannot be laid out: its source)
 
 constexpr double LINE_SPACING = 1.25;
 constexpr double CODE_LINE_SPACING = 1.15;
 constexpr double PLAIN_LINE_SPACING = 1.2;
 
 guint16 u16(uint8_t c) { return static_cast<guint16>(c * 257); }
+
+/// The character a formula takes in the text (the Unicode object replacement character), drawn as the formula.
+constexpr std::string_view FORMULA_CHAR = "\xef\xbf\xbc";
+/// Space above and below a display formula (em of the text).
+constexpr double DISPLAY_PAD = 0.3;
+/// Formulas are drawn this much bigger than the text around: Latin Modern's letters are smaller than a sans text's of
+/// the same size (its x-height is 0.43 em, DejaVu Sans' 0.55 em). KaTeX does the same (1.21).
+constexpr double MATH_SCALE = 1.2;
+
+/// What a formula's shape attribute carries: the formula, its size and where in its room it is drawn.
+struct FormulaShape {
+    std::shared_ptr<const math::Formula> formula;
+    double size = 12;
+    double dx = 0;
+};
+/// Pango draws a shape: the formula at the current point (its baseline's left end). `doPath`: the outlines only.
+void drawFormulaShape(cairo_t* cr, PangoAttrShape* attr, gboolean doPath, gpointer) {
+    const auto* shape = static_cast<const FormulaShape*>(attr->data);
+    if (!shape || !shape->formula) {
+        return;
+    }
+    double x = 0;
+    double y = 0;
+    cairo_get_current_point(cr, &x, &y);
+    math::draw(cr, *shape->formula, x + shape->dx, y, shape->size, doPath);
+}
 
 /// The Pango context of this thread. The font options make the layout independent of the zoom it is drawn at.
 PangoContext* context() {
@@ -43,6 +71,7 @@ PangoContext* context() {
         pango_cairo_context_set_font_options(ctx.get(), options);
         cairo_font_options_destroy(options);
         pango_context_set_round_glyph_positions(ctx.get(), false);
+        pango_cairo_context_set_shape_renderer(ctx.get(), drawFormulaShape, nullptr, nullptr);
     }
     return ctx.get();
 }
@@ -85,6 +114,7 @@ struct Laid {
     xoj::util::GObjectSPtr<PangoLayout> layout;
     std::vector<LinkSpan> links;
     std::vector<SourceMap> sources;
+    std::vector<MathSpan> maths;
     bool cached = false;  ///< taken from LayoutCache
     PangoLayout* get() const { return layout.get(); }
 };
@@ -241,7 +271,13 @@ private:
         atTop = false;
     }
 
-    Laid text(const std::vector<Run>& runs, const TextOptions& o, const std::vector<CodeSpan>& code = {}) {
+    Laid text(const std::vector<Run>& given, const TextOptions& o, const std::vector<CodeSpan>& code = {}) {
+        // A formula's source can come in several runs (a line break in it): one run each, drawn as one
+        std::vector<Run> merged;
+        if (!mathAsSource && std::any_of(given.begin(), given.end(), [](const Run& r) { return r.flags & Math; })) {
+            merged = mergedFormulas(given);
+        }
+        const std::vector<Run>& runs = merged.empty() ? given : merged;
         // The Pango layout of the same text with the same formatting is taken again (LayoutCache): while typing,
         // only the block that changed is shaped anew (a long text on one continuous page)
         std::string key;
@@ -250,7 +286,8 @@ private:
         add(&o.size, sizeof o.size);
         add(&o.width, sizeof o.width);
         add(&o.lineSpacing, sizeof o.lineSpacing);
-        const char flags[] = {static_cast<char>(o.bold), static_cast<char>(o.mono), static_cast<char>(o.align)};
+        const char flags[] = {static_cast<char>(o.bold), static_cast<char>(o.mono), static_cast<char>(o.align),
+                              static_cast<char>(mathAsSource)};
         add(flags, sizeof flags);
         key += st.family;
         key += '\0';
@@ -276,26 +313,97 @@ private:
         return laid;
     }
 
-    /// The layout of a text (`cached`: the same one made before; only the links and sources are made here).
+    /// Consecutive runs of a formula as one run: its whole source.
+    static std::vector<Run> mergedFormulas(const std::vector<Run>& runs) {
+        std::vector<Run> out;
+        out.reserve(runs.size());
+        for (const Run& r: runs) {
+            const uint16_t kind = Math | DisplayMath;
+            if (!out.empty() && (r.flags & Math) && (out.back().flags & kind) == (r.flags & kind) &&
+                out.back().link == r.link) {
+                Run& m = out.back();
+                m.text += r.text;
+                // (from its first to its last text in the source: the line breaks md4c gives are made up)
+                if (r.source != NO_SOURCE && m.source == NO_SOURCE) {
+                    m.source = r.source;
+                    m.sourceLength = r.sourceLength;
+                } else if (r.source != NO_SOURCE && r.source >= m.source) {
+                    m.sourceLength = r.source + r.sourceLength - m.source;
+                }
+                continue;
+            }
+            out.push_back(r);
+        }
+        return out;
+    }
+
+    /// The layout of a text (`cached`: the same one made before; only the links, sources and formulas are made here).
     Laid makeText(const std::vector<Run>& runs, const TextOptions& o, const std::vector<CodeSpan>& code,
                   xoj::util::GObjectSPtr<PangoLayout> cached) {
-        if (cached) {
-            std::vector<LinkSpan> links;
-            std::vector<SourceMap> sources;
-            size_t at = 0;
-            for (const Run& r: runs) {
-                const size_t from = at;
-                at += r.text.size();
-                sources.push_back({static_cast<int>(from), static_cast<int>(at - from), r.source, r.sourceLength, r.flags});
-                if ((r.flags & Link) && r.link >= 0) {
-                    if (!links.empty() && links.back().link == r.link && links.back().end == static_cast<int>(from)) {
-                        links.back().end = static_cast<int>(at);
-                    } else {
-                        links.push_back({static_cast<int>(from), static_cast<int>(at), r.link});
-                    }
+        // The text, where each run is in it, its links and formulas
+        std::string s;
+        std::vector<LinkSpan> links;
+        std::vector<SourceMap> sources;
+        std::vector<MathSpan> maths;
+        struct Shape {
+            size_t from = 0;
+            FormulaShape shape;
+            double width = 0;
+            double ascent = 0;
+            double descent = 0;
+        };
+        std::vector<Shape> shapes;
+        for (const Run& r: runs) {
+            const size_t from = s.size();
+            std::shared_ptr<const math::Formula> formula;
+            if ((r.flags & Math) && !mathAsSource) {
+                formula = math::formula(r.text, r.flags & DisplayMath);
+            }
+            s += formula && formula->ok ? std::string(FORMULA_CHAR) : r.text;
+            const size_t to = s.size();
+            sources.push_back({static_cast<int>(from), static_cast<int>(to - from), r.source, r.sourceLength, r.flags});
+            if ((r.flags & Link) && r.link >= 0) {
+                if (!links.empty() && links.back().link == r.link && links.back().end == static_cast<int>(from)) {
+                    links.back().end = static_cast<int>(to);  // (a link with formatting inside: several runs)
+                } else {
+                    links.push_back({static_cast<int>(from), static_cast<int>(to), r.link});
                 }
             }
-            return {std::move(cached), std::move(links), std::move(sources), true};
+            if (!formula) {
+                continue;
+            }
+            MathSpan m;
+            m.start = static_cast<int>(from);
+            m.length = static_cast<int>(to - from);
+            m.tex = r.text;
+            m.display = r.flags & DisplayMath;
+            if (!formula->ok) {
+                m.error = formula->error;
+                maths.push_back(std::move(m));
+                continue;
+            }
+            // Its size: the text's, smaller if it is wider than the box. A display formula takes a whole line
+            // (Pango breaks the lines around it) and is centered in it, with some room above and below.
+            Shape sh;
+            sh.from = from;
+            sh.shape.formula = formula;
+            sh.shape.size = o.size * MATH_SCALE;
+            if (o.width > 0 && formula->width * sh.shape.size > o.width) {
+                sh.shape.size = o.width / formula->width;
+            }
+            const double inkWidth = formula->width * sh.shape.size;
+            const double pad = m.display ? DISPLAY_PAD * o.size : 0;
+            sh.width = m.display && o.width > 0 ? o.width - 0.01 : inkWidth;
+            sh.shape.dx = (sh.width - inkWidth) / 2;
+            sh.ascent = formula->ascent * sh.shape.size + pad;
+            sh.descent = formula->descent * sh.shape.size + pad;
+            m.inkX = sh.shape.dx;
+            m.inkWidth = inkWidth;
+            maths.push_back(std::move(m));
+            shapes.push_back(std::move(sh));
+        }
+        if (cached) {
+            return {std::move(cached), std::move(links), std::move(sources), std::move(maths), true};
         }
         xoj::util::GObjectSPtr<PangoLayout> l(pango_layout_new(context()), xoj::util::adopt);
         PangoFontDescription* d = pango_font_description_new();
@@ -311,22 +419,11 @@ private:
         pango_layout_set_line_spacing(l.get(), static_cast<float>(o.lineSpacing));
         pango_layout_set_alignment(l.get(), o.align);
 
-        std::string s;
-        std::vector<LinkSpan> links;
-        std::vector<SourceMap> sources;
         PangoAttrList* attrs = pango_attr_list_new();
-        for (const Run& r: runs) {
-            const size_t from = s.size();
-            s += r.text;
-            const size_t to = s.size();
-            sources.push_back({static_cast<int>(from), static_cast<int>(to - from), r.source, r.sourceLength, r.flags});
-            if ((r.flags & Link) && r.link >= 0) {
-                if (!links.empty() && links.back().link == r.link && links.back().end == static_cast<int>(from)) {
-                    links.back().end = static_cast<int>(to);  // (a link with formatting inside: several runs)
-                } else {
-                    links.push_back({static_cast<int>(from), static_cast<int>(to), r.link});
-                }
-            }
+        for (size_t k = 0; k < runs.size(); ++k) {
+            const Run& r = runs[k];
+            const auto from = static_cast<size_t>(sources[k].start);
+            const auto to = from + static_cast<size_t>(sources[k].length);
             if (r.flags & Strong) {
                 insert(attrs, pango_attr_weight_new(PANGO_WEIGHT_BOLD), from, to);
             }
@@ -358,14 +455,31 @@ private:
             if (r.flags & Image) {
                 insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC), from, to);
             }
-            if (r.flags & Math) {
-                insert(attrs, pango_attr_family_new("Serif"), from, to);
-                insert(attrs, pango_attr_style_new(PANGO_STYLE_ITALIC), from, to);
+            if ((r.flags & Math) && s.compare(from, to - from, FORMULA_CHAR) != 0) {
+                // A formula's source: while it is written (the block with the cursor), or one that cannot be laid
+                // out (in red)
+                insert(attrs, pango_attr_family_new(st.monoFamily.c_str()), from, to);
+                insert(attrs, pango_attr_size_new_absolute(static_cast<int>(o.size * 0.9 * PANGO_SCALE)), from, to);
+                if (!mathAsSource) {
+                    insert(attrs,
+                           pango_attr_foreground_new(u16(MATH_ERROR.red), u16(MATH_ERROR.green), u16(MATH_ERROR.blue)),
+                           from, to);
+                }
             }
             if (r.flags & Marker) {
                 insert(attrs, pango_attr_foreground_new(u16(MARKER.red), u16(MARKER.green), u16(MARKER.blue)), from,
                        to);
             }
+        }
+        for (const Shape& sh: shapes) {  // the formulas drawn
+            constexpr double S = PANGO_SCALE;
+            PangoRectangle logical{0, static_cast<int>(-sh.ascent * S), static_cast<int>(sh.width * S),
+                                   static_cast<int>((sh.ascent + sh.descent) * S)};
+            PangoAttribute* a = pango_attr_shape_new_with_data(
+                    &logical, &logical, new FormulaShape(sh.shape),
+                    [](gconstpointer p) -> gpointer { return new FormulaShape(*static_cast<const FormulaShape*>(p)); },
+                    [](gpointer p) { delete static_cast<FormulaShape*>(p); });
+            insert(attrs, a, sh.from, sh.from + FORMULA_CHAR.size());
         }
         for (const CodeSpan& c: code) {  // syntax highlighting
             const auto from = static_cast<size_t>(c.start);
@@ -381,7 +495,7 @@ private:
         pango_layout_set_text(l.get(), s.c_str(), static_cast<int>(s.size()));
         pango_layout_set_attributes(l.get(), attrs);
         pango_attr_list_unref(attrs);
-        return {std::move(l), std::move(links), std::move(sources)};
+        return {std::move(l), std::move(links), std::move(sources), std::move(maths)};
     }
 
     /// Returns its index.
@@ -395,6 +509,7 @@ private:
         it.layout = std::move(l.layout);
         it.links = std::move(l.links);
         it.sources = std::move(l.sources);
+        it.maths = std::move(l.maths);
         it.color = color;
         it.block = top;
         out.items.push_back(std::move(it));
@@ -817,7 +932,9 @@ private:
         }
         margin(kind == BlockKind::Heading ? o.size * 0.8 : 0.75 * st.size);
         open();
+        mathAsSource = true;  // (its formulas as their source: they are being written)
         auto l = text(runs, o, code);
+        mathAsSource = false;
         const double h = pangoHeight(l.get());
         size_t index = 0;
         if (pad > 0) {
@@ -833,7 +950,28 @@ private:
         out.rawItem = static_cast<int>(index);
         out.rawBegin = begin;
         out.rawEnd = rawEnd;
+        if (b && kind == BlockKind::Paragraph) {
+            displayPreview(*b, c);
+        }
         margin(kind == BlockKind::Heading ? o.size * 0.45 : 0.75 * st.size);
+    }
+
+    /// Below a paragraph being written that has $$…$$ formulas: how they look (as Obsidian shows a formula block
+    /// being written). Only drawn: no place of the source is in it.
+    void displayPreview(const Block& b, const Ctx& c) {
+        for (const Run& r: mergedFormulas(b.runs)) {
+            if (!(r.flags & DisplayMath)) {
+                continue;
+            }
+            Run shown = r;
+            shown.flags = Math | DisplayMath;
+            auto l = text({shown}, {st.size, false, false, st.width});
+            l.sources.clear();
+            l.links.clear();
+            const double h = pangoHeight(l.get());
+            addText(std::move(l), 0, y, c.color);
+            y += h;
+        }
     }
 
     /// Whether the cursor (`active`) is on the lines after a fenced code block that is closed (not on its lines).
@@ -863,6 +1001,7 @@ private:
     const Style& st;
     std::string_view source;
     size_t active;
+    bool mathAsSource = false;  ///< formulas as their source (the block being written)
     BlockSpan rawSpan;
     Layout out;
     Layout::Extent current;  ///< item and parts of the top-level block being laid out
@@ -1016,7 +1155,16 @@ std::vector<Rect> textRects(const Item& it, int from, int to) {
             }
             PangoRectangle first;
             pango_layout_index_to_pos(l, std::max(from, start), &first);
-            out.push_back({it.x + left / S, it.y + first.y / S, (right - left) / S, first.height / S});
+            Rect r{it.x + left / S, it.y + first.y / S, (right - left) / S, first.height / S};
+            for (const MathSpan& m: it.maths) {
+                // A display formula takes its whole line: where it is drawn in it
+                if (m.display && m.error.empty() && std::max(from, start) == m.start &&
+                    std::min(to, end) == m.start + m.length) {
+                    r.x += m.inkX;
+                    r.width = m.inkWidth;
+                }
+            }
+            out.push_back(r);
         }
         g_free(ranges);
     } while (pango_layout_iter_next_line(iter));
@@ -1062,6 +1210,56 @@ std::vector<Rect> sourceRects(const Layout& layout, size_t begin, size_t end) {
     return out;
 }
 
+std::string searchText(const Item& it) {
+    if (it.kind != Item::Kind::Text || !it.layout) {
+        return {};
+    }
+    const std::string_view laid = pango_layout_get_text(it.layout.get());
+    if (it.maths.empty()) {
+        return std::string(laid);
+    }
+    std::string out;
+    size_t at = 0;
+    for (const MathSpan& m: it.maths) {
+        if (!m.error.empty() || static_cast<size_t>(m.start) < at) {
+            continue;  // (not drawn: its source is in the text)
+        }
+        out.append(laid.substr(at, static_cast<size_t>(m.start) - at));
+        out += m.tex;
+        at = static_cast<size_t>(m.start + m.length);
+    }
+    out.append(laid.substr(std::min(at, laid.size())));
+    return out;
+}
+
+std::pair<int, int> layoutRange(const Item& it, int from, int to) {
+    // Walk the formulas drawn: before each, the texts are the same, shifted by what the sources before added
+    int shift = 0;  // (searched text - Pango text)
+    int laidFrom = -1;
+    int laidTo = -1;
+    for (const MathSpan& m: it.maths) {
+        if (!m.error.empty()) {
+            continue;
+        }
+        const int texStart = m.start + shift;
+        const int texEnd = texStart + static_cast<int>(m.tex.size());
+        if (laidFrom < 0 && from < texEnd) {
+            laidFrom = from < texStart ? from - shift : m.start;
+        }
+        if (laidTo < 0 && to <= texEnd) {
+            laidTo = to <= texStart ? to - shift : m.start + m.length;
+        }
+        shift += static_cast<int>(m.tex.size()) - m.length;
+    }
+    if (laidFrom < 0) {
+        laidFrom = from - shift;
+    }
+    if (laidTo < 0) {
+        laidTo = to - shift;
+    }
+    return {laidFrom, std::max(laidFrom, laidTo)};
+}
+
 std::vector<Rect> findText(const Layout& layout, const std::string& search) {
     std::vector<Rect> found;
     if (search.empty()) {
@@ -1072,17 +1270,32 @@ std::vector<Rect> findText(const Layout& layout, const std::string& search) {
         if (it.kind != Item::Kind::Text) {
             continue;
         }
-        const std::string_view shown = pango_layout_get_text(it.layout.get());
-        const std::string text = StringUtils::toLowerCase(std::string(shown));
+        // (the source of a formula is searched; a match in it marks the formula)
+        const std::string shown = searchText(it);
+        const std::string text = StringUtils::toLowerCase(shown);
         for (size_t pos = text.find(pattern); pos != std::string::npos; pos = text.find(pattern, pos + 1)) {
             // (a lower case of another length moves the places a little; they stay in the text)
             const auto from = static_cast<int>(std::min(pos, shown.size()));
             const auto to = static_cast<int>(std::min(pos + pattern.size(), shown.size()));
-            const auto rects = textRects(it, from, to);
+            const auto [a, b] = layoutRange(it, from, to);
+            const auto rects = textRects(it, a, b);
             found.insert(found.end(), rects.begin(), rects.end());
         }
     }
     return found;
+}
+
+std::optional<MathHit> mathAt(const Layout& layout, double x, double y) {
+    for (const Item& it: layout.items) {
+        for (const MathSpan& m: it.maths) {
+            for (const Rect& r: textRects(it, m.start, m.start + m.length)) {
+                if (x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height) {
+                    return MathHit{m, r};
+                }
+            }
+        }
+    }
+    return std::nullopt;
 }
 
 void draw(cairo_t* cr, const Layout& layout) {

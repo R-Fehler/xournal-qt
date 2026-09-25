@@ -140,8 +140,8 @@ private:
             }
             before = &m;
         }
-        if (!at) {
-            return std::nullopt;
+        if (!at || (at->flags & Math)) {
+            return std::nullopt;  // (not at a formula: its "$" or "$$" is before it)
         }
         if (byte > at->start) {  // inside a run
             if ((at->flags & INLINE_SPANS) || at->source == NO_SOURCE || at->sourceLength != size_t(at->length)) {

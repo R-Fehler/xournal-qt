@@ -212,6 +212,17 @@ size_t MarkdownEditor::hit(size_t part, double x, double y) const {
                              static_cast<int>(std::clamp(by - best->y, 0.0, best->height - 0.01) * PANGO_SCALE),
                              &index, &trailing);
     const std::string_view laid = pango_layout_get_text(best->layout.get());
+    // On a formula drawn: into its source (its start or end, by the half tapped), not after its closing "$"
+    for (const md::SourceMap& m: best->sources) {
+        if ((m.flags & md::Math) && m.source != md::NO_SOURCE && index >= m.start && index < m.start + m.length &&
+            static_cast<size_t>(m.length) != m.sourceLength) {
+            size_t local = trailing > 0 ? m.source + m.sourceLength : m.source;
+            if (part == current && !preedit.empty() && local > localOf(part, caret)) {
+                local = local >= localOf(part, caret) + preedit.size() ? local - preedit.size() : localOf(part, caret);
+            }
+            return sourceOf(part, local);
+        }
+    }
     // After the character when the point is on its second half
     for (; trailing > 0 && static_cast<size_t>(index) < laid.size(); --trailing) {
         ++index;
@@ -686,6 +697,19 @@ void MarkdownEditor::newLine(bool soft) {
             insert("\n" + std::string(indent == std::string::npos ? line.size() : indent, ' '), EditKind::Other);
             return;
         }
+    }
+    // In a formula block ("$$" and its lines) that is not closed yet: a line of the formula
+    size_t para = ls;
+    while (para > 0 && !blank(lineAt(t, lineStart(t, para - 1)))) {
+        para = lineStart(t, para - 1);
+    }
+    size_t marks = 0;
+    for (size_t i = t.find("$$", para); i != std::string::npos && i + 2 <= from; i = t.find("$$", i + 2)) {
+        marks += i == 0 || t[i - 1] != '\\';
+    }
+    if (marks % 2 == 1) {
+        insert("\n", EditKind::Other);
+        return;
     }
     std::smatch m;
     std::regex_search(line, m, linePrefix());

@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include "model/Document.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
@@ -230,4 +231,45 @@ TEST_F(MarkdownEditorTest, searchHitsFollowTheTextAsItIsDrawnWhileWriting) {
     ASSERT_EQ(hits.size(), 1u);
     EXPECT_NEAR(hits[0].rect.x(), formatted[0].x, 0.01);
     EXPECT_NEAR(hits[0].rect.y(), formatted[0].y, 0.01);
+}
+
+// Formulas: Enter in a "$$" block that is not closed yet is a line of the formula (not a new paragraph), and a tap on
+// a formula drawn puts the cursor into its source (its block shows it then).
+TEST_F(MarkdownEditorTest, formulaBlocksAreWrittenAndATapGoesIntoAFormula) {
+    MarkdownEditor& ed = start();
+    type("Energy $E=mc^2$ here\n");
+    type("$$\n\\sum_k k\n$$\n");
+    type("After");
+    EXPECT_EQ(ed.text(), "Energy $E=mc^2$ here\n\n$$\n\\sum_k k\n$$\n\nAfter");
+    processEvents();
+
+    const Text* box = md::boxOf(*md::markdownLayer(session->getDocument()->getPage(0)));
+    ASSERT_NE(box, nullptr);
+    const auto& shift = box->getTransformation().shift;
+    const auto tapOn = [&](const std::string& tex) {
+        // (the layout as the editor draws it: the block with the cursor as source)
+        const md::Layout& l = md::cachedLayout(box->getText(), md::styleOf(*box), ed.cursorPosition());
+        for (const md::Item& it: l.items) {
+            for (const md::MathSpan& m: it.maths) {
+                if (m.tex.find(tex) != std::string::npos) {
+                    const md::Rect r = md::textRects(it, m.start, m.start + m.length).at(0);
+                    return ed.tap(*view->getPage(0), shift.x + r.x + r.width * 0.75, shift.y + r.y + r.height / 2);
+                }
+            }
+        }
+        ADD_FAILURE() << "no formula " << tex;
+        return false;
+    };
+    // The cursor in "After": both formulas are drawn; a tap on each goes into its source
+    ASSERT_TRUE(tapOn("E=mc^2"));
+    size_t at = ed.text().find("E=mc^2");
+    EXPECT_GE(ed.cursorPosition(), at);
+    EXPECT_LE(ed.cursorPosition(), at + 6);
+    type("0");  // (the cursor is in the formula's source)
+    ed.setCursorPosition(ed.text().size());
+    processEvents();
+    ASSERT_TRUE(tapOn("\\sum_k"));
+    at = ed.text().find("\\sum_k k");
+    EXPECT_GE(ed.cursorPosition(), at);
+    EXPECT_LE(ed.cursorPosition(), at + 8);
 }
