@@ -1264,3 +1264,10 @@ with the sample library stays).
 - [ ] On the Fold 7, open a document (from the library, "Open with", or a new one): the hand is selected, one finger
       scrolls. Tap the pen: the finger writes. Switch to another open tab and back: the pen stays.
 - [ ] Settings -> Touch -> "Open documents with the hand" off: documents open with the tool that was chosen last.
+
+## qpdf built with the app, CI on Debian 13 as root (qt/ci-green)
+
+- [ ] `dpkg -I build/packages/xournal-qt_*.deb` (after `cpack -G DEB`): no `libqpdf` in `Depends`. The `.deb` installs
+      and the app starts on a system without `libqpdf28`/`libqpdf30`.
+- [ ] A PDF with notes: draw, Ctrl+S twice. `XQT_HYBRID_TIMES=1 ./xournal-qt file.pdf` prints no "written in full"
+      for the second save (it was appended, now through qpdf 12.4). The file opens in Okular and in the app again.

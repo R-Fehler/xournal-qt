@@ -428,9 +428,13 @@ with every object serialised through qpdf (`unparseResolved`, a stream's diction
   changed (its text is remembered); at the end the touched objects whose text differs are written again under their
   numbers, with the new objects they reach. Nothing else of the file is read or written.
 - New objects are made by the `Update` (`add`, `addStream`, `copy` of another PDF's objects, `copyStream`), numbered
-  after the file's highest object. Not with qpdf's `makeIndirectObject` or `newStream`: in qpdf 10 the first new
-  object makes it read every object of the file (7 s for pgfmanual); qpdf 11 does not. A new stream is a dictionary
-  in the qpdf document (so other objects can refer to it) whose data the `Update` keeps.
+  after the file's highest object. Not with qpdf's `makeIndirectObject`, `newStream` or `copyForeignObject`: the
+  first new object makes qpdf read every object of the file to find a free number (pgfmanual: 1.1 s with qpdf 12.4,
+  6.4 s with 10.6; the whole appended save takes about 0.2 s). A number is taken with a null object that is replaced
+  later (qpdf 12 gives a handle of a number the file does not have that is bound to nothing). A new stream is a
+  dictionary in the qpdf document (so other objects can refer to it) whose data the `Update` keeps.
+- qpdf 12 or newer is needed; the desktop build compiles a pinned release ([releasing.md](releasing.md), "Which
+  package for which system").
 - The cross-reference section matches the file's style: a cross-reference stream after one (PDF 1.5; our full
   writes use them), with the new dictionaries in an object stream, else a classic table. The trailer has `/Size`,
   `/Root`, `/Info`, `/ID` (the file's first identifier, a new second one) and `/Prev` (the last `startxref`, the

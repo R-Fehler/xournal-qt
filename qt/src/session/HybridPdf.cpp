@@ -17,9 +17,6 @@
 #include <unordered_map>
 
 #include <qpdf/DLL.h>
-#if QPDF_MAJOR_VERSION == 11
-#define POINTERHOLDER_TRANSITION 4  // as upstream's QPdfExport
-#endif
 #include <cairo-pdf.h>
 #include <cairo.h>
 #include <QCryptographicHash>
@@ -1326,8 +1323,6 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
 
 // --- saving again: an incremental update ----------------------------------------------------------------------------
 
-QPDFObjGen idOf(QPDFObjectHandle o) { return o.getObjGen(); }
-
 /// The existing hybrid PDF an incremental save appends to (opened before the document is prepared: what it has
 /// already need not be drawn again).
 struct Existing {
@@ -2424,7 +2419,8 @@ Revision revisionAfterFull(const fs::path& target, const Prepared& prep) {
     QPDF q;
     q.setSuppressWarnings(true);
     q.processFile(target.string().c_str());
-    // (the kids of the page tree's root: written flat; reading the pages themselves takes seconds in qpdf 10)
+    // (the kids of the page tree's root: written flat; reading the pages themselves reads most of a long file: 0.5 s
+    // for pgfmanual with qpdf 12.4, 2.7 s with 10.6)
     QPDFObjectHandle kids = q.getRoot().getKey("/Pages").getKey("/Kids");
     const std::vector<QPDFObjectHandle> pages = kids.isArray() ? kids.getArrayAsVector() : std::vector<QPDFObjectHandle>();
     auto map = [&](size_t k, QPDFObjectHandle o) {

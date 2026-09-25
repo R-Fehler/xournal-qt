@@ -19,9 +19,6 @@
 #include <cairo.h>
 #include <gtest/gtest.h>
 #include <qpdf/DLL.h>
-#if QPDF_MAJOR_VERSION == 11
-#define POINTERHOLDER_TRANSITION 4
-#endif
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFObjectHandle.hh>
 #include <qpdf/QPDFPageDocumentHelper.hh>

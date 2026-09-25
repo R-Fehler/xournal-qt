@@ -166,10 +166,18 @@ bool Update::isNew(QPDFObjectHandle object) const {
     return object.isIndirect() && object.getObjectID() > maxId;
 }
 
-QPDFObjectHandle Update::add(QPDFObjectHandle value) {
+QPDFObjectHandle Update::reserve() {
+    // (qpdf 12: getObjectByObjGen of a number the file does not have is a null that belongs to no number, so the
+    // number is taken with a null first; replacing it later changes that object in place, and the handles see it)
     const QPDFObjGen og(++nextId, 0);
-    pdf.replaceObject(og, value);
+    pdf.replaceObject(og, OH::newNull());
     return pdf.getObjectByObjGen(og);
+}
+
+QPDFObjectHandle Update::add(QPDFObjectHandle value) {
+    OH o = reserve();
+    pdf.replaceObject(o.getObjGen(), value);
+    return o;
 }
 
 QPDFObjectHandle Update::addStream(QPDFObjectHandle dictionary, std::string data) {
@@ -205,8 +213,8 @@ QPDFObjectHandle Update::copyValue(QPDFObjectHandle o, bool top) {
             return OH::newNull();  // (another page: not copied along, as qpdf's copyForeignObject does)
         }
         // Numbered first (the object may refer back to itself), its value copied, then put in place
-        const QPDFObjGen og(++nextId, 0);
-        OH handle = pdf.getObjectByObjGen(og);
+        OH handle = reserve();
+        const QPDFObjGen og = handle.getObjGen();
         copied[key] = handle;
         if (o.isStream()) {
             OH dict = copyValue(o.getDict(), false);

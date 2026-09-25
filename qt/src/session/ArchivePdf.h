@@ -21,9 +21,6 @@
 #include <vector>
 
 #include <qpdf/DLL.h>
-#if QPDF_MAJOR_VERSION == 11
-#define POINTERHOLDER_TRANSITION 4  // as upstream's QPdfExport
-#endif
 #include <qpdf/QPDF.hh>
 
 #include "IncrementalPdf.h"

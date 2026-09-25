@@ -38,8 +38,6 @@ if(XQT_DEPS_CMAKE_PACKAGES)
         set(libzip_FOUND FALSE)
     endif()
 endif()
-find_package(qpdf QUIET)
-
 set(_xoj_pc_modules
     "glib-2.0 >= 2.32.0" gio-2.0 gthread-2.0 cairo cairo-pdf cairo-svg pangocairo
     "poppler-glib >= 0.41.0" gdk-pixbuf-2.0)
@@ -51,13 +49,8 @@ if(NOT libzip_FOUND OR NOT TARGET libzip::zip)
 endif()
 pkg_check_modules(XOJ_DEPS REQUIRED IMPORTED_TARGET ${_xoj_pc_modules})
 
-if(NOT qpdf_FOUND)
-    pkg_search_module(qpdf REQUIRED "libqpdf >= 10.6.0")
-    add_library(xoj_qpdf INTERFACE)
-    target_link_libraries(xoj_qpdf INTERFACE ${qpdf_LIBRARIES})
-    target_include_directories(xoj_qpdf INTERFACE ${qpdf_INCLUDE_DIRS})
-    add_library(qpdf::libqpdf ALIAS xoj_qpdf)
-endif()
+# qpdf 12: built here, or the system's (XQT_SYSTEM_QPDF)
+include(${CMAKE_CURRENT_LIST_DIR}/XqtQpdf.cmake)
 
 add_library(xoj-deps INTERFACE)
 add_library(xoj::deps ALIAS xoj-deps)
