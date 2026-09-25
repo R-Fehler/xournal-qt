@@ -332,6 +332,27 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   exported as an archive PDF into a chosen folder, keeping the folder structure. Other files are copied as they are,
   and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
 
+### Ideas round of 2026-09-25/26 (the author)
+- First wave, started 2026-09-26: `qt/emoji` (bundled colour emoji font, `:smile:` completion, paste) ·
+  `qt/self-reference` (the same document in the reference view, page subsets) · `qt/calibration` (1 cm on screen
+  = 1 cm, per screen) · `qt/sticky-notes` (opaque, resizable, ink and text attached, cover mode for self-testing) ·
+  `qt/annotations-md` (stage 1: live Annotations panel + "Export as Markdown"; stage 2 "keep updated" later).
+- [ ] **Markdown inside the PDF with notes** (the "word-processor" mode): new text documents follow the first-start
+  choice (PDF files → a PDF with the `.md` and its images inside; Xournal++ files → `name.md` + `name.assets/`),
+  changeable in Settings, and a mix must work: existing `.md` files are never converted unasked. Split into
+  `qt/md-images` (images in Markdown + the `.md`/`.assets` pair as one document), `qt/md-pdf` (the container,
+  text only), later ink on Markdown pages. Not started: the author wants to discuss it first.
+- [ ] Citations: Scholar/translate on selected text; bibliography entry → library hits (fuzzy, by title and first
+  page) → open in reference/tab, copy as a link; arXiv import (named by title). Networking is opt-in, and the URL is
+  always shown (hover or preview) before anything is opened or downloaded. `.bib` later, after the user flow is
+  thought through.
+- [ ] Note space for slides: a margin beside/below each slide (page enlarged, also in the PDF), or a page after each.
+- [ ] Forms (only on PDFs that have fields) and a "My signature" stamp. Cryptographic signing: backlog.
+- [ ] **OCR (Tesseract), last of this round**: photo import with cropping, a text layer in PDFs. Never automatic:
+  ask before each run, with "remember my choice", and a button in Settings to forget it.
+- [ ] Handwriting search: research running (`qt/hwr-research`), no implementation yet. Linux matters most.
+- Backlog: visual text diff between PDF versions; cryptographic signing.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
