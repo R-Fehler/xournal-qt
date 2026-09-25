@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -11,6 +12,7 @@
 
 #include "util/StringUtils.h"
 
+#include "EmojiData.h"
 #include "EmojiFont.h"
 #include "MdHighlight.h"
 #include "MdMath.h"
@@ -159,6 +161,7 @@ public:
 
     Layout run(const Document& doc) {
         if (doc.plain) {
+            shortcodes = false;  // (a plain text is shown as it is)
             return runPlain(doc);
         }
         out.links = doc.links;
@@ -278,6 +281,13 @@ private:
         if (!mathAsSource && std::any_of(given.begin(), given.end(), [](const Run& r) { return r.flags & Math; })) {
             merged = mergedFormulas(given);
         }
+        // Shortcodes (":smile:") are shown as their emoji: in text shown formatted, not in code (o.mono: a code or
+        // HTML block) and not in the block being written (mathAsSource), which shows its source
+        if (shortcodes && !mathAsSource && !o.mono) {
+            if (auto e = withEmoji(merged.empty() ? given : merged)) {
+                merged = std::move(*e);
+            }
+        }
         const std::vector<Run>& runs = merged.empty() ? given : merged;
         // The Pango layout of the same text with the same formatting is taken again (LayoutCache): while typing,
         // only the block that changed is shaped anew (a long text on one continuous page)
@@ -312,6 +322,72 @@ private:
             layoutCache().put(std::move(key), laid.layout);
         }
         return laid;
+    }
+
+    /// The runs with each known shortcode (":smile:") in their text as a run of its own, its emoji, which stands for
+    /// the shortcode's source as an entity does (a place in it is the whole of it). Only text that is its source as
+    /// it is (not code, formulas, HTML or entities), and consecutive runs of the same formatting taken together (md4c
+    /// may give a text in parts). Nothing if there is no shortcode.
+    static std::optional<std::vector<Run>> withEmoji(const std::vector<Run>& runs) {
+        const auto plain = [](const Run& r) {
+            return !(r.flags & (Code | Math | Html | Marker)) && r.source != NO_SOURCE &&
+                   r.sourceLength == r.text.size() && r.text.find(':') != std::string::npos;
+        };
+        if (std::none_of(runs.begin(), runs.end(), plain)) {
+            return std::nullopt;
+        }
+        std::vector<Run> out;
+        out.reserve(runs.size() + 2);
+        bool found = false;
+        for (size_t i = 0; i < runs.size();) {
+            if (!(runs[i].flags & (Code | Math | Html | Marker)) && runs[i].source != NO_SOURCE &&
+                runs[i].sourceLength == runs[i].text.size()) {
+                Run joined = runs[i];
+                size_t j = i + 1;
+                for (; j < runs.size(); ++j) {
+                    const Run& r = runs[j];
+                    if (r.flags != joined.flags || r.link != joined.link || r.source != joined.source + joined.sourceLength ||
+                        r.sourceLength != r.text.size()) {
+                        break;
+                    }
+                    joined.text += r.text;
+                    joined.sourceLength += r.sourceLength;
+                }
+                const auto codes = emoji::findShortcodes(joined.text);
+                if (codes.empty()) {
+                    out.insert(out.end(), runs.begin() + static_cast<std::ptrdiff_t>(i),
+                               runs.begin() + static_cast<std::ptrdiff_t>(j));
+                    i = j;
+                    continue;
+                }
+                found = true;
+                size_t at = 0;
+                auto piece = [&](size_t from, size_t to, std::string_view shown) {
+                    if (to <= from) {
+                        return;
+                    }
+                    Run r = joined;
+                    r.text = shown.empty() ? joined.text.substr(from, to - from) : std::string(shown);
+                    r.source = joined.source + from;
+                    r.sourceLength = to - from;
+                    out.push_back(std::move(r));
+                };
+                for (const emoji::Shortcode& c: codes) {
+                    piece(at, c.at, {});
+                    piece(c.at, c.at + c.length, c.emoji);
+                    at = c.at + c.length;
+                }
+                piece(at, joined.text.size(), {});
+                i = j;
+                continue;
+            }
+            out.push_back(runs[i]);
+            ++i;
+        }
+        if (!found) {
+            return std::nullopt;
+        }
+        return out;
     }
 
     /// Consecutive runs of a formula as one run: its whole source.
@@ -1003,6 +1079,7 @@ private:
     std::string_view source;
     size_t active;
     bool mathAsSource = false;  ///< formulas as their source (the block being written)
+    bool shortcodes = true;     ///< ":smile:" shown as 😄 (not in a plain text)
     BlockSpan rawSpan;
     Layout out;
     Layout::Extent current;  ///< item and parts of the top-level block being laid out

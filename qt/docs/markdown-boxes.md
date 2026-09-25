@@ -130,6 +130,16 @@ dollar sign.
 Code: `qt/src/markdown/MdMath.*` (MicroTeX, the recording as paths, the cache), `MdLayout.cpp` (the shapes in the
 text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem` (the tool tip).
 
+## Emoji
+- **Colour, the same everywhere**: emoji in Markdown and text boxes are drawn from the app's own Noto Color Emoji
+  (`qt/resources/fonts`, README there), on every system, in the thumbnails, the PDF export, the hybrid PDF and print.
+  In PDFs each emoji is a picture of the font's resolution (Cairo alone puts a blurred 16-pixel one there).
+  Sequences (👩‍💻, 🇩🇪, 👍🏽, ❤️) are one picture. Code: `qt/src/markdown/EmojiFont.*`.
+- **Shortcodes**: `:smile:` is shown as 😄 and stays `:smile:` in the file, as on GitHub (its names: gemoji,
+  `qt/3rdparty/gemoji`). Not in code, not in a plain text; the block with the cursor shows `:smile:`. The emoji stands
+  for the whole shortcode, as an entity does (a tap on it is its start or end). Code: `qt/src/markdown/EmojiData.*`,
+  `MdLayout.cpp` (`withEmoji`).
+
 ## How it is stored (Xournal++ compatible)
 A box is an ordinary Xournal++ text element in a layer named "Markdown" at the bottom of the page. Ink written with
 the pen goes on top of it, into the layer it went into before.

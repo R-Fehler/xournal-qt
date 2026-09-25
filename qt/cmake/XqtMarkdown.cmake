@@ -52,8 +52,12 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiFont.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiFont.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiFont.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiData.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiData.cpp)
 target_include_directories(xqt-markdown PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/markdown")
+# (the emoji names: gemoji's table, EmojiData.cpp)
+target_include_directories(xqt-markdown PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/gemoji")
 target_link_libraries(xqt-markdown PUBLIC xoj-core PRIVATE xqt-md4c xqt-microtex)
 
 # Syntax highlighting of code blocks (optional; Debian / Ubuntu: libkf6syntaxhighlighting-dev)
@@ -77,7 +81,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdHighlightTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPaginateTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPassagesTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiFontTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiFontTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiDataTest.cpp)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
     target_compile_definitions(xqt-markdown-tests PRIVATE
         XQT_MARKDOWN_GOLDEN="${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/golden"

@@ -1355,3 +1355,7 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       Print (Ctrl+P) to a PDF file: the same. The page's thumbnail and the sidebar previews show them.
 - [ ] A `.md` file with emoji, on pages and on one continuous page: the same.
 - [ ] Windows and Android: the same box shows its emoji in colour (Noto's pictures, not Segoe's or Android's).
+- [ ] Shortcodes: a Markdown box with `Hi :smile: :+1: :heart_eyes:` shows 😄 👍 😍 once the cursor has left the
+      paragraph; the paragraph with the cursor shows `:smile:`. Saved and opened again (and in the `.md` file on
+      disk) it is still `:smile:`. In `` `:smile:` `` and in a code block it stays text; `:nope:` stays text; a `.txt`
+      file shows `:smile:` as it is.
