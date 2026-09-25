@@ -4482,6 +4482,32 @@ TEST_F(MainWindowTest, markdownTextBoxesAreWrittenBesideThePage) {
     EXPECT_EQ(xqt::md::boxAt(*layer, 155, 300), nullptr) << "one undo step for the box";
 }
 
+// Pasted into the Markdown beside the page: formulas as chat apps write them, \( \) and \[ \], become $ $ and $$ $$
+// (the same as on the page), in one undo step of the text; other text is pasted by the TextArea as always.
+TEST_F(MainWindowTest, markdownPanelPastesTexDelimitersAsDollars) {
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* area = find<QQuickItem>("markdownArea");
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, QVariant(0)));
+    ASSERT_TRUE(panel->isVisible());
+    area->forceActiveFocus();
+    ASSERT_TRUE(area->hasActiveFocus());
+    type("Say REPLACE here");
+    // In place of a selection ("REPLACE")
+    QMetaObject::invokeMethod(area, "select", Q_ARG(int, 4), Q_ARG(int, 11));
+    QGuiApplication::clipboard()->setText("\\(E = mc^2\\) and \\(n\\)th");
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(area->property("text").toString().toStdString(), "Say $E = mc^2$ and \\(n\\)th here");
+    EXPECT_EQ(area->property("cursorPosition").toInt(), 26) << "after the pasted text";
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(area->property("text").toString().toStdString(), "Say REPLACE here") << "one undo step";
+    // Nothing to convert: pasted as always
+    area->setProperty("cursorPosition", 0);
+    QGuiApplication::clipboard()->setText("plain ");
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(area->property("text").toString().toStdString(), "plain Say REPLACE here");
+    click(find<QQuickItem>("markdownCancel"));
+}
+
 // The page's Markdown text flows onto new pages while it is written.
 TEST_F(MainWindowTest, markdownFlowsOntoNewPages) {
     auto* panel = find<QQuickItem>("markdownPanel");

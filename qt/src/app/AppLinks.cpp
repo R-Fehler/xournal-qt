@@ -4,6 +4,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <shared_mutex>
 #include <tuple>
 #include <utility>
@@ -12,6 +13,9 @@
 #include <QGuiApplication>
 #include <QMimeData>
 #include <QPointer>
+#include <QQuickTextDocument>
+#include <QTextCursor>
+#include <QTextDocument>
 #include <QThreadPool>
 #include <QVariantMap>
 
@@ -28,6 +32,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/LinkRewrite.h"
 #include "MarkdownFile.h"
+#include "MdTexDelimiters.h"
 #include "model/Element.h"
 #include "model/Layer.h"
 #include "model/Text.h"
@@ -342,6 +347,29 @@ bool AppController::copyDocumentLink(const QString& path, int page) {
 QString AppController::clipboardLinkMarkdown() const {
     const auto copied = links::fromMime(QGuiApplication::clipboard()->mimeData());
     return copied ? links::markdownFor(*copied, session() ? session()->documentFile() : fs::path()) : QString();
+}
+
+bool AppController::pasteMarkdown(QQuickTextDocument* document, int from, int to) {
+    QTextDocument* doc = document ? document->textDocument() : nullptr;
+    if (!doc) {
+        return false;
+    }
+    std::string pasted = QGuiApplication::clipboard()->text().toStdString();
+    pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());
+    const QString text = doc->toPlainText();
+    from = std::clamp(from, 0, static_cast<int>(text.size()));
+    to = std::clamp(to, from, static_cast<int>(text.size()));
+    const std::string converted = md::tex::convertPasted(text.toStdString(), text.left(from).toUtf8().size(),
+                                                         text.left(to).toUtf8().size(), pasted);
+    if (converted == pasted) {
+        return false;
+    }
+    // (one cursor edit: the selection replaced in one undo step of the TextArea, its cursor after the text)
+    QTextCursor cursor(doc);
+    cursor.setPosition(from);
+    cursor.setPosition(to, QTextCursor::KeepAnchor);
+    cursor.insertText(QString::fromStdString(converted));
+    return true;
 }
 
 // --- keeping links working: backlinks, links rewritten after moves, links whose file is gone ------------------

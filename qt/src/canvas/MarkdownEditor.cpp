@@ -28,6 +28,7 @@
 #include "CanvasView.h"
 #include "MdBox.h"
 #include "MdDocument.h"
+#include "MdTexDelimiters.h"
 #include "MdText.h"
 #include "TextEditor.h"
 
@@ -964,6 +965,10 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                 }
                 std::string pasted = QGuiApplication::clipboard()->text().toStdString();
                 pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());  // (the text's lines end in "\n")
+                if (!plain) {
+                    // Formulas as chat apps write them, \( \) and \[ \]: as $ $ and $$ $$ where they are formulas here
+                    pasted = md::tex::convertPasted(t, std::min(caret, anchor), std::max(caret, anchor), pasted);
+                }
                 insert(pasted, EditKind::Other);
                 return true;
             }

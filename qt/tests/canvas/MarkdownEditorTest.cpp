@@ -11,7 +11,9 @@
 #include <string>
 
 #include <QCoreApplication>
+#include <QClipboard>
 #include <QElapsedTimer>
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QPainter>
 #include <QSignalSpy>
@@ -308,4 +310,21 @@ TEST_F(MarkdownEditorTest, texDelimitersKeepThePlacesOfTheText) {
     EXPECT_EQ(ed.cursorPosition(), ed.text().find("words"));
     type("X");
     EXPECT_NE(ed.text().find("then Xwords"), std::string::npos) << ed.text();
+}
+
+// Pasted text with formulas as chat apps write them: its pairs become $…$ and $$…$$ (the file then shows them in
+// Obsidian and GitHub too), in one undo step; not in code, not next to a letter.
+TEST_F(MarkdownEditorTest, pastedTexDelimitersBecomeDollars) {
+    MarkdownEditor& ed = start();
+    type("Intro\n");
+    QGuiApplication::clipboard()->setText("The energy \\(E = mc^2\\) and\r\n\\[\r\n\\sum_k k\r\n\\]\r\nthe \\(n\\)th");
+    key(Qt::Key_V, {}, Qt::ControlModifier);
+    EXPECT_EQ(ed.text(), "Intro\n\nThe energy $E = mc^2$ and\n$$\n\\sum_k k\n$$\nthe \\(n\\)th");
+    key(Qt::Key_Z, {}, Qt::ControlModifier);
+    EXPECT_EQ(ed.text(), "Intro\n\n") << "one undo step";
+    // Into code: as it is
+    type("```\n");
+    QGuiApplication::clipboard()->setText("\\(x\\)");
+    key(Qt::Key_V, {}, Qt::ControlModifier);
+    EXPECT_EQ(ed.text(), "Intro\n\n```\n\\(x\\)");
 }

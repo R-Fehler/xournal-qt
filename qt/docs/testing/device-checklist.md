@@ -1361,3 +1361,7 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       a `\[` whose `\]` comes after a blank line.
 - [ ] Search (Ctrl+F) for a word after `\(x\)`: the hit is on that word. A long `.md` with such formulas is split
       into pages as before (never inside a formula).
+- [ ] Copy an answer with formulas from ChatGPT (it has `\(…\)` and `\[…\]`) and paste it (Ctrl+V) while writing
+      on the page, into a `.md` file, and into the Markdown panel beside the page: the pasted text has `$…$` and
+      `$$…$$` (formulas drawn), `the \(n\)th` stays; Ctrl+Z takes the whole paste back. Pasted into a ``` block: as
+      it is. A plain text box (not Markdown) and a `.txt` file: as it is.

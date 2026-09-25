@@ -112,6 +112,12 @@ where they belong. One pass over the lines; a pair is rewritten only
   fine (`(\(x\)),`). A pair next to another `$` (`\(a\)\(b\)`) or one whose `$` would close money before it
   (`$5, so \( x \)`) stays text too.
 
+**Pasting** into a Markdown text (writing on the page, the `.md` editor, the Markdown panel) converts the pasted
+text's pairs for good: the file then has `$…$`, which Obsidian and GitHub show. The same rules decide, applied to the
+text as it is after the paste: nothing is converted in code or next to a letter, a plain text (`.txt`) is left alone,
+and the paste is one undo step as any other. In the panel it is the keyboard's paste (Ctrl+V) that converts
+(a paste from a touch keyboard's menu comes as it is).
+
 - **Drawn by MicroTeX** (vendored, `qt/3rdparty/microtex`, MIT) with the Latin Modern Math font, which is compiled
   into the program: no LaTeX, no external program, the same on Android. Formulas are paths (vector): sharp at any
   zoom, and in the PDF export and the hybrid PDF as vector drawing (not as text: the TeX is not selectable there).

@@ -34,6 +34,7 @@
 
 #include "filesystem.h"
 
+class QQuickTextDocument;
 class QWindow;
 
 namespace xqt {
@@ -766,6 +767,11 @@ public:
     /// The clipboard holds a link (Copy link): its Markdown for the Markdown text being written beside the page
     /// (relative to the current document), else "".
     Q_INVOKABLE QString clipboardLinkMarkdown() const;
+    /// Paste into the Markdown text being written beside the page (its TextArea's document), in place of
+    /// [from, to): text whose \(…\) and \[…\] (as chat apps write formulas) become $…$ and $$…$$ where they are
+    /// formulas there (md::tex::convertPasted). One undo step. False when there is nothing to convert: the TextArea
+    /// pastes as always.
+    Q_INVOKABLE bool pasteMarkdown(QQuickTextDocument* document, int from, int to);
     /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
     Q_INVOKABLE void requestPrint(const QList<int>& pages) { Q_EMIT printRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);
