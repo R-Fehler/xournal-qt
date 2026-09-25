@@ -1399,6 +1399,9 @@ void draw(cairo_t* cr, const Layout& layout) {
                 break;
         }
     }
+    // No current point left behind (the path is not part of the saved state): Pango draws the next layout at it, and
+    // a text box drawn after this box would be where its last line is
+    cairo_new_path(cr);
     cairo_restore(cr);
 }
 

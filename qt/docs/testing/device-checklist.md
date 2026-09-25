@@ -1373,3 +1373,6 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       in the Markdown buttons. It opens a search and the emoji by category (the row on top jumps to one). Search
       `heart`, `happy`, `flag`: a tap (or Enter: the first found) puts the emoji at the cursor, the picker closes and
       the keys go to the text again. The button is gone when the writing ends.
+- [ ] A page with a Markdown box and, below it, an ordinary text box (Markdown switched off for the text tool):
+      on the canvas, in the thumbnail, in the PDF export and in the PDF with notes the text box is where it was
+      written (it was drawn over the box's last line in the PDF with notes before).
