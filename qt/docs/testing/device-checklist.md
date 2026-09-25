@@ -1346,3 +1346,12 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
+
+## Sticky notes (qt/sticky-notes)
+
+- [ ] A `.xopp` with notes (see qt/docs/sticky-notes.md): open it in upstream Xournal++ (`../xournalpp/build/xournalpp`):
+      no error, each note is an opaque coloured rectangle with the ink and text on it, and a layer "Sticky note" in
+      its layer list. Save it there and open it here again: the notes are still notes.
+- [ ] Export as plain PDF, Export for the archive, Save as hybrid PDF, and Print to a file: open each in Okular (and a
+      browser): the notes are opaque, their ink stops at their edge, no popup note icons. A covering note has no
+      folded corner there.
