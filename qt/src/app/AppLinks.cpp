@@ -115,7 +115,13 @@ bool AppController::followDocumentLinkFrom(const QString& uri, const QString& ho
     // This document: a jump within it (Back comes back)
     if ((link->path.isEmpty() || target == from) && source && (from.empty() || source->documentFile() == from)) {
         const links::Place place = DocumentLinks::placeIn(*source, *link);
-        jumpToPage(place.page);
+        if (how == QLatin1String("reference")) {
+            // In the reference: this document beside itself (qt/self-reference), there
+            referenceMode->showBeside(place.page);
+            setHomeVisible(false);
+        } else {
+            jumpToPage(place.page);
+        }
         if (!place.note.isEmpty()) {
             Q_EMIT pageActionDone(place.note, false);
         }

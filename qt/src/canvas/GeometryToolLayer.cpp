@@ -88,7 +88,7 @@ void GeometryToolLayer::toggle(GeometryToolType wanted) {
         return;
     }
     remove();
-    const size_t pageNo = view.getSession().getCurrentPageNo();
+    const size_t pageNo = view.currentPageNo();
     CanvasPage* page = view.pageCount() > pageNo ? view.getPage(pageNo) : nullptr;
     if (!page) {
         return;
@@ -283,7 +283,7 @@ void GeometryToolLayer::setMinimized(bool minimized) {
         return;
     }
     // Back on the page one is at now (the one it lay on may be far away), where it lay if that is on this page
-    const size_t pageNo = view.getSession().getCurrentPageNo();
+    const size_t pageNo = view.currentPageNo();
     CanvasPage* page = view.pageCount() > pageNo ? view.getPage(pageNo) : nullptr;
     if (!page) {
         return;

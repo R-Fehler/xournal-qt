@@ -3,6 +3,8 @@
 // canvas for reading on the other side (or for writing too, with the edit switch of its pill), behind a divider that
 // can be dragged, with a small pill of its own: the page (a tap: go to a page), edit, fit width, swap sides, swap
 // roles, close. The main document has a thin frame, so it is always clear which side is the notes.
+// The reference may be the tab's own document (qt/self-reference): a second view of it with a page and a zoom of its
+// own.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -345,7 +347,8 @@ Item {
                 IconButton {
                     objectName: "referenceSwapRolesButton"
                     iconName: "xqt-swap-roles"
-                    tip: qsTr("Write in this document (the other one becomes the reference)")
+                    tip: app.reference.self ? qsTr("Swap places (each side keeps its zoom)")
+                                            : qsTr("Write in this document (the other one becomes the reference)")
                     implicitWidth: 40; implicitHeight: 40
                     icon.width: 22; icon.height: 22
                     focusPolicy: Qt.NoFocus
@@ -355,7 +358,7 @@ Item {
                 IconButton {
                     objectName: "referencePopOutButton"
                     iconName: "xqt-pop-out"
-                    tip: qsTr("Show as a tab")
+                    tip: app.reference.self ? qsTr("Go there in the tab (the view beside closes)") : qsTr("Show as a tab")
                     implicitWidth: 40; implicitHeight: 40
                     icon.width: 22; icon.height: 22
                     focusPolicy: Qt.NoFocus
@@ -364,7 +367,7 @@ Item {
                 IconButton {
                     objectName: "referenceCloseButton"
                     iconName: "xqt-close"
-                    tip: qsTr("Close the reference (its tab stays open)")
+                    tip: app.reference.self ? qsTr("Close the view beside") : qsTr("Close the reference (its tab stays open)")
                     implicitWidth: 40; implicitHeight: 40
                     icon.width: 20; icon.height: 20
                     focusPolicy: Qt.NoFocus

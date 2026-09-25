@@ -1346,3 +1346,26 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
+
+## The same document as reference (qt/self-reference)
+
+- [ ] A long PDF or notes open: press and hold (or right click) the current tab → "Show this document beside": the
+      same document appears beside itself at the page in view, fitted to its half, for reading; the tab gets its
+      small book. The same from the book on the current document's card in the tab overview (Ctrl+Shift+E).
+- [ ] The book icon in the page menu (⋮ on a page of the sidebar or the page grid): the document beside itself at
+      that page (the grid closes); with it open already, the reference goes to that page (Back returns).
+- [ ] Scroll and zoom the reference with a finger, the pen, the wheel and the touchpad: the notes do not move, the
+      page sidebar and the page number stay with the notes; the reference's pill counts its own page.
+- [ ] Write on a page of the notes that the reference shows too: the stroke appears in the reference right away (and
+      the other way round with the pen button of the reference's pill on). Ctrl+Z undoes the last one, whichever side.
+- [ ] Insert or delete pages in the notes (page menu, Insert pages…) above the page the reference shows: the
+      reference stays on its page.
+- [ ] Swap roles in the reference's pill: the two sides exchange their places, each keeps its zoom; Alt+Left on
+      each side returns. "Show as a tab": the tab goes to the reference's place, the split closes, no second tab.
+- [ ] × in the pill (or the tab menu "Close the view beside") closes it; closing the tab or moving it to another
+      window closes it too. "Open as reference" of another tab replaces it.
+- [ ] Links: tap a PDF link to a page (a table of contents) → "In the reference": the document beside itself at
+      that page. A Markdown `[see](#page=5)` link asks "Go there" / "In the reference". A link tapped in the
+      reference to a page of the document goes there in the reference.
+- [ ] With `XQT_PERF=1`, a long PDF beside itself, scroll both sides far apart: pages stay sharp, memory stays under
+      the limit set in Settings (not twice it).

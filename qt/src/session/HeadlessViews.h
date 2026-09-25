@@ -8,11 +8,14 @@
 
 #include <cstddef>
 #include <functional>
+#include <vector>
 
 #include "control/ScrollHandler.h"
 #include "gui/MainWindow.h"
 #include "gui/XournalView.h"
 #include "gui/XournalppCursor.h"
+
+class ZoomControl;
 
 namespace xqt {
 
@@ -22,6 +25,68 @@ public:
     size_t getCurrentPage() const override { return currentPage; }
     void layerChanged(size_t) override {}
     void recreatePdfCache() override {}
+};
+
+/// The views showing a session, as one XournalView for reused upstream code (qt/self-reference: a tab's view and a
+/// second view of the same document beside it). What is about the document goes to all of them (a layer changed, the
+/// PDF replaced); the rest (the selection, the zoom, the current page) to the active one: the first view (the
+/// primary one), or while a second view acts (DocumentSession::ViewScope) that one. Without views: the headless one.
+class SessionViews final: public XournalView {
+public:
+    explicit SessionViews(XournalView& headless): headless(headless) {}
+    struct Entry {
+        XournalView* view;
+        ZoomControl* zoom;
+    };
+    std::vector<Entry> views;
+    /// The view acting now instead of the primary one (nullptr: none)
+    XournalView* scoped = nullptr;
+
+    XournalView& active() const { return scoped ? *scoped : views.empty() ? headless : *views.front().view; }
+    /// The zoom of the active view (nullptr: none, headless)
+    ZoomControl* activeZoom() const {
+        const XournalView* a = &active();
+        for (const Entry& e: views) {
+            if (e.view == a) {
+                return e.zoom;
+            }
+        }
+        return nullptr;
+    }
+
+    size_t getCurrentPage() const override { return active().getCurrentPage(); }
+    void layerChanged(size_t page) override {
+        if (views.empty()) {
+            headless.layerChanged(page);
+        }
+        for (const Entry& e: views) {
+            e.view->layerChanged(page);
+        }
+    }
+    void recreatePdfCache() override {
+        if (views.empty()) {
+            headless.recreatePdfCache();
+        }
+        for (const Entry& e: views) {
+            e.view->recreatePdfCache();
+        }
+    }
+    EditSelection* getSelection() const override { return active().getSelection(); }
+    void setSelection(EditSelection* selection) override { active().setSelection(selection); }
+    void clearSelection() override { active().clearSelection(); }
+    void deleteSelection(EditSelection* sel = nullptr) override { active().deleteSelection(sel); }
+    void repaintSelection(bool evenWithoutSelection = false) override { active().repaintSelection(evenWithoutSelection); }
+    double getZoom() const override { return active().getZoom(); }
+    XournalppCursor* getCursor() const override { return active().getCursor(); }
+    Control* getControl() const override { return active().getControl(); }
+    Layout* getLayout() const override { return active().getLayout(); }
+    void ensureRectIsVisible(int x, int y, int width, int height) override {
+        active().ensureRectIsVisible(x, y, width, height);
+    }
+    void pageSelected(size_t page) override { active().pageSelected(page); }
+
+private:
+    XournalView& headless;
 };
 
 /// `control->getWindow()` of a session: gives access to whatever view currently shows the session.

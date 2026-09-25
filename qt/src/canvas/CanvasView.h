@@ -45,6 +45,7 @@
 #include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
 #include "GeometryToolLayer.h"
+#include "session/DocumentSession.h"
 
 class EditSelection;
 class Settings;
@@ -88,6 +89,21 @@ public:
 
     void setDevicePixelRatio(double dpr);
     double devicePixelRatio() const { return dpr; }
+
+    // --- a second view of the same document (qt/self-reference) --------------------------------------------------
+    /// The first view of its session (a tab's): its current page is the session's (the page sidebar, the page number
+    /// and the models follow it), and it follows the session's requests to show a page or a place (search hits,
+    /// undo). A second view (the same document as the reference beside it) has a page of its own and follows nothing.
+    bool isPrimary() const;
+    /// The page this view is at (the most visible one, or the one pressed): the session's for the primary view.
+    size_t currentPageNo() const;
+    void setCurrentPageNo(size_t page);
+    /// While it lives, reused upstream code acting for this view sees it and its current page (see
+    /// DocumentSession::ViewScope): around input and the actions that change the document.
+    DocumentSession::ViewScope actingScope(std::optional<size_t> page = std::nullopt);
+    /// Exchange the places (page and position) with another view of the same document ("swap" with the same document
+    /// as the reference): each keeps its zoom. Both can go back to where they were.
+    void swapPlacesWith(CanvasView& other);
 
     // --- reading only (the reference beside the document of a tab) ---------------------------------------------
     /// Shown for reading only: every tool but the select tools (elements, PDF text) scrolls, as the hand does; a
@@ -337,6 +353,8 @@ Q_SIGNALS:
     /// A PDF link was tapped (the UI offers to follow it).
     void linkTapped(const QString& uri, int page, QRectF viewRect);
     void navigationChanged();
+    /// currentPageNo() changed (the primary view: the session's current page).
+    void currentPageChanged(qulonglong page);
     /// PDF text was selected (Select mode): the UI offers marking / copying it; rect in view coordinates.
     void pdfTextSelected(QRectF viewRect);
     void pdfTextSelectionCleared();
@@ -429,7 +447,13 @@ private:
     };
     NavPoint currentPlace() const;
     bool restorePlace(const NavPoint& place);
+    /// Remember the place before a jump (Back comes back to it)
+    void pushPlace(const NavPoint& here);
     std::vector<NavPoint> backStack, forwardStack;
+    /// A second view's current page (the primary view's is the session's)
+    size_t ownPage = 0;
+    /// The DocumentListener's page selection (and the second view's own): a selection of Markdown texts moved there
+    void markdownSelectionOnPage(size_t page);
     quint64 selectionRev = 0;
 };
 

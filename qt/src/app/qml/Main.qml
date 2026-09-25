@@ -1311,13 +1311,16 @@ ApplicationWindow {
     }
 
     // A tapped link: open it / go to the page (not at once: a tap can be a mistake). A link to a document
-    // (qt/docs/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings).
+    // (qt/docs/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings). A page
+    // or a place of this document offers going there, or showing it in the reference: a second view of the document
+    // beside it (qt/self-reference).
     Popup {
         id: linkPopup
         objectName: "linkPopup"
         property string uri
         property int page: -1
         property var doc: null  // app.documentLink(uri) of a link to a document, else null
+        property bool inDocument: false  // a link to a place of this document (`#page=…`, a chapter)
         padding: 6
         function follow(how) {
             if (linkRemember.checked) app.settings.set("linkOpening", how)
@@ -1336,13 +1339,18 @@ ApplicationWindow {
                         return
                     }
                 }
-                if (info && info.document && info.here) {  // (a place in this document: no need to ask)
-                    app.followDocumentLink(uri, "here")
-                    return
+                const inDocument = !!(info && info.document && info.here)
+                if (inDocument) {  // (a place in this document: there, or in the reference if that was chosen)
+                    const how = (app.settings.revision, app.settings.get("linkOpening"))
+                    if (how !== "ask") {
+                        app.followDocumentLink(uri, how === "reference" ? "reference" : "here")
+                        return
+                    }
                 }
                 linkPopup.uri = uri
                 linkPopup.page = page
                 linkPopup.doc = info && info.document ? info : null
+                linkPopup.inDocument = inDocument
                 linkRemember.checked = false
                 linkPopup.x = Math.max(8, Math.min(canvas.x + rect.x, win.width - linkPopup.width - 8))
                 linkPopup.y = canvas.y + rect.y + rect.height + 6
@@ -1359,6 +1367,7 @@ ApplicationWindow {
                     objectName: "linkLabel"
                     visible: linkPopup.uri !== ""
                     text: !linkPopup.doc ? linkPopup.uri
+                          : linkPopup.inDocument ? (linkPopup.doc.place !== "" ? linkPopup.doc.place : linkPopup.uri)
                           : !linkPopup.doc.found ? qsTr("%1 was not found").arg(linkPopup.doc.name)
                           : linkPopup.doc.place !== "" ? qsTr("%1, %2").arg(linkPopup.doc.name).arg(linkPopup.doc.place)
                                                        : linkPopup.doc.name
@@ -1368,20 +1377,36 @@ ApplicationWindow {
                 }
                 Button {
                     objectName: "linkButton"
-                    visible: !linkPopup.doc
+                    visible: !linkPopup.doc || linkPopup.inDocument
                     flat: true
-                    text: linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
-                                                                                  : qsTr("Page not in this document")
+                    text: linkPopup.inDocument ? qsTr("Go there")
+                          : linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
+                                                                                    : qsTr("Page not in this document")
                     enabled: linkPopup.uri !== "" || linkPopup.page >= 0
                     onClicked: {
-                        if (linkPopup.uri !== "") app.openLink(linkPopup.uri)
-                        else app.jumpToPage(linkPopup.page)
+                        const uri = linkPopup.uri
                         linkPopup.close()
+                        if (linkPopup.inDocument) app.followDocumentLink(uri, "here")
+                        else if (uri !== "") app.openLink(uri)
+                        else app.jumpToPage(linkPopup.page)
+                    }
+                }
+                // A page of this document: in a second view of it beside it (qt/self-reference)
+                Button {
+                    objectName: "linkInReference"
+                    visible: linkPopup.inDocument || (linkPopup.uri === "" && linkPopup.page >= 0)
+                    flat: true
+                    text: qsTr("In the reference")
+                    onClicked: {
+                        const uri = linkPopup.uri
+                        linkPopup.close()
+                        if (linkPopup.inDocument) app.followDocumentLink(uri, "reference")
+                        else app.reference.showBeside(linkPopup.page)
                     }
                 }
             }
             RowLayout {
-                visible: !!linkPopup.doc && linkPopup.doc.found
+                visible: !!linkPopup.doc && linkPopup.doc.found && !linkPopup.inDocument
                 spacing: 0
                 Button {
                     objectName: "linkNewTab"
@@ -1405,7 +1430,7 @@ ApplicationWindow {
             CheckBox {
                 id: linkRemember
                 objectName: "linkRemember"
-                visible: !!linkPopup.doc && linkPopup.doc.found
+                visible: !!linkPopup.doc && linkPopup.doc.found && !linkPopup.inDocument
                 text: qsTr("Remember my choice")
                 ToolTip.visible: hovered
                 ToolTip.delay: 600

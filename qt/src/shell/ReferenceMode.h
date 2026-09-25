@@ -2,7 +2,10 @@
  * xournal-qt: reference mode - a second document beside the current one, in the same tab, for reading while writing.
  *
  * The reference is another open tab (TabManager::Tab::reference, one per tab): the window shows its CanvasView in a
- * second canvas item, beside the current tab's, behind a movable divider. It is for reading only (the canvas item's
+ * second canvas item, beside the current tab's, behind a movable divider. It may be the tab's own document
+ * (qt/self-reference): then a second CanvasView of the same DocumentSession (TabManager::Tab::selfView) with its own
+ * page, zoom, selection and way back; edits show on both sides, there is one undo history, and the rendered pages of
+ * both views share CanvasMemory's limit. See qt/docs/reference-view.md. It is for reading only (the canvas item's
  * readingOnly): it scrolls and zooms, and its elements and PDF text can be selected and copied, to paste them into
  * the notes. Where the divider is (the share of the main document) and on which side the reference is are settings
  * of the application, the same for every tab.
@@ -43,6 +46,8 @@ class ReferenceMode final: public QObject {
     /// Its tab (-1: none)
     Q_PROPERTY(int tab READ tab NOTIFY changed)
     Q_PROPERTY(QString title READ title NOTIFY changed)
+    /// The reference is the current tab's own document, in a second view (qt/self-reference)
+    Q_PROPERTY(bool self READ isSelf NOTIFY changed)
     Q_PROPERTY(int pageNumber READ pageNumber NOTIFY pageChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageChanged)
     Q_PROPERTY(int zoomPercent READ zoomPercent NOTIFY zoomChanged)
@@ -77,6 +82,7 @@ public:
     void setPagesShown(bool shown);
     CanvasView* canvas() const;
     bool active() const;
+    bool isSelf() const;
     int tab() const;
     QString title() const;
     int pageNumber() const;
@@ -94,8 +100,12 @@ public:
     bool onLeft() const;
     void setOnLeft(bool left);
 
-    /// Show the document of tab `index` beside the current tab's (the current tab itself: nothing).
+    /// Show the document of tab `index` beside the current tab's. The current tab itself: its own document, in a
+    /// second view with a page, a zoom and a selection of its own (qt/self-reference), starting where the tab is.
     Q_INVOKABLE void showTab(int index);
+    /// "Show this document beside" (the page menu, a link to a page of it): the current tab's own document as its
+    /// reference (if it is not already), at `page` (-1: where the tab is).
+    Q_INVOKABLE void showBeside(int page = -1);
     /// The current tab shows no reference any more (its tab stays open).
     Q_INVOKABLE void close();
     Q_INVOKABLE void swapSides() { setOnLeft(!onLeft()); }
@@ -103,7 +113,8 @@ public:
     Q_INVOKABLE void swapRoles();
     /// "Show as a tab": the reference's tab moves right after the current tab (unless it is beside it already), the
     /// split closes (the pair is not kept), and the reference's tab becomes the current one. Ctrl+Tab and
-    /// Ctrl+Shift+Tab then go between the two.
+    /// Ctrl+Shift+Tab then go between the two. The tab's own document (it has one tab): the tab goes to the place of
+    /// the reference (Back returns), and the split closes.
     Q_INVOKABLE void popOut();
     Q_INVOKABLE void fitWidth();
     Q_INVOKABLE void zoomIn();

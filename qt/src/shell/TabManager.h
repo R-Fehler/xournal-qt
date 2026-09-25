@@ -64,10 +64,14 @@ public:
     struct Tab {
         std::unique_ptr<DocumentSession> session;
         std::unique_ptr<CanvasView> view;
-        /// Reference mode: the document of another tab shown beside this one (for reading), or none
+        /// Reference mode: the document of another tab shown beside this one (for reading), or none; or this tab's
+        /// own document (qt/self-reference), then shown in `selfView`
         DocumentSession* reference = nullptr;
         /// ... and whether it is written in there (off: for reading only)
         bool referenceEditable = false;
+        /// The second view of this tab's own document, while it is its own reference (its own page, zoom and
+        /// selection; the session's current page stays the tab's view's). It goes with the reference.
+        std::unique_ptr<CanvasView> selfView;
     };
 
     /// Adds a tab after the current one and makes it current. Returns its index.
@@ -97,10 +101,17 @@ public:
     // --- reference mode: each tab may show another tab's document beside its own ---
     /// The tab shown beside tab `index` (-1: none).
     int referenceOf(int index) const;
-    /// Show tab `reference` beside tab `index` (-1: no reference). A tab is not its own reference.
+    /// Show tab `reference` beside tab `index` (-1: no reference). `index` itself: its own document beside it, in a
+    /// second view (qt/self-reference), which starts where the tab's view is.
     void setReference(int index, int reference);
+    /// The view that shows the reference of tab `index`: the reference's tab's view, or the second view of the tab's
+    /// own document (nullptr: no reference).
+    CanvasView* referenceView(int index) const;
+    /// Tab `index` shows its own document beside it.
+    bool isSelfReference(int index) const;
     /// The current tab's document and its reference change places: the reference becomes the current tab, with the
-    /// document it was shown beside as its reference.
+    /// document it was shown beside as its reference. The same document beside itself: the two views exchange their
+    /// places (each keeps its zoom and its shown pages).
     void swapReference();
     /// Whether tab `index` writes in its reference (the edit switch of the reference's pill; off for a new one).
     bool referenceEditable(int index) const;
