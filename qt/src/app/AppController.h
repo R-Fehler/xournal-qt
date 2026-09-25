@@ -783,6 +783,33 @@ public:
     /// For the screenshot hook (it calls methods without arguments)
     Q_INVOKABLE void toggleSetsquare() { toggleGeometryTool("setsquare"); }
     Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
+    // --- sticky notes (qt/docs/sticky-notes.md) ---
+    /// A new sticky note in the middle of the visible part of the current page, selected so that it can be moved
+    /// and resized right away (a select tool is chosen, as for an image). One undo step.
+    Q_INVOKABLE bool insertStickyNote();
+    /// The pastel colors a note can have
+    Q_PROPERTY(QVariantList stickyNoteColors READ stickyNoteColors CONSTANT)
+    QVariantList stickyNoteColors() const;
+    /// A sticky note is selected (its pill: colors, cover, delete)
+    Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
+    bool noteSelected() const;
+    Q_PROPERTY(QColor noteColor READ noteColor WRITE setNoteColor NOTIFY noteSelectionChanged)
+    QColor noteColor() const;
+    void setNoteColor(const QColor& color);
+    /// The selected note covers (self-testing: the pen leaves it alone, a tap lets it peek)
+    Q_PROPERTY(bool noteCovers READ noteCovers WRITE setNoteCovers NOTIFY noteSelectionChanged)
+    bool noteCovers() const;
+    void setNoteCovers(bool covers);
+    Q_INVOKABLE void deleteStickyNote();
+    /// Where the selected note is on the canvas (an empty rect: none), for its pill
+    Q_INVOKABLE QRectF noteBox() const;
+    /// The current page has sticky notes; they are hidden (a view state, not saved)
+    Q_PROPERTY(bool pageHasNotes READ pageHasNotes NOTIFY notesChanged)
+    bool pageHasNotes() const;
+    Q_PROPERTY(bool pageNotesHidden READ pageNotesHidden WRITE setPageNotesHidden NOTIFY notesChanged)
+    bool pageNotesHidden() const;
+    void setPageNotesHidden(bool hidden);
+
     /// Which one lies on the page ("" if none).
     Q_PROPERTY(bool canShowInFileManager READ canShowInFileManager CONSTANT)
     /// Share → "PDF with notes" works here (SystemApps::canShare).
@@ -895,6 +922,10 @@ Q_SIGNALS:
     void toolChanged();
     void zoomChanged();
     void pageChanged();
+    /// A sticky note was selected or unselected, or the selected one changed
+    void noteSelectionChanged();
+    /// Sticky notes came, went, were hidden or shown (on the current page, or it is another page now)
+    void notesChanged();
     /// Messages from the core (XojMsgBox) and file errors, shown by QML.
     void message(const QString& title, const QString& text, bool error);
     /// This folder can be a library only with "All files access": the window explains why it is asked for, then

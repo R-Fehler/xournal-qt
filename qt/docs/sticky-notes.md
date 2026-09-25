@@ -19,12 +19,15 @@ clipped to it. It lies above the page's ink.
   note (the topmost note under the pen). The eraser erases on the note. Strokes that go beyond its edge are kept whole
   and clipped where they are drawn.
 - **Selecting:** a select tool (rectangle, lasso, object) on a note selects the whole note: an outline, a round
-  handle at the bottom-right corner, and a pill with its colours, "Cover" and delete. A drag on the note moves it
-  right away (pen, mouse or finger); the handle resizes it (with any tool). A note stays on its page and inside it.
+  handle at the bottom-right corner, and a pill above the note with its colours, "Cover", delete and deselect (Del
+  and Esc work too). A drag on the note moves it right away (pen, mouse, or a finger on the selected note); the
+  handle resizes it (with any tool). A note stays on its page and inside it. Choosing a tool that is not a select
+  tool ends the selection, so that the pen then writes on the note.
 - **Colours:** five pastel presets (yellow, pink, blue, green, orange). A new note is yellow.
 - **Placing:** "Sticky note" in the shapes menu (next to the setsquare and the compass: things put on the page) and
   "Insert sticky note" in the More menu (next to "Insert image…"). The note goes in the middle of the visible part of
-  the current page, selected, so that it can be moved and resized right away.
+  the current page, selected, and the rectangle select tool is chosen (as for an inserted image), so that it can be
+  moved and resized right away.
 
 ## Cover mode (self-testing)
 
@@ -33,8 +36,9 @@ A note can be switched to **cover** (the pill's "Cover" button). A covered note:
 - is not written on: the pen, the highlighter, the eraser and the text tool leave it alone (nothing is drawn under
   it either: a stroke that starts on it is not made);
 - **peeks** when tapped (pen, finger, mouse, the hand): it turns see-through (a quarter opaque, with a dashed edge),
-  so the answer under it can be checked. Another tap covers again. Peeking is a view state: not saved, not undoable,
-  not in exports, thumbnails or other windows; a document opens with its notes covered.
+  so the answer under it can be checked. Another tap covers again. Peeking is a view state of the open document:
+  not saved, not undoable, not in exports or thumbnails; a document opens with its notes covered. With a select tool
+  a tap selects the note instead (to move it, or to switch "Cover" off).
 
 **Hide / show the notes of a page**: a button in the page pill (next to the page number), shown on pages with notes.
 It hides every note of the page (and shows them again). Like the eye in the layer panel it is not saved in the file
@@ -112,7 +116,12 @@ drawn here, clipped content included; its `/Rect` is the note. Never a `/Text` p
   action, the selected-layer rule.
 - `qt/src/canvas/StickyNotes.*`: the canvas side (selection with its outline and handle, moving, resizing, writing
   on a note, cover taps), used by `CanvasPage`, `CanvasInput` and `CanvasView`.
-- `qt/src/app/qml/NotePill.qml`: colours, cover, delete. The menu entries in `Main.qml`.
+- `qt/src/app/qml/NotePill.qml`: colours, cover, delete, at the note. The menu entries and the page pill's eye in
+  `Main.qml`; `AppController` (`insertStickyNote`, `noteSelected`, `noteColor`, `noteCovers`, `pageNotesHidden` ...).
+- `LayersModel` leaves the notes out of the layer panel.
+- Tests: `StickyNoteTest` (session: the format, the round trip, upstream Xournal++ opening the file, every export),
+  `CanvasReplayTest` (`*StickyNote*`: writing on a note and the clipping on the screen, moving and resizing with the
+  content and undo, cover mode and peeking, placing and deleting), `MainWindowTest.theShapesMenuPlacesAStickyNote…`.
 
 ## Not yet
 
@@ -120,3 +129,4 @@ drawn here, clipped content included; its `/Rect` is the note. Never a `/Text` p
 - Clipping the text box while it is typed (the text being typed shows beyond the note's edge until it is done).
 - Markdown text boxes on notes (a Markdown box goes to the page's Markdown layer, below the notes).
 - A multi-layer selection rectangle that reaches a note selects nothing on the note (a tap selects the note).
+- Hiding the notes of the whole document at once (the eye in the page pill hides those of the current page).

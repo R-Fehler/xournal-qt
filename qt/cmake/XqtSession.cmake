@@ -108,6 +108,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasTextInput.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.cpp
 )
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)

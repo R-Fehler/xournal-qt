@@ -3331,6 +3331,57 @@ TEST_F(MainWindowTest, aPressOnTheCanvasClosesAnOpenMenu) {
 }
 
 // The setsquare and the compass sit in the shapes menu (they are not a way of drawing, they lie on the page).
+TEST_F(MainWindowTest, theShapesMenuPlacesAStickyNoteWithItsPill) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    click(find<QQuickItem>("shapeButton"));
+    auto* item = find<QQuickItem>("stickyNoteItem");
+    ASSERT_NE(item, nullptr);
+    until([&] { return item->isVisible(); });
+    scrollIntoView(item);
+    click(item);
+    until([&] { return controller->noteSelected(); });
+    ASSERT_TRUE(controller->noteSelected()) << "the new note is selected";
+    EXPECT_EQ(controller->tool(), QStringLiteral("selectRect")) << "to be moved and resized right away";
+
+    // Its pill: colors, cover, delete
+    auto* pill = find<QQuickItem>("notePill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    EXPECT_TRUE(pill->isVisible());
+    click(findItem("noteColor2"));
+    EXPECT_EQ(controller->noteColor(), controller->stickyNoteColors()[2].value<QColor>());
+    auto* cover = find<QQuickItem>("noteCoverButton");
+    click(cover);
+    EXPECT_TRUE(controller->noteCovers());
+    EXPECT_TRUE(cover->property("checked").toBool());
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        nextFrame();
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    // The page pill hides and shows the notes of the page
+    auto* pageNotes = find<QQuickItem>("pageNotesButton");
+    ASSERT_NE(pageNotes, nullptr);
+    until([&] { return pageNotes->isVisible(); });
+    EXPECT_TRUE(pageNotes->isVisible()) << "a page with notes";
+    click(pageNotes);
+    EXPECT_TRUE(controller->pageNotesHidden());
+    EXPECT_FALSE(controller->noteSelected()) << "a hidden note is not selected";
+    click(pageNotes);
+    EXPECT_FALSE(controller->pageNotesHidden());
+
+    // Deleted (and back with undo)
+    controller->undo();  // (the cover)
+    controller->undo();  // (the color)
+    controller->undo();  // (the note)
+    EXPECT_FALSE(controller->pageHasNotes());
+    until([&] { return !pageNotes->isVisible(); });
+    EXPECT_FALSE(pageNotes->isVisible());
+    controller->redo();
+    EXPECT_TRUE(controller->pageHasNotes());
+}
+
 TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

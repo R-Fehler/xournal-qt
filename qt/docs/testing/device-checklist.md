@@ -1355,3 +1355,18 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] Export as plain PDF, Export for the archive, Save as hybrid PDF, and Print to a file: open each in Okular (and a
       browser): the notes are opaque, their ink stops at their edge, no popup note icons. A covering note has no
       folded corner there.
+- [ ] Shapes menu → "Sticky note": a yellow note appears in the middle of the visible part of the page, selected
+      (outline, round handle at its bottom right, a pill above it); the select tool is chosen. Drag it with the pen,
+      a finger and the mouse: it follows and stays on its page. Drag the handle: it grows and shrinks (never below a
+      small minimum), what is written on it keeps its size and is cut off at the edge. More menu → "Insert sticky
+      note" does the same.
+- [ ] Choose the pen: the note is no longer selected. Write on it, also across its edge: the ink stays on the note and
+      is cut off at its edge, also while it is being drawn. The text tool writes on it; the eraser erases on it but
+      never the note's own edge. Undo and redo each stroke.
+- [ ] Select it again (select tool, a tap): move it: the ink moves along. Pick a colour in the pill; Delete and Esc
+      work. Undo / redo the place, the move, the resize, the colour, the delete (one step each).
+- [ ] "Cover" in the pill: a folded corner shows. With the pen on it nothing is drawn (neither on it nor under it). A
+      tap (pen, finger, mouse, the hand tool) makes it see-through with a dashed edge: the answer below shows; another
+      tap covers again. Close and reopen the file: covered again (peeking is not saved).
+- [ ] A page with notes has an eye button beside the page number: it hides all notes of the page (thumbnail too) and
+      shows them again. The layer panel does not list the notes.

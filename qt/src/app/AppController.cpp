@@ -54,6 +54,7 @@
 
 #include "CanvasView.h"
 #include "PenHover.h"
+#include "StickyNotes.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
@@ -628,6 +629,8 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
         currentConnections.push_back(
+                connect(s, &DocumentSession::currentPageChanged, this, &AppController::notesChanged));
+        currentConnections.push_back(
                 connect(&s->search(), &DocumentSearch::changed, this, &AppController::searchChanged));
         currentConnections.push_back(
                 connect(&s->search(), &DocumentSearch::finished, this, &AppController::searchChanged));
@@ -638,6 +641,9 @@ void AppController::currentTabChanged() {
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::noteSelectionChanged, this, &AppController::noteSelectionChanged));
+        currentConnections.push_back(connect(v, &CanvasView::notesChanged, this, &AppController::notesChanged));
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
         currentConnections.push_back(
                 connect(v, &CanvasView::markdownRequested, this, &AppController::markdownRequested));
@@ -677,6 +683,8 @@ void AppController::currentTabChanged() {
     Q_EMIT searchChanged();
     Q_EMIT pageUndoChanged();
     Q_EMIT selectionChanged();
+    Q_EMIT noteSelectionChanged();
+    Q_EMIT notesChanged();
     Q_EMIT navigationChanged();
     Q_EMIT pdfTextSelectionChanged();
     Q_EMIT toolChanged();  // the setsquare / compass of that tab
@@ -3664,6 +3672,64 @@ void AppController::setFontFamily(const QString& family) { setFont(family, fontS
 void AppController::setFontSize(double size) { setFont(fontFamily(), size); }
 
 QStringList AppController::fontFamilies() const { return QFontDatabase::families(); }
+
+// --- sticky notes ------------------------------------------------------------------------------------------------
+
+bool AppController::insertStickyNote() {
+    if (textPagesFixed() || !canvas() || session()->isReadOnly()) {
+        return false;
+    }
+    if (!isSelectToolType(app->getToolHandler()->getToolType())) {
+        selectTool("selectRect");  // so that the note can be moved and resized right away (as an image)
+    }
+    return canvas()->notes().insert();
+}
+QVariantList AppController::stickyNoteColors() const {
+    QVariantList colors;
+    for (const Color c: sticky::presetColors()) {
+        colors.push_back(QColor(c.red, c.green, c.blue));
+    }
+    return colors;
+}
+bool AppController::noteSelected() const { return canvas() && canvas()->notes().hasSelection(); }
+QColor AppController::noteColor() const {
+    if (const auto look = canvas() ? canvas()->notes().selectedLook() : std::nullopt) {
+        return QColor(look->color.red, look->color.green, look->color.blue);
+    }
+    return {};
+}
+void AppController::setNoteColor(const QColor& color) {
+    if (canvas()) {
+        canvas()->notes().setColor(Color(static_cast<uint8_t>(color.red()), static_cast<uint8_t>(color.green()),
+                                         static_cast<uint8_t>(color.blue())));
+    }
+}
+bool AppController::noteCovers() const {
+    const auto look = canvas() ? canvas()->notes().selectedLook() : std::nullopt;
+    return look && look->cover;
+}
+void AppController::setNoteCovers(bool covers) {
+    if (canvas()) {
+        canvas()->notes().setCover(covers);
+    }
+}
+QRectF AppController::noteBox() const { return canvas() ? canvas()->notes().selectedViewBox() : QRectF(); }
+void AppController::deleteStickyNote() {
+    if (canvas()) {
+        canvas()->notes().deleteSelected();
+    }
+}
+bool AppController::pageHasNotes() const {
+    return canvas() && canvas()->notes().pageHasNotes(session()->getCurrentPageNo());
+}
+bool AppController::pageNotesHidden() const {
+    return canvas() && canvas()->notes().notesHidden(session()->getCurrentPageNo());
+}
+void AppController::setPageNotesHidden(bool hidden) {
+    if (canvas()) {
+        canvas()->notes().setNotesHidden(session()->getCurrentPageNo(), hidden);
+    }
+}
 
 void AppController::toggleGeometryTool(const QString& which) {
     if (!canvas()) {
