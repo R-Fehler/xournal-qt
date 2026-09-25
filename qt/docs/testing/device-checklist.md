@@ -1346,3 +1346,24 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
+
+## Annotations as Markdown (qt/annotations-md)
+
+- [ ] A lecture PDF: highlight a sentence with the highlighter, underline another from selected text, write a text
+      box, a Markdown box, a link marker (paste a copied link), and a few words by hand in the margin. The page
+      sidebar's highlighter button shows them by page: the highlighted sentences with their text, the boxes, the link,
+      and a small picture of the handwriting. Circles and underlines drawn with the pen over the text are not listed.
+- [ ] A PDF with highlights made in Okular (or Acrobat) with a note: "Highlight in the PDF", its text, its note.
+- [ ] A tap on an item scrolls there (the item in view, also far down a page); Back returns.
+- [ ] With the panel open, write on a page: after a short pause the list shows the new item, without jumping to the
+      top. A 300-page PDF: the first reading shows a spinner and the canvas stays smooth while it reads; an edit then
+      updates the list at once.
+- [ ] The filter button: only handwriting, then "Show all"; the counter says "N of M" meanwhile.
+- [ ] Export (the download button), Xournal++ files mode: `<name>.annotations.md` next to the document; the snackbar's
+      Open shows it. Headings are the PDF's chapters (a PDF without an outline: "Page N"). A tap on a "p. N" link in
+      the opened `.md` opens the document on that page. Export again: it asks before replacing.
+- [ ] PDF files mode: the export asks with a save dialog and writes nothing next to the PDF by itself.
+- [ ] A new document never saved: the export says to save it first.
+- [ ] `XQT_ANNOTATION_PICTURES=1 ./xournal-qt`: the export writes the handwriting as PNGs in `<name>.annotations.assets/`
+      and links them; Typora or Obsidian show them.
+- [ ] Android (emulator): the panel lists and jumps the same; a tap on an item works with a finger.

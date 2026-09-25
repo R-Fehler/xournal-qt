@@ -259,6 +259,8 @@ public:
     // --- navigation history: jumps (links, page grid, sidebar) can be gone back and forth, like a browser ---
     /// Go to a page and remember where the view was.
     void jumpToPage(size_t page);
+    /// The same, showing this part of the page (page points), e.g. an annotation of the Annotations panel.
+    void jumpToRect(size_t page, QRectF rect);
     bool canGoBack() const { return !backStack.empty(); }
     /// How many places Back can go to in this view (a link from another document came in at this depth).
     size_t backDepth() const { return backStack.size(); }
@@ -428,6 +430,8 @@ private:
         QPointF offset;
     };
     NavPoint currentPlace() const;
+    /// Before a jump to `page`: where the view is goes onto the back stack (not for a jump within that page).
+    void rememberPlaceBefore(size_t page);
     bool restorePlace(const NavPoint& place);
     std::vector<NavPoint> backStack, forwardStack;
     quint64 selectionRev = 0;

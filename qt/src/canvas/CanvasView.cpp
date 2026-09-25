@@ -1323,6 +1323,21 @@ void CanvasView::jumpToPage(size_t page) {
     if (page >= pages.size()) {
         return;
     }
+    rememberPlaceBefore(page);
+    session.setCurrentPageNo(page);
+    viewController.scrollToPage(page);
+}
+
+void CanvasView::jumpToRect(size_t page, QRectF rect) {
+    if (page >= pages.size()) {
+        return;
+    }
+    rememberPlaceBefore(page);
+    session.setCurrentPageNo(page);
+    viewController.scrollToPageRect(page, rect.adjusted(-20, -40, 20, 40));
+}
+
+void CanvasView::rememberPlaceBefore(size_t page) {
     const NavPoint here = currentPlace();
     if (here.page && here.page != pages[page]->getPage()) {
         backStack.push_back(here);
@@ -1332,8 +1347,6 @@ void CanvasView::jumpToPage(size_t page) {
         forwardStack.clear();
         Q_EMIT navigationChanged();
     }
-    session.setCurrentPageNo(page);
-    viewController.scrollToPage(page);
 }
 
 bool CanvasView::navigateBack() {

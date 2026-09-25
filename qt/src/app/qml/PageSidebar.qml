@@ -1,7 +1,7 @@
 // Page sidebar: thumbnails of the current document. Tap a page to go there; Ctrl/Shift+click to select pages;
 // press and hold to drag the selected pages to another place; right click or ⋮ for the page menu; Ctrl+C/X/V,
 // Delete and Ctrl+Z (the one undo of the document) with the keyboard. While searching, pages with hits are framed and the list can
-// be limited to them.
+// be limited to them. The last button shows the document's annotations (AnnotationList).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -11,9 +11,11 @@ import QtQuick.Window
 Rectangle {
     id: sidebar
     color: "#eceef1"
-    /// "pages", "layers" or "contents"
+    /// "pages", "layers", "contents" or "annotations"
     property string mode: "pages"
     readonly property bool showContents: mode === "contents"
+    // The annotations are read only while they are shown
+    Binding { target: app.annotations; property: "active"; value: sidebar.visible && sidebar.mode === "annotations" }
     onModeChanged: if (mode === "contents" && !app.outline.available) mode = "pages"
 
     // Pages | Layers | Contents (the last one when the document has a table of contents)
@@ -47,6 +49,36 @@ Rectangle {
                 }
             }
         }
+        // Annotations: an icon (the words do not fit beside the others)
+        AbstractButton {
+            id: annotationsButton
+            objectName: "sidebarAnnotationsButton"
+            implicitWidth: 36
+            implicitHeight: 32
+            readonly property bool active: sidebar.mode === "annotations"
+            onClicked: sidebar.mode = "annotations"
+            Accessible.name: qsTr("Annotations")
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Annotations")
+            background: Rectangle { radius: 16; color: annotationsButton.active ? "#ffffff" : "transparent" }
+            contentItem: Item {
+                Image {
+                    anchors.centerIn: parent
+                    source: app.iconUrl("xopp-tool-highlighter")
+                    sourceSize.width: 18
+                    sourceSize.height: 18
+                    opacity: annotationsButton.active ? 1 : 0.75
+                }
+            }
+        }
+    }
+    AnnotationList {
+        visible: sidebar.mode === "annotations"
+        anchors.top: switchRow.bottom
+        anchors.topMargin: 4
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
     }
     LayerList {
         visible: sidebar.mode === "layers"

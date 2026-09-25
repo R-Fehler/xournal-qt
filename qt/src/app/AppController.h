@@ -53,6 +53,7 @@ class PageFilterModel;
 class LayersModel;
 class ShortcutsModel;
 class OutlineModel;
+class AnnotationsModel;
 class TextFlowSession;
 class MarkdownSession;
 class PageClipboard;
@@ -84,6 +85,8 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* filteredPages READ filteredPagesModel CONSTANT)
     /// Table of contents of the current tab (PDF outline)
     Q_PROPERTY(QObject* outline READ outlineModel CONSTANT)
+    /// Highlights and notes of the current tab (the sidebar's Annotations panel, qt/docs/annotations-md.md)
+    Q_PROPERTY(QObject* annotations READ annotationsModel CONSTANT)
     /// The layers of the current page
     Q_PROPERTY(QObject* layers READ layersModel CONSTANT)
     /// The keyboard shortcuts (the same ones in every window)
@@ -227,6 +230,7 @@ public:
     QObject* pagesModel() const;
     QObject* filteredPagesModel() const;
     QObject* outlineModel() const;
+    QObject* annotationsModel() const;
     QObject* layersModel() const;
     QObject* shortcutsModel() const;
     QObject* settingsModel() const;
@@ -716,6 +720,19 @@ public:
     Q_INVOKABLE void goToPage(int index);
     /// Go to a page and remember the place for "back" (links, page grid, sidebar).
     Q_INVOKABLE void jumpToPage(int index);
+    /// The same, showing this part of the page (page points): an item of the Annotations panel.
+    Q_INVOKABLE void jumpToPlace(int index, const QRectF& rect);
+    // --- the annotations as Markdown (qt/docs/annotations-md.md) ---
+    /// Where "Export as Markdown" writes without asking: "<name>.annotations.md" next to the document, with Xournal++
+    /// files. Empty: ask with a save dialog (PDF files mode writes nothing next to files), or the document was never
+    /// saved.
+    Q_INVOKABLE QUrl annotationsFile() const;
+    /// The file the save dialog suggests; empty: the document was never saved (exportAnnotations says so).
+    Q_INVOKABLE QUrl suggestedAnnotationsFile() const;
+    Q_INVOKABLE bool fileExists(const QUrl& file) const;
+    /// Write the current document's annotations as Markdown (once the panel's list is up to date); then
+    /// annotationsExported.
+    Q_INVOKABLE void exportAnnotations(const QUrl& file);
     Q_INVOKABLE void navigateBack();
     Q_INVOKABLE void navigateForward();
     Q_INVOKABLE void clearNavigation();
@@ -909,6 +926,8 @@ Q_SIGNALS:
     void raiseRequested();
     void recoveryChanged();
     void documentModeChanged();
+    /// exportAnnotations is done: the file written, or why not (`error`).
+    void annotationsExported(const QString& file, const QString& error);
     void searchChanged();
     void viewLayoutChanged();
     void presentingChanged();
@@ -1054,6 +1073,7 @@ private:
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::OutlineModel> outline;
+    std::unique_ptr<xqt::AnnotationsModel> annotations;
     std::unique_ptr<xqt::LayersModel> layers;
     std::unique_ptr<xqt::ShortcutsModel> ownShortcuts;
     xqt::ShortcutsModel* shortcuts = nullptr;  ///< the main window's

@@ -205,11 +205,16 @@ PdfLayoutReader::~PdfLayoutReader() {
     }
 }
 
-PdfPageLayout PdfLayoutReader::layout(int nr) {
+::_PopplerDocument* PdfLayoutReader::document() {
     if (!doc && !failed) {
         doc = openPdf(file);
         failed = !doc;
     }
+    return doc;
+}
+
+PdfPageLayout PdfLayoutReader::layout(int nr) {
+    document();
     if (!doc || nr < 0 || nr >= poppler_document_get_n_pages(doc)) {
         return {};
     }
