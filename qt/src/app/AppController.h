@@ -162,6 +162,8 @@ class AppController: public QObject {
     Q_PROPERTY(double textFlowOverflow READ textFlowOverflow NOTIFY textFlowChanged)
     /// A Markdown box is being edited (markdownPage, 0-based); how far it goes below the page (points)
     Q_PROPERTY(bool markdownActive READ markdownActive NOTIFY markdownChanged)
+    /// Markdown is being written on the page itself (formatted while typing), not in the panel beside it.
+    Q_PROPERTY(bool markdownOnPage READ markdownOnPage NOTIFY markdownOnPageChanged)
     Q_PROPERTY(int markdownPage READ markdownPage NOTIFY markdownChanged)
     /// The last page of the Markdown text being edited (the page's text flows over pages)
     Q_PROPERTY(int markdownLastPage READ markdownLastPage NOTIFY markdownChanged)
@@ -344,6 +346,13 @@ public:
     double markdownOverflow() const { return mdOverflow; }
     /// Start editing the Markdown box of a page (-1: the current page; made when there is none). Returns its source.
     Q_INVOKABLE QString beginMarkdown(int page = -1);
+    bool markdownOnPage() const;
+    /// Write the current page's Markdown text on the page, formatted while typing (the default of the tool bar's
+    /// write button; its source beside the page is the button's menu). The cursor goes to the end of what that page
+    /// holds; a page without Markdown text starts one at its top. False if nothing can be written there.
+    Q_INVOKABLE bool writeMarkdownOnPage();
+    /// Stop writing on the page (the text stays).
+    Q_INVOKABLE void endMarkdownOnPage();
     /// The source as typed: the page follows.
     Q_INVOKABLE void updateMarkdown(const QString& source);
     /// Done (keep: one undo step) or cancel.
@@ -942,6 +951,7 @@ Q_SIGNALS:
     void penPillChanged();
     void textFlowChanged();
     void markdownChanged();
+    void markdownOnPageChanged();
     /// The text tool tapped a Markdown box: the window opens its editor.
     void markdownRequested(int page);
     /// The text tool tapped a Markdown text box, or a place for a new one: the window opens its editor.

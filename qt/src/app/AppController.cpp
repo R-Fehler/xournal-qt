@@ -524,6 +524,41 @@ QString AppController::beginMarkdown(int page) { return startMarkdown(page, std:
 
 QString AppController::beginMarkdownBox(int page, double x, double y) { return startMarkdown(page, QPointF(x, y)); }
 
+bool AppController::markdownOnPage() const {
+    const CanvasView* v = canvas();
+    return v && v->getMarkdownEditor() && !v->textMode();  // (a text file is always written on its pages)
+}
+
+bool AppController::writeMarkdownOnPage() {
+    CanvasView* v = canvas();
+    DocumentSession* s = session();
+    if (!v || !s || s->isReadOnly() || v->textMode() || s->getDocument()->getPageCount() == 0) {
+        return false;
+    }
+    endMarkdown(true);
+    endTextFlow(true);
+    const size_t page = std::min(s->getCurrentPageNo(), s->getDocument()->getPageCount() - 1);
+    double w = 0;
+    double h = 0;
+    {
+        std::shared_lock lock(*s->getDocument());
+        const PageRef p = s->getDocument()->getPage(page);
+        w = p->getWidth();
+        h = p->getHeight();
+    }
+    // (the bottom right: the cursor lands at the end of what the page holds of its text)
+    v->startMarkdown(page, true, w, h);
+    Q_EMIT markdownOnPageChanged();
+    return v->getMarkdownEditor() != nullptr;
+}
+
+void AppController::endMarkdownOnPage() {
+    if (CanvasView* v = canvas(); v && v->getMarkdownEditor() && !v->textMode()) {
+        v->endTextEditing();
+        Q_EMIT markdownOnPageChanged();
+    }
+}
+
 QVariantMap AppController::takeMarkdownFromPage() {
     CanvasView* v = canvas();
     if (!v || !v->getMarkdownEditor()) {
@@ -648,6 +683,8 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
         currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
+        currentConnections.push_back(
+                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownOnPageChanged));
         currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
@@ -681,6 +718,7 @@ void AppController::currentTabChanged() {
     Q_EMIT pdfTextSelectionChanged();
     Q_EMIT toolChanged();  // the setsquare / compass of that tab
     Q_EMIT titlePageChanged();
+    Q_EMIT markdownOnPageChanged();
 }
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }

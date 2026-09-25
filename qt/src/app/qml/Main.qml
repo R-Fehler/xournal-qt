@@ -522,13 +522,14 @@ ApplicationWindow {
                 objectName: "textModeButton"
                 property bool markdownMode: false
                 iconName: markdownMode ? "xqt-markdown" : "xqt-text-mode"
-                tip: markdownMode ? qsTr("Markdown: write Markdown on the page, shown formatted (Ctrl+Alt+M). Hold for the text mode")
+                tip: markdownMode ? qsTr("Markdown: write on the page, shown formatted (Ctrl+Alt+M). Hold for its source beside the page, or the text mode")
                                   : qsTr("Text mode: type the page's text like in a word processor (Ctrl+Alt+E). Hold for Markdown")
-                checked: textFlowPanel.visible || markdownPanel.visible
+                checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
                 onClicked: {
                     if (textFlowPanel.visible) textFlowPanel.close(true)
                     else if (markdownPanel.visible) markdownPanel.close(true)
-                    else if (markdownMode) markdownPanel.open()
+                    else if (app.markdownOnPage) app.endMarkdownOnPage()
+                    else if (markdownMode) app.writeMarkdownOnPage()  // (formatted while typing, on the page)
                     else textFlowPanel.open()
                 }
                 onPressAndHold: Popups.openAt(writeMenu)
@@ -550,10 +551,21 @@ ApplicationWindow {
                     }
                     MenuItem {
                         objectName: "markdownItem"
-                        text: qsTr("Markdown (shown formatted)")
+                        text: qsTr("Markdown (shown formatted, on the page)")
                         checkable: true
                         checked: writeButton.markdownMode
-                        onTriggered: markdownPanel.open()
+                        onTriggered: { writeButton.markdownMode = true; app.writeMarkdownOnPage() }
+                    }
+                    MenuSeparator {}
+                    MenuItem {
+                        objectName: "markdownSourceItem"
+                        text: qsTr("Markdown source beside the page")
+                        onTriggered: {
+                            const onPage = app.takeMarkdownFromPage()
+                            if (onPage.page === undefined) markdownPanel.open()
+                            else if (onPage.pageText) markdownPanel.open(onPage.page)
+                            else markdownPanel.openBox(onPage.page, onPage.x, onPage.y)
+                        }
                     }
                 }
                 Connections {
@@ -2762,10 +2774,12 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
     Shortcut { sequences: win.keysOf("textMode"); enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
     Shortcut {
-        // (Markdown written on the page: its source beside the page)
+        // Markdown on the page (formatted while typing); pressed again while writing there: its source beside the
+        // page
         sequences: win.keysOf("markdownMode"); enabled: !app.homeVisible
         onActivated: {
             if (markdownPanel.visible) { markdownPanel.close(true); return }
+            if (!app.markdownOnPage) { writeButton.markdownMode = true; app.writeMarkdownOnPage(); return }
             const onPage = app.takeMarkdownFromPage()
             if (onPage.page === undefined) markdownPanel.open()
             else if (onPage.pageText) markdownPanel.open(onPage.page)

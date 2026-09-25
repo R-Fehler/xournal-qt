@@ -7,8 +7,11 @@ dialect is CommonMark with GitHub's extensions (tables, strikethrough, task list
 
 ## Two kinds of Markdown text, two ways of writing
 - **The page's Markdown text** starts at the top-left margin and goes to the right margin. It flows onto the next
-  pages (see below). The writing button's "Markdown" (or Ctrl+Alt+M) opens it beside the page. With the text tool,
-  a tap on it writes it on the page.
+  pages (see below). The writing button (in its Markdown mode) or Ctrl+Alt+M writes it **on the page**, formatted
+  while typing, with the cursor at the end of what the current page holds; the button again (or Escape) is done.
+  Its source beside the page is in the button's menu (press and hold, or right-click: "Markdown source beside the
+  page"), and Ctrl+Alt+M while writing on the page opens it there too. With the text tool, a tap on it writes it
+  on the page.
 - **Markdown text boxes** go anywhere on a page. Turn on "Markdown" in the text tool's font menu (hold the text
   button, or tap it again), then tap where the text should go. A tap on a box (text tool) edits it again.
 

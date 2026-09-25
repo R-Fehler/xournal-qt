@@ -4130,11 +4130,49 @@ TEST_F(HomeScreenTest, movesToAnotherLibraryAndWarnsAboutDownloads) {
 }
 
 // Markdown: written beside the page into a box (a text in the layer "Markdown"), opened again with the text tool.
+TEST_F(MainWindowTest, theWritingButtonWritesMarkdownOnThePageItsSourceIsInItsMenu) {
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* button = find<QQuickItem>("textModeButton");
+    ASSERT_NE(panel, nullptr);
+    ASSERT_NE(button, nullptr);
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+
+    // Markdown chosen in the button's menu: written on the page, formatted while typing (not beside it)
+    QMetaObject::invokeMethod(find<QObject>("markdownItem"), "triggered");
+    until([&] { return view->getMarkdownEditor() != nullptr; });
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_FALSE(panel->isVisible());
+    EXPECT_TRUE(controller->markdownOnPage());
+    EXPECT_TRUE(button->property("checked").toBool());
+    type("# Title");
+    EXPECT_EQ(view->getMarkdownEditor()->text(), "# Title");
+
+    // The button again: done; once more (it remembers Markdown): on the page again, the cursor after the text
+    click(button);
+    until([&] { return view->getMarkdownEditor() == nullptr; });
+    EXPECT_FALSE(controller->markdownOnPage());
+    EXPECT_FALSE(button->property("checked").toBool());
+    click(button);
+    until([&] { return view->getMarkdownEditor() != nullptr; });
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_FALSE(panel->isVisible());
+    type(" two");
+    EXPECT_EQ(view->getMarkdownEditor()->text(), "# Title two") << "the cursor at the end of the page's text";
+
+    // The source beside the page: the menu's other entry takes the text being written along
+    QMetaObject::invokeMethod(find<QObject>("markdownSourceItem"), "triggered");
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_EQ(view->getMarkdownEditor(), nullptr);
+    EXPECT_EQ(find<QQuickItem>("markdownArea")->property("text").toString(), QStringLiteral("# Title two"));
+}
+
 TEST_F(MainWindowTest, markdownBoxIsWrittenAndOpenedAgainWithTheTextTool) {
     controller->setMarkdownInPanel(true);  // (the text tool opens it beside the page)
     auto* panel = find<QQuickItem>("markdownPanel");
     ASSERT_NE(panel, nullptr);
-    auto* markdownItem = find<QObject>("markdownItem");  // in the menu of the writing button
+    auto* markdownItem = find<QObject>("markdownSourceItem");  // in the menu of the writing button: beside the page
     ASSERT_NE(markdownItem, nullptr);
     QMetaObject::invokeMethod(markdownItem, "triggered");
     until([&] { return panel->isVisible(); });
@@ -4205,7 +4243,7 @@ TEST_F(MainWindowTest, markdownFormulasAndTheErrorOfOneOnHover) {
     controller->setMarkdownInPanel(true);
     auto* panel = find<QQuickItem>("markdownPanel");
     ASSERT_NE(panel, nullptr);
-    QMetaObject::invokeMethod(find<QObject>("markdownItem"), "triggered");
+    QMetaObject::invokeMethod(find<QObject>("markdownSourceItem"), "triggered");
     until([&] { return panel->isVisible(); });
     ASSERT_TRUE(panel->isVisible());
     find<QQuickItem>("markdownArea")->setProperty(

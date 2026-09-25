@@ -1346,3 +1346,11 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
+
+## Markdown written on the page by default (2026-09-26)
+
+- [ ] In a `.xopp`, the writing button in its Markdown mode (or Ctrl+Alt+M): the cursor is on the page, at the end of
+      that page's Markdown text, and typing shows the text formatted as it is typed. The button is shown pressed; a
+      tap on it (or Escape) ends writing.
+- [ ] Press and hold the button (right-click with a mouse): "Markdown source beside the page" opens the source in the
+      panel beside the page, with the text written so far.
