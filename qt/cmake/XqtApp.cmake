@@ -59,6 +59,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryArchive.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryArchive.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryMigration.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryMigration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ShortcutsModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ShortcutsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.h
@@ -121,6 +123,7 @@ set(XQT_QML_FILES
     src/app/qml/Snackbar.qml
     src/app/qml/SelectionMark.qml
     src/app/qml/HomeView.qml
+    src/app/qml/FolderChooser.qml
     src/app/qml/DocumentCard.qml
     src/app/qml/NewDocumentDialog.qml
     src/app/qml/DocumentModeCards.qml
@@ -227,6 +230,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilterTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFuzzyTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecentLibrariesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryHomeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryCacheTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CliTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ThumbnailsTest.cpp

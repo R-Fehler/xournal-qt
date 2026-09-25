@@ -59,10 +59,42 @@ Or copy the APK to the phone and open it (allow installing from the file manager
 package `org.xournalqt.app`. A document can be opened at start from adb (debug builds only):
 `adb shell am start -S -n org.xournalqt.app/.XournalActivity -e applicationArguments <path>`.
 
-**Where the documents are.** The default library is the app's own folder on the shared storage:
-`/storage/emulated/0/Android/data/org.xournalqt.app/files/Documents/Xournal_Libraries/Default`. Files can be put
-there with `adb push <file> <that folder>/` or over USB. New documents are saved there. Uninstalling the app deletes
-this folder.
+**Where the documents are** (`qt/android-storage`). The libraries live in the phone's own
+`Documents/Xournal_Libraries` (`/storage/emulated/0/Documents/Xournal_Libraries/Default` for the default library;
+the folder comes from `Environment.getExternalStoragePublicDirectory`, [Library.cpp](../src/shell/Library.cpp)
+`PlatformFolders`). There file managers and sync apps (Syncthing) see them, and they stay when the app is uninstalled
+(VISION: the app keeps no hostage data). The app reads and writes there with "All files access", so until it has
+that, the libraries are in the app's own folder, `/storage/emulated/0/Android/data/org.xournalqt.app/files/
+Documents/Xournal_Libraries`, which Android deletes with the app. Which of the two is in use is
+`Library::home()`: the phone's folder once the libraries were moved there (the setting `librariesHome` = `shared`)
+and while the app has the access; else the app's folder (`AppController::chooseLibrariesHome`, at every start).
+- **Moving them.** At the first start, and at later starts while the libraries are in the app's folder, a dialog
+  says where they belong and asks for "All files access" ("Keep libraries on the phone?"). Continue shows
+  Android's page for the access; back with it, the libraries move in the background
+  ([LibraryMigration](../src/shell/LibraryMigration.h)): every file is copied into a hidden
+  `.xqt-moving-<name>` folder next to its place, read back and compared (size and SHA-1), and only when all of it
+  arrived do the folders get their names and the app switches over. Recent files, the library shown, the reading
+  positions and title pages, the library's settings and its cache (previews, search index), the session journal
+  (open tabs), the open tabs themselves and the last folders of the file dialogs follow. The old copies are deleted
+  last, each only if it is still the file that was copied (size and time); a file changed meanwhile stays. If the
+  app is ended before that, the next start finishes it (`library-move.json` in the config folder). A library whose
+  name is taken in the phone's folder becomes "Name (2)" (never merged); an empty one is not moved. A failure (no
+  space, a file that cannot be read, a copy that differs, a file changed during the move) removes the copies and
+  leaves the libraries where they were, in use, with a message saying so.
+- **"Not now"** keeps the libraries in the app's folder; the offer does not come at the start again, but a note on
+  the home screen stays ("Libraries are inside the app and are deleted when it is uninstalled"); tapping it asks
+  again. Without the access later (turned off in the settings) the app works in its own folder again and the note
+  comes back; the libraries in the phone's folder are used again as soon as the access is back (also when it was given for
+  another folder, e.g. the Downloads quick library, while the app's folder has nothing to move).
+- **Uninstalling** asks whether to keep the app's data (`android:hasFragileUserData`): kept, the settings, reading
+  positions and recent files are there again after installing anew (and a library still in the app's folder).
+- **Installed again**: the libraries are still in `Documents/Xournal_Libraries`. The app starts in its (new, empty)
+  folder with the offer; with the access given there is nothing to move, and the phone's folder is used at once.
+- Files can be put into a library with `adb push <file> /sdcard/Documents/Xournal_Libraries/Default/` or over USB.
+- The library cache stays in the app's cache (`qt/android-libraries`): it goes with the app and is read again.
+- **Downloads.** The Downloads quick library (library menu) is the phone's `Download` folder, where browsers and
+  mail apps put files (the app's own Download folder stays empty). Without "All files access" tapping it explains
+  and asks for the access first, then opens it.
 
 **Files from other apps.** "Open with" (a PDF, a `.xopp` or `.xoj`, a `.md` or `.txt`, an image in a file
 manager, a mail or a browser's downloads) and the share sheet (one file or several) hand the app `content://` URIs.
@@ -109,7 +141,13 @@ per-folder packs, the search index, and the folder watcher that sees what the sy
   (`AppController::openLibrary`, `requestStorageAccess`; the Java side is `XournalActivity.hasAllFilesAccess` and
   `requestAllFilesAccess`.) Google Play allows this permission only to some kinds of apps; fine for sideloading and
   F-Droid, to be revisited for Play.
-- The folder is picked with Android's folder picker (Qt's `FolderDialog` is the system's `ACTION_OPEN_DOCUMENT_TREE`
+- **The in-app folder chooser** (`qt/android-storage`, [FolderChooser.qml](../src/app/qml/FolderChooser.qml)): with
+  "All files access", "Open a folder as library…" lists the folders itself, from the phone's storage down (tap a
+  folder to go in, ↑ to go up), and "Use this folder" opens the one shown. Android's picker refuses the `Download`
+  folder, the storage's root and `Android/data` by design; the app can read them by their paths. The storage root
+  itself cannot be a library. Without the access, the system's picker below is used (the access is asked for
+  first when a folder of the storage is picked).
+- Without the in-app chooser the folder is picked with Android's folder picker (Qt's `FolderDialog` is the system's `ACTION_OPEN_DOCUMENT_TREE`
   on Android and gives a `content://` tree URI, no path). A tree of the external storage provider is mapped to its
   path (`ContentFiles::sharedStoragePath`): `content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FUni`
   is `/storage/emulated/0/Documents/Uni`, `home:` is the Documents folder, `<volume id>:` an SD card
@@ -211,7 +249,7 @@ never in the repository.
 |---|---|
 | Tests, the CLI (`xournal-qt-cli`, `xoj-imgdiff`), the golden tests, the spikes | desktop tools (`XQT_BUILD_TESTS/CLI/SPIKES` default OFF on Android) |
 | `.deb` packaging (`XqtPackage.cmake`) | replaced by `XqtAndroid.cmake` |
-| D-Bus ("Show in file manager") | no Qt D-Bus on Android (already optional) |
+| D-Bus ("Show in file manager") | no Qt D-Bus on Android (already optional); the menu items are hidden, as no intent opens a folder in the Files app reliably |
 | Single instance (local socket per library) | Android starts one activity (`singleTop`) |
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
 | Audio, Lua plugins, X11, gtksourceview | already off in the Qt build |
@@ -228,5 +266,15 @@ never in the repository.
   shows the library, creates and saves a document in the default library, draws with the mouse, and renders text
   boxes with Roboto, Noto Serif and Droid Sans Mono (no boxes), umlauts included, and a PDF through poppler. Use
   `-gpu swangle_indirect`: with `swiftshader_indirect` every other triangle of the window is missing.
+
+- `qt/android-storage` (2026-09-25, emulator): the master-qt APK with a library in its own folder (PDFs, `.xopp`
+  files, a subfolder, "Opened" from "Open with", its cache in the app cache, Recent and a reading position), then
+  the new APK over it with `adb install -r`: the offer after the document-mode question, Android's access page, the
+  move (all files identical by MD5, times kept, the old folder gone), Recent, the remembered library, the reading
+  positions and the library's config and cache folders under the new path; the same with the access given before
+  the update and libraries of the same names on the phone ("Default (2)", "Uni (2)"); uninstalled and installed
+  again: the libraries in `Documents/Xournal_Libraries` open again after the access; without the access the
+  Downloads quick library asks for it, with it the phone's Download folder opens; the in-app folder chooser picks
+  `Documents/Uni` and `Download`; no "Show in file manager" in the library menu.
 
 Not checked: the Fold 7 itself (the author's test), stylus input, the Fold's posture changes.

@@ -100,9 +100,11 @@ int main(int argc, char* argv[]) {
     if (!libraryDir.isEmpty()) {
         library.emplace(fs::path(libraryDir.toStdString()));
     } else if (!offscreen) {
+#ifndef Q_OS_ANDROID  // (Android: once the libraries' home is chosen, below)
         std::error_code ec;
         fs::create_directories(xqt::Library::defaultRoot(), ec);
         library.emplace(xqt::Library::defaultRoot());
+#endif
     }
     // One instance per library: a second start hands its files to the running window (as tabs) and exits.
     // Off-screen runs (tests, screenshots) are always independent.
@@ -127,6 +129,14 @@ int main(int argc, char* argv[]) {
     xqt::registerQuickTypes();
     AppController controller;
 #ifdef Q_OS_ANDROID
+    // The libraries' home: the phone's Documents/Xournal_Libraries once they were moved there (with "All files
+    // access"), else the app's own folder (qt/docs/android.md)
+    controller.chooseLibrariesHome();
+    if (libraryDir.isEmpty()) {
+        std::error_code ec;
+        fs::create_directories(xqt::Library::defaultRoot(), ec);
+        library.emplace(xqt::Library::defaultRoot());
+    }
     // One window: it opens the library it showed last (a folder of the shared storage only while the app may read it)
     if (const QString last = controller.rememberedLibrary(); libraryDir.isEmpty() && !last.isEmpty()) {
         xqt::SystemApps& apps = xqt::SystemApps::instance();

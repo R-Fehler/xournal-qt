@@ -57,14 +57,49 @@ namespace xqt {
 
 class FuzzyQuery;
 
+/// The folders of the platform the libraries' home and the Downloads folder can be in (see qt/docs/android.md,
+/// "Where the documents are"). Tests set their own (Library::setPlatformFolders).
+struct PlatformFolders {
+    /// The Documents folder the app may always use: "~/Documents" on the desktop; on Android the app's own folder in
+    /// the shared storage (Android/data/<package>/files/Documents), which Android deletes with the app.
+    fs::path appDocuments;
+    /// The same for downloads ("~/Downloads"; on Android the app's own, where no download ever lands).
+    fs::path appDownloads;
+    /// Android: the phone's own Documents and Download folders (Environment.getExternalStoragePublicDirectory), and
+    /// the storage they are in (Environment.getExternalStorageDirectory: where the in-app folder chooser starts). The
+    /// app reads and writes them with "All files access". Empty on the desktop.
+    fs::path sharedDocuments;
+    fs::path sharedDownloads;
+    fs::path sharedStorage;
+
+    /// This platform's (QStandardPaths; on Android also android.os.Environment through JNI).
+    static PlatformFolders detect();
+};
+
 class Library {
 public:
     explicit Library(const fs::path& root);
 
-    /// "<Documents>/Xournal_Libraries"
+    /// Where the libraries live: in the Documents folder the app may always use, or in the phone's shared Documents
+    /// folder (Android with "All files access", once the libraries were moved there: LibraryMigration.h).
+    enum class Home { App, Shared };
+    /// The folders of this platform; tests set their own (nullptr: this platform's again).
+    static PlatformFolders platformFolders();
+    static void setPlatformFolders(const PlatformFolders* folders);
+    /// The home in use (App until the app says otherwise: AppController::chooseLibrariesHome). Shared only where the
+    /// platform has shared folders.
+    static Home home();
+    static void setHome(Home home);
+    /// The home to use: Shared when the platform has a shared Documents folder, the app may use it (`access`) and the
+    /// libraries were moved there (`moved`, the setting kept since); else App.
+    static Home chooseHome(const PlatformFolders& folders, bool access, bool moved);
+
+    /// "<Documents>/Xournal_Libraries" of the home in use, or of the one given
     static fs::path librariesFolder();
+    static fs::path librariesFolder(Home home);
     static fs::path defaultRoot();
-    /// The user's Downloads folder: can be opened as a (quick) library, but its files are short-lived.
+    /// The user's Downloads folder: can be opened as a (quick) library, but its files are short-lived. On Android the
+    /// phone's Download folder (a folder of the shared storage: opening it needs "All files access").
     static fs::path downloadsFolder();
 
     const fs::path& root() const { return rootDir; }

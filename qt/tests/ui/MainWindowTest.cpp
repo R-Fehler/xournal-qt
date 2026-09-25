@@ -78,6 +78,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
+#include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/PagesModel.h"
 #include "shell/RecentFiles.h"
@@ -87,6 +88,7 @@
 #include "shell/TabManager.h"
 #include "shell/PageSketches.h"
 #include "shell/Thumbnails.h"
+#include "util/PathUtil.h"
 
 #include "AppController.h"
 #include "TextFlow.h"
@@ -6105,4 +6107,150 @@ TEST_F(MainWindowTest, pdfFilesModeSavesIntoThePdf) {
     EXPECT_TRUE(snackbarText->property("text").toString().startsWith("Your notes are saved in lecture.pdf"))
             << snackbarText->property("text").toString().toStdString();
     xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset);  // (the tests share the config folder)
+}
+
+// --- Android: the libraries' home (qt/android-storage) -----------------------------------------------------------------
+
+namespace {
+/// Android without a phone: one window, "All files access" as the test says.
+struct FakeAndroidApps: xqt::SystemApps {
+    bool access = true;
+    bool librariesInOwnWindows() override { return false; }
+    bool hasAllFilesAccess() override { return access; }
+    bool requestAllFilesAccess() override { return true; }
+    bool openWithSystemApp(const QString&) override { return true; }
+    bool showInFileManager(const QString&) override { return true; }
+    bool startLibraryWindow(const QString&) override { return true; }
+};
+
+/// The libraries are in the app's own folder (the platform's folders are the test's).
+class LibrariesHomeWindowTest: public MainWindowTest {
+protected:
+    void prepareController() override {
+        ASSERT_TRUE(tmp.isValid());
+        const fs::path root(tmp.path().toStdString());
+        phone.appDocuments = root / "storage/Android/data/org.xournalqt.app/files/Documents";
+        phone.appDownloads = root / "storage/Android/data/org.xournalqt.app/files/Download";
+        phone.sharedDocuments = root / "storage/Documents";
+        phone.sharedDownloads = root / "storage/Download";
+        phone.sharedStorage = root / "storage";
+        inApp = phone.appDocuments / "Xournal_Libraries";
+        shared = phone.sharedDocuments / "Xournal_Libraries";
+        fs::create_directories(inApp / "Default/Lectures");
+        std::ofstream(inApp / "Default/notes.xopp") << "not a real document";
+        std::ofstream(inApp / "Default/Lectures/week 1.pdf") << "%PDF-1.4";
+        xqt::Library::setPlatformFolders(&phone);
+        xqt::SystemApps::setInstance(&fake);
+        controller->chooseLibrariesHome();
+        controller->setLibraryRoot(inApp / "Default");
+    }
+    void TearDown() override {
+        MainWindowTest::TearDown();
+        xqt::Library::setPlatformFolders(nullptr);
+        xqt::SystemApps::setInstance(nullptr);
+        std::error_code ec;
+        fs::remove(Util::getConfigFile("settings.xml"), ec);  // (the home and the offer are settings)
+    }
+    QTemporaryDir tmp;
+    xqt::PlatformFolders phone;
+    fs::path inApp, shared;
+    FakeAndroidApps fake;
+};
+}  // namespace
+
+TEST_F(LibrariesHomeWindowTest, theOfferAtTheStartMovesTheLibraries) {
+    QObject* dialog = find("librariesHomeDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true)) << "offered at the start";
+    QQuickItem* note = findItem("librariesInAppNote");
+    ASSERT_NE(note, nullptr);
+    EXPECT_TRUE(note->isVisible());
+    click(findItem("librariesHomeContinue"));
+    QObject* messageDialog = find("messageDialog");
+    ASSERT_TRUE(waitOpened(messageDialog, true, 20000)) << "the result is said";
+    EXPECT_TRUE(messageDialog->property("text").toString().contains("Documents/Xournal_Libraries"));
+    EXPECT_TRUE(fs::exists(shared / "Default/Lectures/week 1.pdf"));
+    EXPECT_FALSE(fs::exists(inApp)) << messageDialog->property("text").toString().toStdString();
+    EXPECT_FALSE(note->isVisible()) << "no note any more";
+    EXPECT_EQ(controller->libraryModel()->property("rootPath").toString(),
+              QString::fromStdString(xqt::Library(shared / "Default").root().string()));
+    QMetaObject::invokeMethod(messageDialog, "close");
+}
+
+TEST_F(LibrariesHomeWindowTest, notNowLeavesANoteThatAsksAgain) {
+    QObject* dialog = find("librariesHomeDialog");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    click(findItem("librariesHomeNotNow"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_FALSE(controller->offerLibrariesHome()) << "not at the next start";
+    QQuickItem* note = findItem("librariesInAppNote");
+    ASSERT_NE(note, nullptr);
+    EXPECT_TRUE(note->isVisible());
+    EXPECT_TRUE(fs::exists(inApp / "Default/notes.xopp"));
+    click(note);
+    EXPECT_TRUE(waitOpened(dialog, true)) << "tapping the note asks again";
+    QMetaObject::invokeMethod(dialog, "close");
+}
+
+namespace {
+/// The libraries are in the phone's Documents already; the phone's storage has a Download folder with a paper.
+class FolderChooserWindowTest: public LibrariesHomeWindowTest {
+protected:
+    void prepareController() override {
+        ASSERT_TRUE(tmp.isValid());
+        const fs::path root(tmp.path().toStdString());
+        phone.appDocuments = root / "storage/Android/data/org.xournalqt.app/files/Documents";
+        phone.sharedDocuments = root / "storage/Documents";
+        phone.sharedDownloads = root / "storage/Download";
+        phone.sharedStorage = root / "storage";
+        shared = phone.sharedDocuments / "Xournal_Libraries";
+        fs::create_directories(shared / "Default");
+        fs::create_directories(phone.sharedDownloads / "Papers");
+        std::ofstream(phone.sharedDownloads / "paper.pdf") << "%PDF-1.4";
+        xqt::Library::setPlatformFolders(&phone);
+        xqt::SystemApps::setInstance(&fake);
+        controller->chooseLibrariesHome();  // (nothing to move: the phone's folder at once)
+        controller->setLibraryRoot(xqt::Library::defaultRoot());
+    }
+};
+}  // namespace
+
+// Android's folder picker refuses the Download folder: with "All files access" the app lists the folders itself.
+TEST_F(FolderChooserWindowTest, theDownloadFolderCanBeOpenedAsLibrary) {
+    auto* home = find<QObject>("homeView");
+    ASSERT_NE(home, nullptr);
+    QMetaObject::invokeMethod(home, "pickLibraryFolder");
+    QObject* chooser = find("folderChooser");
+    ASSERT_NE(chooser, nullptr);
+    ASSERT_TRUE(waitOpened(chooser, true)) << "the app's own list, not the system's picker";
+    EXPECT_FALSE(findItem("folderChooserUse")->isEnabled()) << "not the whole storage";
+    QStringList names;
+    for (const QVariant& f: chooser->property("folders").toList()) {
+        names << f.toMap().value("name").toString();
+    }
+    EXPECT_EQ(names, (QStringList{"Documents", "Download"}));
+    // (the delegates are made by the list: found in the item tree)
+    QQuickItem* download = nullptr;
+    until([&] {
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
+            if (i->objectName() == "folderChooserEntry" && i->property("text").toString() == "Download") {
+                return i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                if (QQuickItem* f = walk(c)) {
+                    return f;
+                }
+            }
+            return nullptr;
+        };
+        download = walk(window->contentItem());
+        return download != nullptr;
+    });
+    click(download);
+    EXPECT_EQ(chooser->property("folder").toString(), QString::fromStdString(phone.sharedDownloads.string()));
+    EXPECT_EQ(chooser->property("folders").toList().size(), 1) << "Papers";
+    click(findItem("folderChooserUse"));
+    ASSERT_TRUE(waitOpened(chooser, false));
+    EXPECT_EQ(controller->libraryModel()->property("rootPath").toString(),
+              QString::fromStdString(xqt::Library(phone.sharedDownloads).root().string()));
 }

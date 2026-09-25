@@ -91,9 +91,11 @@ Rectangle {
     }
     /// "Open a folder as library…": the folder picker. On Android a folder of the phone's storage can be a library
     /// only with "All files access": explained and asked for first (then the picker opens, see onPickLibraryFolder).
+    /// With it, Android's picker is replaced by the app's own folder list (the picker refuses the Download folder).
     function pickLibraryFolder() {
-        if (app.storageAccess) openLibraryDialog.open()
-        else storageAccessDialog.ask("")
+        if (!app.storageAccess) storageAccessDialog.ask("")
+        else if (app.inAppFolderChooser) folderChooser.openAt(app.storageRoot)
+        else openLibraryDialog.open()
     }
     /// A folder as library: this one's home screen, else a window of its own (raised if it is open already)
     function openLibraryFolder(path) {
@@ -190,7 +192,7 @@ Rectangle {
     Connections {
         target: app
         function onStorageAccessNeeded(folder) { storageAccessDialog.ask(folder) }
-        function onPickLibraryFolder() { openLibraryDialog.open() }
+        function onPickLibraryFolder() { home.pickLibraryFolder() }
     }
 
     ColumnLayout {
@@ -391,9 +393,13 @@ Rectangle {
                         text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
                         onTriggered: home.pickLibraryFolder()
                     }
+                    // (not on Android: there is no file manager the app could show a folder in reliably)
                     MenuItem {
+                        objectName: "libraryShowInFileManagerItem"
                         text: qsTr("Show in file manager")
                         enabled: app.library.available
+                        visible: app.canShowInFileManager
+                        height: visible ? implicitHeight : 0
                         onTriggered: app.showInFileManager(app.library.rootPath)
                     }
                     MenuItem {
@@ -701,6 +707,42 @@ Rectangle {
                 text: qsTr("Indexing for search %1/%2").arg(app.library.indexed).arg(app.library.indexTotal)
                 font.pixelSize: 12
                 color: "#6b6f75"
+            }
+        }
+
+        // Android: the libraries are still in the app's own folder (Android deletes it with the app); tap: move them
+        AbstractButton {
+            id: librariesInAppNote
+            objectName: "librariesInAppNote"
+            visible: app.librariesInApp && !app.libraryMove.running
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.bottomMargin: 4
+            implicitHeight: inAppLabel.implicitHeight + 12
+            onClicked: librariesHomeDialog.open()
+            background: Rectangle {
+                radius: 8
+                color: librariesInAppNote.pressed ? "#e8eaed" : "#f1f3f4"
+            }
+            contentItem: RowLayout {
+                spacing: 8
+                Image {
+                    Layout.leftMargin: 12
+                    source: app.iconUrl("xqt-library"); sourceSize.width: 16; sourceSize.height: 16
+                    opacity: 0.7
+                }
+                Label {
+                    id: inAppLabel
+                    Layout.fillWidth: true
+                    Layout.rightMargin: 12
+                    wrapMode: Text.Wrap
+                    font.pixelSize: 13
+                    color: "#5f6368"
+                    text: qsTr("Libraries are inside the app and are deleted when it is uninstalled") + "  ·  "
+                          + "<font color=\"" + Material.accentColor + "\">" + qsTr("Keep them on the phone…") + "</font>"
+                    textFormat: Text.StyledText
+                }
             }
         }
 
@@ -1605,6 +1647,111 @@ Rectangle {
         onAccepted: app.requestStorageAccess(folder)
     }
 
+    // Android: the libraries belong in the phone's Documents folder (they are in the app's own folder, which Android
+    // deletes with the app): explained, then "All files access" and the move (AppController::moveLibrariesHome)
+    Dialog {
+        id: librariesHomeDialog
+        objectName: "librariesHomeDialog"
+        property string toMove: ""
+        onAboutToShow: toMove = app.librariesToMove()
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Keep libraries on the phone?")
+        width: Math.min(parent ? parent.width - 32 : 520, 520)
+        Label {
+            width: librariesHomeDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("Your libraries are kept in %1 on the phone, where other apps (file managers, Syncthing) see "
+                       + "them and they survive uninstalling the app.").arg(app.sharedLibrariesName)
+                  + (librariesHomeDialog.toMove !== ""
+                     ? "\n\n" + qsTr("The libraries you have now (%1) are moved there. Each file is checked when it has "
+                                        + "arrived; nothing is deleted before all of them are there.").arg(librariesHomeDialog.toMove)
+                     : "")
+                  + (app.storageAccess ? ""
+                     : "\n\n" + qsTr("For this Xournal Qt needs \u201cAll files access\u201d. Android shows its settings "
+                                        + "page next: turn on the switch for Xournal Qt, then come back."))
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "librariesHomeNotNow"
+                text: qsTr("Not now")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "librariesHomeContinue"
+                text: qsTr("Continue")
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: app.moveLibrariesHome()
+        onRejected: app.declineLibrariesHome()
+    }
+    /// At the start, after the other questions (Main.qml): the offer, once
+    property bool librariesHomeOffered: false
+    function offerLibrariesHomeAtStart() {
+        if (!librariesHomeOffered && app.offerLibrariesHome) {
+            librariesHomeOffered = true
+            librariesHomeDialog.open()
+        }
+    }
+
+    // The move in progress: copied, checked, then the old copies removed
+    Dialog {
+        id: libraryMoveDialog
+        objectName: "libraryMoveDialog"
+        readonly property var move: app.libraryMove
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        closePolicy: Popup.NoAutoClose
+        title: qsTr("Moving the libraries")
+        width: Math.min(parent ? parent.width - 32 : 480, 480)
+        Connections {
+            target: app.libraryMove
+            function onRunningChanged() {
+                if (app.libraryMove.running) libraryMoveDialog.open()
+                else libraryMoveDialog.close()
+            }
+        }
+        ColumnLayout {
+            width: libraryMoveDialog.availableWidth
+            spacing: 10
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: {
+                    const m = libraryMoveDialog.move
+                    if (m.step === "clean") return qsTr("Removing the old copies from the app\u2019s folder…")
+                    const files = qsTr("%1 of %2 files").arg(m.files).arg(m.totalFiles)
+                    return (m.step === "verify" ? qsTr("Checking the copies in %1…") : qsTr("Copying to %1…"))
+                               .arg(app.sharedLibrariesName) + "\n" + files
+                }
+            }
+            ProgressBar {
+                Layout.fillWidth: true
+                from: 0; to: 1
+                value: libraryMoveDialog.move.fraction
+                indeterminate: libraryMoveDialog.move.step === "clean"
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                font.pixelSize: 12
+                color: "#6b6f75"
+                text: qsTr("Until everything is copied and checked, the libraries stay where they are.")
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                text: qsTr("Cancel")
+                enabled: libraryMoveDialog.move.step !== "clean"
+                DialogButtonBox.buttonRole: DialogButtonBox.ActionRole  // (closed when the move stops)
+                onClicked: app.cancelLibrariesMove()
+            }
+        }
+    }
+
     Dialog {
         id: newLibraryDialog
         parent: Overlay.overlay
@@ -1780,6 +1927,7 @@ Rectangle {
             Button {
                 objectName: "libraryArchiveShow"
                 text: qsTr("Show in file manager")
+                visible: app.canShowInFileManager
                 flat: true
                 onClicked: { app.showInFileManager(libraryArchiveSummary.summary.target); libraryArchiveSummary.close() }
             }
@@ -1797,6 +1945,10 @@ Rectangle {
         }
     }
 
+    FolderChooser {
+        id: folderChooser
+        onChosen: function(path) { app.openLibraryAt(path) }
+    }
     FolderDialog {
         id: openLibraryDialog
         title: qsTr("Open a folder as library")

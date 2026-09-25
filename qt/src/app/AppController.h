@@ -40,6 +40,11 @@ namespace xqt {
 class AppContext;
 class CanvasView;
 class LibraryArchive;
+class LibraryMove;
+namespace LibraryMigration {
+struct Plan;
+struct Cleanup;
+}
 class FuzzyQuery;
 class DocumentSession;
 class TabManager;
@@ -432,6 +437,41 @@ public:
     Q_INVOKABLE bool createLibrary(const QString& name);
     /// The file manager with the file selected (a folder: opened), see SystemApps.h.
     Q_INVOKABLE void showInFileManager(const QString& path);
+
+    // --- where the libraries live (Android: the app's own folder or the phone's Documents; LibraryMigration.h) ---
+    /// Android: the libraries are in the app's own folder, which Android deletes with the app (the home screen shows
+    /// a hint, and tapping it offers the move). False on the desktop.
+    Q_PROPERTY(bool librariesInApp READ librariesInApp NOTIFY librariesHomeChanged)
+    bool librariesInApp() const;
+    /// The offer to move them is due at the start: they are in the app's folder and it was not declined.
+    Q_PROPERTY(bool offerLibrariesHome READ offerLibrariesHome NOTIFY librariesHomeChanged)
+    bool offerLibrariesHome() const;
+    /// The libraries' home in the shared storage as the user sees it ("Documents/Xournal_Libraries").
+    Q_PROPERTY(QString sharedLibrariesName READ sharedLibrariesName CONSTANT)
+    QString sharedLibrariesName() const;
+    /// What is in the app's folder to be moved ("12 files, 35 MB"; "" when nothing).
+    Q_INVOKABLE QString librariesToMove() const;
+    /// The move in progress (LibraryMove: running, step "copy" / "verify" / "clean", fraction, files, totalFiles).
+    Q_PROPERTY(QObject* libraryMove READ libraryMoveObject CONSTANT)
+    QObject* libraryMoveObject() const;
+    /// At the start (before the library is chosen): the home from the setting "librariesHome" and "All files access";
+    /// a move that was ended before its clean-up is finished. With the access and nothing to move, the phone's
+    /// folder is used at once.
+    void chooseLibrariesHome();
+    /// "Continue" of the offer: with "All files access" (asked for first when needed) the libraries move to the
+    /// phone's Documents/Xournal_Libraries, in the background (LibraryMigration.h), then the app works there.
+    Q_INVOKABLE void moveLibrariesHome();
+    /// "Not now": no offer at the start any more (the hint stays and asks again).
+    Q_INVOKABLE void declineLibrariesHome();
+    /// Cancel the move while it copies (nothing changes).
+    Q_INVOKABLE void cancelLibrariesMove();
+    /// In-app folder chooser (Android with "All files access": the system's picker refuses the Download folder and
+    /// the storage's root): where it starts, and the folders in a folder [{ name, path }] (hidden ones left out).
+    Q_PROPERTY(bool inAppFolderChooser READ inAppFolderChooser NOTIFY storageAccessChanged)
+    bool inAppFolderChooser() const;
+    Q_PROPERTY(QString storageRoot READ storageRoot CONSTANT)
+    QString storageRoot() const;
+    Q_INVOKABLE QVariantList subfolders(const QString& folder) const;
 
     // --- start and recovery ---
     /// Start of the app: offers recovery after a crash (recoveryItems), else reopens the last tabs (setting), then
@@ -863,6 +903,8 @@ Q_SIGNALS:
     void storageAccessChanged();
     /// "All files access" was just given for opening a folder as library: show the folder picker again.
     void pickLibraryFolder();
+    /// The libraries' home changed (librariesInApp, offerLibrariesHome).
+    void librariesHomeChanged();
     /// The window should come to the front (e.g. another instance handed over files).
     void raiseRequested();
     void recoveryChanged();
@@ -951,6 +993,18 @@ private:
     fs::path lastShareFolder;
     int archiveRunning = 0;
     std::unique_ptr<xqt::LibraryArchive> libraryArchiveTask;
+    std::unique_ptr<xqt::LibraryMove> libraryMoveTask;
+    /// The library shown when the move began, let go while it copies (its index would write into it)
+    fs::path libraryBeforeMove;
+    bool libraryLetGo = false;
+    void startLibrariesMove();
+    void librariesCopied(bool ok, const QString& error, const xqt::LibraryMigration::Plan& plan);
+    void librariesCleanedUp(const xqt::LibraryMigration::Plan& plan, const xqt::LibraryMigration::Cleanup& result,
+                            bool report);
+    /// Paths kept by the controller follow moved libraries: recent files, the library of the settings, the last
+    /// folders of the file dialogs, open tabs.
+    void followMovedLibraries(const std::vector<std::pair<fs::path, fs::path>>& moves);
+    void setLibrariesMoved();
     /// The document an archive is made of: `file`, or the current document's file (empty: none yet).
     fs::path archiveSource(const QString& file) const;
     void archiveDone(const fs::path& target, bool ok, const std::string& error, bool pdfa,
