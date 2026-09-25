@@ -120,6 +120,14 @@ is built.
   MSVC + vcpkg way is the fallback.
 - Pushing only `qt/windows-build`, and only with the author's go.
 
+### `qt/android-storage` (the author, 2026-09-25; merged 2026-09-25)
+- "Libraries are deleted on uninstall; this goes against the philosophy of the app", and the Downloads quick library
+  was empty. Built: libraries in the phone's Documents with a safe move, keep data on uninstall, in-app folder chooser.
+- Left: the author's own move on the Fold 7 (device checklist); SD cards as a home; a kill in the milliseconds between
+  the final renames and the manifest gives "(2)" copies on the next offer; Play Store needs another way than
+  `MANAGE_EXTERNAL_STORAGE`.
+- [ ] After the move on the Fold 7: switch the phone to the release-signed APK (one uninstall; the libraries stay).
+
 ### `qt/android-libraries` (the author, 2026-09-24; merged 2026-09-25)
 - Left (found on the emulator):
   - [ ] Some texts on Android miss the opening quote “ and the dash — ("Default — this window", the start of the

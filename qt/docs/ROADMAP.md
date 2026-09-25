@@ -406,6 +406,18 @@
     app cache.
   - Checked on the emulator only. Left: see TODO.md, `qt/android-libraries`.
 
+- **Libraries in the phone's own folders, `qt/android-storage` (2026-09-25, awaiting on-device test).** On Android,
+  Qt's Documents and Download locations are app-private (deleted on uninstall). With "All files access" the libraries
+  live in the phone's `Documents/Xournal_Libraries` and the Downloads quick library is the real `Download`.
+  - Existing libraries move there in the background: staged copies verified by size and SHA-1, then renamed, then
+    the originals removed only if unchanged since the copy; a manifest finishes an interrupted clean-up. Recent
+    files, reading positions, the journal, open tabs and the library's config/cache follow. Name clashes become
+    "Name (2)".
+  - Declining keeps the app-private folder and a hint on the home screen. `android:hasFragileUserData` offers to keep
+    the app's data on uninstall. An in-app one-level folder chooser opens folders Android's picker refuses
+    (Download). "Show in file manager" is hidden on Android.
+  - Checked on the emulator (move, uninstall/reinstall); not yet on the Fold 7.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
