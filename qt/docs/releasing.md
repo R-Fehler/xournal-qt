@@ -42,8 +42,16 @@ A build without a tag: start the workflow by hand ("Run workflow"); it uses the 
 
 ## Which package for which system
 
-The fork needs Qt 6.5 or newer, cairo, pango, poppler-glib, libzip, qpdf and gdk-pixbuf, and optionally
+The fork needs Qt 6.5 or newer, cairo, pango, poppler-glib, libzip, qpdf 12 and gdk-pixbuf, and optionally
 KSyntaxHighlighting (for highlighted code blocks in Markdown boxes).
+
+**qpdf** is built with the app on Linux ([XqtQpdf.cmake](../cmake/XqtQpdf.cmake)): a pinned release (12.4.1, checked
+by SHA-256) is downloaded when the build is configured and linked statically, with its native crypto and the
+system's zlib and libjpeg. The packages therefore do not depend on the distribution's `libqpdf` (Ubuntu 22.04 has
+10.6, Debian 13 has 12.2), and the incremental save runs on the qpdf it is tested with. Distribution builds can use
+their own qpdf 12 or newer with `-DXQT_SYSTEM_QPDF=ON` (`XQT_SYSTEM_QPDF=1 qt/scripts/linux-deps.sh` installs it);
+offline builds point `-DXQT_QPDF_SOURCE_DIR=<unpacked qpdf-12.4.1>` at the source. Windows (MSYS2, qpdf 12.3) and
+Android (vcpkg, qpdf 12.4) use their package manager's qpdf, which is new enough.
 
 | System | What to use |
 | --- | --- |

@@ -23,6 +23,8 @@
 
 #include "filesystem.h"
 
+class QString;
+
 namespace xqt {
 
 struct DocumentItem {
@@ -171,6 +173,13 @@ Result trashFolder(const fs::path& folder);
 
 /// `path` with its prefix `from` (a file or folder) replaced by `to`; `path` itself if it does not start with it.
 fs::path remap(const fs::path& path, const fs::path& from, const fs::path& to);
+
+/// The order of names in the library: natural ("2" before "10") and case-insensitive ("lecture" before "Makefile"),
+/// by the language's rules (QCollator, e.g. accents) where the platform has them. Without a language (the C locale,
+/// as in containers) or a collator that cannot do this (Android has no ICU), digits by their value and the rest by
+/// case-folded code points. Equal names in another case are ordered case-sensitively, so the order is total.
+int compareNames(const QString& a, const QString& b);
+inline bool namesLess(const QString& a, const QString& b) { return compareNames(a, b) < 0; }
 
 }  // namespace DocumentFiles
 

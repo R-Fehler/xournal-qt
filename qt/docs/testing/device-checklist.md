@@ -1312,3 +1312,12 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       files/Documents -type f | wc -l`). Go through the offer and the move. After: the same number of files under
       `/sdcard/Documents/Xournal_Libraries`, the sample library opens with its previews, Recent and "Last page"
       work. If anything fails, the message says so and the old folder is still in use: nothing is lost.
+
+## qpdf built with the app, CI on Debian 13 as root (qt/ci-green)
+
+- [ ] `dpkg -I build/packages/xournal-qt_*.deb` (after `cpack -G DEB`): no `libqpdf` in `Depends`. The `.deb` installs
+      and the app starts on a system without `libqpdf28`/`libqpdf30`.
+- [ ] A PDF with notes: draw, Ctrl+S twice. `XQT_HYBRID_TIMES=1 ./xournal-qt file.pdf` prints no "written in full"
+      for the second save (it was appended, now through qpdf 12.4). The file opens in Okular and in the app again.
+- [ ] Library order: a folder with "notes 2", "notes 10", "Notes 3", "Makefile" (Show → text files) and
+      "lecture.xopp": by name they are lecture, Makefile, notes 2, Notes 3, notes 10. The same with `LANG=C ./xournal-qt`.

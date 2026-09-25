@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -33,6 +34,8 @@
 #include "session/PdfPageKeeper.h"
 #include "undo/InsertUndoAction.h"
 #include "undo/UndoRedoHandler.h"
+
+#include "../FailingWrites.h"
 
 using namespace xqt;
 using namespace std::chrono_literals;
@@ -280,14 +283,21 @@ TEST_F(BackgroundSaveTest, aFailedSaveKeepsTheDocumentModifiedAndReportsTheError
     s.getUndoRedoHandler()->redo();
     EXPECT_TRUE(s.isModified()) << "nothing was written for this state";
 
-    // A folder that cannot be written
-    fs::create_directories(tmpPath("locked"));
-    fs::permissions(tmpPath("locked"), fs::perms::owner_read | fs::perms::owner_exec);
-    const auto r = s.saveAs(tmpPath("locked") / "x.xopp");
-    fs::permissions(tmpPath("locked"), fs::perms::owner_all);
+    // A folder that cannot be written (a file where the folder should be: also for root)
+    std::ofstream(tmpPath("not a folder")) << "a file";
+    auto r = s.saveAs(tmpPath("not a folder") / "x.xopp");
     EXPECT_FALSE(r.ok);
     EXPECT_FALSE(r.error.empty());
     EXPECT_TRUE(s.isModified());
+    if (test::permissionsBind()) {  // (not as root)
+        fs::create_directories(tmpPath("locked"));
+        fs::permissions(tmpPath("locked"), fs::perms::owner_read | fs::perms::owner_exec);
+        r = s.saveAs(tmpPath("locked") / "x.xopp");
+        fs::permissions(tmpPath("locked"), fs::perms::owner_all);
+        EXPECT_FALSE(r.ok) << "a folder without write permission";
+        EXPECT_FALSE(r.error.empty());
+        EXPECT_TRUE(s.isModified());
+    }
     // Written after all: saved
     ASSERT_TRUE(s.saveAs(tmpPath("fine.xopp")).ok);
     EXPECT_FALSE(s.isModified());

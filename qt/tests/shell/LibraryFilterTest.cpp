@@ -5,11 +5,13 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <fstream>
 #include <functional>
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QLocale>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -184,6 +186,27 @@ TEST_F(LibraryFilterTest, theFilterShowsDocumentsByDefaultAndPdfsWithNotesOnRequ
     f.other = true;
     EXPECT_EQ(f.include(), DocumentFiles::OtherFiles);
     EXPECT_EQ(shown(f), (std::vector<std::string>{"data.xlsx", "report.docx"}));
+}
+
+// The library's order of names does not depend on the language of the system: natural ("2" before "10") and
+// case-insensitive also in the C locale (containers and CI have no language), as in English and German.
+TEST(LibraryOrder, namesAreNaturalAndCaseInsensitiveInEveryLanguage) {
+    const QLocale before;
+    for (const QLocale& locale: {QLocale::c(), QLocale(QLocale::English, QLocale::UnitedStates),
+                                 QLocale(QLocale::German, QLocale::Germany)}) {
+        QLocale::setDefault(locale);
+        std::vector<QString> names{QStringLiteral("notes 10"), QStringLiteral("Makefile"), QStringLiteral("notes 2"),
+                                   QStringLiteral("lecture"),  QStringLiteral("Notes 3"),  QStringLiteral("a"),
+                                   QStringLiteral("A")};
+        std::sort(names.begin(), names.end(), DocumentFiles::namesLess);
+        std::vector<std::string> sorted;
+        for (const auto& n: names) {
+            sorted.push_back(n.toStdString());
+        }
+        EXPECT_EQ(sorted, (std::vector<std::string>{"A", "a", "lecture", "Makefile", "notes 2", "Notes 3", "notes 10"}))
+                << locale.name().toStdString();
+    }
+    QLocale::setDefault(before);
 }
 
 TEST_F(LibraryFilterTest, otherFilesAreRenamedMovedCopiedAndTrashedLikeDocuments) {

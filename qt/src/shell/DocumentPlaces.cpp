@@ -40,7 +40,9 @@ struct Store {
         QSaveFile f(QString::fromStdString(file.string()));  // (written in full or not at all)
         if (f.open(QIODevice::WriteOnly)) {
             f.write(QJsonDocument(entries).toJson(QJsonDocument::Compact));
-            f.commit();
+            if (f.flush()) {  // (see LibraryCache.cpp, writeFile)
+                f.commit();
+            }
         }
     }
 };

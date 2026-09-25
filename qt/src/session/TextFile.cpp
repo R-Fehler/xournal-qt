@@ -186,8 +186,9 @@ bool TextFile::writeAtomically(const fs::path& target, const std::string& bytes,
         out.cancelWriting();
         return false;
     }
-    if (!out.commit()) {
+    if (!out.flush() || !out.commit()) {  // (flush first: see LibraryCache.cpp, writeFile)
         error = out.errorString().toStdString();
+        out.cancelWriting();
         return false;
     }
     return true;

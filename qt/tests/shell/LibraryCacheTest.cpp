@@ -16,6 +16,8 @@
 #include "shell/DocumentFiles.h"
 #include "shell/LibraryCache.h"
 
+#include "../FailingWrites.h"
+
 using namespace xqt;
 
 namespace {
@@ -129,10 +131,17 @@ TEST_F(LibraryCacheTest, bigEntriesHaveAFileOfTheirOwnWrittenOnlyWhenTheyChange)
 TEST_F(LibraryCacheTest, aPackThatCannotBeWrittenStaysAsItWas) {
     const QCborMap first{{QStringLiteral("a.xopp"), 1}};
     ASSERT_TRUE(Packs::write(dir, "notes", 1, first, true));
-    fs::permissions(dir, fs::perms::owner_read | fs::perms::owner_exec);
-    EXPECT_FALSE(Packs::write(dir, "notes", 1, {{QStringLiteral("a.xopp"), 2}}, true));
-    fs::permissions(dir, fs::perms::owner_all);
+    {
+        test::FileSizeLimit full(1);  // (a full disk: the new pack cannot be written, also not by root)
+        EXPECT_FALSE(Packs::write(dir, "notes", 1, {{QStringLiteral("a.xopp"), 2}}, true));
+    }
     EXPECT_EQ(*Packs::read(dir, "notes", 1), first);
+    if (test::permissionsBind()) {  // (not as root)
+        fs::permissions(dir, fs::perms::owner_read | fs::perms::owner_exec);
+        EXPECT_FALSE(Packs::write(dir, "notes", 1, {{QStringLiteral("a.xopp"), 2}}, true)) << "a read-only folder";
+        fs::permissions(dir, fs::perms::owner_all);
+        EXPECT_EQ(*Packs::read(dir, "notes", 1), first);
+    }
 }
 
 TEST_F(LibraryCacheTest, theCacheIsInEachFolderOrMirroredInTheAppCache) {
@@ -150,9 +159,14 @@ TEST_F(LibraryCacheTest, theCacheIsInEachFolderOrMirroredInTheAppCache) {
     EXPECT_TRUE(appCache.mirrorOf(root / "elsewhere").empty());
 
     // A folder that cannot be written: the app cache
-    fs::permissions(lib / "Physics", fs::perms::owner_read | fs::perms::owner_exec);
-    EXPECT_EQ(folders.dirOf(lib / "Physics"), app / "Physics" / ".xournal_library");
-    fs::permissions(lib / "Physics", fs::perms::owner_all);
+    if (test::permissionsBind()) {  // (root writes anyway: then it is used)
+        fs::permissions(lib / "Physics", fs::perms::owner_read | fs::perms::owner_exec);
+        EXPECT_EQ(folders.dirOf(lib / "Physics"), app / "Physics" / ".xournal_library");
+        fs::permissions(lib / "Physics", fs::perms::owner_all);
+    }
+    // ... or where the cache folder cannot be made (a file of that name is in the way)
+    std::ofstream(lib / "Physics" / "Mechanics" / ".xournal_library") << "a file";
+    EXPECT_EQ(folders.dirOf(lib / "Physics" / "Mechanics"), app / "Physics" / "Mechanics" / ".xournal_library");
 
     // The default place in the app cache: by the library's key
     EXPECT_NE(CacheLocation(lib).appCacheDir().string().find("libraries"), std::string::npos);

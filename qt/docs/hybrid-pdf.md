@@ -428,9 +428,13 @@ with every object serialised through qpdf (`unparseResolved`, a stream's diction
   changed (its text is remembered); at the end the touched objects whose text differs are written again under their
   numbers, with the new objects they reach. Nothing else of the file is read or written.
 - New objects are made by the `Update` (`add`, `addStream`, `copy` of another PDF's objects, `copyStream`), numbered
-  after the file's highest object. Not with qpdf's `makeIndirectObject` or `newStream`: in qpdf 10 the first new
-  object makes it read every object of the file (7 s for pgfmanual); qpdf 11 does not. A new stream is a dictionary
-  in the qpdf document (so other objects can refer to it) whose data the `Update` keeps.
+  after the file's highest object. Not with qpdf's `makeIndirectObject`, `newStream` or `copyForeignObject`: the
+  first new object makes qpdf read every object of the file to find a free number (pgfmanual: 1.1 s with qpdf 12.4,
+  6.4 s with 10.6; the whole appended save takes about 0.2 s). A number is taken with a null object that is replaced
+  later (qpdf 12 gives a handle of a number the file does not have that is bound to nothing). A new stream is a
+  dictionary in the qpdf document (so other objects can refer to it) whose data the `Update` keeps.
+- qpdf 12 or newer is needed; the desktop build compiles a pinned release ([releasing.md](releasing.md), "Which
+  package for which system").
 - The cross-reference section matches the file's style: a cross-reference stream after one (PDF 1.5; our full
   writes use them), with the new dictionaries in an object stream, else a classic table. The trailer has `/Size`,
   `/Root`, `/Info`, `/ID` (the file's first identifier, a new second one) and `/Prev` (the last `startxref`, the
@@ -538,6 +542,20 @@ one stroke on another page, as `DocumentSession::save()` waits for it:
 | Ctrl+S written in full (as before) | 6.3 s | 24.6 s (the PDF/A check walks every page) |
 | Ctrl+S appended | 0.20–0.24 s, 22–23 KB | 0.18–0.36 s, 25–26 KB |
 | opened again after appending (clean copy kept) | 0.44 s (5.5 s when it is made) | 0.72 s (5.7 s) |
+
+The same with qpdf 12.4.1 as the app builds it now (2026-09-25, load 1.5–2; the table above was qpdf 10.6). qpdf 12
+reads and writes much faster; qpdf's check warns about pgfmanual's own unsorted name tree (the source has it too),
+nothing else:
+
+| qpdf 12.4.1 | hybrid PDF | archive PDF |
+| --- | --- | --- |
+| Ctrl+S written in full | 1.4 s | 3.3 s |
+| Ctrl+S appended (`benchCtrlS`) | 0.12–0.18 s, 23 KB | 0.14–0.17 s, 25–26 KB |
+| one Ctrl+S of the saved file (`benchOneSave`) | 0.16–0.21 s | 0.16–0.22 s |
+| opened again after appending (clean copy kept) | 0.34 s | 0.41 s |
+
+An appended save with qpdf 12.4: opening the file for the update 0.02 s, the `.xopp` and the new drawing 0.09 s, the
+changed page, serialising and the copy with `fsync` under 0.01 s each, the clean copy's cache entry 0.01 s.
 
 An appended save: opening the file for the update 0.08 s, the `.xopp` (the whole document, gzipped) and the new
 drawing 0.1–0.15 s, the changed page 0.01 s, the copy, update and `fsync` 0.01–0.04 s, the clean copy's cache entry

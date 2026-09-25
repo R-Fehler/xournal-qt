@@ -234,7 +234,7 @@ bool SessionRecovery::writeJournal(const Journal& journal, const fs::path& file)
         return false;
     }
     f.write(QJsonDocument(root).toJson());
-    return f.commit();
+    return f.flush() && f.commit();  // (see LibraryCache.cpp, writeFile)
 }
 
 std::optional<SessionRecovery::Journal> SessionRecovery::readJournal(const fs::path& file) {

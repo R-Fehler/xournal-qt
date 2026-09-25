@@ -29,8 +29,8 @@
 #include <vector>
 
 #include <qpdf/DLL.h>
-#if QPDF_MAJOR_VERSION == 11
-#define POINTERHOLDER_TRANSITION 4  // as upstream's QPdfExport
+#if QPDF_MAJOR_VERSION < 12
+#error "qpdf 12 or newer is needed (see qt/cmake/XqtQpdf.cmake)"
 #endif
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFObjGen.hh>
@@ -58,10 +58,11 @@ struct Stats {
     uint64_t bytes = 0;   ///< the update's length
 };
 
-/// New objects are made through the Update (add, addStream, copy, copyStream), not with qpdf's makeIndirectObject or
-/// newStream: in qpdf 10 the first new object of a QPDF makes it read every object of the file (seconds for a long
-/// PDF written with object streams). The Update numbers them itself; a new stream is a dictionary in `pdf` (so other
-/// objects can refer to it) whose data the Update keeps: isStream() and streamDictionary() tell such streams apart.
+/// New objects are made through the Update (add, addStream, copy, copyStream), not with qpdf's makeIndirectObject,
+/// newStream or copyForeignObject: the first new object of a QPDF makes qpdf read every object of the file to find a
+/// free number (qpdf 12.4: 1.1 s for pgfmanual, 10.6 took 6.4 s; the whole save takes 0.2 s). The Update numbers them
+/// itself after the file's highest; a new stream is a dictionary in `pdf` (so other objects can refer to it) whose
+/// data the Update keeps: isStream() and streamDictionary() tell such streams apart.
 class Update {
 public:
     /// Before `pdf` (opened from a file) is changed.
@@ -97,6 +98,8 @@ public:
     std::string serialize(const Tail& tail, Stats* stats = nullptr);
 
 private:
+    /// The next free number, taken (a null object until it is replaced).
+    QPDFObjectHandle reserve();
     struct Before {
         std::string text;   ///< as it was (a stream: its dictionary)
         bool data = false;  ///< a stream whose data was replaced

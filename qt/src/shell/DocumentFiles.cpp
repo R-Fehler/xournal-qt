@@ -10,8 +10,12 @@
 #include <memory>
 #include <set>
 
+#include <optional>
+
+#include <QCollator>
 #include <QFile>
 #include <QImageReader>
+#include <QLocale>
 #include <QString>
 
 #include "model/Document.h"
@@ -160,9 +164,79 @@ bool isInside(const fs::path& path, const fs::path& folder) {
     return DocumentFiles::remap(path, folder, "/") != path;
 }
 
-/// Natural order ("2" before "10"), case-insensitive.
 bool naturalLess(const std::string& a, const std::string& b) {
-    return QString::localeAwareCompare(QString::fromStdString(a), QString::fromStdString(b)) < 0;
+    return DocumentFiles::compareNames(QString::fromStdString(a), QString::fromStdString(b)) < 0;
+}
+
+bool isAsciiDigit(QChar c) { return c >= u'0' && c <= u'9'; }
+
+/// Natural order without a language: runs of digits by their value, everything else by case-folded code points.
+int plainNaturalCompare(const QString& a, const QString& b) {
+    qsizetype i = 0, j = 0;
+    while (i < a.size() && j < b.size()) {
+        if (isAsciiDigit(a[i]) && isAsciiDigit(b[j])) {
+            qsizetype ei = i, ej = j;
+            while (ei < a.size() && isAsciiDigit(a[ei])) {
+                ++ei;
+            }
+            while (ej < b.size() && isAsciiDigit(b[ej])) {
+                ++ej;
+            }
+            qsizetype si = i, sj = j;  // (leading zeros do not count)
+            while (si + 1 < ei && a[si] == u'0') {
+                ++si;
+            }
+            while (sj + 1 < ej && b[sj] == u'0') {
+                ++sj;
+            }
+            if (ei - si != ej - sj) {
+                return ei - si < ej - sj ? -1 : 1;
+            }
+            for (; si < ei; ++si, ++sj) {
+                if (a[si] != b[sj]) {
+                    return a[si] < b[sj] ? -1 : 1;
+                }
+            }
+            i = ei;
+            j = ej;
+            continue;
+        }
+        const char16_t ca = a[i].toCaseFolded().unicode(), cb = b[j].toCaseFolded().unicode();
+        if (ca != cb) {
+            return ca < cb ? -1 : 1;
+        }
+        ++i;
+        ++j;
+    }
+    if (i < a.size() || j < b.size()) {
+        return i < a.size() ? 1 : -1;
+    }
+    return 0;
+}
+
+/// The collator of the current language, if it sorts naturally and ignores case; else none.
+QCollator* nameCollator() {
+    struct Cached {
+        QLocale locale = QLocale::c();
+        std::optional<QCollator> collator;
+        bool usable = false;
+    };
+    thread_local std::optional<Cached> cached;  // (QCollator is not thread-safe)
+    const QLocale locale;
+    if (!cached || cached->locale != locale) {
+        cached.emplace();
+        cached->locale = locale;
+        if (locale.language() != QLocale::C) {
+            QCollator& c = cached->collator.emplace(locale);
+            c.setNumericMode(true);
+            c.setCaseSensitivity(Qt::CaseInsensitive);
+            // (checked: without ICU, numeric mode and case-insensitivity can be missing)
+            cached->usable = c.compare(QStringLiteral("2"), QStringLiteral("10")) < 0 &&
+                             c.compare(QStringLiteral("lecture"), QStringLiteral("Makefile")) < 0 &&
+                             c.compare(QStringLiteral("Makefile"), QStringLiteral("notes")) < 0;
+        }
+    }
+    return cached->usable ? &*cached->collator : nullptr;
 }
 
 DocumentFiles::Result failure(std::string msg) {
@@ -1002,6 +1076,17 @@ fs::path remap(const fs::path& path, const fs::path& from, const fs::path& to) {
         result /= *pi;
     }
     return result;
+}
+
+int compareNames(const QString& a, const QString& b) {
+    int r = 0;
+    if (QCollator* c = nameCollator()) {
+        r = c->compare(a, b);
+    }
+    if (r == 0) {
+        r = plainNaturalCompare(a, b);
+    }
+    return r != 0 ? r : QString::compare(a, b, Qt::CaseSensitive);
 }
 
 }  // namespace DocumentFiles
