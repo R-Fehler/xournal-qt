@@ -1258,3 +1258,9 @@ with "Uni sample" stays).
       document's old file goes, the copy is now `notes.xopp`.
 - [ ] With Syncthing on the Fold 7 and the computer: edit the same document on both while one is offline, then let
       them sync: the conflict badge appears on the phone (and the copy on the computer).
+
+## Documents open with the hand (Android)
+
+- [ ] On the Fold 7, open a document (from the library, "Open with", or a new one): the hand is selected, one finger
+      scrolls. Tap the pen: the finger writes. Switch to another open tab and back: the pen stays.
+- [ ] Settings -> Touch -> "Open documents with the hand" off: documents open with the tool that was chosen last.

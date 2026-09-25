@@ -390,6 +390,37 @@ TEST_F(MainWindowTest, fingerDrawingIsAToggleInTheToolBarAndASetting) {
     EXPECT_FALSE(settings->get("touchDrawing").toBool()) << "only once";
 }
 
+TEST_F(MainWindowTest, documentsOpenWithTheHandIfSoSet) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    EXPECT_FALSE(settings->get("handWhenOpening").toBool()) << "off on the desktop (on by default on Android)";
+    controller->selectTool("pen");
+    controller->newDocument();
+    EXPECT_EQ(controller->tool(), "pen") << "the tool stays as it was";
+
+    settings->set("handWhenOpening", true);
+    controller->newDocument();
+    EXPECT_EQ(controller->tool(), "hand") << "one finger scrolls in a document just opened";
+    controller->selectTool("pen");  // the user chooses the pen to write
+    controller->tabManager().setCurrentIndex(0);
+    EXPECT_EQ(controller->tool(), "pen") << "switching tabs opens nothing: the pen stays";
+    controller->tabManager().closeTab(0);
+    EXPECT_EQ(controller->tool(), "pen") << "neither does closing one";
+    controller->newDocument();
+    EXPECT_EQ(controller->tool(), "hand");
+
+    // The switch in Settings -> Touch
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("touchTab"));
+    auto* row = findItem("handWhenOpeningSwitch");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
 TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     ASSERT_NE(settings, nullptr);

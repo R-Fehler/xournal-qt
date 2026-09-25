@@ -73,6 +73,16 @@ int SettingsModel::fuzzyTypos(Settings& s) {
 
 void SettingsModel::applyFuzzyTypos(Settings& s) { FuzzyQuery::setTypoTolerance(fuzzyTypos(s)); }
 
+bool SettingsModel::handWhenOpening(Settings& s) {
+#ifdef Q_OS_ANDROID
+    bool on = true;
+#else
+    bool on = false;
+#endif
+    s.getCustomElement("touch").getBool("handWhenOpening", on);
+    return on;
+}
+
 int SettingsModel::systemMemory() const { return static_cast<int>(CanvasMemory::systemMemory() / (1024 * 1024)); }
 
 void SettingsModel::applyPreviewMemory(Settings& s) {
@@ -244,6 +254,11 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
     // One finger draws with the tool, two scroll and zoom (upstream's setting; also the tool bar's toggle)
     add("touchDrawing", [&s] { return QVariant(s.getTouchDrawingEnabled()); },
         [&s](const QVariant& v) { s.setTouchDrawingEnabled(v.toBool()); });
+    add("handWhenOpening", [&s] { return QVariant(handWhenOpening(s)); },
+        [&s](const QVariant& v) {
+            s.getCustomElement("touch").setBool("handWhenOpening", v.toBool());
+            s.customSettingsChanged();
+        });
 
     // --- stabilizer (ranges as in upstream's settings dialog) ---
     add("stabilizerAveraging", [&s] { return QVariant(static_cast<int>(s.getStabilizerAveragingMethod())); },

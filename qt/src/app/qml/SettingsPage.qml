@@ -290,6 +290,15 @@ Popup {
                                    + "and zoom. The same as the finger button in the tool bar. The mouse always draws "
                                    + "with its left button.")
                     }
+                    SwitchRow {
+                        objectName: "handWhenOpeningSwitch"
+                        key: "handWhenOpening"
+                        text: qsTr("Open documents with the hand")
+                    }
+                    Hint {
+                        text: qsTr("A document opens with the hand tool, so one finger scrolls. Choose the pen (or "
+                                   + "another tool) to write.")
+                    }
                     SwitchRow { key: "zoomGestures"; text: qsTr("Pinch with two fingers to zoom") }
                     Hint {
                         text: qsTr("One finger scrolls (unless it draws), two fingers pan and zoom. Tap with two "

@@ -1019,6 +1019,7 @@ private:
     void handOverToLibrary(xqt::DocumentSession& s);
     // The main window owns these; the other windows use the same ones (one library and one list of recent files).
     std::unique_ptr<xqt::SettingsModel> ownSettingsView;
+    int lastTabCount = 0;  ///< tabs before the last change of their number (a document opened: handWhenOpening)
     std::unique_ptr<xqt::LibraryModel> ownLibrary;
     std::unique_ptr<xqt::RecentFiles> ownRecent;
     xqt::SettingsModel* settingsView = nullptr;

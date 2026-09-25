@@ -241,6 +241,12 @@ void AppController::makeTabs() {
         }
     });
     connect(tabs.get(), &TabManager::countChanged, this, [this] {
+        // A document opened (or came from another window): with the hand tool, if so set (on Android by default:
+        // one finger scrolls, the pen is chosen to write)
+        if (tabs->count() > lastTabCount && SettingsModel::handWhenOpening(*app->getSettings())) {
+            selectTool(QStringLiteral("hand"));
+        }
+        lastTabCount = tabs->count();
         if (textWatcher) {
             watchTextFiles();  // (a file opened or closed: watched for changes by other programs)
         }
