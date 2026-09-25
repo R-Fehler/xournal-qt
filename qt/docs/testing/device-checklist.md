@@ -1359,3 +1359,6 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       paragraph; the paragraph with the cursor shows `:smile:`. Saved and opened again (and in the `.md` file on
       disk) it is still `:smile:`. In `` `:smile:` `` and in a code block it stays text; `:nope:` stays text; a `.txt`
       file shows `:smile:` as it is.
+- [ ] Copy `👩‍💻🇩🇪👍🏽` from a browser, paste into a text box and into Markdown written on the page: the arrows step
+      over each emoji at once, Backspace and Delete remove each whole. Copy them back out (Ctrl+C) into a browser:
+      the same three emoji.

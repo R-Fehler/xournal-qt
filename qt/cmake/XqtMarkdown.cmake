@@ -54,7 +54,9 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiFont.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiFont.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiData.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiData.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiData.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/Grapheme.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/Grapheme.cpp)
 target_include_directories(xqt-markdown PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/markdown")
 # (the emoji names: gemoji's table, EmojiData.cpp)
 target_include_directories(xqt-markdown PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/gemoji")

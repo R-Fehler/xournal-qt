@@ -26,6 +26,7 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "Grapheme.h"
 #include "MdBox.h"
 #include "MdDocument.h"
 #include "MdText.h"
@@ -597,29 +598,9 @@ void MarkdownEditor::mouseMoved(double x, double y) {
     }
 }
 
-size_t MarkdownEditor::prevChar(size_t pos) const {
-    const std::string& t = md.text();
-    if (pos == 0) {
-        return 0;
-    }
-    --pos;
-    while (pos > 0 && isContinuation(static_cast<unsigned char>(t[pos]))) {
-        --pos;
-    }
-    return pos;
-}
+size_t MarkdownEditor::prevChar(size_t pos) const { return text::graphemeStep(md.text(), pos, false); }
 
-size_t MarkdownEditor::nextChar(size_t pos) const {
-    const std::string& t = md.text();
-    if (pos >= t.size()) {
-        return t.size();
-    }
-    ++pos;
-    while (pos < t.size() && isContinuation(static_cast<unsigned char>(t[pos]))) {
-        ++pos;
-    }
-    return pos;
-}
+size_t MarkdownEditor::nextChar(size_t pos) const { return text::graphemeStep(md.text(), pos, true); }
 
 size_t MarkdownEditor::wordBoundary(size_t pos, bool forward) const {
     const std::string& t = md.text();
