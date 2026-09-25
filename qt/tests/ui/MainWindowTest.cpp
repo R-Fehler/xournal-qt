@@ -2092,6 +2092,7 @@ TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManage
     EXPECT_TRUE(openWith->isVisible());
     click(child(menu, "showInFileManagerItem"));
     EXPECT_EQ(fake.shown, QStringList{docx});
+    ASSERT_TRUE(waitOpened(menu, false)) << "the menu closes (Qt 6.8: a tap while it is closing goes to it)";
     // A document has no "Open externally"
     click(child(card(rowOf("notes.xopp")), "cardMenuButton"));
     ASSERT_TRUE(waitOpened(menu, true));
@@ -3332,11 +3333,17 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
     click(find<QQuickItem>("shapeButton"));
-    auto* item = find<QObject>("setsquareItem");
+    auto* item = find<QQuickItem>("setsquareItem");
     ASSERT_NE(item, nullptr);
-    until([&] { return item->property("visible").toBool(); });
+    until([&] { return item->isVisible(); });
     EXPECT_FALSE(item->property("checked").toBool());
-    QMetaObject::invokeMethod(item, "triggered");
+    // Tapped as a user does, so that the menu closes (where it is wider, it lies over the pill)
+    scrollIntoView(item);
+    click(item);
+    auto* menu = item->property("menu").value<QObject*>();
+    ASSERT_NE(menu, nullptr);
+    until([&] { return !menu->property("visible").toBool(); });
+    EXPECT_FALSE(menu->property("visible").toBool());
     until([&] { return controller->geometryTool() == QStringLiteral("setsquare"); });
     EXPECT_EQ(controller->geometryTool(), QStringLiteral("setsquare"));
     EXPECT_TRUE(item->property("checked").toBool()) << "the entry shows that it is out";
