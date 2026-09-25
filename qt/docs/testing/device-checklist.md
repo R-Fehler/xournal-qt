@@ -1346,3 +1346,29 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] 50 formulas on a page (copy the block above 25 times): scrolling and typing stay as fast as without them.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
+
+## Screen calibration (qt/calibration)
+
+- [ ] Settings (Ctrl+,) → Display: the line "This screen: …" names the screen, its scaling (e.g. 125 %) and the dpi
+      it reports; a screen that reports nothing (or nonsense) says so and starts at 96 dpi.
+- [ ] Hold a real ruler against the ruler on the screen. Move the slider (or −/+ for 0.1 dpi) until the centimetre
+      and the inch marks match; then the same by dragging the ruler itself (from a mark a few cm out; the 0 mark stays).
+      "Save for this screen". The zoom pill's percentage changes, the page does not change its size.
+- [ ] Ctrl+1 (or the fit menu → "Real size, 100 %"): the pill shows 100 %, and a page measures its paper size
+      (A4: 21.0 cm wide) with the ruler. Draw a 10 cm line with the set square: 10 cm on the screen. The compass
+      and the set square show centimetres that match the ruler.
+- [ ] Ctrl+0 still fits the width, fit page still fits the page; zooming out and in stops at 30 % and 700 %
+      of the real size.
+      The document is not changed by the calibration (no "unsaved" mark).
+- [ ] KDE Wayland with fractional scaling: calibrate at 125 %, switch the display to 150 % in the system settings:
+      Ctrl+1 is still real size without calibrating again. The same on X11 if at hand.
+- [ ] Two screens: calibrate the laptop panel, move the window to the external monitor: 100 % there is what that
+      monitor reports (or its own calibration); back on the panel, the panel's calibration applies again. The
+      Display page shows the screen the window is on.
+- [ ] "Back to what the screen says": the ruler returns to the reported dpi and 100 % follows it again.
+- [ ] While writing in a Markdown box on the page, Ctrl+1 still makes a heading (the box takes the key), outside it
+      Ctrl+1 is real size. The shortcut can be changed in Settings → Shortcuts ("Real size").
+- [ ] The reference beside the document (reading only): Ctrl+1 while it has the focus zooms the reference to real size.
+- [ ] Android (emulator or a test device, not the author's phone): Settings → Display shows the dpi the device reports
+      as the default; the ruler stretches with a finger drag without scrolling the page; saved, 100 % is real size
+      (a credit card is 8.56 cm wide). On a phone-wide window the two buttons wrap onto two lines.

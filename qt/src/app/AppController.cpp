@@ -661,6 +661,8 @@ void AppController::currentTabChanged() {
         applyMarkdownText();
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
+        currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
+                                             &AppController::zoomChanged));
     }
     updatePresentedView();  // (another tab: it presents now)
     if (session() && session()->textFile()) {
@@ -3809,6 +3811,15 @@ void AppController::setZoomPercent(int percent) {
         auto& vc = canvas()->getViewController();
         vc.zoomBy(percent / (vc.zoom() / vc.zoom100() * 100.0),
                   QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
+    }
+}
+
+void AppController::zoomToRealSize() {
+    if (referenceMode->focused()) {
+        referenceMode->zoomToRealSize();
+    } else if (canvas()) {
+        auto& vc = canvas()->getViewController();
+        vc.setZoom(vc.zoom100(), QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
 }
 

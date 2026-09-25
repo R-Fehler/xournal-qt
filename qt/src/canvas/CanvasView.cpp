@@ -92,6 +92,8 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         updateRenderParams();
         zoomControl.setZoom(viewController.zoom(), viewController.zoom100());
     });
+    connect(&viewController, &ViewController::zoom100Changed, this,
+            [this] { zoomControl.setZoom(viewController.zoom(), viewController.zoom100()); });
     connect(&viewController, &ViewController::zoomSettled, this, [this] {
         renderService.unblockRerenderZoom();  // (a pinch ended: no need to wait longer)
         updateVisibility();
@@ -129,6 +131,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     });
     // Column layout changed in the settings: lay out again, keep the current page in view.
     connect(&session.getApp(), &AppContext::settingsChanged, this, [this] {
+        applyZoom100();  // (a screen was calibrated)
         applyScrolling();
         if (layoutConfig() != layout.getConfig()) {
             relayout();
@@ -189,6 +192,18 @@ void CanvasView::setDevicePixelRatio(double value) {
         if (p->getRaster().withBuffer([](xoj::view::Mask& m) { return m.isInitialized(); })) {
             p->rerenderPage();
         }
+    }
+}
+
+void CanvasView::setDisplay(const ScreenCalibration::Display& display) {
+    shownOn = display;
+    hasDisplay = true;
+    applyZoom100();
+}
+
+void CanvasView::applyZoom100() {
+    if (hasDisplay) {
+        viewController.setZoom100(ScreenCalibration::zoom100(*session.getSettings(), shownOn));
     }
 }
 

@@ -45,6 +45,7 @@
 #include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
 #include "GeometryToolLayer.h"
+#include "ScreenCalibration.h"
 
 class EditSelection;
 class Settings;
@@ -88,6 +89,10 @@ public:
 
     void setDevicePixelRatio(double dpr);
     double devicePixelRatio() const { return dpr; }
+    /// The screen the view is shown on (and the window's device pixel ratio there): 100 % follows its calibration
+    /// (ScreenCalibration.h), also when the calibration changes.
+    void setDisplay(const ScreenCalibration::Display& display);
+    const ScreenCalibration::Display& display() const { return shownOn; }
 
     // --- reading only (the reference beside the document of a tab) ---------------------------------------------
     /// Shown for reading only: every tool but the select tools (elements, PDF text) scrolls, as the hand does; a
@@ -396,6 +401,11 @@ private:
     /// XQT_PERF: pages in view waiting for their render at the current zoom, since when (ms since the epoch)
     std::unordered_map<const CanvasPage*, qint64> sharpWanted;
     double dpr = 1.0;
+    /// The screen the view is shown on (none yet: 100 % stays at 96 dpi)
+    ScreenCalibration::Display shownOn;
+    bool hasDisplay = false;
+    /// 100 % from the calibration of the screen the view is on
+    void applyZoom100();
     std::atomic<double> renderZoom{1.0};
     std::atomic<double> renderDpr{1.0};
     std::unique_ptr<EditSelection> selection;

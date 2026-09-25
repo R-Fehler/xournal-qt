@@ -138,6 +138,8 @@ private:
     QPointer<xqt::CanvasView> canvasView;
     std::unique_ptr<xqt::CanvasInput> input;
     QQuickWindow* filteredWindow = nullptr;
+    /// The window moved to another screen: 100 % follows that screen's calibration
+    QMetaObject::Connection screenConnection;
     bool penGrab = false;
     bool mouseGrab = false;
     bool touchSessionOwned = false;

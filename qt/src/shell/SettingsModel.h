@@ -17,6 +17,7 @@
 #include <QStringList>
 #include <QVariant>
 
+class QWindow;
 class Settings;
 
 namespace xqt {
@@ -64,6 +65,17 @@ public:
 
     Q_INVOKABLE QVariant get(const QString& key) const;
     Q_INVOKABLE bool set(const QString& key, const QVariant& value);
+    // --- screen calibration (ScreenCalibration.h): 100 % is the size of the paper on the window's screen ---------
+    /// The screen `window` is on: { key, name, dpr, reportedDpi (logical, 0: none), reportedPlausible, defaultDpi,
+    /// dpi (logical pixels per inch now: calibrated, else the default), ppi (the panel's device pixels per inch),
+    /// calibrated }. DPIs in logical pixels per inch (what the ruler on the page is drawn in).
+    Q_INVOKABLE QVariantMap screenCalibration(QWindow* window) const;
+    /// Calibrates the screen of `window`: `logicalDpi` logical pixels make an inch there (stored as the panel's
+    /// pixels per inch, so that another scaling of the system keeps it). Every view on that screen follows.
+    Q_INVOKABLE void calibrateScreen(QWindow* window, double logicalDpi);
+    /// Takes the calibration of the screen back: what the system reports (or 96 dpi) again.
+    Q_INVOKABLE void resetScreenCalibration(QWindow* window);
+
     /// The settings screen opened / closed: changes are saved once, at close.
     Q_INVOKABLE void begin();
     Q_INVOKABLE void end();

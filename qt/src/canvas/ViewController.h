@@ -31,9 +31,12 @@ public:
 
     /// Logical pixels per page point.
     double zoom() const { return z; }
-    /// Zoom that shows pages at their physical size ("100 %"), from the screen's logical DPI (upstream zoom100Value).
+    /// Zoom that shows pages at their physical size ("100 %"), from the screen's calibration (ScreenCalibration.h;
+    /// upstream zoom100Value).
     double zoom100() const { return z100; }
-    void setZoom100(double value) { z100 = value; }
+    /// A new 100 % (another screen, a calibration): the pages stay as large as they are shown, only what is called
+    /// 100 % changes (the percentage shown, zoom steps, the zoom range).
+    void setZoom100(double value);
     double minZoom() const { return 0.3 * z100; }  // upstream DEFAULT_ZOOM_MIN
     double maxZoom() const { return 7.0 * z100; }  // upstream DEFAULT_ZOOM_MAX
 
@@ -132,6 +135,8 @@ Q_SIGNALS:
     void changed();
     /// Emitted after every zoom change (the render service defers re-renders for a while).
     void zoomChanged();
+    /// What is 100 % changed (the zoom did not)
+    void zoom100Changed();
     /// ~300 ms after the last zoom change (upstream: Scheduler::blockRerenderZoom), or when a zoom gesture ended.
     void zoomSettled();
 
