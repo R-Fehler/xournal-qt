@@ -1209,7 +1209,7 @@ Install the debug APK (`adb install -r …/android-build-debug.apk`; the documen
 ## Android libraries (qt/android-libraries)
 
 Install the debug APK over the old one (`adb install -r …/android-build-debug.apk`; never uninstall: the library
-with "Uni sample" stays).
+with the sample library stays).
 
 - [ ] Autosave when the app goes to the background: open a document, draw a stroke, don't save. Switch to the home
       screen, then swipe the app away in Recents (or Settings → Apps → Xournal Qt → Force stop). Start the app: the
@@ -1220,7 +1220,7 @@ with "Uni sample" stays).
 - [ ] The cache in the app cache: after opening a library folder (below) and scrolling through it, the folder has no
       `.xournal_library` in any of its subfolders (a file manager with hidden files shown, or `adb shell ls -a`).
       Settings → Storage shows "Keep the cache in the app's cache folder" on. The default library "Default" with
-      "Uni sample": its old `.xournal_library` folders are gone after the first start, and the search still finds
+      the sample library: its old `.xournal_library` folders are gone after the first start, and the search still finds
       text at once (moved, not read again).
 - [ ] Put a folder with documents into the phone's storage (a computer over USB, or `adb push Uni
       /sdcard/Documents/`). Library menu ▾ → "Open a folder as library…": a dialog explains "All files access";
