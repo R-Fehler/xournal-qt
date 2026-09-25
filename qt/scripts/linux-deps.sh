@@ -40,7 +40,7 @@ fi
 # has one qt6-declarative for all QML modules, Debian and Ubuntu split them up).
 optional=(
     qt6-declarative-private-dev
-    libqt6svg6 libqt6svg6-dev
+    libqt6svg6 libqt6svg6-dev qt6-svg-plugins
     qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-dialogs
     qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript
     libkf6syntaxhighlighting-dev
