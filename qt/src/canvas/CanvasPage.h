@@ -139,6 +139,7 @@ private:
 
     std::vector<std::unique_ptr<xoj::view::OverlayView>> overlayViews;
     std::unique_ptr<InputHandler> inputHandler;
+    std::unique_ptr<LegacyRedrawable> eraserRedraw;  ///< the eraser's redraws, told to every view of the page
     std::unique_ptr<EraseHandler> eraser;
     bool inEraser = false;
     std::unique_ptr<Selector> selector;  ///< rectangle / lasso being drawn (select tools)

@@ -56,16 +56,40 @@ void eraseViewsOf(Views& views, const Handler* handler) {
     views.erase(std::remove_if(views.begin(), views.end(), [&](const auto& v) { return v->isViewOf(handler); }),
                 views.end());
 }
+
+/*
+ * What the eraser redraws, told to every view of the page: upstream's EraseHandler redraws only the view it was
+ * given (in Xournal++ a page has one view), so a second view of the same page (the self-reference view) kept the
+ * erased ink until it was drawn again, and with "delete stroke" even after the release (nothing else fires then).
+ * The page's listeners (this view too) redraw the range.
+ */
+class EraserRedraw final: public LegacyRedrawable {
+public:
+    explicit EraserRedraw(CanvasPage& view): view(view) {}
+    void repaintArea(double x1, double y1, double x2, double y2) const override { view.repaintArea(x1, y1, x2, y2); }
+    void repaintPage() const override { view.repaintPage(); }
+    void rerenderPage(bool) override { view.getPage()->firePageChanged(); }
+    void rerenderRect(double x, double y, double width, double height) override {
+        Range range(x, y, x + width, y + height);
+        view.getPage()->fireRangeChanged(range);
+    }
+    GdkRGBA getSelectionColor() override { return view.getSelectionColor(); }
+    void deleteViewBuffer() override {}
+
+private:
+    CanvasPage& view;
+};
 }  // namespace
 
 CanvasPage::CanvasPage(CanvasView& view, PageRef page):
         view(view), page(std::move(page)),
-        raster(std::make_shared<PageRaster>(&view, &view.getRenderService(), this->page)) {
+        raster(std::make_shared<PageRaster>(&view, &view.getRenderService(), this->page)),
+        eraserRedraw(std::make_unique<EraserRedraw>(*this)) {
     registerToHandler(this->page);
     DocumentSession& session = view.getSession();
     // Upstream XojPageView: the eraser handler lives as long as the page view
     this->eraser = std::make_unique<EraseHandler>(session.getUndoRedoHandler(), session.getDocument(), this->page,
-                                                  session.getToolHandler(), this);
+                                                  session.getToolHandler(), eraserRedraw.get());
 }
 
 CanvasPage::~CanvasPage() {

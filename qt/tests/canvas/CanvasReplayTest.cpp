@@ -3840,3 +3840,38 @@ TEST_F(CanvasReplayTest, benchmarkStickyNoteClipboard) {
                 median(serialize), median(deserialize), median(copy), median(picture), median(png), median(paste),
                 median(pasteDrawn), median(cut), median(cutDrawn), median(redraw));
 }
+
+// A second view of the same page (the self-reference view) shows what the eraser takes away, while erasing too
+TEST_F(CanvasReplayTest, theEraserRedrawsEveryViewOfThePage) {
+    CanvasView second(*session);
+    second.getViewController().setViewSize(QSizeF(900, 1200));
+    processEvents();
+    drawLine(0, QPointF(100, 400), QPointF(300, 400));
+    drawLine(0, QPointF(100, 600), QPointF(300, 600));
+    processEvents();
+    const QRectF first(90, 390, 220, 20);
+    const QRectF other(90, 590, 220, 20);
+    ASSERT_GT(darkPixels(*second.getPage(0), first), 20) << "the ink shows in the second view";
+    ASSERT_GT(darkPixels(*second.getPage(0), other), 20);
+
+    // "Delete stroke": nothing else redraws the page after the release
+    app->getToolHandler()->selectTool(TOOL_ERASER);
+    app->getToolHandler()->setEraserType(ERASER_TYPE_DELETE_STROKE);
+    drawLine(0, QPointF(200, 350), QPointF(200, 450));
+    processEvents();
+    ASSERT_EQ(elementCount(0), 1u);
+    EXPECT_EQ(darkPixels(*second.getPage(0), first), 0) << "the deleted stroke is gone in the second view";
+
+    // The standard eraser: gone in the second view already while the pen is down
+    app->getToolHandler()->setEraserType(ERASER_TYPE_DEFAULT);
+    tablet(QEvent::TabletPress, viewPos(0, QPointF(150, 560)), 0.5, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 20; ++i) {
+        tablet(QEvent::TabletMove, viewPos(0, QPointF(150, 560 + 4 * i)), 0.5, Qt::NoButton, Qt::LeftButton);
+    }
+    processEvents();
+    EXPECT_EQ(darkPixels(*second.getPage(0), QRectF(145, 590, 10, 20)), 0) << "erased while the pen is still down";
+    EXPECT_GT(darkPixels(*second.getPage(0), QRectF(250, 590, 40, 20)), 5) << "the rest of the stroke stays";
+    tablet(QEvent::TabletRelease, viewPos(0, QPointF(150, 640)), 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(darkPixels(*second.getPage(0), QRectF(145, 590, 10, 20)), 0);
+}
