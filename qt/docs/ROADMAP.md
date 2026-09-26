@@ -596,6 +596,14 @@
   300 % holds 17 MB instead of 1.33 GB, and at 700 % it draws at all; the minimum zoom goes below 30 % when a page
   needs it to fit.
 
+- **Sticky notes as containers, `qt/sticky-containers` (2026-09-26).** One Markdown text per note (10 pt in from its
+  top left, wrap = note width − 20, recognised by place; `xoj::markdown::classifier` seam), started by a text-tool tap
+  or the pill's "Text", reflowing when the note is resized, a "more below" mark when it overflows. Paste and inserted
+  images go into the selected note or the note at the paste point (covering notes take nothing). A rectangle or lasso
+  started in a note selects its elements (never its paper or text); dragged out they join the page, into another note
+  that note, one undo step. `md::holdsBoxes` / `boxesOf` generalise "the Markdown layer" to notes. A drag no longer
+  moves an unselected note: tap it first.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
