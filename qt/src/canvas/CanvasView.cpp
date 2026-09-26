@@ -88,6 +88,8 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     session.addView(this, &zoomControl);  // (the first one is the primary view)
     ownPage = std::min(session.getCurrentPageNo(), session.getDocument()->getPageCount());
     rebuildPages();
+    // (a tap or a drag moves the cursor of the text being written: the emoji suggestions follow)
+    connect(this, &CanvasView::updateRequested, this, &CanvasView::refreshEmojiCompletion);
 
     connect(&viewController, &ViewController::zoomChanged, this, [this] {
         // Like upstream: while zooming, show the existing buffers scaled and render sharp only once the zoom is stable.
@@ -1648,6 +1650,7 @@ void CanvasView::endTextEditing() {
         editor.reset();                           // finishes (one undo step)
         Q_EMIT textEditingChanged(false);
         Q_EMIT updateRequested();
+        refreshEmojiCompletion();
     }
     if (!textEditor) {
         return;
@@ -1657,6 +1660,7 @@ void CanvasView::endTextEditing() {
     textEditor.reset();  // finishes (undo action)
     Q_EMIT textEditingChanged(false);
     Q_EMIT updateRequested();
+    refreshEmojiCompletion();
 }
 
 CanvasTextInput* CanvasView::getTextInput() const {
@@ -1664,6 +1668,49 @@ CanvasTextInput* CanvasView::getTextInput() const {
         return textEditor.get();
     }
     return markdownEditor.get();
+}
+
+bool CanvasView::textKeyPressed(const QKeyEvent* e, bool& finish) {
+    finish = false;
+    CanvasTextInput* editor = getTextInput();
+    if (!editor) {
+        return false;
+    }
+    if (completion.keyPressed(e, *editor)) {
+        Q_EMIT emojiCompletionChanged();
+        refreshEmojiCompletion();
+        return true;
+    }
+    const bool taken = editor->keyPressed(e, finish);
+    if (taken && finish) {
+        endTextEditing();
+    }
+    refreshEmojiCompletion();
+    return taken;
+}
+
+void CanvasView::refreshEmojiCompletion() {
+    if (completion.update(getTextInput())) {
+        Q_EMIT emojiCompletionChanged();
+    }
+}
+
+void CanvasView::chooseEmojiCompletion(int index) {
+    if (CanvasTextInput* editor = getTextInput()) {
+        completion.choose(index, *editor);
+        Q_EMIT emojiCompletionChanged();
+        refreshEmojiCompletion();
+    }
+}
+
+bool CanvasView::insertAtTextCursor(const std::string& text) {
+    CanvasTextInput* editor = getTextInput();
+    if (!editor) {
+        return false;
+    }
+    editor->replaceBeforeCursor(0, text);
+    refreshEmojiCompletion();
+    return true;
 }
 
 double CanvasView::getZoom() const { return viewController.zoom(); }

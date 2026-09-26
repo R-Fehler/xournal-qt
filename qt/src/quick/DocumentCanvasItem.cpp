@@ -1,5 +1,6 @@
 #include "DocumentCanvasItem.h"
 #include "TextFlowEditor.h"
+#include "EmojiNames.h"
 #include "TouchGestures.h"
 
 #include <algorithm>
@@ -264,6 +265,8 @@ void xqt::registerQuickTypes() {
     qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas");
     qmlRegisterType<TextFlowEditor>("XournalQt.Canvas", 1, 0, "TextFlowEditor");
     qmlRegisterType<TouchGestures>("XournalQt.Canvas", 1, 0, "TouchGestures");
+    qmlRegisterSingletonType<EmojiNames>("XournalQt.Canvas", 1, 0, "Emoji",
+                                         [](QQmlEngine*, QJSEngine*) -> QObject* { return new EmojiNames; });
 }
 
 DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
@@ -352,7 +355,9 @@ void DocumentCanvasItem::setView(QObject* object) {
             update();
         });
         connect(input.get(), &xqt::CanvasInput::hoverChanged, this, &QQuickItem::update);
+        connect(canvasView, &xqt::CanvasView::emojiCompletionChanged, this, &DocumentCanvasItem::emojiCompletionChanged);
         connect(canvasView, &xqt::CanvasView::textEditingChanged, this, [this](bool editing) {
+            Q_EMIT textEditingChanged();
             setFlag(ItemAcceptsInputMethod, editing);
             if (editing) {
                 forceActiveFocus(Qt::OtherFocusReason);
@@ -676,10 +681,8 @@ void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
         editor = canvasView->getTextInput();  // a text file: typing starts writing (at the top of the page in view)
     }
     bool finish = false;
-    if (editor && editor->keyPressed(e, finish)) {
-        if (finish) {
-            canvasView->endTextEditing();
-        } else {
+    if (editor && canvasView->textKeyPressed(e, finish)) {  // (the emoji suggestions, then the editor)
+        if (!finish) {
             QGuiApplication::inputMethod()->update(Qt::ImCursorRectangle | Qt::ImSurroundingText |
                                                    Qt::ImCursorPosition | Qt::ImAnchorPosition);
         }
@@ -692,10 +695,54 @@ void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
 void DocumentCanvasItem::inputMethodEvent(QInputMethodEvent* e) {
     if (xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr) {
         editor->inputMethodEvent(e);
+        canvasView->refreshEmojiCompletion();
         e->accept();
         return;
     }
     QQuickItem::inputMethodEvent(e);
+}
+
+bool DocumentCanvasItem::textEditing() const { return canvasView && canvasView->getTextInput(); }
+
+QVariantList DocumentCanvasItem::emojiCompletions() const {
+    QVariantList out;
+    if (canvasView) {
+        for (const auto& c: canvasView->emojiCompletion().suggestions()) {
+            out.append(QVariantMap{{QStringLiteral("emoji"), QString::fromUtf8(c.emoji->emoji)},
+                                   {QStringLiteral("name"), QString::fromUtf8(c.name.data(),
+                                                                              static_cast<qsizetype>(c.name.size()))}});
+        }
+    }
+    return out;
+}
+
+int DocumentCanvasItem::emojiCompletionIndex() const {
+    return canvasView ? canvasView->emojiCompletion().selected() : 0;
+}
+
+QRectF DocumentCanvasItem::emojiCompletionRect() const {
+    return canvasView && canvasView->emojiCompletion().active()
+                   ? inputMethodQuery(Qt::ImCursorRectangle).toRectF()
+                   : QRectF();
+}
+
+void DocumentCanvasItem::chooseEmojiCompletion(int index) {
+    if (canvasView) {
+        QGuiApplication::inputMethod()->reset();  // (the keyboard's word being typed goes with the shortcode)
+        canvasView->chooseEmojiCompletion(index);
+        QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
+    }
+}
+
+bool DocumentCanvasItem::insertText(const QString& text) {
+    if (!canvasView || !canvasView->getTextInput()) {
+        return false;
+    }
+    QGuiApplication::inputMethod()->commit();
+    canvasView->insertAtTextCursor(text.toStdString());
+    QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
+    forceActiveFocus(Qt::OtherFocusReason);
+    return true;
 }
 
 QVariant DocumentCanvasItem::inputMethodQuery(Qt::InputMethodQuery query) const {

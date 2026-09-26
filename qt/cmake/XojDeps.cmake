@@ -40,6 +40,8 @@ if(XQT_DEPS_CMAKE_PACKAGES)
 endif()
 set(_xoj_pc_modules
     "glib-2.0 >= 2.32.0" gio-2.0 gthread-2.0 cairo cairo-pdf cairo-svg pangocairo
+    # (fontconfig and Pango's fontconfig fonts: the app's emoji font, qt/src/markdown/EmojiFont.cpp)
+    "fontconfig >= 2.13" pangoft2
     "poppler-glib >= 0.41.0" gdk-pixbuf-2.0)
 if(NOT TARGET LibXml2::LibXml2)
     list(APPEND _xoj_pc_modules "libxml-2.0 >= 2.0.0")

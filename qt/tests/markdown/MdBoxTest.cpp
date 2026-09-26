@@ -112,6 +112,35 @@ TEST_F(MdBoxTest, markdownLayerIsDrawnFormatted) {
     EXPECT_EQ(upstream.bottom, raw.bottom);
 }
 
+// A page draws its layers one after the other into one Cairo context (the canvas, the export, the hybrid PDF's
+// layers). A text box drawn after a Markdown box is where it is, not where the box's last line was (Pango draws a
+// layout at the current point, and drawing a box must not leave one behind).
+TEST_F(MdBoxTest, aTextAfterAMarkdownBoxIsDrawnWhereItIs) {
+    Layer markdown;
+    markdown.setName(std::string(xoj::markdown::LAYER_NAME));
+    markdown.addElement(makeBox("Some text", 50, 40));
+    Layer plain;
+    plain.addElement(makeBox("Hello", 50, 300));
+
+    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 500, 400);
+    cairo_t* cr = cairo_create(surface);
+    xoj::view::LayerView(&markdown).draw(xoj::view::Context::createDefault(cr));
+    EXPECT_FALSE(cairo_has_current_point(cr)) << "no current point left behind";
+    xoj::view::LayerView(&plain).draw(xoj::view::Context::createDefault(cr));
+    cairo_destroy(cr);
+    cairo_surface_flush(surface);
+    int below = 0;  // (ink of the text box: rows 290 to 330)
+    const unsigned char* data = cairo_image_surface_get_data(surface);
+    const int stride = cairo_image_surface_get_stride(surface);
+    for (int y = 290; y < 330; ++y) {
+        for (int x = 0; x < 500; ++x) {
+            below += data[y * stride + x * 4 + 3] > 0;
+        }
+    }
+    cairo_surface_destroy(surface);
+    EXPECT_GT(below, 50) << "the text box is drawn at its place";
+}
+
 TEST_F(MdBoxTest, theBoundingBoxIsWhatIsDrawn) {
     // The source is 3 short lines; drawn, the paragraph "B" is further down (below a heading 1 and its spacing)
     Layer markdown;

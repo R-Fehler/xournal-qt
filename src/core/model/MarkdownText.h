@@ -22,6 +22,7 @@
 #include <cairo.h>  // for cairo_t
 
 class Text;
+typedef struct _PangoLayout PangoLayout;
 
 namespace xoj::markdown {
 
@@ -41,5 +42,10 @@ using Sizer = Size (*)(const Text& text);
 /// Set once by the frontend (drawing and sizes are asked from several threads). nullptr: texts are texts.
 inline std::atomic<Renderer> renderer{nullptr};
 inline std::atomic<Sizer> sizer{nullptr};
+
+/// Draws the Pango layout of a text (TextView, at the current point). Set once by the frontend (xournal-qt: colour
+/// emoji as sharp pictures in PDFs, qt/src/markdown/EmojiFont.h). nullptr: pango_cairo_show_layout.
+using LayoutPainter = void (*)(cairo_t* cr, PangoLayout* layout);
+inline std::atomic<LayoutPainter> layoutPainter{nullptr};
 
 }  // namespace xoj::markdown

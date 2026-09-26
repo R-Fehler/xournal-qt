@@ -26,6 +26,7 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "Grapheme.h"
 #include "MdBox.h"
 #include "MdDocument.h"
 #include "MdTexDelimiters.h"
@@ -599,29 +600,9 @@ void MarkdownEditor::mouseMoved(double x, double y) {
     }
 }
 
-size_t MarkdownEditor::prevChar(size_t pos) const {
-    const std::string& t = md.text();
-    if (pos == 0) {
-        return 0;
-    }
-    --pos;
-    while (pos > 0 && isContinuation(static_cast<unsigned char>(t[pos]))) {
-        --pos;
-    }
-    return pos;
-}
+size_t MarkdownEditor::prevChar(size_t pos) const { return text::graphemeStep(md.text(), pos, false); }
 
-size_t MarkdownEditor::nextChar(size_t pos) const {
-    const std::string& t = md.text();
-    if (pos >= t.size()) {
-        return t.size();
-    }
-    ++pos;
-    while (pos < t.size() && isContinuation(static_cast<unsigned char>(t[pos]))) {
-        ++pos;
-    }
-    return pos;
-}
+size_t MarkdownEditor::nextChar(size_t pos) const { return text::graphemeStep(md.text(), pos, true); }
 
 size_t MarkdownEditor::wordBoundary(size_t pos, bool forward) const {
     const std::string& t = md.text();
@@ -1071,5 +1052,27 @@ QVariant MarkdownEditor::inputMethodQuery(Qt::InputMethodQuery query) const {
 }
 
 QRectF MarkdownEditor::cursorRectOnPage() const { return caretRect(); }
+
+std::string MarkdownEditor::textBeforeCursor() const {
+    if (hasSelection()) {
+        return {};
+    }
+    const std::string& t = md.text();
+    const size_t ls = md::text::lineStart(t, caret);
+    return t.substr(ls, caret - ls) + preedit;
+}
+
+void MarkdownEditor::replaceBeforeCursor(size_t bytes, const std::string& text) {
+    // (the part of the input method's text before those bytes is typed; the rest goes with them)
+    const size_t fromPreedit = std::min(bytes, preedit.size());
+    const std::string kept = preedit.substr(0, preedit.size() - fromPreedit);
+    preedit.clear();
+    const size_t typed = std::min(bytes - fromPreedit, caret - md::text::lineStart(md.text(), caret));
+    if (hasSelection() || typed == 0) {
+        insert(kept + text, EditKind::Other);
+    } else {
+        edit(caret - typed, caret, kept + text, EditKind::Other);
+    }
+}
 
 }  // namespace xqt

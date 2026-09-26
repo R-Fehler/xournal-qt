@@ -6,6 +6,8 @@
  */
 #pragma once
 
+#include <string>
+
 #include <QRectF>
 #include <QVariant>
 
@@ -35,6 +37,15 @@ public:
     virtual QVariant inputMethodQuery(Qt::InputMethodQuery query) const = 0;
     /// The cursor, in page coordinates (of getPage()).
     virtual QRectF cursorRectOnPage() const = 0;
+
+    // --- emoji (EmojiCompletion) --------------------------------------------------------------------------------
+    /// The text of the cursor's line before the cursor (UTF-8), with the input method's text not yet typed at its
+    /// end; empty while text is selected.
+    virtual std::string textBeforeCursor() const = 0;
+    /// Replaces the last `bytes` bytes of textBeforeCursor() by `text` (a shortcode by its emoji; 0: `text` is
+    /// inserted at the cursor, in place of a selection). The input method's text not yet typed is dropped (its part
+    /// before those bytes is kept, as typed).
+    virtual void replaceBeforeCursor(size_t bytes, const std::string& text) = 0;
 };
 
 }  // namespace xqt

@@ -8,7 +8,6 @@
 #include <QGuiApplication>
 #include <QInputMethodEvent>
 #include <QKeyEvent>
-#include <QTextBoundaryFinder>
 
 #include <pango/pangocairo.h>
 
@@ -32,6 +31,7 @@
 #include "view/overlays/OverlayView.h"
 
 #include "CanvasPage.h"
+#include "Grapheme.h"
 #include "MdBox.h"
 #include "TextFlow.h"
 #include "session/DocumentSession.h"
@@ -287,10 +287,17 @@ bool TextEditor::keyPressed(const QKeyEvent* e, bool& finish) {
     const bool ctrl = e->modifiers() & Qt::ControlModifier;
     const bool shift = e->modifiers() & Qt::ShiftModifier;
     auto grapheme = [&](int from, bool forward) {
-        QTextBoundaryFinder f(QTextBoundaryFinder::Grapheme, content);
-        f.setPosition(from);
-        const qsizetype p = forward ? f.toNextBoundary() : f.toPreviousBoundary();
-        return p < 0 ? from : static_cast<int>(p);
+        // (by Pango's rules, as the text is drawn: Qt 6.7's QTextBoundaryFinder splits flags)
+        const int start = from > 0 ? static_cast<int>(content.lastIndexOf(u'\n', from - 1)) + 1 : 0;
+        const qsizetype nl = content.indexOf(u'\n', from);
+        const QByteArray line = content.mid(start, (nl < 0 ? content.size() : nl) - start).toUtf8();
+        const size_t at = static_cast<size_t>(content.mid(start, from - start).toUtf8().size());
+        const size_t to = text::graphemeStep(std::string_view(line.constData(), static_cast<size_t>(line.size())), at,
+                                             forward);
+        if (to == at) {  // (at the line's start or end: over the line break)
+            return std::clamp(from + (forward ? 1 : -1), 0, static_cast<int>(content.size()));
+        }
+        return start + static_cast<int>(QString::fromUtf8(line.constData(), static_cast<qsizetype>(to)).size());
     };
     bool textChanged = false;
     switch (e->key()) {
@@ -375,6 +382,31 @@ bool TextEditor::keyPressed(const QKeyEvent* e, bool& finish) {
     }
     changed(textChanged);
     return true;
+}
+
+std::string TextEditor::textBeforeCursor() const {
+    if (hasSelection()) {
+        return {};
+    }
+    const int start = cursor > 0 ? static_cast<int>(content.lastIndexOf(u'\n', cursor - 1)) + 1 : 0;
+    return (content.mid(start, cursor - start) + preedit).toStdString();
+}
+
+void TextEditor::replaceBeforeCursor(size_t bytes, const std::string& text) {
+    // (the part of the input method's text before those bytes is typed; the rest goes with them)
+    const QString before = QString::fromStdString(textBeforeCursor());
+    qsizetype n = 0;  // (those bytes as UTF-16)
+    while (n < before.size() && static_cast<size_t>(before.right(n).toUtf8().size()) < bytes) {
+        ++n;
+    }
+    const qsizetype fromPreedit = std::min<qsizetype>(n, preedit.size());
+    const QString kept = preedit.left(preedit.size() - fromPreedit);
+    preedit.clear();
+    if (n > fromPreedit) {
+        anchor = std::max(0, cursor - static_cast<int>(n - fromPreedit));
+    }
+    insert(kept + QString::fromStdString(text));
+    changed(true);
 }
 
 void TextEditor::inputMethodEvent(const QInputMethodEvent* e) {

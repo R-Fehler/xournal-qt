@@ -77,6 +77,8 @@ public:
     /// `cursorRect`: the cursor in page coordinates.
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
     QRectF cursorRectOnPage() const override;
+    std::string textBeforeCursor() const override;
+    void replaceBeforeCursor(size_t bytes, const std::string& text) override;
 
     void setFont(const XojFont& font);
     void setColor(uint32_t argb);

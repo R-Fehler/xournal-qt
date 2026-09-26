@@ -80,7 +80,7 @@ void alias(std::ofstream& out, const char* family, const char* font) {
 }
 }  // namespace
 
-bool useFontconfig() {
+bool useFontconfig(const fs::path& appFonts, const std::function<std::string(bool scaleBitmaps)>& appRules) {
     if (!getEnv(L"XQT_WIN_PANGO_WIN32").empty()) {
         std::cerr << "[xournal-qt] XQT_WIN_PANGO_WIN32: Pango's default font backend (win32).\n";
         return false;
@@ -109,6 +109,9 @@ bool useFontconfig() {
                "<fontconfig>\n";
         out << "  <dir>" << xmlPath(fs::path(windowsFolder) / L"Fonts") << "</dir>\n";
         out << "  <dir>" << xmlPath(userFonts) << "</dir>\n";
+        if (!appFonts.empty()) {
+            out << "  <dir>" << xmlPath(appFonts) << "</dir>\n";
+        }
         out << "  <cachedir>" << xmlPath(folder) << "</cachedir>\n";
         // Before conf.d: a "prefer" that comes first stays in front of the ones conf.d adds.
         // (Family names match whatever their case.)
@@ -121,6 +124,9 @@ bool useFontconfig() {
         }
         if (fs::is_directory(rules, ec)) {
             out << "  <include ignore_missing=\"yes\">" << xmlPath(rules) << "</include>\n";
+        }
+        if (appRules) {
+            out << appRules(!fs::exists(rules / L"10-scale-bitmap-fonts.conf", ec));
         }
         out << "</fontconfig>\n";
         if (!out) {

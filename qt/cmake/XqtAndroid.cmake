@@ -10,14 +10,15 @@ target_sources(xournal-qt PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AndroidActivity.cpp)
 
-# The resources the core reads as files (page templates, palettes, icons) travel as Qt resources and are copied to
+# The resources the core reads as files (page templates, palettes, icons, the emoji font) travel as Qt resources and are copied to
 # the app's data folder at start (AndroidSetup.cpp).
 file(GLOB_RECURSE _xqt_share_files LIST_DIRECTORIES false RELATIVE "${XQT_BUILD_RESOURCE_DIR}" "${XQT_BUILD_RESOURCE_DIR}/*")
 set(_xqt_share_abs)
 foreach(f ${_xqt_share_files})
     list(APPEND _xqt_share_abs "${XQT_BUILD_RESOURCE_DIR}/${f}")
 endforeach()
-qt_add_resources(xournal-qt xqt_android_share PREFIX /xqt-share BASE "${XQT_BUILD_RESOURCE_DIR}"
+# (BIG_RESOURCES: the emoji font is 10 MB, which as a C++ array would take the compiler gigabytes)
+qt_add_resources(xournal-qt xqt_android_share PREFIX /xqt-share BASE "${XQT_BUILD_RESOURCE_DIR}" BIG_RESOURCES
     FILES ${_xqt_share_abs})
 
 # A symbol font for the UI (Android's UI font has no ✓ ✕ ↵ ...; see resources/fonts/README.md)

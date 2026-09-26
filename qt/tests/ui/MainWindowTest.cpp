@@ -39,6 +39,7 @@
 #include <QWheelEvent>
 #include <gtest/gtest.h>
 #include <cairo-pdf.h>
+#include <poppler.h>
 #include <qpdf/DLL.h>
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFObjectHandle.hh>
@@ -6672,4 +6673,215 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileHasTheFormattingBar) {
     const size_t line = text.rfind('\n', hello);
     EXPECT_EQ(text.substr(line + 1, 6), "- [ ] ") << text.substr(line + 1, 40);
     EXPECT_TRUE(find<QQuickItem>("mdTaskList")->property("checked").toBool());
+}
+
+// Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one; the emoji
+// button (shown while writing) opens the picker, whose search finds by name and puts the emoji at the cursor.
+TEST_F(MainWindowTest, emojiSuggestionsAndPickerWhileWritingOnThePage) {
+    const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
+    const QString party = QString::fromUtf8("\xf0\x9f\x8e\x89");
+    controller->setMarkdownInPanel(false);
+    controller->setTextMarkdown(false);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 250, 350, 200));
+    wait(100);
+    auto* button = findItem("emojiButton");
+    ASSERT_NE(button, nullptr);
+    EXPECT_FALSE(button->isVisible()) << "only while writing";
+    const QPointF at = view->pageViewRect(0).topLeft() + QPointF(150, 300) * view->getViewController().zoom();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(at).toPoint());
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    EXPECT_TRUE(button->isVisible());
+
+    auto* list = findItem("emojiSuggestions");
+    ASSERT_NE(list, nullptr);
+    type("Hi :s");
+    EXPECT_FALSE(list->isVisible());
+    type("mi");
+    until([&] { return list->isVisible(); });
+    ASSERT_TRUE(list->isVisible());
+    const QRectF cursor = canvasItem->property("emojiCompletionRect").toRectF();
+    const QPointF cursorInScene = canvasItem->mapToScene(cursor.bottomLeft());
+    const QPointF listInScene = list->mapToScene(QPointF(0, 0));
+    EXPECT_GT(listInScene.y(), cursorInScene.y()) << "below the cursor";
+    EXPECT_NEAR(listInScene.x(), cursorInScene.x(), 2);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(1500);  // (the software renderer is slow)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    QQuickItem* second = nullptr;
+    until([&] { return (second = findItem("emojiSuggestion1")) != nullptr; });
+    click(second);
+    EXPECT_EQ(view->getTextEditor()->text(), "Hi " + smiley);
+    EXPECT_FALSE(list->isVisible());
+
+    click(button);
+    auto* picker = find<QObject>("emojiPicker");
+    ASSERT_NE(picker, nullptr);
+    ASSERT_TRUE(waitOpened(picker, true));
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT_PICKER")) {
+        wait(1500);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT_PICKER"));
+    }
+    find<QObject>("emojiSearch")->setProperty("text", "tada");
+    wait(50);
+    key(Qt::Key_Return);  // (the first found)
+    EXPECT_TRUE(waitOpened(picker, false));
+    ASSERT_NE(view->getTextEditor(), nullptr) << "still writing";
+    EXPECT_EQ(view->getTextEditor()->text(), "Hi " + smiley + party);
+    type("!");
+    EXPECT_EQ(view->getTextEditor()->text(), "Hi " + smiley + party + "!") << "the keys went back to the text";
+    key(Qt::Key_Escape);
+    EXPECT_EQ(view->getTextEditor(), nullptr);
+    EXPECT_FALSE(button->isVisible());
+}
+
+// The Markdown editor beside the page: the same suggestions (Down, Enter), the picker, and the arrows and Backspace
+// over a whole flag.
+TEST_F(MainWindowTest, emojiInTheMarkdownEditorBesideThePage) {
+    const QString smiley = QString::fromUtf8("\xf0\x9f\x98\x83");
+    const QString flag = QString::fromUtf8("\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa");
+    const QString party = QString::fromUtf8("\xf0\x9f\x8e\x89");
+    controller->setMarkdownInPanel(true);
+    controller->setTextMarkdown(true);
+    controller->selectTool("text");
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* area = find<QQuickItem>("markdownArea");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    const QPointF at = view->pageViewRect(0).topLeft() + QPointF(150, 300) * view->getViewController().zoom();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, canvasItem->mapToScene(at).toPoint());
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(area->hasActiveFocus());
+
+    auto* list = findItem("markdownEmojiSuggestions");
+    ASSERT_NE(list, nullptr);
+    type("Hi :smi");
+    until([&] { return list->isVisible(); });
+    ASSERT_TRUE(list->isVisible());
+    key(Qt::Key_Down);
+    key(Qt::Key_Return);
+    EXPECT_EQ(area->property("text").toString(), "Hi " + smiley) << "no new line: Enter took the emoji";
+    EXPECT_FALSE(list->isVisible());
+
+    area->setProperty("text", "a" + flag + "b");
+    area->setProperty("cursorPosition", 5);  // (after the flag: 2 UTF-16 units per regional indicator)
+    key(Qt::Key_Left);
+    EXPECT_EQ(area->property("cursorPosition").toInt(), 1) << "over the whole flag";
+    key(Qt::Key_Right);
+    EXPECT_EQ(area->property("cursorPosition").toInt(), 5);
+    key(Qt::Key_Backspace);
+    EXPECT_EQ(area->property("text").toString(), "ab") << "the whole flag";
+
+    click(findItem("markdownEmoji"));
+    auto* picker = find<QObject>("emojiPicker");
+    QObject* panelPicker = nullptr;
+    for (QObject* p: window->findChildren<QObject*>("emojiPicker")) {
+        if (p->property("opened").toBool() || p->property("visible").toBool()) {
+            panelPicker = p;
+        }
+    }
+    ASSERT_NE(picker, nullptr);
+    until([&] {
+        for (QObject* p: window->findChildren<QObject*>("emojiPicker")) {
+            if (p->property("opened").toBool()) {
+                panelPicker = p;
+                return true;
+            }
+        }
+        return false;
+    });
+    ASSERT_NE(panelPicker, nullptr);
+    for (QObject* s: window->findChildren<QObject*>("emojiSearch")) {
+        s->setProperty("text", "tada");
+    }
+    wait(50);
+    key(Qt::Key_Return);
+    EXPECT_TRUE(waitOpened(panelPicker, false));
+    EXPECT_EQ(area->property("text").toString(), "a" + party + "b");
+    EXPECT_TRUE(area->hasActiveFocus());
+}
+
+// The PDF with notes (the export, print and sharing use it): emoji of a Markdown box (a shortcode among them) and of
+// a text box are in it in colour, as poppler shows it to other viewers. (XQT_KEEP=<file>: keeps the PDF.)
+TEST_F(MainWindowTest, emojiAreInTheExportedPdfInColour) {
+    const QString flag = QString::fromUtf8("\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa");
+    const QString coder = QString::fromUtf8("\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x92\xbb");
+    controller->setMarkdownInPanel(false);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(100, 100, 400, 300));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    // A Markdown box: "Hi :smile: 🇩🇪" (the shortcode shown as 😄)
+    controller->setTextMarkdown(true);
+    controller->setMarkdownFontSize(14);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(120, 150));
+    wait(50);
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    type("Hi :smile: ");
+    QGuiApplication::clipboard()->setText(flag);
+    key(Qt::Key_V, Qt::ControlModifier);
+    key(Qt::Key_Escape);
+    // A text box: "Hey 👩‍💻"
+    controller->setTextMarkdown(false);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(120, 300));
+    wait(50);
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    type("Hey ");
+    QGuiApplication::clipboard()->setText(coder);
+    key(Qt::Key_V, Qt::ControlModifier);
+    key(Qt::Key_Escape);
+
+    QTemporaryDir dir;
+    const QString pdf = qEnvironmentVariableIsSet("XQT_KEEP") ? qEnvironmentVariable("XQT_KEEP") : dir.filePath("emoji.pdf");
+    ASSERT_TRUE(controller->saveAsHybrid(QUrl::fromLocalFile(pdf)));
+    until([&] { return !controller->anySaving(); }, 20000);
+
+    // Poppler draws the page (150 dpi); the colour pixels: in the Markdown box's line and in the text box's line
+    gchar* uri = g_filename_to_uri(pdf.toUtf8().constData(), nullptr, nullptr);
+    PopplerDocument* doc = poppler_document_new_from_file(uri, nullptr, nullptr);
+    g_free(uri);
+    ASSERT_NE(doc, nullptr);
+    PopplerPage* page = poppler_document_get_page(doc, 0);
+    double w = 0, h = 0;
+    poppler_page_get_size(page, &w, &h);
+    const double scale = 150.0 / 72;
+    QImage image(static_cast<int>(w * scale), static_cast<int>(h * scale), QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    cairo_surface_t* surface = cairo_image_surface_create_for_data(image.bits(), CAIRO_FORMAT_ARGB32, image.width(),
+                                                                   image.height(), static_cast<int>(image.bytesPerLine()));
+    cairo_t* cr = cairo_create(surface);
+    cairo_scale(cr, scale, scale);
+    poppler_page_render_for_printing(page, cr);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+    g_object_unref(page);
+    g_object_unref(doc);
+    // Warm colours (the yellow faces, the flag's red and gold, the skin and hair): not the page's blue ruling or its
+    // magenta margin line
+    const auto warmIn = [&](double top, double bottom) {  // (page points)
+        int n = 0;
+        for (int y = static_cast<int>(top * scale); y < static_cast<int>(bottom * scale); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                const QColor c = image.pixelColor(x, y);
+                n += c.red() > 150 && c.blue() < 120 && c.red() - c.blue() > 80;
+            }
+        }
+        return n;
+    };
+    EXPECT_GT(warmIn(135, 180), 300) << "😄 (:smile:) and 🇩🇪 of the Markdown box";
+    EXPECT_GT(warmIn(285, 330), 50) << "👩‍💻 of the text box, at its place";
+    EXPECT_EQ(warmIn(500, 545), 0) << "no emoji there";
 }

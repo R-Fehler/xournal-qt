@@ -41,6 +41,7 @@
 #include "control/zoom/ZoomControl.h"
 
 #include "DocumentLayout.h"
+#include "EmojiCompletion.h"
 #include "ViewController.h"
 #include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
@@ -52,6 +53,8 @@ class EditSelection;
 class Settings;
 class PdfCache;
 class PdfElemSelection;
+
+class QKeyEvent;
 
 namespace xqt {
 
@@ -315,6 +318,19 @@ public:
     /// there is an editor now.
     bool ensureTextEditor();
     void endTextEditing();
+    /// A key for the text being written (the canvas item's keys): the emoji list first (EmojiCompletion), then the
+    /// editor. Returns false if it is not for them; `finish`: Escape ended the writing.
+    bool textKeyPressed(const QKeyEvent* e, bool& finish);
+    /// The emoji suggested for the shortcode being typed (EmojiCompletion.h); emojiCompletionChanged when they
+    /// change.
+    const EmojiCompletion& emojiCompletion() const { return completion; }
+    /// The text or its cursor may have changed: the suggestions follow.
+    void refreshEmojiCompletion();
+    /// A suggestion tapped: it goes in place of the shortcode.
+    void chooseEmojiCompletion(int index);
+    /// An emoji (the picker) at the cursor of the text being written, in place of its selection. False if nothing is
+    /// being written.
+    bool insertAtTextCursor(const std::string& text);
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
@@ -361,6 +377,8 @@ Q_SIGNALS:
     void markdownCursorChanged();
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
     void contextRequested(QPointF viewPos);
+    /// The emoji suggestions for a shortcode being typed were shown, changed or closed (emojiCompletion()).
+    void emojiCompletionChanged();
     /// The text tool tapped the Markdown box of a page (0-based): the UI opens its editor.
     void markdownRequested(int page);
     /// The text tool tapped a Markdown text box, or a place for a new one (page coordinates), to be edited beside
@@ -440,6 +458,7 @@ private:
     std::unique_ptr<EditSelection> selection;
     std::unique_ptr<TextEditor> textEditor;
     std::unique_ptr<MarkdownEditor> markdownEditor;
+    EmojiCompletion completion;
     struct MarkdownSelection {
         const EditSelection* selection = nullptr;
         /// The pages whose selected layer is their Markdown layer for now, with the layer selected before, and

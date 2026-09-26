@@ -5,6 +5,11 @@ set(XQT_BUILD_RESOURCE_DIR "${CMAKE_BINARY_DIR}/share/xournal-qt")
 configure_file("${XOJ_UPSTREAM_DIR}/resources-templates/pagetemplates.ini.in"
     "${XQT_BUILD_RESOURCE_DIR}/pagetemplates.ini" COPYONLY)
 file(COPY "${XOJ_UPSTREAM_DIR}/palettes" DESTINATION "${XQT_BUILD_RESOURCE_DIR}")
+# The colour emoji font and its license (qt/resources/fonts/README.md): a file that fontconfig reads, <resources>/fonts
+foreach(_xqt_font XqtEmoji.ttf LICENSE-NotoColorEmoji.txt)
+    configure_file("${CMAKE_CURRENT_LIST_DIR}/../resources/fonts/${_xqt_font}" "${XQT_BUILD_RESOURCE_DIR}/fonts/${_xqt_font}"
+        COPYONLY)
+endforeach()
 
 # The sRGB profile of archive PDFs (qt/resources/icc/README.md), compiled in as bytes
 set(XQT_SRGB_ICC "${CMAKE_CURRENT_LIST_DIR}/../resources/icc/sRGB.icc")
@@ -105,6 +110,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/EmojiCompletion.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/EmojiCompletion.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.h
@@ -147,6 +154,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownEditorTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/EmojiEditingTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScreenCalibrationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/SecondViewTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)

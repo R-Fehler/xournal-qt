@@ -15,7 +15,9 @@
 #endif
 #include <windows.h>
 
+#include "EmojiFont.h"
 #include "WindowsFonts.h"
+#include "session/AppContext.h"
 
 namespace xqt::windows {
 
@@ -44,7 +46,9 @@ void prepareEnvironment() {
     setIfUnset(L"XDG_CACHE_HOME", QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation));
     // Text: Pango's fontconfig backend (its Windows one dies drawing into images, see WindowsFonts.h), with the font
     // cache built in the background while the window comes up.
-    if (useFontconfig()) {
+    // (with the app's emoji font, EmojiFont.h)
+    const std::filesystem::path fonts = AppContext::defaultResourceDir() / "fonts";
+    if (useFontconfig(fonts, [](bool scaleBitmaps) { return emoji::fontconfigRules(scaleBitmaps); })) {
         warmUpFonts();
     }
 }

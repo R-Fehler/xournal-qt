@@ -4,9 +4,10 @@
 set(XQT_PACKAGING_DIR "${CMAKE_CURRENT_LIST_DIR}/../packaging")
 
 install(TARGETS xournal-qt RUNTIME DESTINATION bin)
-# Resources: page templates, palettes, icons (found at <prefix>/share/xournal-qt, see AppContext)
+# Resources: page templates, palettes, icons, the emoji font (found at <prefix>/share/xournal-qt, see AppContext)
 install(FILES "${XQT_BUILD_RESOURCE_DIR}/pagetemplates.ini" DESTINATION share/xournal-qt)
-install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR}/icons" DESTINATION share/xournal-qt)
+install(DIRECTORY "${XQT_BUILD_RESOURCE_DIR}/palettes" "${XQT_BUILD_RESOURCE_DIR}/icons" "${XQT_BUILD_RESOURCE_DIR}/fonts"
+    DESTINATION share/xournal-qt)
 
 # Windows: the program folder (bin/, share/) is what gets zipped, after windeployqt and the MinGW DLLs have been
 # added (qt/scripts/windows-deploy.sh, docs/windows.md). No desktop files and no .deb there.

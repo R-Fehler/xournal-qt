@@ -487,6 +487,29 @@ ApplicationWindow {
                     }
                 }
             }
+            // Writing on the page (a text box, Markdown, a text file): the emoji picker
+            ToolButton {
+                id: emojiButton
+                objectName: "emojiButton"
+                visible: canvas.textEditing
+                text: "\u{1F642}"
+                font.family: "Xournal Qt Emoji"
+                font.pixelSize: 22
+                implicitWidth: 48
+                implicitHeight: 48
+                focusPolicy: Qt.NoFocus  // (the text being written keeps the keys)
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Emoji (or type : and a name, like :smile)")
+                ToolTip.delay: 600
+                background: Rectangle { radius: 10; color: emojiButton.pressed ? "#e8e8e8" : "transparent" }
+                onClicked: canvasEmojiPicker.open()
+                EmojiPicker {
+                    id: canvasEmojiPicker
+                    x: win.toolbarPosition === "left" ? parent.width : win.toolbarPosition === "right" ? -width : 0
+                    y: win.verticalTools ? 0 : parent.height
+                    onPicked: function(emoji) { close(); canvas.insertText(emoji) }
+                }
+            }
             IconButton {
                 visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "pdfTextButton"
@@ -930,6 +953,16 @@ ApplicationWindow {
             x: Math.max(0, Math.min(canvas.mathErrorRect.x, canvas.width - width))
             y: canvas.mathErrorRect.y + canvas.mathErrorRect.height + 4
         }
+    }
+    // ":smi" typed on the page: the emoji suggested (Up / Down / Enter go to the canvas's editor; a tap chooses).
+    // Beside the canvas, not in it: the canvas takes the presses on its own items.
+    EmojiSuggestions {
+        objectName: "emojiSuggestions"
+        model: canvas.emojiCompletions
+        current: canvas.emojiCompletionIndex
+        cursor: Qt.rect(canvas.x + canvas.emojiCompletionRect.x, canvas.y + canvas.emojiCompletionRect.y,
+                        canvas.emojiCompletionRect.width, canvas.emojiCompletionRect.height)
+        onChosen: function(index) { canvas.chooseEmojiCompletion(index) }
     }
     // Reference mode: another document beside this one (the canvas area is split)
     ReferenceSplit {

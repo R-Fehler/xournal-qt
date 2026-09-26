@@ -1512,3 +1512,35 @@ Update the table in the user doc with the results.
       reference to a page of the document goes there in the reference.
 - [ ] With `XQT_PERF=1`, a long PDF beside itself, scroll both sides far apart: pages stay sharp, memory stays under
       the limit set in Settings (not twice it).
+
+## Emoji (qt/emoji)
+
+- [ ] A Markdown box and a text box with `😄 👩‍💻 🇩🇪 👍🏽 ❤️` (copied from a web page): each shows as one colour
+      picture, the same on every system (the app's Noto Color Emoji), also on a system without an emoji font.
+- [ ] Export as PDF and as the hybrid PDF, open in Okular and evince: the emoji are in colour and sharp at 400 %.
+      Print (Ctrl+P) to a PDF file: the same. The page's thumbnail and the sidebar previews show them.
+- [ ] A `.md` file with emoji, on pages and on one continuous page: the same.
+- [ ] Windows and Android: the same box shows its emoji in colour (Noto's pictures, not Segoe's or Android's).
+- [ ] Shortcodes: a Markdown box with `Hi :smile: :+1: :heart_eyes:` shows 😄 👍 😍 once the cursor has left the
+      paragraph; the paragraph with the cursor shows `:smile:`. Saved and opened again (and in the `.md` file on
+      disk) it is still `:smile:`. In `` `:smile:` `` and in a code block it stays text; `:nope:` stays text; a `.txt`
+      file shows `:smile:` as it is.
+- [ ] Copy `👩‍💻🇩🇪👍🏽` from a browser, paste into a text box and into Markdown written on the page: the arrows step
+      over each emoji at once, Backspace and Delete remove each whole. Copy them back out (Ctrl+C) into a browser:
+      the same three emoji.
+- [ ] Completion: in a text box, in Markdown on the page, in a `.md` file and in the Markdown editor beside the page,
+      type `:smi`: a list below the cursor (😄 smile, 😃 smiley, 😏 smirk, ...). Up / Down move in it, Enter or Tab
+      (or a tap) puts the emoji in place of `:smi`, Escape closes it and typing goes on. `:s` (one letter), `10:30`
+      and `std::ve` show nothing.
+- [ ] Android: Gboard, type `:smi` (the keyboard underlines it as a word being typed): the list shows; a tap on 😄
+      puts the emoji there and the keyboard does not type `:smi` again.
+- [ ] Beside the page, the arrows and Backspace go over a whole flag (🇩🇪).
+- [ ] Picker: while writing on the page (text box, Markdown, `.md` file) the tool bar shows 🙂; beside the page it is
+      in the Markdown buttons. It opens a search and the emoji by category (the row on top jumps to one). Search
+      `heart`, `happy`, `flag`: a tap (or Enter: the first found) puts the emoji at the cursor, the picker closes and
+      the keys go to the text again. The button is gone when the writing ends.
+- [ ] A page with a Markdown box and, below it, an ordinary text box (Markdown switched off for the text tool):
+      on the canvas, in the thumbnail, in the PDF export and in the PDF with notes the text box is where it was
+      written (it was drawn over the box's last line in the PDF with notes before).
+- [ ] Android: a flag (🇩🇪, pasted or from the picker) in a text box and in a Markdown box is a colour flag, not two
+      boxed letters (Android's symbol font has them as letters; Pango 1.58 asks for the family "emoji").

@@ -225,7 +225,9 @@ runs low; the library then reads its documents once again.
   (`FONTCONFIG_FILE`): `/system/fonts`, `/product/fonts`, the app's `files/fonts`, a cache in the app's cache
   folder, and the generic families mapped to Android's fonts ("Sans" → Roboto, "Serif" → Noto Serif, "Monospace" →
   Droid Sans Mono). The first start scans the system fonts (about 1 MB of cache). Poppler uses its Android font
-  backend for PDFs with fonts that are not embedded.
+  backend for PDFs with fonts that are not embedded. It also lists the app's own fonts (`share/xournal-qt/fonts`: the
+  colour emoji font, `qt/resources/fonts/README.md`) with the rules that take emoji from it and scale its bitmaps
+  (Android has no `conf.d`); the font travels in the APK as a big resource (10.7 MB).
 - **Folders**: `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `HOME` and `TMPDIR` point to
   the app's own folders before GLib first reads them, so upstream's `Util::getConfigFolder()` and friends work.
 
