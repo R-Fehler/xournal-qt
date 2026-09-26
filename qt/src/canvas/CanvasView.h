@@ -45,6 +45,7 @@
 #include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
 #include "GeometryToolLayer.h"
+#include "ScreenCalibration.h"
 #include "session/DocumentSession.h"
 
 class EditSelection;
@@ -60,6 +61,7 @@ class TextEditor;
 class MarkdownEditor;
 class CanvasTextInput;
 class RenderService;
+class StickyNotes;
 
 class CanvasView final: public QObject, public XournalView, public Layout, public RasterHost, public DocumentListener {
     Q_OBJECT
@@ -89,6 +91,10 @@ public:
 
     void setDevicePixelRatio(double dpr);
     double devicePixelRatio() const { return dpr; }
+    /// The screen the view is shown on (and the window's device pixel ratio there): 100 % follows its calibration
+    /// (ScreenCalibration.h), also when the calibration changes.
+    void setDisplay(const ScreenCalibration::Display& display);
+    const ScreenCalibration::Display& display() const { return shownOn; }
 
     // --- a second view of the same document (qt/self-reference) --------------------------------------------------
     /// The first view of its session (a tab's): its current page is the session's (the page sidebar, the page number
@@ -257,6 +263,8 @@ public:
     /// Draw the marks of the setsquare's scale onto its page, every `spacingCm`, with the pen's color and width (one
     /// step to undo). False when there is no setsquare out.
     bool drawGeometryMarks(double spacingCm);
+    /// The sticky notes of this view: placing, the selected note, peeking, hiding (qt/docs/sticky-notes.md)
+    StickyNotes& notes() const { return *stickyNotes; }
     /// The setsquare / compass on the canvas.
     GeometryToolLayer& geometryTool() { return geometry; }
     const GeometryToolLayer& geometryTool() const { return geometry; }
@@ -275,6 +283,8 @@ public:
     // --- navigation history: jumps (links, page grid, sidebar) can be gone back and forth, like a browser ---
     /// Go to a page and remember where the view was.
     void jumpToPage(size_t page);
+    /// The same, showing this part of the page (page points), e.g. an annotation of the Annotations panel.
+    void jumpToRect(size_t page, QRectF rect);
     bool canGoBack() const { return !backStack.empty(); }
     /// How many places Back can go to in this view (a link from another document came in at this depth).
     size_t backDepth() const { return backStack.size(); }
@@ -341,6 +351,10 @@ Q_SIGNALS:
     void pagesChanged();
     /// A selection was made or cleared.
     void selectionChanged(bool hasSelection);
+    /// A sticky note was selected or unselected, or the selected one changed (color, cover).
+    void noteSelectionChanged();
+    /// Sticky notes came, went, were hidden or shown.
+    void notesChanged();
     /// Text editing started or ended (keyboard / input method for the canvas).
     void textEditingChanged(bool editing);
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
@@ -414,6 +428,11 @@ private:
     /// XQT_PERF: pages in view waiting for their render at the current zoom, since when (ms since the epoch)
     std::unordered_map<const CanvasPage*, qint64> sharpWanted;
     double dpr = 1.0;
+    /// The screen the view is shown on (none yet: 100 % stays at 96 dpi)
+    ScreenCalibration::Display shownOn;
+    bool hasDisplay = false;
+    /// 100 % from the calibration of the screen the view is on
+    void applyZoom100();
     std::atomic<double> renderZoom{1.0};
     std::atomic<double> renderDpr{1.0};
     std::unique_ptr<EditSelection> selection;
@@ -436,6 +455,7 @@ private:
     double markdownTextSize = 10;    ///< of this font size
     bool markdownInPanel = true;     ///< Markdown text boxes are edited beside the page
     GeometryToolLayer geometry{*this};
+    std::unique_ptr<StickyNotes> stickyNotes;
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;
     PdfTextMode pdfTextMode = PdfTextMode::Highlight;
@@ -446,13 +466,16 @@ private:
         QPointF offset;
     };
     NavPoint currentPlace() const;
+    /// Before a jump to `page`: where the view is goes onto the back stack (not for a jump within that page).
+    void rememberPlaceBefore(size_t page);
     bool restorePlace(const NavPoint& place);
     /// Remember the place before a jump (Back comes back to it)
     void pushPlace(const NavPoint& here);
     std::vector<NavPoint> backStack, forwardStack;
     /// A second view's current page (the primary view's is the session's)
     size_t ownPage = 0;
-    /// The DocumentListener's page selection (and the second view's own): a selection of Markdown texts moved there
+    /// The DocumentListener's page selection (and the second view's own): the pen leaves a sticky note's layer, and a
+    /// selection of Markdown texts moved there
     void markdownSelectionOnPage(size_t page);
     quint64 selectionRev = 0;
 };

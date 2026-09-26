@@ -18,6 +18,10 @@ LayerView::LayerView(const Layer* layer): layer(layer) {}
 const Layer* LayerView::getLayer() const { return layer; }
 
 void LayerView::draw(const Context& ctx) const {
+    // xournal-qt: a layer the frontend draws itself (see layerDrawer)
+    if (LayerDrawer drawLayer = layerDrawer.load(std::memory_order_relaxed); drawLayer && drawLayer(*layer, ctx)) {
+        return;
+    }
     IF_DEBUG_REPAINT(int drawn = 0; int notDrawn = 0;);
 
     // Get the bounds of the mask, in page coordinates

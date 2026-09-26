@@ -61,6 +61,7 @@
 #include "canvas/CanvasPage.h"
 #include "markdown/MdBox.h"
 #include "canvas/PenHover.h"
+#include "canvas/ScreenCalibration.h"
 #include "canvas/MarkdownEditor.h"
 #include "canvas/TextEditor.h"
 #include "render/RenderService.h"
@@ -443,6 +444,107 @@ TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {
     const QByteArray xml = f.readAll();
     EXPECT_TRUE(xml.contains("name=\"pressureMultiplier\" value=\"2.5")) << xml.left(400).toStdString();
     EXPECT_TRUE(xml.contains("name=\"autosaveTimeout\" value=\"7\""));
+}
+
+// Settings -> Display: a ruler on the screen that the slider (or a drag, with the mouse or a finger) stretches until
+// it matches a real one; saved, it calibrates this screen (only this one), and 100 % (Ctrl+1) is the real size from
+// then on.
+TEST_F(MainWindowTest, theScreenIsCalibratedInTheSettings) {
+    namespace SC = xqt::ScreenCalibration;
+    Settings& settings = *controller->context().getSettings();
+    const auto display = SC::displayOf(window->screen(), window->devicePixelRatio());
+    ASSERT_FALSE(display.key.isEmpty());
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    const double defaultDpi = SC::defaultPpi(display) / display.dpr;
+    EXPECT_DOUBLE_EQ(vc.zoom100(), defaultDpi / 72.0) << "not calibrated: what the screen says (or 96 dpi)";
+    EXPECT_FALSE(SC::storedPpi(settings, display.key).has_value());
+
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("displayTab"));
+    QQuickItem* ruler = findItem("calibrationRuler");
+    QQuickItem* slider = findItem("calibrationSlider");
+    ASSERT_NE(ruler, nullptr);
+    ASSERT_NE(slider, nullptr);
+    until([&] { return ruler->isVisible() && slider->isVisible(); });
+    nextFrame();
+    EXPECT_NEAR(ruler->property("dpi").toDouble(), defaultDpi, 1e-6);
+    EXPECT_NEAR(ruler->property("pixelsPerCm").toDouble(), defaultDpi / 2.54, 1e-6);
+
+    // The slider stretches the ruler
+    const double before = ruler->property("dpi").toDouble();
+    click(slider);  // (the middle of the slider: (40 + 400) / 2 dpi)
+    const double moved = ruler->property("dpi").toDouble();
+    EXPECT_NE(moved, before);
+    EXPECT_NEAR(moved, slider->property("value").toDouble(), 1e-6);
+    EXPECT_NEAR(moved, 220.0, 15.0);
+    EXPECT_NEAR(ruler->property("pixelsPerCm").toDouble(), moved / 2.54, 1e-6);
+
+    // ... and so does a drag on the ruler, from its 0 mark: 10 % further out is 10 % more pixels per inch
+    const double zeroX = ruler->property("zeroX").toDouble();
+    const QPointF grab = ruler->mapToScene(QPointF(zeroX + 200, ruler->height() / 2));
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, grab.toPoint());
+    for (int step = 1; step <= 5; ++step) {
+        QTest::mouseMove(window, (grab + QPointF(4 * step, 0)).toPoint());
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, (grab + QPointF(20, 0)).toPoint());
+    wait(50);
+    const double dragged = ruler->property("dpi").toDouble();
+    EXPECT_NEAR(dragged, moved * 1.1, moved * 0.01);
+
+    // ... and a finger (Android): from 220 px to 200 px, a tenth shorter
+    static QPointingDevice* finger = QTest::createTouchDevice();
+    const QPoint touch = ruler->mapToScene(QPointF(zeroX + 220, ruler->height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(1, touch);
+    for (int step = 1; step <= 5; ++step) {
+        QTest::touchEvent(window, finger).move(1, touch - QPoint(4 * step, 0));
+    }
+    QTest::touchEvent(window, finger).release(1, touch - QPoint(20, 0));
+    wait(50);
+    const double touched = ruler->property("dpi").toDouble();
+    EXPECT_NEAR(touched, dragged * 200.0 / 220.0, dragged * 0.01);
+    EXPECT_FALSE(SC::storedPpi(settings, display.key).has_value()) << "nothing is stored before it is saved";
+    EXPECT_DOUBLE_EQ(vc.zoom100(), defaultDpi / 72.0);
+
+    // Saved: for this screen, as the panel's pixels per inch; the view takes it at once
+    const double zoom = vc.zoom();
+    QQuickItem* save = findItem("calibrationSave");
+    scrollIntoView(save);
+    click(save);
+    ASSERT_TRUE(SC::storedPpi(settings, display.key).has_value());
+    EXPECT_NEAR(*SC::storedPpi(settings, display.key), touched * display.dpr, 0.01);
+    std::string stored;
+    settings.getCustomElement("xournalQt").getString("screenCalibration", stored);
+    EXPECT_EQ(QString::fromStdString(stored).count('='), 1) << "one screen: " << stored;
+    EXPECT_NEAR(vc.zoom100(), touched / 72.0, 1e-3);
+    EXPECT_DOUBLE_EQ(vc.zoom(), zoom) << "the page stays as large as it was; only what is called 100 % changes";
+    EXPECT_EQ(controller->zoomPercent(), static_cast<int>(std::lround(zoom / vc.zoom100() * 100)));
+
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    QFile file(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/xournal-qt/settings.xml");
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+    EXPECT_TRUE(file.readAll().contains("screenCalibration")) << "written when the sheet closes";
+
+    // Real size: Ctrl+1
+    key(Qt::Key_1, Qt::ControlModifier);
+    EXPECT_EQ(controller->zoomPercent(), 100);
+    EXPECT_NEAR(vc.zoom(), touched / 72.0, 1e-3);
+
+    // Back to what the screen says
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    QQuickItem* reset = findItem("calibrationReset");
+    scrollIntoView(reset);
+    click(reset);
+    EXPECT_FALSE(SC::storedPpi(settings, display.key).has_value());
+    EXPECT_NEAR(ruler->property("dpi").toDouble(), defaultDpi, 1e-6);
+    EXPECT_DOUBLE_EQ(vc.zoom100(), defaultDpi / 72.0);
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
 }
 
 namespace {
@@ -3331,6 +3433,57 @@ TEST_F(MainWindowTest, aPressOnTheCanvasClosesAnOpenMenu) {
 }
 
 // The setsquare and the compass sit in the shapes menu (they are not a way of drawing, they lie on the page).
+TEST_F(MainWindowTest, theShapesMenuPlacesAStickyNoteWithItsPill) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    click(find<QQuickItem>("shapeButton"));
+    auto* item = find<QQuickItem>("stickyNoteItem");
+    ASSERT_NE(item, nullptr);
+    until([&] { return item->isVisible(); });
+    scrollIntoView(item);
+    click(item);
+    until([&] { return controller->noteSelected(); });
+    ASSERT_TRUE(controller->noteSelected()) << "the new note is selected";
+    EXPECT_EQ(controller->tool(), QStringLiteral("selectRect")) << "to be moved and resized right away";
+
+    // Its pill: colors, cover, delete
+    auto* pill = find<QQuickItem>("notePill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    EXPECT_TRUE(pill->isVisible());
+    click(findItem("noteColor2"));
+    EXPECT_EQ(controller->noteColor(), controller->stickyNoteColors()[2].value<QColor>());
+    auto* cover = find<QQuickItem>("noteCoverButton");
+    click(cover);
+    EXPECT_TRUE(controller->noteCovers());
+    EXPECT_TRUE(cover->property("checked").toBool());
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        nextFrame();
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    // The page pill hides and shows the notes of the page
+    auto* pageNotes = find<QQuickItem>("pageNotesButton");
+    ASSERT_NE(pageNotes, nullptr);
+    until([&] { return pageNotes->isVisible(); });
+    EXPECT_TRUE(pageNotes->isVisible()) << "a page with notes";
+    click(pageNotes);
+    EXPECT_TRUE(controller->pageNotesHidden());
+    EXPECT_FALSE(controller->noteSelected()) << "a hidden note is not selected";
+    click(pageNotes);
+    EXPECT_FALSE(controller->pageNotesHidden());
+
+    // Deleted (and back with undo)
+    controller->undo();  // (the cover)
+    controller->undo();  // (the color)
+    controller->undo();  // (the note)
+    EXPECT_FALSE(controller->pageHasNotes());
+    until([&] { return !pageNotes->isVisible(); });
+    EXPECT_FALSE(pageNotes->isVisible());
+    controller->redo();
+    EXPECT_TRUE(controller->pageHasNotes());
+}
+
 TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
@@ -4130,11 +4283,49 @@ TEST_F(HomeScreenTest, movesToAnotherLibraryAndWarnsAboutDownloads) {
 }
 
 // Markdown: written beside the page into a box (a text in the layer "Markdown"), opened again with the text tool.
+TEST_F(MainWindowTest, theWritingButtonWritesMarkdownOnThePageItsSourceIsInItsMenu) {
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* button = find<QQuickItem>("textModeButton");
+    ASSERT_NE(panel, nullptr);
+    ASSERT_NE(button, nullptr);
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+
+    // Markdown chosen in the button's menu: written on the page, formatted while typing (not beside it)
+    QMetaObject::invokeMethod(find<QObject>("markdownItem"), "triggered");
+    until([&] { return view->getMarkdownEditor() != nullptr; });
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_FALSE(panel->isVisible());
+    EXPECT_TRUE(controller->markdownOnPage());
+    EXPECT_TRUE(button->property("checked").toBool());
+    type("# Title");
+    EXPECT_EQ(view->getMarkdownEditor()->text(), "# Title");
+
+    // The button again: done; once more (it remembers Markdown): on the page again, the cursor after the text
+    click(button);
+    until([&] { return view->getMarkdownEditor() == nullptr; });
+    EXPECT_FALSE(controller->markdownOnPage());
+    EXPECT_FALSE(button->property("checked").toBool());
+    click(button);
+    until([&] { return view->getMarkdownEditor() != nullptr; });
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_FALSE(panel->isVisible());
+    type(" two");
+    EXPECT_EQ(view->getMarkdownEditor()->text(), "# Title two") << "the cursor at the end of the page's text";
+
+    // The source beside the page: the menu's other entry takes the text being written along
+    QMetaObject::invokeMethod(find<QObject>("markdownSourceItem"), "triggered");
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_EQ(view->getMarkdownEditor(), nullptr);
+    EXPECT_EQ(find<QQuickItem>("markdownArea")->property("text").toString(), QStringLiteral("# Title two"));
+}
+
 TEST_F(MainWindowTest, markdownBoxIsWrittenAndOpenedAgainWithTheTextTool) {
     controller->setMarkdownInPanel(true);  // (the text tool opens it beside the page)
     auto* panel = find<QQuickItem>("markdownPanel");
     ASSERT_NE(panel, nullptr);
-    auto* markdownItem = find<QObject>("markdownItem");  // in the menu of the writing button
+    auto* markdownItem = find<QObject>("markdownSourceItem");  // in the menu of the writing button: beside the page
     ASSERT_NE(markdownItem, nullptr);
     QMetaObject::invokeMethod(markdownItem, "triggered");
     until([&] { return panel->isVisible(); });
@@ -4205,7 +4396,7 @@ TEST_F(MainWindowTest, markdownFormulasAndTheErrorOfOneOnHover) {
     controller->setMarkdownInPanel(true);
     auto* panel = find<QQuickItem>("markdownPanel");
     ASSERT_NE(panel, nullptr);
-    QMetaObject::invokeMethod(find<QObject>("markdownItem"), "triggered");
+    QMetaObject::invokeMethod(find<QObject>("markdownSourceItem"), "triggered");
     until([&] { return panel->isVisible(); });
     ASSERT_TRUE(panel->isVisible());
     find<QQuickItem>("markdownArea")->setProperty(
@@ -4480,6 +4671,32 @@ TEST_F(MainWindowTest, markdownTextBoxesAreWrittenBesideThePage) {
 
     controller->undo();
     EXPECT_EQ(xqt::md::boxAt(*layer, 155, 300), nullptr) << "one undo step for the box";
+}
+
+// Pasted into the Markdown beside the page: formulas as chat apps write them, \( \) and \[ \], become $ $ and $$ $$
+// (the same as on the page), in one undo step of the text; other text is pasted by the TextArea as always.
+TEST_F(MainWindowTest, markdownPanelPastesTexDelimitersAsDollars) {
+    auto* panel = find<QQuickItem>("markdownPanel");
+    auto* area = find<QQuickItem>("markdownArea");
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, QVariant(0)));
+    ASSERT_TRUE(panel->isVisible());
+    area->forceActiveFocus();
+    ASSERT_TRUE(area->hasActiveFocus());
+    type("Say REPLACE here");
+    // In place of a selection ("REPLACE")
+    QMetaObject::invokeMethod(area, "select", Q_ARG(int, 4), Q_ARG(int, 11));
+    QGuiApplication::clipboard()->setText("\\(E = mc^2\\) and \\(n\\)th");
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(area->property("text").toString().toStdString(), "Say $E = mc^2$ and \\(n\\)th here");
+    EXPECT_EQ(area->property("cursorPosition").toInt(), 26) << "after the pasted text";
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(area->property("text").toString().toStdString(), "Say REPLACE here") << "one undo step";
+    // Nothing to convert: pasted as always
+    area->setProperty("cursorPosition", 0);
+    QGuiApplication::clipboard()->setText("plain ");
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(area->property("text").toString().toStdString(), "plain Say REPLACE here");
+    click(find<QQuickItem>("markdownCancel"));
 }
 
 // The page's Markdown text flows onto new pages while it is written.

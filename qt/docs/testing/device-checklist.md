@@ -1347,6 +1347,114 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] Android (emulator or a test device): the same box shows its formulas; the first formula shows without a
       noticeable pause.
 
+## Markdown written on the page by default (2026-09-26)
+
+- [ ] In a `.xopp`, the writing button in its Markdown mode (or Ctrl+Alt+M): the cursor is on the page, at the end of
+      that page's Markdown text, and typing shows the text formatted as it is typed. The button is shown pressed; a
+      tap on it (or Escape) ends writing.
+- [ ] Press and hold the button (right-click with a mouse): "Markdown source beside the page" opens the source in the
+      panel beside the page, with the text written so far.
+
+## Screen calibration (qt/calibration)
+
+- [ ] Settings (Ctrl+,) → Display: the line "This screen: …" names the screen, its scaling (e.g. 125 %) and the dpi
+      it reports; a screen that reports nothing (or nonsense) says so and starts at 96 dpi.
+- [ ] Hold a real ruler against the ruler on the screen. Move the slider (or −/+ for 0.1 dpi) until the centimetre
+      and the inch marks match; then the same by dragging the ruler itself (from a mark a few cm out; the 0 mark stays).
+      "Save for this screen". The zoom pill's percentage changes, the page does not change its size.
+- [ ] Ctrl+1 (or the fit menu → "Real size, 100 %"): the pill shows 100 %, and a page measures its paper size
+      (A4: 21.0 cm wide) with the ruler. Draw a 10 cm line with the set square: 10 cm on the screen. The compass
+      and the set square show centimetres that match the ruler.
+- [ ] Ctrl+0 still fits the width, fit page still fits the page; zooming out and in stops at 30 % and 700 %
+      of the real size.
+      The document is not changed by the calibration (no "unsaved" mark).
+- [ ] KDE Wayland with fractional scaling: calibrate at 125 %, switch the display to 150 % in the system settings:
+      Ctrl+1 is still real size without calibrating again. The same on X11 if at hand.
+- [ ] Two screens: calibrate the laptop panel, move the window to the external monitor: 100 % there is what that
+      monitor reports (or its own calibration); back on the panel, the panel's calibration applies again. The
+      Display page shows the screen the window is on.
+- [ ] "Back to what the screen says": the ruler returns to the reported dpi and 100 % follows it again.
+- [ ] While writing in a Markdown box on the page, Ctrl+1 still makes a heading (the box takes the key), outside it
+      Ctrl+1 is real size. The shortcut can be changed in Settings → Shortcuts ("Real size").
+- [ ] The reference beside the document (reading only): Ctrl+1 while it has the focus zooms the reference to real size.
+- [ ] Android (emulator or a test device, not the author's phone): Settings → Display shows the dpi the device reports
+      as the default; the ruler stretches with a finger drag without scrolling the page; saved, 100 % is real size
+      (a credit card is 8.56 cm wide). On a phone-wide window the two buttons wrap onto two lines.
+
+## Annotations as Markdown (qt/annotations-md)
+
+- [ ] A lecture PDF: highlight a sentence with the highlighter, underline another from selected text, write a text
+      box, a Markdown box, a link marker (paste a copied link), and a few words by hand in the margin. The page
+      sidebar's highlighter button shows them by page: the highlighted sentences with their text, the boxes, the link,
+      and a small picture of the handwriting. Circles and underlines drawn with the pen over the text are not listed.
+- [ ] A PDF with highlights made in Okular (or Acrobat) with a note: "Highlight in the PDF", its text, its note.
+- [ ] A tap on an item scrolls there (the item in view, also far down a page); Back returns.
+- [ ] With the panel open, write on a page: after a short pause the list shows the new item, without jumping to the
+      top. A 300-page PDF: the first reading shows a spinner and the canvas stays smooth while it reads; an edit then
+      updates the list at once.
+- [ ] The filter button: only handwriting, then "Show all"; the counter says "N of M" meanwhile.
+- [ ] Export (the download button), Xournal++ files mode: `<name>.annotations.md` next to the document; the snackbar's
+      Open shows it. Headings are the PDF's chapters (a PDF without an outline: "Page N"). A tap on a "p. N" link in
+      the opened `.md` opens the document on that page. Export again: it asks before replacing.
+- [ ] PDF files mode: the export asks with a save dialog and writes nothing next to the PDF by itself.
+- [ ] A new document never saved: the export says to save it first.
+- [ ] `XQT_ANNOTATION_PICTURES=1 ./xournal-qt`: the export writes the handwriting as PNGs in `<name>.annotations.assets/`
+      and links them; Typora or Obsidian show them.
+- [ ] Android (emulator): the panel lists and jumps the same; a tap on an item works with a finger.
+
+## Sticky notes (qt/sticky-notes)
+
+- [ ] A `.xopp` with notes (see qt/docs/sticky-notes.md): open it in upstream Xournal++ (`../xournalpp/build/xournalpp`):
+      no error, each note is an opaque coloured rectangle with the ink and text on it, and a layer "Sticky note" in
+      its layer list. Save it there and open it here again: the notes are still notes.
+- [ ] Export as plain PDF, Export for the archive, Save as hybrid PDF, and Print to a file: open each in Okular (and a
+      browser): the notes are opaque, their ink stops at their edge, no popup note icons. A covering note has no
+      folded corner there.
+- [ ] Shapes menu → "Sticky note": a yellow note appears in the middle of the visible part of the page, selected
+      (outline, round handle at its bottom right, a pill above it); the select tool is chosen. Drag it with the pen,
+      a finger and the mouse: it follows and stays on its page. Drag the handle: it grows and shrinks (never below a
+      small minimum), what is written on it keeps its size and is cut off at the edge. More menu → "Insert sticky
+      note" does the same.
+- [ ] Choose the pen: the note is no longer selected. Write on it, also across its edge: the ink stays on the note and
+      is cut off at its edge, also while it is being drawn. The text tool writes on it; the eraser erases on it but
+      never the note's own edge. Undo and redo each stroke.
+- [ ] Select it again (select tool, a tap): move it: the ink moves along. Pick a colour in the pill; Delete and Esc
+      work. Undo / redo the place, the move, the resize, the colour, the delete (one step each).
+- [ ] "Cover" in the pill: a folded corner shows. With the pen on it nothing is drawn (neither on it nor under it). A
+      tap (pen, finger, mouse, the hand tool) makes it see-through with a dashed edge: the answer below shows; another
+      tap covers again. Close and reopen the file: covered again (peeking is not saved).
+- [ ] A page with notes has an eye button beside the page number: it hides all notes of the page (thumbnail too) and
+      shows them again. The layer panel does not list the notes.
+
+## Markdown out of a PDF text document, other viewers (qt/docs/user/markdown-from-pdf.md)
+
+Once `qt/md-pdf` is released, with a PDF text document that has an image:
+- [ ] Chrome and Edge (Windows' default PDF viewer): is there an attachments list, and can `name.md` be saved from it?
+- [ ] Adobe Acrobat Reader on Android and iPad: attachments listed and saved?
+- [ ] Acrobat Reader and Firefox: saving an image keeps the `name.assets/` part of its name, or only the file name?
+- [ ] The saved `name.md` with its `name.assets` folder opens with the images in Obsidian and VS Code.
+Update the table in the user doc with the results.
+
+## Math delimiters from chat apps (qt/md-tex-delims)
+
+- [ ] A Markdown box with `$E = \hbar\omega$`: drawn as a formula with ħ (not red, not the word "hbar").
+- [ ] `a $ $ b` and a paragraph `$$ $$`: shown as written (`$ $`, `$$ $$`), not as an empty gap. The cursor moves
+      through them character by character.
+- [ ] A Markdown box (or a `.md` file) with text as ChatGPT writes it: `The energy \(E = mc^2\) and (\(a\)).`, then
+      `\[` / `\int_0^1 x\,dx` / `\]` on three lines, and `\[ \sum_k k \]` on one line: drawn as formulas (the blocks
+      centered). The file keeps `\(` (open it in a text editor).
+- [ ] Writing on the page in that paragraph: it shows `\(` and `\)` as typed; a tap after a formula and typing put
+      the letters there, not two characters before. Enter after a `\[` line starts a line of the formula.
+- [ ] Stays text: `` `\(x\)` `` and a ``` block with `\(x\)`; `the \(n\)th` ("(n)th"); `see \[1\] here` ("[1]");
+      a `\[` whose `\]` comes after a blank line.
+- [ ] Search (Ctrl+F) for a word after `\(x\)`: the hit is on that word. A long `.md` with such formulas is split
+      into pages as before (never inside a formula).
+- [ ] Copy an answer with formulas from ChatGPT (it has `\(…\)` and `\[…\]`) and paste it (Ctrl+V) while writing
+      on the page, into a `.md` file, and into the Markdown panel beside the page: the pasted text has `$…$` and
+      `$$…$$` (formulas drawn), `the \(n\)th` stays; Ctrl+Z takes the whole paste back. Pasted into a ``` block: as
+      it is. A plain text box (not Markdown) and a `.txt` file: as it is.
+
+
 ## The same document as reference (qt/self-reference)
 
 - [ ] A long PDF or notes open: press and hold (or right click) the current tab → "Show this document beside": the

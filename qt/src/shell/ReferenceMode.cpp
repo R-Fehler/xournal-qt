@@ -93,6 +93,8 @@ void ReferenceMode::update() {
         connections.push_back(connect(v, &CanvasView::pagesChanged, this, &ReferenceMode::pageChanged));
         connections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                       &ReferenceMode::zoomChanged));
+        connections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
+                                      &ReferenceMode::zoomChanged));
         connections.push_back(connect(v, &CanvasView::selectionChanged, this, &ReferenceMode::selectionChanged));
         connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::selectionChanged));
         connections.push_back(connect(v, &CanvasView::pdfTextSelectionCleared, this, &ReferenceMode::selectionChanged));
@@ -279,6 +281,13 @@ void ReferenceMode::zoomIn() {
     if (shownView) {
         auto& vc = shownView->getViewController();
         vc.zoomBy(1.2, QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
+    }
+}
+
+void ReferenceMode::zoomToRealSize() {
+    if (shownView) {
+        auto& vc = shownView->getViewController();
+        vc.setZoom(vc.zoom100(), QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
     }
 }
 

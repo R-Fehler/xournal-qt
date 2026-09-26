@@ -59,6 +59,7 @@
 #include "IncrementalPdf.h"
 #include "MdBox.h"
 #include "MergedPdf.h"
+#include "StickyNote.h"
 #include "config.h"
 
 namespace xqt::HybridPdf {
@@ -701,13 +702,18 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
                 a.x0 = a.y0 = std::numeric_limits<double>::max();
                 a.x1 = a.y1 = std::numeric_limits<double>::lowest();
                 bool colored = false;
+                // A sticky note: a /Stamp as big as the note (its content is drawn clipped to it), no /InkList (a
+                // viewer that draws ink from it would draw the paper as a line)
+                const Element* notePaper = sticky::paperOf(*layer);
                 for (const auto& e: layer->getElementsView()) {
-                    const auto& box = e->getBoundingBox();
-                    a.x0 = std::min(a.x0, box.x);
-                    a.y0 = std::min(a.y0, box.y);
-                    a.x1 = std::max(a.x1, box.x + box.width);
-                    a.y1 = std::max(a.y1, box.y + box.height);
-                    if (e->getType() == ELEMENT_STROKE) {
+                    if (!notePaper || e == notePaper) {
+                        const auto& box = e->getBoundingBox();
+                        a.x0 = std::min(a.x0, box.x);
+                        a.y0 = std::min(a.y0, box.y);
+                        a.x1 = std::max(a.x1, box.x + box.width);
+                        a.y1 = std::max(a.y1, box.y + box.height);
+                    }
+                    if (e->getType() == ELEMENT_STROKE && !notePaper) {
                         const auto* s = static_cast<const Stroke*>(e);
                         std::vector<double> pts;
                         pts.reserve(s->getPointCount() * 2);

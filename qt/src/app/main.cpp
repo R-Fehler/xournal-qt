@@ -30,6 +30,7 @@
 #include "AppController.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
+#include "shell/AnnotationsModel.h"
 #include "shell/Library.h"
 #include "shell/Previews.h"
 #include "shell/SessionRecovery.h"
@@ -169,6 +170,7 @@ int main(int argc, char* argv[]) {
     engine.addImageProvider("preview", new xqt::PreviewProvider);
     engine.addImageProvider("hitpage", new xqt::HitPageProvider);
     engine.addImageProvider("mdsnippet", new xqt::MdSnippetProvider);
+    engine.addImageProvider("annotation", new xqt::AnnotationImageProvider);
     engine.rootContext()->setContextProperty("app", &controller);
     AppController::setStartMaximized(true);
     // Undocked documents get a window of their own: the same QML, with their own controller as "app".

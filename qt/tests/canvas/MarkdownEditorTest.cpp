@@ -11,7 +11,9 @@
 #include <string>
 
 #include <QCoreApplication>
+#include <QClipboard>
 #include <QElapsedTimer>
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QPainter>
 #include <QSignalSpy>
@@ -272,4 +274,57 @@ TEST_F(MarkdownEditorTest, formulaBlocksAreWrittenAndATapGoesIntoAFormula) {
     at = ed.text().find("\\sum_k k");
     EXPECT_GE(ed.cursorPosition(), at);
     EXPECT_LE(ed.cursorPosition(), at + 8);
+}
+
+// Formulas as chat apps write them, \( … \) and \[ … \]: the text md4c reads is shorter ("\(" is one "$" there),
+// but every place in what is drawn is the place in the text as written. A tap after two formulas and typing go
+// where they were tapped; Enter in a "\[" block that is not closed is a line of the formula.
+TEST_F(MarkdownEditorTest, texDelimitersKeepThePlacesOfTheText) {
+    MarkdownEditor& ed = start();
+    type("Energy \\(x^2\\) and \\(y\\) then words\n");
+    type("\\[\nz\n\\]\n");
+    type("After");
+    EXPECT_EQ(ed.text(), "Energy \\(x^2\\) and \\(y\\) then words\n\n\\[\nz\n\\]\n\nAfter");
+    processEvents();
+
+    const Text* box = md::boxOf(*md::markdownLayer(session->getDocument()->getPage(0)));
+    ASSERT_NE(box, nullptr);
+    const auto& shift = box->getTransformation().shift;
+    // The cursor in "After": the first paragraph is drawn, with its two formulas
+    const md::Layout& l = md::cachedLayout(box->getText(), md::styleOf(*box), ed.cursorPosition());
+    const md::Item* drawn = nullptr;
+    size_t formulas = 0;
+    for (const md::Item& it: l.items) {
+        formulas += it.maths.size();
+        if (it.maths.size() == 2) {
+            drawn = &it;
+        }
+    }
+    ASSERT_NE(drawn, nullptr);
+    EXPECT_EQ(formulas, 3u);  // (and the block's)
+    const std::string laid = pango_layout_get_text(drawn->layout.get());
+    const size_t w = laid.find("words");
+    ASSERT_NE(w, std::string::npos) << laid;
+    const md::Rect r = md::textRects(*drawn, static_cast<int>(w), static_cast<int>(w) + 1).at(0);
+    ASSERT_TRUE(ed.tap(*view->getPage(0), shift.x + r.x + r.width * 0.2, shift.y + r.y + r.height / 2));
+    EXPECT_EQ(ed.cursorPosition(), ed.text().find("words"));
+    type("X");
+    EXPECT_NE(ed.text().find("then Xwords"), std::string::npos) << ed.text();
+}
+
+// Pasted text with formulas as chat apps write them: its pairs become $…$ and $$…$$ (the file then shows them in
+// Obsidian and GitHub too), in one undo step; not in code, not next to a letter.
+TEST_F(MarkdownEditorTest, pastedTexDelimitersBecomeDollars) {
+    MarkdownEditor& ed = start();
+    type("Intro\n");
+    QGuiApplication::clipboard()->setText("The energy \\(E = mc^2\\) and\r\n\\[\r\n\\sum_k k\r\n\\]\r\nthe \\(n\\)th");
+    key(Qt::Key_V, {}, Qt::ControlModifier);
+    EXPECT_EQ(ed.text(), "Intro\n\nThe energy $E = mc^2$ and\n$$\n\\sum_k k\n$$\nthe \\(n\\)th");
+    key(Qt::Key_Z, {}, Qt::ControlModifier);
+    EXPECT_EQ(ed.text(), "Intro\n\n") << "one undo step";
+    // Into code: as it is
+    type("```\n");
+    QGuiApplication::clipboard()->setText("\\(x\\)");
+    key(Qt::Key_V, {}, Qt::ControlModifier);
+    EXPECT_EQ(ed.text(), "Intro\n\n```\n\\(x\\)");
 }

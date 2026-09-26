@@ -6,6 +6,9 @@
 #include <string>
 
 #include <QColor>
+#include <QScreen>
+#include <QVariantMap>
+#include <QWindow>
 
 #include "control/ToolEnums.h"
 #include "control/ToolHandler.h"
@@ -22,6 +25,7 @@
 #include "shell/Thumbnails.h"
 
 #include "CanvasMemory.h"
+#include "ScreenCalibration.h"
 
 namespace xqt {
 
@@ -459,6 +463,50 @@ bool SettingsModel::set(const QString& key, const QVariant& value) {
     Q_EMIT changed();
     Q_EMIT app.settingsChanged();
     return true;
+}
+
+namespace {
+ScreenCalibration::Display displayOf(QWindow* window) {
+    return window ? ScreenCalibration::displayOf(window->screen(), window->devicePixelRatio())
+                  : ScreenCalibration::Display{};
+}
+}  // namespace
+
+QVariantMap SettingsModel::screenCalibration(QWindow* window) const {
+    const auto d = displayOf(window);
+    const auto stored = ScreenCalibration::storedPpi(settings, d.key);
+    const double ppi = ScreenCalibration::ppi(settings, d);
+    return {{"key", d.key},
+            {"name", d.name},
+            {"dpr", d.dpr},
+            {"reportedDpi", d.reportedDpi},
+            {"reportedPlausible", ScreenCalibration::plausible(d.reportedDpi)},
+            {"defaultDpi", ScreenCalibration::logicalDpi(ScreenCalibration::defaultPpi(d), d.dpr)},
+            {"dpi", ScreenCalibration::logicalDpi(ppi, d.dpr)},
+            {"ppi", ppi},
+            {"calibrated", stored.has_value()}};
+}
+
+void SettingsModel::calibrateScreen(QWindow* window, double logicalDpi) {
+    const auto d = displayOf(window);
+    if (d.key.isEmpty() || !(logicalDpi > 0)) {
+        return;
+    }
+    ScreenCalibration::store(settings, d.key, logicalDpi * d.dpr);
+    ++rev;
+    Q_EMIT changed();
+    Q_EMIT app.settingsChanged();  // (the views take the new 100 %)
+}
+
+void SettingsModel::resetScreenCalibration(QWindow* window) {
+    const auto d = displayOf(window);
+    if (!ScreenCalibration::storedPpi(settings, d.key)) {
+        return;
+    }
+    ScreenCalibration::forget(settings, d.key);
+    ++rev;
+    Q_EMIT changed();
+    Q_EMIT app.settingsChanged();
 }
 
 void SettingsModel::begin() {

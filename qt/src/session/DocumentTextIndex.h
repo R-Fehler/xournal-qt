@@ -69,6 +69,9 @@ public:
     PdfLayoutReader& operator=(const PdfLayoutReader&) = delete;
     /// Of a page (0-based); empty if it cannot be read.
     PdfPageLayout layout(int pdfPage);
+    /// Its poppler document (opened when first asked for; nullptr if it cannot be read), e.g. for the annotations of
+    /// its pages (shell/Annotations.h). The same thread as layout().
+    ::_PopplerDocument* document();
 
 private:
     fs::path file;

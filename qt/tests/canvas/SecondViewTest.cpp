@@ -32,6 +32,8 @@
 #include "CanvasInput.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "ScreenCalibration.h"
+#include "StickyNotes.h"
 
 using namespace xqt;
 
@@ -262,4 +264,27 @@ TEST_F(SecondView, thePrimaryViewGoesFirst) {
     second->jumpToPage(2);
     processEvents();
     EXPECT_EQ(session->getCurrentPageNo(), 2u) << "it is the session's view now";
+}
+
+// Merged with qt/calibration and qt/sticky-notes: the second view has its own screen (100 % follows its
+// calibration), and a sticky note placed from it lands on its page.
+TEST_F(SecondView, itHasItsOwnScreenAndPlacesNotesOnItsPage) {
+    ScreenCalibration::Display a;
+    a.key = "test-a";
+    a.reportedDpi = 144;
+    ScreenCalibration::Display b;
+    b.key = "test-b";
+    b.reportedDpi = 96;
+    primary->setDisplay(a);
+    second->setDisplay(b);
+    EXPECT_DOUBLE_EQ(primary->getViewController().zoom100(), 144.0 / 72.0);
+    EXPECT_DOUBLE_EQ(second->getViewController().zoom100(), 96.0 / 72.0) << "each view the screen it is shown on";
+
+    second->jumpToPage(4);
+    processEvents();
+    ASSERT_TRUE(second->notes().insert());
+    EXPECT_TRUE(second->notes().pageHasNotes(4)) << "on the second view's page";
+    EXPECT_FALSE(primary->notes().pageHasNotes(0));
+    EXPECT_TRUE(primary->notes().pageHasNotes(4)) << "the same document: the tab's view has it too";
+    EXPECT_EQ(session->getCurrentPageNo(), 0u);
 }

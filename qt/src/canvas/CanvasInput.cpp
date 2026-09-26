@@ -29,6 +29,7 @@
 
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "StickyNotes.h"
 #include "MarkdownEditor.h"
 #include "session/DocumentSession.h"
 
@@ -570,6 +571,17 @@ bool CanvasInput::actionMotion(const Event& event) {
         return true;
     }
 
+    // A sticky note being moved or resized (on its page, wherever the pointer is)
+    if (view.notes().dragging()) {
+        if (CanvasPage* notePage = view.notes().selectedPage()) {
+            const PositionInputData pos = this->getInputDataRelativeToCurrentPage(notePage, event);
+            const double zoom = view.getViewController().zoom();
+            view.notes().dragTo(pos.x / zoom, pos.y / zoom);
+        }
+        this->updateLastEvent(event);
+        return true;
+    }
+
     // Port of PenInputHandler::actionMotion (selection part)
     if (EditSelection* selection = view.getSelection()) {
         const bool isShiftDown = event.state & GDK_SHIFT_MASK;
@@ -662,8 +674,16 @@ bool CanvasInput::actionEnd(const Event& event) {
     if (EditSelection* selection = view.getSelection(); selection && (!view.isReadingOnly() || selection->isMoving())) {
         selection->mouseUp();
     }
+    // A sticky note moved or resized: one undo step; the release goes to its page (where the press was)
+    CanvasPage* notePage = view.notes().dragging() ? view.notes().selectedPage() : nullptr;
+    if (notePage) {
+        view.notes().endDrag();
+    }
 
-    if (this->sequenceStartPage && toolHandler->isSinglePageTool()) {
+    if (notePage) {
+        PositionInputData pos = getInputDataRelativeToCurrentPage(notePage, event);
+        notePage->onButtonReleaseEvent(pos);
+    } else if (this->sequenceStartPage && toolHandler->isSinglePageTool()) {
         PositionInputData pos = getInputDataRelativeToCurrentPage(this->sequenceStartPage, event);
         pos.pressure = this->filterPressure(pos, this->sequenceStartPage);
         this->sequenceStartPage->onButtonReleaseEvent(pos);
@@ -685,7 +705,8 @@ bool CanvasInput::actionEnd(const Event& event) {
     const bool tapTool = tt == TOOL_HAND || tt == TOOL_SELECT_RECT || tt == TOOL_SELECT_REGION ||
                          tt == TOOL_SELECT_OBJECT || tt == TOOL_SELECT_PDF_TEXT_LINEAR ||
                          tt == TOOL_SELECT_PDF_TEXT_RECT;
-    if (tapTool && !view.getSelection() && monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
+    if (tapTool && !view.getSelection() && !view.notes().hasSelection() &&
+        monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
         std::hypot(event.viewPos.x() - pressViewPos.x(), event.viewPos.y() - pressViewPos.y()) <= TAP_SLOP_PX / 2) {
         view.tapAt(event.viewPos);
     }
@@ -709,6 +730,16 @@ bool CanvasInput::actionEnd(const Event& event) {
 
 bool CanvasInput::startTouchSelection(QPointF viewPos) {
     EditSelection* selection = view.getSelection();
+    if (!selection && !view.isReadingOnly() && view.notes().hasSelection()) {
+        // The selected sticky note: a finger on it moves it, on its handle resizes it
+        CanvasPage* page = view.notes().selectedPage();
+        Event ev;
+        ev.viewPos = viewPos;
+        ev.pressure = Point::NO_PRESSURE;
+        const PositionInputData pos = getInputDataRelativeToCurrentPage(page, ev);
+        const double zoom = view.getViewController().zoom();
+        return view.notes().pressTouch(*page, pos.x / zoom, pos.y / zoom);
+    }
     if (!selection || view.isReadingOnly()) {
         return false;  // (for reading only: a finger scrolls over a selection too, it never moves it)
     }
@@ -729,6 +760,16 @@ bool CanvasInput::startTouchSelection(QPointF viewPos) {
 }
 
 void CanvasInput::moveTouchSelection(QPointF viewPos) {
+    if (view.notes().dragging()) {
+        CanvasPage* page = view.notes().selectedPage();
+        Event ev;
+        ev.viewPos = viewPos;
+        ev.pressure = Point::NO_PRESSURE;
+        const PositionInputData pos = getInputDataRelativeToCurrentPage(page, ev);
+        const double zoom = view.getViewController().zoom();
+        view.notes().dragTo(pos.x / zoom, pos.y / zoom);
+        return;
+    }
     EditSelection* selection = view.getSelection();
     if (!selection) {
         touchSelection = false;
@@ -746,6 +787,9 @@ void CanvasInput::moveTouchSelection(QPointF viewPos) {
 }
 
 void CanvasInput::endTouchSelection() {
+    if (view.notes().dragging()) {
+        view.notes().endDrag();
+    }
     if (EditSelection* selection = view.getSelection()) {
         selection->mouseUp();
     }

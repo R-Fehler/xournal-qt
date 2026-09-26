@@ -46,6 +46,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "CanvasInput.h"
@@ -53,6 +54,7 @@
 #include "CanvasView.h"
 #include "GeometryToolPicture.h"
 #include "PenHover.h"
+#include "StickyNotes.h"
 #include "../SearchHits.h"
 #include "config-test.h"
 #include "TextEditor.h"
@@ -2220,4 +2222,292 @@ TEST_F(CanvasReplayTest, withFingerDrawingOneFingerDrawsAndTwoFingersScroll) {
     input->proximityEvent(false);
     processEvents();
     EXPECT_EQ(elementCount(0), 0u) << "palm rejection";
+}
+
+// --- sticky notes (qt/docs/sticky-notes.md) -------------------------------------------------------------------------
+
+namespace {
+/// Dark pixels of the page on the screen (its buffer and what is drawn over it) in this part (page coordinates)
+int darkPixels(CanvasPage& page, const QRectF& area) {
+    const auto info = page.bufferInfo();
+    const double s = info.zoom * info.dpiScale;
+    const QImage tile = page.composeTile(QRect(static_cast<int>(area.x() * s), static_cast<int>(area.y() * s),
+                                               static_cast<int>(area.width() * s), static_cast<int>(area.height() * s)));
+    int dark = 0;
+    for (int y = 0; y < tile.height(); ++y) {
+        for (int x = 0; x < tile.width(); ++x) {
+            dark += qGray(tile.pixel(x, y)) < 128;
+        }
+    }
+    return dark;
+}
+
+/// The note layers of a page, bottom first
+std::vector<Layer*> notesOf(DocumentSession& session, size_t page) {
+    std::vector<Layer*> notes;
+    for (Layer* l: session.getDocument()->getPage(page)->getLayers()) {
+        if (sticky::isNote(*l)) {
+            notes.push_back(l);
+        }
+    }
+    return notes;
+}
+}  // namespace
+
+TEST_F(CanvasReplayTest, thePenWritesOnAStickyNoteAndTheInkStaysOnIt) {
+    ASSERT_TRUE(view->notes().insert());
+    ASSERT_TRUE(view->notes().hasSelection()) << "a new note is selected, to be moved or resized right away";
+    auto notes = notesOf(*session, 0);
+    ASSERT_EQ(notes.size(), 1u);
+    Layer* note = notes.front();
+    const auto look = sticky::lookOf(*note);
+    ASSERT_TRUE(look);
+    EXPECT_FALSE(look->cover);
+    EXPECT_EQ(look->color, sticky::presetColors().front());
+    view->clearSelection();
+    processEvents();
+    const auto pageOwn = [&] {
+        return static_cast<size_t>(session->getDocument()->getPage(0)->getSelectedLayerId());
+    };
+    EXPECT_NE(pageOwn(), sticky::layerIdOf(*session->getDocument()->getPage(0), note))
+            << "the page's own layer stays the selected one";
+
+    // A stroke that starts on the note goes onto it, also where it runs beyond its edge (clipped when drawn)
+    const QPointF from(look->rect.x + 20, look->rect.y + 20);
+    const QPointF to(look->rect.x + look->rect.width + 60, look->rect.y + 40);
+    drawLine(0, from, to);
+    processEvents();
+    ASSERT_EQ(note->getElementsView().size(), 2u) << "the paper and the stroke";
+    EXPECT_EQ(note->getElementsView().back()->getType(), ELEMENT_STROKE);
+    EXPECT_EQ(elementCount(0), 2u) << "nothing on the page's own layer";
+    EXPECT_NE(pageOwn(), sticky::layerIdOf(*session->getDocument()->getPage(0), note))
+            << "after the stroke the page's own layer is selected again";
+    const double right = look->rect.x + look->rect.width;
+    EXPECT_GT(darkPixels(*view->getPage(0), QRectF(look->rect.x + 15, look->rect.y + 10, 40, 20)), 5)
+            << "the ink shows on the note";
+    EXPECT_EQ(darkPixels(*view->getPage(0), QRectF(right + 10, look->rect.y + 10, 40, 40)), 0)
+            << "and not beyond its edge (clipped)";
+
+    // A stroke that starts beside the note goes onto the page (below the note)
+    drawLine(0, QPointF(20, 20), QPointF(60, 60));
+    processEvents();
+    EXPECT_EQ(note->getElementsView().size(), 2u);
+    EXPECT_EQ(elementCount(0), 3u);
+
+    // The eraser on the note erases what is written on it, never the paper
+    app->getToolHandler()->selectTool(TOOL_ERASER);
+    app->getToolHandler()->setEraserType(ERASER_TYPE_DELETE_STROKE);
+    drawLine(0, from + QPointF(-5, 0), from + QPointF(30, 5));
+    processEvents();
+    EXPECT_EQ(note->getElementsView().size(), 1u) << "the stroke is erased";
+    EXPECT_TRUE(sticky::isNote(*note)) << "the paper stays";
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(note->getElementsView().size(), 2u);
+    app->getToolHandler()->selectTool(TOOL_PEN);
+
+    // The text tool writes on the note as well
+    app->getToolHandler()->selectTool(TOOL_TEXT);
+    const QPointF textAt = viewPos(0, QPointF(look->rect.x + 30, look->rect.y + 80));
+    tablet(QEvent::TabletPress, textAt, 0.5, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, textAt, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_NE(view->getTextEditor(), nullptr);
+    typeInto(*view->getTextEditor(), "Answer");
+    view->endTextEditing();
+    processEvents();
+    ASSERT_EQ(note->getElementsView().size(), 3u) << "the text is on the note";
+    EXPECT_EQ(note->getElementsView().back()->getType(), ELEMENT_TEXT);
+    app->getToolHandler()->selectTool(TOOL_PEN);
+
+    // Undo takes the ink back from the note
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(note->getElementsView().size(), 2u);
+}
+
+TEST_F(CanvasReplayTest, aStickyNoteMovesWithWhatIsWrittenOnItAndIsResizedByItsHandle) {
+    app->getSettings()->setSnapGrid(false);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    view->clearSelection();
+    drawLine(0, QPointF(look.rect.x + 20, look.rect.y + 20), QPointF(look.rect.x + 80, look.rect.y + 60));
+    processEvents();
+    ASSERT_EQ(note->getElementsView().size(), 2u);
+    const auto inkBox = [&] { return note->getElementsView().back()->getBoundingBox(); };
+    const auto ink = inkBox();
+
+    // The select tool takes the whole note: a drag moves it with its ink
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    const double zoom = view->getViewController().zoom();
+    const QPointF grab = viewPos(0, QPointF(look.rect.x + look.rect.width - 20, look.rect.y + look.rect.height - 30));
+    mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 10; ++i) {
+        mouse(QEvent::MouseMove, grab + QPointF(5 * i, 3 * i) * zoom, Qt::NoButton, Qt::LeftButton);
+    }
+    mouse(QEvent::MouseButtonRelease, grab + QPointF(50, 30) * zoom, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_TRUE(view->notes().hasSelection());
+    EXPECT_EQ(view->getSelection(), nullptr) << "no selection of elements: the note is selected whole";
+    auto moved = *sticky::lookOf(*note);
+    EXPECT_NEAR(moved.rect.x, look.rect.x + 50, 0.5);
+    EXPECT_NEAR(moved.rect.y, look.rect.y + 30, 0.5);
+    EXPECT_NEAR(moved.rect.width, look.rect.width, 1e-6);
+    EXPECT_NEAR(inkBox().x, ink.x + 50, 0.5) << "the ink goes along";
+    EXPECT_NEAR(inkBox().y, ink.y + 30, 0.5);
+    EXPECT_EQ(note->getElementsView().size(), 2u);
+
+    // The handle at the bottom right corner resizes it; the ink keeps its size and place (clipped, not scaled)
+    const QPointF handle = viewPos(0, QPointF(moved.rect.x + moved.rect.width, moved.rect.y + moved.rect.height));
+    mouse(QEvent::MouseButtonPress, handle, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 10; ++i) {
+        mouse(QEvent::MouseMove, handle + QPointF(-12 * i, -6 * i) * zoom, Qt::NoButton, Qt::LeftButton);
+    }
+    mouse(QEvent::MouseButtonRelease, handle + QPointF(-120, -60) * zoom, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    auto resized = *sticky::lookOf(*note);
+    EXPECT_NEAR(resized.rect.x, moved.rect.x, 1e-6) << "the top left stays";
+    EXPECT_NEAR(resized.rect.width, moved.rect.width - 120, 0.5);
+    EXPECT_NEAR(resized.rect.height, moved.rect.height - 60, 0.5);
+    EXPECT_NEAR(inkBox().x, ink.x + 50, 0.5) << "the ink stays where it is";
+    EXPECT_NEAR(inkBox().width, ink.width, 1e-6) << "and keeps its size";
+
+    // Never smaller than its minimum, never off its page
+    mouse(QEvent::MouseButtonPress, viewPos(0, QPointF(resized.rect.x + resized.rect.width,
+                                                       resized.rect.y + resized.rect.height)),
+          Qt::LeftButton, Qt::LeftButton);
+    mouse(QEvent::MouseMove, viewPos(0, QPointF(0, 0)), Qt::NoButton, Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, viewPos(0, QPointF(0, 0)), Qt::LeftButton, Qt::NoButton);
+    EXPECT_NEAR(sticky::lookOf(*note)->rect.width, sticky::MIN_SIDE, 1e-6);
+    session->getUndoRedoHandler()->undo();
+
+    // Undo: the size, then the place (with the ink); redo again
+    session->getUndoRedoHandler()->undo();
+    EXPECT_NEAR(sticky::lookOf(*note)->rect.width, moved.rect.width, 1e-6);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_NEAR(sticky::lookOf(*note)->rect.x, look.rect.x, 1e-6);
+    EXPECT_NEAR(inkBox().x, ink.x, 1e-6);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_NEAR(sticky::lookOf(*note)->rect.x, look.rect.x + 50, 0.5);
+    EXPECT_NEAR(inkBox().x, ink.x + 50, 0.5);
+
+    // Another color, as one step
+    view->notes().setColor(sticky::presetColors()[2]);
+    EXPECT_EQ(sticky::lookOf(*note)->color, sticky::presetColors()[2]);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(sticky::lookOf(*note)->color, sticky::presetColors()[0]);
+
+    // Choosing the pen ends the selection: the pen writes on the note
+    app->getToolHandler()->selectTool(TOOL_PEN);
+    app->getToolHandler()->fireToolChanged();
+    processEvents();
+    EXPECT_FALSE(view->notes().hasSelection());
+}
+
+TEST_F(CanvasReplayTest, aCoveringStickyNoteIsNotWrittenOnAndPeeksWhenTapped) {
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    // The answer, under the note
+    const QRectF answer(look.rect.x + 30, look.rect.y + look.rect.height - 40, 100, 20);
+    view->clearSelection();
+    session->getUndoRedoHandler()->undo();  // (the note away, to write under it)
+    drawLine(0, QPointF(answer.left(), answer.center().y()), QPointF(answer.right(), answer.center().y()));
+    ASSERT_TRUE(view->notes().insert());  // (at the same place again)
+    note = notesOf(*session, 0).front();
+    processEvents();
+    ASSERT_EQ(sticky::lookOf(*note)->rect.x, look.rect.x);
+    EXPECT_EQ(darkPixels(*view->getPage(0), answer), 0) << "the note hides the answer";
+    view->notes().setCover(true);
+    EXPECT_TRUE(sticky::lookOf(*note)->cover);
+    EXPECT_EQ(note->getName(), sticky::COVER_LAYER_NAME) << "saved as the layer's name";
+    view->clearSelection();
+    processEvents();
+
+    // The pen neither writes on it nor under it
+    const size_t before = elementCount(0);
+    drawLine(0, QPointF(look.rect.x + 20, look.rect.y + 20), QPointF(look.rect.x + 90, look.rect.y + 50));
+    processEvents();
+    EXPECT_EQ(elementCount(0), before) << "no stroke from a press on a covering note";
+
+    // A tap: it peeks (on the screen only); another tap: it covers again
+    const QPointF middle = viewPos(0, QPointF(look.rect.x + look.rect.width / 2, look.rect.y + look.rect.height / 2));
+    tablet(QEvent::TabletPress, middle, 0.3, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, middle, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_TRUE(sticky::isPeeking(note));
+    EXPECT_EQ(elementCount(0), before);
+    tablet(QEvent::TabletPress, middle, 0.3, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, middle, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_FALSE(sticky::isPeeking(note));
+
+    // The hand tool peeks as well (a tap)
+    app->getToolHandler()->selectTool(TOOL_HAND);
+    mouse(QEvent::MouseButtonPress, middle, Qt::LeftButton, Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, middle, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_TRUE(sticky::isPeeking(note));
+    mouse(QEvent::MouseButtonPress, middle, Qt::LeftButton, Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, middle, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_FALSE(sticky::isPeeking(note));
+    app->getToolHandler()->selectTool(TOOL_PEN);
+
+    // Peeking is drawn on the screen: the page shows what is under the note
+    EXPECT_EQ(darkPixels(*view->getPage(0), answer), 0) << "covered";
+    tablet(QEvent::TabletPress, middle, 0.3, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, middle, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_TRUE(sticky::isPeeking(note));
+    EXPECT_GT(darkPixels(*view->getPage(0), answer), 20) << "peeking: the answer shows through";
+
+    // Cover mode is undone and redone like any change of the note; undoing it ends the peeking look
+    session->getUndoRedoHandler()->undo();
+    EXPECT_FALSE(sticky::lookOf(*note)->cover);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_TRUE(sticky::lookOf(*note)->cover);
+
+    // Hidden: the notes of the page are not there to press on (and not drawn)
+    view->notes().setNotesHidden(0, true);
+    EXPECT_TRUE(view->notes().notesHidden(0));
+    EXPECT_FALSE(note->isVisible());
+    drawLine(0, QPointF(look.rect.x + 20, look.rect.y + 20), QPointF(look.rect.x + 90, look.rect.y + 50));
+    processEvents();
+    EXPECT_EQ(elementCount(0), before + 1) << "a hidden note does not stop the pen";
+    view->notes().setNotesHidden(0, false);
+    EXPECT_TRUE(note->isVisible());
+}
+
+TEST_F(CanvasReplayTest, aStickyNoteIsPlacedAndDeletedAsOneStepEach) {
+    ASSERT_TRUE(view->notes().insert());
+    ASSERT_EQ(notesOf(*session, 0).size(), 1u);
+    EXPECT_TRUE(view->notes().pageHasNotes(0));
+    view->deleteSelection();  // (Del with a note selected)
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u);
+    EXPECT_FALSE(view->notes().hasSelection());
+    session->getUndoRedoHandler()->undo();
+    ASSERT_EQ(notesOf(*session, 0).size(), 1u) << "the delete undone";
+    processEvents();
+    const auto page = session->getDocument()->getPage(0);
+    const auto layers = page->getLayersView();
+    EXPECT_FALSE(sticky::isNote(*layers[page->getSelectedLayerId() - 1])) << "the page's own layer is selected";
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u) << "the placing undone";
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(notesOf(*session, 0).size(), 1u);
+
+    // A tap with the select tool selects it
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    const auto look = *sticky::lookOf(*notesOf(*session, 0).front());
+    const QPointF middle = viewPos(0, QPointF(look.rect.x + look.rect.width / 2, look.rect.y + look.rect.height / 2));
+    mouse(QEvent::MouseButtonPress, middle, Qt::LeftButton, Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, middle, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_TRUE(view->notes().hasSelection());
+    EXPECT_TRUE(session->getUndoRedoHandler()->canRedo()) << "a tap is no undo step (that would end the redo)";
+    // A press beside it ends the selection
+    mouse(QEvent::MouseButtonPress, viewPos(0, QPointF(10, 10)), Qt::LeftButton, Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, viewPos(0, QPointF(10, 10)), Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_FALSE(view->notes().hasSelection());
 }

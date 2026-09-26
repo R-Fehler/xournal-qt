@@ -7,6 +7,7 @@
 #include "model/Layer.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 
 namespace xqt {
 
@@ -38,6 +39,9 @@ void LayersModel::rebuild() {
             // Top first, like Xournal++ shows them; the background is the last row.
             for (size_t i = layers.size(); i > 0; --i) {
                 const Layer* layer = layers[i - 1];
+                if (sticky::isNote(*layer)) {
+                    continue;  // (a sticky note is not a layer to draw on: it is placed, moved and hidden on the page)
+                }
                 Entry e;
                 e.id = i;  // upstream: 1 is the first layer above the background
                 e.name = layer->hasName() ? QString::fromStdString(layer->getName())

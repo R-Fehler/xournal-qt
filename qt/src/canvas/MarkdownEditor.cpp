@@ -28,6 +28,7 @@
 #include "CanvasView.h"
 #include "MdBox.h"
 #include "MdDocument.h"
+#include "MdTexDelimiters.h"
 #include "MdText.h"
 #include "TextEditor.h"
 
@@ -707,7 +708,23 @@ void MarkdownEditor::newLine(bool soft) {
     for (size_t i = t.find("$$", para); i != std::string::npos && i + 2 <= from; i = t.find("$$", i + 2)) {
         marks += i == 0 || t[i - 1] != '\\';
     }
-    if (marks % 2 == 1) {
+    // (the same for a "\[" block, as chat apps write them: its last "\[" or "\]" before the cursor is a "\[")
+    const auto lastMark = [&](const char* mark) {
+        size_t last = std::string::npos;
+        for (size_t i = t.find(mark, para); i != std::string::npos && i + 2 <= from; i = t.find(mark, i + 2)) {
+            size_t backslashes = 0;
+            while (i > backslashes && t[i - 1 - backslashes] == '\\') {
+                ++backslashes;
+            }
+            if (backslashes % 2 == 0) {
+                last = i;
+            }
+        }
+        return last;
+    };
+    const size_t display = lastMark("\\[");
+    const size_t displayEnd = lastMark("\\]");
+    if (marks % 2 == 1 || (display != std::string::npos && (displayEnd == std::string::npos || displayEnd < display))) {
         insert("\n", EditKind::Other);
         return;
     }
@@ -948,6 +965,10 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                 }
                 std::string pasted = QGuiApplication::clipboard()->text().toStdString();
                 pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());  // (the text's lines end in "\n")
+                if (!plain) {
+                    // Formulas as chat apps write them, \( \) and \[ \]: as $ $ and $$ $$ where they are formulas here
+                    pasted = md::tex::convertPasted(t, std::min(caret, anchor), std::max(caret, anchor), pasted);
+                }
                 insert(pasted, EditKind::Other);
                 return true;
             }
