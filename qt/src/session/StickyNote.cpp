@@ -220,6 +220,28 @@ bool hasNotes(const XojPage& page, bool visibleOnly) {
     return false;
 }
 
+namespace {
+thread_local std::optional<Rectangle<double>> changingNote;
+
+/// The clipboard's note: its layer's name, then each element in a stream of its own. Upstream's ObjectInputStream
+/// copies its whole buffer for each stroke it reads (ObjectInputStream::readData), so one stream for a note with
+/// hundreds of strokes took quadratic time (15 ms to read a note with 300 strokes, now 1-3 ms). The name changed
+/// with the format: a note copied by an older version is not pasted (not misread).
+constexpr const char* CLIPBOARD_OBJECT = "StickyNote2";
+}  // namespace
+
+NoteLayerChange::NoteLayerChange(const Layer& layer): before(changingNote) {
+    if (const auto look = lookOf(layer)) {
+        changingNote = drawnRect(look->rect);
+    } else {
+        changingNote.reset();
+    }
+}
+
+NoteLayerChange::~NoteLayerChange() { changingNote = before; }
+
+std::optional<Rectangle<double>> changingNoteArea() { return changingNote; }
+
 Layer::Index layerIdOf(const XojPage& page, const Layer* layer) {
     const auto layers = page.getLayersView();
     for (size_t i = 0; i < layers.size(); ++i) {
@@ -399,12 +421,18 @@ NotePageUndoAction::NotePageUndoAction(LayerController* layers, Layer* layer, Pl
 
 void NotePageUndoAction::move(LayerController* layers, Document& doc, Layer* layer, const Place& from,
                               const Place& to) {
-    layers->removeLayer(from.page, layer);  // (locks the document; the page is drawn again)
+    {
+        NoteLayerChange change(*layer);  // (only the note's part of the page is drawn again)
+        layers->removeLayer(from.page, layer);  // (locks the document)
+    }
     {
         std::unique_lock lock(doc);
         applyLook(*layer, from.look, to.look);
     }
-    layers->insertLayer(to.page, layer, to.position);
+    {
+        NoteLayerChange change(*layer);
+        layers->insertLayer(to.page, layer, to.position);
+    }
     leaveNoteLayer(doc, from.page);
     leaveNoteLayer(doc, to.page);
 }
@@ -429,12 +457,17 @@ std::string serialize(const Layer& layer) {
     }
     ObjectOutputStream out(new BinObjectEncoding());
     out.writeString(PROJECT_STRING);
-    out.writeObject("StickyNote");
+    out.writeObject(CLIPBOARD_OBJECT);
     out.writeString(layer.getName());
     const auto elements = layer.getElementsView();
     out.writeSizeT(elements.size());
     for (const Element* e: elements) {
-        e->serialize(out);
+        // Each element in a stream of its own (see CLIPBOARD_OBJECT)
+        ObjectOutputStream one(new BinObjectEncoding());
+        e->serialize(one);
+        GString* bytes = one.stealData();
+        out.writeImage(std::string_view(bytes->str, bytes->len));
+        g_string_free(bytes, TRUE);
     }
     out.endObject();
     GString* data = out.stealData();
@@ -450,7 +483,7 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
             return nullptr;
         }
         in.readString();  // (the version that wrote it: elements are read the same way since upstream 1.0)
-        in.readObject("StickyNote");
+        in.readObject(CLIPBOARD_OBJECT);
         auto layer = std::make_unique<Layer>();
         const std::string name = in.readString();
         if (!isNoteName(name)) {
@@ -459,7 +492,12 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
         layer->setName(name);
         const size_t count = in.readSizeT();
         for (size_t i = 0; i < count; ++i) {
-            const std::string type = in.getNextObjectName();
+            const std::string bytes = in.readImage();
+            ObjectInputStream one;
+            if (!one.read(bytes.data(), bytes.size())) {
+                return nullptr;
+            }
+            const std::string type = one.getNextObjectName();
             ElementPtr element;
             if (type == "Stroke") {
                 element = std::make_unique<Stroke>();
@@ -474,7 +512,7 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
             } else {
                 return nullptr;
             }
-            element->readSerialized(in);
+            element->readSerialized(one);
             layer->addElement(std::move(element));
         }
         in.endObject();

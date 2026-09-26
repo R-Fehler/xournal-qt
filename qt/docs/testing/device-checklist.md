@@ -1689,6 +1689,10 @@ Update the table in the user doc with the results.
       the point where it was held under the pointer; one Ctrl+Z puts it back where the drag started. While dragging it
       stays at its page's edge (it only jumps on release).
 - [ ] Save, open in upstream Xournal++: the pasted and moved notes are there as any other note.
+- [ ] (qt/sticky-look) A note with a lot of ink (a page of handwriting on a large note): Ctrl+C, Ctrl+X and Ctrl+V
+      are instant; after a paste or a cut only the note's place is drawn again (the rest of the page, a PDF under it,
+      does not flicker or blur). Paste into another app (a chat, an image editor) still gives its picture; with a
+      clipboard manager (Klipper) running, copying causes no noticeable pause either.
 
 ## Kinds of PDFs in the library (qt/library-kinds)
 - [ ] A library with a plain PDF, a PDF with notes (a PDF annotated and saved in PDF files mode) and a PDF text

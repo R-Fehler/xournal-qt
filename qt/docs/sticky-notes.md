@@ -56,11 +56,23 @@ and move notes to other pages.
   there pastes a copied note onto the current page when the note was copied after the last page copy (or a note is
   selected, or no pages are copied); else the pages, as before (`AppController::pastesNoteBeforePages`).
 - **The clipboard format** is the app's own, `application/x-xournal-qt-sticky-note`: the layer's name (cover or
-  not) and every element of the layer, the paper first, in upstream's element serialization (the one of its
-  `application/xournal` clipboard: strokes with their pressure, texts, images). A picture of the note (PNG, twice
-  the page resolution, drawn as in an export: no folded corner) goes along, so pasting into another app gives a
-  picture. Xournal++ itself does not read the note's format; the note is not also put there as upstream's
-  elements, since pasting those here would give loose elements instead of a note.
+  not) and every element of the layer, the paper first, each in upstream's element serialization (the one of its
+  `application/xournal` clipboard: strokes with their pressure, texts, images) in a stream of its own. Why each on
+  its own: upstream's `ObjectInputStream::readData` copies the stream's whole buffer for every stroke it reads, so
+  one stream for a note with 300 strokes took 15 ms to read (quadratic); now 1–3 ms. (Upstream's own paste of a
+  large selection has the same cost; not changed here.) The object is named `StickyNote2`: a note copied by an older
+  version is not pasted. A picture of the note (PNG, twice the page resolution, drawn as in an export: no folded
+  corner, no shade) is offered too, so pasting into another app gives a picture; it is drawn only when an app asks
+  for it (`NoteMimeData`), not at every copy. Xournal++ itself does not read the note's format; the note is not
+  also put there as upstream's elements, since pasting those here would give loose elements instead of a note.
+- **Cost** (`CanvasReplayTest.benchmarkStickyNoteClipboard`, `XQT_BENCH_STICKY=1`, a note with 300 strokes; before →
+  now, ms, the ranges from runs with more or less load from other builds): copy 25–35 → 0.2–0.7 (the picture is no
+  longer drawn at every copy); cut the same; paste 11–15 → 1–2; the redraw after a paste or a cut: the whole page
+  (52–105 on a page with 600 strokes of its own) → only the note's area (26–54 after a paste: the note's own
+  strokes; 6–12 after a cut). Another app asking for the picture: 25–55 to draw it and 19–40 for Qt to make the PNG
+  (at the page's resolution instead of twice it, about half). A note coming onto a page or leaving it (place,
+  paste, cut, delete, the drop on another page, and their undo) draws only its part of the page again
+  (`sticky::NoteLayerChange`, read by `CanvasView::layerChanged`).
 - **Moving to another page:** cut, go to the page, paste. Also: drag the selected note past its page's edge and let
   go over another page: it goes there, the point it was held by under the pointer (inside that page), on top, still
   selected. While dragged it stays at the edge of its page (a page's picture cannot show it beyond the page); it

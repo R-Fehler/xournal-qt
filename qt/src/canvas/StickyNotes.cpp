@@ -39,28 +39,49 @@ bool inside(const Rectangle<double>& r, double x, double y) {
 }
 
 /// Upstream's layer undo actions under the note's own name in the undo list
+/// Upstream's undo of a placed or deleted layer, named after what was done, drawing only the note's part of the page
+/// again (sticky::NoteLayerChange)
 class InsertNoteUndoAction final: public InsertLayerUndoAction {
 public:
     InsertNoteUndoAction(LayerController* layers, const PageRef& page, Layer* layer, Layer::Index position,
                          std::string text):
-            InsertLayerUndoAction(layers, page, layer, position), text(std::move(text)) {}
+            InsertLayerUndoAction(layers, page, layer, position), note(layer), text(std::move(text)) {}
     std::string getText() override { return text; }
+    bool undo(Control* control) override {
+        sticky::NoteLayerChange change(*note);
+        return InsertLayerUndoAction::undo(control);
+    }
+    bool redo(Control* control) override {
+        sticky::NoteLayerChange change(*note);
+        return InsertLayerUndoAction::redo(control);
+    }
 
 private:
+    Layer* note;
     std::string text;
 };
 class RemoveNoteUndoAction final: public RemoveLayerUndoAction {
 public:
     RemoveNoteUndoAction(LayerController* layers, const PageRef& page, Layer* layer, Layer::Index position,
                          std::string text):
-            RemoveLayerUndoAction(layers, page, layer, position), text(std::move(text)) {}
-    std::string getText() override { return text; }
+            RemoveLayerUndoAction(layers, page, layer, position), note(layer), text(std::move(text)) {}
+    std::string getText() override { return text.empty() ? RemoveLayerUndoAction::getText() : text; }
+    bool undo(Control* control) override {
+        sticky::NoteLayerChange change(*note);
+        return RemoveLayerUndoAction::undo(control);
+    }
+    bool redo(Control* control) override {
+        sticky::NoteLayerChange change(*note);
+        return RemoveLayerUndoAction::redo(control);
+    }
 
 private:
+    Layer* note;
     std::string text;
 };
 
-/// A picture of a note for other apps (twice the page's resolution; the caller holds the document's lock)
+/// A picture of a note for other apps (twice the page's resolution; the caller holds the document's lock if the note
+/// is on a page)
 QImage pictureOf(const Layer& layer) {
     const auto look = sticky::lookOf(layer);
     constexpr double SCALE = 2;
@@ -85,6 +106,37 @@ QImage pictureOf(const Layer& layer) {
     cairo_surface_destroy(surface);
     return image;
 }
+
+/// A copied note on the clipboard: the note (sticky::CLIPBOARD_MIME), and a picture of it for other apps that is drawn
+/// only when one asks for it (drawing it at every copy took most of a copy's time: 35 ms for a note with 300 strokes)
+class NoteMimeData final: public QMimeData {
+public:
+    explicit NoteMimeData(const std::string& note) {
+        setData(sticky::CLIPBOARD_MIME, QByteArray(note.data(), static_cast<qsizetype>(note.size())));
+    }
+    QStringList formats() const override { return QMimeData::formats() << IMAGE; }
+    bool hasFormat(const QString& mime) const override { return mime == IMAGE || QMimeData::hasFormat(mime); }
+
+protected:
+    QVariant retrieveData(const QString& mime, QMetaType type) const override {
+        if (mime != IMAGE) {
+            return QMimeData::retrieveData(mime, type);
+        }
+        if (!drawn) {
+            drawn = true;
+            const QByteArray bytes = data(sticky::CLIPBOARD_MIME);
+            if (auto note = sticky::deserialize(bytes.constData(), static_cast<size_t>(bytes.size()))) {
+                picture = pictureOf(*note);  // (a copy of the note, on no page: no lock)
+            }
+        }
+        return picture.isNull() ? QVariant() : QVariant(picture);
+    }
+
+private:
+    inline static const QString IMAGE = QStringLiteral("application/x-qt-image");  // (QMimeData::imageData's)
+    mutable bool drawn = false;
+    mutable QImage picture;
+};
 
 /// The outline of the selected note and its handle (bottom right), over its page
 class NoteSelectionView final: public xoj::view::OverlayView {
@@ -191,7 +243,10 @@ void StickyNotes::place(CanvasPage& page, Layer* layer, const char* what) {
         std::shared_lock lock(*session.getDocument());
         position = ref->getLayerCount();  // (on top of the page's layers)
     }
-    layers->insertLayer(ref, layer, position);  // (locks the document; the view keeps the page's own layer selected)
+    {
+        sticky::NoteLayerChange change(*layer);  // (only the note's part of the page is drawn again)
+        layers->insertLayer(ref, layer, position);  // (locks the document; the view keeps the page's own layer selected)
+    }
     session.getUndoRedoHandler()->addUndoAction(
             std::make_unique<InsertNoteUndoAction>(layers, ref, layer, position, tr(what)));
     sticky::leaveNoteLayer(*session.getDocument(), ref);
@@ -206,23 +261,15 @@ bool StickyNotes::copySelected() {
         return false;
     }
     std::string bytes;
-    QImage picture;
     {
         std::shared_lock lock(*view.getSession().getDocument());
         bytes = sticky::serialize(*selected);
-        if (!bytes.empty()) {
-            picture = pictureOf(*selected);
-        }
     }
     if (bytes.empty()) {
         return false;
     }
-    auto* mime = new QMimeData;
-    mime->setData(sticky::CLIPBOARD_MIME, QByteArray(bytes.data(), static_cast<qsizetype>(bytes.size())));
-    if (!picture.isNull()) {
-        mime->setImageData(picture);  // (pasted into another app: a picture of the note)
-    }
-    QGuiApplication::clipboard()->setMimeData(mime);
+    // (pasted into another app: a picture of the note, drawn when that app asks for it)
+    QGuiApplication::clipboard()->setMimeData(new NoteMimeData(bytes));
     return true;
 }
 
@@ -373,14 +420,12 @@ void StickyNotes::deleteSelected(const char* what) {
         sticky::setPeeking(layer, false);
     }
     LayerController* layers = session.getLayerController();
-    layers->removeLayer(ref, layer);  // (locks the document)
-    if (what) {
-        session.getUndoRedoHandler()->addUndoAction(
-                std::make_unique<RemoveNoteUndoAction>(layers, ref, layer, id - 1, tr(what)));
-    } else {
-        session.getUndoRedoHandler()->addUndoAction(
-                std::make_unique<RemoveLayerUndoAction>(layers, ref, layer, id - 1));
+    {
+        sticky::NoteLayerChange change(*layer);  // (only the note's part of the page is drawn again)
+        layers->removeLayer(ref, layer);  // (locks the document)
     }
+    session.getUndoRedoHandler()->addUndoAction(
+            std::make_unique<RemoveNoteUndoAction>(layers, ref, layer, id - 1, what ? tr(what) : std::string()));
     sticky::leaveNoteLayer(*session.getDocument(), ref);
     Q_EMIT view.notesChanged();
 }

@@ -88,6 +88,22 @@ void applyLook(Layer& layer, const Look& from, const Look& to);
 Layer* noteAt(const XojPage& page, double x, double y);
 /// Whether a page has notes (`visibleOnly`: shown ones)
 bool hasNotes(const XojPage& page, bool visibleOnly = false);
+/// While a note's layer comes onto a page or leaves it (on this thread): only where the note is drawn changes, so a
+/// view draws that part of the page again, not the whole page (CanvasView::layerChanged). Set around the layer
+/// controller's insertLayer / removeLayer (and the undo of them); nothing if the layer is no note.
+class NoteLayerChange {
+public:
+    explicit NoteLayerChange(const Layer& layer);
+    ~NoteLayerChange();
+    NoteLayerChange(const NoteLayerChange&) = delete;
+    NoteLayerChange& operator=(const NoteLayerChange&) = delete;
+
+private:
+    std::optional<xoj::util::Rectangle<double>> before;
+};
+/// Where the note changing now (NoteLayerChange) is drawn; nothing if no note layer is changing on this thread
+std::optional<xoj::util::Rectangle<double>> changingNoteArea();
+
 /// The layer id (1-based, as upstream counts) of a note layer, 0 if it is not on the page
 Layer::Index layerIdOf(const XojPage& page, const Layer* layer);
 
@@ -157,8 +173,9 @@ private:
 };
 
 // --- the clipboard -------------------------------------------------------------------------------------------------
-/// The clipboard's format of a whole note (the app's own: its layer's name and every element, the paper first, in
-/// upstream's element serialization). Upstream Xournal++ does not know it; the note is saved like any other.
+/// The clipboard's format of a whole note (the app's own: its layer's name and every element, the paper first, each
+/// in upstream's element serialization, in a stream of its own). Upstream Xournal++ does not know it; the note is
+/// saved like any other.
 inline constexpr const char* CLIPBOARD_MIME = "application/x-xournal-qt-sticky-note";
 /// A note for the clipboard (the caller holds the document's lock); empty if the layer is no note
 std::string serialize(const Layer& layer);
