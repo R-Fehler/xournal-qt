@@ -491,6 +491,14 @@
   PDF pages), in % or cm, presets, preview, or a blank page after each. 300 pages in ~5 ms, one undo step.
   Upstream shows the larger page with the PDF at the top left (right/bottom space looks the same).
 
+- **Text documents as PDF, `qt/md-pdf` (2026-09-26).** A text document is a notes document whose page 1 starts the
+  page's Markdown text; saved as a PDF with notes it also carries a plain `name.md` (every full and incremental
+  save; `/AFRelationship /Alternative` in archive PDFs). "New text documents: PDF document / Markdown file"
+  (Settings → Documents, following DocumentMode until set); the library's "New text document…". Typing goes into the
+  text (at the end of what the page in view holds) while the pen keeps drawing ink; the formatting bar is there.
+  "Export as Markdown" and "Open as PDF document" (the `.md` stays as it is). Existing `.md` files are never
+  converted. User guide: `qt/docs/user/markdown-from-pdf.md`. Left: images (`qt/md-images`), a "text" badge.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

@@ -337,7 +337,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   `qt/self-reference` (the same document in the reference view, page subsets) · `qt/calibration` (1 cm on screen
   = 1 cm, per screen) · `qt/sticky-notes` (opaque, resizable, ink and text attached, cover mode for self-testing) ·
   `qt/annotations-md` (stage 1: live Annotations panel + "Export as Markdown"; stage 2 "keep updated" later).
-- [ ] **Markdown inside the PDF with notes** (the "word-processor" mode): new text documents follow the first-start
+- [x] **Markdown inside the PDF with notes** (the "word-processor" mode; `qt/md-pdf` merged 2026-09-26; images next: `qt/md-images`): new text documents follow the first-start
   choice (PDF files → a PDF with the `.md` and its images inside; Xournal++ files → `name.md` + `name.assets/`),
   changeable in Settings, and a mix must work: existing `.md` files are never converted unasked. Split into
   `qt/md-images` (images in Markdown + the `.md`/`.assets` pair as one document), `qt/md-pdf` (the container,
