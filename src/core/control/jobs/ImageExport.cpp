@@ -177,10 +177,19 @@ void ImageExport::exportImagePage(size_t pageId, size_t id, double zoomRatio, Ex
         if (!popplerPage) {
             this->lastError = _("Error while exporting the pdf background: I cannot find the pdf page number ");
             this->lastError += std::to_string(pgNo);
-        } else if (format == EXPORT_GRAPHICS_PNG) {
-            popplerPage->render(cr);
         } else {
-            popplerPage->renderForPrinting(cr);
+            cairo_save(cr);  // xournal-qt: space for notes, the PDF at its offset (model/NoteSpace.h)
+            if (const NoteSpace& s = page->getNoteSpace(); !s.empty()) {
+                cairo_set_source_rgb(cr, 1., 1., 1.);  // (white paper around it, as the PDF's own page is)
+                cairo_paint(cr);
+                cairo_translate(cr, s.left, s.top);
+            }
+            if (format == EXPORT_GRAPHICS_PNG) {
+                popplerPage->render(cr);
+            } else {
+                popplerPage->renderForPrinting(cr);
+            }
+            cairo_restore(cr);
         }
     }
 

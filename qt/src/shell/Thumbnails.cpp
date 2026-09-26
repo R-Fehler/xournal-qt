@@ -24,6 +24,7 @@
 #include "PageSketches.h"
 #include "view/DocumentView.h"
 #include "view/background/BackgroundFlags.h"
+#include "PageNoteSpace.h"
 
 namespace xqt {
 
@@ -272,7 +273,7 @@ QImage ThumbnailProvider::renderPage(Document& doc, const PageRef& page, int wid
     xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
     if (page->getBackgroundType().isPdfPage()) {
         if (pdfPage) {
-            pdfPage->render(cr);  // (the page keeps its PDF document)
+            notespace::renderPdf(cr, *page, *pdfPage);  // (the page keeps its PDF document; at its offset)
         }
         flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
     } else {

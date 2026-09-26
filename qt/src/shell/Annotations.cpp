@@ -209,8 +209,8 @@ bool linkOnly(const QString& text, QString& title, QString& target) {
 }
 
 /// The markup annotations of a PDF page (highlight, underline, squiggly, strike out) with the text under them.
-void pdfAnnotations(PopplerDocument* doc, int pdfPage, const std::function<const PdfPageLayout&()>& textLayout,
-                    size_t index, std::vector<Item>& out) {
+void pdfAnnotations(PopplerDocument* doc, int pdfPage, QPointF offset,
+                    const std::function<const PdfPageLayout&()>& textLayout, size_t index, std::vector<Item>& out) {
     if (!doc || pdfPage < 0 || pdfPage >= poppler_document_get_n_pages(doc)) {
         return;
     }
@@ -251,6 +251,9 @@ void pdfAnnotations(PopplerDocument* doc, int pdfPage, const std::function<const
         }
         if (areas.empty()) {
             areas.emplace_back(QPointF(m->area.x1, height - m->area.y2), QPointF(m->area.x2, height - m->area.y1));
+        }
+        for (QRectF& a: areas) {
+            a.translate(offset);  // (onto the page: the PDF is at its offset there)
         }
         Item item;
         item.kind = Kind::PdfHighlight;
@@ -319,6 +322,7 @@ PageContent read(const XojPage& page) {
     c.height = page.getHeight();
     if (page.getBackgroundType().isPdfPage()) {
         c.pdfPage = static_cast<int>(page.getPdfPageNr());
+        c.pdfOffset = QPointF(page.getNoteSpace().left, page.getNoteSpace().top);
     }
     for (const Layer* layer: page.getLayersView()) {
         if (!layer->isVisible() || sticky::isNote(*layer)) {
@@ -362,6 +366,13 @@ std::vector<Item> itemsOf(const PageContent& c, size_t index, PdfLayoutReader* p
     const std::function<const PdfPageLayout&()> textLayout = [&]() -> const PdfPageLayout& {
         if (!layoutRead && pdf && c.pdfPage >= 0) {
             pageLayout = pdf->layout(c.pdfPage);
+            if (!c.pdfOffset.isNull()) {  // (the PDF's boxes onto the page: space for notes)
+                for (QRectF& b: pageLayout.boxes) {
+                    if (!b.isNull()) {
+                        b.translate(c.pdfOffset);
+                    }
+                }
+            }
         }
         layoutRead = true;
         return pageLayout;
@@ -414,7 +425,7 @@ std::vector<Item> itemsOf(const PageContent& c, size_t index, PdfLayoutReader* p
 
     // The PDF's own highlights
     if (pdf && c.pdfPage >= 0) {
-        pdfAnnotations(pdf->document(), c.pdfPage, textLayout, index, items);
+        pdfAnnotations(pdf->document(), c.pdfPage, c.pdfOffset, textLayout, index, items);
     }
 
     // Text boxes, Markdown boxes, link markers

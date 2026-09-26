@@ -241,6 +241,17 @@ void XmlParser::parsePageTag(const XmlParserHelper::AttributeMap& attributeMap) 
     const auto height = XmlParserHelper::getAttribMandatory<double>(xoj::xml_attrs::HEIGHT_STR, attributeMap);
 
     this->builder.addPage(width, height);
+
+    // xournal-qt: space for notes, "left top right bottom" (model/NoteSpace.h)
+    if (const auto sv = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::NOTESPACE_STR, attributeMap)) {
+        auto it = sv->data();
+        auto end = sv->data() + sv->size();
+        double l = 0, t = 0, r = 0, b = 0;
+        if (parseDouble(it, end, l) && parseDouble(it, end, t) && parseDouble(it, end, r) && parseDouble(it, end, b) &&
+            l >= 0 && t >= 0 && r >= 0 && b >= 0 && l + r < width && t + b < height) {
+            this->builder.setPageNoteSpace(l, t, r, b);
+        }
+    }
 }
 
 void XmlParser::parseAudioTag(const XmlParserHelper::AttributeMap& attributeMap) {

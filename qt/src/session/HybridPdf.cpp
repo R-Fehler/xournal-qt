@@ -71,6 +71,8 @@ constexpr const char* CLEAN_NAME = "base.pdf";
 constexpr const char* CHECK_NAME = "changed.txt";
 constexpr const char* PAGES_NAME = "pages.txt";  ///< the file's page objects the clean copy's pages are
 constexpr double MARGIN = 2.0;  ///< around a layer's elements (pt)
+/// A base page with space for notes (qt/docs/note-space.md): its boxes as the PDF had them (/MediaBox, /CropBox)
+constexpr const char* BOXES = "/XournalQtBoxes";
 
 // --- small helpers ------------------------------------------------------------------------------------------------
 
@@ -289,6 +291,69 @@ void unflatten(QPDFObjectHandle page, std::set<std::string>& found) {
     }
 }
 
+// --- space for notes: larger boxes -----------------------------------------------------------------------------------
+
+/// A base page as the PDF has it: the boxes it had before we gave it space for notes. True if it had others.
+bool restoreBoxes(QPDFObjectHandle page) {
+    QPDFObjectHandle saved = page.isDictionary() ? page.getKey(BOXES) : QPDFObjectHandle::newNull();
+    if (!saved.isDictionary()) {
+        return false;
+    }
+    for (const char* key: {"/MediaBox", "/CropBox"}) {
+        QPDFObjectHandle box = saved.getKey(key);
+        if (box.isArray()) {
+            page.replaceKey(key, box.shallowCopy());
+        } else if (page.hasKey(key)) {
+            page.removeKey(key);
+        }
+    }
+    page.removeKey(BOXES);
+    return true;
+}
+
+/// Give a base page space for notes: its crop box grows by the amounts (as the page is shown, its /Rotate undone), its
+/// media box with it. The content stays as it is, so it lands at the offset, and its text, links and the annotations
+/// of other apps stay where they are on it. Starts from the page's own boxes (restoreBoxes).
+void setSpace(QPDFObjectHandle page, const NoteSpace& s) {
+    restoreBoxes(page);
+    if (s.empty()) {
+        return;
+    }
+    QPDFPageObjectHelper helper(page);
+    const QPDFObjectHandle media = helper.getMediaBox();
+    const bool hadCrop = page.hasKey("/CropBox");
+    QPDFObjectHandle::Rectangle crop = helper.getCropBox().getArrayAsRectangle();
+    QPDFObjectHandle saved = QPDFObjectHandle::newDictionary();
+    saved.replaceKey("/MediaBox", QPDFObjectHandle::newArray(media.getArrayAsRectangle()));
+    if (hadCrop) {
+        saved.replaceKey("/CropBox", QPDFObjectHandle::newArray(crop));
+    }
+    QPDFObjectHandle rot = page.getKey("/Rotate");
+    int rotate = rot.isInteger() ? static_cast<int>(rot.getIntValue() % 360) : 0;
+    rotate = (rotate + 360) % 360;
+    // Which side of the PDF's box each side of the shown page is (PDF space: y up)
+    double left = s.left, top = s.top, right = s.right, bottom = s.bottom;  // of the shown page
+    switch (rotate) {
+        case 90:  // shown top = the PDF's left, shown right = its top
+            crop = {crop.llx - top, crop.lly - left, crop.urx + bottom, crop.ury + right};
+            break;
+        case 180:
+            crop = {crop.llx - right, crop.lly - top, crop.urx + left, crop.ury + bottom};
+            break;
+        case 270:
+            crop = {crop.llx - bottom, crop.lly - right, crop.urx + top, crop.ury + left};
+            break;
+        default:
+            crop = {crop.llx - left, crop.lly - bottom, crop.urx + right, crop.ury + top};
+    }
+    const QPDFObjectHandle::Rectangle m = media.getArrayAsRectangle();
+    const QPDFObjectHandle::Rectangle grown(std::min(m.llx, crop.llx), std::min(m.lly, crop.lly),
+                                            std::max(m.urx, crop.urx), std::max(m.ury, crop.ury));
+    page.replaceKey("/MediaBox", QPDFObjectHandle::newArray(grown));
+    page.replaceKey("/CropBox", QPDFObjectHandle::newArray(crop));
+    page.replaceKey(BOXES, saved);
+}
+
 /// Remove our annotations from every page (except `keep`, which lose our mark), our marker and our embedded files.
 /// Returns the /NM of our annotations whose hash differs from the marker's, or that are missing.
 std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}) {
@@ -333,6 +398,7 @@ std::vector<std::string> strip(QPDF& pdf, const std::set<std::string>& keep = {}
     for (auto& page: QPDFPageDocumentHelper(pdf).getAllPages()) {
         QPDFObjectHandle p = page.getObjectHandle();
         unflatten(p, seen);
+        restoreBoxes(p);  // (space for notes: the clean copy has the page's own size)
         QPDFObjectHandle annots = p.getKey("/Annots");
         if (!annots.isArray()) {
             continue;
@@ -546,6 +612,7 @@ struct PageSpec {
     size_t drawnPage = npos;  ///< base page drawn by cairo (page of `drawn`; npos: the file has it, see Reuse)
     size_t annotsFrom = npos; ///< a drawn page: the annotations of other apps on this page of the background PDF
     std::string sig;          ///< a drawn page: what it shows (its background as saved, its size)
+    NoteSpace space;          ///< a page of the background PDF: its space for notes (qt/docs/note-space.md)
 };
 
 struct AnnotSpec {
@@ -671,6 +738,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
             spec.height = p->getHeight();
             if (!out.bg.empty() && p->getBackgroundType().isPdfPage() && p->getPdfPageNr() < bgPages) {
                 spec.pdfPage = p->getPdfPageNr();
+                spec.space = p->getNoteSpace();
             } else {
                 spec.sig = sigOf(h.backgroundHash(i), spec.width, spec.height);
                 if (!reuse || !reuse->backgrounds.count(spec.sig)) {
@@ -859,7 +927,9 @@ std::string drawnSigOf(QPDFObjectHandle page) {
 }
 
 /// The base pages in document order, in `out` (the background PDF, or an empty one).
-std::vector<QPDFObjectHandle> basePages(QPDF& out, QPDF& drawn, const Prepared& prep) {
+/// `withSpace`: the pages with space for notes get larger boxes (not the base pages exported for Xournal++, whose
+/// .xopp says where the PDF goes).
+std::vector<QPDFObjectHandle> basePages(QPDF& out, QPDF& drawn, const Prepared& prep, bool withSpace) {
     QPDFPageDocumentHelper helper(out);
     helper.pushInheritedAttributesToPage();
     const std::vector<QPDFPageObjectHelper> bgPages = helper.getAllPages();
@@ -892,6 +962,11 @@ std::vector<QPDFObjectHandle> basePages(QPDF& out, QPDF& drawn, const Prepared& 
                     }
                     h.replaceKey("/Annots", mine);
                 }
+            }
+            if (withSpace) {
+                setSpace(h, spec.space);
+            } else {
+                restoreBoxes(h);
             }
             order.push_back(h);
         } else {
@@ -1218,6 +1293,18 @@ enum class Mode {
     Archive,  ///< and our layers merged into the pages, links, data as the source, marker; PDF/A-3b
 };
 
+/// The pages (their places) whose boxes we made larger for space for notes (an incremental save reads only those
+/// again).
+QPDFObjectHandle spacesList(const Prepared& prep) {
+    QPDFObjectHandle list = QPDFObjectHandle::newArray();
+    for (size_t i = 0; i < prep.pages.size(); ++i) {
+        if (prep.pages[i].pdfPage != npos && !prep.pages[i].space.empty()) {
+            list.appendItem(QPDFObjectHandle::newInteger(static_cast<long long>(i)));
+        }
+    }
+    return list;
+}
+
 /// The PDF with the base pages (and, by `mode`, our drawing, data and marker), written to `target`.
 Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const std::string& xoppExport = {},
                 const std::string& title = {}) {
@@ -1247,7 +1334,7 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
         drawn.processMemoryFile("drawn by xournal-qt", prep.drawn.data(), prep.drawn.size());
         QPDFPageDocumentHelper(drawn).pushInheritedAttributesToPage();
     }
-    const std::vector<QPDFObjectHandle> order = basePages(out, drawn, prep);
+    const std::vector<QPDFObjectHandle> order = basePages(out, drawn, prep, hybrid);
     r.pages = order.size();
     step("base pages");
     if (hybrid) {
@@ -1291,6 +1378,7 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
             }
         }
         marker.replaceKey("/Drawn", drawnList);
+        marker.replaceKey("/Spaces", spacesList(prep));
         marker.replaceKey("/Layers", record);
         if (!xoppExport.empty()) {
             marker.replaceKey("/XoppExport", QPDFObjectHandle::newUnicodeString(xoppExport));
@@ -1759,6 +1847,9 @@ private:
             }
             fresh += oldTree.count(obj.getObjGen()) ? 0 : 1;
             claimed.insert(obj.getObjGen());
+            if (spec.pdfPage != npos) {
+                placeSpace(i, obj, spec.space);
+            }
             order.push_back(obj);
         }
         size_t removed = 0;
@@ -1783,6 +1874,41 @@ private:
             }
         }
         return true;
+    }
+
+    /// Page i's boxes for its space for notes (qt/docs/note-space.md). Only pages that have or had space are read; a
+    /// page of the file whose boxes change is written again, with its annotations (placed on its crop box).
+    void placeSpace(size_t i, QPDFObjectHandle obj, const NoteSpace& space) {
+        if (u.isNew(obj)) {
+            setSpace(obj, space);
+            return;
+        }
+        if (space.empty() && !hadSpace().count(obj.getObjGen())) {
+            return;  // (not read)
+        }
+        QPDFObjectHandle wanted = obj.shallowCopy();
+        setSpace(wanted, space);
+        if (wanted.unparseResolved() != obj.unparseResolved()) {
+            u.touch(obj);
+            setSpace(obj, space);
+            spaceChanged.insert(i);
+        }
+    }
+
+    /// The page objects the last write gave space for notes (by the marker's /Spaces: their places then).
+    const std::set<QPDFObjGen>& hadSpace() {
+        if (!hadSpaceRead) {
+            hadSpaceRead = true;
+            QPDFObjectHandle list = e.marker.getKey("/Spaces");
+            if (list.isArray()) {
+                for (QPDFObjectHandle n: list.getArrayAsVector()) {
+                    if (n.isInteger() && n.getIntValue() >= 0 && static_cast<size_t>(n.getIntValue()) < e.tree.size()) {
+                        hadSpaceSet.insert(e.tree[static_cast<size_t>(n.getIntValue())].getObjGen());
+                    }
+                }
+            }
+        }
+        return hadSpaceSet;
     }
 
     /// Page i shows a page of the background PDF: its page object in the file, a copy of it when it is shown twice,
@@ -1899,7 +2025,8 @@ private:
     bool unchanged(size_t i) {
         QPDFObjectHandle page = order[i];
         auto was = oldIndex.find(page.getObjGen());
-        if (!e.recorded || was == oldIndex.end() || was->second != i || foreignFrom.count(i) || u.isNew(page)) {
+        if (!e.recorded || was == oldIndex.end() || was->second != i || foreignFrom.count(i) || u.isNew(page) ||
+            spaceChanged.count(i)) {
             return false;
         }
         std::vector<std::pair<size_t, std::pair<std::string, std::string>>> wanted;
@@ -2268,6 +2395,7 @@ private:
             }
         }
         marker.replaceKey("/Drawn", drawnList);
+        marker.replaceKey("/Spaces", spacesList(prep));
         marker.replaceKey("/Layers", record);
         marker.replaceKey("/Base", QPDFObjectHandle::newInteger(e.base));
         marker.replaceKey("/Updates", QPDFObjectHandle::newInteger(e.updates + 1));
@@ -2298,6 +2426,9 @@ private:
     std::vector<QPDFPageObjectHelper> sourcePages;
     std::vector<QPDFObjectHandle> order;  ///< the base pages in document order
     std::map<size_t, QPDFObjectHandle> foreignFrom;  ///< a page in place of another: its annotations of other apps
+    std::set<size_t> spaceChanged;                    ///< pages whose boxes changed (space for notes)
+    std::set<QPDFObjGen> hadSpaceSet;
+    bool hadSpaceRead = false;
     std::map<size_t, std::vector<const AnnotSpec*>> layersOn;
     std::map<size_t, std::vector<const LinkSpec*>> linksOn;
     std::map<QPDFObjGen, size_t> oldIndex;  ///< the pages' places in the file

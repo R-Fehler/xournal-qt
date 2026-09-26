@@ -5,5 +5,5 @@ Icons from [Lucide](https://lucide.dev) (ISC license), in the style of upstream 
 build time (`qt/cmake/XqtApp.cmake`).
 
 The formatting bar's icons (`xqt-code`, `xqt-code-block`, `xqt-sigma`, `xqt-list-todo`, `xqt-quote`, `xqt-table`,
-`xqt-plus`, `xqt-align-*`) are Lucide's; `xqt-rule`, `xqt-page-break`, `xqt-row-*` and `xqt-column-*` are drawn in
-the same style for this app.
+`xqt-plus`, `xqt-align-*`) are Lucide's; `xqt-rule`, `xqt-page-break`, `xqt-row-*`, `xqt-column-*` and `xqt-note-space` (a slide with space for notes
+around it) are drawn in the same style for this app.

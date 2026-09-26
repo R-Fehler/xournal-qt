@@ -105,6 +105,12 @@ void LoadHandler::addPage(double width, double height) {
     this->pages.emplace_back(this->page);
 }
 
+// xournal-qt: space for notes (model/NoteSpace.h)
+void LoadHandler::setPageNoteSpace(double left, double top, double right, double bottom) {
+    xoj_assert(this->page);
+    this->page->setNoteSpace(NoteSpace{left, top, right, bottom});
+}
+
 void LoadHandler::finalizePage() {
     xoj_assert(this->page);
 

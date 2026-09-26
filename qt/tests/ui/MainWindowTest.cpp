@@ -57,6 +57,7 @@
 #include "model/Text.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
+#include "model/NoteSpace.h"
 #include "canvas/CanvasView.h"
 #include "canvas/CanvasMemory.h"
 #include "canvas/CanvasPage.h"
@@ -3061,6 +3062,71 @@ TEST_F(MainWindowTest, backgroundOfExistingPagesAndTheInsertDialog) {
     until([&] { return insert->property("visible").toBool(); });
     EXPECT_TRUE(insert->property("visible").toBool());
     QMetaObject::invokeMethod(insert, "reject");
+}
+
+// Space for notes beside slides (qt/docs/note-space.md): the dialog from the page menu and for all pages
+TEST_F(MainWindowTest, spaceForNotesFromThePageMenuAndForAllPages) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"packaged_xopp/pdfBackground/old.xopp")));
+    wait(80);
+    auto* s = controller->tabManager().currentSession();
+    auto pageOf = [&](size_t i) { return s->getDocument()->getPage(i); };
+    const size_t pages = s->getDocument()->getPageCount();
+    ASSERT_GE(pages, 2u);
+    const double w = pageOf(0)->getWidth(), h = pageOf(0)->getHeight();
+
+    auto* menu = find<QObject>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    menu->setProperty("page", 0);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    auto* item = find<QQuickItem>("pageMenuNoteSpace");
+    ASSERT_NE(item, nullptr);
+    EXPECT_TRUE(item->isEnabled());
+    click(item);
+    auto* dialog = find<QObject>("noteSpaceDialog");
+    ASSERT_NE(dialog, nullptr);
+    until([&] { return dialog->property("opened").toBool(); });
+    ASSERT_TRUE(dialog->property("visible").toBool());
+    EXPECT_EQ(dialog->property("scope").toInt(), 0) << "this page";
+
+    // The preset: half the width on the right; the preview shows the slide in two thirds of the page
+    click(find<QQuickItem>("noteSpacePresetRight"));
+    auto* slide = find<QQuickItem>("noteSpaceSlide");
+    ASSERT_NE(slide, nullptr);
+    EXPECT_NEAR(slide->width() / slide->parentItem()->width(), 2.0 / 3, 0.02);
+    EXPECT_NEAR(slide->x(), 0, 0.5);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(400);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(find<QQuickItem>("noteSpaceApply"));
+    until([&] { return !dialog->property("visible").toBool(); });
+    EXPECT_EQ(pageOf(0)->getNoteSpace(), (NoteSpace{0, 0, std::round(w / 2), 0}));
+    EXPECT_EQ(pageOf(0)->getWidth(), w + std::round(w / 2));
+    EXPECT_TRUE(pageOf(1)->getNoteSpace().empty()) << "only this page";
+    controller->undoPages();
+    EXPECT_EQ(pageOf(0)->getWidth(), w) << "one step to undo";
+
+    // All pages (the More menu opens it so): below each slide, as high as it; in cm the amounts are shown as such
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QVariant::fromValue(QVariantList{0})),
+                              Q_ARG(QVariant, true));
+    until([&] { return dialog->property("opened").toBool(); });
+    EXPECT_NE(dialog->property("scope").toInt(), 0) << "all pages";
+    EXPECT_EQ(dialog->property("targets").toList().size(), static_cast<qsizetype>(pages));
+    click(find<QQuickItem>("noteSpacePresetBelow"));
+    click(find<QQuickItem>("noteSpaceCm"));
+    auto* bottom = find<QQuickItem>("noteSpaceBottom");
+    ASSERT_NE(bottom, nullptr);
+    EXPECT_NEAR(bottom->property("value").toInt(), h * 25.4 / 72, 1) << "millimetres";
+    click(find<QQuickItem>("noteSpaceApply"));
+    until([&] { return !dialog->property("visible").toBool(); });
+    for (size_t i = 0; i < pages; ++i) {
+        EXPECT_NEAR(pageOf(i)->getNoteSpace().bottom, pageOf(i)->getHeight() / 2, 2) << i;
+    }
+    controller->undoPages();
+    for (size_t i = 0; i < pages; ++i) {
+        EXPECT_TRUE(pageOf(i)->getNoteSpace().empty()) << "all in one step: " << i;
+    }
 }
 
 TEST_F(MainWindowTest, rightClickOffersPasteWhereItWasClicked) {

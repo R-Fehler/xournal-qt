@@ -105,5 +105,12 @@ private:
 
     bool finalized;
 
+    /// xournal-qt: where the PDF is drawn on its page (space for notes, model/NoteSpace.h). Poppler is asked in PDF
+    /// coordinates; the bounds, rectangles and regions here are in page coordinates.
+    double offsetX = 0;
+    double offsetY = 0;
+    XojPdfRectangle inPdf(const XojPdfRectangle& r) const;
+    void toPage(cairo_region_t* region) const;
+
     std::shared_ptr<xoj::util::DispatchPool<xoj::view::PdfElementSelectionView>> viewPool;
 };

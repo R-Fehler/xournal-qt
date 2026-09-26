@@ -6,6 +6,7 @@
  * @license GNU GPLv2 or later
  */
 #include <cmath>
+#include <iostream>
 #include <memory>
 
 #include <QCoreApplication>
@@ -46,6 +47,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/PageNoteSpace.h"
 #include "session/StickyNote.h"
 #include "undo/UndoRedoHandler.h"
 
@@ -1812,6 +1814,126 @@ TEST_F(CanvasReplayTest, aLongPressSelectsTheWordOfThePdfAndTheHandlesWidenIt) {
     touch(*input, touchscreen, QEvent::TouchEnd, QEventPoint::State::Released, besideTheText);
     processEvents();
     EXPECT_FALSE(view->hasPdfTextSelection()) << "a tap beside the selected text unselects it";
+}
+
+// Space for notes (qt/docs/note-space.md): the PDF is drawn at an offset; its text is selected and marked where it is
+// drawn, not where it is on the PDF page
+TEST_F(CanvasReplayTest, withSpaceForNotesPdfTextIsSelectedAndMarkedOnTheSlide) {
+    input.reset();
+    view.reset();
+    auto loaded = DocumentSession::loadFile(GET_TESTFILE(u8"packaged_xopp/pdfBackground/old.xopp"));
+    ASSERT_TRUE(loaded.document);
+    session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    notespace::Amounts a;
+    a.left = 100;
+    a.top = 50;
+    a.right = 200;
+    ASSERT_EQ(notespace::apply(*session, {0}, a), 1u);
+    view = std::make_unique<CanvasView>(*session);
+    view->getViewController().setViewSize(QSizeF(900, 1200));
+    input = std::make_unique<CanvasInput>(*view);
+    processEvents();
+
+    const auto onPdf = DocumentSearch::findOnPage(*session->getDocument(), 0, "Test");
+    ASSERT_FALSE(onPdf.empty());
+    const QRectF hit = onPdf.front();  // (page coordinates: with the offset)
+    ASSERT_GT(hit.left(), 100);
+    const QPointF onWord = viewPos(0, hit.center());
+    ASSERT_TRUE(view->selectPdfTextAt(onWord, false)) << "the word where it is drawn";
+    EXPECT_EQ(QString::fromStdString(view->selectedPdfText()), QStringLiteral("Test"));
+    const double zoom = view->getViewController().zoom();
+    const QRectF box = view->pdfSelectionBox();
+    EXPECT_NEAR(box.left(), viewPos(0, hit.topLeft()).x(), 3 * zoom);
+    EXPECT_NEAR(box.top(), viewPos(0, hit.topLeft()).y(), 4 * zoom);
+    EXPECT_TRUE(view->pdfTextSelectionContains(onWord));
+
+    // Marked: the highlighter stroke lies over the word
+    ASSERT_TRUE(view->markPdfText(CanvasView::PdfTextMode::Highlight));
+    const Layer* layer = session->getDocument()->getPage(0)->getSelectedLayer();
+    const Element* mark = nullptr;
+    for (const Element* e: layer->getElementsView()) {
+        mark = e;  // (the last one)
+    }
+    ASSERT_TRUE(mark);
+    const auto bounds = mark->getBoundingBox();
+    EXPECT_NEAR(bounds.x + bounds.width / 2, hit.center().x(), 3);
+    EXPECT_NEAR(bounds.y + bounds.height / 2, hit.center().y(), 3);
+}
+
+// Space for notes: a link of the PDF is where it is drawn (the PDF at its offset)
+TEST_F(CanvasReplayTest, withSpaceForNotesPdfLinksAreWhereTheyAreDrawn) {
+    const fs::path pdf = fs::path(tmp.filePath("link.pdf").toStdString());
+    {
+        cairo_surface_t* surface = cairo_pdf_surface_create(pdf.c_str(), 842, 474);
+        cairo_t* cr = cairo_create(surface);
+        cairo_tag_begin(cr, CAIRO_TAG_LINK, "rect=[72 80 100 30] uri='https://example.org/'");
+        cairo_rectangle(cr, 72, 80, 100, 30);
+        cairo_fill(cr);
+        cairo_tag_end(cr, CAIRO_TAG_LINK);
+        cairo_show_page(cr);
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+    }
+    input.reset();
+    view.reset();
+    auto loaded = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(loaded.document);
+    session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    notespace::Amounts a;
+    a.left = 100;
+    a.top = 50;
+    ASSERT_EQ(notespace::apply(*session, {0}, a), 1u);
+    view = std::make_unique<CanvasView>(*session);
+    view->getViewController().setViewSize(QSizeF(900, 1200));
+    input = std::make_unique<CanvasInput>(*view);
+    processEvents();
+    const auto link = view->linkAt(viewPos(0, QPointF(122 + 100, 95 + 50)));
+    ASSERT_TRUE(link.has_value()) << "on the drawn link";
+    EXPECT_EQ(link->uri, QStringLiteral("https://example.org/"));
+    EXPECT_NEAR(link->viewRect.left(), viewPos(0, QPointF(172, 130)).x(), 1);
+    EXPECT_NEAR(link->viewRect.top(), viewPos(0, QPointF(172, 130)).y(), 1);
+    EXPECT_FALSE(view->linkAt(viewPos(0, QPointF(122, 95))).has_value()) << "not where it is on the PDF page";
+}
+
+// Space for notes on all 300 pages of a PDF with the document in view: quick (only the pages in view are drawn again)
+TEST_F(CanvasReplayTest, spaceForNotesOnAllPagesOfALongPdfIsQuickInView) {
+    const fs::path pdf = fs::path(tmp.filePath("long.pdf").toStdString());
+    {
+        cairo_surface_t* surface = cairo_pdf_surface_create(pdf.c_str(), 842, 474);
+        cairo_t* cr = cairo_create(surface);
+        for (int i = 0; i < 300; ++i) {
+            cairo_rectangle(cr, 72, 80, 100, 30);
+            cairo_fill(cr);
+            cairo_show_page(cr);
+        }
+        cairo_destroy(cr);
+        cairo_surface_destroy(surface);
+    }
+    input.reset();
+    view.reset();
+    auto loaded = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(loaded.document);
+    session = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    view = std::make_unique<CanvasView>(*session);
+    view->getViewController().setViewSize(QSizeF(900, 1200));
+    input = std::make_unique<CanvasInput>(*view);
+    processEvents();
+    std::vector<size_t> all(300);
+    for (size_t i = 0; i < all.size(); ++i) {
+        all[i] = i;
+    }
+    notespace::Amounts a;
+    a.relative = true;
+    a.right = 0.5;
+    QElapsedTimer t;
+    t.start();
+    ASSERT_EQ(notespace::apply(*session, all, a), 300u);
+    const qint64 applied = t.elapsed();
+    processEvents(200);
+    std::cout << "[          ] 300 pages in view: applied in " << applied << " ms" << std::endl;
+    EXPECT_LT(applied, 1500);
+    EXPECT_FALSE(app->getRenderService()->hasWork(RenderService::Priority::Visible)) << "all drawn";
+    EXPECT_NEAR(view->pageViewRect(299).width() / view->pageViewRect(299).height(), 1263.0 / 474, 0.01);
 }
 
 // PDF text tools: select text of the background PDF and mark it (upstream's PdfElemSelection + marker strokes).
