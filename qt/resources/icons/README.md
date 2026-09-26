@@ -11,3 +11,5 @@ more" in the selection's pills).
 
 `xqt-star` and `xqt-bookmark` are Lucide's (`star`, `bookmark`); `xqt-star-filled` and `xqt-bookmark-filled` are the
 same shapes filled (a favourite, a bookmarked page).
+
+`xqt-sliders` is Lucide's `sliders-horizontal`: the library's **View** button (how the cards are shown).

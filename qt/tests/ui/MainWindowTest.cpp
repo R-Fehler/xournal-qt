@@ -1304,9 +1304,9 @@ TEST_F(HomeScreenTest, newDocumentIsSavedInTheLibrary) {
     EXPECT_EQ(controller->title(), "Week.xopp");
 }
 
-// A phone-wide window (411 px, the Fold 7 folded): nothing of the home screen is wider than the window. The header
-// scrolls sideways, the search has a row of its own, the buttons of an empty folder stand one below the other, and
-// the new document dialog fits.
+// A phone-wide window (411 px, the Fold 7 folded): nothing of the home screen is wider than the window. The header is
+// one row that fits (the library's name, View, Settings; qt/adaptive-home), the search has a row of its own, the
+// buttons of an empty folder stand one below the other, and the new document dialog fits.
 TEST_F(HomeScreenTest, aPhoneWideWindowFitsTheHomeScreenAndTheNewDocumentDialog) {
     auto* search = find<QQuickItem>("librarySearchField");
     auto* header = find<QQuickItem>("homeHeader");
@@ -1323,8 +1323,9 @@ TEST_F(HomeScreenTest, aPhoneWideWindowFitsTheHomeScreenAndTheNewDocumentDialog)
     EXPECT_LE(rightEdge(search), window->width()) << "the search field fits";
     EXPECT_GT(search->mapToScene(QPointF(0, 0)).y(), wideSearchY + 30) << "in a row of its own, below";
     EXPECT_LE(rightEdge(header), window->width() + 0.5);
-    EXPECT_TRUE(header->property("interactive").toBool()) << "the header scrolls sideways";
-    EXPECT_GT(rightEdge(settingsButton), window->width()) << "(its last buttons are further right)";
+    EXPECT_FALSE(header->property("interactive").toBool()) << "the header fits: no scrolling sideways";
+    EXPECT_LE(rightEdge(settingsButton), window->width()) << "its last button is inside the window";
+    EXPECT_TRUE(findItem("newDocumentFab")->isVisible()) << "\"+\" floats at the bottom";
     if (wantShots()) {
         saveShot(window, "phone-home");
     }
@@ -2023,11 +2024,15 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     EXPECT_EQ(controller->pageNumber(), 2);
     EXPECT_EQ(controller->searchQuery(), "page 2");
 
-    // Zoom: fewer, bigger cells
+    // Zoom: fewer, bigger cells (in a window too narrow for every button of the header: in View)
     click(find<QQuickItem>("homeTab"));
     const int columns = grid()->property("columns").toInt();
-    click(find<QQuickItem>("zoomInButton"));
+    ASSERT_FALSE(find<QQuickItem>("zoomInButton")->isVisible()) << "(1280 px: the header groups its buttons)";
+    click(find<QQuickItem>("homeViewButton"));
+    ASSERT_TRUE(waitOpened(find("homeViewMenu"), true));
+    click(findItem("viewZoomInButton"));
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
+    key(Qt::Key_Escape);
 }
 
 namespace {
@@ -2385,6 +2390,8 @@ TEST_F(HomeScreenFilterTest, aSyncConflictIsABadgeOnItsDocument) {
 
 TEST_F(HomeScreenFilterTest, theShowButtonChoosesTheKindsOfFilesShown) {
     ASSERT_EQ(gridCount(), 3) << "Physics, lecture, notes: text and other files are not shown by default";
+    window->resize(1920, 900);  // (room for every button of the header; narrower: View → Kinds of files shown)
+    wait(100);
     auto* button = find<QQuickItem>("showButton");
     ASSERT_NE(button, nullptr);
     EXPECT_FALSE(button->property("checked").toBool());
@@ -2472,6 +2479,8 @@ TEST_F(HomeScreenKindsTest, theCardsTellPlainPdfsPdfsWithNotesAndTextDocumentsAp
     }
 
     // Only PDF text documents
+    window->resize(1920, 900);  // (the Show button in the header)
+    wait(100);
     auto* button = find<QQuickItem>("showButton");
     click(button);
     QObject* popup = find("showPopup");
@@ -4955,11 +4964,13 @@ TEST_F(MainWindowTest, documentsOpenWhereTheyWereLeftOffIfWanted) {
     controller->goToPage(5);
     controller->closeTab(controller->currentTab());
 
-    // The switch on the library
+    // The switch on the library (in a window with room for every button of the header)
+    window->resize(1920, 900);
     controller->setHomeVisible(true);
     auto* toggle = find<QQuickItem>("resumeSwitch");
     ASSERT_NE(toggle, nullptr);
     until([&] { return toggle->isVisible(); });
+    wait(150);  // (laid out at the new width)
     click(toggle);
     EXPECT_TRUE(settings->get("resumeAtLastPage").toBool());
     ASSERT_TRUE(controller->openPath(file));
@@ -8539,9 +8550,11 @@ TEST_F(HomeScreenTest, theFavouritesChipShowsOnlyStarredDocuments) {
     EXPECT_TRUE(controller->isFavouriteFile(QString::fromStdString((root / "Physics" / "sheet.pdf").string())));
     library->setFlat(false);
 
+    window->resize(1920, 900);  // (narrower: in View, qt/adaptive-home)
+    wait(100);
     auto* chip = findItem("favouritesChip");
     ASSERT_NE(chip, nullptr);
-    EXPECT_TRUE(chip->isVisible()) << "directly in the header, not in a menu";
+    EXPECT_TRUE(chip->isVisible()) << "directly in the header, not in a menu, where there is room";
     click(chip);
     EXPECT_TRUE(library->favouritesOnly());
     until([&] { return gridCount() == 2; });

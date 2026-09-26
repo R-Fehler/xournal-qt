@@ -16,6 +16,8 @@ FocusScope {
     readonly property var marks: app.libraryBookmarks
     /// Width of a page's picture
     property int thumbWidth: 150
+    /// Room below the last document (the home screen's floating "+" on a phone)
+    property real bottomSpace: 0
 
     Binding { target: view.marks; property: "active"; value: view.shown }
 
@@ -28,6 +30,7 @@ FocusScope {
         focus: true
         model: view.marks
         spacing: 6
+        bottomMargin: view.bottomSpace
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar {}
         TouchpadMomentum { flickable: list }
@@ -94,15 +97,22 @@ FocusScope {
                             height: Math.round(view.thumbWidth * Math.min(aspect, 1.6)) + labelText.implicitHeight + 8
                             Accessible.name: modelData.label
                             onClicked: app.openBookmark(doc.model.path, modelData.page)
-                            onPressAndHold: pageMenu.popup()
-                            TapHandler { acceptedButtons: Qt.RightButton; onTapped: pageMenu.popup() }
-                            Menu {
+                            onPressAndHold: pageMenu.openMenu()
+                            TapHandler {
+                                acceptedButtons: Qt.RightButton
+                                onTapped: function(point) { pageMenu.openMenu(point.position) }
+                            }
+                            // (a sheet on a phone: qt/docs/adaptive-layout.md, "Menus")
+                            AdaptiveMenu {
                                 id: pageMenu
-                                MenuItem {
+                                objectName: "bookmarkMenu"
+                                title: page.modelData.label
+                                AdaptiveMenuItem {
+                                    objectName: "openBookmarkItem"
                                     text: qsTr("Open at this page")
                                     onTriggered: app.openBookmark(doc.model.path, page.modelData.page)
                                 }
-                                MenuItem {
+                                AdaptiveMenuItem {
                                     objectName: "copyBookmarkLink"
                                     text: qsTr("Copy link to this page")
                                     onTriggered: app.copyDocumentLink(doc.model.path, page.modelData.page)

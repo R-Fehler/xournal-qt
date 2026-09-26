@@ -27,6 +27,7 @@
 #include <QQmlExpression>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QTest>
@@ -113,9 +114,9 @@ const Known knownOutside[] = {
         {"doc", "undoButton", "qt/adaptive-panels: the compact view pill"},
         {"doc", "redoButton", "qt/adaptive-panels: the compact view pill"},
         {"doc", "layoutButton", "qt/adaptive-panels: the compact view pill"},
-        // The library's header in phone landscape: its last chip reaches past the edge (F10.1, F10.4)
-        {"home", "favouritesChip", "qt/adaptive-home: the library header regrouped"},
 };
+/// A folder deep down in the library: its breadcrumbs are too long for a phone
+const char* const deepFolder = "Physics/Semester 3 (winter)/Quantum mechanics/Exercise sheets";
 
 class AdaptiveLayoutTest: public ::testing::Test {
 protected:
@@ -130,6 +131,7 @@ protected:
         fs::copy_file(fs::path(GET_TESTFILE(u8"load/pages.xopp.bg_1.png")), root / "pages.xopp.bg_1.png");
         fs::copy_file(fs::path(GET_TESTFILE(u8"load/strokes.xopp")), root / "notes.xopp");
         fs::copy_file(fs::path(GET_TESTFILE(u8"packaged_xopp/pdfBackground/old.xopp.bg.pdf")), root / "lecture.pdf");
+        fs::create_directories(root / deepFolder);
 
         controller = std::make_unique<AppController>();
         controller->setLibraryRoot(root);
@@ -515,6 +517,50 @@ protected:
         ASSERT_NE(cardButton, nullptr) << at << ": a card with its ⋮";
         QMetaObject::invokeMethod(cardButton, "clicked");
         checkOpenMenu(at, window->findChild<QObject*>("homeItemMenu"), cardButton);
+        // "+" and View (qt/adaptive-home), where the header groups its actions; on a phone "+" floats at the bottom
+        QQuickItem* home = findItem("homeView");
+        if (!home->property("expanded").toBool()) {
+            QQuickItem* add = findItem(phoneClass() ? "newDocumentFab" : "newDocumentButton");
+            ASSERT_NE(add, nullptr);
+            EXPECT_TRUE(shownInWindow(add)) << at << ": " << add->objectName().toStdString();
+            QMetaObject::invokeMethod(add, "clicked");
+            checkOpenMenu(at, window->findChild<QObject*>("newMenu"), add);
+            QQuickItem* view = findItem("homeViewButton");
+            ASSERT_NE(view, nullptr);
+            EXPECT_TRUE(shownInWindow(view)) << at << ": View";
+            QMetaObject::invokeMethod(view, "clicked");
+            checkOpenMenu(at, window->findChild<QObject*>("homeViewMenu"), view);
+        } else {
+            for (const char* name: {"newDocumentButton", "importButton", "showButton", "favouritesChip", "zoomInButton",
+                                    "homeSettingsButton"}) {
+                EXPECT_TRUE(shownInWindow(findItem(name))) << at << ": " << name << " (the expanded header)";
+            }
+        }
+    }
+    /// The home screen (qt/adaptive-home): each of its pages, a deep folder with its breadcrumbs (and nothing in it),
+    /// a selection with its actions, and the tab overview lie inside the window, and no row of the home screen is
+    /// wider than the window; on a phone upright the header is one row, the switch and the search rows of their own
+    void checkHomeScreens(const std::string& at);
+    /// Nothing of the home screen's column (its rows and bars) wider than the window
+    void expectNoRowWider(const std::string& at) {
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (!i->isVisible() || i->inherits("QQuickItemView")) {
+                return;  // (the grids scroll their cards)
+            }
+            if (i->inherits("QQuickLayout") || i->inherits("QQuickFlickable")) {
+                const QRectF r = sceneRect(i);
+                EXPECT_TRUE(r.left() >= -1 && r.right() <= window->width() + 1)
+                        << at << ": " << xqt::uitest::labelOf(i).toStdString() << " from " << r.left() << " to "
+                        << r.right() << " (wider than the window)";
+            }
+            if (i->inherits("QQuickFlickable")) {
+                return;  // (what scrolls inside may be wider)
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(findItem("homeView"));
     }
 
     // --- dialogs (qt/adaptive-dialogs) ---
@@ -587,6 +633,7 @@ void AdaptiveLayoutTest::checkSizes(const std::vector<WindowSize>& sizes, bool l
         wait(250);
         if (layout) {
             expectInside("home");
+            checkHomeScreens(at);
         }
         if (menus) {
             checkHomeMenus(at);
@@ -594,6 +641,132 @@ void AdaptiveLayoutTest::checkSizes(const std::vector<WindowSize>& sizes, bool l
         controller->setHomeVisible(false);
         wait(150);
     }
+}
+
+void AdaptiveLayoutTest::checkHomeScreens(const std::string& at) {
+    QQuickItem* home = findItem("homeView");
+    QObject* library = controller->libraryModel();
+    const bool phone = phoneClass();
+    for (int page: {1, 2, 0}) {
+        home->setProperty("page", page);
+        wait(120);
+        expectInside("home");
+        expectNoRowWider(at + " page " + std::to_string(page));
+    }
+    if (phone) {
+        EXPECT_TRUE(shownInWindow(findItem("newDocumentFab"))) << at << ": \"+\" floats at the bottom";
+        EXPECT_FALSE(findItem("newDocumentButton")->isVisible()) << at << ": (not in the header too)";
+    }
+    // On a phone upright: the header one row (the library's name, View, Settings), the switch across a row of its
+    // own below it, then the search
+    if (sizeClass() == "phonePortrait") {
+        auto* header = findItem("homeHeader");
+        EXPECT_FALSE(header->property("interactive").toBool()) << at << ": the header fits without scrolling";
+        EXPECT_LE(header->height(), 56) << at << ": the header is one row";
+        const double row = sceneRect(findItem("homeViewButton")).center().y();
+        for (const char* name: {"libraryMenuButton", "homeViewButton", "homeSettingsButton"}) {
+            auto* b = findItem(name);
+            EXPECT_TRUE(shownInWindow(b)) << at << ": " << name;
+            EXPECT_NEAR(sceneRect(b).center().y(), row, 4) << at << ": " << name << " in the header's row";
+        }
+        const QRectF library = sceneRect(findItem("libraryPageButton"));
+        const QRectF bookmarks = sceneRect(findItem("bookmarksPageButton"));
+        EXPECT_GT(library.top(), sceneRect(header).bottom() - 1) << at << ": the switch below the header";
+        EXPECT_NEAR(library.center().y(), bookmarks.center().y(), 1) << at << ": the switch is one row";
+        EXPECT_GT(bookmarks.width(), 100) << at << ": its tabs share the width";
+        EXPECT_GT(sceneRect(findItem("librarySearchField")).top(), library.bottom()) << at << ": the search below";
+    }
+    if (sizeClass() == "phoneShort") {
+        // Held sideways: one header row with the breadcrumbs in it
+        const double row = sceneRect(findItem("homeViewButton")).center().y();
+        EXPECT_NEAR(sceneRect(findItem("crumbArea")).center().y(), row, 4) << at << ": the breadcrumbs in the header";
+        EXPECT_NEAR(sceneRect(findItem("librarySearchField")).center().y(), row, 4) << at << ": the search too";
+    }
+
+    // A folder deep down (and empty): the breadcrumbs elide from the middle, the last one shows
+    library->setProperty("folder", deepFolder);
+    wait(250);
+    expectInside("homeDeep");
+    expectNoRowWider(at + " deep folder");
+    QQuickItem* crumbArea = findItem("crumbArea");
+    ASSERT_NE(crumbArea, nullptr);
+    const QRectF area = sceneRect(crumbArea);
+    EXPECT_TRUE(insideWindow(area)) << at << ": the breadcrumbs";
+    QQuickItem* last = nullptr;
+    int crumbsShown = 0;
+    for (QQuickItem* i: itemsUnder(crumbArea)) {
+        if (i->objectName() == "crumbLabel" && i->isVisible()) {
+            ++crumbsShown;
+            last = i;
+        }
+    }
+    ASSERT_NE(last, nullptr) << at;
+    EXPECT_EQ(last->property("text").toString(), "Exercise sheets") << at << ": the folder shown";
+    EXPECT_TRUE(area.adjusted(-1, -1, 1, 1).contains(sceneRect(last))) << at << ": the last breadcrumb is not cut off";
+    EXPECT_GE(last->width(), 40) << at;
+    QQuickItem* ellipsis = nullptr;
+    for (QQuickItem* i: itemsUnder(crumbArea)) {
+        if (i->objectName() == "crumbEllipsis" && i->isVisible()) {
+            ellipsis = i;
+        }
+    }
+    if (phone) {
+        EXPECT_NE(ellipsis, nullptr) << at << ": the folders between are left out (…)";
+        EXPECT_LT(crumbsShown, 5) << at;
+    }
+    if (ellipsis) {
+        QMetaObject::invokeMethod(ellipsis, "clicked");
+        QObject* crumbMenu = window->findChild<QObject*>("crumbMenu");
+        checkOpenMenu(at, crumbMenu, ellipsis);
+    }
+    library->setProperty("folder", "");
+    wait(150);
+
+    // Everything selected: the selection bar, on a phone the actions at the bottom
+    QMetaObject::invokeMethod(library, "selectAll");
+    wait(150);
+    expectInside("homeSelection");
+    expectNoRowWider(at + " selection");
+    EXPECT_TRUE(shownInWindow(findItem("homeSelectionBar"))) << at;
+    auto* actions = findItem("selectionActionBar");
+    if (phone) {
+        EXPECT_TRUE(actions->isVisible()) << at << ": the actions in a bar at the bottom";
+        EXPECT_NEAR(sceneRect(actions).bottom(), window->height(), 1.5) << at;
+        for (const char* name: {"selectionOpenAction", "selectionCopyAction", "selectionMoveAction",
+                                "selectionTrashAction", "selectionMoreButton"}) {
+            EXPECT_TRUE(shownInWindow(findItem(name))) << at << ": " << name;
+        }
+        EXPECT_FALSE(findItem("newDocumentFab")->isVisible()) << at << ": no \"+\" while selecting";
+    }
+    if (!actions->isVisible()) {
+        for (const char* name: {"openSelectedButton", "copySelectedButton", "moveSelectedButton", "trashSelectedButton"}) {
+            EXPECT_TRUE(shownInWindow(findItem(name))) << at << ": " << name;
+        }
+    }
+    QMetaObject::invokeMethod(library, "clearSelection");
+    wait(100);
+
+    // The tab overview (with the documents open)
+    QObject* overview = window->findChild<QObject*>("tabOverview");
+    QQmlExpression(qmlContext(overview), overview, "enter = null; exit = null").evaluate();
+    QMetaObject::invokeMethod(overview, "open");
+    ASSERT_TRUE(opened(overview, true)) << at;
+    wait(150);
+    expectInside("overview");
+    auto* grid = findItem("tabGrid");
+    ASSERT_NE(grid, nullptr);
+    EXPECT_TRUE(insideWindow(sceneRect(grid))) << at << ": the overview's grid";
+    EXPECT_TRUE(shownInWindow(findItem("overviewSearchField"))) << at;
+    if (phone) {
+        EXPECT_GE(grid->property("columns").toInt(), 2) << at << ": two documents side by side at least";
+        EXPECT_GE(grid->property("cellWidth").toDouble(), 170) << at;
+    }
+    if (window->width() < 600) {
+        EXPECT_GT(sceneRect(findItem("overviewSearchField")).top(), sceneRect(findItem("closeAllButton")).bottom() - 1)
+                << at << ": the search in a row of its own below the buttons";
+    }
+    QMetaObject::invokeMethod(overview, "close");
+    EXPECT_TRUE(opened(overview, false)) << at;
 }
 
 // --- dialogs (qt/adaptive-dialogs) ---------------------------------------------------------------------------------
@@ -943,6 +1116,193 @@ TEST_F(AdaptiveLayoutTest, menusAreSheetsOnPhones) {
     checkMenuGeometry("1280x800", layoutMenu, layoutButton, true);
     QMetaObject::invokeMethod(layoutMenu, "close");
     EXPECT_TRUE(opened(layoutMenu, false));
+}
+
+// The library's "+" and View (qt/adaptive-home) on a phone (sheets; "+" floats at the bottom) and in a desktop window
+// too narrow for every button (menus in the header): each entry does what it says, and a switch of Show or the size
+// of the cards leaves the menu open
+TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
+    QObject* library = controller->libraryModel();
+    QQuickItem* home = findItem("homeView");
+    ASSERT_NE(home, nullptr);
+    for (const WindowSize& s: {WindowSize{412, 915, "phone-portrait"}, WindowSize{1280, 800, "laptop-16x10"}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        const bool phone = phoneClass();
+        home->setProperty("page", 0);
+        wait(100);
+        ASSERT_FALSE(home->property("expanded").toBool()) << at << ": the header groups its actions";
+        QObject* newMenu = window->findChild<QObject*>("newMenu");
+        QObject* viewMenu = window->findChild<QObject*>("homeViewMenu");
+        auto openMenu = [&](QObject* menu, const char* button) {
+            click(findItem(button));
+            ASSERT_TRUE(opened(phone ? sheet() : menu, true)) << at << ": " << button;
+            settled(phone ? sheet() : menu);
+        };
+        // An entry of the menu shown (on a phone: its row in the sheet; a submenu drills in)
+        auto choose = [&](const char* entry) {
+            QQuickItem* target = phone ? sheetRow(entry) : nullptr;
+            if (!phone) {
+                for (QObject* m: {newMenu, viewMenu, window->findChild<QObject*>("viewSortMenu"),
+                                  window->findChild<QObject*>("viewShowMenu")}) {
+                    if (!m->property("visible").toBool()) {
+                        continue;
+                    }
+                    for (QQuickItem* it: menuEntries(m)) {
+                        auto* sub = it->property("subMenu").value<QObject*>();
+                        if (it->objectName() == entry || (sub && sub->objectName() == entry)) {
+                            target = it;
+                        }
+                    }
+                }
+            }
+            ASSERT_NE(target, nullptr) << at << ": " << entry;
+            click(target);
+            wait(100);
+        };
+        auto closeMenus = [&] {
+            for (int i = 0; i < 3 && (sheet()->property("visible").toBool() || viewMenu->property("visible").toBool() ||
+                                      newMenu->property("visible").toBool());
+                 ++i) {
+                QTest::keyClick(window, Qt::Key_Escape);
+                wait(200);
+            }
+        };
+        const char* const add = phone ? "newDocumentFab" : "newDocumentButton";
+
+        // "+": New document, New Markdown file, New text file, New folder, Import files, Import a folder
+        struct Entry {
+            const char* entry;
+            const char* dialog;
+        };
+        for (const Entry& e: {Entry{"newDocumentItem", "newDocumentDialog"}, Entry{"newMarkdownItem", "textFileDialog"},
+                              Entry{"newTextItem", "textFileDialog"}, Entry{"addNewFolderItem", "folderNameDialog"},
+                              Entry{"addImportFilesItem", "importDialog"},
+                              Entry{"addImportFolderItem", "importFolderDialog"}}) {
+            openMenu(newMenu, add);
+            choose(e.entry);
+            QObject* d = window->findChild<QObject*>(e.dialog);
+            ASSERT_NE(d, nullptr) << e.dialog;
+            until([&] { return d->property("visible").toBool(); });
+            EXPECT_TRUE(d->property("visible").toBool()) << at << ": " << e.entry << " opens " << e.dialog;
+            if (std::string(e.entry) == "newTextItem") {
+                EXPECT_EQ(d->property("extension").toString(), ".txt") << at;
+            }
+            QMetaObject::invokeMethod(d, "close");
+            until([&] { return !d->property("visible").toBool(); });
+            ASSERT_FALSE(d->property("visible").toBool()) << e.dialog;
+            wait(100);
+        }
+
+        // View: Only favourites, All documents at once, Sort, Open where left off
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewFavouritesItem");
+        EXPECT_TRUE(library->property("favouritesOnly").toBool()) << at;
+        EXPECT_TRUE(findItem("homeViewButton")->property("checked").toBool()) << at << ": View marked while it filters";
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewFavouritesItem");
+        EXPECT_FALSE(library->property("favouritesOnly").toBool()) << at;
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewFlatItem");
+        EXPECT_TRUE(library->property("flat").toBool()) << at;
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewFlatItem");
+        EXPECT_FALSE(library->property("flat").toBool()) << at;
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewSortMenu");
+        if (!phone) {
+            ASSERT_TRUE(opened(window->findChild<QObject*>("viewSortMenu"), true)) << at;
+        }
+        choose("viewSortByRead");
+        EXPECT_EQ(library->property("sortBy").toString(), "read") << at;
+        library->setProperty("sortBy", "name");
+        closeMenus();
+        const bool resume = findItem("resumeSwitch")->property("checked").toBool();
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewResumeItem");
+        EXPECT_NE(findItem("resumeSwitch")->property("checked").toBool(), resume) << at << ": Open where left off";
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewResumeItem");
+        EXPECT_EQ(findItem("resumeSwitch")->property("checked").toBool(), resume) << at;
+
+        // View → Show: its switches leave it open; Defaults
+        openMenu(viewMenu, "homeViewButton");
+        choose("viewShowMenu");
+        if (!phone) {
+            ASSERT_TRUE(opened(window->findChild<QObject*>("viewShowMenu"), true)) << at;
+            settled(window->findChild<QObject*>("viewShowMenu"));
+        }
+        QQuickItem* notes = findItem("viewShowNotes");
+        ASSERT_NE(notes, nullptr) << at;
+        EXPECT_TRUE(shownInWindow(notes)) << at << ": the switches of Show";
+        click(notes);
+        EXPECT_FALSE(library->property("show").toMap().value("notes").toBool()) << at << ": notes hidden";
+        EXPECT_TRUE(library->property("showFiltered").toBool()) << at;
+        EXPECT_TRUE((phone ? sheet() : window->findChild<QObject*>("viewShowMenu"))->property("visible").toBool())
+                << at << ": still open";
+        click(findItem("viewShowDefaults"));
+        EXPECT_FALSE(library->property("showFiltered").toBool()) << at << ": Defaults";
+        closeMenus();
+
+        // View: the size of the cards (the menu stays open)
+        auto* grid = findItem("libraryGrid");
+        const int columns = grid->property("columns").toInt();
+        openMenu(viewMenu, "homeViewButton");
+        QQuickItem* smaller = findItem("viewZoomOutButton");
+        ASSERT_NE(smaller, nullptr) << at;
+        EXPECT_TRUE(shownInWindow(smaller)) << at;
+        click(smaller);
+        EXPECT_EQ(grid->property("columns").toInt(), columns + 1) << at << ": smaller cards";
+        EXPECT_TRUE((phone ? sheet() : viewMenu)->property("visible").toBool()) << at << ": still open";
+        click(findItem("viewZoomInButton"));
+        EXPECT_EQ(grid->property("columns").toInt(), columns) << at;
+        closeMenus();
+        if (phone) {
+            // (on a phone never fewer than two columns)
+            home->setProperty("columnsNormal", 1);
+            EXPECT_EQ(grid->property("columns").toInt(), 2) << at;
+            home->setProperty("columnsNormal", 0);
+        }
+
+        // Recent: "+" also opens a file
+        home->setProperty("page", 1);
+        wait(100);
+        QSignalSpy openFile(home, SIGNAL(openFileRequested()));
+        openMenu(newMenu, add);
+        choose("addOpenFileItem");
+        EXPECT_EQ(openFile.count(), 1) << at << ": Open a file…";
+        for (QObject* o: window->findChildren<QObject*>()) {  // (the window's file dialog)
+            if (o->inherits("QQuickFileDialog") && o->property("visible").toBool()) {
+                QMetaObject::invokeMethod(o, "close");
+            }
+        }
+        wait(100);
+        home->setProperty("page", 0);
+        wait(100);
+    }
+}
+
+// On a phone the tab overview opens from the tab dots of the compact chrome (their middle; with more than 12 documents
+// the count "3 / 14" is there instead, in the same place), and it has two columns
+TEST_F(AdaptiveLayoutTest, theTabOverviewOpensFromTheTabDotsOnAPhone) {
+    openDocument();
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "notes.xopp").string())));
+    wait(200);
+    resize(412, 915);
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    wait(150);
+    auto* dots = findItem("fullScreenTabs");
+    ASSERT_NE(dots, nullptr);
+    ASSERT_TRUE(dots->isVisible()) << "the tab dots of the compact chrome";
+    QObject* overview = window->findChild<QObject*>("tabOverview");
+    click(dots);
+    ASSERT_TRUE(opened(overview, true)) << "a tap on the dots opens the overview";
+    wait(150);
+    auto* grid = findItem("tabGrid");
+    EXPECT_EQ(grid->property("columns").toInt(), 2);
+    expectInside("overview");
+    QTest::keyClick(window, Qt::Key_Escape);
+    EXPECT_TRUE(opened(overview, false));
 }
 
 // (skipped in SetUp unless XQT_UI_ADAPTIVE is set: about a minute)
