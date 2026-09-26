@@ -455,3 +455,48 @@ TEST(Annotations, tinyMarksAreKept) {
     EXPECT_EQ(items[1].rect, QRectF(300, 300, 2, 2)) << "a lone dot is kept";
     EXPECT_EQ(items[2].rect, QRectF(100, 600, 50, 12));
 }
+
+namespace {
+/// A one-page PDF with a red area (100, 100)-(300, 200) on white.
+fs::path makeColourPdf(const QTemporaryDir& dir) {
+    const fs::path file = fs::path(dir.filePath("red.pdf").toStdString());
+    cairo_surface_t* surface = cairo_pdf_surface_create(file.c_str(), 595, 842);
+    cairo_t* cr = cairo_create(surface);
+    cairo_set_source_rgb(cr, 1, 0, 0);
+    cairo_rectangle(cr, 100, 100, 200, 100);
+    cairo_fill(cr);
+    cairo_show_page(cr);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+    return file;
+}
+}  // namespace
+
+// The pictures of handwriting show the page under the ink (dimmed), the ink on top
+TEST(Annotations, aPictureShowsThePdfUnderTheInk) {
+    QTemporaryDir tmp;
+    auto loaded = DocumentSession::loadFile(makeColourPdf(tmp));
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    Document& doc = *loaded.document;
+    PageRef page = doc.getPage(0);
+    stroke(page->getSelectedLayer(), StrokeTool::PEN, 3, {{120, 150}, {280, 150}});
+
+    const QRectF area(110, 120, 180, 60);
+    const QImage img = an::drawArea(doc, page, area, 2.0);
+    ASSERT_EQ(img.size(), QSize(360, 120));
+    const auto at = [&](double x, double y) {
+        return img.pixelColor(static_cast<int>((x - area.x()) * 2), static_cast<int>((y - area.y()) * 2));
+    };
+    const QColor red = at(150, 130);
+    EXPECT_GT(red.red(), 230) << "the PDF's red under the ink";
+    EXPECT_GT(red.green(), 40) << "dimmed: a light wash over it";
+    EXPECT_LT(red.green(), 170);
+    EXPECT_NEAR(red.green(), red.blue(), 4);
+    const QColor ink = at(150, 150);
+    EXPECT_LT(ink.red(), 60) << "the ink on top, not washed";
+    EXPECT_LT(ink.green(), 60);
+
+    // Without the background (as before): white under the ink
+    const QImage plain = an::drawArea(doc, page, area, 2.0, false);
+    EXPECT_EQ(plain.pixelColor(80, 20), QColor(Qt::white));
+}

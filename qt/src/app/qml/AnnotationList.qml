@@ -1,5 +1,5 @@
 // The Annotations panel of the page sidebar (qt/docs/annotations-md.md): the document's highlights, text and Markdown
-// boxes, handwriting (a picture of each piece, and the PDF text it is on) and links, by page. A tap goes there. The list follows the document
+// boxes, handwriting (a picture of each piece on its page, washed out, and the PDF text it is on) and links, by page. A tap goes there. The list follows the document
 // (read again once the writing pauses). The filter button chooses the kinds shown; "Export as Markdown" writes them
 // into a .md with links back to their pages.
 import QtQuick
@@ -218,7 +218,10 @@ Item {
                         visible: entry.picture !== ""
                         Layout.preferredHeight: visible ? Math.min(96, Math.max(16, width * entry.aspect)) : 0
                         source: entry.picture
-                        sourceSize.width: Math.round(width * Screen.devicePixelRatio)
+                        // (the row's width, not the image's: that one changes while the row is laid out, and each
+                        // width would be a picture drawn)
+                        sourceSize.width: Math.round((entry.width - entry.leftPadding - entry.rightPadding - 9)
+                                                     * Screen.devicePixelRatio)
                         fillMode: Image.PreserveAspectFit
                         horizontalAlignment: Image.AlignLeft
                         asynchronous: true

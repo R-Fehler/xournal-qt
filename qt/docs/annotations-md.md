@@ -1,7 +1,7 @@
 # Annotations as Markdown
 
-Status: **stage 1 built in `qt/annotations-md`** (an experiment, 2026-09-26); every piece of handwriting listed in
-`qt/annotations-context` (2026-09-26). The author's goal (2026-09-25): collect a
+Status: **stage 1 built in `qt/annotations-md`** (an experiment, 2026-09-26); every piece of handwriting listed, with
+the page under it in its picture, in `qt/annotations-context` (2026-09-26). The author's goal (2026-09-25): collect a
 document's highlights and notes as Markdown, with links back to their places.
 
 ## The Annotations panel
@@ -14,7 +14,7 @@ document's annotations by page, top to bottom:
 | Highlight | The highlighter's strokes over PDF text, with the text under them. Strokes drawn one after another in one color on the same or the next lines are one highlight. Highlight, underline and strike through made from selected PDF text are highlighter strokes too. |
 | Highlight in the PDF | The PDF's own markup annotations (highlight, underline, squiggly, strike out) made in other apps, with the text under them and their note. The annotations our hybrid PDF writes for its own layers (`xopp:` names) are not listed twice. |
 | Text / Markdown | Text boxes and Markdown boxes with their text. The panel shows a Markdown box formatted. |
-| Handwriting | Every piece of ink, as a small picture: the pen's strokes (drawn by hand, with the ruler, as shapes or through the stroke recogniser: all pen strokes), on any visible layer, and highlighter strokes over no text (neither PDF text nor a text box). A stroke joins the piece written just before it when it is within 18 pt (about 6 mm); pieces that overlap are one; a dot or short mark (under 4 pt) joins the nearest piece within 36 pt, else it is listed by itself. Ink on PDF text (an underline, a circle, a strike through, a word written over the slide) is listed with that text: `on “Kalman gain”`. Not listed: the whiteout eraser's strokes (they hide ink), hidden layers. |
+| Handwriting | Every piece of ink, as a small picture of it on its page: the pen's strokes (drawn by hand, with the ruler, as shapes or through the stroke recogniser: all pen strokes), on any visible layer, and highlighter strokes over no text (neither PDF text nor a text box). A stroke joins the piece written just before it when it is within 18 pt (about 6 mm); pieces that overlap are one; a dot or short mark (under 4 pt) joins the nearest piece within 36 pt, else it is listed by itself. Ink on PDF text (an underline, a circle, a strike through, a word written over the slide) is listed with that text: `on “Kalman gain”`. Not listed: the whiteout eraser's strokes (they hide ink), hidden layers. |
 | Link | A link marker: a Markdown box that is only `[title](target)` ([links.md](links.md)). |
 | Note | Sticky notes: another block builds them and plugs in with `annotations::setNoteSource` (a function called for each page read, under the document's read lock). The filter shows "Notes" only when there are any. |
 
@@ -28,7 +28,7 @@ document's annotations by page, top to bottom:
 - The PDF's text is read (with a poppler instance of its own, `PdfLayoutReader`) only for pages that need it: pages
   with highlighter strokes, handwriting or markup annotations. Most pages of a big PDF have none.
 - The pictures of handwriting come from the `image://annotation/<session>/<revision>/<rect>` provider on a worker of
-  their own, only for the rows on screen, and only the page's layers (no background).
+  their own, only for the rows on screen. See "The page under the ink" below.
 
 ### Which text handwriting is on
 
@@ -41,6 +41,27 @@ whole words, and cut at 300 characters. Handwriting in the margin has no caption
 Before 2026-09-26 ink mostly over PDF text lines was left out as "a mark, not a note". On slides people write on the
 slide, so whole notes vanished (the author's report: a page listed its Markdown box and not its ink). Now nothing is
 left out; the caption tells what an underline or circle marks. Dots and short marks (under 4 pt) were dropped too.
+
+### The page under the ink
+
+A picture of handwriting shows the part of the page around it (the item with 8 pt around it, at least 60 × 30 pt):
+the page's PDF page, else its image background or paper colour, **washed out with 35 % white** (the page at about
+65 %), and the ink on top, not washed. Rulings (lined, graph paper) are left out: at this size they look like strokes
+and say nothing. Highlights, text and Markdown boxes have no picture: their text says it.
+
+How it stays cheap:
+- It is drawn for the rows on screen only (the ListView makes delegates for them), on one low-priority worker; the
+  row asked for last is drawn first, a row scrolled away before its turn is not drawn, and nothing is drawn while the
+  canvas has pages in view to draw. A 100-page document: the first screen draws 14 pictures, a jump to the end 10
+  more (the UI test counts them).
+- The part is drawn with a cairo clip: poppler draws only what falls into it. The picture is as wide as the panel's
+  row (in device pixels; at most 4 px per point), asked with one width per row (the row's, which does not change while
+  it is laid out; the image's own width did, and each width was a picture).
+- The pictures drawn last are kept (24 MB, the least recently used go first), by the page's revision and the width:
+  scrolling back shows them at once, an edited page's pictures are not asked for again.
+- Not reused: the thumbnails and sketches (they have the ink in them, which would show twice, blurred, and they are
+  far coarser than a crop shown 200 px wide) and the canvas's PdfCache (the pages in view only, at the canvas's zoom,
+  behind the canvas's own lock: the canvas would wait for the panel).
 
 Code: `qt/src/shell/Annotations.*` (what counts, the Markdown), `qt/src/shell/AnnotationsModel.*` (the panel's
 model, the worker, the pictures), `qt/src/app/AppAnnotations.cpp` (export), `qt/src/app/qml/AnnotationList.qml`.
@@ -86,8 +107,8 @@ The download button of the panel writes a `.md`:
 - **Handwriting: a page link with "(handwriting)", not a picture.** Our Markdown editor and Markdown boxes do not draw
   images yet ([markdown-boxes.md](markdown-boxes.md), "Not yet"), so a picture would show as its alt text there.
   The picture export is built and tested: `XQT_ANNOTATION_PICTURES=1` writes each piece as
-  `<name>.assets/p<page>-<n>.png` (Typora's folder convention) and links it as `![Handwriting, page N](…)`. Turn it
-  on by default once the editor draws images.
+  `<name>.assets/p<page>-<n>.png` (Typora's folder convention, the same crop as the panel's, with the page under
+  the ink) and links it as `![Handwriting, page N](…)`. Turn it on by default once the editor draws images.
 - Handwriting on PDF text ends with the text, quoted: `- [p. 1](…) (handwriting) on “Kalman gain”`, or
   `- ![Handwriting, page 1](…) on “Kalman gain” ([p. 1](…))` with pictures.
 

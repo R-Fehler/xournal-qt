@@ -1405,7 +1405,13 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       strike through made with the pen, a word written on the slide over its text, a rectangle and a ruler line, a dot
       by itself. The ones on PDF text say which text under the picture: `on “Kalman gain”` (whole words). The page
       where only the Markdown box was listed before now lists its ink too.
-- [ ] Export: handwriting on PDF text ends with `on “…”` in the `.md`.
+- [ ] The pictures show the page under the ink, washed out (the slide at about 65 %), the ink dark on top; a dot
+      shows some of the page around it. A page of lined or graph paper: no lines under the ink (the paper colour
+      stays); an image background shows.
+- [ ] A 300-page lecture PDF with ink on many pages: open the panel and fling through the list, drag its scroll bar to
+      the end: it stays smooth, pictures fill in for the rows in view; scrolling back shows them at once.
+- [ ] `XQT_ANNOTATION_PICTURES=1`: the exported PNGs have the page under the ink too; handwriting on PDF text ends
+      with `on “…”` in the `.md`.
 
 ## Sticky notes (qt/sticky-notes)
 

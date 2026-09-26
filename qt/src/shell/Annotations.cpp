@@ -20,14 +20,18 @@
 #include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "pdf/base/XojPdfPage.h"
 #include "view/LayerView.h"
 #include "view/View.h"
+#include "view/background/BackgroundFlags.h"
+#include "view/background/BackgroundView.h"
 
 #include "DocumentChapters.h"
 #include "DocumentLinks.h"
 #include "LinkRewrite.h"
 #include "MdDocument.h"
 #include "session/DocumentTextIndex.h"
+#include "session/PageNoteSpace.h"
 #include "session/StickyNote.h"
 
 namespace xqt::annotations {
@@ -635,7 +639,19 @@ std::vector<Item> collect(Document& doc, PdfLayoutReader* pdf) {
     return out;
 }
 
-QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double scale) {
+QRectF pictureRect(const QRectF& r) {
+    QRectF out = r.adjusted(-PICTURE_MARGIN, -PICTURE_MARGIN, PICTURE_MARGIN, PICTURE_MARGIN);
+    // (a dot shows where it is: some of the page around it)
+    if (out.width() < PICTURE_MIN_WIDTH) {
+        out.adjust(-(PICTURE_MIN_WIDTH - out.width()) / 2, 0, (PICTURE_MIN_WIDTH - out.width()) / 2, 0);
+    }
+    if (out.height() < PICTURE_MIN_HEIGHT) {
+        out.adjust(0, -(PICTURE_MIN_HEIGHT - out.height()) / 2, 0, (PICTURE_MIN_HEIGHT - out.height()) / 2);
+    }
+    return out;
+}
+
+QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double scale, bool background) {
     const int w = std::max(1, static_cast<int>(std::ceil(rect.width() * scale)));
     const int h = std::max(1, static_cast<int>(std::ceil(rect.height() * scale)));
     QImage img(w, h, QImage::Format_ARGB32_Premultiplied);
@@ -646,7 +662,33 @@ QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double s
     cairo_scale(cr, scale, scale);
     cairo_translate(cr, -rect.x(), -rect.y());
     cairo_rectangle(cr, rect.x(), rect.y(), rect.width(), rect.height());
-    cairo_clip(cr);
+    cairo_clip(cr);  // (poppler and the views draw only this part: the rest is clipped before it is rasterised)
+    if (background) {
+        // The page under the ink: its PDF page (drawn without the document lock, like the thumbnails: poppler has its
+        // own), else its image or paper colour. Rulings (lined, graph paper) are left out: at this size they look
+        // like strokes and say nothing about the note.
+        XojPdfPageSPtr pdfPage;
+        {
+            std::shared_lock lock(doc);
+            if (page->getBackgroundType().isPdfPage()) {
+                pdfPage = doc.getPdfPage(page->getPdfPageNr());
+            }
+        }
+        if (pdfPage) {
+            notespace::renderPdf(cr, *page, *pdfPage);
+        } else {
+            std::shared_lock lock(doc);
+            constexpr xoj::view::BackgroundFlags flags = {
+                    xoj::view::HIDE_PDF_BACKGROUND, xoj::view::SHOW_IMAGE_BACKGROUND, xoj::view::HIDE_RULING_BACKGROUND,
+                    xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR, xoj::view::FORCE_VISIBLE};
+            if (auto view = xoj::view::BackgroundView::createForPage(page, flags)) {
+                view->draw(cr);
+            }
+        }
+        // Dimmed, so the ink stands out: a light wash of white
+        cairo_set_source_rgba(cr, 1, 1, 1, BACKGROUND_WASH);
+        cairo_paint(cr);
+    }
     {
         std::shared_lock lock(doc);
         for (const Layer* layer: page->getLayersView()) {

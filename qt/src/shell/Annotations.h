@@ -113,9 +113,16 @@ std::vector<Item> collect(Document& doc, PdfLayoutReader* pdf);
 using NoteSource = std::function<void(const XojPage& page, std::vector<Item>& notes)>;
 void setNoteSource(NoteSource source);
 
-/// A picture of a part of a page: its visible layers (no background) on white, `scale` pixels per point. Takes the
-/// document's read lock; any thread.
-QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double scale);
+/// The part of a page the picture of an item shows: the item with some room around it (PICTURE_MARGIN), at least
+/// PICTURE_MIN_WIDTH × PICTURE_MIN_HEIGHT (a dot shows where it is).
+QRectF pictureRect(const QRectF& itemRect);
+constexpr double PICTURE_MARGIN = 8, PICTURE_MIN_WIDTH = 60, PICTURE_MIN_HEIGHT = 30;
+/// How much the page under the ink is washed out in a picture (a white wash of this opacity: the PDF at 65 %).
+constexpr double BACKGROUND_WASH = 0.35;
+/// A picture of a part of a page, `scale` pixels per point: with `background`, the page under it (its PDF page, else
+/// its image or paper colour; no rulings) washed out by BACKGROUND_WASH, then its visible layers; else the layers on
+/// white. Takes the document's read lock, not while the PDF is drawn; any thread.
+QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double scale, bool background = true);
 
 // --- the Markdown export ---------------------------------------------------------------------------------------
 
