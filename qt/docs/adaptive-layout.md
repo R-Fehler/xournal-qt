@@ -58,7 +58,8 @@ let go, never under it. The setting **Settings → Touch → Buttons sized for f
 off) overrides it.
 
 `minTarget` is 48 with the touch profile and 40 without. So far it sizes the page sidebar's switch (Pages, Layers,
-Contents, Annotations) and the full-screen tab bar (36 px high, arrows 48 wide). The later blocks size their own
+Contents, Annotations), the full-screen tab bar (36 px high, arrows 48 wide), the sidebar's arrow and the target of
+the tab that puts the tool bar away. The later blocks size their own
 targets with it (audit F14).
 
 ## Choices made by hand, per class
@@ -70,7 +71,7 @@ is stored per class in the app's settings (the `xournalQt` part of `settings.xml
 | --- | --- | --- |
 | `sidebar` | `shown`, `hidden` (none: automatic) | this block |
 | `chrome` | `compact`, `reader` (none: automatic, the full chrome) | this block |
-| `toolbar` | `top`, `twoRowsTop`, `twoRowsBottom`, `railLeft`, `railRight` (none: automatic) | `qt/adaptive-toolbar` |
+| `toolbar` | `top`, `twoRowsTop`, `twoRowsBottom`, `railLeft`, `railRight` (none: automatic) | `qt/adaptive-toolbar` (below) |
 
 `app.settings.layoutChoice(class, what)`, `setLayoutChoice(class, what, value)` ("" or "auto" removes it),
 `hasLayoutChoices()` and `resetLayoutChoices()` (`SettingsModel`). A change counts as a settings revision, so QML
@@ -90,12 +91,16 @@ size, "Controls at this size" (the chrome choice of this class), and "Reset the 
 - **docked** (beside the page) when this class chose `shown`, or nothing was chosen and `roomForSidebar`: the window
   is at least 1110 px wide (the page keeps ~900 px beside its 210 px), and the class is a desktop one. So a portrait
   tablet and a phone never get it docked automatically: a single A4 page must stay well visible;
-- otherwise hidden. Its **Pages** button then opens it as a **drawer** over the page, with the rest dimmed. Picking a
+- otherwise hidden. The **arrow** at the left edge of the canvas area (`sidebarArrow`, since qt/adaptive-toolbar: it
+  replaces the tool bar's Pages button) then opens it as a **drawer** over the page, with the rest dimmed. Picking a
   page (or a chapter, or an annotation) closes it, and so does a tap on the dimmed page. The drawer is for the
   moment: it is not remembered. The button just outside its edge (the sidebar icon) keeps it beside the page in this
   class (`shown`).
-- The Pages button in a docked sidebar hides it: `hidden` for this class where it would be shown automatically.
-  Showing it again where there is room clears the choice.
+- The same arrow sits at the sidebar's edge while it is open ("‹") and closes it: a docked sidebar is then `hidden`
+  for this class where it would be shown automatically. Showing it again where there is room clears the choice.
+- The arrow: a slim tab at 40 % of the canvas's height (clear of the search bar at the top and the pills at the
+  bottom), `minTarget` wide in the touch profile (24 px otherwise). Not in the compact or reader chrome, not while
+  presenting, and not while the tool bar is put away (unless the sidebar is open: then it closes it).
 
 `win.showSidebar(shown)` and `win.dockSidebar()` are the functions; `sidebarDocked`, `sidebarAsDrawer` and
 `sidebarDrawerOpen` the state.
@@ -164,7 +169,8 @@ How a menu uses it:
 
 ### The ⋮ menu
 
-Ten entries at the top (about 450 px high, 530 with the touch profile), the rest one level deeper:
+Nine entries at the top (at most), the rest one level deeper. Since qt/adaptive-toolbar it holds only what has no
+button of its own ("One place for each action", below):
 
 | Top level | Inside |
 | --- | --- |
@@ -173,15 +179,177 @@ Ten entries at the top (about 450 px high, 530 with the touch profile), the rest
 | Print… (Ctrl+P) | |
 | Bookmark this page / Remove the bookmark of this page | |
 | Add to favourites / Remove from favourites | |
-| **Document ▸** | Rename…, Open externally, Edit anyway (as plain text)…, Edit as notes, Open as PDF document, Remove unused images…, Linked from…, Copy link to this page |
+| **Document ▸** | Rename…, Edit anyway (as plain text)…, Open as PDF document, Remove unused images…, Linked from…, Copy link to this page |
 | **Export ▸** | Export as plain PDF…, Export for the archive…, Export as Markdown |
-| **Page ▸** (not for text files) | Insert pages…, Insert image…, Insert sticky note, Background of this page…, Page size…, Space for notes…, Start a chapter here… |
-| **View ▸** | All pages (Ctrl+Alt+G), All open documents, Full screen (F11), Present (F5), Present without controls (Ctrl+F5), Read (only the page: the reader chrome of this size class), Hide the tool bar, Tool bar position ▸ (Top, Left, Right) |
-| Settings (Ctrl+,) | |
+| **Page ▸** (not for text files) | Insert pages…, Background of this page…, Page size…, Space for notes…, Start a chapter here… |
+| **View ▸** | All open documents, Page layout… (phone portrait only: the view pill has no room for its button), Present without controls (Ctrl+F5), Read (only the page: the reader chrome of this size class), Tool bar position ▸ (Top, Two rows at the top, Two rows at the bottom, Left, Right, Automatic for this window size) |
 
-Entries that depend on the document (a `.md`: Edit as notes, Open as PDF document, Remove unused images; a text
-file: no Save as, no Page) are left out as before. "Markdown source beside the page" stays in the menu of the writing
-button.
+Entries that depend on the document (a `.md`: Open as PDF document, Remove unused images; a text file: no Save as, no
+Page) are left out as before. "Markdown source beside the page" is in the menu of the writing button (its long
+press). Entries and submenus have icons where an obvious one exists (`AdaptiveMenu.iconName` for a submenu's entry);
+the phone sheet shows them too.
+
+## The tool bar (`qt/adaptive-toolbar`)
+
+The author's decisions of 2026-09-26: a single A4 page stays well visible (no side chrome that narrows the page in
+portrait); two rows at the top on a portrait tablet; the tools grouped and prioritised for everyone, ⋮ pinned at the
+end; what does not fit goes into a "more tools" button next to ⋮, never scrolled away silently.
+
+### Its place, per size class
+
+`win.toolbarLayout` is the class's choice (`layout/<class>/toolbar`, ⋮ → View → Tool bar position), else automatic:
+
+| Layout | Automatic when | What |
+| --- | --- | --- |
+| `twoRowsTop` | tablet portrait (a 2-in-1 or a Surface upright); any other class that is not a phone when one row would hide a tool that is never hidden (e.g. 800×600, 600×800; back to one row with 32 px to spare) | two rows at the top: the tools on the first, the colors, widths, insert and file buttons on the second (below) |
+| `twoRowsBottom` | never (chosen) | the same two rows below the page, closer to the fingertips (like a phone browser's address bar) |
+| `top` | every other class (the older setting "top") | one row |
+| `railLeft`, `railRight` | the older setting "left" / "right" (Settings of before; not by size) | a column of two at a side, ⋮ pinned at its bottom |
+
+"Automatic for this window size" in the submenu removes the choice. `win.chooseToolbar(layout)` stores `""` when the
+layout is the automatic one. The older global `app.toolbarPosition` (top / left / right) is still read as the
+automatic place outside tablet portrait.
+
+### What goes where: ToolBarPlan.js
+
+`qt/src/app/qml/ToolBarPlan.js` is a pure function of the room (the bar's width, or a rail's height) and the buttons
+offered for the document. `toolArea` in `Main.qml` lays the buttons out by it (they are placed, not in a Layout), and
+again when the room, the buttons or the colors change. Groups, in order of use: **tools** (pen/highlighter, eraser,
+hand, the finger draws, select, text box, write on the page, sticky note, shapes, setsquare/compass, mark PDF text,
+the emoji while writing), **colors**, **widths**, **insert** (image, add a page), **view** (search, full screen,
+present, settings), **file** (new, open, save; a `.md`: edit as notes; a text file: open externally). ⋮ and "more
+tools" are pinned at the end, outside the part that could scroll.
+
+The bar is a flexible space filler: each group has several forms, and the bar takes the richest that fits, in this
+order of compression as the room runs short:
+
+1. everything expanded: all palette colors and "+", the five widths;
+2. the widths become **one cycling width button** (a tap: the next width, as the pen pill's; a long press: the five);
+3. the colors become **the current color, the recent ones and a palette button**: at least 4 recent colors (used
+   last, then the palette's), as many as fit (they are the filler: more room, more colors);
+4. low-priority buttons go into **"more tools"**, one by one: New, Open, Save, Settings, Present, Full screen, Edit as
+   notes, Open externally, Search, Add a page, Image, Emoji, Mark PDF text, Setsquare/compass, Shapes;
+5. the colors become **one cycling color button** (a tap: the next of the first five palette colors; a long press:
+   the palette) – phone-sized rooms only;
+6. on phones, last: Sticky note, Write on the page, Text box, The finger draws, Select, Hand. Pen/highlighter and the
+   eraser always stay.
+
+Two rows: the first row (tools, view) and the second (colors, widths, insert, file) are fitted one after the other,
+the second first; the end (⋮, "more tools") sits at the end of the first row. At 960 px (a Surface at 200 %) both rows
+show everything; at 720 px (a 2-in-1 at 125 %) the view buttons go into "more tools", the widths become one button and
+the colors the recent ones. The plan is deterministic; a bar that grows takes a richer plan only with 24 px to spare
+(no flicker at an edge), and nothing changes while a pointer is held (a stroke).
+
+The tools that are **never hidden** above phones (audit D3): pen, highlighter, eraser, hand and the finger draws,
+select (rectangle and lasso), the text box and writing on the page, the sticky note, the current color and at least
+four more, the width, and ⋮.
+
+**"More tools"** (`moreToolsButton`, », next to ⋮) opens `moreToolsPopup` below the bar (above a bottom bar, beside a
+rail): the buttons themselves, each with its name beside it (a tap on the name is a tap on the button), two columns
+when there are more than eight. It closes after a button was used, unless the button opened a menu of its own (the
+shapes' list), and when a tool is chosen.
+
+**The compact chrome** (full screen) shows the same buttons in the tool square's popup, in six columns (layout
+`grid`: nothing goes into "more tools" there; the popup scrolls).
+
+**A text document** being written (a `.md` with its format bar): the tool bar is merged into the format bar (F7.2): ⋮
+and "more tools" at the format bar's end (`MarkdownFormatBar.trailing`), all the other buttons (new, open, save, edit
+as notes, open externally, search, full screen, present, settings, emoji) in "more tools". One row instead of two.
+
+The tab that puts the bar away sits in the middle of its edge towards the pages (⋮ keeps the end); a rail's at 75 % of
+its height. Its target reaches into the pages, `minTarget` deep in the touch profile.
+
+### Cycling buttons
+
+Tools that do almost the same share one button (`ToolCycleButton.qml`, the logic in `ToolGroups.qml`, `win.toolGroups`):
+
+| Group | Variants (a tap goes through them) | Only in its list |
+| --- | --- | --- |
+| `pen` | pen ↔ highlighter (freehand) | |
+| `eraser` | standard ↔ whiteout ↔ whole strokes (`eraserMode`) | |
+| `select` | rectangle ↔ lasso | rectangle and lasso on all layers |
+| `shape` | line, rectangle, ellipse, arrow, double arrow, coordinate system, recognize shapes (the pen, or the highlighter in hand, draws them) | |
+| `geometry` | setsquare ↔ compass | "Take it off the page" (also the × of the geometry pill) |
+
+- A tap on the button while its tool is in use: the next variant. A tap while another tool is in use: its tool with
+  the variant used last (remembered per group in the setting `toolVariants`; the eraser's is `eraserMode`).
+- The icon is the variant in use (or the one last used); small dots under it say how many there are and which one.
+- A long press (or a right click) lists all variants with icon and name, with the group's name on top: to pick one.
+- The keys (P, H, E, S, L) take a variant directly; the button follows and remembers it.
+- The pen pill of the compact chrome uses the same `pen` button (smaller); the tool square's popup holds the tool
+  bar's buttons themselves.
+- The shapes menu and the eraser menu are gone. What they held besides variants: the sticky note (a button of its
+  own), the setsquare and the compass (their group), snapping to the grid (Settings), the eraser's size (the widths).
+
+The **text box** and **writing on the page** stay two buttons, not a cycling pair: writing on the page is switched on
+and off by its button (a tap while it is on ends it), which a cycle cannot do; the text box is a tool like the pen.
+The text box is always a Markdown text box now (`win.takeTextBox()` sets `textMarkdown`); the plain text tool is no
+longer offered (T takes the Markdown text box). Plain texts in documents are still drawn, and the text box tool still
+edits them as plain text (a tap on one: `CanvasView`, "an ordinary text there is edited as it is"). Its long press
+(or a tap while it is in use) opens the font: family and size.
+
+### Labels without hover
+
+Every button of the tool bar, the pills and "more tools" says what it is by its icon; where an icon alone was
+ambiguous it was replaced (below). Without hover (a finger):
+
+- a finger held on a button (`IconButton`) shows its name (`label`) above the finger while held; letting go then does
+  not press it. The mouse and the pen's hover show the tool tip as before; a mouse or a pen held long still presses
+  the button on release;
+- a button with a long press of its own keeps it (`ownHold`): a cycling button (its list), the writing button (the
+  Markdown source beside the page), the text box (the font), Mark PDF text (how it marks), Add a page (Insert
+  pages…), Present (without controls), the page layout (its menu), the zoom percentage (the whole page), a color (its
+  menu). A menu it opens shows the button's name on top (`AdaptiveMenu.titleShown`);
+- "more tools" shows the names beside the buttons; the phone sheet shows the menus' icons and names.
+
+**Icons changed** (in `qt/resources/icons`, Lucide's or drawn in their style; see its README): the finger draws
+(`xqt-finger-draw`), mark PDF text (`xqt-mark-text`), the text box (`xqt-text-box`), writing on the page
+(`xqt-page-text`), the eraser's whiteout (`xqt-eraser-whiteout`) and whole strokes (`xqt-eraser-stroke`), the page
+layout (`xqt-page-single` / `xqt-book-open`), "more tools" (`xqt-tools-more`), and icons for the ⋮ entries.
+
+### The view pill
+
+Undo, redo, the page layout, the page grid, **the contents** (moved here from the tool bar), the page number, and a
+small **zoom percentage** (no − / + any more):
+
+- a tap on the percentage: after the platform's double-click time (so a double tap does not flash it) a menu: Fit the
+  width (Ctrl+0), Real size 100 % (Ctrl+1), Fit the height (the page's height fills the view), Fit the whole page;
+- a double click / double tap, or a long press: the whole page; a right click: the menu at once;
+- pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle button zoom as before.
+
+It never runs out of the window (clamped 8 px inside; in a narrow canvas it lies over the neighbour), and it moves up
+above the reference's pill where the two would meet. In phone portrait (and tiny) the page layout button is left out:
+⋮ → View → Page layout… opens its menu.
+
+### One place for each action
+
+The author's rule: only one way to do things, to reduce menu clutter. No ⋮ entry repeats a button of the tool bar
+(or its "more tools"), the view pill or the sidebar; keyboard shortcuts stay. Where the button can be out of sight:
+
+| Action | Its one place | Keys | With the bar put away / in the compact or reader chrome |
+| --- | --- | --- | --- |
+| Pen, highlighter, eraser, hand, the finger draws, select, text box, write on the page, sticky note, shapes, setsquare / compass, mark PDF text, colors, widths | tool bar (tools: cycling buttons) | P H E A S L T I, Ctrl+Alt+M | the tool square's popup (compact); the pen pill (colors, width, pen / highlighter); the strip at the edge brings the bar back |
+| Insert image (was also ⋮ → Page) | tool bar / more tools | I | as above |
+| Insert sticky note (was also ⋮ → Page and the shapes menu) | tool bar | | as above |
+| Add a page (long press: Insert pages…) | tool bar / more tools | Ctrl+N | as above; ⋮ → Page → Insert pages… is kept (a dialog: several pages, background, size) |
+| Search | tool bar / more tools | Ctrl+F | |
+| Full screen (was also ⋮ → View) | tool bar / more tools | F11 | in full screen: "Leave full screen" in the tool square's popup, Esc |
+| Present (was also ⋮ → View) | tool bar / more tools | F5 | the tool square's popup ("Present") |
+| Present without controls | ⋮ → View (it differs from Present) | Ctrl+F5; a long press on Present | |
+| Settings (was also ⋮) | tool bar / more tools | Ctrl+, | the tool square's popup; the home screen's settings |
+| New, Open, Save | tool bar / more tools | Ctrl+Shift+N, Ctrl+O, Ctrl+S | the tab strip's + |
+| Edit as notes, Open externally (were also ⋮ → Document) | tool bar / more tools (a `.md`: more tools in the format bar) | | |
+| All pages (was also ⋮ → View) | view pill | Ctrl+Alt+G | the view pill stays in the compact chrome |
+| Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above |
+| Page layout | view pill (long press: the menu); phone portrait: ⋮ → View → Page layout… | | |
+| Zoom fits | view pill's percentage | Ctrl+0, Ctrl+1 | |
+| The page sidebar (was the tool bar's Pages button) | the arrow at the canvas's edge / the sidebar's edge | | not in the compact or reader chrome |
+| Hide the tool bar (was also ⋮ → View) | the tab on the bar's edge | | the strip at the edge shows it again |
+| Tool bar position | ⋮ → View → Tool bar position | | |
+| Snap to the grid (was the shapes menu) | Settings | | |
+| Plain text box (removed) | – (T and the text box make Markdown text boxes; plain texts are still edited) | | |
+
+The reader chrome hides everything; its corner mark brings the full chrome back (as before).
 
 ## The collapse ladder (what the later blocks build)
 
@@ -189,9 +357,9 @@ The author's decisions of 2026-09-26 on the audit's proposals:
 
 | Step | When (automatic) | What changes | Block |
 | --- | --- | --- | --- |
-| 0 | desktop wide, room for the sidebar | everything as today; the tool bar grouped (colors, widths), ⋮ pinned | `qt/adaptive-toolbar` |
+| 0 | desktop wide, room for the sidebar | everything as today; the tool bar grouped (colors, widths), ⋮ pinned (**done**) | `qt/adaptive-toolbar` |
 | 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer (**done**) | this block |
-| 1b | tablet portrait (a 2-in-1 or Surface upright) | **two tool rows** at the top by default, all important tools shown; "two rows at the bottom" (closer to the fingertips) as the class's choice; no side chrome that narrows the page: an A4 page stays well visible | `qt/adaptive-toolbar` |
+| 1b | tablet portrait (a 2-in-1 or Surface upright) | **two tool rows** at the top by default, all important tools shown; "two rows at the bottom" (closer to the fingertips) as the class's choice; no side chrome that narrows the page: an A4 page stays well visible (**done**) | `qt/adaptive-toolbar` |
 | 2 | phone portrait (w < 600) or short (h < 560) | the compact chrome in the window: tab dots, and a **bottom tool dock** in phone portrait (the tool square with the pen pill in landscape); dialogs and menus as sheets (menus: **done**) | `qt/compact-chrome`, `qt/adaptive-menus`, `qt/adaptive-dialogs` |
 | 3 | **tiny only** (w or h < 360) | the reader chrome, automatically; everywhere else "Read" is a manual choice | `qt/compact-chrome` |
 
@@ -244,6 +412,18 @@ that rework their screens:
 - `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizes*'`: the same checks (with the menus
   and all submenus) at all 18 sizes of the audit (about 70 s), with a `[ WALK ]` line per screen (outside, hidden by
   scrolling, small).
+- The tool bar (qt/adaptive-toolbar), in the same checks at the five sizes (and all 18 with `XQT_UI_ADAPTIVE=1`): ⋮
+  shown and outside anything that scrolls; the tools that are never hidden shown (on phones: shown or in "more
+  tools"); the colors (the current one and at least 4 more, above phones) and the width; "more tools" only when
+  something is in it; the view pill inside the window; two rows with nothing in "more tools" at 960×1392.
+  `twoRowsFitAt720`, `toolBarPlaceIsChosenPerSizeClass` (two rows at the bottom, remembered per class, the rail with ⋮
+  at its bottom, "Automatic"), `colorsAndWidthsTakeTheRoomThereIs` (all at 1920, the width button and the recent
+  colors at 1280, the cycling color button at 412: tap and long press), `moreToolsHoldsWhatDoesNotFit`,
+  `sidebarArrowOpensAndCloses`, `viewPillWithContentsInsideAndClearOfTheReference` (five sizes, a reference open).
+  `XQT_TOOLBAR_SHOTS=<folder> ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.toolBarPictures'` saves pictures of
+  the layouts (about 20 s).
+- `MainWindowTest.zoomPercentageTapDoubleTapAndHold`, `cyclingToolButtons`, `theEraserButtonCyclesHowItErases`,
+  `theGeometryButtonPutsTheSetsquareOnThePage`, `aFingerHeldOnAButtonShowsItsName`.
 - `SettingsModelTest.layoutChoicesPerSizeClass` (label `shell`): the storage.
 - The audit's own walk (`XQT_UI_AUDIT`, pictures and `report.tsv`, now with the class) shares the walker
   (`qt/tests/ui/LayoutWalk.h`).
