@@ -14,7 +14,11 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 
 | Action | What it does |
 | --- | --- |
+| **Search in this document** | the document's search bar with the text, run (qt/selection-search) |
+| **Search in open tabs** | the tab overview, its search with the text |
+| **Search in the library** | the home screen, the library's search with the text (the library shown) |
 | **Find this paper** | the library, by title (section 2); no hit: Google Scholar and arXiv |
+| **Search the web** | the browser, with the search engine of Settings (below) |
 | **Search in Google Scholar** | the browser, `https://scholar.google.com/scholar?q=<text>` |
 | **Translate** | the browser, with the translator of Settings (below) |
 | **arXiv 1706.03762** | only when the text has an arXiv ID: its page, or its PDF downloaded into the library (section 3) |
@@ -30,6 +34,22 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 - The browser: `QDesktopServices::openUrl`, through `SystemApps` so tests never start one. Only `http`/`https`.
 - The query is the selected text, whitespace collapsed, hyphenation at line ends joined ("hyphen- ation" →
   "hyphenation"), cut to 500 characters for Scholar and 1,500 for translators (URL lengths).
+
+**The menu's order** (qt/selection-search): the searches here first (document, open tabs, library), then the
+paper (Find this paper, arXiv), then the web (Search the web, Scholar, Translate), with separators between them.
+The searches take the text cleaned as above and cut to its first **200 characters** at a word (`cite::QUERY_CHARS`,
+`Citations::searchQuery`); the document search, the overview's and the library's are run at once (no waiting for
+Enter, whatever the length). In the reference beside the notes, the reference has no search of its own: its entry
+reads "Search in “<the notes' name>”" and searches the notes (with the notes' own document as reference, "Search in
+this document").
+
+**Search the web.** Settings → Documents → "Web and citations" → *Search the web with*: Google (default,
+`https://www.google.com/search?q={text}`), DuckDuckGo, Bing, Ecosia, Startpage (`/sp/search?query=`), Brave Search,
+Qwant, or "Custom…" with an address in which `{text}` is replaced (`cite::searchEngines`). A custom address must be
+`http(s)`, with a host, and have `{text}` (not in the host); an address that is not valid is not stored (the hint
+under the field says why). The text is percent-encoded (`QUrl::toPercentEncoding`: `& + = ? # %` never become the
+address's own) and the address parsed strictly (`QUrl::StrictMode`). The entry shows the engine's name and its
+address, and opens through the same confirmation as Scholar.
 
 **Translate.** Settings → Documents → "Web and citations":
 - *Translator*: Google Translate (default), DeepL, Bing Translator, or "Custom…" with an address in which `{text}`
@@ -137,6 +157,7 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 | Key | Values | Default |
 | --- | --- | --- |
 | `webConfirm` | ask before opening a web address | on |
+| `webSearch` | `google`, `duckduckgo`, `bing`, `ecosia`, `startpage`, `brave`, `qwant`, or a custom address with `{text}` | `google` |
 | `translateService` | `google`, `deepl`, `bing`, or a custom address with `{text}` / `{lang}` | `google` |
 | `translateLanguage` | a language code, `""` = the system's | `""` |
 | `networkAccess` | `ask`, `on`, `off` | `ask` |
@@ -166,8 +187,16 @@ As planned above, with these details:
   (`LibraryIndex::titleSearch`), so a big library does not stall the window.
 - arXiv: `ArxivSheet.qml` (with the opt-in dialog), `Citations` (search, look-up, download), `NetFetch` /
   `ArxivQueue` (`qt/src/shell/NetFetch.*`). Only the first arXiv ID of a selection is offered in the menu.
-- Tests: `CitationTest` (session: queries, addresses, 15 real bibliography entries, title words and scores, arXiv
+- The searches of selected text (qt/selection-search): `LookUpMenu.qml` calls `win.searchInDocument`
+  (opens the search bar, sets `app.searchQuery`: the bar follows a search set from elsewhere), `win.searchOpenTabs`
+  (`TabOverview.searchFor`) and `win.searchLibraryFor` (`HomeView.searchFor`). The Markdown source beside the page
+  and text-mode documents have no look-up menu, so no searches either.
+- Tests: `CitationTest` (session: queries, addresses, every web search engine, a custom search address and its
+  validation, the 200-character cut, the escaping), 15 real bibliography entries, title words and scores, arXiv
   IDs, the saved Atom answers, download names), `CitationLibraryTest` and `ArxivTest` (shell: titles in the index,
   papers named by numbers found by title, old entries, opt-in, the 3 s queue, downloads with a fake network),
-  `CitationsTest` (ui: the confirmation with the address, "Don't ask again", our own text, the pill → the hits → the
+  `SettingsModelTest.theWebSearchIsKept` (shell: the setting in the settings file),
+  `CitationsTest` (ui: the menu's order; the text in the document's search bar, the overview's and the library's
+  search; Search the web with DuckDuckGo and a custom address through the confirmation to the fake browser; the
+  confirmation with the address, "Don't ask again", our own text, the pill → the hits → the
   reference, copy link, no hit → Scholar, the arXiv flow with the opt-in → download → reference).

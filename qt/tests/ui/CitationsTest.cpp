@@ -10,6 +10,7 @@
 #include <functional>
 #include <shared_mutex>
 
+#include <QAbstractItemModel>
 #include <QBuffer>
 #include <QClipboard>
 #include <QImage>
@@ -115,6 +116,7 @@ protected:
     void TearDown() override {
         settings()->set("webConfirm", true);
         settings()->set("translateLanguage", "");
+        settings()->set("webSearch", "google");
         controller->shutdown();
         engine.reset();
         controller.reset();
@@ -332,6 +334,124 @@ TEST_F(CitationsTest, textBeingWrittenIsLookedUpToo) {
     until([&] { return shown("contextLookUp"); });
     EXPECT_TRUE(shown("contextLookUp"));
     QTest::keyClick(window, Qt::Key_Escape);
+}
+
+// Search selected text (qt/selection-search): the look-up menu has the searches here first, then the paper, then the
+// web. Each local search gets the text: the document's search bar, the tab overview's search, the library's search.
+TEST_F(CitationsTest, selectedTextIsSearchedInTheDocumentTheTabsAndTheLibrary) {
+    selectReference();
+    auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
+    const QString query = citations->searchQuery(controller->selectedText());
+    ASSERT_FALSE(query.isEmpty());
+    EXPECT_TRUE(query.contains("Attention is all you need"));
+    click("pdfLookUpButton");
+    until([&] { return shown("lookUpSearchDocument"); });
+    shot("6-search-menu");
+    // The order: the searches here, the paper, the web
+    auto yOf = [&](const char* name) {
+        auto* i = find<QQuickItem>(name);
+        return i && i->isVisible() ? i->mapToScene(QPointF(0, 0)).y() : -1.0;
+    };
+    const char* order[] = {"lookUpSearchDocument", "lookUpSearchTabs", "lookUpSearchLibrary", "lookUpFindPaper",
+                           "lookUpWebSearch", "lookUpScholar", "lookUpTranslate"};
+    for (size_t i = 1; i < std::size(order); ++i) {
+        EXPECT_LT(yOf(order[i - 1]), yOf(order[i])) << order[i - 1] << " before " << order[i];
+    }
+    EXPECT_GE(yOf(order[0]), 0);
+
+    // In this document: the search bar has the text, and it runs
+    click("lookUpSearchDocument");
+    until([&] { return shown("searchBar") && !shown("lookUpMenu"); });
+    ASSERT_TRUE(shown("searchBar"));
+    EXPECT_EQ(controller->searchQuery(), query);
+    until([&] { return find("searchField")->property("text").toString() == query; });
+    EXPECT_EQ(find("searchField")->property("text").toString(), query) << "the bar shows what it searches";
+    until([&] { return controller->searchHitCount() > 0; });
+    EXPECT_GT(controller->searchHitCount(), 0) << "found on the page it was selected on";
+
+    // In the open tabs: the overview opens with its search for the text, run
+    if (!controller->pdfTextIsSelected()) {
+        selectReference();
+    }
+    click("pdfLookUpButton");
+    click("lookUpSearchTabs");
+    until([&] { return shown("tabOverview"); });
+    ASSERT_TRUE(shown("tabOverview"));
+    EXPECT_EQ(find("overviewSearchField")->property("text").toString(), query);
+    auto* tabs = qobject_cast<QAbstractItemModel*>(controller->tabsModel());
+    ASSERT_NE(tabs, nullptr);
+    const int hitsRole = tabs->roleNames().key("searchHits", -1);
+    ASSERT_GE(hitsRole, 0);
+    until([&] { return tabs->data(tabs->index(0, 0), hitsRole).toInt() > 0; });
+    EXPECT_GT(tabs->data(tabs->index(0, 0), hitsRole).toInt(), 0) << "the tabs were searched";
+    shot("7-search-tabs");
+    QMetaObject::invokeMethod(find("tabOverview"), "close");
+    until([&] { return !shown("tabOverview"); });
+
+    // In the library: the home screen, with the library's search for the text
+    if (!controller->pdfTextIsSelected()) {
+        selectReference();
+    }
+    click("pdfLookUpButton");
+    click("lookUpSearchLibrary");
+    until([&] { return controller->homeVisible() && library()->searchQuery() == query; });
+    EXPECT_TRUE(controller->homeVisible());
+    EXPECT_EQ(library()->searchQuery(), query);
+    EXPECT_EQ(find("librarySearchField")->property("text").toString(), query);
+    EXPECT_FALSE(shown("pdfTextHandles")) << "the knobs of the selected text are not laid over the library";
+    shot("8-search-library");
+}
+
+// Search the web: the engine of Settings, its address shown in the menu and asked with (as Scholar's), and exactly that
+// address goes to the browser. A custom address works the same; "Don't ask again" is respected.
+TEST_F(CitationsTest, searchTheWebAsksWithTheEnginesAddress) {
+    settings()->set("webSearch", "duckduckgo");
+    selectReference();
+    auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
+    const QString query = citations->searchQuery(controller->selectedText());
+    click("pdfLookUpButton");
+    until([&] { return shown("lookUpWebSearch"); });
+    ASSERT_TRUE(shown("lookUpWebSearch"));
+    EXPECT_TRUE(find("lookUpWebSearchUrl")->property("text").toString().startsWith("https://duckduckgo.com/?q="))
+            << find("lookUpWebSearchUrl")->property("text").toString().toStdString();
+    EXPECT_TRUE(find("lookUpWebSearch")->property("text").toString().contains("DuckDuckGo"));
+    click("lookUpWebSearch");
+    until([&] { return shown("webConfirm"); });
+    ASSERT_TRUE(shown("webConfirm")) << "asked first";
+    EXPECT_TRUE(browser.opened.isEmpty());
+    const QString url = find("webConfirmUrl")->property("text").toString();
+    EXPECT_EQ(QUrl(url).host(), "duckduckgo.com");
+    EXPECT_EQ(QUrlQuery(QUrl(url)).queryItemValue("q", QUrl::FullyDecoded), query);
+    shot("9-web-search-confirm");
+    click("webConfirmOpen");
+    until([&] { return !browser.opened.isEmpty() && !shown("webConfirm"); });
+    ASSERT_EQ(browser.opened.size(), 1);
+    EXPECT_EQ(browser.opened.front().toString(QUrl::FullyEncoded), url) << "the address shown is the one opened";
+
+    // A custom address, and no more questions
+    settings()->set("webSearch", "https://search.example.org/find?lang=de&q={text}");
+    if (!controller->pdfTextIsSelected()) {
+        selectReference();
+    }
+    click("pdfLookUpButton");
+    until([&] { return shown("lookUpWebSearch"); });
+    EXPECT_TRUE(find("lookUpWebSearchUrl")->property("text").toString().startsWith("https://search.example.org/find?"));
+    click("lookUpWebSearch");
+    until([&] { return shown("webConfirm"); });
+    click("webConfirmDontAsk");
+    click("webConfirmOpen");
+    until([&] { return browser.opened.size() == 2 && !shown("webConfirm"); });
+    ASSERT_EQ(browser.opened.size(), 2);
+    EXPECT_EQ(browser.opened.back().host(), "search.example.org");
+    EXPECT_EQ(QUrlQuery(browser.opened.back()).queryItemValue("q", QUrl::FullyDecoded), query);
+    if (!controller->pdfTextIsSelected()) {
+        selectReference();
+    }
+    click("pdfLookUpButton");
+    click("lookUpWebSearch");
+    until([&] { return browser.opened.size() == 3 && !shown("lookUpMenu"); });
+    EXPECT_EQ(browser.opened.size(), 3);
+    EXPECT_FALSE(shown("webConfirm")) << "not asked any more";
 }
 
 // A reference (selected in a PDF) finds its paper in the library by the paper's title - the file is named by its

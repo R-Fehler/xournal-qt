@@ -1,8 +1,8 @@
 /*
  * xournal-qt: citations, the QML side (`app.citations`, qt/docs/citations.md).
  *
- * Selected text (PDF text, or the text being written) can be looked up: Google Scholar and a translator in the
- * browser. Every web address is shown before it is opened (the menu shows it; a confirmation shows it whole unless
+ * Selected text (PDF text, or the text being written) can be looked up: the web search engine of Settings, Google
+ * Scholar and a translator in the browser (and searched here: the QML takes `searchQuery`, its first 200 characters). Every web address is shown before it is opened (the menu shows it; a confirmation shows it whole unless
  * "Don't ask again" was chosen); the browser is reached through SystemApps, which tests replace.
  *
  * A bibliography entry finds its paper in the library: its title is guessed (cite::guessTitle), and the library's
@@ -55,6 +55,18 @@ public:
     /// The translator's address for the text (Settings: `translateService`, `translateLanguage`); "" for an empty
     /// text or a custom translator address that is not valid.
     Q_INVOKABLE QString translateUrl(const QString& text) const;
+    /// The web search's address for the text (Settings: `webSearch`, an engine or a custom address with `{text}`); ""
+    /// for an empty text or a custom address that is not valid.
+    Q_INVOKABLE QString webSearchUrl(const QString& text) const;
+    /// The name of the web search engine of Settings ("Google"; "" for a custom address).
+    Q_INVOKABLE QString webSearchName() const;
+    /// The engines Settings offers: [{ key, name }]
+    Q_INVOKABLE QVariantList searchEngines() const;
+    /// A custom search address Settings accepts: http(s), with `{text}`.
+    Q_INVOKABLE bool isSearchTemplate(const QString& pattern) const;
+    /// The selection as the searches take it (the document, the open tabs, the library): cleaned (cleanText), at
+    /// most the first 200 characters, cut at a word.
+    Q_INVOKABLE QString searchQuery(const QString& text) const;
     /// Open a web address (http, https) in the browser. The caller showed it first. False for anything else.
     Q_INVOKABLE bool openWeb(const QString& url);
     /// An address to read: its escapes decoded ("q=Attention is all"); what opens is the address itself.

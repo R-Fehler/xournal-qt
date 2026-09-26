@@ -68,6 +68,14 @@ Rectangle {
         searchField.forceActiveFocus()
         searchField.selectAll()
     }
+    /// Search the library for this text, right away (selected text: the look-up menu)
+    function searchFor(text) {
+        page = 0
+        searchTyping.stop()
+        searchField.text = text
+        lib.searchQuery = text
+        libraryGrid.forceActiveFocus()
+    }
     onVisibleChanged: if (visible) focusGrid()
     onPageChanged: focusGrid()
     function openLibraryRow(index) {

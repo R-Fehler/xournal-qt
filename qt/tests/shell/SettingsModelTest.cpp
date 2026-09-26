@@ -201,6 +201,25 @@ TEST_F(SettingsModelTest, savedOnceWhenTheScreenCloses) {
     EXPECT_FALSE(reloaded.isZoomGesturesEnabled());
 }
 
+// The web search of selected text (qt/selection-search): Google until another engine or an address is chosen, and
+// the choice is in the settings file.
+TEST_F(SettingsModelTest, theWebSearchIsKept) {
+    EXPECT_EQ(model->get("webSearch").toString(), "google") << "the default";
+    const QString file = tmp.filePath("settings.xml");
+    for (const QString& choice: {QStringLiteral("duckduckgo"), QStringLiteral("https://example.org/?q={text}")}) {
+        model->begin();
+        model->set("webSearch", choice);
+        model->end();
+        Settings reloaded(fs::path(file.toStdString()));
+        reloaded.load();
+        std::string v;
+        EXPECT_TRUE(reloaded.getCustomElement("xournalQt").getString("webSearch", v));
+        EXPECT_EQ(QString::fromStdString(v), choice);
+        auto again = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(file.toStdString()), 1);
+        EXPECT_EQ(SettingsModel(*again).get("webSearch").toString(), choice);
+    }
+}
+
 // Snapping to the grid is off: for a new setup, and once for settings saved before (where upstream's default had
 // switched it on). After that it stays as chosen.
 TEST_F(SettingsModelTest, snappingToTheGridIsOffUnlessChosen) {

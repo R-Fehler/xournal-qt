@@ -52,6 +52,34 @@ QString Citations::translateUrl(const QString& text) const {
     return url.isValid() ? url.toString(QUrl::FullyEncoded) : QString();
 }
 
+QString Citations::webSearchUrl(const QString& text) const {
+    const QString pattern = cite::searchEnginePattern(customString(settings, "webSearch", QStringLiteral("google")));
+    const QUrl url = cite::webSearchUrl(pattern, text);
+    return url.isValid() && !url.isEmpty() ? url.toString(QUrl::FullyEncoded) : QString();
+}
+
+QString Citations::webSearchName() const {
+    const QString key = customString(settings, "webSearch", QStringLiteral("google")).trimmed();
+    for (const cite::SearchEngine& e: cite::searchEngines()) {
+        if (e.key == key) {
+            return e.name;
+        }
+    }
+    return {};
+}
+
+QVariantList Citations::searchEngines() const {
+    QVariantList list;
+    for (const cite::SearchEngine& e: cite::searchEngines()) {
+        list << QVariantMap{{QStringLiteral("key"), e.key}, {QStringLiteral("name"), e.name}};
+    }
+    return list;
+}
+
+bool Citations::isSearchTemplate(const QString& pattern) const { return cite::isSearchTemplate(pattern); }
+
+QString Citations::searchQuery(const QString& text) const { return cite::cleanText(text, cite::QUERY_CHARS); }
+
 bool Citations::openWeb(const QString& url) {
     const QUrl u = QUrl::fromEncoded(url.toUtf8(), QUrl::StrictMode);
     if (!cite::isWebAddress(u) || !SystemApps::instance().openWebAddress(u)) {

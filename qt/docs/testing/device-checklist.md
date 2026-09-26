@@ -1829,3 +1829,28 @@ Design: [md-images.md](../md-images.md).
 - [ ] A phone-wide window (Fold 7 folded): the bar fits the canvas, the field narrower, all buttons reachable.
 - [ ] A long PDF (the pgf manual) opened with Fuzzy on, wait a few seconds, then type a fuzzy search in the bar: no
       pause at the first key (the vocabularies were made in the background).
+
+## Search selected text (qt/selection-search)
+- [ ] Select PDF text (the PDF text tool, or a long press), tap the magnifier of its pill: the menu starts with
+      "Search in this document", "Search in open tabs", "Search in the library"; then "Find this paper in the
+      library" (and arXiv, if the text has an ID); then "Search the web (Google)", "Search in Google Scholar",
+      "Translate", each with its address as a second line.
+- [ ] "Search in this document": the search bar opens with the text in it, the hits are counted and the first is
+      shown. Typing in the bar afterwards still searches as usual.
+- [ ] "Search in open tabs" (two or three documents open): the overview opens with the text in its search field;
+      documents with hits are marked.
+- [ ] "Search in the library": the home screen opens on the library shown before, with the text in its search field
+      and the hits listed.
+- [ ] "Search the web": the confirmation shows the whole address (Google by default); Open opens the browser there.
+      After "Don't ask again" it opens straight away; Settings turns the question back on.
+- [ ] Settings → Documents → "Web and citations" → "Search the web with": choose DuckDuckGo, Bing, Ecosia,
+      Startpage, Brave Search, Qwant in turn; the menu's address changes with it, and each opens a result page for
+      the text. The choice is still there after restarting the app.
+- [ ] "Custom…": an address such as `https://www.wikipedia.org/w/index.php?search={text}` is taken; without
+      `{text}`, or not starting with http(s)://, the hint turns red and the old choice stays.
+- [ ] A long selection (half a page): the searches take its first 200 characters, ending at a whole word.
+- [ ] Text selected in a Markdown box or a text element (right click / long press → "Look up…"): the same entries.
+- [ ] The reference beside the notes: select text there, open its look-up menu: "Search in “notes name”" searches
+      the notes (the reference has no search of its own); the other entries as above. With the notes' own document
+      as reference, the entry reads "Search in this document".
+- [ ] Android (Fold 7): the menu fits the screen (folded and unfolded), the entries are easy to tap.

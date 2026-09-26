@@ -68,6 +68,84 @@ TEST(Citation, aCustomTranslatorMustBeAWebAddressWithTheText) {
     EXPECT_FALSE(cite::translateUrl("", "x", "de").isValid()) << "no translator: no address";
 }
 
+// The web search of selected text (qt/selection-search): each engine's address has the text as its query
+TEST(Citation, eachSearchEngineGetsTheTextAsItsQuery) {
+    struct Expected {
+        const char* key;
+        const char* host;
+        const char* path;
+        const char* item;
+    };
+    const Expected engines[] = {{"google", "www.google.com", "/search", "q"},
+                                {"duckduckgo", "duckduckgo.com", "/", "q"},
+                                {"bing", "www.bing.com", "/search", "q"},
+                                {"ecosia", "www.ecosia.org", "/search", "q"},
+                                {"startpage", "www.startpage.com", "/sp/search", "query"},
+                                {"brave", "search.brave.com", "/search", "q"},
+                                {"qwant", "www.qwant.com", "/", "q"}};
+    ASSERT_EQ(cite::searchEngines().size(), std::size(engines));
+    EXPECT_EQ(cite::searchEngines().front().key, "google") << "the default comes first";
+    for (const Expected& e: engines) {
+        SCOPED_TRACE(e.key);
+        const QString pattern = cite::searchEnginePattern(e.key);
+        ASSERT_FALSE(pattern.isEmpty());
+        const QUrl url = cite::webSearchUrl(pattern, "Kalman\n  filter");
+        ASSERT_TRUE(url.isValid());
+        EXPECT_EQ(url.scheme(), "https");
+        EXPECT_EQ(url.host(), e.host);
+        EXPECT_EQ(url.path(), e.path);
+        EXPECT_EQ(queryItem(url, e.item), "Kalman filter") << "cleaned: whitespace collapsed";
+    }
+}
+
+TEST(Citation, theWebSearchEscapesTheTextAndTakesItsFirstWords) {
+    const QString google = cite::searchEnginePattern("google");
+    const QUrl url = cite::webSearchUrl(google, "C++ & Rust: a+b = c? #1 100% Würde/Straße");
+    EXPECT_EQ(url.toString(QUrl::FullyEncoded),
+              "https://www.google.com/search?q=C%2B%2B%20%26%20Rust%3A%20a%2Bb%20%3D%20c%3F%20%231%20100%25%20"
+              "W%C3%BCrde%2FStra%C3%9Fe")
+            << "& + = ? # % are escaped, not taken for the address's own";
+    EXPECT_EQ(queryItem(url, "q"), "C++ & Rust: a+b = c? #1 100% Würde/Straße");
+    EXPECT_FALSE(url.hasFragment());
+
+    // A long selection: its first 200 characters, cut at a word
+    QString longText;
+    for (int i = 0; longText.size() < 1000; ++i) {
+        longText += QStringLiteral("word%1 ").arg(i);
+    }
+    const QString q = queryItem(cite::webSearchUrl(google, longText), "q");
+    EXPECT_LE(q.size(), cite::QUERY_CHARS);
+    EXPECT_GT(q.size(), cite::QUERY_CHARS - 12);
+    EXPECT_TRUE(longText.startsWith(q + " ")) << "whole words: " << q.toStdString();
+    EXPECT_EQ(cite::cleanText(longText, cite::QUERY_CHARS), q);
+
+    EXPECT_FALSE(cite::webSearchUrl(google, "  \n ").isValid()) << "no text: no address";
+    EXPECT_FALSE(cite::webSearchUrl("", "x").isValid()) << "no engine: no address";
+}
+
+TEST(Citation, aCustomSearchMustBeAWebAddressWithTheText) {
+    const QString custom = "https://example.org/find?lang=de&q={text}";
+    EXPECT_TRUE(cite::isSearchTemplate(custom));
+    EXPECT_EQ(cite::searchEnginePattern(custom), custom);
+    const QUrl url = cite::webSearchUrl(custom, "a & b");
+    EXPECT_EQ(queryItem(url, "q"), "a & b");
+    EXPECT_EQ(queryItem(url, "lang"), "de");
+    EXPECT_EQ(url.toString(QUrl::FullyEncoded), "https://example.org/find?lang=de&q=a%20%26%20b");
+    EXPECT_TRUE(cite::isSearchTemplate("http://wiki.local/search/{text}")) << "http, the text in the path";
+    EXPECT_EQ(cite::webSearchUrl("http://wiki.local/search/{text}", "a/b").toString(QUrl::FullyEncoded),
+              "http://wiki.local/search/a%2Fb");
+
+    EXPECT_FALSE(cite::isSearchTemplate("https://example.org/find?q=")) << "no {text}";
+    EXPECT_FALSE(cite::isSearchTemplate("example.org/find?q={text}")) << "no scheme";
+    EXPECT_FALSE(cite::isSearchTemplate("ftp://example.org/{text}"));
+    EXPECT_FALSE(cite::isSearchTemplate("file:///etc/{text}"));
+    EXPECT_FALSE(cite::isSearchTemplate("javascript:alert({text})"));
+    EXPECT_FALSE(cite::isSearchTemplate("https://{text}")) << "no host but the text";
+    EXPECT_FALSE(cite::isSearchTemplate(""));
+    EXPECT_TRUE(cite::searchEnginePattern("javascript:alert({text})").isEmpty());
+    EXPECT_TRUE(cite::searchEnginePattern("yahoo").isEmpty()) << "no such engine, no address";
+}
+
 TEST(Citation, onlyWebAddressesAreOpened) {
     EXPECT_TRUE(cite::isWebAddress(QUrl("https://scholar.google.com/scholar?q=x")));
     EXPECT_TRUE(cite::isWebAddress(QUrl("http://export.arxiv.org/api/query")));

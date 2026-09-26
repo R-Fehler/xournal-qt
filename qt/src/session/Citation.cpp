@@ -73,6 +73,52 @@ QUrl translateUrl(const QString& pattern, const QString& text, const QString& la
     return QUrl::fromEncoded(address.toUtf8(), QUrl::StrictMode);
 }
 
+const std::vector<SearchEngine>& searchEngines() {
+    static const std::vector<SearchEngine> list{
+            {QStringLiteral("google"), QStringLiteral("Google"), QStringLiteral("https://www.google.com/search?q={text}")},
+            {QStringLiteral("duckduckgo"), QStringLiteral("DuckDuckGo"), QStringLiteral("https://duckduckgo.com/?q={text}")},
+            {QStringLiteral("bing"), QStringLiteral("Bing"), QStringLiteral("https://www.bing.com/search?q={text}")},
+            {QStringLiteral("ecosia"), QStringLiteral("Ecosia"), QStringLiteral("https://www.ecosia.org/search?q={text}")},
+            {QStringLiteral("startpage"), QStringLiteral("Startpage"),
+             QStringLiteral("https://www.startpage.com/sp/search?query={text}")},
+            {QStringLiteral("brave"), QStringLiteral("Brave Search"),
+             QStringLiteral("https://search.brave.com/search?q={text}")},
+            {QStringLiteral("qwant"), QStringLiteral("Qwant"), QStringLiteral("https://www.qwant.com/?q={text}")},
+    };
+    return list;
+}
+
+bool isSearchTemplate(const QString& pattern) {
+    const QString s = pattern.trimmed();
+    if (!s.contains(QStringLiteral("{text}"))) {
+        return false;
+    }
+    // The text goes into the path, the query or the fragment: never into where the address leads
+    static const QString marker = QStringLiteral("xqtselectedtext");
+    const QUrl url(QString(s).replace(QStringLiteral("{text}"), marker), QUrl::StrictMode);
+    return isWebAddress(url) && !url.authority().contains(marker);
+}
+
+QString searchEnginePattern(const QString& setting) {
+    const QString s = setting.trimmed();
+    for (const SearchEngine& e: searchEngines()) {
+        if (e.key == s) {
+            return e.pattern;
+        }
+    }
+    return isSearchTemplate(s) ? s : QString();
+}
+
+QUrl webSearchUrl(const QString& pattern, const QString& text) {
+    const QString q = cleanText(text, QUERY_CHARS);
+    if (pattern.isEmpty() || q.isEmpty()) {
+        return {};
+    }
+    QString address = pattern.trimmed();
+    address.replace(QStringLiteral("{text}"), QString::fromLatin1(QUrl::toPercentEncoding(q)));
+    return QUrl::fromEncoded(address.toUtf8(), QUrl::StrictMode);
+}
+
 QString systemLanguage() {
     const QLocale locale = QLocale::system();
     const QString name = locale.name();  // "de_DE", "zh_CN", "C"
