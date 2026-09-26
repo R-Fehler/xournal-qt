@@ -2024,15 +2024,18 @@ TEST_F(HomeScreenTest, extendedSearchShowsHitPagesAndOpensThePage) {
     EXPECT_EQ(controller->pageNumber(), 2);
     EXPECT_EQ(controller->searchQuery(), "page 2");
 
-    // Zoom: fewer, bigger cells (in a window too narrow for every button of the header: in View)
+    // Zoom: fewer, bigger cells (+ in the header; in a window too narrow for every button of the header: in View)
     click(find<QQuickItem>("homeTab"));
     const int columns = grid()->property("columns").toInt();
-    ASSERT_FALSE(find<QQuickItem>("zoomInButton")->isVisible()) << "(1280 px: the header groups its buttons)";
-    click(find<QQuickItem>("homeViewButton"));
-    ASSERT_TRUE(waitOpened(find("homeViewMenu"), true));
-    click(findItem("viewZoomInButton"));
+    if (find<QQuickItem>("zoomInButton")->isVisible()) {
+        click(find<QQuickItem>("zoomInButton"));
+    } else {
+        click(find<QQuickItem>("homeViewButton"));
+        ASSERT_TRUE(waitOpened(find("homeViewMenu"), true));
+        click(findItem("viewZoomInButton"));
+        key(Qt::Key_Escape);
+    }
     EXPECT_EQ(grid()->property("columns").toInt(), std::max(1, columns - 1));
-    key(Qt::Key_Escape);
 }
 
 namespace {
@@ -8550,11 +8553,9 @@ TEST_F(HomeScreenTest, theFavouritesChipShowsOnlyStarredDocuments) {
     EXPECT_TRUE(controller->isFavouriteFile(QString::fromStdString((root / "Physics" / "sheet.pdf").string())));
     library->setFlat(false);
 
-    window->resize(1920, 900);  // (narrower: in View, qt/adaptive-home)
-    wait(100);
-    auto* chip = findItem("favouritesChip");
+    auto* chip = findItem("favouritesChip");  // (the star of the switch, at every size)
     ASSERT_NE(chip, nullptr);
-    EXPECT_TRUE(chip->isVisible()) << "directly in the header, not in a menu, where there is room";
+    EXPECT_TRUE(chip->isVisible()) << "directly in the header, not in a menu";
     click(chip);
     EXPECT_TRUE(library->favouritesOnly());
     until([&] { return gridCount() == 2; });

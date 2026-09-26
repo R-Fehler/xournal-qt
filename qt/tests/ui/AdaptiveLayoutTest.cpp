@@ -657,24 +657,28 @@ void AdaptiveLayoutTest::checkHomeScreens(const std::string& at) {
         EXPECT_TRUE(shownInWindow(findItem("newDocumentFab"))) << at << ": \"+\" floats at the bottom";
         EXPECT_FALSE(findItem("newDocumentButton")->isVisible()) << at << ": (not in the header too)";
     }
-    // On a phone upright: the header one row (the library's name, View, Settings), the switch across a row of its
-    // own below it, then the search
-    if (sizeClass() == "phonePortrait") {
+    // Wherever the header groups its actions: the switch is the library's name, its ▾ and three icons (Recent,
+    // Favourites, Bookmarks), all in the header's row with View and Settings
+    const char* const headerRow[] = {"libraryPageButton", "libraryMenuButton", "recentPageButton", "favouritesChip",
+                                     "bookmarksPageButton", "homeViewButton", "homeSettingsButton"};
+    if (!home->property("expanded").toBool()) {
         auto* header = findItem("homeHeader");
         EXPECT_FALSE(header->property("interactive").toBool()) << at << ": the header fits without scrolling";
         EXPECT_LE(header->height(), 56) << at << ": the header is one row";
         const double row = sceneRect(findItem("homeViewButton")).center().y();
-        for (const char* name: {"libraryMenuButton", "homeViewButton", "homeSettingsButton"}) {
+        for (const char* name: headerRow) {
             auto* b = findItem(name);
             EXPECT_TRUE(shownInWindow(b)) << at << ": " << name;
             EXPECT_NEAR(sceneRect(b).center().y(), row, 4) << at << ": " << name << " in the header's row";
         }
-        const QRectF library = sceneRect(findItem("libraryPageButton"));
-        const QRectF bookmarks = sceneRect(findItem("bookmarksPageButton"));
-        EXPECT_GT(library.top(), sceneRect(header).bottom() - 1) << at << ": the switch below the header";
-        EXPECT_NEAR(library.center().y(), bookmarks.center().y(), 1) << at << ": the switch is one row";
-        EXPECT_GT(bookmarks.width(), 100) << at << ": its tabs share the width";
-        EXPECT_GT(sceneRect(findItem("librarySearchField")).top(), library.bottom()) << at << ": the search below";
+        for (const char* name: {"recentPageButton", "favouritesChip", "bookmarksPageButton"}) {
+            EXPECT_TRUE(findItem(name)->property("iconOnly").toBool()) << at << ": " << name << " as its icon";
+        }
+        EXPECT_GE(findItem("libraryPageButton")->width(), 80) << at << ": room for the library's name";
+    }
+    if (sizeClass() == "phonePortrait") {
+        EXPECT_GT(sceneRect(findItem("librarySearchField")).top(), sceneRect(findItem("homeHeader")).bottom() - 1)
+                << at << ": the search in a row of its own below";
     }
     if (sizeClass() == "phoneShort") {
         // Held sideways: one header row with the breadcrumbs in it
@@ -1125,7 +1129,7 @@ TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
     QObject* library = controller->libraryModel();
     QQuickItem* home = findItem("homeView");
     ASSERT_NE(home, nullptr);
-    for (const WindowSize& s: {WindowSize{412, 915, "phone-portrait"}, WindowSize{1280, 800, "laptop-16x10"}}) {
+    for (const WindowSize& s: {WindowSize{412, 915, "phone-portrait"}, WindowSize{1024, 700, "small-desktop"}}) {
         resize(s.w, s.h);
         const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
         const bool phone = phoneClass();
@@ -1194,17 +1198,20 @@ TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
             wait(100);
         }
 
-        // View: Only favourites, All documents at once, Sort, Open where left off
-        openMenu(viewMenu, "homeViewButton");
-        choose("viewFavouritesItem");
+        // The star of the switch: only favourites, on and off; not in View (one place)
+        auto* star = findItem("favouritesChip");
+        click(star);
         EXPECT_TRUE(library->property("favouritesOnly").toBool()) << at;
-        EXPECT_TRUE(findItem("homeViewButton")->property("checked").toBool()) << at << ": View marked while it filters";
-        openMenu(viewMenu, "homeViewButton");
-        choose("viewFavouritesItem");
+        EXPECT_TRUE(star->property("chosen").toBool()) << at << ": marked while on";
+        click(star);
         EXPECT_FALSE(library->property("favouritesOnly").toBool()) << at;
+        EXPECT_EQ(window->findChild<QObject*>("viewFavouritesItem"), nullptr) << at;
+
+        // View: All documents at once, Sort, Open where left off
         openMenu(viewMenu, "homeViewButton");
         choose("viewFlatItem");
         EXPECT_TRUE(library->property("flat").toBool()) << at;
+        EXPECT_TRUE(findItem("homeViewButton")->property("checked").toBool()) << at << ": View marked while it filters";
         openMenu(viewMenu, "homeViewButton");
         choose("viewFlatItem");
         EXPECT_FALSE(library->property("flat").toBool()) << at;
@@ -1271,6 +1278,11 @@ TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
         openMenu(newMenu, add);
         choose("addOpenFileItem");
         EXPECT_EQ(openFile.count(), 1) << at << ": Open a file…";
+        wait(100);
+        click(star);  // (on Recent: the library's favourites)
+        EXPECT_EQ(home->property("page").toInt(), 0) << at;
+        EXPECT_TRUE(library->property("favouritesOnly").toBool()) << at;
+        library->setProperty("favouritesOnly", false);
         for (QObject* o: window->findChildren<QObject*>()) {  // (the window's file dialog)
             if (o->inherits("QQuickFileDialog") && o->property("visible").toBool()) {
                 QMetaObject::invokeMethod(o, "close");

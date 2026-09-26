@@ -566,8 +566,8 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
   - New folder
   - In a window too narrow for all these buttons (and on a phone, where it floats at the bottom right) they are one
     button, **"+"**: New document…, New Markdown file…, New text file…, Import files…, Import a folder…, New folder…
-    (on Recent: Open a file…); the ways to show the cards (Only favourites, All documents at once, Kinds of files shown,
-    Sort, Last page, the size of the cards) are in **View**
+    (on Recent: Open a file…); the ways to show the cards (All documents at once, Kinds of files shown, Sort, Last
+    page, the size of the cards) are in **View**; Favourites is the star of the switch at every size
     ([adaptive-layout.md](adaptive-layout.md), "The home screen and the tab overview").
 - **Recent**: the documents opened lately that still exist (the list is shared by all windows:
   `recent.json` in the config folder), and the folders opened as a library that are not in

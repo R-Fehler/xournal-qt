@@ -44,19 +44,25 @@ Rectangle {
     /// The row's width (16 px margin at the left, 8 at the right)
     readonly property real headerRoom: width - 24
     readonly property real searchMinimum: 150 + 6 + 48
-    /// The switch as the header shows it (the words of Bookmarks counted: the need does not change with the page)
-    readonly property real switchNeed: libraryTab.implicitWidth + recentTab.implicitWidth + 52 + bookmarksWord.advanceWidth + 12
+    /// The switch as icons: the library's name, its ▾, Recent, Favourites, Bookmarks
+    readonly property real switchNeed: libraryTab.implicitWidth + libraryMenuButton.implicitWidth + 3 * 40 + 4 * 2 + 8
+    /// What the words beside the icons of Recent, Favourites and Bookmarks add
+    readonly property real switchWords: recentWord.advanceWidth + favouritesWord.advanceWidth + bookmarksWord.advanceWidth + 3 * 12
+    TextMetrics { id: recentWord; text: qsTr("Recent") }
+    TextMetrics { id: favouritesWord; text: qsTr("Favourites") }
     TextMetrics { id: bookmarksWord; text: qsTr("Bookmarks") }
-    /// What the expanded row needs: the switch, the libraries' ▾, the search at its smallest, New, Last page, Import,
-    /// New folder, Flat, Favourites, Show, Sort, − and + with their separators, Settings, and the spacing between them
-    readonly property real expandedNeed: switchNeed + 40 + searchMinimum + 48 + resume.implicitWidth + 5 * 48 + 40
-                                         + 2 * 40 + 2 * 13 + 48 + 16 * 6
+    /// What the expanded row needs: the switch, a search wide enough for its placeholder (300; below that the grouped
+    /// row with a wider search is better), New, Last page, Import, New folder, Flat, Show, Sort, − and + with their
+    /// separators, Settings, and the spacing between them
+    readonly property real expandedNeed: switchNeed + 300 + 6 + 48 + 48 + resume.implicitWidth + 5 * 48
+                                         + 2 * 40 + 2 * 13 + 48 + 15 * 6
     readonly property bool expanded: !phoneLayout && headerRoom >= expandedNeed
-    /// Room for the words beside the icons of the Bookmarks tab and the Favourites chip (else icons with tips), and a
-    /// search at its full width
-    readonly property bool roomy: expanded && headerRoom >= expandedNeed + 230 + 180
-    /// The grouped row: the switch, ▾, the search at its smallest, "+", View and Settings
-    readonly property real groupedNeed: switchNeed + 40 + searchMinimum + 3 * 48 + 8 * 6
+    /// Room for the words beside the icons of the switch (Recent, Favourites, Bookmarks), and a search at its full
+    /// width. One rule: words only where the header has room for every button and them; everywhere else icons (a tip
+    /// on hover, and while a finger is held on them)
+    readonly property bool roomy: expanded && headerRoom >= expandedNeed + 230 + switchWords
+    /// The grouped row: the switch, the search at its smallest, "+", View and Settings
+    readonly property real groupedNeed: switchNeed + searchMinimum + 3 * 48 + 6 * 6
     /// The search in a row of its own: on a phone upright, and in a window too narrow for it in the header
     readonly property bool searchOwnRow: portraitPhone || (!phoneLayout && !expanded && headerRoom < groupedNeed)
     /// The actions on a selection in a bar at the bottom (Open, Copy, Move, Trash, ⋮): on a phone, and where the
@@ -359,7 +365,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: home.shortLayout ? 4 : 10
             Layout.preferredHeight: headerRow.implicitHeight
-            contentWidth: headerRow.width + 24
+            contentWidth: headerRow.width + headerRow.x + 8
             contentHeight: headerRow.implicitHeight
             flickableDirection: Flickable.HorizontalFlick
             boundsBehavior: Flickable.StopAtBounds
@@ -367,144 +373,23 @@ Rectangle {
             clip: true
         RowLayout {
             id: headerRow
-            x: 16
+            x: home.phoneLayout ? 12 : 16
             // (the search field and the breadcrumbs give way down to their minimum before the row scrolls)
-            width: Math.max(headerFlick.width - 24, implicitWidth
+            width: Math.max(headerFlick.width - x - 8, implicitWidth
                             - (searchSlot.visible ? searchSlot.Layout.preferredWidth - searchSlot.Layout.minimumWidth : 0)
                             - (headerCrumbSlot.visible ? headerCrumbSlot.Layout.preferredWidth - headerCrumbSlot.Layout.minimumWidth : 0))
             height: headerFlick.height
-            spacing: 6
+            spacing: home.phoneLayout ? 4 : 6
 
-            // The switch Library / Recent / Bookmarks (switchBox): here, or in a row of its own on a phone upright
+            // The switch: the library's name with its ▾, Recent, Favourites, Bookmarks (switchBox); on a phone upright
+            // it takes what the row leaves (the name elided)
             Item {
                 id: switchSlot
-                visible: !home.portraitPhone
-                Layout.preferredWidth: switchBox.implicitWidth
+                readonly property real smallest: switchBox.implicitWidth - libraryTab.implicitWidth + 64
+                Layout.fillWidth: home.portraitPhone
+                Layout.minimumWidth: home.portraitPhone ? smallest : switchBox.implicitWidth
+                Layout.preferredWidth: home.portraitPhone ? smallest : switchBox.implicitWidth
                 Layout.preferredHeight: switchBox.implicitHeight
-            }
-            // The libraries: a ▾ beside the switch; on a phone upright the header's title, the library's name
-            ToolButton {
-                id: libraryMenuButton
-                objectName: "libraryMenuButton"
-                readonly property bool titled: home.portraitPhone
-                readonly property string tip: qsTr("Libraries")
-                Layout.fillWidth: titled
-                implicitWidth: titled ? libraryTitleRow.implicitWidth + leftPadding + rightPadding : 40
-                implicitHeight: 48
-                leftPadding: titled ? 8 : 4
-                rightPadding: titled ? 8 : 4
-                Accessible.name: tip
-                onClicked: Popups.openAt(libraryMenu)
-                // (a finger held on it says what it is, as the other buttons: qt/docs/adaptive-layout.md)
-                property bool heldTip: false
-                onPressAndHold: heldTip = true
-                onReleased: heldTip = false
-                onCanceled: heldTip = false
-                ToolTip.visible: heldTip || (hovered && !titled)
-                ToolTip.text: tip
-                ToolTip.delay: heldTip ? 0 : 600
-                background: Rectangle {
-                    radius: 10
-                    color: libraryMenuButton.pressed ? "#e8e8e8" : "transparent"
-                }
-                contentItem: Item {
-                    RowLayout {
-                        id: libraryTitleRow
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.horizontalCenter: libraryMenuButton.titled ? undefined : parent.horizontalCenter
-                        width: libraryMenuButton.titled ? Math.min(implicitWidth, parent.width) : implicitWidth
-                        spacing: 8
-                        Image {
-                            visible: libraryMenuButton.titled
-                            source: app.iconUrl("xqt-library")
-                            sourceSize.width: 20
-                            sourceSize.height: 20
-                        }
-                        Label {
-                            objectName: "libraryTitle"
-                            visible: libraryMenuButton.titled
-                            Layout.fillWidth: true
-                            text: app.library.available ? app.library.name : qsTr("Libraries")
-                            elide: Text.ElideRight
-                            font.pixelSize: 18
-                            font.weight: Font.DemiBold
-                            color: "#202124"
-                        }
-                        Image {
-                            source: app.iconUrl("xqt-chevron-down")
-                            sourceSize.width: 22
-                            sourceSize.height: 22
-                        }
-                    }
-                }
-                // The libraries: this window shows one (highlighted); another one opens in a new window.
-                AdaptiveMenu {
-                    id: libraryMenu
-                    objectName: "libraryMenu"
-                    minimumWidth: 300
-                    property var libraries: []
-                    onAboutToShow: libraries = app.libraries()
-                    Label {
-                        text: app.libraryWindows ? qsTr("Libraries (another one opens in a new window)")
-                                                 : qsTr("Libraries (the window switches to another one)")
-                        leftPadding: 16
-                        rightPadding: 16
-                        topPadding: 8
-                        bottomPadding: 4
-                        width: libraryMenu.width
-                        wrapMode: Text.Wrap
-                        font.pixelSize: 12
-                        color: "#6b6f75"
-                    }
-                    Instantiator {
-                        id: libraryList
-                        model: libraryMenu.libraries
-                        delegate: AdaptiveMenuItem {
-                            id: libraryItem
-                            objectName: "libraryMenuEntry"
-                            required property var modelData
-                            readonly property bool current: modelData.current
-                            readonly property string label: modelData.downloads ? qsTr("Downloads folder (quick library)") : modelData.name
-                            text: current ? qsTr("%1 — this window").arg(label) : label
-                            font.weight: current ? Font.DemiBold : Font.Normal
-                            icon.source: app.iconUrl(modelData.downloads ? "xqt-download" : "xqt-library")
-                            icon.color: current ? Material.accentColor : "#566d86"
-                            background: Rectangle {
-                                color: libraryItem.current ? "#e8eaf6" : (libraryItem.highlighted ? "#f1f3f4" : "transparent")
-                            }
-                            // This library: just the home screen; another: a new window (one library per window)
-                            // (a path, not "file://" + path: on Windows that makes the drive letter a host)
-                            onTriggered: current ? (app.homeVisible = true) : app.openLibraryAt(modelData.path)
-                        }
-                        // after the heading
-                        onObjectAdded: function(index, object) { libraryMenu.insertItem(index + 1, object) }
-                        onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
-                    }
-                    MenuSeparator {}
-                    AdaptiveMenuItem {
-                        text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
-                        onTriggered: newLibraryDialog.open()
-                    }
-                    AdaptiveMenuItem {
-                        objectName: "openFolderAsLibraryItem"
-                        text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
-                        onTriggered: home.pickLibraryFolder()
-                    }
-                    // (not on Android: there is no file manager the app could show a folder in reliably)
-                    AdaptiveMenuItem {
-                        objectName: "libraryShowInFileManagerItem"
-                        text: qsTr("Show in file manager")
-                        enabled: app.library.available
-                        offered: app.canShowInFileManager
-                        onTriggered: app.showInFileManager(app.library.rootPath)
-                    }
-                    AdaptiveMenuItem {
-                        objectName: "exportLibraryArchiveItem"
-                        text: qsTr("Export library as archive…")
-                        enabled: app.library.available && !app.libraryArchive.running
-                        onTriggered: libraryArchiveDialog.open()
-                    }
-                }
             }
             // Where we are in the library (crumbBar): here on a phone held sideways, else in a row of its own below
             Item {
@@ -516,7 +401,7 @@ Rectangle {
                 Layout.preferredHeight: 44
             }
 
-            Item { Layout.fillWidth: true; visible: !headerCrumbSlot.visible }
+            Item { Layout.fillWidth: true; visible: !headerCrumbSlot.visible && !home.portraitPhone }
 
             // Search in the whole library (searchGroup, below): here, or in a row of its own
             Item {
@@ -530,7 +415,7 @@ Rectangle {
                 Layout.preferredHeight: 48
             }
 
-            Item { Layout.fillWidth: true; visible: !headerCrumbSlot.visible }
+            Item { Layout.fillWidth: true; visible: !headerCrumbSlot.visible && !home.portraitPhone }
 
             // --- expanded: every action a button of its own ---
             // The same as in the settings: open a document at the page where it was left (a small toggle)
@@ -664,38 +549,6 @@ Rectangle {
                 checked: app.library.flat
                 onClicked: app.library.flat = !app.library.flat
             }
-            // Only the favourites (starred documents of the whole library): a chip of its own, combined with the kinds
-            // shown and the search; the Bookmarks view follows it too
-            ToolButton {
-                id: favouritesChip
-                objectName: "favouritesChip"
-                visible: home.expanded && (home.page === 0 || home.page === 2) && app.library.available
-                text: qsTr("Favourites")
-                display: home.roomy ? AbstractButton.TextBesideIcon : AbstractButton.IconOnly
-                implicitWidth: home.roomy ? implicitContentWidth + leftPadding + rightPadding : 40
-                Accessible.name: text
-                icon.source: app.iconUrl(checked ? "xqt-star-filled" : "xqt-star")
-                icon.color: "transparent"
-                icon.width: 18
-                icon.height: 18
-                checkable: true
-                checked: app.library.favouritesOnly
-                onToggled: app.library.favouritesOnly = checked
-                implicitHeight: 40
-                font.pixelSize: 13
-                font.weight: checked ? Font.DemiBold : Font.Normal
-                Material.foreground: checked ? "#8a5a00" : "#5f6368"
-                ToolTip.visible: hovered
-                ToolTip.text: checked ? qsTr("Only favourites are shown - tap: all documents")
-                                      : qsTr("Show only favourites (starred documents)")
-                ToolTip.delay: 600
-                background: Rectangle {
-                    radius: 10
-                    color: favouritesChip.checked ? "#fdf1d0" : (favouritesChip.pressed ? "#e8e8e8" : "transparent")
-                    border.width: favouritesChip.checked ? 1 : 0
-                    border.color: "#f4b400"
-                }
-            }
             // Which kinds of files the library shows (a setting of the library), marked when not the default
             IconButton {
                 id: showButton
@@ -754,24 +607,17 @@ Rectangle {
                 id: viewButton
                 objectName: "homeViewButton"
                 visible: !home.expanded
+                implicitWidth: home.phoneLayout ? 44 : 48
                 iconName: "xqt-sliders"
-                tip: qsTr("View: favourites, which files, sorting, size of the cards")
+                tip: qsTr("View: which files, sorting, size of the cards")
                 // (marked while it shows less than everything)
                 checked: app.library.available && home.page !== 1
-                         && (app.library.favouritesOnly || app.library.showFiltered || (home.page === 0 && app.library.flat))
+                         && (app.library.showFiltered || (home.page === 0 && app.library.flat))
                 onClicked: Popups.openAt(viewMenu)
                 AdaptiveMenu {
                     id: viewMenu
                     objectName: "homeViewMenu"
                     title: qsTr("View")
-                    AdaptiveMenuItem {
-                        objectName: "viewFavouritesItem"
-                        text: qsTr("Only favourites")
-                        offered: home.page !== 1 && app.library.available
-                        checkable: true
-                        checked: app.library.favouritesOnly
-                        onTriggered: app.library.favouritesOnly = checked
-                    }
                     AdaptiveMenuItem {
                         objectName: "viewFlatItem"
                         text: qsTr("All documents at once (no folders)")
@@ -839,21 +685,12 @@ Rectangle {
             // (the tool bar with its menu is not there while the library is shown)
             IconButton {
                 objectName: "homeSettingsButton"
+                implicitWidth: home.phoneLayout ? 44 : 48
                 iconName: "xqt-settings"
                 tip: qsTr("Settings (Ctrl+,)")
                 onClicked: home.settingsRequested()
             }
         }
-        }
-        // The switch's own row on a phone held upright: across the width
-        Item {
-            id: switchRow
-            visible: home.portraitPhone && home.selectionCount === 0
-            Layout.fillWidth: true
-            Layout.leftMargin: 16
-            Layout.rightMargin: 16
-            Layout.topMargin: 4
-            Layout.preferredHeight: switchBox.implicitHeight
         }
         // The search's own row
         Item {
@@ -1403,35 +1240,45 @@ Rectangle {
         }
     }
 
-    // A tab of the switch Library / Recent / Bookmarks: its icon and its word; only the icon (its word in a tip, and
-    // while a finger is held on it) where room is short and it is not the one shown
+    // A tab of the switch: the library's name (its icon beside it outside the phones), or the icon of Recent,
+    // Favourites or Bookmarks, with its word only where the header has room for all words (roomy); an icon alone says
+    // its word in a tip on hover and while a finger is held on it
     component PageTab: AbstractButton {
         id: tab
-        property int pageIndex
+        property int pageIndex: -1
         property string label
         property string iconName
-        /// Only its icon while it is not shown and the header is short of room (the Bookmarks tab)
-        property bool compact: false
-        readonly property bool current: home.page === pageIndex
-        readonly property bool iconOnly: !home.portraitPhone
-                                         && (home.shortLayout ? !current || pageIndex === 0 : !current && compact && !home.roomy)
-        Layout.fillWidth: home.portraitPhone
-        Layout.preferredWidth: home.portraitPhone ? 100 : implicitWidth
+        /// Its tip (default: its word)
+        property string tip: label
+        /// Shown as chosen: the page shown (the star: only favourites)
+        property bool chosen: home.page === pageIndex
+        property color chosenColor: "#ffffff"
+        property color chosenBorder: "transparent"
+        property color chosenText: "#202124"
+        /// What a tap does (default: show its page)
+        property var tapAction: null
+        /// The library's tab: its name, never the icon alone
+        readonly property bool named: pageIndex === 0
+        readonly property bool iconOnly: !named && !home.roomy
+        Layout.fillWidth: named && home.portraitPhone
+        Layout.maximumWidth: named && home.shortLayout ? 180 : Number.POSITIVE_INFINITY
         Layout.fillHeight: true
         implicitHeight: home.touch ? 44 : 40
-        implicitWidth: iconOnly ? (home.touch ? 44 : 40) : tabRow.implicitWidth + 28
-        onClicked: home.page = pageIndex
+        implicitWidth: iconOnly ? (home.touch ? 44 : 40) : tabRow.implicitWidth + (named ? 20 : 28)
+        onClicked: tapAction ? tapAction() : (home.page = pageIndex)
         property bool heldTip: false
         onPressAndHold: heldTip = true
         onReleased: heldTip = false
         onCanceled: heldTip = false
-        ToolTip.visible: iconOnly && (hovered || heldTip)
-        ToolTip.text: label
+        ToolTip.visible: (iconOnly || tip !== label) && (hovered || heldTip)
+        ToolTip.text: tip
         ToolTip.delay: heldTip ? 0 : 600
         Accessible.name: label
         background: Rectangle {
             radius: height / 2
-            color: tab.current ? "#ffffff" : "transparent"
+            color: tab.chosen ? tab.chosenColor : (tab.pressed ? "#d5d8dc" : "transparent")
+            border.width: tab.chosen && tab.chosenBorder !== Qt.color("transparent") ? 1 : 0
+            border.color: tab.chosenBorder
         }
         contentItem: Item {
             RowLayout {
@@ -1440,12 +1287,18 @@ Rectangle {
                 // (a narrow tab: its word elided)
                 width: Math.min(implicitWidth, parent.width)
                 spacing: 6
-                Image { source: app.iconUrl(tab.iconName); sourceSize.width: 18; sourceSize.height: 18 }
+                Image {
+                    visible: !(tab.named && home.phoneLayout)
+                    source: app.iconUrl(tab.iconName)
+                    sourceSize.width: tab.iconOnly ? 22 : 18
+                    sourceSize.height: tab.iconOnly ? 22 : 18
+                    opacity: tab.enabled ? 1 : 0.4
+                }
                 Label {
                     visible: !tab.iconOnly
                     text: tab.label
-                    font.weight: tab.current ? Font.DemiBold : Font.Normal
-                    color: tab.enabled ? "#202124" : "#9aa0a6"
+                    font.weight: tab.chosen ? Font.DemiBold : Font.Normal
+                    color: !tab.enabled ? "#9aa0a6" : tab.chosen ? tab.chosenText : "#202124"
                     elide: Text.ElideRight
                     Layout.fillWidth: true
                     Layout.maximumWidth: 220
@@ -1547,10 +1400,11 @@ Rectangle {
         }
     }
 
-    // The switch Library / Recent / Bookmarks: in the header, or across a row of its own on a phone held upright
+    // The switch in the header: the library's name (its page) with ▾ (the libraries), Recent, Favourites (★),
+    // Bookmarks
     Rectangle {
         id: switchBox
-        parent: home.portraitPhone ? switchRow : switchSlot
+        parent: switchSlot
         anchors.fill: parent
         radius: height / 2
         color: "#e1e4e8"
@@ -1568,10 +1422,106 @@ Rectangle {
                 id: libraryTab
                 objectName: "libraryPageButton"
                 pageIndex: 0
-                // (on a phone upright the header's title has the library's name)
-                label: app.library.available && !home.portraitPhone ? app.library.name : qsTr("Library")
+                label: app.library.available ? app.library.name : qsTr("Library")
                 iconName: "xqt-library"
                 enabled: app.library.available
+            }
+            // The libraries: another one, a new one, a folder as library, …
+            ToolButton {
+                id: libraryMenuButton
+                objectName: "libraryMenuButton"
+                readonly property string tip: qsTr("Libraries")
+                Layout.fillHeight: true
+                implicitWidth: 30
+                leftPadding: 0
+                rightPadding: 0
+                Accessible.name: tip
+                icon.source: app.iconUrl("xqt-chevron-down")
+                icon.width: 20
+                icon.height: 20
+                icon.color: "#3c4043"
+                display: AbstractButton.IconOnly
+                onClicked: Popups.openAt(libraryMenu)
+                // (a finger held on it says what it is, as the other buttons: qt/docs/adaptive-layout.md)
+                property bool heldTip: false
+                onPressAndHold: heldTip = true
+                onReleased: heldTip = false
+                onCanceled: heldTip = false
+                ToolTip.visible: heldTip || hovered
+                ToolTip.text: tip
+                ToolTip.delay: heldTip ? 0 : 600
+                background: Rectangle {
+                    radius: height / 2
+                    color: libraryMenuButton.pressed ? "#d5d8dc" : "transparent"
+                }
+                        // The libraries: this window shows one (highlighted); another one opens in a new window.
+                        AdaptiveMenu {
+                            id: libraryMenu
+                            objectName: "libraryMenu"
+                            minimumWidth: 300
+                            property var libraries: []
+                            onAboutToShow: libraries = app.libraries()
+                            Label {
+                                text: app.libraryWindows ? qsTr("Libraries (another one opens in a new window)")
+                                                         : qsTr("Libraries (the window switches to another one)")
+                                leftPadding: 16
+                                rightPadding: 16
+                                topPadding: 8
+                                bottomPadding: 4
+                                width: libraryMenu.width
+                                wrapMode: Text.Wrap
+                                font.pixelSize: 12
+                                color: "#6b6f75"
+                            }
+                            Instantiator {
+                                id: libraryList
+                                model: libraryMenu.libraries
+                                delegate: AdaptiveMenuItem {
+                                    id: libraryItem
+                                    objectName: "libraryMenuEntry"
+                                    required property var modelData
+                                    readonly property bool current: modelData.current
+                                    readonly property string label: modelData.downloads ? qsTr("Downloads folder (quick library)") : modelData.name
+                                    text: current ? qsTr("%1 — this window").arg(label) : label
+                                    font.weight: current ? Font.DemiBold : Font.Normal
+                                    icon.source: app.iconUrl(modelData.downloads ? "xqt-download" : "xqt-library")
+                                    icon.color: current ? Material.accentColor : "#566d86"
+                                    background: Rectangle {
+                                        color: libraryItem.current ? "#e8eaf6" : (libraryItem.highlighted ? "#f1f3f4" : "transparent")
+                                    }
+                                    // This library: just the home screen; another: a new window (one library per window)
+                                    // (a path, not "file://" + path: on Windows that makes the drive letter a host)
+                                    onTriggered: current ? (app.homeVisible = true) : app.openLibraryAt(modelData.path)
+                                }
+                                // after the heading
+                                onObjectAdded: function(index, object) { libraryMenu.insertItem(index + 1, object) }
+                                onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
+                            }
+                            MenuSeparator {}
+                            AdaptiveMenuItem {
+                                text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
+                                onTriggered: newLibraryDialog.open()
+                            }
+                            AdaptiveMenuItem {
+                                objectName: "openFolderAsLibraryItem"
+                                text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
+                                onTriggered: home.pickLibraryFolder()
+                            }
+                            // (not on Android: there is no file manager the app could show a folder in reliably)
+                            AdaptiveMenuItem {
+                                objectName: "libraryShowInFileManagerItem"
+                                text: qsTr("Show in file manager")
+                                enabled: app.library.available
+                                offered: app.canShowInFileManager
+                                onTriggered: app.showInFileManager(app.library.rootPath)
+                            }
+                            AdaptiveMenuItem {
+                                objectName: "exportLibraryArchiveItem"
+                                text: qsTr("Export library as archive…")
+                                enabled: app.library.available && !app.libraryArchive.running
+                                onTriggered: libraryArchiveDialog.open()
+                            }
+                        }
             }
             PageTab {
                 id: recentTab
@@ -1580,6 +1530,30 @@ Rectangle {
                 label: qsTr("Recent")
                 iconName: "xqt-history"
             }
+            // Only the favourites: a filter of the library and of its bookmarks (starred documents of the whole
+            // library, combined with Show and the search), not a page of its own, as the chip was. Filled and marked
+            // while on; on Recent a tap shows the library's favourites.
+            PageTab {
+                id: favouritesTab
+                objectName: "favouritesChip"
+                label: qsTr("Favourites")
+                tip: chosen ? qsTr("Only favourites are shown - tap: all documents")
+                            : qsTr("Show only favourites (starred documents)")
+                iconName: chosen ? "xqt-star-filled" : "xqt-star"
+                enabled: app.library.available
+                chosen: app.library.favouritesOnly && home.page !== 1
+                chosenColor: "#fdf1d0"
+                chosenBorder: "#f4b400"
+                chosenText: "#8a5a00"
+                tapAction: function() {
+                    if (home.page === 1) {
+                        home.page = 0
+                        app.library.favouritesOnly = true
+                    } else {
+                        app.library.favouritesOnly = !app.library.favouritesOnly
+                    }
+                }
+            }
             PageTab {
                 id: bookmarksTab
                 objectName: "bookmarksPageButton"
@@ -1587,7 +1561,6 @@ Rectangle {
                 label: qsTr("Bookmarks")
                 iconName: "xqt-bookmark"
                 enabled: app.library.available
-                compact: true
             }
         }
     }
