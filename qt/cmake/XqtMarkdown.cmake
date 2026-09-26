@@ -51,6 +51,8 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPaginate.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPaginate.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBookmarks.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiFont.h
@@ -88,6 +90,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdBoxTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdHighlightTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPaginateTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdBookmarksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPassagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiFontTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiDataTest.cpp

@@ -396,6 +396,10 @@ public:
     /// Bookmark a page with this label ("": the automatic one, "Page N"), rename its bookmark, or remove it (nullopt).
     /// One undo step. False if nothing changed.
     bool setBookmark(size_t page, std::optional<std::string> label);
+    /// The pages of a text document's Markdown (a .md, a PDF text document) have the bookmarks written in their text
+    /// (`<!-- xqt:bookmark … -->`, TextDocument::syncBookmarks): read again after the text changed (typed, undone).
+    /// Emits bookmarksChanged if one changed.
+    void syncTextBookmarks();
 
     // --- several pages at once (sidebar / page grid selection) --------------------------------------------------
     /// The undo stack that page changes go onto: the one of everything (as in upstream), see addPageUndoAction().
@@ -458,6 +462,7 @@ private:
     void enableAutosave(bool enable);
     void updatePageActions();
     void applyBookmark(const PageRef& page, const std::optional<std::string>& label);
+    bool textBookmarksQueued = false;
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
 

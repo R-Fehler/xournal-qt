@@ -30,6 +30,8 @@
 #include "pdf/base/XojPdfPage.h"
 #include "session/DocumentSession.h"
 #include "session/Citation.h"
+#include "session/DocumentImages.h"
+#include "session/PageBookmarks.h"
 #include "session/FuzzyQuery.h"
 #include "session/HybridPdf.h"
 #include "session/PdfTitle.h"
@@ -39,6 +41,8 @@
 #include "util/PathUtil.h"
 
 #include "MarkdownFile.h"
+#include "MdBookmarks.h"
+#include "MdImages.h"
 #include "MdPassages.h"
 #include "Previews.h"
 
@@ -577,7 +581,9 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
     // Its bookmarks (added 2026-09 with qt/bookmarks: an entry without them had none)
     const QCborMap marks = notes.value(QStringLiteral("bookmarks")).toMap();
     for (auto it = marks.cbegin(); it != marks.cend(); ++it) {
-        if (const qint64 page = it.key().toInteger(-1); page >= 0 && page < texts.size()) {
+        // (a Markdown file has no pages in the index: its bookmarks' pages are those it is laid out on)
+        if (const qint64 page = it.key().toInteger(-1);
+            page >= 0 && (page < texts.size() || e->kind == QLatin1String("md"))) {
             e->bookmarks[static_cast<int>(page)] = it.value().toString();
         }
     }
@@ -841,14 +847,32 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     };
     if (!item.md.empty()) {
         // Plain text: its passages through md4c, without the syntax
-        const md::Document doc = md::parse(MarkdownFile::read(item.md));
+        const std::string source = MarkdownFile::read(item.md);
+        const md::Document doc = md::parse(source);
         if (gone()) {
             return nullptr;
         }
         ++docsRead;
+        std::string label;  // (a bookmark comment: not shown, its label is found with the block it marks)
         for (const md::Passage& p: md::passages(doc)) {
-            e->blockText << simplified(QString::fromStdString(p.text));
+            std::string text = p.text;
+            if (p.path.size() == 1 && md::bookmarks::isMark(doc.root.children[p.path[0]])) {
+                label = *md::bookmarks::labelOf(p.text);
+                text.clear();
+            } else if (!label.empty()) {
+                text = label + " " + text;
+                label.clear();
+            }
+            e->blockText << simplified(QString::fromStdString(text));
             e->blockLevel.push_back(p.kind == md::Passage::Kind::Heading ? p.level : 0);
+        }
+        // Its bookmarks (qt/docs/bookmarks.md, "Markdown"): on the pages the text is laid out on as it opens
+        if (md::bookmarks::mayContain(source)) {
+            md::images::RootHandle root(DocumentImages::markdownRoot(item.md));  // (its pictures: their heights)
+            const auto pages = MarkdownFile::document(source);
+            for (const auto& m: PageBookmarks::of(*pages)) {
+                e->bookmarks[static_cast<int>(m.page)] = QString::fromStdString(m.label);
+            }
         }
         for (const md::LinkTarget& l: md::linksOf(doc)) {
             (l.wiki ? e->wikiLinks : e->links) << QString::fromStdString(l.target);
@@ -1348,7 +1372,10 @@ std::vector<LibraryIndex::Bookmark> LibraryIndex::bookmarks() const {
     for (const auto& [folder, f]: folders) {
         for (const auto& [name, e]: f.docs) {
             for (const auto& [page, label]: e->bookmarks) {
-                const double aspect = page < e->pageCount() ? e->aspects[static_cast<size_t>(page)] : 0;
+                const double aspect = page < e->pageCount() ? e->aspects[static_cast<size_t>(page)]
+                                      : e->kind == QLatin1String("md")
+                                              ? MarkdownFile::PAGE_HEIGHT / MarkdownFile::PAGE_WIDTH  // (A4)
+                                              : 0;
                 out.push_back({e->file, page, label, aspect});
             }
         }

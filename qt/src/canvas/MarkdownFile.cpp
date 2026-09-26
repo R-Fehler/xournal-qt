@@ -21,6 +21,7 @@
 #include "TextFlow.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
+#include "session/TextDocument.h"
 #include "session/TextFile.h"
 
 namespace xqt::MarkdownFile {
@@ -188,6 +189,7 @@ std::unique_ptr<Document> make(const std::string& source, const md::Style& s, si
         }
         doc->addPage(std::move(page));
     }
+    TextDocument::syncBookmarks(*doc);  // (its bookmark comments, qt/docs/bookmarks.md)
     return doc;
 }
 }  // namespace
@@ -224,6 +226,7 @@ std::unique_ptr<Document> continuousDocument(const std::string& source, const md
     page->setSelectedLayerId(2);
     page->setSize(PAGE_WIDTH, continuousHeight(md::contentHeight(*added)));
     doc->addPage(std::move(page));
+    TextDocument::syncBookmarks(*doc);
     return doc;
 }
 }  // namespace

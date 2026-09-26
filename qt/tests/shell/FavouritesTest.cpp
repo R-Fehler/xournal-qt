@@ -22,9 +22,12 @@
 #include "session/DocumentSession.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
+#include "shell/HitPages.h"
 #include "shell/Library.h"
 #include "shell/LibraryBookmarks.h"
 #include "shell/LibraryModel.h"
+
+#include "MarkdownFile.h"
 
 using namespace xqt;
 
@@ -232,4 +235,72 @@ TEST_F(FavouritesTest, theBookmarksViewGroupsThemByDocument) {
     model.refresh();
     waitFor([&] { return view.count() == 3; });
     EXPECT_EQ(view.count(), 3);
+}
+
+// A Markdown file's bookmarks are comments in its text (qt/docs/bookmarks.md, "Markdown"): the index reads them on the
+// pages the file is laid out on as it opens, keeps them in its packs, finds their labels, and the Bookmarks view shows
+// them with a picture of their page
+TEST_F(FavouritesTest, theIndexReadsTheBookmarksOfMarkdownFiles) {
+    std::string text = "<!-- xqt:bookmark -->\n# Notes\n\n";
+    for (int i = 0; i < 40; ++i) {
+        if (i == 25) {
+            text += "<!-- xqt:bookmark Proof of theorem 3.2 -->\n";
+        }
+        text += "Paragraph " + std::to_string(i) +
+                " is long enough to take two lines of a page when it is laid out at the size of a Markdown file.\n\n";
+    }
+    text += "```\n<!-- xqt:bookmark not one: an example in code -->\n```\n";
+    {
+        std::ofstream out(root / "notes.md", std::ios::binary);
+        out << text;
+    }
+    size_t proofPage = 0;
+    {
+        const auto pages = MarkdownFile::document(text);
+        proofPage = MarkdownFile::pageOf(*pages, text.find("Paragraph 25 "));
+    }
+    ASSERT_GT(proofPage, 0u);
+    {
+        LibraryIndex index(root);
+        index.update(DocumentFiles::scanRecursive(root));
+        index.waitForDone();
+        const auto marks = index.bookmarks();
+        ASSERT_EQ(marks.size(), 2u);
+        EXPECT_EQ(marks[0].file, root / "notes.md");
+        EXPECT_EQ(marks[0].page, 0);
+        EXPECT_EQ(marks[0].label, "Notes") << "the automatic one: the heading it marks";
+        EXPECT_EQ(marks[1].page, static_cast<int>(proofPage));
+        EXPECT_EQ(marks[1].label, "Proof of theorem 3.2");
+        EXPECT_NEAR(marks[1].aspect, 841.89 / 595.276, 0.01);
+        const auto hits = index.search("theorem");
+        ASSERT_EQ(hits.size(), 1u) << "found by its label";
+        EXPECT_EQ(hits[0].file, root / "notes.md");
+        const auto code = index.search("xqt");
+        ASSERT_EQ(code.size(), 1u);
+        EXPECT_EQ(code[0].count, 1) << "the example in code only: the comments are not text of the file";
+        index.flush();
+    }
+    LibraryIndex again(root);
+    again.update(DocumentFiles::scanRecursive(root));
+    again.waitForDone();
+    EXPECT_EQ(again.documentsRead(), 0) << "from the packs";
+    ASSERT_EQ(again.bookmarks().size(), 2u);
+    EXPECT_EQ(again.bookmarks()[1].page, static_cast<int>(proofPage));
+
+    // A picture of its page for the Bookmarks view
+    const QImage img = HitPageProvider::render(root / "notes.md", static_cast<int>(proofPage), QString(), 200);
+    ASSERT_FALSE(img.isNull());
+    EXPECT_NEAR(double(img.height()) / img.width(), 841.89 / 595.276, 0.02);
+    HitPageProvider::clearCaches();
+
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    LibraryBookmarksModel view(&model);
+    view.setActive(true);
+    ASSERT_EQ(view.count(), 1);
+    EXPECT_EQ(view.total(), 2);
+    model.setSearchQuery("theorem");
+    ASSERT_EQ(view.count(), 1);
+    EXPECT_EQ(view.total(), 1);
 }

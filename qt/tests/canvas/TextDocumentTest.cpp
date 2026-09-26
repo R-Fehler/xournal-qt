@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 
 #include <QCoreApplication>
@@ -21,6 +22,7 @@
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "session/PageBookmarks.h"
 #include "session/TextDocument.h"
 #include "session/TextFile.h"
 #include "undo/UndoRedoHandler.h"
@@ -29,6 +31,7 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "CanvasView.h"
+#include "MarkdownBookmarks.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
@@ -456,6 +459,191 @@ TEST_F(TextDocumentTest, aContinuousPageGrowsWithTheTextAndSwitchesToPagesAndBac
     std::string expected = bytes;
     expected.insert(expected.find("Paragraph 30"), "x");
     EXPECT_EQ(session->currentText(), expected);
+}
+
+// --- bookmarks in a .md (qt/docs/bookmarks.md, "Markdown") ------------------------------------------------------
+
+namespace {
+std::vector<std::pair<size_t, std::string>> bookmarksOf(DocumentSession& s) {
+    std::vector<std::pair<size_t, std::string>> out;
+    std::shared_lock lock(*s.getDocument());
+    for (const auto& m: PageBookmarks::of(*s.getDocument())) {
+        out.emplace_back(m.page, m.label);
+    }
+    return out;
+}
+}  // namespace
+
+// The comments are the pages' bookmarks: on the page of the block they mark, named after it; typing one by hand makes
+// one, deleting it (or text across it) removes it
+TEST_F(TextDocumentTest, bookmarkCommentsAreThePagesBookmarks) {
+    std::string text = longMarkdown("\n");
+    text.insert(text.find("## Section 20"), "<!-- xqt:bookmark -->\n");
+    text.insert(text.find("Paragraph 31 "), "<!-- xqt:bookmark Thirty-one -->\n");
+    const fs::path p = file("marks.md", text);
+    open(p);
+    const size_t page20 = MarkdownFile::pageOf(*session->getDocument(), text.find("## Section 20"));
+    const size_t page31 = MarkdownFile::pageOf(*session->getDocument(), text.find("Paragraph 31 "));
+    ASSERT_LT(page20, page31);
+    EXPECT_EQ(bookmarksOf(*session), (std::vector<std::pair<size_t, std::string>>{{page20, "Section 20"},
+                                                                                     {page31, "Thirty-one"}}));
+    // Typed by hand (as other editors write it): a bookmark as soon as the line is complete
+    cursorBefore("## Section 5");
+    type("<!-- xqt:bookmark Five -->");
+    key(Qt::Key_Return, "\r", Qt::ShiftModifier);
+    const size_t page5 = MarkdownFile::pageOf(*session->getDocument(), session->currentText().find("## Section 5"));
+    ASSERT_EQ(bookmarksOf(*session).size(), 3u) << session->currentText().substr(0, 2000);
+    EXPECT_EQ(bookmarksOf(*session)[0], (std::pair<size_t, std::string>{page5, "Five"}));
+    // An example in a code block is not one
+    cursorBefore("int main()");
+    type("<!-- xqt:bookmark code --> ");
+    EXPECT_EQ(bookmarksOf(*session).size(), 3u);
+    view->getMarkdownEditor()->undo();
+    view->getMarkdownEditor()->undo();
+    view->getMarkdownEditor()->undo();
+    view->getMarkdownEditor()->undo();
+    ASSERT_EQ(session->currentText().find("code -->"), std::string::npos);
+}
+
+// In the text being written, the comment's line is not shown and the cursor goes past it; Backspace and Delete next to
+// it take the whole line (undoable)
+TEST_F(TextDocumentTest, theCursorGoesPastABookmarkComment) {
+    const std::string text = "# Title\n\nFirst paragraph.\n\n<!-- xqt:bookmark Mark -->\n## Heading\n\nLast.\n";
+    const fs::path p = file("cursor.md", text);
+    open(p);
+    ASSERT_EQ(bookmarksOf(*session).size(), 1u);
+    const size_t comment = text.find("<!--");
+    const size_t heading = text.find("## Heading");
+    cursorBefore("## Heading");
+    MarkdownEditor* e = view->getMarkdownEditor();
+    EXPECT_EQ(e->cursorPosition(), heading);
+    key(Qt::Key_Left);
+    EXPECT_EQ(e->cursorPosition(), comment - 1) << "past the comment: the blank line before it";
+    key(Qt::Key_Right);
+    EXPECT_EQ(e->cursorPosition(), heading);
+    // Put onto it: moved off it (the way it went)
+    e->setCursorPosition(comment + 5);
+    EXPECT_TRUE(e->cursorPosition() == heading || e->cursorPosition() == comment - 1) << e->cursorPosition();
+    // It is not shown in the text being written either: the heading's page lays out as without it
+    cursorBefore("Last.");
+    {
+        const std::string shown = session->currentText();
+        std::string without = shown;
+        without.erase(comment, heading - comment);
+        md::Style s = MarkdownFile::style();
+        EXPECT_NEAR(md::layout(md::parse(shown), s, shown, shown.find("Last.")).height,
+                    md::layout(md::parse(without), s, without, without.find("Last.")).height, 0.01);
+    }
+    // Backspace at the start of the heading: the comment's line goes (one step), the heading stays
+    cursorBefore("## Heading");
+    key(Qt::Key_Backspace);
+    EXPECT_EQ(session->currentText(), "# Title\n\nFirst paragraph.\n\n## Heading\n\nLast.\n");
+    EXPECT_TRUE(bookmarksOf(*session).empty());
+    e->undo();
+    EXPECT_EQ(session->currentText(), text);
+    EXPECT_EQ(bookmarksOf(*session).size(), 1u);
+    // Delete at the end of the line before: the comment's line goes, the cursor stays
+    e->setCursorPosition(comment - 1);
+    key(Qt::Key_Delete);
+    EXPECT_EQ(session->currentText(), "# Title\n\nFirst paragraph.\n\n## Heading\n\nLast.\n");
+    EXPECT_EQ(e->cursorPosition(), comment - 1);
+    e->undo();
+    EXPECT_EQ(session->currentText(), text);
+    // A selection across it takes it with it
+    e->setCursorPosition(text.find("paragraph."));
+    for (int i = 0; i < 100 && e->cursorPosition() < heading + 3; ++i) {
+        key(Qt::Key_Right, {}, Qt::ShiftModifier);
+    }
+    EXPECT_EQ(e->cursorPosition(), heading + 3);
+    key(Qt::Key_Backspace);
+    EXPECT_EQ(session->currentText(), "# Title\n\nFirst Heading\n\nLast.\n");
+    EXPECT_TRUE(bookmarksOf(*session).empty());
+    e->undo();
+    EXPECT_EQ(session->currentText(), text);
+    EXPECT_EQ(bookmarksOf(*session).size(), 1u);
+}
+
+// "Bookmark this page" (the page menu, ⋮): a comment before the first block that starts on the page, one undo step;
+// removed and renamed the same way; saved, the file has the line and nothing else changed
+TEST_F(TextDocumentTest, bookmarkThisPageWritesTheCommentIntoTheText) {
+    const std::string bytes = longMarkdown("\n");
+    const fs::path p = file("menu.md", bytes);
+    open(p);
+    ASSERT_GT(session->getDocument()->getPageCount(), 4u);
+    // Without a cursor: an edit of its own
+    auto r = MarkdownBookmarks::edit(*session, view.get(), 2, MarkdownBookmarks::Change::Add);
+    ASSERT_TRUE(r.changed);
+    EXPECT_FALSE(r.earlier);
+    auto marks = bookmarksOf(*session);
+    ASSERT_EQ(marks.size(), 1u);
+    EXPECT_EQ(marks[0].first, 2u);
+    const std::string added = session->currentText();
+    const size_t at = added.find("<!-- xqt:bookmark -->\n");
+    ASSERT_NE(at, std::string::npos);
+    EXPECT_EQ(added.substr(0, at) + added.substr(at + 22), bytes) << "only the line";
+    EXPECT_EQ(MarkdownFile::pageOf(*session->getDocument(), at), 2u);
+    EXPECT_TRUE(session->isModified());
+    ASSERT_TRUE(session->save().ok);
+    EXPECT_EQ(readFile(p), added);
+    // One undo step
+    session->getUndoRedoHandler()->undo();
+    processEvents();
+    EXPECT_EQ(session->currentText(), bytes);
+    EXPECT_TRUE(bookmarksOf(*session).empty());
+    session->getUndoRedoHandler()->redo();
+    processEvents();
+    EXPECT_EQ(bookmarksOf(*session).size(), 1u);
+
+    // Renamed (the label cleaned), then back to the automatic one
+    r = MarkdownBookmarks::edit(*session, view.get(), 2, MarkdownBookmarks::Change::Rename, "Proof -- of 3.2");
+    ASSERT_TRUE(r.changed);
+    EXPECT_NE(session->currentText().find("<!-- xqt:bookmark Proof \xe2\x80\x93 of 3.2 -->\n"), std::string::npos);
+    EXPECT_EQ(bookmarksOf(*session)[0].second, "Proof \xe2\x80\x93 of 3.2");
+    r = MarkdownBookmarks::edit(*session, view.get(), 2, MarkdownBookmarks::Change::Rename, "Page 3");
+    ASSERT_TRUE(r.changed);
+    EXPECT_EQ(session->currentText(), added);
+
+    // With the cursor in the text: a step of the text being written, the cursor stays in its text
+    cursorBefore("Paragraph 30 ");
+    MarkdownEditor* e = view->getMarkdownEditor();
+    const size_t page = MarkdownFile::pageOf(*session->getDocument(), e->cursorPosition());
+    ASSERT_NE(page, 2u);
+    r = MarkdownBookmarks::edit(*session, view.get(), page, MarkdownBookmarks::Change::Add);
+    ASSERT_TRUE(r.changed);
+    EXPECT_EQ(session->currentText().substr(e->cursorPosition(), 13), "Paragraph 30 ");
+    EXPECT_EQ(bookmarksOf(*session).size(), 2u);
+    e->undo();
+    EXPECT_EQ(session->currentText(), added);
+    EXPECT_EQ(bookmarksOf(*session).size(), 1u);
+    e->redo();
+    EXPECT_EQ(bookmarksOf(*session).size(), 2u);
+    // Removed: its line goes
+    r = MarkdownBookmarks::edit(*session, view.get(), page, MarkdownBookmarks::Change::Remove);
+    ASSERT_TRUE(r.changed);
+    EXPECT_EQ(session->currentText(), added);
+    r = MarkdownBookmarks::edit(*session, view.get(), 2, MarkdownBookmarks::Change::Remove);
+    ASSERT_TRUE(r.changed);
+    EXPECT_EQ(session->currentText(), bytes);
+    EXPECT_TRUE(bookmarksOf(*session).empty());
+    ASSERT_TRUE(session->save().ok);
+    EXPECT_EQ(readFile(p), bytes) << "saved: the file as it was";
+}
+
+// A comment written elsewhere (odd spacing, Windows line ends) stays as it is, byte for byte, when the file is edited
+// and saved
+TEST_F(TextDocumentTest, aBookmarkLineIsSavedByteForByte) {
+    std::string bytes = longMarkdown("\r\n");
+    bytes.insert(bytes.find("## Section 12"), "<!--   xqt:bookmark   Odd  spacing   -->\r\n");
+    const fs::path p = file("crlf.md", bytes);
+    open(p);
+    ASSERT_EQ(bookmarksOf(*session).size(), 1u);
+    EXPECT_EQ(bookmarksOf(*session)[0].second, "Odd  spacing");
+    cursorBefore("Paragraph 25 ");
+    type("NEW ");
+    ASSERT_TRUE(session->save().ok);
+    std::string expected = bytes;
+    expected.insert(expected.find("Paragraph 25 "), "NEW ");
+    EXPECT_EQ(readFile(p), expected);
 }
 
 // XQT_BENCH_TEXT=1: typing into a long .md on pages and on one continuous page (which lays out all of the text on

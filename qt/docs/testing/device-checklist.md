@@ -2101,3 +2101,33 @@ Design: [md-images.md](../md-images.md).
       document name) matches. The library search itself also finds a document by a bookmark's name.
 - [ ] Android (Fold 7, both screens): the Favourites chip and the Bookmarks tab fit in the header (it scrolls
       sideways when narrow); the stars and ribbons are big enough to tap.
+
+## Bookmarks in Markdown (qt/md-bookmarks)
+- [ ] A long `.md` (several pages): page menu of page 3 → the ribbon icon: a ribbon on its preview, "Bookmark added:
+      …" (its heading, or "Page 3"). Nothing moved on the page; the text has `<!-- xqt:bookmark -->` before the first
+      paragraph or heading that starts on page 3 (look in the Markdown source, or open the file in another editor
+      after saving).
+- [ ] Rename it in its dialog ("Proof -- 3.2"): the ribbon's label and the Contents sidebar say "Proof – 3.2". Rename
+      it to "Page 3" or to its heading: automatic again (`<!-- xqt:bookmark -->`). Remove it: the line is gone.
+- [ ] With the cursor in the text: bookmark another page; the cursor stays where it was; Ctrl+Z takes the bookmark
+      back first, then what was typed before.
+- [ ] Put the cursor at the start of the marked paragraph: Left goes to the end of the line before (never onto the
+      hidden line), Right comes back. Backspace there removes the bookmark (the ribbon goes), Ctrl+Z brings it back.
+- [ ] Type `<!-- xqt:bookmark Typed -->` on a line of its own before a heading: the ribbon appears when the line is
+      complete. The same inside a code block (```` ``` ````): no ribbon.
+- [ ] Add text above a bookmark until its paragraph goes onto the next page: the ribbon moves with it.
+- [ ] Save, open the `.md` in Obsidian / Typora / GitHub (or pandoc): the comment is not shown; edit the file there
+      (add a paragraph above), come back: the app reloads it and the ribbon is where the paragraph is now.
+- [ ] A long code block over three pages: bookmark its middle page: the note says the bookmark went on the page where
+      the block starts.
+- [ ] Library → Bookmarks tab: the `.md`'s bookmarks with pictures of their pages (its pictures drawn); the search
+      finds the `.md` by a bookmark's label; tapping one opens the file at that page.
+- [ ] A PDF text document: bookmark two pages, Ctrl+S; Okular / Evince / a browser: the outline's "Bookmarks" entry
+      lists them. Extract `name.md` (`qpdf --show-attachment=name.md`): it has the two comment lines. A page of notes
+      after the text: its bookmark works as before.
+- [ ] A PDF text document bookmarked with the `qt/bookmarks` build (before this block): opened, its bookmarks are
+      still there (ribbons, Contents), the document is not marked modified; after Ctrl+S the extracted `name.md` has
+      the comment lines.
+- [ ] A `.txt`: no bookmark icon in the page menu and ⋮.
+- [ ] Android (Fold 7): bookmark a page of a `.md` from the page menu (press and hold); the ribbon and the Bookmarks
+      tab as on the desktop.

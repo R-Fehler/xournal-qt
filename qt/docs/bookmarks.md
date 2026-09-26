@@ -83,6 +83,81 @@ dictionary's `/Count` follows).
 - Bookmarks changed in another PDF app are not read back while the file carries our data (the embedded document
   wins, and the next save writes the item again).
 
+### Markdown (`qt/md-bookmarks`)
+Decided with the author (2026-09-26). In a Markdown text a bookmark is an **HTML comment on a line of its own, right
+before the block it marks** (a paragraph, a heading, a list, a table, a code block):
+
+```markdown
+<!-- xqt:bookmark Proof of theorem 3.2 -->
+## Proof
+```
+
+`<!-- xqt:bookmark -->` (no label) is the **automatic** one: named after the heading it marks, else the first
+heading of its page, else "Page N".
+
+**Why a comment.** A `.md` is a plain text other apps edit too: no attribute or side file would survive them. It
+follows the convention of the fork's own markers (`<!-- xqt:cont … -->` of the pages, `<!-- xqt:plain -->`), GitHub,
+Obsidian, Typora, pandoc and the other renderers hide it, and it **moves with the text**: text added above it, a
+reflow, an edit in another editor take it along with its block. A position (line number, byte offset) kept elsewhere
+would not.
+
+- **Read with the parser**, never with a text search (`qt/src/markdown/MdBookmarks.*`): a top-level HTML block that is
+  exactly such a comment (spaces around it are fine; text after it, several lines, or `-->` in the label are not).
+  So an example in a code block, in `` `code` ``, in a quote or in a list is not a bookmark. A plain text (`.txt`)
+  has none.
+- **Its page** is the page the block after it starts on: the pagination (`MdPaginate`) keeps a comment with the
+  block after it, as it keeps a heading (and a page with nothing but comments before a block that does not fit is
+  not made: the block stays and goes below the margin, as before). A bookmark at the very end of the text is on the
+  last page. Several bookmarks on one page: the page's bookmark is the first one (its label); removing the page's
+  bookmark removes all of them.
+- **Labels** are written on one line (line breaks and tabs become spaces), without `--` (it would end or invalidate
+  the comment: it becomes "–"), trimmed. Reading keeps the label as written (trimmed).
+- **Pages ← text:** the bookmarks of the pages of the text are read from their slices into `XojPage::bookmark`
+  (`TextDocument::syncBookmarks`: the page's first bookmark comment, its label or the automatic one resolved) when a
+  document is made or loaded, after every change of the text (`MarkdownSession`), and after undo / redo (queued: the
+  undo handler may call back under the document's lock). So the pages sidebar (ribbons), the contents sidebar, the
+  library and the PDF's outline read them as they read any page's bookmark, with no code of their own.
+- **Which pages:** the pages of the text that starts on page 1 (`TextDocument::hasTextBookmarks`): a `.md` (and the
+  `.md` with its `.assets` folder), a PDF text document ([md-pdf.md](md-pdf.md)), and so also a `.xopp` whose page 1
+  starts the page's Markdown text (a text document by the same rule). Other pages keep the page attribute: a page of
+  notes after the text, Markdown text boxes, a `.xopp` whose text starts on a later page. A page attribute written
+  by the `qt/bookmarks` build on a page of such a text **becomes a comment** when the document is opened
+  (`TextDocument::migrateBookmarks`, before the pages are read from the text): before the first block that starts on
+  its page, as "Bookmark this page" puts it, with its label ("" stays automatic), written into that page's box as it
+  is (a comment takes no room, so nothing is laid out again). A page that has a comment already keeps only that. The
+  document is not marked modified; the comment is written with the next save. (Saving still writes each page's
+  bookmark as the page attribute too, as a mirror of the comment; on opening, the comment wins.)
+- **Bookmark this page** (page menu, ⋮) on such a page is an **edit of the text** (`MarkdownBookmarks::edit`,
+  `qt/src/canvas`): `<!-- xqt:bookmark -->` is inserted before the **first block that starts on the page** (a page
+  that begins inside a block: the first block after it; comments are skipped). **Decision:** a page that is all
+  inside one block (a long code block, list or table) has no place of its own: the comment goes before the block
+  that goes on over it, so the bookmark is on the page that block starts on, and the note says so ("Bookmark added
+  on page 3, where the text of this page begins"); if that block has a bookmark already, nothing is added. Removing
+  deletes the page's comment lines; renaming rewrites the first one ("Page N", or the automatic label itself, makes
+  it automatic again).
+  - In a `.md` with the cursor in the text it is a step of the text being written (`MarkdownEditor::applyEdit`, its
+    undo, Ctrl+Z steps back through it); the cursor stays where it was in the text. Without a cursor, and in a PDF
+    text document (whose undo takes back a whole edit of the text), it is an edit of its own: one undo step
+    (`MarkdownFile::setText`). Saving writes it as any typed text (byte for byte elsewhere).
+- **In the text being written** the comment's line is not drawn and takes no room (as every comment). The cursor is
+  never on it: moved onto it, it goes past it the way it went (Left from the start of the marked block: to the end
+  of the line before; Right: back). Backspace at the start of the marked block, or Delete at the end of the line
+  before it, removes the whole line (one step, undoable); a selection across it takes it along. The Markdown source
+  beside the page shows it as it is, and a comment typed there (or on the page, or in another editor) is a bookmark
+  as soon as its line is complete.
+- **PDF text documents:** the comments are in the flow, so in the embedded `document.xopp` and in the plain
+  `name.md` other apps get; each save also writes them into the PDF's outline item "Bookmarks" (the pages' bookmarks,
+  as above: nothing new in `HybridPdf`). Tested with `qpdf --check` after full and incremental saves.
+- **Library:** the index reads a `.md` with a bookmark comment on the pages it opens on (`MarkdownFile::document`
+  with its pictures, only for files that contain `xqt:bookmark`), into its entry's bookmarks (the "notes" pack as for
+  other documents; a Markdown entry has no pages there, so their aspect is A4). A comment's passage is indexed as the
+  label, in front of the passage of the block it marks (so the search finds the label, the card shows that block).
+  The Bookmarks view draws a `.md`'s page with `HitPageProvider` like the others (the file laid out with its
+  pictures).
+- **Not yet:** on a continuous page (`textContinuous`) every bookmark is on the one page (its ribbon shows the first),
+  while the library still lists them on the pages the file has on pages; going to the comment's place on the long
+  page is not done. Markdown text boxes and flows that start after page 1 of a `.xopp` keep the page attribute.
+
 ### Library cache
 `LibraryIndex` reads a document's bookmarks with its pages (`fillPages`, also for a document saved in the app) into
 its entry, and keeps them in the folder's **"notes" pack** (`"bookmarks": {page: label}`, only when there are any).
@@ -107,7 +182,7 @@ do. The library search also matches a page's bookmark label (plain and fuzzy sea
 - The snackbar after adding or removing one offers Undo.
 
 ### Not in this block
-- **Markdown documents** (`.md`): no bookmarks; their headings are the chapters already.
-- Text files shown or edited as text: no bookmarks.
+- Markdown documents: done in `qt/md-bookmarks` (above).
+- Plain text files (`.txt`, other text files edited as text): no bookmarks.
 - Upstream's plain PDF export (`XojCairoPdfExport`) writes the PDF's outline as it was read, with our item as it was
   when the document was opened; it does not write the current bookmarks.
