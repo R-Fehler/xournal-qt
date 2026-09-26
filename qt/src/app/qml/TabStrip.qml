@@ -1,5 +1,6 @@
 // Tab strip: the home tab (library, recent documents), one tab per open document (touch sized), close buttons, "+"
-// for a new document.
+// for a new document. A double click with the mouse on the shown tab's title, or "Rename…" in a tab's menu (right
+// click, or press and hold), edits its name in place (qt/rename).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -143,10 +144,18 @@ Rectangle {
                 /// Shown beside the current document (reference mode)
                 required property bool isReference
                 readonly property bool shown: current && !app.homeVisible
-                width: Math.min(260, Math.max(140, titleLabel.implicitWidth + 70))
+                /// Its name is edited in place (qt/rename)
+                readonly property bool renaming: tabRename.active
+                width: renaming ? 280 : Math.min(260, Math.max(140, titleLabel.implicitWidth + 70))
                 height: list.height
                 hoverEnabled: true
                 onClicked: app.currentTab = index
+                /// Rename in place: the name selected, the extension stays (Enter renames, Escape cancels)
+                function startRename() {
+                    const info = app.tabRenameInfo(index)
+                    tabRename.extension = info.extension || ""
+                    tabRename.start(info.name || "", info.problem)
+                }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
                     acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
@@ -154,8 +163,26 @@ Rectangle {
                 }
                 TapHandler {
                     id: tabLongPress
+                    enabled: !tab.renaming
                     acceptedButtons: Qt.LeftButton
                     onLongPressed: Popups.openAt(tabMenu, tabLongPress.point.position)
+                }
+                // A double click with the mouse on the title of the tab that is shown: its name is edited in place.
+                // On another tab the first click shows that one, and the double click does not rename.
+                TapHandler {
+                    id: titleDoubleClick
+                    objectName: "tabTitleDoubleClick"
+                    enabled: !tab.renaming
+                    acceptedButtons: Qt.LeftButton
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    property bool shownAtPress: false
+                    property bool shownAtFirstTap: false
+                    onPressedChanged: if (pressed) shownAtPress = tab.shown
+                    onTapped: if (tapCount === 1) shownAtFirstTap = shownAtPress
+                    onDoubleTapped: function(point) {
+                        const p = titleLabel.mapFromItem(tab, point.position)
+                        if (shownAtFirstTap && tab.shown && titleLabel.contains(p)) tab.startRename()
+                    }
                 }
                 // Dragged off the strip: a window of its own. The tab follows the finger while it is held.
                 // In scene coordinates: the tab moves with the finger, so its own coordinates would not grow
@@ -170,6 +197,7 @@ Rectangle {
                 opacity: tabDrag.active ? 0.85 : 1
                 DragHandler {
                     id: tabDrag
+                    enabled: !tab.renaming
                     target: null
                     onActiveChanged: {
                         if (active) {
@@ -187,6 +215,18 @@ Rectangle {
                 Menu {
                     id: tabMenu
                     objectName: "tabMenu"
+                    property bool renameAfter: false
+                    // (after the menu is gone: it gives the focus back when it closes)
+                    onClosed: if (renameAfter) { renameAfter = false; tab.startRename() }
+                    MenuItem {
+                        objectName: "renameTabItem"
+                        text: qsTr("Rename…")
+                        onTriggered: {
+                            app.currentTab = tab.index
+                            app.homeVisible = false
+                            tabMenu.renameAfter = true
+                        }
+                    }
                     MenuItem {
                         objectName: "undockTabItem"
                         text: app.secondaryWindow ? qsTr("Move to the main window")
@@ -250,6 +290,8 @@ Rectangle {
                     }
                     Label {
                         id: titleLabel
+                        objectName: "tabTitle"
+                        visible: !tab.renaming
                         Layout.fillWidth: true
                         Layout.leftMargin: tab.isReference && !app.homeVisible ? 4 : 12
                         Layout.topMargin: 4
@@ -258,6 +300,16 @@ Rectangle {
                         elide: Text.ElideMiddle
                         color: tab.shown ? "#202124" : "#5f6368"
                         font.weight: tab.shown ? Font.DemiBold : Font.Normal
+                    }
+                    InlineRename {
+                        id: tabRename
+                        objectName: "tabRename"
+                        visible: active
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 8
+                        Layout.topMargin: 4
+                        check: function(name) { return app.tabRenameProblem(tab.index, name) }
+                        onAccepted: function(name) { app.renameTab(tab.index, name) }
                     }
                     ToolButton {
                         Layout.topMargin: 4

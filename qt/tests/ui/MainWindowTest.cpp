@@ -84,6 +84,7 @@
 #include "session/TextDocument.h"
 #include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
+#include "shell/DocumentPlaces.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
 #include "shell/Library.h"
@@ -7737,4 +7738,288 @@ TEST_F(MainWindowTest, emojiAreInTheExportedPdfInColour) {
     EXPECT_GT(warmIn(135, 180), 300) << "😄 (:smile:) and 🇩🇪 of the Markdown box";
     EXPECT_GT(warmIn(285, 330), 50) << "👩‍💻 of the text box, at its place";
     EXPECT_EQ(warmIn(500, 545), 0) << "no emoji there";
+}
+
+// --- renaming a document from its tab, the ⋮ menu, the library's and the overview's cards (qt/rename) ---
+namespace {
+class RenameTest: public HomeScreenTest {
+protected:
+    static QQuickItem* inside(QQuickItem* root, const char* name) {
+        if (!root) {
+            return nullptr;
+        }
+        if (root->objectName() == name) {
+            return root;
+        }
+        for (QQuickItem* c: root->childItems()) {
+            if (QQuickItem* f = inside(c, name)) {
+                return f;
+            }
+        }
+        return nullptr;
+    }
+    QQuickItem* tab(int i) const { return itemAt(find<QQuickItem>("tabList"), i); }
+    static bool editing(QQuickItem* inlineRename) {
+        return inlineRename && inlineRename->property("active").toBool();
+    }
+    static QString fieldText(QQuickItem* inlineRename) {
+        return inlineRename->property("field").value<QObject*>()->property("text").toString();
+    }
+    void doubleClick(QQuickItem* item) {
+        ASSERT_NE(item, nullptr);
+        QTest::mouseDClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(item));
+        wait(50);
+    }
+    void holdMouse(QQuickItem* item) {
+        ASSERT_NE(item, nullptr);
+        const QPoint at = centerOf(item);
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
+        wait(800);  // (press and hold)
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at);
+        wait(50);
+    }
+    void holdFinger(QQuickItem* item) {
+        ASSERT_NE(item, nullptr);
+        static QPointingDevice* finger = QTest::createTouchDevice();
+        const QPoint at = centerOf(item);
+        QTest::touchEvent(window, finger).press(1, at);
+        wait(800);
+        QTest::touchEvent(window, finger).release(1, at);
+        wait(50);
+    }
+    void open(const char* name) {
+        ASSERT_TRUE(controller->openPath(QString::fromStdString((root / name).string())));
+        controller->setHomeVisible(false);
+        wait(100);
+    }
+};
+}  // namespace
+
+// A double click on the shown tab's title edits its name in place: the name selected, the extension beside it.
+// Escape cancels, a taken name says so and stays, Enter renames the file, and the tab follows.
+TEST_F(RenameTest, aDoubleClickOnTheShownTabRenamesItsDocument) {
+    open("notes.xopp");
+    ASSERT_EQ(controller->tabCount(), 1);
+    xqt::DocumentPlaces::setLastPage(root / "notes.xopp", 3);
+    QQuickItem* field = inside(tab(0), "tabRename");
+    ASSERT_NE(field, nullptr);
+    EXPECT_FALSE(editing(field));
+
+    doubleClick(inside(tab(0), "tabTitle"));
+    ASSERT_TRUE(editing(field)) << "a double click on the shown tab's title";
+    EXPECT_EQ(fieldText(field), "notes") << "the name without its extension";
+    EXPECT_EQ(inside(field, "inlineRenameExtension")->property("text").toString(), ".xopp") << "which stays";
+    type("x");
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(editing(field)) << "Escape cancels";
+    EXPECT_TRUE(fs::exists(root / "notes.xopp"));
+    EXPECT_EQ(controller->title(), "notes.xopp");
+
+    doubleClick(inside(tab(0), "tabTitle"));
+    ASSERT_TRUE(editing(field));
+    type("lecture");  // (the PDF's name)
+    EXPECT_FALSE(field->property("problem").toString().isEmpty()) << "a taken name says so";
+    key(Qt::Key_Return);
+    EXPECT_TRUE(editing(field)) << "and is not taken";
+    EXPECT_TRUE(fs::exists(root / "notes.xopp"));
+
+    key(Qt::Key_A, Qt::ControlModifier);
+    type("Week");
+    EXPECT_TRUE(field->property("problem").toString().isEmpty());
+    key(Qt::Key_Return);
+    EXPECT_FALSE(editing(field));
+    EXPECT_TRUE(fs::exists(root / "Week.xopp"));
+    EXPECT_FALSE(fs::exists(root / "notes.xopp"));
+    EXPECT_EQ(controller->title(), "Week.xopp") << "the tab follows";
+    EXPECT_EQ(inside(tab(0), "tabTitle")->property("text").toString(), "Week.xopp");
+    EXPECT_EQ(xqt::DocumentPlaces::lastPage(root / "Week.xopp"), 3) << "its reading place goes along";
+    EXPECT_GE(rowOf("Week.xopp"), 0) << "the library shows it under its new name";
+}
+
+// On a tab that is not shown, the first click of a double click shows it; the double click does not rename.
+TEST_F(RenameTest, aDoubleClickOnAnotherTabOnlyShowsIt) {
+    open("notes.xopp");
+    open("lecture.pdf");
+    ASSERT_EQ(controller->tabCount(), 2);
+    ASSERT_EQ(controller->currentTab(), 1);
+    doubleClick(inside(tab(0), "tabTitle"));
+    EXPECT_EQ(controller->currentTab(), 0);
+    EXPECT_FALSE(editing(inside(tab(0), "tabRename"))) << "not renamed on the way";
+    // The tab's menu (right click; press and hold with a finger) has "Rename…" too
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, centerOf(tab(1)));
+    wait(50);
+    QObject* menu = tab(1)->findChild<QObject*>("tabMenu");
+    ASSERT_NE(menu, nullptr);
+    ASSERT_TRUE(waitOpened(menu, true));
+    click(findItem("renameTabItem"));
+    ASSERT_TRUE(waitOpened(menu, false));
+    until([&] { return editing(inside(tab(1), "tabRename")); });
+    EXPECT_EQ(controller->currentTab(), 1) << "that tab is shown";
+    ASSERT_TRUE(editing(inside(tab(1), "tabRename"))) << "and its name edited in place";
+    EXPECT_EQ(fieldText(inside(tab(1), "tabRename")), "lecture");
+    key(Qt::Key_Escape);
+    EXPECT_TRUE(fs::exists(root / "lecture.pdf"));
+}
+
+// "Rename…" of the ⋮ menu: a dialog with the name and the extension as fixed text; a name that cannot be used says
+// why and OK waits.
+TEST_F(RenameTest, theMoreMenuRenamesInADialog) {
+    open("lecture.pdf");
+    QObject* menu = find("moreMenu");
+    QMetaObject::invokeMethod(menu, "open");
+    ASSERT_TRUE(waitOpened(menu, true));
+    click(findItem("renameDocumentItem"));
+    QObject* dialog = find("renameDocumentDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    auto* field = find<QQuickItem>("renameDocumentField");
+    auto* problem = find<QQuickItem>("renameDocumentProblem");
+    EXPECT_EQ(field->property("text").toString(), "lecture");
+    EXPECT_EQ(find<QQuickItem>("renameDocumentExtension")->property("text").toString(), ".pdf");
+
+    type("notes");  // a .xopp of that name is there
+    EXPECT_TRUE(problem->isVisible());
+    key(Qt::Key_Return);
+    EXPECT_TRUE(dialog->property("visible").toBool()) << "a taken name is not accepted";
+    key(Qt::Key_A, Qt::ControlModifier);
+    type("a/b");
+    EXPECT_TRUE(problem->isVisible()) << "no slash";
+    key(Qt::Key_A, Qt::ControlModifier);
+    type("Slides");
+    EXPECT_FALSE(problem->isVisible());
+    key(Qt::Key_Return);
+    EXPECT_TRUE(waitOpened(dialog, false));
+    EXPECT_TRUE(fs::exists(root / "Slides.pdf")) << "the extension is kept";
+    EXPECT_FALSE(fs::exists(root / "lecture.pdf"));
+    EXPECT_EQ(controller->title(), "Slides.pdf");
+
+    // A new document that was never saved: the name it gets when it is saved
+    controller->newDocument();
+    wait(50);
+    QMetaObject::invokeMethod(menu, "open");
+    ASSERT_TRUE(waitOpened(menu, true));
+    click(findItem("renameDocumentItem"));
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(find<QQuickItem>("renameDocumentExtension")->property("text").toString(), ".xopp");
+    type("Ideas");
+    key(Qt::Key_Return);
+    EXPECT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(controller->title(), "Ideas");
+    EXPECT_EQ(QFileInfo(controller->suggestedSaveFile().toLocalFile()).fileName(), "Ideas.xopp");
+}
+
+// A read-only file is not renamed (it says why).
+TEST_F(RenameTest, aReadOnlyFileIsNotRenamed) {
+    open("notes.xopp");
+    fs::permissions(root / "notes.xopp", fs::perms::owner_read, fs::perm_options::replace);
+    if (QFileInfo(QString::fromStdString((root / "notes.xopp").string())).isWritable()) {
+        fs::permissions(root / "notes.xopp", fs::perms::owner_all, fs::perm_options::replace);
+        GTEST_SKIP() << "files are writable anyway (root)";
+    }
+    EXPECT_FALSE(controller->tabRenameInfo(0).value("problem").toString().isEmpty());
+    EXPECT_FALSE(controller->tabRenameProblem(0, "Diary").isEmpty());
+    QSignalSpy messages(controller.get(), &AppController::message);
+    EXPECT_FALSE(controller->renameTab(0, "Diary"));
+    EXPECT_EQ(messages.count(), 1) << "it says why";
+    EXPECT_TRUE(fs::exists(root / "notes.xopp"));
+    fs::permissions(root / "notes.xopp", fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
+}
+
+// A .md with its pictures ("name.assets/"), renamed from its tab: both, and its links to the pictures follow (the
+// library's rename).
+TEST_F(RenameTest, aMarkdownFileAndItsPicturesAreRenamedFromTheTab) {
+    fs::create_directories(root / "Trip.assets");
+    QImage picture(8, 8, QImage::Format_RGB32);
+    picture.fill(Qt::red);
+    ASSERT_TRUE(picture.save(QString::fromStdString((root / "Trip.assets" / "a.png").string())));
+    std::ofstream(root / "Trip.md") << "# Trip\n\n![a](Trip.assets/a.png)\n";
+    open("Trip.md");
+    ASSERT_EQ(controller->title(), "Trip.md");
+    QQuickItem* field = inside(tab(0), "tabRename");
+    doubleClick(inside(tab(0), "tabTitle"));
+    ASSERT_TRUE(editing(field));
+    EXPECT_EQ(fieldText(field), "Trip");
+    type("Journey");
+    key(Qt::Key_Return);
+    EXPECT_TRUE(fs::exists(root / "Journey.md"));
+    EXPECT_TRUE(fs::exists(root / "Journey.assets" / "a.png"));
+    EXPECT_FALSE(fs::exists(root / "Trip.md"));
+    EXPECT_FALSE(fs::exists(root / "Trip.assets"));
+    std::ifstream in(root / "Journey.md");
+    const std::string text{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    EXPECT_NE(text.find("](Journey.assets/a.png)"), std::string::npos) << text;
+    EXPECT_EQ(controller->title(), "Journey.md");
+    EXPECT_FALSE(controller->property("modified").toBool()) << "the file and the text agree";
+}
+
+// The library: a press and hold (mouse or finger) or a double click on a card's title edits its name in place; a
+// click on the title still opens it.
+TEST_F(RenameTest, aCardTitleIsRenamedInPlace) {
+    // Press and hold with the mouse
+    QQuickItem* lecture = card(rowOf("lecture.pdf"));
+    holdMouse(inside(lecture, "cardTitleArea"));
+    QQuickItem* field = inside(lecture, "cardRename");
+    ASSERT_TRUE(editing(field)) << "a press and hold on the title";
+    EXPECT_EQ(fieldText(field), "lecture");
+    EXPECT_EQ(controller->tabCount(), 0) << "not opened";
+    type("Talk");
+    key(Qt::Key_Return);
+    EXPECT_TRUE(fs::exists(root / "Talk.pdf"));
+    EXPECT_FALSE(fs::exists(root / "lecture.pdf"));
+
+    // A double click with the mouse
+    QQuickItem* notes = card(rowOf("notes.xopp"));
+    doubleClick(inside(notes, "cardTitleArea"));
+    field = inside(notes, "cardRename");
+    ASSERT_TRUE(editing(field)) << "a double click on the title";
+    type("Talk");
+    EXPECT_FALSE(field->property("problem").toString().isEmpty()) << "taken";
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(editing(field));
+    wait(QGuiApplication::styleHints()->mouseDoubleClickInterval() + 100);
+    EXPECT_EQ(controller->tabCount(), 0) << "a double click does not open it";
+
+    // A press and hold with a finger: a folder too
+    QQuickItem* physics = card(rowOf("Physics"));
+    holdFinger(inside(physics, "cardTitleArea"));
+    field = inside(physics, "cardRename");
+    ASSERT_TRUE(editing(field)) << "a finger's press and hold on the title";
+    type("Maths");
+    key(Qt::Key_Return);
+    EXPECT_TRUE(fs::is_directory(root / "Maths"));
+
+    // A click on the title opens it (a moment later)
+    click(inside(card(rowOf("notes.xopp")), "cardTitleArea"));
+    until([&] { return controller->tabCount() == 1; });
+    EXPECT_EQ(controller->tabCount(), 1);
+    EXPECT_EQ(controller->title(), "notes.xopp");
+}
+
+// The overview of open documents: a double click (mouse) or a press and hold on a card's title edits the name in
+// place; Escape cancels it and leaves the overview open.
+TEST_F(RenameTest, anOverviewCardTitleIsRenamedInPlace) {
+    open("notes.xopp");
+    QObject* overview = find("tabOverview");
+    key(Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+    ASSERT_TRUE(waitOpened(overview, true));
+    auto* grid = find<QQuickItem>("tabGrid");
+    QQuickItem* cell = itemAt(grid, 0);
+    ASSERT_NE(cell, nullptr);
+    QQuickItem* field = inside(cell, "overviewRename");
+    doubleClick(inside(cell, "overviewTitleArea"));
+    ASSERT_TRUE(editing(field)) << "a double click on the title";
+    EXPECT_EQ(fieldText(field), "notes");
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(editing(field));
+    wait(QGuiApplication::styleHints()->mouseDoubleClickInterval() + 100);
+    EXPECT_TRUE(overview->property("visible").toBool()) << "Escape cancels the name, not the overview";
+
+    holdMouse(inside(cell, "overviewTitleArea"));
+    ASSERT_TRUE(editing(field)) << "a press and hold on the title";
+    type("Plan");
+    key(Qt::Key_Return);
+    EXPECT_TRUE(fs::exists(root / "Plan.xopp"));
+    EXPECT_FALSE(fs::exists(root / "notes.xopp"));
+    EXPECT_EQ(controller->title(), "Plan.xopp");
+    EXPECT_EQ(inside(cell, "overviewTitle")->property("text").toString(), "Plan.xopp");
 }

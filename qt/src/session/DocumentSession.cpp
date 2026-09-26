@@ -837,6 +837,14 @@ void DocumentSession::movePageTowardsEnd() {
 bool DocumentSession::hasFilePath() const { return !getFilePath().empty(); }
 
 fs::path DocumentSession::suggestSavePath() const {
+    fs::path suggested = defaultSavePath();
+    if (!untitled.empty() && !hasFilePath() && !text) {
+        suggested.replace_filename(untitled + ".xopp");  // (named in its tab)
+    }
+    return suggested;
+}
+
+fs::path DocumentSession::defaultSavePath() const {
     if (text && !hasFilePath()) {
         return text->path();  // (a text file is saved as itself)
     }
@@ -1029,10 +1037,20 @@ std::string DocumentSession::getDisplayName() const {
     if (!shownPath.empty()) {
         return char_cast(shownPath.filename().u8string().c_str());
     }
+    if (!untitled.empty()) {
+        return untitled;
+    }
     if (!madeSuggestion.empty()) {
         return char_cast(madeSuggestion.filename().u8string().c_str());
     }
     return _("Untitled");
+}
+
+void DocumentSession::setUntitledName(const std::string& name) {
+    if (name != untitled) {
+        untitled = name;
+        Q_EMIT filePathChanged();  // (the tab's title)
+    }
 }
 
 bool DocumentSession::isModified() const {

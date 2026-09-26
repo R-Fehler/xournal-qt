@@ -1,5 +1,6 @@
 // Overview of all open documents (tabs) as a grid of cards with the current page of each: tap a card to switch to
-// it, × to close it, + for a new document. Keyboard: arrows, Enter, Delete, Escape.
+// it, × to close it, + for a new document. Keyboard: arrows, Enter, Delete, Escape. A double click (mouse) or a press
+// and hold on a card's title edits the document's name in place (qt/rename).
 // The search field searches all open documents: documents with hits are marked; opening one shows its hits (the
 // document's own search, from its current page on). "Fuzzy" in the field: fzf's syntax, as in the library (the same
 // app-wide toggle): a document is marked when the expression holds with the terms in its title or text.
@@ -25,7 +26,9 @@ Popup {
     width: parent ? parent.width : 800
     height: parent ? parent.height : 600
     padding: 0
-    closePolicy: Popup.CloseOnEscape
+    /// A card's name is being edited (Escape cancels that, it does not close the overview)
+    property bool renaming: false
+    closePolicy: renaming ? Popup.NoAutoClose : Popup.CloseOnEscape
     onAboutToShow: {
         grid.currentIndex = app.currentTab
         grid.forceActiveFocus()
@@ -300,6 +303,13 @@ Popup {
                                                   ? app.fuzzyName(searchField.text, title).marks : []
                 readonly property string markedTitle: Fuzzy.marked(title, titleMarks, "#c2410c")
                 opacity: overview.searching && !hit && (overview.namesOnly || !searchRunning) ? 0.45 : 1
+                /// Edit its name in place (the name selected, the extension stays)
+                function startRename() {
+                    const info = app.tabRenameInfo(index)
+                    grid.currentIndex = index
+                    cellRename.extension = info.extension || ""
+                    cellRename.start(info.name || "", info.problem)
+                }
 
                 Rectangle {
                     anchors.fill: parent
@@ -350,12 +360,35 @@ Popup {
                                 color: Material.accentColor
                             }
                             Label {
+                                id: cellTitle
                                 objectName: "overviewTitle"
+                                visible: !cellRename.active
                                 Layout.fillWidth: true
                                 text: cell.markedTitle !== "" ? cell.markedTitle : cell.title
                                 textFormat: cell.markedTitle !== "" ? Text.StyledText : Text.AutoText
                                 elide: Text.ElideMiddle
                                 font.weight: cell.current ? Font.DemiBold : Font.Normal
+                                // The title: a double click (mouse) or a press and hold edits the name in place
+                                RenameGestures {
+                                    objectName: "overviewTitleArea"
+                                    anchors.fill: parent
+                                    anchors.margins: -6  // (a finger's size)
+                                    onTapped: overview.activate(cell.index)
+                                    onRenameRequested: cell.startRename()
+                                }
+                            }
+                            InlineRename {
+                                id: cellRename
+                                objectName: "overviewRename"
+                                visible: active
+                                Layout.fillWidth: true
+                                check: function(name) { return app.tabRenameProblem(cell.index, name) }
+                                onActiveChanged: overview.renaming = active
+                                onAccepted: function(name) {
+                                    app.renameTab(cell.index, name)
+                                    grid.forceActiveFocus()
+                                }
+                                onCanceled: if (overview.visible) grid.forceActiveFocus()
                             }
                             Label {
                                 visible: !overview.searching

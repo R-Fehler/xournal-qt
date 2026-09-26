@@ -103,6 +103,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp)
@@ -120,6 +121,9 @@ endif()
 set(XQT_QML_FILES
     src/app/qml/Main.qml
     src/app/qml/IconButton.qml
+    src/app/qml/InlineRename.qml
+    src/app/qml/RenameDialog.qml
+    src/app/qml/RenameGestures.qml
     src/app/qml/TabStrip.qml
     src/app/qml/PageSidebar.qml
     src/app/qml/SettingsPage.qml

@@ -175,8 +175,19 @@ std::string uniqueName(const fs::path& folder, const std::string& stem);
 bool validName(const std::string& name);
 
 /// Rename a document: the .xopp and its PDF (or image) together. A text or other file: `newName` is its whole file
-/// name.
+/// name. Every rename in the app goes through here (the library, the recent list, a tab, qt/docs/library.md
+/// "Renaming"); what follows it (index, reading places, open tabs, links) is the caller's (Result::moved).
 Result rename(const DocumentItem& item, const std::string& newName);
+/// Why a document cannot get `newName`, as rename() checks it (the name fields show it while the name is typed).
+/// None: it can, or it is its name already. ReadOnly: its file or its folder cannot be written.
+enum class RenameProblem { None, Empty, Separator, Invalid, Taken, ReadOnly, Missing };
+RenameProblem renameProblem(const DocumentItem& item, const std::string& newName);
+/// The problems of the name alone (Empty, Separator, Invalid; None).
+RenameProblem nameProblem(const std::string& newName);
+/// Its files and its folder can be written (else renaming it is ReadOnly).
+bool renamable(const DocumentItem& item);
+/// The same for a folder (renameFolder).
+RenameProblem folderRenameProblem(const fs::path& folder, const std::string& newName);
 /// Move a document into another folder.
 Result move(const DocumentItem& item, const fs::path& folder);
 /// Copy a document file into a folder (under a free name): a .xopp with the PDF it uses (stored as "<name>.pdf" next

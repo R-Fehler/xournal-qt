@@ -180,11 +180,12 @@ The author accepted the plan with its proposals:
   `LibraryIndex::linkSources` lists them.
 - **Backlinks**: ⋮ → **Linked from…** lists the documents of the library whose links lead to the current one (a
   link to any of its files: the PDF of a `.xopp` counts; a wiki link by its name); a tap opens one.
-- **Rewritten after a rename or move in the app** (the library's Rename, Move to…, dragging onto a folder; also
-  whole folders): `LinkRewrite::plan` finds the links that point elsewhere now - links to what moved, and the
-  relative links of a moved document itself - and writes each anew relative to where it is (the fragment stays; a
-  wiki link to a renamed document gets the new name). Only link targets change: `](…)`, `](<…>)`, `[id]: …`,
-  `[[…]]`; the rest of the text stays byte for byte.
+- **Rewritten after a rename or move in the app** (the library's Rename, Move to…, dragging onto a folder; also whole
+  folders; a rename from a tab, ⋮ → Rename… or the overview of open documents, which is the library's rename):
+  `LinkRewrite::plan` finds the links that point elsewhere now - links to what moved, and the relative links of a moved
+  document itself - and writes each anew relative to where it is (the fragment stays; a wiki link to a renamed document
+  gets the new name). Only link targets change: `](…)`, `](<…>)`, `[id]: …`, `[[…]]`; the rest of the text stays byte
+  for byte.
   - Open documents change through themselves, with undo (a `.xopp`'s texts as text edits, a `.md` as one edit of
     its text), and are saved when they had no unsaved changes (so the file has the new link too); with unsaved
     changes they keep the change until they are saved.

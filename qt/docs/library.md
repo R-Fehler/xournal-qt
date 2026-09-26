@@ -97,7 +97,7 @@ the tooltip and the accessible name say it in words):
   - `Thumbs.db`, `desktop.ini`
 - **Rename / move** rename or move both files. The `.xopp` is loaded and written again with upstream's LoadHandler and
   SaveHandler, so its PDF reference (relative to the `.xopp`) points to the new place; the same for the image a
-  `.xopp` annotates. Open tabs and the recent list follow the new paths.
+  `.xopp` annotates. Open tabs and the recent list follow the new paths (below, "Renaming").
 - Text and other files are renamed by their whole file name, moved, copied and trashed like documents; a name that is
   taken becomes "name (2).ext".
 - **Import / copy** copy a `.xopp` together with the PDF it uses. That PDF is stored as `name.pdf` next to the copy,
@@ -106,6 +106,43 @@ the tooltip and the accessible name say it in words):
   images). Text and other files come along only when the library shows them; hidden folders (`.git`, …) stay behind. A name that is taken becomes "name (2)": taken by
   any document (`.xopp`, PDF, `.md`, image), so a moved `.xopp` never pairs with an image or PDF that was there.
 - **Trash** moves the files (or the folder) to the desktop trash.
+
+### Renaming
+
+One rename for every place it is offered (qt/rename): `DocumentFiles::rename` renames the document's files, and then
+the search index entry, the reading places and title page (`DocumentPlaces`), the previews, the open tabs, the recent
+list and the links to and from it follow (`LibraryModel::followMoves`, `AppController::filesChanged`,
+[links.md](links.md)). What is renamed with it:
+
+- a `.xopp` with the PDF (or the image) of its name next to it: both, as one document (the library pairs them; the
+  `.xopp` is written again so it points to the renamed PDF). A `.xopp` whose PDF has another name or lives elsewhere:
+  only the `.xopp` (its reference to the PDF is written anew).
+- a PDF with notes, a PDF text document: the PDF (and its copy for Xournal++ next to it, if there is one).
+- a `.md` with its `name.assets/`: both, and its links to the pictures ([md-images.md](md-images.md)).
+- a text or other file: the file.
+
+Where:
+
+- **Library and Recent**: "Rename…" in a card's menu (or F2) asks in a dialog. On the card's **title** (its name and
+  the line below it) a **press and hold** (finger or mouse) or a **double click** with the mouse edits the name in
+  place: the name selected, a text file's extension beside it as fixed text; Enter renames, Escape or a click
+  elsewhere cancels, a name that cannot be used says why (red) and stays. A click on the title still opens the card, a
+  moment later (the time a double click may take); the rest of the card works as before (a tap opens, press and
+  hold opens the menu or drags). A folder's title renames the folder.
+- **A tab**: a **double click** with the mouse on the title of the tab that is shown edits it in place, the same way
+  (the extension stays beside it). A double click on another tab only shows that tab (its first click does). The tab's
+  menu (right click, or press and hold with a finger) has **Rename…**, which shows that tab and edits its name.
+- **⋮ → Rename…**: a dialog with the name and the extension as fixed text, what goes with it (its PDF, its pictures),
+  and why a name cannot be used (OK waits for one that can).
+- **The overview of open documents**: a double click (mouse) or a press and hold on a card's title edits it in place;
+  Escape cancels the name, not the overview.
+
+The checks, the same everywhere (`DocumentFiles::renameProblem`): no empty name, no `/` or `\`, no hidden name (a
+leading dot), not a name another document here has (any kind: `.xopp`, PDF, `.md`, image, a `name.assets` folder), and
+not a read-only file or folder ("read-only: it cannot be renamed"). From a tab, a document being saved at that moment is
+asked to wait. A **new document that was never saved** has no file: its rename sets its tab's title and the name it is
+saved under ("Ideas" → "Ideas.xopp" in Save as). A new document that shows an image or a read-only file renames that
+file, and its pages' image backgrounds follow.
 
 ### Markdown files and images, opened
 - A **Markdown file** opens for editing ([md-editor.md](md-editor.md)): a new document of plain A4 pages with the
@@ -539,6 +576,8 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     (`.xournal_library/`), so nothing is indexed again. (Not so when the library keeps its cache in the app cache:
     the subfolder is a library with a key and settings of its own, starts with the cache in its folders and indexes
     its documents once.)
+  - on the title (name and the line below it): press and hold, or a double click with the mouse, renames it in place
+    (above, "Renaming"); a click there opens it a moment later, a right click opens the menu
   - right click, ⋮, or press and hold: the menu (Open, Select, Rename, Copy to…, Move to…, Show in its folder,
     Open externally (Markdown, text and other files, images: [md-editor.md](md-editor.md)), Share… (see
     hybrid-pdf.md; a text file: the file itself), Show in file manager, Remove from list, Move to trash)
