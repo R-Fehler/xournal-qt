@@ -457,17 +457,20 @@ Rectangle {
             IconButton {
                 objectName: "newDocumentButton"
                 iconName: "xqt-file-plus"
-                tip: qsTr("New document, Markdown file or text file")
+                tip: app.newTextAsPdf ? qsTr("New document, text document or text file")
+                                      : qsTr("New document, Markdown file or text file")
                 onClicked: Popups.openAt(newMenu)
                 Menu {
                     id: newMenu
                     objectName: "newMenu"
                     MenuItem { objectName: "newDocumentItem"; text: qsTr("New document…"); onTriggered: newDocumentDialog.open() }
+                    // A text document: a PDF text document or a Markdown file, as Settings → Documents says
+                    // (qt/docs/md-pdf.md)
                     MenuItem {
                         objectName: "newMarkdownItem"
-                        text: qsTr("New Markdown file…")
+                        text: app.newTextAsPdf ? qsTr("New text document…") : qsTr("New Markdown file…")
                         enabled: app.library.available
-                        onTriggered: { textFileDialog.extension = ".md"; textFileDialog.open() }
+                        onTriggered: { textFileDialog.extension = app.newTextAsPdf ? ".pdf" : ".md"; textFileDialog.open() }
                     }
                     MenuItem {
                         objectName: "newTextItem"
@@ -1480,7 +1483,8 @@ Rectangle {
         onAccepted: if (folderField.text.trim() !== "") app.library.createFolder(folderField.text)
     }
 
-    // "New Markdown file" / "New text file": its name (made in the current folder and opened to write in)
+    // "New text document" (a PDF text document, ".pdf"), "New Markdown file" / "New text file": its name (made in the
+    // current folder and opened to write in)
     Dialog {
         id: textFileDialog
         objectName: "textFileDialog"
@@ -1488,7 +1492,8 @@ Rectangle {
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
-        title: extension === ".md" ? qsTr("New Markdown file") : qsTr("New text file")
+        title: extension === ".pdf" ? qsTr("New text document") : extension === ".md" ? qsTr("New Markdown file")
+                                                                                     : qsTr("New text file")
         width: Math.min(parent ? parent.width * 0.9 : 440, 440)
         onAboutToShow: { textFileField.text = ""; textFileField.forceActiveFocus() }
         RowLayout {
@@ -1505,7 +1510,8 @@ Rectangle {
             Label { text: textFileDialog.extension; color: "#5f6368" }
         }
         standardButtons: Dialog.Ok | Dialog.Cancel
-        onAccepted: app.createTextFile(textFileField.text, extension)
+        onAccepted: extension === ".pdf" ? app.createTextDocument(textFileField.text)
+                                         : app.createTextFile(textFileField.text, extension)
     }
 
     // Where to copy / move documents and folders: a folder of this library or of another one.

@@ -155,7 +155,8 @@ std::unique_ptr<Document> document(const std::string& source, size_t maxPages) {
     return document(source, style(), maxPages);
 }
 
-std::unique_ptr<Document> document(const std::string& source, const md::Style& s, size_t maxPages) {
+namespace {
+std::unique_ptr<Document> make(const std::string& source, const md::Style& s, size_t maxPages, bool firstBox) {
     md::installRenderer();  // (idempotent: the boxes are drawn formatted and are as big as they are drawn)
     auto doc = std::make_unique<Document>(&handler());
     const md::Frame f = frame();
@@ -165,7 +166,8 @@ std::unique_ptr<Document> document(const std::string& source, const md::Style& s
         auto page = std::make_shared<XojPage>(PAGE_WIDTH, PAGE_HEIGHT);
         page->setBackgroundType(PageType(PageTypeFormat::Plain));
         page->setBackgroundColor(Colors::white);
-        if (i < pages.slices.size() && !pages.slices[i].empty()) {
+        const bool slice = i < pages.slices.size() && !pages.slices[i].empty();
+        if (slice || (i == 0 && firstBox)) {
             // The layer first: a text in a layer named "Markdown" is a Markdown text
             auto* layer = new Layer();
             layer->setName(std::string(xoj::markdown::LAYER_NAME));
@@ -175,7 +177,7 @@ std::unique_ptr<Document> document(const std::string& source, const md::Style& s
             box->setFont(XojFont(s.family, s.size));
             box->setColor(s.color);
             box->setWrap(f.width);
-            box->setText(pages.slices[i]);
+            box->setText(slice ? pages.slices[i] : std::string());
             Text* added = box.get();
             layer->addElement(std::move(box));
             added->getBoundingBox();  // (sizes are computed lazily, also by the renderers: once, here)
@@ -184,6 +186,15 @@ std::unique_ptr<Document> document(const std::string& source, const md::Style& s
         doc->addPage(std::move(page));
     }
     return doc;
+}
+}  // namespace
+
+std::unique_ptr<Document> document(const std::string& source, const md::Style& s, size_t maxPages) {
+    return make(source, s, maxPages, false);
+}
+
+std::unique_ptr<Document> notesDocument(const std::string& source) {
+    return make(source, style(), static_cast<size_t>(-1), true);
 }
 
 namespace {

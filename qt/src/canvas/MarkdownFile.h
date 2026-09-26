@@ -74,6 +74,10 @@ std::unique_ptr<Document> document(const std::string& source, size_t maxPages = 
 std::unique_ptr<Document> document(const std::string& source, const md::Style& style,
                                    size_t maxPages = static_cast<size_t>(-1));
 
+/// A text document of notes (qt/docs/md-pdf.md): `source` on plain A4 pages as document() makes it, with the page's
+/// Markdown text on page 1 even when it is empty (the box makes it a text document: typing goes into it).
+std::unique_ptr<Document> notesDocument(const std::string& source);
+
 /// Where the part of the text on each page of a document made by document() begins (bytes of the text), from its
 /// pages as they are now.
 std::vector<size_t> pageStarts(Document& doc);

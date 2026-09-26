@@ -74,6 +74,7 @@
 #include "session/IncrementalPdf.h"
 #include "session/DocumentMode.h"
 #include "session/HybridPdf.h"
+#include "session/TextDocument.h"
 #include "session/PdfPageKeeper.h"
 #include "shell/DocumentFiles.h"
 #include "shell/HitPages.h"
@@ -1150,6 +1151,68 @@ TEST_F(HomeScreenTest, newMarkdownAndTextFilesAreMadeInTheFolderAndOpened) {
     EXPECT_TRUE(fs::exists(root / "Ideas (2).md"));
     EXPECT_EQ(controller->title(), "Ideas (2).md");
     EXPECT_EQ(controller->textDocument(), "markdown");
+}
+
+// A new text document in PDF files mode (qt/docs/md-pdf.md): the menu offers "New text document…", which makes
+// "name.pdf", a PDF with notes, and opens it with the cursor in its text and the formatting bar; typing writes into
+// the text, the pen stays the pen, and ⋮ offers "Export as Markdown".
+TEST_F(HomeScreenTest, aNewTextDocumentIsAPdfInPdfFilesMode) {
+    Settings& settings = *controller->context().getSettings();
+    struct Back {  // (the tests share the config folder)
+        Settings& s;
+        ~Back() { xqt::DocumentMode::store(s, xqt::DocumentMode::Mode::Unset); }
+    } back{settings};
+    xqt::DocumentMode::store(settings, xqt::DocumentMode::Mode::Pdf);
+    Q_EMIT controller->context().settingsChanged();  // (as Settings do)
+    click(find<QQuickItem>("newDocumentButton"));
+    QObject* menu = find("newMenu");
+    ASSERT_TRUE(waitOpened(menu, true));
+    QQuickItem* item = findItem("newMarkdownItem");
+    ASSERT_NE(item, nullptr);
+    EXPECT_EQ(item->property("text").toString(), QString::fromUtf8("New text document…"));
+    click(item);
+    QObject* dialog = find("textFileDialog");
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(dialog->property("title").toString(), "New text document");
+    type("Report");
+    key(Qt::Key_Return);
+    EXPECT_TRUE(waitOpened(dialog, false));
+    wait(50);
+    EXPECT_EQ(controller->title(), "Report.pdf");
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(root / "Report.pdf"));
+    EXPECT_FALSE(fs::exists(root / "Report.md"));
+    EXPECT_TRUE(controller->textNotes());
+    auto* bar = findItem("markdownFormatBar");
+    ASSERT_NE(bar, nullptr);
+    until([&] { return bar->isVisible(); });
+    EXPECT_TRUE(bar->isVisible());
+    const QString tool = controller->tool();
+    type("Hello");
+    key(Qt::Key_Escape);  // (done writing)
+    EXPECT_EQ(controller->tool(), tool) << "the tools stay the notes' tools";
+    type(" world");  // (again, without a click)
+    key(Qt::Key_Escape);
+    EXPECT_TRUE(bar->isVisible()) << "shown while nothing is written, as for a .md";
+    EXPECT_TRUE(controller->modified());
+    ASSERT_TRUE(controller->save());
+    auto loaded = xqt::DocumentSession::loadFile(root / "Report.pdf");
+    ASSERT_TRUE(loaded.document);
+    {
+        std::shared_lock lock(*loaded.document);
+        EXPECT_EQ(xqt::TextDocument::flowText(*loaded.document), "Hello world");
+    }
+    // ⋮ → Export as Markdown is there (a .md's "Open as PDF document" is not)
+    QObject* more = find("moreMenu");
+    ASSERT_NE(more, nullptr);
+    QMetaObject::invokeMethod(more, "open");
+    ASSERT_TRUE(waitOpened(more, true));
+    auto* exportItem = find<QQuickItem>("exportMarkdownItem");
+    ASSERT_NE(exportItem, nullptr);
+    until([&] { return exportItem->isVisible(); });
+    EXPECT_TRUE(exportItem->isVisible());
+    EXPECT_FALSE(find<QQuickItem>("openAsPdfDocumentItem")->isVisible());
+    key(Qt::Key_Escape);
 }
 
 TEST_F(HomeScreenTest, severalDocumentsAreSelectedAndMovedIntoAFolder) {
@@ -6417,7 +6480,14 @@ TEST_F(MainWindowTest, settingsChangeTheDocumentMode) {
     ASSERT_NE(intoPdf, nullptr);
     EXPECT_TRUE(xopp->property("chosen").toBool()) << "the mode in effect (the tests': Xournal++ files)";
     EXPECT_TRUE(intoPdf->isVisible());
+    // New text documents follow the mode while they are not chosen (qt/docs/md-pdf.md)
+    auto* textRow = findItem("newTextDocumentsRow");
+    ASSERT_NE(textRow, nullptr);
+    QQuickItem* textCombo = textRow->childItems().last();
+    EXPECT_EQ(textCombo->property("currentValue").toString(), "md");
     click(pdf);
+    until([&] { return textCombo->property("currentValue").toString() == "pdf"; });
+    EXPECT_EQ(textCombo->property("currentValue").toString(), "pdf");
     EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Pdf);
     EXPECT_TRUE(controller->pdfOnly());
     EXPECT_TRUE(pdf->property("chosen").toBool());
@@ -6425,6 +6495,8 @@ TEST_F(MainWindowTest, settingsChangeTheDocumentMode) {
     until([&] { return !intoPdf->isVisible(); });
     EXPECT_FALSE(intoPdf->isVisible()) << "always so in PDF files mode";
     click(xopp);
+    until([&] { return textCombo->property("currentValue").toString() == "md"; });
+    EXPECT_EQ(textCombo->property("currentValue").toString(), "md");
     EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Xopp);
     EXPECT_FALSE(controller->pdfOnly());
     EXPECT_TRUE(xopp->property("chosen").toBool());

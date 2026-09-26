@@ -6,6 +6,7 @@
  */
 #include <algorithm>
 #include <cctype>
+#include <shared_mutex>
 
 #include <QFile>
 #include <QFileInfo>
@@ -21,10 +22,14 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "session/AppContext.h"
+#include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
+#include "session/TextDocument.h"
 #include "session/TextFile.h"
 #include "shell/DocumentFiles.h"
 #include "shell/LibraryModel.h"
+#include "shell/LocalUrl.h"
+#include "shell/RecentFiles.h"
 #include "shell/TabManager.h"
 #include "util/PathUtil.h"
 #include "control/ScrollHandler.h"
@@ -230,7 +235,8 @@ bool AppController::editAsNotes() {
     }
     const fs::path md = s->textFile()->path();
     const std::string text = s->currentText();  // (as it is here, saved or not)
-    auto notes = std::make_unique<DocumentSession>(*app, MarkdownFile::document(text, MarkdownFile::style()));
+    // (a text document of notes: typing goes into its text, also when the .md is empty; qt/docs/md-pdf.md)
+    auto notes = std::make_unique<DocumentSession>(*app, MarkdownFile::notesDocument(text));
     fs::path xopp = md;
     xopp.replace_extension(".xopp");
     notes->setMadeFrom(xopp);
@@ -245,6 +251,129 @@ bool AppController::editAsNotes() {
                                   .arg(QString::fromStdString(md.filename().string()),
                                        QString::fromStdString(suggested.filename().string())),
                           false);
+    return true;
+}
+
+// --- text documents as PDF (qt/docs/md-pdf.md) ------------------------------------------------------------------------
+
+bool AppController::newTextAsPdf() const {
+    return DocumentMode::newTextDocuments(*app->getSettings()) == DocumentMode::TextKind::Pdf;
+}
+
+bool AppController::makeTextPdf(const std::string& text, const fs::path& pdf) {
+    auto made = std::make_unique<DocumentSession>(*app, MarkdownFile::notesDocument(text));
+    DocumentSession* created = made.get();
+    tabs->addTab(std::move(made));
+    setHomeVisible(false);
+    const DocumentSession::SaveResult r = created->saveAsHybrid(pdf);
+    if (!r.ok) {
+        Q_EMIT titleChanged();
+        Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
+        return false;  // (the tab stays, unsaved: Save as… writes it elsewhere)
+    }
+    recent->add(created->getFilePath());
+    afterHybridSave(*created);  // (with the library's refresh)
+    Q_EMIT titleChanged();
+    if (CanvasView* v = canvas(); v && tabs->currentSession() == created) {
+        v->ensureTextEditor();  // (write at once)
+    }
+    return true;
+}
+
+bool AppController::createTextDocument(const QString& name) {
+    if (!newTextAsPdf()) {
+        return createTextFile(name, QStringLiteral(".md"));
+    }
+    if (!library->available()) {
+        return false;
+    }
+    fs::path pdf(library->newDocumentPath(name).toStdString());  // (a name free for every kind of document)
+    pdf.replace_extension(".pdf");
+    return makeTextPdf(std::string(), pdf);
+}
+
+bool AppController::openAsPdfDocument() {
+    DocumentSession* s = session();
+    if (!s || !s->textFile() || s->hasFilePath() || s->textFile()->kind() != TextFile::Kind::Markdown) {
+        return false;
+    }
+    const fs::path md = s->textFile()->path();
+    const std::string text = s->currentText();  // (as it is here, saved or not)
+    fs::path pdf = md.parent_path() / (md.stem().string() + ".pdf");
+    std::error_code ec;
+    for (int i = 2; fs::exists(pdf, ec); ++i) {
+        pdf = md.parent_path() / (md.stem().string() + " (" + std::to_string(i) + ").pdf");
+    }
+    if (!makeTextPdf(text, pdf)) {
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("%1 made from %2, which stays as it is")
+                                  .arg(QString::fromStdString(pdf.filename().string()),
+                                       QString::fromStdString(md.filename().string())),
+                          false);
+    return true;
+}
+
+bool AppController::textNotes() const {
+    const CanvasView* v = canvas();
+    return v && v->typesIntoFlow();
+}
+
+bool AppController::hasMarkdownText() const {
+    DocumentSession* s = session();
+    if (!s || s->textFile()) {
+        return false;
+    }
+    std::shared_lock lock(*s->getDocument());
+    return TextDocument::isTextDocument(*s->getDocument()) || TextDocument::hasMarkdownText(*s->getDocument());
+}
+
+QUrl AppController::markdownExportFile() const {
+    const DocumentSession* s = session();
+    if (!s || s->documentFile().empty() || pdfOnly()) {
+        return {};  // (PDF files: nothing is written next to files, the window asks)
+    }
+    const fs::path doc = s->documentFile();
+    return QUrl::fromLocalFile(QString::fromStdString((doc.parent_path() / (doc.stem().string() + ".md")).string()));
+}
+
+QUrl AppController::suggestedMarkdownExport() const {
+    const DocumentSession* s = session();
+    if (!s) {
+        return {};
+    }
+    fs::path target = s->documentFile();
+    if (target.empty()) {
+        target = fs::path(suggestedSaveFile().toLocalFile().toStdString());
+    }
+    target.replace_extension(".md");
+    return QUrl::fromLocalFile(QString::fromStdString(target.string()));
+}
+
+bool AppController::exportMarkdown(const QUrl& file) {
+    DocumentSession* s = session();
+    fs::path target(localPathOf(file).toStdString());
+    if (!s || s->textFile() || target.empty()) {
+        return false;
+    }
+    if (target.extension().empty()) {
+        target += ".md";
+    }
+    std::string text;
+    {
+        std::shared_lock lock(*s->getDocument());
+        text = TextDocument::markdown(*s->getDocument());
+    }
+    // (the images of the text go into "name.assets/" once qt/md-images is there)
+    const QString path = QString::fromStdString(target.string());
+    QSaveFile out(path);
+    if (!out.open(QIODevice::WriteOnly) || out.write(text.data(), static_cast<qint64>(text.size())) < 0 ||
+        !out.commit()) {
+        Q_EMIT message(tr("Export as Markdown failed"), tr("\"%1\" cannot be written.").arg(path), true);
+        return false;
+    }
+    library->refresh();
+    Q_EMIT pageActionDone(tr("Markdown written: %1").arg(QString::fromStdString(target.filename().string())), false);
     return true;
 }
 

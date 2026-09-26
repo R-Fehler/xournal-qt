@@ -60,6 +60,7 @@
 #include "MdBox.h"
 #include "MergedPdf.h"
 #include "StickyNote.h"
+#include "TextDocument.h"
 #include "config.h"
 
 namespace xqt::HybridPdf {
@@ -705,6 +706,7 @@ struct Prepared {
     std::string drawn;  ///< a PDF (cairo): the generated base pages and the appearance of each annotation
     std::string xopp;
     std::vector<std::pair<std::string, std::string>> extras;  ///< files next to the .xopp (attached images)
+    std::vector<TextDocument::Attachment> attachments;        ///< files for other apps (a text document's "name.md")
     std::string error;
 };
 
@@ -722,6 +724,7 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
     }
     {
         std::shared_lock lock(doc);
+        out.attachments = TextDocument::attachments(doc, pdfName);  // (qt/docs/md-pdf.md)
         out.bg = doc.getPdfFilepath();
         const size_t bgPages = pdfPageCount != npos ? pdfPageCount : doc.getPdfPageCount();
         cairo_surface_t* surface = cairo_pdf_surface_create_for_stream(appendTo, &out.drawn, 1, 1);
@@ -898,9 +901,9 @@ struct WorkDir {
 
 /// `relationship`: an archive PDF's associated file (PDF/A-3): how it relates to the PDF (/Source, /Supplement).
 void addEmbedded(QPDF& pdf, const std::string& name, const std::string& data, const std::string& description,
-                 const char* relationship = nullptr) {
+                 const char* relationship = nullptr, const std::string& mime = {}) {
     auto stream = QPDFEFStreamObjectHelper::createEFStream(pdf, data);
-    stream.setSubtype(name == DATA_NAME ? ArchivePdf::XOPP_MIME : "image/png");
+    stream.setSubtype(!mime.empty() ? mime : name == DATA_NAME ? ArchivePdf::XOPP_MIME : "image/png");
     if (relationship) {
         stream.setModDate(pdfDateNow());
     }
@@ -1361,6 +1364,11 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
         for (const auto& [name, data]: prep.extras) {
             addEmbedded(out, name, data, "A file of the Xournal++ document of this PDF", archive ? "/Supplement" : nullptr);
             files.appendItem(QPDFObjectHandle::newUnicodeString(name));
+        }
+        for (const auto& a: prep.attachments) {  // (for other apps: a text document's "name.md"; listed with the
+            addEmbedded(out, a.name, a.data, a.description,  // images, so the clean copy never carries them)
+                        archive && !a.relationship.empty() ? a.relationship.c_str() : nullptr, a.mime);
+            files.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
         }
         QPDFObjectHandle marker = QPDFObjectHandle::newDictionary();
         marker.replaceKey("/Version", QPDFObjectHandle::newInteger(archive ? ARCHIVE_FORMAT_VERSION : FORMAT_VERSION));
@@ -2324,7 +2332,7 @@ private:
     void embedData() {
         touchNames(u, e.root);
         QPDFEmbeddedFileDocumentHelper efdh(q);
-        auto replaceData = [&](const std::string& name, const std::string& data, bool xopp) {
+        auto replaceData = [&](const std::string& name, const std::string& data, bool xopp, const std::string& mime = {}) {
             auto spec = efdh.getEmbeddedFile(name);
             QPDFObjectHandle s = spec ? spec->getObjectHandle() : QPDFObjectHandle::newNull();
             QPDFObjectHandle ef = s.isDictionary() ? s.getKey("/EF") : QPDFObjectHandle::newNull();
@@ -2337,7 +2345,8 @@ private:
             QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
             dict.replaceKey("/Type", QPDFObjectHandle::newName("/EmbeddedFile"));
             dict.replaceKey("/Subtype",
-                            QPDFObjectHandle::newName("/" + std::string(xopp ? ArchivePdf::XOPP_MIME : "image/png")));
+                            QPDFObjectHandle::newName("/" + (!mime.empty() ? mime
+                                                             : std::string(xopp ? ArchivePdf::XOPP_MIME : "image/png"))));
             QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
             params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(data.size())));
             const QByteArray md5 = QCryptographicHash::hash(
@@ -2366,6 +2375,12 @@ private:
             files.appendItem(QPDFObjectHandle::newUnicodeString(name));
             if (!before.erase(name) || !replaceData(name, data, false)) {
                 throw std::runtime_error("the document has other background images");
+            }
+        }
+        for (const auto& a: prep.attachments) {  // (the same files for other apps, their data new)
+            files.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
+            if (!before.erase(a.name) || !replaceData(a.name, a.data, false, a.mime)) {
+                throw std::runtime_error("the document has other attachments");
             }
         }
         if (!before.empty()) {

@@ -57,6 +57,7 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
+#include "session/TextDocument.h"
 #include "PageNoteSpace.h"
 #include "Perf.h"
 #include "StickyNotes.h"
@@ -1613,15 +1614,52 @@ void CanvasView::textPress(CanvasPage& page, double x, double y) {
     startMarkdown(*idx, true, x, y);
 }
 
+bool CanvasView::typesIntoFlow() const {
+    if (session.textFile() || session.isReadOnly() || readingOnly) {
+        return false;
+    }
+    Document& doc = *session.getDocument();
+    std::shared_lock lock(doc);
+    return TextDocument::isTextDocument(doc);
+}
+
 bool CanvasView::ensureTextEditor() {
     if (markdownEditor) {
         return true;
     }
-    if (!textMode()) {
+    if (textEditor) {
+        return false;  // (a text box is being written)
+    }
+    const size_t page = std::min(currentPageNo(), session.getDocument()->getPageCount() - 1);
+    if (textMode()) {
+        startMarkdown(page, true, TextFlow::MARGIN, TextFlow::MARGIN);
+        return markdownEditor != nullptr;
+    }
+    if (!typesIntoFlow()) {
         return false;
     }
-    startMarkdown(std::min(currentPageNo(), session.getDocument()->getPageCount() - 1), true,
-                  TextFlow::MARGIN, TextFlow::MARGIN);
+    // A text document of notes: at the end of what the page in view holds of its text (as the writing button starts
+    // it), or at the end of the text when that page is after it
+    size_t end = 1;
+    double w = 0;
+    double h = 0;
+    size_t at = page;
+    {
+        Document& doc = *session.getDocument();
+        std::shared_lock lock(doc);
+        TextDocument::flowText(doc, 0, &end);
+        at = std::min(page, end - 1);
+        w = doc.getPage(at)->getWidth();
+        h = doc.getPage(at)->getHeight();
+    }
+    startMarkdown(at, true, w, h);  // (the bottom right: the cursor at the end of the page's part)
+    if (markdownEditor && at == end - 1) {
+        // The text's last page: at its very end (a space typed last stays before the cursor), before the line
+        // breaks that end it
+        const std::string& text = markdownEditor->text();
+        const size_t last = text.find_last_not_of('\n');
+        markdownEditor->setCursorPosition(last == std::string::npos ? 0 : last + 1);
+    }
     return markdownEditor != nullptr;
 }
 

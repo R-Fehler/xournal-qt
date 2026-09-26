@@ -294,7 +294,7 @@ ApplicationWindow {
         id: formatBar
         width: parent.width
         visible: !app.homeVisible && !app.presenting && !markdownPanel.visible
-                 && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable))
+                 && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable) || app.textNotes)
         format: app.markdownFormat
         onFormatRequested: function(action, arg) {
             app.formatMarkdown(action, arg)
@@ -844,6 +844,7 @@ ApplicationWindow {
                 onClicked: Popups.openAt(moreMenu)
                 Menu {
                     id: moreMenu
+                    objectName: "moreMenu"
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
                     MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
@@ -854,6 +855,22 @@ ApplicationWindow {
                         height: visible ? implicitHeight : 0
                         text: qsTr("Edit as notes (to write on with the pen)")
                         onTriggered: app.editAsNotes()
+                    }
+                    // Text documents as PDF (qt/docs/md-pdf.md): a .md as a new PDF text document; the Markdown of
+                    // a document's page texts as a .md
+                    MenuItem {
+                        objectName: "openAsPdfDocumentItem"
+                        visible: app.textDocument === "markdown"
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Open as PDF document")
+                        onTriggered: app.openAsPdfDocument()
+                    }
+                    MenuItem {
+                        objectName: "exportMarkdownItem"
+                        visible: !win.textDoc && app.hasMarkdownText
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Export as Markdown")
+                        onTriggered: win.exportMarkdown()
                     }
                     MenuItem {
                         objectName: "openExternallyItem"
@@ -2197,6 +2214,60 @@ ApplicationWindow {
         }
         onAccepted: app.resolveTextChange(true)
         onRejected: app.resolveTextChange(false)
+    }
+    // "Export as Markdown" (qt/docs/md-pdf.md): next to the document (Xournal++ files; asked before a file is
+    // replaced), else where this dialog says
+    function exportMarkdown() {
+        const file = app.markdownExportFile()
+        if (file.toString() === "") {
+            const suggestion = app.suggestedMarkdownExport().toString()
+            markdownExportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
+            markdownExportDialog.selectedFile = suggestion
+            markdownExportDialog.open()
+        } else if (app.fileExists(file)) {
+            markdownReplaceDialog.file = file
+            markdownReplaceDialog.open()
+        } else {
+            app.exportMarkdown(file)
+        }
+    }
+    FileDialog {
+        id: markdownExportDialog
+        objectName: "markdownExportDialog"
+        title: qsTr("Export as Markdown")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "md"
+        nameFilters: [qsTr("Markdown (*.md)")]
+        onAccepted: app.exportMarkdown(selectedFile)
+    }
+    Dialog {
+        id: markdownReplaceDialog
+        objectName: "markdownReplaceDialog"
+        property url file
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Replace the Markdown file?")
+        width: Math.min(win.width * 0.9, 440)
+        Label {
+            width: markdownReplaceDialog.availableWidth
+            wrapMode: Text.WordWrap
+            text: qsTr("%1 exists. Replace it with the Markdown of this document?")
+                  .arg(decodeURIComponent(markdownReplaceDialog.file.toString().replace(/^.*\//, "")))
+        }
+        footer: DialogButtonBox {
+            Button { text: qsTr("Choose another place…"); DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+                     onClicked: {
+                         markdownReplaceDialog.close()
+                         const suggestion = markdownReplaceDialog.file.toString()
+                         markdownExportDialog.currentFolder = suggestion.substring(0, suggestion.lastIndexOf("/"))
+                         markdownExportDialog.selectedFile = suggestion
+                         markdownExportDialog.open()
+                     } }
+            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+            Button { objectName: "markdownReplaceButton"; text: qsTr("Replace")
+                     DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+        }
+        onAccepted: app.exportMarkdown(file)
     }
     FileDialog {
         id: exportDialog

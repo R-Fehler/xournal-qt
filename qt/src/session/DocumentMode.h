@@ -33,6 +33,13 @@ bool shouldAsk(Settings& settings);
 /// Store the choice (saved at once).
 void store(Settings& settings, Mode mode);
 
+/// What a new text document is (qt/docs/md-pdf.md): a PDF text document ("name.pdf", a PDF with notes whose page 1
+/// starts the page's Markdown text) or a Markdown file ("name.md"). The setting "newTextDocuments" ("pdf", "md");
+/// while it is not stored it follows the mode in effect (PDF files: a PDF document).
+enum class TextKind { Pdf, Markdown };
+TextKind newTextDocuments(Settings& settings);
+void setNewTextDocuments(Settings& settings, TextKind kind);
+
 QString nameOf(Mode mode);  ///< "xopp", "pdf", "" (Unset)
 Mode fromName(const QString& name);  ///< Unset for anything else
 

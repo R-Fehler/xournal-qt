@@ -1567,3 +1567,34 @@ Update the table in the user doc with the results.
 - [ ] "A blank page after each instead" in the dialog: a plain page follows each chosen slide; one undo.
 - [ ] Open a `.xopp` saved with space in Xournal++ (GTK): space on the right/below looks the same; with space on the
       left/top the slide is at the top left (documented in qt/docs/note-space.md).
+
+
+## Text documents as PDF (qt/md-pdf)
+
+- [ ] A text document of notes (a `.md` → ⋮ → "Edit as notes", or a PDF text document): with the pen tool, type on
+      the keyboard without tapping first: the letters go into the text at the top of the page in view (on a page of
+      notes after the text: at the end of the text). The pen still draws ink; Escape ends writing.
+- [ ] Save it as a PDF with notes (Save as… → "PDF with notes"), then in a PDF viewer's attachment list (Okular:
+      Embedded Files; Firefox: the paperclip; Acrobat Reader: the paperclip): `document.xopp` and `name.md`. Save
+      `name.md`: it is the text, without `<!-- xqt:cont -->` lines. `qpdf --show-attachment=name.md name.pdf` prints
+      the same.
+- [ ] Change the text and press Ctrl+S (an incremental save): `name.md` in the viewer is the new text.
+- [ ] Write ink on a text page, then add lines above it: the ink stays where it was (expected; move it by hand).
+- [ ] Export for the archive of a PDF text document: its attachments list `name.md` too; veraPDF (if at hand) still
+      passes it.
+- [ ] Settings → Documents: "New text documents" shows "PDF document" in PDF files mode and "Markdown file" in
+      Xournal++ files mode until it is changed; changed, it stays when the mode changes.
+- [ ] Library → new button: with "PDF document", the entry reads "New text document…", the name dialog shows `.pdf`;
+      OK makes `name.pdf` in the folder (no `.md`, nothing else next to it), opens it with the cursor blinking in the
+      text and the formatting bar under the tool bar. Type a heading and a list with the bar; Ctrl+S; the card in
+      the library shows the typeset first page. With "Markdown file": "New Markdown file…" makes `name.md` as before.
+- [ ] Existing `.md` files open in the `.md` editor in both modes and save as `.md`; no PDF appears next to them.
+- [ ] Library search: a word of a PDF text document's text finds its card and page.
+- [ ] A `.md` → ⋮ → "Open as PDF document": `name.pdf` appears next to it (a second time: `name (2).pdf`) and opens
+      with the cursor in its text (at the end of page 1); the `.md` card is unchanged (its time too). Unsaved
+      changes of the `.md` are in the PDF, not in the `.md`.
+- [ ] A PDF text document → ⋮ → "Export as Markdown": in PDF files mode a save dialog (`name.md` suggested); in
+      Xournal++ files mode `name.md` is written next to it, and when that file exists a question ("Replace",
+      "Choose another place…", "Cancel"). The file is the text as typed, page breaks as
+      `<div style="page-break-after: always"></div>`. Notes with Markdown text on a later page have the entry too;
+      notes without any do not.

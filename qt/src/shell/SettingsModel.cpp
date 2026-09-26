@@ -210,6 +210,17 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                 DocumentMode::store(s, mode);
             }
         });
+    // What a new text document is (qt/docs/md-pdf.md): "pdf" (a PDF text document) or "md" (a Markdown file); while it
+    // is not chosen, as the way documents are kept says
+    add("newTextDocuments",
+        [&s] {
+            return QVariant(DocumentMode::newTextDocuments(s) == DocumentMode::TextKind::Pdf ? QStringLiteral("pdf")
+                                                                                               : QStringLiteral("md"));
+        },
+        [&s](const QVariant& v) {
+            DocumentMode::setNewTextDocuments(
+                    s, v.toString() == "pdf" ? DocumentMode::TextKind::Pdf : DocumentMode::TextKind::Markdown);
+        });
     add("canvasMemory", [&s] { return QVariant(canvasMemory(s)); },
         [&s](const QVariant& v) {
             const int maxMb = static_cast<int>(CanvasMemory::maxLimit() / (1024 * 1024));

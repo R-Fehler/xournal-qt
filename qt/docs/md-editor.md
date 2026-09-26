@@ -147,6 +147,10 @@ Markdown text flowing over them (a Markdown box per page, drawn formatted; the t
 titled `name.xopp`, counts as unsaved until it is saved (closing asks), and saving suggests `name.xopp` next to the
 `.md`.
 
+**Open as PDF document** (⋮ of a `.md`) does the same and saves the notes at once as a PDF text document next to
+the `.md` (`name.pdf`, or `name (2).pdf`): a PDF with notes that also carries the text as `name.md` inside
+([md-pdf.md](md-pdf.md)). The `.md` is not touched.
+
 **In the library the two are two cards** ("MD" and the notes), not one: after "Edit as notes" they go their own
 ways (the `.md` is edited as text, the `.xopp` with ink and its own Markdown text), so neither is the other's
 background, unlike a PDF or an image and its `.xopp`.

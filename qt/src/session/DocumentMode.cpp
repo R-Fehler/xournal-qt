@@ -61,4 +61,21 @@ void store(Settings& settings, Mode mode) {
     settings.customSettingsChanged();
 }
 
+TextKind newTextDocuments(Settings& settings) {
+    std::string v;
+    settings.getCustomElement("xournalQt").getString("newTextDocuments", v);
+    if (v == "pdf") {
+        return TextKind::Pdf;
+    }
+    if (v == "md") {
+        return TextKind::Markdown;
+    }
+    return pdfOnly(settings) ? TextKind::Pdf : TextKind::Markdown;
+}
+
+void setNewTextDocuments(Settings& settings, TextKind kind) {
+    settings.getCustomElement("xournalQt").setString("newTextDocuments", kind == TextKind::Pdf ? "pdf" : "md");
+    settings.customSettingsChanged();
+}
+
 }  // namespace xqt::DocumentMode

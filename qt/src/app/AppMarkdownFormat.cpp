@@ -147,8 +147,9 @@ bool AppController::formatMarkdown(const QString& action, const QString& arg) {
     if (!a || !v) {
         return false;
     }
-    if (!v->getMarkdownEditor() && textDocument() == "markdown") {
-        v->ensureTextEditor();  // (a .md without a cursor yet: at the top of the page in view, as typing does)
+    if (!v->getMarkdownEditor() && (textDocument() == "markdown" || v->typesIntoFlow())) {
+        // (a .md or a text document of notes without a cursor yet: at the top of the page in view, as typing does)
+        v->ensureTextEditor();
     }
     MarkdownEditor* editor = v->getMarkdownEditor();
     if (!editor || editor->isPlain()) {
