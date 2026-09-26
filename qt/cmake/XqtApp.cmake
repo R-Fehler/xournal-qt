@@ -172,6 +172,7 @@ set(XQT_QML_FILES
     src/app/qml/Fuzzy.js
     src/app/qml/ReferenceSplit.qml
     src/app/qml/CanvasScrollBars.qml
+    src/app/qml/LinkStatusLine.qml
     src/app/qml/PdfTextPill.qml
     src/app/qml/NotePill.qml
     src/app/qml/SelectionPill.qml

@@ -1758,3 +1758,29 @@ Design: [md-images.md](../md-images.md).
       edits it.
 - [ ] Paste a picture into `my notes (1).md`: it shows at once, the file has `![](my%20notes%20%281%29.assets/…)`,
       and the picture is in the `my notes (1).assets` folder. The file shows the picture in Obsidian or VS Code too.
+
+## Links with the mouse, and their address on hover (qt/link-hover)
+- [ ] A PDF with links (a paper with references, a table of contents), the pen tool: click a link with the mouse.
+      The sheet ("Open" / "Go to page N" / "In the reference") comes, no dot is drawn. Drag from a link: a stroke,
+      beginning where the mouse was pressed; nothing is followed.
+- [ ] The same with the highlighter, the eraser, a shape (rectangle), the hand, the rectangle select and the PDF
+      text tool: a click follows. The text tool: a click writes; Ctrl + click follows.
+- [ ] A click held down for a second without moving still follows (a slow click is a click).
+- [ ] A link marker (Copy link on a page, paste on another page) and a web address typed in a text box: a click
+      with the pen tool follows (the document sheet: new tab / reference / here, "Remember my choice" as with a
+      finger).
+- [ ] A `.md` open for writing: a click on a link puts the cursor into it; Ctrl + click follows.
+- [ ] The reference beside the notes: a click on a link there follows it as a tap does.
+- [ ] With the pen (tablet), the pen tool: tapping a link still makes a dot (the pen writes).
+- [ ] Rest the mouse on a PDF web link: after a moment the whole address shows at the bottom left of the canvas;
+      moving off hides it; passing quickly over links shows nothing. The cursor is a pointing hand over links (pen
+      tool, hand, select), the cross elsewhere, and the cross with the text tool (Ctrl held: the hand).
+- [ ] A PDF's table of contents: "Page 12 · Chapter title". A link marker: "kalman.xopp, page 3". A marker to a
+      file that was deleted: "name (not found)". A `.md`'s `[[wiki link]]`: the file it finds.
+- [ ] Hover a link near the bottom left of the canvas: the line moves to the bottom right, never under the pointer.
+- [ ] The reference beside the notes: its links show in a line at the bottom left of the reference.
+- [ ] The pen hovering over a link (Surface Pro, Wacom): the line shows after a moment; lifting the pen away hides
+      it. The pen's cursor does not change.
+- [ ] Dark theme (if set): the line is dark grey with light text.
+- [ ] Android (Fold 7, fingers only): no line ever appears; with the S Pen hovering, it does.
+

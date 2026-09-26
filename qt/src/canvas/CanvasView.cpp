@@ -1033,6 +1033,143 @@ std::optional<CanvasView::LinkTarget> CanvasView::textLinkAt(QPointF viewPos) co
     return std::nullopt;
 }
 
+std::vector<LinkSpot> CanvasView::findLinkSpots(size_t index) const {
+    // The same links as textLinkAt and linkAt, all at once: the texts' first (they lie on top of the PDF)
+    std::vector<LinkSpot> spots;
+    Document* doc = session.getDocument();
+    XojPdfPageSPtr pdf;
+    QPointF offset;  // where the PDF is on the page (space for notes)
+    {
+        std::shared_lock lock(*doc);
+        if (index >= doc->getPageCount()) {
+            return spots;
+        }
+        const PageRef page = doc->getPage(index);
+        for (const Layer* layer: page->getLayersView()) {
+            if (!layer->isVisible()) {
+                continue;
+            }
+            for (const Element* element: layer->getElementsView()) {
+                if (element->getType() != ELEMENT_TEXT) {
+                    continue;
+                }
+                const auto* text = static_cast<const Text*>(element);
+                if (text->isMarkdown()) {
+                    for (const md::LinkHit& hit: md::linkBoxes(*text)) {
+                        LinkSpot spot;
+                        spot.rect = QRectF(hit.x, hit.y, hit.width, hit.height);
+                        spot.uri = QString::fromStdString(hit.target);
+                        if (hit.wiki) {
+                            spot.uri = QStringLiteral("[[%1]]").arg(spot.uri);  // (as textLinkAt)
+                        }
+                        if (spot.uri.startsWith(QLatin1String("#Page:"))) {
+                            spot.page = spot.uri.mid(6).toInt() - 1;
+                            spot.uri.clear();
+                        }
+                        spots.push_back(std::move(spot));
+                    }
+                    continue;
+                }
+                const auto links = xoj::util::findLinks(text->getText());
+                if (links.empty()) {
+                    continue;
+                }
+                // As textLinkAt: a text has one font and one size, so its lines are equally high; a line holds the
+                // first link on it, and a text with one link is that link all over
+                const auto& box = text->getBoundingBox();
+                const std::string& str = text->getText();
+                const auto lineCount = static_cast<size_t>(1 + std::count(str.begin(), str.end(), '\n'));
+                const double lineHeight = box.height / static_cast<double>(lineCount);
+                std::vector<bool> taken(lineCount, false);
+                for (const auto& link: links) {
+                    const auto line = static_cast<size_t>(
+                            std::count(str.begin(), str.begin() + static_cast<std::ptrdiff_t>(link.start), '\n'));
+                    if (line >= lineCount || taken[line]) {
+                        continue;
+                    }
+                    taken[line] = true;
+                    LinkSpot spot;
+                    spot.uri = QString::fromStdString(link.uri);
+                    spot.page = link.page > 0 ? link.page - 1 : -1;
+                    spot.rect = links.size() == 1 ? QRectF(box.x, box.y, box.width, box.height)
+                                                  : QRectF(box.x, box.y + static_cast<double>(line) * lineHeight,
+                                                           box.width, lineHeight);
+                    spots.push_back(std::move(spot));
+                }
+            }
+        }
+        if (page->getBackgroundType().isPdfPage()) {
+            pdf = doc->getPdfPage(page->getPdfPageNr());
+            offset = notespace::offsetOf(*page);
+        }
+    }
+    if (pdf) {
+        for (auto&& [rect, action]: pdf->getLinks()) {
+            auto dest = action ? action->getDestination() : nullptr;
+            if (!dest) {
+                continue;
+            }
+            LinkSpot spot;
+            spot.rect = QRectF(QPointF(rect.x1, rect.y1) + offset, QSizeF(rect.x2 - rect.x1, rect.y2 - rect.y1));
+            if (auto uri = dest->getURI()) {
+                spot.uri = QString::fromStdString(*uri);
+            } else {
+                spot.pdfPage = static_cast<int>(dest->getPdfPage());
+            }
+            spots.push_back(std::move(spot));
+        }
+    }
+    return spots;
+}
+
+std::optional<CanvasView::LinkHover> CanvasView::hoverLinkAt(QPointF viewPos) {
+    const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
+    if (!idx || *idx >= pages.size()) {
+        return std::nullopt;
+    }
+    CanvasPage& page = *pages[*idx];
+    if (!page.linkSpots()) {
+        ++linkSearches;
+        page.setLinkSpots(findLinkSpots(*idx));
+    }
+    const QRectF pageRect = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    const QPointF onPage = (viewPos - pageRect.topLeft()) / zoom;
+    const std::vector<LinkSpot>& spots = *page.linkSpots();
+    for (size_t i = 0; i < spots.size(); ++i) {
+        const LinkSpot& spot = spots[i];
+        // (inclusive edges, as the tap's test)
+        if (onPage.x() < spot.rect.left() || onPage.x() > spot.rect.right() || onPage.y() < spot.rect.top() ||
+            onPage.y() > spot.rect.bottom()) {
+            continue;
+        }
+        LinkHover hover;
+        hover.id = {&page, i};
+        hover.target.uri = spot.uri;
+        hover.target.page = spot.page;
+        hover.target.pdfPage = spot.pdfPage;
+        hover.target.viewRect = QRectF(pageRect.topLeft() + spot.rect.topLeft() * zoom, spot.rect.size() * zoom);
+        if (spot.pdfPage >= 0) {
+            Document* doc = session.getDocument();
+            std::shared_lock lock(*doc);
+            const size_t p = doc->findPdfPage(static_cast<size_t>(spot.pdfPage));
+            hover.target.page = p == npos ? -1 : static_cast<int>(p);
+        }
+        const CanvasTextInput* editor = getTextInput();
+        hover.editing = textMode() || (editor && &editor->getPage() == &page && editor->contains(onPage.x(), onPage.y()));
+        return hover;
+    }
+    return std::nullopt;
+}
+
+bool CanvasView::followLinkAt(QPointF viewPos) {
+    if (const auto hover = hoverLinkAt(viewPos)) {
+        Q_EMIT linkTapped(hover->target.uri, hover->target.page, hover->target.viewRect);
+        return true;
+    }
+    return false;
+}
+
 std::optional<CanvasView::MathError> CanvasView::mathErrorAt(QPointF viewPos) const {
     const auto idx = layout.pageAt(viewController.viewToContent(viewPos), viewController.zoom());
     if (!idx) {

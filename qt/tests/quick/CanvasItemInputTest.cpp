@@ -17,6 +17,7 @@
 #include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <gtest/gtest.h>
@@ -26,7 +27,9 @@
 #include "control/ToolHandler.h"
 #include "model/Document.h"
 #include "model/Layer.h"
+#include "model/Font.h"
 #include "model/Stroke.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
@@ -340,4 +343,93 @@ TEST_F(CanvasItemInputTest, pagesFollowTheCanvasWhenItMoves) {
         ASSERT_EQ(QColor(shot.pixel(x, y)), QColor("#404040")) << "page drawn left of its position at x=" << x;
     }
     EXPECT_EQ(QColor(shot.pixel(static_cast<int>(page.left()) + 3, y)), QColor(Qt::white)) << "page missing";
+}
+
+namespace {
+/// A text with a web address on the first page; the place of the link in the window (scene coordinates)
+QPointF addWebLink(DocumentSession& session, CanvasView& view, DocumentCanvasItem& canvas) {
+    auto text = std::make_unique<Text>();
+    text->setText("see https://example.org/hover for more");
+    text->setFont(XojFont("Sans", 14));
+    text->move(80, 120);
+    const Text* raw = text.get();
+    {
+        auto page = session.getDocument()->getPage(0);
+        std::unique_lock lock(*session.getDocument());
+        page->getSelectedLayer()->addElement(std::move(text));
+    }
+    session.getDocument()->getPage(0)->firePageChanged();
+    const auto& box = raw->getBoundingBox();
+    const QPointF onPage(box.x + box.width / 2, box.y + box.height / 2);
+    const QPointF inView = view.pageViewRect(0).topLeft() + onPage * view.getViewController().zoom();
+    return canvas.mapToScene(inView);
+}
+}  // namespace
+
+// Links with the mouse (qt/docs/links.md): resting on a link shows where it leads after a moment, the cursor is a
+// pointing hand where a click follows it, and a click follows it (the pen tool draws nothing there).
+TEST_F(CanvasItemInputTest, theMouseOverALinkShowsItsTargetAndAClickFollowsIt) {
+    const QPointF link = addWebLink(*session, *view, *canvas);
+    wait(100);
+    const int lookups = view->linkLookups();
+    QTest::mouseMove(window, (link + QPointF(0, 300)).toPoint());  // (off the link first)
+    wait(50);
+    EXPECT_EQ(canvas->cursor().shape(), Qt::CrossCursor);
+    for (int i = 0; i <= 10; ++i) {
+        QTest::mouseMove(window, (link + QPointF(-30 + 3 * i, 0)).toPoint());
+    }
+    EXPECT_EQ(canvas->cursor().shape(), Qt::PointingHandCursor) << "a click follows it";
+    EXPECT_TRUE(canvas->hoveredLink().isEmpty()) << "not at once: passing over a link shows nothing";
+    wait(DocumentCanvasItem::LINK_HOVER_MS + 150);
+    EXPECT_EQ(canvas->hoveredLink().value("uri").toString(), "https://example.org/hover");
+    EXPECT_LE(view->linkLookups(), lookups + 1) << "the moves looked up the page's links at most once";
+
+    // Off the link: gone at once, the cursor is the tool's again
+    QTest::mouseMove(window, (link + QPointF(0, 300)).toPoint());
+    wait(20);
+    EXPECT_TRUE(canvas->hoveredLink().isEmpty());
+    EXPECT_EQ(canvas->cursor().shape(), Qt::CrossCursor);
+
+    // Passing over it quickly: nothing
+    QTest::mouseMove(window, link.toPoint());
+    wait(60);
+    QTest::mouseMove(window, (link + QPointF(0, 300)).toPoint());
+    wait(DocumentCanvasItem::LINK_HOVER_MS + 100);
+    EXPECT_TRUE(canvas->hoveredLink().isEmpty());
+
+    // A click with the pen tool follows it and draws nothing
+    QSignalSpy followed(view.get(), &CanvasView::linkTapped);
+    const size_t before = strokeCount();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, link.toPoint());
+    wait(50);
+    ASSERT_EQ(followed.count(), 1);
+    EXPECT_EQ(followed.at(0).at(0).toString(), "https://example.org/hover");
+    EXPECT_EQ(strokeCount(), before);
+
+    // The text tool writes where it clicks: an ordinary cursor, but the target is still shown
+    app->getToolHandler()->selectTool(TOOL_TEXT);
+    QTest::mouseMove(window, (link + QPointF(4, 0)).toPoint());
+    wait(DocumentCanvasItem::LINK_HOVER_MS + 150);
+    EXPECT_EQ(canvas->cursor().shape(), Qt::CrossCursor);
+    EXPECT_FALSE(canvas->hoveredLink().isEmpty());
+}
+
+TEST_F(CanvasItemInputTest, theHoveringPenShowsALinksTargetToo) {
+    const QPointF link = addWebLink(*session, *view, *canvas);
+    wait(100);
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, true, link,
+                                                                 window->mapToGlobal(link));
+    for (int i = 0; i <= 5; ++i) {
+        tablet(link + QPointF(i, 0), Qt::NoButton, 0.0);  // (hovering: no button, no pressure)
+    }
+    EXPECT_TRUE(canvas->hoveredLink().isEmpty());
+    wait(DocumentCanvasItem::LINK_HOVER_MS + 150);
+    EXPECT_EQ(canvas->hoveredLink().value("uri").toString(), "https://example.org/hover");
+    EXPECT_EQ(canvas->cursor().shape(), Qt::CrossCursor) << "the pen keeps its tool (it writes on a link)";
+    // The pen goes away: nothing is shown
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, false, link,
+                                                                 window->mapToGlobal(link));
+    QWindowSystemInterface::flushWindowSystemEvents();
+    wait(20);
+    EXPECT_TRUE(canvas->hoveredLink().isEmpty());
 }

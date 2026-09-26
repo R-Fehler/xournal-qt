@@ -18,6 +18,8 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <optional>
+#include <utility>
 
 #include <QMatrix4x4>
 #include <QPointF>
@@ -27,6 +29,7 @@
 #include <QString>
 #include <QTimer>
 #include <QVariantList>
+#include <QVariantMap>
 
 namespace xqt {
 class CanvasInput;
@@ -51,6 +54,12 @@ class DocumentCanvasItem: public QQuickItem {
     /// coordinates). The window shows it as a tool tip.
     Q_PROPERTY(QString mathError READ mathError NOTIFY mathErrorChanged)
     Q_PROPERTY(QRectF mathErrorRect READ mathErrorRect NOTIFY mathErrorChanged)
+    /// The link under the mouse or the hovering pen, once it rested on it for a moment (LINK_HOVER_MS): { uri, page,
+    /// pdfPage } as CanvasView::LinkTarget has them; empty when there is none. The window shows where it leads in a
+    /// status line (qt/docs/links.md, "Links with the mouse"). `hoveredLinkPointer`: where the pointer is (item
+    /// coordinates), so the line keeps out of its way.
+    Q_PROPERTY(QVariantMap hoveredLink READ hoveredLink NOTIFY hoveredLinkChanged)
+    Q_PROPERTY(QPointF hoveredLinkPointer READ hoveredLinkPointer NOTIFY hoveredLinkPointerChanged)
     /// Text is being written on the canvas (a text box, Markdown): the emoji picker inserts there.
     Q_PROPERTY(bool textEditing READ textEditing NOTIFY textEditingChanged)
     /// The emoji suggested for the shortcode being typed (":smi"; EmojiCompletion): {emoji, name} each, the one chosen
@@ -69,6 +78,10 @@ public:
     void setReadingOnly(bool on);
 
     QString mathError() const { return mathErrorText; }
+    QVariantMap hoveredLink() const { return linkShown; }
+    QPointF hoveredLinkPointer() const { return linkPointer; }
+    /// How long the pointer rests on a link before its target is shown
+    static constexpr int LINK_HOVER_MS = 300;
 
     bool textEditing() const;
     QVariantList emojiCompletions() const;
@@ -123,6 +136,8 @@ Q_SIGNALS:
     void viewportChanged();
     void readingOnlyChanged();
     void mathErrorChanged();
+    void hoveredLinkChanged();
+    void hoveredLinkPointerChanged();
     void textEditingChanged();
     void emojiCompletionChanged();
 
@@ -153,6 +168,11 @@ private:
     /// The mouse moved without a button: the formula error under it, once it rests (hoverTimer).
     void mouseHovers(QPointF scenePos);
     void setMathError(const QString& error, const QRectF& rect);
+    /// The mouse (`mouse`) or the hovering pen is at this place (item coordinates): the link there, if any, is shown
+    /// after LINK_HOVER_MS, and the mouse's cursor becomes a pointing hand where a click follows it.
+    void linkHovers(QPointF itemPos, Qt::KeyboardModifiers modifiers, bool mouse);
+    /// Nothing is hovered any more (left, pressed, the pen went away)
+    void endLinkHover();
 
     QPointer<xqt::CanvasView> canvasView;
     std::unique_ptr<xqt::CanvasInput> input;
@@ -169,6 +189,15 @@ private:
     QPointF hoverScenePos;
     QString mathErrorText;
     QRectF mathErrorArea;
+    // the link hovered (linkHovers)
+    std::pair<const void*, size_t> linkId{nullptr, 0};  ///< the link the pointer is on (null: none)
+    bool linkCovered = false;  ///< ... but a control over the canvas is there
+    QVariantMap linkPending;   ///< it, to be shown when linkTimer fires
+    QVariantMap linkShown;
+    QPointF linkPointer;
+    QTimer linkTimer;
+    bool linkHoverByMouse = false;
+    std::optional<QPointF> linkHoverAt;  ///< where the pointer was last (to look again when the pages move under it)
     std::atomic<int> shownPreviews{0};
     std::atomic<int> mostTiles{0};
     std::atomic<int> previewFrames{0};

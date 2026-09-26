@@ -106,6 +106,51 @@ QVariantMap AppController::documentLink(const QString& uri) const {
     return info;
 }
 
+QString AppController::linkPreview(QObject* view, const QString& uri, int page, int pdfPage) const {
+    auto* v = qobject_cast<CanvasView*>(view);
+    DocumentSession* s = v ? &v->getSession() : session();
+    // A page of the document holding the link, with the chapter it is in (the last one beginning at or before it)
+    auto pageText = [&](int p) {
+        QString text = tr("Page %1").arg(p + 1);
+        if (s) {
+            QString chapter;
+            int from = -1;
+            for (const links::Chapter& c: DocumentLinks::chaptersOf(*s->getDocument())) {
+                if (c.page <= p && c.page >= from) {
+                    chapter = c.title;
+                    from = c.page;
+                }
+            }
+            if (!chapter.isEmpty()) {
+                text = tr("%1 · %2").arg(text, chapter);
+            }
+        }
+        return text;
+    };
+    if (uri.isEmpty()) {
+        if (page >= 0) {
+            return pageText(page);
+        }
+        return pdfPage >= 0 ? tr("PDF page %1 (not in this document)").arg(pdfPage + 1) : QString();
+    }
+    const auto link = linkOf(uri);
+    if (!link) {
+        return uri;  // a web or mail address, …: in full
+    }
+    const fs::path from = s ? s->documentFile() : fs::path();
+    const fs::path root = library && library->library() ? library->library()->root() : fs::path();
+    const fs::path target = DocumentLinks::targetOf(*link, from, root, library ? library->searchIndex() : nullptr);
+    if (s && (link->path.isEmpty() || (!target.empty() && target == from))) {
+        return pageText(DocumentLinks::placeIn(*s, *link).page);  // a place in this document
+    }
+    if (target.empty()) {
+        return tr("%1 (not found)").arg(link->path.section(QLatin1Char('/'), -1));
+    }
+    const QString name = QString::fromStdString(target.filename().string());
+    const QString place = placeText(*link);
+    return place.isEmpty() ? name : tr("%1, %2").arg(name, place);
+}
+
 bool AppController::followDocumentLink(const QString& uri, const QString& how) {
     return followDocumentLinkFrom(uri, how, session() ? session()->documentFile() : fs::path());
 }

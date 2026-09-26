@@ -8,7 +8,9 @@
 #include <chrono>
 #include <cmath>
 
+#include <QGuiApplication>
 #include <QNativeGestureEvent>
+#include <QStyleHints>
 #include <QPointingDevice>
 #include <QTabletEvent>
 #include <QTouchEvent>
@@ -283,14 +285,43 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
             modifier3 = e->button() == Qt::RightButton;
             deviceClassPressed = true;
             runningDeviceClass = DeviceClass::Mouse;
+            // A link under a tool that a click on it follows: wait whether it is a click or a drag. (The object select
+            // tool selects what it clicks; with nothing there it follows the link on the release, as with a tap.)
+            if (e->button() == Qt::LeftButton &&
+                view.getSession().getToolHandler()->getToolType() != TOOL_SELECT_OBJECT &&
+                !(onGeometryTool(viewPos) && view.getSession().getToolHandler()->isDrawingTool())) {
+                if (const auto link = view.hoverLinkAt(viewPos); link && clickFollowsLink(link->editing, e->modifiers())) {
+                    linkPress = ev;
+                    view.getViewController().stopMomentum();
+                    return true;
+                }
+            }
             actionStart(ev);
             break;
         case QEvent::MouseMove:
+            if (linkPress && deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
+                if (std::hypot(viewPos.x() - linkPress->viewPos.x(), viewPos.y() - linkPress->viewPos.y()) <=
+                    QGuiApplication::styleHints()->startDragDistance()) {
+                    break;  // (still a click)
+                }
+                // A drag: the tool starts where the mouse was pressed, as it would have
+                const Event press = *std::exchange(linkPress, std::nullopt);
+                actionStart(press);
+            }
             if (deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
                 actionMotion(ev);
             }
             break;
         case QEvent::MouseButtonRelease:
+            if (linkPress && deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
+                // A click on the link: followed, as a tap would (nothing was drawn)
+                const QPointF at = std::exchange(linkPress, std::nullopt)->viewPos;
+                deviceClassPressed = false;
+                runningDeviceClass.reset();
+                modifier2 = modifier3 = false;
+                view.followLinkAt(at);
+                break;
+            }
             if (deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
                 actionEnd(ev);
                 deviceClassPressed = false;
@@ -302,6 +333,48 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
             break;
     }
     return true;
+}
+
+bool CanvasInput::clickFollowsLink(bool editing, Qt::KeyboardModifiers modifiers) const {
+    if (modifiers & Qt::ControlModifier) {
+        return true;  // Ctrl + click: always (as in text editors and browsers' editable pages)
+    }
+    if (editing) {
+        return false;  // the text being written: the click puts the cursor there
+    }
+    if (view.getSelection() || view.notes().hasSelection() || view.hasPdfTextSelection()) {
+        return false;  // the click ends the selection first (as a tap does)
+    }
+    DocumentSession& s = view.getSession();
+    if (s.isReadOnly() || view.isReadingOnly()) {
+        return true;  // (for reading: every tool is the hand, the select tools select by dragging)
+    }
+    ToolHandler* h = s.getToolHandler();
+    switch (h->getToolType()) {
+        case TOOL_HAND:
+        case TOOL_SELECT_RECT:
+        case TOOL_SELECT_REGION:
+        case TOOL_SELECT_MULTILAYER_RECT:
+        case TOOL_SELECT_MULTILAYER_REGION:
+        case TOOL_SELECT_OBJECT:
+        case TOOL_SELECT_PDF_TEXT_LINEAR:
+        case TOOL_SELECT_PDF_TEXT_RECT:
+        case TOOL_ERASER:
+        case TOOL_LASER_POINTER_PEN:
+        case TOOL_LASER_POINTER_HIGHLIGHTER:
+        case TOOL_DRAW_RECT:
+        case TOOL_DRAW_ELLIPSE:
+        case TOOL_DRAW_ARROW:
+        case TOOL_DRAW_DOUBLE_ARROW:
+        case TOOL_DRAW_COORDINATE_SYSTEM:
+            return true;
+        case TOOL_PEN:
+        case TOOL_HIGHLIGHTER:
+            // (a spline is drawn with clicks: those stay its points)
+            return h->getDrawingType() != DRAWING_TYPE_SPLINE;
+        default:
+            return false;  // the text tool writes, the others place what they make: Ctrl + click
+    }
 }
 
 // --- port of PenInputHandler -----------------------------------------------------------------------------------------
@@ -652,6 +725,15 @@ bool CanvasInput::actionMotion(const Event& event) {
     return false;
 }
 
+bool CanvasInput::isClick(const Event& release) const {
+    const double moved = std::hypot(release.viewPos.x() - pressViewPos.x(), release.viewPos.y() - pressViewPos.y());
+    if (release.deviceClass == DeviceClass::Mouse) {
+        // A click of the mouse: however long it took, as long as it did not move beyond the drag distance
+        return moved <= QGuiApplication::styleHints()->startDragDistance();
+    }
+    return monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 && moved <= TAP_SLOP_PX / 2;
+}
+
 bool CanvasInput::actionEnd(const Event& event) {
     ToolHandler* toolHandler = view.getSession().getToolHandler();
     if (std::exchange(this->textPress, false)) {
@@ -661,8 +743,7 @@ bool CanvasInput::actionEnd(const Event& event) {
     }
     if (std::exchange(this->readOnlyPress, false)) {
         // A read-only document: nothing was written; a tap may be a link
-        if (monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
-            std::hypot(event.viewPos.x() - pressViewPos.x(), event.viewPos.y() - pressViewPos.y()) <= TAP_SLOP_PX / 2) {
+        if (isClick(event)) {
             view.tapAt(event.viewPos);
         } else if (view.getViewController().snapping()) {
             view.getViewController().endScroll({});  // (dragged: to rest on a page)
@@ -703,11 +784,10 @@ bool CanvasInput::actionEnd(const Event& event) {
     // A tap with the hand or a select tool that selected nothing: maybe a PDF link.
     const ToolType tt = toolHandler->getToolType();
     const bool tapTool = tt == TOOL_HAND || tt == TOOL_SELECT_RECT || tt == TOOL_SELECT_REGION ||
+                         tt == TOOL_SELECT_MULTILAYER_RECT || tt == TOOL_SELECT_MULTILAYER_REGION ||
                          tt == TOOL_SELECT_OBJECT || tt == TOOL_SELECT_PDF_TEXT_LINEAR ||
                          tt == TOOL_SELECT_PDF_TEXT_RECT;
-    if (tapTool && !view.getSelection() && !view.notes().hasSelection() &&
-        monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 &&
-        std::hypot(event.viewPos.x() - pressViewPos.x(), event.viewPos.y() - pressViewPos.y()) <= TAP_SLOP_PX / 2) {
+    if (tapTool && !view.getSelection() && !view.notes().hasSelection() && isClick(event)) {
         view.tapAt(event.viewPos);
     }
 

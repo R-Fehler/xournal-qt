@@ -59,6 +59,7 @@ class QKeyEvent;
 namespace xqt {
 
 class CanvasPage;
+struct LinkSpot;
 class DocumentSession;
 class TextEditor;
 class MarkdownEditor;
@@ -230,6 +231,22 @@ public:
     void doubleTapAt(QPointF viewPos);
     /// A web address in a text element under this point (nothing if there is none).
     std::optional<LinkTarget> textLinkAt(QPointF viewPos) const;
+    /// A link under the mouse or the hovering pen (qt/docs/links.md, "The mouse and hovering"): from the links each
+    /// page keeps (CanvasPage::linkSpots, looked for once per page and change), so it is cheap enough for every move.
+    /// The same links a tap finds (texts first, then the PDF's).
+    struct LinkHover {
+        LinkTarget target;
+        /// It lies in the text being written (a Markdown text, a text box, a text file): a click puts the cursor
+        /// there, Ctrl + click follows it
+        bool editing = false;
+        /// Which link it is (the same while the pointer stays on it)
+        std::pair<const void*, size_t> id{nullptr, 0};
+    };
+    std::optional<LinkHover> hoverLinkAt(QPointF viewPos);
+    /// Follow the link under a view position as a tap does (linkTapped). False when there is none.
+    bool followLinkAt(QPointF viewPos);
+    /// How many times the links of a page were looked for (the PDF's links, the texts): tests count them.
+    int linkLookups() const { return linkSearches; }
     /// A formula of a Markdown text under this point that cannot be drawn (shown as its source): why, and where it
     /// is (view coordinates).
     struct MathError {
@@ -472,6 +489,9 @@ private:
     std::atomic<double> renderZoom{1.0};
     std::atomic<double> renderDpr{1.0};
     std::unique_ptr<EditSelection> selection;
+    /// The links of a page (CanvasPage::linkSpots): looked for in the document
+    std::vector<LinkSpot> findLinkSpots(size_t index) const;
+    int linkSearches = 0;
     std::unique_ptr<TextEditor> textEditor;
     std::unique_ptr<MarkdownEditor> markdownEditor;
     EmojiCompletion completion;

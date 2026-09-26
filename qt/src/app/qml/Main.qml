@@ -1576,6 +1576,10 @@ ApplicationWindow {
         anchors.horizontalCenter: canvas.horizontalCenter
     }
 
+    // Where the link under the mouse or the hovering pen leads (qt/docs/links.md, "Links with the mouse")
+    LinkStatusLine {
+        canvasItem: canvas
+    }
     // Scroll bars over the canvas: wide enough to be dragged with a finger or the pen.
     CanvasScrollBars {
         canvasItem: canvas

@@ -1006,6 +1006,11 @@ public:
     /// file's name ("" for this document), place: "page 12", "chapter …", found: the file is there, here: it is
     /// this document }.
     Q_INVOKABLE QVariantMap documentLink(const QString& uri) const;
+    /// What the status line shows for the link under the mouse or the hovering pen (qt/docs/links.md, "Links with the
+    /// mouse"), in the document of `view` (a CanvasView: the tab's or the reference): a web address in full; a page
+    /// of that document as "Page 12 · its chapter"; a link to another document as its file name and the place ("…,
+    /// page 3"), or "name (not found)". `page` / `pdfPage` as CanvasView::LinkTarget has them.
+    Q_INVOKABLE QString linkPreview(QObject* view, const QString& uri, int page, int pdfPage) const;
     /// Follow a link to a document from the current one: "tab" (switches to it when it is open), "reference" (beside
     /// the current document) or "here" (in place of the current document, which closes when it has no unsaved
     /// changes; Back opens it again). A place in the current document itself: "reference" shows it in a second view

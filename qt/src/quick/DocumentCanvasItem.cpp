@@ -284,6 +284,14 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
         geometrySettled = true;
         update();
     });
+    linkTimer.setSingleShot(true);
+    linkTimer.setInterval(LINK_HOVER_MS);
+    connect(&linkTimer, &QTimer::timeout, this, [this] {
+        if (linkId.first && !linkCovered && linkShown != linkPending) {
+            linkShown = linkPending;
+            Q_EMIT hoveredLinkChanged();
+        }
+    });
     hoverTimer.setSingleShot(true);
     hoverTimer.setInterval(HOVER_RESTS_MS);
     connect(&hoverTimer, &QTimer::timeout, this, [this] {
@@ -296,6 +304,70 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
         }
         setMathError({}, {});
     });
+}
+
+void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modifiers, bool mouse) {
+    linkHoverAt = itemPos;
+    linkHoverByMouse = mouse;
+    std::optional<xqt::CanvasView::LinkHover> link;
+    if (canvasView && input && isVisible() && QRectF(0, 0, width(), height()).contains(itemPos)) {
+        link = canvasView->hoverLinkAt(itemPos);  // (the links each page keeps: cheap for every move)
+    }
+    if (!link) {
+        endLinkHover();
+        linkHoverAt = itemPos;
+        return;
+    }
+    if (link->id != linkId) {
+        // Another link: is it the canvas that is under the pointer there, not a control over it? (Only asked when
+        // the link changes: the hit test of the items is not for every move.)
+        linkId = link->id;
+        linkCovered = !claims(mapToScene(itemPos));
+        linkPending = QVariantMap{{QStringLiteral("uri"), link->target.uri},
+                                  {QStringLiteral("page"), link->target.page},
+                                  {QStringLiteral("pdfPage"), link->target.pdfPage}};
+        if (linkCovered) {
+            linkTimer.stop();
+            if (!linkShown.isEmpty()) {
+                linkShown.clear();
+                Q_EMIT hoveredLinkChanged();
+            }
+        } else if (!linkShown.isEmpty()) {
+            linkShown = linkPending;  // from one link to the next: at once, as browsers do
+            Q_EMIT hoveredLinkChanged();
+        } else {
+            linkTimer.start();
+        }
+    } else if (linkCovered && !claims(mapToScene(itemPos))) {
+        // (still under a control, or a menu is open: asked again while so)
+    } else if (linkCovered) {
+        linkCovered = false;  // the control or menu went
+        linkTimer.start();
+    }
+    if (linkPointer != itemPos) {
+        linkPointer = itemPos;
+        Q_EMIT hoveredLinkPointerChanged();
+    }
+    // The mouse's cursor: a pointing hand where a click follows the link
+    const bool hand = mouse && !linkCovered && input->clickFollowsLink(link->editing, modifiers);
+    const Qt::CursorShape shape = hand ? Qt::PointingHandCursor : Qt::CrossCursor;
+    if (cursor().shape() != shape) {
+        setCursor(shape);
+    }
+}
+
+void DocumentCanvasItem::endLinkHover() {
+    linkHoverAt.reset();
+    linkId = {nullptr, 0};
+    linkCovered = false;
+    linkTimer.stop();
+    if (!linkShown.isEmpty()) {
+        linkShown.clear();
+        Q_EMIT hoveredLinkChanged();
+    }
+    if (cursor().shape() != Qt::CrossCursor) {
+        setCursor(Qt::CrossCursor);
+    }
 }
 
 void DocumentCanvasItem::mouseHovers(QPointF scenePos) {
@@ -339,6 +411,7 @@ void DocumentCanvasItem::setView(QObject* object) {
             canvasView->setReadingOnly(false);
         }
     }
+    endLinkHover();
     input.reset();
     canvasView = v;
     viewReplaced = true;
@@ -351,6 +424,12 @@ void DocumentCanvasItem::setView(QObject* object) {
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &DocumentCanvasItem::viewportChanged);
         connect(&canvasView->getViewController(), &xqt::ViewController::changed, this,
                 &DocumentCanvasItem::viewportChanged);
+        // The pages moved under a resting pointer (the wheel, a jump): the link there now
+        connect(&canvasView->getViewController(), &xqt::ViewController::changed, this, [this] {
+            if (linkHoverAt && !mouseGrab && !penGrab) {
+                linkHovers(*linkHoverAt, QGuiApplication::keyboardModifiers(), linkHoverByMouse);
+            }
+        });
         connect(canvasView, &QObject::destroyed, this, [this] {
             input.reset();
             viewReplaced = true;
@@ -538,6 +617,9 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
         if (e->type() == QEvent::TabletEnterProximity || e->type() == QEvent::TabletLeaveProximity) {
             xqt::inputlog::event(e);
             input->proximityEvent(e->type() == QEvent::TabletEnterProximity);
+            if (e->type() == QEvent::TabletLeaveProximity && linkHoverAt && !linkHoverByMouse) {
+                endLinkHover();  // (the pen went away)
+            }
         }
         return false;
     }
@@ -554,6 +636,9 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             auto* t = static_cast<QTabletEvent*>(e);
             xqt::Perf::add(xqt::Perf::PenEvents);
             if (!penGrab && (heldByAnother(&DocumentCanvasItem::penGrab) || !claims(t->position()))) {
+                if (linkHoverAt && !linkHoverByMouse) {
+                    endLinkHover();  // (the pen hovers a control now)
+                }
                 xqt::inputlog::decision(e, false, "not on this canvas (a control, a menu, another canvas)");
                 return false;  // unaccepted: Qt synthesizes mouse events for the QML controls
             }
@@ -572,6 +657,12 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 penGrab = false;
             }
             input->tabletEvent(t, mapFromScene(t->position()));
+            // The pen hovering: where a link under it leads (the pen itself keeps its tool: no pointing hand)
+            if (e->type() == QEvent::TabletMove && t->buttons() == Qt::NoButton && !penGrab) {
+                linkHovers(mapFromScene(t->position()), t->modifiers(), false);
+            } else if (e->type() == QEvent::TabletPress) {
+                endLinkHover();
+            }
             t->accept();
             return true;
         }
@@ -610,10 +701,17 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             if (!mouseGrab && (m->buttons() == Qt::NoButton ? e->type() == QEvent::MouseMove : mouseElsewhere)) {
                 if (e->type() == QEvent::MouseMove && m->buttons() == Qt::NoButton) {
                     mouseHovers(m->scenePosition());
+                    const auto type = m->device() ? m->device()->type() : QInputDevice::DeviceType::Mouse;
+                    if (type == QInputDevice::DeviceType::Mouse || type == QInputDevice::DeviceType::TouchPad) {
+                        linkHovers(mapFromScene(m->scenePosition()), m->modifiers(), true);
+                    }
                 }
                 return false;
             }
             setMathError({}, {});
+            if (e->type() == QEvent::MouseButtonPress) {
+                endLinkHover();  // (a click may follow it: the sheet or the page comes)
+            }
             const bool inside = !heldByAnother(&DocumentCanvasItem::mouseGrab) && claims(m->scenePosition());
             xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
             if (!mouseGrab && !inside) {
@@ -640,6 +738,19 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             m->accept();
             return true;
         }
+        case QEvent::KeyPress:
+        case QEvent::KeyRelease:
+            // Ctrl pressed or let go over a link in text being written: Ctrl + click follows it (the cursor says so)
+            if (static_cast<QKeyEvent*>(e)->key() == Qt::Key_Control && linkHoverAt && linkHoverByMouse &&
+                !mouseGrab) {
+                linkHovers(*linkHoverAt, static_cast<QKeyEvent*>(e)->modifiers(), true);
+            }
+            return false;
+        case QEvent::Leave:
+            if (linkHoverAt && linkHoverByMouse) {
+                endLinkHover();  // the mouse left the window
+            }
+            return false;
         case QEvent::Wheel: {
             auto* w = static_cast<QWheelEvent*>(e);
             if (!claims(w->scenePosition())) {

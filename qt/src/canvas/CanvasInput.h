@@ -57,6 +57,11 @@ public:
 
     std::optional<QPointF> hoverPosition() const { return hover; }
     bool hoverIsEraser() const { return hoverEraser; }
+    /// A click of the mouse on a link follows it (qt/docs/links.md, "Links with the mouse"): with the hand, the select
+    /// tools and the tools that draw (a drag still draws), whatever the tool with Ctrl; on text being written
+    /// (`editing`) only with Ctrl, a plain click puts the cursor there. Not while a selection is out (the click ends
+    /// it) nor with a spline being drawn.
+    bool clickFollowsLink(bool editing, Qt::KeyboardModifiers modifiers) const;
 
 Q_SIGNALS:
     void hoverChanged();
@@ -77,6 +82,8 @@ private:
     bool actionStart(const Event& event);
     bool actionMotion(const Event& event);
     bool actionEnd(const Event& event);
+    /// The release of a press that did not move (a tap, a click): it may follow a link
+    bool isClick(const Event& release) const;
     bool changeTool(const Event& event);
     void updateLastEvent(const Event& event);
     PositionInputData getInputDataRelativeToCurrentPage(CanvasPage* page, const Event& event) const;
@@ -115,6 +122,10 @@ private:
     double lastPressure = 0.0;
     std::optional<DeviceClass> runningDeviceClass;
     bool mousePanning = false;
+    /// A mouse press on a link that a click follows: nothing starts until the mouse moves beyond the drag distance
+    /// (then the press starts the tool where it was, and it draws as always) or is released (then the link is
+    /// followed, and no dot is drawn).
+    std::optional<Event> linkPress;
 
     // pen proximity / hover / palm rejection
     bool penInProximity = false;

@@ -18,6 +18,7 @@
 #include <QImage>
 #include <QRect>
 #include <QRectF>
+#include <QString>
 
 #include "gui/LegacyRedrawable.h"
 #include "gui/PageView.h"
@@ -44,6 +45,15 @@ class ToolView;
 namespace xqt {
 
 class CanvasView;
+
+/// A link on a page where it is drawn (page coordinates): a PDF link, a web address in a text, a link of a Markdown
+/// text or a link marker. CanvasView::hoverLinkAt finds them.
+struct LinkSpot {
+    QRectF rect;
+    QString uri;       ///< the target (a wiki link as "[[name]]"); empty: a page of this document
+    int page = -1;     ///< a page of this document (0-based; "#Page:N", a web address's page), else -1
+    int pdfPage = -1;  ///< a PDF link to a page: the PDF page (0-based), resolved to a page when used
+};
 
 class CanvasPage final: public XojPageView {
 public:
@@ -80,6 +90,11 @@ public:
     bool hasOverlays() const { return !overlayViews.empty(); }
     void addOverlayView(std::unique_ptr<xoj::view::OverlayView> v);
     void removeOverlayViewsOf(const OverlayBase* o);
+
+    /// The links on this page, found once and kept until the page changes (any change of it forgets them): the mouse
+    /// looks them up on every move (CanvasView::hoverLinkAt). Null: not looked for since the last change.
+    const std::vector<LinkSpot>* linkSpots() const { return links ? &*links : nullptr; }
+    void setLinkSpots(std::vector<LinkSpot> spots) { links = std::move(spots); }
 
     /// Called by the CanvasView (UI thread) when the raster finished rendering.
     void rasterUpdated(std::optional<xoj::util::Rectangle<double>> area);
@@ -136,6 +151,8 @@ private:
     std::optional<Layer::Index> layerBeforeNote;  ///< the page's selected layer while writing on a note
     std::optional<xoj::util::Rectangle<double>> noteClip;  ///< the note written on: the stroke is drawn clipped to it
     std::optional<std::pair<double, double>> coverPress;  ///< a press on a covering note (a tap: it peeks)
+
+    std::optional<std::vector<LinkSpot>> links;  ///< linkSpots()
 
     mutable std::vector<Range> dirtyRanges;  ///< page coordinates
     mutable bool allDirty = true;

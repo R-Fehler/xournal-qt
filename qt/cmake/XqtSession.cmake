@@ -174,7 +174,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfTextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/EmojiEditingTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScreenCalibrationTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/SecondViewTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/SecondViewTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/LinkMouseTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-canvas-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-canvas-tests PRIVATE "${TEST_CONFIG_DIR}")
