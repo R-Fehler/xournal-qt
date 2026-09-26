@@ -15,6 +15,8 @@ Popup {
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     property int page: 0
+    /// The document was shown beside itself at the page (the page grid closes then)
+    signal referenced()
     readonly property var pages: app.pages.isSelected(page) ? app.pages.selectedPages() : [page]
     readonly property string what: pages.length > 1 ? qsTr("%1 pages").arg(pages.length) : qsTr("page")
     readonly property int lastPage: pages[pages.length - 1]
@@ -50,7 +52,7 @@ Popup {
     ColumnLayout {
         spacing: 2
         GridLayout {
-            columns: 5
+            columns: 6
             columnSpacing: 0
             rowSpacing: 0
             Layout.alignment: Qt.AlignHCenter
@@ -112,6 +114,13 @@ Popup {
                 iconName: "xqt-link"
                 tip: qsTr("Copy a link to this page")
                 onClicked: { app.copyPageLink(menu.page); menu.close() }
+            }
+            // The document beside itself (qt/self-reference), at this page: a second view with its own scrolling
+            PageAction {
+                objectName: "pageMenuShowBeside"
+                iconName: "xqt-reference"
+                tip: qsTr("Show this document beside, at this page")
+                onClicked: { app.reference.showBeside(menu.page); menu.close(); menu.referenced() }
             }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: "#e2e5e9" }

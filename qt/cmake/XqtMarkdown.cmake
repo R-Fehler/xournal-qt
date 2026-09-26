@@ -56,7 +56,11 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiData.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiData.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/Grapheme.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/Grapheme.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/Grapheme.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdTexDelimiters.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdTexDelimiters.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdFormat.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdFormat.cpp)
 target_include_directories(xqt-markdown PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/markdown")
 # (the emoji names: gemoji's table, EmojiData.cpp)
 target_include_directories(xqt-markdown PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/gemoji")
@@ -84,7 +88,9 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPaginateTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPassagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiFontTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiDataTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiDataTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdTexDelimitersTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdFormatTest.cpp)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
     target_compile_definitions(xqt-markdown-tests PRIVATE
         XQT_MARKDOWN_GOLDEN="${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/golden"

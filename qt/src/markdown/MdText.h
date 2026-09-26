@@ -86,4 +86,16 @@ inline bool startsBlock(std::string_view line) {
     return line.size() >= 4 && line.substr(0, 4) == "    ";  // (indented code)
 }
 
+/// Whether an HTML block is a page break (`<div style="page-break-after: always"></div>`, or the CSS 3
+/// `break-after: page`): the pages of the text break after it, and it is not drawn.
+inline bool pageBreak(std::string_view html) {
+    const size_t a = html.find_first_not_of(" \t\r\n");
+    if (a == std::string_view::npos || html.substr(a, 4) != "<div") {
+        return false;
+    }
+    return (html.find("page-break-after") != std::string_view::npos && html.find("always") != std::string_view::npos) ||
+           html.find("break-after: page") != std::string_view::npos ||
+           html.find("break-after:page") != std::string_view::npos;
+}
+
 }  // namespace xqt::md::text

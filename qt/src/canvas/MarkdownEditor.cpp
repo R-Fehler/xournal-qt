@@ -29,6 +29,7 @@
 #include "Grapheme.h"
 #include "MdBox.h"
 #include "MdDocument.h"
+#include "MdTexDelimiters.h"
 #include "MdText.h"
 #include "TextEditor.h"
 
@@ -450,6 +451,7 @@ void MarkdownEditor::changed(bool textChanged) {
         }
     }
     lastArea = now;
+    Q_EMIT view.markdownCursorChanged();
 }
 
 void MarkdownEditor::edit(size_t from, size_t to, const std::string& with, EditKind kind) {
@@ -688,7 +690,23 @@ void MarkdownEditor::newLine(bool soft) {
     for (size_t i = t.find("$$", para); i != std::string::npos && i + 2 <= from; i = t.find("$$", i + 2)) {
         marks += i == 0 || t[i - 1] != '\\';
     }
-    if (marks % 2 == 1) {
+    // (the same for a "\[" block, as chat apps write them: its last "\[" or "\]" before the cursor is a "\[")
+    const auto lastMark = [&](const char* mark) {
+        size_t last = std::string::npos;
+        for (size_t i = t.find(mark, para); i != std::string::npos && i + 2 <= from; i = t.find(mark, i + 2)) {
+            size_t backslashes = 0;
+            while (i > backslashes && t[i - 1 - backslashes] == '\\') {
+                ++backslashes;
+            }
+            if (backslashes % 2 == 0) {
+                last = i;
+            }
+        }
+        return last;
+    };
+    const size_t display = lastMark("\\[");
+    const size_t displayEnd = lastMark("\\]");
+    if (marks % 2 == 1 || (display != std::string::npos && (displayEnd == std::string::npos || displayEnd < display))) {
         insert("\n", EditKind::Other);
         return;
     }
@@ -740,31 +758,16 @@ size_t MarkdownEditor::emptyItemMark() const {
     return ls + static_cast<size_t>(m[1].length());
 }
 
-void MarkdownEditor::wrap(const std::string& before, const std::string& after) {
-    const size_t from = std::min(caret, anchor);
-    const size_t to = std::max(caret, anchor);
-    const std::string inner = md.text().substr(from, to - from);
-    edit(from, to, before + inner + after);
-    // The cursor inside the marks (the text selected again)
-    anchor = from + before.size();
-    caret = anchor + inner.size();
+void MarkdownEditor::applyEdit(const md::format::Edit& change) {
+    preedit.clear();
+    if (change.from != change.to || !change.with.empty()) {
+        edit(change.from, change.to, change.with);
+    }
+    const size_t size = md.text().size();
+    anchor = std::min(change.anchor, size);
+    caret = std::min(change.caret, size);
+    lastWasTyping = false;
     changed(false);
-}
-
-void MarkdownEditor::setPrefix(const std::string& prefix) {
-    using namespace md::text;
-    const std::string& t = md.text();
-    const size_t ls = lineStart(t, caret);
-    const std::string line(lineAt(t, ls));
-    std::smatch m;
-    std::regex_search(line, m, linePrefix());
-    const size_t indent = static_cast<size_t>(m[1].length());
-    const std::string old = m[2].matched ? m[2].str() : std::string();
-    const size_t offset = caret - ls;
-    const std::string added = old == prefix ? std::string() : prefix;
-    edit(ls + indent, ls + indent + old.size(), added);
-    const size_t start = ls + indent + added.size();
-    moveCursor(std::max(start, ls + offset + added.size() - std::min(offset, old.size())), false);
 }
 
 void MarkdownEditor::indent(bool in) {
@@ -929,6 +932,10 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                 }
                 std::string pasted = QGuiApplication::clipboard()->text().toStdString();
                 pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());  // (the text's lines end in "\n")
+                if (!plain) {
+                    // Formulas as chat apps write them, \( \) and \[ \]: as $ $ and $$ $$ where they are formulas here
+                    pasted = md::tex::convertPasted(t, std::min(caret, anchor), std::max(caret, anchor), pasted);
+                }
                 insert(pasted, EditKind::Other);
                 return true;
             }
@@ -953,30 +960,38 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
             default:
                 break;
         }
+        // The formatting keys: the formatting bar's tools (md::format), each one undo step
+        std::optional<md::format::Action> action;
         switch (e->key()) {
             case Qt::Key_B:
-                wrap("**", "**");
-                return true;
+                action = md::format::Action::Bold;
+                break;
             case Qt::Key_I:
-                wrap("*", "*");
-                return true;
+                action = md::format::Action::Italic;
+                break;
             case Qt::Key_E:
-                wrap("`", "`");
-                return true;
+                action = md::format::Action::Code;
+                break;
             case Qt::Key_K:
-                wrap("[", "](https://)");
-                return true;
+                action = md::format::Action::Link;
+                break;
             case Qt::Key_0:
-                setPrefix("");
-                return true;
+                action = md::format::Action::Paragraph;
+                break;
             case Qt::Key_1:
+                action = md::format::Action::Heading1;
+                break;
             case Qt::Key_2:
+                action = md::format::Action::Heading2;
+                break;
             case Qt::Key_3:
-                setPrefix(std::string(static_cast<size_t>(e->key() - Qt::Key_0), '#') + " ");
-                return true;
+                action = md::format::Action::Heading3;
+                break;
             default:
                 return false;
         }
+        applyEdit(md::format::apply(t, anchor, caret, *action));
+        return true;
     }
     const QString typed = e->text();
     if (!typed.isEmpty() && !(e->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) && typed.at(0).isPrint()) {

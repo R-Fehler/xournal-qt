@@ -58,12 +58,14 @@
 #include "MarkdownFile.h"
 #include "MdBox.h"
 #include "Perf.h"
+#include "StickyNotes.h"
 #include "TextEditor.h"
 #include "TextFlow.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 
 namespace xqt {
 
@@ -77,13 +79,14 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         session(session),
         renderService(*session.getApp().getRenderService()),
         viewController(&layout) {
+    stickyNotes = std::make_unique<StickyNotes>(*this);
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     // (the rendered pages are kept by CanvasMemory: the PDF cache only serves edits of the visible ones)
     pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
     pdfCachePages = session.getDocument()->getPdfPageCount();
     registerListener(&session);
-    session.setXournalView(this);
-    session.setZoomControl(&zoomControl);
+    session.addView(this, &zoomControl);  // (the first one is the primary view)
+    ownPage = std::min(session.getCurrentPageNo(), session.getDocument()->getPageCount());
     rebuildPages();
     // (a tap or a drag moves the cursor of the text being written: the emoji suggestions follow)
     connect(this, &CanvasView::updateRequested, this, &CanvasView::refreshEmojiCompletion);
@@ -94,6 +97,8 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         updateRenderParams();
         zoomControl.setZoom(viewController.zoom(), viewController.zoom100());
     });
+    connect(&viewController, &ViewController::zoom100Changed, this,
+            [this] { zoomControl.setZoom(viewController.zoom(), viewController.zoom100()); });
     connect(&viewController, &ViewController::zoomSettled, this, [this] {
         renderService.unblockRerenderZoom();  // (a pinch ended: no need to wait longer)
         updateVisibility();
@@ -108,10 +113,22 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         sinceVisibility.restart();
         updateVisibility();
     });
-    connect(&session, &DocumentSession::scrollToPageRequested, this,
-            [this](qulonglong page) { viewController.scrollToPage(page); });
-    connect(&session, &DocumentSession::scrollToRectRequested, this,
-            [this](qulonglong page, QRectF rect) { viewController.scrollToPageRect(page, rect); });
+    // (the primary view only: a second view of the document stays where its reader is)
+    connect(&session, &DocumentSession::scrollToPageRequested, this, [this](qulonglong page) {
+        if (isPrimary()) {
+            viewController.scrollToPage(page);
+        }
+    });
+    connect(&session, &DocumentSession::scrollToRectRequested, this, [this](qulonglong page, QRectF rect) {
+        if (isPrimary()) {
+            viewController.scrollToPageRect(page, rect);
+        }
+    });
+    connect(&session, &DocumentSession::currentPageChanged, this, [this](qulonglong page) {
+        if (isPrimary()) {
+            Q_EMIT currentPageChanged(page);
+        }
+    });
     // Search hits are drawn by the canvas item over the pages.
     connect(&session.search(), &DocumentSearch::changed, this, &CanvasView::updateRequested);
     // Upstream's Control::clearSelectionEndText (before saving, undo, page operations, ...): the elements go back.
@@ -128,9 +145,15 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
             !textMode()) {  // (a text file is written whatever the tool)
             endTextEditing();
         }
+        // A sticky note stays selected for the select tools; the pen (or any other tool) writes on it
+        if (stickyNotes->hasSelection() && !stickyNotes->dragging() &&
+            !isSelectToolType(this->session.getToolHandler()->getToolType())) {
+            stickyNotes->clearSelection();
+        }
     });
     // Column layout changed in the settings: lay out again, keep the current page in view.
     connect(&session.getApp(), &AppContext::settingsChanged, this, [this] {
+        applyZoom100();  // (a screen was calibrated)
         applyScrolling();
         if (layoutConfig() != layout.getConfig()) {
             relayout();
@@ -149,8 +172,7 @@ CanvasView::~CanvasView() {
     endTextEditing();
     pdfSelection.reset();
     selection.reset();  // the selected elements go back into the document
-    session.setXournalView(nullptr);
-    session.setZoomControl(nullptr);
+    session.removeView(this);
     unregisterListener();
     pages.clear();  // detaches and cancels the rasters
 }
@@ -194,6 +216,18 @@ void CanvasView::setDevicePixelRatio(double value) {
     }
 }
 
+void CanvasView::setDisplay(const ScreenCalibration::Display& display) {
+    shownOn = display;
+    hasDisplay = true;
+    applyZoom100();
+}
+
+void CanvasView::applyZoom100() {
+    if (hasDisplay) {
+        viewController.setZoom100(ScreenCalibration::zoom100(*session.getSettings(), shownOn));
+    }
+}
+
 void CanvasView::updateRenderParams() {
     renderZoom = viewController.zoom();
     renderDpr = dpr;
@@ -217,6 +251,7 @@ void CanvasView::cancelRenders() {
 }
 
 void CanvasView::rebuildPages() {
+    stickyNotes->pageGoing(stickyNotes->selectedPage());
     geometry.allPagesGoing();
     sharpWanted.clear();
     cancelRenders();
@@ -230,6 +265,8 @@ void CanvasView::rebuildPages() {
     pages.reserve(n);
     for (size_t i = 0; i < n; ++i) {
         pages.push_back(std::make_unique<CanvasPage>(*this, doc->getPage(i)));
+        // Xournal++ selects each page's top layer, which may be a sticky note: the page's own layer instead
+        sticky::leaveNoteLayer(*doc, pages.back()->getPage());
     }
     refreshLayout();
     geometry.pagesChanged();
@@ -267,7 +304,7 @@ void CanvasView::setPresenting(bool on) {
     if (on == presenting) {
         return;
     }
-    const size_t page = session.getCurrentPageNo();
+    const size_t page = currentPageNo();
     if (on) {
         zoomBeforePresenting = viewController.zoom();
         fitBeforePresenting = viewController.keptFit();
@@ -289,7 +326,7 @@ void CanvasView::setPresenting(bool on) {
 }
 
 void CanvasView::relayout() {
-    const size_t page = session.getCurrentPageNo();
+    const size_t page = currentPageNo();
     refreshLayout();
     if (presenting) {
         viewController.fitPresentedPage(page);
@@ -302,6 +339,7 @@ void CanvasView::relayout() {
 // --- selection (port of upstream XournalView) ------------------------------------------------------------------
 
 void CanvasView::clearSelection() {
+    stickyNotes->clearSelection();
     // Deleting the EditSelection puts the elements back into their layer.
     const bool ofMarkdown = selection && markdownSelection && markdownSelection->selection == selection.get();
     selection.reset();
@@ -318,6 +356,10 @@ void CanvasView::clearSelection() {
 void CanvasView::deleteSelection(EditSelection* sel) {
     if (sel == nullptr) {
         sel = selection.get();
+        if (!sel && stickyNotes->hasSelection()) {
+            stickyNotes->deleteSelected();  // (the selection is a sticky note)
+            return;
+        }
     }
     if (sel) {
         auto undo = std::make_unique<DeleteUndoAction>(sel->getSourcePage(), false);
@@ -393,8 +435,9 @@ bool CanvasView::cutSelection() {
 // Text from the clipboard: a text element where the user pasted it (or in the middle of the page)
 bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPos) {
     const size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
-                                         .value_or(session.getCurrentPageNo())
-                               : session.getCurrentPageNo();
+                                         .value_or(currentPageNo())
+                               : currentPageNo();
+    const auto scope = actingScope(pNr);
     Document* doc = session.getDocument();
     PageRef page;
     Layer* layer = nullptr;
@@ -440,7 +483,7 @@ bool CanvasView::pasteLinkMarker(std::optional<QPointF> viewPos) {
         return false;
     }
     Document* doc = session.getDocument();
-    size_t pNr = session.getCurrentPageNo();
+    size_t pNr = currentPageNo();
     QPointF onPage(72, 72);
     PageRef page;
     if (const EditSelection* sel = getSelection()) {
@@ -547,7 +590,8 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
         return false;
     }
     const QByteArray bytes = mime->data(XOURNAL_MIME);
-    const size_t pNr = session.getCurrentPageNo();
+    const size_t pNr = currentPageNo();
+    const auto scope = actingScope(pNr);
     if (pNr >= pages.size()) {
         return false;
     }
@@ -615,7 +659,8 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
 }
 
 bool CanvasView::insertImage(const QByteArray& data) {
-    const size_t pNr = session.getCurrentPageNo();
+    const size_t pNr = currentPageNo();
+    const auto scope = actingScope(pNr);
     if (pNr >= pages.size() || data.isEmpty()) {
         return false;
     }
@@ -838,6 +883,16 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
 }
 
 bool CanvasView::tapAt(QPointF viewPos) {
+    // A covering sticky note: it peeks, or covers again
+    if (CanvasPage* page = pageAt(viewPos)) {
+        if (const auto idx = indexOf(page)) {
+            const QRectF r = pageViewRect(*idx);
+            const double zoom = viewController.zoom();
+            if (stickyNotes->tapCover(*page, (viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom)) {
+                return true;
+            }
+        }
+    }
     // A task's check box in a Markdown text: switched (not in a document shown for reading only)
     if (CanvasPage* page = readingOnly ? nullptr : pageAt(viewPos)) {
         if (const auto idx = indexOf(page)) {
@@ -1138,6 +1193,7 @@ void CanvasView::pdfTextPress(CanvasPage& page, double x, double y) {
     if (page.getPage()->getPdfPageNr() == npos) {
         return;  // no PDF on this page
     }
+    const auto scope = actingScope(indexOf(&page));  // (it takes its PDF page from the current page)
     pdfSelection = std::make_unique<PdfElemSelection>(x, y, &session);
     pdfSelectionPage = &page;
     page.addOverlayView(std::make_unique<xoj::view::PdfElementSelectionView>(
@@ -1325,17 +1381,81 @@ void CanvasView::jumpToPage(size_t page) {
     if (page >= pages.size()) {
         return;
     }
+    rememberPlaceBefore(page);
+    setCurrentPageNo(page);  // (the session's page for the tab's view, else the view's own)
+    viewController.scrollToPage(page);
+}
+
+void CanvasView::jumpToRect(size_t page, QRectF rect) {
+    if (page >= pages.size()) {
+        return;
+    }
+    rememberPlaceBefore(page);
+    setCurrentPageNo(page);
+    viewController.scrollToPageRect(page, rect.adjusted(-20, -40, 20, 40));
+}
+
+void CanvasView::rememberPlaceBefore(size_t page) {
     const NavPoint here = currentPlace();
     if (here.page && here.page != pages[page]->getPage()) {
-        backStack.push_back(here);
-        if (backStack.size() > 50) {
-            backStack.erase(backStack.begin());
-        }
-        forwardStack.clear();
-        Q_EMIT navigationChanged();
+        pushPlace(here);
     }
-    session.setCurrentPageNo(page);
-    viewController.scrollToPage(page);
+}
+
+void CanvasView::pushPlace(const NavPoint& here) {
+    backStack.push_back(here);
+    if (backStack.size() > 50) {
+        backStack.erase(backStack.begin());
+    }
+    forwardStack.clear();
+    Q_EMIT navigationChanged();
+}
+
+// --- a second view of the same document (qt/self-reference) -----------------------------------------------------
+
+bool CanvasView::isPrimary() const { return session.isPrimaryView(this); }
+
+size_t CanvasView::currentPageNo() const {
+    if (isPrimary()) {
+        return session.getCurrentPageNo();
+    }
+    return pages.empty() ? 0 : std::min(ownPage, pages.size() - 1);
+}
+
+void CanvasView::setCurrentPageNo(size_t page) {
+    if (isPrimary()) {
+        session.setCurrentPageNo(page);  // (tells the models; currentPageChanged follows)
+        return;
+    }
+    if (page >= pages.size() || page == ownPage) {
+        return;
+    }
+    ownPage = page;
+    markdownSelectionOnPage(page);
+    Q_EMIT currentPageChanged(page);
+}
+
+DocumentSession::ViewScope CanvasView::actingScope(std::optional<size_t> page) {
+    return {session, this, page.value_or(currentPageNo())};
+}
+
+void CanvasView::swapPlacesWith(CanvasView& other) {
+    if (&other == this || &other.session != &session) {
+        return;
+    }
+    const NavPoint mine = currentPlace();
+    const NavPoint theirs = other.currentPlace();
+    auto go = [](CanvasView& v, const NavPoint& here, const NavPoint& to) {
+        if (!to.page) {
+            return;
+        }
+        if (here.page) {
+            v.pushPlace(here);
+        }
+        v.restorePlace(to);
+    };
+    go(*this, mine, theirs);
+    go(other, theirs, mine);
 }
 
 bool CanvasView::navigateBack() {
@@ -1376,7 +1496,8 @@ void CanvasView::clearNavigation() {
 
 void CanvasView::selectAllOnPage() {
     // Port of Control::selectAllOnPage
-    const size_t pageNr = session.getCurrentPageNo();
+    const size_t pageNr = currentPageNo();
+    const auto scope = actingScope(pageNr);
     if (pageNr >= pages.size()) {
         return;
     }
@@ -1488,7 +1609,7 @@ bool CanvasView::ensureTextEditor() {
     if (!textMode()) {
         return false;
     }
-    startMarkdown(std::min(session.getCurrentPageNo(), session.getDocument()->getPageCount() - 1), true,
+    startMarkdown(std::min(currentPageNo(), session.getDocument()->getPageCount() - 1), true,
                   TextFlow::MARGIN, TextFlow::MARGIN);
     return markdownEditor != nullptr;
 }
@@ -1681,7 +1802,7 @@ void CanvasView::updateVisibility() {
     const PerfScope measure(Perf::VisibilityTime);
     const auto [first, last] = visiblePages();
     const double zoom = viewController.zoom();
-    size_t mostVisible = session.getCurrentPageNo();
+    size_t mostVisible = currentPageNo();
     double bestArea = -1;
     const QRectF visible = viewController.visibleContentRect();
     const auto shownArea = [&](size_t i) {
@@ -1723,7 +1844,7 @@ void CanvasView::updateVisibility() {
     // the page sidebar follows).
     {
         const PerfScope measure(Perf::CurrentPageTime);
-        session.setCurrentPageNo(mostVisible);
+        setCurrentPageNo(mostVisible);
     }
     if (shown) {
         CanvasMemory::instance().used(this);  // (plans what to keep and render in advance once this pauses)
@@ -1790,7 +1911,7 @@ qint64 CanvasView::planCache(qint64 share) {
     }
     auto [first, last] = visiblePages();
     if (first > last || last >= n) {
-        first = last = std::min(session.getCurrentPageNo(), n - 1);
+        first = last = std::min(currentPageNo(), n - 1);
     }
     qint64 planned = 0;
     for (size_t i = first; i <= last; ++i) {
@@ -1839,7 +1960,7 @@ qint64 CanvasView::planCache(qint64 share) {
     // In advance: nearest first, the two sides in the proportion of their parts
     renderService.dropQueued(RenderService::Priority::Preload);
     const double zoom = viewController.zoom();
-    const auto current = static_cast<std::ptrdiff_t>(session.getCurrentPageNo());
+    const auto current = static_cast<std::ptrdiff_t>(currentPageNo());
     size_t a = last + 1;
     auto b = static_cast<std::ptrdiff_t>(first) - 1;
     qint64 doneAfter = 0, doneBefore = 0;
@@ -1866,7 +1987,7 @@ void CanvasView::evictPdfCache(std::unordered_set<size_t> keep) {
 qint64 CanvasView::trimTo(qint64 allowed) {
     evictPdfCache({});
     const auto [first, last] = visiblePages();
-    const auto current = static_cast<std::ptrdiff_t>(session.getCurrentPageNo());
+    const auto current = static_cast<std::ptrdiff_t>(currentPageNo());
     qint64 held = 0;
     std::vector<std::pair<std::ptrdiff_t, size_t>> farthestFirst;  // distance, page
     for (size_t i = 0; i < pages.size(); ++i) {
@@ -1891,12 +2012,15 @@ qint64 CanvasView::trimTo(qint64 allowed) {
 
 // --- XournalView ---------------------------------------------------------------------------------------------------
 
-size_t CanvasView::getCurrentPage() const { return session.getCurrentPageNo(); }
+size_t CanvasView::getCurrentPage() const { return currentPageNo(); }
 
 void CanvasView::layerChanged(size_t page) {
     if (page < pages.size()) {
+        // Layers came or went (also by undo): the page's own layer stays the selected one, not a sticky note
+        sticky::leaveNoteLayer(*session.getDocument(), pages[page]->getPage());
         pages[page]->rerenderPage();
     }
+    stickyNotes->layersChanged();
 }
 
 PdfCache* CanvasView::rasterPdfCache(bool background) const {
@@ -2013,23 +2137,55 @@ void CanvasView::pageInserted(size_t page) {
         std::shared_lock lock(*session.getDocument());
         ref = session.getDocument()->getPage(page);
     }
+    // A second view stays at the place of its reader (the pages written in beside it come and go)
+    const NavPoint here = isPrimary() ? NavPoint{} : currentPlace();
     pages.insert(pages.begin() + static_cast<std::ptrdiff_t>(std::min(page, pages.size())),
                  std::make_unique<CanvasPage>(*this, std::move(ref)));
+    if (!isPrimary() && page <= ownPage && pages.size() > 1) {
+        ++ownPage;  // (the same page, one on)
+    }
     refreshLayout();
+    if (here.page) {
+        restorePlace(here);
+    }
     geometry.pagesChanged();  // a page moved elsewhere comes back as a new one
 }
 
 void CanvasView::pageDeleted(size_t page) {
+    const NavPoint here = isPrimary() ? NavPoint{} : currentPlace();
     if (page < pages.size()) {
+        stickyNotes->pageGoing(pages[page].get());
         geometry.pageGoing(pages[page].get());
         sharpWanted.erase(pages[page].get());
         pages.erase(pages.begin() + static_cast<std::ptrdiff_t>(page));
+        if (!isPrimary() && page < ownPage) {
+            --ownPage;
+        }
     }
     refreshLayout();
+    if (here.page) {
+        restorePlace(here);  // (not if its page went)
+    }
     geometry.pagesChanged();
 }
 
 void CanvasView::pageSelected(size_t pageNo) {
+    if (isPrimary()) {  // (the session's page is the primary view's; a second view tells itself)
+        markdownSelectionOnPage(pageNo);
+    }
+}
+
+void CanvasView::markdownSelectionOnPage(size_t pageNo) {
+    {
+        PageRef current;
+        {
+            std::shared_lock lock(*session.getDocument());
+            if (pageNo < session.getDocument()->getPageCount()) {
+                current = session.getDocument()->getPage(pageNo);
+            }
+        }
+        sticky::leaveNoteLayer(*session.getDocument(), current);  // (the pen writes on the page, not on a note)
+    }
     // A selection of Markdown texts moved to another page is dropped into that page's Markdown layer (made if
     // needed): it is its selected layer for now.
     if (!selection || !markdownSelection || markdownSelection->selection != selection.get()) {

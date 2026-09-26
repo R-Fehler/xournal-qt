@@ -54,6 +54,7 @@
 
 #include "CanvasView.h"
 #include "PenHover.h"
+#include "StickyNotes.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
@@ -73,6 +74,7 @@
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"
 #include "shell/OutlineModel.h"
+#include "shell/AnnotationsModel.h"
 #include "shell/LocalUrl.h"
 #include "shell/PdfPrinting.h"
 #include "ImageFile.h"
@@ -136,6 +138,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
+    annotations = std::make_unique<AnnotationsModel>();
     layers = std::make_unique<LayersModel>();
     ownPageClipboard = std::make_unique<PageClipboard>();
     pageClipboard = ownPageClipboard.get();
@@ -194,6 +197,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     pages = std::make_unique<PagesModel>();
     filteredPages = std::make_unique<PageFilterModel>(*pages);
     outline = std::make_unique<OutlineModel>();
+    annotations = std::make_unique<AnnotationsModel>();
     layers = std::make_unique<LayersModel>();
     connect(this, &AppController::searchChanged, this, [this] {
         if (searchQuery().isEmpty()) {
@@ -210,7 +214,10 @@ void AppController::makeTabs() {
     referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
     connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
     connect(referenceMode.get(), &ReferenceMode::openDocumentLink, this, [this](const QString& uri, const QString& from) {
-        followDocumentLinkFrom(uri, QStringLiteral("tab"), fs::path(from.toStdString()));
+        // (a place of the document itself, tapped in the second view of it: it goes there, in the reference)
+        const bool inItself = referenceMode->isSelf() && documentLink(uri).value("here").toBool();
+        followDocumentLinkFrom(uri, inItself ? QStringLiteral("reference") : QStringLiteral("tab"),
+                               fs::path(from.toStdString()));
     });
     connect(referenceMode.get(), &ReferenceMode::copied, this, [this](const QString& what) {
         Q_EMIT pageActionDone(what, false);
@@ -271,6 +278,7 @@ AppController::~AppController() {
     flow.reset();  // (before the sessions)
     pages->setSession(nullptr);
     outline->setSession(nullptr);
+    annotations->setSession(nullptr);
     layers->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
     referenceMode.reset();
@@ -524,6 +532,41 @@ QString AppController::beginMarkdown(int page) { return startMarkdown(page, std:
 
 QString AppController::beginMarkdownBox(int page, double x, double y) { return startMarkdown(page, QPointF(x, y)); }
 
+bool AppController::markdownOnPage() const {
+    const CanvasView* v = canvas();
+    return v && v->getMarkdownEditor() && !v->textMode();  // (a text file is always written on its pages)
+}
+
+bool AppController::writeMarkdownOnPage() {
+    CanvasView* v = canvas();
+    DocumentSession* s = session();
+    if (!v || !s || s->isReadOnly() || v->textMode() || s->getDocument()->getPageCount() == 0) {
+        return false;
+    }
+    endMarkdown(true);
+    endTextFlow(true);
+    const size_t page = std::min(s->getCurrentPageNo(), s->getDocument()->getPageCount() - 1);
+    double w = 0;
+    double h = 0;
+    {
+        std::shared_lock lock(*s->getDocument());
+        const PageRef p = s->getDocument()->getPage(page);
+        w = p->getWidth();
+        h = p->getHeight();
+    }
+    // (the bottom right: the cursor lands at the end of what the page holds of its text)
+    v->startMarkdown(page, true, w, h);
+    Q_EMIT markdownOnPageChanged();
+    return v->getMarkdownEditor() != nullptr;
+}
+
+void AppController::endMarkdownOnPage() {
+    if (CanvasView* v = canvas(); v && v->getMarkdownEditor() && !v->textMode()) {
+        v->endTextEditing();
+        Q_EMIT markdownOnPageChanged();
+    }
+}
+
 QVariantMap AppController::takeMarkdownFromPage() {
     CanvasView* v = canvas();
     if (!v || !v->getMarkdownEditor()) {
@@ -628,16 +671,22 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(s, &DocumentSession::currentPageChanged, this, &AppController::pageChanged));
         currentConnections.push_back(
+                connect(s, &DocumentSession::currentPageChanged, this, &AppController::notesChanged));
+        currentConnections.push_back(
                 connect(&s->search(), &DocumentSearch::changed, this, &AppController::searchChanged));
         currentConnections.push_back(
                 connect(&s->search(), &DocumentSearch::finished, this, &AppController::searchChanged));
     }
     pages->setSession(session());
     outline->setSession(session());
+    annotations->setSession(session());
     layers->setSession(session());
     if (CanvasView* v = canvas()) {
         currentConnections.push_back(connect(v, &CanvasView::pagesChanged, this, &AppController::pageChanged));
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::noteSelectionChanged, this, &AppController::noteSelectionChanged));
+        currentConnections.push_back(connect(v, &CanvasView::notesChanged, this, &AppController::notesChanged));
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
         currentConnections.push_back(
                 connect(v, &CanvasView::markdownRequested, this, &AppController::markdownRequested));
@@ -648,6 +697,12 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::navigationChanged, this, &AppController::navigationChanged));
         currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
+        currentConnections.push_back(
+                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownOnPageChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownFormatChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
         currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
@@ -661,12 +716,15 @@ void AppController::currentTabChanged() {
         applyMarkdownText();
         currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                              &AppController::zoomChanged));
+        currentConnections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
+                                             &AppController::zoomChanged));
     }
     updatePresentedView();  // (another tab: it presents now)
     if (session() && session()->textFile()) {
         QTimer::singleShot(0, this, [this, s = QPointer<DocumentSession>(session())] { checkTextFile(s); });
     }
     Q_EMIT documentChanged();
+    Q_EMIT markdownFormatChanged();
     Q_EMIT titleChanged();
     Q_EMIT textLayoutChanged();
     Q_EMIT modifiedChanged();
@@ -677,10 +735,13 @@ void AppController::currentTabChanged() {
     Q_EMIT searchChanged();
     Q_EMIT pageUndoChanged();
     Q_EMIT selectionChanged();
+    Q_EMIT noteSelectionChanged();
+    Q_EMIT notesChanged();
     Q_EMIT navigationChanged();
     Q_EMIT pdfTextSelectionChanged();
     Q_EMIT toolChanged();  // the setsquare / compass of that tab
     Q_EMIT titlePageChanged();
+    Q_EMIT markdownOnPageChanged();
 }
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
@@ -1036,13 +1097,14 @@ void AppController::stepPage(int delta) {
     if (!v || v->pageCount() == 0 || v->getViewController().stepPages(delta)) {
         return;
     }
-    const auto page = static_cast<std::ptrdiff_t>(v->getSession().getCurrentPageNo()) + delta;
+    // (its own page: a second view of the document beside it has one)
+    const auto page = static_cast<std::ptrdiff_t>(v->currentPageNo()) + delta;
     showPage(static_cast<size_t>(std::clamp<std::ptrdiff_t>(page, 0, static_cast<std::ptrdiff_t>(v->pageCount()) - 1)));
 }
 
 void AppController::showPage(size_t page) {
     if (CanvasView* v = keyCanvas(); v && page < v->pageCount()) {
-        v->getSession().setCurrentPageNo(page);
+        v->setCurrentPageNo(page);  // (the session's for the tab's view, else the view's own)
         v->getViewController().scrollToPage(page);
     }
 }
@@ -1159,6 +1221,7 @@ void AppController::setHomeVisible(bool visible) {
 }
 QObject* AppController::filteredPagesModel() const { return filteredPages.get(); }
 QObject* AppController::outlineModel() const { return outline.get(); }
+QObject* AppController::annotationsModel() const { return annotations.get(); }
 QObject* AppController::layersModel() const { return layers.get(); }
 QObject* AppController::shortcutsModel() const { return shortcuts; }
 int AppController::currentTab() const { return tabs->currentIndex(); }
@@ -3665,6 +3728,64 @@ void AppController::setFontSize(double size) { setFont(fontFamily(), size); }
 
 QStringList AppController::fontFamilies() const { return QFontDatabase::families(); }
 
+// --- sticky notes ------------------------------------------------------------------------------------------------
+
+bool AppController::insertStickyNote() {
+    if (textPagesFixed() || !canvas() || session()->isReadOnly()) {
+        return false;
+    }
+    if (!isSelectToolType(app->getToolHandler()->getToolType())) {
+        selectTool("selectRect");  // so that the note can be moved and resized right away (as an image)
+    }
+    return canvas()->notes().insert();
+}
+QVariantList AppController::stickyNoteColors() const {
+    QVariantList colors;
+    for (const Color c: sticky::presetColors()) {
+        colors.push_back(QColor(c.red, c.green, c.blue));
+    }
+    return colors;
+}
+bool AppController::noteSelected() const { return canvas() && canvas()->notes().hasSelection(); }
+QColor AppController::noteColor() const {
+    if (const auto look = canvas() ? canvas()->notes().selectedLook() : std::nullopt) {
+        return QColor(look->color.red, look->color.green, look->color.blue);
+    }
+    return {};
+}
+void AppController::setNoteColor(const QColor& color) {
+    if (canvas()) {
+        canvas()->notes().setColor(Color(static_cast<uint8_t>(color.red()), static_cast<uint8_t>(color.green()),
+                                         static_cast<uint8_t>(color.blue())));
+    }
+}
+bool AppController::noteCovers() const {
+    const auto look = canvas() ? canvas()->notes().selectedLook() : std::nullopt;
+    return look && look->cover;
+}
+void AppController::setNoteCovers(bool covers) {
+    if (canvas()) {
+        canvas()->notes().setCover(covers);
+    }
+}
+QRectF AppController::noteBox() const { return canvas() ? canvas()->notes().selectedViewBox() : QRectF(); }
+void AppController::deleteStickyNote() {
+    if (canvas()) {
+        canvas()->notes().deleteSelected();
+    }
+}
+bool AppController::pageHasNotes() const {
+    return canvas() && canvas()->notes().pageHasNotes(session()->getCurrentPageNo());
+}
+bool AppController::pageNotesHidden() const {
+    return canvas() && canvas()->notes().notesHidden(session()->getCurrentPageNo());
+}
+void AppController::setPageNotesHidden(bool hidden) {
+    if (canvas()) {
+        canvas()->notes().setNotesHidden(session()->getCurrentPageNo(), hidden);
+    }
+}
+
 void AppController::toggleGeometryTool(const QString& which) {
     if (!canvas()) {
         return;
@@ -3812,6 +3933,15 @@ void AppController::setZoomPercent(int percent) {
     }
 }
 
+void AppController::zoomToRealSize() {
+    if (referenceMode->focused()) {
+        referenceMode->zoomToRealSize();
+    } else if (canvas()) {
+        auto& vc = canvas()->getViewController();
+        vc.setZoom(vc.zoom100(), QPointF(vc.viewSize().width() / 2, vc.viewSize().height() / 2));
+    }
+}
+
 void AppController::zoomOut() {
     if (referenceMode->focused()) {
         referenceMode->zoomOut();
@@ -3880,6 +4010,11 @@ void AppController::clearPdfTextSelection() {
 void AppController::jumpToPage(int index) {
     if (canvas() && index >= 0) {
         canvas()->jumpToPage(static_cast<size_t>(index));
+    }
+}
+void AppController::jumpToPlace(int index, const QRectF& rect) {
+    if (canvas() && index >= 0) {
+        canvas()->jumpToRect(static_cast<size_t>(index), rect);
     }
 }
 // (across documents: AppLinks.cpp)

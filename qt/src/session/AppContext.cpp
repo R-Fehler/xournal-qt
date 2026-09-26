@@ -14,6 +14,7 @@
 
 #include "EmojiFont.h"
 #include "MdBox.h"
+#include "StickyNote.h"
 #include "config-dev.h"  // for SETTINGS_XML_FILE
 
 namespace xqt {
@@ -21,6 +22,7 @@ namespace xqt {
 AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderThreads):
         resourceDir(std::move(resourceDir)) {
     md::installRenderer();  // Markdown boxes are drawn formatted (on the canvas, in thumbnails, exports, ...)
+    sticky::installDrawer();  // sticky notes: their content clipped to them, everywhere a page is drawn
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN)
     // The colour emoji font that comes with the app, for Pango (Windows and Android have it in the fonts.conf they
     // write at start: WindowsSetup.cpp, AndroidSetup.cpp)

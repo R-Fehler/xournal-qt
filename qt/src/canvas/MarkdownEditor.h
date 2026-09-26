@@ -12,7 +12,8 @@
  * Shift+Enter (a line of the same paragraph), Backspace / Delete, the arrows (with Ctrl: words; Up / Down on the
  * lines as drawn), Home / End (the line; with Ctrl: the text), Shift for selecting, Ctrl+A / C / X / V, Ctrl+Z /
  * Ctrl+Shift+Z (in the text being written; afterwards the whole edit is one undo step), Ctrl+B / I / E / K (bold,
- * italic, code, link), Ctrl+1 / 2 / 3 / 0 (headings), Tab / Shift+Tab (list levels), Escape (done).
+ * italic, code, link), Ctrl+1 / 2 / 3 / 0 (headings), Tab / Shift+Tab (list levels), Escape (done). The formatting
+ * keys and the formatting bar's tools are md::format's (applyEdit).
  *
  * @license GNU GPLv2 or later
  */
@@ -27,6 +28,7 @@
 
 #include "CanvasTextInput.h"
 #include "MarkdownSession.h"
+#include "MdFormat.h"
 
 namespace xoj::view {
 class OverlayView;
@@ -87,6 +89,11 @@ public:
     size_t anchorPosition() const { return anchor; }
     /// Put the cursor at a source offset (e.g. where it was before the text was read again).
     void setCursorPosition(size_t offset);
+    /// A change made by a formatting tool (md::format, the formatting bar): text[from, to) is replaced, then the
+    /// selection is set. One undo step in the text being written.
+    void applyEdit(const md::format::Edit& change);
+    /// Plain text (a .txt): no Markdown formatting.
+    bool isPlain() const { return plain; }
     /// Undo and redo in the text being written (Ctrl+Z / Ctrl+Shift+Z).
     bool canUndo() const { return !undoStack.empty(); }
     bool canRedo() const { return !redoStack.empty(); }
@@ -130,8 +137,6 @@ private:
     /// The cursor at the end of a list item or quote line with nothing but its mark: where the mark begins (npos:
     /// not so).
     size_t emptyItemMark() const;
-    void wrap(const std::string& before, const std::string& after);
-    void setPrefix(const std::string& prefix);
     void indent(bool in);
     size_t verticalMove(bool down) const;
     size_t prevChar(size_t pos) const;

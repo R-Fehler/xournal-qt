@@ -75,6 +75,10 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LinkRewrite.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/OutlineModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Annotations.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Annotations.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AnnotationsModel.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/AnnotationsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HitPages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/MdSnippets.h
@@ -94,7 +98,9 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
@@ -136,6 +142,7 @@ set(XQT_QML_FILES
     src/app/qml/InsertPagesDialog.qml
     src/app/qml/ContentsOverview.qml
     src/app/qml/OutlineList.qml
+    src/app/qml/AnnotationList.qml
     src/app/qml/TextFlowPanel.qml
     src/app/qml/MarkdownPanel.qml
     src/app/qml/EmojiSuggestions.qml
@@ -160,8 +167,11 @@ set(XQT_QML_FILES
     src/app/qml/ReferenceSplit.qml
     src/app/qml/CanvasScrollBars.qml
     src/app/qml/PdfTextPill.qml
+    src/app/qml/NotePill.qml
     src/app/qml/SelectionPill.qml
-    src/app/qml/Popups.js)
+    src/app/qml/Popups.js
+    src/app/qml/MarkdownFormatBar.qml
+    src/app/qml/MarkdownTableEditor.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
@@ -210,7 +220,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
         GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
@@ -222,6 +233,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TabsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LinkRewriteTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/AnnotationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ReferenceModeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PagesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SettingsModelTest.cpp

@@ -46,6 +46,9 @@ TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(par
             if (ThumbnailProvider::idOf(t.session.get()) == id) {
                 tabDataChanged(t.session.get(), {SketchRole});
                 t.view->previewsChanged();
+                if (t.selfView) {
+                    t.selfView->previewsChanged();
+                }
             }
         }
     });
@@ -70,6 +73,7 @@ TabManager::~TabManager() {
     for (auto& t: tabs) {
         rememberPlace(t.session.get());
         ThumbnailProvider::unregisterSession(t.session.get());
+        t.selfView.reset();
         t.view.reset();  // the view refers to the session
         t.session.reset();
     }
@@ -247,6 +251,7 @@ std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
     tabs.erase(tabs.begin() + index);
     endRemoveRows();
     const bool hadReference = std::exchange(tab->reference, nullptr) != nullptr;  // (it stays in this window)
+    tab->selfView.reset();  // (its own document beside it: the split closes as well)
     Q_EMIT countChanged();
     const int old = current;
     if (current > index || current >= count()) {
@@ -301,6 +306,7 @@ void TabManager::closeTab(int index) {
     disconnect(tab.session.get(), nullptr, this, nullptr);
     tab.session->waitForSaves();
     tab.session->deleteAutosaveFile();
+    tab.selfView.reset();
     tab.view.reset();
     tab.session.reset();
     Q_EMIT savingChanged();
@@ -362,18 +368,52 @@ int TabManager::referenceOf(int index) const {
 }
 
 void TabManager::setReference(int index, int reference) {
-    if (index < 0 || index >= count() || reference == index || reference >= count()) {
+    if (index < 0 || index >= count() || reference >= count()) {
         return;
     }
+    Tab& tab = tabs[static_cast<size_t>(index)];
     DocumentSession* ref = reference >= 0 ? tabs[static_cast<size_t>(reference)].session.get() : nullptr;
-    if (std::exchange(tabs[static_cast<size_t>(index)].reference, ref) != ref) {
-        tabs[static_cast<size_t>(index)].referenceEditable = false;  // (another reference: for reading at first)
-        referenceMarksChanged();
-        Q_EMIT referencesChanged();
+    if (tab.reference == ref) {
+        return;
     }
+    tab.reference = ref;
+    tab.referenceEditable = false;  // (another reference: for reading at first)
+    std::unique_ptr<CanvasView> goes = std::move(tab.selfView);
+    if (ref == tab.session.get()) {
+        // A second view of the same document (its own page, zoom and selection), where the tab's view is
+        tab.selfView = std::make_unique<CanvasView>(*tab.session);
+        const quint64 id = ThumbnailProvider::idOf(ref);
+        tab.selfView->setPreviewSource(
+                [id, ref](size_t page) { return PageSketches::instance().preview(id, ref->pageId(page)); });
+        tab.selfView->getViewController().scrollToPage(tab.view->currentPageNo());  // (once it has a size)
+    }
+    referenceMarksChanged();
+    Q_EMIT referencesChanged();
+    goes.reset();  // (after the window let go of it)
+}
+
+CanvasView* TabManager::referenceView(int index) const {
+    if (index < 0 || index >= count()) {
+        return nullptr;
+    }
+    const Tab& tab = tabs[static_cast<size_t>(index)];
+    if (tab.selfView) {
+        return tab.selfView.get();
+    }
+    return view(referenceOf(index));
+}
+
+bool TabManager::isSelfReference(int index) const {
+    return index >= 0 && index < count() && tabs[static_cast<size_t>(index)].selfView != nullptr;
 }
 
 void TabManager::swapReference() {
+    if (isSelfReference(current)) {
+        // The same document on both sides: the views exchange their places (Back returns on each side)
+        Tab& tab = tabs[static_cast<size_t>(current)];
+        tab.view->swapPlacesWith(*tab.selfView);
+        return;
+    }
     const int ref = referenceOf(current);
     if (ref < 0) {
         return;
@@ -381,6 +421,7 @@ void TabManager::swapReference() {
     // The pair is the same, the other way round (and the other tab no longer shows it beside itself twice)
     tabs[static_cast<size_t>(ref)].reference = tabs[static_cast<size_t>(current)].session.get();
     tabs[static_cast<size_t>(ref)].referenceEditable = false;  // (the notes shown for reading at first)
+    tabs[static_cast<size_t>(ref)].selfView.reset();           // (it showed itself beside it: not any more)
     tabs[static_cast<size_t>(current)].reference = nullptr;
     tabs[static_cast<size_t>(current)].referenceEditable = false;
     const int old = current;
@@ -409,6 +450,7 @@ void TabManager::forgetReferencesTo(const DocumentSession* s) {
         if (t.reference == s) {
             t.reference = nullptr;
             t.referenceEditable = false;
+            t.selfView.reset();
             changed = true;
         }
     }

@@ -289,6 +289,26 @@ ApplicationWindow {
         Material.foreground: "#303030"
         height: 56
       }
+      // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/md-editor.md)
+      MarkdownFormatBar {
+        id: formatBar
+        width: parent.width
+        visible: !app.homeVisible && !app.presenting && !markdownPanel.visible
+                 && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable))
+        format: app.markdownFormat
+        onFormatRequested: function(action, arg) {
+            app.formatMarkdown(action, arg)
+            canvas.forceActiveFocus()
+        }
+        onTableRequested: {
+            tableEditor.openFor(app.markdownTable(), function(cells, aligns) { app.writeMarkdownTable(cells, aligns) })
+        }
+      }
+    }
+    // The table editor of the formatting bar (the notes' canvas; the editor beside the page has its own)
+    MarkdownTableEditor {
+        id: tableEditor
+        onClosed: if (formatBar.visible) canvas.forceActiveFocus()
     }
 
     // The tools: in the header (top), or a column at the left or right side (setting). One set of tools, moved.
@@ -545,13 +565,14 @@ ApplicationWindow {
                 objectName: "textModeButton"
                 property bool markdownMode: false
                 iconName: markdownMode ? "xqt-markdown" : "xqt-text-mode"
-                tip: markdownMode ? qsTr("Markdown: write Markdown on the page, shown formatted (Ctrl+Alt+M). Hold for the text mode")
+                tip: markdownMode ? qsTr("Markdown: write on the page, shown formatted (Ctrl+Alt+M). Hold for its source beside the page, or the text mode")
                                   : qsTr("Text mode: type the page's text like in a word processor (Ctrl+Alt+E). Hold for Markdown")
-                checked: textFlowPanel.visible || markdownPanel.visible
+                checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
                 onClicked: {
                     if (textFlowPanel.visible) textFlowPanel.close(true)
                     else if (markdownPanel.visible) markdownPanel.close(true)
-                    else if (markdownMode) markdownPanel.open()
+                    else if (app.markdownOnPage) app.endMarkdownOnPage()
+                    else if (markdownMode) app.writeMarkdownOnPage()  // (formatted while typing, on the page)
                     else textFlowPanel.open()
                 }
                 onPressAndHold: Popups.openAt(writeMenu)
@@ -573,10 +594,21 @@ ApplicationWindow {
                     }
                     MenuItem {
                         objectName: "markdownItem"
-                        text: qsTr("Markdown (shown formatted)")
+                        text: qsTr("Markdown (shown formatted, on the page)")
                         checkable: true
                         checked: writeButton.markdownMode
-                        onTriggered: markdownPanel.open()
+                        onTriggered: { writeButton.markdownMode = true; app.writeMarkdownOnPage() }
+                    }
+                    MenuSeparator {}
+                    MenuItem {
+                        objectName: "markdownSourceItem"
+                        text: qsTr("Markdown source beside the page")
+                        onTriggered: {
+                            const onPage = app.takeMarkdownFromPage()
+                            if (onPage.page === undefined) markdownPanel.open()
+                            else if (onPage.pageText) markdownPanel.open(onPage.page)
+                            else markdownPanel.openBox(onPage.page, onPage.x, onPage.y)
+                        }
                     }
                 }
                 Connections {
@@ -635,6 +667,12 @@ ApplicationWindow {
                         checkable: true
                         checked: app.geometryTool === "compass"
                         onTriggered: app.toggleCompass()
+                    }
+                    // A paper note on the page: write on it, move it, cover answers with it (qt/docs/sticky-notes.md)
+                    MenuItem {
+                        objectName: "stickyNoteItem"
+                        text: qsTr("Sticky note (write on it, cover with it)")
+                        onTriggered: app.insertStickyNote()
                     }
                     MenuSeparator {}
                     // Corners of shapes and moved selections jump onto the half-centimetre grid (upstream's tool bar
@@ -846,6 +884,7 @@ ApplicationWindow {
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     MenuSeparator {}
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
+                    MenuItem { objectName: "insertStickyNoteItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert sticky note"); onTriggered: app.insertStickyNote() }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
@@ -1169,6 +1208,16 @@ ApplicationWindow {
                 color: "#505050"
                 Layout.rightMargin: app.horizontalScrolling ? 0 : 6
             }
+            // Only on a page with sticky notes: hide them all (to see what they cover) and show them again
+            IconButton {
+                objectName: "pageNotesButton"
+                visible: app.pageHasNotes && !win.textDoc
+                iconName: app.pageNotesHidden ? "xqt-eye-off" : "xqt-eye"
+                tip: app.pageNotesHidden ? qsTr("Show the sticky notes of this page") : qsTr("Hide the sticky notes of this page")
+                implicitWidth: 36; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                onClicked: app.pageNotesHidden = !app.pageNotesHidden
+            }
             IconButton {
                 objectName: "nextPageButton"
                 visible: app.horizontalScrolling
@@ -1199,6 +1248,11 @@ ApplicationWindow {
                     id: fitMenu
                     objectName: "fitMenu"
                     MenuItem { text: qsTr("Fit the width (Ctrl+0)"); onTriggered: app.fitWidth() }
+                    MenuItem {
+                        objectName: "realSizeItem"
+                        text: qsTr("Real size, 100 % (Ctrl+1)")
+                        onTriggered: app.zoomToRealSize()
+                    }
                     MenuItem { text: qsTr("Fit the height"); onTriggered: app.fitHeight() }
                     MenuItem {
                         objectName: "fitPageItem"
@@ -1293,6 +1347,14 @@ ApplicationWindow {
         hidden: pageGrid.visible
     }
 
+    // The selected sticky note: its color, cover mode, delete.
+    NotePill {
+        id: notePill
+        objectName: "notePill"
+        canvasItem: canvas
+        hidden: pageGrid.visible
+    }
+
     // Selected PDF text: mark or copy it (at the text, going along with it).
     PdfTextPill {
         id: pdfTextBar
@@ -1344,13 +1406,16 @@ ApplicationWindow {
     }
 
     // A tapped link: open it / go to the page (not at once: a tap can be a mistake). A link to a document
-    // (qt/docs/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings).
+    // (qt/docs/links.md) offers a new tab, the reference or "here", unless a choice was remembered (Settings). A page
+    // or a place of this document offers going there, or showing it in the reference: a second view of the document
+    // beside it (qt/self-reference).
     Popup {
         id: linkPopup
         objectName: "linkPopup"
         property string uri
         property int page: -1
         property var doc: null  // app.documentLink(uri) of a link to a document, else null
+        property bool inDocument: false  // a link to a place of this document (`#page=…`, a chapter)
         padding: 6
         function follow(how) {
             if (linkRemember.checked) app.settings.set("linkOpening", how)
@@ -1369,13 +1434,18 @@ ApplicationWindow {
                         return
                     }
                 }
-                if (info && info.document && info.here) {  // (a place in this document: no need to ask)
-                    app.followDocumentLink(uri, "here")
-                    return
+                const inDocument = !!(info && info.document && info.here)
+                if (inDocument) {  // (a place in this document: there, or in the reference if that was chosen)
+                    const how = (app.settings.revision, app.settings.get("linkOpening"))
+                    if (how !== "ask") {
+                        app.followDocumentLink(uri, how === "reference" ? "reference" : "here")
+                        return
+                    }
                 }
                 linkPopup.uri = uri
                 linkPopup.page = page
                 linkPopup.doc = info && info.document ? info : null
+                linkPopup.inDocument = inDocument
                 linkRemember.checked = false
                 linkPopup.x = Math.max(8, Math.min(canvas.x + rect.x, win.width - linkPopup.width - 8))
                 linkPopup.y = canvas.y + rect.y + rect.height + 6
@@ -1392,6 +1462,7 @@ ApplicationWindow {
                     objectName: "linkLabel"
                     visible: linkPopup.uri !== ""
                     text: !linkPopup.doc ? linkPopup.uri
+                          : linkPopup.inDocument ? (linkPopup.doc.place !== "" ? linkPopup.doc.place : linkPopup.uri)
                           : !linkPopup.doc.found ? qsTr("%1 was not found").arg(linkPopup.doc.name)
                           : linkPopup.doc.place !== "" ? qsTr("%1, %2").arg(linkPopup.doc.name).arg(linkPopup.doc.place)
                                                        : linkPopup.doc.name
@@ -1401,20 +1472,36 @@ ApplicationWindow {
                 }
                 Button {
                     objectName: "linkButton"
-                    visible: !linkPopup.doc
+                    visible: !linkPopup.doc || linkPopup.inDocument
                     flat: true
-                    text: linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
-                                                                                  : qsTr("Page not in this document")
+                    text: linkPopup.inDocument ? qsTr("Go there")
+                          : linkPopup.uri !== "" ? qsTr("Open") : linkPopup.page >= 0 ? qsTr("Go to page %1").arg(linkPopup.page + 1)
+                                                                                    : qsTr("Page not in this document")
                     enabled: linkPopup.uri !== "" || linkPopup.page >= 0
                     onClicked: {
-                        if (linkPopup.uri !== "") app.openLink(linkPopup.uri)
-                        else app.jumpToPage(linkPopup.page)
+                        const uri = linkPopup.uri
                         linkPopup.close()
+                        if (linkPopup.inDocument) app.followDocumentLink(uri, "here")
+                        else if (uri !== "") app.openLink(uri)
+                        else app.jumpToPage(linkPopup.page)
+                    }
+                }
+                // A page of this document: in a second view of it beside it (qt/self-reference)
+                Button {
+                    objectName: "linkInReference"
+                    visible: linkPopup.inDocument || (linkPopup.uri === "" && linkPopup.page >= 0)
+                    flat: true
+                    text: qsTr("In the reference")
+                    onClicked: {
+                        const uri = linkPopup.uri
+                        linkPopup.close()
+                        if (linkPopup.inDocument) app.followDocumentLink(uri, "reference")
+                        else app.reference.showBeside(linkPopup.page)
                     }
                 }
             }
             RowLayout {
-                visible: !!linkPopup.doc && linkPopup.doc.found
+                visible: !!linkPopup.doc && linkPopup.doc.found && !linkPopup.inDocument
                 spacing: 0
                 Button {
                     objectName: "linkNewTab"
@@ -1438,7 +1525,7 @@ ApplicationWindow {
             CheckBox {
                 id: linkRemember
                 objectName: "linkRemember"
-                visible: !!linkPopup.doc && linkPopup.doc.found
+                visible: !!linkPopup.doc && linkPopup.doc.found && !linkPopup.inDocument
                 text: qsTr("Remember my choice")
                 ToolTip.visible: hovered
                 ToolTip.delay: 600
@@ -2426,6 +2513,20 @@ ApplicationWindow {
         target: app
         function onPageActionDone(text, undoable) { snackbar.show(text, undoable) }
     }
+    Connections {
+        target: app
+        // The annotations were exported as Markdown (the Annotations panel): open the file from here
+        function onAnnotationsExported(file, error) {
+            if (error !== "") {
+                messageDialog.title = qsTr("Export failed")
+                messageDialog.text = error
+                messageDialog.open()
+                return
+            }
+            snackbar.show(qsTr("Annotations exported to %1").arg(file.split("/").pop()), false, qsTr("Open"),
+                          function() { app.openPath(file) })
+        }
+    }
 
     Connections {
         target: app
@@ -2795,10 +2896,12 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
     Shortcut { sequences: win.keysOf("textMode"); enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
     Shortcut {
-        // (Markdown written on the page: its source beside the page)
+        // Markdown on the page (formatted while typing); pressed again while writing there: its source beside the
+        // page
         sequences: win.keysOf("markdownMode"); enabled: !app.homeVisible
         onActivated: {
             if (markdownPanel.visible) { markdownPanel.close(true); return }
+            if (!app.markdownOnPage) { writeButton.markdownMode = true; app.writeMarkdownOnPage(); return }
             const onPage = app.takeMarkdownFromPage()
             if (onPage.page === undefined) markdownPanel.open()
             else if (onPage.pageText) markdownPanel.open(onPage.page)
@@ -2810,14 +2913,15 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }
     Shortcut { sequences: win.keysOf("cut"); enabled: docKeys; onActivated: app.cutSelection() }
     Shortcut { sequences: win.keysOf("paste"); enabled: docKeys; onActivated: app.pasteElements() }
-    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && app.hasSelection; onActivated: app.deleteSelection() }
+    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.deleteSelection() }
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
-    Shortcut { sequence: "Escape"; enabled: docKeys && app.hasSelection; onActivated: app.clearSelection() }
+    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.clearSelection() }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }
     Shortcut { sequences: win.keysOf("zoomOut"); enabled: docKeys; onActivated: app.zoomOut() }
     Shortcut { sequences: win.keysOf("fitWidth"); enabled: docKeys; onActivated: app.fitWidth() }
+    Shortcut { sequences: win.keysOf("realSize"); enabled: docKeys; onActivated: app.zoomToRealSize() }
     Shortcut { sequences: win.keysOf("quit"); onActivated: win.close() }
     ShortcutSheet {
         id: shortcutSheet

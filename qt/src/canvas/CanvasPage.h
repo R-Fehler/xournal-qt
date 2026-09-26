@@ -23,9 +23,11 @@
 #include "gui/PageView.h"
 #include "gui/inputdevices/DeviceId.h"
 #include "model/PageListener.h"
+#include "model/Layer.h"
 #include "model/PageRef.h"
 #include "render/PageRaster.h"
 #include "util/Range.h"
+#include "util/Rectangle.h"
 #include "view/Repaintable.h"
 
 class EraseHandler;
@@ -122,6 +124,18 @@ private:
     /// Select the element under a tap (port of upstream's SelectObject). `aggregate`: add to the selection.
     bool selectObjectAt(double x, double y, bool multiLayer, bool aggregate);
     DeviceId currentSequenceDeviceId;
+
+    // --- sticky notes (qt/docs/sticky-notes.md) ---
+    /// A press with a tool that writes: onto the note there, if any (its layer is selected until the release). True
+    /// when the press is done with (on a covering note: nothing is written, a tap lets it peek).
+    bool pressOnNote(double x, double y);
+    /// The page's own layer is selected again after writing on a note
+    void leaveNote();
+    /// The eraser stays inside the note it erases on (never on the paper's edge). False: the note is too small.
+    bool eraserInNote(double& x, double& y) const;
+    std::optional<Layer::Index> layerBeforeNote;  ///< the page's selected layer while writing on a note
+    std::optional<xoj::util::Rectangle<double>> noteClip;  ///< the note written on: the stroke is drawn clipped to it
+    std::optional<std::pair<double, double>> coverPress;  ///< a press on a covering note (a tap: it peeks)
 
     mutable std::vector<Range> dirtyRanges;  ///< page coordinates
     mutable bool allDirty = true;

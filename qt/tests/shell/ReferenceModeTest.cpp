@@ -5,6 +5,7 @@
  */
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QPointer>
 #include <QSignalSpy>
 #include <gtest/gtest.h>
 
@@ -64,8 +65,120 @@ TEST(ReferenceMode, aTabShowsAnotherTabBesideItself) {
     EXPECT_FALSE(t.tabs().data(t.tabs().index(1), TabManager::ReferenceRole).toBool());
     EXPECT_FALSE(t.tabs().data(t.tabs().index(0), TabManager::ReferenceRole).toBool());
 
-    t.ref().showTab(0);  // not beside itself
-    EXPECT_EQ(t.tabs().referenceOf(0), 2);
+    EXPECT_FALSE(t.ref().isSelf());
+}
+
+// qt/self-reference: the current tab's own document beside it, in a second view of its own
+TEST(ReferenceMode, aTabShowsItsOwnDocumentBesideItself) {
+    ThreeTabs t;
+    t.c.insertPages(1, 0, -1, false, 9);  // (tab 0: ten pages)
+    CanvasView* main = t.tabs().view(0);
+    main->getViewController().setViewSize(QSizeF(600, 800));
+    main->jumpToPage(4);
+    QCoreApplication::processEvents();
+    t.ref().showTab(0);
+    ASSERT_TRUE(t.ref().active());
+    EXPECT_TRUE(t.ref().isSelf());
+    EXPECT_EQ(t.tabs().referenceOf(0), 0);
+    EXPECT_TRUE(t.tabs().isSelfReference(0));
+    auto* second = t.tabs().referenceView(0);
+    ASSERT_NE(second, nullptr);
+    EXPECT_NE(second, main) << "a second view, not the tab's";
+    EXPECT_EQ(t.ref().canvas(), second);
+    EXPECT_EQ(&second->getSession(), t.tabs().session(0)) << "of the same document";
+    EXPECT_TRUE(t.tabs().data(t.tabs().index(0), TabManager::ReferenceRole).toBool()) << "the tab strip marks it";
+    EXPECT_FALSE(t.ref().editing()) << "for reading at first";
+    second->getViewController().setViewSize(QSizeF(400, 800));
+    QCoreApplication::processEvents();
+    EXPECT_EQ(t.ref().pageNumber(), 5) << "it starts where the tab is";
+
+    // Its own page: the page number of its pill follows it, the tab's stays
+    QSignalSpy pageChanged(&t.ref(), &ReferenceMode::pageChanged);
+    t.ref().goToPage(8);
+    EXPECT_EQ(t.ref().pageNumber(), 9);
+    EXPECT_GE(pageChanged.count(), 1);
+    EXPECT_EQ(t.c.pageNumber(), 5);
+    EXPECT_EQ(t.tabs().session(0)->getCurrentPageNo(), 4u);
+
+    // Keys with the reference: its pages, not the tab's
+    t.ref().setFocused(true);
+    t.c.previousPage();
+    EXPECT_EQ(t.ref().pageNumber(), 8);
+    EXPECT_EQ(t.c.pageNumber(), 5);
+    t.ref().setFocused(false);
+
+    // Swap: the places change sides (each keeps its zoom), the tab stays
+    const double zoom = second->getViewController().zoom();
+    t.ref().swapRoles();
+    QCoreApplication::processEvents();
+    EXPECT_EQ(t.c.currentTab(), 0);
+    EXPECT_TRUE(t.ref().isSelf());
+    EXPECT_EQ(t.c.pageNumber(), 8);
+    EXPECT_EQ(t.ref().pageNumber(), 5);
+    EXPECT_DOUBLE_EQ(second->getViewController().zoom(), zoom);
+
+    // "Show beside" of a page while it is open: it goes there
+    t.ref().showBeside(1);
+    EXPECT_EQ(t.ref().pageNumber(), 2);
+    EXPECT_EQ(t.ref().canvas(), second);
+
+    // Another tab: its own reference (none); back: the second view again
+    t.c.setCurrentTab(1);
+    EXPECT_FALSE(t.ref().active());
+    t.c.setCurrentTab(0);
+    EXPECT_EQ(t.ref().canvas(), second);
+
+    // Close: the second view goes, the tab stays
+    QPointer<CanvasView> gone(second);
+    t.ref().close();
+    EXPECT_FALSE(t.ref().active());
+    EXPECT_TRUE(gone.isNull());
+    EXPECT_EQ(t.c.tabCount(), 3);
+    EXPECT_EQ(t.tabs().session(0)->viewCount(), 1u);
+}
+
+TEST(ReferenceMode, theSameDocumentBesideItselfPopsOutIntoItsOwnTab) {
+    ThreeTabs t;
+    t.c.insertPages(1, 0, -1, false, 9);
+    t.tabs().view(0)->getViewController().setViewSize(QSizeF(600, 800));
+    const int mainPage = t.c.pageNumber();
+    t.ref().showBeside(6);  // (the page menu: at that page)
+    ASSERT_TRUE(t.ref().isSelf());
+    t.ref().canvas()->getViewController().setViewSize(QSizeF(400, 800));
+    QCoreApplication::processEvents();
+    EXPECT_EQ(t.ref().pageNumber(), 7);
+    EXPECT_EQ(t.c.pageNumber(), mainPage);
+    // "Show as a tab": it has a tab, this one: the tab goes to the place of the reference (Back returns)
+    t.ref().popOut();
+    EXPECT_FALSE(t.ref().active());
+    EXPECT_EQ(t.c.currentTab(), 0);
+    EXPECT_EQ(t.c.tabCount(), 3) << "no tab more";
+    EXPECT_EQ(t.c.pageNumber(), 7);
+    EXPECT_TRUE(t.tabs().view(0)->canGoBack());
+
+    // Another reference replaces it, and the other way round
+    t.ref().showTab(0);
+    ASSERT_TRUE(t.ref().isSelf());
+    t.ref().showTab(2);
+    EXPECT_FALSE(t.ref().isSelf());
+    EXPECT_EQ(t.ref().canvas(), t.tabs().view(2));
+    EXPECT_EQ(t.tabs().session(0)->viewCount(), 1u);
+    t.ref().showTab(0);
+    EXPECT_TRUE(t.ref().isSelf());
+
+    // The tab moves to another window: its split stays behind (closed)
+    auto taken = t.tabs().takeTab(0);
+    ASSERT_NE(taken, nullptr);
+    EXPECT_FALSE(taken->selfView);
+    EXPECT_EQ(taken->session->viewCount(), 1u);
+    EXPECT_FALSE(t.ref().active());
+    t.tabs().adoptTab(std::move(taken));
+
+    // Closing the tab closes its second view with it
+    t.ref().showTab(t.tabs().currentIndex());
+    ASSERT_TRUE(t.ref().isSelf());
+    t.c.closeTab(t.tabs().currentIndex());
+    EXPECT_FALSE(t.ref().isSelf());
 }
 
 TEST(ReferenceMode, eachTabHasItsOwnReference) {
@@ -354,4 +467,28 @@ TEST(ReferenceMode, theGridListsThePagesOfTheReferenceWhileItIsShown) {
     t.ref().setPagesShown(true);
     t.ref().close();
     EXPECT_FALSE(t.ref().pagesShown());
+}
+
+// A link to a page of the document itself (`#page=`, a PDF link to a page) can open in the reference: the document
+// beside itself, at that page; the tab stays where it is.
+TEST(ReferenceMode, aLinkToAPageOfTheDocumentOpensInTheReference) {
+    ThreeTabs t;
+    t.c.insertPages(1, 0, -1, false, 9);
+    t.tabs().view(0)->getViewController().setViewSize(QSizeF(600, 800));
+    t.c.jumpToPage(1);
+    ASSERT_TRUE(t.c.followDocumentLink("#page=6", "reference"));
+    ASSERT_TRUE(t.ref().isSelf());
+    EXPECT_EQ(t.ref().pageNumber(), 6);
+    EXPECT_EQ(t.c.pageNumber(), 2);
+    // Open already: it goes there (Back returns)
+    ASSERT_TRUE(t.c.followDocumentLink("#page=9", "reference"));
+    EXPECT_EQ(t.ref().pageNumber(), 9);
+    EXPECT_TRUE(t.ref().canGoBack());
+    // "Here" still goes there in the tab
+    ASSERT_TRUE(t.c.followDocumentLink("#page=4", "here"));
+    EXPECT_EQ(t.c.pageNumber(), 4);
+    EXPECT_EQ(t.ref().pageNumber(), 9);
+    // A PDF link to a page ("In the reference" of the link popup)
+    t.ref().showBeside(2);
+    EXPECT_EQ(t.ref().pageNumber(), 3);
 }

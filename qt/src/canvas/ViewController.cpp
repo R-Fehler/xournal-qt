@@ -120,6 +120,14 @@ void ViewController::placeAnchor(const Anchor& a, QPointF viewPos) {
     clamp();
 }
 
+void ViewController::setZoom100(double value) {
+    if (!(value > 0) || value == z100) {
+        return;
+    }
+    z100 = value;
+    Q_EMIT zoom100Changed();
+}
+
 void ViewController::setZoom(double zoom, QPointF viewAnchor) {
     zoom = std::clamp(zoom, minZoom(), maxZoom());
     if (zoom == z) {

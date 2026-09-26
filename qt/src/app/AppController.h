@@ -20,6 +20,7 @@
 #include <QFileSystemWatcher>
 #include <QObject>
 #include <QPointer>
+#include <QQuickTextDocument>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
@@ -34,6 +35,7 @@
 
 #include "filesystem.h"
 
+class QQuickTextDocument;
 class QWindow;
 
 namespace xqt {
@@ -53,6 +55,7 @@ class PageFilterModel;
 class LayersModel;
 class ShortcutsModel;
 class OutlineModel;
+class AnnotationsModel;
 class TextFlowSession;
 class MarkdownSession;
 class PageClipboard;
@@ -84,6 +87,8 @@ class AppController: public QObject {
     Q_PROPERTY(QObject* filteredPages READ filteredPagesModel CONSTANT)
     /// Table of contents of the current tab (PDF outline)
     Q_PROPERTY(QObject* outline READ outlineModel CONSTANT)
+    /// Highlights and notes of the current tab (the sidebar's Annotations panel, qt/docs/annotations-md.md)
+    Q_PROPERTY(QObject* annotations READ annotationsModel CONSTANT)
     /// The layers of the current page
     Q_PROPERTY(QObject* layers READ layersModel CONSTANT)
     /// The keyboard shortcuts (the same ones in every window)
@@ -162,6 +167,11 @@ class AppController: public QObject {
     Q_PROPERTY(double textFlowOverflow READ textFlowOverflow NOTIFY textFlowChanged)
     /// A Markdown box is being edited (markdownPage, 0-based); how far it goes below the page (points)
     Q_PROPERTY(bool markdownActive READ markdownActive NOTIFY markdownChanged)
+    /// Markdown is being written on the page itself (formatted while typing), not in the panel beside it.
+    Q_PROPERTY(bool markdownOnPage READ markdownOnPage NOTIFY markdownOnPageChanged)
+    /// What is at the cursor of the Markdown being written on the page or in a .md, for the formatting bar
+    /// (md::format::State: bold, italic, strike, code, math, link, heading, list, quote, codeBlock, table)
+    Q_PROPERTY(QVariantMap markdownFormat READ markdownFormat NOTIFY markdownFormatChanged)
     Q_PROPERTY(int markdownPage READ markdownPage NOTIFY markdownChanged)
     /// The last page of the Markdown text being edited (the page's text flows over pages)
     Q_PROPERTY(int markdownLastPage READ markdownLastPage NOTIFY markdownChanged)
@@ -227,6 +237,7 @@ public:
     QObject* pagesModel() const;
     QObject* filteredPagesModel() const;
     QObject* outlineModel() const;
+    QObject* annotationsModel() const;
     QObject* layersModel() const;
     QObject* shortcutsModel() const;
     QObject* settingsModel() const;
@@ -344,6 +355,33 @@ public:
     double markdownOverflow() const { return mdOverflow; }
     /// Start editing the Markdown box of a page (-1: the current page; made when there is none). Returns its source.
     Q_INVOKABLE QString beginMarkdown(int page = -1);
+    bool markdownOnPage() const;
+    // --- the formatting bar (qt/docs/md-editor.md, "Formatting bar"; AppMarkdownFormat.cpp) --------------------------
+    QVariantMap markdownFormat() const;
+    /// A formatting tool (md::format::actionNamed: "bold", "heading2", "codeBlock" with the language as `arg`, ...)
+    /// on the Markdown written on the page or in the .md: one undo step. False if no Markdown is written.
+    Q_INVOKABLE bool formatMarkdown(const QString& action, const QString& arg = QString());
+    /// The same on the source beside the page (its TextArea's document: one undo step there). The selection after it:
+    /// {anchor, caret} (the text's offsets); empty if nothing was done.
+    Q_INVOKABLE QVariantMap formatMarkdownIn(QQuickTextDocument* document, int anchor, int caret,
+                                             const QString& action, const QString& arg = QString());
+    /// What is at the cursor of a source (the editor beside the page), as markdownFormat.
+    Q_INVOKABLE QVariantMap markdownFormatOf(const QString& text, int anchor, int caret) const;
+    /// The table at the cursor, for the table editor: {found, cells: [[header cells], [row cells], ...], aligns:
+    /// ["left" | "center" | "right" | "", ...], row (0: the header), column}; found false: none there.
+    Q_INVOKABLE QVariantMap markdownTable() const;
+    Q_INVOKABLE QVariantMap markdownTableIn(const QString& text, int caret) const;
+    /// The table editor's table as a GFM pipe table over the table at the cursor, or as a new one there. One undo
+    /// step.
+    Q_INVOKABLE bool writeMarkdownTable(const QVariantList& cells, const QStringList& aligns);
+    Q_INVOKABLE QVariantMap writeMarkdownTableIn(QQuickTextDocument* document, int anchor, int caret,
+                                                 const QVariantList& cells, const QStringList& aligns);
+    /// Write the current page's Markdown text on the page, formatted while typing (the default of the tool bar's
+    /// write button; its source beside the page is the button's menu). The cursor goes to the end of what that page
+    /// holds; a page without Markdown text starts one at its top. False if nothing can be written there.
+    Q_INVOKABLE bool writeMarkdownOnPage();
+    /// Stop writing on the page (the text stays).
+    Q_INVOKABLE void endMarkdownOnPage();
     /// The source as typed: the page follows.
     Q_INVOKABLE void updateMarkdown(const QString& source);
     /// Done (keep: one undo step) or cancel.
@@ -574,7 +612,8 @@ private:
 
 public:
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
-    /// new document stays, to write the notes in). Without a document open: opened as the document.
+    /// new document stays, to write the notes in). Without a document open: opened as the document. The current
+    /// document itself: a second view of it beside it.
     Q_INVOKABLE bool openAsReference(const QString& path);
     /// A document and a conflict copy of it (a sync app's, SyncConflicts.h) side by side: the document as the tab, the
     /// copy as its reference.
@@ -710,12 +749,27 @@ public:
     /// Zoom to this (around the middle of the view), e.g. back to what it was.
     Q_INVOKABLE void setZoomPercent(int percent);
     Q_INVOKABLE void zoomOut();
+    /// 100 %: the pages as large as the paper, after the screen's calibration (Settings -> Screen)
+    Q_INVOKABLE void zoomToRealSize();
     Q_INVOKABLE void addPageAfterCurrent();
 
     // --- pages of the current document (index: 0-based page) ---
     Q_INVOKABLE void goToPage(int index);
     /// Go to a page and remember the place for "back" (links, page grid, sidebar).
     Q_INVOKABLE void jumpToPage(int index);
+    /// The same, showing this part of the page (page points): an item of the Annotations panel.
+    Q_INVOKABLE void jumpToPlace(int index, const QRectF& rect);
+    // --- the annotations as Markdown (qt/docs/annotations-md.md) ---
+    /// Where "Export as Markdown" writes without asking: "<name>.annotations.md" next to the document, with Xournal++
+    /// files. Empty: ask with a save dialog (PDF files mode writes nothing next to files), or the document was never
+    /// saved.
+    Q_INVOKABLE QUrl annotationsFile() const;
+    /// The file the save dialog suggests; empty: the document was never saved (exportAnnotations says so).
+    Q_INVOKABLE QUrl suggestedAnnotationsFile() const;
+    Q_INVOKABLE bool fileExists(const QUrl& file) const;
+    /// Write the current document's annotations as Markdown (once the panel's list is up to date); then
+    /// annotationsExported.
+    Q_INVOKABLE void exportAnnotations(const QUrl& file);
     Q_INVOKABLE void navigateBack();
     Q_INVOKABLE void navigateForward();
     Q_INVOKABLE void clearNavigation();
@@ -766,6 +820,11 @@ public:
     /// The clipboard holds a link (Copy link): its Markdown for the Markdown text being written beside the page
     /// (relative to the current document), else "".
     Q_INVOKABLE QString clipboardLinkMarkdown() const;
+    /// Paste into the Markdown text being written beside the page (its TextArea's document), in place of
+    /// [from, to): text whose \(…\) and \[…\] (as chat apps write formulas) become $…$ and $$…$$ where they are
+    /// formulas there (md::tex::convertPasted). One undo step. False when there is nothing to convert: the TextArea
+    /// pastes as always.
+    Q_INVOKABLE bool pasteMarkdown(QQuickTextDocument* document, int from, int to);
     /// Ask the window for the print dialog, with these pages (0-based; empty: the whole document).
     Q_INVOKABLE void requestPrint(const QList<int>& pages) { Q_EMIT printRequested(pages); }
     Q_INVOKABLE void insertPageBefore(int index);
@@ -783,6 +842,33 @@ public:
     /// For the screenshot hook (it calls methods without arguments)
     Q_INVOKABLE void toggleSetsquare() { toggleGeometryTool("setsquare"); }
     Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
+    // --- sticky notes (qt/docs/sticky-notes.md) ---
+    /// A new sticky note in the middle of the visible part of the current page, selected so that it can be moved
+    /// and resized right away (a select tool is chosen, as for an image). One undo step.
+    Q_INVOKABLE bool insertStickyNote();
+    /// The pastel colors a note can have
+    Q_PROPERTY(QVariantList stickyNoteColors READ stickyNoteColors CONSTANT)
+    QVariantList stickyNoteColors() const;
+    /// A sticky note is selected (its pill: colors, cover, delete)
+    Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
+    bool noteSelected() const;
+    Q_PROPERTY(QColor noteColor READ noteColor WRITE setNoteColor NOTIFY noteSelectionChanged)
+    QColor noteColor() const;
+    void setNoteColor(const QColor& color);
+    /// The selected note covers (self-testing: the pen leaves it alone, a tap lets it peek)
+    Q_PROPERTY(bool noteCovers READ noteCovers WRITE setNoteCovers NOTIFY noteSelectionChanged)
+    bool noteCovers() const;
+    void setNoteCovers(bool covers);
+    Q_INVOKABLE void deleteStickyNote();
+    /// Where the selected note is on the canvas (an empty rect: none), for its pill
+    Q_INVOKABLE QRectF noteBox() const;
+    /// The current page has sticky notes; they are hidden (a view state, not saved)
+    Q_PROPERTY(bool pageHasNotes READ pageHasNotes NOTIFY notesChanged)
+    bool pageHasNotes() const;
+    Q_PROPERTY(bool pageNotesHidden READ pageNotesHidden WRITE setPageNotesHidden NOTIFY notesChanged)
+    bool pageNotesHidden() const;
+    void setPageNotesHidden(bool hidden);
+
     /// Which one lies on the page ("" if none).
     Q_PROPERTY(bool canShowInFileManager READ canShowInFileManager CONSTANT)
     /// Share → "PDF with notes" works here (SystemApps::canShare).
@@ -841,7 +927,8 @@ public:
     Q_INVOKABLE QVariantMap documentLink(const QString& uri) const;
     /// Follow a link to a document from the current one: "tab" (switches to it when it is open), "reference" (beside
     /// the current document) or "here" (in place of the current document, which closes when it has no unsaved
-    /// changes; Back opens it again). The place is looked up (DocumentLinks::placeIn); what was not found is said.
+    /// changes; Back opens it again). A place in the current document itself: "reference" shows it in a second view
+    /// of the document beside it (qt/self-reference), anything else goes there. The place is looked up (DocumentLinks::placeIn); what was not found is said.
     /// False when it is no link to a document or the file is not found.
     Q_INVOKABLE bool followDocumentLink(const QString& uri, const QString& how);
     /// "Linked from": the documents of the library whose links lead to the current one (the index's links):
@@ -895,6 +982,10 @@ Q_SIGNALS:
     void toolChanged();
     void zoomChanged();
     void pageChanged();
+    /// A sticky note was selected or unselected, or the selected one changed
+    void noteSelectionChanged();
+    /// Sticky notes came, went, were hidden or shown (on the current page, or it is another page now)
+    void notesChanged();
     /// Messages from the core (XojMsgBox) and file errors, shown by QML.
     void message(const QString& title, const QString& text, bool error);
     /// This folder can be a library only with "All files access": the window explains why it is asked for, then
@@ -909,6 +1000,8 @@ Q_SIGNALS:
     void raiseRequested();
     void recoveryChanged();
     void documentModeChanged();
+    /// exportAnnotations is done: the file written, or why not (`error`).
+    void annotationsExported(const QString& file, const QString& error);
     void searchChanged();
     void viewLayoutChanged();
     void presentingChanged();
@@ -942,6 +1035,8 @@ Q_SIGNALS:
     void penPillChanged();
     void textFlowChanged();
     void markdownChanged();
+    void markdownOnPageChanged();
+    void markdownFormatChanged();
     /// The text tool tapped a Markdown box: the window opens its editor.
     void markdownRequested(int page);
     /// The text tool tapped a Markdown text box, or a place for a new one: the window opens its editor.
@@ -1054,6 +1149,7 @@ private:
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;
     std::unique_ptr<xqt::OutlineModel> outline;
+    std::unique_ptr<xqt::AnnotationsModel> annotations;
     std::unique_ptr<xqt::LayersModel> layers;
     std::unique_ptr<xqt::ShortcutsModel> ownShortcuts;
     xqt::ShortcutsModel* shortcuts = nullptr;  ///< the main window's

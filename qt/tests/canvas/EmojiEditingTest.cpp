@@ -25,6 +25,7 @@
 #include "CanvasView.h"
 #include "EmojiCompletion.h"
 #include "MarkdownEditor.h"
+#include "MdFormat.h"
 #include "TextEditor.h"
 #include "TextFlow.h"
 
@@ -267,4 +268,31 @@ TEST_F(EmojiEditingTest, pickerInsertsAtTheCursor) {
     key(Qt::Key_Left, {}, Qt::ShiftModifier);
     EXPECT_TRUE(view->insertAtTextCursor(PARTY));
     EXPECT_EQ(m.text(), "xy" + PARTY);
+}
+
+/// The suggestions follow the text however it changes: pasted (Ctrl+V, with its formula conversion) or edited by the
+/// formatting bar (MarkdownEditor::applyEdit, which the keys do not see).
+TEST_F(EmojiEditingTest, completionFollowsPastesAndFormattingEdits) {
+    MarkdownEditor& e = startMarkdown();
+    paste("Hi :smi");
+    ASSERT_EQ(e.text(), "Hi :smi");
+    EXPECT_TRUE(view->emojiCompletion().active()) << "after Ctrl+V";
+    key(Qt::Key_Return);
+    EXPECT_EQ(e.text(), "Hi " + SMILE);
+
+    md::format::Edit change;
+    change.from = e.text().size();
+    change.to = change.from;
+    change.with = " :hear";
+    change.anchor = change.caret = change.from + change.with.size();
+    e.applyEdit(change);
+    processEvents();
+    EXPECT_TRUE(view->emojiCompletion().active()) << "after an edit of the formatting bar";
+    md::format::Edit selectAll;
+    selectAll.from = selectAll.to = 0;
+    selectAll.anchor = 0;
+    selectAll.caret = e.text().size();
+    e.applyEdit(selectAll);
+    processEvents();
+    EXPECT_FALSE(view->emojiCompletion().active()) << "text selected: no suggestions";
 }

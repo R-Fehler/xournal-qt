@@ -826,6 +826,9 @@ private:
         if (s.rfind("<!--", 0) == 0 && s.size() >= 7 && s.compare(s.size() - 3, 3, "-->") == 0) {
             return;  // a comment: not shown (also the page markers of the boxes)
         }
+        if (text::pageBreak(s)) {
+            return;  // a page break: the page ends there (MdPaginate), nothing is drawn
+        }
         margin(0.75 * st.size);
         open();
         Run r{s};

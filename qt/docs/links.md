@@ -128,8 +128,10 @@ The author accepted the plan with its proposals:
   place ("kalman.xopp, chapter "Prediction step""), **Open in a new tab**, **Open as reference**, **Open here** and
   **Remember my choice**. Remembered, a tap opens the document at once; Settings → Documents → Links → "A link to
   another document opens" (`linkOpening` in the `xournalQt` part of the settings: `ask`, `tab`, `reference`,
-  `here`) changes it back. A link into the same document (`#page=5`, a link to its own file) goes there without
-  asking; a web address still shows "Open".
+  `here`) changes it back. A link into the same document (`#page=5`, a link to its own file) asks **Go there** or
+  **In the reference** (the document beside itself, [reference-view.md](reference-view.md)); a remembered
+  `reference` opens it there at once, any other remembered choice goes there. A PDF link to a page offers "Go to
+  page N" and "In the reference" as well. A web address still shows "Open".
 - The file: the path relative to the document holding the link (a new document: relative to the library); a PDF
   with its `.xopp` opens as the `.xopp`, as in the library. A wiki link's name is looked for next to the document
   (with `.md` added), then in the library index by file name (`LibraryIndex::filesNamed`; a `.md` first, then the
@@ -142,7 +144,8 @@ The author accepted the plan with its proposals:
 - Back and Forward (Alt+Left/Right, the ← → pill) go across documents: a followed link is remembered with where it
   came from; Back first goes through the places jumped to in the document since the link was followed, then back to
   the document the link was in (its tab, or its file opened again), and Forward returns.
-- A link in the reference opens in a new tab (resolved from the reference's own file).
+- A link in the reference opens in a new tab (resolved from the reference's own file). When the reference is the
+  document itself, a link to a place of it goes there in the reference.
 - Markdown boxes keep whether a link is a `[[wiki link]]` (`md::LinkHit::wiki`), so a tap looks the name up.
 
 ### 3. Making links (`AppLinks.cpp`, `CanvasView::pasteLinkMarker`, `links::toMime`)

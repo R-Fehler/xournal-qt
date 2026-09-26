@@ -465,7 +465,7 @@ Popup {
                     // Reference mode: shown beside the current document (again: not any more)
                     ToolButton {
                         objectName: "overviewReferenceButton"
-                        visible: !cell.current && !overview.searching
+                        visible: !overview.searching  // (the current document: beside itself, a second view)
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.margins: 2
@@ -489,7 +489,9 @@ Popup {
                             }
                         }
                         ToolTip.visible: hovered
-                        ToolTip.text: cell.isReference ? qsTr("Close the reference") : qsTr("Open as reference")
+                        ToolTip.text: cell.current ? (cell.isReference ? qsTr("Close the view beside")
+                                                                       : qsTr("Show this document beside"))
+                                     : cell.isReference ? qsTr("Close the reference") : qsTr("Open as reference")
                     }
                     ToolButton {
                         anchors.top: parent.top

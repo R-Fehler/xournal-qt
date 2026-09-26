@@ -332,6 +332,54 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   exported as an archive PDF into a chosen folder, keeping the folder structure. Other files are copied as they are,
   and a short `README.txt` explains the contents. It runs in the background with progress and can be cancelled.
 
+### Ideas round of 2026-09-25/26 (the author)
+- First wave, started 2026-09-26 (merged so far: calibration, annotations-md, sticky-notes): `qt/emoji` (bundled colour emoji font, `:smile:` completion, paste) ·
+  `qt/self-reference` (the same document in the reference view, page subsets) · `qt/calibration` (1 cm on screen
+  = 1 cm, per screen) · `qt/sticky-notes` (opaque, resizable, ink and text attached, cover mode for self-testing) ·
+  `qt/annotations-md` (stage 1: live Annotations panel + "Export as Markdown"; stage 2 "keep updated" later).
+- [ ] **Markdown inside the PDF with notes** (the "word-processor" mode): new text documents follow the first-start
+  choice (PDF files → a PDF with the `.md` and its images inside; Xournal++ files → `name.md` + `name.assets/`),
+  changeable in Settings, and a mix must work: existing `.md` files are never converted unasked. Split into
+  `qt/md-images` (images in Markdown + the `.md`/`.assets` pair as one document), `qt/md-pdf` (the container,
+  text only), later ink on Markdown pages. Not started: the author wants to discuss it first.
+  - Ink on reflowing Markdown (the author, 2026-09-26): no anchoring; the user handles it (e.g. inserts a page
+    above and moves the text on). Document the behaviour, don't engineer around it.
+  - Agreed (2026-09-26): one model for both (a document is pages; a Markdown text is a flow over a run of pages).
+    A `.md` is a document with exactly one flow and nothing else; the PDF text document is the notes model (flow +
+    ink) inside a PDF with notes, exportable as `.md` + assets; a page break in Markdown
+    (`<div style="page-break-after: always"></div>`) ends the flow's page.
+  - Agreed (2026-09-26): the PDF text document also carries a plain `name.md` (rewritten on every save) and its
+    images as `name.assets/…` attachments next to the `.xopp`, so whoever gets the PDF can extract portable
+    Markdown with any PDF viewer (copying text out of a PDF would not give Markdown).
+  - Images (`qt/md-images`, after `qt/md-pdf`): drawn inline like formulas (cached); paste/drop saves the image
+    and inserts `![](name.assets/…)`; `.md` → `name.assets/` next to it (the pair is one document); PDF text
+    document → attachments inside the PDF (unpacked to the app cache while editing); Markdown boxes in a `.xopp` →
+    inside the `.xopp`. Web images are not fetched unasked (alt text + "load", URL shown first).
+- [ ] **`qt/md-toolbar`** (the author, 2026-09-26): formatting tools for people who don't know Markdown syntax, in
+  the `.md` editor and for Markdown boxes: heading levels, bold/italic/strike/code, bullet, numbered and checkbox
+  lists, quote, code block, link, image, horizontal rule, math, page break, and **insert/edit table** in an
+  interactive table editor (a grid in a popup: cells, add/remove rows and columns, alignment, the current row and
+  column shown), writing a normal pipe table. A page break needs a syntax that other tools ignore or understand
+  (proposal: `<div style="page-break-after: always"></div>`, as Typora and Obsidian's PDF export use).
+- [ ] Citations: Scholar/translate on selected text; bibliography entry → library hits (fuzzy, by title and first
+  page) → open in reference/tab, copy as a link; arXiv import (named by title). Networking is opt-in, and the URL is
+  always shown (hover or preview) before anything is opened or downloaded. `.bib` later, after the user flow is
+  thought through.
+- [ ] Note space for slides: a margin beside/below each slide (page enlarged, also in the PDF), or a page after each.
+- [ ] Forms (only on PDFs that have fields) and a "My signature" stamp. Cryptographic signing: backlog.
+- [ ] **OCR (Tesseract), last of this round**: photo import with cropping, a text layer in PDFs. Never automatic:
+  ask before each run, with "remember my choice", and a button in Settings to forget it.
+- [?] **Handwriting search**: research done (`qt/docs/research/handwriting-recognition.md`, 2026-09-26). Proposal:
+  search only in v1 (top-5 word candidates with boxes into `DocumentTextIndex`, so fuzzy search and highlights work
+  as for PDF text); Linux and Android: bundled ONNX Runtime + TrOCR-small handwritten int8 (64 MB, 0.2 s per line,
+  English 97 % of words found; German only 41 %); Windows: the system recogniser (German included). No fine-tuning
+  in v1 (keep corrections, library words as extra candidates, a training text as a check). Questions for the
+  author: search-only first? train a German model once (fhswf/german_handwriting, AFL-3.0) or rely on Windows for
+  German? ML Kit on Android as an opt-in flavour or not at all? +64 MB per model in packages, or a one-time
+  download from our release page? corrections in the `.xopp` or only in the cache? defer fine-tuning?
+  Note: points in this codebase carry no time, only x, y and pressure (stroke order is there).
+- Backlog: visual text diff between PDF versions; cryptographic signing.
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).

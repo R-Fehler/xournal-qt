@@ -68,6 +68,9 @@ public:
     PageRaster& operator=(const PageRaster&) = delete;
 
     const PageRef& getPage() const { return page; }
+    /// Whether this thread is drawing a page for the screen right now: what only the screen shows (a sticky note that
+    /// peeks, the corner of a covering one) asks this. Thumbnails, previews and exports are not for the screen.
+    static bool drawingForScreen();
 
     // --- UI thread ---------------------------------------------------------------------------------------------
     /// Re-render the whole page (zoom or page changed). Upstream: XojPageView::rerenderPage(sizeChanged).

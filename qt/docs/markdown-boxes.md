@@ -7,8 +7,11 @@ dialect is CommonMark with GitHub's extensions (tables, strikethrough, task list
 
 ## Two kinds of Markdown text, two ways of writing
 - **The page's Markdown text** starts at the top-left margin and goes to the right margin. It flows onto the next
-  pages (see below). The writing button's "Markdown" (or Ctrl+Alt+M) opens it beside the page. With the text tool,
-  a tap on it writes it on the page.
+  pages (see below). The writing button (in its Markdown mode) or Ctrl+Alt+M writes it **on the page**, formatted
+  while typing, with the cursor at the end of what the current page holds; the button again (or Escape) is done.
+  Its source beside the page is in the button's menu (press and hold, or right-click: "Markdown source beside the
+  page"), and Ctrl+Alt+M while writing on the page opens it there too. With the text tool, a tap on it writes it
+  on the page.
 - **Markdown text boxes** go anywhere on a page. Turn on "Markdown" in the text tool's font menu (hold the text
   button, or tap it again), then tap where the text should go. A tap on a box (text tool) edits it again.
 
@@ -27,7 +30,10 @@ Writing:
       whole text). Shift selects.
     - Editing: Backspace and Delete, Ctrl+A / C / X / V.
     - Formatting: Ctrl+B / I / E / K (bold, italic, code, link), Ctrl+1 / 2 / 3 / 0 (headings), Tab and Shift+Tab
-      (list levels).
+      (list levels). Each is one undo step; the marks go again when pressed on text that has them.
+  - The formatting bar, a row under the tool bar while Markdown is written, has these and the other tools (lists,
+    check boxes, quote, code block, formula, table editor, rule, image, page break): [md-editor.md](md-editor.md),
+    "Formatting bar".
   - Ctrl+Z / Ctrl+Shift+Z undo and redo in the text being written; once it is done, the whole edit is one undo step.
   - Escape (or a tap elsewhere) is done.
   - Ctrl+Alt+M opens the same text beside the page.
@@ -49,6 +55,9 @@ shows each page's source). A page is split only where the rest reads the same on
 - between the lines of a code block: the page closes the fence and the next page opens it again;
 - between the items of a list: a numbered list goes on with its numbers;
 - between the rows of a table: the next page repeats the header.
+
+A page break (`<div style="page-break-after: always"></div>`, the formatting bar's "Page break") ends the page after
+it; it is not drawn ([md-editor.md](md-editor.md), "Page breaks").
 
 A part that continues the page before starts with a comment, `<!-- xqt:cont … -->` (not shown), which says what was
 added for the page (a fence, a table header), so the parts give exactly the text again. A block that cannot be split
@@ -73,9 +82,10 @@ the editor beside the page ("Size", which also changes the text being edited).
 ## Using it
 - Open the editor with the writing button in the tool bar (hold or right-click it and choose "Markdown"; after that a
   tap opens Markdown again) or with Ctrl+Alt+M. The editor opens beside the page and shows the source.
-- The buttons insert Markdown: H1-H3, lists, quotes and task lists change the mark of the current line; B, I, S,
-  code and Link put marks around the selection. Enter continues a list, and Enter on an empty item ends it.
-- Keys: Ctrl+B / I / E (code) / K (link), Ctrl+1-3 for headings, Tab / Shift+Tab to indent list items.
+- The formatting bar above the source has the same tools as on the page (the table editor too), acting on the
+  source, each one undo step of the source. Enter continues a list, and Enter on an empty item ends it.
+- Keys: Ctrl+B / I / E (code) / K (link), Ctrl+1-3 for headings (Ctrl+0: paragraph), Tab / Shift+Tab to indent list
+  items.
 - Done (or Esc) keeps the text, and the whole edit is one undo step. Cancel puts the page back.
 - With the text tool, a tap on a box opens its Markdown again.
 - A tap on a link opens it; `[text](#Page:12)` goes to page 12 of the document.
@@ -94,12 +104,37 @@ the editor beside the page ("Size", which also changes the text being edited).
 in the box. The `$$` may stand on lines of their own. As in md4c (the parser) and GitHub, an opening `$` does not
 follow a letter or digit and a closing one is not followed by one: `costs $5 and $10` stays text, and `\$` is a
 dollar sign.
+An empty formula (`$ $`, `$$ $$`, only blanks or line breaks between the marks) is no formula: it is shown as it is
+written, marks and all (md4c makes a formula of the blank; MicroTeX would draw nothing).
+
+**`\( … \)` and `\[ … \]`** (as ChatGPT and other chat apps write formulas, and LaTeX) are formulas too:
+`\(x^2\)` in the text, `\[ … \]` a formula block. md4c only knows `$`, so `md::parse` gives it the text with these
+pairs as `$…$` and `$$…$$` (`qt/src/markdown/MdTexDelimiters.*`) and maps every place it reports back to the text as
+written: the file keeps `\(`, the block being written shows it, and the cursor, the search and the page splits stay
+where they belong. One pass over the lines; a pair is rewritten only
+- within a paragraph (a `\[` whose `\]` comes after a blank line stays text, and so does an unclosed one);
+- outside code (fenced and indented blocks, `` `inline` `` spans of any number of backticks) and outside a `$…$`
+  formula; `\\(` is a backslash and a "(";
+- `\[` only where it begins a line's text and `\]` only where it ends one (a full stop or comma may follow):
+  `\[1\]` inside a line is an escaped bracket, as pandoc writes them;
+- where md4c takes the `$` as a formula's mark. **Known limit:** md4c ignores a `$` right after a letter or digit
+  (opening) or right before one (closing), so `the \(n\)th` stays text ("(n)th"); punctuation around a formula is
+  fine (`(\(x\)),`). A pair next to another `$` (`\(a\)\(b\)`) or one whose `$` would close money before it
+  (`$5, so \( x \)`) stays text too.
+
+**Pasting** into a Markdown text (writing on the page, the `.md` editor, the Markdown panel) converts the pasted
+text's pairs for good: the file then has `$…$`, which Obsidian and GitHub show. The same rules decide, applied to the
+text as it is after the paste: nothing is converted in code or next to a letter, a plain text (`.txt`) is left alone,
+and the paste is one undo step as any other. In the panel it is the keyboard's paste (Ctrl+V) that converts
+(a paste from a touch keyboard's menu comes as it is).
 
 - **Drawn by MicroTeX** (vendored, `qt/3rdparty/microtex`, MIT) with the Latin Modern Math font, which is compiled
   into the program: no LaTeX, no external program, the same on Android. Formulas are paths (vector): sharp at any
   zoom, and in the PDF export and the hybrid PDF as vector drawing (not as text: the TeX is not selectable there).
   They are drawn 1.2 times the size of the text around them (Latin Modern's letters are smaller than a sans
   text's; KaTeX does the same) and in its color (in a link, a quote, a heading); `\textcolor{red}{x}` colors a part.
+  MicroTeX knows unicode-math's names; `\hbar` was missing there and is added in the vendored copy (the same symbol
+  as `\hslash`, U+210F).
 - **In the text**: a formula takes the place of one character (U+FFFC) of the Pango layout, with a shape as big as
   the formula, on the text's baseline. So lines break around it, pages are split around it (never inside a
   formula, and a `$$` block keeps its `$$` lines), and a tap on it is a place in the text. A formula wider than the
@@ -107,8 +142,8 @@ dollar sign.
 - **Writing on the page**: the block with the cursor shows its Markdown, formulas included (their source in a
   monospaced font), as for the other marks; a `$$` block being written also shows the formula below its source.
   The other blocks show the formulas drawn. A tap on a drawn formula puts the cursor into its source (its start or
-  end, by the half tapped). In a `$$` block that is not closed yet, Enter starts a line of the formula (as in a code
-  block), not a new paragraph.
+  end, by the half tapped). In a `$$` (or `\[`) block that is not closed yet, Enter starts a line of the formula
+  (as in a code block), not a new paragraph.
 - **Errors**: a formula that MicroTeX cannot read is shown as its source, in red. Resting the mouse on it shows why
   (a tool tip). Nothing a formula says can crash the app: MicroTeX gets no source longer than 8,000 bytes or nested
   deeper than 64 braces, its exceptions are caught, and the crashes found by fuzzing it are fixed in the vendored copy
