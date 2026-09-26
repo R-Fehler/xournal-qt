@@ -332,7 +332,25 @@ Pagination paginate(const std::string& source, Style style, const std::function<
         // Only the blocks that can be on the page (and a few more): as many as the first ones say, more if needed
         const Document all = parse(rest);
         const auto spans = topLevelSpans(rest, all);
-        size_t blocks = std::min<size_t>(spans.size(), 12);
+        // A page break (`<div style="page-break-after: always"></div>`): the page ends after it, when what is before
+        // it fits (one at the top of a page, before anything else, is already where a page starts)
+        size_t limit = spans.size();
+        bool content = false;
+        for (size_t i = 0; i < spans.size(); ++i) {
+            if (spans[i].begin < prefix.size()) {
+                continue;  // (the lines added for the page)
+            }
+            if (all.root.children[i].kind == BlockKind::Html &&
+                pageBreak(std::string_view(rest).substr(spans[i].begin, spans[i].end - spans[i].begin))) {
+                if (content) {
+                    limit = i + 1;
+                    break;
+                }
+                continue;
+            }
+            content = true;
+        }
+        size_t blocks = std::min<size_t>(limit, 12);
         std::string laidOut;
         Document some;
         Layout lay;
@@ -347,11 +365,11 @@ Pagination paginate(const std::string& source, Style style, const std::function<
                 some = parse(laidOut);
                 lay = layout(some, style);
             }
-            if (whole || lay.height > f.height + 0.01) {
+            if (whole || lay.height > f.height + 0.01 || blocks >= limit) {
                 break;
             }
-            blocks = std::max(blocks + 4, static_cast<size_t>(static_cast<double>(blocks) * f.height /
-                                                              std::max(lay.height, 1.0) * 1.3));
+            blocks = std::min(limit, std::max(blocks + 4, static_cast<size_t>(static_cast<double>(blocks) * f.height /
+                                                                              std::max(lay.height, 1.0) * 1.3)));
         }
         const Document& doc = whole ? all : some;
         if ((whole && lay.height <= f.height + 0.01) || page + 1 >= MAX_PAGES) {
@@ -361,7 +379,10 @@ Pagination paginate(const std::string& source, Style style, const std::function<
             out.overflow = std::max(out.overflow, overflow);
             break;
         }
-        Split split = Splitter(laidOut, prefix.size(), doc, lay, f.height, startOf(lineAt(prefix, 0)), style.size).find();
+        Split split = !whole && blocks >= limit && lay.height <= f.height + 0.01
+                              ? Split{spans[limit].begin, "", marker("block"), 0}  // (after the page break)
+                              : Splitter(laidOut, prefix.size(), doc, lay, f.height, startOf(lineAt(prefix, 0)),
+                                         style.size).find();
         if (style.plain) {
             split.close.clear();
             split.next = plainNext;  // (lines as they are: nothing added, only the marker)

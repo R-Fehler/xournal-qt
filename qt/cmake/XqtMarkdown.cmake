@@ -50,7 +50,9 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPaginate.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPaginate.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdFormat.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdFormat.cpp)
 target_include_directories(xqt-markdown PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/markdown")
 target_link_libraries(xqt-markdown PUBLIC xoj-core PRIVATE xqt-md4c xqt-microtex)
 
@@ -74,7 +76,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdBoxTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdHighlightTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPaginateTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPassagesTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdPassagesTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdFormatTest.cpp)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
     target_compile_definitions(xqt-markdown-tests PRIVATE
         XQT_MARKDOWN_GOLDEN="${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/golden")

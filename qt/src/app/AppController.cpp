@@ -685,6 +685,10 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &AppController::pdfTextSelected));
         currentConnections.push_back(
                 connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownOnPageChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownFormatChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
         currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
@@ -706,6 +710,7 @@ void AppController::currentTabChanged() {
         QTimer::singleShot(0, this, [this, s = QPointer<DocumentSession>(session())] { checkTextFile(s); });
     }
     Q_EMIT documentChanged();
+    Q_EMIT markdownFormatChanged();
     Q_EMIT titleChanged();
     Q_EMIT textLayoutChanged();
     Q_EMIT modifiedChanged();

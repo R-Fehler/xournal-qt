@@ -6466,3 +6466,133 @@ TEST_F(FolderChooserWindowTest, theDownloadFolderCanBeOpenedAsLibrary) {
     EXPECT_EQ(controller->libraryModel()->property("rootPath").toString(),
               QString::fromStdString(xqt::Library(phone.sharedDownloads).root().string()));
 }
+
+// The formatting bar (qt/docs/md-editor.md): shown while Markdown is written on the page; its buttons change the text
+// at the cursor; the table editor edits cells in a grid and writes a pipe table.
+TEST_F(MainWindowTest, theFormattingBarAndTheTableEditor) {
+    controller->setMarkdownInPanel(false);
+    auto* bar = find<QQuickItem>("markdownFormatBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_FALSE(bar->isVisible()) << "not while nothing is written";
+    ASSERT_TRUE(controller->writeMarkdownOnPage());
+    wait(50);
+    EXPECT_TRUE(bar->isVisible()) << "while Markdown is written on the page";
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    type("Title");
+
+    // The heading menu: Heading 1; the button shows the level at the cursor
+    auto* headingButton = find<QQuickItem>("mdHeadingButton");
+    click(headingButton);
+    auto* headingMenu = find<QObject>("mdHeadingMenu");
+    ASSERT_TRUE(waitOpened(headingMenu, true));
+    click(findItem("mdHeading1Item"));
+    EXPECT_EQ(editor->text(), "# Title");
+    EXPECT_EQ(findItem("mdHeadingLabel")->property("text").toString(), "H1") << "the level at the cursor";
+    EXPECT_TRUE(canvasItem->hasActiveFocus()) << "the text keeps the keys";
+
+    // Bold around the selected word, the button checked
+    key(Qt::Key_Return);
+    type("word");
+    key(Qt::Key_Left, Qt::ControlModifier | Qt::ShiftModifier);
+    auto* bold = find<QQuickItem>("mdBold");
+    EXPECT_FALSE(bold->property("checked").toBool());
+    click(bold);
+    EXPECT_EQ(editor->text(), "# Title\n\n**word**");
+    EXPECT_TRUE(bold->property("checked").toBool()) << "bold at the cursor";
+
+    // A new table: typed in its cells, a column removed, the pipe in a cell escaped
+    click(find<QQuickItem>("mdTable"));
+    auto* table = find<QObject>("tableEditor");
+    ASSERT_NE(table, nullptr);
+    ASSERT_TRUE(waitOpened(table, true));
+    until([&] { auto* c = findItem("tableCell0_0"); return c && c->hasActiveFocus(); });
+    type("Name");
+    key(Qt::Key_Tab);
+    type("Value");
+    key(Qt::Key_Tab);
+    EXPECT_TRUE(findItem("tableCell0_2")->hasActiveFocus()) << "Tab: the next cell";
+    click(findItem("tableRemoveColumn"));
+    EXPECT_EQ(table->property("columnCount").toInt(), 2);
+    click(findItem("tableCell1_0"));
+    type("a|b");
+    key(Qt::Key_Tab);
+    type("1");
+    EXPECT_EQ(findItem("tablePlace")->property("text").toString(), "Row 1, Column 2");
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {  // (the bar and the table editor, to look at)
+        wait(1500);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(findItem("tableOk"));
+    ASSERT_TRUE(waitOpened(table, false));
+    const std::string written = "| Name | Value |\n"
+                                "| ---- | ----- |\n"
+                                "| a\\|b | 1     |\n"
+                                "|      |       |";
+    EXPECT_EQ(editor->text(), "# Title\n\n**word**\n\n" + written + "\n\n");
+    editor->undo();
+    EXPECT_EQ(editor->text(), "# Title\n\n**word**") << "one undo step";
+    editor->redo();
+
+    // Edited again: the table at the cursor is read into the grid; its first column centered
+    editor->setCursorPosition(editor->text().find("a\\|b") + 1);
+    wait(20);
+    EXPECT_TRUE(find<QQuickItem>("mdTable")->property("checked").toBool()) << "in a table";
+    click(find<QQuickItem>("mdTable"));
+    ASSERT_TRUE(waitOpened(table, true));
+    auto* cell = findItem("tableCell1_0");
+    ASSERT_NE(cell, nullptr);
+    EXPECT_EQ(cell->property("text").toString(), "a|b") << "the escaped pipe as a pipe";
+    until([&] { return cell->hasActiveFocus(); });
+    EXPECT_TRUE(cell->hasActiveFocus()) << "the cell of the cursor";
+    click(findItem("tableAlignCenter"));
+    click(findItem("tableOk"));
+    ASSERT_TRUE(waitOpened(table, false));
+    EXPECT_EQ(editor->text(), "# Title\n\n**word**\n\n| Name | Value |\n"
+                              "| :--: | ----- |\n"
+                              "| a\\|b | 1     |\n"
+                              "|      |       |\n\n");
+
+    // Cancel changes nothing
+    click(find<QQuickItem>("mdTable"));
+    ASSERT_TRUE(waitOpened(table, true));
+    click(findItem("tableCancel"));
+    ASSERT_TRUE(waitOpened(table, false));
+    EXPECT_EQ(editor->text().find("| :--: |") != std::string::npos, true);
+
+    // Beside the page: its own bar, on the source (one undo step of the source)
+    key(Qt::Key_M, Qt::ControlModifier | Qt::AltModifier);
+    auto* panel = find<QQuickItem>("markdownPanel");
+    until([&] { return panel->isVisible(); });
+    ASSERT_TRUE(panel->isVisible());
+    EXPECT_FALSE(bar->isVisible()) << "the panel has its own";
+    auto* area = find<QQuickItem>("markdownArea");
+    const std::string before = area->property("text").toString().toStdString();
+    click(findItem("panelMdBold"));
+    EXPECT_EQ(area->property("text").toString().toStdString(), before + "****") << "empty marks at the cursor";
+    EXPECT_EQ(area->property("cursorPosition").toInt(), static_cast<int>(before.size()) + 2) << "between them";
+    QMetaObject::invokeMethod(area, "undo");
+    EXPECT_EQ(area->property("text").toString().toStdString(), before);
+    click(find<QQuickItem>("markdownCancel"));
+}
+
+// A .md: the bar is there all the time (its text is written with the keyboard); a tool starts writing if needed.
+TEST_F(HomeScreenMarkdownTest, aMarkdownFileHasTheFormattingBar) {
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
+    wait(100);
+    auto* bar = find<QQuickItem>("markdownFormatBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_TRUE(bar->isVisible());
+    click(find<QQuickItem>("canvas"));
+    type("Hello");
+    click(find<QQuickItem>("mdTaskList"));
+    const std::string text = controller->tabManager().currentSession()->currentText();
+    const size_t hello = text.find("Hello");
+    ASSERT_NE(hello, std::string::npos);
+    const size_t line = text.rfind('\n', hello);
+    EXPECT_EQ(text.substr(line + 1, 6), "- [ ] ") << text.substr(line + 1, 40);
+    EXPECT_TRUE(find<QQuickItem>("mdTaskList")->property("checked").toBool());
+}

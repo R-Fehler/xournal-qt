@@ -92,7 +92,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
@@ -157,7 +158,9 @@ set(XQT_QML_FILES
     src/app/qml/CanvasScrollBars.qml
     src/app/qml/PdfTextPill.qml
     src/app/qml/SelectionPill.qml
-    src/app/qml/Popups.js)
+    src/app/qml/Popups.js
+    src/app/qml/MarkdownFormatBar.qml
+    src/app/qml/MarkdownTableEditor.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
