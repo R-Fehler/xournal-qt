@@ -95,7 +95,7 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
 | `qt/src/app/AppTextFiles.cpp` | `createTextDocument`, `openAsPdfDocument`, `exportMarkdown` |
 | `qt/src/canvas/CanvasView.cpp`, `qt/src/quick/DocumentCanvasItem.cpp` | typing into the flow |
 | `qt/src/app/qml/HomeView.qml`, `Main.qml`, `SettingsPage.qml` | the menus and the setting |
-| `qt/tests/session/TextDocumentTest.cpp`, `qt/tests/ui/MainWindowTest.cpp` | the tests |
+| `qt/tests/canvas/PdfTextDocumentTest.cpp`, `qt/tests/shell/TextPdfTest.cpp`, `qt/tests/ui/MainWindowTest.cpp` | the tests |
 
 ## Not yet
 

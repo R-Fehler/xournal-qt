@@ -457,7 +457,8 @@ Rectangle {
             IconButton {
                 objectName: "newDocumentButton"
                 iconName: "xqt-file-plus"
-                tip: qsTr("New document, Markdown file or text file")
+                tip: app.newTextAsPdf ? qsTr("New document, text document or text file")
+                                      : qsTr("New document, Markdown file or text file")
                 onClicked: Popups.openAt(newMenu)
                 Menu {
                     id: newMenu
