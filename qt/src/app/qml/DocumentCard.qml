@@ -164,7 +164,7 @@ Item {
                 }
                 // "PDF" for documents with a PDF (annotated or not), "MD" for Markdown files, "IMG" for images, the
                 // extension of text and other files. With notes (a .xopp next to it, or in the PDF): "PDF ✎"; a PDF
-                // text document: "PDF M↓" in blue (the Markdown mark: a PDF that carries Markdown); an archive PDF: "PDF/A" (qt/docs/library.md, "Kinds of PDFs").
+                // text document: "PDF MD" in blue (a PDF that carries Markdown, as the "MD" of Markdown files); an archive PDF: "PDF/A" (qt/docs/library.md, "Kinds of PDFs").
                 Rectangle {
                     id: pdfBadge
                     objectName: "kindBadge"
@@ -201,7 +201,7 @@ Item {
                         id: pdfLabel
                         objectName: "kindBadgeText"
                         anchors.centerIn: parent
-                        text: pdfBadge.isPdf && card.pdfText ? pdfBadge.label + " M↓"
+                        text: pdfBadge.isPdf && card.pdfText ? pdfBadge.label + " MD"
                               : pdfBadge.withNotes ? pdfBadge.label + " ✎" : pdfBadge.label
                         font.pixelSize: 10
                         font.weight: Font.Bold
