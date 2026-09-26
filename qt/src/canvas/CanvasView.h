@@ -168,6 +168,8 @@ public:
     PdfCache* rasterPdfCache(bool background) const override;
     XojPdfPageSPtr rasterPendingPdfPage(size_t number) const override;
     RasterParams rasterParams() const override;
+    /// The view's rectangle on a page (page coordinates; beside the page when it is out of view)
+    xoj::util::Rectangle<double> viewOnPage(size_t index) const;
     void rasterUpdated(PageRaster* raster, std::optional<xoj::util::Rectangle<double>> area) override;
 
     // --- DocumentListener -------------------------------------------------------------------------------------

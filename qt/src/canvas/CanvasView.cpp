@@ -58,6 +58,7 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
+#include "session/PageMargins.h"
 #include "session/TextDocument.h"
 #include "PageNoteSpace.h"
 #include "Perf.h"
@@ -1764,7 +1765,7 @@ bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     if (!layer || !layer->isVisible()) {
         return false;
     }
-    const Text* box = md::pageBoxOf(*layer, TextFlow::styleFor(p, TextFlow::Style{}).leftMargin, TextFlow::MARGIN);
+    const Text* box = PageMargins::pageBox(*layer, p);
     return box && box == md::boxAt(*layer, x, y);
 }
 
@@ -2044,9 +2045,11 @@ void CanvasView::updateVisibility() {
     // this while a zoom gesture is running), the one the reader looks at first.
     auto render = [&](size_t i) {
         CanvasPage* page = pages[i].get();
-        if (const auto info = page->bufferInfo(); !info.valid || info.zoom != zoom || info.dpiScale != dpr) {
-            page->getRaster().ensureRendered(false);
-            if (Perf::on()) {
+        // (a big page drawn in part: again when the part in view leaves what is drawn, PageRaster::setView)
+        if (const auto info = page->bufferInfo();
+            !info.valid || info.zoom != zoom || info.dpiScale != dpr || !info.whole) {
+            page->getRaster().setView(viewOnPage(i));
+            if (page->getRaster().ensureRendered(false) && Perf::on()) {
                 sharpWanted[page] = QDateTime::currentMSecsSinceEpoch();  // (the last request counts)
             }
         }
@@ -2120,9 +2123,22 @@ qint64 CanvasView::bufferBytes() const {
     return sum;
 }
 
+xoj::util::Rectangle<double> CanvasView::viewOnPage(size_t index) const {
+    const double zoom = viewController.zoom();
+    const QRectF page = layout.pageRect(index, zoom);
+    const QRectF v = viewController.visibleContentRect();
+    return {(v.x() - page.x()) / zoom, (v.y() - page.y()) / zoom, v.width() / zoom, v.height() / zoom};
+}
+
 qint64 CanvasView::pageBytes(size_t index) const {
     const QRectF r = layout.pageRect(index, viewController.zoom());
-    const qint64 atZoom = static_cast<qint64>(std::ceil(r.width() * dpr)) * static_cast<qint64>(std::ceil(r.height() * dpr)) * 4;
+    qint64 atZoom = static_cast<qint64>(std::ceil(r.width() * dpr)) * static_cast<qint64>(std::ceil(r.height() * dpr)) * 4;
+    if (const QSizeF size = layout.pageSize(index); !PageRaster::drawnWhole(size.width(), size.height(), {viewController.zoom(), dpr})) {
+        // A big page drawn in part: the part around the view (PageRaster::placementFor)
+        const QSizeF v = viewController.viewSize() * 2 * dpr;
+        atZoom = std::min<qint64>(atZoom, std::min(static_cast<qint64>(std::ceil(v.width()) * std::ceil(v.height())),
+                                                    static_cast<qint64>(PageRaster::WHOLE_PAGE_PIXELS)) * 4);
+    }
     const auto info = pages[index]->bufferInfo();
     return info.valid ? std::max(atZoom, static_cast<qint64>(info.pixelSize.width()) * info.pixelSize.height() * 4)
                       : atZoom;
@@ -2200,6 +2216,7 @@ qint64 CanvasView::planCache(qint64 share) {
         const auto info = pages[i]->bufferInfo();
         const bool near = std::abs(static_cast<std::ptrdiff_t>(i) - current) <= CanvasMemory::NEAR_PAGES;
         if (!info.valid || (near && (info.zoom != zoom || info.dpiScale != dpr))) {
+            pages[i]->getRaster().setView(viewOnPage(i));  // (a big page: its part nearest to the view)
             pages[i]->getRaster().ensureRendered(true);
         }
     }

@@ -60,6 +60,9 @@ public:
     QStringList paperFormats() const;
     /// The paper format at `index` is meant to be landscape (16:9): choosing it turns the page.
     Q_INVOKABLE bool paperIsWide(int index) const;
+    /// The size of new pages as text ("100 × 150 mm"): for a size that is none of the paperFormats (paperFormat -1,
+    /// e.g. set in Xournal++), which the dialogs offer as it is.
+    Q_INVOKABLE QString templatePaperSize() const;
     /// All keys, for tests.
     QStringList keys() const;
 

@@ -30,7 +30,8 @@ public:
         Markdown,  ///< .md: rendered as Markdown while it is edited
         Plain,     ///< .txt, or another text file edited as plain text: no rendering
     };
-    /// Where the text of a page begins on its page (TextFlow::MARGIN, the page's Markdown text).
+    /// Where the text of a page begins on its page (TextFlow::MARGIN, the page's Markdown text; a text file's pages
+    /// are A4, PageMargins.h).
     static constexpr double PAGE_MARGIN = 56.7;
     /// Bigger files open read-only (their start: MarkdownFile::MAX_BYTES).
     static constexpr size_t MAX_EDIT_BYTES = 2 * 1024 * 1024;

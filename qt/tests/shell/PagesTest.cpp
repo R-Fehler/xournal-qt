@@ -22,6 +22,7 @@
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
+#include "session/PageMargins.h"
 #include "session/DocumentSearch.h"
 #include "../SearchHits.h"
 #include "session/DocumentSession.h"
@@ -119,6 +120,27 @@ TEST(Chapters, comeFromTheDocumentWhenNoPdfHasThem) {
         processEvents(20);
     }
     EXPECT_EQ(outline->count(), 1) << "undo takes the chapter back";
+}
+
+// A chapter heading on a flashcard sits at the card's margins (session/PageMargins.h), not 2 cm in.
+TEST(Chapters, sitAtTheMarginsOfASmallPage) {
+    AppController c;
+    c.newDocument();
+    auto* s = c.tabManager().currentSession();
+    const PageRef card = s->getDocument()->getPage(0);
+    card->setSize(74 * 72 / 25.4, 105 * 72 / 25.4);  // (A7)
+    ASSERT_TRUE(c.addChapter(0, "Cells", 0));
+    const Text* heading = nullptr;
+    for (const auto& element: card->getSelectedLayer()->getElements()) {
+        if (element->getType() == ELEMENT_TEXT) {
+            heading = static_cast<const Text*>(element.get());
+        }
+    }
+    ASSERT_NE(heading, nullptr);
+    const PageMargins::Margins m = PageMargins::of(card);
+    EXPECT_NEAR(m.top, 10 * 72 / 25.4, 0.1) << "10 mm on A7";
+    EXPECT_DOUBLE_EQ(heading->getTransformation().shift.x, m.left);
+    EXPECT_DOUBLE_EQ(heading->getTransformation().shift.y, m.top);
 }
 
 TEST(Chapters, comeFromTheHeadingsOfMarkdownBoxes) {
@@ -575,7 +597,7 @@ TEST(Pages, insertPagesWithBackgroundSizeAndOrientation) {
     Document* doc = s->getDocument();
 
     // Three plain landscape A4 pages after the first one
-    ASSERT_TRUE(c.insertPages(1, plain, 1, true, 3));
+    ASSERT_TRUE(c.insertPages(1, plain, static_cast<int>(settings->paperFormats().indexOf("A4")), true, 3));
     ASSERT_EQ(doc->getPageCount(), 4u);
     for (size_t i = 1; i <= 3; ++i) {
         EXPECT_NEAR(doc->getPage(i)->getWidth(), 841.89, 0.1);

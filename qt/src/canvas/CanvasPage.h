@@ -81,9 +81,15 @@ public:
         double zoom = 1.0;      ///< zoom the buffer was rendered at
         double dpiScale = 1.0;  ///< device pixels per logical pixel of the buffer
         QSize pixelSize;
+        /// A big page drawn in part (PageRaster::Placement): the buffer's top left on the page in logical pixels of
+        /// its zoom (whole pages: 0, 0), and the part of the page it shows (page coordinates)
+        bool whole = true;
+        QPoint origin;
+        QRectF area;
     };
     BufferInfo bufferInfo();
-    /// Buffer + overlay views for a rectangle of buffer pixels (call on the UI thread / during scene graph sync).
+    /// Buffer + overlay views for a rectangle of buffer pixels (from the buffer's top left, BufferInfo::origin; call
+    /// on the UI thread / during scene graph sync).
     QImage composeTile(const QRect& pixelRect);
     /// Dirty areas since the last call, in buffer pixels of the given buffer geometry. `all` = everything.
     std::vector<QRect> takeDirty(const BufferInfo& info, bool& all);

@@ -20,6 +20,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/PageMargins.h"
 #include "undo/UndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
@@ -107,16 +108,11 @@ TextBlock fromVariant(const QVariantMap& m) {
 }
 
 Style styleFor(const PageRef& page, Style s) {
-    const PageType bg = page->getBackgroundType();
-    if (bg.format == PageTypeFormat::Lined) {
-        double margin = 72;  // (upstream's default: 1 inch; negative: on the right)
-        BackgroundConfig(bg.config).loadValue(background_config_strings::CFG_MARGIN, margin);
-        if (margin >= 0) {
-            s.leftMargin = std::max(s.leftMargin, margin + 10);
-        } else {
-            s.rightMargin = std::max(s.rightMargin, -margin + 10);
-        }
-    }
+    const PageMargins::Margins m = PageMargins::of(page);
+    s.leftMargin = m.left;
+    s.rightMargin = m.right;
+    s.topMargin = m.top;
+    s.bottomMargin = m.bottom;
     return s;
 }
 
@@ -165,7 +161,7 @@ std::vector<TextBlock> read(const PageRef& page, const Style& pageStyle) {
         return ba.x < bb.x;
     });
     static const std::regex marker(R"(^(•|◦|▪|\d+[.)])$)");
-    double expectedY = MARGIN;  // where the next block would start without empty lines
+    double expectedY = style.topMargin;  // where the next block would start without empty lines
     for (size_t i = 0; i < texts.size(); ++i) {
         const Text* t = texts[i];
         const auto& box = t->getBoundingBox();
@@ -215,7 +211,7 @@ std::vector<ElementPtr> layout(const std::vector<TextBlock>& blocks, double page
                                const Style& style, double* overflow) {
     std::vector<ElementPtr> elements;
     const double right = pageWidth - style.rightMargin;
-    double y = MARGIN;
+    double y = style.topMargin;
     std::vector<int> numbers;  // per list level: the next number
     for (size_t i = 0; i < blocks.size(); ++i) {
         const TextBlock& b = blocks[i];
@@ -253,7 +249,7 @@ std::vector<ElementPtr> layout(const std::vector<TextBlock>& blocks, double page
         y += height + spacingAfter(size);
     }
     if (overflow) {
-        *overflow = std::max(0.0, y - (pageHeight - MARGIN));
+        *overflow = std::max(0.0, y - (pageHeight - style.bottomMargin));
     }
     return elements;
 }

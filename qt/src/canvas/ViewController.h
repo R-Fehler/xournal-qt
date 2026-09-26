@@ -37,7 +37,8 @@ public:
     /// A new 100 % (another screen, a calibration): the pages stay as large as they are shown, only what is called
     /// 100 % changes (the percentage shown, zoom steps, the zoom range).
     void setZoom100(double value);
-    double minZoom() const { return 0.3 * z100; }  // upstream DEFAULT_ZOOM_MIN
+    /// Upstream's DEFAULT_ZOOM_MIN (30 %), or less when the biggest page needs it to be seen whole (an A0 poster)
+    double minZoom() const;
     double maxZoom() const { return 7.0 * z100; }  // upstream DEFAULT_ZOOM_MAX
 
     QSizeF viewSize() const { return view; }
