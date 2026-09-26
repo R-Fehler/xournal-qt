@@ -1897,6 +1897,70 @@ TEST_F(AdaptiveLayoutTest, sidebarDrawerKeysAndPhoneWidth) {
     EXPECT_FALSE(sidebar->isVisible()) << "a page picked: closed";
 }
 
+// The format bar of a text document: all its tools as buttons where there is room; the inserts in "Insert" in a
+// narrower window, nothing scrolled on a desktop or a tablet; on a phone the row scrolls, with a fading edge
+TEST_F(AdaptiveLayoutTest, formatBarFoldsIntoInsertInsteadOfScrolling) {
+    std::ofstream(root / "kalman.md") << "# Lecture 3\n\n## Kalman filter\n\nThe **prediction** step.\n";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
+    wait(400);
+    auto* bar = named("markdownFormatBar");
+    ASSERT_NE(bar, nullptr);
+    auto* flick = named("formatBarFlick");
+    ASSERT_NE(flick, nullptr);
+    auto scrolls = [&] { return flick->property("contentWidth").toDouble() > flick->width() + 0.5; };
+    for (const WindowSize& s: {WindowSize{1920, 1080, ""}, WindowSize{1280, 800, ""}, WindowSize{960, 1392, ""},
+                               WindowSize{800, 600, ""}, WindowSize{720, 1232, ""}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        ASSERT_TRUE(bar->isVisible()) << at;
+        EXPECT_FALSE(scrolls()) << at << ": no sideways scrolling on a desktop or a tablet";
+        const bool inMenu = bar->property("insertsInMenu").toBool();
+        EXPECT_EQ(named("mdInsertButton")->isVisible(), inMenu) << at;
+        EXPECT_EQ(named("mdImage")->isVisible(), !inMenu) << at;
+        for (const char* stays: {"mdBold", "mdItalic", "mdLink", "mdBulletList", "mdNumberedList", "mdTaskList"}) {
+            EXPECT_TRUE(shownInWindow(named(stays))) << at << ": " << stays << " stays in the row";
+        }
+        EXPECT_TRUE(shownInWindow(named("mdParagraph")) || shownInWindow(named("mdBlockButton"))) << at;
+        if (s.w >= 1280) {
+            EXPECT_FALSE(inMenu) << at << ": room for all";
+        }
+    }
+    resize(800, 600);
+    ASSERT_TRUE(bar->property("insertsInMenu").toBool()) << "800 px: the inserts in a menu";
+    // Its entries work: a rule at the cursor
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(named("canvas")));
+    wait(100);
+    auto* insert = named("mdInsertButton");
+    QMetaObject::invokeMethod(insert, "clicked");
+    auto* menu = window->findChild<QObject*>("mdInsertMenu");
+    ASSERT_TRUE(opened(menu, true));
+    settled(menu);
+    checkMenuGeometry("800x600", menu, insert, true);
+    EXPECT_NE(menuEntries(menu).size(), 0u);
+    const std::string before = controller->tabManager().currentSession()->currentText();
+    QMetaObject::invokeMethod(window->findChild<QObject*>("mdInsertRule"), "triggered");
+    QMetaObject::invokeMethod(menu, "close");
+    wait(100);
+    const std::string after = controller->tabManager().currentSession()->currentText();
+    EXPECT_NE(after.find("---"), std::string::npos) << after;
+    EXPECT_NE(after, before);
+    // The heading buttons are 40 wide in the touch profile
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "on"));
+    resize(1920, 1080);
+    EXPECT_GE(named("mdHeading1")->width(), 40);
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "auto"));
+    // A phone: the row scrolls, its right edge fades
+    resize(412, 915);
+    EXPECT_FALSE(bar->property("insertsInMenu").toBool()) << "a phone: nothing in menus";
+    EXPECT_TRUE(scrolls());
+    EXPECT_TRUE(named("formatBarFadeRight")->isVisible());
+    EXPECT_FALSE(named("formatBarFadeLeft")->isVisible());
+    flick->setProperty("contentX", flick->property("contentWidth").toDouble() - flick->width());
+    wait(50);
+    EXPECT_TRUE(named("formatBarFadeLeft")->isVisible());
+    EXPECT_FALSE(named("formatBarFadeRight")->isVisible());
+}
+
 // The pills at the canvas's bottom keep clear of the view pill (audit F6): the selection pill, the back / forward
 // pill, and the pen pill of the compact chrome
 TEST_F(AdaptiveLayoutTest, pillsKeepClearOfTheViewPill) {
@@ -2025,7 +2089,12 @@ TEST_F(AdaptiveLayoutTest, toolBarPictures) {
     shot("markdown-960x1392-merged");
     resize(1280, 800);
     shot("markdown-1280x800-merged");
-}
+    // The format bar's forms (qt/adaptive-panels): Insert, then a plain "+", then the headings in one button
+    for (const WindowSize& s: {WindowSize{1024, 700, ""}, WindowSize{800, 600, ""}, WindowSize{720, 1232, ""},
+                               WindowSize{600, 800, ""}}) {
+        resize(s.w, s.h);
+        shot(QString("markdown-%1x%2-format-bar").arg(s.w).arg(s.h).toUtf8().constData());
+    }
 }
 
 // One place for each action (qt/docs/adaptive-layout.md): ⋮ repeats no button of the tool bar, "more tools", the view

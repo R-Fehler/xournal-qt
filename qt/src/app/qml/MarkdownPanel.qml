@@ -188,6 +188,7 @@ Pane {
             Layout.fillWidth: true
             namePrefix: "panel"
             color: "transparent"
+            fadeColor: "#fafafa"
             format: panel.format
             onFormatRequested: function(action, arg) { panel.applyFormat(action, arg) }
             onTableRequested: panel.editTable()
