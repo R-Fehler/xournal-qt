@@ -435,8 +435,9 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   `XQT_LOG_WINDOW=1` and look for a touch cancel, or an odd touch end, just before the resize.
 
 ### Flaky tests
-- [~] `CanvasMemoryTest.twoViewsOfOneDocumentShareTheLimit` (qt/self-reference) is about one page over the limit in
-  about half the runs alone (2026-09-26); being fixed in `qt/two-views-memory`.
+- [x] `CanvasMemoryTest.twoViewsOfOneDocumentShareTheLimit` was a real overshoot: renders a trimmed view started
+  earlier landed after the trim uncounted. Fixed in `qt/two-views-memory` (2026-09-26): a trimmed view re-plans on
+  every render that lands.
 - [x] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
   `-j6` load (2026-09-24), at the check after "the way back brings it into view again". It passed 3 of 3 alone.
   The wait for the scroll back is probably too short under load.
