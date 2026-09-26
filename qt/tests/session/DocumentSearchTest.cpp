@@ -45,7 +45,10 @@ protected:
         app = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR),
                                            fs::path(tmp.filePath("settings.xml").toStdString()), 1);
     }
-    void TearDown() override { DocumentTextIndex::setSeeder({}); }
+    void TearDown() override {
+        DocumentTextIndex::setSeeder({});
+        DocumentTextIndex::setWordsInBackground(false);
+    }
     std::unique_ptr<DocumentSession> open(const fs::path& file) {
         auto r = DocumentSession::loadFile(file);
         EXPECT_TRUE(r.document) << r.error;
@@ -429,6 +432,40 @@ TEST_F(DocumentSearchTest, fuzzyWordsAreCountedAndMarkedWhole) {
     EXPECT_EQ(s->search().hitCount(), 3);
     s->getUndoRedoHandler()->undo();
     ASSERT_TRUE(waitFor([&] { return s->search().hitCount() == 0; }));
+}
+
+// With the fuzzy search on, the vocabularies of the PDF text are made on the text index's worker once the text is
+// known (read, or already known when it is turned on): the first fuzzy search of a long document finds them made
+// instead of making them on the UI thread (about 160 ms for 1,300 pages). Off, nothing is made before a fuzzy search.
+TEST_F(DocumentSearchTest, vocabulariesAreMadeInTheBackgroundWhenTheFuzzySearchIsOn) {
+    const int pages = 12;
+    const fs::path pdf = makeLinesPdf(tmp, pages);
+    auto off = open(pdf);
+    DocumentTextIndex& offIndex = off->search().textIndex();
+    offIndex.start();
+    ASSERT_TRUE(waitFor([&] { return offIndex.complete(); }));
+    waitFor([] { return false; }, 200);
+    EXPECT_EQ(offIndex.pdfPagesWithWords(), 0u) << "off: not made";
+
+    DocumentTextIndex::setWordsInBackground(true);
+    ASSERT_TRUE(waitFor([&] { return offIndex.pdfPagesWithWords() == static_cast<size_t>(pages); }))
+            << "turned on: made for the text known";
+    auto on = open(pdf);
+    DocumentTextIndex& index = on->search().textIndex();
+    index.start();
+    ASSERT_TRUE(waitFor([&] { return index.complete() && index.pdfPagesWithWords() == static_cast<size_t>(pages); }))
+            << "on: made once the text is read";
+    const size_t bytes = index.vocabularyBytes();
+    on->search().setQuery(QStringLiteral("evry"), false, true);
+    ASSERT_TRUE(waitForCounts(on->search()));
+    EXPECT_EQ(on->search().hitCount(), 2 * pages) << "counted from them";
+    EXPECT_EQ(on->search().countCorrections(), 0);
+    EXPECT_EQ(on->search().hitCount(), [&] {
+        off->search().setQuery(QStringLiteral("evry"), false, true);
+        return off->search().hitCount();
+    }());
+    EXPECT_LE(index.vocabularyBytes(), bytes + 4096) << "the PDF pages' were not made again (only the empty "
+                                                        "vocabularies of the pages' text elements)";
 }
 
 // The PDF text is read in the background, from the current page outwards, and the counts grow meanwhile.

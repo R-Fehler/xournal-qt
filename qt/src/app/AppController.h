@@ -196,6 +196,12 @@ class AppController: public QObject {
     Q_PROPERTY(bool searchRunning READ searchRunning NOTIFY searchChanged)
     /// Number of pages with search hits
     Q_PROPERTY(int searchHitPageCount READ searchHitPageCount NOTIFY searchChanged)
+    /// The search is read with the fuzzy search's syntax: that of the current search while there is one (e.g. handed
+    /// over from the library), else the app-wide setting (app.library.fuzzySearch) new searches take. Set (the toggle
+    /// in the search bar): the setting, and the current search runs again in that mode.
+    Q_PROPERTY(bool searchFuzzy READ searchFuzzy WRITE setSearchFuzzy NOTIFY searchFuzzyChanged)
+    /// Why the current (fuzzy) search is read as plain text ("": it is not).
+    Q_PROPERTY(QString searchHint READ searchHint NOTIFY searchChanged)
     // Page layout of the canvas (upstream settings viewColumns, showPairedPages, numPairsOffset), for all tabs
     Q_PROPERTY(int viewColumns READ viewColumns WRITE setViewColumns NOTIFY viewLayoutChanged)
     Q_PROPERTY(bool pairedPages READ pairedPages WRITE setPairedPages NOTIFY viewLayoutChanged)
@@ -435,6 +441,9 @@ public:
     int searchCurrent() const;
     bool searchRunning() const;
     int searchHitPageCount() const;
+    bool searchFuzzy() const;
+    void setSearchFuzzy(bool fuzzy);
+    QString searchHint() const;
     bool hasSelection() const;
     bool canGoBack() const;
     QString pdfTextMode() const { return pdfMode; }
@@ -1089,6 +1098,7 @@ Q_SIGNALS:
     /// exportAnnotations is done: the file written, or why not (`error`).
     void annotationsExported(const QString& file, const QString& error);
     void searchChanged();
+    void searchFuzzyChanged();
     void viewLayoutChanged();
     void presentingChanged();
     void pageUndoChanged();

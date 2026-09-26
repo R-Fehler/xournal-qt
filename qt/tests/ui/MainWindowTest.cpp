@@ -1460,6 +1460,140 @@ TEST_F(MainWindowTest, theSearchFieldsKeepWhatIsTypedWhileASearchRuns) {
     EXPECT_EQ(hits(), 400 * 3);
 }
 
+namespace {
+/// A PDF of three pages; "turbine" on the first and the third.
+void makeTurbinePdf(const std::string& file) {
+    cairo_surface_t* surface = cairo_pdf_surface_create(file.c_str(), 595, 842);
+    cairo_t* cr = cairo_create(surface);
+    cairo_select_font_face(cr, "sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 14);
+    for (const char* line: {"The turbine blades turn in the wind.", "Nothing to see on this page.",
+                            "A second turbine stands by the river."}) {
+        cairo_move_to(cr, 60, 100);
+        cairo_show_text(cr, line);
+        cairo_show_page(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+}
+}  // namespace
+
+// "Fuzzy" in the search bar of a document (the author, 2026-09-26): the text is read with the fuzzy search's syntax,
+// typos tolerated; a tap searches it again in the other mode and sets the app-wide setting. A search handed over from
+// the library or the tab overview with Fuzzy on shows it on (the bar used to show no sign of it). Its help opens on a
+// long press, as in the library.
+TEST_F(MainWindowTest, theSearchBarHasAFuzzyToggle) {
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->setFuzzySearch(false);  // (the tests share the config folder)
+    QTemporaryDir tmp;
+    const QString pdf = tmp.filePath("turbines.pdf");
+    makeTurbinePdf(pdf.toStdString());
+    ASSERT_TRUE(controller->openPath(pdf));
+    key(Qt::Key_F, Qt::ControlModifier);
+    auto* toggle = find<QQuickItem>("searchFuzzy");
+    ASSERT_NE(toggle, nullptr);
+    until([&] { return toggle->isVisible(); });
+    EXPECT_FALSE(toggle->property("checked").toBool());
+
+    // Misspelled: nothing plain, the pages with "turbine" fuzzy
+    type("tbine");
+    ASSERT_TRUE(waitFor([&] { return controller->searchQuery() == "tbine" && !controller->searchRunning(); }, 8000));
+    EXPECT_EQ(controller->searchHitCount(), 0) << "plain: no such text";
+    click(toggle);
+    EXPECT_TRUE(toggle->property("checked").toBool());
+    EXPECT_TRUE(library->fuzzySearch()) << "the app-wide setting";
+    EXPECT_TRUE(controller->property("searchFuzzy").toBool());
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 2 && !controller->searchRunning(); }))
+            << "searched again, fuzzy";
+    EXPECT_EQ(controller->searchQuery(), "tbine");
+    EXPECT_EQ(controller->searchHitPageCount(), 2) << "pages 1 and 3";
+    EXPECT_EQ(controller->searchCurrent(), 1);
+    EXPECT_TRUE(find<QQuickItem>("searchField")->hasActiveFocus()) << "the field keeps the keys";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(800);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+
+    // The syntax, as in the library; typing on keeps the mode
+    struct Case {
+        const char* query;
+        int hits;
+    };
+    for (const Case& c: {Case{"turbnie", 2},      // a typo
+                         Case{"'tbine", 0},       // exactly these letters
+                         Case{"'turbine'", 2},    // the whole word
+                         Case{"^turb", 2},        // a word that starts with it
+                         Case{"bine$", 2},        // a word that ends with it
+                         Case{"tbine river", 3},  // every hit of both terms
+                         Case{"tbine !river", 2}}) {
+        controller->setSearchQuery(QString::fromUtf8(c.query));
+        ASSERT_TRUE(waitFor([&] { return !controller->searchRunning(); })) << c.query;
+        EXPECT_TRUE(controller->property("searchFuzzy").toBool()) << c.query;
+        EXPECT_EQ(controller->searchHitCount(), c.hits) << c.query;
+    }
+    auto* hint = find<QQuickItem>("searchSyntaxHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->isVisible());
+    controller->setSearchQuery("(tbine");
+    until([&] { return hint->isVisible(); });
+    EXPECT_TRUE(hint->isVisible()) << "a ( not closed: searched as plain text, and it says so";
+
+    // Off again: plain
+    controller->setSearchQuery("tbine");
+    click(toggle);
+    EXPECT_FALSE(toggle->property("checked").toBool());
+    EXPECT_FALSE(library->fuzzySearch());
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 0 && !controller->searchRunning(); }));
+    EXPECT_FALSE(hint->isVisible());
+
+    // Handed over from the library with Fuzzy on: the bar shows it on
+    key(Qt::Key_Escape);
+    library->setFuzzySearch(true);
+    ASSERT_TRUE(controller->openSearchHit(pdf, "tbine"));
+    library->setFuzzySearch(false);  // turned off in the library meanwhile: this document's search stays fuzzy
+    until([&] { return find<QQuickItem>("searchBar")->isVisible(); });
+    EXPECT_TRUE(toggle->property("checked").toBool()) << "the handed-over search is fuzzy";
+    ASSERT_TRUE(waitFor([&] { return controller->searchHitCount() == 2 && !controller->searchRunning(); }));
+    // ... and from the tab overview
+    controller->clearSearch();
+    EXPECT_FALSE(toggle->property("checked").toBool()) << "no search: the setting";
+    library->setFuzzySearch(true);
+    controller->searchAllTabs("tbine");
+    EXPECT_TRUE(toggle->property("checked").toBool());
+    library->setFuzzySearch(false);
+    controller->searchAllTabs("tbine");
+    EXPECT_FALSE(toggle->property("checked").toBool());
+    EXPECT_EQ(controller->searchHitCount(), 0);
+
+    // The help: a long press (not toggled)
+    key(Qt::Key_F, Qt::ControlModifier);
+    QObject* help = find("searchFuzzyHelp");
+    ASSERT_NE(help, nullptr);
+    const QPoint center = toggle->mapToScene(QPointF(toggle->width() / 2, toggle->height() / 2)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, center);
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, center);
+    ASSERT_TRUE(waitOpened(help, true)) << "opened by a long press";
+    EXPECT_FALSE(library->fuzzySearch()) << "not toggled by it";
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(help, false));
+    library->setFuzzySearch(false);
+
+    // A phone-wide window: the bar fits (its field gives way)
+    window->resize(420, 800);
+    nextFrame();
+    auto* bar = find<QQuickItem>("searchBar");
+    const QRectF shown = bar->mapRectToScene(QRectF(0, 0, bar->width(), bar->height()));
+    EXPECT_GE(shown.left(), 0);
+    EXPECT_LE(shown.right(), window->width());
+    const QRectF toggleShown = toggle->mapRectToScene(QRectF(0, 0, toggle->width(), toggle->height()));
+    EXPECT_LE(toggleShown.right(), shown.right());
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(500);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT").replace(".png", "-narrow.png"));
+    }
+}
+
 // Typing on the library starts a search, but keys that only have a control character as their text do not type it.
 TEST_F(HomeScreenTest, onlyVisibleCharactersStartTheLibrarySearch) {
     auto* grid = find<QQuickItem>("libraryGrid");

@@ -37,6 +37,13 @@ DocumentTextIndex::Seeder& seeder() {
     return s;
 }
 int startDelayMs = 2000;
+/// The vocabularies of PDF text are made in the background (setWordsInBackground)
+bool wordsInBackground = false;
+/// The indexes there are (UI thread)
+std::set<DocumentTextIndex*>& instances() {
+    static std::set<DocumentTextIndex*> all;
+    return all;
+}
 /// A worker's turn: then the documents of the other tabs get theirs, and what was read is shown.
 constexpr int SLICE_MS = 100;
 
@@ -262,6 +269,7 @@ struct DocumentTextIndex::Worker {
     fs::path file;
     std::deque<int> layoutsWanted;  ///< front first
     std::set<int> textWanted;
+    std::deque<std::pair<int, QString>> wordsWanted;  ///< PDF pages and their text, to make vocabularies of
     int focus = 0;
     bool queued = false;   ///< a task for it is in the pool or running
     bool working = false;  ///< a page is being read (outside the lock)
@@ -295,20 +303,30 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
     QElapsedTimer slice;
     slice.start();
     std::vector<std::pair<int, QString>> texts;
+    std::vector<MadeWords> made;
     auto post = [&] {
-        if (texts.empty()) {
+        if (texts.empty() && made.empty()) {
             return;
         }
         std::lock_guard lock(w->mtx);
         if (DocumentTextIndex* o = w->owner) {
-            QMetaObject::invokeMethod(
-                    o, [o, t = std::move(texts)]() mutable { o->received(std::move(t)); }, Qt::QueuedConnection);
+            if (!texts.empty()) {
+                QMetaObject::invokeMethod(
+                        o, [o, t = std::move(texts)]() mutable { o->received(std::move(t)); }, Qt::QueuedConnection);
+            }
+            if (!made.empty()) {
+                QMetaObject::invokeMethod(
+                        o, [o, m = std::move(made)]() mutable { o->receivedWords(std::move(m)); },
+                        Qt::QueuedConnection);
+            }
         }
         texts.clear();
+        made.clear();
     };
     for (;;) {
         int nr = -1;
         bool layout = false;
+        std::optional<QString> wordsOf;  ///< a vocabulary to make, of this text
         {
             std::unique_lock lock(w->mtx);
             w->working = false;
@@ -321,7 +339,7 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
                 nr = w->layoutsWanted.front();
                 w->layoutsWanted.pop_front();
                 layout = true;
-            } else if (!w->textWanted.empty()) {
+            } else if (!w->textWanted.empty() || !w->wordsWanted.empty()) {
                 if (slice.elapsed() > SLICE_MS) {
                     // Show what was read, and let the other documents have their turn
                     lock.unlock();
@@ -329,14 +347,20 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
                     textPool().start([w] { drain(w); }, 0);
                     return;
                 }
-                // The page nearest to the reader's
-                auto it = w->textWanted.lower_bound(w->focus);
-                if (it == w->textWanted.end() ||
-                    (it != w->textWanted.begin() && w->focus - *std::prev(it) < *it - w->focus)) {
-                    it = it == w->textWanted.begin() ? it : std::prev(it);
+                if (!w->textWanted.empty()) {
+                    // The page nearest to the reader's
+                    auto it = w->textWanted.lower_bound(w->focus);
+                    if (it == w->textWanted.end() ||
+                        (it != w->textWanted.begin() && w->focus - *std::prev(it) < *it - w->focus)) {
+                        it = it == w->textWanted.begin() ? it : std::prev(it);
+                    }
+                    nr = *it;
+                    w->textWanted.erase(it);
+                } else {
+                    nr = w->wordsWanted.front().first;
+                    wordsOf = std::move(w->wordsWanted.front().second);
+                    w->wordsWanted.pop_front();
                 }
-                nr = *it;
-                w->textWanted.erase(it);
             } else {
                 w->queued = false;
                 if (w->releaseWanted && w->doc) {
@@ -352,6 +376,12 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
         if (!layout) {
             // Not for the pages in view: they are rendered first
             RenderService::waitForVisiblePages(std::chrono::milliseconds(500));
+        }
+        if (wordsOf) {
+            // (no poppler: the words of text read before)
+            made.push_back({nr, *wordsOf, std::make_shared<const words::Vocabulary>(
+                                                  std::initializer_list<QStringView>{*wordsOf})});
+            continue;
         }
         QString text;
         std::shared_ptr<PdfPageLayout> pageLayout;
@@ -389,7 +419,17 @@ void DocumentTextIndex::Worker::drain(const std::shared_ptr<Worker>& w) {
 void DocumentTextIndex::setSeeder(Seeder s) { seeder() = std::move(s); }
 void DocumentTextIndex::setStartDelay(int ms) { startDelayMs = ms; }
 
+void DocumentTextIndex::setWordsInBackground(bool on) {
+    wordsInBackground = on;
+    if (on) {
+        for (DocumentTextIndex* index: instances()) {
+            index->prepareWordsLater();
+        }
+    }
+}
+
 DocumentTextIndex::DocumentTextIndex(DocumentSession& session): session(session) {
+    instances().insert(this);
     rebuild();
     registerListener(&session);
     startTimer.setSingleShot(true);
@@ -413,6 +453,7 @@ DocumentTextIndex::DocumentTextIndex(DocumentSession& session): session(session)
 }
 
 DocumentTextIndex::~DocumentTextIndex() {
+    instances().erase(this);
     unregisterListener();
     // The worker may be reading a page of this document: it is done with it before the document goes (it posts
     // nothing any more; its poppler instance goes with its last task)
@@ -444,6 +485,7 @@ void DocumentTextIndex::rebuild() {
         pdfText.assign(pdfPages, QString());
         pdfWords.assign(pdfPages, nullptr);
         pdfKnown.assign(pdfPages, 0);
+        wordsQueued.assign(pdfPages, 0);
         layouts.clear();
         if (worker) {
             std::lock_guard lock(worker->mtx);
@@ -596,6 +638,53 @@ const words::Vocabulary* DocumentTextIndex::pdfWordsOf(int nr) {
     return w.get();
 }
 
+void DocumentTextIndex::prepareWordsLater() {
+    std::vector<int> all(pdfText.size());
+    for (size_t nr = 0; nr < all.size(); ++nr) {
+        all[nr] = static_cast<int>(nr);
+    }
+    wantWords(all);
+}
+
+void DocumentTextIndex::wantWords(const std::vector<int>& nrs) {
+    std::vector<std::pair<int, QString>> list;
+    for (const int nr: nrs) {
+        const auto i = static_cast<size_t>(nr);
+        if (nr >= 0 && i < pdfText.size() && pdfKnown[i] && !pdfWords[i] && !wordsQueued[i] &&
+            !pdfText[i].isEmpty()) {
+            wordsQueued[i] = 1;
+            list.emplace_back(nr, pdfText[i]);  // (shared, not copied: the worker only reads it)
+        }
+    }
+    if (list.empty()) {
+        return;
+    }
+    std::lock_guard lock(worker->mtx);
+    for (auto& entry: list) {
+        worker->wordsWanted.push_back(std::move(entry));
+    }
+    Worker::queue(worker, 0);
+}
+
+void DocumentTextIndex::receivedWords(std::vector<MadeWords> made) {
+    for (MadeWords& m: made) {
+        const auto i = static_cast<size_t>(m.pdfPage);
+        if (m.pdfPage < 0 || i >= pdfText.size()) {
+            continue;
+        }
+        wordsQueued[i] = 0;
+        // (not if the text changed meanwhile, or the search made it already)
+        if (pdfKnown[i] && !pdfWords[i] && pdfText[i] == m.text) {
+            pdfWords[i] = std::move(m.words);
+        }
+    }
+}
+
+size_t DocumentTextIndex::pdfPagesWithWords() const {
+    return static_cast<size_t>(
+            std::count_if(pdfWords.begin(), pdfWords.end(), [](const auto& w) { return w != nullptr; }));
+}
+
 std::map<int, QString> DocumentTextIndex::pdfTexts() const {
     std::map<int, QString> out;
     for (size_t i = 0; i < pdfText.size(); ++i) {
@@ -625,6 +714,9 @@ void DocumentTextIndex::start() {
     wantText();
     if (!changed.empty()) {
         Q_EMIT textChanged(changed);
+    }
+    if (wordsInBackground) {
+        prepareWordsLater();  // (after the search: what it made already is not made again)
     }
     if (complete() && seededCount > 0) {
         Q_EMIT completed();
@@ -657,6 +749,7 @@ void DocumentTextIndex::setPdfText(int nr, QString text, std::vector<size_t>& ch
     }
     pdfText[static_cast<size_t>(nr)] = std::move(text);
     pdfWords[static_cast<size_t>(nr)].reset();
+    wordsQueued[static_cast<size_t>(nr)] = 0;  // (one made of the text before is not taken)
     known = 1;
     for (size_t i = 0; i < pages.size(); ++i) {
         if (pages[i].pdf == nr) {
@@ -668,7 +761,9 @@ void DocumentTextIndex::setPdfText(int nr, QString text, std::vector<size_t>& ch
 void DocumentTextIndex::received(std::vector<std::pair<int, QString>> texts) {
     const bool wasComplete = complete();
     std::vector<size_t> changed;
+    std::vector<int> nrs;
     for (auto& [nr, text]: texts) {
+        nrs.push_back(nr);
         setPdfText(nr, std::move(text), changed);
         ++readCount;
     }
@@ -676,6 +771,9 @@ void DocumentTextIndex::received(std::vector<std::pair<int, QString>> texts) {
     std::sort(changed.begin(), changed.end());
     if (!changed.empty()) {
         Q_EMIT textChanged(changed);
+    }
+    if (wordsInBackground) {
+        wantWords(nrs);
     }
     if (complete() && !wasComplete) {
         Q_EMIT completed();

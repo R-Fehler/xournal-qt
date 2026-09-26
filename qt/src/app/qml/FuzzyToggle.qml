@@ -1,6 +1,7 @@
-// The fuzzy search's toggle in a search field (library, tab overview): the search reads fzf's syntax - names fuzzy
-// and ranked, words ANDed, | for or, ! for not, parentheses. An app-wide setting (app.library.fuzzySearch), off by
-// default. A long press or a right click opens its help (FuzzyHelp.qml); the tooltip says so.
+// The fuzzy search's toggle in a search field (library, tab overview, the search bar of a document): the search
+// reads fzf's syntax - names fuzzy and ranked, words ANDed, | for or, ! for not, parentheses. An app-wide setting
+// (app.library.fuzzySearch), off by default. A long press or a right click opens its help (FuzzyHelp.qml); the
+// tooltip says so. The document's search bar shows the mode of its search instead (`fuzzy`, `setFuzzy`).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -9,8 +10,11 @@ ToolButton {
     id: toggle
     text: qsTr("Fuzzy")
     checkable: true
-    checked: app.library.fuzzySearch
-    onToggled: app.library.fuzzySearch = checked
+    /// What it shows, and what a tap sets (default: the setting)
+    property bool fuzzy: app.library.fuzzySearch
+    property var setFuzzy: function(on) { app.library.fuzzySearch = on }
+    checked: fuzzy
+    onToggled: setFuzzy(checked)
     implicitHeight: 36
     leftPadding: 6
     rightPadding: 6
