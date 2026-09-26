@@ -15,6 +15,7 @@
 #include "EmojiData.h"
 #include "EmojiFont.h"
 #include "MdHighlight.h"
+#include "MdImages.h"
 #include "MdMath.h"
 #include "MdText.h"
 
@@ -30,6 +31,9 @@ constexpr Color MUTED(0x57, 0x60, 0x6a);
 constexpr Color TABLE_HEADER_BACKGROUND(0xf6, 0xf8, 0xfa);
 constexpr Color MARKER(0x9a, 0xa0, 0xa6);
 constexpr Color MATH_ERROR(0xc6, 0x28, 0x28);  // (a formula that cannot be laid out: its source)
+constexpr Color IMAGE_ERROR(0xc6, 0x28, 0x28);  // (the path of a picture that is not there)
+constexpr Color IMAGE_ERROR_BACKGROUND(0xfd, 0xec, 0xea);
+constexpr Color BUTTON_BACKGROUND(0xe3, 0xec, 0xfb);  // ("Load image" of a web picture)
 
 constexpr double LINE_SPACING = 1.25;
 constexpr double CODE_LINE_SPACING = 1.15;
@@ -45,22 +49,38 @@ constexpr double DISPLAY_PAD = 0.3;
 /// the same size (its x-height is 0.43 em, DejaVu Sans' 0.55 em). KaTeX does the same (1.21).
 constexpr double MATH_SCALE = 1.2;
 
-/// What a formula's shape attribute carries: the formula, its size and where in its room it is drawn.
+/// What a shape attribute carries: a formula, its size and where in its room it is drawn; or a picture and its size.
 struct FormulaShape {
     std::shared_ptr<const math::Formula> formula;
     double size = 12;
     double dx = 0;
+    // a picture (qt/docs/md-images.md)
+    bool isImage = false;
+    images::Info image;
+    double width = 0;
+    double height = 0;
+    double ascent = 0;  ///< above the baseline
 };
-/// Pango draws a shape: the formula at the current point (its baseline's left end). `doPath`: the outlines only.
+/// Pango draws a shape at the current point (its baseline's left end): the formula, or the picture. `doPath`: the
+/// outlines only (a picture has none).
 void drawFormulaShape(cairo_t* cr, PangoAttrShape* attr, gboolean doPath, gpointer) {
     const auto* shape = static_cast<const FormulaShape*>(attr->data);
-    if (!shape || !shape->formula) {
+    if (!shape) {
         return;
     }
     double x = 0;
     double y = 0;
     cairo_get_current_point(cr, &x, &y);
-    math::draw(cr, *shape->formula, x + shape->dx, y, shape->size, doPath);
+    if (shape->isImage) {
+        if (!doPath) {
+            images::draw(cr, shape->image, x + shape->dx, y - shape->ascent, shape->width, shape->height);
+            cairo_move_to(cr, x, y);  // (the picture's clip and paint leave no current point)
+        }
+        return;
+    }
+    if (shape->formula) {
+        math::draw(cr, *shape->formula, x + shape->dx, y, shape->size, doPath);
+    }
 }
 
 /// The Pango context of this thread. The font options make the layout independent of the zoom it is drawn at.
@@ -92,7 +112,59 @@ struct TextOptions {
     double width = -1;  ///< wrap width (points); -1: no wrapping
     double lineSpacing = LINE_SPACING;
     PangoAlignment align = PANGO_ALIGN_LEFT;
+    bool blockImage = false;  ///< the text is a picture alone: as wide as the column (qt/docs/md-images.md)
 };
+
+/// A paragraph's text that is one picture alone (and blanks): a block image.
+bool isImageOnly(const std::vector<Run>& runs) {
+    int pictures = 0;
+    for (const Run& r: runs) {
+        if (r.flags & Image) {
+            ++pictures;
+        } else if (r.text.find_first_not_of(" \t\n\r") != std::string::npos) {
+            return false;
+        }
+    }
+    return pictures == 1;
+}
+
+/// The size a picture is drawn at (points) and how far it goes below the baseline: a block image as its natural
+/// size (96 dpi), smaller to the column's width and no higher than MAX_BLOCK_ASPECT times it; one in a line of text
+/// as high as the line, never bigger than its natural size.
+struct PictureSize {
+    double width = 0;
+    double height = 0;
+    double descent = 0;
+};
+PictureSize pictureSize(const images::Info& info, double fontSize, double column, bool block) {
+    PictureSize p;
+    const double naturalW = info.width * images::POINTS_PER_PIXEL;
+    const double naturalH = info.height * images::POINTS_PER_PIXEL;
+    if (naturalW <= 0 || naturalH <= 0) {
+        return p;
+    }
+    p.width = naturalW;
+    p.height = naturalH;
+    if (!block) {
+        p.height = std::min(naturalH, fontSize * 1.2);
+        p.width = naturalW * p.height / naturalH;
+    }
+    const double maxW = column > 0 ? column - 0.01 : naturalW;
+    if (p.width > maxW) {
+        p.height *= maxW / p.width;
+        p.width = maxW;
+    }
+    if (block) {
+        const double maxH = (column > 0 ? column : naturalW) * images::MAX_BLOCK_ASPECT;
+        if (p.height > maxH) {
+            p.width *= maxH / p.height;
+            p.height = maxH;
+        }
+    } else {
+        p.descent = std::min(0.22 * fontSize, 0.25 * p.height);
+    }
+    return p;
+}
 
 struct Ctx {
     Color color;
@@ -118,6 +190,7 @@ struct Laid {
     std::vector<LinkSpan> links;
     std::vector<SourceMap> sources;
     std::vector<MathSpan> maths;
+    std::vector<ImageSpan> images;
     bool cached = false;  ///< taken from LayoutCache
     PangoLayout* get() const { return layout.get(); }
 };
@@ -298,17 +371,29 @@ private:
         add(&o.width, sizeof o.width);
         add(&o.lineSpacing, sizeof o.lineSpacing);
         const char flags[] = {static_cast<char>(o.bold), static_cast<char>(o.mono), static_cast<char>(o.align),
-                              static_cast<char>(mathAsSource)};
+                              static_cast<char>(mathAsSource), static_cast<char>(o.blockImage)};
         add(flags, sizeof flags);
         key += st.family;
         key += '\0';
         key += st.monoFamily;
         key += '\0';
-        for (const Run& r: runs) {
+        // (a picture: the file it is and its size, which the shape is made for)
+        std::vector<images::Info> pictures(runs.size());
+        for (size_t k = 0; k < runs.size(); ++k) {
+            const Run& r = runs[k];
             const uint32_t n = static_cast<uint32_t>(r.text.size());
             add(&n, sizeof n);
             add(&r.flags, sizeof r.flags);
             key += r.text;
+            if (drawsPicture(r)) {
+                pictures[k] = images::info(out.links[static_cast<size_t>(r.link)]);
+                key += '\0';
+                key += out.links[static_cast<size_t>(r.link)];
+                key += '\0';
+                key += std::to_string(static_cast<int>(pictures[k].state));
+                key += pictures[k].stamp;
+                key += '\0';
+            }
         }
         for (const CodeSpan& c: code) {
             add(&c.start, sizeof c.start);
@@ -317,7 +402,7 @@ private:
             const char b[] = {static_cast<char>(c.bold), static_cast<char>(c.italic)};
             add(b, sizeof b);
         }
-        Laid laid = makeText(runs, o, code, layoutCache().find(key));
+        Laid laid = makeText(runs, o, code, layoutCache().find(key), pictures);
         if (!laid.cached) {
             layoutCache().put(std::move(key), laid.layout);
         }
@@ -415,13 +500,19 @@ private:
     }
 
     /// The layout of a text (`cached`: the same one made before; only the links, sources and formulas are made here).
+    /// A run of a picture that is shown as one (not in the block being written, which shows its source).
+    bool drawsPicture(const Run& r) const {
+        return (r.flags & Image) && !mathAsSource && r.link >= 0 && static_cast<size_t>(r.link) < out.links.size();
+    }
+
     Laid makeText(const std::vector<Run>& runs, const TextOptions& o, const std::vector<CodeSpan>& code,
-                  xoj::util::GObjectSPtr<PangoLayout> cached) {
+                  xoj::util::GObjectSPtr<PangoLayout> cached, const std::vector<images::Info>& pictures) {
         // The text, where each run is in it, its links and formulas
         std::string s;
         std::vector<LinkSpan> links;
         std::vector<SourceMap> sources;
         std::vector<MathSpan> maths;
+        std::vector<ImageSpan> pictureSpans;
         struct Shape {
             size_t from = 0;
             FormulaShape shape;
@@ -430,8 +521,68 @@ private:
             double descent = 0;
         };
         std::vector<Shape> shapes;
-        for (const Run& r: runs) {
+        /// Parts of a picture that is not drawn: its path (red), its "Load image" button
+        struct Decoration {
+            size_t from = 0;
+            size_t to = 0;
+            bool button = false;
+        };
+        std::vector<Decoration> decorations;
+        std::vector<bool> shaped(runs.size(), false);
+        for (size_t k = 0; k < runs.size(); ++k) {
+            const Run& r = runs[k];
             const size_t from = s.size();
+            if (drawsPicture(r)) {
+                // A picture: drawn as one character with its shape, or (not there, a web picture) its alt text and path
+                const images::Info& info = k < pictures.size() ? pictures[k] : images::Info{};
+                const std::string& target = out.links[static_cast<size_t>(r.link)];
+                ImageSpan span;
+                span.link = r.link;
+                span.start = static_cast<int>(from);
+                const PictureSize size = info.state == images::Info::State::Ok
+                                                 ? pictureSize(info, o.size, o.width, o.blockImage)
+                                                 : PictureSize{};
+                if (size.width > 0 && size.height > 0) {
+                    s += FORMULA_CHAR;
+                    span.drawn = true;
+                    span.width = size.width;
+                    span.height = size.height;
+                    span.descent = size.descent;
+                    Shape sh;
+                    sh.from = from;
+                    sh.shape.isImage = true;
+                    sh.shape.image = info;
+                    sh.shape.width = size.width;
+                    sh.shape.height = size.height;
+                    sh.shape.ascent = size.height - size.descent;
+                    sh.width = size.width;
+                    sh.ascent = size.height - size.descent;
+                    sh.descent = size.descent;
+                    shapes.push_back(std::move(sh));
+                    shaped[k] = true;
+                } else if (info.state == images::Info::State::Web) {
+                    s += r.text.empty() ? target : r.text;
+                    s += "\xc2\xa0";  // (no break before the button)
+                    span.web = true;
+                    span.buttonStart = static_cast<int>(s.size());
+                    s += "\xe2\xa4\x93\xc2\xa0Load image\xc2\xa0";  // ⤓ Load image
+                    span.buttonEnd = static_cast<int>(s.size());
+                    decorations.push_back({static_cast<size_t>(span.buttonStart), static_cast<size_t>(span.buttonEnd), true});
+                } else {
+                    if (!r.text.empty()) {
+                        s += r.text;
+                        s += ' ';
+                    }
+                    const size_t pathFrom = s.size();
+                    s += target.empty() ? std::string("(no path)") : target;
+                    decorations.push_back({pathFrom, s.size(), false});
+                }
+                span.length = static_cast<int>(s.size() - from);
+                pictureSpans.push_back(span);
+                sources.push_back({static_cast<int>(from), static_cast<int>(s.size() - from), r.source, r.sourceLength,
+                                   r.flags});
+                continue;
+            }
             std::shared_ptr<const math::Formula> formula;
             if ((r.flags & Math) && !mathAsSource) {
                 formula = math::formula(r.text, r.flags & DisplayMath);
@@ -480,7 +631,8 @@ private:
             shapes.push_back(std::move(sh));
         }
         if (cached) {
-            return {std::move(cached), std::move(links), std::move(sources), std::move(maths), true};
+            return {std::move(cached), std::move(links), std::move(sources), std::move(maths), std::move(pictureSpans),
+                    true};
         }
         xoj::util::GObjectSPtr<PangoLayout> l(pango_layout_new(context()), xoj::util::adopt);
         PangoFontDescription* d = pango_font_description_new();
@@ -510,7 +662,7 @@ private:
             if (r.flags & Strike) {
                 insert(attrs, pango_attr_strikethrough_new(true), from, to);
             }
-            if (r.flags & (Underline | Link)) {
+            if ((r.flags & (Underline | Link)) && !shaped[k]) {
                 insert(attrs, pango_attr_underline_new(PANGO_UNDERLINE_SINGLE), from, to);
             }
             if (r.flags & Link) {
@@ -548,7 +700,17 @@ private:
                        to);
             }
         }
-        for (const Shape& sh: shapes) {  // the formulas drawn
+        for (const Decoration& d: decorations) {  // pictures not drawn: the path in red, the "Load image" button
+            const Color fg = d.button ? LINK_COLOR : IMAGE_ERROR;
+            const Color bg = d.button ? BUTTON_BACKGROUND : IMAGE_ERROR_BACKGROUND;
+            insert(attrs, pango_attr_foreground_new(u16(fg.red), u16(fg.green), u16(fg.blue)), d.from, d.to);
+            insert(attrs, pango_attr_background_new(u16(bg.red), u16(bg.green), u16(bg.blue)), d.from, d.to);
+            insert(attrs, pango_attr_style_new(PANGO_STYLE_NORMAL), d.from, d.to);
+            if (d.button) {
+                insert(attrs, pango_attr_size_new_absolute(static_cast<int>(o.size * 0.85 * PANGO_SCALE)), d.from, d.to);
+            }
+        }
+        for (const Shape& sh: shapes) {  // the formulas and pictures drawn
             constexpr double S = PANGO_SCALE;
             PangoRectangle logical{0, static_cast<int>(-sh.ascent * S), static_cast<int>(sh.width * S),
                                    static_cast<int>((sh.ascent + sh.descent) * S)};
@@ -572,7 +734,7 @@ private:
         pango_layout_set_text(l.get(), s.c_str(), static_cast<int>(s.size()));
         pango_layout_set_attributes(l.get(), attrs);
         pango_attr_list_unref(attrs);
-        return {std::move(l), std::move(links), std::move(sources), std::move(maths)};
+        return {std::move(l), std::move(links), std::move(sources), std::move(maths), std::move(pictureSpans)};
     }
 
     /// Returns its index.
@@ -587,6 +749,7 @@ private:
         it.links = std::move(l.links);
         it.sources = std::move(l.sources);
         it.maths = std::move(l.maths);
+        it.images = std::move(l.images);
         it.color = color;
         it.block = top;
         out.items.push_back(std::move(it));
@@ -658,7 +821,8 @@ private:
     void paragraph(const Block& b, double x, double w, const Ctx& c) {
         margin(c.tight ? 0 : 0.75 * st.size);
         open();
-        auto l = text(b.runs, {st.size, false, false, w});
+        const bool block = isImageOnly(b.runs);  // (a picture alone: as wide as the column, no line spacing)
+        auto l = text(b.runs, {st.size, false, false, w, block ? 0.0 : LINE_SPACING, PANGO_ALIGN_LEFT, block});
         const double h = pangoHeight(l.get());
         mainItem(addText(std::move(l), x, y, c.color));
         y += h;
@@ -1033,6 +1197,9 @@ private:
         if (b && kind == BlockKind::Paragraph) {
             displayPreview(*b, c);
         }
+        if (b) {
+            picturePreview(*b, c);
+        }
         margin(kind == BlockKind::Heading ? o.size * 0.45 : 0.75 * st.size);
     }
 
@@ -1051,6 +1218,29 @@ private:
             const double h = pangoHeight(l.get());
             addText(std::move(l), 0, y, c.color);
             y += h;
+        }
+    }
+
+    /// Below a block being written that has pictures: the pictures (as the formula preview), each on a line of its
+    /// own, as big as they are drawn when the block is not written (a block image as wide as the column). Only
+    /// drawn: no place of the source is in it (a web picture's "Load image" works there too).
+    void picturePreview(const Block& b, const Ctx& c) {
+        const bool block = isImageOnly(b.runs);
+        for (const Run& r: b.runs) {
+            if (!(r.flags & Image) || r.link < 0 || static_cast<size_t>(r.link) >= out.links.size()) {
+                continue;
+            }
+            Run shown = r;
+            shown.flags = Image;
+            auto l = text({shown}, {st.size, false, false, st.width, block ? 0.0 : LINE_SPACING, PANGO_ALIGN_LEFT, block});
+            l.sources.clear();
+            l.links.clear();
+            const double h = pangoHeight(l.get());
+            addText(std::move(l), 0, y, c.color);
+            y += h;
+        }
+        for (const Block& child: b.children) {
+            picturePreview(child, c);
         }
     }
 
@@ -1377,6 +1567,55 @@ std::optional<MathHit> mathAt(const Layout& layout, double x, double y) {
         }
     }
     return std::nullopt;
+}
+
+std::optional<ImageButtonHit> imageButtonAt(const Layout& layout, double x, double y) {
+    for (const Item& it: layout.items) {
+        for (const ImageSpan& p: it.images) {
+            if (!p.web || p.buttonStart < 0 || p.link < 0 || static_cast<size_t>(p.link) >= layout.links.size()) {
+                continue;
+            }
+            for (const Rect& r: textRects(it, p.buttonStart, p.buttonEnd)) {
+                const double around = 2;  // (a finger is not a pin)
+                if (x >= r.x - around && x <= r.x + r.width + around && y >= r.y - around &&
+                    y <= r.y + r.height + around) {
+                    return ImageButtonHit{layout.links[static_cast<size_t>(p.link)], r};
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::vector<ImageHit> imageRects(const Layout& layout) {
+    std::vector<ImageHit> out;
+    for (const Item& it: layout.items) {
+        for (const ImageSpan& p: it.images) {
+            const std::string link = p.link >= 0 && static_cast<size_t>(p.link) < layout.links.size()
+                                             ? layout.links[static_cast<size_t>(p.link)]
+                                             : std::string();
+            if (!p.drawn) {
+                for (const Rect& r: textRects(it, p.start, p.start + p.length)) {
+                    out.push_back({link, r, false});
+                }
+                continue;
+            }
+            // Where its character is, on its line's baseline (see pictureSize)
+            int line = 0;
+            int xpos = 0;
+            pango_layout_index_to_line_x(it.layout.get(), p.start, false, &line, &xpos);
+            PangoLayoutIter* iter = pango_layout_get_iter(it.layout.get());
+            for (int i = 0; i < line && pango_layout_iter_next_line(iter); ++i) {
+            }
+            const double base = pango_layout_iter_get_baseline(iter) / static_cast<double>(PANGO_SCALE);
+            pango_layout_iter_free(iter);
+            out.push_back({link,
+                           Rect{it.x + xpos / static_cast<double>(PANGO_SCALE),
+                                it.y + base - (p.height - p.descent), p.width, p.height},
+                           true});
+        }
+    }
+    return out;
 }
 
 void draw(cairo_t* cr, const Layout& layout) {

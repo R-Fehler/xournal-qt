@@ -15,6 +15,7 @@
 #include <QThreadPool>
 
 #include "model/Document.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 #include "util/PathUtil.h"
 
@@ -372,6 +373,10 @@ QImage render(const DocumentItem& item) {
         // same, as plain text
         const size_t title = static_cast<size_t>(std::max(0, titleOf(item)));
         const size_t bytes = std::min(MarkdownFile::MAX_BYTES, (title + 1) * 16384);
+        md::images::RootHandle root;  // (its pictures)
+        if (!item.md.empty()) {
+            root.set(DocumentImages::markdownRoot(item.md));
+        }
         auto doc = MarkdownFile::document(item.md.empty() ? MarkdownFile::readAsPlainText(item.other, bytes)
                                                           : MarkdownFile::read(item.md, bytes),
                                           title + 1);

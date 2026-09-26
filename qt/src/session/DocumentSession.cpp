@@ -45,6 +45,7 @@
 #include "AppContext.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
+#include "DocumentImages.h"
 #include "DocumentSearch.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
@@ -229,6 +230,21 @@ void DocumentSession::init() {
     });
     updatePageActions();
     firePageSelected(0);  // LayerController tracks the current page through the document events
+    connect(this, &DocumentSession::filePathChanged, this, &DocumentSession::updateImageRoot);
+    updateImageRoot();
+}
+
+void DocumentSession::updateImageRoot() {
+    // A .md (edited, or shown read-only): its folder and "name.assets" next to it
+    const fs::path file = text ? text->path() : shownPath;
+    if (!file.empty() && !hasFilePath()) {
+        const md::images::Root root = DocumentImages::markdownRoot(file);
+        if (!imageRoot.active() || imageRoot.root().assetsDir != root.assetsDir) {
+            imageRoot.set(root);
+        }
+        return;
+    }
+    imageRoot.reset();
 }
 
 DocumentSession::~DocumentSession() {

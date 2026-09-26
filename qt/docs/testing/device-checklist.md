@@ -1648,3 +1648,19 @@ Update the table in the user doc with the results.
 - [ ] Settings → Documents → Web and citations → "Connect to arXiv": Off → the sheet says it is off and its buttons
       are disabled; "Ask the first time" asks again.
 - [ ] Android: the sheets fit a phone (scroll), the download lands in the library folder on the phone's storage.
+
+## Images in Markdown (qt/md-images)
+Design: [md-images.md](../md-images.md).
+- [ ] A `.md` with `![](name.assets/photo.jpg)` (a big photo from the phone), `![](name.assets/diagram.svg)` and a
+      GIF: each alone in its paragraph is as wide as the text (a small one keeps its size), upright (a photo taken
+      in portrait is not lying on its side), sharp when zoomed in; the GIF shows its first frame.
+- [ ] An image inside a sentence (`an icon ![](icon.png) here`) is as high as the line; the line does not jump.
+- [ ] A missing file: its alt text and path in red, in the text. Create the file (another app): shown once the text
+      is laid out again (type a key).
+- [ ] Put the cursor on the image's line: its Markdown shows, dimmed, and the picture stays below it; the arrows and
+      a tap move through the source as usual.
+- [ ] A very tall image (a screenshot of a long page) fits a page: its page is not longer than the others.
+- [ ] Scrolling through a text with 20 photos stays smooth (after the first time they are drawn); typing in it
+      does not stutter.
+- [ ] The same text in: full-page mode, one continuous page, the library card's thumbnail, Print, Export as PDF
+      (the PDF shows the photos; a JPEG is as sharp as the original).

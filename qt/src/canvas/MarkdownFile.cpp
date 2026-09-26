@@ -19,6 +19,7 @@
 #include "MdBox.h"
 #include "MdPaginate.h"
 #include "TextFlow.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 #include "session/TextFile.h"
 
@@ -121,6 +122,8 @@ std::unique_ptr<Document> continuousDocument(const std::string& source, const md
 }  // namespace
 
 std::unique_ptr<Document> textDocument(const TextFile& file, bool continuous) {
+    // (its pictures: the pages are laid out now, before a session registers the file's root)
+    const md::images::RootHandle root(DocumentImages::markdownRoot(file.path()));
     return continuous ? continuousDocument(file.text(), style(file)) : document(file.text(), style(file));
 }
 

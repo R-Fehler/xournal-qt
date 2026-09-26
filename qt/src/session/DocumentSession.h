@@ -33,6 +33,7 @@
 #include "undo/UndoRedoHandler.h"  // for UndoRedoListener
 
 #include "HeadlessViews.h"
+#include "MdImages.h"
 #include "SessionActions.h"
 #include "filesystem.h"
 
@@ -511,6 +512,10 @@ private:
     /// generated background are kept from there). Forgotten when the pages of the background PDF may be renumbered.
     std::unordered_map<const XojPage*, std::pair<std::weak_ptr<XojPage>, size_t>> hybridBase;
     std::unique_ptr<TextFile> text;  ///< a text file edited (or shown read-only)
+    /// Where the relative links of the document's Markdown point (its pictures, qt/docs/md-images.md): registered
+    /// while it is open, kept up to date with its file (updateImageRoot).
+    md::images::RootHandle imageRoot;
+    void updateImageRoot();
     bool textModified = false;
     bool textContinuous = false;
     fs::path madeSuggestion;  ///< setMadeFrom

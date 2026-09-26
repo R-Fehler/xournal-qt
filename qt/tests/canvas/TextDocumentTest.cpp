@@ -20,15 +20,19 @@
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
+#include "session/TextDocument.h"
 #include "session/TextFile.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Util.h"
+#include "view/DocumentView.h"
+#include "view/background/BackgroundFlags.h"
 
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
 #include "MdDocument.h"
+#include "MdImages.h"
 #include "TextFlow.h"
 #include "model/Layer.h"
 #include "model/Text.h"
@@ -256,6 +260,83 @@ TEST_F(TextDocumentTest, aTapAnywhereOnAPagePutsTheCursorIntoTheText) {
     view->textPress(*view->canvasPageOf(session->getDocument()->getPage(0).get()), TextFlow::MARGIN + 1,
                     TextFlow::MARGIN + 1);
     EXPECT_LT(view->getMarkdownEditor()->cursorPosition(), starts[1]);
+}
+
+/// A picture of one color, w × h pixels, as a PNG.
+static void writePng(const fs::path& file, int w, int h) {
+    fs::create_directories(file.parent_path());
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
+    cairo_t* cr = cairo_create(s);
+    cairo_set_source_rgb(cr, 1, 0, 0);
+    cairo_paint(cr);
+    cairo_destroy(cr);
+    cairo_surface_write_to_png(s, file.string().c_str());
+    cairo_surface_destroy(s);
+}
+
+/// A page drawn as the thumbnails and exports draw it (DocumentView), at 1 pixel per point.
+static cairo_surface_t* drawPage(const PageRef& page) {
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, static_cast<int>(page->getWidth()),
+                                                    static_cast<int>(page->getHeight()));
+    cairo_t* cr = cairo_create(s);
+    xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
+    flags.forceBackgroundColor = xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR;
+    DocumentView().drawPage(page, cr, true, flags);
+    cairo_destroy(cr);
+    cairo_surface_flush(s);
+    return s;
+}
+
+static int redPixels(cairo_surface_t* s) {
+    int n = 0;
+    const unsigned char* d = cairo_image_surface_get_data(s);
+    for (int y = 0; y < cairo_image_surface_get_height(s); ++y) {
+        for (int x = 0; x < cairo_image_surface_get_width(s); ++x) {
+            n += (*reinterpret_cast<const uint32_t*>(d + y * cairo_image_surface_get_stride(s) + x * 4) & 0xffffff) ==
+                 0xff0000;
+        }
+    }
+    return n;
+}
+
+// qt/docs/md-images.md: a .md's pictures in "name.assets/" next to it are drawn on its pages, laid out with them
+// (the file's root is there while the pages are made, and while the session lives).
+TEST_F(TextDocumentTest, aPictureNextToTheFileIsDrawnOnItsPage) {
+    const fs::path dir(tmp.path().toStdString());
+    writePng(dir / "notes.assets" / "red.png", 400, 200);  // 300 × 150 pt
+    std::string text = "# Notes\n\nA picture:\n\n![](notes.assets/red.png)\n\n";
+    for (int i = 0; i < 60; ++i) {
+        text += "Line " + std::to_string(i) + " of the text after the picture.\n\n";
+    }
+    const fs::path p = file("notes.md", text);
+    open(p);
+    ASSERT_GE(session->getDocument()->getPageCount(), 2u);
+    cairo_surface_t* s = drawPage(session->getDocument()->getPage(0));
+    EXPECT_NEAR(redPixels(s), 300 * 150, 2 * (300 + 150));
+    cairo_surface_destroy(s);
+    // Its page holds as much less text as the picture takes
+    const Text* box = TextDocument::pageBoxOf(session->getDocument()->getPage(0));
+    ASSERT_NE(box, nullptr);
+    const std::string first = box->getText();
+    const auto lines = [](const std::string& t) {
+        size_t n = 0;
+        while (t.find("Line " + std::to_string(n) + " ") != std::string::npos) {
+            ++n;
+        }
+        return n;
+    };
+    std::string without = text;
+    without.replace(without.find("![](notes.assets/red.png)"), 25, "No picture.");
+    auto plain = MarkdownFile::document(without);
+    const Text* plainBox = TextDocument::pageBoxOf(plain->getPage(0));
+    ASSERT_NE(plainBox, nullptr);
+    // (150 pt of picture: some 7 lines of 22 pt less)
+    EXPECT_LT(lines(first) + 5, lines(plainBox->getText())) << "the picture takes room on the page";
+    // The root goes with the session
+    EXPECT_FALSE(md::images::resolve("notes.assets/red.png").empty());
+    view.reset();
+    session.reset();
+    EXPECT_TRUE(md::images::resolve("notes.assets/red.png").empty());
 }
 
 TEST_F(TextDocumentTest, aPlainTextFileIsWrittenAsItIsWithoutMarkdown) {

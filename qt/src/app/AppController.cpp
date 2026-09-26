@@ -80,6 +80,7 @@
 #include "ImageFile.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
+#include "MdImageDecoder.h"
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "MdPassages.h"
@@ -113,6 +114,7 @@ Color toColor(const QColor& c) {
 
 AppController::AppController(QObject* parent): QObject(parent) {
     app = std::make_shared<AppContext>(AppContext::defaultResourceDir());
+    MdImageDecoder::install();  // the pictures of Markdown texts, read with Qt (qt/docs/md-images.md)
     colors = std::make_shared<Palette>(app->getResourceDir() / "palettes" / "xournal.gpl");
     try {
         colors->load();

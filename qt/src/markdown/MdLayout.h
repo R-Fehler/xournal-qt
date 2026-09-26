@@ -68,6 +68,23 @@ struct MathSpan {
     double inkWidth = 0;
 };
 
+/// A picture (![alt](path)) in the text of an item: bytes [start, start + length) of its Pango layout's text. One
+/// that is drawn is one character, U+FFFC, with a shape as big as the picture; one that is not (a missing file, a
+/// web picture not loaded) is its alt text and path, and a web picture has a "Load image" button, bytes
+/// [buttonStart, buttonEnd) (qt/docs/md-images.md).
+struct ImageSpan {
+    int start = 0;
+    int length = 0;
+    int link = -1;          ///< index into Layout::links (its path)
+    bool drawn = false;
+    bool web = false;       ///< a web picture not loaded
+    int buttonStart = -1;   ///< its "Load image" (web)
+    int buttonEnd = -1;
+    double width = 0;       ///< drawn: its size (points)
+    double height = 0;
+    double descent = 0;     ///< how far it goes below the baseline
+};
+
 /// One thing to draw, in box coordinates (top left of the box at 0, 0).
 struct Item {
     enum class Kind { Text, Fill, Line };
@@ -80,6 +97,7 @@ struct Item {
     std::vector<LinkSpan> links;                  ///< Text
     std::vector<SourceMap> sources;               ///< Text
     std::vector<MathSpan> maths;                  ///< Text: its formulas
+    std::vector<ImageSpan> images;                ///< Text: its pictures
     Color color;
     double lineWidth = 1;
     size_t block = 0;   ///< the top-level block it belongs to
@@ -156,6 +174,20 @@ struct MathHit {
     Rect rect;
 };
 std::optional<MathHit> mathAt(const Layout& layout, double x, double y);
+/// The "Load image" button of a web picture at a point (box coordinates): its address and where the button is.
+struct ImageButtonHit {
+    std::string url;
+    Rect rect;
+};
+std::optional<ImageButtonHit> imageButtonAt(const Layout& layout, double x, double y);
+/// Every picture of a layout where it is drawn (box coordinates) with its link: the drawn ones (tests, the
+/// canvas' tool tips).
+struct ImageHit {
+    std::string link;
+    Rect rect;
+    bool drawn = false;
+};
+std::vector<ImageHit> imageRects(const Layout& layout);
 /// Where a range of the source, [begin, end), is drawn (box coordinates): a rectangle per line of each text it is in.
 /// Marks that are not drawn (a "**", a fence) have no place; text that stands for source it does not show (an
 /// entity) is marked whole.

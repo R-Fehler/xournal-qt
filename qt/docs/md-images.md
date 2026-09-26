@@ -1,0 +1,93 @@
+# Images in Markdown (`qt/md-images`)
+
+Status: plan agreed with the author 2026-09-26 (TODO.md, "Ideas round of 2026-09-25/26"); built as `qt/md-images`.
+Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline shapes), [md-editor.md](md-editor.md)
+(the `.md` editor), [md-pdf.md](md-pdf.md) (PDF text documents).
+
+## Drawing
+
+- `![alt](path "title")` is one run of the parsed text (`md::Run` with `Image`): its text is the alt text, its source
+  the whole `![…](…)` (as a formula's run is its whole `$…$`), its link the image's path. The layout puts an image in
+  the text as one character, U+FFFC, with a Pango shape as big as the picture, as it does for formulas
+  (`MdLayout.cpp`). So lines break around it, a tap on it is a place in the text, pages are split around it and never
+  inside it.
+- **Sizes** (points; a picture's pixel is 0.75 pt, i.e. its natural size at 96 dpi):
+  - an image alone in its paragraph is a block: its natural size, made smaller to the column's width, never bigger;
+    no higher than 1.4 times the column's width (so that it fits an A4 page's text, 482 × 729 pt, with its margins);
+  - an image in a line of text is as high as the line (1.2 em), never bigger than its natural size, on the baseline.
+- **Where the files are** (`md::images`, Qt-free): every open document registers a *root*: the folder its relative
+  links are relative to, and where its `name.assets/` really is (next to a `.md`; in the app cache for a PDF text
+  document, which carries its images inside). A relative link is looked for in the roots, newest first; the first
+  file that exists is taken, also with `%20` and the like decoded. The renderer draws a page's box without knowing its
+  document (upstream's `TextView` seam gives only the text element), so the roots are process-wide; two open
+  documents of the same name share `name.assets/…` names, and the first existing file wins (the names pasted are
+  time stamps, so they do not collide in practice).
+- **Kinds**: PNG, JPEG, GIF (first frame), WebP where Qt reads it, SVG (Qt SVG), read by the app's decoder
+  (`QImageReader`, `QSvgRenderer`, installed by `AppContext`); without it (the CLI, the Markdown tests) gdk-pixbuf.
+- **Cache**: a picture's size (the header only) is cached by path, modification time and file size; the decoded
+  pixels by that and the size decoded (the pixels needed where it is drawn, rounded up to halvings of the natural
+  size, so zooming reuses them). The pixel cache owns at most 64 MB, least recently used first out. On a vector
+  surface (PDF export, the hybrid PDF, print) the picture is drawn at its natural size, a JPEG as the file itself
+  (Cairo embeds it as it is), each picture once per PDF (`CAIRO_MIME_TYPE_UNIQUE_ID`).
+- **Missing or unreadable file**: the alt text and the path, in red, in the text.
+- **While the block is written** (the block with the cursor shows its Markdown): the `![…](…)` is shown as its source,
+  and the picture is drawn below the block, as the preview of a `$$` formula.
+- **Everywhere**: the canvas, the `.md` editor, full-page mode, thumbnails, previews, PDF export, the hybrid PDF and
+  print all draw Markdown through `md::layout` / `md::draw`.
+- **Pagination**: an image is one character of its line: it never splits, and the aspect limit above keeps a block
+  image within an A4 page. (A box does not know its page, so the page height cannot be the limit: the canvas, the
+  thumbnails and the PDF draw a page's part from its box alone, and they must agree with the pagination.)
+
+## Adding images
+
+- Paste (Ctrl+V with a picture on the clipboard), a dropped image file, or the formatting bar's image button (a
+  file picker) saves the picture and inserts `![](name.assets/image-YYYY-MM-DD-HHMMSS.png)` at the cursor (Typora's
+  names; a dropped or picked file keeps its name and kind, made unique in the folder). The alt text is empty. It is
+  one undo step of the text; undo leaves the file (see clean-up).
+- Where the file goes, by document:
+  - a `.md`: `name.assets/` next to it;
+  - a PDF text document: its assets folder in the app cache (packed into the PDF at the next save);
+  - Markdown boxes in a `.xopp`: see below.
+
+## `.md` and `name.assets/`: one document
+
+- The library shows one card for the pair and never lists `.assets` folders (the index and "all files" too).
+- Move, rename, delete (to the trash) and share take both. A rename rewrites the links in the `.md`: the prefix
+  `oldname.assets/` becomes `newname.assets/` (links written as `./oldname.assets/…` and `<oldname.assets/…>` too).
+- Sync conflicts: the conflict copies of the `.md` are shown as before; the folder goes with the `.md` it belongs to.
+- Clean-up: images in `name.assets/` that the text no longer links to are not deleted automatically. ⋮ → **Remove
+  unused images** lists them and moves them to the trash.
+
+## PDF text documents
+
+- The images are attachments `name.assets/<file>` next to `name.md` (`TextDocument::attachments`). Nothing is
+  written next to the PDF.
+- Opening unpacks them into the app cache (`<cache>/md-assets/<hash of the PDF's path>/name.assets/`), which is the
+  document's root: links resolve there, and pasted images go there.
+- A full write packs the images the text links to (unreferenced ones are dropped); an incremental save adds the new
+  ones and keeps the ones already in the file.
+- **Open as PDF document** packs the `.md`'s linked images; **Export as Markdown** writes `name.md` and the images
+  into `name.assets/` next to it.
+
+## Web images
+
+`https://…` pictures are never fetched unasked: they show as the alt text and a small **Load image** button. The
+first load goes through the opt-in networking and the address confirmation of `qt/citations` (`networkAccess`,
+`WebConfirm`, `NetFetch`). A loaded picture is kept in the app cache only (`<cache>/web-images/`) and shown from
+there afterwards.
+
+## Markdown boxes in a `.xopp`
+
+See "The `.xopp` storage" below (decided when built).
+
+## Code
+
+| File | What |
+| --- | --- |
+| `qt/src/markdown/MdImages.*` | links to files (roots), sizes, the decoder, the pixel cache, drawing |
+| `qt/src/markdown/MdDocument.cpp` | the image run (`Builder::endImage`) |
+| `qt/src/markdown/MdLayout.cpp` | the image shape, block and inline sizes, placeholders, the preview while writing |
+| `qt/src/canvas/MdImageDecoder.*` | the app's decoder (Qt) and the web cache folder |
+| `qt/src/session/DocumentImages.*` | a document's root and `name.assets` |
+| `DocumentSession::updateImageRoot`, `MarkdownFile::textDocument` | the root while a document is open, and while its pages are made |
+| `qt/tests/markdown/MdImagesTest.cpp`, `qt/tests/canvas/TextDocumentTest.cpp` | the tests (`XQT_MD_IMAGES_SHOTS=<dir>` draws a picture to look at) |
