@@ -520,6 +520,12 @@
   ~65 %; rulings skipped), rendered per crop on a worker (newest first, rows scrolled away skipped, yielding to the
   canvas), 24 MB LRU; one request per row.
 
+- **Kinds of PDFs in the library, `qt/library-kinds` (2026-09-26).** The index records each PDF's kind (plain, with
+  notes, text document, archive, archive text) from the one marker read it already does (`HybridPdf::markerOf`;
+  `/Files` listing a `.md` = text document), tied to the PDF's stamp; old entries get it lazily (0.1–1.3 ms each,
+  worker). Cards show "PDF", "PDF ✎", "PDF Aa", "PDF/A ✎"/"PDF/A Aa" (grid, list, Recent). "Only PDFs with notes"
+  uses the index (300 × 200-page PDFs: 361 ms on the UI thread → 7 ms); new "Only PDF text documents".
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
