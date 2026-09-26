@@ -49,6 +49,7 @@
 
 #include "control/settings/Settings.h"
 #include "model/Document.h"
+#include "model/DocumentHandler.h"
 #include "model/Layer.h"
 #include "model/Point.h"
 #include "model/Stroke.h"
@@ -93,6 +94,7 @@
 
 #include "AppController.h"
 #include "TextFlow.h"
+#include "MarkdownFile.h"
 #include "../SearchHits.h"
 #include "config-test.h"
 
@@ -2240,6 +2242,71 @@ TEST_F(HomeScreenFilterTest, theShowButtonChoosesTheKindsOfFilesShown) {
     click(child(popup, "showDefaults"));
     EXPECT_EQ(gridCount(), 3);
     EXPECT_FALSE(button->property("checked").toBool());
+}
+
+namespace {
+/// The library of HomeScreenFilterTest with a PDF with notes ("memo.pdf") and a PDF text document ("essay.pdf") next to
+/// the plain "lecture.pdf"
+class HomeScreenKindsTest: public HomeScreenFilterTest {
+protected:
+    void prepareController() override {
+        ASSERT_TRUE(tmp.isValid());
+        root = fs::path(tmp.path().toStdString());
+        {
+            DocumentHandler handler;
+            Document doc(&handler);
+            auto page = std::make_shared<XojPage>(595, 842);
+            auto stroke = std::make_unique<Stroke>();
+            stroke->setWidth(2);
+            stroke->addPoint(Point(100, 100, 1.0));
+            stroke->addPoint(Point(300, 200, 1.0));
+            page->getSelectedLayer()->addElement(std::move(stroke));
+            doc.addPage(page);
+            ASSERT_TRUE(xqt::HybridPdf::write(doc, root / "memo.pdf").ok);
+        }
+        auto text = xqt::MarkdownFile::notesDocument("# An essay\n\nWritten, not drawn.\n");
+        ASSERT_TRUE(xqt::HybridPdf::write(*text, root / "essay.pdf").ok);
+        HomeScreenFilterTest::prepareController();
+    }
+    QString badgeOf(const char* file) const {
+        QQuickItem* c = card(rowOf(file));
+        return c ? child(c, "kindBadgeText")->property("text").toString() : QString("<no card>");
+    }
+};
+}  // namespace
+
+// The kinds of PDFs at a glance (qt/docs/library.md, "Kinds of PDFs"): a plain PDF, a PDF with notes and a PDF text
+// document have badges of their own (the text document's in another colour), said in words in the tooltip; "Only PDF
+// text documents" shows only those.
+TEST_F(HomeScreenKindsTest, theCardsTellPlainPdfsPdfsWithNotesAndTextDocumentsApart) {
+    ASSERT_TRUE(waitFor([&] { return badgeOf("essay.pdf") == "PDF Aa"; }, 20000)) << badgeOf("essay.pdf").toStdString();
+    EXPECT_EQ(badgeOf("lecture.pdf"), "PDF");
+    EXPECT_EQ(badgeOf("memo.pdf"), "PDF ✎");
+    EXPECT_FALSE(child(card(rowOf("notes.xopp")), "kindBadge")->isVisible()) << "notes alone: no badge";
+    QQuickItem* plain = child(card(rowOf("lecture.pdf")), "kindBadge");
+    QQuickItem* notes = child(card(rowOf("memo.pdf")), "kindBadge");
+    QQuickItem* text = child(card(rowOf("essay.pdf")), "kindBadge");
+    EXPECT_EQ(text->property("description").toString(), "PDF text document");
+    EXPECT_EQ(notes->property("description").toString(), "PDF with notes");
+    EXPECT_EQ(plain->property("description").toString(), "PDF");
+    EXPECT_NE(text->property("color"), notes->property("color")) << "told apart by colour too";
+    EXPECT_EQ(notes->property("color"), plain->property("color")) << "(both red: PDFs)";
+    if (qEnvironmentVariableIsSet("XQT_SHOTS")) {
+        saveShot(window, "library-kinds");
+    }
+
+    // Only PDF text documents
+    auto* button = find<QQuickItem>("showButton");
+    click(button);
+    QObject* popup = find("showPopup");
+    ASSERT_TRUE(waitOpened(popup, true));
+    click(child(popup, "showOnlyTextDocuments"));
+    EXPECT_GE(rowOf("essay.pdf"), 0);
+    EXPECT_LT(rowOf("memo.pdf"), 0);
+    EXPECT_LT(rowOf("lecture.pdf"), 0);
+    EXPECT_GE(rowOf("notes.xopp"), 0) << "notes are not PDFs";
+    click(child(popup, "showDefaults"));
+    EXPECT_GE(rowOf("lecture.pdf"), 0);
 }
 
 TEST_F(HomeScreenFilterTest, anOtherFileOpensWithItsAppAndIsShownInTheFileManager) {

@@ -67,22 +67,45 @@ struct DocumentItem {
     }
 };
 
+/// What a PDF that is a document's file is, by what it carries (qt/docs/library.md, "Kinds of PDFs"): the library
+/// index keeps it per PDF (LibraryIndex::pdfKind), so the cards and the "Show" filter never look into a PDF.
+enum class PdfKind {
+    Unknown,      ///< not indexed (yet), or not a PDF
+    Plain,        ///< a PDF (without our marker)
+    Notes,        ///< a PDF with notes (a hybrid PDF: hybrid-pdf.md)
+    Text,         ///< a PDF text document: a PDF with notes whose page 1 starts the page's Markdown text (md-pdf.md)
+    Archive,      ///< an archive PDF (PDF/A-3 with its notes)
+    ArchiveText,  ///< an archive PDF of a text document
+};
+/// "plain", "notes", "text", "archive", "archive-text" ("" for Unknown): in the index and for QML
+const char* pdfKindName(PdfKind kind);
+PdfKind pdfKindNamed(const QString& name);
+/// A PDF with notes (also a text document, an archive PDF)
+inline bool hasNotes(PdfKind k) { return k != PdfKind::Unknown && k != PdfKind::Plain; }
+inline bool isTextDocument(PdfKind k) { return k == PdfKind::Text || k == PdfKind::ArchiveText; }
+
 /// Which kinds of files the library shows ("Show" in the library, a setting of each library). Hidden files and the
 /// app's cache folders are never shown.
 struct ShowFilter {
     bool notes = true;              ///< .xopp, .xoj alone
     bool pdfs = true;               ///< PDFs, alone or with their .xopp (also hybrid PDFs)
     bool onlyPdfsWithNotes = false; ///< of the PDFs only those with a .xopp next to them, and hybrid PDFs
+    bool onlyTextDocuments = false; ///< of the PDFs only PDF text documents
     bool markdown = true;
     bool images = true;             ///< alone or with their .xopp
     bool text = false;              ///< text and code files
     bool other = false;             ///< all other files
-    bool shows(const DocumentItem& item) const;
+    /// `pdfKind`: what the item's PDF is when it is the document's file (the library index knows it; a PDF not
+    /// indexed yet is not one with notes). Only asked for when kindMatters().
+    bool shows(const DocumentItem& item, PdfKind pdfKind = PdfKind::Unknown) const;
+    /// Whether shows() needs the kind of a PDF
+    bool kindMatters() const { return pdfs && (onlyPdfsWithNotes || onlyTextDocuments); }
     /// What a listing must include for it (DocumentFiles::Include).
     unsigned include() const;
     bool isDefault() const { return *this == ShowFilter(); }
     bool operator==(const ShowFilter& o) const {
         return notes == o.notes && pdfs == o.pdfs && onlyPdfsWithNotes == o.onlyPdfsWithNotes &&
+               onlyTextDocuments == o.onlyTextDocuments &&
                markdown == o.markdown && images == o.images && text == o.text && other == o.other;
     }
 };

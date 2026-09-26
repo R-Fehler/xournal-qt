@@ -74,8 +74,8 @@ class LibraryModel final: public QAbstractListModel {
     Q_PROPERTY(int cacheFiles READ cacheFiles NOTIFY cacheChanged)
     /// Its cache was removed: nothing is cached any more until the library is opened again
     Q_PROPERTY(bool cacheRemoved READ cacheRemoved NOTIFY cacheChanged)
-    /// Which kinds of files are shown: { notes, pdfs, onlyPdfsWithNotes, markdown, images, text, other } (bools; see
-    /// setShown)
+    /// Which kinds of files are shown: { notes, pdfs, onlyPdfsWithNotes, onlyTextDocuments, markdown, images, text,
+    /// other } (bools; see setShown)
     Q_PROPERTY(QVariantMap show READ show NOTIFY showChanged)
     /// The filter is not the default one (the "Show" button is marked)
     Q_PROPERTY(bool showFiltered READ showFiltered NOTIFY showChanged)
@@ -122,6 +122,9 @@ public:
         NameMarksRole,
         /// Conflict copies of the document that sync apps left next to it (SyncConflicts.h): their paths
         ConflictsRole,
+        /// A document whose file is a PDF: what the PDF is, from the index (pdfKindName: "plain", "notes", "text",
+        /// "archive", "archive-text"; "" until it is indexed, and for other documents and folders)
+        PdfKindRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
@@ -220,7 +223,8 @@ public:
     void setShowFilter(const ShowFilter& f);
     QVariantMap show() const;
     bool showFiltered() const { return !filter.isDefault(); }
-    /// Show a kind of files or not: "notes", "pdfs", "onlyPdfsWithNotes", "markdown", "images", "text", "other".
+    /// Show a kind of files or not: "notes", "pdfs", "onlyPdfsWithNotes", "onlyTextDocuments", "markdown", "images",
+    /// "text", "other".
     Q_INVOKABLE void setShown(const QString& key, bool shown);
     /// The default filter again.
     Q_INVOKABLE void resetShown();
@@ -297,6 +301,8 @@ private:
     std::vector<fs::path> allFolders() const;
     fs::path dirOf(const QString& relative) const;
     void rebuild();
+    /// The filter shows it (a PDF's kind from the index, when the filter asks for it)
+    bool shown(const DocumentItem& item) const;
     static Row itemRow(const DocumentItem& item);
     /// A folder, with the number of items in it that are shown
     Row folderRow(const fs::path& folder) const;
@@ -317,6 +323,8 @@ private:
     std::unique_ptr<QFileSystemWatcher> watcher;
     QTimer refreshTimer;  ///< changes on disk come in bursts
     QTimer searchTimer;   ///< search again while indexing
+    QTimer kindsTimer;    ///< the filter asks what PDFs are: list again when the index found out more
+    quint64 kindsSeen = 0;  ///< the index's pdfKindChanges() when the rows were made
     std::vector<Row> rows;
     QString currentFolder;
     bool flatView = false;

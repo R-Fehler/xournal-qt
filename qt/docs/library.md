@@ -40,9 +40,44 @@ A **library** is a plain folder of documents that a window works in, like a work
   (the image is the background of its page). A `.xopp` next to a PDF of its name belongs to the PDF; of several
   images of one name, the first of `.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`, `.heif` pairs (the extension written in
   lower or upper case).
-- Cards show what a document is: "PDF", "MD", "IMG" ("✎": with its `.xopp`). The library model has a kind per row
-  (`notes`, `pdf`, `md`, `image`) for a filter by kind; a hybrid PDF is `pdf`, with the row's `hybrid` flag set when
-  it is known from the listing (next to its `.xopp` export; a lone hybrid PDF is not looked into when listing).
+- Cards show what a document is: "PDF", "MD", "IMG" ("✎": with its `.xopp`, or its notes in the PDF). The library
+  model has a kind per row (`notes`, `pdf`, `md`, `image`) for a filter by kind; a hybrid PDF is `pdf`, with the
+  row's `hybrid` flag set when it is known from the listing (next to its `.xopp` export). What a PDF is comes from the
+  index (below).
+
+### Kinds of PDFs
+A PDF that is a document's file is one of these, and its card's badge says which (`qt/src/app/qml/DocumentCard.qml`;
+the tooltip and the accessible name say it in words):
+
+| Kind (`pdfKind`) | What it is | Badge |
+| --- | --- | --- |
+| `plain` | a PDF (without our marker) | red "PDF" |
+| `notes` | a PDF with notes (a hybrid PDF, [hybrid-pdf.md](hybrid-pdf.md)) | red "PDF ✎" (as a PDF with its `.xopp`) |
+| `text` | a PDF text document: a PDF with notes whose page 1 starts the page's Markdown text ([md-pdf.md](md-pdf.md)); it opens with the formatting bar | blue "PDF Aa", "PDF text document" |
+| `archive`, `archive-text` | an archive PDF (PDF/A-3 with its notes), of a text document | "PDF/A ✎", blue "PDF/A Aa" |
+
+- **Where it comes from:** the library index keeps it per PDF in `notes.pack` (`pdfKind`), tied to the PDF's stamp
+  like the rest of the entry (`LibraryIndex::pdfKind`, a look-up; `PdfKind` in `DocumentFiles.h`). It is found out
+  while the index reads the PDF anyway: opening a PDF reads our marker in its catalog (qpdf reads the trailer, the
+  cross-reference table, the catalog and the marker, not the pages or the embedded files), which says whether it is
+  a PDF with notes, an archive PDF, and whether it carries a `name.md` (listed in the marker's `/Files`): a text
+  document. The marker is remembered per file version, so the kind costs no second read. A PDF with notes written by
+  a build before it carried `name.md` is a text document when the document it carries starts with the page's
+  Markdown text (the index has it open then).
+- Entries written before kinds were kept get only the kind read, once (the marker; no document, no text): as the
+  titles of qt/citations, without a format bump.
+- A PDF changed by another program keeps its last kind until the index has read it again (its stamp changed). A
+  document saved in the app (into a PDF, a new text document, "Open as PDF document", a conversion) is read again by
+  the index at once, and its card follows.
+- The Recent cards show the kinds of the library's PDFs too (from the same index); a PDF outside the library shows
+  "PDF". The tab overview has no badges.
+- Measured (2026-09-26, `XQT_BENCH_KINDS=300 [XQT_BENCH_PDF=<pdf>] xqt-shell-tests
+  --gtest_filter='LibraryKindsTest.bench*'`, 300 PDFs in 5 folders, 113 of them with notes, the flat list, machine
+  busy with other builds): before, "Only PDFs with notes" looked into each lone PDF on the UI thread, 34 ms for small
+  generated PDFs and **361 ms** for copies of a 1.3 MB, 200-page manual the first time (then about 1 ms, remembered
+  per file version and up to 4,096 files); now turning the filter on takes 7 ms in all (the listing and the look-ups),
+  and no PDF is looked into. Reading only the kind of an entry from before costs 0.1–1.3 ms per PDF, on the index's
+  worker.
 - **Text and code files** (`.txt`, `.tex`, `.py`, `.cpp`, `.h`, `.json`, `.csv`, `.org`, `.rst`, `.yaml`, `.toml`,
   `.sh`, and many more, also `Makefile`, `README`, … without an extension) and **all other files** (Office files and
   the rest) are items too, each known by its whole file name (`report.docx`), when the library's "Show" filter shows
@@ -194,7 +229,8 @@ the library is zipped to be sent. Until the library is opened again nothing is c
 positions are kept.
 
 A cache folder holds a few **packs**, one file each, split by how often they change:
-- `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`, `md`, `image`), name, the size and time of
+- `notes.pack`: per document (by file name): its kind (`xopp`, `pdf`, `md`, `image`; a PDF also what it is,
+  `pdfKind`, see "Kinds of PDFs"), name, the size and time of
   its `.xopp` (a Markdown file, an image alone: of that file), the PDF it uses (relative to the folder when it is in
   the library; next to it: its name) with that PDF's size and time, and per page which PDF page it shows, the text
   of its text elements and its shape, and a sample of its own file (a hash of the size and of the first and last
@@ -439,13 +475,16 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
     | --- | --- |
     | Notes (`.xopp`, `.xoj` alone) | on |
     | PDFs (alone or with their `.xopp`), and "only PDFs with notes" (with a `.xopp` next to them, or hybrid PDFs) | on, off |
+    | … "only PDF text documents" | off |
     | Markdown (`.md`) | on |
     | Images (alone or with their `.xopp`) | on |
     | Text and code | off |
     | All other files | off |
 
-    A PDF with its `.xopp` counts as a PDF, an image with its `.xopp` as an image. For "only PDFs with notes" a PDF
-    alone is looked into once per version (whether it is a hybrid PDF). Turning text files on or off brings them into
+    A PDF with its `.xopp` counts as a PDF, an image with its `.xopp` as an image. "Only PDFs with notes" and "only
+    PDF text documents" take what a PDF is from the index ("Kinds of PDFs"): no PDF is looked into on the UI thread.
+    A PDF the index has not read yet counts as a plain one until it has (the grid lists again as the index finds out
+    more, at most twice a second). Both on: the text documents. Turning text files on or off brings them into
     the search index or takes them out.
   - search: folders whose name matches (tap one to open it), then documents whose name or text matches; "Fuzzy"
     in the field: fzf's syntax, names ranked (see Fuzzy search above)

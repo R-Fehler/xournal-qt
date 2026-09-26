@@ -13,6 +13,7 @@
 #include <set>
 #include <shared_mutex>
 #include <sstream>
+#include <string_view>
 #include <system_error>
 #include <unordered_map>
 
@@ -2786,8 +2787,11 @@ namespace {
 struct Kind {
     int kind = 0;            ///< 0: no marker, 1: a hybrid PDF, 2: an archive PDF
     bool revisions = false;  ///< it has incremental updates
+    bool markdown = false;   ///< its marker lists a "name.md" for other apps (a PDF text document)
 };
-/// Remembered by path, size and time.
+std::atomic<int> kindReads{0};
+/// Remembered by path, size and time. qpdf reads the trailer and the cross-reference table, then only the objects
+/// asked for (the catalog, the marker): not the pages or the embedded files.
 Kind kindOf(const fs::path& pdf) {
     static std::mutex m;
     static std::unordered_map<std::string, Kind> known;
@@ -2799,6 +2803,7 @@ Kind kindOf(const fs::path& pdf) {
         }
     }
     Kind kind;
+    ++kindReads;
     try {
         QPDF q;
         q.setSuppressWarnings(true);
@@ -2807,6 +2812,15 @@ Kind kindOf(const fs::path& pdf) {
         if (marker.isDictionary()) {
             QPDFObjectHandle archive = marker.getKey("/Archive");
             kind.kind = archive.isBool() && archive.getBoolValue() ? 2 : 1;
+            // (a text document's "name.md" is listed there with the other files it carries: TextDocument.h)
+            QPDFObjectHandle files = marker.getKey("/Files");
+            for (int i = 0; files.isArray() && i < files.getArrayNItems() && !kind.markdown; ++i) {
+                QPDFObjectHandle v = files.getArrayItem(i);
+                const std::string name = v.isString() ? v.getUTF8Value() : std::string();
+                constexpr std::string_view md = ".md";
+                kind.markdown = name.size() > md.size() && name.find('/') == std::string::npos &&
+                                name.compare(name.size() - md.size(), md.size(), md) == 0;
+            }
         }
         kind.revisions = q.getTrailer().hasKey("/Prev");
     } catch (const std::exception&) {
@@ -2826,6 +2840,13 @@ bool isHybrid(const fs::path& pdf) { return kindOf(pdf).kind != 0; }
 bool isArchive(const fs::path& pdf) { return kindOf(pdf).kind == 2; }
 
 bool hasEarlierRevisions(const fs::path& pdf) { return kindOf(pdf).revisions; }
+
+Marker markerOf(const fs::path& pdf) {
+    const Kind k = kindOf(pdf);
+    return {k.kind != 0, k.kind == 2, k.kind != 0 && k.markdown};
+}
+
+int markerReads() { return kindReads.load(); }
 
 bool compact(const fs::path& pdf, std::string& error) {
     try {

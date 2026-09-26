@@ -1091,13 +1091,42 @@ int compareNames(const QString& a, const QString& b) {
 
 }  // namespace DocumentFiles
 
-bool ShowFilter::shows(const DocumentItem& item) const {
+const char* pdfKindName(PdfKind kind) {
+    switch (kind) {
+        case PdfKind::Plain:
+            return "plain";
+        case PdfKind::Notes:
+            return "notes";
+        case PdfKind::Text:
+            return "text";
+        case PdfKind::Archive:
+            return "archive";
+        case PdfKind::ArchiveText:
+            return "archive-text";
+        case PdfKind::Unknown:
+            break;
+    }
+    return "";
+}
+
+PdfKind pdfKindNamed(const QString& name) {
+    for (PdfKind k: {PdfKind::Plain, PdfKind::Notes, PdfKind::Text, PdfKind::Archive, PdfKind::ArchiveText}) {
+        if (name == QLatin1String(pdfKindName(k))) {
+            return k;
+        }
+    }
+    return PdfKind::Unknown;
+}
+
+bool ShowFilter::shows(const DocumentItem& item, PdfKind pdfKind) const {
     switch (item.kind()) {
         case DocumentItem::Kind::Notes:
             return notes;
         case DocumentItem::Kind::Pdf:
-            // With notes: its .xopp, or its notes in it (a hybrid PDF; a lone one is looked into, once per version)
-            return pdfs && (!onlyPdfsWithNotes || !item.xopp.empty() || item.hybrid || HybridPdf::isHybrid(item.pdf));
+            // With notes: its .xopp, or its notes in it (a PDF with notes: the index knows it). A text document is
+            // always a PDF with notes (a .xopp next to a plain PDF is not one).
+            return pdfs && (!onlyPdfsWithNotes || !item.xopp.empty() || item.hybrid || hasNotes(pdfKind)) &&
+                   (!onlyTextDocuments || isTextDocument(pdfKind));
         case DocumentItem::Kind::Markdown:
             return markdown;
         case DocumentItem::Kind::Image:

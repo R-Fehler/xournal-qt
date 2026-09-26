@@ -191,6 +191,8 @@ public:
     int packsWritten() const { return packWrites.load(); }
     /// PDF titles read for entries that had none (PdfTitle.h; tests).
     int titlesRead() const { return titleReads.load(); }
+    /// Kinds of PDFs read for entries that had none (only their marker; tests).
+    int pdfKindsRead() const { return kindReads.load(); }
     /// Called on the worker for each document of an update once it was found on disk, before its entry is looked at
     /// (tests: a move that lands just then). Set it while the index is idle.
     void setCheckHook(std::function<void(const fs::path&)> hook) { checkHook = std::move(hook); }
@@ -248,6 +250,13 @@ public:
     void prepareWords();
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
+    /// What an indexed PDF is, the main file of a document (a PDF alone, a PDF with notes): PdfKind::Unknown when it
+    /// is not indexed yet or not a PDF. Kept in the entry with the PDF's stamp (read with it: from its marker when it
+    /// is opened, and the document it carries), so it is a look-up: for the cards and the "Show" filter on the UI
+    /// thread. A PDF changed on disk keeps its last kind until the index has read it again.
+    PdfKind pdfKind(const fs::path& file) const;
+    /// Changes when the kind of an indexed PDF changed, or a PDF came or went (the "Show" filter lists again).
+    quint64 pdfKindChanges() const { return kindChanges.load(); }
     /// The indexed documents whose file name is `name`, case ignored (links whose path is gone, wiki links). With
     /// `withoutExtension`, `name` has no extension ("turbines" finds "turbines.md", "Turbines.xopp").
     std::vector<fs::path> filesNamed(const QString& name, bool withoutExtension = false) const;
@@ -323,12 +332,17 @@ private:
         QString heading;
         /// They were read (entries of PDFs indexed before titles were: only the title is read, once)
         bool titleRead = true;
+        /// Its main file is a PDF: what it is (plain, with notes, a text document, an archive PDF). Unknown in entries
+        /// of PDFs indexed before kinds were kept: then only the kind is read, once (from the PDF's marker).
+        PdfKind pdfKind = PdfKind::Unknown;
+        bool isPdf() const;
+        bool pdfKindMissing() const;
         int pageCount() const { return static_cast<int>(elementText.size()); }
         bool showsPdfPages() const;
         /// Nothing changed since it was read.
         bool upToDate(const DocumentItem& item) const;
-        /// Nothing changed, but its PDF's title was never read (an entry from before titles were kept).
-        bool onlyTitleMissing(const DocumentItem& item) const;
+        /// Nothing changed, but its PDF's title or kind was never read (an entry from before they were kept).
+        bool onlyMetaMissing(const DocumentItem& item) const;
     };
     using EntryPtr = std::shared_ptr<const Entry>;
     /// The vocabularies of an entry: per passage (a Markdown or text file), else per page (Vocabulary.h).
@@ -393,10 +407,12 @@ private:
     std::map<fs::path, Folder> folders;  ///< by folder
     bool firstRun = true;                ///< (the worker's) the stored packs of all folders are read once
     std::atomic<quint64> generation{0};
+    std::atomic<quint64> kindChanges{0};
     std::atomic<bool> running{false};
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
-    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0}, titleReads{0};
+    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0}, titleReads{0},
+            kindReads{0};
     std::function<void(const fs::path&)> checkHook;
 };
 

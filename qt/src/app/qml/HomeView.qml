@@ -554,6 +554,14 @@ Rectangle {
                             leftPadding: 40
                             font.pixelSize: 13
                         }
+                        ShowToggle {
+                            objectName: "showOnlyTextDocuments"
+                            key: "onlyTextDocuments"
+                            text: qsTr("Only PDF text documents")
+                            enabled: showPopup.show.pdfs === true
+                            leftPadding: 40
+                            font.pixelSize: 13
+                        }
                         ShowToggle { objectName: "showMarkdown"; key: "markdown"; text: qsTr("Markdown (.md)") }
                         ShowToggle { objectName: "showImages"; key: "images"; text: qsTr("Images") }
                         ShowToggle { objectName: "showText"; key: "text"; text: qsTr("Text and code (.txt, .tex, .py, …)") }
@@ -872,6 +880,7 @@ Rectangle {
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
                         kind: model.kind
+                        pdfKind: model.pdfKind
                         fileIcon: model.fileIcon
                         hits: model.hits
                         conflicts: model.conflicts ? model.conflicts.length : 0
@@ -1071,6 +1080,7 @@ Rectangle {
                         lastPage: model.lastPage
                         hasXopp: model.hasXopp
                         kind: model.kind
+                        pdfKind: model.pdfKind
                         width: recentGrid.cellWidth
                         height: recentGrid.cellHeight
                         active: home.visible

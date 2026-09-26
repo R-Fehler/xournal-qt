@@ -129,6 +129,17 @@ fs::path xoppExportOf(const fs::path& pdf);
 bool isHybrid(const fs::path& pdf);
 /// Whether it is an archive PDF (writeArchive; remembered likewise).
 bool isArchive(const fs::path& pdf);
+/// What our marker in a PDF's catalog says (read with isHybrid, and remembered with it: one read per file version).
+/// qpdf reads the trailer, the cross-reference table, the catalog and the marker, not the pages or the embedded files.
+struct Marker {
+    bool hybrid = false;    ///< it carries our marker: a PDF with notes
+    bool archive = false;   ///< an archive PDF (writeArchive)
+    /// It carries a "name.md" for other apps (listed in the marker's /Files): a PDF text document (TextDocument.h)
+    bool markdown = false;
+};
+Marker markerOf(const fs::path& pdf);
+/// How often a marker was read from a file (not remembered) so far, in this process (tests: nothing read twice).
+int markerReads();
 /// Whether the file holds earlier revisions (incremental updates, by this app or another): older versions of the ink
 /// may still be in it, so it is written anew before it is shared (remembered likewise).
 bool hasEarlierRevisions(const fs::path& pdf);

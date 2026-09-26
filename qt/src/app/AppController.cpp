@@ -180,6 +180,16 @@ AppController::AppController(QObject* parent): QObject(parent) {
         library->filesMoved(r);  // a renamed library document keeps its search index entry
         filesChanged(r);
     };
+    // The Recent cards show what a PDF of the library is, as its cards do (the index knows it)
+    recent->setPdfKinds([lib = QPointer<LibraryModel>(library)](const fs::path& file) {
+        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
+        return index ? index->pdfKind(file) : PdfKind::Unknown;
+    });
+    connect(library, &LibraryModel::indexChanged, recent, [this] {
+        if (!library->indexing()) {
+            recent->pdfKindsChanged();
+        }
+    });
     journalFile = SessionRecovery::defaultJournalFile();
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &AppController::applicationStateChanged);
 }

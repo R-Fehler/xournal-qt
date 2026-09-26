@@ -40,6 +40,7 @@ public:
         LastPageRole,  ///< the page the document was left at (-1: not known)
         KindRole,      ///< "notes", "pdf", "md", "image", "text" (DocumentItem::kindName); a library: "library"
         IsLibraryRole, ///< a folder opened as a library
+        PdfKindRole,   ///< a document whose file is a PDF: what it is, where the library knows it (pdfKindName; else "")
     };
     static constexpr int MAX_ENTRIES = 100;
 
@@ -58,6 +59,10 @@ public:
     void addLibrary(const fs::path& folder);
     /// A file or folder has a new path.
     void remap(const fs::path& from, const fs::path& to);
+    /// What a PDF is, where it is known (the library index: set by the controller; not set: not known).
+    void setPdfKinds(std::function<PdfKind(const fs::path&)> lookup);
+    /// The kinds known may have changed (the index read more): the cards show them anew.
+    void pdfKindsChanged();
     /// Files were renamed, moved or trashed (open tabs follow).
     std::function<void(const DocumentFiles::Result&)> onFilesChanged;
 
@@ -105,6 +110,7 @@ private:
     void dropLibraries();
 
     fs::path storeFile;
+    std::function<PdfKind(const fs::path&)> pdfKinds;
     std::vector<Row> rows;
     GridSelection selection;
 };

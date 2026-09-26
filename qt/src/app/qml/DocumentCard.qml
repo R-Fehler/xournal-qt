@@ -28,6 +28,11 @@ Item {
     property bool hasXopp: false
     /// "notes", "pdf", "md", "image", "text", "other" (a PDF or an image with its .xopp: "pdf" / "image" and hasXopp)
     property string kind
+    /// A document whose file is a PDF: what the PDF is (the library index knows it): "plain", "notes" (a PDF with
+    /// notes), "text" (a PDF text document), "archive", "archive-text"; "" while not known
+    property string pdfKind
+    readonly property bool pdfText: pdfKind === "text" || pdfKind === "archive-text"
+    readonly property bool pdfArchive: pdfKind === "archive" || pdfKind === "archive-text"
     /// A text or other file: the icon of its type (shown instead of a preview for other files)
     property string fileIcon
     /// A text or other file: its extension in capitals ("DOCX"; "" without one)
@@ -158,33 +163,54 @@ Item {
                     opacity: 0.85
                 }
                 // "PDF" for documents with a PDF (annotated or not), "MD" for Markdown files, "IMG" for images, the
-                // extension of text and other files
+                // extension of text and other files. With notes (a .xopp next to it, or in the PDF): "PDF ✎"; a PDF
+                // text document: "PDF Aa" in blue; an archive PDF: "PDF/A" (qt/docs/library.md, "Kinds of PDFs").
                 Rectangle {
                     id: pdfBadge
                     objectName: "kindBadge"
-                    readonly property string label: card.hasPdf || card.kind === "pdf" ? qsTr("PDF")
+                    readonly property bool isPdf: card.hasPdf || card.kind === "pdf"
+                    readonly property bool withNotes: card.hasXopp || (isPdf && card.pdfKind !== "" && card.pdfKind !== "plain")
+                    readonly property string label: isPdf ? (card.pdfArchive ? qsTr("PDF/A") : qsTr("PDF"))
                                                     : card.kind === "md" ? qsTr("MD")
                                                     : card.kind === "image" ? qsTr("IMG")
                                                     : card.kind === "text" ? (card.extension !== "" ? card.extension : qsTr("TXT"))
                                                     : card.kind === "other" ? card.extension : ""
+                    /// What the badge stands for, in words (its tooltip and accessible name)
+                    readonly property string description:
+                        isPdf ? (card.pdfText ? (card.pdfArchive ? qsTr("PDF text document (archive PDF)") : qsTr("PDF text document"))
+                                 : card.pdfArchive ? qsTr("Archive PDF with notes")
+                                 : card.pdfKind === "notes" ? qsTr("PDF with notes")
+                                 : card.hasXopp ? qsTr("PDF with notes (its .xopp next to it)") : qsTr("PDF"))
+                        : card.kind === "md" ? qsTr("Markdown file")
+                        : card.kind === "image" ? (card.hasXopp ? qsTr("Image with notes") : qsTr("Image"))
+                        : card.kind === "text" ? qsTr("Text file")
+                        : label
                     visible: !card.isFolder && label !== ""
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 6
                     radius: 4
                     color: card.kind === "md" ? "#455a64" : card.kind === "image" ? "#00897b"
-                           : card.kind === "text" ? "#6d4c41" : card.kind === "other" ? "#5f6368" : "#d93025"
+                           : card.kind === "text" ? "#6d4c41" : card.kind === "other" ? "#5f6368"
+                           : isPdf && card.pdfText ? "#1565c0" : "#d93025"
                     width: pdfLabel.implicitWidth + 8
                     height: 16
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: description
                     Label {
                         id: pdfLabel
                         objectName: "kindBadgeText"
                         anchors.centerIn: parent
-                        text: card.hasXopp ? pdfBadge.label + " ✎" : pdfBadge.label
+                        text: pdfBadge.isPdf && card.pdfText ? pdfBadge.label + " Aa"
+                              : pdfBadge.withNotes ? pdfBadge.label + " ✎" : pdfBadge.label
                         font.pixelSize: 10
                         font.weight: Font.Bold
                         color: "#ffffff"
                     }
+                    HoverHandler { id: badgeHover }
+                    ToolTip.visible: badgeHover.hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: description
                 }
                 HitBadge {
                     anchors.right: parent.right

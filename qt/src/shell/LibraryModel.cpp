@@ -52,6 +52,13 @@ LibraryModel::LibraryModel(QObject* parent): QAbstractListModel(parent) {
     searchTimer.setSingleShot(true);
     searchTimer.setInterval(700);
     connect(&searchTimer, &QTimer::timeout, this, &LibraryModel::updateSearch);
+    kindsTimer.setSingleShot(true);
+    kindsTimer.setInterval(500);
+    connect(&kindsTimer, &QTimer::timeout, this, [this] {
+        if (idx && filter.kindMatters() && idx->pdfKindChanges() != kindsSeen) {
+            rebuild();  // (the index found out what PDFs are: the filter shows them now, or not)
+        }
+    });
 }
 
 LibraryModel::~LibraryModel() {
@@ -127,8 +134,11 @@ void LibraryModel::openCache() {
         if (!query.isEmpty() && !searchTimer.isActive()) {
             searchTimer.start();  // new text: search again (not on every document)
         }
+        if (filter.kindMatters() && idx->pdfKindChanges() != kindsSeen && !kindsTimer.isActive()) {
+            kindsTimer.start();  // (not on every document)
+        }
         if (!rows.empty()) {
-            Q_EMIT dataChanged(index(0), index(static_cast<int>(rows.size()) - 1), {PageCountRole});
+            Q_EMIT dataChanged(index(0), index(static_cast<int>(rows.size()) - 1), {PageCountRole, PdfKindRole});
         }
     });
 }
@@ -330,7 +340,7 @@ LibraryModel::Row LibraryModel::folderRow(const fs::path& f) const {
     const auto inside = DocumentFiles::scan(f, filter.include());
     r.itemCount = static_cast<int>(inside.folders.size() +
                                    std::count_if(inside.items.begin(), inside.items.end(),
-                                                 [this](const DocumentItem& i) { return filter.shows(i); }));
+                                                 [this](const DocumentItem& i) { return shown(i); }));
     return r;
 }
 
@@ -369,14 +379,14 @@ std::vector<LibraryModel::Row> LibraryModel::fuzzyRows(const FuzzyQuery& parsed)
     if (onlyNames) {
         auto all = DocumentFiles::scanRecursive(lib->root(), include);
         for (const auto& item: all) {
-            if (filter.shows(item)) {
+            if (shown(item)) {
                 byName(item);
             }
         }
     } else {
         for (auto& hit: idx->search(parsed)) {
             const DocumentItem item = DocumentFiles::itemOf(hit.file, include);
-            if (item.valid() && filter.shows(item)) {
+            if (item.valid() && shown(item)) {
                 Row r = itemRow(item);
                 r.hit = std::move(hit);
                 docRows.push_back(std::move(r));
@@ -463,7 +473,14 @@ void LibraryModel::watchFolders(const std::vector<fs::path>& folders) {
     }
 }
 
+bool LibraryModel::shown(const DocumentItem& item) const {
+    // What a PDF is only when the filter asks (the index knows it: nothing is read here)
+    const bool askIndex = filter.kindMatters() && idx && item.kind() == DocumentItem::Kind::Pdf;
+    return filter.shows(item, askIndex ? idx->pdfKind(item.main()) : PdfKind::Unknown);
+}
+
 void LibraryModel::rebuild() {
+    kindsSeen = idx ? idx->pdfKindChanges() : 0;
     std::vector<Row> newRows;
     marks = query;
     if (lib && fuzzy && !query.trimmed().isEmpty()) {
@@ -479,7 +496,7 @@ void LibraryModel::rebuild() {
         // The documents of the library that are shown
         auto allShown = [this, include] {
             auto all = DocumentFiles::scanRecursive(lib->root(), include);
-            std::erase_if(all, [this](const DocumentItem& i) { return !filter.shows(i); });
+            std::erase_if(all, [this](const DocumentItem& i) { return !shown(i); });
             return all;
         };
         if (const QString q = LibraryIndex::simplified(query).trimmed(); !q.isEmpty() && onlyNames) {
@@ -529,7 +546,7 @@ void LibraryModel::rebuild() {
             }
             for (auto& hit: idx->search(query)) {
                 const DocumentItem item = DocumentFiles::itemOf(hit.file, include);
-                if (item.valid() && filter.shows(item)) {
+                if (item.valid() && shown(item)) {
                     if (!hit.inName && !otherRows.empty()) {
                         std::move(otherRows.begin(), otherRows.end(), std::back_inserter(newRows));
                         otherRows.clear();
@@ -552,7 +569,7 @@ void LibraryModel::rebuild() {
                     folderRows.push_back(folderRow(f));
                 }
                 for (const auto& item: listing.items) {
-                    if (filter.shows(item)) {
+                    if (shown(item)) {
                         docRows.push_back(itemRow(item));
                     }
                 }
@@ -689,6 +706,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             return r.isFolder ? QString() : QString::fromLatin1(r.item.kindName());
         case HybridRole:
             return !r.isFolder && r.item.hybrid;
+        case PdfKindRole:
+            return r.isFolder || !idx ? QString() : QString::fromLatin1(pdfKindName(idx->pdfKind(r.path)));
         case HitPassageListRole: {
             QVariantList passages;
             passages.reserve(static_cast<qsizetype>(r.hit.blockHits.size()));
@@ -753,6 +772,7 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {HitPageBaseRole, "hitPageBase"},
             {KindRole, "kind"},
             {HybridRole, "hybrid"},
+            {PdfKindRole, "pdfKind"},
             {HitPassageListRole, "hitPassageList"},
             {HitPassageBaseRole, "hitPassageBase"},
             {SizeRole, "size"},
@@ -780,14 +800,17 @@ void LibraryModel::setShowFilter(const ShowFilter& f) {
 
 QVariantMap LibraryModel::show() const {
     return {{"notes", filter.notes},   {"pdfs", filter.pdfs}, {"onlyPdfsWithNotes", filter.onlyPdfsWithNotes},
+            {"onlyTextDocuments", filter.onlyTextDocuments},
             {"markdown", filter.markdown}, {"images", filter.images}, {"text", filter.text},
             {"other", filter.other}};
 }
 
 void LibraryModel::setShown(const QString& key, bool shown) {
     ShowFilter f = filter;
-    bool* flags[] = {&f.notes, &f.pdfs, &f.onlyPdfsWithNotes, &f.markdown, &f.images, &f.text, &f.other};
-    const char* keys[] = {"notes", "pdfs", "onlyPdfsWithNotes", "markdown", "images", "text", "other"};
+    bool* flags[] = {&f.notes,  &f.pdfs, &f.onlyPdfsWithNotes, &f.onlyTextDocuments, &f.markdown, &f.images,
+                     &f.text,   &f.other};
+    const char* keys[] = {"notes",  "pdfs", "onlyPdfsWithNotes", "onlyTextDocuments", "markdown", "images",
+                          "text",   "other"};
     for (size_t i = 0; i < std::size(keys); ++i) {
         if (key == QLatin1String(keys[i])) {
             *flags[i] = shown;
