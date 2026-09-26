@@ -392,6 +392,11 @@ public:
     void movePageTowardsBeginning();
     void movePageTowardsEnd();
 
+    // --- bookmarks (PageBookmarks.h, qt/docs/bookmarks.md) ----------------------------------------------------------
+    /// Bookmark a page with this label ("": the automatic one, "Page N"), rename its bookmark, or remove it (nullopt).
+    /// One undo step. False if nothing changed.
+    bool setBookmark(size_t page, std::optional<std::string> label);
+
     // --- several pages at once (sidebar / page grid selection) --------------------------------------------------
     /// The undo stack that page changes go onto: the one of everything (as in upstream), see addPageUndoAction().
     UndoRedoHandler* getPageUndoRedoHandler() const { return undoRedo.get(); }
@@ -441,6 +446,8 @@ Q_SIGNALS:
     void pageContentChanged(qulonglong page);
     /// A pageRevision() changed (or pages came or went).
     void pageRevisionsChanged();
+    /// A page's bookmark was set, renamed or removed (also by undo and redo).
+    void bookmarksChanged();
     /// Show this rectangle of a page (page points), e.g. a search hit.
     void scrollToRectRequested(qulonglong page, QRectF rect);
 
@@ -450,6 +457,7 @@ private:
     void init();
     void enableAutosave(bool enable);
     void updatePageActions();
+    void applyBookmark(const PageRef& page, const std::optional<std::string>& label);
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
 

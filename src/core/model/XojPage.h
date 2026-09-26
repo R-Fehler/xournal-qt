@@ -65,6 +65,13 @@ public:
     const NoteSpace& getNoteSpace() const;
     void setNoteSpace(const NoteSpace& space);
 
+    /**
+     * xournal-qt: the page is bookmarked (qt/docs/bookmarks.md): its label ("": the app names it). Saved as the page
+     * attribute xqt-bookmark="label"; nullopt: not bookmarked.
+     */
+    const std::optional<std::string>& getBookmark() const;
+    void setBookmark(std::optional<std::string> label);
+
     bool isAnnotated() const;
 
     void setBackgroundColor(Color color);
@@ -129,6 +136,11 @@ private:
      * xournal-qt: space for notes around the content (see model/NoteSpace.h)
      */
     NoteSpace noteSpace;
+
+    /**
+     * xournal-qt: the page's bookmark (see getBookmark)
+     */
+    std::optional<std::string> bookmark;
 
     /**
      * The background color if the background type is plain

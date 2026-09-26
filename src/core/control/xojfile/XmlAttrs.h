@@ -26,6 +26,7 @@ constexpr auto FILEVERSION_STR = u8"fileversion";
 constexpr auto WIDTH_STR = u8"width";  // also in stroke
 constexpr auto HEIGHT_STR = u8"height";
 constexpr auto NOTESPACE_STR = u8"notespace";  // xournal-qt: "left top right bottom" (model/NoteSpace.h)
+constexpr auto BOOKMARK_STR = u8"xqt-bookmark";  // xournal-qt: the page's bookmark label (qt/docs/bookmarks.md)
 
 // background
 constexpr auto NAME_STR = u8"name";  // also in layer

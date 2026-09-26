@@ -2036,3 +2036,12 @@ Design: [md-images.md](../md-images.md).
       Ctrl+V pastes them onto the page clicked.
 - [ ] Android (Fold 7): a rectangle drawn with the pen around two notes selects both; a finger drag in the dashed box
       moves them; the selection's pill fits.
+
+## Favourites and bookmarks (qt/bookmarks)
+- [ ] A .xopp with two bookmarks (one named, one "Page N"): save, open it in upstream Xournal++: no message, the pages
+      as before. Save it there and open it here again: the bookmarks are gone (documented).
+- [ ] A PDF with notes (PDF files mode) with its own table of contents: bookmark two pages, Ctrl+S. Open the PDF in
+      Okular / Evince / a browser / Acrobat / Xodo: the outline shows the book's chapters as before and, last, a
+      "Bookmarks" entry with the two pages; tapping one goes to its page. Rename one here, Ctrl+S: the other viewer
+      (reloaded) shows the new name.
+- [ ] Remove all bookmarks, Ctrl+S: the "Bookmarks" entry is gone in the other viewer, the chapters are still there.

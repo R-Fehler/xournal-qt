@@ -291,6 +291,9 @@ void SaveHandler::visitPage(XmlNode* root, ConstPageRef p, const Document* doc, 
     if (const NoteSpace& s = p->getNoteSpace(); !s.empty()) {  // xournal-qt: model/NoteSpace.h
         page->setAttrib(xoj::xml_attrs::NOTESPACE_STR, std::vector<double>{s.left, s.top, s.right, s.bottom});
     }
+    if (const auto& bookmark = p->getBookmark()) {  // xournal-qt: qt/docs/bookmarks.md
+        page->setAttrib(xoj::xml_attrs::BOOKMARK_STR, *bookmark);
+    }
 
     auto* background = new XmlNode(TAG_NAMES[TagType::BACKGROUND]);
     page->addChild(background);

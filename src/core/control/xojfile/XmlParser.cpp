@@ -252,6 +252,10 @@ void XmlParser::parsePageTag(const XmlParserHelper::AttributeMap& attributeMap) 
             this->builder.setPageNoteSpace(l, t, r, b);
         }
     }
+    // xournal-qt: a bookmark on the page (qt/docs/bookmarks.md)
+    if (const auto label = XmlParserHelper::getAttrib<std::string_view>(xoj::xml_attrs::BOOKMARK_STR, attributeMap)) {
+        this->builder.setPageBookmark(std::string{*label});
+    }
 }
 
 void XmlParser::parseAudioTag(const XmlParserHelper::AttributeMap& attributeMap) {

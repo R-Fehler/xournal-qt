@@ -51,6 +51,10 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyQuery.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/FuzzyQuery.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageOrderUndoAction.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageBookmarks.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageBookmarks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfBookmarks.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PdfBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/MergedPdf.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/IncrementalPdf.h
@@ -161,7 +165,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickyNoteTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp)
     target_link_libraries(xqt-session-tests PRIVATE xqt-session Qt6::Test GTest::gtest)
     target_include_directories(xqt-session-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-session-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}"
