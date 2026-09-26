@@ -6,4 +6,5 @@ build time (`qt/cmake/XqtApp.cmake`).
 
 The formatting bar's icons (`xqt-code`, `xqt-code-block`, `xqt-sigma`, `xqt-sigma-block`, `xqt-list-todo`, `xqt-quote`, `xqt-table`,
 `xqt-plus`, `xqt-align-*`) are Lucide's; `xqt-rule`, `xqt-page-break`, `xqt-row-*`, `xqt-column-*` and `xqt-note-space` (a slide with space for notes
-around it) are drawn in the same style for this app.
+around it) are drawn in the same style for this app, as is `xqt-select-more` (a dashed selection with a plus: "Select
+more" in the selection's pills).

@@ -17,6 +17,8 @@
 #include "control/settings/Settings.h"
 
 #include "CanvasView.h"
+#include "StickyNotes.h"
+#include "session/AppContext.h"
 #include "PageSketches.h"
 #include "session/StickyNote.h"
 #include "PagesModel.h"
@@ -79,6 +81,7 @@ void ReferenceMode::update() {
     connections.clear();
     if (shownView) {
         shownView->clearPdfTextSelection();  // (what was selected to copy; the selection of elements stays)
+        shownView->setSelectingMore(false);  // (select more ends with the view shown)
     }
     shownView = v;
     shownSession = s;
@@ -97,6 +100,13 @@ void ReferenceMode::update() {
         connections.push_back(connect(&v->getViewController(), &ViewController::zoom100Changed, this,
                                       &ReferenceMode::zoomChanged));
         connections.push_back(connect(v, &CanvasView::selectionChanged, this, &ReferenceMode::selectionChanged));
+        connections.push_back(connect(v, &CanvasView::noteSelectionChanged, this, &ReferenceMode::noteSelectionChanged));
+        // (select more: available, on or off, the count)
+        connections.push_back(connect(v, &CanvasView::selectMoreChanged, this, &ReferenceMode::selectMoreChanged));
+        connections.push_back(connect(v, &CanvasView::selectionChanged, this, &ReferenceMode::selectMoreChanged));
+        connections.push_back(connect(v, &CanvasView::noteSelectionChanged, this, &ReferenceMode::selectMoreChanged));
+        connections.push_back(
+                connect(&s->getApp(), &AppContext::activeToolChanged, this, &ReferenceMode::selectMoreChanged));
         connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::selectionChanged));
         connections.push_back(connect(v, &CanvasView::pdfTextSelectionCleared, this, &ReferenceMode::selectionChanged));
         connections.push_back(connect(v, &CanvasView::pdfTextSelected, this, &ReferenceMode::pdfTextSelected));
@@ -116,6 +126,8 @@ void ReferenceMode::update() {
     Q_EMIT pageChanged();
     Q_EMIT zoomChanged();
     Q_EMIT selectionChanged();
+    Q_EMIT noteSelectionChanged();
+    Q_EMIT selectMoreChanged();
     Q_EMIT pdfTextSelectionChanged();
     Q_EMIT navigationChanged();
     if (!active()) {
@@ -177,7 +189,65 @@ void ReferenceMode::setFocused(bool on) {
 }
 
 bool ReferenceMode::hasSelection() const {
-    return shownView && (shownView->getSelection() || shownView->hasPdfTextSelection());
+    // (elements, or several notes with elements: the selection's pill; a single note has its own, as on the notes)
+    return shownView &&
+           (shownView->getSelection() || shownView->mixed().active() || shownView->hasPdfTextSelection());
+}
+
+bool ReferenceMode::selectMoreOffered() const { return shownView && shownView->offersSelectMore(); }
+bool ReferenceMode::selectMoreAvailable() const { return shownView && shownView->canSelectMore(); }
+bool ReferenceMode::selectingMore() const { return shownView && shownView->selectingMore(); }
+void ReferenceMode::setSelectingMore(bool on) {
+    if (shownView) {
+        shownView->setSelectingMore(on);  // (only while it is written in: CanvasView::canSelectMore)
+    }
+}
+int ReferenceMode::selectedCount() const { return shownView ? shownView->selectedCount() : 0; }
+
+bool ReferenceMode::noteSelected() const { return shownView && shownView->notes().hasSelection(); }
+QColor ReferenceMode::noteColor() const {
+    if (const auto look = shownView ? shownView->notes().selectedLook() : std::nullopt) {
+        return QColor(look->color.red, look->color.green, look->color.blue);
+    }
+    return {};
+}
+void ReferenceMode::setNoteColor(const QColor& color) {
+    if (shownView && editing()) {
+        shownView->notes().setColor(Color(static_cast<uint8_t>(color.red()), static_cast<uint8_t>(color.green()),
+                                          static_cast<uint8_t>(color.blue())));
+    }
+}
+bool ReferenceMode::noteCovers() const {
+    const auto look = shownView ? shownView->notes().selectedLook() : std::nullopt;
+    return look && look->cover;
+}
+void ReferenceMode::setNoteCovers(bool covers) {
+    if (shownView && editing()) {
+        shownView->notes().setCover(covers);
+    }
+}
+QRectF ReferenceMode::noteBox() const { return shownView ? shownView->notes().selectedViewBox() : QRectF(); }
+bool ReferenceMode::writeNoteText() {
+    return shownView && editing() && !shownSession->isReadOnly() && shownView->writeNoteText();
+}
+bool ReferenceMode::copyStickyNote() {
+    const bool ok = shownView && (shownView->mixed().active() ? shownView->mixed().copy()
+                                                              : shownView->notes().copySelected());
+    if (ok) {
+        Q_EMIT copied(tr("Copied from the reference"));
+    }
+    return ok;
+}
+bool ReferenceMode::cutStickyNote() {
+    if (!shownView || !editing()) {
+        return false;
+    }
+    return shownView->mixed().active() ? shownView->mixed().cut() : shownView->notes().cutSelected();
+}
+void ReferenceMode::deleteStickyNote() {
+    if (shownView && editing()) {
+        shownView->notes().deleteSelected();
+    }
 }
 
 bool ReferenceMode::canGoBack() const { return shownView && shownView->canGoBack(); }
@@ -368,8 +438,8 @@ bool ReferenceMode::copy() {
 void ReferenceMode::clearSelection() {
     if (shownView) {
         shownView->clearPdfTextSelection();
-        if (shownView->getSelection()) {
-            shownView->clearSelection();
+        if (shownView->hasAnySelection()) {
+            shownView->clearSelection();  // (elements, a note, several notes)
         }
     }
 }
@@ -465,7 +535,7 @@ bool ReferenceMode::pasteAt(qreal x, qreal y) {
 bool ReferenceMode::canPaste() const {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
     return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal") ||
-                    mime->hasFormat(sticky::CLIPBOARD_MIME));
+                    mime->hasFormat(sticky::CLIPBOARD_MIME) || mime->hasFormat(sticky::GROUP_CLIPBOARD_MIME));
 }
 
 void ReferenceMode::selectAllOnPage() {

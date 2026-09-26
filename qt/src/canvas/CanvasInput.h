@@ -170,6 +170,8 @@ private:
     QPointF lastGeometryPos;
     /// A finger on a selection of elements moves, resizes or rotates it (instead of scrolling the page).
     bool startTouchSelection(QPointF viewPos);
+    /// (the finger on the selection: what it does)
+    bool pressTouchSelection(QPointF viewPos);
     void moveTouchSelection(QPointF viewPos);
     void endTouchSelection();
     bool touchSelection = false;
@@ -187,6 +189,11 @@ private:
     QPointF touchSessionStartPos;
     QPointF pressViewPos;
     double pressTimeMs = 0;
+    /// Select more is on and the press (or the finger) started moving the selection here (view coordinates): let go
+    /// without moving it, it was a tap, and what is there leaves the selection or joins it (CanvasView::toggleAt)
+    std::optional<QPointF> toggleOnTap;
+    /// The release is where the press was (however long it took): a tap on the selection when select more is on
+    bool barelyMoved(const Event& release) const;
     bool pinching = false;
     double pinchStartDistance = 1;
     bool panning = false;

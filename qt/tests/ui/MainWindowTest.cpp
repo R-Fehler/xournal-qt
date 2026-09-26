@@ -4150,6 +4150,94 @@ TEST_F(MainWindowTest, severalStickyNotesSelectedTogetherHaveTheSelectionsPill) 
     EXPECT_EQ(controller->pageCount(), pages);
 }
 
+// qt/touch-multiselect: "Select more" in the pills of a selection (with the rectangle or lasso), highlighted while on,
+// and the count of what is selected
+TEST_F(MainWindowTest, thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* s = controller->tabManager().currentSession();
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    ASSERT_TRUE(controller->insertStickyNote());
+    ASSERT_TRUE(controller->insertStickyNote());
+    std::vector<Layer*> notes;
+    {
+        std::shared_lock lock(*s->getDocument());
+        for (Layer* l: s->getDocument()->getPage(0)->getLayers()) {
+            if (xqt::sticky::isNote(*l)) {
+                notes.push_back(l);
+            }
+        }
+    }
+    ASSERT_EQ(notes.size(), 2u);
+    // (side by side)
+    for (size_t i = 0; i < notes.size(); ++i) {
+        const auto look = *xqt::sticky::lookOf(*notes[i]);
+        auto to = look;
+        to.rect = {60.0 + 200.0 * static_cast<double>(i), 80, 120, 90};
+        xqt::sticky::changeLook(*s->getDocument(), s->getDocument()->getPage(0), *notes[i], look, to);
+    }
+    controller->selectTool("selectRect");
+    view->selectTogether(*view->getPage(0), {notes[0]}, {});
+    auto* notePill = find<QQuickItem>("notePill");
+    auto* selectionPill = find<QQuickItem>("selectionBar");
+    ASSERT_NE(notePill, nullptr);
+    ASSERT_NE(selectionPill, nullptr);
+    until([&] { return notePill->isVisible(); });
+
+    // One note, the rectangle tool: its pill offers it (not highlighted), without a count
+    auto* noteMore = findItem("noteSelectMore");
+    ASSERT_NE(noteMore, nullptr);
+    EXPECT_TRUE(noteMore->isVisible());
+    EXPECT_FALSE(noteMore->property("checked").toBool());
+    EXPECT_FALSE(findItem("noteCount")->isVisible());
+    controller->selectTool("selectObject");
+    wait(20);
+    EXPECT_FALSE(noteMore->isVisible()) << "only with the rectangle or the lasso";
+    controller->selectTool("selectRegion");
+    wait(20);
+    EXPECT_TRUE(noteMore->isVisible());
+
+    // On: highlighted, the count (one)
+    click(noteMore);
+    EXPECT_TRUE(controller->selectingMore());
+    EXPECT_TRUE(noteMore->property("checked").toBool());
+    EXPECT_TRUE(findItem("noteCount")->isVisible());
+    EXPECT_EQ(findItem("noteCount")->property("text").toString(), "1");
+
+    // A tap on the other note: both, the selection's pill with the count and select more still on
+    ASSERT_TRUE(view->toggleAt(*view->getPage(0), 320, 120));
+    until([&] { return selectionPill->isVisible(); });
+    EXPECT_FALSE(notePill->isVisible());
+    auto* more = findItem("selectionMore");
+    auto* count = findItem("selectionCount");
+    ASSERT_NE(more, nullptr);
+    ASSERT_NE(count, nullptr);
+    EXPECT_TRUE(more->isVisible());
+    EXPECT_TRUE(more->property("checked").toBool());
+    EXPECT_TRUE(count->isVisible());
+    EXPECT_EQ(count->property("text").toString(), "2");
+
+    // Tapped again: off (the selection stays)
+    click(more);
+    EXPECT_FALSE(controller->selectingMore());
+    EXPECT_FALSE(more->property("checked").toBool());
+    EXPECT_TRUE(selectionPill->isVisible());
+    EXPECT_EQ(count->property("text").toString(), "2");
+    click(more);
+    EXPECT_TRUE(more->property("checked").toBool());
+
+    // Another tool: it ends; a tool that is no select tool ends the selection too
+    controller->selectTool("selectRect");
+    wait(20);
+    EXPECT_FALSE(controller->selectingMore());
+    EXPECT_FALSE(more->property("checked").toBool());
+    controller->selectTool("pen");
+    until([&] { return !selectionPill->isVisible(); });
+    EXPECT_FALSE(selectionPill->isVisible());
+    EXPECT_FALSE(notePill->isVisible());
+}
+
 TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

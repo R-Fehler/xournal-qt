@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <QClipboard>
+#include <QMimeData>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QGuiApplication>
@@ -30,10 +31,12 @@
 #include "model/XojPage.h"
 #include "canvas/CanvasPage.h"
 #include "canvas/CanvasView.h"
+#include "canvas/StickyNotes.h"
 #include "render/RenderService.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
@@ -895,6 +898,120 @@ TEST_F(ReferenceWindowTest, aSelectionInTheReferenceHasItsBarOnItsSide) {
     click(findItem("referenceSelectionDelete"));
     EXPECT_EQ(elements(session), 0u) << "not deleted in the reference";
     EXPECT_FALSE(bar->isVisible());
+}
+
+// The document beside itself (qt/self-reference), written in: selecting works as on the notes - the selection's pill
+// for elements and for notes selected together, the note's pill for one note, Ctrl + click adds, "Select more" and the
+// count (qt/touch-multiselect). For reading only: a note's pill offers copying.
+TEST_F(ReferenceWindowTest, selectingInTheSameDocumentBesideItselfWorksAsOnTheNotes) {
+    auto* session = tabs().session(0);
+    ASSERT_TRUE(controller->insertStickyNote());
+    ASSERT_TRUE(controller->insertStickyNote());
+    std::vector<Layer*> notes;
+    {
+        std::shared_lock lock(*session->getDocument());
+        for (Layer* l: session->getDocument()->getPage(0)->getLayers()) {
+            if (xqt::sticky::isNote(*l)) {
+                notes.push_back(l);
+            }
+        }
+    }
+    ASSERT_EQ(notes.size(), 2u);
+    for (size_t i = 0; i < notes.size(); ++i) {  // (side by side)
+        const auto look = *xqt::sticky::lookOf(*notes[i]);
+        auto to = look;
+        to.rect = {60.0 + 200.0 * static_cast<double>(i), 80, 120, 90};
+        xqt::sticky::changeLook(*session->getDocument(), session->getDocument()->getPage(0), *notes[i], look, to);
+    }
+    {
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setWidth(2);
+        stroke->addPoint(Point(100, 300, 1.0));
+        stroke->addPoint(Point(200, 350, 1.0));
+        session->getDocument()->getPage(0)->getSelectedLayer()->addElement(std::move(stroke));
+        session->firePageChanged(0);
+    }
+    controller->clearSelection();
+    ref().showBeside(0);
+    until([&] { return reference->isVisible(); });
+    ASSERT_TRUE(ref().isSelf());
+    ref().setEditing(true);
+    controller->selectTool("selectRect");
+    wait(100);
+    xqt::CanvasView* second = ref().canvas();
+    ASSERT_NE(second, nullptr);
+
+    // Ink selected by a rectangle: the selection's pill, with its count and select more
+    auto drag = [&](QPoint from, QPoint to) {
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 8; ++i) {
+            QTest::mouseMove(window, from + (to - from) * i / 8);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(100);
+    };
+    drag(onReferencePage(0, QPointF(80, 280)), onReferencePage(0, QPointF(230, 380)));
+    ASSERT_NE(second->getSelection(), nullptr);
+    auto* bar = findItem("referenceSelectionBar");
+    until([&] { return bar->isVisible(); });
+    EXPECT_EQ(findItem("referenceSelectionCount")->property("text").toString(), "1");
+    EXPECT_TRUE(findItem("referenceSelectionMore")->isVisible());
+
+    // Ctrl + click on a note: it joins the ink (the selection's pill, two)
+    QTest::mouseClick(window, Qt::LeftButton, Qt::ControlModifier, onReferencePage(0, QPointF(100, 120)));
+    wait(50);
+    ASSERT_TRUE(second->mixed().active()) << "Ctrl + click adds in the reference";
+    EXPECT_TRUE(ref().hasSelection());
+    until([&] { return findItem("referenceSelectionCount")->property("text").toString() == "2"; });
+    EXPECT_TRUE(bar->isVisible()) << "notes selected together have the selection's pill in the reference too";
+    EXPECT_FALSE(findItem("selectionBar")->isVisible()) << "not the notes' pill";
+
+    // Select more: a tap on the other note adds it, on the first one takes it away
+    click(findItem("referenceSelectionMore"));
+    EXPECT_TRUE(ref().selectingMore());
+    EXPECT_TRUE(findItem("referenceSelectionMore")->property("checked").toBool());
+    EXPECT_FALSE(controller->selectingMore()) << "the notes' view has its own";
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, onReferencePage(0, QPointF(320, 120)));
+    wait(50);
+    EXPECT_EQ(ref().selectedCount(), 3);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, onReferencePage(0, QPointF(150, 325)));
+    wait(50);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, onReferencePage(0, QPointF(100, 120)));
+    wait(50);
+    ASSERT_TRUE(second->notes().hasSelection()) << "one note left: its own selection";
+    EXPECT_EQ(second->notes().selectedLayer(), notes[1]);
+
+    // One note: the note's pill in the reference, select more on, the count
+    auto* notePill = findItem("referenceNotePill");
+    ASSERT_NE(notePill, nullptr);
+    until([&] { return notePill->isVisible(); });
+    EXPECT_FALSE(bar->isVisible());
+    EXPECT_FALSE(findItem("notePill")->isVisible()) << "not the notes' pill";
+    EXPECT_TRUE(findItem("referenceNoteSelectMore")->property("checked").toBool());
+    EXPECT_EQ(findItem("referenceNoteCount")->property("text").toString(), "1");
+    EXPECT_TRUE(findItem("referenceNoteDelete")->isVisible());
+    EXPECT_TRUE(findItem("referenceNoteColor0")->isVisible());
+    EXPECT_LE(sceneRect(notePill).width() * notePill->scale(), sceneRect(reference).width())
+            << "the note's pill fits into the reference's half";
+    EXPECT_GE(notePill->mapToScene(QPointF(notePill->width(), 0)).x(), sceneRect(reference).left());
+    EXPECT_LE(notePill->mapToScene(QPointF(notePill->width(), 0)).x(), sceneRect(reference).right());
+    click(findItem("referenceNoteDeselect"));
+    EXPECT_FALSE(second->hasAnySelection()) << "deselected in the reference";
+    until([&] { return !notePill->isVisible(); });
+    EXPECT_FALSE(ref().selectingMore());
+
+    // For reading only: a note (selected by a rectangle, to copy it) has a pill for copying
+    ref().setEditing(false);
+    wait(50);
+    second->selectTogether(*second->getPage(0), {notes[0]}, {});
+    until([&] { return notePill->isVisible(); });
+    EXPECT_TRUE(findItem("referenceNoteCopy")->isVisible());
+    EXPECT_FALSE(findItem("referenceNoteDelete")->isVisible());
+    EXPECT_EQ(findItem("referenceNoteColor0", true), nullptr) << "no colours while only reading";
+    EXPECT_FALSE(findItem("referenceNoteSelectMore")->isVisible()) << "nothing to add while only reading";
+    QGuiApplication::clipboard()->clear();
+    click(findItem("referenceNoteCopy"));
+    EXPECT_TRUE(QGuiApplication::clipboard()->mimeData()->hasFormat(xqt::sticky::CLIPBOARD_MIME));
 }
 
 TEST_F(ReferenceWindowTest, markdownIsWrittenInTheReferenceWhenItIsWrittenIn) {

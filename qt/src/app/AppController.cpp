@@ -136,6 +136,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
         }
     });
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
+    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     loadCustomWidths();
@@ -218,6 +219,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     recent = mainWindow.recent;
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
+    connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
     connect(app.get(), &AppContext::toolPropertiesChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::settingsChanged, this, &AppController::documentModeChanged);
     pages = std::make_unique<PagesModel>();
@@ -681,6 +683,10 @@ void AppController::currentTabChanged() {
         disconnect(c);
     }
     currentConnections.clear();
+    if (currentCanvas && currentCanvas != canvas()) {
+        currentCanvas->setSelectingMore(false);  // (another document: select more ends)
+    }
+    currentCanvas = canvas();
     if (DocumentSession* s = session()) {
         currentConnections.push_back(
                 connect(s, &DocumentSession::modifiedChanged, this, &AppController::modifiedChanged));
@@ -714,6 +720,10 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectionChanged));
         currentConnections.push_back(
                 connect(v, &CanvasView::noteSelectionChanged, this, &AppController::noteSelectionChanged));
+        currentConnections.push_back(connect(v, &CanvasView::selectMoreChanged, this, &AppController::selectMoreChanged));
+        currentConnections.push_back(connect(v, &CanvasView::selectionChanged, this, &AppController::selectMoreChanged));
+        currentConnections.push_back(
+                connect(v, &CanvasView::noteSelectionChanged, this, &AppController::selectMoreChanged));
         currentConnections.push_back(connect(v, &CanvasView::notesChanged, this, &AppController::notesChanged));
         currentConnections.push_back(connect(v, &CanvasView::linkTapped, this, &AppController::linkTapped));
         currentConnections.push_back(
@@ -775,6 +785,7 @@ void AppController::currentTabChanged() {
     Q_EMIT pageUndoChanged();
     Q_EMIT selectionChanged();
     Q_EMIT noteSelectionChanged();
+    Q_EMIT selectMoreChanged();
     Q_EMIT notesChanged();
     Q_EMIT navigationChanged();
     Q_EMIT pdfTextSelectionChanged();
@@ -787,6 +798,15 @@ bool AppController::hasSelection() const {
     // (elements, or several sticky notes with elements: the selection's pill; a single note has its own)
     return canvas() && (canvas()->getSelection() || canvas()->mixed().active());
 }
+bool AppController::selectMoreOffered() const { return canvas() && canvas()->offersSelectMore(); }
+bool AppController::selectMoreAvailable() const { return canvas() && canvas()->canSelectMore(); }
+bool AppController::selectingMore() const { return canvas() && canvas()->selectingMore(); }
+void AppController::setSelectingMore(bool on) {
+    if (canvas()) {
+        canvas()->setSelectingMore(on);
+    }
+}
+int AppController::selectedCount() const { return canvas() ? canvas()->selectedCount() : 0; }
 bool AppController::copySelection() {
     if (referenceMode->focused() && (referenceMode->hasSelection() ||
                                      (referenceMode->canvas() && referenceMode->canvas()->notes().hasSelection()))) {

@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include <QColor>
 #include <QMetaObject>
 #include <QObject>
 #include <QPointF>
@@ -57,6 +58,16 @@ class ReferenceMode final: public QObject {
     Q_PROPERTY(bool focused READ focused WRITE setFocused NOTIFY focusedChanged)
     /// Elements or PDF text are selected in the reference (to copy them).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
+    /// Select more, as on the notes (AppController's properties of the same names; qt/touch-multiselect)
+    Q_PROPERTY(bool selectMoreOffered READ selectMoreOffered NOTIFY selectMoreChanged)
+    Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
+    Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
+    Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
+    /// A sticky note is selected in the reference: the note's pill, as on the notes (AppController's properties of the
+    /// same names; changing it only while the reference is written in)
+    Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
+    Q_PROPERTY(QColor noteColor READ noteColor WRITE setNoteColor NOTIFY noteSelectionChanged)
+    Q_PROPERTY(bool noteCovers READ noteCovers WRITE setNoteCovers NOTIFY noteSelectionChanged)
     /// PDF text is selected in the reference (the same name as AppController's: the pills of a canvas take either)
     Q_PROPERTY(bool pdfTextIsSelected READ pdfTextIsSelected NOTIFY pdfTextSelectionChanged)
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationChanged)
@@ -93,6 +104,22 @@ public:
     void setEditing(bool on);
     void setFocused(bool on);
     bool hasSelection() const;
+    bool selectMoreOffered() const;
+    bool selectMoreAvailable() const;
+    bool selectingMore() const;
+    void setSelectingMore(bool on);
+    int selectedCount() const;
+    bool noteSelected() const;
+    QColor noteColor() const;
+    void setNoteColor(const QColor& color);
+    bool noteCovers() const;
+    void setNoteCovers(bool covers);
+    /// The selected note in the reference's canvas coordinates (empty: none)
+    Q_INVOKABLE QRectF noteBox() const;
+    Q_INVOKABLE bool writeNoteText();
+    Q_INVOKABLE bool copyStickyNote();
+    Q_INVOKABLE bool cutStickyNote();
+    Q_INVOKABLE void deleteStickyNote();
     bool canGoBack() const;
     bool canGoForward() const;
     double ratio() const;
@@ -166,6 +193,8 @@ Q_SIGNALS:
     void zoomChanged();
     void focusedChanged();
     void selectionChanged();
+    void noteSelectionChanged();
+    void selectMoreChanged();
     void navigationChanged();
     void layoutChanged();
     void pagesShownChanged();
