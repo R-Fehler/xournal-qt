@@ -1,6 +1,8 @@
 // Search in the current document: a floating bar over the canvas (Ctrl+F). Enter / Shift+Enter or the arrows go to
 // the next / previous hit; Escape or × ends the search. Short texts (fewer than 4 characters: thousands of hits in a
-// long document) are only searched on Enter or a tap on the search icon, not while typing.
+// long document) are only searched on Enter or a tap on the search icon, not while typing. "Fuzzy" reads the text with
+// the fuzzy search's syntax (FuzzyToggle): it shows the mode of the document's search (on for one handed over from
+// the library or the tab overview with Fuzzy on), and a tap sets the app-wide setting and searches the text again.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -69,6 +71,7 @@ Pane {
     }
 
     RowLayout {
+        anchors.fill: parent  // (a narrow window: the field gives way)
         spacing: 2
         IconButton {
             objectName: "searchNowButton"
@@ -83,6 +86,8 @@ Pane {
             id: field
             objectName: "searchField"
             Layout.preferredWidth: 240
+            Layout.minimumWidth: 64
+            Layout.fillWidth: true
             selectByMouse: true
             background: null
             // A plain hint instead of the Material style's floating placeholder.
@@ -121,6 +126,26 @@ Pane {
                 : app.searchHitCount === 0 ? (app.searchRunning ? qsTr("Searching…") : qsTr("No results"))
                 : (app.searchCurrent > 0 ? app.searchCurrent + " / " : "") + app.searchHitCount
                   + (app.searchRunning ? "…" : "")
+        }
+        // Fuzzy search: an expression that is not valid is searched as plain text, and says why
+        Label {
+            objectName: "searchSyntaxHint"
+            visible: app.searchHint !== ""
+            Layout.maximumWidth: 110
+            text: app.searchHint
+            elide: Text.ElideRight
+            color: "#b3261e"
+            font.pixelSize: 12
+            ToolTip.visible: syntaxHover.hovered
+            ToolTip.text: qsTr("%1 - searched as plain text").arg(app.searchHint)
+            ToolTip.delay: 300
+            HoverHandler { id: syntaxHover }
+        }
+        FuzzyToggle {
+            objectName: "searchFuzzy"
+            fuzzy: app.searchFuzzy
+            setFuzzy: function(on) { app.searchFuzzy = on }
+            focusPolicy: Qt.NoFocus  // (Enter and Escape stay the field's)
         }
         IconButton {
             iconName: "xqt-chevron-up"; tip: qsTr("Previous (Shift+Enter)")

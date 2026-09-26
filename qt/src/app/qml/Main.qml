@@ -1595,6 +1595,7 @@ ApplicationWindow {
         anchors.top: canvas.top
         anchors.topMargin: 12
         anchors.horizontalCenter: canvas.horizontalCenter
+        width: Math.min(implicitWidth, canvas.width - 16)
     }
 
     // Where the link under the mouse or the hovering pen leads (qt/docs/links.md, "Links with the mouse")

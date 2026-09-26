@@ -173,11 +173,17 @@ AppController::AppController(QObject* parent): QObject(parent) {
         bool fuzzy = false;
         app->getSettings()->getCustomElement("xournalQt").getBool("fuzzySearch", fuzzy);
         library->setFuzzySearch(fuzzy);
+        // (with it on, open documents make the vocabularies of their text in the background: the first fuzzy search
+        // of a long document does not make them on the UI thread)
+        DocumentTextIndex::setWordsInBackground(fuzzy);
         connect(library, &LibraryModel::fuzzySearchChanged, this, [this] {
             app->getSettings()->getCustomElement("xournalQt").setBool("fuzzySearch", library->fuzzySearch());
             app->getSettings()->customSettingsChanged();
+            DocumentTextIndex::setWordsInBackground(library->fuzzySearch());
         });
     }
+    connect(library, &LibraryModel::fuzzySearchChanged, this, &AppController::searchFuzzyChanged);
+    connect(this, &AppController::searchChanged, this, &AppController::searchFuzzyChanged);
     ownRecent = std::make_unique<RecentFiles>(RecentFiles::defaultStoreFile());
     recent = ownRecent.get();
     recent->onFilesChanged = [this](const DocumentFiles::Result& r) {
@@ -222,6 +228,8 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
             filteredPages->setOnlySearchHits(false);
         }
     });
+    connect(library, &LibraryModel::fuzzySearchChanged, this, &AppController::searchFuzzyChanged);
+    connect(this, &AppController::searchChanged, this, &AppController::searchFuzzyChanged);
     makeTabs();
     home = false;  // it shows documents, never the home screen
 }
@@ -863,10 +871,23 @@ void AppController::clearSelection() {
 QString AppController::searchQuery() const { return session() ? session()->search().query() : QString(); }
 void AppController::setSearchQuery(const QString& query) {
     if (session()) {
-        // A search handed over by the fuzzy search stays one while it is refined here (until it is cleared)
-        session()->search().setQuery(query, true, session()->search().fuzzy() && !query.isEmpty());
+        // In the mode the search bar shows: a search refined here keeps its mode (also one handed over from the
+        // library), a new one takes the setting
+        session()->search().setQuery(query, true, searchFuzzy() && !query.isEmpty());
     }
 }
+bool AppController::searchFuzzy() const {
+    const DocumentSession* s = session();
+    return s && !s->search().query().isEmpty() ? s->search().fuzzy() : library->fuzzySearch();
+}
+void AppController::setSearchFuzzy(bool fuzzy) {
+    library->setFuzzySearch(fuzzy);  // the setting: new searches here, the library's, the tab overview's
+    if (DocumentSession* s = session(); s && !s->search().query().isEmpty() && s->search().fuzzy() != fuzzy) {
+        s->search().setQuery(s->search().query(), true, fuzzy);  // the same text again, in this mode
+    }
+    Q_EMIT searchFuzzyChanged();
+}
+QString AppController::searchHint() const { return session() ? session()->search().hint() : QString(); }
 int AppController::searchHitCount() const {
     return session() ? session()->search().hitCount() : 0;
 }

@@ -334,6 +334,9 @@ of the document (`qt/src/session/DocumentTextIndex.*`), kept while the document 
   unsaved edits, undo and redo are searched; a changed page is read again once the edits pause, pages that come, go
   or move take their text along.
 
+The search bar (Ctrl+F) has the **Fuzzy** toggle of the library (below, "Fuzzy search"): on, the text typed is read
+with the fuzzy search's syntax, typos tolerated.
+
 A search has two steps (`DocumentSearch.*`): a string scan over the index counts the hits of every page (about 7 ms
 for the 1,300 pages of the pgf manual, on each key typed) - the count, "n pages with hits", the marks in the sidebar
 and the page grid and the counts in the tab overview come from it at once. Where the hits are drawn is computed
@@ -351,11 +354,12 @@ after 0.1 s) with at most 0.3 ms per event loop pass, and each key typed costs a
 for the manual's text, the kept character boxes about 4 MB, the worker's poppler instance about 8 MB.
 
 ## Fuzzy search
-"Fuzzy" in the library's search field (and in the tab overview's, below) turns on fzf's extended search syntax
+"Fuzzy" in the library's search field (and in the tab overview's and an open document's search bar, below) turns on
+fzf's extended search syntax
 (modelled on [fzf](https://github.com/junegunn/fzf#search-syntax); its matching is ported from fzf, MIT). Off by
 default; an app-wide setting (`fuzzySearch` in the `xournalQt` part of the settings file), shared by all windows. Off,
 the search is exactly the plain one. The button's tooltip is one line; a **long press or a right click** on it (in
-the library and in the tab overview) opens the **help** (`qt/src/app/qml/FuzzyHelp.qml`, also from Settings →
+the library, the tab overview and a document's search bar) opens the **help** (`qt/src/app/qml/FuzzyHelp.qml`, also from Settings →
 Search): what fuzzy means for names and for text, with the typo tolerance as it is set, the syntax with an example
 per row, and how the pages with hits are chosen. The help is where this text lives; the table below mirrors it.
 
@@ -425,8 +429,8 @@ marked).
 documents with exact hits in the text (a word that contains the term, or a hit of a term that is not fuzzy) before
 those whose words only match fuzzily, then the hits in the text, then the newest. The matched letters of a name are highlighted on its card, as fzf shows them.
 
-Opening a hit (a card, a page, a snippet card) searches the document with the same query and syntax; refined in the
-document's search bar it stays a fuzzy search until the bar is cleared. The pictures of the pages mark every term
+Opening a hit (a card, a page, a snippet card) searches the document with the same query and syntax; its search bar
+shows Fuzzy on, and refined there it stays a fuzzy search until the bar is cleared. The pictures of the pages mark every term
 that is not negated where the search of an open document marks it: the page's PDF text is read with the boxes of its
 characters (a poppler instance of the cached document, `PdfLayoutReader`) and matched with `TextMatch`, so `^`, `$`
 and `'word'` are marked at word bounds and a fuzzy term's words whole. (The plain search's pictures still use
@@ -439,8 +443,21 @@ words with how often each occurs, made from the index text in memory (the packs 
 is turned on or at its first search, and kept until the document changes, and a term is matched once against the
 dictionary (the last 16 terms are kept). A page's count is the sum of the counts of its matching words, the hits
 `TextMatch` marks in its text; where a substring term's hit overlaps a matching word, that page is counted in its
-text, so it counts once, as it is marked. The index of an open document does the same per page (the first fuzzy
-search makes the vocabularies).
+text, so it counts once, as it is marked. The index of an open document does the same per page. With the fuzzy
+search on, it makes the vocabularies of its PDF text on its worker (the one that reads the text, at idle priority)
+as soon as the text is known - when it is read, when the setting is turned on - so the first fuzzy search finds them
+made; otherwise the first fuzzy search makes the missing ones on the UI thread (still so for a fuzzy search handed
+over from the library while the document opens: it comes before the worker had a turn).
+
+**In an open document** the search bar (Ctrl+F) has the same button. It is one setting, not one of its own: a tap
+turns the app-wide setting on or off (the library's and the tab overview's buttons follow) and searches the text in
+the field again in that mode. What the button shows is the mode of the document's search while there is one - so a
+search handed over from the library or the tab overview with Fuzzy on shows it on, even when the setting is turned
+off elsewhere meanwhile - and the setting when the bar is empty; a new search takes the setting, a search refined in
+the bar keeps its mode. The count, "n pages with hits", the page grid and the marks in the sidebar are the fuzzy
+search's (every hit of a term that is not negated; its whole word marked), and an expression that is not valid is
+searched as plain text with a short red hint in the bar, as in the library. The reference view has no search bar of
+its own.
 
 **The tab overview** ("search all documents", Ctrl+Shift+F) has the same button and setting: a document (its
 title, and the text of its search index) is marked when the expression holds, its title's matched letters are
@@ -462,8 +479,9 @@ index search took 24-51 ms for one word (`kalman`, `klman`, `sgnals`), 72 ms for
 `(kalman | robust) !draft ^lin`; now, matching words, 25-41 ms, 35-41 ms and 104 ms. The first search makes the
 vocabularies of all 3,000 documents (~10 MB of text): 320-410 ms, done in the background when the fuzzy search is
 on. In an open document (the pgf manual, 1,321 pages): matching every word for each key typed took 54-75 ms (160 ms
-for two terms); from the vocabularies 1.7-7.8 ms, the substring search 3-5 ms. Its first fuzzy search makes the
-vocabularies, ~160 ms and 1.7 MB for 6.6 MB of text, a dictionary of 12,000 words. `XQT_BENCH_PDF=<pdf>
+for two terms); from the vocabularies 1.7-7.8 ms, the substring search 3-5 ms. Its first fuzzy search made the
+vocabularies on the UI thread, ~160 ms and 1.7 MB for 6.6 MB of text, a dictionary of 12,000 words; with the fuzzy
+search on they are made in the background beforehand (2026-09-26). `XQT_BENCH_PDF=<pdf>
 xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open document.
 
 ## Home screen

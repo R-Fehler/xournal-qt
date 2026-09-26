@@ -18,7 +18,11 @@
  *  - where the characters of a few PDF pages are drawn (layout(): the last pages whose hits were marked), read on
  *    demand before any other work.
  *
- * UI thread, except the reading of PDF text, which runs on one background worker for all documents.
+ * With setWordsInBackground (the fuzzy search is on), the vocabularies of the PDF text (Vocabulary.h) are made on the
+ * same worker once the text is known, so the first fuzzy search does not make them on the UI thread.
+ *
+ * UI thread, except the reading of PDF text and the making of its vocabularies, which run on one background worker
+ * for all documents.
  *
  * @license GNU GPLv2 or later
  */
@@ -131,8 +135,15 @@ public:
     /// the page's texts (Vocabulary.h, made when first needed and kept until the text changes).
     int count(size_t page, const words::Terms& terms);
     /// Make the vocabularies of all pages whose text is known (before fuzzy terms are prepared: their words are
-    /// matched at once then, not one by one).
+    /// matched at once then, not one by one). Those made in the background already are taken as they are.
     void prepareWords();
+    /// The vocabularies of the PDF text are made in the background as soon as the text is known, in every index
+    /// (the fuzzy search is on: its first search finds them made). Off by default. UI thread.
+    static void setWordsInBackground(bool on);
+    /// Make the vocabularies of the PDF text known so far in the background (setWordsInBackground does it).
+    void prepareWordsLater();
+    /// PDF pages whose vocabulary is made (tests).
+    size_t pdfPagesWithWords() const;
     /// A term is on the page (in the text known so far).
     bool contains(size_t page, const textmatch::Term& term);
     /// Term `i` of `terms` is on the page.
@@ -191,6 +202,14 @@ private:
     void setPdfText(int pdfPage, QString text, std::vector<size_t>& changed);
     void received(std::vector<std::pair<int, QString>> texts);
     void receivedLayout(int pdfPage, std::shared_ptr<const PdfPageLayout> layout);
+    struct MadeWords {
+        int pdfPage = -1;
+        QString text;  ///< the text it was made of
+        std::shared_ptr<const words::Vocabulary> words;
+    };
+    void receivedWords(std::vector<MadeWords> made);
+    /// Queue the vocabularies of these PDF pages for the worker (those known, without one, not queued)
+    void wantWords(const std::vector<int>& pdfPages);
     void wantText();
     void countUnknown();
 
@@ -200,6 +219,7 @@ private:
     std::vector<QString> pdfText;  ///< by PDF page
     std::vector<std::shared_ptr<const words::Vocabulary>> pdfWords;  ///< by PDF page, of its text (null: not made)
     std::vector<char> pdfKnown;
+    std::vector<char> wordsQueued;  ///< by PDF page: its vocabulary is being made in the background
     size_t unknownPages = 0;
     bool started = false;
     int readCount = 0, seededCount = 0;

@@ -12,7 +12,8 @@
  * The current hit is a page and a hit on it; stepping to a page whose hits are not placed yet counts on the page's
  * count and scrolls there once they are.
  *
- * A query of the fuzzy search (FuzzyQuery.h; handed over from the library or the tab overview with the toggle on)
+ * A query of the fuzzy search (FuzzyQuery.h; the search bar's Fuzzy toggle, or handed over from the library or the
+ * tab overview with it on)
  * counts and marks the hits of all its terms that are not negated. Whether the document matches the whole
  * expression (with its name) and on which pages it holds, the tab overview asks with matches() and matchingPages().
  *

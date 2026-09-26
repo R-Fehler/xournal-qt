@@ -1811,3 +1811,21 @@ Design: [md-images.md](../md-images.md).
       Escape ends presenting as before, F5 too; the next F5 presents with the controls again.
 - [ ] Settings → Shortcuts lists "Present without controls" on Ctrl+F5; other keys given there work.
 - [ ] With a reference open: presenting without controls shows the notes alone; the reference comes back after.
+
+## Fuzzy search inside a document (qt/doc-search-fuzzy)
+- [ ] A PDF with a word such as "turbine", Fuzzy off: Ctrl+F, type `tbine`: "No results". Tap **Fuzzy** in the bar:
+      the same text is searched again, the hits of "turbine" come (the whole word marked), the count, "n pages with
+      hits", the page grid and the sidebar marks agree. The cursor stays in the field (Enter still steps).
+- [ ] Fuzzy on in the bar: the library's and the tab overview's Fuzzy buttons and Settings → Search are on too (one
+      setting); tapping it off in the bar turns them off, and `tbine` finds nothing again.
+- [ ] Fuzzy on: `turbnie` (a typo) finds "turbine"; `'tbine` finds nothing; `'turbine'`, `^turb`, `bine$` find it;
+      `tbine !river` counts and marks only "turbine" (a negated term is not marked); `(tbine` shows a short red hint
+      and searches plain text.
+- [ ] Library with Fuzzy on: search `tbine`, open a hit: the document's bar shows `tbine` with Fuzzy **on**. Turn
+      Fuzzy off in the library, go back to the tab: the bar still shows Fuzzy on (its search is fuzzy); close the
+      bar and open it again: off (the setting).
+- [ ] The same from the tab overview (Ctrl+Shift+F, Fuzzy on, `tbine`, open a card): Fuzzy on in the bar.
+- [ ] Long press (a finger) or right click on Fuzzy in the bar: its help opens, the toggle does not change.
+- [ ] A phone-wide window (Fold 7 folded): the bar fits the canvas, the field narrower, all buttons reachable.
+- [ ] A long PDF (the pgf manual) opened with Fuzzy on, wait a few seconds, then type a fuzzy search in the bar: no
+      pause at the first key (the vocabularies were made in the background).
