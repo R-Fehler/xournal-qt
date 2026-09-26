@@ -15,10 +15,13 @@
 #include "model/Document.h"
 #include "model/XojPage.h"
 #include "session/DocumentSearch.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 #include "session/DocumentTextIndex.h"
 
 #include "Library.h"
+#include "MarkdownFile.h"
+#include "MdImages.h"
 #include "Thumbnails.h"
 
 namespace xqt {
@@ -33,6 +36,7 @@ struct CachedDocument {
     std::unique_ptr<Document> doc;
     bool loaded = false;
     std::unique_ptr<PdfLayoutReader> pdfText;  ///< the text of its PDF pages (terms of the fuzzy search)
+    std::unique_ptr<md::images::RootHandle> pictures;  ///< a Markdown file: where its pictures are
 };
 
 struct Caches {
@@ -152,7 +156,13 @@ QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& 
         // One document is read at a time: the loader (and poppler behind it) is not made for several threads.
         static std::mutex loading;
         std::lock_guard loadLock(loading);
-        cached->doc = DocumentSession::loadFile(item.main()).document;
+        if (!item.md.empty()) {
+            // A Markdown file (its bookmarks, qt/docs/bookmarks.md): its pages as it opens, with its pictures
+            cached->pictures = std::make_unique<md::images::RootHandle>(DocumentImages::markdownRoot(item.md));
+            cached->doc = MarkdownFile::document(MarkdownFile::read(item.md));
+        } else {
+            cached->doc = DocumentSession::loadFile(item.main()).document;
+        }
     }
     Document* doc = cached->doc.get();
     if (!doc) {

@@ -8655,3 +8655,72 @@ TEST_F(MainWindowTest, togglingABookmarkOnAPage) {
     key(Qt::Key_Z, Qt::ControlModifier);
     EXPECT_EQ(controller->bookmarkOf(1), "Page 2");
 }
+
+// qt/md-bookmarks: a page of a .md bookmarked from the page menu is a comment in its text (saved with it): the ribbon
+// on the page's preview, the Bookmarks section of the contents sidebar, and the library's Bookmarks tab
+TEST_F(HomeScreenMarkdownTest, bookmarkingAPageOfAMarkdownFile) {
+    const fs::path file = root / "kalman.md";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    ASSERT_GT(controller->pageCount(), 2);
+    EXPECT_TRUE(controller->canBookmark());
+    auto* menu = find<QObject>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    menu->setProperty("page", 1);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    auto* item = find<QQuickItem>("pageMenuBookmark");
+    ASSERT_NE(item, nullptr);
+    EXPECT_TRUE(item->isVisible());
+    EXPECT_EQ(item->property("tip").toString(), "Bookmark this page");
+    click(item);
+    EXPECT_EQ(controller->bookmarkOf(1), "Page 2");
+    ASSERT_EQ(controller->bookmarks().size(), 1);
+    EXPECT_TRUE(controller->modified());
+    const std::string text = controller->tabManager().currentSession()->currentText();
+    EXPECT_NE(text.find("<!-- xqt:bookmark -->\nParagraph"), std::string::npos);
+    until([&] { return visibleNamed(window->contentItem(), "sidebarRibbon") != nullptr; });
+    EXPECT_NE(visibleNamed(window->contentItem(), "sidebarRibbon"), nullptr) << "the ribbon on the page's preview";
+    // The contents sidebar lists it, after the headings' table of contents
+    until([&] { return !menu->property("visible").toBool(); });  // (the page menu gone: it would take the click)
+    auto* contentsButton = visibleNamed(window->contentItem(), "sidebarContentsButton");
+    ASSERT_NE(contentsButton, nullptr);
+    click(contentsButton);
+    until([&] { return visibleNamed(window->contentItem(), "bookmarkEntry") != nullptr; });
+    auto* entry = visibleNamed(window->contentItem(), "bookmarkEntry");
+    ASSERT_NE(entry, nullptr);
+    controller->jumpToPage(0);
+    click(entry);
+    until([&] { return controller->pageNumber() == 2; });
+    EXPECT_EQ(controller->pageNumber(), 2);
+    // Saved: the line is in the file
+    ASSERT_TRUE(controller->save());
+    {
+        std::ifstream in(file, std::ios::binary);
+        const std::string saved{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+        EXPECT_EQ(saved, text);
+    }
+    // The library's Bookmarks tab
+    controller->setHomeVisible(true);
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->refresh();
+    until([&] { return !library->indexing() && library->searchIndex()->bookmarks().size() == 1; });
+    ASSERT_EQ(library->searchIndex()->bookmarks().size(), 1u);
+    click(findItem("bookmarksPageButton"));
+    auto* list = find<QQuickItem>("bookmarksList");
+    ASSERT_NE(list, nullptr);
+    until([&] { return list->property("count").toInt() == 1; });
+    ASSERT_EQ(list->property("count").toInt(), 1);
+    QQuickItem* card = nullptr;
+    until([&] {
+        for (auto* i: itemsNamed(list, "bookmarkCard")) {
+            if (i->isVisible()) {
+                card = i;
+            }
+        }
+        return card != nullptr;
+    });
+    ASSERT_NE(card, nullptr);
+    EXPECT_EQ(card->property("modelData").toMap().value("label").toString(), "Page 2");
+    EXPECT_EQ(card->property("modelData").toMap().value("page").toInt(), 1);
+}
