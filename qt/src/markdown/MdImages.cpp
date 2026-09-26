@@ -396,7 +396,7 @@ Info info(std::string_view link) {
     const fs::path p = pathOf(i.path);
     const auto size = fs::file_size(p, ec);
     const auto time = fs::last_write_time(p, ec);
-    i.stamp = i.path + '\n' + std::to_string(time.time_since_epoch().count()) + '\n' + std::to_string(size);
+    i.stamp = i.path + '\n' + std::to_string(static_cast<long long>(time.time_since_epoch().count())) + '\n' + std::to_string(size);
     Caches& c = caches();
     {
         std::lock_guard lock(c.mtx);
