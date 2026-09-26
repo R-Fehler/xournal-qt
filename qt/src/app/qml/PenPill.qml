@@ -66,23 +66,15 @@ Rectangle {
         rowSpacing: 2
         columnSpacing: 2
 
-        // Pen or highlighter
-        AbstractButton {
+        // Pen or highlighter: the tool bar's cycling button (ToolGroups.qml), smaller: a tap switches, a long press
+        // lists both
+        ToolCycleButton {
             objectName: "penPillTool"
+            group: "pen"
             implicitWidth: 36
             implicitHeight: 36
-            onClicked: app.selectTool(app.tool === "highlighter" ? "pen" : "highlighter")
-            ToolTip.visible: hovered
-            ToolTip.text: app.tool === "highlighter" ? qsTr("Pen") : qsTr("Highlighter")
-            ToolTip.delay: 600
-            contentItem: Image {
-                source: app.iconUrl(app.tool === "highlighter" ? "xopp-tool-highlighter" : "xopp-tool-pencil")
-                sourceSize.width: 22
-                sourceSize.height: 22
-                fillMode: Image.Pad
-                horizontalAlignment: Image.AlignHCenter
-                verticalAlignment: Image.AlignVCenter
-            }
+            icon.width: 22
+            icon.height: 22
         }
         Rectangle {  // a line between the parts
             Layout.preferredWidth: pill.vertical ? 24 : 1

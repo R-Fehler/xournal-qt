@@ -114,8 +114,13 @@ protected:
     void SetUp() override {
         controller = std::make_unique<AppController>();
         prepareController();
-        // (the tests of a run share the config: no layout chosen by hand in an earlier one, e.g. the sidebar hidden)
+        // (the tests of a run share the config: no layout chosen by hand in an earlier one, e.g. the sidebar hidden;
+        // no tool variant or recent color remembered)
         QMetaObject::invokeMethod(controller->settingsModel(), "resetLayoutChoices");
+        if (!restarting) {
+            QMetaObject::invokeMethod(controller->settingsModel(), "set", Q_ARG(QString, "toolVariants"), Q_ARG(QVariant, ""));
+            QMetaObject::invokeMethod(controller->settingsModel(), "set", Q_ARG(QString, "recentColors"), Q_ARG(QVariant, ""));
+        }
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
         engine->addImageProvider("sketch", new xqt::SketchProvider);
@@ -195,6 +200,18 @@ protected:
                           item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         wait(50);
     }
+    /// An entry of a menu by its name (entries made by a Repeater are not found through the objects' parents)
+    static QObject* entryOf(QObject* menu, const char* name) {
+        const int n = menu ? menu->property("count").toInt() : 0;
+        for (int i = 0; i < n; ++i) {
+            QQuickItem* it = nullptr;
+            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
+            if (it && it->objectName() == name) {
+                return it;
+            }
+        }
+        return nullptr;
+    }
     /// Scrolls the flickable (a ScrollView's) that holds `item` so that the item is shown (to be clicked).
     void scrollIntoView(QQuickItem* item) {
         ASSERT_NE(item, nullptr);
@@ -264,7 +281,15 @@ protected:
 
     /// Before the window is loaded. Most tests are about a document (the app starts on the home screen).
     virtual void prepareController() { controller->newDocument(); }
+    /// The app closed and started again within a test: what it remembers stays
+    void restart() {
+        restarting = true;
+        TearDown();
+        SetUp();
+        restarting = false;
+    }
 
+    bool restarting = false;
     std::unique_ptr<AppController> controller;
     std::unique_ptr<QQmlApplicationEngine> engine;
     QQuickWindow* window = nullptr;
@@ -470,6 +495,7 @@ TEST_F(MainWindowTest, documentsOpenWithTheHandIfSoSet) {
     until([&] { return row->isVisible(); });
     key(Qt::Key_Escape);
     ASSERT_TRUE(waitOpened(sheet, false));
+    settings->set("handWhenOpening", false);  // (the tests share the config: the next ones open with the pen)
 }
 
 TEST_F(MainWindowTest, settingsSheetAppliesAndSavesOnClose) {
@@ -2530,7 +2556,11 @@ TEST_F(HomeScreenFilterTest, textFilesAndImagesOpenExternally) {
     click(find<QQuickItem>("canvas"));
     type("x");
     ASSERT_TRUE(controller->modified());
-    click(findItem("openExternallyButton"));
+    // (a .md being written: its tool bar is merged into the format bar, the button in "more tools")
+    ASSERT_TRUE(findItem("moreToolsButton")->isVisible());
+    click(findItem("moreToolsButton"));
+    ASSERT_TRUE(waitOpened(find("moreToolsPopup"), true));
+    click(find<QQuickItem>("openExternallyButton"));
     auto* dialog = find<QObject>("externalSaveDialog");
     ASSERT_NE(dialog, nullptr);
     ASSERT_TRUE(waitOpened(dialog, true));
@@ -2841,7 +2871,7 @@ TEST_F(MainWindowTest, fiveWidthsInTheToolBar) {
 }
 
 TEST_F(MainWindowTest, toolbarMovesToTheLeftOrRight) {
-    auto* gridButton = find<QQuickItem>("contentsButton");  // a tool bar button
+    auto* gridButton = find<QQuickItem>("penButton");  // a tool bar button
     auto* canvas = find<QQuickItem>("canvas");
     ASSERT_NE(gridButton, nullptr);
     auto sceneX = [](QQuickItem* i) { return i->mapToScene(QPointF(0, 0)).x(); };
@@ -2873,7 +2903,7 @@ TEST_F(MainWindowTest, fullScreenShowsOnlyTheCurrentTool) {
     EXPECT_TRUE(window->property("fullScreenMode").toBool());
     EXPECT_TRUE(square->isVisible());
     EXPECT_FALSE(find<QQuickItem>("sidebar")->isVisible());
-    auto* gridButton = find<QQuickItem>("contentsButton");  // a tool bar button
+    auto* gridButton = find<QQuickItem>("penButton");  // a tool bar button
     EXPECT_FALSE(gridButton->isVisible()) << "the tools are hidden";
     EXPECT_TRUE(find<QQuickItem>("viewPill")->isVisible()) << "page number, zoom and the page grid stay";
 
@@ -3004,8 +3034,8 @@ TEST_F(MainWindowTest, contentsInTheSidebarAndTheOverview) {
     until([&] { return controller->pageNumber() == 5; });
     EXPECT_EQ(controller->pageNumber(), 5);
 
-    // Overview: the pages of each heading; a page opens there. One button opens it, the one in the tool bar, and
-    // it shows whether the overview is open.
+    // Overview: the pages of each heading; a page opens there. One button opens it, the one in the view pill beside
+    // the page grid, and it shows whether the overview is open.
     auto* contentsButton = find<QQuickItem>("contentsButton");
     ASSERT_NE(contentsButton, nullptr);
     EXPECT_FALSE(contentsButton->property("checked").toBool());
@@ -3094,20 +3124,82 @@ TEST_F(MainWindowTest, pageAndLayoutShortcutsInThePill) {
     QMetaObject::invokeMethod(layoutMenu, "close");
     until([&] { return !layoutMenu->property("visible").toBool(); });
 
-    // Press and hold offers the other fits, and the menu opens at its button (not at some stale mouse position)
+}
+
+// The zoom percentage of the view pill (small; no − / + beside it): a tap opens the fits once the double-tap time is
+// over (so a double tap does not flash the menu); a double click fits the page, with no menu; a finger held on it fits
+// the page too. The menu's entries do what they say; Ctrl+plus / minus / 0 still zoom.
+TEST_F(MainWindowTest, zoomPercentageTapDoubleTapAndHold) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(100);
     auto* zoomButton = find<QQuickItem>("zoomButton");
-    ASSERT_NE(zoomButton, nullptr);
-    const QPoint at = zoomButton->mapToScene(QPointF(zoomButton->width() / 2, zoomButton->height() / 2)).toPoint();
-    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
-    wait(1000);  // (press and hold)
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at);
     auto* fitMenu = find<QObject>("fitMenu");
+    ASSERT_NE(zoomButton, nullptr);
     ASSERT_NE(fitMenu, nullptr);
-    until([&] { return fitMenu->property("visible").toBool(); });
-    EXPECT_TRUE(fitMenu->property("visible").toBool());
-    // At its button: the pill sits at the bottom, so the menu flips above it (never at the window corner)
+    const QPoint at = zoomButton->mapToScene(QPointF(zoomButton->width() / 2, zoomButton->height() / 2)).toPoint();
+    const int interval = QGuiApplication::styleHints()->mouseDoubleClickInterval();
+    int noToolButtons = 0;  // (no − / + beside it)
+    for (auto* i: find<QQuickItem>("viewPill")->findChildren<QQuickItem*>()) {
+        const QString text = i->property("text").toString();
+        noToolButtons += i->isVisible() && i->inherits("QQuickAbstractButton") && (text == QStringLiteral("−") || text == "+");
+    }
+    EXPECT_EQ(noToolButtons, 0) << "no − / + in the pill";
+
+    // A tap: the menu, after the double-tap time
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, at);
+    wait(interval / 3);
+    EXPECT_FALSE(fitMenu->property("visible").toBool()) << "not at once: it waits for a second tap";
+    until([&] { return fitMenu->property("visible").toBool(); }, interval + 1500);
+    ASSERT_TRUE(fitMenu->property("visible").toBool()) << "the fits after the double-tap time";
+    // At its button: the pill sits at the bottom, so the menu opens above it
     EXPECT_LT(fitMenu->property("y").toDouble(), 0);
     EXPECT_GT(fitMenu->property("y").toDouble(), -window->height());
+    // Its entries: fit the width, 100 %, fit the height, fit the page
+    controller->setZoomPercent(300);
+    wait(50);
+    QMetaObject::invokeMethod(find<QObject>("fitWidthItem"), "triggered");
+    wait(50);
+    const int wide = controller->zoomPercent();
+    EXPECT_LT(wide, 300) << "fit the width";
+    QMetaObject::invokeMethod(fitMenu, "close");
+    until([&] { return !fitMenu->property("visible").toBool(); });
+    QMetaObject::invokeMethod(find<QObject>("fitHeightItem"), "triggered");
+    wait(50);
+    const int high = controller->zoomPercent();
+    EXPECT_LT(high, wide) << "the height of a portrait page needs less zoom";
+    QMetaObject::invokeMethod(find<QObject>("realSizeItem"), "triggered");
+    wait(50);
+    EXPECT_NE(controller->zoomPercent(), high) << "100 %";
+    QMetaObject::invokeMethod(find<QObject>("fitPageItem"), "triggered");
+    wait(50);
+    const int page = controller->zoomPercent();
+    EXPECT_LE(page, high) << "the whole page";
+
+    // A double click: the whole page, no menu
+    controller->setZoomPercent(250);
+    wait(50);
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, at);
+    wait(30);
+    QTest::mouseDClick(window, Qt::LeftButton, Qt::NoModifier, at);
+    wait(interval + 300);
+    EXPECT_FALSE(fitMenu->property("visible").toBool()) << "a double click opens no menu";
+    EXPECT_EQ(controller->zoomPercent(), page) << "a double click fits the page";
+
+    // A finger held on it: the whole page too
+    controller->setZoomPercent(250);
+    wait(50);
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    QTest::touchEvent(window, finger).press(0, at);
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
+    QTest::touchEvent(window, finger).release(0, at);
+    wait(interval + 300);
+    EXPECT_EQ(controller->zoomPercent(), page) << "held: fits the page";
+    EXPECT_FALSE(fitMenu->property("visible").toBool()) << "and opens no menu";
+
+    // The keys still zoom
+    key(Qt::Key_0, Qt::ControlModifier);
+    wait(50);
+    EXPECT_EQ(controller->zoomPercent(), wide) << "Ctrl+0: the width";
 }
 
 TEST_F(MainWindowTest, theToolBarCanBePutAway) {
@@ -3115,7 +3207,7 @@ TEST_F(MainWindowTest, theToolBarCanBePutAway) {
     wait(50);
     auto* tools = find<QQuickItem>("sideTools");
     auto* square = find<QQuickItem>("quickToolSquare");  // the small tool square
-    auto* pen = find<QQuickItem>("contentsButton");  // a tool bar button
+    auto* pen = find<QQuickItem>("penButton");  // a tool bar button
     ASSERT_NE(pen, nullptr);
     EXPECT_TRUE(pen->isVisible());
 
@@ -3158,11 +3250,15 @@ TEST_F(MainWindowTest, theToolBarTabAndStripFollowTheDockSide) {
     // Where the chevron on it points, from the icon and its rotation (clockwise, y down)
     auto pointsTo = [](QQuickItem* item) -> std::string {
         QQuickItem* arrow = nullptr;
-        for (QQuickItem* c: item->childItems()) {
-            if (c->property("source").isValid()) {
-                arrow = c;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            for (QQuickItem* c: i->childItems()) {
+                if (c->property("source").isValid()) {
+                    arrow = c;
+                }
+                walk(c);
             }
-        }
+        };
+        walk(item);
         if (!arrow) {
             return "no arrow";
         }
@@ -3932,14 +4028,14 @@ TEST_F(MainWindowTest, theToolBarHasAStickyNoteButton) {
     EXPECT_TRUE(controller->noteSelected()) << "a note is placed and selected";
 }
 
-TEST_F(MainWindowTest, theShapesMenuPlacesAStickyNoteWithItsPill) {
+TEST_F(MainWindowTest, theStickyNoteButtonPlacesANoteWithItsPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
-    click(find<QQuickItem>("shapeButton"));
-    auto* item = find<QQuickItem>("stickyNoteItem");
+    window->setWidth(1920);  // (the button in sight)
+    wait(100);
+    auto* item = find<QQuickItem>("stickyNoteButton");
     ASSERT_NE(item, nullptr);
     until([&] { return item->isVisible(); });
-    scrollIntoView(item);
     click(item);
     until([&] { return controller->noteSelected(); });
     ASSERT_TRUE(controller->noteSelected()) << "the new note is selected";
@@ -4271,24 +4367,22 @@ TEST_F(MainWindowTest, thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected
     EXPECT_FALSE(notePill->isVisible());
 }
 
-TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
+// The setsquare and the compass share a cycling button (qt/docs/adaptive-layout.md, "Cycling buttons"): a tap puts the
+// setsquare on the page, the next tap the compass instead; the geometry pill's × takes it away.
+TEST_F(MainWindowTest, theGeometryButtonPutsTheSetsquareOnThePage) {
+    qobject_cast<xqt::SettingsModel*>(controller->settingsModel())->set("toolVariants", "");  // (the setsquare first)
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
-    click(find<QQuickItem>("shapeButton"));
-    auto* item = find<QQuickItem>("setsquareItem");
+    window->setWidth(1920);  // (the button in sight)
+    wait(100);
+    auto* item = find<QQuickItem>("geometryButton");
     ASSERT_NE(item, nullptr);
     until([&] { return item->isVisible(); });
     EXPECT_FALSE(item->property("checked").toBool());
-    // Tapped as a user does, so that the menu closes (where it is wider, it lies over the pill)
-    scrollIntoView(item);
     click(item);
-    auto* menu = item->property("menu").value<QObject*>();
-    ASSERT_NE(menu, nullptr);
-    until([&] { return !menu->property("visible").toBool(); });
-    EXPECT_FALSE(menu->property("visible").toBool());
     until([&] { return controller->geometryTool() == QStringLiteral("setsquare"); });
     EXPECT_EQ(controller->geometryTool(), QStringLiteral("setsquare"));
-    EXPECT_TRUE(item->property("checked").toBool()) << "the entry shows that it is out";
+    EXPECT_TRUE(item->property("checked").toBool()) << "the button shows that it is out";
 
     // Its pill: the tool can be put aside and brought back, and turned in steps of 15 degrees
     auto* pill = find<QQuickItem>("geometryPill");
@@ -4339,27 +4433,20 @@ TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
         window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
     }
 
-    // Snapping to the grid: off at first, switched from the same menu
-    auto* snap = find<QObject>("snapGridItem");
-    ASSERT_NE(snap, nullptr);
-    auto* settingsModel = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
-    EXPECT_FALSE(snap->property("checked").toBool());
-    QMetaObject::invokeMethod(snap, "toggle");
-    QMetaObject::invokeMethod(snap, "triggered");
-    EXPECT_TRUE(settingsModel->get("snapGrid").toBool()) << "switched on from the shapes menu";
-    QMetaObject::invokeMethod(snap, "toggle");
-    QMetaObject::invokeMethod(snap, "triggered");
-    EXPECT_FALSE(settingsModel->get("snapGrid").toBool());
-
-    // The compass instead, then away again
-    auto* compass = find<QObject>("compassItem");
-    ASSERT_NE(compass, nullptr);
-    QMetaObject::invokeMethod(compass, "triggered");
-    EXPECT_EQ(controller->geometryTool(), QStringLiteral("compass"));
-    QMetaObject::invokeMethod(compass, "triggered");
+    // The compass instead (the next tap), then away again (the pill's ×)
+    click(item);
+    EXPECT_EQ(controller->geometryTool(), QStringLiteral("compass")) << "the next tap: the compass";
+    EXPECT_EQ(item->property("iconName").toString(), QStringLiteral("xopp-compass"));
+    auto* close = find<QQuickItem>("geometryClose");
+    ASSERT_NE(close, nullptr);
+    click(close);
     EXPECT_TRUE(controller->geometryTool().isEmpty());
     until([&] { return !pill->isVisible(); });
-    EXPECT_FALSE(pill->isVisible()) << "the Shapes entry takes tool and pill away";
+    EXPECT_FALSE(pill->isVisible()) << "the × takes tool and pill away";
+    EXPECT_FALSE(item->property("checked").toBool());
+    click(item);
+    EXPECT_EQ(controller->geometryTool(), QStringLiteral("compass")) << "back with the one used last";
+    controller->toggleGeometryTool("");
 }
 
 // Selected PDF text used to freeze the canvas: its knobs lie over the whole canvas, and after copying nothing
@@ -4587,36 +4674,178 @@ TEST_F(MainWindowTest, aLongPressOnPdfTextAlsoOffersPaste) {
     xqt::PenHover::instance().reset();
 }
 
-// The eraser button: a tap takes the eraser, tapped again it offers how the eraser erases.
-TEST_F(MainWindowTest, theEraserButtonOffersHowItErases) {
+// The eraser is a cycling button: a tap takes the eraser as it erased last; tapped again, the next way (standard,
+// whiteout, whole strokes); held or right-clicked, all of them with their names. Its size: the widths of the bar.
+TEST_F(MainWindowTest, theEraserButtonCyclesHowItErases) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    settings->set("eraserMode", "default");
     auto* button = find<QQuickItem>("eraserButton");
     ASSERT_NE(button, nullptr);
-    auto* menu = find<QObject>("eraserMenu");
+    EXPECT_EQ(find<QObject>("eraserMenu"), nullptr) << "no menu of its own any more";
+    auto* menu = find<QObject>("eraserButtonVariants");
     ASSERT_NE(menu, nullptr);
     click(button);
     EXPECT_EQ(controller->tool(), "eraser");
-    EXPECT_FALSE(menu->property("visible").toBool()) << "the first tap only takes the eraser";
+    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("default")) << "the first tap takes the eraser";
+    EXPECT_FALSE(menu->property("visible").toBool());
     click(button);
-    until([&] { return menu->property("visible").toBool(); });
-    EXPECT_TRUE(menu->property("visible").toBool()) << "the second tap offers its kinds";
-    auto* whole = find<QObject>("eraserWholeStrokes");
-    ASSERT_NE(whole, nullptr);
-    QMetaObject::invokeMethod(whole, "triggered");
+    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("whiteout")) << "the next way";
+    click(button);
     EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("deleteStroke"));
-    EXPECT_TRUE(whole->property("checked").toBool());
-    QMetaObject::invokeMethod(menu, "close");
-    until([&] { return !menu->property("visible").toBool(); });
+    EXPECT_EQ(button->property("iconName").toString(), QStringLiteral("xqt-eraser-stroke")) << "its icon says which";
+    click(button);
+    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("default")) << "and round again";
 
-    // The right mouse button opens it as well, with another tool in hand
+    // Another tool, then the eraser again: as it erased last
+    click(button);  // (whiteout)
+    controller->selectTool("pen");
+    click(button);
+    EXPECT_EQ(controller->tool(), "eraser");
+    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("whiteout"));
+
+    // The right mouse button lists them, with another tool in hand
     controller->selectTool("pen");
     QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
                       button->mapToScene(QPointF(button->width() / 2, button->height() / 2)).toPoint());
     until([&] { return menu->property("visible").toBool(); });
     EXPECT_TRUE(menu->property("visible").toBool()) << "right click";
-    QMetaObject::invokeMethod(find<QObject>("eraserStandard"), "triggered");
-    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("default"));
-    EXPECT_EQ(controller->tool(), "eraser") << "choosing a kind takes the eraser";
+    EXPECT_EQ(menu->property("title").toString(), QStringLiteral("Eraser")) << "named as the button";
+    ASSERT_NE(entryOf(menu, "variant_deleteStroke"), nullptr);
+    QMetaObject::invokeMethod(entryOf(menu, "variant_deleteStroke"), "triggered");
+    EXPECT_EQ(settings->get("eraserMode").toString(), QStringLiteral("deleteStroke"));
+    EXPECT_EQ(controller->tool(), "eraser") << "choosing a way takes the eraser";
+    settings->set("eraserMode", "default");
+    controller->selectTool("pen");
+}
+
+// The cycling buttons (qt/docs/adaptive-layout.md, "Cycling buttons"): pen ↔ highlighter, select rectangle ↔ lasso and
+// the shapes share a button each. A tap on the button in use takes the next variant; from another tool it takes the
+// one used last; a long press lists them (the multi-layer selections only there); the keys take a variant directly
+// and the button follows. What was used last is kept over a restart. The shapes menu is gone.
+TEST_F(MainWindowTest, cyclingToolButtons) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setWidth(1920);
+    wait(100);
+    controller->selectTool("pen");
+    controller->setDrawingType("default");
+    auto* pen = find<QQuickItem>("penButton");
+    auto* select = find<QQuickItem>("selectButton");
+    auto* shape = find<QQuickItem>("shapeButton");
+    ASSERT_NE(pen, nullptr);
+    ASSERT_NE(select, nullptr);
+    ASSERT_NE(shape, nullptr);
+    EXPECT_EQ(find<QObject>("setsquareItem"), nullptr) << "no shapes menu";
+    EXPECT_EQ(find<QObject>("snapGridItem"), nullptr);
+    EXPECT_TRUE(pen->property("checked").toBool());
+    click(pen);
+    EXPECT_EQ(controller->tool(), "highlighter") << "the pen in use: a tap takes the highlighter";
+    EXPECT_EQ(pen->property("iconName").toString(), QStringLiteral("xopp-tool-highlighter"));
+    click(select);
+    EXPECT_EQ(controller->tool(), "selectRect");
+    EXPECT_FALSE(pen->property("checked").toBool());
+    click(pen);
+    EXPECT_EQ(controller->tool(), "highlighter") << "from another tool: the one used last";
+    key(Qt::Key_P);
+    EXPECT_EQ(controller->tool(), "pen");
+    EXPECT_EQ(pen->property("iconName").toString(), QStringLiteral("xopp-tool-pencil")) << "the key: the button follows";
+    click(select);
+    click(select);
+    EXPECT_EQ(controller->tool(), "selectRegion") << "rectangle ↔ lasso";
+
+    // The shapes: a long press lists them all; one picked, the pen draws it
+    auto* shapes = find<QObject>("shapeButtonVariants");
+    ASSERT_NE(shapes, nullptr);
+    QMetaObject::invokeMethod(shape, "pressAndHold");
+    until([&] { return shapes->property("visible").toBool(); });
+    ASSERT_TRUE(shapes->property("visible").toBool()) << "a long press: the list";
+    EXPECT_EQ(shapes->property("title").toString(), QStringLiteral("Shapes"));
+    ASSERT_NE(entryOf(shapes, "variant_arrow"), nullptr);
+    EXPECT_EQ(shapes->property("count").toInt(), 8) << "the seven shapes (and the geometry's entry, not offered)";
+    QMetaObject::invokeMethod(entryOf(shapes, "variant_arrow"), "triggered");
+    until([&] { return !shapes->property("visible").toBool(); });
+    EXPECT_EQ(controller->drawingType(), QStringLiteral("arrow"));
+    EXPECT_EQ(controller->tool(), "pen");
+    EXPECT_TRUE(shape->property("checked").toBool());
+    EXPECT_FALSE(pen->property("checked").toBool()) << "the pen button is freehand";
+    click(shape);
+    EXPECT_EQ(controller->drawingType(), QStringLiteral("doubleArrow")) << "a tap: the next shape";
+    click(pen);
+    EXPECT_EQ(controller->drawingType(), QStringLiteral("default")) << "the pen button: freehand again";
+    click(pen);  // (the highlighter)
+    // The multi-layer selections: in the list only
+    auto* selects = find<QObject>("selectButtonVariants");
+    ASSERT_NE(selects, nullptr);
+    QMetaObject::invokeMethod(select, "pressAndHold");
+    until([&] { return selects->property("visible").toBool(); });
+    ASSERT_NE(entryOf(selects, "variant_selectMultiLayerRect"), nullptr);
+    QMetaObject::invokeMethod(entryOf(selects, "variant_selectMultiLayerRect"), "triggered");
+    EXPECT_EQ(controller->tool(), "selectMultiLayerRect");
+    EXPECT_TRUE(select->property("checked").toBool());
+    click(select);
+    EXPECT_EQ(controller->tool(), "selectRect") << "a tap from the list-only one: the first of the cycle";
+
+    // Kept over a restart: the highlighter, the double arrow
+    restart();
+    auto* again = find<QQuickItem>("penButton");
+    ASSERT_NE(again, nullptr);
+    EXPECT_EQ(again->property("iconName").toString(), QStringLiteral("xopp-tool-highlighter")) << "the one used last";
+    EXPECT_EQ(find<QQuickItem>("shapeButton")->property("iconName").toString(), QStringLiteral("xopp-draw-double-arrow"));
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    settings->set("toolVariants", "");
+    controller->selectTool("pen");
+}
+
+// On a touch screen a finger held on a plain button shows its name above the finger, and letting go does not press it
+// (no hover on a touch screen); a button with a long press of its own keeps it (the zoom percentage: the whole page).
+TEST_F(MainWindowTest, aFingerHeldOnAButtonShowsItsName) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setWidth(1920);
+    wait(100);
+    controller->selectTool("pen");
+    auto* hand = find<QQuickItem>("handButton");
+    ASSERT_NE(hand, nullptr);
+    ASSERT_TRUE(hand->isVisible());
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    const QPoint at = hand->mapToScene(QPointF(hand->width() / 2, hand->height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(0, at);
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 250);
+    EXPECT_TRUE(hand->property("labelShown").toBool()) << "held: its name shows (held by a pointer: "
+                                                       << hand->property("heldPointer").toBool() << ")";
+    auto tipShown = [&] {
+        for (QObject* o: hand->findChildren<QObject*>()) {
+            if (o->inherits("QQuickToolTip") && o->property("visible").toBool() && o->property("text").toString() == "Hand") {
+                return true;
+            }
+        }
+        return false;
+    };
+    until(tipShown, 1500);
+    EXPECT_TRUE(tipShown()) << "the name \"Hand\" above the finger";
+    QTest::touchEvent(window, finger).release(0, at);
+    wait(100);
+    EXPECT_FALSE(hand->property("labelShown").toBool()) << "gone when let go";
+    EXPECT_EQ(controller->tool(), "pen") << "and the button was not pressed";
+    // A quick tap still presses it
+    QTest::touchEvent(window, finger).press(0, at);
+    QTest::touchEvent(window, finger).release(0, at);
+    wait(100);
+    EXPECT_EQ(controller->tool(), "hand");
+    controller->selectTool("pen");
+
+    // The zoom percentage keeps its own long press: the whole page
+    auto* zoom = find<QQuickItem>("zoomButton");
+    ASSERT_NE(zoom, nullptr);
+    controller->fitPage();
+    wait(50);
+    const int page = controller->zoomPercent();
+    controller->setZoomPercent(250);
+    wait(50);
+    const QPoint z = zoom->mapToScene(QPointF(zoom->width() / 2, zoom->height() / 2)).toPoint();
+    QTest::touchEvent(window, finger).press(0, z);
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
+    QTest::touchEvent(window, finger).release(0, z);
+    wait(100);
+    EXPECT_EQ(controller->zoomPercent(), page) << "held: the whole page";
 }
 
 // The tools on single keys, as in Xournal++: P pen, E eraser, H highlighter, T text, S select, L lasso, A hand. Not

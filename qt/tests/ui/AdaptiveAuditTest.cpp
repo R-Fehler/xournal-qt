@@ -359,10 +359,10 @@ void AdaptiveAuditTest::walk() {
     }
     // The tools in a column at the side (the setting), as a portrait tablet might want them
     if (wanted("sideToolbar")) {
-        controller->setProperty("toolbarPosition", "left");
+        QMetaObject::invokeMethod(window, "chooseToolbar", Q_ARG(QVariant, "railLeft"));  // (this size class)
         wait(400);
         shot("sideToolbar", toolbarFit());
-        controller->setProperty("toolbarPosition", "top");
+        QMetaObject::invokeMethod(window, "chooseLayout", Q_ARG(QVariant, "toolbar"), Q_ARG(QVariant, ""));
         wait(300);
     }
     if (wanted("settings")) {

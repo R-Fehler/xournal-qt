@@ -361,6 +361,31 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.customSettingsChanged();
         });
 
+    // The variant last used of each cycling tool button (qt/docs/adaptive-layout.md, "Cycling buttons"), as
+    // "group=variant;…", e.g. "pen=highlighter;shape=arrow" (the eraser's is eraserMode)
+    add("toolVariants",
+        [&s] {
+            std::string v;
+            s.getCustomElement("xournalQt").getString("toolVariants", v);
+            return QVariant(QString::fromStdString(v));
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setString("toolVariants", v.toString().toStdString());
+            s.customSettingsChanged();
+        });
+
+    // The colors used last (the tool bar's "recent" colors), newest first: "#rrggbb,…"
+    add("recentColors",
+        [&s] {
+            std::string v;
+            s.getCustomElement("xournalQt").getString("recentColors", v);
+            return QVariant(QString::fromStdString(v));
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setString("recentColors", v.toString().toStdString());
+            s.customSettingsChanged();
+        });
+
     // --- stabilizer (ranges as in upstream's settings dialog) ---
     add("stabilizerAveraging", [&s] { return QVariant(static_cast<int>(s.getStabilizerAveragingMethod())); },
         [&s](const QVariant& v) {

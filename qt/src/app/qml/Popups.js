@@ -14,3 +14,21 @@ function openAt(menu, pos) {
         menu.popup()
     }
 }
+/// A popup of this item's own (a menu declared inside it) is open: e.g. a button in "more tools" opened its menu
+function hasOpenPopup(item) {
+    if (!item || !item.data) return false
+    for (let i = 0; i < item.data.length; ++i) {
+        const o = item.data[i]
+        if (o && o.opened === true) return true
+    }
+    return false
+}
+/// Some item in `container` has a popup of its own open
+function hasOpenPopupIn(container) {
+    if (!container) return false
+    const children = container.children
+    for (let i = 0; i < children.length; ++i) {
+        if (hasOpenPopup(children[i])) return true
+    }
+    return false
+}

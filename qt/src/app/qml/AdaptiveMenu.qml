@@ -15,6 +15,11 @@ Menu {
     id: control
     /// As a submenu: whether its entry is offered at all
     property bool offered: true
+    /// Its title shown on top of the menu too (the sheet of the phone classes always shows a title): a menu opened by
+    /// a long press on a button names the button (qt/docs/adaptive-layout.md, "Labels without hover")
+    property bool titleShown: false
+    /// As a submenu: the icon of its entry in the menu above
+    property string iconName: ""
     property real minimumWidth: 200
     property real maximumWidth: 420
     /// The window's layout (Main.qml's `win.adaptive`), if there is one
@@ -28,7 +33,7 @@ Menu {
             const it = itemAt(i)
             if (it && it.offered !== false) w = Math.max(w, it.implicitWidth)
         }
-        return w
+        return titleShown && title !== "" ? Math.max(w, titleMetrics.advanceWidth + 32) : w
     }
     readonly property real windowWidth: typeof win !== "undefined" && win ? win.width : 100000
     readonly property real windowHeight: typeof win !== "undefined" && win ? win.height : 100000
@@ -38,7 +43,10 @@ Menu {
     verticalPadding: 6
 
     // Submenus get an entry that can be left out (`offered`) and has the same height as the others
-    delegate: AdaptiveMenuItem { offered: subMenu ? subMenu.offered !== false : true }
+    delegate: AdaptiveMenuItem {
+        offered: subMenu ? subMenu.offered !== false : true
+        icon.source: subMenu && subMenu.iconName ? app.iconUrl(subMenu.iconName) : ""
+    }
 
     contentItem: ListView {
         id: list
@@ -49,10 +57,28 @@ Menu {
         clip: true
         currentIndex: control.currentIndex
         boundsBehavior: Flickable.StopAtBounds
+        header: control.titleShown && control.title !== "" ? titleHeader : null
         // Scrolls only where the window is too short for it: then the bar shows that there is more
         ScrollBar.vertical: ScrollBar {
             objectName: "menuScrollBar"
             policy: list.interactive ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+        }
+    }
+
+    readonly property TextMetrics titleMetrics: TextMetrics { text: control.title; font.weight: Font.DemiBold }
+    Component {
+        id: titleHeader
+        Label {
+            objectName: "menuTitle"
+            width: ListView.view ? ListView.view.width : implicitWidth
+            text: control.title
+            elide: Text.ElideRight
+            font.weight: Font.DemiBold
+            color: "#5f6368"
+            leftPadding: 16
+            rightPadding: 16
+            topPadding: 6
+            bottomPadding: 6
         }
     }
 

@@ -31,6 +31,10 @@ Item {
     readonly property real mainX: active && onLeft ? referenceWidth + gap : 0
     readonly property real referenceX: onLeft ? 0 : mainWidth + gap
     readonly property alias referenceCanvas: referenceCanvas
+    /// Where the reference's pill is (in this item; empty without a reference): the main view pill keeps clear of it
+    readonly property rect pillRect: active ? Qt.rect(referenceScope.x + referencePill.x, referencePill.y,
+                                                      referencePill.width, referencePill.height)
+                                            : Qt.rect(0, 0, 0, 0)
 
     // The keys act on the reference while it (or its pill) has the focus (AppController)
     Binding {

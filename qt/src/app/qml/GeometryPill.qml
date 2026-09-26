@@ -1,7 +1,7 @@
-// While the setsquare or the compass is out (Shapes menu): a small pill at the top right of the canvas with what the
-// tool can do. Its icon switches the tool off for a moment and back on: put aside, the tool is gone from the page
-// and the pill shrinks to that icon; a tap on it brings both back where they were. The Shapes menu entry takes the
-// tool away altogether.
+// While the setsquare or the compass is out (the tool bar's setsquare / compass button): a small pill at the top right
+// of the canvas with what the tool can do. Its icon switches the tool off for a moment and back on: put aside, the
+// tool is gone from the page and the pill shrinks to that icon; a tap on it brings both back where they were. Its ×
+// takes the tool away altogether.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -97,6 +97,20 @@ Pane {
             text: app.geometryMarkSpacing === 1 ? qsTr("1 cm") : qsTr("½ cm")
             tip: qsTr("Distance of the marks (tap for the other one)")
             onClicked: app.geometryMarkSpacing = app.geometryMarkSpacing === 1 ? 0.5 : 1
+        }
+        // Off the page altogether (the tool bar's setsquare / compass button brings it back)
+        ToolSeparator { visible: !pill.small }
+        IconButton {
+            objectName: "geometryClose"
+            visible: !pill.small
+            iconName: "xqt-close"
+            label: pill.compass ? qsTr("Take the compass away") : qsTr("Take the setsquare away")
+            tip: label
+            implicitWidth: 44
+            implicitHeight: 44
+            icon.width: 20
+            icon.height: 20
+            onClicked: app.toggleGeometryTool("")
         }
     }
 }
