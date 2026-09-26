@@ -513,6 +513,13 @@
   place when it fits, offset over an identical note, one undo step. A note dragged onto another page moves there
   (one undo step). Upstream Xournal++ cannot paste a note.
 
+- **All handwriting in the annotations, with its context, `qt/annotations-context` (2026-09-26).** Handwriting over
+  PDF text was dropped as "marks" (whole notes on slides vanished) and dots under 4 pt were dropped; now every piece
+  is listed, captioned with the words it crosses, underlines or circles (`on “…”`, also in the export), and dots
+  join the nearest piece. The panel's pictures show the page under the ink (PDF, image or paper colour, dimmed to
+  ~65 %; rulings skipped), rendered per crop on a worker (newest first, rows scrolled away skipped, yielding to the
+  canvas), 24 MB LRU; one request per row.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
