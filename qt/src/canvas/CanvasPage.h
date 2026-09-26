@@ -162,6 +162,10 @@ private:
     /// The rectangle or lasso started on a note ends: its elements inside it (never its paper or its text) are
     /// selected, or the note when it was a tap.
     void selectInNote(Layer* note, bool tapped);
+    /// A rectangle or lasso started beside the notes ends (not a tap): when it encloses whole notes (or `add`s to a
+    /// selection of notes), they are selected with the page's elements in it (qt/docs/sticky-notes.md, "Several notes
+    /// at once"). False: no note in it, the selection is made as before.
+    bool selectNotesAndElements(bool add);
 
     std::optional<std::vector<LinkSpot>> links;  ///< linkSpots()
 

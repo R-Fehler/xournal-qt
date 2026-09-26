@@ -236,4 +236,47 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size);
 xoj::util::Rectangle<double> pastePlace(xoj::util::Rectangle<double> rect, double pageWidth, double pageHeight,
                                         const std::vector<xoj::util::Rectangle<double>>& taken);
 
+/// Where a copied selection of several notes and elements (qt/docs/sticky-notes.md, "Several notes at once") goes on
+/// a page of this size: how far it is moved as a whole (its layout and size kept). The same place when it fits, else
+/// moved inside the page (its top left at the page's when it is larger); moved on a little while one of its `notes`
+/// would lie exactly on one of `taken`.
+xoj::util::Point<double> groupPastePlace(const xoj::util::Rectangle<double>& bounds,
+                                         const std::vector<xoj::util::Rectangle<double>>& notes, double pageWidth,
+                                         double pageHeight, const std::vector<xoj::util::Rectangle<double>>& taken);
+
+// --- several notes and elements together -----------------------------------------------------------------------
+/// The clipboard's format of a selection of whole notes together with elements of the page (the app's own): where it
+/// all was (its bounds), each note as CLIPBOARD_MIME has it, each element in a stream of its own (with whether it was
+/// a Markdown box of the page).
+inline constexpr const char* GROUP_CLIPBOARD_MIME = "application/x-xournal-qt-selection";
+/// Notes and elements for the clipboard (the caller holds the document's lock)
+std::string serializeGroup(const xoj::util::Rectangle<double>& bounds, const std::vector<const Layer*>& notes,
+                           const std::vector<const Element*>& elements);
+/// A selection from the clipboard (on no page)
+struct Group {
+    xoj::util::Rectangle<double> bounds;
+    std::vector<std::unique_ptr<Layer>> notes;
+    std::vector<ElementPtr> elements;
+    std::vector<bool> markdown;  ///< per element: it was a Markdown box of its page (its page's Markdown layer's)
+};
+std::optional<Group> deserializeGroup(const char* data, size_t size);
+
+/// Several undo actions as one step, named: undone last first (they may depend on each other, as layers taken from a
+/// page and put on another do), redone in their order.
+class UndoSteps final: public UndoAction {
+public:
+    explicit UndoSteps(std::string text);
+    void add(std::unique_ptr<UndoAction> step);
+    bool empty() const { return steps.empty(); }
+    bool undo(Control* control) override;
+    bool redo(Control* control) override;
+    std::vector<PageRef> getPages() override;
+    std::string getText() override { return text; }
+
+private:
+    std::vector<std::unique_ptr<UndoAction>> steps;
+    std::vector<PageRef> pages;
+    std::string text;
+};
+
 }  // namespace xqt::sticky

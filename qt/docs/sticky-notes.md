@@ -3,7 +3,8 @@
 Status: built in `qt/sticky-notes` (2026-09-26); copy, cut, paste and moving to another page in
 `qt/sticky-clipboard` (2026-09-26); the darker edge and the shade, cheaper copy / cut / paste in `qt/sticky-look`
 (2026-09-26); notes as containers (their Markdown text, paste and images into them, selecting in them) in
-`qt/sticky-containers` (2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
+`qt/sticky-containers` (2026-09-26); several notes selected at once (with elements of the page) and the note's text
+clipped while it is written in `qt/sticky-select` (2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
 user can write on and move around, with the ink and text on them staying attached; not a PDF popup note that other
 viewers minimise; usable for self-testing by moving them over solutions; adaptable in size.
 
@@ -166,10 +167,77 @@ image there goes onto the page, below it).
   undo step ("Move into sticky note", "Move out of sticky note", "Move to another sticky note"). A move to another
   page goes into the note under it there, or onto that page. Resizing and rotating the selection never change its
   layer. A selection of the page's Markdown boxes is not put into a note (its boxes stay in the Markdown layer).
-- A rectangle or lasso that starts outside every note behaves as before (the page's layer; a multi-layer one skips
-  notes).
+- A rectangle or lasso that starts outside every note selects the page's elements as before (the page's layer; a
+  multi-layer one skips notes), and the notes it encloses whole (see "Several notes at once").
 - While a selection of a note's elements lives, the note is the page's selected layer (like the Markdown layer for a
   selection of Markdown boxes, see "The selected layer"); when it ends, the layer selected before is again.
+
+## Several notes at once (qt/sticky-select)
+
+The author's request (2026-09-26): "Selecting multiple notes would be good, either with Ctrl during select-clicking
+or with the rectangle selection tool etc., so we can select them together with other annotations to copy-paste
+somewhere else."
+
+### What selects them
+- **Ctrl + click** (the mouse; the pen with Ctrl held; Shift works too) with a select tool on a note adds it to what
+  is selected on that page, or takes it away when it is selected. On an element of the page (the selected layer's,
+  or a Markdown text of the page; a multi-layer tool: any layer that is no note) the same, while notes are selected.
+  With elements selected (an ordinary selection) Ctrl + click on a note makes one selection of them and the note.
+  Without notes selected, Ctrl + click on elements adds them as Shift + click always did (upstream's aggregate).
+- **A rectangle or lasso started beside the notes** selects the notes it encloses whole (all of the paper inside
+  it: the whole layer, never a note's elements apart from it) and the page's elements in it (as before: the selected
+  layer, else the page's Markdown texts; a multi-layer tool: the topmost layer with elements in it that is no note).
+  Ctrl or Shift: added to what is selected.
+- Unchanged: **a rectangle or lasso started inside a note** selects that note's elements; **a tap** on a note
+  selects that note alone; the object select tool takes one note. One note alone is always the note's own selection
+  (its outline, its handle, its pill); elements alone are an ordinary selection (resized, rotated, recoloured as
+  before). Only two or more notes, or notes with elements, make the selection described here.
+- **Touch** has no way to add yet: Ctrl and Shift need a keyboard (a finger on the selection moves it, as a finger
+  moves any selection).
+
+### What it does
+- It is drawn over its page: an outline around each note, a thin box around each element (up to 200), a dashed box
+  around all of it. The **selection's pill** shows (not the note's): copy, cut, paste, delete, deselect. Colour, cover
+  and size stay per note (the note's pill, for one note).
+- **Moving**: a drag in its box (pen, mouse, a finger) moves everything together; it stays on its page while dragged.
+  One undo step ("Move selection"). Let go over another page, it all goes there (the point held under the pointer,
+  moved inside that page, the layout kept): the notes on top of that page's layers in their order, the elements into
+  its own layer (Markdown texts into its Markdown layer); one undo step ("Move selection to another page").
+- **Delete**, **Cut**: one undo step ("Delete", "Cut").
+- **Copy** (Ctrl+C, the pill): the clipboard's own format `application/x-xournal-qt-selection`
+  (`sticky::GROUP_CLIPBOARD_MIME`): where it all was (its bounds), each note as a copied note is
+  (`CLIPBOARD_MIME`'s bytes), each element in a stream of its own with whether it was a Markdown text of its page.
+  A picture of it all (PNG at twice the page's resolution, the elements under the notes, as in an export) is drawn
+  only when another app asks for it.
+- **Paste** (Ctrl+V, the pills, the page sidebar's Ctrl+V): onto the current page of the view pasted in, in the same
+  layout: where it was when it fits, else moved inside the page as a whole (never made smaller); moved 16 points on
+  while one of its notes would lie exactly on a note of that page (a paste over the original, a second paste). The
+  notes go on top of the page's layers, the elements into the page's own layer (Markdown texts into its Markdown
+  layer, made if needed), all selected together; one undo step ("Paste"). Another tab or window, another document:
+  the same (the system clipboard). Xournal++ does not read this format (as for a single note).
+- In the page sidebar with notes selected together, Ctrl+C / Ctrl+X take them, not the pages (as for one note).
+
+### How it is built (the decision)
+- **Considered: upstream's EditSelection with the notes in it.** It takes the selected elements out of their one
+  layer while they are selected and drops them into the selected layer of the page they end on. A note is a layer of
+  its own (its paper first, its content clipped to it): taken apart into an EditSelection it would stop being a note,
+  and an EditSelection has one source layer, so notes (several layers) and page ink cannot be in one.
+- **Considered: an EditSelection for the elements next to several notes in StickyNotes, dragged together.** Two
+  selections to keep in step: two drags, two undo steps to merge, the EditSelection's box and handles do not reach
+  the notes, and its resize and rotation handles mean nothing for notes.
+- **Chosen: a selection of its own that holds note layers and elements where they are**, each note a unit
+  (`MixedSelection`, qt/src/canvas). Nothing is taken out of its layer while selected, so a note stays a note, and
+  elements of several layers can be in it. A drag moves each element (`Element::move`) and each note
+  (`sticky::applyLook`, which moves what is on it) directly and has only that area drawn again, as a note's own drag
+  does. Every change is one undo step composed of upstream's actions and ours (`NoteUndoAction` /
+  `NotePageUndoAction` per note, upstream's `MoveUndoAction` per layer of elements, `DeleteUndoAction`,
+  `AddUndoAction`, the layer insert and remove), in `sticky::UndoSteps`, which undoes them in reverse order (notes
+  taken from one page and put on another depend on the order). `CanvasView::selectTogether` decides what a set of
+  notes and elements becomes (one note: StickyNotes; elements of one layer: an EditSelection; else a MixedSelection),
+  `CanvasView::toggleSelected` / `takeSelected` do Ctrl + click. The single note, its pill, its clipboard format, its
+  drag to another page and the selection inside a note are unchanged.
+- The selection follows the document: an undo (or anything else) that takes away one of its notes or elements takes
+  it out of the selection (`MixedSelection::validate`, on every change of the undo stack and of a page's layers).
 
 ### File format
 Nothing new: what is on a note is in the note's layer, as before; the note's Markdown text is a text element with a
@@ -304,6 +372,8 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
 - Elements dragged into a note, out of it or to another note on the same page: `sticky::ContentMoveUndoAction` (the
   move of that drag and the change of layer; undone, they are back at their places in their old layer). Onto another
   page: upstream's move (it changes the layer too).
+- Several notes (with elements) moved, moved to another page, deleted, cut, pasted: `sticky::UndoSteps`, one step of
+  the notes' and the elements' own actions (see "Several notes at once").
 - Peeking and hiding are view states, not undo steps.
 
 ## Code
@@ -320,6 +390,12 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   on a note, cover taps, copy / cut / paste and the picture for other apps, the drop on another page), used by
   `CanvasPage`, `CanvasInput` and `CanvasView` (`copySelection`, `cutSelection` and `pasteElements` hand a note to
   it).
+- Several notes at once (qt/sticky-select): `qt/src/canvas/MixedSelection.*` (the selection, its drawing, drag, drop
+  on another page, copy, cut, delete, paste, the picture for other apps); `CanvasView::selectTogether`,
+  `toggleSelected`, `takeSelected`, `hasAnySelection`; `CanvasPage::selectNotesAndElements` and Ctrl / Shift in
+  `CanvasPage::onButtonPressEvent`, `selectObjectAt`; `StickyNotes::press` (`add`); `CanvasInput` (the drag, also
+  with a finger); `sticky::serializeGroup`, `deserializeGroup`, `groupPastePlace`, `UndoSteps`;
+  `AppController::notesSelectedTogether` (the page sidebar's keys).
 - `qt/src/app/qml/NotePill.qml`: colours, cover, copy, cut, delete, at the note. `PageKeys.qml`: the sidebar's keys
   with a note. The menu entries and the page pill's eye in
   `Main.qml`; `AppController` (`insertStickyNote`, `noteSelected`, `noteColor`, `noteCovers`, `pageNotesHidden` ...).
@@ -347,6 +423,15 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   `CanvasReplayTest.aNotesTextIsClippedToTheNoteWhileItIsWrittenAndAHintSaysWhenTheCursorIsBelow` (no pixel of the
   text or its frame below the note while it is written, the triangle, the hint's place, gone with the cursor on the
   note and when done, the note keeps its size).
+- Tests of several notes at once: `StickySelectTest` (canvas): `ctrlClickAddsAndTakesAwayNotesAndElements` (mouse
+  and pen, a selection of ink joined by a note, back to one note's own selection),
+  `aRectangleBesideTheNotesSelectsThemWholeWithThePagesInkAndMovesThemAsOneStep` (the notes whole, the ink between
+  them, not the ink below; the drag, drawn where it is; one undo step; a rectangle in a note and a tap unchanged; one
+  note alone, ink alone as before), `aSelectionOfNotesAndInkIsDeletedAsOneStep`,
+  `aSelectionOfNotesAndInkIsCopiedAndPastedInItsLayoutAsOneStep` (the picture, another page, the offset of a second
+  paste, cut, another document), `aSelectionOfNotesAndInkIsDraggedOntoAnotherPageAsOneStep`;
+  `MainWindowTest.severalStickyNotesSelectedTogetherHaveTheSelectionsPill` (the selection's pill, not the note's; its
+  Copy and Delete; the page sidebar's Ctrl+V and Ctrl+X).
 
 ## Not yet
 
@@ -356,9 +441,13 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
 - A note selected in the second view (self-reference) has no pill of its own: Ctrl+C / X / V work there.
 - Clipping a plain text box (the text tool with Markdown off) while it is typed on a note: it shows beyond the
   note's edge until it is done. (The note's Markdown text is clipped while it is written.)
-- A multi-layer selection rectangle that starts beside a note and reaches it selects nothing on the note (one
-  started on the note selects in it; a tap selects the note).
-- A selection of elements from several notes, or from a note and the page, at once (a selection is in one layer).
+- A rectangle that starts beside a note and reaches only part of it selects nothing on the note (one that encloses
+  it selects it whole; one started on the note selects in it).
+- A selection of elements from inside several notes, or from inside a note and the page, at once (a selection of
+  elements is in one layer; whole notes with page elements: "Several notes at once").
+- Several notes selected together: no colour or cover for all of them at once, no resize; Ctrl + click on touch
+  screens (no way to add without a keyboard); a selection of several notes in the second view (self-reference) has no
+  pill of its own (the keys work).
 - Pictures dropped on a note that is not being written (drops are taken while Markdown is written).
 - Scrolling the note's text (what goes below the note shows when the note is made larger).
 - Hiding the notes of the whole document at once (the eye in the page pill hides those of the current page).

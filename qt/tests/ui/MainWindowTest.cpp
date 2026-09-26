@@ -3980,6 +3980,61 @@ TEST_F(MainWindowTest, aStickyNoteIsMovedToAnotherPageByCutAndPaste) {
     EXPECT_EQ(controller->pageCount(), pages) << "not the page";
 }
 
+// Several sticky notes selected together (qt/sticky-select): the selection's pill (not the note's), its Copy and
+// Delete; in the page sidebar Ctrl+V pastes them onto the page clicked, Ctrl+X cuts them (not the pages).
+TEST_F(MainWindowTest, severalStickyNotesSelectedTogetherHaveTheSelectionsPill) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* s = controller->tabManager().currentSession();
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    auto notesOn = [&](size_t page) {
+        std::vector<Layer*> notes;
+        std::shared_lock lock(*s->getDocument());
+        for (Layer* l: s->getDocument()->getPage(page)->getLayers()) {
+            if (xqt::sticky::isNote(*l)) {
+                notes.push_back(l);
+            }
+        }
+        return notes;
+    };
+    ASSERT_TRUE(controller->insertStickyNote());
+    ASSERT_TRUE(controller->insertStickyNote());
+    ASSERT_EQ(notesOn(0).size(), 2u);
+    view->selectTogether(*view->getPage(0), notesOn(0), {});
+    auto* selectionPill = find<QQuickItem>("selectionBar");
+    auto* notePill = find<QQuickItem>("notePill");
+    ASSERT_NE(selectionPill, nullptr);
+    ASSERT_NE(notePill, nullptr);
+    until([&] { return selectionPill->isVisible(); });
+    EXPECT_TRUE(selectionPill->isVisible()) << "the selection's pill: copy, cut, delete";
+    EXPECT_FALSE(notePill->isVisible()) << "no note's pill for several notes";
+    EXPECT_TRUE(controller->notesSelectedTogether());
+
+    QGuiApplication::clipboard()->clear();
+    click(findItem("selectionCopy"));
+    ASSERT_TRUE(QGuiApplication::clipboard()->mimeData()->hasFormat(xqt::sticky::GROUP_CLIPBOARD_MIME));
+    click(findItem("selectionDelete"));
+    EXPECT_EQ(notesOn(0).size(), 0u);
+    until([&] { return !selectionPill->isVisible(); });
+    controller->undo();
+    EXPECT_EQ(notesOn(0).size(), 2u) << "one undo step";
+
+    // The sidebar has the keys: Ctrl+V pastes both onto the page clicked (not pages)
+    auto* list = find<QQuickItem>("sidebarList");
+    ASSERT_NE(list, nullptr);
+    const int pages = controller->pageCount();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(list, 1)));
+    until([&] { return s->getCurrentPageNo() == 1; });
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(notesOn(1).size(), 2u) << "both notes pasted onto the page clicked";
+    EXPECT_EQ(controller->pageCount(), pages) << "no pages pasted";
+    ASSERT_TRUE(controller->notesSelectedTogether());
+    key(Qt::Key_X, Qt::ControlModifier);
+    EXPECT_EQ(notesOn(1).size(), 0u) << "both cut, not the page";
+    EXPECT_EQ(controller->pageCount(), pages);
+}
+
 TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

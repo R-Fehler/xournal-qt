@@ -454,8 +454,33 @@ void StickyNotes::startDrag(Drag how, double x, double y) {
     dragStart = dragNow = *look;
 }
 
-bool StickyNotes::press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected, bool areaTool) {
+std::unique_ptr<UndoAction> StickyNotes::insertUndo(LayerController* layers, const PageRef& page, Layer* layer,
+                                                    Layer::Index position, std::string text) {
+    return std::make_unique<InsertNoteUndoAction>(layers, page, layer, position, std::move(text));
+}
+
+std::unique_ptr<UndoAction> StickyNotes::removeUndo(LayerController* layers, const PageRef& page, Layer* layer,
+                                                    Layer::Index position, std::string text) {
+    return std::make_unique<RemoveNoteUndoAction>(layers, page, layer, position, std::move(text));
+}
+
+bool StickyNotes::press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected, bool areaTool,
+                        bool add) {
     deselected = false;
+    if (add && selectTool) {
+        // Ctrl or Shift: a note there joins the selection or leaves it; elsewhere the press goes on (it adds too)
+        Layer* note = nullptr;
+        {
+            std::shared_lock lock(*view.getSession().getDocument());
+            note = sticky::noteAt(*page.getPage(), x, y);
+        }
+        drag = Drag::None;
+        if (note) {
+            view.toggleSelected(page, note, nullptr);
+            return true;
+        }
+        return false;
+    }
     if (selected) {
         if (onHandle(page, x, y)) {
             startDrag(Drag::Resize, x, y);

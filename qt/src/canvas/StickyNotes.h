@@ -10,7 +10,9 @@
  */
 #pragma once
 
+#include <memory>
 #include <optional>
+#include <string>
 #include <unordered_set>
 
 #include <QPointF>
@@ -20,6 +22,9 @@
 #include "model/OverlayBase.h"
 #include "model/PageRef.h"
 #include "session/StickyNote.h"
+
+class LayerController;
+class UndoAction;
 
 namespace xqt {
 
@@ -69,7 +74,11 @@ public:
     /// `areaTool` (a rectangle or lasso select tool): on a note that is not selected (and does not cover) the press is
     /// not the note's: the rectangle or lasso selects in the note (CanvasPage; a tap selects the note then).
     /// Returns true when the press was the note's (nothing else happens); `deselected`: it only ended a selection.
-    bool press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected, bool areaTool = false);
+    /// `add` (Ctrl or Shift with a select tool): a note there is added to the selection or taken out of it
+    /// (CanvasView::toggleSelected; qt/docs/sticky-notes.md, "Several notes at once"); elsewhere the press goes on
+    /// without ending the selection (a rectangle or a tap adds to it).
+    bool press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected, bool areaTool = false,
+               bool add = false);
     /// A finger on the selected note (view coordinates): it moves it or its handle resizes it. False: not on it.
     bool pressTouch(CanvasPage& page, double x, double y);
     bool dragging() const { return drag != Drag::None; }
@@ -97,6 +106,13 @@ public:
 
     /// Screen pixels of the handle's radius
     static constexpr double HANDLE_RADIUS_PX = 9;
+
+    /// Upstream's undo of a note layer placed on a page or taken from it, named `text` (empty: upstream's name),
+    /// drawing only the note's part of the page again (for several notes at once: MixedSelection)
+    static std::unique_ptr<UndoAction> insertUndo(LayerController* layers, const PageRef& page, Layer* layer,
+                                                  Layer::Index position, std::string text);
+    static std::unique_ptr<UndoAction> removeUndo(LayerController* layers, const PageRef& page, Layer* layer,
+                                                  Layer::Index position, std::string text);
 
 private:
     enum class Drag { None, Move, Resize };

@@ -1990,3 +1990,21 @@ Design: [md-images.md](../md-images.md).
       the bottom right shows. With the cursor below the bottom, a dark label below the note says "The text is longer
       than the note: make the note bigger"; typing goes on (the label takes no keys or presses). Move the cursor up
       (arrow keys, or a tap on the text): the label goes. Escape: the label goes; the note did not grow.
+- [ ] Place two notes (move one aside), write on one, draw some ink on the page between them and some far below.
+      Rectangle select tool: a click on one note selects it (its pill). Ctrl + click on the other: both have an
+      outline, a dashed box goes around both, the selection's pill shows (copy, cut, paste, delete), not the note's.
+      Ctrl + click the ink between them: it joins (a thin box around it). Ctrl + click a note again: it leaves; until
+      one note is left, which has its own pill again. With the pen: hold Ctrl on the keyboard and tap a note: the same.
+- [ ] Draw a rectangle starting on the empty page around both notes and the ink between them (not the ink below):
+      both notes and the ink are selected together. Drag inside the dashed box: all of it moves (the note's ink with
+      its note); Ctrl+Z puts all of it back in one step. A rectangle started inside a note still selects the note's
+      ink only; a tap on a note still selects just that note.
+- [ ] Del: all of it goes; Ctrl+Z brings it back in one step. Ctrl+C, go to another page, Ctrl+V: the same notes and
+      ink in the same layout, selected; Ctrl+V again: a copy a little further down and right; Ctrl+Z removes one paste
+      in one step. Ctrl+X cuts in one step. Paste into another tab (another document): the same layout.
+- [ ] Drag the selection and let go over the next page: all of it goes there, in its layout; Ctrl+Z in one step.
+- [ ] Paste into another app (an image editor, a chat): a picture of the notes and the ink.
+- [ ] A page clicked in the sidebar, several notes selected on the canvas: Ctrl+X cuts the notes (not the page);
+      Ctrl+V pastes them onto the page clicked.
+- [ ] Android (Fold 7): a rectangle drawn with the pen around two notes selects both; a finger drag in the dashed box
+      moves them; the selection's pill fits.

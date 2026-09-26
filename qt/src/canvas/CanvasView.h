@@ -47,6 +47,7 @@
 #include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
 #include "GeometryToolLayer.h"
+#include "MixedSelection.h"
 #include "ScreenCalibration.h"
 #include "session/DocumentSession.h"
 #include "session/StickyNote.h"
@@ -299,6 +300,20 @@ public:
     bool drawGeometryMarks(double spacingCm);
     /// The sticky notes of this view: placing, the selected note, peeking, hiding (qt/docs/sticky-notes.md)
     StickyNotes& notes() const { return *stickyNotes; }
+    /// A selection of several notes, or of notes with elements of the page (qt/docs/sticky-notes.md, "Several notes
+    /// at once")
+    MixedSelection& mixed() const { return *mixedSelection; }
+    /// Anything selected: elements, a note, several notes (with elements)
+    bool hasAnySelection() const;
+    /// Select notes and elements of a page (anything selected before ends): one note alone is the note's selection
+    /// (its pill), elements of one layer alone an ordinary selection of elements, else a MixedSelection.
+    void selectTogether(CanvasPage& page, std::vector<Layer*> notes, std::vector<MixedSelection::Item> items);
+    /// Ctrl (or Shift) and a select tool on a note or an element of a page: it joins what is selected there, or
+    /// leaves it (a selection on another page ends).
+    void toggleSelected(CanvasPage& page, Layer* note, Element* element);
+    /// What is selected on a page as notes and elements (the selection ends: elements selected go back into their
+    /// layer); nothing when the selection is elsewhere, or elements inside a note are selected.
+    std::pair<std::vector<Layer*>, std::vector<MixedSelection::Item>> takeSelected(CanvasPage& page);
     /// The handle that sets the width of a Markdown text box (written on the page, or selected)
     MarkdownBoxResize& boxResize() const { return *boxResizer; }
     /// The setsquare / compass on the canvas.
@@ -558,6 +573,7 @@ private:
     bool markdownInPanel = false;    ///< Markdown text boxes are edited beside the page (tests; normally on the page)
     GeometryToolLayer geometry{*this};
     std::unique_ptr<StickyNotes> stickyNotes;
+    std::unique_ptr<MixedSelection> mixedSelection;
     std::unique_ptr<MarkdownBoxResize> boxResizer;
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;

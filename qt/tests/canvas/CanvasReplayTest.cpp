@@ -3378,6 +3378,369 @@ TEST_F(CanvasReplayTest, aNotesTextIsClippedToTheNoteWhileItIsWrittenAndAHintSay
     EXPECT_EQ(*sticky::lookOf(*note), look) << "the note is not made bigger by itself";
 }
 
+// --- several notes at once, with elements of the page (qt/sticky-select) ----------------------------------------
+
+namespace {
+/// A note on a page at this place (placed, then moved there; not an undo step of its own)
+Layer* noteAt(DocumentSession& session, CanvasView& view, size_t page, const xoj::util::Rectangle<double>& rect) {
+    session.setCurrentPageNo(page);
+    if (!view.notes().insert()) {
+        return nullptr;
+    }
+    Layer* layer = view.notes().selectedLayer();
+    const auto look = *sticky::lookOf(*layer);
+    auto to = look;
+    to.rect = rect;
+    sticky::changeLook(*session.getDocument(), session.getDocument()->getPage(page), *layer, look, to);
+    view.clearSelection();
+    return layer;
+}
+/// Where a stroke begins (its bounding box is computed again when it is read from the clipboard)
+QPointF startOf(const Element* e) {
+    const auto& p = static_cast<const Stroke*>(e)->getPointVector().front();
+    return {p.x, p.y};
+}
+/// The strokes of a page's own layers (not on notes)
+std::vector<const Element*> pageInkOf(DocumentSession& session, size_t page) {
+    std::vector<const Element*> ink;
+    for (const Layer* l: session.getDocument()->getPage(page)->getLayersView()) {
+        if (!sticky::isNote(*l)) {
+            for (const Element* e: l->getElementsView()) {
+                ink.push_back(e);
+            }
+        }
+    }
+    return ink;
+}
+}  // namespace
+
+class StickySelectTest: public CanvasReplayTest {
+protected:
+    void SetUp() override {
+        CanvasReplayTest::SetUp();
+        app->getSettings()->setSnapGrid(false);
+        a = noteAt(*session, *view, 0, {60, 100, 120, 90});
+        b = noteAt(*session, *view, 0, {300, 120, 120, 90});
+        ASSERT_NE(a, nullptr);
+        ASSERT_NE(b, nullptr);
+        session->setCurrentPageNo(0);
+        drawLine(0, QPointF(80, 130), QPointF(150, 160));   // on note A
+        drawLine(0, QPointF(200, 150), QPointF(260, 180));  // on the page, between the notes
+        drawLine(0, QPointF(60, 500), QPointF(120, 520));   // on the page, far below
+        processEvents();
+        ASSERT_EQ(a->getElementsView().size(), 2u) << "the paper and the ink";
+        const auto ink = pageInkOf(*session, 0);
+        ASSERT_EQ(ink.size(), 2u);
+        between = ink[0];
+        below = ink[1];
+        app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    }
+    /// A click (mouse) at a point of a page, with these keys held
+    void click(size_t page, QPointF at, Qt::KeyboardModifiers keys = Qt::NoModifier) {
+        const QPointF pos = viewPos(page, at);
+        for (const auto type: {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
+            QMouseEvent e(type, pos, pos, Qt::LeftButton,
+                          type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton, keys, &mousePointer);
+            e.setTimestamp(timestamp);
+            timestamp += 5;
+            input->mouseEvent(&e, pos);
+        }
+    }
+    /// A drag with the mouse from a point of a page to a point of a page
+    void drag(size_t fromPage, QPointF from, size_t toPage, QPointF to) {
+        const QPointF a = viewPos(fromPage, from);
+        const QPointF b = viewPos(toPage, to);
+        mouse(QEvent::MouseButtonPress, a, Qt::LeftButton, Qt::LeftButton);
+        for (int i = 1; i <= 16; ++i) {
+            mouse(QEvent::MouseMove, a + (b - a) * i / 16.0, Qt::NoButton, Qt::LeftButton);
+        }
+        mouse(QEvent::MouseButtonRelease, b, Qt::LeftButton, Qt::NoButton);
+        processEvents();
+    }
+    /// A rectangle around both notes and the ink between them, started beside them
+    void selectAround() { drag(0, QPointF(30, 60), 0, QPointF(460, 260)); }
+    std::vector<Layer*> selectedNotes() const { return view->mixed().notes(); }
+    std::vector<const Element*> selectedElements() const {
+        std::vector<const Element*> out;
+        for (const auto& i: view->mixed().items()) {
+            out.push_back(i.element);
+        }
+        return out;
+    }
+
+    Layer* a = nullptr;
+    Layer* b = nullptr;
+    const Element* between = nullptr;
+    const Element* below = nullptr;
+};
+
+TEST_F(StickySelectTest, ctrlClickAddsAndTakesAwayNotesAndElements) {
+    // A click selects one note: its own selection (its pill)
+    click(0, QPointF(100, 180));
+    ASSERT_TRUE(view->notes().hasSelection());
+    EXPECT_EQ(view->notes().selectedLayer(), a);
+    EXPECT_FALSE(view->mixed().active());
+
+    // Ctrl + click on the other note: both (no note pill; the selection's pill)
+    click(0, QPointF(350, 200), Qt::ControlModifier);
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_FALSE(view->notes().hasSelection());
+    EXPECT_EQ(view->getSelection(), nullptr);
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a, b}));
+    EXPECT_TRUE(view->hasAnySelection());
+
+    // Ctrl + click on page ink: it joins them (it stays in its layer)
+    click(0, QPointF(230, 165), Qt::ControlModifier);
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_EQ(selectedElements(), (std::vector<const Element*>{between}));
+    EXPECT_EQ(pageInkOf(*session, 0).size(), 2u) << "nothing is taken out of the page while selected";
+
+    // Ctrl + click on a selected note: it leaves; on the ink: it leaves; one note left: its own selection again
+    click(0, QPointF(100, 180), Qt::ControlModifier);
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{b}));
+    click(0, QPointF(230, 165), Qt::ControlModifier);
+    EXPECT_FALSE(view->mixed().active());
+    ASSERT_TRUE(view->notes().hasSelection());
+    EXPECT_EQ(view->notes().selectedLayer(), b);
+    click(0, QPointF(350, 200), Qt::ControlModifier);
+    EXPECT_FALSE(view->hasAnySelection()) << "the last one taken away: nothing selected";
+
+    // Ctrl with the pen works the same; a selection of ink and a Ctrl + tap on a note: together
+    drag(0, QPointF(190, 140), 0, QPointF(270, 190));  // (around the ink between the notes)
+    ASSERT_NE(view->getSelection(), nullptr);
+    const QPointF onA = viewPos(0, QPointF(100, 180));
+    QTabletEvent press(QEvent::TabletPress, &pen, onA, onA, 0.5, 0.f, 0.f, 0.f, 0.0, 0.f, Qt::ControlModifier,
+                       Qt::LeftButton, Qt::LeftButton);
+    press.setTimestamp(timestamp += 5);
+    input->tabletEvent(&press, onA);
+    QTabletEvent release(QEvent::TabletRelease, &pen, onA, onA, 0.0, 0.f, 0.f, 0.f, 0.0, 0.f, Qt::ControlModifier,
+                         Qt::LeftButton, Qt::NoButton);
+    release.setTimestamp(timestamp += 5);
+    input->tabletEvent(&release, onA);
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_EQ(view->getSelection(), nullptr);
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a}));
+    EXPECT_EQ(selectedElements(), (std::vector<const Element*>{between}));
+    EXPECT_EQ(pageInkOf(*session, 0).size(), 2u) << "the ink back in its layer, selected there";
+
+    // A click beside it ends it
+    click(0, QPointF(500, 700));
+    EXPECT_FALSE(view->hasAnySelection());
+}
+
+TEST_F(StickySelectTest, aRectangleBesideTheNotesSelectsThemWholeWithThePagesInkAndMovesThemAsOneStep) {
+    const auto lookA = *sticky::lookOf(*a);
+    const auto lookB = *sticky::lookOf(*b);
+    const auto inkOnA = contentOf(*a);
+    const auto betweenBox = between->getBoundingBox();
+    const auto belowBox = below->getBoundingBox();
+
+    selectAround();
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a, b})) << "the notes it encloses, whole";
+    EXPECT_EQ(selectedElements(), (std::vector<const Element*>{between})) << "and the page's ink in it (not the ink "
+                                                                            "on a note: it goes with its note)";
+    const auto box = view->mixed().bounds();
+    ASSERT_TRUE(box);
+    EXPECT_NEAR(box->x, 60, 1);
+    EXPECT_NEAR(box->x + box->width, 420, 1);
+
+    // Dragged: all of it moves together; one undo step
+    drag(0, QPointF(230, 165), 0, QPointF(260, 205));
+    EXPECT_TRUE(view->mixed().active()) << "still selected";
+    EXPECT_NEAR(sticky::lookOf(*a)->rect.x, lookA.rect.x + 30, 0.5);
+    EXPECT_NEAR(sticky::lookOf(*a)->rect.y, lookA.rect.y + 40, 0.5);
+    EXPECT_NEAR(sticky::lookOf(*b)->rect.x, lookB.rect.x + 30, 0.5);
+    EXPECT_NEAR(between->getBoundingBox().x, betweenBox.x + 30, 0.5);
+    EXPECT_NEAR(between->getBoundingBox().y, betweenBox.y + 40, 0.5);
+    EXPECT_NEAR(std::get<1>(contentOf(*a).front()), std::get<1>(inkOnA.front()) + 30, 0.5) << "the note's ink along";
+    EXPECT_NEAR(below->getBoundingBox().x, belowBox.x, 1e-6) << "what is not selected stays";
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Move selection");
+    processEvents();
+    EXPECT_GT(darkPixels(*view->getPage(0), QRectF(betweenBox.x + 30, betweenBox.y + 40, betweenBox.width,
+                                                   betweenBox.height)),
+              3)
+            << "drawn where it is now";
+
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(*sticky::lookOf(*a), lookA);
+    EXPECT_EQ(*sticky::lookOf(*b), lookB);
+    EXPECT_EQ(contentOf(*a), inkOnA);
+    EXPECT_NEAR(between->getBoundingBox().x, betweenBox.x, 1e-6);
+    EXPECT_NEAR(between->getBoundingBox().y, betweenBox.y, 1e-6);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_NEAR(sticky::lookOf(*b)->rect.y, lookB.rect.y + 40, 0.5);
+    EXPECT_NEAR(between->getBoundingBox().y, betweenBox.y + 40, 0.5);
+    session->getUndoRedoHandler()->undo();
+    view->clearSelection();
+
+    // A rectangle started inside a note still selects what is on it; a tap on a note selects that note alone
+    drag(0, QPointF(70, 110), 0, QPointF(170, 185));
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_FALSE(view->mixed().active());
+    ASSERT_EQ(view->getSelection()->getElementsView().size(), 1u) << "the note's ink";
+    view->clearSelection();
+    click(0, QPointF(350, 200));
+    EXPECT_TRUE(view->notes().hasSelection());
+    EXPECT_EQ(view->notes().selectedLayer(), b);
+    EXPECT_FALSE(view->mixed().active());
+    view->clearSelection();
+
+    // A rectangle beside the notes around one note alone: that note's own selection; around ink only: as before
+    drag(0, QPointF(280, 100), 0, QPointF(440, 230));
+    EXPECT_TRUE(view->notes().hasSelection());
+    EXPECT_EQ(view->notes().selectedLayer(), b);
+    drag(0, QPointF(40, 480), 0, QPointF(140, 540));
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_FALSE(view->mixed().active());
+}
+
+TEST_F(StickySelectTest, aSelectionOfNotesAndInkIsDeletedAsOneStep) {
+    const auto lookA = *sticky::lookOf(*a);
+    const auto inkOnA = contentOf(*a);
+    selectAround();
+    ASSERT_TRUE(view->mixed().active());
+    view->deleteSelection();
+    EXPECT_FALSE(view->hasAnySelection());
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u);
+    EXPECT_EQ(pageInkOf(*session, 0), (std::vector<const Element*>{below}));
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Delete");
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 0), (std::vector<Layer*>{a, b}));
+    EXPECT_EQ(*sticky::lookOf(*a), lookA);
+    EXPECT_EQ(contentOf(*a), inkOnA);
+    EXPECT_EQ(pageInkOf(*session, 0), (std::vector<const Element*>{between, below})) << "in their order";
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u);
+    EXPECT_EQ(pageInkOf(*session, 0).size(), 1u);
+}
+
+TEST_F(StickySelectTest, aSelectionOfNotesAndInkIsCopiedAndPastedInItsLayoutAsOneStep) {
+    const auto lookA = *sticky::lookOf(*a);
+    const auto lookB = *sticky::lookOf(*b);
+    const auto inkOnA = contentOf(*a);
+    const QPointF betweenStart = startOf(between);
+    selectAround();
+    ASSERT_TRUE(view->copySelection());
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    ASSERT_TRUE(mime->hasFormat(sticky::GROUP_CLIPBOARD_MIME));
+    ASSERT_TRUE(mime->hasImage()) << "a picture of it all for other apps";
+    const QImage picture = qvariant_cast<QImage>(mime->imageData());
+    const auto box = *view->mixed().bounds();
+    EXPECT_EQ(picture.width(), static_cast<int>(std::ceil(box.width * 2)));
+    const QColor paper = picture.pixelColor(static_cast<int>((lookA.rect.x - box.x + 5) * 2),
+                                            static_cast<int>((lookA.rect.y + lookA.rect.height - 5 - box.y) * 2));
+    EXPECT_EQ(paper.blue(), lookA.color.blue) << "the picture shows the notes";
+    EXPECT_TRUE(view->mixed().active()) << "copying keeps the selection";
+
+    // On the second page: the same layout, selected, one undo step
+    session->setCurrentPageNo(1);
+    ASSERT_TRUE(view->pasteElements());
+    auto notes = notesOf(*session, 1);
+    ASSERT_EQ(notes.size(), 2u);
+    EXPECT_EQ(*sticky::lookOf(*notes[0]), lookA);
+    EXPECT_EQ(*sticky::lookOf(*notes[1]), lookB);
+    EXPECT_EQ(contentOf(*notes[0]), inkOnA) << "with what is on it";
+    auto ink = pageInkOf(*session, 1);
+    ASSERT_EQ(ink.size(), 1u);
+    EXPECT_EQ(startOf(ink[0]), betweenStart) << "the page's ink where it was";
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_EQ(view->mixed().selectedPage(), view->getPage(1));
+    EXPECT_EQ(selectedNotes(), notes);
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Paste");
+    EXPECT_FALSE(sticky::isNote(*session->getDocument()->getPage(1)->getSelectedLayer()));
+
+    // Again: a little further (not exactly on the first copy), still in its layout
+    ASSERT_TRUE(view->pasteElements());
+    notes = notesOf(*session, 1);
+    ASSERT_EQ(notes.size(), 4u);
+    EXPECT_NEAR(sticky::lookOf(*notes[2])->rect.x, lookA.rect.x + 16, 1e-6);
+    EXPECT_NEAR(sticky::lookOf(*notes[3])->rect.y, lookB.rect.y + 16, 1e-6);
+    ink = pageInkOf(*session, 1);
+    ASSERT_EQ(ink.size(), 2u);
+    EXPECT_NEAR(startOf(ink[1]).x(), betweenStart.x() + 16, 1e-6);
+
+    // Each paste is one step
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 1).size(), 2u);
+    EXPECT_EQ(pageInkOf(*session, 1).size(), 1u);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 1).size(), 0u);
+    EXPECT_EQ(pageInkOf(*session, 1).size(), 0u);
+    EXPECT_FALSE(view->mixed().active());
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(notesOf(*session, 1).size(), 2u);
+    EXPECT_EQ(pageInkOf(*session, 1).size(), 1u);
+
+    // Cut: one step
+    view->clearSelection();
+    selectAround();
+    ASSERT_TRUE(view->cutSelection());
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u);
+    EXPECT_EQ(pageInkOf(*session, 0).size(), 1u);
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Cut");
+
+    // Into another document (another tab): the same layout, its own undo
+    DocumentSession other(*app);
+    other.insertNewPage(1);
+    CanvasView otherView(other);
+    otherView.getViewController().setViewSize(QSizeF(900, 1200));
+    processEvents();
+    other.setCurrentPageNo(1);
+    ASSERT_TRUE(otherView.pasteElements());
+    const auto pasted = notesOf(other, 1);
+    ASSERT_EQ(pasted.size(), 2u);
+    EXPECT_EQ(*sticky::lookOf(*pasted[0]), lookA);
+    EXPECT_EQ(*sticky::lookOf(*pasted[1]), lookB);
+    EXPECT_EQ(contentOf(*pasted[0]), inkOnA);
+    ASSERT_EQ(pageInkOf(other, 1).size(), 1u);
+    EXPECT_EQ(startOf(pageInkOf(other, 1)[0]), betweenStart);
+    EXPECT_TRUE(otherView.mixed().active());
+    other.getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(other, 1).size(), 0u);
+    EXPECT_EQ(pageInkOf(other, 1).size(), 0u);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 0).size(), 2u) << "the cut undone";
+}
+
+TEST_F(StickySelectTest, aSelectionOfNotesAndInkIsDraggedOntoAnotherPageAsOneStep) {
+    const auto lookA = *sticky::lookOf(*a);
+    const auto lookB = *sticky::lookOf(*b);
+    const auto inkOnA = contentOf(*a);
+    const auto betweenBox = between->getBoundingBox();
+    selectAround();
+    ASSERT_TRUE(view->mixed().active());
+    // Held on the ink between the notes, let go over the second page
+    drag(0, QPointF(230, 165), 1, QPointF(250, 300));
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u);
+    ASSERT_EQ(notesOf(*session, 1), (std::vector<Layer*>{a, b})) << "the same notes, in their order";
+    EXPECT_EQ(pageInkOf(*session, 0), (std::vector<const Element*>{below}));
+    EXPECT_EQ(pageInkOf(*session, 1), (std::vector<const Element*>{between}));
+    const double dx = 250 - 230;
+    const double dy = 300 - 165;
+    EXPECT_NEAR(sticky::lookOf(*a)->rect.x, lookA.rect.x + dx, 0.5) << "held where it was held, its layout kept";
+    EXPECT_NEAR(sticky::lookOf(*a)->rect.y, lookA.rect.y + dy, 0.5);
+    EXPECT_NEAR(sticky::lookOf(*b)->rect.y, lookB.rect.y + dy, 0.5);
+    EXPECT_NEAR(between->getBoundingBox().x, betweenBox.x + dx, 0.5);
+    EXPECT_NEAR(between->getBoundingBox().y, betweenBox.y + dy, 0.5);
+    EXPECT_NEAR(std::get<2>(contentOf(*a).front()), std::get<2>(inkOnA.front()) + dy, 0.5);
+    ASSERT_TRUE(view->mixed().active()) << "still selected, on the other page";
+    EXPECT_EQ(view->mixed().selectedPage(), view->getPage(1));
+
+    // One undo step: back on the first page, where the drag began
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 0), (std::vector<Layer*>{a, b}));
+    EXPECT_EQ(notesOf(*session, 1).size(), 0u);
+    EXPECT_EQ(*sticky::lookOf(*a), lookA);
+    EXPECT_EQ(*sticky::lookOf(*b), lookB);
+    EXPECT_EQ(contentOf(*a), inkOnA);
+    EXPECT_EQ(pageInkOf(*session, 0).size(), 2u);
+    EXPECT_NEAR(between->getBoundingBox().y, betweenBox.y, 1e-6);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(notesOf(*session, 1).size(), 2u);
+    EXPECT_EQ(pageInkOf(*session, 1).size(), 1u);
+}
+
 TEST_F(CanvasReplayTest, benchmarkStickyNoteClipboard) {
     if (!qEnvironmentVariableIsSet("XQT_BENCH_STICKY")) {
         GTEST_SKIP() << "a benchmark: set XQT_BENCH_STICKY=1";
