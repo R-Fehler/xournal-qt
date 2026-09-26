@@ -47,6 +47,11 @@
 #include "shell/RecentFiles.h"
 #include "shell/ReferenceMode.h"
 #include "shell/Thumbnails.h"
+#include "shell/TabManager.h"
+#include "session/DocumentSession.h"
+#include "model/Document.h"
+#include "model/XojPage.h"
+#include "model/Layer.h"
 
 #include "AdaptiveLayout.h"
 #include "AppController.h"
@@ -1673,6 +1678,188 @@ TEST_F(AdaptiveLayoutTest, viewPillWithContentsInsideAndClearOfTheReference) {
     controller->reference().close();
 }
 
+// --- the panels (qt/adaptive-panels) --------------------------------------------------------------------------------
+
+// The Markdown source: beside the page on a desktop and a phone held sideways, below it on a portrait tablet (half) and
+// a phone (the bottom 60 %); the page keeps a sensible width beside it, and the whole width above it
+TEST_F(AdaptiveLayoutTest, sourcePanelBesideOrBelowThePage) {
+    openDocument();
+    auto* panel = findItem("markdownPanel");
+    auto* canvas = named("canvas");
+    ASSERT_NE(panel, nullptr);
+    struct Case {
+        int w, h;
+        const char* place;
+    };
+    for (const Case& c: {Case{1920, 1080, "side"}, Case{1280, 800, "side"}, Case{960, 1392, "bottom"},
+                         Case{412, 915, "phone"}, Case{915, 412, "side"}}) {
+        resize(c.w, c.h);
+        const std::string at = std::to_string(c.w) + "x" + std::to_string(c.h);
+        QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, 0));
+        until([&] { return panel->isVisible(); });
+        wait(150);
+        ASSERT_TRUE(panel->isVisible()) << at;
+        const QRectF p = sceneRect(panel), page = sceneRect(canvas);
+        EXPECT_TRUE(insideWindow(p)) << at << ": the panel inside the window";
+        if (std::string(c.place) == "side") {
+            EXPECT_FALSE(flag("sourceAtBottom")) << at;
+            EXPECT_NEAR(p.left(), page.right(), 1) << at << ": beside the page";
+            EXPECT_NEAR(p.top(), page.top(), 1) << at;
+            EXPECT_GE(page.width(), std::min(480.0, 0.6 * c.w)) << at << ": the page keeps a sensible width";
+        } else {
+            EXPECT_TRUE(flag("sourceAtBottom")) << at;
+            EXPECT_NEAR(p.top(), page.bottom(), 1) << at << ": below the page";
+            EXPECT_NEAR(p.left(), page.left(), 1) << at;
+            EXPECT_NEAR(p.width(), page.width(), 1) << at;
+            EXPECT_NEAR(page.width(), c.w, 1) << at << ": the page keeps the whole width";
+            const double share = page.height() / (page.height() + p.height());
+            EXPECT_NEAR(share, std::string(c.place) == "phone" ? 0.4 : 0.5, 0.02) << at << ": the page's share";
+            EXPECT_TRUE(named("sourceDivider")->isVisible()) << at;
+        }
+        // The view pill stays inside the page
+        EXPECT_TRUE(page.adjusted(-1, -1, 1, 1).contains(sceneRect(named("viewPill")))) << at << ": the view pill";
+        QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
+        until([&] { return !panel->isVisible(); });
+    }
+}
+
+// Below the page, the divider is dragged; the page's share is remembered for that size class only
+TEST_F(AdaptiveLayoutTest, sourceDividerIsDraggedAndRememberedPerClass) {
+    openDocument();
+    resize(960, 1392);
+    auto* panel = findItem("markdownPanel");
+    auto* canvas = named("canvas");
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, 0));
+    until([&] { return panel->isVisible(); });
+    wait(100);
+    auto* grip = findItem("sourceDividerGrip");
+    ASSERT_NE(grip, nullptr);
+    ASSERT_TRUE(shownInWindow(grip));
+    const double pageBefore = canvas->height();
+    auto* layer = controller->tabManager().currentSession()->getDocument()->getPage(0)->getSelectedLayer();
+    const size_t elements = layer->getElements().size();
+    const QPoint from = centerOf(grip);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, from + QPoint(0, -20 * i));
+        wait(5);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, from + QPoint(0, -200));
+    wait(80);
+    EXPECT_NEAR(canvas->height(), pageBefore - 200, 20) << "the page got shorter, the source taller";
+    EXPECT_FALSE(choice("tabletPortrait", "sourceSplit").isEmpty()) << "remembered for this class";
+    EXPECT_EQ(layer->getElements().size(), elements) << "dragging the divider drew";
+    const double dragged = canvas->height();
+    resize(412, 915);
+    const double phonePage = canvas->height() / (canvas->height() + panel->height());
+    EXPECT_NEAR(phonePage, 0.4, 0.02) << "a phone: its own (the automatic 40 %)";
+    resize(960, 1392);
+    EXPECT_NEAR(canvas->height(), dragged, 2) << "back on the tablet: its share again";
+    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
+}
+
+// The reference: top and bottom in a portrait area, side by side in a landscape one; the divider's ratio stays when
+// that flips; both pills lie inside their halves and never meet; in a narrow half the reference's pill is its page
+// and a ⋮ with the rest
+TEST_F(AdaptiveLayoutTest, referenceSplitFollowsTheAreaAndItsPillsStayApart) {
+    openDocument();
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "notes.xopp").string())));
+    wait(200);
+    controller->reference().showTab(0);
+    controller->reference().setRatio(0.6);
+    wait(300);
+    auto* split = findItem("referenceSplit");
+    auto* canvas = named("canvas");
+    auto* refCanvas = findItem("referenceCanvas");
+    auto* pill = named("viewPill");
+    auto* refPill = findItem("referencePill");
+    ASSERT_NE(split, nullptr);
+    for (const WindowSize& s: fiveSizes) {
+        resize(s.w, s.h);
+        wait(100);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        const QRectF area = sceneRect(split), main = sceneRect(canvas), ref = sceneRect(refCanvas);
+        const bool portrait = area.height() > area.width();
+        EXPECT_EQ(split->property("vertical").toBool(), portrait) << at;
+        if (portrait) {
+            EXPECT_NEAR(main.width(), area.width(), 1) << at << ": top and bottom";
+            EXPECT_NEAR(ref.width(), area.width(), 1) << at;
+            EXPECT_FALSE(main.intersects(ref)) << at;
+            EXPECT_NEAR(main.height() / (area.height() - 8), 0.6, 0.01) << at << ": the ratio kept";
+        } else {
+            EXPECT_NEAR(main.height(), area.height(), 1) << at << ": side by side";
+            EXPECT_NEAR(main.width() / (area.width() - 8), 0.6, 0.01) << at << ": the ratio kept";
+        }
+        ASSERT_TRUE(refPill->isVisible()) << at;
+        EXPECT_TRUE(main.adjusted(-1, -1, 1, 1).contains(sceneRect(pill))) << at << ": the view pill inside its half";
+        EXPECT_TRUE(ref.adjusted(-1, -1, 1, 1).contains(sceneRect(refPill))) << at << ": the reference's pill";
+        EXPECT_FALSE(sceneRect(pill).intersects(sceneRect(refPill))) << at << ": the pills apart";
+        const bool narrow = ref.width() < 480;
+        EXPECT_EQ(findItem("referenceMoreButton")->isVisible(), narrow) << at;
+        EXPECT_EQ(findItem("referenceGridButton")->isVisible(), !narrow) << at;
+        EXPECT_TRUE(findItem("referencePageButton")->isVisible()) << at;
+    }
+    // 1920x1080 and 960x1392 in the audit's words: side by side, then top and bottom
+    resize(1920, 1080);
+    EXPECT_FALSE(split->property("vertical").toBool());
+    resize(960, 1392);
+    EXPECT_TRUE(split->property("vertical").toBool());
+    // A narrow half: its ⋮ holds the rest, and its entries work
+    resize(412, 915);
+    auto* more = findItem("referenceMoreButton");
+    ASSERT_TRUE(more->isVisible());
+    QMetaObject::invokeMethod(more, "clicked");
+    QObject* s = sheet();
+    ASSERT_TRUE(opened(s, true)) << "a sheet on a phone";
+    settled(s);
+    ASSERT_NE(sheetRow("referenceGridItem"), nullptr);
+    EXPECT_NE(sheetRow("referenceCloseItem"), nullptr);
+    EXPECT_EQ(sheetRow("referenceCopyItem"), nullptr) << "nothing selected: no copy";
+    click(sheetRow("referenceGridItem"));
+    EXPECT_TRUE(opened(s, false));
+    until([&] { return controller->reference().pagesShown(); });
+    EXPECT_TRUE(controller->reference().pagesShown()) << "the reference's pages";
+    controller->reference().setPagesShown(false);
+    controller->reference().close();
+}
+
+// The compact view pill in a canvas under 520 px: undo, redo, the page number (a tap: all pages), the contents and the
+// zoom; inside the canvas
+TEST_F(AdaptiveLayoutTest, compactViewPillOnAPhone) {
+    openDocument();
+    auto* pill = named("viewPill");
+    auto* canvas = named("canvas");
+    resize(1920, 1080);
+    EXPECT_FALSE(pill->property("compact").toBool());
+    EXPECT_TRUE(named("pageGridButton")->isVisible());
+    EXPECT_FALSE(named("pageNumberButton")->isVisible());
+    resize(412, 915);
+    ASSERT_TRUE(pill->property("compact").toBool());
+    for (const char* name: {"undoButton", "redoButton", "pageNumberButton", "contentsButton", "zoomButton"}) {
+        EXPECT_TRUE(shownInWindow(named(name))) << name << " in the compact pill";
+    }
+    for (const char* name: {"pageGridButton", "layoutButton", "pageNumberLabel"}) {
+        EXPECT_FALSE(named(name)->isVisible()) << name << " not in the compact pill";
+    }
+    EXPECT_TRUE(sceneRect(canvas).contains(sceneRect(pill))) << "inside the canvas";
+    EXPECT_LE(pill->width(), canvas->width() - 16);
+    auto* grid = named("pageGrid");
+    click(named("pageNumberButton"));
+    until([&] { return grid->isVisible(); });
+    EXPECT_TRUE(grid->isVisible()) << "the page number opens all pages";
+    QMetaObject::invokeMethod(grid, "close");
+    until([&] { return !grid->isVisible(); });
+    // Beside the Markdown source of a desktop window made small: the compact pill too, and ⋮ offers the page layout
+    resize(1024, 700);
+    auto* panel = findItem("markdownPanel");
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, 0));
+    until([&] { return panel->isVisible(); });
+    wait(100);
+    EXPECT_EQ(pill->property("compact").toBool(), canvas->width() < 520) << canvas->width();
+    EXPECT_TRUE(sceneRect(canvas).adjusted(-1, -1, 1, 1).contains(sceneRect(pill)));
+    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
+}
+
 // The drawer: slides in; Esc and the back key close it; on a phone up to 85 % of the width
 TEST_F(AdaptiveLayoutTest, sidebarDrawerKeysAndPhoneWidth) {
     openDocument();
@@ -1708,6 +1895,53 @@ TEST_F(AdaptiveLayoutTest, sidebarDrawerKeysAndPhoneWidth) {
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(first));
     until([&] { return !sidebar->isVisible(); });
     EXPECT_FALSE(sidebar->isVisible()) << "a page picked: closed";
+}
+
+// The pills at the canvas's bottom keep clear of the view pill (audit F6): the selection pill, the back / forward
+// pill, and the pen pill of the compact chrome
+TEST_F(AdaptiveLayoutTest, pillsKeepClearOfTheViewPill) {
+    openDocument();
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "notes.xopp").string())));  // (strokes to select)
+    wait(200);
+    auto* pill = named("viewPill");
+    auto* selection = named("selectionBar");
+    auto* nav = named("navPill");
+    auto* pen = named("penPill");
+    controller->selectTool("select");
+    for (const WindowSize& s: fiveSizes) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        controller->selectAllOnPage();
+        until([&] { return selection->isVisible(); });
+        wait(50);
+        ASSERT_TRUE(selection->isVisible()) << at;
+        EXPECT_FALSE(sceneRect(selection).intersects(sceneRect(pill))) << at << ": the selection pill";
+        EXPECT_TRUE(insideWindow(sceneRect(selection))) << at;
+        controller->clearSelection();
+        controller->jumpToPage(2);
+        wait(50);
+        if (nav->isVisible()) {
+            EXPECT_FALSE(sceneRect(nav).intersects(sceneRect(pill))) << at << ": the back / forward pill";
+        }
+    }
+    controller->selectTool("pen");
+    window->setProperty("fullScreenMode", true);
+    wait(200);
+    window->showNormal();
+    for (const WindowSize& s: {WindowSize{915, 412, ""}, WindowSize{412, 915, ""}, WindowSize{1280, 800, ""}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        for (const char* side: {"right", "bottom"}) {
+            controller->setProperty("penPillSide", side);
+            controller->setProperty("penPillOffset", 0.9);
+            wait(250);
+            ASSERT_TRUE(pen->isVisible()) << at;
+            if (pill->isVisible()) {
+                EXPECT_FALSE(sceneRect(pen).intersects(sceneRect(pill))) << at << " " << side << ": the pen pill";
+            }
+        }
+    }
+    window->setProperty("fullScreenMode", false);
 }
 
 // Pictures of the tool bar in its layouts, to look at (skipped unless XQT_TOOLBAR_SHOTS=<folder>)
@@ -1791,6 +2025,7 @@ TEST_F(AdaptiveLayoutTest, toolBarPictures) {
     shot("markdown-960x1392-merged");
     resize(1280, 800);
     shot("markdown-1280x800-merged");
+}
 }
 
 // One place for each action (qt/docs/adaptive-layout.md): ⋮ repeats no button of the tool bar, "more tools", the view

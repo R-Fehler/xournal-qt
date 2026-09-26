@@ -20,18 +20,27 @@ Rectangle {
     readonly property string side: app.penPillSide
     readonly property bool vertical: side === "left" || side === "right"
     readonly property real gap: 12
-    implicitWidth: vertical ? 52 : content.implicitWidth + 16
-    implicitHeight: vertical ? content.implicitHeight + 16 : 52
+    /// Its buttons: a finger's size in the touch profile (audit F6.3), else 36
+    readonly property int button: win.adaptive.touchProfile ? 44 : 36
+    implicitWidth: vertical ? button + 16 : content.implicitWidth + 16
+    implicitHeight: vertical ? content.implicitHeight + 16 : button + 16
     width: implicitWidth
     height: implicitHeight
+    /// The view pill (the lower right corner): where the two would meet, this one moves up above it
+    property Item avoid: null
 
     // Where it sits: at its side, moved along it by penPillOffset (dragging moves it and may change the side)
-    x: dragging ? x : (side === "left" ? gap
-                       : side === "right" ? parent.width - width - gap
-                       : Math.round((parent.width - width) * app.penPillOffset))
-    y: dragging ? y : (side === "top" ? gap
-                       : side === "bottom" ? parent.height - height - gap
-                       : Math.round((parent.height - height) * app.penPillOffset))
+    readonly property real homeX: side === "left" ? gap
+                                  : side === "right" ? parent.width - width - gap
+                                  : Math.round((parent.width - width) * app.penPillOffset)
+    readonly property real homeY: side === "top" ? gap
+                                  : side === "bottom" ? parent.height - height - gap
+                                  : Math.round((parent.height - height) * app.penPillOffset)
+    readonly property bool meets: avoid !== null && avoid.visible && homeX - 8 < avoid.x + avoid.width
+                                  && homeX + width + 8 > avoid.x && homeY - 8 < avoid.y + avoid.height
+                                  && homeY + height + 8 > avoid.y
+    x: dragging ? x : homeX
+    y: dragging ? y : meets ? Math.max(gap, avoid.y - height - 12) : homeY
     property bool dragging: false
 
     Behavior on x { enabled: !pill.dragging; NumberAnimation { duration: 120 } }
@@ -71,8 +80,8 @@ Rectangle {
         ToolCycleButton {
             objectName: "penPillTool"
             group: "pen"
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: pill.button
+            implicitHeight: pill.button
             icon.width: 22
             icon.height: 22
         }
@@ -90,8 +99,8 @@ Rectangle {
                 required property color modelData
                 required property int index
                 objectName: "penPillColor"
-                implicitWidth: 36
-                implicitHeight: 36
+                implicitWidth: pill.button
+                implicitHeight: pill.button
                 onClicked: app.setColor(modelData)
                 onPressAndHold: Popups.openAt(dotMenu)
                 contentItem: Item {
@@ -113,8 +122,8 @@ Rectangle {
         }
         AbstractButton {
             objectName: "penPillAddColor"
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: pill.button
+            implicitHeight: pill.button
             onClicked: pillColorDialog.open()
             ToolTip.visible: hovered
             ToolTip.text: qsTr("Add a color (press and hold one to remove it)")
@@ -141,8 +150,8 @@ Rectangle {
         AbstractButton {
             id: widthKnob
             objectName: "penPillWidth"
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: pill.button
+            implicitHeight: pill.button
             readonly property real dotSize: {
                 const ref = app.tool, thick = app.sizeWidth(4)
                 const width = app.size === 5 ? app.customWidth : app.sizeWidth(app.size)

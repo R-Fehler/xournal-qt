@@ -344,7 +344,13 @@ TEST_F(ReferenceWindowTest, poppingOutAnAdjacentReferenceMovesNoTabAndKeepsFullS
     window->setProperty("fullScreenMode", true);
     wait(200);
     QSignalSpy moved(&tabs(), &QAbstractItemModel::rowsMoved);
-    click(findItem("referencePopOutButton"));
+    if (findItem("referencePopOutButton")->isVisible()) {
+        click(findItem("referencePopOutButton"));
+    } else {  // (a narrow half: the pill's ⋮ holds it)
+        EXPECT_TRUE(findItem("referenceMoreButton")->isVisible());
+        QMetaObject::invokeMethod(window->findChild<QObject*>("referencePopOutItem"), "triggered");
+        wait(50);
+    }
     EXPECT_EQ(moved.count(), 0) << "already beside the notes";
     EXPECT_EQ(controller->currentTab(), 1);
     EXPECT_FALSE(reference->isVisible());

@@ -13,9 +13,17 @@ Pane {
     objectName: "markdownPanel"
     visible: false
     padding: 0
+    /// Below the page (a portrait tablet or phone: Main.qml's sourceAtBottom), else beside it (right)
+    property bool atBottom: false
+    // (below the page: room above the title for the divider's grip)
+    topPadding: atBottom ? 10 : 0
     background: Rectangle {
         color: "#fafafa"
-        Rectangle { width: 1; anchors.top: parent.top; anchors.bottom: parent.bottom; color: "#d5d8dc" }  // towards the pages
+        Rectangle {  // the line towards the pages
+            width: panel.atBottom ? parent.width : 1
+            height: panel.atBottom ? 1 : parent.height
+            color: "#d5d8dc"
+        }
     }
 
     property int zoomBefore: 100
