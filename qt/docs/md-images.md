@@ -83,10 +83,15 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
 
 ## Web images
 
-`https://…` pictures are never fetched unasked: they show as the alt text and a small **Load image** button. The
-first load goes through the opt-in networking and the address confirmation of `qt/citations` (`networkAccess`,
-`WebConfirm`, `NetFetch`). A loaded picture is kept in the app cache only (`<cache>/web-images/`) and shown from
-there afterwards.
+`https://…` pictures are never fetched unasked: they show as the alt text (the address when it has none) and a small
+**Load image** button. A tap on it (`md::imageButtonAt`; with any tool, also while the text is written) shows the
+whole address and its host (`WebImageConfirm.qml`); while connecting to the web was not decided (`networkAccess`
+"ask", the setting of `qt/citations`), it also says what that means, and **Load** is the opt-in (the setting becomes
+"on", as arXiv's "Allow"). With the setting "off" nothing is sent (a message says so). The picture is fetched through
+`NetFetch` (tests: a fake; 20 s, at most 40 MB), checked to be a picture, and kept in the app cache only
+(`<cache>/web-images/<hash of the address>.img`); from then on the address shows it from there, in every document.
+The texts that show it are laid out again (`AppController::relayoutPictures`); in a `.md` the pages follow at the next
+edit.
 
 ## Markdown boxes in a `.xopp`
 

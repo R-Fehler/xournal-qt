@@ -13,6 +13,7 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QKeyEvent>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -33,6 +34,8 @@
 #include "MdBox.h"
 #include "MdDocument.h"
 #include "MdImages.h"
+#include "MdLayout.h"
+#include "CanvasPage.h"
 #include "TextFlow.h"
 #include "model/Layer.h"
 #include "model/Text.h"
@@ -337,6 +340,46 @@ TEST_F(TextDocumentTest, aPictureNextToTheFileIsDrawnOnItsPage) {
     view.reset();
     session.reset();
     EXPECT_TRUE(md::images::resolve("notes.assets/red.png").empty());
+}
+
+// A web picture is never fetched unasked (qt/docs/md-images.md): it shows its alt text and "Load image", and a tap on
+// that asks the window (imageLoadRequested), also while the text is written.
+TEST_F(TextDocumentTest, aWebPicturesLoadButtonAsksTheWindow) {
+    const std::string url = "https://example.org/logo.png";
+    const fs::path p = file("web.md", "# Web\n\nSee ![Logo](" + url + ") here.\n\nMore text.\n");
+    open(p);
+    const PageRef page = session->getDocument()->getPage(0);
+    const Text* box = TextDocument::pageBoxOf(page);
+    ASSERT_NE(box, nullptr);
+    std::optional<md::Rect> button;
+    {
+        const md::Layout& l = md::cachedLayout(box->getText(), md::styleOf(*box));
+        for (const md::Item& it: l.items) {
+            for (const md::ImageSpan& span: it.images) {
+                if (span.web) {
+                    button = md::textRects(it, span.buttonStart, span.buttonEnd).front();
+                }
+            }
+        }
+    }
+    ASSERT_TRUE(button) << "a web picture has a Load image button";
+    EXPECT_TRUE(md::images::resolve(url).empty() || !fs::exists(md::images::resolve(url)));
+    const auto& shift = box->getTransformation().shift;
+    const double x = shift.x + button->x + button->width / 2;
+    const double y = shift.y + button->y + button->height / 2;
+    QSignalSpy asked(view.get(), &CanvasView::imageLoadRequested);
+    CanvasPage* onPage = view->canvasPageOf(page.get());
+    ASSERT_NE(onPage, nullptr);
+    view->textPress(*onPage, x, y);
+    ASSERT_EQ(asked.count(), 1);
+    EXPECT_EQ(asked.front().front().toString().toStdString(), url);
+    // While the text is written (the cursor elsewhere in it): the same
+    view->textPress(*onPage, shift.x + 2, shift.y + 2);
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    view->getMarkdownEditor()->setCursorPosition(session->currentText().find("More"));
+    processEvents();
+    view->textPress(*onPage, x, y);
+    EXPECT_EQ(asked.count(), 2);
 }
 
 TEST_F(TextDocumentTest, aPlainTextFileIsWrittenAsItIsWithoutMarkdown) {

@@ -869,6 +869,12 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
                     hit = text;
                     mark = m;
                 }
+                if (const auto url = md::imageButtonAt(*text, x, y)) {
+                    // (a web picture's "Load image": the UI asks, then fetches it)
+                    lock.unlock();
+                    Q_EMIT imageLoadRequested(QString::fromStdString(*url));
+                    return true;
+                }
             }
         }
     }

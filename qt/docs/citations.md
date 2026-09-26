@@ -117,7 +117,8 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
   written through `QSaveFile` on a worker thread. Then the library looks again (`LibraryModel::refresh`), it is
   indexed, and the sheet offers **Open as reference** and **Open in a tab**.
 - **Networking is opt-in.** Setting `networkAccess` (Settings → Documents → "Web and citations"): *Ask* (the
-  default), *On*, *Off*. The first network use while *Ask* explains in one dialog what goes where: "Searching arXiv
+  default), *On*, *Off*. (It also covers the web pictures of Markdown texts, loaded one by one when asked:
+  [md-images.md](md-images.md), "Web images".) The first network use while *Ask* explains in one dialog what goes where: "Searching arXiv
   sends the words of the title to export.arxiv.org; downloading fetches the PDF from arxiv.org. Nothing else is
   sent, no account is used." **Allow** sets *On*; **Not now** does nothing. *Off*: the arXiv actions say it is
   turned off in Settings. The browser actions (Scholar, Translate, "Open on arxiv.org") are not networking of the

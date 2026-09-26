@@ -2823,6 +2823,11 @@ ApplicationWindow {
     ChapterDialog { id: chapterDialog }
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
     WebConfirm { id: webConfirm }
+    WebImageConfirm { id: webImageConfirm }
+    Connections {
+        target: app
+        function onWebImageRequested(url, host, access) { webImageConfirm.ask(url, host, access) }
+    }
     FindPaperSheet { id: findPaperSheet }
     ArxivSheet { id: arxivSheet }
     PdfTextHandles { }

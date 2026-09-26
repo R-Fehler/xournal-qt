@@ -1685,3 +1685,8 @@ Design: [md-images.md](../md-images.md).
 - [ ] ⋮ → Export as Markdown: `name.md` and `name.assets/` with the photos; open the `.md` in another editor
       (Typora, Obsidian, VS Code's preview): the photos show.
 - [ ] A `.md` with pictures → ⋮ → Open as PDF document: the new PDF shows them and carries them as attachments.
+- [ ] A `.md` with `![Logo](https://…/logo.png)`: shows "Logo ⤓ Load image", nothing is fetched (no network
+      traffic; flight mode makes no difference). Tap "Load image" (pen, finger, mouse): the whole address and its
+      host are shown; the first time also what connecting means. Cancel: nothing. Load: the picture appears; open
+      the file again (or restart): shown at once from the cache, without asking.
+- [ ] Settings → Web and citations → "Connect to the web": Off → "Load image" says it is off and sends nothing.

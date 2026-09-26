@@ -571,6 +571,10 @@ bool MarkdownEditor::toggleCheckBox(CanvasPage& onPage, double x, double y) {
             continue;
         }
         const QPointF o = originOf(i);
+        if (const auto button = md::imageButtonAt(layoutOf(i), x - o.x(), y - o.y())) {
+            Q_EMIT view.imageLoadRequested(QString::fromStdString(button->url));  // (a web picture's "Load image")
+            return true;
+        }
         const auto box = md::checkBoxAt(layoutOf(i), x - o.x(), y - o.y());
         if (!box || box->mark < parts[i].part.prefix) {
             continue;

@@ -6,9 +6,13 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <fstream>
 #include <functional>
+#include <shared_mutex>
 
+#include <QBuffer>
 #include <QClipboard>
+#include <QImage>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QFile>
@@ -25,6 +29,11 @@
 #include "canvas/CanvasView.h"
 #include "canvas/MarkdownEditor.h"
 #include "canvas/ViewController.h"
+#include "markdown/MdBox.h"
+#include "markdown/MdImages.h"
+#include "model/Document.h"
+#include "model/Text.h"
+#include "session/TextDocument.h"
 #include "session/DocumentSession.h"
 #include "shell/Citations.h"
 #include "shell/LibraryModel.h"
@@ -493,4 +502,75 @@ TEST_F(CitationsTest, anArxivPaperIsDownloadedAfterTheOptInAndOpensAsReference) 
     EXPECT_EQ(controller->reference().title(), "Attention Is All You Need (1706.03762).pdf");
     settings()->set("networkAccess", "ask");
     xqt::ArxivQueue::setInterval(3000);
+}
+
+// A web picture in a Markdown text (qt/docs/md-images.md): never fetched unasked. Its "Load image" shows the whole
+// address (and, while connecting was not decided, what that means); Cancel sends nothing; Load fetches it (the opt-in
+// then), keeps it in the app cache and the text shows it. Networking off: nothing is sent.
+TEST_F(CitationsTest, aWebPictureIsLoadedOnlyWhenAskedWithItsAddressShown) {
+    xqt::test::FakeNet net;
+    QImage logo(24, 12, QImage::Format_RGB32);
+    logo.fill(Qt::darkGreen);
+    QByteArray png;
+    {
+        QBuffer b(&png);
+        b.open(QIODevice::WriteOnly);
+        logo.save(&b, "PNG");
+    }
+    net.answer = [png](const QUrl&) { return xqt::test::FakeNet::ok(png); };
+    const QString url = "https://example.org/pics/logo.png?size=2";
+    std::ofstream(root / "web.md") << "# Web\n\n![Logo](" << url.toStdString() << ")\n";
+    settings()->set("networkAccess", "ask");
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "web.md").string())));
+    wait(100);
+    EXPECT_TRUE(net.calls.empty()) << "nothing is fetched when the text is shown";
+    ASSERT_NE(view(), nullptr);
+
+    // "Load image" tapped: the address is shown, and what connecting means
+    Q_EMIT view()->imageLoadRequested(url);
+    until([&] { return shown("webImageConfirm"); });
+    ASSERT_TRUE(shown("webImageConfirm"));
+    EXPECT_EQ(find("webImageUrl")->property("text").toString(), url);
+    EXPECT_TRUE(find("webImageHost")->property("text").toString().contains("example.org"));
+    EXPECT_TRUE(shown("webImageOptIn"));
+    click("webImageCancel");
+    until([&] { return !shown("webImageConfirm"); });
+    wait(50);
+    EXPECT_TRUE(net.calls.empty()) << "Cancel sends nothing";
+    EXPECT_EQ(settings()->get("networkAccess").toString(), "ask");
+
+    // Load: fetched once, kept in the app cache, shown
+    Q_EMIT view()->imageLoadRequested(url);
+    until([&] { return shown("webImageConfirm"); });
+    click("webImageLoad");
+    until([&] { return !net.calls.empty(); });
+    ASSERT_EQ(net.calls.size(), 1u);
+    EXPECT_EQ(net.calls[0].url.toString(), url);
+    EXPECT_EQ(settings()->get("networkAccess").toString(), "on") << "loading was the opt-in";
+    until([&] { return xqt::md::images::info(url.toStdString()).state == xqt::md::images::Info::State::Ok; });
+    const auto info = xqt::md::images::info(url.toStdString());
+    EXPECT_EQ(info.state, xqt::md::images::Info::State::Ok);
+    EXPECT_EQ(info.width, 24);
+    EXPECT_NE(info.path.find("web-images"), std::string::npos) << info.path;
+    EXPECT_FALSE(fs::exists(root / "web.assets")) << "not next to the document";
+    {
+        // The text shows it now
+        xqt::DocumentSession* s = controller->tabManager().currentSession();
+        std::shared_lock lock(*s->getDocument());
+        const Text* box = xqt::TextDocument::pageBoxOf(s->getDocument()->getPage(0));
+        ASSERT_NE(box, nullptr);
+        const auto pictures = xqt::md::imageRects(xqt::md::cachedLayout(box->getText(), xqt::md::styleOf(*box)));
+        ASSERT_EQ(pictures.size(), 1u);
+        EXPECT_TRUE(pictures[0].drawn);
+    }
+
+    // Networking off: the tap sends nothing (the window says it is off)
+    until([&] { return !shown("webImageConfirm"); });
+    settings()->set("networkAccess", "off");
+    const QString other = "https://example.org/pics/other.png";
+    Q_EMIT view()->imageLoadRequested(other);
+    wait(100);
+    EXPECT_FALSE(shown("webImageConfirm"));
+    EXPECT_EQ(net.calls.size(), 1u);
+    settings()->set("networkAccess", "ask");
 }

@@ -128,6 +128,14 @@ std::optional<MathHit> mathAt(const Text& text, double x, double y) {
     return hit;
 }
 
+std::optional<std::string> imageButtonAt(const Text& text, double x, double y) {
+    const auto& shift = text.getTransformation().shift;
+    if (const auto hit = imageButtonAt(cachedLayout(text.getText(), styleOf(text)), x - shift.x, y - shift.y)) {
+        return hit->url;
+    }
+    return std::nullopt;
+}
+
 std::optional<size_t> checkBoxAt(const Text& text, double x, double y) {
     const auto& shift = text.getTransformation().shift;
     if (const auto box = checkBoxAt(cachedLayout(text.getText(), styleOf(text)), x - shift.x, y - shift.y)) {

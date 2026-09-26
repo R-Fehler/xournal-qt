@@ -405,6 +405,9 @@ Q_SIGNALS:
     void geometryChanged();
     /// Something went wrong that the user should know (e.g. a pasted picture could not be saved).
     void messageRequested(const QString& title, const QString& text);
+    /// The "Load image" of a web picture in a Markdown text was tapped (qt/docs/md-images.md): the UI shows the
+    /// address and fetches it when the user agrees.
+    void imageLoadRequested(const QString& url);
 
 private:
     void rebuildPages();
