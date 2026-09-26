@@ -45,15 +45,20 @@ without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
   cursor is at its start; else after the line): code block (a menu of languages; selected lines go inside the fence),
   table (below), formula block (`$$` lines), image (a file picker: the
   picture is copied into `name.assets/` and linked at the cursor, [md-images.md](md-images.md)), horizontal rule and
-  page break (below), each a button of its own (no "+" menu: the row scrolls sideways when the window is narrow).
+  page break (below), each a button of its own where there is room; else in the **Insert** menu (below).
 - **Pictures**: Ctrl+V with a picture on the clipboard saves it as `name.assets/image-YYYY-MM-DD-HHMMSS.png` and
   links it at the cursor; picture files dropped on the page are copied there and linked. One undo step each; undo
   leaves the files ([md-images.md](md-images.md)).
 - The buttons show what is at the cursor: bold, italic, …, the list, quote, code block, table. It is worked out from
   the cursor's line (and the fences before it), not from the whole parse.
 - Every tool is one undo step, as are the keys; they are the same operations (`md::format`). The tools do not take
-  the keyboard focus: the text keeps it (and the on-screen keyboard stays). On a narrow window the row scrolls
-  sideways.
+  the keyboard focus: the text keeps it (and the on-screen keyboard stays).
+- **Where the room is short** (qt/adaptive-panels; [adaptive-layout.md](adaptive-layout.md), "The format bar"): on a
+  desktop or a tablet the bar takes the richest form that fits, never scrolling: first the blocks go into an
+  **Insert** menu ("+ Insert": code block ▸ languages, table, formula block, image, rule, page break), then "Insert"
+  loses its word (a "+"), then ¶/H1/H2/H3 become one button with the level at the cursor and a menu. The marks and
+  the lists always stay in the row. On a phone the row scrolls sideways instead, with fading edges where there is
+  more. A finger held on a button shows its name. In the touch profile the level buttons are 40 px wide.
 
 ### Tables
 The table button opens a table editor: the table at the cursor, or a new one (a header and two rows of three

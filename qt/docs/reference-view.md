@@ -12,7 +12,14 @@ what beside it), `ReferenceSplit.qml` (the split, the divider, the pill). Tests:
 - For reading by default: tools scroll there, selections can be copied but not moved. The pen button of its pill
   lets the tool in hand write there too (per tab; off for every new reference).
 - The pill: page number (go to a page), the page grid, edit, copy, fit width, swap sides, swap roles (the reference
-  becomes the notes), "Show as a tab", close. Keys act on the side tapped last.
+  becomes the notes), "Show as a tab", close. Keys act on the side tapped last. In a narrow half (under 480 px: a
+  phone, a small window) the pill is the page number and a ⋮ that holds the rest (`referenceMenu`; a sheet on a
+  phone), so it stays small.
+- **Side by side or top and bottom** (qt/adaptive-panels): side by side where the canvas area is landscape, top and
+  bottom where it is portrait (h > w: a tablet or a phone held upright), with 16 px of margin around square so a
+  window dragged across does not flicker. "Swap sides" puts the reference at the bottom (top) then. The divider is
+  dragged the same way across, and keeps its ratio (the notes' share) when the orientation flips. The notes' view
+  pill and the reference's pill each stay inside their half, so they never meet.
 
 ## The same document beside itself (`qt/self-reference`)
 

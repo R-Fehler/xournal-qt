@@ -103,9 +103,8 @@ is built.
 ### Adaptive UI ([ui-adaptive-audit.md](qt/docs/ui-adaptive-audit.md), [adaptive-layout.md](qt/docs/adaptive-layout.md))
 - [x] Block 1 `qt/adaptive-foundation`: size classes, touch profile, choices per class, the sidebar binding and
   drawer, chromeMode apart from full screen, `AdaptiveLayoutTest`.
-- [ ] Left from block 1: `HomeView` (760, 1500), `TabOverview`, the Markdown panel and the reference split still keep
-  their own widths (table in adaptive-layout.md); the tab strip's 38 px buttons and the other F14 targets are not
-  sized by `minTarget` yet; the drawer has no slide animation; Escape does not close it.
+- [ ] Left from block 1: `HomeView` (760, 1500), `TabOverview` still keep their own widths (table in
+  adaptive-layout.md); the tab strip's 38 px buttons and the other F14 targets are not sized by `minTarget` yet.
 - [x] Block 2 `qt/adaptive-menus`: `AdaptiveMenu` (width of its entries, never taller than the window, clear of its
   button; a bottom sheet with drill-in in the phone classes, `MenuSheet`), the ⋮ regrouping (10 entries, Document /
   Export / Page / View), used for ⋮, library, card, tab, layout and page menus; `menusFitAtFiveSizes`,
@@ -123,12 +122,18 @@ is built.
   the Markdown table editor, the look-up menu and the small anchored popups (link, page jump, custom width) are
   not adapted; the dialogs are not checked against the bottom safe area (block 8).
 - [ ] Left from block 4 `qt/adaptive-toolbar` (tool bar layouts, "more tools", cycling buttons, the view pill, the
-  sidebar arrow, the text document's bar in the format bar): the format bar itself still scrolls sideways in a narrow
-  window (F7.1, D10: its insert overflow, and docking above the soft keyboard on phones: `qt/adaptive-panels` /
-  `qt/safe-areas-keyboard`); the colors' popups (palette, widths, "more tools") are popups, not sheets, on phones;
+  sidebar arrow, the text document's bar in the format bar): docking the format bar above the soft keyboard on
+  phones (`qt/compact-chrome` / `qt/safe-areas-keyboard`); the colors' popups (palette, widths, "more tools") are popups, not sheets, on phones;
   the phone's final tool layout is the bottom dock of `qt/compact-chrome`; menus still plain `Menu`s: the home
   screen's New / Import / Sort, the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
   cell menu; the pen pill's width and colors are not cycling buttons with lists yet.
+- [x] Block 5 `qt/adaptive-panels`: the Markdown source below the page in portrait (a draggable divider, remembered per
+  class), the reference top and bottom in a portrait area (ratio kept), the reference's narrow pill (page + ⋮), the
+  compact view pill, pills kept clear of the view pill, the drawer's slide / Esc / back key / phone width, the format
+  bar's Insert overflow and fading edges.
+- [ ] Left from block 5: the format bar still scrolls below ~680 px on a desktop (600×800); the Markdown panel's
+  title and size rows are not made smaller on a phone; the reference pill's page popup and the source panel's emoji
+  picker are plain popups; the pen pill is still tall in phone landscape (its redesign is qt/compact-chrome's dock).
 
 ---
 

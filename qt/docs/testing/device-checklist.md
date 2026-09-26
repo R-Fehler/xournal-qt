@@ -2276,3 +2276,49 @@ The sidebar and text documents:
 - [ ] A `.md` being written: one bar only (the format bar), with "»" and ⋮ at its end; "»" has New, Open, Save, Edit as
       notes, Open externally, Search, … ⋮ has no Settings, no Full screen, no Insert image (they are buttons).
 - [ ] The text box (T): a new text box is Markdown; tapping an old plain text still edits it as plain text.
+
+## Adaptive panels (qt/adaptive-panels)
+
+qt/docs/adaptive-layout.md, "Panels". Test with a notes document (several pages), a PDF with a table of contents, and a
+`.md`.
+
+The Markdown source (write Markdown on a page: hold the writing button → "Markdown source beside the page"):
+- [ ] Desktop, 1920 and a window dragged down to ~800 wide: the source beside the page at the right, the page keeps
+      at least half the window; no 52 px strip anywhere.
+- [ ] Surface upright (960×1392): the source in the bottom half, the page above as wide as the window. Drag the grip
+      between them up and down: the split follows, the pen does not draw. Turn to landscape: beside the page; back
+      upright: the split you dragged comes back.
+- [ ] Phone (Fold 7 folded, 412×915): the page above (about 40 %), the source below with Cancel/Done, the format bar
+      (scrolling, faded edge) and the text; typing shows on the page above. Phone sideways: beside the page.
+
+The reference (open another document as reference, and "Show this document beside"):
+- [ ] Surface upright: the reference on top, the notes below (or the other way after "Swap top and bottom"); the grip
+      in the middle of the horizontal divider drags the split. Turn to landscape: side by side with the same share.
+- [ ] Phone upright: top and bottom; the reference's pill shows "1 / 12" and ⋮; ⋮ opens a sheet with All pages, Write
+      in the reference, Fit the width, Swap, Show as a tab, Close. The two pills never overlap.
+- [ ] Laptop with the sidebar open (halves of about 530 px): the reference's pill still shows all its buttons.
+
+The view pill:
+- [ ] Phone upright: undo, redo, the contents, "3 / 12", the zoom %; a tap on "3 / 12" opens all pages; the pill lies
+      inside the page area with room at both ends. ⋮ → View → Page layout… is there.
+- [ ] Beside a reference or the Markdown source on a small desktop window: the pill stays in its own half.
+- [ ] Select strokes on a phone: the selection's pill sits above the view pill, not over it. Jump to a page from the
+      contents: the back/forward pill does not cover the view pill either.
+- [ ] Full screen with the pen, the pen pill dragged to the lower right: it stays above the view pill. With a finger
+      its buttons are bigger (44 px).
+
+The sidebar as a drawer:
+- [ ] Surface upright: the arrow slides the drawer in; a tap on the dimmed page slides it out; Esc closes it; it stays
+      open while switching to Layers or Contents; picking a page closes it.
+- [ ] Android (Fold 7 folded): the drawer takes most of the width (about 85 %), the thumbnails are large; the back
+      key closes the drawer (not the app, not the document).
+
+The format bar:
+- [ ] A `.md` on a desktop, the window dragged from 1920 down to ~700: at about 1000 px "+ Insert" replaces the six
+      block buttons (code block, table, formula, image, rule, page break), then ¶/H1/H2/H3 become one button with a
+      menu, then "+" loses its word; bold … quote stay; the row does not scroll (below ~680 px it does, with a fade). Each Insert entry works (code block ▸ Python, table…,
+      image…, rule, page break).
+- [ ] Surface upright (960): all as buttons. A 2-in-1 upright (720): no scrolling; ¶ as one button with a menu and a
+      plain "+" for the inserts.
+- [ ] With a finger: the heading buttons are a bit wider; holding one shows "Heading 1".
+- [ ] Phone: the row scrolls sideways; a fade at the edge where more buttons are.
