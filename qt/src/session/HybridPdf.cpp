@@ -55,6 +55,7 @@
 #include "view/background/BackgroundView.h"
 
 #include "ArchivePdf.h"
+#include "DocumentImages.h"
 #include "DocumentLink.h"
 #include "IncrementalPdf.h"
 #include "MdBox.h"
@@ -70,6 +71,7 @@ namespace {
 constexpr const char* MARKER = "/XournalQt";  ///< in the catalog, and the private key of our annotations
 constexpr const char* CLEAN_NAME = "base.pdf";
 constexpr const char* CHECK_NAME = "changed.txt";
+constexpr const char* PICTURES_NAME = "pictures";  ///< the pictures a text document carries (qt/docs/md-images.md)
 constexpr const char* PAGES_NAME = "pages.txt";  ///< the file's page objects the clean copy's pages are
 constexpr double MARGIN = 2.0;  ///< around a layer's elements (pt)
 /// A base page with space for notes (qt/docs/note-space.md): its boxes as the PDF had them (/MediaBox, /CropBox)
@@ -2368,8 +2370,12 @@ private:
             throw std::runtime_error("the embedded document is missing");
         }
         std::set<std::string> before;
-        for (const auto& n: stringsOf(e.marker.getKey("/Files"))) {
-            before.insert(n);
+        {
+            QPDFObjectHandle listed = e.marker.getKey("/Files");
+            for (int i = 0; listed.isArray() && i < listed.getArrayNItems(); ++i) {
+                QPDFObjectHandle v = listed.getArrayItem(i);
+                before.insert(v.isString() ? v.getUTF8Value() : v.isName() ? v.getName() : std::string());
+            }
         }
         for (const auto& [name, data]: prep.extras) {
             files.appendItem(QPDFObjectHandle::newUnicodeString(name));
@@ -2377,10 +2383,57 @@ private:
                 throw std::runtime_error("the document has other background images");
             }
         }
+        // A picture the text links to that the file does not have yet: a new file specification in the name tree
+        // (the tree's nodes are touched above)
+        auto addNew = [&](const TextDocument::Attachment& a) {
+            if (archive) {
+                throw std::runtime_error("a new attachment of an archive PDF");  // (its /AF: written in full)
+            }
+            QPDFObjectHandle dict = QPDFObjectHandle::newDictionary();
+            dict.replaceKey("/Type", QPDFObjectHandle::newName("/EmbeddedFile"));
+            dict.replaceKey("/Subtype", QPDFObjectHandle::newName("/" + (a.mime.empty() ? std::string("image/png") : a.mime)));
+            QPDFObjectHandle params = QPDFObjectHandle::newDictionary();
+            params.replaceKey("/Size", QPDFObjectHandle::newInteger(static_cast<long long>(a.data.size())));
+            const QByteArray md5 = QCryptographicHash::hash(
+                    QByteArray::fromRawData(a.data.data(), static_cast<int>(a.data.size())), QCryptographicHash::Md5);
+            params.replaceKey("/CheckSum", QPDFObjectHandle::newString(md5.toStdString()));
+            dict.replaceKey("/Params", params);
+            QPDFObjectHandle stream = u.addStream(dict, a.data);
+            QPDFObjectHandle ef = QPDFObjectHandle::newDictionary();
+            ef.replaceKey("/F", stream);
+            ef.replaceKey("/UF", stream);
+            QPDFObjectHandle spec = QPDFObjectHandle::newDictionary();
+            spec.replaceKey("/Type", QPDFObjectHandle::newName("/Filespec"));
+            spec.replaceKey("/F", QPDFObjectHandle::newUnicodeString(a.name));
+            spec.replaceKey("/UF", QPDFObjectHandle::newUnicodeString(a.name));
+            spec.replaceKey("/EF", ef);
+            if (!a.description.empty()) {
+                spec.replaceKey("/Desc", QPDFObjectHandle::newUnicodeString(a.description));
+            }
+            efdh.replaceEmbeddedFile(a.name, QPDFFileSpecObjectHelper(u.add(spec)));
+        };
         for (const auto& a: prep.attachments) {  // (the same files for other apps, their data new)
             files.appendItem(QPDFObjectHandle::newUnicodeString(a.name));
+            if (a.fixed) {
+                // A picture: the one the file has stays as it is (its data does not change under its name); a new one
+                // is added (qt/docs/md-images.md)
+                if (!before.erase(a.name)) {
+                    addNew(a);
+                }
+                continue;
+            }
             if (!before.erase(a.name) || !replaceData(a.name, a.data, false, a.mime)) {
                 throw std::runtime_error("the document has other attachments");
+            }
+        }
+        // Pictures the text does not link to any more: kept (and listed, so the clean copy never has them) until the
+        // file is written in full
+        for (auto it = before.begin(); it != before.end();) {
+            if (it->find('/') != std::string::npos) {
+                files.appendItem(QPDFObjectHandle::newUnicodeString(*it));
+                it = before.erase(it);
+            } else {
+                ++it;
             }
         }
         if (!before.empty()) {
@@ -2894,6 +2947,42 @@ fs::path xoppExportOf(const fs::path& pdf) {
     }
 }
 
+namespace {
+/// The picture attachments of a text document (listed in the marker's /Files with a folder in their name,
+/// "name.assets/…"; qt/docs/md-images.md) written into `dir`/pictures under their names. The folder is made also when
+/// there are none (the cache entry has its pictures then).
+void extractPictures(QPDF& q, QPDFObjectHandle marker, const fs::path& dir) {
+    const fs::path pictures = dir / PICTURES_NAME;
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    const fs::path tmp = partOf(pictures);
+    fs::remove_all(tmp, ec);
+    fs::create_directories(tmp, ec);
+    QPDFObjectHandle files = marker.getKey("/Files");
+    QPDFEmbeddedFileDocumentHelper efdh(q);
+    for (int i = 0; files.isArray() && i < files.getArrayNItems(); ++i) {
+        QPDFObjectHandle v = files.getArrayItem(i);
+        const std::string name = v.isString() ? v.getUTF8Value() : std::string();
+        const fs::path target = DocumentImages::below(tmp, name);
+        if (name.find('/') == std::string::npos || target.empty()) {
+            continue;
+        }
+        auto spec = efdh.getEmbeddedFile(v.getStringValue());
+        if (!spec) {
+            spec = efdh.getEmbeddedFile(name);
+        }
+        if (!spec) {
+            continue;
+        }
+        auto buffer = spec->getEmbeddedFileStream().getStreamData(qpdf_dl_all);
+        fs::create_directories(target.parent_path(), ec);
+        writeFile(target, std::string(reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize()));
+    }
+    fs::remove_all(pictures, ec);
+    fs::rename(tmp, pictures, ec);
+}
+}  // namespace
+
 Opened open(const fs::path& pdf) {
     Opened o;
     try {
@@ -2937,6 +3026,7 @@ Opened open(const fs::path& pdf) {
                                                    buffer->getSize()));
                 }
             }
+            extractPictures(q, marker, dir);  // (before strip(): it removes them)
             std::vector<QPDFObjectHandle> pages;  // (the clean copy's page k is this page of the file)
             for (auto& p: QPDFPageDocumentHelper(q).getAllPages()) {
                 pages.push_back(p.getObjectHandle());
@@ -2961,7 +3051,14 @@ Opened open(const fs::path& pdf) {
             fs::rename(tmp, check, ec);  // last: the entry is complete
         } else {
             touch(base);
+            if (!fs::exists(dir / PICTURES_NAME, ec)) {  // (an entry made before pictures were carried)
+                QPDF q;
+                q.setSuppressWarnings(true);
+                q.processFile(pdf.string().c_str());
+                extractPictures(q, q.getRoot().getKey(MARKER), dir);
+            }
         }
+        o.pictures = dir / PICTURES_NAME;
         {
             std::istringstream in(bytesOf(check));
             for (std::string line; std::getline(in, line);) {

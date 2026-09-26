@@ -132,6 +132,10 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
                 result.warnings = std::move(opened.warnings);
                 result.hybrid = true;
                 result.hybridChanged = std::move(opened.changed);
+                // The pictures its Markdown carries: into its work folder, found there from now on (while the result
+                // lives, and then by the session's own root; qt/docs/md-images.md)
+                DocumentImages::unpack(path, opened.pictures);
+                result.pictures = std::make_shared<md::images::RootHandle>(DocumentImages::embeddedRoot(path));
                 prepareLoaded(*result.document);
                 return result;
             }
@@ -235,15 +239,32 @@ void DocumentSession::init() {
 }
 
 void DocumentSession::updateImageRoot() {
+    const auto setRoot = [](md::images::RootHandle& handle, const md::images::Root& root) {
+        if (!handle.active() || handle.root().baseDir != root.baseDir || handle.root().assetsDir != root.assetsDir) {
+            handle.set(root);
+        }
+    };
     // A .md (edited, or shown read-only): its folder and "name.assets" next to it
     const fs::path file = text ? text->path() : shownPath;
     if (!file.empty() && !hasFilePath()) {
-        const md::images::Root root = DocumentImages::markdownRoot(file);
-        if (!imageRoot.active() || imageRoot.root().assetsDir != root.assetsDir) {
-            imageRoot.set(root);
-        }
+        folderImageRoot.reset();
+        setRoot(imageRoot, DocumentImages::markdownRoot(file));
         return;
     }
+    // A PDF with notes (a PDF text document): the pictures it carries are in its work folder in the app cache; the
+    // folder it is in for other relative links. Saved under another name: its pictures go along.
+    const fs::path document = hasFilePath() ? getFilePath() : fs::path();
+    if (!document.empty() && hasExtension(document, ".pdf")) {
+        const md::images::Root root = DocumentImages::embeddedRoot(document);
+        if (imageRoot.active() && imageRoot.root().baseDir != root.baseDir && !imageRoot.root().baseDir.empty()) {
+            const std::string from = imageRoot.root().baseDir;
+            DocumentImages::unpack(document, fs::path(std::u8string(from.begin(), from.end())));
+        }
+        setRoot(folderImageRoot, DocumentImages::folderRoot(document));
+        setRoot(imageRoot, root);  // (the newer one: looked in first)
+        return;
+    }
+    folderImageRoot.reset();
     imageRoot.reset();
 }
 

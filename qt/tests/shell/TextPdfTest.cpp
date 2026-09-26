@@ -10,6 +10,8 @@
 #include <shared_mutex>
 #include <string>
 
+#include <QDateTime>
+#include <QImage>
 #include <QTemporaryDir>
 #include <QUrl>
 #include <gtest/gtest.h>
@@ -19,6 +21,7 @@
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "session/AppContext.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
@@ -30,6 +33,8 @@
 #include "AppController.h"
 #include "CanvasView.h"
 #include "MarkdownFile.h"
+#include "MarkdownImages.h"
+#include "MdImages.h"
 
 using namespace xqt;
 
@@ -209,6 +214,95 @@ TEST_F(TextPdf, exportAsMarkdownWritesTheText) {
     c.newDocument();
     EXPECT_FALSE(c.hasMarkdownText());
     EXPECT_FALSE(c.textNotes());
+}
+
+// qt/docs/md-images.md: a PDF text document carries its pictures as attachments "name.assets/…" (nothing is written
+// next to it); opened, they are in its work folder in the app cache; an incremental save adds a new one and keeps the
+// ones it has; a full write drops those the text does not link to; Export as Markdown writes them next to the .md;
+// Open as PDF document packs a .md's pictures.
+TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
+    AppController c;
+    Choice choice(c);
+    c.setLibraryRoot(root);
+    DocumentMode::store(*c.context().getSettings(), DocumentMode::Mode::Pdf);
+    ASSERT_TRUE(c.createTextDocument("Report"));
+    view(c)->endTextEditing();
+    const fs::path pdf = root / "Report.pdf";
+    // A pasted picture: into the work folder, linked as Report.assets/…
+    QImage red(40, 20, QImage::Format_RGB32);
+    red.fill(Qt::red);
+    QString error;
+    const auto first = MarkdownImages::savePicture(current(c), red, error, QDateTime(QDate(2026, 9, 26), QTime(10, 11, 12)));
+    ASSERT_TRUE(first) << error.toStdString();
+    EXPECT_EQ(*first, "Report.assets/image-2026-09-26-101112.png");
+    EXPECT_TRUE(fs::exists(DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png"));
+    MarkdownFile::setText(current(c), "# Report\n\n![](" + *first + ")\n");
+    ASSERT_TRUE(c.save());
+    EXPECT_FALSE(fs::exists(root / "Report.assets")) << "nothing next to the PDF";
+    const std::string png = bytesOf(DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png");
+    EXPECT_EQ(attachment(pdf, "Report.assets/image-2026-09-26-101112.png"), png);
+    EXPECT_EQ(attachment(pdf, "Report.md"), "# Report\n\n![](Report.assets/image-2026-09-26-101112.png)\n");
+
+    // Opened again (its work folder gone: it comes from the PDF): the picture is found
+    c.closeTab(c.tabManager().currentIndex());
+    fs::remove_all(DocumentImages::workFolder(pdf));
+    {
+        auto loaded = DocumentSession::loadFile(pdf);
+        ASSERT_TRUE(loaded.document);
+        EXPECT_EQ(md::images::resolve(*first),
+                  (DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png").string());
+    }
+    ASSERT_TRUE(c.openPath(qstr(pdf)));
+    EXPECT_FALSE(md::images::resolve(*first).empty());
+
+    // A second picture: an incremental save adds it, the first one stays as it was (the file is small: a picture
+    // would make it grow by more than the share that writes it anew)
+    const double compactAbove = HybridPdf::compactAbove;
+    HybridPdf::compactAbove = 100;
+    struct Restore {
+        double v;
+        ~Restore() { HybridPdf::compactAbove = v; }
+    } restore{compactAbove};
+    const auto second = MarkdownImages::savePicture(current(c), red, error, QDateTime(QDate(2026, 9, 26), QTime(10, 11, 13)));
+    ASSERT_TRUE(second);
+    MarkdownFile::setText(current(c), "# Report\n\n![](" + *first + ")\n\n![](" + *second + ")\n");
+    const auto sizeBefore = fs::file_size(pdf);
+    DocumentSession::SaveRequest save;
+    const auto r = current(c).saveNow(save);
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental) << "a new picture is appended";
+    EXPECT_LT(fs::file_size(pdf) - sizeBefore, 2 * png.size() + 20000) << "the first one is not written again";
+    EXPECT_EQ(attachment(pdf, *second), png);
+    EXPECT_EQ(attachment(pdf, *first), png);
+
+    // The first one no longer linked: kept by an incremental save, dropped by a full write
+    MarkdownFile::setText(current(c), "# Report\n\n![](" + *second + ")\n");
+    ASSERT_TRUE(current(c).saveNow(save).ok);
+    EXPECT_EQ(attachment(pdf, *first), png);
+    save.compact = true;
+    ASSERT_TRUE(current(c).saveNow(save).ok);
+    EXPECT_EQ(attachment(pdf, *first), "<none>");
+    EXPECT_EQ(attachment(pdf, *second), png);
+    EXPECT_FALSE(HybridPdf::hasEarlierRevisions(pdf));
+    // (the clean copy the document shows its pages from never carries them)
+
+    // Export as Markdown: the text and Report.assets/ next to it
+    fs::create_directories(root / "out");
+    ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Report.md")));
+    EXPECT_EQ(bytesOf(root / "out" / "Report.md"), "# Report\n\n![](" + *second + ")\n");
+    EXPECT_EQ(bytesOf(root / "out" / "Report.assets" / "image-2026-09-26-101113.png"), png);
+    // Under another name: the links follow the name of its folder
+    ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Other name.md")));
+    EXPECT_EQ(bytesOf(root / "out" / "Other name.md"), "# Report\n\n![](Other%20name.assets/image-2026-09-26-101113.png)\n");
+    EXPECT_TRUE(fs::exists(root / "out" / "Other name.assets" / "image-2026-09-26-101113.png"));
+
+    // Open as PDF document of a .md with a picture: the PDF carries it
+    writeFile(root / "notes.md", "# Notes\n\n![](notes.assets/a.png)\n");
+    fs::create_directories(root / "notes.assets");
+    ASSERT_TRUE(red.save(qstr(root / "notes.assets" / "a.png")));
+    ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
+    ASSERT_TRUE(c.openAsPdfDocument());
+    EXPECT_EQ(attachment(root / "notes.pdf", "notes.assets/a.png"), bytesOf(root / "notes.assets" / "a.png"));
 }
 
 // The library's index reads the text of a PDF text document: its words are found

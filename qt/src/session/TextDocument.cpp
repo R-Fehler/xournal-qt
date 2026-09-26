@@ -1,6 +1,9 @@
 #include "TextDocument.h"
 
 #include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <iterator>
 #include <string_view>
 
 #include "model/BackgroundConfig.h"
@@ -10,7 +13,9 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 
+#include "DocumentImages.h"
 #include "MdBox.h"
+#include "MdImages.h"
 #include "MdPaginate.h"
 #include "TextFile.h"
 
@@ -120,15 +125,45 @@ std::vector<Attachment> attachments(Document& doc, const std::string& pdfName) {
     if (!isTextDocument(doc)) {
         return out;
     }
-    Attachment md;
+    Attachment md;  // (first: out.insert below)
     md.name = markdownName(pdfName);
     md.data = flowText(doc);
     md.mime = "text/markdown";
     md.description = "The text of this PDF as Markdown (xournal-qt)";
     md.relationship = "/Alternative";
-    out.push_back(std::move(md));
-    // (qt/md-images: the images of the text as "name.assets/…")
+    // The pictures of the text, under the paths its links name (qt/docs/md-images.md)
+    for (const std::string& carried: DocumentImages::carriedLinks(md.data)) {
+        const std::string file = md::images::resolve(carried);
+        std::ifstream in(fs::path(std::u8string(file.begin(), file.end())), std::ios::binary);
+        if (file.empty() || !in) {
+            continue;  // (a picture that is not there: its link stays, as in the text)
+        }
+        Attachment a;
+        a.name = carried;
+        a.data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        a.mime = pictureMime(carried);
+        a.description = "A picture of the text of this PDF (xournal-qt)";
+        a.relationship = "/Supplement";
+        a.fixed = true;
+        out.push_back(std::move(a));
+    }
+    out.insert(out.begin(), std::move(md));
     return out;
+}
+
+std::string pictureMime(const std::string& name) {
+    std::string ext = name.substr(name.find_last_of('.') == std::string::npos ? name.size() : name.find_last_of('.'));
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    static const std::pair<const char*, const char*> kinds[] = {
+            {".png", "image/png"},   {".jpg", "image/jpeg"},    {".jpeg", "image/jpeg"}, {".gif", "image/gif"},
+            {".webp", "image/webp"}, {".svg", "image/svg+xml"}, {".bmp", "image/bmp"},
+    };
+    for (const auto& [e, mime]: kinds) {
+        if (ext == e) {
+            return mime;
+        }
+    }
+    return "application/octet-stream";
 }
 
 }  // namespace xqt::TextDocument

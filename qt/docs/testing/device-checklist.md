@@ -1677,3 +1677,11 @@ Design: [md-images.md](../md-images.md).
       pictures still show, the links in the file say `newname.assets/`, the tab is not marked modified. Move it to
       another folder, copy it, move it to the trash: the folder goes along each time.
 - [ ] Share → "Copy to clipboard" of a `.md` with pictures, paste in the file manager: the `.md` and its folder.
+- [ ] PDF files mode: a new text document, paste a photo, save. Nothing appears next to the PDF. Okular / Firefox's
+      attachment list shows `name.md` and `name.assets/image-….png`; `qpdf --list-attachments` too. Close and open
+      the PDF again (also after a restart): the photo shows.
+- [ ] Paste a second photo and save (Ctrl+S): quick (appended); both are in the attachment list. Delete the first
+      link, save, then Share (written anew): the first photo is gone from the attachments.
+- [ ] ⋮ → Export as Markdown: `name.md` and `name.assets/` with the photos; open the `.md` in another editor
+      (Typora, Obsidian, VS Code's preview): the photos show.
+- [ ] A `.md` with pictures → ⋮ → Open as PDF document: the new PDF shows them and carries them as attachments.

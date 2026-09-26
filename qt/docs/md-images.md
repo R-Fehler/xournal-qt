@@ -65,14 +65,21 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
 
 ## PDF text documents
 
-- The images are attachments `name.assets/<file>` next to `name.md` (`TextDocument::attachments`). Nothing is
-  written next to the PDF.
-- Opening unpacks them into the app cache (`<cache>/md-assets/<hash of the PDF's path>/name.assets/`), which is the
-  document's root: links resolve there, and pasted images go there.
-- A full write packs the images the text links to (unreferenced ones are dropped); an incremental save adds the new
-  ones and keeps the ones already in the file.
-- **Open as PDF document** packs the `.md`'s linked images; **Export as Markdown** writes `name.md` and the images
-  into `name.assets/` next to it.
+- The images are attachments next to `name.md`, under the paths the links name (`name.assets/<file>`;
+  `TextDocument::attachments`). Nothing is written next to the PDF.
+- Opening extracts them with the clean copy (the cache entry of the file's version, `pictures/`) and copies them into
+  the document's **work folder** in the app cache, `<cache>/md-assets/<hash of the PDF's path>/` (a folder per
+  document, so that pictures pasted and not saved yet are still there after a crash). While the document (or a
+  `LoadResult` of it: a library preview) is open, its root is that folder (every relative link is looked for there,
+  and pictures added go into `name.assets/` in it), after it the folder the PDF is in. Saved under another name, the
+  document takes its work folder's pictures along.
+- A full write packs the pictures the text links to (unreferenced ones are dropped). An incremental save adds the new
+  ones and keeps what the file has (a picture's data never changes under its name), also pictures the text no longer
+  links to, until the next full write. (A small file grows by more than a quarter with a picture: the policy of
+  incremental saves then writes it in full anyway.)
+- **Open as PDF document** copies the `.md`'s linked pictures into the new PDF's work folder, so its first save
+  packs them; **Export as Markdown** writes `name.md` and the pictures into `name.assets/` next to it (links into
+  another `….assets/` folder, from an older name, are rewritten to `name.assets/`).
 
 ## Web images
 

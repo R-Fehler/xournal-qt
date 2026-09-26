@@ -66,6 +66,9 @@ public:
         bool hybrid = false;
         /// A hybrid PDF whose annotations of ours another app changed, moved or deleted (their names)
         std::vector<std::string> hybridChanged;
+        /// A hybrid PDF: the root of the pictures its Markdown carries (qt/docs/md-images.md), registered while this
+        /// lives (a session registers its own).
+        std::shared_ptr<md::images::RootHandle> pictures;
     };
     /// Load a .xopp, .xoj or .pdf file (a PDF gets one page per PDF page; a hybrid PDF is its embedded document). Does not touch any session, so it may
     /// run on a worker thread before the tab is created.
@@ -520,6 +523,7 @@ private:
     /// Where the relative links of the document's Markdown point (its pictures, qt/docs/md-images.md): registered
     /// while it is open, kept up to date with its file (updateImageRoot).
     md::images::RootHandle imageRoot;
+    md::images::RootHandle folderImageRoot;  ///< (a PDF with notes: the folder it is in)
     void updateImageRoot();
     bool textModified = false;
     bool textContinuous = false;
