@@ -665,6 +665,9 @@ private:
     std::optional<std::string> pictureLinkFor(const QString& arg);
     /// A text file open in `s` was renamed or moved (`from` -> `to`, the library): its tab follows.
     void followTextFile(xqt::DocumentSession& s, const fs::path& from, const fs::path& to);
+    /// The file a new document shows (an image written on, a file shown read-only) was renamed or moved: the tab and
+    /// its pages' image backgrounds follow.
+    void followShownFile(xqt::DocumentSession& s, const fs::path& from, const fs::path& to);
     /// The Markdown texts of every open document that show this picture: laid out again and drawn.
     void relayoutPictures(const std::string& link);
     void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);
@@ -686,6 +689,20 @@ public:
     Q_INVOKABLE bool saveReferenceInHand();
     /// Close a tab without asking (QML asks about unsaved changes first). The last tab is replaced by a new one.
     Q_INVOKABLE void closeTab(int index);
+    // --- renaming (AppRename.cpp, qt/docs/library.md "Renaming") ------------------------------------------------
+    /// What the name field of a tab's document shows: {name (without the extension), extension (it stays), note (what
+    /// is renamed with it), unsaved (a new document: the name it is saved under), problem (read-only: why not)}.
+    Q_INVOKABLE QVariantMap tabRenameInfo(int index) const;
+    /// Why the tab's document cannot get `name` (without the extension): "" if it can (or it is its name).
+    Q_INVOKABLE QString tabRenameProblem(int index, const QString& name) const;
+    /// Rename the tab's document the way the library does (DocumentFiles::rename; the index, reading places, tabs,
+    /// recent list and links follow). A new document without a file: its title and the name it is saved under. False
+    /// (with a message) if it cannot.
+    Q_INVOKABLE bool renameTab(int index, const QString& name);
+    /// Why a card's document or folder (`path`) cannot get `name` as the library's rename takes it (a text or other
+    /// file: the whole file name): "" if it can.
+    Q_INVOKABLE QString renameProblem(const QString& path, const QString& name) const;
+    static QString renameProblemText(int problem, const QString& name);
     Q_INVOKABLE void moveTab(int from, int to);
     Q_INVOKABLE void nextTab();
     Q_INVOKABLE void previousTab();

@@ -1873,3 +1873,34 @@ Design: [md-images.md](../md-images.md).
 - [ ] Full screen with several documents: the slim bar at the top has small ‹ and › arrows at its ends that go to the
       previous / next document (dimmed at the first / last one); a tap between them still opens the overview, a swipe
       still switches. With a finger and with the mouse.
+
+## Renaming documents (qt/rename)
+- [ ] Open a `.xopp` from the library. Double click (mouse) on its tab's title: the title becomes a field with the
+      name selected and ".xopp" beside it in grey. Type a new name, Enter: the tab shows the new name, the library
+      shows the card under it, and the document opens again at the page it was left at.
+- [ ] The same, Escape instead of Enter: nothing is renamed; again, then click on the page: nothing is renamed.
+- [ ] Type the name of another document of that folder (also one of another kind, e.g. a PDF's): the field turns
+      red and says the name is taken; Enter keeps the field open. `a/b` says why too.
+- [ ] Two tabs: double click on the tab that is not shown: it is shown, no field. A double click on it now renames.
+- [ ] Touch (Fold 7 / the 2-in-1 as tablet): press and hold a tab: its menu has "Rename…"; it shows that tab and
+      edits its title in place (the keyboard comes up, the field is not hidden by it).
+- [ ] ⋮ → Rename…: a dialog with the name and the extension (".xopp", ".pdf", ".md") beside the field; a taken name
+      or an empty one says why and OK is greyed; a new name renames the file, the tab follows.
+- [ ] A `.xopp` with its PDF next to it (lecture.xopp + lecture.pdf): the dialog says both are renamed; after it, both
+      have the new name and the document still shows its PDF pages. A PDF with notes: the PDF is renamed.
+- [ ] A `.md` with pictures (`name.assets/`), open with unsaved text: rename it from the tab: the folder is renamed
+      too, the pictures still show, the links in the text use the new folder name; the unsaved text is still there
+      and saving writes it to the new file. Documents that link to it get the new link.
+- [ ] A new document (never saved): ⋮ → Rename… "Name the document", type "Ideas": the tab says "Ideas"; Save as
+      suggests "Ideas.xopp".
+- [ ] A read-only file (e.g. `chmod a-w` on Linux, a file of a read-only folder): the rename field or dialog says it
+      is read-only, and nothing is renamed.
+- [ ] Library: press and hold (finger) on a card's name: the name becomes a field (not the menu, no drag); press and
+      hold on the preview still opens the menu, and holding then moving still drags. Enter renames the card.
+- [ ] Library with the mouse: a double click on a card's name renames in place; a single click on the name opens the
+      document (a moment later); a click on the preview opens at once. Right click on the name: the menu.
+- [ ] A text file (`.py`) in the library: the field shows the name without ".py", ".py" beside it; it stays.
+- [ ] A folder's name: press and hold renames the folder; its documents keep their places and previews.
+- [ ] The overview of open documents: double click (mouse) or press and hold (finger) on a card's title edits it in
+      place; Escape cancels the name and the overview stays open; Enter renames, the card and the tab follow.
+- [ ] Recent: the same gestures on a card's title rename a document outside the library; it opens again at its page.

@@ -883,6 +883,8 @@ ApplicationWindow {
                     id: moreMenu
                     objectName: "moreMenu"
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
+                    // Its name (qt/rename): the file, and what belongs to it, as the library renames it
+                    MenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
                     MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
                     MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
                     MenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); onTriggered: backlinksDialog.show() }
@@ -2941,6 +2943,7 @@ ApplicationWindow {
     InsertPagesDialog { id: insertPagesDialog }
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
+    RenameDialog { id: renameDocumentDialog }
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
     WebConfirm { id: webConfirm }
     WebImageConfirm { id: webImageConfirm }

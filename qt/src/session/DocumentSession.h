@@ -221,6 +221,10 @@ public:
     fs::path documentFile() const;
     /// Title for the tab: file name, or "Untitled" / the PDF name / the shown file's name for unsaved documents.
     std::string getDisplayName() const;
+    /// A new document that has no file yet was given a name (renamed in its tab, qt/rename): its title, and the name
+    /// saving suggests ("<name>.xopp"). Empty: none.
+    void setUntitledName(const std::string& name);
+    const std::string& untitledName() const { return untitled; }
     /// The file this new document shows without being that file: a Markdown file shown read-only (MarkdownFile.h), a
     /// text or code file shown read-only as plain text (`readOnly`), an image to write on (ImageFile.h). It is never
     /// written: saving asks for a .xopp (see suggestSavePath), and once saved the document is that .xopp. Empty: none.
@@ -441,6 +445,8 @@ Q_SIGNALS:
     void scrollToRectRequested(qulonglong page, QRectF rect);
 
 private:
+    /// suggestSavePath without the name of an untitled document
+    fs::path defaultSavePath() const;
     void init();
     void enableAutosave(bool enable);
     void updatePageActions();
@@ -528,6 +534,7 @@ private:
     bool textModified = false;
     bool textContinuous = false;
     fs::path madeSuggestion;  ///< setMadeFrom
+    std::string untitled;     ///< setUntitledName
     bool madeUnsaved = false;
     std::string lastAutosavedText;
     /// filesOnDisk() as read or written last (size, time, a sample of the content)

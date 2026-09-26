@@ -2325,6 +2325,10 @@ void AppController::filesChanged(const DocumentFiles::Result& r) {
                 followTextFile(*s, from, to);
                 continue;
             }
+            if (!s->hasFilePath() && !s->shownFile().empty() && s->annotatedPdf().empty()) {
+                followShownFile(*s, from, to);  // (an image written on, a file shown read-only)
+                continue;
+            }
             const fs::path file = s->hasFilePath() ? s->getFilePath() : fs::path();
             const fs::path pdf = s->getDocument()->getPdfFilepath();
             const fs::path newFile = file.empty() ? file : DocumentFiles::remap(file, from, to);
