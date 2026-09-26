@@ -1,7 +1,7 @@
 // "Find this paper" (qt/docs/citations.md): a bibliography entry (selected text) is looked for in the library by its
 // title, not by file names (arXiv papers are named by numbers). The guessed title can be corrected; each hit opens
 // beside the notes (the reference), in a tab, or copies a link to paste onto the citation. Not in the library: Google
-// Scholar, with the address shown.
+// Scholar and arXiv, with their addresses shown.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -23,6 +23,7 @@ Popup {
     property string raw: ""
     readonly property var hits: app.citations.paperHits
     readonly property bool searching: app.citations.searchingPapers
+    readonly property string arxivUrl: titleField.text.trim() !== "" ? app.citations.arxivSearchUrl(titleField.text) : ""
     readonly property string scholarUrl: titleField.text.trim() !== "" ? app.citations.scholarUrl(titleField.text) : ""
 
     /// The documents shown when it opened (the reference is in one of them: it is not its own paper)
@@ -210,6 +211,22 @@ Popup {
                 Layout.fillWidth: true
                 Layout.leftMargin: 12
                 text: sheet.scholarUrl !== "" ? app.citations.displayUrl(sheet.scholarUrl) : ""
+                color: "#6b6f75"
+                font.pixelSize: 11
+                elide: Text.ElideRight
+            }
+            Button {
+                objectName: "findPaperArxiv"
+                text: qsTr("Search arXiv")
+                flat: true
+                enabled: sheet.arxivUrl !== ""
+                onClicked: { const t = titleField.text; sheet.close(); win.arxivSearch(t) }
+            }
+            Label {
+                objectName: "findPaperArxivUrl"
+                Layout.fillWidth: true
+                Layout.leftMargin: 12
+                text: sheet.arxivUrl
                 color: "#6b6f75"
                 font.pixelSize: 11
                 elide: Text.ElideRight

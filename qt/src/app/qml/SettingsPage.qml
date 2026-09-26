@@ -412,6 +412,16 @@ Popup {
                         key: "webConfirm"
                         text: qsTr("Ask before opening a web address (it is shown whole)")
                     }
+                    ComboRow {
+                        objectName: "networkAccessRow"
+                        key: "networkAccess"
+                        text: qsTr("Connect to arXiv (searching sends the title's words; downloading fetches the PDF)")
+                        options: [
+                            { text: qsTr("Ask the first time"), value: "ask" },
+                            { text: qsTr("Allowed"), value: "on" },
+                            { text: qsTr("Off"), value: "off" }
+                        ]
+                    }
                     RowLayout {
                         id: translatorRow
                         Layout.fillWidth: true

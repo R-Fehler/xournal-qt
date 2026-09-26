@@ -17,6 +17,8 @@ Menu {
     function named(n) { return namePrefix === "" ? n : namePrefix + n.charAt(0).toUpperCase() + n.slice(1) }
 
     readonly property string scholarUrl: text !== "" ? app.citations.scholarUrl(text) : ""
+    /// The arXiv IDs in the text: [{ id, full, absUrl, pdfUrl, lookUpUrl }]
+    readonly property var arxivIds: text !== "" ? app.citations.arxivIdsIn(text) : []
     readonly property string translateUrl: (app.settings.revision, text !== "" ? app.citations.translateUrl(text) : "")
 
     /// An entry with its web address as a second line
@@ -25,6 +27,8 @@ Menu {
         property string url: ""
         property string label: ""
         property string purpose: label
+        /// What it does instead of opening the address in the browser (null: that)
+        property var run: null
         text: label
         height: visible ? implicitHeight : 0
         visible: url !== ""
@@ -40,7 +44,7 @@ Menu {
                 Layout.fillWidth: true
             }
         }
-        onTriggered: win.openWebAddress(url, purpose)
+        onTriggered: run ? run() : win.openWebAddress(url, purpose)
     }
 
     MenuItem {
@@ -48,6 +52,20 @@ Menu {
         text: qsTr("Find this paper in the library")
         enabled: menu.text !== ""
         onTriggered: win.findPaper(menu.text)
+    }
+    // An arXiv ID in the text (the first one): its paper into the library (the arXiv sheet looks up its title first,
+    // to name the file, showing that address again with its button), and its page in the browser
+    WebItem {
+        objectName: menu.named("lookUpArxiv")
+        label: menu.arxivIds.length > 0 ? qsTr("arXiv %1: into the library…").arg(menu.arxivIds[0].full) : ""
+        url: menu.arxivIds.length > 0 ? menu.arxivIds[0].lookUpUrl : ""
+        run: function() { win.arxivPaper(menu.arxivIds[0].full) }
+    }
+    WebItem {
+        objectName: menu.named("lookUpArxivPage")
+        label: menu.arxivIds.length > 0 ? qsTr("arXiv %1 on arxiv.org").arg(menu.arxivIds[0].full) : ""
+        purpose: qsTr("The paper on arxiv.org")
+        url: menu.arxivIds.length > 0 ? menu.arxivIds[0].absUrl : ""
     }
     MenuSeparator {}
     WebItem {

@@ -1,5 +1,6 @@
 /*
- * xournal-qt: citations (qt/docs/citations.md): the look-up addresses of selected text.
+ * xournal-qt: citations (qt/docs/citations.md): the look-up addresses of selected text, the title of a bibliography
+ * entry and how titles match, arXiv IDs, arXiv's answers (saved ones: no network) and the names of downloads.
  *
  * @license GNU GPLv2 or later
  */
@@ -7,6 +8,8 @@
 #include <gtest/gtest.h>
 
 #include "session/Citation.h"
+
+#include "../ArxivSamples.h"
 
 using namespace xqt;
 
@@ -197,4 +200,112 @@ TEST(Citation, aTitleMatchesItsDocumentsTitleBestAndToleratesTypos) {
     EXPECT_DOUBLE_EQ(cite::titleInText(cite::titleWords("Adam: A Method for Stochastic Optimization"), entryWords, 1), 1.0);
     EXPECT_LT(cite::titleInText(cite::titleWords("Attention Is All You Need"), entryWords, 1), 0.3);
     EXPECT_EQ(cite::titleInText(cite::titleWords("Adam"), entryWords, 1), 0.0) << "too short to say";
+}
+
+// --- arXiv ------------------------------------------------------------------------------------------------------
+
+namespace {
+QStringList ids(const QString& text) {
+    QStringList out;
+    for (const cite::ArxivId& id: cite::arxivIds(text)) {
+        out << id.full();
+    }
+    return out;
+}
+}  // namespace
+
+TEST(Citation, arxivIdsAreRecognised) {
+    EXPECT_EQ(ids("arXiv:2401.12345"), QStringList{"2401.12345"});
+    EXPECT_EQ(ids("arXiv:2401.12345v2"), QStringList{"2401.12345v2"});
+    EXPECT_EQ(ids("arXiv: 1706.03762"), QStringList{"1706.03762"}) << "a space after the colon (as PDFs break it)";
+    EXPECT_EQ(ids("A. Vaswani et al. Attention is all you need. arXiv preprint arXiv:1706.03762, 2017."),
+              QStringList{"1706.03762"});
+    EXPECT_EQ(ids("CoRR abs/1412.6980 (arXiv), 2014"), QStringList{"1412.6980"}) << "four digits until 2014";
+    EXPECT_EQ(ids("https://arxiv.org/abs/2005.14165v4"), QStringList{"2005.14165v4"});
+    EXPECT_EQ(ids("see arxiv.org/pdf/1512.03385.pdf"), QStringList{"1512.03385"});
+    EXPECT_EQ(ids("2401.12345v2 (arXiv)"), QStringList{"2401.12345v2"}) << "bare, with arXiv in the text";
+    // Old style, also bare
+    EXPECT_EQ(ids("E. Witten, hep-th/9802150"), QStringList{"hep-th/9802150"});
+    EXPECT_EQ(ids("arXiv:math.AG/0601001v2"), QStringList{"math.AG/0601001v2"});
+    EXPECT_EQ(ids("https://arxiv.org/abs/cond-mat/0102536"), QStringList{"cond-mat/0102536"});
+    // Not IDs
+    EXPECT_EQ(ids("J. Basic Eng. 82(1), pp. 1234.5678, 1960"), QStringList{}) << "no arXiv in the text";
+    EXPECT_EQ(ids("Proc. 2017, 1706.03762"), QStringList{}) << "a bare number without arXiv";
+    EXPECT_EQ(ids("arXiv:1713.01234"), QStringList{}) << "no month 13";
+    EXPECT_EQ(ids("arXiv:1401.12345"), QStringList{}) << "five digits only since 2015";
+    EXPECT_EQ(ids("arXiv:1501.1234"), QStringList{}) << "four digits only until 2014";
+    EXPECT_EQ(ids("foo/9901001"), QStringList{}) << "not an archive";
+    // Each once, in order
+    EXPECT_EQ(ids("arXiv:1706.03762 and arxiv.org/abs/1706.03762v7, then hep-th/9901001 and arXiv:2005.14165"),
+              QStringList({"1706.03762", "hep-th/9901001", "2005.14165"}));
+}
+
+TEST(Citation, arxivAddressesAreItsApisAndPages) {
+    const QUrl search = cite::arxivSearchUrl("Attention is all you need");
+    EXPECT_EQ(search.toString(QUrl::FullyEncoded),
+              "https://export.arxiv.org/api/query?search_query=ti:attention+AND+ti:all+AND+ti:you+AND+ti:need"
+              "&start=0&max_results=10");
+    EXPECT_EQ(cite::arxivSearchUrl("Über die Wärmeleitung in Metallen").toString(QUrl::FullyEncoded),
+              "https://export.arxiv.org/api/query?search_query=ti:w%C3%A4rmeleitung+AND+ti:metallen"
+              "&start=0&max_results=10")
+            << "stop words left out, letters beyond ASCII escaped";
+    const QUrl longTitle = cite::arxivSearchUrl("one two three four five six seven eight nine ten");
+    EXPECT_EQ(longTitle.toString(QUrl::FullyEncoded).count("ti:"), 8) << "at most 8 words";
+    EXPECT_FALSE(cite::arxivSearchUrl("the of and").isValid()) << "nothing to search";
+
+    const cite::ArxivId id{"1706.03762", "v7"};
+    EXPECT_EQ(cite::arxivIdUrl(id).toString(), "https://export.arxiv.org/api/query?id_list=1706.03762v7");
+    EXPECT_EQ(cite::arxivAbsUrl(id).toString(), "https://arxiv.org/abs/1706.03762v7");
+    EXPECT_EQ(cite::arxivPdfUrl(id).toString(), "https://arxiv.org/pdf/1706.03762v7");
+    EXPECT_EQ(cite::arxivPdfUrl({"hep-th/9901001", ""}).toString(), "https://arxiv.org/pdf/hep-th/9901001");
+}
+
+TEST(Citation, arxivsAtomAnswerIsRead) {
+    QString error;
+    const auto papers = cite::parseArxivFeed(test::ARXIV_SEARCH, &error);
+    EXPECT_EQ(error, "");
+    ASSERT_EQ(papers.size(), 3u);
+    const cite::ArxivPaper& p = papers[0];
+    EXPECT_EQ(p.id.id, "1706.03762");
+    EXPECT_EQ(p.id.version, "v7");
+    EXPECT_EQ(p.title, "Attention Is All You Need");
+    EXPECT_EQ(p.authors, QStringList({"Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit", "Llion Jones"}));
+    EXPECT_EQ(p.year, "2017");
+    EXPECT_TRUE(p.summary.startsWith("The dominant sequence transduction models"));
+    EXPECT_EQ(p.pdf.toString(), "https://arxiv.org/pdf/1706.03762v7") << "https, not the feed's http";
+    EXPECT_EQ(papers[1].title, "Attention is All You Need in Speech Separation: a Study of Transformers")
+            << "a title broken over lines is one line";
+    EXPECT_EQ(papers[2].id.id, "hep-th/9901001");
+    EXPECT_EQ(papers[2].id.version, "v1");
+
+    // An error of the API: no papers, and why
+    EXPECT_TRUE(cite::parseArxivFeed(test::ARXIV_ERROR, &error).empty());
+    EXPECT_EQ(error, "incorrect id format for 1234.5");
+    // No results: no papers, no error
+    EXPECT_TRUE(cite::parseArxivFeed(test::ARXIV_EMPTY, &error).empty());
+    EXPECT_EQ(error, "");
+    // Not a feed (a proxy's page, a broken answer)
+    EXPECT_TRUE(cite::parseArxivFeed("<html><body>Service unavailable</body></html>", &error).empty());
+    EXPECT_FALSE(error.isEmpty());
+    EXPECT_TRUE(cite::parseArxivFeed("", &error).empty());
+    EXPECT_FALSE(error.isEmpty());
+}
+
+TEST(Citation, aDownloadIsNamedByItsTitleWithTheId) {
+    EXPECT_EQ(cite::downloadName("Attention Is All You Need", {"1706.03762", "v7"}),
+              "Attention Is All You Need (1706.03762).pdf") << "the ID without its version";
+    EXPECT_EQ(cite::downloadName("Adam: A Method for Stochastic Optimization", {"1412.6980", ""}),
+              "Adam - A Method for Stochastic Optimization (1412.6980).pdf");
+    EXPECT_EQ(cite::downloadName("What/Why? A \"study\" <of> |pipes|*\\", {"2401.12345", ""}),
+              "What Why A study of pipes (2401.12345).pdf") << "what file systems do not allow is left out";
+    EXPECT_EQ(cite::downloadName("$O(n \\log n)$ sorting for {TeX}", {"2401.12345", ""}),
+              "O(n log n) sorting for TeX (2401.12345).pdf") << "TeX marks left out";
+    EXPECT_EQ(cite::downloadName("Line\nbreaks\tand   spaces...", {"2401.12345", ""}),
+              "Line breaks and spaces (2401.12345).pdf") << "no dots at its end";
+    EXPECT_EQ(cite::downloadName("An old one", {"hep-th/9901001", "v1"}), "An old one (hep-th_9901001).pdf");
+    EXPECT_EQ(cite::downloadName("", {"1706.03762", ""}), "arXiv 1706.03762.pdf");
+    EXPECT_EQ(cite::downloadName("...", {"1706.03762", ""}), "arXiv 1706.03762.pdf");
+    const QString longName = cite::downloadName(QString("word ").repeated(60), {"1706.03762", ""});
+    EXPECT_LE(longName.size(), 120 + QString(" (1706.03762).pdf").size());
+    EXPECT_TRUE(longName.endsWith("word (1706.03762).pdf")) << "cut at a word: " << longName.toStdString();
 }

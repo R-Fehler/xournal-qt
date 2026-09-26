@@ -235,6 +235,9 @@ ApplicationWindow {
     }
     /// "Find this paper": the library searched for the title of a bibliography entry (qt/docs/citations.md)
     function findPaper(text) { findPaperSheet.openFor(text) }
+    /// arXiv: a search by title, or one paper by its ID (qt/docs/citations.md)
+    function arxivSearch(title) { arxivSheet.openSearch(title) }
+    function arxivPaper(id) { arxivSheet.openId(id) }
     function closeWindow() {
         if (app.anySaving) {
             if (!waitingToClose) {
@@ -2703,6 +2706,7 @@ ApplicationWindow {
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
     WebConfirm { id: webConfirm }
     FindPaperSheet { id: findPaperSheet }
+    ArxivSheet { id: arxivSheet }
     PdfTextHandles { }
     Connections {
         target: app

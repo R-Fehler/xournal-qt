@@ -184,6 +184,19 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.getCustomElement("xournalQt").setBool("webConfirm", v.toBool());
             s.customSettingsChanged();
         });
+    // arXiv's search and its PDFs (the app's own networking, opt-in): "ask" (not decided yet), "on", "off"
+    add("networkAccess",
+        [&s] {
+            std::string v;
+            s.getCustomElement("xournalQt").getString("networkAccess", v);
+            return QVariant(v == "on" || v == "off" ? QString::fromStdString(v) : QStringLiteral("ask"));
+        },
+        [&s](const QVariant& v) {
+            const QString how = v.toString();
+            s.getCustomElement("xournalQt")
+                    .setString("networkAccess", how == "on" || how == "off" ? how.toStdString() : std::string("ask"));
+            s.customSettingsChanged();
+        });
     for (const auto& [key, fallback]: {std::pair{"translateService", "google"}, std::pair{"translateLanguage", ""}}) {
         add(key,
             [&s, key = key, fallback = fallback] {

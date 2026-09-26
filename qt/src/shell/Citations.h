@@ -8,6 +8,10 @@
  * A bibliography entry finds its paper in the library: its title is guessed (cite::guessTitle), and the library's
  * documents are matched by their titles (LibraryIndex::findTitle) on a worker thread; the hits come as `paperHits`.
  *
+ * arXiv (opt-in: Settings `networkAccess`, "ask" until the user allows it): IDs in selected text, a search by title
+ * through the export API, and a paper's PDF downloaded into the library, named by its title. Requests go through
+ * ArxivQueue (one every 3 s) and NetFetch (tests: a fake); the file is written on a worker thread.
+ *
  * @license GNU GPLv2 or later
  */
 #pragma once
@@ -20,6 +24,7 @@ class Settings;
 
 namespace xqt {
 
+class ArxivQueue;
 class LibraryModel;
 
 class Citations final: public QObject {
@@ -29,6 +34,16 @@ class Citations final: public QObject {
     Q_PROPERTY(QVariantList paperHits READ paperHits NOTIFY papersChanged)
     /// findPapers() is still matching
     Q_PROPERTY(bool searchingPapers READ searchingPapers NOTIFY papersChanged)
+    /// arXiv's answer to the last search or look-up: [{ id, full (with its version), title, authors, year, absUrl,
+    /// pdfUrl, fileName (what the download is called) }]
+    Q_PROPERTY(QVariantList arxivResults READ arxivResults NOTIFY arxivChanged)
+    /// A request to arXiv runs, or waits for its turn (`arxivWaiting`)
+    Q_PROPERTY(bool arxivBusy READ arxivBusy NOTIFY arxivChanged)
+    Q_PROPERTY(bool arxivWaiting READ arxivWaiting NOTIFY arxivChanged)
+    /// What happened last: an error, or "" (the UI says what runs)
+    Q_PROPERTY(QString arxivError READ arxivError NOTIFY arxivChanged)
+    /// The file the last download went to (or was there already); "" before
+    Q_PROPERTY(QString downloadedPath READ downloadedPath NOTIFY arxivChanged)
 public:
     /// `library`: the window's library (its index, its folders; may be null in tests).
     Citations(Settings& settings, LibraryModel* library, QObject* parent = nullptr);
@@ -65,7 +80,37 @@ public:
     QVariantList paperHits() const { return hits; }
     bool searchingPapers() const { return searching; }
 
+    // --- arXiv ---------------------------------------------------------------------------------------------------
+    /// The arXiv IDs in a text: [{ id, full, absUrl, pdfUrl, lookUpUrl }]
+    Q_INVOKABLE QVariantList arxivIdsIn(const QString& text) const;
+    /// The export API's search for a title, and its entry of one ID (the addresses shown before they are fetched)
+    Q_INVOKABLE QString arxivSearchUrl(const QString& title) const;
+    Q_INVOKABLE QString arxivLookUpUrl(const QString& fullId) const;
+    /// The setting: "ask" (not decided yet), "on", "off"
+    Q_INVOKABLE QString networkAccess() const;
+    /// Search arXiv by title / look up an ID: false (and nothing is sent) unless networking is on.
+    Q_INVOKABLE bool arxivSearch(const QString& title);
+    Q_INVOKABLE bool arxivLookUp(const QString& fullId);
+    /// Download the PDF of `arxivResults[index]` into a folder of the library (relative to it; "" the top). A file of
+    /// that name there is that paper already: not downloaded again (`downloadedPath` is it). False unless networking
+    /// is on.
+    Q_INVOKABLE bool arxivDownload(int index, const QString& folder);
+    /// Where arxivResults[index] would be saved in that folder (absolute), and whether it is there already.
+    Q_INVOKABLE QString downloadPath(int index, const QString& folder) const;
+    Q_INVOKABLE bool downloadExists(int index, const QString& folder) const;
+    /// The library's folders (relative; "" the top), and the one the library shows.
+    Q_INVOKABLE QStringList libraryFolders() const;
+    Q_INVOKABLE QString currentFolder() const;
+    QVariantList arxivResults() const { return results; }
+    bool arxivBusy() const { return busy > 0 || arxivWaiting(); }
+    bool arxivWaiting() const;
+    QString arxivError() const { return error; }
+    QString downloadedPath() const { return downloaded; }
+
 Q_SIGNALS:
+    void arxivChanged();
+    /// A paper was saved into the library (or was there already).
+    void paperDownloaded(const QString& path);
     /// A web address was opened (tests; the note).
     void webOpened(const QString& url);
     void papersChanged();
@@ -76,6 +121,15 @@ private:
     QVariantList hits;
     bool searching = false;
     quint64 searchGeneration = 0;
+    // arXiv
+    bool networkOn();
+    void fetchFeed(const QUrl& url);
+    ArxivQueue* queue;
+    QVariantList results;
+    int busy = 0;
+    QString error;
+    QString downloaded;
+    quint64 arxivGeneration = 0;
 };
 
 }  // namespace xqt

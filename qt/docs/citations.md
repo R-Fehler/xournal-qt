@@ -102,16 +102,20 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 - **Search by title**: the export API, `https://export.arxiv.org/api/query?search_query=ti:w1+AND+ti:w2…&max_results=10`
   (the title's words without stop words, at most 8), an Atom feed. The results list shows title, authors, year and
   ID; each has **Download into the library** (its PDF URL shown) and **Open on arxiv.org** (browser, URL shown).
-- **An ID alone** asks the API for its title first (`id_list=<id>`), to name the file.
+  `https`, not the `http` of arXiv's examples.
+- **An ID alone** asks the API for its title first (`id_list=<id>`), to name the file. The look-up menu offers the
+  first ID of the selection ("arXiv 2005.14165: into the library…", with that address under it, and "… on
+  arxiv.org"); the arXiv sheet then shows the address again next to its button.
 - **Download into the library**: `https://arxiv.org/pdf/<id>` (with its version if the text had one) is fetched into
-  the current library folder, or another one chosen in the sheet (the library's folder chooser), named by the
-  paper's title: `Attention Is All You Need (1706.03762).pdf`. The name: the title with `/ \ : * ? " < > |` and
-  control characters removed, whitespace collapsed, at most 120 characters (cut at a word), trailing dots and
-  spaces dropped; the ID without its version, `/` of an old-style ID as `_` (`hep-th_9901001`). A file of that name
-  that is there already is **not downloaded again** (the sheet offers to open it); another file of that name gets
-  " (2)". The body must start with `%PDF-`, else it is an error (arXiv sends HTML pages for withdrawn papers). It is
-  written through `QSaveFile` on a worker thread. Then the library picks it up (its watcher; the sheet asks it to
-  look now), it is indexed, and the sheet offers **Open as reference** and **Open in a tab**.
+  the current library folder, or another one chosen in the sheet ("Save into", the library's folders), named by the
+  paper's title: `Attention Is All You Need (1706.03762).pdf`. The name: the title with `/ \ * ? " < > | $ { }` and
+  control characters left out, a colon written as " -" (`Adam - A Method for Stochastic Optimization
+  (1412.6980).pdf`), whitespace collapsed, at most 120 characters (cut at a word), no dots, spaces or dashes at its
+  end; the ID without its version, `/` of an old-style ID as `_` (`hep-th_9901001`). The ID in the name makes it
+  that paper: a file of that name is **not downloaded again** (the sheet shows "In the library" and offers to open
+  it). The body must start with `%PDF-`, else it is an error (arXiv sends HTML pages for withdrawn papers). It is
+  written through `QSaveFile` on a worker thread. Then the library looks again (`LibraryModel::refresh`), it is
+  indexed, and the sheet offers **Open as reference** and **Open in a tab**.
 - **Networking is opt-in.** Setting `networkAccess` (Settings → Documents → "Web and citations"): *Ask* (the
   default), *On*, *Off*. The first network use while *Ask* explains in one dialog what goes where: "Searching arXiv
   sends the words of the title to export.arxiv.org; downloading fetches the PDF from arxiv.org. Nothing else is
@@ -147,3 +151,22 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 - `qt/src/shell/Citations.*`: `app.citations`, the QML side: look-up addresses, the confirmation, the title search,
   arXiv search and download, the opt-in.
 - QML: `LookUpMenu.qml` (the menu of the pills), `WebConfirm.qml`, `FindPaperSheet.qml`.
+
+## What is built (`qt/citations`)
+
+As planned above, with these details:
+- The look-up menu is `LookUpMenu.qml`, opened by the magnifier of the PDF text pill and by "Look up…" of the
+  context pill (both also in the reference). Our own text is the selection of a Markdown box, a text element or a
+  `.md` on the page (`CanvasView::selectedText`); the Markdown source beside the page and text-mode documents
+  (`TextFlowEditor`) have no look-up yet.
+- The confirmation (`WebConfirm.qml`) shows the exact, escaped address; the menu shows it decoded to be read
+  (`Citations::displayUrl`).
+- The paper of a reference: `FindPaperSheet.qml`; matching on a worker thread from a snapshot of the index entries
+  (`LibraryIndex::titleSearch`), so a big library does not stall the window.
+- arXiv: `ArxivSheet.qml` (with the opt-in dialog), `Citations` (search, look-up, download), `NetFetch` /
+  `ArxivQueue` (`qt/src/shell/NetFetch.*`). Only the first arXiv ID of a selection is offered in the menu.
+- Tests: `CitationTest` (session: queries, addresses, 15 real bibliography entries, title words and scores, arXiv
+  IDs, the saved Atom answers, download names), `CitationLibraryTest` and `ArxivTest` (shell: titles in the index,
+  papers named by numbers found by title, old entries, opt-in, the 3 s queue, downloads with a fake network),
+  `CitationsTest` (ui: the confirmation with the address, "Don't ask again", our own text, the pill → the hits → the
+  reference, copy link, no hit → Scholar, the arXiv flow with the opt-in → download → reference).

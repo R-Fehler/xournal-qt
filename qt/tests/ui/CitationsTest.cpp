@@ -11,6 +11,7 @@
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -38,7 +39,9 @@
 #include "shell/TabManager.h"
 #include "shell/Thumbnails.h"
 
+#include "../ArxivSamples.h"
 #include "../CitationPdfs.h"
+#include "../FakeNet.h"
 #include "AppController.h"
 
 namespace fs = std::filesystem;
@@ -57,6 +60,10 @@ struct FakeBrowser: xqt::SystemApps {
 constexpr const char* REFERENCE =
         "[1] A. Vaswani, N. Shazeer, et al., \"Attention is all you need,\" in Proc. NeurIPS, 2017, pp. 5998-6008.";
 constexpr double REF_X = 40, REF_Y = 200;
+/// A second one, with an arXiv ID
+constexpr const char* ARXIV_REFERENCE =
+        "[2] T. B. Brown et al., Language models are few-shot learners, arXiv:2005.14165, 2020.";
+constexpr double ARXIV_REF_Y = 230;
 
 class CitationsTest: public ::testing::Test {
 protected:
@@ -69,7 +76,8 @@ protected:
         settings()->set("translateService", "google");
         settings()->set("translateLanguage", "de");
         xqt::test::makePdf((root / "refs.pdf").string(), "",
-                           {{"References", 14, 150, REF_X}, {REFERENCE, 8, REF_Y, REF_X}});
+                           {{"References", 14, 150, REF_X}, {REFERENCE, 8, REF_Y, REF_X},
+                            {ARXIV_REFERENCE, 8, ARXIV_REF_Y, REF_X}});
         // The papers, named by numbers as arXiv names them
         fs::create_directories(root / "Papers");
         xqt::test::makePaper((root / "Papers" / "1706.03762.pdf").string(), "Attention Is All You Need",
@@ -163,6 +171,18 @@ protected:
                 break;
             }
         }
+        // (where it is once laid out: a list's delegate, a Flow, are placed after they appear)
+        QPointF was(-1e9, -1e9);
+        until([&] {
+            auto* i = find<QQuickItem>(name);
+            const QPointF at = i ? i->mapToScene(QPointF(0, 0)) : QPointF();
+            const bool still = at == was;
+            was = at;
+            if (!still) {
+                wait(30);
+            }
+            return still;
+        });
         SCOPED_TRACE(name);
         click(find<QQuickItem>(name));
     }
@@ -178,17 +198,18 @@ protected:
         return canvasItem ? qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>()) : nullptr;
     }
     /// Open refs.pdf and select its reference line (a long press on a line with the PDF text tool selects the line)
-    void selectReference() {
+    void selectReference() { selectLine(REF_Y, "Attention is all you need"); }
+    void selectLine(double y, const char* text) {
         ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "refs.pdf").string())));
         wait(200);
         xqt::CanvasView* v = view();
         ASSERT_NE(v, nullptr);
         const double zoom = v->getViewController().zoom();
-        const QPointF onLine = v->pageViewRect(0).topLeft() + QPointF(REF_X + 120, REF_Y - 3) * zoom;
+        const QPointF onLine = v->pageViewRect(0).topLeft() + QPointF(REF_X + 120, y - 3) * zoom;
         ASSERT_TRUE(v->selectPdfTextAt(onLine, true));
         until([&] { return shown("pdfLookUpButton"); });
         ASSERT_TRUE(controller->pdfTextIsSelected());
-        EXPECT_TRUE(controller->selectedText().contains("Attention is all you need")) << controller->selectedText().toStdString();
+        EXPECT_TRUE(controller->selectedText().contains(text)) << controller->selectedText().toStdString();
     }
 
     xqt::LibraryModel* library() const { return qobject_cast<xqt::LibraryModel*>(controller->libraryModel()); }
@@ -396,4 +417,80 @@ TEST_F(CitationsTest, withoutAHitGoogleScholarIsOffered) {
     until([&] { return !browser.opened.isEmpty(); });
     ASSERT_EQ(browser.opened.size(), 1);
     EXPECT_EQ(QUrlQuery(browser.opened.front()).queryItemValue("q", QUrl::FullyDecoded), "Long short-term memory");
+}
+
+// An arXiv ID in a reference: the menu offers the paper; the arXiv sheet shows the address it asks, asks once whether
+// the app may connect (nothing is sent before), then lists arXiv's answer; "Download into the library" saves the PDF
+// named by its title, and it opens beside the notes.
+TEST_F(CitationsTest, anArxivPaperIsDownloadedAfterTheOptInAndOpensAsReference) {
+    xqt::test::FakeNet net;
+    QTemporaryDir answers;  // (outside the library)
+    const std::string answerPdf = answers.filePath("answer.pdf").toStdString();
+    xqt::test::makePaper(answerPdf, "Attention Is All You Need", "Attention Is All You Need", "Ashish Vaswani");
+    QFile answerFile(QString::fromStdString(answerPdf));
+    ASSERT_TRUE(answerFile.open(QIODevice::ReadOnly));
+    const QByteArray pdfBytes = answerFile.readAll();
+    net.answer = [&](const QUrl& url) {
+        return xqt::test::FakeNet::ok(url.host() == "export.arxiv.org" ? QByteArray(xqt::test::ARXIV_SEARCH) : pdfBytes);
+    };
+    xqt::ArxivQueue::setInterval(0);
+    settings()->set("networkAccess", "ask");
+    waitForTheIndex();
+
+    selectLine(ARXIV_REF_Y, "arXiv:2005.14165");
+    click("pdfLookUpButton");
+    until([&] { return shown("lookUpArxiv"); });
+    ASSERT_TRUE(shown("lookUpArxiv")) << "the menu offers the paper of the ID";
+    EXPECT_EQ(find("lookUpArxivUrl")->property("text").toString(),
+              "https://export.arxiv.org/api/query?id_list=2005.14165") << "with the address it asks";
+    EXPECT_TRUE(shown("lookUpArxivPage"));
+    click("lookUpArxiv");
+    until([&] { return shown("arxivSheet"); });
+    ASSERT_TRUE(shown("arxivSheet"));
+    EXPECT_EQ(find("arxivRequestUrl")->property("text").toString(),
+              "https://export.arxiv.org/api/query?id_list=2005.14165") << "the address, next to its button";
+    shot("6-arxiv-sheet");
+
+    // The first request asks; "Not now" sends nothing
+    click("arxivRequest");
+    until([&] { return shown("networkOptIn"); });
+    ASSERT_TRUE(shown("networkOptIn"));
+    shot("7-network-opt-in");
+    click("networkOptInNo");
+    until([&] { return !shown("networkOptIn"); });
+    wait(100);
+    EXPECT_TRUE(net.calls.empty()) << "nothing sent";
+    EXPECT_EQ(settings()->get("networkAccess").toString(), "ask");
+
+    // Allow: the setting, then the request - exactly the address shown
+    click("arxivRequest");
+    until([&] { return shown("networkOptIn"); });
+    click("networkOptInAllow");
+    until([&] { return !net.calls.empty() && !shown("networkOptIn"); });
+    ASSERT_EQ(net.calls.size(), 1u);
+    EXPECT_EQ(net.calls[0].url.toString(QUrl::FullyEncoded), "https://export.arxiv.org/api/query?id_list=2005.14165");
+    EXPECT_EQ(settings()->get("networkAccess").toString(), "on") << "not asked again";
+    until([&] { return find("arxivResultTitle") != nullptr; });
+    ASSERT_NE(find("arxivResultTitle"), nullptr);
+    EXPECT_EQ(find("arxivResultTitle")->property("text").toString(), "Attention Is All You Need");
+    EXPECT_EQ(find("arxivPdfUrl")->property("text").toString(), "https://arxiv.org/pdf/1706.03762v7")
+            << "the PDF's address is shown before it is fetched";
+    shot("8-arxiv-results");
+
+    // Download: into the library's folder, named by the title
+    click("arxivDownload");
+    const fs::path saved = root / "Attention Is All You Need (1706.03762).pdf";
+    until([&] { return fs::exists(saved) && shown("arxivOpenReference"); }, 15000);
+    ASSERT_TRUE(fs::exists(saved)) << "calls: " << net.calls.size() << ", error: "
+                                   << find("arxivStatus")->property("text").toString().toStdString();
+    ASSERT_EQ(net.calls.size(), 2u);
+    EXPECT_EQ(net.calls[1].url.toString(), "https://arxiv.org/pdf/1706.03762v7");
+    ASSERT_TRUE(shown("arxivOpenReference")) << "then offered to open";
+    shot("9-arxiv-downloaded");
+    click("arxivOpenReference");
+    until([&] { return controller->reference().active(); });
+    ASSERT_TRUE(controller->reference().active());
+    EXPECT_EQ(controller->reference().title(), "Attention Is All You Need (1706.03762).pdf");
+    settings()->set("networkAccess", "ask");
+    xqt::ArxivQueue::setInterval(3000);
 }

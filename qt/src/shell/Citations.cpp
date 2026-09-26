@@ -6,6 +6,9 @@
 #include "Citations.h"
 
 #include <QClipboard>
+#include <QDir>
+#include <QFileInfo>
+#include <QSaveFile>
 #include <QGuiApplication>
 #include <QPointer>
 #include <QThreadPool>
@@ -17,6 +20,7 @@
 
 #include "Library.h"
 #include "LibraryModel.h"
+#include "NetFetch.h"
 #include "SystemApps.h"
 
 namespace xqt {
@@ -29,7 +33,9 @@ QString customString(Settings& settings, const char* key, const QString& fallbac
 }  // namespace
 
 Citations::Citations(Settings& settings, LibraryModel* library, QObject* parent):
-        QObject(parent), settings(settings), library(library) {}
+        QObject(parent), settings(settings), library(library), queue(new ArxivQueue(this)) {
+    connect(queue, &ArxivQueue::waitingChanged, this, &Citations::arxivChanged);
+}
 
 Citations::~Citations() = default;
 
@@ -132,6 +138,219 @@ void Citations::findPapers(const QString& title, const QString& raw, const QStri
             Q_EMIT self->papersChanged();
         });
     });
+}
+
+}  // namespace xqt
+
+namespace xqt {
+
+// --- arXiv -------------------------------------------------------------------------------------------------------
+
+namespace {
+constexpr int API_TIMEOUT_MS = 20000;
+constexpr int PDF_TIMEOUT_MS = 120000;
+constexpr qint64 API_MAX_BYTES = 4 * 1024 * 1024;
+constexpr qint64 PDF_MAX_BYTES = 300 * 1024 * 1024;
+
+QVariantMap paperMap(const cite::ArxivPaper& p) {
+    QString authors = p.authors.mid(0, 3).join(QStringLiteral(", "));
+    if (p.authors.size() > 3) {
+        authors += QStringLiteral(" et al.");
+    }
+    return {{QStringLiteral("id"), p.id.id},
+            {QStringLiteral("full"), p.id.full()},
+            {QStringLiteral("title"), p.title},
+            {QStringLiteral("authors"), authors},
+            {QStringLiteral("year"), p.year},
+            {QStringLiteral("absUrl"), cite::arxivAbsUrl(p.id).toString(QUrl::FullyEncoded)},
+            {QStringLiteral("pdfUrl"), p.pdf.toString(QUrl::FullyEncoded)},
+            {QStringLiteral("fileName"), cite::downloadName(p.title, p.id)}};
+}
+}  // namespace
+
+QVariantList Citations::arxivIdsIn(const QString& text) const {
+    QVariantList list;
+    for (const cite::ArxivId& id: cite::arxivIds(text)) {
+        list << QVariantMap{{QStringLiteral("id"), id.id},
+                            {QStringLiteral("full"), id.full()},
+                            {QStringLiteral("absUrl"), cite::arxivAbsUrl(id).toString(QUrl::FullyEncoded)},
+                            {QStringLiteral("pdfUrl"), cite::arxivPdfUrl(id).toString(QUrl::FullyEncoded)},
+                            {QStringLiteral("lookUpUrl"), cite::arxivIdUrl(id).toString(QUrl::FullyEncoded)}};
+    }
+    return list;
+}
+
+QString Citations::arxivSearchUrl(const QString& title) const {
+    return cite::arxivSearchUrl(title).toString(QUrl::FullyEncoded);
+}
+
+QString Citations::arxivLookUpUrl(const QString& fullId) const {
+    const std::vector<cite::ArxivId> ids = cite::arxivIds(QStringLiteral("arXiv:") + fullId);
+    return ids.empty() ? QString() : cite::arxivIdUrl(ids.front()).toString(QUrl::FullyEncoded);
+}
+
+QString Citations::networkAccess() const {
+    const QString v = customString(settings, "networkAccess", QStringLiteral("ask"));
+    return v == QLatin1String("on") || v == QLatin1String("off") ? v : QStringLiteral("ask");
+}
+
+bool Citations::networkOn() {
+    if (networkAccess() == QLatin1String("on")) {
+        return true;
+    }
+    error = networkAccess() == QLatin1String("off")
+                    ? tr("Connecting to arXiv is turned off (Settings → Documents → Web and citations).")
+                    : tr("Connecting to arXiv was not allowed yet.");
+    Q_EMIT arxivChanged();
+    return false;
+}
+
+bool Citations::arxivWaiting() const { return queue->waiting(); }
+
+void Citations::fetchFeed(const QUrl& url) {
+    const quint64 generation = ++arxivGeneration;
+    results.clear();
+    error.clear();
+    ++busy;
+    Q_EMIT arxivChanged();
+    queue->get(url, API_TIMEOUT_MS, API_MAX_BYTES, [self = QPointer<Citations>(this), generation](const NetFetch::Reply& r) {
+        if (!self) {
+            return;
+        }
+        --self->busy;
+        if (generation != self->arxivGeneration) {
+            Q_EMIT self->arxivChanged();
+            return;  // (a newer search)
+        }
+        if (!r.error.isEmpty()) {
+            self->error = r.error;
+        } else {
+            QString problem;
+            for (const cite::ArxivPaper& p: cite::parseArxivFeed(r.body, &problem)) {
+                self->results << paperMap(p);
+            }
+            self->error = problem;
+        }
+        Q_EMIT self->arxivChanged();
+    });
+}
+
+bool Citations::arxivSearch(const QString& title) {
+    const QUrl url = cite::arxivSearchUrl(title);
+    if (!url.isValid() || !networkOn()) {
+        return false;
+    }
+    fetchFeed(url);
+    return true;
+}
+
+bool Citations::arxivLookUp(const QString& fullId) {
+    const QString address = arxivLookUpUrl(fullId);
+    if (address.isEmpty() || !networkOn()) {
+        return false;
+    }
+    fetchFeed(QUrl::fromEncoded(address.toUtf8()));
+    return true;
+}
+
+QStringList Citations::libraryFolders() const {
+    QStringList folders{QString()};
+    if (library && library->library()) {
+        const fs::path root = library->library()->root();
+        for (const fs::path& f: DocumentFiles::foldersRecursive(root)) {
+            folders << QString::fromStdString(f.lexically_relative(root).generic_string());
+        }
+    }
+    return folders;
+}
+
+QString Citations::currentFolder() const { return library ? library->folder() : QString(); }
+
+QString Citations::downloadPath(int index, const QString& folder) const {
+    if (index < 0 || index >= results.size() || !library || !library->library()) {
+        return {};
+    }
+    const QString name = results[index].toMap().value(QStringLiteral("fileName")).toString();
+    fs::path dir = library->library()->root();
+    if (!folder.isEmpty()) {
+        dir /= fs::path(folder.toStdString());
+    }
+    return QString::fromStdString((dir / fs::path(name.toStdString())).lexically_normal().string());
+}
+
+bool Citations::downloadExists(int index, const QString& folder) const {
+    const QString path = downloadPath(index, folder);
+    return !path.isEmpty() && QFileInfo::exists(path);
+}
+
+bool Citations::arxivDownload(int index, const QString& folder) {
+    const QString path = downloadPath(index, folder);
+    if (path.isEmpty()) {
+        return false;
+    }
+    if (QFileInfo::exists(path)) {
+        downloaded = path;  // (named by the paper's ID: the paper is there)
+        error.clear();
+        Q_EMIT arxivChanged();
+        Q_EMIT paperDownloaded(path);
+        return true;
+    }
+    if (!networkOn()) {
+        return false;
+    }
+    const QUrl pdf = QUrl::fromEncoded(results[index].toMap().value(QStringLiteral("pdfUrl")).toString().toUtf8());
+    if (!cite::isWebAddress(pdf)) {
+        return false;
+    }
+    error.clear();
+    downloaded.clear();
+    ++busy;
+    Q_EMIT arxivChanged();
+    queue->get(pdf, PDF_TIMEOUT_MS, PDF_MAX_BYTES, [self = QPointer<Citations>(this), path](const NetFetch::Reply& r) {
+        if (!self) {
+            return;
+        }
+        auto fail = [&](const QString& why) {
+            --self->busy;
+            self->error = why;
+            Q_EMIT self->arxivChanged();
+        };
+        if (!r.error.isEmpty()) {
+            fail(r.error);
+            return;
+        }
+        if (!r.body.startsWith("%PDF-")) {
+            fail(tr("arXiv did not send a PDF (the paper may be withdrawn, or only its source is there)."));
+            return;
+        }
+        // Written on a worker thread (a PDF of some MB), under another name first
+        QThreadPool::globalInstance()->start([self, path, body = r.body] {
+            QString problem;
+            QDir().mkpath(QFileInfo(path).absolutePath());
+            QSaveFile file(path);
+            if (!file.open(QIODevice::WriteOnly) || file.write(body) != body.size() || !file.commit()) {
+                problem = tr("The PDF could not be saved: %1").arg(file.errorString());
+            }
+            QMetaObject::invokeMethod(QCoreApplication::instance(), [self, path, problem] {
+                if (!self) {
+                    return;
+                }
+                --self->busy;
+                self->error = problem;
+                if (problem.isEmpty()) {
+                    self->downloaded = path;
+                    if (self->library) {
+                        self->library->refresh();  // (indexed like any new document)
+                    }
+                }
+                Q_EMIT self->arxivChanged();
+                if (problem.isEmpty()) {
+                    Q_EMIT self->paperDownloaded(path);
+                }
+            });
+        });
+    });
+    return true;
 }
 
 }  // namespace xqt

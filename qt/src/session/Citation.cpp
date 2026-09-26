@@ -9,6 +9,7 @@
 
 #include <QLocale>
 #include <QRegularExpression>
+#include <QXmlStreamReader>
 
 #include "TextMatch.h"
 #include "WordMatch.h"
@@ -418,6 +419,200 @@ double titleInText(const QStringList& title, const QSet<QString>& text, int typo
         return 0.0;
     }
     return shareFound(title, QStringList(text.begin(), text.end()), text, typos);
+}
+
+// --- arXiv ---------------------------------------------------------------------------------------------------
+
+namespace {
+/// The archives of old-style IDs ("hep-th/9901001")
+const QString& oldArchives() {
+    static const QString list = QStringLiteral(
+            "astro-ph|cond-mat|gr-qc|hep-ex|hep-lat|hep-ph|hep-th|math-ph|nlin|nucl-ex|nucl-th|physics|quant-ph|math|cs|"
+            "q-bio|q-fin|stat|eess|econ|acc-phys|adap-org|alg-geom|ao-sci|atom-ph|bayes-an|chao-dyn|chem-ph|cmp-lg|"
+            "comp-gas|dg-ga|funct-an|mtrl-th|patt-sol|plasm-ph|q-alg|solv-int|supr-con");
+    return list;
+}
+
+/// "1706.03762v7" → id + version
+ArxivId splitVersion(const QString& full) {
+    static const QRegularExpression v(QStringLiteral("^(.*?)(v\\d+)?$"));
+    const auto m = v.match(full);
+    return {m.captured(1), m.captured(2)};
+}
+}  // namespace
+
+std::vector<ArxivId> arxivIds(const QString& text) {
+    std::vector<ArxivId> ids;
+    auto add = [&](const QString& id, const QString& version) {
+        if (std::none_of(ids.begin(), ids.end(), [&](const ArxivId& known) { return known.id == id; })) {
+            ids.push_back({id, version});
+        }
+    };
+    const bool saysArxiv = text.contains(QStringLiteral("arxiv"), Qt::CaseInsensitive);
+    // New style: YYMM.NNNN(N), the month 01-12 (4 digits after the dot until 2014, 5 since 2015)
+    static const QRegularExpression fresh(QStringLiteral("(?<![\\d.])(\\d{2})(\\d{2})\\.(\\d{4,5})(v\\d+)?(?![\\d])"));
+    // Old style: archive(.SUBJECT)/YYMMNNN
+    static const QRegularExpression old(QStringLiteral("(?<![\\w-])((?:%1)(?:\\.[A-Z]{2})?/\\d{7})(v\\d+)?(?!\\d)")
+                                                .arg(oldArchives()));
+    struct Found {
+        qsizetype at;
+        QString id, version;
+    };
+    std::vector<Found> found;
+    if (saysArxiv) {
+        for (auto it = fresh.globalMatch(text); it.hasNext();) {
+            const auto m = it.next();
+            const int month = m.captured(2).toInt();
+            const int year = m.captured(1).toInt();
+            const bool fiveDigits = m.captured(3).size() == 5;
+            if (month < 1 || month > 12 || (fiveDigits && year < 15) || (!fiveDigits && year >= 15)) {
+                continue;
+            }
+            found.push_back({m.capturedStart(), m.captured(1) + m.captured(2) + QLatin1Char('.') + m.captured(3),
+                             m.captured(4)});
+        }
+    }
+    for (auto it = old.globalMatch(text); it.hasNext();) {
+        const auto m = it.next();
+        found.push_back({m.capturedStart(), m.captured(1), m.captured(2)});
+    }
+    std::sort(found.begin(), found.end(), [](const Found& a, const Found& b) { return a.at < b.at; });
+    for (const Found& f: found) {
+        add(f.id, f.version);
+    }
+    return ids;
+}
+
+QUrl arxivSearchUrl(const QString& title, int maxResults) {
+    QStringList words = titleWords(title);
+    words.removeDuplicates();
+    if (words.size() > 8) {
+        words = words.mid(0, 8);
+    }
+    QStringList terms;
+    for (const QString& w: words) {
+        terms << QStringLiteral("ti:") + QString::fromLatin1(QUrl::toPercentEncoding(w));
+    }
+    if (terms.isEmpty()) {
+        return {};
+    }
+    return QUrl::fromEncoded(QStringLiteral("https://export.arxiv.org/api/query?search_query=%1&start=0&max_results=%2")
+                                     .arg(terms.join(QStringLiteral("+AND+")))
+                                     .arg(maxResults)
+                                     .toLatin1(),
+                             QUrl::StrictMode);
+}
+
+QUrl arxivIdUrl(const ArxivId& id) {
+    return QUrl::fromEncoded(
+            (QStringLiteral("https://export.arxiv.org/api/query?id_list=") + id.full()).toLatin1(), QUrl::StrictMode);
+}
+
+QUrl arxivAbsUrl(const ArxivId& id) { return QUrl(QStringLiteral("https://arxiv.org/abs/") + id.full()); }
+
+QUrl arxivPdfUrl(const ArxivId& id) { return QUrl(QStringLiteral("https://arxiv.org/pdf/") + id.full()); }
+
+std::vector<ArxivPaper> parseArxivFeed(const QByteArray& atom, QString* error) {
+    std::vector<ArxivPaper> papers;
+    QString problem;
+    QXmlStreamReader xml(atom);
+    bool feed = false;
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (!xml.isStartElement()) {
+            continue;
+        }
+        if (xml.name() == QLatin1String("feed")) {
+            feed = true;
+            continue;
+        }
+        if (!feed || xml.name() != QLatin1String("entry")) {
+            continue;
+        }
+        ArxivPaper p;
+        QString idUrl, summary;
+        while (!(xml.isEndElement() && xml.name() == QLatin1String("entry")) && !xml.atEnd()) {
+            xml.readNext();
+            if (!xml.isStartElement()) {
+                continue;
+            }
+            const auto name = xml.name();
+            if (name == QLatin1String("id")) {
+                idUrl = xml.readElementText().trimmed();
+            } else if (name == QLatin1String("title")) {
+                p.title = xml.readElementText().simplified();
+            } else if (name == QLatin1String("summary")) {
+                summary = xml.readElementText().simplified();
+            } else if (name == QLatin1String("published")) {
+                p.year = xml.readElementText().trimmed().left(4);
+            } else if (name == QLatin1String("name")) {
+                p.authors << xml.readElementText().simplified();
+            } else if (name == QLatin1String("link") &&
+                       xml.attributes().value(QLatin1String("title")) == QLatin1String("pdf")) {
+                QUrl pdf(xml.attributes().value(QLatin1String("href")).toString());
+                if (pdf.scheme() == QLatin1String("http")) {
+                    pdf.setScheme(QStringLiteral("https"));
+                }
+                p.pdf = pdf;
+            }
+        }
+        p.summary = summary;
+        if (idUrl.contains(QStringLiteral("/api/errors"))) {
+            problem = summary.isEmpty() ? QStringLiteral("arXiv reported an error") : summary;
+            continue;
+        }
+        const qsizetype abs = idUrl.indexOf(QStringLiteral("/abs/"));
+        if (abs < 0) {
+            continue;
+        }
+        p.id = splitVersion(idUrl.mid(abs + 5));
+        if (p.id.id.isEmpty() || p.title.isEmpty()) {
+            continue;
+        }
+        if (!isWebAddress(p.pdf)) {
+            p.pdf = arxivPdfUrl(p.id);
+        }
+        papers.push_back(std::move(p));
+    }
+    if (xml.hasError() && papers.empty() && problem.isEmpty()) {
+        problem = QStringLiteral("The answer is not an arXiv feed (%1)").arg(xml.errorString());
+    } else if (!feed && problem.isEmpty()) {
+        problem = QStringLiteral("The answer is not an arXiv feed");
+    }
+    if (error) {
+        *error = papers.empty() ? problem : QString();
+    }
+    return papers;
+}
+
+QString downloadName(const QString& title, const ArxivId& id) {
+    QString name;
+    for (const QChar c: title) {
+        if (c.unicode() < 0x20 || c.unicode() == 0x7F || QStringLiteral("/\\*?\"<>|$").contains(c)) {
+            name += QLatin1Char(' ');
+        } else if (c == QLatin1Char(':')) {
+            name += QStringLiteral(" -");  // "Adam: A Method" → "Adam - A Method"
+        } else {
+            name += c;
+        }
+    }
+    name.remove(QLatin1Char('{')).remove(QLatin1Char('}'));
+    name = name.simplified();
+    constexpr qsizetype LONGEST = 120;
+    if (name.size() > LONGEST) {
+        const qsizetype cut = name.lastIndexOf(QLatin1Char(' '), LONGEST);
+        name.truncate(cut > LONGEST / 2 ? cut : LONGEST);
+    }
+    while (!name.isEmpty() && (name.back() == QLatin1Char('.') || name.back() == QLatin1Char(' ') ||
+                               name.back() == QLatin1Char('-'))) {
+        name.chop(1);
+    }
+    while (!name.isEmpty() && name.front() == QLatin1Char('.')) {
+        name.remove(0, 1);
+    }
+    QString number = id.id;
+    number.replace(QLatin1Char('/'), QLatin1Char('_'));
+    return name.isEmpty() ? QStringLiteral("arXiv %1.pdf").arg(number) : QStringLiteral("%1 (%2).pdf").arg(name, number);
 }
 
 }  // namespace xqt::cite

@@ -1543,3 +1543,19 @@ Update the table in the user doc with the results.
       under it (asked with the whole address, as above).
 - [ ] While the library is still being read (a new, big library), the sheet says so.
 - [ ] A big library (1,000+ papers): the sheet answers within a second, the window does not stutter while it looks.
+- [ ] arXiv: select a reference with an arXiv ID (`arXiv:1706.03762`, or an `arxiv.org/abs/…` address) → Look up:
+      "arXiv 1706.03762: into the library…" with the API's address under it, and "… on arxiv.org" (browser).
+- [ ] The arXiv sheet shows the address next to "Look it up on arXiv". The first time: "Connect to arXiv?" explains
+      what is sent where; "Not now" sends nothing; "Allow" looks it up (and is not asked again).
+- [ ] The result shows title, authors, year, the file name it will get and the PDF's address. "Save into" lists the
+      library's folders (the one the library shows is chosen). "Download into the library": after a moment "In the
+      library: Attention Is All You Need (1706.03762).pdf", the file is in that folder (the library shows it, found
+      by its title), "Open as reference" opens it beside the notes.
+- [ ] The same paper again: "In the library" at once, nothing downloaded twice.
+- [ ] No hit in the library → "Search arXiv" (with its address) → the arXiv sheet searches by the title; several
+      requests in a row wait their turn ("Waiting for arXiv (one request every 3 seconds)…").
+- [ ] Without network (flight mode): a clear error ("export.arxiv.org did not answer within 20 s." or the system's
+      message), nothing half-written in the library.
+- [ ] Settings → Documents → Web and citations → "Connect to arXiv": Off → the sheet says it is off and its buttons
+      are disabled; "Ask the first time" asks again.
+- [ ] Android: the sheets fit a phone (scroll), the download lands in the library folder on the phone's storage.
