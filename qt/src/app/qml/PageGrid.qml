@@ -63,7 +63,7 @@ Rectangle {
     }
 
     PageKeys { id: pageKeys }
-    PageMenu { id: pageMenu }
+    PageMenu { id: pageMenu; onReferenced: pageGrid.close() }
 
     GridView {
         id: grid

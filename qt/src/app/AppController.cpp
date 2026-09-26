@@ -214,7 +214,10 @@ void AppController::makeTabs() {
     referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
     connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
     connect(referenceMode.get(), &ReferenceMode::openDocumentLink, this, [this](const QString& uri, const QString& from) {
-        followDocumentLinkFrom(uri, QStringLiteral("tab"), fs::path(from.toStdString()));
+        // (a place of the document itself, tapped in the second view of it: it goes there, in the reference)
+        const bool inItself = referenceMode->isSelf() && documentLink(uri).value("here").toBool();
+        followDocumentLinkFrom(uri, inItself ? QStringLiteral("reference") : QStringLiteral("tab"),
+                               fs::path(from.toStdString()));
     });
     connect(referenceMode.get(), &ReferenceMode::copied, this, [this](const QString& what) {
         Q_EMIT pageActionDone(what, false);
@@ -1094,13 +1097,14 @@ void AppController::stepPage(int delta) {
     if (!v || v->pageCount() == 0 || v->getViewController().stepPages(delta)) {
         return;
     }
-    const auto page = static_cast<std::ptrdiff_t>(v->getSession().getCurrentPageNo()) + delta;
+    // (its own page: a second view of the document beside it has one)
+    const auto page = static_cast<std::ptrdiff_t>(v->currentPageNo()) + delta;
     showPage(static_cast<size_t>(std::clamp<std::ptrdiff_t>(page, 0, static_cast<std::ptrdiff_t>(v->pageCount()) - 1)));
 }
 
 void AppController::showPage(size_t page) {
     if (CanvasView* v = keyCanvas(); v && page < v->pageCount()) {
-        v->getSession().setCurrentPageNo(page);
+        v->setCurrentPageNo(page);  // (the session's for the tab's view, else the view's own)
         v->getViewController().scrollToPage(page);
     }
 }

@@ -183,7 +183,7 @@ void DocumentSession::init() {
     static std::atomic<quint64> nextSerial{1};
     serialNo = nextSerial++;
     searcher = std::make_unique<DocumentSearch>(*this);
-    window.view = &headlessView;
+    window.view = &views;
     // One undo stack for everything, as in upstream: what is written and the page structure (insert, delete,
     // move, paste). Undoing a page change tells about it (pageActionUndone), it may not be in view.
     undoRedo = std::make_unique<UndoRedoHandler>(this);
@@ -248,7 +248,10 @@ DocumentSession::~DocumentSession() {
 
 Settings* DocumentSession::getSettings() const { return app.getSettings(); }
 ToolHandler* DocumentSession::getToolHandler() const { return app.getToolHandler(); }
-ZoomControl* DocumentSession::getZoomControl() const { return zoomControl; }
+ZoomControl* DocumentSession::getZoomControl() const {
+    ZoomControl* z = views.activeZoom();
+    return z ? z : const_cast<ZoomControl*>(&headlessZoom);
+}
 Document* DocumentSession::getDocument() const { return doc.get(); }
 UndoRedoHandler* DocumentSession::getUndoRedoHandler() const { return undoRedo.get(); }
 MainWindow* DocumentSession::getWindow() const { return const_cast<SessionWindow*>(&window); }
@@ -260,10 +263,10 @@ ActionDatabase* DocumentSession::getActionDatabase() const { return const_cast<S
 
 PageRef DocumentSession::getCurrentPage() {
     std::shared_lock lock(*doc);
-    return doc->getPage(std::min(currentPage, doc->getPageCount() - 1));
+    return doc->getPage(std::min(workingPage.value_or(currentPage), doc->getPageCount() - 1));
 }
 
-size_t DocumentSession::getCurrentPageNo() const { return currentPage; }
+size_t DocumentSession::getCurrentPageNo() const { return workingPage.value_or(currentPage); }
 
 void DocumentSession::setCurrentPageNo(size_t page) {
     if (page >= doc->getPageCount() || page == currentPage) {
@@ -283,11 +286,37 @@ void DocumentSession::setCopyCutEnabled(bool enabled) {
     actions.enableAction(Action::CUT, enabled);
 }
 
-void DocumentSession::setXournalView(XournalView* view) { window.view = view ? view : &headlessView; }
+void DocumentSession::addView(XournalView* view, ZoomControl* zoom) {
+    if (view && !std::any_of(views.views.begin(), views.views.end(), [view](const auto& e) { return e.view == view; })) {
+        views.views.push_back({view, zoom});
+    }
+}
+
+void DocumentSession::removeView(XournalView* view) {
+    auto& v = views.views;
+    v.erase(std::remove_if(v.begin(), v.end(), [view](const auto& e) { return e.view == view; }), v.end());
+    if (views.scoped == view) {
+        views.scoped = nullptr;
+        workingPage.reset();
+    }
+}
+
+bool DocumentSession::isPrimaryView(const XournalView* view) const {
+    return !views.views.empty() && views.views.front().view == view;
+}
+
+DocumentSession::ViewScope::ViewScope(DocumentSession& session, XournalView* view, size_t page):
+        session(session), previousView(session.views.scoped), previousPage(session.workingPage) {
+    session.views.scoped = session.isPrimaryView(view) ? nullptr : view;
+    session.workingPage = page;
+}
+
+DocumentSession::ViewScope::~ViewScope() {
+    session.views.scoped = previousView;
+    session.workingPage = previousPage;
+}
 
 void DocumentSession::setCursor(XournalppCursor* c) { cursor = c ? c : &headlessCursor; }
-
-void DocumentSession::setZoomControl(ZoomControl* z) { zoomControl = z ? z : &headlessZoom; }
 
 void DocumentSession::insertNewPage(size_t position, bool automatedInsertion) {
     // Port of PageBackgroundChangeController::insertNewPage (default branch: no page type chosen for new pages,

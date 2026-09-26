@@ -17,6 +17,7 @@
 #include <QQuickWindow>
 #include <QSignalSpy>
 #include <QTest>
+#include <QWheelEvent>
 #include <gtest/gtest.h>
 
 #include <QFile>
@@ -477,7 +478,7 @@ TEST_F(ReferenceWindowTest, pdfTextOfTheReferenceIsCopiedForTheNotes) {
 }
 
 TEST_F(ReferenceWindowTest, theMenusOpenAReference) {
-    // The tab strip's menu of the other tab (the menu of the current tab has no such entry)
+    // The tab strip's menu of the other tab (the current tab's: its own document beside it)
     auto* list = findItem("tabList");
     ASSERT_NE(list, nullptr);
     auto menuEntry = [&](int index) -> QQuickItem* {
@@ -503,8 +504,18 @@ TEST_F(ReferenceWindowTest, theMenusOpenAReference) {
     click(entry);  // "Close the reference" now
     EXPECT_FALSE(ref().active());
     wait(300);
-    EXPECT_EQ(menuEntry(0), nullptr) << "the current tab is not its own reference";
-    key(Qt::Key_Escape);
+    // The current tab: its own document beside it (qt/self-reference)
+    entry = menuEntry(0);
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->property("text").toString(), "Show this document beside");
+    click(entry);
+    EXPECT_TRUE(ref().isSelf());
+    wait(300);
+    entry = menuEntry(0);
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->property("text").toString(), "Close the view beside");
+    click(entry);
+    EXPECT_FALSE(ref().active());
     wait(300);
 
     // The tab overview: the button on the card of another document
@@ -512,8 +523,29 @@ TEST_F(ReferenceWindowTest, theMenusOpenAReference) {
     ASSERT_NE(overview, nullptr);
     QMetaObject::invokeMethod(overview, "open");
     until([&] { return overview->property("opened").toBool(); });
+    // (the current document's card has one too: beside itself)
+    auto cardButton = [&](int index) -> QQuickItem* {
+        QQuickItem* found = nullptr;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (!found && i->objectName() == "overviewReferenceButton" && i->isVisible()) {
+                for (QQuickItem* p = i->parentItem(); p; p = p->parentItem()) {
+                    if (p->property("index").isValid()) {
+                        if (p->property("index").toInt() == index) {
+                            found = i;
+                        }
+                        break;
+                    }
+                }
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(window->contentItem()->parentItem() ? window->contentItem()->parentItem() : window->contentItem());
+        return found;
+    };
     QQuickItem* button = nullptr;
-    until([&] { return (button = findItem("overviewReferenceButton", true)) != nullptr; });
+    until([&] { return (button = cardButton(1)) != nullptr; });
     ASSERT_NE(button, nullptr);
     click(button);
     EXPECT_EQ(ref().tab(), 1);
@@ -1009,4 +1041,117 @@ TEST_F(ReferenceWindowTest, fittedToTheWidthNeitherHalfScrollsSideways) {
     }
     EXPECT_FALSE(findItem("horizontalScrollBar")->isVisible()) << "the notes scroll sideways";
     EXPECT_FALSE(findItem("referenceHorizontalScrollBar")->isVisible()) << "the reference scrolls sideways";
+}
+
+// qt/self-reference: the document of the tab beside itself - a second view with its own scrolling and zoom, the same
+// pages (what is written on one side shows on the other), opened from the page menu at a page, closed by its pill.
+TEST_F(ReferenceWindowTest, theSameDocumentBesideItself) {
+    ASSERT_TRUE(controller->insertPages(1, 0, -1, false, 9));  // (ten pages)
+    controller->jumpToPage(0);
+    wait(100);
+    // The page menu of the sidebar: "Show beside, at this page"
+    QObject* pageMenu = nullptr;
+    for (QObject* o: window->findChildren<QObject*>("pageMenu")) {
+        if (o->parent() && o->parent()->objectName() != "pageGrid") {
+            pageMenu = o;
+        }
+    }
+    ASSERT_NE(pageMenu, nullptr);
+    QMetaObject::invokeMethod(pageMenu, "openFor", Q_ARG(QVariant, 6), Q_ARG(QVariant, QVariant::fromValue(static_cast<QObject*>(main))),
+                              Q_ARG(QVariant, 100), Q_ARG(QVariant, 100));
+    until([&] { return pageMenu->property("opened").toBool(); });
+    QQuickItem* showBeside = findItem("pageMenuShowBeside", true);
+    ASSERT_NE(showBeside, nullptr);
+    click(showBeside);
+    until([&] { return reference->isVisible() && ref().pageNumber() == 7; });
+    until([&] { return !pageMenu->property("visible").toBool(); });  // (it fades out)
+    ASSERT_TRUE(ref().isSelf());
+    auto* second = ref().canvas();
+    auto* first = tabs().view(0);
+    ASSERT_NE(second, first);
+    EXPECT_EQ(reference->property("view").value<QObject*>(), second);
+    EXPECT_EQ(main->property("view").value<QObject*>(), first);
+    EXPECT_TRUE(reference->property("readingOnly").toBool()) << "for reading at first";
+    EXPECT_EQ(ref().pageNumber(), 7) << "at the page of the menu";
+    EXPECT_EQ(controller->pageNumber(), 1) << "the tab stays where it is";
+    EXPECT_EQ(controller->tabCount(), 2);
+
+    // Scrolled on its own: the wheel over the reference moves it, not the notes
+    const QPointF mainPos = first->getViewController().scrollPosition();
+    const QPointF refPos = second->getViewController().scrollPosition();
+    const QPointF at = reference->mapToScene(QPointF(reference->width() / 2, reference->height() / 2));
+    for (int i = 0; i < 3; ++i) {
+        QWheelEvent e(at, window->mapToGlobal(at), QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
+                      Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(window, &e);
+        wait(30);
+    }
+    until([&] { return second->getViewController().scrollPosition() != refPos; });
+    EXPECT_NE(second->getViewController().scrollPosition(), refPos);
+    EXPECT_EQ(first->getViewController().scrollPosition(), mainPos) << "the notes did not move";
+
+    // The same page on both sides: a stroke on the notes shows in the reference too
+    ref().goToPage(0);
+    until([&] { return ref().pageNumber() == 1; });
+    wait(300);
+    controller->context().getRenderService()->waitForIdle();
+    wait(100);
+    const QRectF refPage = QRectF(reference->mapToScene(second->pageViewRect(0).topLeft()),
+                                  second->pageViewRect(0).size())
+                                   .intersected(sceneRect(reference));
+    auto darkIn = [&](const QRectF& r) {
+        const QImage img = window->grabWindow();
+        const double dpr = img.devicePixelRatio();
+        int n = 0;
+        for (int y = static_cast<int>(r.top() * dpr); y < static_cast<int>(r.bottom() * dpr); y += 2) {
+            for (int x = static_cast<int>(r.left() * dpr); x < static_cast<int>(r.right() * dpr); x += 2) {
+                if (x >= 0 && y >= 0 && x < img.width() && y < img.height() && qGray(img.pixel(x, y)) < 100) {
+                    ++n;
+                }
+            }
+        }
+        return n;
+    };
+    const int before = darkIn(refPage);
+    controller->selectTool("pen");
+    // (the notes may be wider than their half: a place on their first page that is in view)
+    const QPoint a = main->mapToScene(QPointF(60, first->pageViewRect(0).top() + 120)).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (int i = 1; i <= 12; ++i) {
+        QTest::mouseMove(window, a + QPoint(15 * i, 4 * i));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(180, 48));
+    wait(100);
+    EXPECT_EQ(elements(tabs().session(0)), 1u);
+    until([&] { return darkIn(refPage) > before; });
+    EXPECT_GT(darkIn(refPage), before) << "the stroke shows in the reference too";
+
+    // And the other way round, with the edit switch of its pill
+    click(findItem("referenceEditButton", true));
+    EXPECT_TRUE(ref().editing());
+    const QPoint b = onReferencePage(0, QPointF(80, 400));
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, b);
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, b + QPoint(8 * i, 3 * i));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, b + QPoint(80, 30));
+    wait(100);
+    EXPECT_EQ(elements(tabs().session(0)), 2u) << "written in the reference: the same page of the same document";
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(300);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    EXPECT_EQ(controller->pageNumber(), 1);
+    // One history: undo in the notes takes it back
+    main->forceActiveFocus(Qt::MouseFocusReason);
+    ref().setFocused(false);
+    controller->undo();
+    EXPECT_EQ(elements(tabs().session(0)), 1u);
+
+    // Its pill closes it: the second view goes, the tab stays
+    click(findItem("referenceCloseButton", true));
+    EXPECT_FALSE(ref().active());
+    EXPECT_FALSE(reference->isVisible());
+    EXPECT_EQ(tabs().session(0)->viewCount(), 1u);
+    EXPECT_EQ(controller->tabCount(), 2);
 }

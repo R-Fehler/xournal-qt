@@ -612,7 +612,8 @@ private:
 
 public:
     /// Show a file beside the current document, as its reference (opened as a tab if it is not open yet; an untouched
-    /// new document stays, to write the notes in). Without a document open: opened as the document.
+    /// new document stays, to write the notes in). Without a document open: opened as the document. The current
+    /// document itself: a second view of it beside it.
     Q_INVOKABLE bool openAsReference(const QString& path);
     /// A document and a conflict copy of it (a sync app's, SyncConflicts.h) side by side: the document as the tab, the
     /// copy as its reference.
@@ -926,7 +927,8 @@ public:
     Q_INVOKABLE QVariantMap documentLink(const QString& uri) const;
     /// Follow a link to a document from the current one: "tab" (switches to it when it is open), "reference" (beside
     /// the current document) or "here" (in place of the current document, which closes when it has no unsaved
-    /// changes; Back opens it again). The place is looked up (DocumentLinks::placeIn); what was not found is said.
+    /// changes; Back opens it again). A place in the current document itself: "reference" shows it in a second view
+    /// of the document beside it (qt/self-reference), anything else goes there. The place is looked up (DocumentLinks::placeIn); what was not found is said.
     /// False when it is no link to a document or the file is not found.
     Q_INVOKABLE bool followDocumentLink(const QString& uri, const QString& how);
     /// "Linked from": the documents of the library whose links lead to the current one (the index's links):

@@ -418,3 +418,38 @@ TEST_F(CanvasMemoryTest, aDocumentInSightKeepsItsPagesBeforeOneInTheBackground) 
     reference->setShown(false);
     notes->setShown(false);
 }
+
+// qt/self-reference: the same document beside itself is a second view in the same memory, not a second limit. Both
+// views keep their visible pages, and together they stay within the limit.
+TEST_F(CanvasMemoryTest, twoViewsOfOneDocumentShareTheLimit) {
+    AppController c;
+    CanvasView* notes = openPages(c, 5);
+    const int tab = c.tabManager().currentIndex();
+    c.tabManager().setReference(tab, tab);
+    CanvasView* second = c.tabManager().referenceView(tab);
+    ASSERT_NE(second, nullptr);
+    ASSERT_NE(second, notes);
+    const qint64 page = pageBytes(notes);
+    CanvasMemory::instance().setLimit(page * 20);
+    for (CanvasView* v: {notes, second}) {
+        v->setShown(true);
+        v->getViewController().setViewSize(QSizeF(800, 1000));
+    }
+    second->getViewController().scrollToPage(30);
+    processEvents(20);
+    CanvasMemory::instance().used(second);
+    CanvasMemory::instance().planNow();
+    settle(c);
+    EXPECT_LE(CanvasMemory::instance().bytes(), page * 20) << "two views, one limit";
+    EXPECT_LE(notes->bufferBytes() + second->bufferBytes(), CanvasMemory::instance().pagesLimit());
+    for (CanvasView* v: {notes, second}) {
+        const auto [first, last] = v->visiblePages();
+        for (size_t i = first; i <= last; ++i) {
+            EXPECT_TRUE(rendered(v, i)) << "page " << i + 1;
+        }
+    }
+    EXPECT_GT(second->currentPageNo(), 20u);
+    EXPECT_LT(notes->currentPageNo(), 10u) << "each view where its reader is";
+    notes->setShown(false);
+    second->setShown(false);
+}

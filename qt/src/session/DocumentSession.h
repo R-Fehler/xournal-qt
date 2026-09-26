@@ -307,10 +307,34 @@ public:
     bool pdfKeepsPictures() const { return keepingPictures; }
 
     // --- view side --------------------------------------------------------------------------------------------
-    /// The view showing this session (nullptr: headless). Not owned.
-    void setXournalView(XournalView* view);
-    /// Zoom values for reused upstream code, kept up to date by the view (nullptr: headless, zoom 1).
-    void setZoomControl(ZoomControl* zoom);
+    /// A view shows this session from now on (not owned), with the zoom values it keeps up to date for reused upstream
+    /// code. The first one is the primary view (a tab's): the session's current page is its page, and the page
+    /// sidebar, the page number and the models follow it. A second view of the same document (the reference beside
+    /// it, qt/self-reference) keeps a page, a zoom and a selection of its own. Without views the session is headless
+    /// (zoom 1).
+    void addView(XournalView* view, ZoomControl* zoom);
+    /// The view goes (the next one becomes the primary view if it was that).
+    void removeView(XournalView* view);
+    bool isPrimaryView(const XournalView* view) const;
+    size_t viewCount() const { return views.views.size(); }
+    /// While it lives, reused upstream code (tools, selections, undo actions) sees `view` as the view of the session
+    /// (control->getWindow()->getXournal(), getZoomControl()) and `page` as the current page (getCurrentPage(),
+    /// getCurrentPageNo()), without a page change being told: what a second view does (a press, a release, an action
+    /// of its pill) lands on its own page, and the primary view, the page sidebar and the models stay where they
+    /// are. (The primary view uses it too, for upstream code that takes the page from the current page: the page
+    /// pressed, not the one most in view.)
+    class ViewScope {
+    public:
+        ViewScope(DocumentSession& session, XournalView* view, size_t page);
+        ~ViewScope();
+        ViewScope(const ViewScope&) = delete;
+        ViewScope& operator=(const ViewScope&) = delete;
+
+    private:
+        DocumentSession& session;
+        XournalView* previousView;
+        std::optional<size_t> previousPage;
+    };
     /// Cursor implementation of the view (nullptr: headless). Not owned.
     void setCursor(XournalppCursor* cursor);
     void setCurrentPageNo(size_t page);
@@ -445,12 +469,14 @@ private:
     SessionActions actions;
     SessionWindow window;
     HeadlessXournalView headlessView;
+    SessionViews views{headlessView};
     HeadlessCursor headlessCursor;
     ZoomControl headlessZoom;
-    ZoomControl* zoomControl = &headlessZoom;
     XournalppCursor* cursor = &headlessCursor;
     SessionScrollHandler scrollHandler;
     size_t currentPage = 0;
+    /// ViewScope: the page of a second view that acts now (getCurrentPage/No)
+    std::optional<size_t> workingPage;
     bool lastModified = false;
 
     std::unique_ptr<SaveTask> saveTask;  ///< the save that runs

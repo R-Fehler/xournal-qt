@@ -89,9 +89,12 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     currentSequenceDeviceId = pos.deviceId;
 
     DocumentSession& control = view.getSession();
-    if (auto idx = view.indexOf(this); idx && *idx != control.getCurrentPageNo()) {
-        control.setCurrentPageNo(*idx);
+    if (auto idx = view.indexOf(this); idx && *idx != view.currentPageNo()) {
+        view.setCurrentPageNo(*idx);  // (the session's page for the primary view, else the view's own)
     }
+    // Upstream code that asks for the view or the current page gets this view and this page (a second view of the
+    // document: qt/self-reference)
+    const auto scope = view.actingScope(view.indexOf(this));
     ToolHandler* h = control.getToolHandler();
 
     double x = pos.x;
@@ -325,6 +328,7 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
     currentSequenceDeviceId.reset();
 
     DocumentSession& control = view.getSession();
+    const auto scope = view.actingScope(view.indexOf(this));
     if (this->inputHandler) {
         this->inputHandler->onButtonReleaseEvent(pos, getZoom());
         this->inputHandler.reset();
@@ -384,7 +388,14 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
                         SelectionFactory::addElementsFromActiveLayer(&control, view.getSelection(), sel).release());
             } else {
                 // with a multi-layer selector the objects might be on another layer
-                control.getLayerController()->switchToLay(layerOfFinalizedSel);
+                if (view.isPrimary()) {
+                    control.getLayerController()->switchToLay(layerOfFinalizedSel);
+                } else {
+                    // (a second view: the layer controller follows the session's page, the primary view's)
+                    control.clearSelectionEndText();
+                    std::unique_lock lock(*control.getDocument());
+                    this->page->setSelectedLayerId(layerOfFinalizedSel);
+                }
                 view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, page, this,
                                                                                     selector->releaseElements())
                                           .release());

@@ -103,7 +103,7 @@ QRectF StickyNotes::selectedViewBox() const {
 
 bool StickyNotes::insert() {
     DocumentSession& session = view.getSession();
-    const size_t pNr = session.getCurrentPageNo();
+    const size_t pNr = view.currentPageNo();  // (a second view of the document: its own page)
     if (pNr >= view.pageCount() || session.isReadOnly() || view.isReadingOnly()) {
         return false;
     }

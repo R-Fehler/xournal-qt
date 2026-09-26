@@ -196,9 +196,10 @@ Rectangle {
                     }
                     MenuItem {
                         objectName: "openAsReferenceTabItem"
-                        text: tab.isReference ? qsTr("Close the reference") : qsTr("Open as reference")
-                        visible: !tab.current  // (beside the current document; not beside itself)
-                        height: visible ? implicitHeight : 0
+                        // (beside the current document; the current one itself: a second view of it beside it)
+                        text: tab.current ? (tab.isReference ? qsTr("Close the view beside")
+                                                             : qsTr("Show this document beside"))
+                                          : tab.isReference ? qsTr("Close the reference") : qsTr("Open as reference")
                         onTriggered: {
                             if (tab.isReference) {
                                 app.reference.close()
