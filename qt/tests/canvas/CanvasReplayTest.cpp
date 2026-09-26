@@ -3324,6 +3324,60 @@ TEST_F(CanvasReplayTest, aRectangleInAStickyNoteSelectsItsElementsThatLeaveAndJo
     EXPECT_EQ(view->getSelection(), nullptr);
 }
 
+TEST_F(CanvasReplayTest, aNotesTextIsClippedToTheNoteWhileItIsWrittenAndAHintSaysWhenTheCursorIsBelow) {
+    app->getSettings()->setSnapGrid(false);
+    plainPages(*session, *view);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    const double bottom = look.rect.y + look.rect.height;
+    const QRectF below(look.rect.x + 2, bottom + 6, look.rect.width - 4, 160);
+    ASSERT_TRUE(view->writeNoteText());
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_TRUE(view->noteTextHintBox().isEmpty()) << "nothing written yet";
+
+    // Many lines: they go on below the note's bottom
+    std::string source;
+    for (int i = 1; i <= 14; ++i) {
+        source += "Line " + std::to_string(i) + "\n\n";
+    }
+    source += "The end";
+    ASSERT_TRUE(view->insertAtTextCursor(source));
+    processEvents();
+    EXPECT_GT(darkPixels(*view->getPage(0), QRectF(look.rect.x + 8, look.rect.y + 8, 60, 30)), 5)
+            << "the text shows on the note while it is written";
+    EXPECT_EQ(darkPixels(*view->getPage(0), below), 0)
+            << "nothing of it (nor of its frame) below the note while it is written: clipped as when it is done";
+
+    // The cursor at the end, below the note: the note's triangle, and the hint where the note is
+    const QRectF hint = view->noteTextHintBox();
+    ASSERT_FALSE(hint.isEmpty()) << "the cursor is below the note: the window says that the text is longer";
+    const QRectF pageRect = view->pageViewRect(0);
+    const double zoom = view->getViewController().zoom();
+    EXPECT_NEAR(hint.x(), pageRect.x() + look.rect.x * zoom, 1);
+    EXPECT_NEAR(hint.bottom(), pageRect.y() + bottom * zoom, 1) << "the note's place, for the label below it";
+    const double side = std::min({7.0, look.rect.width / 6, look.rect.height / 6});
+    const QPointF mark(look.rect.x + look.rect.width - sticky::TEXT_PADDING / 2 - side / 2, bottom - 2 - side * 0.35);
+    const QImage markShot = screenOf(*view->getPage(0), QRectF(mark - QPointF(0.5, 0.5), QSizeF(1, 1)));
+    const QColor markColor = markShot.pixelColor(markShot.width() / 2, markShot.height() / 2);
+    const Color edge = sticky::edgeColor(look.color);
+    EXPECT_NEAR(markColor.red(), edge.red, 10) << "the \"more below\" triangle shows while it is written";
+    EXPECT_NEAR(markColor.blue(), edge.blue, 10);
+
+    // The cursor on the note again: no hint
+    view->getMarkdownEditor()->setCursorPosition(0);
+    EXPECT_TRUE(view->noteTextHintBox().isEmpty());
+    view->getMarkdownEditor()->setCursorPosition(source.size());
+    EXPECT_FALSE(view->noteTextHintBox().isEmpty());
+
+    // Done: still clipped (drawn by the page now), no hint; the note keeps its size
+    view->endTextEditing();
+    processEvents();
+    EXPECT_TRUE(view->noteTextHintBox().isEmpty());
+    EXPECT_EQ(darkPixels(*view->getPage(0), below), 0);
+    EXPECT_EQ(*sticky::lookOf(*note), look) << "the note is not made bigger by itself";
+}
+
 TEST_F(CanvasReplayTest, benchmarkStickyNoteClipboard) {
     if (!qEnvironmentVariableIsSet("XQT_BENCH_STICKY")) {
         GTEST_SKIP() << "a benchmark: set XQT_BENCH_STICKY=1";

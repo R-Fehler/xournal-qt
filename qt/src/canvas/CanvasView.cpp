@@ -1864,6 +1864,20 @@ bool CanvasView::writeNoteText() {
     return true;
 }
 
+QRectF CanvasView::noteTextHintBox() const {
+    if (!markdownEditor || !markdownEditor->cursorBelowNote()) {
+        return {};
+    }
+    const auto note = markdownEditor->noteRect();
+    const auto idx = indexOf(&markdownEditor->getPage());
+    if (!note || !idx) {
+        return {};
+    }
+    const double zoom = viewController.zoom();
+    const QRectF pageRect = pageViewRect(*idx);
+    return QRectF(pageRect.topLeft() + note->topLeft() * zoom, note->size() * zoom);
+}
+
 bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     std::shared_lock lock(*session.getDocument());
     const PageRef p = page.getPage();

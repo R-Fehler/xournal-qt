@@ -124,6 +124,13 @@ image there goes onto the page, below it).
   their size and place, as before. The width follows the note in the undo of a resize too.
 - What goes beyond the note's bottom is clipped, as any content of a note. On the screen a small triangle in the
   paper's edge colour at the bottom right says that there is more below (made larger, the note shows the rest).
+- **Also while it is written** (qt/sticky-select): the text being written is drawn by the editor over the page (not
+  by the page's picture, which leaves it out meanwhile); the editor clips it, its frame and the cursor to the note's
+  paper as well, and draws the triangle when the text goes on below. When the cursor is below the note's bottom
+  (typing there shows nothing), a small label below the note says "The text is longer than the note: make the note
+  bigger" (`CanvasView::noteTextHintBox`, the canvas's `noteTextHint`, `noteTextHint` in `Main.qml`). It is a label,
+  not a dialog: typing goes on, and it goes when the cursor is back on the note or the text is done. The note is
+  not made bigger by itself: its size is the author's (a note covering a solution must not grow over the page).
 - It moves, is copied, cut, pasted and dragged to another page with the note (it is the note's layer's). It is
   **not** taken by a rectangle or lasso inside the note (it is the note's frame, like the paper): it stays at the
   top left.
@@ -335,8 +342,11 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   plain text, an image fitted into it, a covering note takes nothing),
   `aRectangleInAStickyNoteSelectsItsElementsThatLeaveAndJoinItByADrag` (never the paper or the text, dragged out and
   in, one undo step each, a tap selects the note); `AnnotationsTest.aStickyNotesMarkdownTextIsItsCaptionAsShown`;
-  `MainWindowTest.theNotePillWritesTheNotesTextAndPutsAnImageOnIt` (`XQT_TEST_SHOT=<png>` saves a picture of a note
-  whose text goes on below it).
+  `MainWindowTest.theNotePillWritesTheNotesTextAndPutsAnImageOnIt` (the hint label while the cursor is below the
+  note; `XQT_TEST_SHOT=<png>` saves a picture of a note whose text goes on below it);
+  `CanvasReplayTest.aNotesTextIsClippedToTheNoteWhileItIsWrittenAndAHintSaysWhenTheCursorIsBelow` (no pixel of the
+  text or its frame below the note while it is written, the triangle, the hint's place, gone with the cursor on the
+  note and when done, the note keeps its size).
 
 ## Not yet
 
@@ -344,8 +354,8 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   release).
 - Pasting a note into upstream Xournal++ (it does not know the note's clipboard format).
 - A note selected in the second view (self-reference) has no pill of its own: Ctrl+C / X / V work there.
-- Clipping the text box while it is typed (the text being typed shows beyond the note's edge until it is done; the
-  note's Markdown text too, while it is written).
+- Clipping a plain text box (the text tool with Markdown off) while it is typed on a note: it shows beyond the
+  note's edge until it is done. (The note's Markdown text is clipped while it is written.)
 - A multi-layer selection rectangle that starts beside a note and reaches it selects nothing on the note (one
   started on the note selects in it; a tap selects the note).
 - A selection of elements from several notes, or from a note and the page, at once (a selection is in one layer).

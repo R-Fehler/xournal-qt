@@ -67,6 +67,9 @@ class DocumentCanvasItem: public QQuickItem {
     Q_PROPERTY(QVariantList emojiCompletions READ emojiCompletions NOTIFY emojiCompletionChanged)
     Q_PROPERTY(int emojiCompletionIndex READ emojiCompletionIndex NOTIFY emojiCompletionChanged)
     Q_PROPERTY(QRectF emojiCompletionRect READ emojiCompletionRect NOTIFY emojiCompletionChanged)
+    /// A sticky note's text is written with the cursor below the note's bottom: where the note is (item coordinates;
+    /// empty otherwise). The window says that the text is longer than the note (qt/docs/sticky-notes.md).
+    Q_PROPERTY(QRectF noteTextHint READ noteTextHint NOTIFY noteTextHintChanged)
 public:
     explicit DocumentCanvasItem(QQuickItem* parent = nullptr);
     ~DocumentCanvasItem() override;
@@ -87,6 +90,7 @@ public:
     QVariantList emojiCompletions() const;
     int emojiCompletionIndex() const;
     QRectF emojiCompletionRect() const;
+    QRectF noteTextHint() const;
     /// A suggestion tapped: its emoji goes in place of the shortcode.
     Q_INVOKABLE void chooseEmojiCompletion(int index);
     /// Text (an emoji of the picker) at the cursor of the text being written. False if none is.
@@ -140,6 +144,7 @@ Q_SIGNALS:
     void hoveredLinkPointerChanged();
     void textEditingChanged();
     void emojiCompletionChanged();
+    void noteTextHintChanged();
 
 protected:
     QSGNode* updatePaintNode(QSGNode* old, UpdatePaintNodeData*) override;

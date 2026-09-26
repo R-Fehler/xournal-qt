@@ -373,6 +373,10 @@ public:
     /// Write the selected sticky note's Markdown text (the note's pill: "Text"): started, or edited with the cursor at
     /// its end. False: no note selected (or a covering one).
     bool writeNoteText();
+    /// A sticky note's text being written with the cursor below the note's bottom: where the note is (view
+    /// coordinates), for the hint that the text is longer than the note; empty otherwise. Changes with
+    /// markdownCursorChanged (and when the view scrolls or zooms).
+    QRectF noteTextHintBox() const;
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
     bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
     /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text

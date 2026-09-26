@@ -1035,6 +1035,26 @@ ApplicationWindow {
             x: Math.max(0, Math.min(canvas.mathErrorRect.x, canvas.width - width))
             y: canvas.mathErrorRect.y + canvas.mathErrorRect.height + 4
         }
+        // A sticky note's text written below the note's bottom: it is clipped there, so the window says why nothing
+        // shows (a label, not a dialog: typing goes on; the note is not made bigger by itself)
+        Rectangle {
+            objectName: "noteTextHint"
+            visible: canvas.noteTextHint.width > 0
+            readonly property rect note: canvas.noteTextHint
+            x: Math.max(4, Math.min(note.x, canvas.width - width - 4))
+            y: Math.min(note.y + note.height + 6, canvas.height - height - 4)
+            width: noteTextHintLabel.implicitWidth + 20
+            height: noteTextHintLabel.implicitHeight + 10
+            radius: 4
+            color: "#e6505357"
+            Label {
+                id: noteTextHintLabel
+                anchors.centerIn: parent
+                text: qsTr("The text is longer than the note: make the note bigger")
+                color: "#ffffff"
+                font.pixelSize: 13
+            }
+        }
     }
     // ":smi" typed on the page: the emoji suggested (Up / Down / Enter go to the canvas's editor; a tap chooses).
     // Beside the canvas, not in it: the canvas takes the presses on its own items.

@@ -3868,9 +3868,21 @@ TEST_F(MainWindowTest, theNotePillWritesTheNotesTextAndPutsAnImageOnIt) {
         window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
         return;
     }
+    // Written on below the note's bottom (clipped there): a hint says so, until it is done
+    auto* hint = find<QQuickItem>("noteTextHint");
+    ASSERT_NE(hint, nullptr);
+    EXPECT_FALSE(hint->isVisible());
+    type("\r2\r3\r4\r5\r6\r7\r8\r9\r10\r11\r12\r13\r14");
+    until([&] { return hint->isVisible(); });
+    EXPECT_TRUE(hint->isVisible()) << "the cursor is below the note";
+    const QRectF noteShown = view->noteTextHintBox();
+    const QPointF hintAt = hint->mapToItem(find<QQuickItem>("canvas"), QPointF(0, 0));
+    EXPECT_GT(hintAt.y(), noteShown.bottom()) << "below the note";
     controller->endMarkdownOnPage();
+    until([&] { return !hint->isVisible(); });
+    EXPECT_FALSE(hint->isVisible());
     ASSERT_NE(xqt::sticky::textOf(*note), nullptr);
-    EXPECT_EQ(xqt::sticky::textOf(*note)->getText(), "Hello");
+    EXPECT_EQ(xqt::sticky::textOf(*note)->getText().rfind("Hello\n\n2", 0), 0u);
     EXPECT_TRUE(xqt::sticky::textOf(*note)->isMarkdown());
 
     // The image chosen in the dialog goes onto the selected note

@@ -26,6 +26,7 @@
 
 class LayerController;
 class Stroke;
+typedef struct _cairo cairo_t;
 class Text;
 class XojPage;
 class Document;
@@ -146,6 +147,9 @@ bool isPeeking(const Layer* layer);
 /// edge (a look of our renderer: nothing of it is in the file). False if the layer is no note (the drawer of
 /// upstream's LayerView, see view/LayerView.h).
 bool draw(const Layer& layer, const xoj::view::Context& ctx);
+/// The small triangle at a note's bottom right that says its Markdown text goes on below its bottom (the screen only;
+/// drawn by `draw`, and by the editor while the text is written)
+void drawMoreBelow(cairo_t* cr, const xoj::util::Rectangle<double>& rect, Color paper);
 /// What is drawn around a note's paper: `Full` (the edge and the shadow) in the app; the others for measuring what
 /// they cost (the benchmark in StickyNoteTest). `Flat` is the paper as upstream draws it. Any thread may ask.
 enum class Finish { Flat, Edge, Full };

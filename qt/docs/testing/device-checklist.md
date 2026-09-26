@@ -1983,3 +1983,10 @@ Design: [md-images.md](../md-images.md).
       pictures and ink unclipped.
 - [ ] Android (Fold 7): the pill's buttons fit (folded and unfolded); "Text" brings the on-screen keyboard; a finger
       drag of a selection inside a note works the same.
+
+## Selecting several sticky notes; the note's text clipped while typing (qt/sticky-select)
+- [ ] Place a note, "Text" in its pill, type a dozen short paragraphs (Enter after each): the lines stop at the
+      note's bottom edge while typing (nothing below the note, not even the dashed frame), and the small triangle at
+      the bottom right shows. With the cursor below the bottom, a dark label below the note says "The text is longer
+      than the note: make the note bigger"; typing goes on (the label takes no keys or presses). Move the cursor up
+      (arrow keys, or a tap on the text): the label goes. Escape: the label goes; the note did not grow.

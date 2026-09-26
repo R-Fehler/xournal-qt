@@ -304,6 +304,12 @@ void MarkdownEditor::paint(cairo_t* cr) const {
     const QPointF o = originOf(current);
     const Color selectionColor = session.getSettings()->getSelectionColor();
     cairo_save(cr);
+    if (note) {
+        // A sticky note's text: only what shows on the note, as when it is done (the cursor too)
+        cairo_rectangle(cr, note->rect.x, note->rect.y, note->rect.width, note->rect.height);
+        cairo_clip(cr);
+    }
+    cairo_save(cr);
     cairo_translate(cr, o.x(), o.y());
 
     // The frame of the box being written (as the text tool's)
@@ -370,6 +376,26 @@ void MarkdownEditor::paint(cairo_t* cr) const {
     if (const auto h = widthHandle(); h && page) {
         MarkdownBoxResize::drawHandle(cr, h->x(), h->y(), 1.0 / page->getZoom(), selectionColor);
     }
+    // A note's text that goes on below the note (or the cursor there): the note's "more below" mark
+    if (note && (o.y() + layout.height > note->rect.y + note->rect.height + 0.5 || cursorBelowNote())) {
+        sticky::drawMoreBelow(cr, note->rect, note->color);
+    }
+    cairo_restore(cr);
+}
+
+bool MarkdownEditor::cursorBelowNote() const {
+    if (!note || parts.empty() || !page) {
+        return false;
+    }
+    const QRectF c = caretRect();
+    return c.bottom() > note->rect.y + note->rect.height + 0.5;  // (its line is cut off, or not seen at all)
+}
+
+std::optional<QRectF> MarkdownEditor::noteRect() const {
+    if (!note) {
+        return std::nullopt;
+    }
+    return QRectF(note->rect.x, note->rect.y, note->rect.width, note->rect.height);
 }
 
 // --- changes -----------------------------------------------------------------------------------------------------
@@ -432,6 +458,7 @@ void MarkdownEditor::changed(bool textChanged) {
     }
     (void)textChanged;  // (the session has the text already: edit())
     parts = md.parts();
+    note = md.noteLook();  // (a note's text: clipped to it)
     if (parts.empty()) {
         return;
     }

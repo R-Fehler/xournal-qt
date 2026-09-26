@@ -347,6 +347,21 @@ bool isPeeking(const Layer* layer) {
     return peeking.count(layer) > 0;
 }
 
+void drawMoreBelow(cairo_t* cr, const Rectangle<double>& rect, Color paper) {
+    const double side = std::min({7.0, rect.width / 6, rect.height / 6});
+    const double cx = rect.x + rect.width - TEXT_PADDING / 2 - side / 2;
+    const double by = rect.y + rect.height - 2;
+    const Color more = edgeColor(paper);
+    cairo_save(cr);
+    cairo_move_to(cr, cx - side / 2, by - side * 0.6);
+    cairo_line_to(cr, cx + side / 2, by - side * 0.6);
+    cairo_line_to(cr, cx, by);
+    cairo_close_path(cr);
+    cairo_set_source_rgb(cr, more.red / 255.0, more.green / 255.0, more.blue / 255.0);
+    cairo_fill(cr);
+    cairo_restore(cr);
+}
+
 bool draw(const Layer& layer, const xoj::view::Context& ctx) {
     const Stroke* paper = paperOf(layer);
     if (!paper) {
@@ -408,16 +423,7 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
         if (const Text* text = textOf(layer); text && !text->getText().empty()) {
             const auto box = text->getBoundingBox();  // (as big as it is drawn: the Markdown sizer)
             if (box.y + box.height > rect.y + rect.height + 0.5) {
-                const double side = std::min({7.0, rect.width / 6, rect.height / 6});
-                const double cx = rect.x + rect.width - TEXT_PADDING / 2 - side / 2;
-                const double by = rect.y + rect.height - 2;
-                const Color more = edgeColor(paper->getColor());
-                cairo_move_to(cr, cx - side / 2, by - side * 0.6);
-                cairo_line_to(cr, cx + side / 2, by - side * 0.6);
-                cairo_line_to(cr, cx, by);
-                cairo_close_path(cr);
-                cairo_set_source_rgb(cr, more.red / 255.0, more.green / 255.0, more.blue / 255.0);
-                cairo_fill(cr);
+                drawMoreBelow(cr, rect, paper->getColor());
             }
         }
     }
