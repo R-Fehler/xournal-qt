@@ -653,6 +653,12 @@
   `AdaptiveLayoutTest` at five sizes (all 18 with `XQT_UI_ADAPTIVE=1`). Next: menus, dialogs, tool bar, home,
   panels, safe areas, compact chrome (see `qt/docs/adaptive-layout.md`).
 
+- **Adaptive menus, `qt/adaptive-menus` (2026-09-26).** `AdaptiveMenu`: as wide as its longest entry, never taller
+  than the window (scrolls with a real bar), never over its button; rows `minTarget` high. On phone sizes one shared
+  `MenuSheet` shows the entries as a bottom sheet (drag handle, drill-in submenus with a back arrow, Esc / Android
+  back one level up; `win.safeBottom`). Used for ⋮, library, card, tab, layout and page menus. ⋮ regrouped into 10
+  entries (Document / Export / Page / View submenus), about 450 px. Open: the remaining plain menus (shapes first).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
