@@ -450,6 +450,7 @@ void MarkdownEditor::changed(bool textChanged) {
         }
     }
     lastArea = now;
+    Q_EMIT view.markdownCursorChanged();
 }
 
 void MarkdownEditor::edit(size_t from, size_t to, const std::string& with, EditKind kind) {
@@ -776,31 +777,16 @@ size_t MarkdownEditor::emptyItemMark() const {
     return ls + static_cast<size_t>(m[1].length());
 }
 
-void MarkdownEditor::wrap(const std::string& before, const std::string& after) {
-    const size_t from = std::min(caret, anchor);
-    const size_t to = std::max(caret, anchor);
-    const std::string inner = md.text().substr(from, to - from);
-    edit(from, to, before + inner + after);
-    // The cursor inside the marks (the text selected again)
-    anchor = from + before.size();
-    caret = anchor + inner.size();
+void MarkdownEditor::applyEdit(const md::format::Edit& change) {
+    preedit.clear();
+    if (change.from != change.to || !change.with.empty()) {
+        edit(change.from, change.to, change.with);
+    }
+    const size_t size = md.text().size();
+    anchor = std::min(change.anchor, size);
+    caret = std::min(change.caret, size);
+    lastWasTyping = false;
     changed(false);
-}
-
-void MarkdownEditor::setPrefix(const std::string& prefix) {
-    using namespace md::text;
-    const std::string& t = md.text();
-    const size_t ls = lineStart(t, caret);
-    const std::string line(lineAt(t, ls));
-    std::smatch m;
-    std::regex_search(line, m, linePrefix());
-    const size_t indent = static_cast<size_t>(m[1].length());
-    const std::string old = m[2].matched ? m[2].str() : std::string();
-    const size_t offset = caret - ls;
-    const std::string added = old == prefix ? std::string() : prefix;
-    edit(ls + indent, ls + indent + old.size(), added);
-    const size_t start = ls + indent + added.size();
-    moveCursor(std::max(start, ls + offset + added.size() - std::min(offset, old.size())), false);
 }
 
 void MarkdownEditor::indent(bool in) {
@@ -993,30 +979,38 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
             default:
                 break;
         }
+        // The formatting keys: the formatting bar's tools (md::format), each one undo step
+        std::optional<md::format::Action> action;
         switch (e->key()) {
             case Qt::Key_B:
-                wrap("**", "**");
-                return true;
+                action = md::format::Action::Bold;
+                break;
             case Qt::Key_I:
-                wrap("*", "*");
-                return true;
+                action = md::format::Action::Italic;
+                break;
             case Qt::Key_E:
-                wrap("`", "`");
-                return true;
+                action = md::format::Action::Code;
+                break;
             case Qt::Key_K:
-                wrap("[", "](https://)");
-                return true;
+                action = md::format::Action::Link;
+                break;
             case Qt::Key_0:
-                setPrefix("");
-                return true;
+                action = md::format::Action::Paragraph;
+                break;
             case Qt::Key_1:
+                action = md::format::Action::Heading1;
+                break;
             case Qt::Key_2:
+                action = md::format::Action::Heading2;
+                break;
             case Qt::Key_3:
-                setPrefix(std::string(static_cast<size_t>(e->key() - Qt::Key_0), '#') + " ");
-                return true;
+                action = md::format::Action::Heading3;
+                break;
             default:
                 return false;
         }
+        applyEdit(md::format::apply(t, anchor, caret, *action));
+        return true;
     }
     const QString typed = e->text();
     if (!typed.isEmpty() && !(e->modifiers() & (Qt::AltModifier | Qt::MetaModifier)) && typed.at(0).isPrint()) {

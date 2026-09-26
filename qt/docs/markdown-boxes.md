@@ -30,7 +30,10 @@ Writing:
       whole text). Shift selects.
     - Editing: Backspace and Delete, Ctrl+A / C / X / V.
     - Formatting: Ctrl+B / I / E / K (bold, italic, code, link), Ctrl+1 / 2 / 3 / 0 (headings), Tab and Shift+Tab
-      (list levels).
+      (list levels). Each is one undo step; the marks go again when pressed on text that has them.
+  - The formatting bar, a row under the tool bar while Markdown is written, has these and the other tools (lists,
+    check boxes, quote, code block, formula, table editor, rule, image, page break): [md-editor.md](md-editor.md),
+    "Formatting bar".
   - Ctrl+Z / Ctrl+Shift+Z undo and redo in the text being written; once it is done, the whole edit is one undo step.
   - Escape (or a tap elsewhere) is done.
   - Ctrl+Alt+M opens the same text beside the page.
@@ -52,6 +55,9 @@ shows each page's source). A page is split only where the rest reads the same on
 - between the lines of a code block: the page closes the fence and the next page opens it again;
 - between the items of a list: a numbered list goes on with its numbers;
 - between the rows of a table: the next page repeats the header.
+
+A page break (`<div style="page-break-after: always"></div>`, the formatting bar's "Page break") ends the page after
+it; it is not drawn ([md-editor.md](md-editor.md), "Page breaks").
 
 A part that continues the page before starts with a comment, `<!-- xqt:cont … -->` (not shown), which says what was
 added for the page (a fence, a table header), so the parts give exactly the text again. A block that cannot be split
@@ -76,9 +82,10 @@ the editor beside the page ("Size", which also changes the text being edited).
 ## Using it
 - Open the editor with the writing button in the tool bar (hold or right-click it and choose "Markdown"; after that a
   tap opens Markdown again) or with Ctrl+Alt+M. The editor opens beside the page and shows the source.
-- The buttons insert Markdown: H1-H3, lists, quotes and task lists change the mark of the current line; B, I, S,
-  code and Link put marks around the selection. Enter continues a list, and Enter on an empty item ends it.
-- Keys: Ctrl+B / I / E (code) / K (link), Ctrl+1-3 for headings, Tab / Shift+Tab to indent list items.
+- The formatting bar above the source has the same tools as on the page (the table editor too), acting on the
+  source, each one undo step of the source. Enter continues a list, and Enter on an empty item ends it.
+- Keys: Ctrl+B / I / E (code) / K (link), Ctrl+1-3 for headings (Ctrl+0: paragraph), Tab / Shift+Tab to indent list
+  items.
 - Done (or Esc) keeps the text, and the whole edit is one undo step. Cancel puts the page back.
 - With the text tool, a tap on a box opens its Markdown again.
 - A tap on a link opens it; `[text](#Page:12)` goes to page 12 of the document.

@@ -20,6 +20,7 @@
 #include <QFileSystemWatcher>
 #include <QObject>
 #include <QPointer>
+#include <QQuickTextDocument>
 #include <QRectF>
 #include <QString>
 #include <QStringList>
@@ -168,6 +169,9 @@ class AppController: public QObject {
     Q_PROPERTY(bool markdownActive READ markdownActive NOTIFY markdownChanged)
     /// Markdown is being written on the page itself (formatted while typing), not in the panel beside it.
     Q_PROPERTY(bool markdownOnPage READ markdownOnPage NOTIFY markdownOnPageChanged)
+    /// What is at the cursor of the Markdown being written on the page or in a .md, for the formatting bar
+    /// (md::format::State: bold, italic, strike, code, math, link, heading, list, quote, codeBlock, table)
+    Q_PROPERTY(QVariantMap markdownFormat READ markdownFormat NOTIFY markdownFormatChanged)
     Q_PROPERTY(int markdownPage READ markdownPage NOTIFY markdownChanged)
     /// The last page of the Markdown text being edited (the page's text flows over pages)
     Q_PROPERTY(int markdownLastPage READ markdownLastPage NOTIFY markdownChanged)
@@ -352,6 +356,26 @@ public:
     /// Start editing the Markdown box of a page (-1: the current page; made when there is none). Returns its source.
     Q_INVOKABLE QString beginMarkdown(int page = -1);
     bool markdownOnPage() const;
+    // --- the formatting bar (qt/docs/md-editor.md, "Formatting bar"; AppMarkdownFormat.cpp) --------------------------
+    QVariantMap markdownFormat() const;
+    /// A formatting tool (md::format::actionNamed: "bold", "heading2", "codeBlock" with the language as `arg`, ...)
+    /// on the Markdown written on the page or in the .md: one undo step. False if no Markdown is written.
+    Q_INVOKABLE bool formatMarkdown(const QString& action, const QString& arg = QString());
+    /// The same on the source beside the page (its TextArea's document: one undo step there). The selection after it:
+    /// {anchor, caret} (the text's offsets); empty if nothing was done.
+    Q_INVOKABLE QVariantMap formatMarkdownIn(QQuickTextDocument* document, int anchor, int caret,
+                                             const QString& action, const QString& arg = QString());
+    /// What is at the cursor of a source (the editor beside the page), as markdownFormat.
+    Q_INVOKABLE QVariantMap markdownFormatOf(const QString& text, int anchor, int caret) const;
+    /// The table at the cursor, for the table editor: {found, cells: [[header cells], [row cells], ...], aligns:
+    /// ["left" | "center" | "right" | "", ...], row (0: the header), column}; found false: none there.
+    Q_INVOKABLE QVariantMap markdownTable() const;
+    Q_INVOKABLE QVariantMap markdownTableIn(const QString& text, int caret) const;
+    /// The table editor's table as a GFM pipe table over the table at the cursor, or as a new one there. One undo
+    /// step.
+    Q_INVOKABLE bool writeMarkdownTable(const QVariantList& cells, const QStringList& aligns);
+    Q_INVOKABLE QVariantMap writeMarkdownTableIn(QQuickTextDocument* document, int anchor, int caret,
+                                                 const QVariantList& cells, const QStringList& aligns);
     /// Write the current page's Markdown text on the page, formatted while typing (the default of the tool bar's
     /// write button; its source beside the page is the button's menu). The cursor goes to the end of what that page
     /// holds; a page without Markdown text starts one at its top. False if nothing can be written there.
@@ -1010,6 +1034,7 @@ Q_SIGNALS:
     void textFlowChanged();
     void markdownChanged();
     void markdownOnPageChanged();
+    void markdownFormatChanged();
     /// The text tool tapped a Markdown box: the window opens its editor.
     void markdownRequested(int page);
     /// The text tool tapped a Markdown text box, or a place for a new one: the window opens its editor.

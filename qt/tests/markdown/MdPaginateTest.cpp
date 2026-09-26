@@ -394,3 +394,27 @@ TEST(MdPlain, aPlainTextFlowsOntoPagesAndJoinsAgain) {
     ASSERT_EQ(e.slices.size(), 1u);
     EXPECT_EQ(join(e.slices), "");
 }
+
+// A page break (the formatting bar's "Page break") ends the page after it; it is not drawn.
+TEST(MdPaginate, aPageBreakEndsThePage) {
+    const std::string pageBreak = "<div style=\"page-break-after: always\"></div>";
+    const std::string text = "# One\n\nShort.\n\n" + pageBreak + "\n\n# Two\n\nAlso short.\n";
+    const auto p = paginate(text, style(), small);
+    ASSERT_EQ(p.slices.size(), 2u);
+    EXPECT_EQ(p.slices[0], "# One\n\nShort.\n\n" + pageBreak + "\n\n");
+    EXPECT_EQ(p.slices[1], "<!-- xqt:cont block -->\n# Two\n\nAlso short.\n");
+    EXPECT_EQ(join(p.slices), text);
+    Style s = style();
+    s.width = 300;
+    EXPECT_EQ(layout(parse(pageBreak + "\n"), s).items.size(), 0u) << "not drawn";
+    // Text that does not fit before it: split as always, the break ends the page it is on
+    const std::string longer = "# Notes\n\n" + paragraphs(6) + pageBreak + "\n\nAfter the break.\n";
+    const auto q = paginate(longer, style(), small);
+    ASSERT_GE(q.slices.size(), 3u);
+    EXPECT_EQ(join(q.slices), longer);
+    EXPECT_NE(q.slices[q.slices.size() - 2].find(pageBreak), std::string::npos);
+    EXPECT_EQ(q.slices.back(), "<!-- xqt:cont block -->\nAfter the break.\n");
+    // At the top of a page (nothing before it there): no empty page
+    const auto r = paginate(pageBreak + "\n\nFirst.\n", style(), small);
+    EXPECT_EQ(r.slices.size(), 1u);
+}

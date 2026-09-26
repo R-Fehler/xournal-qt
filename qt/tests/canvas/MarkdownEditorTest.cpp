@@ -328,3 +328,41 @@ TEST_F(MarkdownEditorTest, pastedTexDelimitersBecomeDollars) {
     key(Qt::Key_V, {}, Qt::ControlModifier);
     EXPECT_EQ(ed.text(), "Intro\n\n```\n\\(x\\)");
 }
+
+// The formatting bar's tools and keys (md::format) on the text written on the page: each is one step of its undo,
+// the selection follows, and the bar hears of every change of the cursor.
+TEST_F(MarkdownEditorTest, formattingToolsAreOneUndoStepEach) {
+    MarkdownEditor& editor = start();
+    QSignalSpy cursorMoved(view.get(), &CanvasView::markdownCursorChanged);
+    type("one\ntwo");
+    EXPECT_GT(cursorMoved.count(), 0);
+    EXPECT_EQ(editor.text(), "one\n\ntwo");
+    // Both paragraphs selected: a bullet list, one step
+    editor.setCursorPosition(0);
+    key(Qt::Key_End, {}, Qt::ControlModifier | Qt::ShiftModifier);
+    const std::string text = editor.text();
+    editor.applyEdit(md::format::apply(text, editor.anchorPosition(), editor.cursorPosition(),
+                                       md::format::Action::BulletList));
+    EXPECT_EQ(editor.text(), "- one\n\n- two");
+    EXPECT_EQ(editor.anchorPosition(), 2u) << "the selection follows";
+    EXPECT_EQ(editor.cursorPosition(), editor.text().size());
+    editor.undo();
+    EXPECT_EQ(editor.text(), "one\n\ntwo") << "one undo step";
+    editor.redo();
+    EXPECT_EQ(editor.text(), "- one\n\n- two");
+    // Ctrl+B on the word "two", then again: the marks come and go
+    editor.setCursorPosition(editor.text().size());
+    key(Qt::Key_Left, {}, Qt::ControlModifier | Qt::ShiftModifier);
+    key(Qt::Key_B, {}, Qt::ControlModifier);
+    EXPECT_EQ(editor.text(), "- one\n\n- **two**");
+    EXPECT_TRUE(md::format::stateAt(editor.text(), editor.anchorPosition(), editor.cursorPosition()).bold);
+    key(Qt::Key_B, {}, Qt::ControlModifier);
+    EXPECT_EQ(editor.text(), "- one\n\n- two");
+    // Ctrl+2: a heading instead of the list's mark; Ctrl+0: a paragraph
+    key(Qt::Key_2, {}, Qt::ControlModifier);
+    EXPECT_EQ(editor.text(), "- one\n\n## two");
+    key(Qt::Key_0, {}, Qt::ControlModifier);
+    EXPECT_EQ(editor.text(), "- one\n\ntwo");
+    editor.undo();
+    EXPECT_EQ(editor.text(), "- one\n\n## two") << "each tool: one step";
+}

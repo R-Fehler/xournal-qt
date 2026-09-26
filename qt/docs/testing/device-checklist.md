@@ -1453,3 +1453,38 @@ Update the table in the user doc with the results.
       on the page, into a `.md` file, and into the Markdown panel beside the page: the pasted text has `$…$` and
       `$$…$$` (formulas drawn), `the \(n\)th` stays; Ctrl+Z takes the whole paste back. Pasted into a ``` block: as
       it is. A plain text box (not Markdown) and a `.txt` file: as it is.
+
+## Markdown tool bar and table editor (qt/md-toolbar)
+
+- [ ] Open a `.md` from the library: a second row under the tool bar holds the formatting tools (¶/H, B, I, S, code,
+      link, Σ, lists, check boxes, quote, code block, table, +). It is there before anything is typed; a tool used
+      first starts writing at the top of the page in view. A `.txt` has no such row.
+- [ ] In a `.xopp`, write Markdown on the page (the writing button in its Markdown mode, or a Markdown text box with
+      the text tool): the row appears; tap the button again (or Escape): it goes. With the tool bar at the left or
+      right, and in full screen, the row is still at the top.
+- [ ] Select a word, tap B: `**word**`, B shown pressed; tap B again: the marks go. Without a selection B puts
+      `****` with the cursor in the middle, B again takes them away. The same for I, S, code and Σ (`$…$`). Link on a
+      selected word: `[word](https://)` with "https://" selected, typing replaces it; on a link, Link makes it text.
+- [ ] ¶ menu: Heading 1/2/3 and Paragraph; the button shows H1/H2/H3 on a heading line. Ctrl+1/2/3/0 do the same
+      while writing (tool tips name the keys); outside writing Ctrl+1 is still real size.
+- [ ] Select three lines (one empty between): bullet list → each text line gets "- ", again → they go; numbered list
+      numbers them 1., 2., 3. (after a numbered item it goes on from its number); check boxes; quote puts "> " on
+      each and ">" on the empty line.
+- [ ] Code block: its menu of languages; the fence goes on lines of its own with a blank line around it and the
+      cursor inside; with lines selected, they go inside the fence.
+- [ ] + menu: formula block (`$$` lines, cursor inside), horizontal rule, image (a placeholder `![image](image.png)`
+      with the file name selected), page break. After a page break in a `.md` on pages, the next text starts on a new
+      page; the break itself is not drawn (in the continuous page: nothing shows). Print to PDF: the same pages.
+- [ ] Every tool is one step of undo (Ctrl+Z, the undo button in a `.md`).
+- [ ] Table: tap it outside a table: "Insert table" with 3 columns, header and 2 rows. Type, Tab / Shift+Tab move,
+      Tab in the last cell adds a row, arrows move at the edges of a cell's text, Enter goes down. The current row
+      and column are tinted and named ("Row 2, Column 3"). Add / remove rows and columns with the buttons and with a
+      cell's menu (right-click, or press and hold with a finger), and with the row and column heads. Align a column
+      (the buttons, or its menu): the column head says so. Insert: a pipe table, columns padded to line up, a "|"
+      typed in a cell written as `\|`. Cancel changes nothing.
+- [ ] With the cursor in a table, the table button is pressed; tapping it opens the table in the grid at the cell of
+      the cursor. OK replaces it (Ctrl+Z brings the old one back in one step).
+- [ ] The source beside the page (the writing button's menu): the same row of tools above the source, acting on it
+      (one undo step there too), and its own table editor.
+- [ ] A phone-wide window (Android emulator or a test device): the row scrolls sideways; the tools do not close the
+      on-screen keyboard; the table editor fits the window and its grid scrolls.

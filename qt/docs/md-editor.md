@@ -16,10 +16,60 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
 - Typing without a cursor starts writing at the top of the page in view.
 - The tool bar has no ink tools for a text file (pen, eraser, shapes, colors, sizes, add page); page operations
   (insert, delete, move, paste pages, backgrounds, images, chapters) do nothing: the pages are the text's.
+- The formatting bar (below) is shown for a `.md`; a `.txt` has none.
 - Backspace right after the mark of an empty list item or quote line (`- `, `1. `, `- [ ] `, `> `) removes the
   whole mark (as in Ghostwriter).
 - Undo / redo (Ctrl+Z / Ctrl+Shift+Z and the undo button) go step by step through the text being written (a word,
   a line break, a deletion). The editor keeps changes, not copies of the text, so a long file stays cheap.
+
+## Formatting bar
+A row under the tool bar, shown while Markdown is written: in a `.md` (all the time), for Markdown written on a page
+of a `.xopp` (the page's text and Markdown text boxes), and above the source beside the page. It is for writing
+without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
+- **¶ / H1–H3** (a menu): paragraph, heading 1, 2, 3 (Ctrl+0 / 1 / 2 / 3). The button shows the level of the line
+  with the cursor.
+- **Marks in the text**: bold (Ctrl+B), italic (Ctrl+I), strikethrough, code (Ctrl+E), link (Ctrl+K), formula
+  (`$…$`). Around the selection (on each of its lines, not around the spaces); without a selection the empty marks
+  go in with the cursor between them. On text that has the mark (the cursor in it, or it selected, with its marks or
+  not), the mark goes. A link around a selected text selects the address to type (`[text](https://)`); a selected
+  address becomes the target (`[](address)`); on a link, Link makes it its text again.
+- **Marks of the lines**: bullet list, numbered list, check boxes, quote, for every line of the selection (empty
+  lines are left out; a quote goes on over them with `>`). If all of them have it, it goes; else they all get it (a
+  list mark or heading they had is replaced; a numbered list goes on from the item before it). The quote stays when
+  a line becomes a heading or a list item.
+- **Blocks**, on lines of their own with a blank line before and after (on an empty line; before the line when the
+  cursor is at its start; else after the line): code block (a menu of languages; selected lines go inside the fence),
+  table (below), and in the **+** menu: formula block (`$$` lines), horizontal rule, image (a placeholder
+  `![image](image.png)` with the file name selected: images are not shown yet), page break (below).
+- The buttons show what is at the cursor: bold, italic, …, the list, quote, code block, table. It is worked out from
+  the cursor's line (and the fences before it), not from the whole parse.
+- Every tool is one undo step, as are the keys; they are the same operations (`md::format`). The tools do not take
+  the keyboard focus: the text keeps it (and the on-screen keyboard stays). On a narrow window the row scrolls
+  sideways.
+
+### Tables
+The table button opens a table editor: the table at the cursor, or a new one (a header and two rows of three
+columns). The cells are a grid of text fields:
+- Tab / Shift+Tab: the next / previous cell (Tab in the last cell adds a row); the arrows go to the cell next to it
+  at the edge of a cell's text; Enter goes to the cell below; Ctrl+Enter is OK.
+- Rows and columns: add below / right, remove (the buttons), and in a menu of a cell (right-click, press and hold)
+  or of a row's or column's head: row above / below, column left / right, remove, alignment. The header row stays.
+- A column is aligned left, centered or right (`:--`, `:-:`, `--:`); again: no alignment.
+- The current row and column are tinted, their heads marked, and named above the grid ("Row 3, Column 2").
+- OK writes a GFM pipe table, the columns padded with spaces to line up (wide characters count twice), over the
+  table at the cursor or as a new block, as one undo step. A `|` in a cell is written `\|` (and read back as `|`); a
+  line break in a cell is `<br>`; inline Markdown in a cell stays as it is typed. Cancel (or Escape) changes nothing.
+
+### Page breaks
+The page break is `<div style="page-break-after: always"></div>` (as Typora, Pandoc and most Markdown-to-PDF tools
+read it; `break-after: page` too). The pages of the text end after it when the text before it fits (otherwise the
+text is split as always and the page with the break ends after it); one at the top of a page is ignored (no empty
+page). It is not drawn; the block with the cursor shows its source as any block. On one continuous page it does
+nothing. Code: `MdPaginate.cpp` (`paginate`), `text::pageBreak`.
+
+Code: `qt/src/markdown/MdFormat.*` (the tools as changes of the text, the state at the cursor, `md::table`),
+`MarkdownEditor::applyEdit`, `qt/src/app/AppMarkdownFormat.cpp`, `qml/MarkdownFormatBar.qml`,
+`qml/MarkdownTableEditor.qml`.
 
 ## New Markdown file, new text file
 The library's new button (the file with a plus) opens a menu: **New document…** (notes, as before), **New
@@ -132,7 +182,12 @@ program changed it (its bytes differ from what was read or saved last; our own s
 - QOwnNotes: a note changed on disk without local changes is reloaded silently, with local changes the user
   chooses (Reload / keep).
 - Typora / Obsidian's live preview (already in the Markdown boxes): the block with the cursor as source.
+- Typora, Obsidian, Zettlr and iA Writer's keyboard bar: the formatting bar's groups, marks toggled on the selection
+  or inserted empty, a style menu for the headings; Word and LibreOffice: the table grid (Tab to the next cell, Tab
+  in the last one adds a row).
 
 ## Not yet
-- Images pasted into `<name>.assets/`, Obsidian vault detection and its warnings.
+- Images pasted into `<name>.assets/`, Obsidian vault detection and its warnings. The formatting bar's image is a
+  placeholder until images are shown (a file picker then).
+- Table editor: cells of more than one line (a line break is written as `<br>`), moving rows and columns by drag.
 - "Save as" for a text file (use the library's Rename / Copy).

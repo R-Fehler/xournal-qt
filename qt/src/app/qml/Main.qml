@@ -289,6 +289,26 @@ ApplicationWindow {
         Material.foreground: "#303030"
         height: 56
       }
+      // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/md-editor.md)
+      MarkdownFormatBar {
+        id: formatBar
+        width: parent.width
+        visible: !app.homeVisible && !app.presenting && !markdownPanel.visible
+                 && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable))
+        format: app.markdownFormat
+        onFormatRequested: function(action, arg) {
+            app.formatMarkdown(action, arg)
+            canvas.forceActiveFocus()
+        }
+        onTableRequested: {
+            tableEditor.openFor(app.markdownTable(), function(cells, aligns) { app.writeMarkdownTable(cells, aligns) })
+        }
+      }
+    }
+    // The table editor of the formatting bar (the notes' canvas; the editor beside the page has its own)
+    MarkdownTableEditor {
+        id: tableEditor
+        onClosed: if (formatBar.visible) canvas.forceActiveFocus()
     }
 
     // The tools: in the header (top), or a column at the left or right side (setting). One set of tools, moved.

@@ -1,6 +1,7 @@
 // Markdown: write the Markdown of a page, or of a Markdown text box on it, beside the pages (right). The page shows
-// it formatted as you type (a box is a Xournal++ text in a layer "Markdown": Xournal++ shows the source). The buttons
-// insert Markdown; Enter continues a list. Done keeps it (one undo step), Cancel restores the page.
+// it formatted as you type (a box is a Xournal++ text in a layer "Markdown": Xournal++ shows the source). The
+// formatting bar's tools (MarkdownFormatBar, as on the page) change the source, each one undo step of the source;
+// Enter continues a list. Done keeps it (one undo step), Cancel restores the page.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -52,35 +53,28 @@ Pane {
     function lineEnd(pos) { const i = area.text.indexOf("\n", pos); return i < 0 ? area.length : i }
     readonly property var prefixPattern: /^(\s*)(#{1,6} |[-*+] \[[ xX]\] |[-*+] |\d+[.)] |> )?/
 
-    /// Put `before` / `after` around the selection (or insert both, the cursor between them).
-    function wrap(before, after) {
-        const s = area.selectionStart, e = area.selectionEnd
-        area.insert(e, after)
-        area.insert(s, before)
-        area.select(s + before.length, e + before.length)
+    /// What is at the cursor, for the formatting bar
+    property var format: ({})
+    function anchorPosition() { return area.cursorPosition === area.selectionStart ? area.selectionEnd : area.selectionStart }
+    function updateFormat() { if (visible) format = app.markdownFormatOf(area.text, anchorPosition(), area.cursorPosition) }
+    /// The selection after a tool ({anchor, caret})
+    function select(selection) {
+        if (selection && selection.anchor !== undefined) {
+            area.cursorPosition = selection.anchor
+            area.moveCursorSelection(selection.caret, TextEdit.SelectCharacters)
+        }
         area.forceActiveFocus()
+        updateFormat()
     }
-    /// Give the current line a prefix ("# ", "- ", "> ", ...) instead of the one it has; the same again removes it.
-    function setPrefix(prefix) {
-        const start = lineStart(area.cursorPosition)
-        const line = area.text.substring(start, lineEnd(start))
-        const m = line.match(prefixPattern)
-        const indent = m[1].length
-        const old = m[2] || ""
-        const cursor = area.cursorPosition
-        area.remove(start + indent, start + indent + old.length)
-        const added = old === prefix ? "" : prefix
-        area.insert(start + indent, added)
-        area.cursorPosition = Math.max(start + indent + added.length, cursor - old.length + added.length)
-        area.forceActiveFocus()
+    /// A formatting tool (md::format: "bold", "heading2", ...) on the source: one undo step of the source
+    function applyFormat(action, arg) {
+        select(app.formatMarkdownIn(area.textDocument, anchorPosition(), area.cursorPosition, action, arg || ""))
     }
-    function insertBlock(text) {
-        const pos = area.cursorPosition
-        const start = lineStart(pos)
-        const atEmptyLine = start === pos && lineEnd(pos) === pos
-        const before = atEmptyLine ? "" : "\n\n"
-        area.insert(lineEnd(pos), before + text)
-        area.forceActiveFocus()
+    function editTable() {
+        const anchor = anchorPosition(), caret = area.cursorPosition
+        panelTable.openFor(app.markdownTableIn(area.text, caret), function(cells, aligns) {
+            panel.select(app.writeMarkdownTableIn(area.textDocument, anchor, caret, cells, aligns))
+        })
     }
     /// Enter in a list or quote: the next line gets the same mark (the next number); on an empty item, the list ends.
     function returnPressed() {
@@ -125,74 +119,27 @@ Pane {
             Button { objectName: "markdownDone"; text: qsTr("Done"); highlighted: true; onClicked: panel.close(true) }
         }
 
-        // Insert Markdown
-        Flow {
+        // The formatting tools (as on the page)
+        MarkdownFormatBar {
             Layout.fillWidth: true
-            Layout.leftMargin: 8
+            namePrefix: "panel"
+            color: "transparent"
+            format: panel.format
+            onFormatRequested: function(action, arg) { panel.applyFormat(action, arg) }
+            onTableRequested: panel.editTable()
+        }
+        // The size of the text (the text's font size: the drawing follows)
+        RowLayout {
+            Layout.leftMargin: 14
             Layout.rightMargin: 8
-            spacing: 2
-            component MdButton: ToolButton {
-                id: mb
-                property string tip
-                implicitWidth: Math.max(40, implicitContentWidth + 16)
-                implicitHeight: 40
+            Label { text: qsTr("Size"); color: "#5f6368" }
+            SpinBox {
+                objectName: "markdownSize"
+                from: 4; to: 72
+                value: Math.round(app.markdownBoxSize)
+                editable: true
                 focusPolicy: Qt.NoFocus
-                ToolTip.visible: hovered && tip !== ""
-                ToolTip.text: tip
-                ToolTip.delay: 600
-            }
-            MdButton { text: "H1"; font.bold: true; tip: qsTr("Heading 1 (# )"); onClicked: panel.setPrefix("# ") }
-            MdButton { text: "H2"; font.bold: true; tip: qsTr("Heading 2 (## )"); onClicked: panel.setPrefix("## ") }
-            MdButton { text: "H3"; font.bold: true; tip: qsTr("Heading 3 (### )"); onClicked: panel.setPrefix("### ") }
-            IconButton {
-                iconName: "xqt-bold"; tip: qsTr("Bold (Ctrl+B)")
-                implicitWidth: 40; implicitHeight: 40; icon.width: 20; icon.height: 20
-                focusPolicy: Qt.NoFocus
-                onClicked: panel.wrap("**", "**")
-            }
-            IconButton {
-                iconName: "xqt-italic"; tip: qsTr("Italic (Ctrl+I)")
-                implicitWidth: 40; implicitHeight: 40; icon.width: 20; icon.height: 20
-                focusPolicy: Qt.NoFocus
-                onClicked: panel.wrap("*", "*")
-            }
-            MdButton { text: "S"; font.strikeout: true; tip: qsTr("Strikethrough"); onClicked: panel.wrap("~~", "~~") }
-            MdButton { text: "</>"; font.family: "monospace"; tip: qsTr("Code (Ctrl+E)"); onClicked: panel.wrap("`", "`") }
-            MdButton { text: qsTr("Link"); tip: qsTr("Link (Ctrl+K)"); onClicked: panel.wrap("[", "](https://)") }
-            ToolSeparator {}
-            IconButton {
-                iconName: "xqt-list"; tip: qsTr("Bullet list (- )")
-                implicitWidth: 40; implicitHeight: 40; icon.width: 20; icon.height: 20
-                focusPolicy: Qt.NoFocus
-                onClicked: panel.setPrefix("- ")
-            }
-            IconButton {
-                iconName: "xqt-list-ordered"; tip: qsTr("Numbered list (1. )")
-                implicitWidth: 40; implicitHeight: 40; icon.width: 20; icon.height: 20
-                focusPolicy: Qt.NoFocus
-                onClicked: panel.setPrefix("1. ")
-            }
-            MdButton { text: "☐"; tip: qsTr("Task list (- [ ] )"); onClicked: panel.setPrefix("- [ ] ") }
-            MdButton { text: "“"; font.pixelSize: 20; tip: qsTr("Quote (> )"); onClicked: panel.setPrefix("> ") }
-            MdButton { text: "{ }"; font.family: "monospace"; tip: qsTr("Code block"); onClicked: panel.insertBlock("```\n\n```\n") }
-            MdButton {
-                text: qsTr("Table"); tip: qsTr("Table")
-                onClicked: panel.insertBlock("| Column | Column |\n|--------|--------|\n| | |\n")
-            }
-            MdButton { text: "―"; tip: qsTr("Horizontal rule (---)"); onClicked: panel.insertBlock("---\n") }
-            ToolSeparator {}
-            // The size of the text (the text's font size: the drawing follows)
-            RowLayout {
-                height: 40
-                Label { text: qsTr("Size"); color: "#5f6368" }
-                SpinBox {
-                    objectName: "markdownSize"
-                    from: 4; to: 72
-                    value: Math.round(app.markdownBoxSize)
-                    editable: true
-                    focusPolicy: Qt.NoFocus
-                    onValueModified: { app.setMarkdownBoxSize(value); area.forceActiveFocus() }
-                }
+                onValueModified: { app.setMarkdownBoxSize(value); area.forceActiveFocus() }
             }
         }
 
@@ -230,6 +177,9 @@ Pane {
                 padding: 14
                 placeholderText: qsTr("Markdown: # heading, **bold**, *italic*, - list, 1. list, > quote, ``` code")
                 onTextChanged: if (panel.visible) pageUpdate.restart()
+                onCursorPositionChanged: panel.updateFormat()
+                onSelectionStartChanged: panel.updateFormat()
+                onSelectionEndChanged: panel.updateFormat()
                 Keys.onPressed: function(event) {
                     const ctrl = event.modifiers & Qt.ControlModifier
                     if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
@@ -241,15 +191,15 @@ Pane {
                         const spaces = area.text.substring(start, start + 2).match(/^ {0,2}/)[0].length
                         area.remove(start, start + spaces); event.accepted = true
                     } else if (ctrl && event.key === Qt.Key_B) {
-                        panel.wrap("**", "**"); event.accepted = true
+                        panel.applyFormat("bold"); event.accepted = true
                     } else if (ctrl && event.key === Qt.Key_I) {
-                        panel.wrap("*", "*"); event.accepted = true
+                        panel.applyFormat("italic"); event.accepted = true
                     } else if (ctrl && event.key === Qt.Key_E) {
-                        panel.wrap("`", "`"); event.accepted = true
+                        panel.applyFormat("code"); event.accepted = true
                     } else if (ctrl && event.key === Qt.Key_K) {
-                        panel.wrap("[", "](https://)"); event.accepted = true
-                    } else if (ctrl && event.key >= Qt.Key_1 && event.key <= Qt.Key_3) {
-                        panel.setPrefix("#".repeat(event.key - Qt.Key_0) + " "); event.accepted = true
+                        panel.applyFormat("link"); event.accepted = true
+                    } else if (ctrl && event.key >= Qt.Key_0 && event.key <= Qt.Key_3) {
+                        panel.applyFormat(event.key === Qt.Key_0 ? "paragraph" : "heading" + (event.key - Qt.Key_0)); event.accepted = true
                     } else if (event.key === Qt.Key_Escape) {
                         panel.close(true); event.accepted = true
                     } else if (event.matches(StandardKey.Paste) && app.clipboardLinkMarkdown() !== "") {
@@ -264,5 +214,11 @@ Pane {
                 }
             }
         }
+    }
+
+    MarkdownTableEditor {
+        id: panelTable
+        namePrefix: "panel"
+        onClosed: area.forceActiveFocus()
     }
 }

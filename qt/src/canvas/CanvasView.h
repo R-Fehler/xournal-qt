@@ -341,6 +341,8 @@ Q_SIGNALS:
     void notesChanged();
     /// Text editing started or ended (keyboard / input method for the canvas).
     void textEditingChanged(bool editing);
+    /// The Markdown being written changed, or its cursor moved (the formatting bar shows what is at the cursor).
+    void markdownCursorChanged();
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
     void contextRequested(QPointF viewPos);
     /// The text tool tapped the Markdown box of a page (0-based): the UI opens its editor.
