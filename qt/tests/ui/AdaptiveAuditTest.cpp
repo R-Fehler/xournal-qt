@@ -34,44 +34,14 @@
 #include "shell/Thumbnails.h"
 
 #include "AppController.h"
+#include "LayoutWalk.h"
 #include "config-test.h"
 
 namespace fs = std::filesystem;
 
 namespace {
-struct Size {
-    int w;
-    int h;
-    const char* label;
-};
-// Logical pixels. Tablets and 2-in-1s: the screen minus a 48 px task bar where the desktop has one.
-const Size allSizes[] = {
-        {1920, 1080, "desktop-fhd"},        {1366, 768, "laptop"},           {1280, 800, "laptop-16x10"},
-        {1024, 700, "small-desktop"},       {800, 600, "tiny-desktop"},      {600, 800, "narrow-tall"},
-        {412, 915, "phone-portrait"},       {915, 412, "phone-landscape"},   {900, 1000, "fold7-inner"},
-        {1280, 500, "short-wide"},          {960, 1392, "surface-200-portrait"}, {1440, 912, "surface-200-landscape"},
-        {1280, 1872, "surface-150-portrait"}, {1920, 1232, "surface-150-landscape"},
-        {864, 1488, "2in1-150-portrait"},   {720, 1232, "2in1-125-portrait"}, {1536, 816, "2in1-landscape"},
-        {1280, 672, "2in1-125-landscape"},
-};
-
-QString fixture(const char8_t* rel) {
-    const auto p = GET_TESTFILE(rel);
-    return QString::fromUtf8(reinterpret_cast<const char*>(p.c_str()));
-}
-
-QString labelOf(QQuickItem* i) {
-    if (!i->objectName().isEmpty()) {
-        return i->objectName();
-    }
-    for (const char* p: {"iconName", "text", "tip"}) {
-        const QString v = i->property(p).toString();
-        if (!v.isEmpty()) {
-            return QString(p) + "=" + v.left(24);
-        }
-    }
-    return QString::fromLatin1(i->metaObject()->className());
-}
+using Size = xqt::uitest::WindowSize;
+using xqt::uitest::labelOf;
 
 class AdaptiveAuditTest: public ::testing::Test {
 protected:
@@ -180,49 +150,15 @@ protected:
         const QImage picture = window->grabWindow();
         picture.save(folder + '/' + name + ".png");
 
-        const QRectF win(0, 0, window->width(), window->height());
-        QStringList outside, hidden, small;
-        int buttons = 0;
-        // Every visible item: the part of it that is shown (clipping ancestors cut it) and where it is
-        std::function<void(QQuickItem*, QRectF)> walk = [&](QQuickItem* i, QRectF clip) {
-            if (!i->isVisible() || i->opacity() <= 0.01) {
-                return;
-            }
-            const QRectF r = i->mapRectToScene(QRectF(0, 0, i->width(), i->height()));
-            const bool button = i->inherits("QQuickAbstractButton");
-            const bool control = button || i->inherits("QQuickTextInput") || i->inherits("QQuickTextEdit") ||
-                                 i->inherits("QQuickTextField") || i->inherits("QQuickComboBox") ||
-                                 i->inherits("QQuickSpinBox");
-            if (control && r.width() > 1 && r.height() > 1 && i->isEnabled()) {
-                const QRectF shown = r.intersected(clip);
-                if (button) {
-                    ++buttons;
-                }
-                if (shown.width() < r.width() - 2 || shown.height() < r.height() - 2) {
-                    // cut by a scrolling (clipping) area: hidden until scrolled
-                    if (!clip.contains(win)) {
-                        hidden << labelOf(i);
-                    }
-                }
-                if (!win.contains(shown.adjusted(1, 1, -1, -1)) && !shown.isEmpty()) {
-                    outside << QString("%1@%2,%3").arg(labelOf(i)).arg(int(shown.right())).arg(int(shown.bottom()));
-                }
-                if (button && !shown.isEmpty() && (r.width() < 40 || r.height() < 40)) {
-                    small << QString("%1(%2x%3)").arg(labelOf(i)).arg(int(r.width())).arg(int(r.height()));
-                }
-            }
-            const QRectF inner = i->clip() ? clip.intersected(r) : clip;
-            for (QQuickItem* c: i->childItems()) {
-                walk(c, inner);
-            }
-        };
-        walk(window->contentItem(), QRectF(-1e6, -1e6, 2e6, 2e6));
-        outside.removeDuplicates();
-        hidden.removeDuplicates();
-        small.removeDuplicates();
+        const xqt::uitest::LayoutFindings f = xqt::uitest::walkLayout(window);
+        const QStringList &outside = f.outside, &hidden = f.hidden, &small = f.small;
+        const int buttons = f.buttons;
 
         std::ofstream report((folder + "/report.tsv").toStdString(), std::ios::app);
-        report << name.toStdString() << "\t" << screen << "\t" << s.w << "x" << s.h << "\tbuttons=" << buttons
+        const QObject* adaptive = window->property("adaptive").value<QObject*>();
+        const QString sizeClass = adaptive ? adaptive->property("sizeClass").toString() : QString();
+        report << name.toStdString() << "\t" << screen << "\t" << s.w << "x" << s.h << "\tclass="
+               << sizeClass.toStdString() << "\tbuttons=" << buttons
                << "\toutside=" << outside.size() << "\thidden=" << hidden.size() << "\tsmall=" << small.size() << "\t"
                << extra.toStdString() << "\tOUT[" << outside.join(' ').toStdString() << "]\tHIDDEN["
                << hidden.join(' ').toStdString() << "]\tSMALL[" << small.join(' ').toStdString() << "]\n";
@@ -338,10 +274,10 @@ void AdaptiveAuditTest::walk() {
         shot("doc", QString("sidebarDefault=%1; %2").arg(sidebarDefault).arg(toolbarFit()));
     }
     if (wanted("docSidebar") && !sidebarDefault) {
-        window->setProperty("sidebarShown", true);
+        QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));  // (a binding: shown by its button)
         wait(300);
         shot("docSidebar", toolbarFit());
-        window->setProperty("sidebarShown", false);
+        QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, false));  // (a binding: shown by its button)
     }
     // The ⋮ menu, opened as a user does: the tool bar scrolled to its end first
     if (wanted("moreMenu")) {
@@ -544,7 +480,7 @@ TEST_F(AdaptiveAuditTest, walkTheScreensAtAllSizes) {
         GTEST_SKIP() << "set XQT_UI_AUDIT=<folder>";
     }
     const QString only = qEnvironmentVariable("XQT_UI_AUDIT_SIZES");
-    for (const Size& s: allSizes) {
+    for (const Size& s: xqt::uitest::auditSizes) {
         if (!only.isEmpty() && !only.split(',').contains(QString("%1x%2").arg(s.w).arg(s.h))) {
             continue;
         }

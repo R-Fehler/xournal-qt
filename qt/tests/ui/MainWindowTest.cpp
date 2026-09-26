@@ -114,6 +114,8 @@ protected:
     void SetUp() override {
         controller = std::make_unique<AppController>();
         prepareController();
+        // (the tests of a run share the config: no layout chosen by hand in an earlier one, e.g. the sidebar hidden)
+        QMetaObject::invokeMethod(controller->settingsModel(), "resetLayoutChoices");
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
         engine->addImageProvider("sketch", new xqt::SketchProvider);
@@ -962,7 +964,7 @@ TEST_F(MainWindowTest, shotOfTheCanvas) {
     restPointer(window);  // (no tool tip of a hovered button in the picture)
     wait(200);
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    window->setProperty("sidebarShown", true);
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));  // (a binding: shown by its button)
     controller->goToPage(7);  // squared paper
     wait(600);
 
@@ -1006,7 +1008,7 @@ TEST_F(MainWindowTest, shotOfMarkdown) {
     while (controller->tabCount() > 1) {
         controller->closeTab(0);
     }
-    window->setProperty("sidebarShown", false);
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, false));  // (a binding: shown by its button)
     auto* panel = find<QQuickItem>("markdownPanel");
     ASSERT_NE(panel, nullptr);
     QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, 0));
@@ -4669,7 +4671,7 @@ TEST_F(MainWindowTest, benchScrollCost) {
     xqt::CanvasMemory::instance().planNow();
     wait(2000);
     for (const bool sidebar: {true, false}) {
-        window->setProperty("sidebarShown", sidebar);
+        QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, sidebar));  // (a binding: shown by its button)
         wait(300);
         const quint64 before = view->visibilityUpdates();
         QElapsedTimer t;

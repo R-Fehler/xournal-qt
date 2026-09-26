@@ -100,6 +100,13 @@ is built.
 
 ## Ready: bug and polish blocks
 
+### Adaptive UI ([ui-adaptive-audit.md](qt/docs/ui-adaptive-audit.md), [adaptive-layout.md](qt/docs/adaptive-layout.md))
+- [x] Block 1 `qt/adaptive-foundation`: size classes, touch profile, choices per class, the sidebar binding and
+  drawer, chromeMode apart from full screen, `AdaptiveLayoutTest`.
+- [ ] Left from block 1: `HomeView` (760, 1500), `TabOverview`, the Markdown panel and the reference split still keep
+  their own widths (table in adaptive-layout.md); the tab strip's 38 px buttons and the other F14 targets are not
+  sized by `minTarget` yet; the drawer has no slide animation; Escape does not close it.
+
 ---
 
 ## Ready after a short plan: platform

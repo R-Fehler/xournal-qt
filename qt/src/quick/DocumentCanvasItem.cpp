@@ -1,6 +1,7 @@
 #include "DocumentCanvasItem.h"
 #include "TextFlowEditor.h"
 #include "EmojiNames.h"
+#include "AdaptiveLayout.h"
 #include "TouchGestures.h"
 
 #include <algorithm>
@@ -269,6 +270,7 @@ void xqt::registerQuickTypes() {
     qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas");
     qmlRegisterType<TextFlowEditor>("XournalQt.Canvas", 1, 0, "TextFlowEditor");
     qmlRegisterType<TouchGestures>("XournalQt.Canvas", 1, 0, "TouchGestures");
+    qmlRegisterType<AdaptiveLayout>("XournalQt.Canvas", 1, 0, "AdaptiveLayout");
     qmlRegisterSingletonType<EmojiNames>("XournalQt.Canvas", 1, 0, "Emoji",
                                          [](QQmlEngine*, QJSEngine*) -> QObject* { return new EmojiNames; });
 }
@@ -279,6 +281,7 @@ DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     setCursor(Qt::CrossCursor);
     // Proximity events are only delivered to the application object.
     qApp->installEventFilter(this);
+    xqt::AdaptiveLayout::watchBeforeCanvases();  // (it sees the strokes on this canvas too: they hold the size class)
     allCanvases().push_back(this);
     geometryTimer.setSingleShot(true);
     geometryTimer.setInterval(GEOMETRY_SETTLES_MS);

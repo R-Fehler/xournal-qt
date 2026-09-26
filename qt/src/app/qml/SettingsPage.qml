@@ -90,6 +90,9 @@ Popup {
         property alias text: label.text
         property var options: []    // [{ text, value }]; value may be a string or an index
         property var dependsOn      // another value its setting follows (read again when it changes)
+        // Instead of a key: where the value is read and written (functions)
+        property var getter: null
+        property var setter: null
         Layout.fillWidth: true
         Label { id: label; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         ComboBox {
@@ -98,8 +101,9 @@ Popup {
             textRole: "text"
             valueRole: "value"
             // count: re-evaluate once the model is there
-            currentIndex: (sheet.s.revision, row.dependsOn, count, indexOfValue(sheet.s.get(row.key)))
-            onActivated: sheet.s.set(row.key, currentValue)
+            currentIndex: (sheet.s.revision, row.dependsOn, count,
+                           indexOfValue(row.getter ? row.getter() : sheet.s.get(row.key)))
+            onActivated: row.setter ? row.setter(currentValue) : sheet.s.set(row.key, currentValue)
         }
     }
 
@@ -300,6 +304,18 @@ Popup {
                     Hint {
                         text: qsTr("A document opens with the hand tool, so one finger scrolls. Choose the pen (or "
                                    + "another tool) to write.")
+                    }
+                    ComboRow {
+                        objectName: "touchProfileRow"
+                        key: "touchProfile"
+                        text: qsTr("Buttons sized for fingers")
+                        options: [{ text: qsTr("When a finger is used"), value: "auto" },
+                                  { text: qsTr("Always"), value: "on" },
+                                  { text: qsTr("Never"), value: "off" }]
+                    }
+                    Hint {
+                        text: qsTr("Some buttons get bigger when the screen is touched with a finger, and smaller again "
+                                   + "when the mouse is used. The pen changes nothing.")
                     }
                     SwitchRow { key: "zoomGestures"; text: qsTr("Pinch with two fingers to zoom") }
                     Hint {
@@ -777,6 +793,50 @@ Popup {
                               ? qsTr("Calibrated: 100 % is the real size on this screen. Another screen keeps its "
                                      + "own calibration; the window takes it when it is moved there.")
                               : qsTr("Not calibrated yet: 100 % follows what the screen says.")
+                    }
+
+                    // The layout for the window's size (qt/docs/adaptive-layout.md)
+                    SectionTitle { text: qsTr("Window size") }
+                    SwitchRow {
+                        objectName: "adaptiveLayoutSwitch"
+                        key: "adaptiveLayout"
+                        text: qsTr("Adapt the layout to the window size")
+                    }
+                    Hint {
+                        objectName: "sizeClassHint"
+                        readonly property var names: ({
+                            desktopWide: qsTr("a wide desktop window"),
+                            desktopNarrow: qsTr("a narrow desktop window or a tablet in landscape"),
+                            tabletPortrait: qsTr("a tablet in portrait"),
+                            phonePortrait: qsTr("a phone in portrait"),
+                            phoneShort: qsTr("a phone in landscape or a low window"),
+                            tiny: qsTr("a tiny window")
+                        })
+                        readonly property var adaptive: win.adaptive
+                        text: qsTr("This window is %1 (%2 × %3).").arg(names[adaptive.sizeClass])
+                                                            .arg(Math.round(adaptive.classWidth))
+                                                            .arg(Math.round(adaptive.classHeight))
+                              + " " + ((sheet.s.revision, sheet.s.get("adaptiveLayout"))
+                                         ? qsTr("The page sidebar shows beside the page when there is room for it. "
+                                                + "What you show or hide by hand is kept for each kind of window.")
+                                         : qsTr("The window keeps the desktop layout at every size."))
+                    }
+                    ComboRow {
+                        // The chrome chosen for this kind of window (stored as a layout choice, not a setting)
+                        objectName: "chromeChoiceRow"
+                        text: qsTr("Controls at this size")
+                        options: [{ text: qsTr("All (tabs, tool bar)"), value: "" },
+                                  { text: qsTr("Compact (as in full screen)"), value: "compact" },
+                                  { text: qsTr("None (reading)"), value: "reader" }]
+                        getter: function() { return win.chromeChoice }
+                        setter: function(v) { win.chooseChrome(v === "" ? "full" : v) }
+                    }
+                    Button {
+                        objectName: "resetLayoutButton"
+                        text: qsTr("Reset the layout choices")
+                        flat: true
+                        enabled: (sheet.s.revision, sheet.s.hasLayoutChoices())
+                        onClicked: sheet.s.resetLayoutChoices()
                     }
                     Item { Layout.preferredHeight: 16 }
                 }
