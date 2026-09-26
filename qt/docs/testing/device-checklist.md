@@ -1386,7 +1386,7 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] A lecture PDF: highlight a sentence with the highlighter, underline another from selected text, write a text
       box, a Markdown box, a link marker (paste a copied link), and a few words by hand in the margin. The page
       sidebar's highlighter button shows them by page: the highlighted sentences with their text, the boxes, the link,
-      and a small picture of the handwriting. Circles and underlines drawn with the pen over the text are not listed.
+      and a small picture of the handwriting.
 - [ ] A PDF with highlights made in Okular (or Acrobat) with a note: "Highlight in the PDF", its text, its note.
 - [ ] A tap on an item scrolls there (the item in view, also far down a page); Back returns.
 - [ ] With the panel open, write on a page: after a short pause the list shows the new item, without jumping to the
@@ -1401,6 +1401,11 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] `XQT_ANNOTATION_PICTURES=1 ./xournal-qt`: the export writes the handwriting as PNGs in `<name>.annotations.assets/`
       and links them; Typora or Obsidian show them.
 - [ ] Android (emulator): the panel lists and jumps the same; a tap on an item works with a finger.
+- [ ] (qt/annotations-context) Every piece of handwriting is listed: a circle around a word, an underline and a
+      strike through made with the pen, a word written on the slide over its text, a rectangle and a ruler line, a dot
+      by itself. The ones on PDF text say which text under the picture: `on “Kalman gain”` (whole words). The page
+      where only the Markdown box was listed before now lists its ink too.
+- [ ] Export: handwriting on PDF text ends with `on “…”` in the `.md`.
 
 ## Sticky notes (qt/sticky-notes)
 

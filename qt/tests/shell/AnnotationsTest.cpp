@@ -5,6 +5,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <cmath>
 #include <memory>
 
 #include <QRegularExpression>
@@ -131,6 +132,13 @@ std::unique_ptr<Document> makeDocument(const fs::path& pdf) {
     return std::move(loaded.document);
 }
 
+/// A stroke of handwriting known by its box only (grouping).
+an::PageContent::Mark inkBox(double x, double y, double w, double h) {
+    an::PageContent::Mark m;
+    m.box = QRectF(x, y, w, h);
+    return m;
+}
+
 std::vector<an::Item> ofKind(const std::vector<an::Item>& items, an::Kind kind) {
     std::vector<an::Item> out;
     for (const auto& i: items) {
@@ -179,11 +187,15 @@ TEST(Annotations, collectsHighlightsBoxesHandwritingAndLinks) {
     EXPECT_EQ(links[0].target, "notes.xopp#page=2");
 
     const auto ink = ofKind(items, an::Kind::Ink);
-    ASSERT_EQ(ink.size(), 1u) << "the margin note is one piece; the stroke through the text is a mark";
+    ASSERT_EQ(ink.size(), 2u) << "the margin note is one piece; the stroke through the text is listed too";
     EXPECT_EQ(ink[0].page, 0u);
-    EXPECT_GE(ink[0].rect.left(), 515);
-    EXPECT_LE(ink[0].rect.top(), 400);
-    EXPECT_GE(ink[0].rect.bottom(), 419);
+    EXPECT_TRUE(ink[0].text.startsWith("Noise is")) << "the text it marks: " << ink[0].text.toStdString();
+    EXPECT_FALSE(ink[0].text.contains("Kalman"));
+    EXPECT_EQ(ink[1].page, 0u);
+    EXPECT_EQ(ink[1].text, QString()) << "in the margin: over no text";
+    EXPECT_GE(ink[1].rect.left(), 515);
+    EXPECT_LE(ink[1].rect.top(), 400);
+    EXPECT_GE(ink[1].rect.bottom(), 419);
 
     // Reading order: page by page, top to bottom
     for (size_t i = 1; i < items.size(); ++i) {
@@ -220,7 +232,9 @@ TEST(Annotations, withSpaceForNotesHighlightsFindTheTextUnderThem) {
     EXPECT_NEAR(pdfHighlights[0].rect.left(), 155, 1) << "where it is drawn on the page";
     EXPECT_NEAR(pdfHighlights[0].rect.top(), 842 - 756 + 50, 1);
     const auto ink = ofKind(items, an::Kind::Ink);
-    ASSERT_EQ(ink.size(), 1u) << "the stroke through the text is still a mark, not a note";
+    ASSERT_EQ(ink.size(), 2u);
+    EXPECT_TRUE(ink[0].text.startsWith("Noise is")) << "the text under the mark, found at the offset: "
+                                                    << ink[0].text.toStdString();
 }
 
 TEST(Annotations, aStickyNoteIsListedAsANoteNotAsItsTextOrInk) {
@@ -251,8 +265,7 @@ TEST(Annotations, handwritingWrittenApartIsTwoPieces) {
     c.width = 595;
     c.height = 842;
     // Written one after the other: two strokes of a word, far away another word, then back to the first: a dot over it
-    c.ink = {QRectF(500, 100, 20, 10), QRectF(525, 102, 20, 10), QRectF(500, 600, 30, 12),
-             QRectF(540, 101, 10, 10)};
+    c.ink = {inkBox(500, 100, 20, 10), inkBox(525, 102, 20, 10), inkBox(500, 600, 30, 12), inkBox(540, 101, 10, 10)};
     const auto items = an::itemsOf(c, 0, nullptr);
     ASSERT_EQ(items.size(), 2u);
     EXPECT_EQ(items[0].rect, QRectF(500, 100, 50, 12)) << "a late stroke over the first word joins it";
@@ -290,6 +303,8 @@ TEST(Annotations, markdownWithLinksBackToThePlaces) {
     EXPECT_TRUE(md.contains("> **Summary**: the gain balances model and measurement."));
     EXPECT_TRUE(md.contains("- [Kalman notes](../Lectures/notes.xopp#page=2)")) << "relinked from the Notes folder";
     EXPECT_TRUE(md.contains("(handwriting)")) << "no pictures asked for";
+    EXPECT_TRUE(md.contains(QStringLiteral("(handwriting) on “Noise is"))) << "the text it marks, quoted: "
+                                                                          << md.toStdString();
 
     // Every link leads back: it parses, points at the document, and its page is the item's
     const QRegularExpression placeLink(QStringLiteral(R"(\[p\. (\d+)\]\(([^)]+)\))"));
@@ -308,10 +323,11 @@ TEST(Annotations, markdownWithLinksBackToThePlaces) {
     input.inkImages = true;
     std::vector<an::Picture> pictures;
     const QString withPictures = QString::fromStdString(an::markdown(items, input, mdFile, &pictures));
-    ASSERT_EQ(pictures.size(), 1u);
+    ASSERT_EQ(pictures.size(), 2u);
     EXPECT_EQ(pictures[0].file, "lecture one.annotations.assets/p1-01.png");
     EXPECT_EQ(items[pictures[0].item].kind, an::Kind::Ink);
     EXPECT_TRUE(withPictures.contains("](lecture%20one.annotations.assets/p1-01.png)")) << withPictures.toStdString();
+    EXPECT_TRUE(withPictures.contains(QStringLiteral("p1-01.png) on “Noise is"))) << withPictures.toStdString();
     EXPECT_EQ(an::assetsFolder(mdFile).filename(), "lecture one.annotations.assets");
 }
 
@@ -327,4 +343,115 @@ TEST(Annotations, markdownEscapesPlainText) {
     EXPECT_NE(md.find("- \\# not a heading\n  1\\. not a list \\* \\[x\\] \\$5 ([p. 1](d.xopp#page=1))"), std::string::npos)
             << md;
     EXPECT_NE(md.find("\n## Page 1\n"), std::string::npos) << "a heading per page without chapters";
+}
+
+// The author's report (2026-09-26): on a page only the Markdown box was listed, not the ink. Ink written on the
+// slide, over its text, was left out as "a mark"; now every piece of handwriting is listed, with the text it is on.
+TEST(Annotations, aPageWithAMarkdownBoxAndInkOnTheSlideListsBoth) {
+    QTemporaryDir tmp;
+    const fs::path pdf = makePdf(tmp);
+    auto loaded = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    Document& doc = *loaded.document;
+    PageRef p = doc.getPage(0);
+    auto* md = new Layer();
+    md->setName(std::string(xoj::markdown::LAYER_NAME));
+    p->getLayers().push_back(md);  // (the page owns it)
+    text(md, "**Summary**: noise is Gaussian.", 300, 500);
+    // A word written on the slide, over its second line ("Noise is modelled as Gaussian."), in three strokes, one of
+    // them on the Markdown layer
+    Layer* layer = p->getLayers().front();
+    stroke(layer, StrokeTool::PEN, 1.4, {{150, 120}, {162, 134}, {174, 120}});
+    stroke(layer, StrokeTool::PEN, 1.4, {{180, 122}, {192, 132}});
+    stroke(md, StrokeTool::PEN, 1.4, {{198, 120}, {210, 134}, {222, 121}});
+
+    PdfLayoutReader reader(pdf);
+    const auto items = an::collect(doc, &reader);
+    ASSERT_EQ(ofKind(items, an::Kind::Markdown).size(), 1u);
+    const auto ink = ofKind(items, an::Kind::Ink);
+    ASSERT_EQ(ink.size(), 1u) << "the handwriting on the slide is one piece, listed";
+    EXPECT_TRUE(ink[0].text.contains("Gaussian")) << "the words it is written over: " << ink[0].text.toStdString();
+    EXPECT_LE(ink[0].rect.left(), 150);
+    EXPECT_GE(ink[0].rect.right(), 222);
+}
+
+// A circle around a word, a box drawn around it: the handwriting is listed with the word it marks
+TEST(Annotations, aCircleAroundAWordIsListedWithTheWord) {
+    QTemporaryDir tmp;
+    const fs::path pdf = makePdf(tmp);
+    auto loaded = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    Document& doc = *loaded.document;
+    // Around "Kalman" (the first word of page 1, from x = 60 on the line at y = 100); a box around the second line of
+    // page 2, drawn with the rectangle tool (a closed pen stroke)
+    std::vector<QPointF> circle;
+    for (int i = 0; i <= 32; ++i) {
+        const double a = 2 * M_PI * i / 32;
+        circle.emplace_back(83 + 27 * std::cos(a), 96 + 13 * std::sin(a));
+    }
+    {
+        auto s = std::make_unique<Stroke>();
+        s->setWidth(1.4);
+        s->setColor(Color(0xffff0000U));
+        for (const QPointF& q: circle) {
+            s->addPoint(Point(q.x(), q.y()));
+        }
+        doc.getPage(0)->getSelectedLayer()->addElement(std::move(s));
+    }
+    stroke(doc.getPage(1)->getSelectedLayer(), StrokeTool::PEN, 1.4,
+           {{52, 116}, {330, 116}, {330, 137}, {52, 137}, {52, 116}});
+
+    PdfLayoutReader reader(pdf);
+    const auto items = an::collect(doc, &reader);
+    const auto ink = ofKind(items, an::Kind::Ink);
+    ASSERT_EQ(ink.size(), 2u);
+    EXPECT_TRUE(ink[0].text.contains("Kalman")) << ink[0].text.toStdString();
+    EXPECT_FALSE(ink[0].text.contains("estimate")) << ink[0].text.toStdString();
+    EXPECT_FALSE(ink[0].text.contains("Noise")) << ink[0].text.toStdString();
+    EXPECT_EQ(ink[1].page, 1u);
+    EXPECT_TRUE(ink[1].text.startsWith("Covariance shrinks")) << ink[1].text.toStdString();
+    EXPECT_FALSE(ink[1].text.contains("update step")) << ink[1].text.toStdString();
+}
+
+// Ink of every drawing tool counts: the pen, its shapes (ruler, rectangle, the stroke recogniser: pen strokes too),
+// the highlighter over no text, on any visible layer, on a page without a PDF. Not the whiteout eraser (it hides ink)
+// and not a hidden layer (not what the reader sees).
+TEST(Annotations, inkOfEveryToolIsListed) {
+    XojPage page(595, 842);
+    Layer* first = page.getSelectedLayer();
+    stroke(first, StrokeTool::PEN, 1.4, {{60, 100}, {90, 110}, {120, 100}});        // pen
+    stroke(first, StrokeTool::PEN, 1.4, {{60, 200}, {300, 200}});                   // ruler
+    Stroke* rect = stroke(first, StrokeTool::PEN, 1.4, {{60, 300}, {200, 300}, {200, 360}, {60, 360}, {60, 300}});
+    rect->setFill(128);                                                             // a filled rectangle
+    stroke(first, StrokeTool::HIGHLIGHTER, 12, {{60, 460}, {250, 460}}, 0xffff00);  // highlighter over nothing
+    stroke(first, StrokeTool::ERASER, 8, {{400, 100}, {500, 100}}, 0xffffff);       // whiteout
+    auto* second = new Layer();
+    page.getLayers().push_back(second);  // (the page owns it)
+    stroke(second, StrokeTool::PEN, 1.4, {{60, 600}, {100, 640}});  // another layer (not the selected one)
+    auto* hidden = new Layer();
+    hidden->setVisible(false);
+    page.getLayers().push_back(hidden);
+    stroke(hidden, StrokeTool::PEN, 1.4, {{60, 750}, {100, 760}});
+
+    const auto ink = ofKind(an::itemsOf(an::read(page), 0, nullptr), an::Kind::Ink);
+    ASSERT_EQ(ink.size(), 5u);
+    EXPECT_NEAR(ink[0].rect.top(), 100, 2);
+    EXPECT_NEAR(ink[1].rect.top(), 200, 2);
+    EXPECT_NEAR(ink[2].rect.top(), 300, 2);
+    EXPECT_NEAR(ink[3].rect.center().y(), 460, 2);
+    EXPECT_NEAR(ink[4].rect.top(), 600, 2);
+}
+
+// Dots and short marks: kept, joined to the handwriting next to them
+TEST(Annotations, tinyMarksAreKept) {
+    an::PageContent c;
+    c.width = 595;
+    c.height = 842;
+    // A word, another word far away, then a dot next to the first (an "i"'s dot written late), and a lone dot
+    c.ink = {inkBox(500, 100, 40, 12), inkBox(100, 600, 50, 12), inkBox(545, 98, 2, 2), inkBox(300, 300, 2, 2)};
+    const auto items = an::itemsOf(c, 0, nullptr);
+    ASSERT_EQ(items.size(), 3u);
+    EXPECT_EQ(items[0].rect, QRectF(500, 98, 47, 14)) << "the dot joined the word next to it";
+    EXPECT_EQ(items[1].rect, QRectF(300, 300, 2, 2)) << "a lone dot is kept";
+    EXPECT_EQ(items[2].rect, QRectF(100, 600, 50, 12));
 }
