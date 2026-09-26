@@ -526,6 +526,18 @@
   worker). Cards show "PDF", "PDF ✎", "PDF Aa", "PDF/A ✎"/"PDF/A Aa" (grid, list, Recent). "Only PDFs with notes"
   uses the index (300 × 200-page PDFs: 361 ms on the UI thread → 7 ms); new "Only PDF text documents".
 
+- **Images in Markdown, `qt/md-images` (2026-09-26).** `![alt](path)` is drawn in the text like a formula (block
+  images fit the column, never above their 96 dpi size, at most 1.4 × the column high; inline images line-high;
+  missing files show alt text and path in red; the source shows while editing, the picture below it); decoded
+  pictures cached (64 MB). Ctrl+V, drop and the bar's Image… save `name.assets/image-….png` (one undo step). A `.md`
+  and its `name.assets/` are one document in the library (hidden folder; rename rewrites the links, move, copy,
+  trash, share take it along). PDF text documents carry pictures as `name.assets/…` attachments (unpacked to the
+  app cache while editing; incremental saves add new ones only). `.xopp` files carry them as extra
+  `<preview xqt-file=…>` elements that Xournal++ ignores. Web pictures load only on request (opt-in, address shown).
+  ⋮ → Remove unused images. Left: CLI exports of `.xopp` pictures, `![[image]]`, drop at the cursor.
+- **Markdown boxes always written on the page (2026-09-26).** The text tool's "Write Markdown beside the page" switch
+  is gone (a stored value is ignored); the source beside the page is the writing button's menu or Ctrl+Alt+M.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

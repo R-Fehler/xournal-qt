@@ -351,7 +351,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - Agreed (2026-09-26): the PDF text document also carries a plain `name.md` (rewritten on every save) and its
     images as `name.assets/…` attachments next to the `.xopp`, so whoever gets the PDF can extract portable
     Markdown with any PDF viewer (copying text out of a PDF would not give Markdown).
-  - Images (`qt/md-images`, after `qt/md-pdf`): drawn inline like formulas (cached); paste/drop saves the image
+  - [x] Images (`qt/md-images`, merged 2026-09-26): drawn inline like formulas (cached); paste/drop saves the image
     and inserts `![](name.assets/…)`; `.md` → `name.assets/` next to it (the pair is one document); PDF text
     document → attachments inside the PDF (unpacked to the app cache while editing); Markdown boxes in a `.xopp` →
     inside the `.xopp`. Web images are not fetched unasked (alt text + "load", URL shown first).
