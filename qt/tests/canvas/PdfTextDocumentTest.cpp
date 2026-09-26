@@ -301,7 +301,7 @@ TEST_F(PdfTextDocumentTest, typingGoesIntoTheText) {
     ASSERT_TRUE(view->ensureTextEditor());
     type("Hello ");
     view->endTextEditing();
-    EXPECT_EQ(flowOf(*session->getDocument()), "# Hello Title\n\nFirst paragraph.\n") << "(the heading's text)";
+    EXPECT_EQ(flowOf(*session->getDocument()), "# Title\n\nFirst paragraph.Hello \n") << "at the end of the page's part";
     EXPECT_TRUE(session->isModified());
 
     // The page in view is after the text: typing goes to the end of the text
@@ -309,8 +309,7 @@ TEST_F(PdfTextDocumentTest, typingGoesIntoTheText) {
     ASSERT_TRUE(view->ensureTextEditor());
     type("End");
     view->endTextEditing();
-    const std::string flow = flowOf(*session->getDocument());
-    EXPECT_EQ(flow.rfind("End"), flow.find_last_not_of('\n') - 2) << flow;
+    EXPECT_EQ(flowOf(*session->getDocument()), "# Title\n\nFirst paragraph.Hello End\n");
     EXPECT_EQ(session->getDocument()->getPageCount(), 2u);
 
     // Not for notes without a text on page 1

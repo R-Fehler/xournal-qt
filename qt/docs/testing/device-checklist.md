@@ -1527,3 +1527,11 @@ Update the table in the user doc with the results.
 - [ ] Write ink on a text page, then add lines above it: the ink stays where it was (expected; move it by hand).
 - [ ] Export for the archive of a PDF text document: its attachments list `name.md` too; veraPDF (if at hand) still
       passes it.
+- [ ] Settings → Documents: "New text documents" shows "PDF document" in PDF files mode and "Markdown file" in
+      Xournal++ files mode until it is changed; changed, it stays when the mode changes.
+- [ ] Library → new button: with "PDF document", the entry reads "New text document…", the name dialog shows `.pdf`;
+      OK makes `name.pdf` in the folder (no `.md`, nothing else next to it), opens it with the cursor blinking in the
+      text and the formatting bar under the tool bar. Type a heading and a list with the bar; Ctrl+S; the card in
+      the library shows the typeset first page. With "Markdown file": "New Markdown file…" makes `name.md` as before.
+- [ ] Existing `.md` files open in the `.md` editor in both modes and save as `.md`; no PDF appears next to them.
+- [ ] Library search: a word of a PDF text document's text finds its card and page.

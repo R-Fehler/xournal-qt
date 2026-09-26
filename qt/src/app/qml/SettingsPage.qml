@@ -89,6 +89,7 @@ Popup {
         property string key
         property alias text: label.text
         property var options: []    // [{ text, value }]; value may be a string or an index
+        property var dependsOn      // another value its setting follows (read again when it changes)
         Layout.fillWidth: true
         Label { id: label; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         ComboBox {
@@ -97,7 +98,7 @@ Popup {
             textRole: "text"
             valueRole: "value"
             // count: re-evaluate once the model is there
-            currentIndex: (sheet.s.revision, count, indexOfValue(sheet.s.get(row.key)))
+            currentIndex: (sheet.s.revision, row.dependsOn, count, indexOfValue(sheet.s.get(row.key)))
             onActivated: sheet.s.set(row.key, currentValue)
         }
     }
@@ -389,6 +390,20 @@ Popup {
                     Hint {
                         text: qsTr("Documents you have keep their format: a .xopp stays a .xopp until you save it as a "
                                    + "PDF with notes (Save as…). Copies for Xournal++: Share → “For Xournal++”.")
+                    }
+                    ComboRow {
+                        objectName: "newTextDocumentsRow"
+                        key: "newTextDocuments"
+                        dependsOn: app.documentMode  // (while not chosen, it follows the mode)
+                        text: qsTr("New text documents")
+                        options: [
+                            { text: qsTr("PDF document"), value: "pdf" },
+                            { text: qsTr("Markdown file"), value: "md" }
+                        ]
+                    }
+                    Hint {
+                        text: qsTr("A PDF document opens in any PDF app and carries its text as a Markdown file inside. "
+                                   + "Markdown files you have stay Markdown files.")
                     }
                     SectionTitle { text: qsTr("Start") }
                     SwitchRow { key: "restoreSession"; text: qsTr("Reopen the documents of the last session") }

@@ -294,7 +294,7 @@ ApplicationWindow {
         id: formatBar
         width: parent.width
         visible: !app.homeVisible && !app.presenting && !markdownPanel.visible
-                 && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable))
+                 && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable) || app.textNotes)
         format: app.markdownFormat
         onFormatRequested: function(action, arg) {
             app.formatMarkdown(action, arg)
@@ -821,6 +821,7 @@ ApplicationWindow {
                 onClicked: Popups.openAt(moreMenu)
                 Menu {
                     id: moreMenu
+                    objectName: "moreMenu"
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
                     MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }

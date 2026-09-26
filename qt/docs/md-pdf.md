@@ -69,11 +69,13 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
 - It opens in the notes model: the flow is the page's Markdown text written on the page (WYSIWYG), the pen writes
   ink on top, and the formatting bar (`qt/md-toolbar`) is shown as for a `.md`.
 - **Typing goes into the flow without a click:** a key typed while nothing is being written starts writing the
-  flow on the page in view (the flow's last page when the page in view is after it), as in the `.md` editor; the
-  formatting bar's tools do the same. The pen, the mouse and a finger keep their tools (ink, select, scroll): the
-  text is written with the keyboard, or with a tap of the text tool on it, and Escape ends writing.
-  (Decision: the `.md` editor's "every tool puts the cursor" would take the pen away from the ink, which is the
-  point of a text document in the notes model.)
+  flow at the end of what the page in view holds of it (as the writing button starts it; on the flow's last page at
+  the very end of the text, and when the page in view is after the flow, there too). The formatting bar's tools do
+  the same. The pen, the mouse and a finger keep their tools (ink, select, scroll): the text is written with the
+  keyboard, or placed with a tap of the text tool on it, and Escape ends writing. (Decision: the `.md` editor's
+  "every tool puts the cursor" would take the pen away from the ink, which is the point of a text document in the
+  notes model; and the end of the page's part, not its top as in a `.md`, so that typing again after Escape goes
+  on where the text ended, and a new document's first key needs no cursor placed.)
 - A new text document (New text document…, Open as PDF document) opens with the cursor in its text.
 
 ## The library

@@ -6,6 +6,7 @@
  */
 #include <algorithm>
 #include <cctype>
+#include <shared_mutex>
 
 #include <QFile>
 #include <QFileInfo>
@@ -21,10 +22,14 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "session/AppContext.h"
+#include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
+#include "session/TextDocument.h"
 #include "session/TextFile.h"
 #include "shell/DocumentFiles.h"
 #include "shell/LibraryModel.h"
+#include "shell/LocalUrl.h"
+#include "shell/RecentFiles.h"
 #include "shell/TabManager.h"
 #include "util/PathUtil.h"
 #include "control/ScrollHandler.h"
@@ -230,7 +235,8 @@ bool AppController::editAsNotes() {
     }
     const fs::path md = s->textFile()->path();
     const std::string text = s->currentText();  // (as it is here, saved or not)
-    auto notes = std::make_unique<DocumentSession>(*app, MarkdownFile::document(text, MarkdownFile::style()));
+    // (a text document of notes: typing goes into its text, also when the .md is empty; qt/docs/md-pdf.md)
+    auto notes = std::make_unique<DocumentSession>(*app, MarkdownFile::notesDocument(text));
     fs::path xopp = md;
     xopp.replace_extension(".xopp");
     notes->setMadeFrom(xopp);
@@ -246,6 +252,49 @@ bool AppController::editAsNotes() {
                                        QString::fromStdString(suggested.filename().string())),
                           false);
     return true;
+}
+
+// --- text documents as PDF (qt/docs/md-pdf.md) ------------------------------------------------------------------------
+
+bool AppController::newTextAsPdf() const {
+    return DocumentMode::newTextDocuments(*app->getSettings()) == DocumentMode::TextKind::Pdf;
+}
+
+bool AppController::makeTextPdf(const std::string& text, const fs::path& pdf) {
+    auto made = std::make_unique<DocumentSession>(*app, MarkdownFile::notesDocument(text));
+    DocumentSession* created = made.get();
+    tabs->addTab(std::move(made));
+    setHomeVisible(false);
+    const DocumentSession::SaveResult r = created->saveAsHybrid(pdf);
+    if (!r.ok) {
+        Q_EMIT titleChanged();
+        Q_EMIT message(tr("Saving failed"), QString::fromStdString(r.error), true);
+        return false;  // (the tab stays, unsaved: Save as… writes it elsewhere)
+    }
+    recent->add(created->getFilePath());
+    afterHybridSave(*created);  // (with the library's refresh)
+    Q_EMIT titleChanged();
+    if (CanvasView* v = canvas(); v && tabs->currentSession() == created) {
+        v->ensureTextEditor();  // (write at once)
+    }
+    return true;
+}
+
+bool AppController::createTextDocument(const QString& name) {
+    if (!newTextAsPdf()) {
+        return createTextFile(name, QStringLiteral(".md"));
+    }
+    if (!library->available()) {
+        return false;
+    }
+    fs::path pdf(library->newDocumentPath(name).toStdString());  // (a name free for every kind of document)
+    pdf.replace_extension(".pdf");
+    return makeTextPdf(std::string(), pdf);
+}
+
+bool AppController::textNotes() const {
+    const CanvasView* v = canvas();
+    return v && v->typesIntoFlow();
 }
 
 QString AppController::externalFileOf(const QString& path) const {

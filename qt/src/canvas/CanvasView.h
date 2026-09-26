@@ -315,8 +315,8 @@ public:
     /// typing goes into its text, the tools stay as they are (the pen writes ink).
     bool typesIntoFlow() const;
     /// Text mode (or a text document of notes) and no cursor yet: the editor starts at the top of the current page
-    /// (keys typed go there; a text document of notes: at the end of its text when the page in view is after it).
-    /// True if there is an editor now.
+    /// (keys typed go there; a text document of notes: at the end of what the page holds of its text, as the writing
+    /// button starts it, or at the end of its text when the page in view is after it). True if there is an editor now.
     bool ensureTextEditor();
     void endTextEditing();
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
