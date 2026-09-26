@@ -57,6 +57,10 @@ Item {
     property bool canStar: !isFolder && !isLibrary && kind !== "other"
     signal favouriteToggled()
     property bool highlighted: false
+    /// A narrow card (two columns on a phone): the name on up to two lines instead of cut short in the middle
+    property bool twoLineName: false
+    /// Fingers in use (the window's touch profile): the ⋮ as big as a finger needs
+    readonly property bool touch: typeof win !== "undefined" && win && win.adaptive ? win.adaptive.touchProfile : false
     property bool selected: false
     /// Items are being selected: the circles are shown on all cards.
     property bool selectionMode: false
@@ -338,7 +342,9 @@ Item {
                             Layout.fillWidth: true
                             text: card.markedName !== "" ? card.markedName : card.name
                             textFormat: card.markedName !== "" ? Text.StyledText : Text.AutoText
-                            elide: Text.ElideMiddle
+                            wrapMode: card.twoLineName ? Text.WrapAtWordBoundaryOrAnywhere : Text.NoWrap
+                            maximumLineCount: card.twoLineName ? 2 : 1
+                            elide: card.twoLineName ? Text.ElideRight : Text.ElideMiddle
                             font.weight: Font.DemiBold
                             color: "#202124"
                         }
@@ -376,8 +382,9 @@ Item {
                 ToolButton {
                     objectName: "cardMenuButton"
                     Layout.alignment: Qt.AlignTop
-                    implicitWidth: 36
-                    implicitHeight: 40
+                    implicitWidth: card.touch ? 44 : 40
+                    implicitHeight: card.touch ? 48 : 40
+                    Accessible.name: qsTr("Menu")
                     icon.source: app.iconUrl("xqt-more")
                     icon.color: "#5f6368"
                     icon.width: 20

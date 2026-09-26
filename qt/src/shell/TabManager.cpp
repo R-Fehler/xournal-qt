@@ -174,6 +174,22 @@ QHash<int, QByteArray> TabManager::roleNames() const {
             {ReferenceRole, "isReference"}};
 }
 
+double TabManager::tallestPageAspect() const {
+    double tallest = 0;
+    for (const Tab& t: tabs) {
+        Document* doc = t.session->getDocument();
+        std::shared_lock lock(*doc);
+        const size_t page = t.session->getCurrentPageNo();
+        if (page < doc->getPageCount()) {
+            const PageRef p = doc->getPage(page);
+            if (p && p->getWidth() > 0) {
+                tallest = std::max(tallest, p->getHeight() / p->getWidth());
+            }
+        }
+    }
+    return tallest > 0 ? std::clamp(tallest, 0.5, 1.6) : 1.414;
+}
+
 bool TabManager::anySaving() const {
     return std::any_of(tabs.begin(), tabs.end(), [](const Tab& t) { return t.session->isSaving(); });
 }

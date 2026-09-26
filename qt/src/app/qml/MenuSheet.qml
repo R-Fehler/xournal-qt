@@ -262,7 +262,7 @@ Popup {
                                 // A check mark (a checked choice) or the arrow of a submenu
                                 Item {
                                     id: marker
-                                    visible: entry.kind === "submenu" || (row.menuEntry.checkable && row.menuEntry.checked)
+                                    visible: entry.kind === "submenu" || (row.menuEntry.checkable === true && row.menuEntry.checked === true)
                                     anchors.right: parent.right
                                     anchors.rightMargin: 20
                                     anchors.verticalCenter: parent.verticalCenter

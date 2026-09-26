@@ -526,7 +526,9 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
   returns to it. Ctrl+Shift+L toggles it. Ctrl+Tab goes back to the document.
 - **Library**:
   - views: folders with breadcrumbs, or all documents at once; sort by name or last modified
-  - **Show** (the button next to the sort button): which kinds of files the library shows. A setting of each library,
+  - **Show** (the button next to the sort button; in a narrower window and on a phone View → Kinds of files shown,
+    see [adaptive-layout.md](adaptive-layout.md), "The home screen and the tab overview"): which kinds of files the
+    library shows. A setting of each library,
     kept in its `library.json` (`"show"`). It applies to the grid, the flat list, the counts on folder cards and the
     search results (the Recent grid is not filtered: it lists what was opened, from any library).
 
@@ -562,6 +564,11 @@ xqt-session-tests --gtest_filter='DocumentSearchTest.bench*'` measures the open 
   - Import: files, or a folder with all its subfolders (the Import button's menu); also dropping files or folders
     from the file manager. They are copied.
   - New folder
+  - In a window too narrow for all these buttons (and on a phone, where it floats at the bottom right) they are one
+    button, **"+"**: New document…, New Markdown file…, New text file…, Import files…, Import a folder…, New folder…
+    (on Recent: Open a file…); the ways to show the cards (All documents at once, Kinds of files shown, Sort, Last
+    page, the size of the cards) are in **View**; Favourites is the star of the switch at every size
+    ([adaptive-layout.md](adaptive-layout.md), "The home screen and the tab overview").
 - **Recent**: the documents opened lately that still exist (the list is shared by all windows:
   `recent.json` in the config folder), and the folders opened as a library that are not in
   `<Documents>/Xournal_Libraries` ("Open a folder as library…", `xournal-qt <folder>`, the file manager's action),

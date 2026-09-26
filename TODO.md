@@ -129,6 +129,13 @@ is built.
   the phone's final tool layout is the bottom dock of `qt/compact-chrome`; menus still plain `Menu`s: the home
   screen's New / Import / Sort, the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
   cell menu; the pen pill's width and colors are not cycling buttons with lists yet.
+- [ ] Left from block 6 `qt/adaptive-home` (the switch as name ▾ + Recent / ★ / Bookmarks icons, the library header's
+  ladder with "+" and View, the floating "+", the
+  breadcrumbs "…", the selection's bar at the bottom, the tab overview's wrapping header and aspect cells): give the
+  home screen's `IconButton`s a short `label` once `qt/adaptive-toolbar`'s long-press label is merged (until then a
+  held finger shows their tip); the phone tab strip (the current title, a count, the overview) belongs to
+  `qt/adaptive-toolbar` / `qt/compact-chrome`; a list view of the library for phones (audit D7, "consider") is not
+  built; the overview cards' ×, star and reference buttons are 40 px, not `minTarget`.
 
 ---
 

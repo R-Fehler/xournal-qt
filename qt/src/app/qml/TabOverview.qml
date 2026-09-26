@@ -117,114 +117,46 @@ Popup {
         else searchTyping.stop()
     }
 
+    // --- the layout for the window's size (qt/docs/adaptive-layout.md, "The home screen and the tab overview") ---
+    readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
+    readonly property bool phoneLayout: adaptive !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptive.layoutClass) >= 0
+    readonly property bool shortLayout: phoneLayout && (adaptive.layoutClass === "phoneShort" || adaptive.orientation === "landscape")
+    /// Below 600 px, and where the title, the search and the buttons do not fit side by side, the header wraps: the
+    /// title and the buttons in one row, the search across the width below
+    readonly property bool narrowHeader: (adaptive !== null && adaptive.widthClass === "compact")
+                                         || width < overviewCount.implicitWidth + Math.min(380, width * 0.4) + 4 * 48 + 80
+    /// The tallest page of the open documents (height / width): the cells follow it (asked when the overview opens
+    /// and when documents come or go)
+    readonly property real pageAspect: (visible, grid.count, app.tabs.tallestPageAspect())
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
         RowLayout {
+            objectName: "overviewHeader"
             Layout.fillWidth: true
-            Layout.leftMargin: 24
-            Layout.rightMargin: 12
-            Layout.topMargin: 10
+            Layout.leftMargin: overview.narrowHeader ? 16 : 24
+            Layout.rightMargin: overview.narrowHeader ? 4 : 12
+            Layout.topMargin: overview.shortLayout ? 4 : 10
+            spacing: 4
             Label {
+                id: overviewCount
+                objectName: "overviewCount"
                 text: grid.count === 1 ? qsTr("1 open document") : qsTr("%1 open documents").arg(grid.count)
                 font.pixelSize: 20
                 font.weight: Font.DemiBold
+                elide: Text.ElideRight
+                Layout.fillWidth: overview.narrowHeader
+                Layout.minimumWidth: 0
             }
-            Item { Layout.fillWidth: true }
-            // Search in all open documents
-            Rectangle {
+            Item { Layout.fillWidth: true; visible: !overview.narrowHeader }
+            // Search in all open documents (searchBox): here, or in a row of its own below in a narrow window
+            Item {
+                id: wideSearchSlot
+                visible: !overview.narrowHeader
                 Layout.preferredWidth: Math.min(380, overview.width * 0.4)
                 Layout.preferredHeight: 44
-                radius: 22
-                color: "#ffffff"
-                border.width: searchField.activeFocus ? 2 : 1
-                border.color: searchField.activeFocus ? Material.accentColor : "#c9ccd1"
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 4
-                    ToolButton {
-                        implicitWidth: 36; implicitHeight: 36
-                        icon.source: app.iconUrl("xqt-search")
-                        icon.color: "#3c4043"
-                        display: AbstractButton.IconOnly
-                        onClicked: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(searchField.text) }
-                        ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Search (Enter)")
-                        ToolTip.delay: 600
-                    }
-                    TextField {
-                        id: searchField
-                        objectName: "overviewSearchField"
-                        Layout.fillWidth: true
-                        background: null
-                        Label {
-                            anchors.verticalCenter: parent.verticalCenter
-                            x: parent.leftPadding
-                            visible: parent.text === "" && parent.preeditText === ""
-                            text: qsTr("Search all documents")
-                            color: "#8a8d91"
-                        }
-                        selectByMouse: true
-                        onTextEdited: overview.typed()
-                        Keys.onReturnPressed: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(text); grid.forceActiveFocus() }
-                        Keys.onEnterPressed: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(text); grid.forceActiveFocus() }
-                        Keys.onDownPressed: grid.forceActiveFocus()
-                    }
-                    Label {
-                        visible: searchField.text !== "" && searchField.text.length < 4 && searchTyping.pending
-                        text: qsTr("Enter ↵")
-                        color: "#6b6f75"
-                        font.pixelSize: 12
-                    }
-                    // Fuzzy search: an expression that is not valid is searched as plain text, and says why
-                    Label {
-                        id: syntaxHint
-                        objectName: "overviewSyntaxHint"
-                        readonly property string hint: overview.fuzzy ? app.fuzzyHint(searchField.text) : ""
-                        visible: hint !== ""
-                        Layout.maximumWidth: 150
-                        text: hint
-                        elide: Text.ElideRight
-                        color: "#b3261e"
-                        font.pixelSize: 12
-                        ToolTip.visible: syntaxHover.hovered
-                        ToolTip.text: qsTr("%1 - searched as plain text").arg(hint)
-                        ToolTip.delay: 300
-                        HoverHandler { id: syntaxHover }
-                    }
-                    FuzzyToggle { objectName: "overviewSearchFuzzy" }
-                    // The reduced search: names only (as in the library)
-                    ToolButton {
-                        id: namesOnlyButton
-                        objectName: "overviewNamesOnly"
-                        text: qsTr("Names")
-                        checkable: true
-                        checked: overview.namesOnly
-                        onToggled: overview.namesOnly = checked
-                        implicitHeight: 36
-                        font.pixelSize: 13
-                        font.weight: checked ? Font.DemiBold : Font.Normal
-                        Material.foreground: checked ? Material.accentColor : "#5f6368"
-                        ToolTip.visible: hovered
-                        ToolTip.text: checked ? qsTr("Searching the names only - tap to search the text too")
-                                              : qsTr("Search the names of the open documents only")
-                        ToolTip.delay: 600
-                        background: Rectangle {
-                            radius: 10
-                            color: namesOnlyButton.checked ? "#e0e3f5" : (namesOnlyButton.pressed ? "#e8e8e8" : "transparent")
-                        }
-                    }
-                    ToolButton {
-                        visible: searchField.text !== ""
-                        implicitWidth: 36; implicitHeight: 36
-                        icon.source: app.iconUrl("xqt-close")
-                        icon.color: "#3c4043"
-                        display: AbstractButton.IconOnly
-                        onClicked: { searchField.text = ""; searchTyping.stop(); searchTyping.pending = false; overview.runSearch("") }
-                    }
-                }
             }
             IconButton {
                 objectName: "overviewExtendedButton"
@@ -233,8 +165,9 @@ Popup {
                 checked: overview.extended
                 onClicked: overview.extended = !overview.extended
             }
-            Item { Layout.fillWidth: true }
+            Item { Layout.fillWidth: true; visible: !overview.narrowHeader }
             IconButton {
+                objectName: "overviewNewButton"
                 iconName: "xopp-document-new"
                 tip: qsTr("New document")
                 onClicked: { app.newDocument(); overview.close() }
@@ -246,7 +179,16 @@ Popup {
                 enabled: grid.count > 0
                 onClicked: overview.closeAllRequested()
             }
-            IconButton { iconName: "xqt-close"; tip: qsTr("Back"); onClicked: overview.close() }
+            IconButton { objectName: "overviewBackButton"; iconName: "xqt-close"; tip: qsTr("Back"); onClicked: overview.close() }
+        }
+        Item {
+            id: narrowSearchSlot
+            visible: overview.narrowHeader
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.topMargin: 4
+            Layout.preferredHeight: 44
         }
 
         GridView {
@@ -254,16 +196,21 @@ Popup {
             objectName: "tabGrid"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.margins: 16
+            Layout.margins: overview.phoneLayout ? 8 : 16
             clip: true
             model: app.tabs
             keyNavigationEnabled: true
             boundsBehavior: Flickable.StopAtBounds
-            readonly property int columns: Math.max(1, Math.floor(width / (overview.extendedView ? 380 : 280)))
+            // At least two cards side by side on a phone (cells of 170 px and up), three or four held sideways
+            readonly property int minCell: overview.extendedView ? 380 : overview.shortLayout ? 210 : overview.phoneLayout ? 170 : 280
+            readonly property int columns: Math.max(overview.phoneLayout && !overview.extendedView ? 2 : 1, Math.floor(width / minCell))
             cellWidth: Math.floor(width / columns)
             readonly property int stripHeight: overview.extendedView ? Math.round(Math.max(120, cellWidth * 0.55)) : 0
+            // As high as the page needs (its picture as wide as the card, the title below); held sideways never
+            // higher than the grid, so a whole card shows
             cellHeight: overview.extendedView ? Math.round(cellWidth * 0.5 + 44 + stripHeight + 24)
-                                              : Math.round(cellWidth * 1.25)
+                        : Math.round(Math.min(overview.shortLayout ? Math.max(160, height) : 100000,
+                                              (cellWidth - 52) * overview.pageAspect + 84))
             ScrollBar.vertical: ScrollBar {}
             TouchpadMomentum { flickable: grid }
 
@@ -577,6 +524,111 @@ Popup {
                         ToolTip.text: qsTr("Close")
                     }
                 }
+            }
+        }
+    }
+
+    // Search in all open documents: in the header, or in a row of its own below it in a narrow window
+    Rectangle {
+        id: searchBox
+        parent: overview.narrowHeader ? narrowSearchSlot : wideSearchSlot
+        anchors.fill: parent
+        radius: 22
+        color: "#ffffff"
+        border.width: searchField.activeFocus ? 2 : 1
+        border.color: searchField.activeFocus ? Material.accentColor : "#c9ccd1"
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 2
+            spacing: 2
+            ToolButton {
+                objectName: "overviewSearchButton"
+                implicitWidth: 40; implicitHeight: 40
+                icon.source: app.iconUrl("xqt-search")
+                icon.color: "#3c4043"
+                display: AbstractButton.IconOnly
+                onClicked: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(searchField.text) }
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Search (Enter)")
+                ToolTip.delay: 600
+            }
+            TextField {
+                id: searchField
+                objectName: "overviewSearchField"
+                Layout.fillWidth: true
+                Layout.minimumWidth: 40
+                background: null
+                Label {
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: parent.leftPadding
+                    width: parent.width - parent.leftPadding - parent.rightPadding  // (a narrow field: …)
+                    elide: Text.ElideRight
+                    visible: parent.text === "" && parent.preeditText === ""
+                    text: qsTr("Search all documents")
+                    color: "#8a8d91"
+                }
+                selectByMouse: true
+                onTextEdited: overview.typed()
+                Keys.onReturnPressed: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(text); grid.forceActiveFocus() }
+                Keys.onEnterPressed: { searchTyping.stop(); searchTyping.pending = false; overview.runSearch(text); grid.forceActiveFocus() }
+                Keys.onDownPressed: grid.forceActiveFocus()
+            }
+            Label {
+                visible: searchField.text !== "" && searchField.text.length < 4 && searchTyping.pending
+                text: qsTr("Enter ↵")
+                color: "#6b6f75"
+                font.pixelSize: 12
+            }
+            // Fuzzy search: an expression that is not valid is searched as plain text, and says why
+            Label {
+                id: syntaxHint
+                objectName: "overviewSyntaxHint"
+                readonly property string hint: overview.fuzzy ? app.fuzzyHint(searchField.text) : ""
+                visible: hint !== ""
+                Layout.maximumWidth: 150
+                text: hint
+                elide: Text.ElideRight
+                color: "#b3261e"
+                font.pixelSize: 12
+                ToolTip.visible: syntaxHover.hovered
+                ToolTip.text: qsTr("%1 - searched as plain text").arg(hint)
+                ToolTip.delay: 300
+                HoverHandler { id: syntaxHover }
+            }
+            FuzzyToggle { objectName: "overviewSearchFuzzy"; implicitHeight: 40 }
+            // The reduced search: names only (as in the library)
+            ToolButton {
+                id: namesOnlyButton
+                objectName: "overviewNamesOnly"
+                text: qsTr("Names")
+                checkable: true
+                checked: overview.namesOnly
+                onToggled: overview.namesOnly = checked
+                implicitHeight: 40
+                leftPadding: 6
+                rightPadding: 6
+                font.pixelSize: 13
+                font.weight: checked ? Font.DemiBold : Font.Normal
+                Material.foreground: checked ? Material.accentColor : "#5f6368"
+                ToolTip.visible: hovered
+                ToolTip.text: checked ? qsTr("Searching the names only - tap to search the text too")
+                                      : qsTr("Search the names of the open documents only")
+                ToolTip.delay: 600
+                background: Rectangle {
+                    radius: 10
+                    color: namesOnlyButton.checked ? "#e0e3f5" : (namesOnlyButton.pressed ? "#e8e8e8" : "transparent")
+                }
+            }
+            ToolButton {
+                objectName: "overviewSearchClear"
+                visible: searchField.text !== ""
+                implicitWidth: 40; implicitHeight: 40
+                Accessible.name: qsTr("Clear the search")
+                icon.source: app.iconUrl("xqt-close")
+                icon.color: "#3c4043"
+                display: AbstractButton.IconOnly
+                onClicked: { searchField.text = ""; searchTyping.stop(); searchTyping.pending = false; overview.runSearch("") }
             }
         }
     }

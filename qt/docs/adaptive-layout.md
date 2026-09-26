@@ -409,6 +409,77 @@ without `parent`, `modal`, `anchors.centerIn`, `width`, `height`, `x` or `y` (th
 The tool popup of the tool square gives the tools what is left above "Present" and "Leave full screen" / "Show the tabs
 and the tool bar", so both stay inside a short window; the tools scroll.
 
+## The home screen and the tab overview (qt/adaptive-home)
+
+`HomeView.qml` reads `win.adaptive` (`layoutClass`, `orientation`, `touchProfile`, `minTarget`); the phone classes
+follow the layout class, so "Adapt the layout" off keeps the desktop home screen.
+
+**The switch** (`switchBox`, the same at every size): the library's **name** (`libraryPageButton`, its page; the
+library icon beside it outside the phones; elided when long), its **▾** (`libraryMenuButton`, the libraries menu), then
+three icons: **Recent** (clock), **Favourites** (★, `favouritesChip`) and **Bookmarks** (ribbon). One rule for their
+words: beside the icons only where the header has room for every button and the words (`roomy`, e.g. 1920 px);
+everywhere else the icons alone, with their word in a tip on hover and while a finger is held on them.
+
+The star is the Favourites filter as the chip was: a **toggle**, not a page of its own. On the Library and the
+Bookmarks page it shows only the starred documents of the whole library (combined with Show and the search); it is
+filled and marked yellow while on. On Recent (which it does not filter) a tap shows the library's favourites. It is
+not in View: one place per action.
+
+**The header's ladder.** One row, as many actions as buttons of their own as fit:
+
+- **expanded** (`expanded`: the row has room for every button with a search of 300 px, e.g. 1920 px): the switch,
+  the search, Last page, New ▾, Import ▾, New folder, Flat, Show, Sort, − and +, Settings. The need is measured from
+  the buttons (`expandedNeed`), not a fixed width.
+- **grouped** (a narrower desktop window: 1280, 1366, the tablets): the switch, the search, **"+"**
+  (`newDocumentButton` with the plus icon: New document…, New Markdown file… or New text document…, New text file…,
+  Import files…, Import a folder…, New folder…; on Recent: Open a file…) and **View** (`homeViewButton`, the sliders
+  icon, marked while it shows less than everything: All documents at once, Kinds of files shown ▸ (the Show switches,
+  which leave the menu open), Sort ▸, Open documents where they were left off, and the size of the cards − +, which
+  leaves it open too), Settings. Where even that leaves the search less than its smallest width, the search moves to a
+  row of its own (`searchOwnRow`).
+- Only one of the two is there at a time: no action in two places. Both menus are `AdaptiveMenu`s (sheets on phones),
+  and so are Import ▾ and Sort of the expanded row, the Show button's menu (`showPopup`), and the menu of a bookmark
+  in the Bookmarks view.
+
+**Phones** (`phoneLayout`):
+
+- **"+" floats** at the bottom right (`newDocumentFab`, 56 px, above the safe area), not in the header; the snackbar
+  moves above it. While items are selected it goes.
+- **Upright** (`portraitPhone`): the header is **one row**: the switch (the library's name takes what is left, about
+  110 px at 412 with the touch profile), View, Settings (44 px each). Below it the search, then the breadcrumbs.
+- **Sideways** (`shortLayout`, phone short, or tiny in landscape): **one header row**: the switch (the name at most
+  180 px), the **breadcrumbs** (`crumbBar` moves into the header), the search, View, Settings. Cards about as high as wide (`cardHeight`: 0.8 × the width +
+  the title, instead of 1.2 ×).
+- At least two columns of cards (`fewestColumns`, also for − and +), names on up to two lines in narrow cards
+  (`twoLineName`), the card's ⋮ 44 × 48 with the touch profile.
+
+**Breadcrumbs** (`crumbArea`): they never widen the page (the area has no width of its own and clips). When they do
+not fit, the last folder comes first (up to 60 % of the room), then the library's name with what is left (elided,
+at most half; left out below 56 px), then as many folders before the last as fit; the rest is **"…"**
+(`crumbEllipsis`), which opens a menu of those folders (`crumbMenu`). A too long last name is elided at its end.
+Dragging cards onto a crumb moves them there, as before.
+
+**The selection bar**: the whole row (Select all, Open, Copy to…, Move to…, Remove from list, Trash…) where it fits
+(`selectionFull` is measured while hidden); on a phone, or where it does not fit, the top bar keeps × and the count,
+and the actions go into **a bar at the bottom** (`selectionActionBar`: Open, Copy to, Move to, Trash, and More with
+Select all and, on Recent, Remove from list), icons above their words, as Android's file apps have them.
+
+**The tab overview** (`TabOverview.qml`):
+
+- Below 600 px (`widthClass` compact) the header wraps: the count, extended search, New, Close all and × in one row,
+  the search across the width below it (`narrowHeader`). The count elides; nothing forces a width, and the search's
+  placeholder elides instead of running under Fuzzy and Names.
+- Columns: cells of at least 280 px on a desktop, 170 on a phone upright (so at least two columns), 210 held sideways
+  (four at 915 px). The cells are as high as the **tallest current page of the open documents** needs
+  (`TabManager::tallestPageAspect`, height / width, 0.5 to 1.6) instead of 1.25 × their width; held sideways never
+  higher than the grid.
+- On a phone it opens from the tab dots of the compact chrome (a tap between their arrows; with more than 12 documents
+  the count "3 / 14" is there instead) and from the tab strip's overview button.
+
+**Labels without hover**: the icon buttons of the home screen are `IconButton`s, which get the long-press label of
+`qt/adaptive-toolbar` when it is merged (their `tip` until they have a `label`). The home screen's own buttons (the
+switch's icons and ★, ▾, the floating "+") show their word while a finger is held on them.
+
 ## The collapse ladder (what the later blocks build)
 
 The author's decisions of 2026-09-26 on the audit's proposals:
@@ -442,9 +513,6 @@ that rework their screens:
 
 | Where | Threshold | Block |
 | --- | --- | --- |
-| `HomeView.qml` `narrow` | window < 760: the search in its own row | `qt/adaptive-home` |
-| `HomeView.qml` `roomy` | window ≥ 1500: the Bookmarks tab and Favourites chip with words | `qt/adaptive-home` |
-| `TabOverview.qml` | the header row's width, cells of ≥ 280 px, 1.25 × high | `qt/adaptive-home` |
 | `Main.qml` Markdown panel | `min(max(360, 0.38 w), 600)` | `qt/adaptive-panels` |
 | `ReferenceSplit.qml` | always side by side | `qt/adaptive-panels` |
 | `NewDocumentDialog.qml` | its body < 520 → one column (its own width: fine as it is) | – |
@@ -491,6 +559,15 @@ that rework their screens:
   the layouts (about 20 s).
 - `MainWindowTest.zoomPercentageTapDoubleTapAndHold`, `cyclingToolButtons`, `theEraserButtonCyclesHowItErases`,
   `theGeometryButtonPutsTheSetsquareOnThePage`, `aFingerHeldOnAButtonShowsItsName`.
+- The home screen (`checkHomeScreens`, part of `classesSidebarAndControlsAtFiveSizes` and of the full walk): each of
+  its three pages, a deep empty folder (the breadcrumbs: "…" on a phone, the last one whole), everything selected (the
+  bar at the bottom on a phone) and the tab overview lie inside the window, and no row of the home screen is wider
+  than it; wherever the header is grouped it is one row with the name, ▾, the three icons, View and Settings (at
+  412 × 915 the search below); at 915 × 412 the breadcrumbs and
+  the search are in the header. The menus test opens "+" and View (sheets on phones) and the crumbs' "…".
+  `theHomeScreensPlusAndViewMenusWork` (about 20 s) triggers every entry of "+" and View and the star at 412 × 915
+  and 1024 × 700;
+  `theTabOverviewOpensFromTheTabDotsOnAPhone`.
 - `SettingsModelTest.layoutChoicesPerSizeClass` (label `shell`): the storage.
 - The audit's own walk (`XQT_UI_AUDIT`, pictures and `report.tsv`, now with the class) shares the walker
   (`qt/tests/ui/LayoutWalk.h`).

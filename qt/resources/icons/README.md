@@ -23,3 +23,5 @@ The adaptive tool bar (qt/adaptive-toolbar; icons that must be clear without a t
 - Drawn in the same style: `xqt-finger-draw` (Lucide's `pointer` with a stroke at the fingertip: the finger draws),
   `xqt-mark-text` (lines of text, one of them highlighted: mark PDF text), `xqt-text-box` (a dashed box with a T: a
   text box) and `xqt-eraser-stroke` (a small eraser over a stroke: erase whole strokes).
+
+`xqt-sliders` is Lucide's `sliders-horizontal`: the library's **View** button (how the cards are shown).

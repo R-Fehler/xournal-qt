@@ -17,11 +17,57 @@ import "Popups.js" as Popups
 Rectangle {
     id: home
     objectName: "homeView"
-    /// A narrow window (a phone): the library search gets a row of its own
-    readonly property bool narrow: width < 760
-    /// Wide enough for the words beside the icons of the Bookmarks tab and the Favourites chip (else icons with tips)
-    readonly property bool roomy: width >= 1500
     color: "#eef0f3"
+
+    // --- the layout for the window's size (qt/docs/adaptive-layout.md, "The home screen and the tab overview") ---
+    /// The window's layout (Main.qml's `win.adaptive`), if there is one
+    readonly property var adaptive: typeof win !== "undefined" && win ? win.adaptive : null
+    readonly property string layoutClass: adaptive ? adaptive.layoutClass : "desktopWide"
+    /// A phone class: the "+" floats at the bottom, the actions on a selection are a bar at the bottom
+    readonly property bool phoneLayout: ["phonePortrait", "phoneShort", "tiny"].indexOf(layoutClass) >= 0
+    /// A phone held sideways (or another short window of a phone class): one header row with the breadcrumbs in it,
+    /// shorter cards
+    readonly property bool shortLayout: phoneLayout && (layoutClass === "phoneShort"
+                                                        || (adaptive !== null && adaptive.orientation === "landscape"))
+    /// A phone held upright: the switch Library / Recent / Bookmarks in a row of its own, across the width
+    readonly property bool portraitPhone: phoneLayout && !shortLayout
+    readonly property bool touch: adaptive !== null && adaptive.touchProfile
+    /// What a finger needs (48 with the touch profile, else 40)
+    readonly property int minTarget: adaptive ? adaptive.minTarget : 40
+    readonly property real safeBottom: typeof win !== "undefined" && win && win.safeBottom ? win.safeBottom : 0
+    /// Room below the last cards for the floating "+" of a phone
+    readonly property real fabSpace: phoneLayout ? 72 : 0
+
+    // The header's ladder: every action a button of its own where the row has room for all of them with the search
+    // at its smallest ("expanded", a wide desktop window); else New and Import behind "+" and the ways to show the
+    // cards behind "View" ("grouped"). Only one of the two is there at a time: no action in two places.
+    /// The row's width (16 px margin at the left, 8 at the right)
+    readonly property real headerRoom: width - 24
+    readonly property real searchMinimum: 150 + 6 + 48
+    /// The switch as icons: the library's name, its ▾, Recent, Favourites, Bookmarks
+    readonly property real switchNeed: libraryTab.implicitWidth + libraryMenuButton.implicitWidth + 3 * 40 + 4 * 2 + 8
+    /// What the words beside the icons of Recent, Favourites and Bookmarks add
+    readonly property real switchWords: recentWord.advanceWidth + favouritesWord.advanceWidth + bookmarksWord.advanceWidth + 3 * 12
+    TextMetrics { id: recentWord; text: qsTr("Recent") }
+    TextMetrics { id: favouritesWord; text: qsTr("Favourites") }
+    TextMetrics { id: bookmarksWord; text: qsTr("Bookmarks") }
+    /// What the expanded row needs: the switch, a search wide enough for its placeholder (300; below that the grouped
+    /// row with a wider search is better), New, Last page, Import, New folder, Flat, Show, Sort, − and + with their
+    /// separators, Settings, and the spacing between them
+    readonly property real expandedNeed: switchNeed + 300 + 6 + 48 + 48 + resume.implicitWidth + 5 * 48
+                                         + 2 * 40 + 2 * 13 + 48 + 15 * 6
+    readonly property bool expanded: !phoneLayout && headerRoom >= expandedNeed
+    /// Room for the words beside the icons of the switch (Recent, Favourites, Bookmarks), and a search at its full
+    /// width. One rule: words only where the header has room for every button and them; everywhere else icons (a tip
+    /// on hover, and while a finger is held on them)
+    readonly property bool roomy: expanded && headerRoom >= expandedNeed + 230 + switchWords
+    /// The grouped row: the switch, the search at its smallest, "+", View and Settings
+    readonly property real groupedNeed: switchNeed + searchMinimum + 3 * 48 + 6 * 6
+    /// The search in a row of its own: on a phone upright, and in a window too narrow for it in the header
+    readonly property bool searchOwnRow: portraitPhone || (!phoneLayout && !expanded && headerRoom < groupedNeed)
+    /// The actions on a selection in a bar at the bottom (Open, Copy, Move, Trash, ⋮): on a phone, and where the
+    /// selection bar's row does not fit
+    readonly property bool selectionAtBottom: phoneLayout || selectionFull.implicitWidth + selectionLabel.implicitWidth + 96 > width
     /// 0: library, 1: recent documents, 2: the library's bookmarks (qt/docs/bookmarks.md)
     property int page: app.library.available ? 0 : 1
     /// Changes when a star is set or taken away (the Recent cards ask for theirs)
@@ -35,14 +81,23 @@ Rectangle {
     property int columnsNormal: 0
     property int columnsExtended: 0
     function autoColumns(width, extendedCells) { return Math.max(extendedCells ? 1 : 2, Math.floor(width / (extendedCells ? 380 : 210))) }
+    /// The fewest columns: two cards side by side on a phone (the extended search: one)
+    function fewestColumns(extendedCells) { return phoneLayout && !extendedCells ? 2 : 1 }
     function columnsFor(width, extendedCells) {
         const chosen = extendedCells ? columnsExtended : columnsNormal
-        return chosen > 0 ? chosen : autoColumns(width, extendedCells)
+        return chosen > 0 ? Math.max(fewestColumns(extendedCells), chosen) : autoColumns(width, extendedCells)
+    }
+    /// Narrow cards (two columns on a phone) show a name on two lines rather than cut short
+    function twoLineNames(cellWidth) { return phoneLayout && cellWidth < 240 }
+    /// A card: its first page (a sheet of paper, a little taller than wide) and the name below; on a phone held
+    /// sideways about as high as wide, so that a whole row of them fits under the header
+    function cardHeight(cellWidth) {
+        return Math.round(cellWidth * (shortLayout ? 0.8 : 1.2) + 44 + (twoLineNames(cellWidth) ? 18 : 0))
     }
     /// −1: smaller cells (more columns), +1: bigger cells
     function zoom(step) {
         const grid = page === 0 ? libraryGrid : recentGrid
-        const n = Math.max(1, Math.min(12, grid.columns - step))
+        const n = Math.max(fewestColumns(extendedView && page === 0), Math.min(12, grid.columns - step))
         if (extendedView) columnsExtended = n
         else columnsNormal = n
     }
@@ -216,13 +271,16 @@ Rectangle {
         spacing: 0
 
         // --- while items are selected: what to do with them ---
+        // (the whole row where it fits; else the count here and the actions in a bar at the bottom, as the file apps
+        // of phones have them: selectionActions)
         Rectangle {
+            id: selectionBar
             objectName: "homeSelectionBar"
             visible: home.selectionCount > 0
             Layout.fillWidth: true
             Layout.leftMargin: 12
             Layout.rightMargin: 12
-            Layout.topMargin: 10
+            Layout.topMargin: home.shortLayout ? 4 : 10
             Layout.preferredHeight: 48
             radius: 24
             color: "#e8eaf6"
@@ -231,65 +289,83 @@ Rectangle {
                 anchors.leftMargin: 4
                 anchors.rightMargin: 8
                 spacing: 2
-                IconButton { iconName: "xqt-close"; tip: qsTr("Clear the selection (Esc)"); onClicked: home.currentModel.clearSelection() }
+                IconButton {
+                    objectName: "clearSelectionButton"
+                    iconName: "xqt-close"
+                    tip: qsTr("Clear the selection (Esc)")
+                    onClicked: home.currentModel.clearSelection()
+                }
                 Label {
+                    id: selectionLabel
                     objectName: "selectionLabel"
                     text: qsTr("%1 selected").arg(home.selectionCount)
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
                     color: "#283593"
+                    elide: Text.ElideRight
                     Layout.leftMargin: 4
+                    Layout.fillWidth: home.selectionAtBottom
                 }
-                Button { text: qsTr("Select all"); flat: true; onClicked: home.currentModel.selectAll() }
-                Item { Layout.fillWidth: true }
-                Button {
-                    text: qsTr("Open")
-                    flat: true
-                    icon.source: app.iconUrl("xopp-document-open")
-                    onClicked: home.openAll(home.currentModel.selectedPaths(), home.currentModel)
-                }
-                Button {
-                    objectName: "copySelectedButton"
-                    text: qsTr("Copy to…")
-                    flat: true
-                    enabled: app.library.available
-                    icon.source: app.iconUrl("xopp-edit-copy")
-                    onClicked: home.askTransfer(home.currentModel.selectedPaths(), true)
-                }
-                Button {
-                    objectName: "moveSelectedButton"
-                    text: qsTr("Move to…")
-                    flat: true
-                    enabled: app.library.available
-                    icon.source: app.iconUrl("xqt-folder-input")
-                    onClicked: home.askTransfer(home.currentModel.selectedPaths(), false)
-                }
-                Button {
-                    visible: home.page === 1
-                    text: qsTr("Remove from list")
-                    flat: true
-                    onClicked: app.recent.removePaths(app.recent.selectedPaths())
-                }
-                Button {
-                    text: qsTr("Trash…")
-                    flat: true
-                    icon.source: app.iconUrl("xqt-delete")
-                    onClicked: home.askTrash(home.currentModel, home.currentModel.selectedPaths())
+                // (measured also while it is hidden: whether it fits decides where the actions are)
+                RowLayout {
+                    id: selectionFull
+                    visible: !home.selectionAtBottom
+                    Layout.fillWidth: true
+                    spacing: 2
+                    Button { objectName: "selectAllButton"; text: qsTr("Select all"); flat: true; onClicked: home.currentModel.selectAll() }
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        objectName: "openSelectedButton"
+                        text: qsTr("Open")
+                        flat: true
+                        icon.source: app.iconUrl("xopp-document-open")
+                        onClicked: home.openAll(home.currentModel.selectedPaths(), home.currentModel)
+                    }
+                    Button {
+                        objectName: "copySelectedButton"
+                        text: qsTr("Copy to…")
+                        flat: true
+                        enabled: app.library.available
+                        icon.source: app.iconUrl("xopp-edit-copy")
+                        onClicked: home.askTransfer(home.currentModel.selectedPaths(), true)
+                    }
+                    Button {
+                        objectName: "moveSelectedButton"
+                        text: qsTr("Move to…")
+                        flat: true
+                        enabled: app.library.available
+                        icon.source: app.iconUrl("xqt-folder-input")
+                        onClicked: home.askTransfer(home.currentModel.selectedPaths(), false)
+                    }
+                    Button {
+                        visible: home.page === 1
+                        text: qsTr("Remove from list")
+                        flat: true
+                        onClicked: app.recent.removePaths(app.recent.selectedPaths())
+                    }
+                    Button {
+                        objectName: "trashSelectedButton"
+                        text: qsTr("Trash…")
+                        flat: true
+                        icon.source: app.iconUrl("xqt-delete")
+                        onClicked: home.askTrash(home.currentModel, home.currentModel.selectedPaths())
+                    }
                 }
             }
         }
 
-        // --- header: library / recent, search, actions ---
-        // (a window too narrow for all of it scrolls it sideways, like the tool bar; a narrow one, e.g. a phone, has
-        // the search in a row of its own below)
+        // --- header: library / recent / bookmarks, search, actions (qt/docs/adaptive-layout.md) ---
+        // (the ladder: every action a button of its own where there is room (expanded), else behind "+" and View; on
+        // a phone "+" floats at the bottom, the switch has a row of its own when upright, and the breadcrumbs come
+        // into this row when held sideways. A window too narrow even for that, e.g. a tiny one, scrolls it sideways)
         Flickable {
             id: headerFlick
             objectName: "homeHeader"
             visible: home.selectionCount === 0
             Layout.fillWidth: true
-            Layout.topMargin: 10
+            Layout.topMargin: home.shortLayout ? 4 : 10
             Layout.preferredHeight: headerRow.implicitHeight
-            contentWidth: headerRow.width + 24
+            contentWidth: headerRow.width + headerRow.x + 8
             contentHeight: headerRow.implicitHeight
             flickableDirection: Flickable.HorizontalFlick
             boundsBehavior: Flickable.StopAtBounds
@@ -297,163 +373,56 @@ Rectangle {
             clip: true
         RowLayout {
             id: headerRow
-            x: 16
-            // (the search field gives way down to its minimum before the row scrolls, as it did without scrolling)
-            width: Math.max(headerFlick.width - 24, implicitWidth - (searchSlot.visible
-                            ? searchSlot.Layout.preferredWidth - searchSlot.Layout.minimumWidth : 0))
+            x: home.phoneLayout ? 12 : 16
+            // (the search field and the breadcrumbs give way down to their minimum before the row scrolls)
+            width: Math.max(headerFlick.width - x - 8, implicitWidth
+                            - (searchSlot.visible ? searchSlot.Layout.preferredWidth - searchSlot.Layout.minimumWidth : 0)
+                            - (headerCrumbSlot.visible ? headerCrumbSlot.Layout.preferredWidth - headerCrumbSlot.Layout.minimumWidth : 0))
             height: headerFlick.height
-            spacing: 6
+            spacing: home.phoneLayout ? 4 : 6
 
-            Rectangle {
-                radius: 22
-                color: "#e1e4e8"
-                implicitWidth: pageSwitch.implicitWidth + 8
-                implicitHeight: 44
-                Row {
-                    id: pageSwitch
-                    anchors.centerIn: parent
-                    spacing: 2
-                    Repeater {
-                        model: [
-                            { text: app.library.available ? app.library.name : qsTr("Library"), icon: "xqt-library", enabled: app.library.available },
-                            { text: qsTr("Recent"), icon: "xqt-history", enabled: true },
-                            { text: qsTr("Bookmarks"), icon: "xqt-bookmark", enabled: app.library.available, compact: true }
-                        ]
-                        delegate: AbstractButton {
-                            id: switchButton
-                            required property int index
-                            required property var modelData
-                            objectName: index === 0 ? "libraryPageButton" : index === 1 ? "recentPageButton" : "bookmarksPageButton"
-                            enabled: modelData.enabled
-                            implicitHeight: 38
-                            implicitWidth: switchRow.implicitWidth + (iconOnly ? 14 : 28)
-                            onClicked: home.page = index
-                            /// Only its icon (a tip says what it is) while it is not shown and the header is short of room
-                            readonly property bool iconOnly: modelData.compact === true && !home.roomy && home.page !== index
-                            ToolTip.visible: iconOnly && hovered
-                            ToolTip.text: modelData.text
-                            ToolTip.delay: 600
-                            Accessible.name: modelData.text
-                            background: Rectangle {
-                                radius: 19
-                                color: home.page === switchButton.index ? "#ffffff" : "transparent"
-                            }
-                            contentItem: Item {
-                                RowLayout {
-                                    id: switchRow
-                                    anchors.centerIn: parent
-                                    spacing: 6
-                                    Image { source: app.iconUrl(switchButton.modelData.icon); sourceSize.width: 18; sourceSize.height: 18 }
-                                    Label {
-                                        visible: !switchButton.iconOnly
-                                        text: switchButton.modelData.text
-                                        font.weight: home.page === switchButton.index ? Font.DemiBold : Font.Normal
-                                        color: switchButton.enabled ? "#202124" : "#9aa0a6"
-                                        elide: Text.ElideRight
-                                        Layout.maximumWidth: 220
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            // The switch: the library's name with its ▾, Recent, Favourites, Bookmarks (switchBox); on a phone upright
+            // it takes what the row leaves (the name elided)
+            Item {
+                id: switchSlot
+                readonly property real smallest: switchBox.implicitWidth - libraryTab.implicitWidth + 64
+                Layout.fillWidth: home.portraitPhone
+                Layout.minimumWidth: home.portraitPhone ? smallest : switchBox.implicitWidth
+                Layout.preferredWidth: home.portraitPhone ? smallest : switchBox.implicitWidth
+                Layout.preferredHeight: switchBox.implicitHeight
             }
-            IconButton {
-                objectName: "libraryMenuButton"
-                iconName: "xqt-chevron-down"
-                tip: qsTr("Libraries")
-                implicitWidth: 36
-                onClicked: Popups.openAt(libraryMenu)
-                // The libraries: this window shows one (highlighted); another one opens in a new window.
-                AdaptiveMenu {
-                    id: libraryMenu
-                    objectName: "libraryMenu"
-                    minimumWidth: 300
-                    property var libraries: []
-                    onAboutToShow: libraries = app.libraries()
-                    Label {
-                        text: app.libraryWindows ? qsTr("Libraries (another one opens in a new window)")
-                                                 : qsTr("Libraries (the window switches to another one)")
-                        leftPadding: 16
-                        rightPadding: 16
-                        topPadding: 8
-                        bottomPadding: 4
-                        width: libraryMenu.width
-                        wrapMode: Text.Wrap
-                        font.pixelSize: 12
-                        color: "#6b6f75"
-                    }
-                    Instantiator {
-                        id: libraryList
-                        model: libraryMenu.libraries
-                        delegate: AdaptiveMenuItem {
-                            id: libraryItem
-                            objectName: "libraryMenuEntry"
-                            required property var modelData
-                            readonly property bool current: modelData.current
-                            readonly property string label: modelData.downloads ? qsTr("Downloads folder (quick library)") : modelData.name
-                            text: current ? qsTr("%1 — this window").arg(label) : label
-                            font.weight: current ? Font.DemiBold : Font.Normal
-                            icon.source: app.iconUrl(modelData.downloads ? "xqt-download" : "xqt-library")
-                            icon.color: current ? Material.accentColor : "#566d86"
-                            background: Rectangle {
-                                color: libraryItem.current ? "#e8eaf6" : (libraryItem.highlighted ? "#f1f3f4" : "transparent")
-                            }
-                            // This library: just the home screen; another: a new window (one library per window)
-                            // (a path, not "file://" + path: on Windows that makes the drive letter a host)
-                            onTriggered: current ? (app.homeVisible = true) : app.openLibraryAt(modelData.path)
-                        }
-                        // after the heading
-                        onObjectAdded: function(index, object) { libraryMenu.insertItem(index + 1, object) }
-                        onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
-                    }
-                    MenuSeparator {}
-                    AdaptiveMenuItem {
-                        text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
-                        onTriggered: newLibraryDialog.open()
-                    }
-                    AdaptiveMenuItem {
-                        objectName: "openFolderAsLibraryItem"
-                        text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
-                        onTriggered: home.pickLibraryFolder()
-                    }
-                    // (not on Android: there is no file manager the app could show a folder in reliably)
-                    AdaptiveMenuItem {
-                        objectName: "libraryShowInFileManagerItem"
-                        text: qsTr("Show in file manager")
-                        enabled: app.library.available
-                        offered: app.canShowInFileManager
-                        onTriggered: app.showInFileManager(app.library.rootPath)
-                    }
-                    AdaptiveMenuItem {
-                        objectName: "exportLibraryArchiveItem"
-                        text: qsTr("Export library as archive…")
-                        enabled: app.library.available && !app.libraryArchive.running
-                        onTriggered: libraryArchiveDialog.open()
-                    }
-                }
+            // Where we are in the library (crumbBar): here on a phone held sideways, else in a row of its own below
+            Item {
+                id: headerCrumbSlot
+                visible: home.shortLayout && home.page === 0 && app.library.available
+                Layout.fillWidth: true
+                Layout.minimumWidth: 80
+                Layout.preferredWidth: 320
+                Layout.preferredHeight: 44
             }
 
-            Item { Layout.fillWidth: true }
+            Item { Layout.fillWidth: true; visible: !headerCrumbSlot.visible && !home.portraitPhone }
 
-            // Search in the whole library (searchGroup, below): here, or in a row of its own when the window is narrow
+            // Search in the whole library (searchGroup, below): here, or in a row of its own
             Item {
                 id: searchSlot
-                visible: !home.narrow && (home.page === 0 || home.page === 2) && app.library.available
+                visible: !home.searchOwnRow && (home.page === 0 || home.page === 2) && app.library.available
                 // As wide as there is room for, up to 380 and the button (the buttons of the row come first)
                 Layout.fillWidth: true
-                Layout.minimumWidth: 150 + 6 + 48
+                Layout.minimumWidth: home.searchMinimum
                 Layout.maximumWidth: 380 + 6 + 48
-                Layout.preferredWidth: 380 + 6 + 48
+                Layout.preferredWidth: home.shortLayout ? 240 + 6 + 48 : 380 + 6 + 48
                 Layout.preferredHeight: 48
             }
 
-            Item { Layout.fillWidth: true }
+            Item { Layout.fillWidth: true; visible: !headerCrumbSlot.visible && !home.portraitPhone }
 
+            // --- expanded: every action a button of its own ---
             // The same as in the settings: open a document at the page where it was left (a small toggle)
             ToolButton {
                 id: resume
                 objectName: "resumeSwitch"
+                visible: home.expanded
                 text: qsTr("Last page")
                 icon.source: app.iconUrl("xqt-history")
                 icon.width: 18
@@ -476,49 +445,97 @@ Rectangle {
                 }
             }
 
-            // New: a document of notes, a Markdown file or a text file (in the current folder)
+            // New: a document of notes, a Markdown file or a text file (in the current folder). Grouped ("+"): also
+            // Import, New folder and (Recent) Open a file. On a phone the floating "+" (newDocumentFab) opens it.
             IconButton {
+                id: newButton
                 objectName: "newDocumentButton"
-                iconName: "xqt-file-plus"
-                tip: app.newTextAsPdf ? qsTr("New document, text document or text file")
-                                      : qsTr("New document, Markdown file or text file")
+                visible: !home.phoneLayout
+                iconName: home.expanded ? "xqt-file-plus" : "xqt-plus"
+                tip: home.expanded ? (app.newTextAsPdf ? qsTr("New document, text document or text file")
+                                                       : qsTr("New document, Markdown file or text file"))
+                                   : qsTr("New document, import, new folder")
                 onClicked: Popups.openAt(newMenu)
-                Menu {
+                AdaptiveMenu {
                     id: newMenu
                     objectName: "newMenu"
-                    MenuItem { objectName: "newDocumentItem"; text: qsTr("New document…"); onTriggered: newDocumentDialog.open() }
+                    title: qsTr("New")
+                    /// Import, New folder and Open a file are here when they have no button of their own
+                    readonly property bool grouped: !home.expanded
+                    AdaptiveMenuItem {
+                        objectName: "newDocumentItem"
+                        text: qsTr("New document…")
+                        icon.source: app.iconUrl("xqt-notebook-pen")
+                        onTriggered: newDocumentDialog.open()
+                    }
                     // A text document: a PDF text document or a Markdown file, as Settings → Documents says
                     // (qt/docs/md-pdf.md)
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "newMarkdownItem"
                         text: app.newTextAsPdf ? qsTr("New text document…") : qsTr("New Markdown file…")
+                        icon.source: app.iconUrl("xqt-markdown")
                         enabled: app.library.available
                         onTriggered: { textFileDialog.extension = app.newTextAsPdf ? ".pdf" : ".md"; textFileDialog.open() }
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "newTextItem"
                         text: qsTr("New text file…")
+                        icon.source: app.iconUrl("xqt-file-text")
                         enabled: app.library.available
                         onTriggered: { textFileDialog.extension = ".txt"; textFileDialog.open() }
+                    }
+                    MenuSeparator {
+                        property bool offered: newMenu.grouped && (home.page === 0 && app.library.available || home.page === 1)
+                        visible: offered
+                        height: offered ? implicitHeight : 0
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "addImportFilesItem"
+                        text: qsTr("Import files…")
+                        icon.source: app.iconUrl("xqt-import")
+                        offered: newMenu.grouped && home.page === 0 && app.library.available
+                        onTriggered: importDialog.open()
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "addImportFolderItem"
+                        text: qsTr("Import a folder with its subfolders…")
+                        icon.source: app.iconUrl("xqt-folder-input")
+                        offered: newMenu.grouped && home.page === 0 && app.library.available
+                        onTriggered: importFolderDialog.open()
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "addNewFolderItem"
+                        text: qsTr("New folder…")
+                        icon.source: app.iconUrl("xqt-folder-plus")
+                        offered: newMenu.grouped && home.page === 0 && app.library.available
+                        enabled: !app.library.flat && !home.searching
+                        onTriggered: { folderNameDialog.row = -1; folderNameDialog.open() }
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "addOpenFileItem"
+                        text: qsTr("Open a file…")
+                        icon.source: app.iconUrl("xopp-document-open")
+                        offered: newMenu.grouped && home.page === 1
+                        onTriggered: home.openFileRequested()
                     }
                 }
             }
             IconButton {
                 objectName: "importButton"
-                visible: home.page === 0 && app.library.available
+                visible: home.expanded && home.page === 0 && app.library.available
                 iconName: "xqt-import"
                 tip: qsTr("Import PDFs and Xournal files, or a whole folder (copies them into this folder)")
                 onClicked: Popups.openAt(importMenu)
-                Menu {
+                AdaptiveMenu {
                     id: importMenu
                     objectName: "importMenu"
-                    MenuItem { text: qsTr("Import files…"); onTriggered: importDialog.open() }
-                    MenuItem { text: qsTr("Import a folder with its subfolders…"); onTriggered: importFolderDialog.open() }
+                    AdaptiveMenuItem { objectName: "importFilesItem"; text: qsTr("Import files…"); onTriggered: importDialog.open() }
+                    AdaptiveMenuItem { objectName: "importFolderItem"; text: qsTr("Import a folder with its subfolders…"); onTriggered: importFolderDialog.open() }
                 }
             }
             IconButton {
                 objectName: "newFolderButton"
-                visible: home.page === 0 && app.library.available
+                visible: home.expanded && home.page === 0 && app.library.available
                 enabled: !app.library.flat && !home.searching
                 iconName: "xqt-folder-plus"
                 tip: qsTr("New folder")
@@ -526,137 +543,46 @@ Rectangle {
             }
             IconButton {
                 objectName: "flatButton"
-                visible: home.page === 0 && app.library.available
+                visible: home.expanded && home.page === 0 && app.library.available
                 iconName: app.library.flat ? "xqt-layout-grid" : "xqt-folder-tree"
                 tip: app.library.flat ? qsTr("All documents (show folders)") : qsTr("Folders (show all documents at once)")
                 checked: app.library.flat
                 onClicked: app.library.flat = !app.library.flat
             }
-            // Only the favourites (starred documents of the whole library): a chip of its own, combined with the kinds
-            // shown and the search; the Bookmarks view follows it too
-            ToolButton {
-                id: favouritesChip
-                objectName: "favouritesChip"
-                visible: (home.page === 0 || home.page === 2) && app.library.available
-                text: qsTr("Favourites")
-                display: home.roomy ? AbstractButton.TextBesideIcon : AbstractButton.IconOnly
-                implicitWidth: home.roomy ? implicitContentWidth + leftPadding + rightPadding : 40
-                Accessible.name: text
-                icon.source: app.iconUrl(checked ? "xqt-star-filled" : "xqt-star")
-                icon.color: "transparent"
-                icon.width: 18
-                icon.height: 18
-                checkable: true
-                checked: app.library.favouritesOnly
-                onToggled: app.library.favouritesOnly = checked
-                implicitHeight: 40
-                font.pixelSize: 13
-                font.weight: checked ? Font.DemiBold : Font.Normal
-                Material.foreground: checked ? "#8a5a00" : "#5f6368"
-                ToolTip.visible: hovered
-                ToolTip.text: checked ? qsTr("Only favourites are shown - tap: all documents")
-                                      : qsTr("Show only favourites (starred documents)")
-                ToolTip.delay: 600
-                background: Rectangle {
-                    radius: 10
-                    color: favouritesChip.checked ? "#fdf1d0" : (favouritesChip.pressed ? "#e8e8e8" : "transparent")
-                    border.width: favouritesChip.checked ? 1 : 0
-                    border.color: "#f4b400"
-                }
-            }
             // Which kinds of files the library shows (a setting of the library), marked when not the default
             IconButton {
                 id: showButton
                 objectName: "showButton"
-                visible: (home.page === 0 || home.page === 2) && app.library.available
+                visible: home.expanded && (home.page === 0 || home.page === 2) && app.library.available
                 iconName: "xqt-filter"
                 tip: app.library.showFiltered ? qsTr("Show: some kinds of files are hidden or added") : qsTr("Show: which kinds of files")
                 checked: app.library.showFiltered
-                onClicked: showPopup.opened ? showPopup.close() : showPopup.open()
-                Popup {
-                    id: showPopup
-                    objectName: "showPopup"
-                    y: showButton.height
-                    x: Math.min(0, showButton.width - width)
-                    padding: 8
-                    readonly property var show: app.library.show
-                    component ShowToggle: CheckDelegate {
-                        property string key
-                        Layout.fillWidth: true
-                        checked: showPopup.show[key] === true
-                        onToggled: app.library.setShown(key, checked)
-                        font.pixelSize: 14
-                        topPadding: 6
-                        bottomPadding: 6
-                    }
-                    contentItem: ColumnLayout {
-                        spacing: 0
-                        Label {
-                            text: qsTr("Show in this library")
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
-                            color: "#5f6368"
-                            Layout.leftMargin: 12
-                            Layout.bottomMargin: 4
-                        }
-                        ShowToggle { objectName: "showNotes"; key: "notes"; text: qsTr("Notes (.xopp, .xoj)") }
-                        ShowToggle { objectName: "showPdfs"; key: "pdfs"; text: qsTr("PDFs") }
-                        ShowToggle {
-                            objectName: "showOnlyPdfsWithNotes"
-                            key: "onlyPdfsWithNotes"
-                            text: qsTr("Only PDFs with notes")
-                            enabled: showPopup.show.pdfs === true
-                            leftPadding: 40
-                            font.pixelSize: 13
-                        }
-                        ShowToggle {
-                            objectName: "showOnlyTextDocuments"
-                            key: "onlyTextDocuments"
-                            text: qsTr("Only PDF text documents")
-                            enabled: showPopup.show.pdfs === true
-                            leftPadding: 40
-                            font.pixelSize: 13
-                        }
-                        ShowToggle { objectName: "showMarkdown"; key: "markdown"; text: qsTr("Markdown (.md)") }
-                        ShowToggle { objectName: "showImages"; key: "images"; text: qsTr("Images") }
-                        ShowToggle { objectName: "showText"; key: "text"; text: qsTr("Text and code (.txt, .tex, .py, …)") }
-                        ShowToggle { objectName: "showOther"; key: "other"; text: qsTr("All other files") }
-                        Button {
-                            objectName: "showDefaults"
-                            Layout.alignment: Qt.AlignRight
-                            flat: true
-                            text: qsTr("Defaults")
-                            enabled: app.library.showFiltered
-                            onClicked: app.library.resetShown()
-                        }
-                    }
-                }
+                onClicked: Popups.openAt(showPopup)
+                ShowMenu { id: showPopup; objectName: "showPopup"; prefix: "show"; heading: true }
             }
             IconButton {
-                visible: home.page === 0 && app.library.available
+                objectName: "sortButton"
+                visible: home.expanded && home.page === 0 && app.library.available
                 iconName: "xqt-sort"
                 tip: qsTr("Sort")
                 onClicked: Popups.openAt(sortMenu)
-                Menu {
-                    id: sortMenu
-                    MenuItem { text: qsTr("By name"); checkable: true; checked: app.library.sortBy === "name"; onTriggered: app.library.sortBy = "name" }
-                    MenuItem { text: qsTr("Last modified first"); checkable: true; checked: app.library.sortBy === "modified"; onTriggered: app.library.sortBy = "modified" }
-                    MenuItem { objectName: "sortByRead"; text: qsTr("Last read first"); checkable: true; checked: app.library.sortBy === "read"; onTriggered: app.library.sortBy = "read" }
-                }
+                SortMenu { id: sortMenu; objectName: "sortMenu"; prefix: "sort" }
             }
             IconButton {
-                visible: home.page === 1
+                objectName: "openFileButton"
+                visible: home.expanded && home.page === 1
                 iconName: "xopp-document-open"
                 tip: qsTr("Open a file")
                 onClicked: home.openFileRequested()
             }
-            ToolSeparator {}
+            ToolSeparator { visible: home.expanded }
             ToolButton {
                 objectName: "zoomOutButton"
+                visible: home.expanded
                 text: "−"
                 font.pixelSize: 22
                 implicitWidth: 40
-                enabled: (home.page === 0 ? libraryGrid : recentGrid).columns < 12
+                enabled: home.page !== 2 && (home.page === 0 ? libraryGrid : recentGrid).columns < 12
                 onClicked: home.zoom(-1)
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Smaller cells (Ctrl+wheel, pinch)")
@@ -664,29 +590,112 @@ Rectangle {
             }
             ToolButton {
                 objectName: "zoomInButton"
+                visible: home.expanded
                 text: "+"
                 font.pixelSize: 22
                 implicitWidth: 40
-                enabled: (home.page === 0 ? libraryGrid : recentGrid).columns > 1
+                enabled: home.page !== 2 && (home.page === 0 ? libraryGrid : recentGrid).columns > home.fewestColumns(home.extendedView && home.page === 0)
                 onClicked: home.zoom(1)
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Bigger cells (Ctrl+wheel, pinch)")
                 ToolTip.delay: 600
             }
-            ToolSeparator {}
+            ToolSeparator { visible: home.expanded }
+
+            // --- grouped: how the cards are shown, behind one button ---
+            IconButton {
+                id: viewButton
+                objectName: "homeViewButton"
+                visible: !home.expanded
+                implicitWidth: home.phoneLayout ? 44 : 48
+                iconName: "xqt-sliders"
+                tip: qsTr("View: which files, sorting, size of the cards")
+                // (marked while it shows less than everything)
+                checked: app.library.available && home.page !== 1
+                         && (app.library.showFiltered || (home.page === 0 && app.library.flat))
+                onClicked: Popups.openAt(viewMenu)
+                AdaptiveMenu {
+                    id: viewMenu
+                    objectName: "homeViewMenu"
+                    title: qsTr("View")
+                    AdaptiveMenuItem {
+                        objectName: "viewFlatItem"
+                        text: qsTr("All documents at once (no folders)")
+                        offered: home.page === 0 && app.library.available
+                        checkable: true
+                        checked: app.library.flat
+                        onTriggered: app.library.flat = checked
+                    }
+                    ShowMenu {
+                        objectName: "viewShowMenu"
+                        prefix: "viewShow"
+                        offered: home.page !== 1 && app.library.available
+                    }
+                    SortMenu {
+                        objectName: "viewSortMenu"
+                        prefix: "viewSort"
+                        title: qsTr("Sort")
+                        offered: home.page === 0 && app.library.available
+                    }
+                    AdaptiveMenuItem {
+                        objectName: "viewResumeItem"
+                        text: qsTr("Open documents where they were left off")
+                        checkable: true
+                        checked: (app.settings.revision, app.settings.get("resumeAtLastPage"))
+                        onTriggered: app.settings.set("resumeAtLastPage", checked)
+                    }
+                    MenuSeparator {
+                        property bool offered: home.page !== 2
+                        visible: offered
+                        height: offered ? implicitHeight : 0
+                    }
+                    // The size of the cards: − and + (Ctrl+wheel and pinch too); the menu stays open
+                    RowLayout {
+                        objectName: "viewCardSizeRow"
+                        property bool offered: home.page !== 2
+                        visible: offered
+                        height: offered ? implicitHeight : 0
+                        width: parent ? parent.width : implicitWidth
+                        readonly property var grid: home.page === 0 ? libraryGrid : recentGrid
+                        Label { text: qsTr("Size of the cards"); Layout.leftMargin: 16; Layout.fillWidth: true }
+                        ToolButton {
+                            objectName: "viewZoomOutButton"
+                            text: "−"
+                            font.pixelSize: 20
+                            implicitWidth: home.minTarget
+                            implicitHeight: home.minTarget
+                            enabled: parent.grid.columns < 12
+                            onClicked: home.zoom(-1)
+                            Accessible.name: qsTr("Smaller cards")
+                        }
+                        ToolButton {
+                            objectName: "viewZoomInButton"
+                            text: "+"
+                            font.pixelSize: 20
+                            implicitWidth: home.minTarget
+                            implicitHeight: home.minTarget
+                            Layout.rightMargin: 8
+                            enabled: parent.grid.columns > home.fewestColumns(home.extendedView && home.page === 0)
+                            onClicked: home.zoom(1)
+                            Accessible.name: qsTr("Bigger cards")
+                        }
+                    }
+                }
+            }
             // (the tool bar with its menu is not there while the library is shown)
             IconButton {
                 objectName: "homeSettingsButton"
+                implicitWidth: home.phoneLayout ? 44 : 48
                 iconName: "xqt-settings"
                 tip: qsTr("Settings (Ctrl+,)")
                 onClicked: home.settingsRequested()
             }
         }
         }
-        // The search's own row in a narrow window
+        // The search's own row
         Item {
             id: narrowSearchSlot
-            visible: home.narrow && home.selectionCount === 0 && (home.page === 0 || home.page === 2) && app.library.available
+            visible: home.searchOwnRow && home.selectionCount === 0 && (home.page === 0 || home.page === 2) && app.library.available
             Layout.fillWidth: true
             Layout.leftMargin: 16
             Layout.rightMargin: 16
@@ -694,87 +703,14 @@ Rectangle {
             Layout.preferredHeight: 48
         }
 
-        // --- where we are in the library ---
-        RowLayout {
+        // --- where we are in the library (crumbBar; on a phone held sideways in the header instead) ---
+        Item {
+            id: crumbRowSlot
+            visible: !home.shortLayout && home.page === 0 && app.library.available
             Layout.fillWidth: true
             Layout.leftMargin: 16
             Layout.rightMargin: 16
             Layout.preferredHeight: 44
-            visible: home.page === 0 && app.library.available
-            spacing: 2
-
-            IconButton {
-                objectName: "folderUpButton"
-                iconName: "xqt-arrow-up"
-                tip: qsTr("Up (Backspace)")
-                implicitWidth: 40; implicitHeight: 40
-                visible: !home.searching && !app.library.flat && !app.library.favouritesOnly
-                enabled: app.library.folder !== ""
-                onClicked: app.library.goUp()
-            }
-            Row {
-                id: crumbRow
-                visible: !home.searching && !app.library.flat && !app.library.favouritesOnly
-                spacing: 0
-                Repeater {
-                    model: app.library.breadcrumbs
-                    delegate: AbstractButton {
-                        id: crumb
-                        required property int index
-                        required property var modelData
-                        readonly property string folder: modelData.folder
-                        readonly property bool dropTarget: moveDrag.active && moveDrag.hasTarget && moveDrag.target === folder
-                        implicitHeight: 36
-                        implicitWidth: crumbLabel.implicitWidth + (index > 0 ? 34 : 18)
-                        onClicked: app.library.folder = folder
-                        background: Rectangle {
-                            radius: 8
-                            color: crumb.dropTarget ? "#c5cae9" : (crumb.hovered ? "#e1e4e8" : "transparent")
-                        }
-                        contentItem: Item {
-                            Image {
-                                visible: crumb.index > 0
-                                anchors.verticalCenter: parent.verticalCenter
-                                x: 0
-                                source: app.iconUrl("xqt-chevron-right")
-                                sourceSize.width: 16; sourceSize.height: 16
-                                opacity: 0.6
-                            }
-                            Label {
-                                id: crumbLabel
-                                anchors.verticalCenter: parent.verticalCenter
-                                x: crumb.index > 0 ? 24 : 9
-                                text: crumb.modelData.name
-                                font.pixelSize: 15
-                                font.weight: crumb.index === app.library.breadcrumbs.length - 1 ? Font.DemiBold : Font.Normal
-                                color: "#3c4043"
-                            }
-                        }
-                    }
-                }
-            }
-            Label {
-                visible: home.searching || app.library.flat || app.library.favouritesOnly
-                Layout.leftMargin: 8
-                text: home.searching ? (libraryGrid.count === 1 ? qsTr("1 result") : qsTr("%1 results").arg(libraryGrid.count))
-                      : app.library.favouritesOnly ? qsTr("Favourites in %1").arg(app.library.name)
-                                     : qsTr("All documents in %1").arg(app.library.name)
-                font.pixelSize: 15
-                color: "#3c4043"
-            }
-            Item { Layout.fillWidth: true }
-            BusyIndicator {
-                visible: app.library.importing
-                running: visible
-                implicitWidth: 28; implicitHeight: 28
-            }
-            Label {
-                objectName: "indexStatus"
-                visible: app.library.indexing && app.library.indexTotal > 0
-                text: qsTr("Indexing for search %1/%2").arg(app.library.indexed).arg(app.library.indexTotal)
-                font.pixelSize: 12
-                color: "#6b6f75"
-            }
         }
 
         // Android: the libraries are still in the app's own folder (Android deletes it with the app); tap: move them
@@ -859,11 +795,12 @@ Rectangle {
                     boundsBehavior: Flickable.StopAtBounds
                     readonly property int columns: home.columnsFor(width, home.extendedView)
                     property int dropIndex: -1
+                    bottomMargin: home.fabSpace  // (the last cards scroll out from under the floating "+")
                     cellWidth: Math.floor(width / columns)
                     // Extended search: a smaller first page, the row of pages with hits below the title.
                     readonly property int stripHeight: home.extendedView ? Math.round(Math.max(120, cellWidth * 0.55)) : 0
                     cellHeight: home.extendedView ? Math.round(cellWidth * 0.5 + 44 + stripHeight + 24)
-                                                  : Math.round(cellWidth * 1.2 + 44)
+                                                  : home.cardHeight(cellWidth)
                     ScrollBar.vertical: ScrollBar {}
                     TouchpadMomentum { flickable: libraryGrid }
                     WheelHandler {
@@ -956,6 +893,7 @@ Rectangle {
                         }
                         width: libraryGrid.cellWidth
                         height: libraryGrid.cellHeight
+                        twoLineName: home.twoLineNames(libraryGrid.cellWidth)
                         active: home.visible
                         row: index
                         dragOverlay: home.searching ? null : moveDrag
@@ -1099,8 +1037,9 @@ Rectangle {
                     keyNavigationEnabled: true
                     boundsBehavior: Flickable.StopAtBounds
                     readonly property int columns: home.columnsFor(width, false)
+                    bottomMargin: home.fabSpace
                     cellWidth: Math.floor(width / columns)
-                    cellHeight: Math.round(cellWidth * 1.2 + 44)
+                    cellHeight: home.cardHeight(cellWidth)
                     ScrollBar.vertical: ScrollBar {}
                     TouchpadMomentum { flickable: recentGrid }
                     WheelHandler {
@@ -1143,6 +1082,7 @@ Rectangle {
                         pdfKind: model.pdfKind
                         width: recentGrid.cellWidth
                         height: recentGrid.cellHeight
+                        twoLineName: home.twoLineNames(recentGrid.cellWidth)
                         active: home.visible
                         row: index
                         selected: model.selected
@@ -1192,30 +1132,700 @@ Rectangle {
             BookmarksView {
                 id: bookmarksView
                 shown: home.visible && home.page === 2
+                bottomSpace: home.fabSpace
+            }
+        }
+
+        // --- the actions on a selection at the bottom (a phone, or no room in the selection bar) ---
+        // Open, Copy, Move and Trash, and ⋮ for the rest, as the file apps of phones have them
+        Rectangle {
+            id: selectionActions
+            objectName: "selectionActionBar"
+            visible: home.selectionCount > 0 && home.selectionAtBottom
+            Layout.fillWidth: true
+            Layout.preferredHeight: 60 + home.safeBottom
+            color: "#ffffff"
+            Rectangle { width: parent.width; height: 1; color: "#dadce0" }
+            RowLayout {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                height: 60
+                spacing: 0
+                BarAction {
+                    objectName: "selectionOpenAction"
+                    iconName: "xopp-document-open"
+                    text: qsTr("Open")
+                    onClicked: home.openAll(home.currentModel.selectedPaths(), home.currentModel)
+                }
+                BarAction {
+                    objectName: "selectionCopyAction"
+                    iconName: "xopp-edit-copy"
+                    text: qsTr("Copy to")
+                    enabled: app.library.available
+                    onClicked: home.askTransfer(home.currentModel.selectedPaths(), true)
+                }
+                BarAction {
+                    objectName: "selectionMoveAction"
+                    iconName: "xqt-folder-input"
+                    text: qsTr("Move to")
+                    enabled: app.library.available
+                    onClicked: home.askTransfer(home.currentModel.selectedPaths(), false)
+                }
+                BarAction {
+                    objectName: "selectionTrashAction"
+                    iconName: "xqt-delete"
+                    text: qsTr("Trash")
+                    onClicked: home.askTrash(home.currentModel, home.currentModel.selectedPaths())
+                }
+                BarAction {
+                    id: selectionMoreButton
+                    objectName: "selectionMoreButton"
+                    iconName: "xqt-more"
+                    text: qsTr("More")
+                    onClicked: Popups.openAt(selectionMenu)
+                    AdaptiveMenu {
+                        id: selectionMenu
+                        objectName: "selectionMenu"
+                        title: qsTr("%1 selected").arg(home.selectionCount)
+                        AdaptiveMenuItem {
+                            objectName: "selectAllItem"
+                            text: qsTr("Select all")
+                            onTriggered: home.currentModel.selectAll()
+                        }
+                        AdaptiveMenuItem {
+                            objectName: "removeSelectedFromListItem"
+                            text: qsTr("Remove from list")
+                            offered: home.page === 1
+                            onTriggered: app.recent.removePaths(app.recent.selectedPaths())
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Search in the whole library, and the extended search: in the header, or in a row of its own when narrow
+    // A button of the selection's bar at the bottom: its icon above its word
+    component BarAction: AbstractButton {
+        id: action
+        property string iconName
+        Layout.fillWidth: true
+        Layout.preferredWidth: 1
+        Layout.fillHeight: true
+        implicitHeight: 56
+        Accessible.name: text
+        background: Rectangle {
+            radius: 12
+            color: action.pressed ? "#e8eaed" : "transparent"
+        }
+        contentItem: ColumnLayout {
+            spacing: 2
+            opacity: action.enabled ? 1 : 0.4
+            Image {
+                Layout.alignment: Qt.AlignHCenter
+                source: app.iconUrl(action.iconName)
+                sourceSize.width: 24
+                sourceSize.height: 24
+            }
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.maximumWidth: action.width - 4
+                text: action.text
+                elide: Text.ElideRight
+                font.pixelSize: 12
+                color: "#3c4043"
+            }
+        }
+    }
+
+    // A tab of the switch: the library's name (its icon beside it outside the phones), or the icon of Recent,
+    // Favourites or Bookmarks, with its word only where the header has room for all words (roomy); an icon alone says
+    // its word in a tip on hover and while a finger is held on it
+    component PageTab: AbstractButton {
+        id: tab
+        property int pageIndex: -1
+        property string label
+        property string iconName
+        /// Its tip (default: its word)
+        property string tip: label
+        /// Shown as chosen: the page shown (the star: only favourites)
+        property bool chosen: home.page === pageIndex
+        property color chosenColor: "#ffffff"
+        property color chosenBorder: "transparent"
+        property color chosenText: "#202124"
+        /// What a tap does (default: show its page)
+        property var tapAction: null
+        /// The library's tab: its name, never the icon alone
+        readonly property bool named: pageIndex === 0
+        readonly property bool iconOnly: !named && !home.roomy
+        Layout.fillWidth: named && home.portraitPhone
+        Layout.maximumWidth: named && home.shortLayout ? 180 : Number.POSITIVE_INFINITY
+        Layout.fillHeight: true
+        implicitHeight: home.touch ? 44 : 40
+        implicitWidth: iconOnly ? (home.touch ? 44 : 40) : tabRow.implicitWidth + (named ? 20 : 28)
+        onClicked: tapAction ? tapAction() : (home.page = pageIndex)
+        property bool heldTip: false
+        onPressAndHold: heldTip = true
+        onReleased: heldTip = false
+        onCanceled: heldTip = false
+        ToolTip.visible: (iconOnly || tip !== label) && (hovered || heldTip)
+        ToolTip.text: tip
+        ToolTip.delay: heldTip ? 0 : 600
+        Accessible.name: label
+        background: Rectangle {
+            radius: height / 2
+            color: tab.chosen ? tab.chosenColor : (tab.pressed ? "#d5d8dc" : "transparent")
+            border.width: tab.chosen && tab.chosenBorder !== Qt.color("transparent") ? 1 : 0
+            border.color: tab.chosenBorder
+        }
+        contentItem: Item {
+            RowLayout {
+                id: tabRow
+                anchors.centerIn: parent
+                // (a narrow tab: its word elided)
+                width: Math.min(implicitWidth, parent.width)
+                spacing: 6
+                Image {
+                    visible: !(tab.named && home.phoneLayout)
+                    source: app.iconUrl(tab.iconName)
+                    sourceSize.width: tab.iconOnly ? 22 : 18
+                    sourceSize.height: tab.iconOnly ? 22 : 18
+                    opacity: tab.enabled ? 1 : 0.4
+                }
+                Label {
+                    visible: !tab.iconOnly
+                    text: tab.label
+                    font.weight: tab.chosen ? Font.DemiBold : Font.Normal
+                    color: !tab.enabled ? "#9aa0a6" : tab.chosen ? tab.chosenText : "#202124"
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 220
+                }
+            }
+        }
+    }
+
+    // A kind of file shown or not (the library's "Show" setting)
+    component ShowToggle: CheckDelegate {
+        property string key
+        Layout.fillWidth: true
+        checked: app.library.show[key] === true
+        onToggled: app.library.setShown(key, checked)
+        font.pixelSize: 14
+        topPadding: 6
+        bottomPadding: 6
+        implicitHeight: Math.max(home.minTarget, Math.max(implicitContentHeight, implicitIndicatorHeight) + topPadding + bottomPadding)
+    }
+    // Which kinds of files the library shows (a setting of each library): switches that leave the menu open while they
+    // are changed. The Show button's menu (expanded) and View → Show (grouped); on a phone a page of the sheet.
+    component ShowMenu: AdaptiveMenu {
+        id: showMenu
+        /// The start of the objectNames of its switches ("show": showNotes, showPdfs, …, showDefaults)
+        property string prefix: "show"
+        /// Its title on top (the Show button's menu; as a submenu and in the sheet the title is the entry)
+        property bool heading: false
+        title: qsTr("Kinds of files shown")
+        ColumnLayout {
+            width: parent ? parent.width : implicitWidth
+            spacing: 0
+            Label {
+                visible: showMenu.heading
+                text: qsTr("Show in this library")
+                font.pixelSize: 13
+                font.weight: Font.DemiBold
+                color: "#5f6368"
+                Layout.leftMargin: 12
+                Layout.topMargin: 4
+                Layout.bottomMargin: 4
+            }
+            ShowToggle { objectName: showMenu.prefix + "Notes"; key: "notes"; text: qsTr("Notes (.xopp, .xoj)") }
+            ShowToggle { objectName: showMenu.prefix + "Pdfs"; key: "pdfs"; text: qsTr("PDFs") }
+            ShowToggle {
+                objectName: showMenu.prefix + "OnlyPdfsWithNotes"
+                key: "onlyPdfsWithNotes"
+                text: qsTr("Only PDFs with notes")
+                enabled: app.library.show.pdfs === true
+                leftPadding: 40
+                font.pixelSize: 13
+            }
+            ShowToggle {
+                objectName: showMenu.prefix + "OnlyTextDocuments"
+                key: "onlyTextDocuments"
+                text: qsTr("Only PDF text documents")
+                enabled: app.library.show.pdfs === true
+                leftPadding: 40
+                font.pixelSize: 13
+            }
+            ShowToggle { objectName: showMenu.prefix + "Markdown"; key: "markdown"; text: qsTr("Markdown (.md)") }
+            ShowToggle { objectName: showMenu.prefix + "Images"; key: "images"; text: qsTr("Images") }
+            ShowToggle { objectName: showMenu.prefix + "Text"; key: "text"; text: qsTr("Text and code (.txt, .tex, .py, …)") }
+            ShowToggle { objectName: showMenu.prefix + "Other"; key: "other"; text: qsTr("All other files") }
+            Button {
+                objectName: showMenu.prefix + "Defaults"
+                Layout.alignment: Qt.AlignRight
+                Layout.rightMargin: 8
+                flat: true
+                text: qsTr("Defaults")
+                enabled: app.library.showFiltered
+                onClicked: app.library.resetShown()
+            }
+        }
+    }
+    // How the library is sorted (the Sort button's menu, and View → Sort)
+    component SortMenu: AdaptiveMenu {
+        id: sortChoices
+        property string prefix: "sort"
+        AdaptiveMenuItem {
+            objectName: sortChoices.prefix + "ByName"
+            text: qsTr("By name")
+            checkable: true
+            checked: app.library.sortBy === "name"
+            onTriggered: app.library.sortBy = "name"
+        }
+        AdaptiveMenuItem {
+            objectName: sortChoices.prefix + "ByModified"
+            text: qsTr("Last modified first")
+            checkable: true
+            checked: app.library.sortBy === "modified"
+            onTriggered: app.library.sortBy = "modified"
+        }
+        AdaptiveMenuItem {
+            objectName: sortChoices.prefix + "ByRead"
+            text: qsTr("Last read first")
+            checkable: true
+            checked: app.library.sortBy === "read"
+            onTriggered: app.library.sortBy = "read"
+        }
+    }
+
+    // The switch in the header: the library's name (its page) with ▾ (the libraries), Recent, Favourites (★),
+    // Bookmarks
+    Rectangle {
+        id: switchBox
+        parent: switchSlot
+        anchors.fill: parent
+        radius: height / 2
+        color: "#e1e4e8"
+        implicitWidth: switchTabs.implicitWidth + 8
+        implicitHeight: switchTabs.implicitHeight + 6
+        RowLayout {
+            id: switchTabs
+            anchors.fill: parent
+            anchors.leftMargin: 4
+            anchors.rightMargin: 4
+            anchors.topMargin: 3
+            anchors.bottomMargin: 3
+            spacing: 2
+            PageTab {
+                id: libraryTab
+                objectName: "libraryPageButton"
+                pageIndex: 0
+                label: app.library.available ? app.library.name : qsTr("Library")
+                iconName: "xqt-library"
+                enabled: app.library.available
+            }
+            // The libraries: another one, a new one, a folder as library, …
+            ToolButton {
+                id: libraryMenuButton
+                objectName: "libraryMenuButton"
+                readonly property string tip: qsTr("Libraries")
+                Layout.fillHeight: true
+                implicitWidth: 30
+                leftPadding: 0
+                rightPadding: 0
+                Accessible.name: tip
+                icon.source: app.iconUrl("xqt-chevron-down")
+                icon.width: 20
+                icon.height: 20
+                icon.color: "#3c4043"
+                display: AbstractButton.IconOnly
+                onClicked: Popups.openAt(libraryMenu)
+                // (a finger held on it says what it is, as the other buttons: qt/docs/adaptive-layout.md)
+                property bool heldTip: false
+                onPressAndHold: heldTip = true
+                onReleased: heldTip = false
+                onCanceled: heldTip = false
+                ToolTip.visible: heldTip || hovered
+                ToolTip.text: tip
+                ToolTip.delay: heldTip ? 0 : 600
+                background: Rectangle {
+                    radius: height / 2
+                    color: libraryMenuButton.pressed ? "#d5d8dc" : "transparent"
+                }
+                        // The libraries: this window shows one (highlighted); another one opens in a new window.
+                        AdaptiveMenu {
+                            id: libraryMenu
+                            objectName: "libraryMenu"
+                            minimumWidth: 300
+                            property var libraries: []
+                            onAboutToShow: libraries = app.libraries()
+                            Label {
+                                text: app.libraryWindows ? qsTr("Libraries (another one opens in a new window)")
+                                                         : qsTr("Libraries (the window switches to another one)")
+                                leftPadding: 16
+                                rightPadding: 16
+                                topPadding: 8
+                                bottomPadding: 4
+                                width: libraryMenu.width
+                                wrapMode: Text.Wrap
+                                font.pixelSize: 12
+                                color: "#6b6f75"
+                            }
+                            Instantiator {
+                                id: libraryList
+                                model: libraryMenu.libraries
+                                delegate: AdaptiveMenuItem {
+                                    id: libraryItem
+                                    objectName: "libraryMenuEntry"
+                                    required property var modelData
+                                    readonly property bool current: modelData.current
+                                    readonly property string label: modelData.downloads ? qsTr("Downloads folder (quick library)") : modelData.name
+                                    text: current ? qsTr("%1 — this window").arg(label) : label
+                                    font.weight: current ? Font.DemiBold : Font.Normal
+                                    icon.source: app.iconUrl(modelData.downloads ? "xqt-download" : "xqt-library")
+                                    icon.color: current ? Material.accentColor : "#566d86"
+                                    background: Rectangle {
+                                        color: libraryItem.current ? "#e8eaf6" : (libraryItem.highlighted ? "#f1f3f4" : "transparent")
+                                    }
+                                    // This library: just the home screen; another: a new window (one library per window)
+                                    // (a path, not "file://" + path: on Windows that makes the drive letter a host)
+                                    onTriggered: current ? (app.homeVisible = true) : app.openLibraryAt(modelData.path)
+                                }
+                                // after the heading
+                                onObjectAdded: function(index, object) { libraryMenu.insertItem(index + 1, object) }
+                                onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
+                            }
+                            MenuSeparator {}
+                            AdaptiveMenuItem {
+                                text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
+                                onTriggered: newLibraryDialog.open()
+                            }
+                            AdaptiveMenuItem {
+                                objectName: "openFolderAsLibraryItem"
+                                text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
+                                onTriggered: home.pickLibraryFolder()
+                            }
+                            // (not on Android: there is no file manager the app could show a folder in reliably)
+                            AdaptiveMenuItem {
+                                objectName: "libraryShowInFileManagerItem"
+                                text: qsTr("Show in file manager")
+                                enabled: app.library.available
+                                offered: app.canShowInFileManager
+                                onTriggered: app.showInFileManager(app.library.rootPath)
+                            }
+                            AdaptiveMenuItem {
+                                objectName: "exportLibraryArchiveItem"
+                                text: qsTr("Export library as archive…")
+                                enabled: app.library.available && !app.libraryArchive.running
+                                onTriggered: libraryArchiveDialog.open()
+                            }
+                        }
+            }
+            PageTab {
+                id: recentTab
+                objectName: "recentPageButton"
+                pageIndex: 1
+                label: qsTr("Recent")
+                iconName: "xqt-history"
+            }
+            // Only the favourites: a filter of the library and of its bookmarks (starred documents of the whole
+            // library, combined with Show and the search), not a page of its own, as the chip was. Filled and marked
+            // while on; on Recent a tap shows the library's favourites.
+            PageTab {
+                id: favouritesTab
+                objectName: "favouritesChip"
+                label: qsTr("Favourites")
+                tip: chosen ? qsTr("Only favourites are shown - tap: all documents")
+                            : qsTr("Show only favourites (starred documents)")
+                iconName: chosen ? "xqt-star-filled" : "xqt-star"
+                enabled: app.library.available
+                chosen: app.library.favouritesOnly && home.page !== 1
+                chosenColor: "#fdf1d0"
+                chosenBorder: "#f4b400"
+                chosenText: "#8a5a00"
+                tapAction: function() {
+                    if (home.page === 1) {
+                        home.page = 0
+                        app.library.favouritesOnly = true
+                    } else {
+                        app.library.favouritesOnly = !app.library.favouritesOnly
+                    }
+                }
+            }
+            PageTab {
+                id: bookmarksTab
+                objectName: "bookmarksPageButton"
+                pageIndex: 2
+                label: qsTr("Bookmarks")
+                iconName: "xqt-bookmark"
+                enabled: app.library.available
+            }
+        }
+    }
+
+    // --- where we are in the library: the breadcrumbs, or what the list shows (search, flat, favourites) ---
+    // The breadcrumbs elide from the middle: the library, "…" (a menu of the folders left out) and as many of the last
+    // folders as fit ("Library › … › Quantum mechanics › Exercise sheets"); they never widen the page.
+    RowLayout {
+        id: crumbBar
+        parent: home.shortLayout ? headerCrumbSlot : crumbRowSlot
+        anchors.fill: parent
+        spacing: 2
+        readonly property bool showCrumbs: !home.searching && !app.library.flat && !app.library.favouritesOnly
+
+        IconButton {
+            objectName: "folderUpButton"
+            iconName: "xqt-arrow-up"
+            tip: qsTr("Up (Backspace)")
+            implicitWidth: home.touch ? 44 : 40
+            implicitHeight: home.touch ? 44 : 40
+            visible: crumbBar.showCrumbs
+            enabled: app.library.folder !== ""
+            onClicked: app.library.goUp()
+        }
+        Item {
+            id: crumbArea
+            objectName: "crumbArea"
+            visible: crumbBar.showCrumbs
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumWidth: 0
+            Layout.preferredWidth: 0
+            clip: true
+            /// Which crumbs show: the library (unless even the last folder is short of room then), "…" for the
+            /// folders left out, and the ones from `first` on; the widths of the library's and of the last one (elided
+            /// when they do not fit)
+            readonly property var plan: {
+                const n = crumbRepeater.count, room = width
+                const widths = []
+                for (let i = 0; i < n; ++i) {
+                    const c = crumbRepeater.itemAt(i)
+                    widths.push(c ? c.naturalWidth : 0)
+                }
+                const total = widths.reduce(function(a, b) { return a + b }, 0)
+                if (n <= 1 || total <= room)
+                    return { first: 1, showRoot: true, rootWidth: n > 0 ? Math.min(widths[0], room) : 0,
+                             lastWidth: n > 0 ? Math.min(widths[n - 1], room) : 0 }
+                const ellipsis = crumbEllipsis.implicitWidth
+                const last = widths[n - 1]
+                // The last folder first (up to 60 % of the room, at least 120), then the library with what is left
+                // (at most half the room), left out too when that is less than 56
+                const lastWant = Math.min(last, Math.max(120, room * 0.6))
+                const rootRoom = room - (n > 2 ? ellipsis : 0) - lastWant
+                const showRoot = rootRoom >= 56
+                const rootWidth = Math.min(widths[0], rootRoom, room * 0.5)
+                let first = n - 1
+                let used = (showRoot ? rootWidth : 0) + (n > 2 || !showRoot ? ellipsis : 0) + last
+                while (first - 1 >= 1 && used + widths[first - 1] <= room) {
+                    first--
+                    used += widths[first]
+                }
+                const shownEllipsis = first > 1 || !showRoot
+                let middle = 0
+                for (let i = first; i < n - 1; ++i) middle += widths[i]
+                const lastRoom = room - (showRoot ? rootWidth : 0) - (shownEllipsis ? ellipsis : 0) - middle
+                return { first: first, showRoot: showRoot, rootWidth: rootWidth,
+                         lastWidth: Math.max(40, Math.min(last, lastRoom)) }
+            }
+            /// The folders left out ("…"): [{name, folder}]
+            readonly property var hidden: {
+                const list = [], crumbs = app.library.breadcrumbs
+                for (let i = plan.showRoot ? 1 : 0; i < plan.first && i < crumbs.length; ++i) list.push(crumbs[i])
+                return list
+            }
+            Row {
+                id: crumbRow
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 0
+                Repeater {
+                    id: crumbRepeater
+                    model: app.library.breadcrumbs
+                    delegate: Row {
+                        id: crumbItem
+                        required property int index
+                        required property var modelData
+                        readonly property string folder: modelData.folder
+                        readonly property bool last: index === crumbRepeater.count - 1
+                        /// Its width with its whole name
+                        readonly property real naturalWidth: crumbLabel.implicitWidth + (index > 0 ? 34 : 18)
+                        /// Where the crumb itself starts (after "…")
+                        readonly property real crumbX: crumb.x
+                        visible: index === 0 ? crumbArea.plan.showRoot : index >= crumbArea.plan.first
+                        // "…" before the first folder shown after the library: the ones left out
+                        AbstractButton {
+                            id: crumbEllipsisHere
+                            objectName: "crumbEllipsis"
+                            visible: crumbItem.index > 0 && crumbItem.index === crumbArea.plan.first
+                                     && (crumbItem.index > 1 || !crumbArea.plan.showRoot)
+                            implicitHeight: home.touch ? 44 : 40
+                            implicitWidth: crumbEllipsis.implicitWidth
+                            onClicked: Popups.openAt(crumbMenu)
+                            Accessible.name: qsTr("More folders")
+                            background: Rectangle {
+                                radius: 8
+                                color: crumbEllipsisHere.hovered || crumbEllipsisHere.pressed ? "#e1e4e8" : "transparent"
+                            }
+                            contentItem: Item {
+                                Image {
+                                    visible: crumbArea.plan.showRoot
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    source: app.iconUrl("xqt-chevron-right")
+                                    sourceSize.width: 16; sourceSize.height: 16
+                                    opacity: 0.6
+                                }
+                                Label {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    x: crumbArea.plan.showRoot ? 24 : 12
+                                    text: "…"
+                                    font.pixelSize: 15
+                                    color: "#3c4043"
+                                }
+                            }
+                        }
+                        AbstractButton {
+                            id: crumb
+                            objectName: "crumb"
+                            readonly property bool dropTarget: moveDrag.active && moveDrag.hasTarget && moveDrag.target === crumbItem.folder
+                            implicitHeight: home.touch ? 44 : 40
+                            implicitWidth: crumbItem.naturalWidth
+                            width: crumbItem.index === 0 ? crumbArea.plan.rootWidth
+                                   : crumbItem.last ? crumbArea.plan.lastWidth : implicitWidth
+                            onClicked: app.library.folder = crumbItem.folder
+                            Accessible.name: crumbItem.modelData.name
+                            background: Rectangle {
+                                radius: 8
+                                color: crumb.dropTarget ? "#c5cae9" : (crumb.hovered ? "#e1e4e8" : "transparent")
+                            }
+                            contentItem: Item {
+                                Image {
+                                    visible: crumbItem.index > 0
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    x: 0
+                                    source: app.iconUrl("xqt-chevron-right")
+                                    sourceSize.width: 16; sourceSize.height: 16
+                                    opacity: 0.6
+                                }
+                                Label {
+                                    id: crumbLabel
+                                    objectName: "crumbLabel"
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    x: crumbItem.index > 0 ? 24 : 9
+                                    width: crumb.width - x - (crumbItem.index > 0 ? 10 : 9)
+                                    text: crumbItem.modelData.name
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 15
+                                    font.weight: crumbItem.last ? Font.DemiBold : Font.Normal
+                                    color: "#3c4043"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // (its size: the "…" of the crumbs is as wide)
+            Item { id: crumbEllipsis; visible: false; implicitWidth: 48 }
+            AdaptiveMenu {
+                id: crumbMenu
+                objectName: "crumbMenu"
+                title: qsTr("Folders")
+                Instantiator {
+                    model: crumbArea.hidden
+                    delegate: AdaptiveMenuItem {
+                        required property var modelData
+                        objectName: "crumbMenuEntry"
+                        text: modelData.name
+                        icon.source: app.iconUrl("xqt-folder")
+                        onTriggered: app.library.folder = modelData.folder
+                    }
+                    onObjectAdded: function(index, object) { crumbMenu.insertItem(index, object) }
+                    onObjectRemoved: function(index, object) { crumbMenu.removeItem(object) }
+                }
+            }
+        }
+        Label {
+            objectName: "listCaption"
+            visible: !crumbBar.showCrumbs
+            Layout.leftMargin: 8
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            text: home.searching ? (libraryGrid.count === 1 ? qsTr("1 result") : qsTr("%1 results").arg(libraryGrid.count))
+                  : app.library.favouritesOnly ? qsTr("Favourites in %1").arg(app.library.name)
+                                 : qsTr("All documents in %1").arg(app.library.name)
+            elide: Text.ElideRight
+            font.pixelSize: 15
+            color: "#3c4043"
+        }
+        BusyIndicator {
+            visible: app.library.importing
+            running: visible
+            implicitWidth: 28; implicitHeight: 28
+        }
+        Label {
+            objectName: "indexStatus"
+            visible: app.library.indexing && app.library.indexTotal > 0
+            text: home.shortLayout ? qsTr("Indexing %1/%2").arg(app.library.indexed).arg(app.library.indexTotal)
+                                   : qsTr("Indexing for search %1/%2").arg(app.library.indexed).arg(app.library.indexTotal)
+            font.pixelSize: 12
+            color: "#6b6f75"
+        }
+    }
+
+    // A phone: "+" (new document, import, new folder) floats at the bottom right, in reach of the thumb
+    RoundButton {
+        id: addFab
+        objectName: "newDocumentFab"
+        visible: home.phoneLayout && home.selectionCount === 0 && !moveDrag.active
+        z: 25
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 16
+        anchors.bottomMargin: 16 + home.safeBottom
+        width: 56
+        height: 56
+        highlighted: true
+        Material.elevation: 6
+        icon.source: app.iconUrl("xqt-plus")
+        icon.color: "#ffffff"
+        icon.width: 26
+        icon.height: 26
+        display: AbstractButton.IconOnly
+        readonly property string tip: newButton.tip
+        Accessible.name: tip
+        onClicked: Popups.openAt(newMenu)
+        // (a finger held on it says what it is)
+        property bool heldTip: false
+        onPressAndHold: heldTip = true
+        onReleased: heldTip = false
+        onCanceled: heldTip = false
+        ToolTip.visible: heldTip || (hovered && !home.touch)
+        ToolTip.text: tip
+        ToolTip.delay: heldTip ? 0 : 600
+    }
+
+    // Search in the whole library, and the extended search: in the header, or in a row of its own
     RowLayout {
         id: searchGroup
-        parent: home.narrow ? narrowSearchSlot : searchSlot
+        parent: home.searchOwnRow ? narrowSearchSlot : searchSlot
         anchors.fill: parent
         spacing: 6
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 44
+            Layout.minimumWidth: 0
             radius: 22
             color: "#ffffff"
             border.width: searchField.activeFocus ? 2 : 1
             border.color: searchField.activeFocus ? Material.accentColor : "#c9ccd1"
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 4
+                anchors.leftMargin: 8
+                anchors.rightMargin: 2
+                spacing: 2
                 ToolButton {
                     objectName: "librarySearchButton"
-                    implicitWidth: 36; implicitHeight: 36
+                    implicitWidth: 40; implicitHeight: 40
                     icon.source: app.iconUrl("xqt-search")
                     icon.color: "#3c4043"
                     display: AbstractButton.IconOnly
@@ -1228,6 +1838,7 @@ Rectangle {
                     id: searchField
                     objectName: "librarySearchField"
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 40
                     background: null
                     selectByMouse: true
                     Label {
@@ -1236,7 +1847,7 @@ Rectangle {
                         width: parent.width - parent.leftPadding - parent.rightPadding  // (a narrow field: …)
                         elide: Text.ElideRight
                         visible: parent.text === "" && parent.preeditText === ""
-                        text: qsTr("Search documents and folders")
+                        text: parent.width < 170 ? qsTr("Search") : qsTr("Search documents and folders")
                         color: "#8a8d91"
                     }
                     onTextEdited: home.typed()
@@ -1266,7 +1877,7 @@ Rectangle {
                     ToolTip.delay: 300
                     HoverHandler { id: hintHover }
                 }
-                FuzzyToggle { objectName: "librarySearchFuzzy" }
+                FuzzyToggle { objectName: "librarySearchFuzzy"; implicitHeight: 40 }
                 // The reduced search: names only (of documents, and of folders unless the list is flat)
                 ToolButton {
                     id: namesOnly
@@ -1275,7 +1886,9 @@ Rectangle {
                     checkable: true
                     checked: home.lib.namesOnly
                     onToggled: home.lib.namesOnly = checked
-                    implicitHeight: 36
+                    implicitHeight: 40
+                    leftPadding: 6
+                    rightPadding: 6
                     font.pixelSize: 13
                     font.weight: checked ? Font.DemiBold : Font.Normal
                     Material.foreground: checked ? Material.accentColor : "#5f6368"
@@ -1289,11 +1902,13 @@ Rectangle {
                     }
                 }
                 ToolButton {
+                    objectName: "librarySearchClear"
                     visible: searchField.text !== ""
-                    implicitWidth: 36; implicitHeight: 36
+                    implicitWidth: 40; implicitHeight: 40
                     icon.source: app.iconUrl("xqt-close")
                     icon.color: "#3c4043"
                     display: AbstractButton.IconOnly
+                    Accessible.name: qsTr("Clear the search")
                     onClicked: { searchField.text = ""; searchTyping.stop(); home.lib.searchQuery = "" }
                 }
             }
@@ -1348,10 +1963,11 @@ Rectangle {
                 hasTarget = true
                 return
             }
-            // A breadcrumb (a folder above)
+            // A breadcrumb (a folder above; not its "…")
             const c = mapToItem(crumbRow, p.x, p.y)
             const crumb = crumbRow.childAt(c.x, c.y)
-            if (crumb && crumb.folder !== undefined && crumb.folder !== app.library.folder) {
+            if (crumb && crumb.visible && crumb.folder !== undefined && c.x - crumb.x >= crumb.crumbX
+                    && crumb.folder !== app.library.folder) {
                 target = crumb.folder
                 hasTarget = true
             }
@@ -2017,6 +2633,7 @@ Rectangle {
 
     FileDialog {
         id: importDialog
+        objectName: "importDialog"
         title: qsTr("Import into the library")
         fileMode: FileDialog.OpenFiles
         nameFilters: [qsTr("Documents (*.xopp *.xoj *.pdf *.md *.png *.jpg *.jpeg *.webp *.heic *.heif)"),
@@ -2028,6 +2645,7 @@ Rectangle {
     }
     FolderDialog {
         id: importFolderDialog
+        objectName: "importFolderDialog"
         title: qsTr("Import a folder (with its subfolders) into the library")
         onAccepted: {
             const dir = selectedFolder, folder = app.library.flat || home.searching ? "" : app.library.folder
@@ -2199,6 +2817,6 @@ Rectangle {
         z: 30
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 32
+        anchors.bottomMargin: addFab.visible ? 88 + home.safeBottom : 32
     }
 }

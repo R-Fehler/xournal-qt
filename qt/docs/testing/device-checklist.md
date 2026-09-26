@@ -2276,3 +2276,38 @@ The sidebar and text documents:
 - [ ] A `.md` being written: one bar only (the format bar), with "»" and ⋮ at its end; "»" has New, Open, Save, Edit as
       notes, Open externally, Search, … ⋮ has no Settings, no Full screen, no Insert image (they are buttons).
 - [ ] The text box (T): a new text box is Markdown; tapping an old plain text still edits it as plain text.
+
+## Adaptive home and tab overview (qt/adaptive-home)
+See [adaptive-layout.md](../adaptive-layout.md), "The home screen and the tab overview".
+- [ ] Desktop, maximized at 1920: every button in one row; the switch reads "<library> ▾ | Recent | Favourites |
+      Bookmarks" with words. New ▾, Import ▾ and Sort open as menus below their buttons; Show opens its switches, which
+      stay open while you tick several.
+- [ ] The star (Favourites): on the Library page only the starred documents of all folders, filled and yellow while
+      on; tap again: all. With a search or Show: combined. On Bookmarks: only the favourites' bookmarks. On Recent a
+      tap switches to the Library's favourites.
+- [ ] Make the window narrower (about 1280, then 960): the switch becomes the library's name, ▾ and three icons (clock,
+      star, ribbon); the buttons after the search become "+" and View (the sliders); nothing scrolls sideways. "+": New
+      document, New Markdown file, New text file, Import files, Import a folder, New folder all work. View: All
+      documents at once, Kinds of files shown (tick two kinds: the menu stays open), Sort, Open documents where they
+      were left off, and − / + for the size of the cards (stays open); no Favourites in it. View is marked while it
+      filters. Point at an icon: its word as a tip.
+- [ ] Recent: "+" also has Open a file…; Bookmarks: the search and View (kinds of files) are there.
+- [ ] A deep folder (four levels, long names) in a narrow window: "Library › … › last folder"; the "…" lists the folders
+      in between and opens them; nothing of the page is wider than the window. Drag a card onto a crumb: it moves there.
+- [ ] Select several cards in a narrow window (about 700 wide): the actions are a bar at the bottom (Open, Copy to,
+      Move to, Trash, More → Select all, on Recent Remove from list); wider: the row at the top as before.
+- [ ] Android, Fold 7 folded (412 wide): the header is one row: the library's name (elided) ▾, clock, star, ribbon,
+      View, Settings; the search below it. Press and hold the clock, the star, the ribbon: their names, and nothing
+      switches. "+" floats at the bottom right above the
+      navigation bar; tap it: a sheet with New / Import / New folder. View: a sheet; Kinds of files shown drills in and
+      its switches work in the sheet.
+- [ ] Fold 7 folded: two columns of cards, long names on two lines, the ⋮ of a card easy to hit. Press and hold a card,
+      "Select": the bar at the bottom with Open, Copy to, Move to, Trash, More; "+" is gone while selecting.
+- [ ] Fold 7 folded, a deep folder: the breadcrumbs end with the folder you are in, "…" in between.
+- [ ] Fold 7 in landscape (915 × 412): one header row (the library's name ▾, clock, star, ribbon, the breadcrumbs,
+      the search, View, Settings); a whole row of cards fits below it.
+- [ ] Tab overview on the folded Fold 7 (open three documents, compact chrome: Settings → Display → Controls at this
+      size → Compact): a tap on the tab dots at the top opens it; two cards side by side; the search below the title and
+      buttons; its placeholder does not run under Fuzzy and Names; the × of each card inside the screen.
+- [ ] Tab overview in landscape: four cards in a row, each whole. With only slides open (landscape pages) the cards
+      are lower than with an A4 page among them.
