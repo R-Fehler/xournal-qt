@@ -665,6 +665,15 @@
   stack; Esc / Android back close. Settings on phones: a list of sections → section pages; labels above sliders and
   combos below 600 px. The quick-tools popup fits short windows. Open: tab overview, table editor, small popups.
 
+- **Adaptive tool bar, `qt/adaptive-toolbar` (2026-09-27).** `ToolBarPlan.js` lays the bar out from the room there
+  is: widths → one cycling button, colours → current + recents (+ palette), low-priority buttons → "more tools" (»),
+  on phones colours → one cycling button; ⋮ pinned outside any scrolling. Two rows on tablet portrait (top, or bottom
+  by choice; per class in ⋮ → View → Tool bar position). Cycling buttons: pen ↔ highlighter, eraser types, select
+  rectangle ↔ lasso, shapes, setsquare ↔ compass (dots, long-press list, last variant kept). The text box makes
+  Markdown boxes. Sidebar arrow tab; the view pill without − / +, a small zoom % (tap: fit menu; double tap / long
+  press: fit page), Contents beside the page grid. One place per action (⋮ lost its duplicates); clearer icons;
+  a held finger shows a button's name.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
