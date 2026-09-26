@@ -62,6 +62,7 @@
 #include "canvas/CanvasMemory.h"
 #include "canvas/CanvasPage.h"
 #include "markdown/MdBox.h"
+#include "markdown/MdImages.h"
 #include "canvas/PenHover.h"
 #include "canvas/ScreenCalibration.h"
 #include "canvas/MarkdownEditor.h"
@@ -6811,6 +6812,115 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileHasTheFormattingBar) {
     const size_t line = text.rfind('\n', hello);
     EXPECT_EQ(text.substr(line + 1, 6), "- [ ] ") << text.substr(line + 1, 40);
     EXPECT_TRUE(find<QQuickItem>("mdTaskList")->property("checked").toBool());
+}
+
+// Pictures in a .md (qt/docs/md-images.md): the formatting bar's image opens a file picker, a picked file is copied
+// into "kalman.assets/" and linked at the cursor; a pasted picture is saved there as image-….png; picture files
+// dropped on the page are copied and linked. Each is one undo step of the text; undo leaves the files.
+TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFile) {
+    const fs::path md = root / "kalman.md";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(md.string())));
+    wait(100);
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    click(canvasItem);
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    editor->setCursorPosition(0);
+    type("X");
+    const std::string start = editor->text();
+
+    // A picture file somewhere else
+    const fs::path outside = root / "elsewhere";
+    fs::create_directories(outside);
+    QImage red(40, 20, QImage::Format_RGB32);
+    red.fill(Qt::red);
+    ASSERT_TRUE(red.save(QString::fromStdString((outside / "my plot.png").string())));
+
+    // The image of the insert menu: a file picker
+    click(find<QQuickItem>("mdInsert"));
+    ASSERT_TRUE(waitOpened(find<QObject>("mdInsertMenu"), true));
+    click(findItem("mdImageItem"));
+    auto* dialog = find<QObject>("mdImageDialog");
+    ASSERT_NE(dialog, nullptr);
+    until([&] { return dialog->property("visible").toBool(); });
+    EXPECT_TRUE(dialog->property("visible").toBool()) << "the picker is open";
+    QMetaObject::invokeMethod(dialog, "close");
+    // What it gives when a file is picked (the bar's action with the file's URL)
+    auto* bar = find<QQuickItem>("markdownFormatBar");
+    QMetaObject::invokeMethod(bar, "act", Q_ARG(QVariant, QString("image")),
+                              Q_ARG(QVariant, QUrl::fromLocalFile(QString::fromStdString((outside / "my plot.png").string()))
+                                                      .toString()));
+    wait(50);
+    const fs::path assets = root / "kalman.assets";
+    EXPECT_TRUE(fs::exists(assets / "my plot.png")) << "copied next to the .md";
+    const std::string link = "X![my plot](kalman.assets/my%20plot.png)";  // (a file's name is its alt text)
+    EXPECT_EQ(editor->text().substr(0, link.size()), link);
+    EXPECT_EQ(editor->text().substr(link.size()), start.substr(1));
+    EXPECT_EQ(xqt::md::images::resolve("kalman.assets/my%20plot.png"), (assets / "my plot.png").string());
+
+    // Ctrl+V with a picture on the clipboard: saved as image-YYYY-MM-DD-HHMMSS.png, linked at the cursor
+    key(Qt::Key_Return);
+    auto* mime = new QMimeData;
+    QImage blue(30, 30, QImage::Format_RGB32);
+    blue.fill(Qt::blue);
+    mime->setImageData(blue);
+    QGuiApplication::clipboard()->setMimeData(mime);
+    const std::string beforePaste = editor->text();
+    key(Qt::Key_V, Qt::ControlModifier);
+    std::vector<fs::path> pasted;
+    for (const auto& e: fs::directory_iterator(assets)) {
+        if (e.path().filename().string().rfind("image-", 0) == 0) {
+            pasted.push_back(e.path());
+        }
+    }
+    ASSERT_EQ(pasted.size(), 1u);
+    const std::string name = pasted[0].filename().string();
+    EXPECT_EQ(name.size(), std::string("image-2026-09-26-101112.png").size()) << name;
+    EXPECT_NE(editor->text().find("![](kalman.assets/" + name + ")"), std::string::npos) << editor->text().substr(0, 120);
+    // One undo step; the file stays
+    editor->undo();
+    EXPECT_TRUE(editor->text() == beforePaste);
+    EXPECT_TRUE(fs::exists(pasted[0]));
+    editor->redo();
+
+    // A copied text that also carries a picture (a spreadsheet's cells): the text
+    auto* both = new QMimeData;
+    both->setText("a\tb");
+    both->setImageData(blue);
+    QGuiApplication::clipboard()->setMimeData(both);
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_NE(editor->text().find("a\tb"), std::string::npos);
+
+    // Two picture files dropped on the page: both copied, linked at the cursor as one change
+    QImage green(10, 10, QImage::Format_RGB32);
+    green.fill(Qt::green);
+    ASSERT_TRUE(green.save(QString::fromStdString((outside / "g.png").string())));
+    ASSERT_TRUE(green.save(QString::fromStdString((outside / "h.jpg").string())));
+    const std::string beforeDrop = editor->text();
+    QMimeData drop;
+    drop.setUrls({QUrl::fromLocalFile(QString::fromStdString((outside / "g.png").string())),
+                  QUrl::fromLocalFile(QString::fromStdString((outside / "h.jpg").string()))});
+    const QPoint at = canvasItem->mapToScene(QPointF(canvasItem->width() / 2, canvasItem->height() / 2)).toPoint();
+    QDragEnterEvent enter(at, Qt::CopyAction, &drop, Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(window, &enter);
+    QDragMoveEvent move(at, Qt::CopyAction, &drop, Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(window, &move);
+    QDropEvent dropped(at, Qt::CopyAction, &drop, Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(window, &dropped);
+    wait(50);
+    EXPECT_TRUE(fs::exists(assets / "g.png"));
+    EXPECT_TRUE(fs::exists(assets / "h.jpg"));
+    EXPECT_NE(editor->text().find("![g](kalman.assets/g.png)\n\n![h](kalman.assets/h.jpg)"), std::string::npos);
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {  // (the pictures on the page, to look at)
+        editor->setCursorPosition(editor->text().find("The needle"));
+        view->getViewController().scrollToPageRect(0, QRectF(0, 0, 600, 500));
+        wait(1500);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    editor->undo();
+    EXPECT_TRUE(editor->text() == beforeDrop) << "one undo step";
 }
 
 // Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one; the emoji

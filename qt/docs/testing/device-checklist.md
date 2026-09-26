@@ -1664,3 +1664,11 @@ Design: [md-images.md](../md-images.md).
       does not stutter.
 - [ ] The same text in: full-page mode, one continuous page, the library card's thumbnail, Print, Export as PDF
       (the PDF shows the photos; a JPEG is as sharp as the original).
+- [ ] In a `.md`: copy a picture (a browser's "Copy image", a screenshot tool), put the cursor on an empty line,
+      Ctrl+V: `![](name.assets/image-2026-…png)` appears and the picture shows; the file is in `name.assets/` next
+      to the `.md` (the file manager). Ctrl+Z takes the link away; the file stays.
+- [ ] Copy cells of a spreadsheet (LibreOffice Calc) and paste: the text comes, not a picture of the cells.
+- [ ] Formatting bar → **+** → Image…: the system's file picker (Android: the photo picker / documents); a picked
+      photo is copied into `name.assets/` under its name and linked with its name as alt text.
+- [ ] Drag two picture files from the file manager onto the page (desktop): both copied and linked, one Ctrl+Z
+      takes both away.

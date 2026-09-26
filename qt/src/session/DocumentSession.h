@@ -238,6 +238,9 @@ public:
     /// The text the pages hold now (the parts of the page's Markdown text joined). `lock`: under the document's read
     /// lock (not in a crash handler).
     std::string currentText(bool lock = true) const;
+    /// Where the relative links of its Markdown point, and where its pictures are kept (qt/docs/md-images.md);
+    /// nullptr: nowhere (a notes document not saved yet).
+    const md::images::Root* imageRootOf() const { return imageRoot.active() ? &imageRoot.root() : nullptr; }
     /// The text changed (the pages' boxes): the modified state follows.
     void textEdited();
     /// The text is on one continuous page that grows with it (else on pages; MarkdownFile::relayout switches).

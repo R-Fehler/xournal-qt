@@ -128,6 +128,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MdImageDecoder.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MdImageDecoder.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownImages.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownImages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasTextInput.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.cpp

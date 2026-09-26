@@ -40,8 +40,11 @@ without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
   a line becomes a heading or a list item.
 - **Blocks**, on lines of their own with a blank line before and after (on an empty line; before the line when the
   cursor is at its start; else after the line): code block (a menu of languages; selected lines go inside the fence),
-  table (below), and in the **+** menu: formula block (`$$` lines), horizontal rule, image (a placeholder
-  `![image](image.png)` with the file name selected: images are not shown yet), page break (below).
+  table (below), and in the **+** menu: formula block (`$$` lines), horizontal rule, image (a file picker: the
+  picture is copied into `name.assets/` and linked at the cursor, [md-images.md](md-images.md)), page break (below).
+- **Pictures**: Ctrl+V with a picture on the clipboard saves it as `name.assets/image-YYYY-MM-DD-HHMMSS.png` and
+  links it at the cursor; picture files dropped on the page are copied there and linked. One undo step each; undo
+  leaves the files ([md-images.md](md-images.md)).
 - The buttons show what is at the cursor: bold, italic, …, the list, quote, code block, table. It is worked out from
   the cursor's line (and the fences before it), not from the whole parse.
 - Every tool is one undo step, as are the keys; they are the same operations (`md::format`). The tools do not take
@@ -192,7 +195,6 @@ program changed it (its bytes differ from what was read or saved last; our own s
   in the last one adds a row).
 
 ## Not yet
-- Images pasted into `<name>.assets/`, Obsidian vault detection and its warnings. The formatting bar's image is a
-  placeholder until images are shown (a file picker then).
+- Obsidian vault detection and its warnings.
 - Table editor: cells of more than one line (a line break is written as `<br>`), moving rows and columns by drag.
 - "Save as" for a text file (use the library's Rename / Copy).

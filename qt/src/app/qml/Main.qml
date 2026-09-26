@@ -979,6 +979,18 @@ ApplicationWindow {
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
 
+        // Picture files dropped on Markdown being written (a .md, a text document, Markdown on a page): saved with
+        // the document and linked at the cursor (qt/docs/md-images.md)
+        DropArea {
+            objectName: "markdownDropArea"
+            anchors.fill: parent
+            enabled: formatBar.visible
+            keys: ["text/uri-list"]
+            onDropped: function(drop) {
+                if (drop.hasUrls && app.insertMarkdownImages(drop.urls))
+                    drop.accept(Qt.CopyAction)
+            }
+        }
         // The mouse rests on a formula of a Markdown text that cannot be drawn (shown as its source, in red): why
         ToolTip {
             objectName: "mathErrorTip"

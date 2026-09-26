@@ -437,8 +437,8 @@ Edit image(std::string_view t, size_t anchor, size_t caret, std::string_view pat
     if (alt.find('\n') != std::string::npos) {
         alt.clear();
     }
-    if (alt.empty()) {
-        alt = "image";
+    if (alt.empty() && path.empty()) {
+        alt = "image";  // (a placeholder: "image.png" to be typed over; a picture's alt text stays empty, as Typora's)
     }
     const std::string target = path.empty() ? std::string("image.png") : std::string(path);
     const std::string with = "![" + alt + "](" + target + ")";

@@ -7,12 +7,17 @@
  */
 #include <algorithm>
 
+#include <QFileInfo>
+#include <QImageReader>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QUrl>
 
 #include "AppController.h"
 #include "CanvasView.h"
 #include "MarkdownEditor.h"
+#include "MarkdownImages.h"
+#include "shell/ContentFiles.h"
 #include "MdFormat.h"
 
 using namespace xqt;
@@ -141,7 +146,66 @@ QVariantMap AppController::markdownFormat() const {
     return stateMap(md::format::stateAt(editor->text(), editor->anchorPosition(), editor->cursorPosition()));
 }
 
+/// A picture file brought in (the formatting bar's picker, a drop): saved where the document keeps its pictures, its
+/// link ("name.assets/…"); nullopt with a message if that failed. Links and paths that are no file URL stay as they
+/// are.
+std::optional<std::string> AppController::pictureLinkFor(const QString& arg) {
+    const QUrl url(arg);
+    if (!(url.isLocalFile() || ContentFiles::isForeign(url)) || !session()) {
+        return arg.toStdString();
+    }
+    const QString source = ContentFiles::sourceOf(url);
+    QString name = url.isLocalFile() ? url.fileName() : QFileInfo(source).fileName();
+    if (!MarkdownImages::isPictureName(name)) {
+        // (a picker's content:// URI may have no extension: the picture's kind from its content)
+        const QByteArray kind = QImageReader::imageFormat(source);
+        if (kind.isEmpty()) {
+            Q_EMIT message(tr("Insert picture"), tr("\"%1\" is not a picture that can be shown.").arg(name), true);
+            return std::nullopt;
+        }
+        name = (name.isEmpty() ? QStringLiteral("image") : name) + '.' + QString::fromLatin1(kind);
+    }
+    QString error;
+    auto link = MarkdownImages::addPictureFile(*session(), source, name, error);
+    if (!link) {
+        Q_EMIT message(tr("Insert picture"), error, true);
+    }
+    return link;
+}
+
+bool AppController::insertMarkdownImages(const QList<QUrl>& files) {
+    CanvasView* v = canvas();
+    if (!v || files.isEmpty()) {
+        return false;
+    }
+    if (!v->getMarkdownEditor() && (textDocument() == "markdown" || v->typesIntoFlow())) {
+        v->ensureTextEditor();
+    }
+    MarkdownEditor* editor = v->getMarkdownEditor();
+    if (!editor || editor->isPlain()) {
+        return false;
+    }
+    // Each saved, all of them inserted at the cursor as one change (one undo step), one per line
+    std::string markdown;
+    for (const QUrl& url: files) {
+        const auto link = pictureLinkFor(url.toString());
+        if (!link) {
+            return false;
+        }
+        const QString name = url.isLocalFile() ? url.fileName() : QFileInfo(ContentFiles::sourceOf(url)).fileName();
+        markdown += (markdown.empty() ? "" : "\n\n") +
+                    MarkdownImages::markdownFor(*link, QFileInfo(name).completeBaseName().toStdString());
+    }
+    const size_t from = std::min(editor->anchorPosition(), editor->cursorPosition());
+    const size_t to = std::max(editor->anchorPosition(), editor->cursorPosition());
+    editor->applyEdit({from, to, markdown, from + markdown.size(), from + markdown.size()});
+    return true;
+}
+
 bool AppController::formatMarkdown(const QString& action, const QString& arg) {
+    if (action == QLatin1String("image") && !arg.isEmpty()) {
+        return insertMarkdownImages({QUrl(arg)});  // (the picker's file; a path typed in stays below)
+    }
     const auto a = md::format::actionNamed(action.toStdString());
     CanvasView* v = canvas();
     if (!a || !v) {
@@ -166,10 +230,18 @@ QVariantMap AppController::formatMarkdownIn(QQuickTextDocument* document, int an
     if (!a || !document || !document->textDocument()) {
         return {};
     }
+    std::string value = arg.toStdString();
+    if (*a == md::format::Action::Image && !arg.isEmpty()) {
+        const auto link = pictureLinkFor(arg);  // (a picked file: saved with the document, linked)
+        if (!link) {
+            return {};
+        }
+        value = *link;
+    }
     const QString text = document->textDocument()->toPlainText();
     const std::string source = text.toStdString();
     return applyIn(document, source,
-                   md::format::apply(source, utf8Offset(text, anchor), utf8Offset(text, caret), *a, arg.toStdString()));
+                   md::format::apply(source, utf8Offset(text, anchor), utf8Offset(text, caret), *a, value));
 }
 
 QVariantMap AppController::markdownFormatOf(const QString& text, int anchor, int caret) const {

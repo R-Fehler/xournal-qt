@@ -710,6 +710,10 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
         currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
+        currentConnections.push_back(connect(v, &CanvasView::messageRequested, this,
+                                             [this](const QString& title, const QString& text) {
+                                                 Q_EMIT message(title, text, true);
+                                             }));
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
         // Whoever changes the selection (a press on the page, copying, marking, a page change): the knobs and the

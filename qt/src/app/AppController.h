@@ -385,6 +385,10 @@ public:
     /// A formatting tool (md::format::actionNamed: "bold", "heading2", "codeBlock" with the language as `arg`, ...)
     /// on the Markdown written on the page or in the .md: one undo step. False if no Markdown is written.
     Q_INVOKABLE bool formatMarkdown(const QString& action, const QString& arg = QString());
+    /// Pictures (files: the formatting bar's picker, a drop) into the Markdown written on the page or in the .md:
+    /// saved where the document keeps its pictures ("name.assets/"), their Markdown at the cursor, one undo step
+    /// (qt/docs/md-images.md). False if nothing was inserted (a message says why when a picture could not be saved).
+    Q_INVOKABLE bool insertMarkdownImages(const QList<QUrl>& files);
     /// The same on the source beside the page (its TextArea's document: one undo step there). The selection after it:
     /// {anchor, caret} (the text's offsets); empty if nothing was done.
     Q_INVOKABLE QVariantMap formatMarkdownIn(QQuickTextDocument* document, int anchor, int caret,
@@ -639,6 +643,7 @@ public:
     void setFingerDrawingDefault(bool on);
 
 private:
+    std::optional<std::string> pictureLinkFor(const QString& arg);
     void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);
 
 public:

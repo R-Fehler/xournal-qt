@@ -403,6 +403,8 @@ Q_SIGNALS:
     void pdfTextSelectionCleared();
     /// The setsquare / compass changed on its own (e.g. put aside because its page went).
     void geometryChanged();
+    /// Something went wrong that the user should know (e.g. a pasted picture could not be saved).
+    void messageRequested(const QString& title, const QString& text);
 
 private:
     void rebuildPages();
