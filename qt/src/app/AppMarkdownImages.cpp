@@ -24,7 +24,10 @@
 #include "MdBox.h"
 #include "MdImages.h"
 #include "session/AppContext.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
+#include "session/TextFile.h"
+#include "shell/SystemApps.h"
 #include "shell/NetFetch.h"
 #include "shell/TabManager.h"
 
@@ -127,4 +130,47 @@ void AppController::relayoutPictures(const std::string& link) {
             }
         }
     }
+}
+
+// --- Remove unused images (qt/docs/md-images.md, "Clean-up") -----------------------------------------------------------
+
+QStringList AppController::unusedMarkdownImages() const {
+    const DocumentSession* s = session();
+    if (!s || !s->textFile() || s->hasFilePath() || s->textFile()->kind() != TextFile::Kind::Markdown) {
+        return {};
+    }
+    const fs::path md = s->textFile()->path();
+    const fs::path folder = DocumentImages::assetsFolder(md);
+    QStringList out;
+    for (const fs::path& f: DocumentImages::unusedPictures(md, s->currentText())) {
+        const std::u8string rel = fs::relative(f, folder).generic_u8string();
+        out.push_back(QString::fromUtf8(reinterpret_cast<const char*>(rel.data()), static_cast<qsizetype>(rel.size())));
+    }
+    return out;
+}
+
+int AppController::trashMarkdownImages(const QStringList& files) {
+    const QStringList unused = unusedMarkdownImages();  // (only those: never a picture the text links to)
+    if (unused.isEmpty()) {
+        return 0;
+    }
+    const fs::path folder = DocumentImages::assetsFolder(session()->textFile()->path());
+    int moved = 0;
+    for (const QString& f: files) {
+        if (!unused.contains(f)) {
+            continue;
+        }
+        const QByteArray u = f.toUtf8();
+        const fs::path file = folder / fs::path(std::u8string(u.begin(), u.end()));
+        if (SystemApps::instance().moveToTrash(QString::fromStdString(file.string()))) {
+            ++moved;
+        } else {
+            Q_EMIT message(tr("Remove unused images"), tr("\"%1\" could not be moved to the trash.").arg(f), true);
+        }
+    }
+    if (moved > 0) {
+        md::images::changed();
+        Q_EMIT pageActionDone(tr("%n unused image(s) moved to the trash", nullptr, moved), false);
+    }
+    return moved;
 }

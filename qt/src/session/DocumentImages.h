@@ -54,6 +54,11 @@ size_t copyLinked(const std::string& markdown, const fs::path& folder);
 /// how many pictures were copied.
 std::string exportPictures(const std::string& markdown, const fs::path& mdFile, size_t& copied);
 
+/// The pictures (any files) in the "name.assets" folder of a `.md` that its text does not link to (images, links,
+/// reference definitions, HTML src), sorted: what "Remove unused images" offers to move to the trash. A folder
+/// that is not there: none.
+std::vector<fs::path> unusedPictures(const fs::path& markdownFile, const std::string& text);
+
 /// A file name as a link to it is written: what Markdown or a web address would read otherwise %-encoded (" " is
 /// "%20", "(" "%28", …).
 std::string linkEncoded(const std::string& name);

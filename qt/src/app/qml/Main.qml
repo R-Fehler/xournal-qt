@@ -881,6 +881,13 @@ ApplicationWindow {
                         onTriggered: app.openAsPdfDocument()
                     }
                     MenuItem {
+                        objectName: "unusedImagesItem"
+                        visible: app.textDocument === "markdown"
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Remove unused images…")
+                        onTriggered: unusedImagesDialog.show()
+                    }
+                    MenuItem {
                         objectName: "exportMarkdownItem"
                         visible: !win.textDoc && app.hasMarkdownText
                         height: visible ? implicitHeight : 0
@@ -2824,6 +2831,7 @@ ApplicationWindow {
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
     WebConfirm { id: webConfirm }
     WebImageConfirm { id: webImageConfirm }
+    UnusedImagesDialog { id: unusedImagesDialog }
     Connections {
         target: app
         function onWebImageRequested(url, host, access) { webImageConfirm.ask(url, host, access) }

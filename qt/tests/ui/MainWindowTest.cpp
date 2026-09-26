@@ -6957,6 +6957,44 @@ TEST_F(HomeScreenMarkdownTest, aRenamedMarkdownFileTakesItsPicturesAlongAlsoWhen
     EXPECT_FALSE(s->textChangedOnDisk(bytes)) << "no question about a change on disk";
 }
 
+// ⋮ → Remove unused images… of a .md (qt/docs/md-images.md): lists the files of its folder the text does not link to
+// (a link to a PDF there counts as used), and moves them to the trash only when asked.
+TEST_F(HomeScreenMarkdownTest, removeUnusedImagesListsThemFirst) {
+    FakeSystemApps apps;
+    xqt::SystemApps::setInstance(&apps);
+    std::ofstream(root / "pics.md") << "# Pictures\n\n![](pics.assets/used.png)\n\n[the paper](pics.assets/paper.pdf)\n";
+    QImage img(8, 8, QImage::Format_RGB32);
+    img.fill(Qt::blue);
+    fs::create_directories(root / "pics.assets" / "old");
+    for (const char* name: {"used.png", "unused.png", "old/older.png"}) {
+        ASSERT_TRUE(img.save(QString::fromStdString((root / "pics.assets" / name).string())));
+    }
+    std::ofstream(root / "pics.assets" / "paper.pdf") << "%PDF-1.4";
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "pics.md").string())));
+    wait(100);
+    EXPECT_EQ(controller->unusedMarkdownImages(), (QStringList{"old/older.png", "unused.png"}));
+
+    QObject* more = find("moreMenu");
+    QMetaObject::invokeMethod(more, "open");
+    ASSERT_TRUE(waitOpened(more, true));
+    auto* item = find<QQuickItem>("unusedImagesItem");
+    until([&] { return item->isVisible(); });
+    click(item);
+    auto* dialog = find<QObject>("unusedImagesDialog");
+    ASSERT_TRUE(waitOpened(dialog, true));
+    EXPECT_EQ(dialog->property("files").toStringList(), (QStringList{"old/older.png", "unused.png"}));
+    EXPECT_TRUE(apps.trashed.isEmpty()) << "nothing before it is asked";
+    click(findItem("unusedImagesTrash"));
+    ASSERT_TRUE(waitOpened(dialog, false));
+    EXPECT_EQ(apps.trashed.size(), 2);
+    EXPECT_FALSE(fs::exists(root / "pics.assets" / "unused.png"));
+    EXPECT_TRUE(fs::exists(root / "pics.assets" / "used.png"));
+    EXPECT_TRUE(fs::exists(root / "pics.assets" / "paper.pdf"));
+    // (a picture whose link was just deleted counts as unused: the text as it is now)
+    EXPECT_TRUE(controller->unusedMarkdownImages().isEmpty());
+    xqt::SystemApps::setInstance(nullptr);
+}
+
 // Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one; the emoji
 // button (shown while writing) opens the picker, whose search finds by name and puts the emoji at the cursor.
 TEST_F(MainWindowTest, emojiSuggestionsAndPickerWhileWritingOnThePage) {

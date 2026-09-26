@@ -181,6 +181,7 @@ set(XQT_QML_FILES
     src/app/qml/LookUpMenu.qml
     src/app/qml/WebConfirm.qml
     src/app/qml/WebImageConfirm.qml
+    src/app/qml/UnusedImagesDialog.qml
     src/app/qml/FindPaperSheet.qml
     src/app/qml/ArxivSheet.qml)
 foreach(f ${XQT_QML_FILES})

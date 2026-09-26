@@ -60,8 +60,10 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
   `name.assets/`); the folder is hidden and goes with the `.md` it belongs to.
 - An open `.md` renamed in the library follows in its tab: the path, the links in its text (one undo step), and the
   file's new bytes are taken as read (no question about a change on disk).
-- Clean-up: images in `name.assets/` that the text no longer links to are not deleted automatically. ⋮ → **Remove
-  unused images** lists them and moves them to the trash.
+- Clean-up: images in `name.assets/` that the text no longer links to are not deleted automatically (undo may bring
+  a link back). ⋮ → **Remove unused images…** lists the files of the folder that the text as it is now does not link
+  to (images, links, reference definitions, HTML `src`: a linked PDF there counts as used) and moves them to the
+  trash when asked (`DocumentImages::unusedPictures`, `UnusedImagesDialog.qml`).
 
 ## PDF text documents
 

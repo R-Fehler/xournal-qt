@@ -187,6 +187,50 @@ std::string exportPictures(const std::string& markdown, const fs::path& mdFile, 
     return text;
 }
 
+std::vector<fs::path> unusedPictures(const fs::path& markdownFile, const std::string& text) {
+    std::vector<fs::path> out;
+    const fs::path folder = assetsFolder(markdownFile);
+    std::error_code ec;
+    if (!fs::is_directory(folder, ec)) {
+        return out;
+    }
+    // What the text links to, as paths relative to the .md's folder (its links and pictures; HTML's src="…")
+    std::vector<std::string> linked;
+    const md::Document doc = md::parse(text);
+    std::vector<std::string> links = doc.links;
+    for (size_t at = text.find("src="); at != std::string::npos; at = text.find("src=", at + 4)) {
+        const char quote = at + 4 < text.size() ? text[at + 4] : 0;
+        if (quote == '"' || quote == '\'') {
+            const size_t end = text.find(quote, at + 5);
+            if (end != std::string::npos) {
+                links.push_back(text.substr(at + 5, end - at - 5));
+            }
+        }
+    }
+    for (const std::string& link: links) {
+        const std::string rel = md::images::relativePath(link);
+        if (!rel.empty()) {
+            linked.push_back(rel);
+            linked.push_back(md::images::percentDecoded(rel));
+        }
+    }
+    const std::string prefix = assetsName(markdownFile) + "/";
+    for (auto it = fs::recursive_directory_iterator(folder, ec); !ec && it != fs::recursive_directory_iterator();
+         it.increment(ec)) {
+        std::error_code fec;
+        if (!it->is_regular_file(fec)) {
+            continue;
+        }
+        const std::u8string inFolder = fs::relative(it->path(), folder, fec).generic_u8string();
+        const std::string rel = prefix + std::string(inFolder.begin(), inFolder.end());
+        if (std::find(linked.begin(), linked.end(), rel) == linked.end()) {
+            out.push_back(it->path());
+        }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
 std::string linkEncoded(const std::string& name) {
     std::string out;
     for (const char c: name) {

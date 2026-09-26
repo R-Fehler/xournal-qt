@@ -1690,3 +1690,6 @@ Design: [md-images.md](../md-images.md).
       host are shown; the first time also what connecting means. Cancel: nothing. Load: the picture appears; open
       the file again (or restart): shown at once from the cache, without asking.
 - [ ] Settings → Web and citations → "Connect to the web": Off → "Load image" says it is off and sends nothing.
+- [ ] A `.md`: paste two pictures, delete the link of one. ⋮ → Remove unused images…: it lists that one (not the
+      other, not a PDF the text links to in the folder); Cancel keeps it; Move to trash: it is in the system's
+      trash (Android: deleted after this question).

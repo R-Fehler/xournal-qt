@@ -393,6 +393,12 @@ public:
     /// agreed; qt/docs/md-images.md) into the app cache, and lay out the texts that show it again. Choosing it is the
     /// opt-in to networking when that was not decided yet; false (a message) when networking is off.
     Q_INVOKABLE bool loadWebImage(const QString& url);
+    /// "Remove unused images" of a .md: the files in its "name.assets" folder that its text (as it is now) does not
+    /// link to, as paths relative to that folder; empty when there are none (or it is no .md).
+    Q_INVOKABLE QStringList unusedMarkdownImages() const;
+    /// Move these files of the .md's "name.assets" folder (as unusedMarkdownImages gives them) to the trash. The count
+    /// moved.
+    Q_INVOKABLE int trashMarkdownImages(const QStringList& files);
     /// The same on the source beside the page (its TextArea's document: one undo step there). The selection after it:
     /// {anchor, caret} (the text's offsets); empty if nothing was done.
     Q_INVOKABLE QVariantMap formatMarkdownIn(QQuickTextDocument* document, int anchor, int caret,
