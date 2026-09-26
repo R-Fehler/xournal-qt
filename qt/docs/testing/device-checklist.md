@@ -1683,3 +1683,20 @@ Update the table in the user doc with the results.
       the point where it was held under the pointer; one Ctrl+Z puts it back where the drag started. While dragging it
       stays at its page's edge (it only jumps on release).
 - [ ] Save, open in upstream Xournal++: the pasted and moved notes are there as any other note.
+
+## Kinds of PDFs in the library (qt/library-kinds)
+- [ ] A library with a plain PDF, a PDF with notes (a PDF annotated and saved in PDF files mode) and a PDF text
+      document (New text document… in PDF files mode): the badges read "PDF" (red), "PDF ✎" (red) and "PDF Aa"
+      (blue). Hovering a badge (desktop) says "PDF", "PDF with notes", "PDF text document". A PDF with its `.xopp`
+      next to it still reads "PDF ✎", an image "IMG", a Markdown file "MD".
+- [ ] An archive PDF (⋮ → Export for the archive…) reads "PDF/A ✎"; one of a text document "PDF/A Aa" (blue).
+- [ ] The badges are the same in the flat list (all documents) and in the Recent grid for documents of the library.
+- [ ] Annotate a plain PDF and save: its card turns from "PDF" into "PDF ✎" within a second or two. "Open as PDF
+      document" of a `.md`: the new card reads "PDF Aa".
+- [ ] Show → "Only PDFs with notes": the plain PDFs go at once, no pause of the window (also in a library with
+      hundreds of PDFs). Show → "Only PDF text documents": only the text documents stay (and notes, Markdown files,
+      images as set). "Defaults" brings everything back.
+- [ ] A big library opened for the first time with "Only PDF text documents" on: the text documents appear while the
+      library is being read, the window stays responsive.
+- [ ] Replace a PDF text document by a plain PDF of the same name with another program: after the library has read
+      it again, the card reads "PDF".

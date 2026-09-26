@@ -254,6 +254,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilterTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryKindsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFuzzyTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecentLibrariesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryHomeTest.cpp
