@@ -597,7 +597,7 @@ TEST(Pages, insertPagesWithBackgroundSizeAndOrientation) {
     Document* doc = s->getDocument();
 
     // Three plain landscape A4 pages after the first one
-    ASSERT_TRUE(c.insertPages(1, plain, 1, true, 3));
+    ASSERT_TRUE(c.insertPages(1, plain, static_cast<int>(settings->paperFormats().indexOf("A4")), true, 3));
     ASSERT_EQ(doc->getPageCount(), 4u);
     for (size_t i = 1; i <= 3; ++i) {
         EXPECT_NEAR(doc->getPage(i)->getWidth(), 841.89, 0.1);
