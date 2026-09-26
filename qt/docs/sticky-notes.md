@@ -32,7 +32,7 @@ clipped to it. It lies above the page's ink.
   pen then writes on the note.
 - **Colours:** five pastel presets (yellow, pink, blue, green, orange). A new note is yellow.
 - **Placing:** "Sticky note" in the shapes menu (next to the setsquare and the compass: things put on the page) and
-  "Insert sticky note" in the More menu (next to "Insert image…"). The note goes in the middle of the visible part of
+  "Insert sticky note" in ⋮ → Page (next to "Insert image…"). The note goes in the middle of the visible part of
   the current page, selected, and the rectangle select tool is chosen (as for an inserted image), so that it can be
   moved and resized right away.
 
@@ -105,7 +105,7 @@ image there goes onto the page, below it).
   things go to the middle of the note. They are pasted selected, as before, and stay in the note when the
   selection ends. A copied link (a link marker, a Markdown text of its own) and a copied note are not put into a
   note (a copied note is pasted as a note, as before).
-- **Insert image** (the More menu, the pill's **Image…** button): into the selected note, or into the note in the
+- **Insert image** (⋮ → Page, the pill's **Image…** button): into the selected note, or into the note in the
   middle of the visible part of the page; fitted into the note (at most 80 % of its width and height, never enlarged)
   and centred on it.
 - **Pictures and links dropped** on Markdown being written go into that text, as before; while the note's text is

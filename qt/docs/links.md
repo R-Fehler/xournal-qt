@@ -149,8 +149,8 @@ The author accepted the plan with its proposals:
 - Markdown boxes keep whether a link is a `[[wiki link]]` (`md::LinkHit::wiki`), so a tap looks the name up.
 
 ### 3. Making links (`AppLinks.cpp`, `CanvasView::pasteLinkMarker`, `links::toMime`)
-- **Copy link**: the page menu of the sidebar and the page grid ("Copy a link to this page"), ⋮ → "Copy link to
-  this page", the contents in the sidebar (press and hold or right-click a chapter → "Copy link to this chapter"),
+- **Copy link**: the page menu of the sidebar and the page grid ("Copy a link to this page"), ⋮ → Document → "Copy link
+  to this page", the contents in the sidebar (press and hold or right-click a chapter → "Copy link to this chapter"),
   a library card's menu ("Copy link"; also on search results), and a page with hits in the extended search (press
   and hold or right-click → "Copy link to this page"). The page of a document that is not open is linked from the
   library index (its PDF page, or its text for the fingerprint: `LibraryIndex::linkPages`).
@@ -178,14 +178,14 @@ The author accepted the plan with its proposals:
   written before has no `links` key: its `.xopp` is read once more (only the `.xopp`: its PDF text is kept), no
   format change. Entries converted from the layout before the packs learn their links when the `.xopp` is saved.
   `LibraryIndex::linkSources` lists them.
-- **Backlinks**: ⋮ → **Linked from…** lists the documents of the library whose links lead to the current one (a
-  link to any of its files: the PDF of a `.xopp` counts; a wiki link by its name); a tap opens one.
+- **Backlinks**: ⋮ → Document → **Linked from…** lists the documents of the library whose links lead to the current one
+  (a link to any of its files: the PDF of a `.xopp` counts; a wiki link by its name); a tap opens one.
 - **Rewritten after a rename or move in the app** (the library's Rename, Move to…, dragging onto a folder; also whole
-  folders; a rename from a tab, ⋮ → Rename… or the overview of open documents, which is the library's rename):
-  `LinkRewrite::plan` finds the links that point elsewhere now - links to what moved, and the relative links of a moved
-  document itself - and writes each anew relative to where it is (the fragment stays; a wiki link to a renamed document
-  gets the new name). Only link targets change: `](…)`, `](<…>)`, `[id]: …`, `[[…]]`; the rest of the text stays byte
-  for byte.
+  folders; a rename from a tab, ⋮ → Document → Rename… or the overview of open documents, which is the library's
+  rename): `LinkRewrite::plan` finds the links that point elsewhere now - links to what moved, and the relative links of
+  a moved document itself - and writes each anew relative to where it is (the fragment stays; a wiki link to a renamed
+  document gets the new name). Only link targets change: `](…)`, `](<…>)`, `[id]: …`, `[[…]]`; the rest of the text
+  stays byte for byte.
   - Open documents change through themselves, with undo (a `.xopp`'s texts as text edits, a `.md` as one edit of
     its text), and are saved when they had no unsaved changes (so the file has the new link too); with unsaved
     changes they keep the change until they are saved.

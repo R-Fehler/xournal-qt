@@ -106,6 +106,16 @@ is built.
 - [ ] Left from block 1: `HomeView` (760, 1500), `TabOverview`, the Markdown panel and the reference split still keep
   their own widths (table in adaptive-layout.md); the tab strip's 38 px buttons and the other F14 targets are not
   sized by `minTarget` yet; the drawer has no slide animation; Escape does not close it.
+- [x] Block 2 `qt/adaptive-menus`: `AdaptiveMenu` (width of its entries, never taller than the window, clear of its
+  button; a bottom sheet with drill-in in the phone classes, `MenuSheet`), the ⋮ regrouping (10 entries, Document /
+  Export / Page / View), used for ⋮, library, card, tab, layout and page menus; `menusFitAtFiveSizes`,
+  `menusAreSheetsOnPhones`.
+- [ ] Left from block 2: the other menus are plain `Menu`s still (eraser, shapes, colors, PDF text, writing, the
+  view pill's fit, the home screen's New / Import / Sort, the sidebar's layer / outline / bookmark menus, the look-up
+  menu, the table editor's cell menu): switch them to `AdaptiveMenu` (the shapes menu, about 620 px, is taller than a
+  phone-landscape window). On a phone the tool bar buttons that went into ⋮'s overflow should come back in the sheet
+  (with `qt/adaptive-toolbar`). The sheet is not checked on the Fold 7 yet (Android back key, the navigation bar via
+  `safeBottom`). Unchecked choices show no box in the sheet (only a check mark when chosen).
 
 ---
 
