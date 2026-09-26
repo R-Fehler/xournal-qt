@@ -674,6 +674,13 @@
   press: fit page), Contents beside the page grid. One place per action (⋮ lost its duplicates); clearer icons;
   a held finger shows a button's name.
 
+- **Adaptive home and tab overview, `qt/adaptive-home` (2026-09-27).** The library switch is the library's name ▾
+  and three icons (Recent, ★ Favourites as a toggle, Bookmarks), words beside them only at full width; the header
+  groups its actions behind "+" and View where they don't fit (measured); one header row on phones, the floating "+";
+  breadcrumbs shorten from the middle with a "…" menu; on phones a selection's actions sit in a bottom bar. New,
+  Import, Sort, Show are `AdaptiveMenu`s. Tab overview: the header wraps, 2 columns on a phone, 4 sideways, cells as
+  tall as the pages.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

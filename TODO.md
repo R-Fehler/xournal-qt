@@ -103,15 +103,15 @@ is built.
 ### Adaptive UI ([ui-adaptive-audit.md](qt/docs/ui-adaptive-audit.md), [adaptive-layout.md](qt/docs/adaptive-layout.md))
 - [x] Block 1 `qt/adaptive-foundation`: size classes, touch profile, choices per class, the sidebar binding and
   drawer, chromeMode apart from full screen, `AdaptiveLayoutTest`.
-- [ ] Left from block 1: `HomeView` (760, 1500), `TabOverview`, the Markdown panel and the reference split still keep
-  their own widths (table in adaptive-layout.md); the tab strip's 38 px buttons and the other F14 targets are not
+- [ ] Left from block 1: the Markdown panel and the reference split still keep
+  their own widths (HomeView and TabOverview done in block 6) (table in adaptive-layout.md); the tab strip's 38 px buttons and the other F14 targets are not
   sized by `minTarget` yet; the drawer has no slide animation; Escape does not close it.
 - [x] Block 2 `qt/adaptive-menus`: `AdaptiveMenu` (width of its entries, never taller than the window, clear of its
   button; a bottom sheet with drill-in in the phone classes, `MenuSheet`), the ⋮ regrouping (10 entries, Document /
   Export / Page / View), used for ⋮, library, card, tab, layout and page menus; `menusFitAtFiveSizes`,
   `menusAreSheetsOnPhones`.
-- [ ] Left from block 2: the other menus are plain `Menu`s still (eraser, shapes, colors, PDF text, writing, the
-  view pill's fit, the home screen's New / Import / Sort, the sidebar's layer / outline / bookmark menus, the look-up
+- [ ] Left from block 2: the other menus are plain `Menu`s still (colors, PDF text, writing, the
+  view pill's fit, the sidebar's layer / outline / bookmark menus, the look-up
   menu, the table editor's cell menu): switch them to `AdaptiveMenu` (the shapes menu, about 620 px, is taller than a
   phone-landscape window). On a phone the tool bar buttons that went into ⋮'s overflow should come back in the sheet
   (with `qt/adaptive-toolbar`). The sheet is not checked on the Fold 7 yet (Android back key, the navigation bar via
@@ -126,8 +126,7 @@ is built.
   sidebar arrow, the text document's bar in the format bar): the format bar itself still scrolls sideways in a narrow
   window (F7.1, D10: its insert overflow, and docking above the soft keyboard on phones: `qt/adaptive-panels` /
   `qt/safe-areas-keyboard`); the colors' popups (palette, widths, "more tools") are popups, not sheets, on phones;
-  the phone's final tool layout is the bottom dock of `qt/compact-chrome`; menus still plain `Menu`s: the home
-  screen's New / Import / Sort, the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
+  the phone's final tool layout is the bottom dock of `qt/compact-chrome`; menus still plain `Menu`s: the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
   cell menu; the pen pill's width and colors are not cycling buttons with lists yet.
 - [ ] Left from block 6 `qt/adaptive-home` (the switch as name ▾ + Recent / ★ / Bookmarks icons, the library header's
   ladder with "+" and View, the floating "+", the
