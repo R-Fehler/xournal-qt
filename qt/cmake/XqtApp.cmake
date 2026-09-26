@@ -16,6 +16,8 @@ add_library(xqt-quick STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TextFlowEditor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/TouchGestures.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/AdaptiveLayout.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/quick/AdaptiveLayout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/InputLog.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/quick/EmojiNames.h

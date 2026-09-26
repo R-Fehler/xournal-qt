@@ -333,6 +333,34 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             s.customSettingsChanged();
         });
 
+    // Bigger targets for fingers (AdaptiveLayout's touch profile): "auto" (on Android and iOS, and after a finger
+    // touched the screen), "on" or "off"
+    add("touchProfile",
+        [&s] {
+            std::string mode = "auto";
+            s.getCustomElement("touch").getString("profile", mode);
+            return QVariant(QString::fromStdString(mode == "on" || mode == "off" ? mode : "auto"));
+        },
+        [&s](const QVariant& v) {
+            const QString mode = v.toString();
+            s.getCustomElement("touch").setString("profile",
+                                                  mode == "on" || mode == "off" ? mode.toStdString() : "auto");
+            s.customSettingsChanged();
+        });
+
+    // --- display ---
+    // The layout follows the window's size (qt/docs/adaptive-layout.md); off: the desktop layout at every size
+    add("adaptiveLayout",
+        [&s] {
+            bool on = true;
+            s.getCustomElement("xournalQt").getBool("adaptiveLayout", on);
+            return QVariant(on);
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setBool("adaptiveLayout", v.toBool());
+            s.customSettingsChanged();
+        });
+
     // --- stabilizer (ranges as in upstream's settings dialog) ---
     add("stabilizerAveraging", [&s] { return QVariant(static_cast<int>(s.getStabilizerAveragingMethod())); },
         [&s](const QVariant& v) {
@@ -583,6 +611,57 @@ void SettingsModel::resetScreenCalibration(QWindow* window) {
     ++rev;
     Q_EMIT changed();
     Q_EMIT app.settingsChanged();
+}
+
+namespace {
+constexpr const char* LAYOUT_PREFIX = "layout/";
+/// A size class or a part of the layout as a key: letters only
+bool plainName(const QString& name) {
+    return !name.isEmpty() && std::all_of(name.begin(), name.end(), [](QChar c) { return c.isLetter(); });
+}
+}  // namespace
+
+QString SettingsModel::layoutChoice(const QString& sizeClass, const QString& what) const {
+    if (!plainName(sizeClass) || !plainName(what)) {
+        return {};
+    }
+    std::string v;
+    settings.getCustomElement("xournalQt").getString(LAYOUT_PREFIX + (sizeClass + '/' + what).toStdString(), v);
+    return v == "auto" ? QString() : QString::fromStdString(v);
+}
+
+void SettingsModel::setLayoutChoice(const QString& sizeClass, const QString& what, const QString& value) {
+    const QString stored = value == "auto" ? QString() : value;
+    if (!plainName(sizeClass) || !plainName(what) || layoutChoice(sizeClass, what) == stored) {
+        return;
+    }
+    const std::string key = LAYOUT_PREFIX + (sizeClass + '/' + what).toStdString();
+    SElement& custom = settings.getCustomElement("xournalQt");
+    if (stored.isEmpty()) {
+        custom.attributes().erase(key);
+    } else {
+        custom.setString(key, value.toStdString());
+    }
+    settings.customSettingsChanged();
+    ++rev;
+    Q_EMIT changed();
+}
+
+bool SettingsModel::hasLayoutChoices() const {
+    const auto& attributes = settings.getCustomElement("xournalQt").attributes();
+    return std::any_of(attributes.begin(), attributes.end(),
+                       [](const auto& a) { return a.first.rfind(LAYOUT_PREFIX, 0) == 0; });
+}
+
+void SettingsModel::resetLayoutChoices() {
+    if (!hasLayoutChoices()) {
+        return;
+    }
+    auto& attributes = settings.getCustomElement("xournalQt").attributes();
+    std::erase_if(attributes, [](const auto& a) { return a.first.rfind(LAYOUT_PREFIX, 0) == 0; });
+    settings.customSettingsChanged();
+    ++rev;
+    Q_EMIT changed();
 }
 
 void SettingsModel::begin() {

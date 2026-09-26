@@ -325,3 +325,45 @@ TEST_F(SettingsModelTest, snappingToTheGridIsOffUnlessChosen) {
     auto later = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR), fs::path(file), 1);
     EXPECT_TRUE(later->getSettings()->isSnapGrid()) << "a choice is kept";
 }
+
+// The layout chosen by hand per size class (qt/docs/adaptive-layout.md): stored as layout/<class>/<what>, saved at
+// once, "" (or "auto") for the automatic choice; the reset removes them all and nothing else.
+TEST_F(SettingsModelTest, layoutChoicesPerSizeClass) {
+    QSignalSpy changed(model.get(), &SettingsModel::changed);
+    EXPECT_FALSE(model->hasLayoutChoices());
+    EXPECT_EQ(model->layoutChoice("desktopWide", "sidebar"), "");
+    model->setLayoutChoice("desktopWide", "sidebar", "hidden");
+    model->setLayoutChoice("tabletPortrait", "sidebar", "shown");
+    model->setLayoutChoice("tabletPortrait", "toolbar", "twoRowsBottom");
+    EXPECT_EQ(changed.count(), 3);
+    EXPECT_EQ(model->layoutChoice("desktopWide", "sidebar"), "hidden");
+    EXPECT_EQ(model->layoutChoice("tabletPortrait", "sidebar"), "shown");
+    EXPECT_EQ(model->layoutChoice("phonePortrait", "sidebar"), "") << "each class its own";
+    model->setLayoutChoice("tabletPortrait", "sidebar", "shown");
+    EXPECT_EQ(changed.count(), 3) << "the same again: no change";
+    model->setLayoutChoice("../x", "sidebar", "shown");
+    EXPECT_EQ(model->layoutChoice("../x", "sidebar"), "") << "names are plain words";
+
+    // Kept in the settings file
+    const int before = model->get("fuzzyTypos").toInt();
+    auto again = std::make_unique<AppContext>(fs::path(XQT_BUILD_RESOURCE_DIR),
+                                              fs::path(tmp.filePath("settings.xml").toStdString()), 1);
+    SettingsModel reread(*again);
+    EXPECT_EQ(reread.layoutChoice("tabletPortrait", "toolbar"), "twoRowsBottom");
+
+    model->setLayoutChoice("desktopWide", "sidebar", "auto");
+    EXPECT_EQ(model->layoutChoice("desktopWide", "sidebar"), "");
+    model->resetLayoutChoices();
+    EXPECT_FALSE(model->hasLayoutChoices());
+    EXPECT_EQ(model->layoutChoice("tabletPortrait", "toolbar"), "");
+    EXPECT_EQ(model->get("fuzzyTypos").toInt(), before) << "the other settings stay";
+}
+
+TEST_F(SettingsModelTest, adaptiveLayoutAndTouchProfile) {
+    EXPECT_TRUE(model->get("adaptiveLayout").toBool()) << "on by default";
+    EXPECT_EQ(model->get("touchProfile").toString(), "auto");
+    model->set("touchProfile", "sometimes");
+    EXPECT_EQ(model->get("touchProfile").toString(), "auto") << "only auto, on, off";
+    model->set("touchProfile", "on");
+    EXPECT_EQ(model->get("touchProfile").toString(), "on");
+}

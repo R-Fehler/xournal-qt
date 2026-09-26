@@ -83,6 +83,17 @@ public:
     /// Takes the calibration of the screen back: what the system reports (or 96 dpi) again.
     Q_INVOKABLE void resetScreenCalibration(QWindow* window);
 
+    // --- the layout chosen by hand per size class (qt/docs/adaptive-layout.md) ---------------------------------
+    /// What was chosen for `what` ("sidebar", "toolbar", "chrome") in the size class `sizeClass` (AdaptiveLayout's
+    /// names), stored as "layout/<class>/<what>" in the xournalQt part; "": nothing, the automatic choice applies.
+    /// Changes count as a revision, so `(settings.revision, settings.layoutChoice(...))` follows them.
+    Q_INVOKABLE QString layoutChoice(const QString& sizeClass, const QString& what) const;
+    /// Stores a choice ("" or "auto": back to the automatic one); saved at once.
+    Q_INVOKABLE void setLayoutChoice(const QString& sizeClass, const QString& what, const QString& value);
+    Q_INVOKABLE bool hasLayoutChoices() const;
+    /// Every class back to the automatic choices.
+    Q_INVOKABLE void resetLayoutChoices();
+
     /// The settings screen opened / closed: changes are saved once, at close.
     Q_INVOKABLE void begin();
     Q_INVOKABLE void end();
