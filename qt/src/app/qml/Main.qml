@@ -25,13 +25,81 @@ ApplicationWindow {
     property var afterDiscardCheck: null
     /// The part of the window's top under the system's status bar (edge to edge on Android; set by main.cpp)
     property real safeTop: 0
-    property bool sidebarShown: width >= 900
     property bool quitting: false
+
+    // --- the layout for the window's size (qt/docs/adaptive-layout.md) --------------------------------------------
+    /// The size class (desktopWide, desktopNarrow, tabletPortrait, phonePortrait, phoneShort, tiny), the width and
+    /// height classes, the touch profile and its target size (minTarget). Everything that depends on the window's size
+    /// reads it from here instead of keeping a threshold of its own.
+    readonly property AdaptiveLayout adaptive: AdaptiveLayout {
+        objectName: "adaptiveLayout"
+        window: win
+        adaptive: (app.settings.revision, app.settings.get("adaptiveLayout"))
+        touchSetting: (app.settings.revision, app.settings.get("touchProfile"))
+    }
+    /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "chrome", later "toolbar"
+    function layoutChoice(what) { return (app.settings.revision, app.settings.layoutChoice(adaptive.layoutClass, what)) }
+    function chooseLayout(what, value) { app.settings.setLayoutChoice(adaptive.layoutClass, what, value) }
+
+    // The page sidebar: beside the page when there is room for it (the page keeps ~900 px; not in portrait or on a
+    // phone), unless it was hidden or shown by hand in this size class. Without room, its button opens it as a
+    // drawer over the page, which closes when a page is picked or the page is tapped.
+    readonly property string sidebarChoice: layoutChoice("sidebar")
+    readonly property bool sidebarDocked: sidebarChoice === "shown" || (sidebarChoice === "" && adaptive.roomForSidebar)
+    property bool sidebarDrawerOpen: false
+    readonly property bool sidebarShown: sidebarDocked || sidebarDrawerOpen
+    readonly property bool sidebarAsDrawer: !sidebarDocked
+    onSidebarDockedChanged: sidebarDrawerOpen = false
+    readonly property string layoutClass: adaptive.layoutClass
+    onLayoutClassChanged: sidebarDrawerOpen = false  // (a drawer is for the moment, in the size it was opened in)
+    /// The Pages button: hides the sidebar (remembered for this size class), or shows it again - beside the page where
+    /// there is room, else as a drawer (for the moment, not remembered)
+    function showSidebar(shown) {
+        if (shown) {
+            if (sidebarDocked) return
+            if (adaptive.roomForSidebar) chooseLayout("sidebar", "")  // (it was hidden by hand: automatic again)
+            else sidebarDrawerOpen = true
+        } else {
+            sidebarDrawerOpen = false
+            if (sidebarDocked) chooseLayout("sidebar", adaptive.roomForSidebar ? "hidden" : "")
+        }
+    }
+    /// The drawer's pin: keep the sidebar beside the page in this size class, although room is short
+    function dockSidebar() {
+        sidebarDrawerOpen = false
+        chooseLayout("sidebar", adaptive.roomForSidebar ? "" : "shown")
+    }
+
+    // The chrome: "full" (tab strip, tool bar, sidebar), "compact" (full screen's: the tab dots, the tool square, the
+    // pen pill, the view pill) or "reader" (no HUD; the corner mark brings it back). Separate from the window's state
+    // (windowFullScreen) and from presenting (black, page by page). Full screen (F11, fullScreenMode) is the compact
+    // chrome in a full-screen window; otherwise the chrome is what was chosen for this size class, else "full" (the
+    // automatic choices per class come with qt/compact-chrome).
+    readonly property string chromeChoice: layoutChoice("chrome")
+    readonly property string chromeMode: chromeChoice === "reader" && !app.presenting ? "reader"
+                                         : (fullScreenMode || chromeChoice === "compact") ? "compact" : "full"
+    readonly property bool fullChrome: chromeMode === "full"
+    /// Nothing over the page but the page: presenting without controls, or the reader chrome
+    readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible)
+    onHudHiddenChanged: if (hudHidden) quickTools.close()
+    function chooseChrome(mode) { chooseLayout("chrome", mode === "full" ? "" : mode) }
+
     readonly property string toolbarPosition: app.toolbarPosition
     readonly property bool sideToolbar: toolbarPosition === "left" || toolbarPosition === "right"
-    /// Full screen: no tab strip, tool bar or page sidebar; a small square shows the current tool, a tap on it offers
-    /// the tools (the same ones) and colors. The page / zoom pill stays.
+    /// Full screen (F11): the compact chrome - no tab strip, tool bar or page sidebar; a small square shows the current
+    /// tool, a tap on it offers the tools (the same ones) and colors. The page / zoom pill stays - in a full-screen
+    /// window (windowFullScreen).
     property bool fullScreenMode: false
+    onFullScreenModeChanged: {
+        if (!fullScreenMode) {
+            quickTools.close()
+            app.presenting = false  // (presenting is full screen)
+        }
+        windowFullScreen = fullScreenMode
+    }
+    /// The window's state: full screen or not (showFullScreen). Full screen (fullScreenMode) sets it; on its own it
+    /// changes nothing else.
+    property bool windowFullScreen: false
     /// The window's state outside full screen (maximized or not), followed all the time rather than read when full
     /// screen starts: the platform may report the state late or in steps, and leaving full screen goes back to it
     property int windowedVisibility: app.startMaximized ? Window.Maximized : Window.Windowed
@@ -47,7 +115,7 @@ ApplicationWindow {
                 app.logWindow("maximized again (the compositor gave back the normal size)")
                 showMaximized()
             }
-        } else if (!fullScreenMode && (visibility === Window.Windowed || visibility === Window.Maximized)) {
+        } else if (!windowFullScreen && (visibility === Window.Windowed || visibility === Window.Maximized)) {
             windowedVisibility = visibility
         }
     }
@@ -57,19 +125,17 @@ ApplicationWindow {
         onTriggered: {
             win.leavingFullScreen = false
             // settled: the state it is in now is the window's state
-            if (!win.fullScreenMode && (win.visibility === Window.Windowed || win.visibility === Window.Maximized))
+            if (!win.windowFullScreen && (win.visibility === Window.Windowed || win.visibility === Window.Maximized))
                 win.windowedVisibility = win.visibility
         }
     }
-    onFullScreenModeChanged: {
-        if (fullScreenMode) {
+    onWindowFullScreenChanged: {
+        if (windowFullScreen) {
             leavingFullScreenTimer.stop()
             leavingFullScreen = false
             app.logWindow("full screen")
             showFullScreen()
         } else {
-            quickTools.close()
-            app.presenting = false  // (presenting is full screen)
             leavingFullScreen = true
             remaximized = false
             leavingFullScreenTimer.restart()
@@ -78,8 +144,8 @@ ApplicationWindow {
             else showNormal()
         }
     }
-    /// No tool bar: in full screen, or when it was put away - the small tool square takes over
-    readonly property bool noToolbar: fullScreenMode || app.toolbarHidden
+    /// No tool bar: in the compact or reader chrome, or when it was put away - the small tool square takes over
+    readonly property bool noToolbar: !fullChrome || app.toolbarHidden
     readonly property bool verticalTools: sideToolbar || noToolbar
     /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
     readonly property bool textDoc: app.textDocument !== ""
@@ -102,7 +168,6 @@ ApplicationWindow {
     /// brings them back and hides them again. Every presentation starts as it is asked for: F5 with the controls.
     property bool presentClean: false
     readonly property bool cleanPage: app.presenting && presentClean
-    onCleanPageChanged: if (cleanPage) quickTools.close()
 
     function withSavedChanges(action) {
         if (!app.modified) {
@@ -314,9 +379,10 @@ ApplicationWindow {
     header: Column {
       TabStrip {
         id: tabStrip
+        objectName: "tabStrip"
         width: parent.width
         topInset: win.safeTop
-        visible: !win.fullScreenMode
+        visible: win.fullChrome || app.homeVisible  // (the home screen keeps it: the way back to the documents)
         onCloseRequested: function(index) { requestCloseTab(index) }
         onOverviewRequested: tabOverview.open()
         onUndockRequested: function(index) { app.undockTab(index) }
@@ -339,7 +405,7 @@ ApplicationWindow {
       MarkdownFormatBar {
         id: formatBar
         width: parent.width
-        visible: !app.homeVisible && !app.presenting && !markdownPanel.visible
+        visible: !app.homeVisible && !app.presenting && !win.hudHidden && !markdownPanel.visible
                  && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable) || app.textNotes)
         format: app.markdownFormat
         onFormatRequested: function(action, arg) {
@@ -403,7 +469,7 @@ ApplicationWindow {
             rowSpacing: 2
             columnSpacing: 2
 
-            IconButton { iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: sidebarShown; onClicked: sidebarShown = !sidebarShown }
+            IconButton { objectName: "pagesButton"; iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: win.sidebarShown; onClicked: win.showSidebar(!win.sidebarShown) }
             IconButton {
                 objectName: "contentsButton"
                 iconName: "xqt-toc"
@@ -831,7 +897,7 @@ ApplicationWindow {
                 }
                 CustomWidthPopup {
                     id: customSizePopup
-                    side: win.fullScreenMode ? "left" : win.toolbarPosition
+                    side: !win.fullChrome ? "left" : win.toolbarPosition
                 }
             }
             Item { Layout.fillWidth: !win.verticalTools; Layout.fillHeight: win.verticalTools; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1 }
@@ -1023,7 +1089,33 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.left: win.toolbarPosition === "left" ? sideTools.right : parent.left
         width: 210
-        visible: sidebarShown && !win.fullScreenMode
+        visible: win.sidebarShown && win.fullChrome
+        // As a drawer (no room beside the page): over the page, below the home screen; it closes once a page is picked
+        z: win.sidebarAsDrawer ? 49 : 0
+        onPagePicked: if (win.sidebarAsDrawer) win.showSidebar(false)
+        // The drawer's pin, just outside its edge: keep the sidebar beside the page at this window size
+        IconButton {
+            objectName: "sidebarPin"
+            visible: win.sidebarAsDrawer
+            x: parent.width + 8
+            y: 8
+            iconName: "xopp-sidebar-show"
+            tip: qsTr("Keep the pages beside the page at this window size")
+            onClicked: win.dockSidebar()
+            background: Rectangle { radius: 12; color: parent.pressed ? "#e8e8e8" : "#ffffff"; border.color: "#d5d8dc" }
+        }
+    }
+    // Behind the drawer: the page dimmed; a tap there closes the drawer (and does not draw)
+    Rectangle {
+        objectName: "sidebarScrim"
+        visible: sidebar.visible && win.sidebarAsDrawer
+        anchors.fill: parent
+        z: 48
+        color: "#4d000000"
+        MouseArea {
+            anchors.fill: parent
+            onClicked: win.showSidebar(false)
+        }
     }
 
     DocumentCanvas {
@@ -1096,7 +1188,8 @@ ApplicationWindow {
         anchors.right: textFlowPanel.visible ? textFlowPanel.left
                        : markdownPanel.visible ? markdownPanel.left
                        : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
-        anchors.left: sidebar.visible ? sidebar.right : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
+        anchors.left: sidebar.visible && !win.sidebarAsDrawer ? sidebar.right
+                      : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
     }
 
     // A Markdown file shown read-only for now, an image to write on: what that means (closed for this tab with ×).
@@ -1105,12 +1198,12 @@ ApplicationWindow {
         objectName: "shownFileNote"
         property string closedFor: ""
         visible: app.shownFileNote !== "" && closedFor !== app.title && !pageGrid.visible && !contentsOverview.visible
-                 && !win.cleanPage
+                 && !win.hudHidden
         // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right)
         anchors.bottom: canvas.bottom
         anchors.left: canvas.left
         anchors.bottomMargin: 24
-        anchors.leftMargin: app.presenting ? 56 : 24  // (presenting: beside the corner mark)
+        anchors.leftMargin: presentCornerMark.visible ? 56 : 24  // (presenting, reading: beside the corner mark)
         width: Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560))
         padding: 2
         leftPadding: 14
@@ -1152,8 +1245,9 @@ ApplicationWindow {
     Pane {
         id: viewPill
         objectName: "viewPill"
-        // also in full screen; presenting only the page number, for a moment (presentPageIndicator)
-        visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting
+        // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in the
+        // reader chrome
+        visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden
         anchors.right: canvas.right
         anchors.bottom: canvas.bottom
         anchors.rightMargin: 28
@@ -1493,10 +1587,10 @@ ApplicationWindow {
     Pane {
         id: navPill
         objectName: "navPill"
-        visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.cleanPage
+        visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.hudHidden
         anchors.left: canvas.left
         anchors.bottom: canvas.bottom
-        anchors.leftMargin: app.presenting ? 56 : 20  // (presenting: beside the corner mark)
+        anchors.leftMargin: presentCornerMark.visible ? 56 : 20  // (presenting, reading: beside the corner mark)
         anchors.bottomMargin: 24
         padding: 2
         Material.foreground: "#303030"
@@ -1672,7 +1766,7 @@ ApplicationWindow {
     // Where the link under the mouse or the hovering pen leads (qt/docs/links.md, "Links with the mouse")
     LinkStatusLine {
         canvasItem: canvas
-        visible: !win.cleanPage
+        visible: !win.hudHidden
     }
     // Scroll bars over the canvas: wide enough to be dragged with a finger or the pen.
     CanvasScrollBars {
@@ -2528,16 +2622,17 @@ ApplicationWindow {
     Rectangle {
         id: fullScreenTabs
         objectName: "fullScreenTabs"
-        visible: win.fullScreenMode && !app.presenting && !app.homeVisible && app.tabs.count > 1
+        visible: win.chromeMode === "compact" && !app.presenting && !app.homeVisible && app.tabs.count > 1
                  && !searchBar.visible
         z: 59
         // at the top, in the middle of the window (over the notes and a reference beside them alike)
         anchors.horizontalCenter: parent.horizontalCenter
         y: 0
-        height: 26  // (thin to look at, a finger's height to touch)
+        // (thin to look at; for fingers (the touch profile) taller, with arrows as wide as a finger)
+        height: win.adaptive.touchProfile ? 36 : 26
         width: Math.max(120, (tabDots.visible ? tabDots.implicitWidth : tabCountLabel.implicitWidth) + 36) + 2 * arrowWidth
-        readonly property int arrowWidth: 26
-        radius: 13
+        readonly property int arrowWidth: win.adaptive.touchProfile ? win.adaptive.minTarget : 26
+        radius: height / 2
         color: "#b3303134"
         readonly property bool manyTabs: app.tabs.count > 12
         PageIndicator {
@@ -2640,7 +2735,7 @@ ApplicationWindow {
         z: 59
         anchors.horizontalCenter: parent.horizontalCenter
         y: fullScreenTabs.height + 8
-        visible: opacity > 0 && win.fullScreenMode
+        visible: opacity > 0 && win.chromeMode === "compact"
         opacity: 0
         width: Math.min(tabToastText.implicitWidth + 28, parent.width - 160)
         height: 32
@@ -2710,10 +2805,12 @@ ApplicationWindow {
     // Presenting: a faint mark in the lower left corner; a tap (click, pen) hides the controls - the pen pill, the
     // tool square - or shows them again, as Ctrl+F5 does (qt/present-clean). The mark is a few pixels, barely there
     // on a projector; the target around it is a finger wide. The pointer or the pen over it makes it clearer.
+    // In the reader chrome (no HUD) it is the way back to the chrome.
     AbstractButton {
         id: presentCornerMark
         objectName: "presentCornerMark"
-        visible: app.presenting
+        readonly property bool reading: !app.presenting && win.chromeMode === "reader" && !app.homeVisible
+        visible: app.presenting || reading
         z: 91
         anchors.left: canvas.left
         anchors.bottom: canvas.bottom
@@ -2722,7 +2819,7 @@ ApplicationWindow {
         focusPolicy: Qt.NoFocus  // (the keys stay with the page)
         hoverEnabled: true
         readonly property bool lit: hovered || markHover.hovered || pressed
-        Accessible.name: win.presentClean ? qsTr("Show the controls") : qsTr("Hide the controls")
+        Accessible.name: win.presentClean || reading ? qsTr("Show the controls") : qsTr("Hide the controls")
         background: null
         contentItem: Item {
             Rectangle {
@@ -2741,7 +2838,10 @@ ApplicationWindow {
             }
         }
         HoverHandler { id: markHover; acceptedDevices: PointerDevice.Mouse | PointerDevice.Stylus }
-        onClicked: win.presentClean = !win.presentClean
+        onClicked: {
+            if (reading) win.chooseChrome("full")
+            else win.presentClean = !win.presentClean
+        }
     }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {
@@ -2816,7 +2916,7 @@ ApplicationWindow {
     // Putting the tool bar away and getting it back: a small tab at its end, and a slim strip while it is away.
     Rectangle {
         objectName: "toolbarToggle"
-        visible: !app.homeVisible && !win.fullScreenMode && !app.toolbarHidden
+        visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden
         z: 58
         width: win.sideToolbar ? 18 : 42
         height: win.sideToolbar ? 42 : 18
@@ -2846,7 +2946,7 @@ ApplicationWindow {
     Rectangle {
         id: toolbarShow
         objectName: "toolbarShow"
-        visible: !app.homeVisible && !win.fullScreenMode && app.toolbarHidden
+        visible: !app.homeVisible && win.fullChrome && app.toolbarHidden
         readonly property string side: win.sideToolbar ? win.toolbarPosition : "top"
         z: 60  // over the edge of the pen pill, which sits at the right edge by default
         width: side === "top" ? 96 : 16
@@ -2891,9 +2991,9 @@ ApplicationWindow {
     Rectangle {
         id: quickToolSquare
         objectName: "quickToolSquare"
-        // Only in full screen: with the bar merely put away, the arrow strip brings it back at once. Not while
-        // presenting without controls.
-        visible: win.fullScreenMode && !app.homeVisible && !win.cleanPage
+        // Only in the compact chrome (full screen): with the bar merely put away, the arrow strip brings it back at
+        // once. Not while presenting without controls, nor in the reader chrome.
+        visible: win.chromeMode === "compact" && !app.homeVisible && !win.hudHidden
         z: 60
         x: canvas.x + 16  // (over the main document, also when a reference is beside it)
         y: canvas.y + 16
@@ -2967,12 +3067,21 @@ ApplicationWindow {
                     else win.startPresenting(true)
                 }
             }
+            // Full screen: back to the window; the compact chrome chosen in a window: back to the full chrome
             Button {
                 objectName: "leaveFullScreenButton"
                 width: parent.width
                 flat: true
-                text: qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
-                onClicked: win.fullScreenMode = false
+                text: !win.fullScreenMode ? qsTr("Show the tabs and the tool bar")
+                                          : qsTr("Leave full screen") + (app.presenting ? "" : qsTr(" (Esc)"))
+                onClicked: {
+                    if (win.fullScreenMode) {
+                        win.fullScreenMode = false
+                    } else {
+                        quickTools.close()
+                        win.chooseChrome("full")
+                    }
+                }
             }
         }
         // A tool, color or size was chosen: back to writing

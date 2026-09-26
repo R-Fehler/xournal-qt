@@ -16,6 +16,8 @@ ListView {
     onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
     ScrollBar.vertical: ScrollBar {}
     TouchpadMomentum { flickable: list }
+    /// An entry was tapped: its page is shown (the sidebar as a drawer closes then)
+    signal picked()
 
     header: Column {
         objectName: "bookmarksSection"
@@ -43,7 +45,7 @@ ListView {
                 topPadding: 6
                 bottomPadding: 6
                 highlighted: modelData.page === app.pageNumber - 1
-                onClicked: app.jumpToPage(modelData.page)
+                onClicked: { app.jumpToPage(modelData.page); list.picked() }
                 onPressAndHold: markMenu.popup()
                 TapHandler { acceptedButtons: Qt.RightButton; onTapped: markMenu.popup() }
                 Menu {
@@ -111,7 +113,7 @@ ListView {
         topPadding: 6
         bottomPadding: 6
         highlighted: index === app.outline.currentRow
-        onClicked: if (page >= 0) app.jumpToPage(page)
+        onClicked: if (page >= 0) { app.jumpToPage(page); list.picked() }
         // Press and hold, or a right click: a link to the chapter (qt/docs/links.md)
         onPressAndHold: if (page >= 0) chapterMenu.popup()
         TapHandler { acceptedButtons: Qt.RightButton; onTapped: if (entry.page >= 0) chapterMenu.popup() }

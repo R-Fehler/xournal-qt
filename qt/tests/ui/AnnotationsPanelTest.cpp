@@ -90,6 +90,8 @@ protected:
         root = fs::path(tmp.path().toStdString());
         controller = std::make_unique<AppController>();
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
+        // (the tests of a run share the config: no sidebar hidden by hand in an earlier one)
+        QMetaObject::invokeMethod(controller->settingsModel(), "resetLayoutChoices");
         engine = std::make_unique<QQmlApplicationEngine>();
         engine->addImageProvider("thumbnail", new xqt::ThumbnailProvider);
         engine->addImageProvider("sketch", new xqt::SketchProvider);
@@ -151,7 +153,7 @@ TEST_F(AnnotationsPanelTest, listsJumpsFollowsEditsFiltersAndExports) {
     makeNotes(file);
     ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
     wait(100);
-    window->setProperty("sidebarShown", true);
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));  // (a binding: shown by its button)
     wait(50);
     EXPECT_EQ(model()->pagesRead(), 0) << "nothing is read while the panel is not shown";
 
@@ -272,7 +274,7 @@ TEST_F(AnnotationsPanelTest, aHundredPagesDrawOnlyThePicturesInView) {
     }
     ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
     wait(100);
-    window->setProperty("sidebarShown", true);
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));  // (a binding: shown by its button)
     wait(50);
     click(find<QQuickItem>("sidebarAnnotationsButton"));
     auto* list = find<QQuickItem>("annotationList");

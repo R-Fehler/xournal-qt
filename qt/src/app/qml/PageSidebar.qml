@@ -16,6 +16,8 @@ Rectangle {
     readonly property bool showContents: mode === "contents"
     /// A table of contents, or bookmarks (listed at the top of it)
     readonly property bool hasContents: app.outline.available || app.bookmarks.length > 0
+    /// A page, an entry of the contents or an annotation was tapped and is shown now (a drawer closes then)
+    signal pagePicked()
     // The annotations are read only while they are shown
     Binding { target: app.annotations; property: "active"; value: sidebar.visible && sidebar.mode === "annotations" }
     onModeChanged: if (mode === "contents" && !hasContents) mode = "pages"
@@ -39,7 +41,7 @@ Rectangle {
                 objectName: "sidebar" + modelData.key.charAt(0).toUpperCase() + modelData.key.slice(1) + "Button"
                 visible: modelData.key !== "contents" || sidebar.hasContents
                 Layout.fillWidth: true
-                implicitHeight: 32
+                implicitHeight: win.adaptive.touchProfile ? win.adaptive.minTarget : 32  // (a finger: bigger)
                 readonly property bool active: sidebar.mode === modelData.key
                 onClicked: sidebar.mode = modelData.key
                 background: Rectangle { radius: 16; color: switchButton.active ? "#ffffff" : "transparent" }
@@ -55,8 +57,8 @@ Rectangle {
         AbstractButton {
             id: annotationsButton
             objectName: "sidebarAnnotationsButton"
-            implicitWidth: 36
-            implicitHeight: 32
+            implicitWidth: win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+            implicitHeight: win.adaptive.touchProfile ? win.adaptive.minTarget : 32
             readonly property bool active: sidebar.mode === "annotations"
             onClicked: sidebar.mode = "annotations"
             Accessible.name: qsTr("Annotations")
@@ -75,6 +77,7 @@ Rectangle {
         }
     }
     AnnotationList {
+        onPicked: sidebar.pagePicked()
         visible: sidebar.mode === "annotations"
         anchors.top: switchRow.bottom
         anchors.topMargin: 4
@@ -91,6 +94,7 @@ Rectangle {
         anchors.right: parent.right
     }
     OutlineList {
+        onPicked: sidebar.pagePicked()
         visible: sidebar.showContents && sidebar.hasContents
         anchors.top: switchRow.bottom
         anchors.topMargin: 4
@@ -213,6 +217,7 @@ Rectangle {
                             app.pages.clearSelection()
                             app.pages.setAnchor(entry.pageIndex)
                             app.jumpToPage(entry.pageIndex)
+                            sidebar.pagePicked()
                         }
                     }
                     onHeld: list.forceActiveFocus()

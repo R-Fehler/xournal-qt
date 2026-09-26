@@ -11,6 +11,8 @@ import QtQuick.Window
 
 Item {
     id: panel
+    /// An annotation was tapped: its place is shown (the sidebar as a drawer closes then)
+    signal picked()
     readonly property var model: app.annotations
     readonly property var kinds: [
         { key: "highlight", text: qsTr("Highlights") },
@@ -179,7 +181,7 @@ Item {
             bottomPadding: 4
             Accessible.name: panel.kindLabel(kind) + (itemText === "" ? "" : kind === "ink" ? " " + qsTr("on “%1”").arg(itemText)
                                                                                            : ": " + itemText)
-            onClicked: app.jumpToPlace(page, rect)
+            onClicked: { app.jumpToPlace(page, rect); panel.picked() }
             contentItem: RowLayout {
                 spacing: 6
                 Rectangle {
