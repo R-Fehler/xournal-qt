@@ -3022,12 +3022,17 @@ ApplicationWindow {
             id: quickToolsColumn
             width: parent.width
             spacing: 4
+            // The tools take what is left above the two buttons, which stay inside the window (the tools scroll: F6.4)
             Item {
                 id: quickToolsHolder
                 width: parent.width
-                height: Math.min(toolRow.implicitHeight, win.contentItem.height - 90)
+                height: Math.max(0, Math.min(toolRow.implicitHeight,
+                                             win.contentItem.height - 16 - quickTools.topPadding - quickTools.bottomPadding
+                                             - presentToggle.height - leaveFullScreen.height
+                                             - 2 * quickToolsColumn.spacing))
             }
             Button {
+                id: presentToggle
                 objectName: "presentToggleButton"
                 width: parent.width
                 flat: true
@@ -3046,6 +3051,7 @@ ApplicationWindow {
             }
             // Full screen: back to the window; the compact chrome chosen in a window: back to the full chrome
             Button {
+                id: leaveFullScreen
                 objectName: "leaveFullScreenButton"
                 width: parent.width
                 flat: true

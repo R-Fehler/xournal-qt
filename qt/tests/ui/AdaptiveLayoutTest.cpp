@@ -987,3 +987,31 @@ TEST_F(AdaptiveLayoutTest, settingsOnAPhoneAreAListOfSections) {
         EXPECT_FALSE(sheet->property("visible").toBool()) << at;
     }
 }
+
+// The quick tools of the compact chrome (F6.4, F9.4): Present and "Show the tabs and the tool bar" stay inside a
+// short window, the tools scroll
+TEST_F(AdaptiveLayoutTest, quickToolsFitAShortWindow) {
+    openDocument();
+    for (const WindowSize& s: {WindowSize{1024, 700, "small-desktop"}, WindowSize{1280, 500, "short-wide"},
+                               WindowSize{915, 412, "phone-landscape"}, WindowSize{412, 915, "phone-portrait"}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+        wait(50);
+        auto* popup = window->findChild<QObject*>("quickTools");
+        ASSERT_NE(popup, nullptr);
+        QMetaObject::invokeMethod(popup, "open");
+        until([&] { return popup->property("opened").toBool(); });
+        for (const char* name: {"presentToggleButton", "leaveFullScreenButton"}) {
+            auto* b = findItem(name);
+            ASSERT_NE(b, nullptr) << name;
+            const QRectF r = b->mapRectToScene(QRectF(0, 0, b->width(), b->height()));
+            EXPECT_TRUE(QRectF(0, 0, s.w, s.h).adjusted(-1, -1, 1, 1).contains(r))
+                    << at << ": " << name << " at " << r.y() << ".." << r.bottom();
+        }
+        QMetaObject::invokeMethod(popup, "close");
+        until([&] { return !popup->property("visible").toBool(); });
+        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+        wait(30);
+    }
+}
