@@ -1,5 +1,7 @@
 // Settings: a large modal sheet with sections (pen, touch, stabilizer, documents, display, search, new pages,
-// storage, shortcuts).
+// storage, shortcuts). On a desktop or a tablet the sections are tabs; on a phone (qt/docs/adaptive-layout.md) the sheet
+// takes the whole screen and shows the sections as a list, each opening as a page with a back arrow. Below 600 px the
+// rows put their label above the slider or the box.
 // The values are upstream Xournal++'s settings (settings.xml keys); they apply immediately and are saved when the
 // sheet closes. "Storage" is about the cache of the library of this window (a setting of the library).
 import QtQuick
@@ -11,13 +13,43 @@ Popup {
     id: sheet
     modal: true
     focus: true
-    anchors.centerIn: Overlay.overlay
-    width: Math.min(parent ? parent.width - 32 : 900, 920)
-    height: parent ? parent.height - 48 : 700
+    parent: Overlay.overlay
+    readonly property var win: ApplicationWindow.window
+    readonly property var adaptive: win && win.adaptive ? win.adaptive : null
+    /// A phone: the whole screen, the sections as a list
+    readonly property bool phone: adaptive !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptive.layoutClass) >= 0
+    /// The rows put their label above the control
+    readonly property bool narrow: width < 600
+    /// On a phone: a section is shown (else the list of them)
+    property bool sectionShown: false
+    readonly property real keyboardTop: {
+        const r = Qt.inputMethod.keyboardRectangle
+        return Qt.inputMethod.visible && r.height > 0 ? r.y / (Qt.platform.os === "android" ? Screen.devicePixelRatio : 1)
+                                                      : Infinity
+    }
+    readonly property real safeTop: win && win.safeTop !== undefined ? win.safeTop : 0
+    readonly property real roomBottom: parent ? Math.min(parent.height, keyboardTop) : 700
+    readonly property real parentWidth: parent ? parent.width : 900
+    x: phone ? 0 : Math.round((parentWidth - width) / 2)
+    y: phone ? safeTop : Math.round(Math.max(safeTop + 24, ((parent ? parent.height : 700) - height) / 2))
+    width: phone ? parentWidth : Math.min(parentWidth - 32, 920)
+    height: Math.max(0, roomBottom - safeTop - (phone ? 0 : 48))
     padding: 0
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    // (on a phone in a section, Esc and the back key go back to the list first: below)
+    closePolicy: phone && sectionShown ? Popup.CloseOnPressOutside : Popup.CloseOnEscape | Popup.CloseOnPressOutside
     onOpened: app.settings.begin()
     onClosed: app.settings.end()
+    onAboutToShow: sectionShown = false
+    onPhoneChanged: if (!phone) sectionShown = false
+
+    /// The sections, in the order of the tabs (Shortcuts last: it matters little without a keyboard)
+    readonly property var sectionNames: [qsTr("Pen"), qsTr("Touch"), qsTr("Stabilizer"), qsTr("Documents"),
+        qsTr("Display"), qsTr("Search"), qsTr("New pages"), qsTr("Storage"), qsTr("Shortcuts")]
+    function showSection(index) {
+        sections.currentIndex = index
+        sectionShown = true
+    }
+    function showShortcuts() { showSection(sectionNames.length - 1) }
 
     readonly property var s: app.settings
     /// The cache was removed: the window closes (so the app does not build it again at once)
@@ -29,7 +61,7 @@ Popup {
         return qsTr("%1 kB").arg(bytes > 0 ? Math.max(1, Math.round(bytes / 1024)) : 0)
     }
 
-    background: Rectangle { color: "#fafafa"; radius: 14 }
+    background: Rectangle { color: "#fafafa"; radius: sheet.phone ? 0 : 14 }
 
     FuzzyHelp { id: fuzzyHelp; objectName: "settingsFuzzyHelp" }
 
@@ -58,7 +90,7 @@ Popup {
             onToggled: sheet.s.set(row.key, checked)
         }
     }
-    component SliderRow: RowLayout {
+    component SliderRow: GridLayout {
         id: row
         property string key
         property alias text: label.text
@@ -69,10 +101,20 @@ Popup {
         property string suffix: ""
         property real factor: 1  // shown value = stored value * factor
         Layout.fillWidth: true
-        Label { id: label; Layout.preferredWidth: 220; wrapMode: Text.WordWrap }
+        // (narrow: the label above the slider and its value)
+        columns: sheet.narrow ? 2 : 3
+        rowSpacing: 0
+        Label {
+            id: label
+            Layout.columnSpan: sheet.narrow ? 2 : 1
+            Layout.fillWidth: sheet.narrow
+            Layout.preferredWidth: sheet.narrow ? -1 : 220
+            wrapMode: Text.WordWrap
+        }
         Slider {
             id: slider
             Layout.fillWidth: true
+            Layout.minimumWidth: 120
             from: row.from; to: row.to; stepSize: row.stepSize
             snapMode: Slider.SnapAlways
             value: (sheet.s.revision, sheet.s.get(row.key))
@@ -84,7 +126,7 @@ Popup {
             text: (slider.value * row.factor).toFixed(row.decimals) + row.suffix
         }
     }
-    component ComboRow: RowLayout {
+    component ComboRow: GridLayout {
         id: row
         property string key
         property alias text: label.text
@@ -94,9 +136,13 @@ Popup {
         property var getter: null
         property var setter: null
         Layout.fillWidth: true
+        // (narrow: the label above the box)
+        columns: sheet.narrow ? 1 : 2
+        rowSpacing: 0
         Label { id: label; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         ComboBox {
-            Layout.preferredWidth: 260
+            Layout.fillWidth: sheet.narrow
+            Layout.preferredWidth: sheet.narrow ? -1 : 260
             model: row.options
             textRole: "text"
             valueRole: "value"
@@ -111,18 +157,79 @@ Popup {
         anchors.fill: parent
         spacing: 0
 
-        // Header
+        // Header. On a phone: × (the list) or ‹ (a section: back to the list) at the left, as Android's full-screen
+        // pages
         RowLayout {
             Layout.fillWidth: true
-            Layout.leftMargin: 20
+            Layout.leftMargin: sheet.phone ? 4 : 20
             Layout.rightMargin: 8
-            Layout.topMargin: 8
-            Label { text: qsTr("Settings"); font.pixelSize: 22; font.weight: Font.DemiBold; Layout.fillWidth: true }
-            IconButton { iconName: "xqt-close"; tip: qsTr("Close"); onClicked: sheet.close() }
+            Layout.topMargin: sheet.phone ? 4 : 8
+            Layout.bottomMargin: sheet.phone ? 4 : 0
+            IconButton {
+                objectName: "settingsBackButton"
+                visible: sheet.phone
+                iconName: sheet.sectionShown ? "xqt-chevron-left" : "xqt-close"
+                tip: sheet.sectionShown ? qsTr("Back") : qsTr("Close")
+                implicitWidth: Math.max(48, sheet.adaptive ? sheet.adaptive.minTarget : 48)
+                implicitHeight: implicitWidth
+                onClicked: sheet.sectionShown ? sheet.sectionShown = false : sheet.close()
+            }
+            Label {
+                objectName: "settingsTitle"
+                text: sheet.phone && sheet.sectionShown ? sheet.sectionNames[sections.currentIndex] : qsTr("Settings")
+                font.pixelSize: sheet.phone ? 20 : 22
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+                Layout.leftMargin: sheet.phone ? 8 : 0
+            }
+            IconButton { visible: !sheet.phone; iconName: "xqt-close"; tip: qsTr("Close"); onClicked: sheet.close() }
+            // Esc and the back key in a section of the phone's list: back to the list; else the back key closes
+            Shortcut {
+                sequences: [StandardKey.Cancel]
+                enabled: sheet.opened && sheet.phone && sheet.sectionShown
+                onActivated: sheet.sectionShown = false
+            }
+            Shortcut {
+                sequences: ["Back"]
+                enabled: sheet.opened
+                onActivated: sheet.phone && sheet.sectionShown ? sheet.sectionShown = false : sheet.close()
+            }
         }
-        function showShortcuts() { sections.currentIndex = sections.count - 1 }
+        // On a phone: the sections as a list
+        ListView {
+            id: sectionList
+            objectName: "settingsSectionList"
+            visible: sheet.phone && !sheet.sectionShown
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            model: sheet.sectionNames
+            ScrollBar.vertical: ScrollBar {}
+            delegate: ItemDelegate {
+                required property int index
+                required property string modelData
+                objectName: "settingsSection" + index
+                width: ListView.view.width
+                height: Math.max(56, sheet.adaptive ? sheet.adaptive.minTarget + 8 : 56)
+                leftPadding: 24
+                text: modelData
+                font.pixelSize: 16
+                onClicked: sheet.showSection(index)
+                Image {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 16
+                    anchors.verticalCenter: parent.verticalCenter
+                    source: app.iconUrl("xqt-chevron-right")
+                    sourceSize.width: 20
+                    sourceSize.height: 20
+                    opacity: 0.6
+                }
+            }
+        }
         TabBar {
             id: sections
+            visible: !sheet.phone
             Layout.fillWidth: true
             Layout.leftMargin: 12
             Layout.rightMargin: 12
@@ -137,9 +244,11 @@ Popup {
             TabButton { objectName: "storageTab"; text: qsTr("Storage"); width: implicitWidth }
             TabButton { objectName: "shortcutsTab"; text: qsTr("Shortcuts"); width: implicitWidth }
         }
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#e0e0e0" }
+        Rectangle { Layout.fillWidth: true; height: 1; color: "#e0e0e0"; visible: !sheet.phone || sheet.sectionShown }
 
         StackLayout {
+            objectName: "settingsSections"
+            visible: !sheet.phone || sheet.sectionShown
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: sections.currentIndex
@@ -246,11 +355,12 @@ Popup {
                         key: "palmNearHeight"; text: qsTr("The pen counts as near up to")
                         from: 5; to: 100; stepSize: 1; decimals: 0; suffix: " %"
                     }
-                    RowLayout {
+                    GridLayout {
                         visible: app.penHover.reportsHeight
-                        spacing: 12
+                        columns: sheet.narrow ? 1 : 2
+                        columnSpacing: 12
                         Label {
-                            Layout.preferredWidth: 220
+                            Layout.preferredWidth: sheet.narrow ? -1 : 220
                             text: app.penHover.inProximity
                                   ? qsTr("Your pen is at %1 % now").arg(Math.round(app.penHover.height * 100))
                                   : qsTr("Your pen is away")
@@ -455,16 +565,19 @@ Popup {
                         ]
                     }
                     // The web search of selected text (the look-up menu): an engine, or an address with {text}
-                    RowLayout {
+                    GridLayout {
                         id: webSearchRow
                         Layout.fillWidth: true
+                        columns: sheet.narrow ? 1 : 2
+                        rowSpacing: 0
                         readonly property string current: (sheet.s.revision, sheet.s.get("webSearch"))
                         readonly property var known: app.citations.searchEngines()
                         readonly property bool custom: !known.some(function(e) { return e.key === current })
                         Label { text: qsTr("Search the web with"); Layout.fillWidth: true; wrapMode: Text.WordWrap }
                         ComboBox {
                             objectName: "webSearchChoice"
-                            Layout.preferredWidth: 260
+                            Layout.fillWidth: sheet.narrow
+                            Layout.preferredWidth: sheet.narrow ? -1 : 260
                             model: webSearchRow.known.map(function(e) { return e.name }).concat([qsTr("Custom…")])
                             currentIndex: {
                                 for (let i = 0; i < webSearchRow.known.length; ++i)
@@ -496,16 +609,19 @@ Popup {
                               ? qsTr("{text} is replaced by the selected text.")
                               : qsTr("The address must start with http:// or https:// and contain {text}.")
                     }
-                    RowLayout {
+                    GridLayout {
                         id: translatorRow
                         Layout.fillWidth: true
+                        columns: sheet.narrow ? 1 : 2
+                        rowSpacing: 0
                         readonly property string current: (sheet.s.revision, sheet.s.get("translateService"))
                         readonly property var known: app.citations.translators()
                         readonly property bool custom: !known.some(function(t) { return t.key === current })
                         Label { text: qsTr("Translate with"); Layout.fillWidth: true; wrapMode: Text.WordWrap }
                         ComboBox {
                             objectName: "translatorChoice"
-                            Layout.preferredWidth: 260
+                            Layout.fillWidth: sheet.narrow
+                            Layout.preferredWidth: sheet.narrow ? -1 : 260
                             model: translatorRow.known.map(function(t) { return t.name }).concat([qsTr("Custom address…")])
                             currentIndex: {
                                 for (let i = 0; i < translatorRow.known.length; ++i)
@@ -613,9 +729,11 @@ Popup {
                         from: 64; to: 1024; stepSize: 64; decimals: 0; suffix: " MB"
                     }
                     SectionTitle { text: qsTr("File names") }
-                    RowLayout {
+                    GridLayout {
                         Layout.fillWidth: true
-                        Label { text: qsTr("Name for new documents"); Layout.preferredWidth: 220 }
+                        columns: sheet.narrow ? 1 : 2
+                        rowSpacing: 0
+                        Label { text: qsTr("Name for new documents"); Layout.preferredWidth: sheet.narrow ? -1 : 220 }
                         TextField {
                             Layout.fillWidth: true
                             text: (sheet.s.revision, sheet.s.get("defaultSaveName"))
@@ -849,12 +967,14 @@ Popup {
                     width: parent.width - 48
                     x: 24
                     spacing: 10
-                    RowLayout {
+                    GridLayout {
                         Layout.fillWidth: true
+                        columns: sheet.narrow ? 1 : 2
+                        rowSpacing: 0
                         SectionTitle { text: qsTr("Fuzzy search") }
                         Button {
                             objectName: "fuzzyHelpButton"
-                            Layout.topMargin: 18
+                            Layout.topMargin: sheet.narrow ? 0 : 18
                             flat: true
                             text: qsTr("Help: syntax and examples")
                             onClicked: fuzzyHelp.open()
@@ -880,8 +1000,10 @@ Popup {
                                    + "close together (tbine finds \"turbine\"), or with a typo; the whole word is "
                                    + "marked. Shorter words are found as they are typed.")
                     }
-                    RowLayout {
+                    GridLayout {
                         Layout.fillWidth: true
+                        columns: sheet.narrow ? 1 : 2
+                        rowSpacing: 0
                         Label {
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
@@ -890,7 +1012,8 @@ Popup {
                         ComboBox {
                             id: typos
                             objectName: "fuzzyTyposCombo"
-                            Layout.preferredWidth: 360
+                            Layout.fillWidth: sheet.narrow
+                            Layout.preferredWidth: sheet.narrow ? -1 : 360
                             model: [
                                 { text: qsTr("Off"), value: 0 },
                                 { text: qsTr("1 letter, in words of 5+ letters"), value: 1 },

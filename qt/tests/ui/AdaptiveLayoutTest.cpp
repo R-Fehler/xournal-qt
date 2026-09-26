@@ -909,3 +909,81 @@ TEST_F(AdaptiveLayoutTest, aPhoneSheetAndTheBackKey) {
     until([&] { return !d->property("visible").toBool(); });
     EXPECT_FALSE(d->property("visible").toBool()) << "the back key";
 }
+
+// Settings: tabs on a desktop; on a phone the whole screen, a list of the sections, each a page with a back arrow;
+// sliders keep their width (F12.2)
+TEST_F(AdaptiveLayoutTest, settingsOnAPhoneAreAListOfSections) {
+    openDocument();
+    auto* sheet = window->findChild<QObject*>("settingsPage");
+    ASSERT_NE(sheet, nullptr);
+    auto popupItem = [&]() -> QQuickItem* { return sheet->property("contentItem").value<QQuickItem*>()->parentItem(); };
+    auto visibleIn = [&](const char* name) {
+        for (auto* i: itemsUnder(popupItem())) {
+            if (i->objectName() == name) {
+                return i->isVisible();
+            }
+        }
+        return false;
+    };
+    resize(1280, 800);
+    QMetaObject::invokeMethod(sheet, "open");
+    until([&] { return sheet->property("opened").toBool(); });
+    EXPECT_TRUE(visibleIn("displayTab")) << "tabs on a desktop";
+    EXPECT_FALSE(visibleIn("settingsSectionList"));
+    EXPECT_LT(popupItem()->width(), window->width());
+    QMetaObject::invokeMethod(sheet, "close");
+    until([&] { return !sheet->property("visible").toBool(); });
+
+    for (const WindowSize& s: {WindowSize{412, 915, "phone-portrait"}, WindowSize{915, 412, "phone-landscape"}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        QMetaObject::invokeMethod(sheet, "open");
+        until([&] { return sheet->property("opened").toBool(); });
+        EXPECT_NEAR(popupItem()->width(), s.w, 1) << at << ": the whole screen";
+        EXPECT_NEAR(popupItem()->height(), s.h, 1) << at;
+        EXPECT_TRUE(visibleIn("settingsSectionList")) << at << ": the sections as a list";
+        EXPECT_FALSE(visibleIn("displayTab")) << at;
+        EXPECT_FALSE(visibleIn("settingsSections")) << at;
+        // Pen: the section as a page, its sliders not squeezed to their knob
+        QQuickItem* pen = nullptr;
+        until([&] {
+            for (auto* i: itemsUnder(popupItem())) {
+                if (i->objectName() == "settingsSection0") {
+                    pen = i;
+                }
+            }
+            return pen != nullptr;
+        });
+        ASSERT_NE(pen, nullptr) << at;
+        const QString shots = qEnvironmentVariable("XQT_UI_DIALOG_SHOTS");
+        if (!shots.isEmpty()) {
+            window->grabWindow().save(QString("%1/settingsList-%2.png").arg(shots, QString::fromStdString(at)));
+        }
+        click(pen);
+        if (!shots.isEmpty()) {
+            wait(50);
+            window->grabWindow().save(QString("%1/settingsPen-%2.png").arg(shots, QString::fromStdString(at)));
+        }
+        EXPECT_TRUE(sheet->property("sectionShown").toBool()) << at;
+        EXPECT_TRUE(visibleIn("settingsSections")) << at;
+        EXPECT_FALSE(visibleIn("settingsSectionList")) << at;
+        wait(50);
+        int sliders = 0;
+        for (auto* i: itemsUnder(popupItem())) {
+            if (i->inherits("QQuickSlider") && i->isVisible()) {
+                ++sliders;
+                EXPECT_GE(i->width(), 120) << at << ": a slider of the Pen section";
+                EXPECT_LE(i->mapToScene(QPointF(i->width(), 0)).x(), s.w + 1) << at;
+            }
+        }
+        EXPECT_GE(sliders, 2) << at;
+        // Esc (the back key): back to the list first, then closed
+        QTest::keyClick(window, Qt::Key_Escape);
+        wait(50);
+        EXPECT_FALSE(sheet->property("sectionShown").toBool()) << at << ": back to the list";
+        EXPECT_TRUE(sheet->property("visible").toBool()) << at;
+        QTest::keyClick(window, Qt::Key_Escape);
+        until([&] { return !sheet->property("visible").toBool(); });
+        EXPECT_FALSE(sheet->property("visible").toBool()) << at;
+    }
+}
