@@ -533,6 +533,7 @@ TEST_F(CitationsTest, aWebPictureIsLoadedOnlyWhenAskedWithItsAddressShown) {
     EXPECT_EQ(find("webImageUrl")->property("text").toString(), url);
     EXPECT_TRUE(find("webImageHost")->property("text").toString().contains("example.org"));
     EXPECT_TRUE(shown("webImageOptIn"));
+    shot("web-image-confirm");
     click("webImageCancel");
     until([&] { return !shown("webImageConfirm"); });
     wait(50);
