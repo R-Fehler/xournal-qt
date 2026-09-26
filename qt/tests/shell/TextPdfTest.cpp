@@ -5,6 +5,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <shared_mutex>
@@ -13,6 +14,7 @@
 #include <QDateTime>
 #include <QImage>
 #include <QTemporaryDir>
+#include <zlib.h>
 #include <QUrl>
 #include <gtest/gtest.h>
 #include <qpdf/QPDF.hh>
@@ -45,6 +47,19 @@ std::string bytesOf(const fs::path& p) {
 }
 void writeFile(const fs::path& p, const std::string& bytes) { std::ofstream(p, std::ios::binary) << bytes; }
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
+/// The XML of a .xopp
+std::string gunzip(const fs::path& p) {
+    gzFile in = gzopen(p.string().c_str(), "r");
+    std::string out;
+    char buf[65536];
+    for (int n; in && (n = gzread(in, buf, sizeof buf)) > 0;) {
+        out.append(buf, static_cast<size_t>(n));
+    }
+    if (in) {
+        gzclose(in);
+    }
+    return out;
+}
 QUrl url(const fs::path& p) { return QUrl::fromLocalFile(qstr(p)); }
 
 /// The data of an attachment of a PDF (read with qpdf); "<none>" when it has none of that name.
@@ -303,6 +318,59 @@ TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
     ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
     ASSERT_TRUE(c.openAsPdfDocument());
     EXPECT_EQ(attachment(root / "notes.pdf", "notes.assets/a.png"), bytesOf(root / "notes.assets" / "a.png"));
+}
+
+// qt/docs/md-images.md: the Markdown of notes (.xopp) carries its pictures inside the .xopp, as extra <preview xqt-file>
+// elements at the end (Xournal++ ignores them); a .xopp without pictures is written as before; opened again, they
+// are in its work folder; a PDF with notes made from it carries them as attachments.
+TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
+    AppController c;
+    c.setLibraryRoot(root);
+    c.newDocument();
+    const fs::path xopp = root / "lecture.xopp";
+    ASSERT_TRUE(current(c).saveAs(xopp).ok);
+    const std::string before = gunzip(xopp);
+    EXPECT_EQ(before.find("xqt-file"), std::string::npos) << "no pictures: as upstream writes it";
+
+    // A picture pasted into the page's Markdown text of the saved notes: kept in its work folder until saved
+    QImage blue(30, 10, QImage::Format_RGB32);
+    blue.fill(Qt::blue);
+    QString error;
+    const auto link = MarkdownImages::savePicture(current(c), blue, error, QDateTime(QDate(2026, 9, 26), QTime(9, 0)));
+    ASSERT_TRUE(link) << error.toStdString();
+    EXPECT_EQ(*link, "lecture.assets/image-2026-09-26-090000.png");
+    MarkdownFile::setText(current(c), "# Lecture\n\n![](" + *link + ")\n");
+    ASSERT_TRUE(current(c).save().ok);
+    EXPECT_FALSE(fs::exists(root / "lecture.assets")) << "nothing next to the .xopp";
+    const std::string xml = gunzip(xopp);
+    EXPECT_NE(xml.find("<preview xqt-file=\"lecture.assets/image-2026-09-26-090000.png\">"), std::string::npos);
+    EXPECT_LT(xml.find("<preview>"), xml.find("<preview xqt-file")) << "the document's own preview first";
+    if (const char* keep = std::getenv("XQT_KEEP_XOPP")) {  // (to open it in Xournal++: qt/docs/md-images.md)
+        fs::copy_file(xopp, keep, fs::copy_options::overwrite_existing);
+    }
+    const auto carried = DocumentImages::xoppPictures(xopp);
+    ASSERT_EQ(carried.size(), 1u);
+    EXPECT_EQ(carried[0].second,
+              bytesOf(DocumentImages::workFolder(xopp) / "lecture.assets" / "image-2026-09-26-090000.png"));
+
+    // Opened again, its work folder gone: the picture comes from the file
+    c.closeTab(c.tabManager().currentIndex());
+    fs::remove_all(DocumentImages::workFolder(xopp));
+    {
+        auto loaded = DocumentSession::loadFile(xopp);
+        ASSERT_TRUE(loaded.document);
+        EXPECT_EQ(md::images::info(*link).state, md::images::Info::State::Ok);
+        EXPECT_EQ(md::images::info(*link).width, 30);
+    }
+    // Moved in the library (not open): the picture is still in it
+    fs::create_directories(root / "Physics");
+    auto moved = DocumentFiles::move(DocumentFiles::itemOf(xopp), root / "Physics");
+    ASSERT_TRUE(moved.ok) << moved.error;
+    EXPECT_EQ(DocumentImages::xoppPictures(root / "Physics" / "lecture.xopp").size(), 1u);
+    // Saved as a PDF with notes: an attachment
+    ASSERT_TRUE(c.openPath(qstr(root / "Physics" / "lecture.xopp")));
+    ASSERT_TRUE(current(c).saveAsHybrid(root / "Physics" / "lecture.pdf").ok);
+    EXPECT_EQ(attachment(root / "Physics" / "lecture.pdf", *link), carried[0].second);
 }
 
 // The library's index reads the text of a PDF text document: its words are found

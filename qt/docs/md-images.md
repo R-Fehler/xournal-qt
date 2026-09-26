@@ -44,10 +44,11 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
   file picker) saves the picture and inserts `![](name.assets/image-YYYY-MM-DD-HHMMSS.png)` at the cursor (Typora's
   names; a dropped or picked file keeps its name and kind, made unique in the folder). The alt text is empty. It is
   one undo step of the text; undo leaves the file (see clean-up).
-- Where the file goes, by document:
+- Where the file goes, by document (`MarkdownImages::placeOf`: the document's root):
   - a `.md`: `name.assets/` next to it;
-  - a PDF text document: its assets folder in the app cache (packed into the PDF at the next save);
-  - Markdown boxes in a `.xopp`: see below.
+  - a PDF text document, any PDF with notes, a `.xopp`: `name.assets/` in its work folder in the app cache (carried
+    inside the file from the next save on, below);
+  - notes not saved yet: none ("Pictures can be added once the document is saved.").
 
 ## `.md` and `name.assets/`: one document
 
@@ -95,9 +96,35 @@ whole address and its host (`WebImageConfirm.qml`); while connecting to the web 
 The texts that show it are laid out again (`AppController::relayoutPictures`); in a `.md` the pages follow at the next
 edit.
 
-## Markdown boxes in a `.xopp`
+## Markdown boxes in a `.xopp` (decided when built)
 
-See "The `.xopp` storage" below (decided when built).
+The pictures of the Markdown texts of notes are inside the `.xopp`, as extra `<preview>` elements at the end of the
+document, each with an attribute naming the picture and its data in base64 (as a TeX image's):
+
+```xml
+<preview xqt-file="lecture.assets/image-2026-09-26-090000.png">iVBORw0KGgo…</preview>
+```
+
+- Links in the Markdown are `name.assets/…` as elsewhere; opening the `.xopp` copies its pictures into its work folder
+  in the app cache, where they resolve (`DocumentImages::unpackXopp`), as for a PDF text document.
+- Written by `PictureSaveHandler` (upstream's `SaveHandler` with the nodes added after `prepareSave`: no upstream file
+  changed) wherever the fork writes a `.xopp`: save, save as, autosave (a recovered document has its pictures), and the
+  library's rewrite of a moved `.xopp`. Only the pictures some Markdown text links to; a document without pictures is
+  written byte for byte as before. The document's own preview stays the first `<preview>` (thumbnails read the first).
+- A PDF with notes carries the pictures of any of its Markdown (not only a text document's) as attachments.
+- **Xournal++**: 1.3.4 and its current master (built from `../xournalpp`) open such a file silently and show the
+  Markdown source as text (checked with `xournalpp --create-pdf`, in a separate config folder). They ignore the contents
+  of `<preview>` and unknown attributes; 1.2's loader ignores `<preview>` altogether. Saving the file in Xournal++ keeps
+  one preview of its own: the pictures are gone then, their links stay (shown as missing in xournal-qt).
+- Options not taken:
+  - Upstream's zip container for `.xopp` (`mimetype`, `META-INF/version`, `content.xml`, attachments): its loader has
+    the mimetype check inverted (`if (!strcmp(mimetype, "application/xournal++")) throw "Mimetype wrong"`, 1.1 to
+    master), so a correct file is refused; a wrong mimetype would only work until that bug is fixed.
+  - An element of our own under `<xournal>`: 1.3.4 ignores it with a warning on the console, but master's new parser
+    reports "Ignoring unexpected … tag" as a loading error (shown to the user).
+  - Upstream `<image>` elements (base64 too) in a hidden place: Xournal++ would draw or lose them (layers have no
+    saved visibility), and they have no name to link to.
+  - A folder next to the `.xopp`: files next to a document are what the plan avoids for notes.
 
 ## Code
 
@@ -107,6 +134,11 @@ See "The `.xopp` storage" below (decided when built).
 | `qt/src/markdown/MdDocument.cpp` | the image run (`Builder::endImage`) |
 | `qt/src/markdown/MdLayout.cpp` | the image shape, block and inline sizes, placeholders, the preview while writing |
 | `qt/src/canvas/MdImageDecoder.*` | the app's decoder (Qt) and the web cache folder |
-| `qt/src/session/DocumentImages.*` | a document's root and `name.assets` |
+| `qt/src/session/DocumentImages.*` | a document's root and `name.assets`, the work folder, carried pictures, the `.xopp`'s pictures, renaming links, unused pictures |
+| `qt/src/session/PictureSaveHandler.h` | a `.xopp` with its pictures |
+| `qt/src/session/HybridPdf.cpp`, `TextDocument.cpp` | pictures as PDF attachments (extracted with the clean copy; incremental saves add new ones) |
+| `qt/src/canvas/MarkdownImages.*`, `qt/src/app/AppMarkdownFormat.cpp` | paste, drop, the picker |
+| `qt/src/app/AppMarkdownImages.cpp`, `qml/WebImageConfirm.qml`, `qml/UnusedImagesDialog.qml` | web pictures, removing unused ones |
+| `qt/src/shell/DocumentFiles.cpp` | the `.md` and its `name.assets` in the library |
 | `DocumentSession::updateImageRoot`, `MarkdownFile::textDocument` | the root while a document is open, and while its pages are made |
 | `qt/tests/markdown/MdImagesTest.cpp`, `qt/tests/canvas/TextDocumentTest.cpp` | the tests (`XQT_MD_IMAGES_SHOTS=<dir>` draws a picture to look at) |

@@ -15,6 +15,8 @@
 #include "MdImages.h"
 #include "filesystem.h"
 
+class Document;
+
 namespace xqt::DocumentImages {
 
 /// "name.assets" for "name.md" (or "name.pdf", "name.archive.pdf", "name.xopp").
@@ -47,6 +49,26 @@ void unpack(const fs::path& document, const fs::path& pictures);
 /// The pictures a Markdown text links to (as the roots resolve them now) copied under their carried paths into
 /// `folder` (another document's work folder, the folder next to an exported .md). Returns how many.
 size_t copyLinked(const std::string& markdown, const fs::path& folder);
+
+/// The pictures the Markdown texts of a document link to (every box of every page's Markdown layer), as carried
+/// paths (see carriedLinks), each once. The caller holds the document's lock (shared is enough).
+std::vector<std::string> carriedPicturesOf(Document& doc);
+/// Those that are there now (as the roots resolve them): their carried path and data. Reads the files.
+std::vector<std::pair<std::string, std::string>> picturesData(const std::vector<std::string>& carried);
+
+// --- pictures inside a .xopp -------------------------------------------------------------------------------------
+// A .xopp carries the pictures of its Markdown boxes as extra <preview> elements at the end of the document, with
+// an attribute naming the picture: <preview xqt-file="name.assets/image-….png">base64</preview>. Xournal++ (1.2,
+// 1.3 and its current master: tested) ignores the contents of <preview> and unknown attributes, silently, so it
+// opens the file and shows the Markdown source; saving it there drops them (the links stay). Documents without
+// pictures are written exactly as before.
+
+/// The name of that attribute.
+constexpr const char* XOPP_PICTURE_ATTRIBUTE = "xqt-file";
+/// The pictures a .xopp carries: name and data (read from its XML; none for a file without them).
+std::vector<std::pair<std::string, std::string>> xoppPictures(const fs::path& xopp);
+/// They copied into the document's work folder; true if it carries any.
+bool unpackXopp(const fs::path& xopp);
 
 /// Export as Markdown (qt/docs/md-images.md): the pictures `markdown` links to, next to `mdFile` as it expects them:
 /// links into another "…assets/" folder (the document's name changed since) are rewritten to "name.assets/" of

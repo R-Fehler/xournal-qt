@@ -52,12 +52,14 @@
 #include "view/background/BackgroundFlags.h"
 
 #include "AppContext.h"
+#include "DocumentImages.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
 #include "DocumentSession.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PdfPageKeeper.h"
+#include "PictureSaveHandler.h"
 #include "TextFile.h"
 #include "PageNoteSpace.h"
 
@@ -159,11 +161,15 @@ xoj::util::CairoSurfaceSPtr previewOf(const PageRef& page, const XojPdfPageSPtr&
 /// Port of SaveJob::save for a copy of the document: the file only (the document learns of it on its thread).
 DocumentSession::SaveResult writeXoppFile(Document& copy, const fs::path& target, bool createBackup,
                                           std::unique_ptr<SaveHandler>& h) {
-    h = std::make_unique<SaveHandler>();
+    auto pictures = std::make_unique<PictureSaveHandler>();
+    std::vector<std::string> carried;
     {
         std::shared_lock lock(copy);
-        h->prepareSave(&copy, target);
+        pictures->prepareSave(&copy, target);
+        carried = DocumentImages::carriedPicturesOf(copy);  // (its Markdown's pictures go into it: md-images.md)
     }
+    pictures->addPictures(DocumentImages::picturesData(carried));
+    h = std::move(pictures);
     if (createBackup) {
         try {
             // The backup must be created for the target: this is the file that will be written.

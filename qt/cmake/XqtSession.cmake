@@ -72,6 +72,7 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextDocument.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentImages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentImages.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PictureSaveHandler.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.h

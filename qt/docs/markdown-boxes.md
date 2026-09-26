@@ -195,6 +195,9 @@ the pen goes on top of it, into the layer it went into before.
 - **Wrap width:** the width of the box.
 - **Position:** the top left of the box.
 
+Pictures of the Markdown (`![](name.assets/…)`) are carried at the end of the `.xopp` as extra `<preview>` elements,
+which Xournal++ ignores ([md-images.md](md-images.md), "Markdown boxes in a `.xopp`").
+
 Xournal++ shows the source as plain text and keeps it unchanged. xournal-qt draws it formatted everywhere a page is
 drawn (canvas, thumbnails, previews, PDF export) through small seams in upstream's `Text`, `Layer` and `TextView`: a text in a Markdown layer knows it is one, is drawn formatted and is as big as it is drawn (ADR-0002).
 

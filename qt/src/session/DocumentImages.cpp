@@ -2,10 +2,22 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <iterator>
 #include <functional>
 #include <vector>
 
+#include <glib.h>
+
+#include "model/Document.h"
+#include "model/Layer.h"
+#include "model/Text.h"
+#include "model/XojPage.h"
+#include "util/GzUtil.h"
 #include "util/PathUtil.h"
+
+#include "MdBox.h"
 
 #include "MdDocument.h"
 #include "TextDocument.h"
@@ -151,6 +163,125 @@ size_t copyLinked(const std::string& markdown, const fs::path& folder) {
         md::images::changed();
     }
     return n;
+}
+
+std::vector<std::string> carriedPicturesOf(Document& doc) {
+    std::vector<std::string> out;
+    for (size_t i = 0; i < doc.getPageCount(); ++i) {
+        const Layer* layer = md::markdownLayer(doc.getPage(i));
+        if (!layer) {
+            continue;
+        }
+        for (const auto* e: layer->getElementsView()) {
+            if (e->getType() != ELEMENT_TEXT) {
+                continue;
+            }
+            const std::string& text = static_cast<const Text*>(e)->getText();
+            if (text.find("![") == std::string::npos) {
+                continue;  // (no picture: not parsed)
+            }
+            for (std::string& c: carriedLinks(text)) {
+                if (std::find(out.begin(), out.end(), c) == out.end()) {
+                    out.push_back(std::move(c));
+                }
+            }
+        }
+    }
+    return out;
+}
+
+std::vector<std::pair<std::string, std::string>> picturesData(const std::vector<std::string>& carried) {
+    std::vector<std::pair<std::string, std::string>> out;
+    for (const std::string& c: carried) {
+        const std::string file = md::images::resolve(c);
+        if (file.empty()) {
+            continue;
+        }
+        std::ifstream in(fs::path(std::u8string(file.begin(), file.end())), std::ios::binary);
+        if (in) {
+            out.emplace_back(c, std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()));
+        }
+    }
+    return out;
+}
+
+namespace {
+std::string unescaped(std::string s) {
+    static const std::pair<const char*, char> entities[] = {{"&amp;", '&'}, {"&quot;", '"'}, {"&apos;", '\''},
+                                                            {"&lt;", '<'},  {"&gt;", '>'}};
+    std::string out;
+    for (size_t i = 0; i < s.size();) {
+        bool done = false;
+        if (s[i] == '&') {
+            for (const auto& [e, c]: entities) {
+                if (s.compare(i, std::strlen(e), e) == 0) {
+                    out += c;
+                    i += std::strlen(e);
+                    done = true;
+                    break;
+                }
+            }
+        }
+        if (!done) {
+            out += s[i++];
+        }
+    }
+    return out;
+}
+}  // namespace
+
+std::vector<std::pair<std::string, std::string>> xoppPictures(const fs::path& xopp) {
+    std::vector<std::pair<std::string, std::string>> out;
+    gzFile in = GzUtil::openPath(xopp, "r");
+    if (!in) {
+        return out;
+    }
+    std::string xml;
+    char buf[1 << 16];
+    for (int n; (n = gzread(in, buf, sizeof buf)) > 0;) {
+        xml.append(buf, static_cast<size_t>(n));
+    }
+    gzclose(in);
+    const std::string open = std::string("<preview ") + XOPP_PICTURE_ATTRIBUTE + "=\"";
+    for (size_t at = xml.find(open); at != std::string::npos; at = xml.find(open, at + 1)) {
+        const size_t nameFrom = at + open.size();
+        const size_t nameTo = xml.find('"', nameFrom);
+        const size_t dataFrom = nameTo == std::string::npos ? nameTo : xml.find('>', nameTo);
+        const size_t dataTo = dataFrom == std::string::npos ? dataFrom : xml.find("</preview>", dataFrom);
+        if (dataTo == std::string::npos) {
+            break;
+        }
+        std::string base64 = xml.substr(dataFrom + 1, dataTo - dataFrom - 1);
+        gsize length = 0;
+        guchar* data = g_base64_decode(base64.c_str(), &length);
+        out.emplace_back(unescaped(xml.substr(nameFrom, nameTo - nameFrom)),
+                         std::string(reinterpret_cast<const char*>(data), length));
+        g_free(data);
+        at = dataTo;
+    }
+    return out;
+}
+
+bool unpackXopp(const fs::path& xopp) {
+    const auto pictures = xoppPictures(xopp);
+    if (pictures.empty()) {
+        return false;
+    }
+    const fs::path work = workFolder(xopp);
+    for (const auto& [name, data]: pictures) {
+        const fs::path target = below(work, name);
+        if (target.empty()) {
+            continue;
+        }
+        std::error_code ec;
+        if (fs::exists(target, ec) && fs::file_size(target, ec) == data.size()) {
+            continue;
+        }
+        fs::create_directories(target.parent_path(), ec);
+        std::ofstream(target, std::ios::binary) << data;
+    }
+    md::images::changed();
+    return true;
 }
 
 std::string exportPictures(const std::string& markdown, const fs::path& mdFile, size_t& copied) {

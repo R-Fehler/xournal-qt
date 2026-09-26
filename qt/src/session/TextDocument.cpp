@@ -122,32 +122,27 @@ std::string markdownName(const std::string& pdfName) {
 
 std::vector<Attachment> attachments(Document& doc, const std::string& pdfName) {
     std::vector<Attachment> out;
-    if (!isTextDocument(doc)) {
-        return out;
+    if (isTextDocument(doc)) {
+        Attachment md;
+        md.name = markdownName(pdfName);
+        md.data = flowText(doc);
+        md.mime = "text/markdown";
+        md.description = "The text of this PDF as Markdown (xournal-qt)";
+        md.relationship = "/Alternative";
+        out.push_back(std::move(md));
     }
-    Attachment md;  // (first: out.insert below)
-    md.name = markdownName(pdfName);
-    md.data = flowText(doc);
-    md.mime = "text/markdown";
-    md.description = "The text of this PDF as Markdown (xournal-qt)";
-    md.relationship = "/Alternative";
-    // The pictures of the text, under the paths its links name (qt/docs/md-images.md)
-    for (const std::string& carried: DocumentImages::carriedLinks(md.data)) {
-        const std::string file = md::images::resolve(carried);
-        std::ifstream in(fs::path(std::u8string(file.begin(), file.end())), std::ios::binary);
-        if (file.empty() || !in) {
-            continue;  // (a picture that is not there: its link stays, as in the text)
-        }
+    // The pictures of its Markdown (the text's, and those of Markdown boxes of any notes), under the paths their links
+    // name (qt/docs/md-images.md)
+    for (auto& [carried, data]: DocumentImages::picturesData(DocumentImages::carriedPicturesOf(doc))) {
         Attachment a;
         a.name = carried;
-        a.data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        a.data = std::move(data);
         a.mime = pictureMime(carried);
-        a.description = "A picture of the text of this PDF (xournal-qt)";
+        a.description = "A picture of the Markdown of this PDF (xournal-qt)";
         a.relationship = "/Supplement";
         a.fixed = true;
         out.push_back(std::move(a));
     }
-    out.insert(out.begin(), std::move(md));
     return out;
 }
 

@@ -57,7 +57,7 @@ struct Attachment {
     bool fixed = false;
 };
 /// What the PDF `pdfName` written from this document carries for other apps: a text document its "name.md" (the
-/// flow) and the pictures it links to, under the paths its links name ("name.assets/image-….png";
+/// flow) and the pictures its Markdown links to (also in notes), under the paths the links name ("name.assets/…";
 /// qt/docs/md-images.md). The pictures are found through the roots (md::images): the document's work folder while it
 /// is open.
 std::vector<Attachment> attachments(Document& doc, const std::string& pdfName);

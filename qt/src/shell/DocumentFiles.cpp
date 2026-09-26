@@ -357,11 +357,13 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
     // The .xopp must be rewritten if it uses a PDF by its path: the path changes (relative to the .xopp). The same
     // for the image it annotates.
     std::unique_ptr<Document> doc;
+    std::shared_ptr<md::images::RootHandle> pictures;  // (its Markdown's pictures, while it is written again)
     if (!item.xopp.empty() && lower(item.xopp.extension().string()) == ".xopp") {
         auto loaded = DocumentSession::loadFile(item.xopp);
         if (!loaded.document) {
             return failure(loaded.error);
         }
+        pictures = loaded.pictures;
         if (!item.image.empty()) {
             // Pages with its image (or a lost one, repaired with the image next to it) as background, by path
             std::error_code ec;

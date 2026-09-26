@@ -1693,3 +1693,8 @@ Design: [md-images.md](../md-images.md).
 - [ ] A `.md`: paste two pictures, delete the link of one. ⋮ → Remove unused images…: it lists that one (not the
       other, not a PDF the text links to in the folder); Cancel keeps it; Move to trash: it is in the system's
       trash (Android: deleted after this question).
+- [ ] Notes (`.xopp`, saved): write Markdown on the page, paste a picture: it shows; save, close, open again (also
+      after moving the file in the library): it shows. Nothing appears next to the `.xopp`.
+- [ ] That `.xopp` opened in Xournal++ (1.3 on the desktop): opens without a message, the page shows the Markdown
+      source as text.
+- [ ] The same notes saved as a PDF with notes: the picture shows; Okular lists it among the attachments.
