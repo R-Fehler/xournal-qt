@@ -139,7 +139,9 @@ public:
     /// How long scroll changes are collected before the visible pages are looked at (ms; tests)
     void setVisibilityDelay(int ms) { visibilityDelay = ms; }
     /// A page was rendered whole (CanvasPage): one outside the window of the last plan that is not in view any more
-    /// (its render was asked for before that plan, the reader went on meanwhile) asks for a new plan.
+    /// (its render was asked for before that plan, the reader went on meanwhile) asks for a new plan. So does every
+    /// page of a view that was last trimmed (trimTo): what it holds was counted when it was trimmed, a render that
+    /// lands later (in advance, asked for while it was the current view) is more than that.
     void pageRendered(const CanvasPage* page);
     /// Pages from `first` to `last` keep their buffers (the window of the last planCache; tests)
     std::pair<size_t, size_t> cacheWindow() const { return window; }
@@ -446,6 +448,8 @@ private:
     bool shown = false;
     bool readingOnly = false;
     std::pair<size_t, size_t> window{1, 0};
+    /// The last plan trimmed this view (it was not the current one): it has no window of its own
+    bool trimmed = false;
     int visibilityDelay = 8;
     QElapsedTimer sinceVisibility;
     QTimer visibilityTimer;
