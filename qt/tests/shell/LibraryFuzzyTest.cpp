@@ -321,15 +321,24 @@ TEST_F(LibraryFuzzyTest, openedHitsSearchTheDocumentTheSameWay) {
     EXPECT_TRUE(s->search().fuzzy());
     EXPECT_EQ(s->search().hitCount(), 2) << "xournal on page 1, filter on page 2";
     EXPECT_EQ(s->search().currentPage(), 1u);
-    // Refined in the document's own search bar it stays fuzzy; cleared, the next search is plain
+    // Refined in the document's own search bar it stays fuzzy; cleared, the next search follows the fuzzy setting
+    // (qt/doc-search-fuzzy: one setting for the library and the document's search bar): on, then off
     c.setSearchQuery("xournal | kalman");
     EXPECT_TRUE(s->search().fuzzy());
     waitFor([&] { return !s->search().isRunning(); });
     EXPECT_EQ(s->search().hitCount(), 2);
     c.setSearchQuery("");
     c.setSearchQuery("xournal | kalman");
-    EXPECT_FALSE(s->search().fuzzy());
+    EXPECT_TRUE(s->search().fuzzy()) << "the setting is on";
+    waitFor([&] { return !s->search().isRunning(); });
+    EXPECT_EQ(s->search().hitCount(), 2);
+    model->setFuzzySearch(false);
+    c.setSearchQuery("");
+    c.setSearchQuery("xournal | kalman");
+    EXPECT_FALSE(s->search().fuzzy()) << "the setting is off: plain";
+    waitFor([&] { return !s->search().isRunning(); });
     EXPECT_EQ(s->search().hitCount(), 0);
+    model->setFuzzySearch(true);
 
     // The toggle is remembered (an app-wide setting)
     AppController again;
