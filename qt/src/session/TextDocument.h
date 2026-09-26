@@ -46,6 +46,12 @@ bool hasTextBookmarks(Document& doc, size_t* end = nullptr);
 /// label or the automatic one), into XojPage::bookmark (which the pages sidebar, the contents, the library and the
 /// PDF's outline read). Other pages keep theirs. Returns whether one changed. The caller holds the lock (unique).
 bool syncBookmarks(Document& doc);
+/// Bookmarks of those pages that are page attributes (XojPage::bookmark as read from a file, written by the
+/// qt/bookmarks build before they were comments): each becomes a comment in the text, before the first block that
+/// starts on its page (as "Bookmark this page" puts it, md::bookmarks::add; its label kept, "" stays automatic),
+/// unless the page has one already. The comment goes into the page's box as it is (it takes no room: no page is laid
+/// out again). Call before syncBookmarks, on a document no one else sees yet. Returns how many were added.
+size_t migrateBookmarks(Document& doc);
 /// What syncBookmarks would change (the pages and their new bookmarks), read under a shared lock.
 std::vector<std::pair<PageRef, std::optional<std::string>>> bookmarkChanges(Document& doc);
 /// The Markdown of all flows of the document in page order: one flow as it is; several joined with a page break

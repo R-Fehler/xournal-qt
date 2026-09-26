@@ -112,7 +112,10 @@ bool DocumentSession::LoadResult::isNewerFileVersion() const { return fileVersio
 namespace {
 void prepareLoaded(Document& doc) {
     doc.setDocumentHandler(&detachedHandler());  // the LoadHandler's handler dies with it
-    TextDocument::syncBookmarks(doc);  // (a text document: its bookmarks are its text's, qt/docs/bookmarks.md)
+    // A text document: its bookmarks are its text's comments (qt/docs/bookmarks.md); page attributes of an older
+    // build become comments first (written with the next save; the document is not marked modified)
+    TextDocument::migrateBookmarks(doc);
+    TextDocument::syncBookmarks(doc);
     // Element sizes are computed lazily, also by the (parallel) renderers: compute them once, here, before any
     // renderer sees the document.
     for (size_t i = 0; i < doc.getPageCount(); ++i) {

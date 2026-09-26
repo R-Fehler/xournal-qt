@@ -2125,6 +2125,9 @@ Design: [md-images.md](../md-images.md).
 - [ ] A PDF text document: bookmark two pages, Ctrl+S; Okular / Evince / a browser: the outline's "Bookmarks" entry
       lists them. Extract `name.md` (`qpdf --show-attachment=name.md`): it has the two comment lines. A page of notes
       after the text: its bookmark works as before.
+- [ ] A PDF text document bookmarked with the `qt/bookmarks` build (before this block): opened, its bookmarks are
+      still there (ribbons, Contents), the document is not marked modified; after Ctrl+S the extracted `name.md` has
+      the comment lines.
 - [ ] A `.txt`: no bookmark icon in the page menu and ⋮.
 - [ ] Android (Fold 7): bookmark a page of a `.md` from the page menu (press and hold); the ribbon and the Bookmarks
       tab as on the desktop.

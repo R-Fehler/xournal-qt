@@ -121,8 +121,12 @@ would not.
   `.md` with its `.assets` folder), a PDF text document ([md-pdf.md](md-pdf.md)), and so also a `.xopp` whose page 1
   starts the page's Markdown text (a text document by the same rule). Other pages keep the page attribute: a page of
   notes after the text, Markdown text boxes, a `.xopp` whose text starts on a later page. A page attribute written
-  by the `qt/bookmarks` build on a page of such a text is replaced by the comments (there were none then): it is
-  lost when the document is opened (not migrated; that build was merged the same day).
+  by the `qt/bookmarks` build on a page of such a text **becomes a comment** when the document is opened
+  (`TextDocument::migrateBookmarks`, before the pages are read from the text): before the first block that starts on
+  its page, as "Bookmark this page" puts it, with its label ("" stays automatic), written into that page's box as it
+  is (a comment takes no room, so nothing is laid out again). A page that has a comment already keeps only that. The
+  document is not marked modified; the comment is written with the next save. (Saving still writes each page's
+  bookmark as the page attribute too, as a mirror of the comment; on opening, the comment wins.)
 - **Bookmark this page** (page menu, ⋮) on such a page is an **edit of the text** (`MarkdownBookmarks::edit`,
   `qt/src/canvas`): `<!-- xqt:bookmark -->` is inserted before the **first block that starts on the page** (a page
   that begins inside a block: the first block after it; comments are skipped). **Decision:** a page that is all
