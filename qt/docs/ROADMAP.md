@@ -551,6 +551,15 @@
   "kalman.xopp, chapter …", "(not found)"; it never takes input; the cursor is a pointing hand where a click follows.
   Links are looked up once per page and cached.
 
+- **Middle click fits the page, `qt/middle-click-fit` (2026-09-26).** A mouse middle click (< 500 ms, within the drag
+  distance) calls `doubleTapAt` (whole page, text column, or fit width); a middle drag keeps the mapped tool (the
+  hand); pens' barrel buttons never count. Also in the second view and while presenting.
+- **Presenting without controls, `qt/present-clean` (2026-09-26).** Ctrl+F5 ("Present without controls", rebindable),
+  a long press or right click on the present button, or ⋮, present with only the slide: the pen pill, the tool
+  square, the page-number flash, the back/forward pill and the link status line are hidden. A 6 px dot at 14 %
+  opacity in the lower-left corner (48 px touch target, brighter on hover) toggles the controls. F5 presents with
+  them as before.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
