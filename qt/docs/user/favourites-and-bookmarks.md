@@ -6,8 +6,8 @@
 
 Tap the star on a document's card in the library (with a mouse it appears when you point at the card), or choose
 **Add to favourites** in the card's menu or in the document's **⋮** menu. **Favourites** next to the "Show" button
-then shows only your starred documents, from all folders of the library; it works together with the search and with
-"Show".
+(in a narrower window and on a phone: **View → Only favourites**, the button with the sliders) then shows only your
+starred documents, from all folders of the library; it works together with the search and with "Show".
 
 A star is yours, not the document's: it is kept by the app, **not in the file**. The file is not changed, sync apps do
 not upload it again, and others you share it with do not see your stars. Renaming or moving a document in the app keeps

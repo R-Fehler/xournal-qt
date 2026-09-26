@@ -31,8 +31,9 @@ The key is the document's PDF when it has one (a PDF keeps its star when its `.x
 - Recent cards: the same star.
 - The open document: ⋮ → "Add to favourites" / "Remove from favourites".
 - The overview of open documents: the star beside the close button (starred ones always, others under the mouse).
-- Library home: the **Favourites** chip next to the "Show" filter (not in a menu; its word shows in windows 1500 px
-  wide or more, else the star alone with a tip, so the header still fits 1280 px). With it on, the grid lists the
+- Library home: the **Favourites** chip next to the "Show" filter where the header has room for every button (its
+  word shows where there is still more room, else the star alone with a tip); in a narrower window and on a phone it
+  is **View → Only favourites** (qt/adaptive-home, [adaptive-layout.md](adaptive-layout.md)). With it on, the grid lists the
   starred documents of the **whole library** without folders (like the flat list), combined with the "Show" filter and
   the search. The Bookmarks view follows it too. The chip is not remembered across starts.
 

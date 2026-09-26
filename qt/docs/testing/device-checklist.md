@@ -2217,3 +2217,33 @@ See [adaptive-layout.md](../adaptive-layout.md), "Dialogs and sheets".
       the sliders are wide, the labels above them; the back button goes back to the list, again closes Settings.
 - [ ] Fold 7 folded, landscape (915 × 412): dialogs take the whole screen and scroll; Settings as in portrait.
 - [ ] Fold 7 unfolded (about 900 × 1000): dialogs in the middle, as on a tablet; Settings with tabs.
+
+## Adaptive home and tab overview (qt/adaptive-home)
+See [adaptive-layout.md](../adaptive-layout.md), "The home screen and the tab overview".
+- [ ] Desktop, maximized at 1920: the library header as before (every button in one row, Favourites and Bookmarks
+      with their words). New ▾, Import ▾ and Sort open as menus below their buttons; Show opens its switches, which
+      stay open while you tick several.
+- [ ] Make the window narrower (about 1280, then 960): the buttons after the search become "+" and View (the sliders);
+      nothing scrolls sideways. "+": New document, New Markdown file, New text file, Import files, Import a folder, New
+      folder all work. View: Only favourites, All documents at once, Kinds of files shown (tick two kinds: the menu stays
+      open), Sort, Open documents where they were left off, and − / + for the size of the cards (stays open). View is
+      marked while it filters.
+- [ ] Recent: "+" also has Open a file…; Bookmarks: the search and View (favourites, kinds of files) are there.
+- [ ] A deep folder (four levels, long names) in a narrow window: "Library › … › last folder"; the "…" lists the folders
+      in between and opens them; nothing of the page is wider than the window. Drag a card onto a crumb: it moves there.
+- [ ] Select several cards in a narrow window (about 700 wide): the actions are a bar at the bottom (Open, Copy to,
+      Move to, Trash, More → Select all, on Recent Remove from list); wider: the row at the top as before.
+- [ ] Android, Fold 7 folded (412 wide): the header is one row (the library's name ▾, View, Settings), below it
+      Library | Recent | Bookmarks across the width, then the search. "+" floats at the bottom right above the
+      navigation bar; tap it: a sheet with New / Import / New folder. View: a sheet; Kinds of files shown drills in and
+      its switches work in the sheet.
+- [ ] Fold 7 folded: two columns of cards, long names on two lines, the ⋮ of a card easy to hit. Press and hold a card,
+      "Select": the bar at the bottom with Open, Copy to, Move to, Trash, More; "+" is gone while selecting.
+- [ ] Fold 7 folded, a deep folder: the breadcrumbs end with the folder you are in, "…" in between.
+- [ ] Fold 7 in landscape (915 × 412): one header row (Library / Recent / Bookmarks as icons, the breadcrumbs, the
+      search, View, Settings); a whole row of cards fits below it; press and hold an icon of the switch: its name.
+- [ ] Tab overview on the folded Fold 7 (open three documents, compact chrome: Settings → Display → Controls at this
+      size → Compact): a tap on the tab dots at the top opens it; two cards side by side; the search below the title and
+      buttons; its placeholder does not run under Fuzzy and Names; the × of each card inside the screen.
+- [ ] Tab overview in landscape: four cards in a row, each whole. With only slides open (landscape pages) the cards
+      are lower than with an A4 page among them.

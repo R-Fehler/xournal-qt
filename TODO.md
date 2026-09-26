@@ -122,6 +122,12 @@ is built.
   dialog's grow animation (no slide); the Settings sheet is its own popup, not an `AdaptiveDialog`; the tab overview,
   the Markdown table editor, the look-up menu and the small anchored popups (link, page jump, custom width) are
   not adapted; the dialogs are not checked against the bottom safe area (block 8).
+- [ ] Left from block 6 `qt/adaptive-home` (the library header's ladder with "+" and View, the floating "+", the
+  breadcrumbs "…", the selection's bar at the bottom, the tab overview's wrapping header and aspect cells): give the
+  home screen's `IconButton`s a short `label` once `qt/adaptive-toolbar`'s long-press label is merged (until then a
+  held finger shows their tip); the phone tab strip (the current title, a count, the overview) belongs to
+  `qt/adaptive-toolbar` / `qt/compact-chrome`; a list view of the library for phones (audit D7, "consider") is not
+  built; the overview cards' ×, star and reference buttons are 40 px, not `minTarget`.
 
 ---
 
