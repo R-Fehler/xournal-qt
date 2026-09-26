@@ -644,6 +644,15 @@
   them (Bookmarks tab, search). Page-attribute bookmarks on text pages from the earlier build become comments on
   load. Open: continuous page mode, Markdown boxes and texts starting after page 1 keep the page attribute.
 
+- **Adaptive layout, foundation, `qt/adaptive-foundation` (2026-09-26; audit `qt/docs/ui-adaptive-audit.md`).** One
+  `AdaptiveLayout` per window (`win.adaptive`): size classes by width and height (desktop wide / narrow, tablet
+  portrait, phone portrait, phone short, tiny), 32 px hysteresis, no change while a pointer is held; a touch profile
+  (48 px targets; auto / on / off); layout choices remembered per class, "Adapt the layout to the window size" and
+  "Reset the layout choices" in Settings. The sidebar follows the window again (docked from 1110 px on desktop,
+  else a drawer over the page); `chromeMode` (full / compact / reader) apart from full screen and presenting.
+  `AdaptiveLayoutTest` at five sizes (all 18 with `XQT_UI_ADAPTIVE=1`). Next: menus, dialogs, tool bar, home,
+  panels, safe areas, compact chrome (see `qt/docs/adaptive-layout.md`).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
