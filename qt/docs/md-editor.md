@@ -27,8 +27,8 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
 A row under the tool bar, shown while Markdown is written: in a `.md` (all the time), for Markdown written on a page
 of a `.xopp` (the page's text and Markdown text boxes), and above the source beside the page. It is for writing
 without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
-- **¶ / H1–H3** (a menu): paragraph, heading 1, 2, 3 (Ctrl+0 / 1 / 2 / 3). The button shows the level of the line
-  with the cursor.
+- **¶, H1, H2, H3** (four buttons): paragraph, heading 1, 2, 3 (Ctrl+0 / 1 / 2 / 3). The button of the level of the line with
+  the cursor is highlighted.
 - **Marks in the text**: bold (Ctrl+B), italic (Ctrl+I), strikethrough, code (Ctrl+E), link (Ctrl+K), formula
   (`$…$`). Around the selection (on each of its lines, not around the spaces); without a selection the empty marks
   go in with the cursor between them. On text that has the mark (the cursor in it, or it selected, with its marks or

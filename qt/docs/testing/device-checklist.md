@@ -1864,3 +1864,10 @@ Design: [md-images.md](../md-images.md).
       the notes (the reference has no search of its own); the other entries as above. With the notes' own document
       as reference, the entry reads "Search in this document".
 - [ ] Android (Fold 7): the menu fits the screen (folded and unfolded), the entries are easy to tap.
+
+## Heading buttons; arrows in the full-screen tab bar (2026-09-26)
+
+- [ ] The formatting bar has ¶, H1, H2, H3 as buttons (no menu); the one of the line with the cursor is highlighted.
+- [ ] Full screen with several documents: the slim bar at the top has small ‹ and › arrows at its ends that go to the
+      previous / next document (dimmed at the first / last one); a tap between them still opens the overview, a swipe
+      still switches. With a finger and with the mouse.

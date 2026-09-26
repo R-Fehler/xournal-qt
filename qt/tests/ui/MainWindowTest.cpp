@@ -6796,6 +6796,22 @@ TEST_F(MainWindowTest, fullScreenTabDotsSwitchDocuments) {
     EXPECT_EQ(controller->currentTab(), 2);
     EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "still full screen";
 
+    // The small arrows at the ends of the bar: previous / next (the last one: "next" does nothing)
+    auto* previous = find<QQuickItem>("fullScreenTabPrevious");
+    auto* next = find<QQuickItem>("fullScreenTabNext");
+    ASSERT_NE(previous, nullptr);
+    ASSERT_NE(next, nullptr);
+    click(previous);
+    EXPECT_EQ(controller->currentTab(), 1);
+    click(previous);
+    EXPECT_EQ(controller->currentTab(), 0);
+    click(previous);
+    EXPECT_EQ(controller->currentTab(), 0) << "the first: nothing before it";
+    click(next);
+    click(next);
+    EXPECT_EQ(controller->currentTab(), 2);
+    EXPECT_FALSE(find<QObject>("tabOverview")->property("visible").toBool()) << "an arrow does not open the overview";
+
     // A tap: the overview of the open documents
     QObject* overview = find("tabOverview");
     click(bar);
@@ -7202,14 +7218,13 @@ TEST_F(MainWindowTest, theFormattingBarAndTheTableEditor) {
     ASSERT_NE(editor, nullptr);
     type("Title");
 
-    // The heading menu: Heading 1; the button shows the level at the cursor
-    auto* headingButton = find<QQuickItem>("mdHeadingButton");
-    click(headingButton);
-    auto* headingMenu = find<QObject>("mdHeadingMenu");
-    ASSERT_TRUE(waitOpened(headingMenu, true));
-    click(findItem("mdHeading1Item"));
+    // The heading buttons (no menu): Heading 1; its button is the one highlighted at the cursor
+    EXPECT_EQ(find<QObject>("mdHeadingMenu"), nullptr);
+    EXPECT_TRUE(findItem("mdParagraph")->property("highlighted").toBool());
+    click(findItem("mdHeading1"));
     EXPECT_EQ(editor->text(), "# Title");
-    EXPECT_EQ(findItem("mdHeadingLabel")->property("text").toString(), "H1") << "the level at the cursor";
+    EXPECT_TRUE(findItem("mdHeading1")->property("highlighted").toBool()) << "the level at the cursor";
+    EXPECT_FALSE(findItem("mdParagraph")->property("highlighted").toBool());
     EXPECT_TRUE(canvasItem->hasActiveFocus()) << "the text keeps the keys";
 
     // Bold around the selected word, the button checked

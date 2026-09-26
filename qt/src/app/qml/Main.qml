@@ -2475,7 +2475,8 @@ ApplicationWindow {
         Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }
     }
     // Full screen (editing): the open documents as dots in a slim bar at the top; a tap shows them all, a swipe along
-    // the bar goes to the next or previous one (only on the bar: the pages keep every touch)
+    // the bar or its small arrows at both ends go to the next or previous one (only on the bar: the pages keep every
+    // touch)
     Rectangle {
         id: fullScreenTabs
         objectName: "fullScreenTabs"
@@ -2486,7 +2487,8 @@ ApplicationWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         y: 0
         height: 26  // (thin to look at, a finger's height to touch)
-        width: Math.max(120, (tabDots.visible ? tabDots.implicitWidth : tabCountLabel.implicitWidth) + 36)
+        width: Math.max(120, (tabDots.visible ? tabDots.implicitWidth : tabCountLabel.implicitWidth) + 36) + 2 * arrowWidth
+        readonly property int arrowWidth: 26
         radius: 13
         color: "#b3303134"
         readonly property bool manyTabs: app.tabs.count > 12
@@ -2530,7 +2532,41 @@ ApplicationWindow {
             color: "#ffffff"
             font.pixelSize: 13
         }
-        TapHandler { onTapped: tabOverview.open() }
+        // The previous / next document: small arrows at the ends of the bar
+        component TabArrow: Item {
+            id: arrow
+            property bool forward
+            readonly property bool atEnd: forward ? app.currentTab >= app.tabs.count - 1 : app.currentTab <= 0
+            width: fullScreenTabs.arrowWidth
+            height: fullScreenTabs.height
+            Label {
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: -1
+                text: arrow.forward ? "›" : "‹"
+                color: "#ffffff"
+                opacity: arrow.atEnd ? 0.35 : (arrowHover.hovered ? 1 : 0.8)
+                font.pixelSize: 20
+                font.bold: true
+            }
+            HoverHandler { id: arrowHover }
+            TapHandler {
+                enabled: !arrow.atEnd
+                onTapped: {
+                    if (arrow.forward) app.nextTab()
+                    else app.previousTab()
+                    tabToast.show()
+                }
+            }
+        }
+        TabArrow { objectName: "fullScreenTabPrevious"; forward: false; anchors.left: parent.left }
+        TabArrow { objectName: "fullScreenTabNext"; forward: true; anchors.right: parent.right }
+        // Between the arrows, a tap: the overview of all of them
+        Item {
+            anchors.fill: parent
+            anchors.leftMargin: fullScreenTabs.arrowWidth
+            anchors.rightMargin: fullScreenTabs.arrowWidth
+            TapHandler { onTapped: tabOverview.open() }
+        }
         DragHandler {
             id: tabSwipe
             target: null
@@ -2545,7 +2581,7 @@ ApplicationWindow {
             }
         }
         ToolTip.visible: tabHover.hovered
-        ToolTip.text: qsTr("Open documents: tap for all of them, swipe for the next or previous one")
+        ToolTip.text: qsTr("Open documents: tap for all of them; the arrows or a swipe for the next or previous one")
         ToolTip.delay: 800
         HoverHandler { id: tabHover }
     }

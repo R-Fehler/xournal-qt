@@ -30,6 +30,23 @@ Rectangle {
 
     function act(action, arg) { bar.formatRequested(action, arg === undefined ? "" : arg) }
 
+    // A paragraph / heading level button (the one at the cursor highlighted)
+    component LevelButton: ToolButton {
+        property int level
+        property string tool
+        readonly property bool current: (bar.format.heading || 0) === level
+        implicitWidth: 36
+        implicitHeight: 40
+        focusPolicy: Qt.NoFocus  // (the text keeps the keys and the keyboard)
+        enabled: !bar.format.codeBlock
+        checkable: false
+        highlighted: current
+        font.bold: level > 0
+        font.pixelSize: level === 0 ? 18 : level === 1 ? 16 : level === 2 ? 14 : 13
+        ToolTip.visible: hovered
+        ToolTip.delay: 600
+        onClicked: bar.act(tool)
+    }
     component FormatButton: IconButton {
         property string tool: ""
         implicitWidth: 40
@@ -57,57 +74,12 @@ Rectangle {
             height: flick.height
             spacing: 2
 
-            // The block's kind: paragraph or heading (the current one shown)
-            ToolButton {
-                id: headingButton
-                objectName: bar.named("mdHeadingButton")
-                readonly property int level: bar.format.heading || 0
-                implicitWidth: 56
-                implicitHeight: 40
-                focusPolicy: Qt.NoFocus
-                enabled: !bar.format.codeBlock
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Paragraph or heading (Ctrl+0, Ctrl+1, Ctrl+2, Ctrl+3)")
-                ToolTip.delay: 600
-                onClicked: Popups.openAt(headingMenu)
-                // "¶" or "H1"-"H6", and the arrow of a menu
-                contentItem: Row {
-                    spacing: 2
-                    Label {
-                        objectName: bar.named("mdHeadingLabel")
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 26
-                        horizontalAlignment: Text.AlignHCenter
-                        text: headingButton.level > 0 ? "H" + headingButton.level : "¶"
-                        font.bold: headingButton.level > 0
-                        font.pixelSize: headingButton.level > 0 ? 15 : 19
-                        color: headingButton.enabled ? (headingButton.level > 0 ? Material.accentColor : "#303030") : "#b0b0b0"
-                    }
-                    Image {
-                        anchors.verticalCenter: parent.verticalCenter
-                        source: app.iconUrl("xqt-chevron-down-small")
-                        sourceSize.width: 16
-                        sourceSize.height: 16
-                        opacity: 0.7
-                    }
-                }
-                Menu {
-                    id: headingMenu
-                    objectName: bar.named("mdHeadingMenu")
-                    focus: false  // (the text keeps the keys and the keyboard)
-                    component LevelItem: MenuItem {
-                        property int level
-                        property string tool
-                        checkable: true
-                        checked: headingButton.level === level
-                        onTriggered: bar.act(tool)
-                    }
-                    LevelItem { text: qsTr("Paragraph (Ctrl+0)"); level: 0; tool: "paragraph"; objectName: bar.named("mdParagraphItem") }
-                    LevelItem { text: qsTr("Heading 1 (Ctrl+1)"); level: 1; tool: "heading1"; font.pixelSize: 20; font.bold: true; objectName: bar.named("mdHeading1Item") }
-                    LevelItem { text: qsTr("Heading 2 (Ctrl+2)"); level: 2; tool: "heading2"; font.pixelSize: 17; font.bold: true; objectName: bar.named("mdHeading2Item") }
-                    LevelItem { text: qsTr("Heading 3 (Ctrl+3)"); level: 3; tool: "heading3"; font.bold: true; objectName: bar.named("mdHeading3Item") }
-                }
-            }
+            // The block's kind: paragraph or heading 1-3, each a button of its own (the one at the cursor checked;
+            // no menu: the row scrolls sideways when the window is narrow)
+            LevelButton { objectName: bar.named("mdParagraph"); level: 0; tool: "paragraph"; text: "¶"; ToolTip.text: qsTr("Paragraph (Ctrl+0)") }
+            LevelButton { objectName: bar.named("mdHeading1"); level: 1; tool: "heading1"; text: "H1"; ToolTip.text: qsTr("Heading 1 (Ctrl+1)") }
+            LevelButton { objectName: bar.named("mdHeading2"); level: 2; tool: "heading2"; text: "H2"; ToolTip.text: qsTr("Heading 2 (Ctrl+2)") }
+            LevelButton { objectName: bar.named("mdHeading3"); level: 3; tool: "heading3"; text: "H3"; ToolTip.text: qsTr("Heading 3 (Ctrl+3)") }
             ToolSeparator {}
             // Marks in the text: around the selection, or empty with the cursor between them; again: they go
             FormatButton { objectName: bar.named("mdBold"); iconName: "xqt-bold"; tool: "bold"; checked: !!bar.format.bold; tip: qsTr("Bold (Ctrl+B)") }
