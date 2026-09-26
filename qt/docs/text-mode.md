@@ -1,4 +1,9 @@
-# Text mode
+# Text mode (deprecated)
+
+> **Deprecated (2026-09-26, the author):** the text mode is no longer offered: the writing button writes Markdown on
+> the page (formatted while typing), which does what the text mode did and more. Its button entry and Ctrl+Alt+E are
+> gone; the code (`TextFlowPanel.qml`, `qt/src/canvas/TextFlow.*`) and its tests stay for now. Text written with it
+> is ordinary text on the page and can still be edited with the text tool.
 
 A keyboard-oriented way to write the text of a page, like in a word processor (toolbar button "Text mode",
 Ctrl+Alt+E). The editor opens beside the pages (on the right; the page is zoomed to fit next to it and gets its

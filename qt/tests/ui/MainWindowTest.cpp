@@ -4576,6 +4576,8 @@ TEST_F(MainWindowTest, theWritingButtonWritesMarkdownOnThePageItsSourceIsInItsMe
     xqt::CanvasView* view = controller->tabManager().currentView();
     ASSERT_NE(view, nullptr);
 
+    EXPECT_EQ(find<QObject>("textModeItem"), nullptr) << "the text mode is deprecated: not offered any more";
+    EXPECT_TRUE(button->property("markdownMode").toBool());
     // Markdown chosen in the button's menu: written on the page, formatted while typing (not beside it)
     QMetaObject::invokeMethod(find<QObject>("markdownItem"), "triggered");
     until([&] { return view->getMarkdownEditor() != nullptr; });
@@ -5190,10 +5192,11 @@ TEST_F(MainWindowTest, markdownCheckBoxesAreTapped) {
     key(Qt::Key_Escape);
 }
 
+// DEPRECATED text mode (qt/docs/text-mode.md): no longer offered in the UI, its panel opened directly here
 TEST_F(MainWindowTest, textModeTypesThePageText) {
     auto* panel = find<QQuickItem>("textFlowPanel");
     ASSERT_NE(panel, nullptr);
-    click(find<QQuickItem>("textModeButton"));
+    QMetaObject::invokeMethod(panel, "open");
     ASSERT_TRUE(panel->isVisible());
     EXPECT_TRUE(controller->textFlowActive());
     auto* area = find<QQuickItem>("textFlowArea");
@@ -5251,7 +5254,7 @@ TEST_F(MainWindowTest, textModeTypesThePageText) {
     EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
 
     // Cancel restores the page
-    click(find<QQuickItem>("textModeButton"));
+    QMetaObject::invokeMethod(panel, "open");
     type("x");
     wait(300);
     click(find<QQuickItem>("textFlowCancel"));

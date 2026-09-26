@@ -565,22 +565,22 @@ ApplicationWindow {
                     }
                 }
             }
-            // Writing on the page with the keyboard: the text mode or Markdown (the one used last; hold for both)
+            // Writing on the page with the keyboard: Markdown, formatted while typing (hold for its source beside the page).
+            // DEPRECATED (2026-09-26): the text mode (TextFlowPanel, TextFlow) is no longer offered here; its code
+            // stays for now (qt/docs/text-mode.md).
             IconButton {
                 visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 id: writeButton
                 objectName: "textModeButton"
-                property bool markdownMode: false
-                iconName: markdownMode ? "xqt-markdown" : "xqt-text-mode"
-                tip: markdownMode ? qsTr("Markdown: write on the page, shown formatted (Ctrl+Alt+M). Hold for its source beside the page, or the text mode")
-                                  : qsTr("Text mode: type the page's text like in a word processor (Ctrl+Alt+E). Hold for Markdown")
+                property bool markdownMode: true  // (always; kept for the tests and QML that read it)
+                iconName: "xqt-markdown"
+                tip: qsTr("Markdown: write on the page, shown formatted (Ctrl+Alt+M). Hold for its source beside the page")
                 checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
                 onClicked: {
                     if (textFlowPanel.visible) textFlowPanel.close(true)
                     else if (markdownPanel.visible) markdownPanel.close(true)
                     else if (app.markdownOnPage) app.endMarkdownOnPage()
-                    else if (markdownMode) app.writeMarkdownOnPage()  // (formatted while typing, on the page)
-                    else textFlowPanel.open()
+                    else app.writeMarkdownOnPage()  // (formatted while typing, on the page)
                 }
                 onPressAndHold: Popups.openAt(writeMenu)
                 TapHandler {
@@ -592,13 +592,6 @@ ApplicationWindow {
                     id: writeMenu
                     objectName: "writeModeMenu"
                     width: 340
-                    MenuItem {
-                        objectName: "textModeItem"
-                        text: qsTr("Text mode (like a word processor)")
-                        checkable: true
-                        checked: !writeButton.markdownMode
-                        onTriggered: textFlowPanel.open()
-                    }
                     MenuItem {
                         objectName: "markdownItem"
                         text: qsTr("Markdown (shown formatted, on the page)")
@@ -617,10 +610,6 @@ ApplicationWindow {
                             else markdownPanel.openBox(onPage.page, onPage.x, onPage.y)
                         }
                     }
-                }
-                Connections {
-                    target: textFlowPanel
-                    function onVisibleChanged() { if (textFlowPanel.visible) writeButton.markdownMode = false }
                 }
                 Connections {
                     target: markdownPanel
@@ -3007,7 +2996,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("forward"); enabled: docKeys; onActivated: app.navigateForward() }
     Shortcut { sequences: win.keysOf("pageGrid"); enabled: docKeys; onActivated: pageGrid.visible ? pageGrid.close() : pageGrid.open() }
     Shortcut { sequences: win.keysOf("contents"); enabled: docKeys; onActivated: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open() }
-    Shortcut { sequences: win.keysOf("textMode"); enabled: !app.homeVisible; onActivated: textFlowPanel.visible ? textFlowPanel.close(true) : textFlowPanel.open() }
+    // (DEPRECATED: the text mode's Ctrl+Alt+E is gone with it; TextFlowPanel stays, not offered)
     Shortcut {
         // Markdown on the page (formatted while typing); pressed again while writing there: its source beside the
         // page

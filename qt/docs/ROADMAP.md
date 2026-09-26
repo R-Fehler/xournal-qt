@@ -538,6 +538,12 @@
 - **Markdown boxes always written on the page (2026-09-26).** The text tool's "Write Markdown beside the page" switch
   is gone (a stored value is ignored); the source beside the page is the writing button's menu or Ctrl+Alt+M.
 
+- **The text mode is deprecated (2026-09-26, the author).** Markdown written on the page does what it did and more:
+  the writing button writes Markdown only, its menu has no "Text mode", Ctrl+Alt+E is gone. The code
+  (`TextFlowPanel.qml`, `TextFlow.*`) and its tests stay for now, marked DEPRECATED; its text on existing pages is
+  ordinary text the text tool still edits. Also: pictures pasted into a `.md` with blanks in its name are linked
+  encoded (`my%20notes.assets/…`), so they resolve.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

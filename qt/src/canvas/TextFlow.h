@@ -1,4 +1,7 @@
 /*
+ * DEPRECATED (2026-09-26): the text mode is no longer offered in the UI (Markdown written on the page replaces
+ * it, qt/docs/text-mode.md); kept for now, with its tests.
+ *
  * xournal-qt: typed text on a page, laid out like in a word processor (the text mode).
  *
  * Xournal++ compatible: the text is made of ordinary upstream Text elements, one per block (heading, paragraph,

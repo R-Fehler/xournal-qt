@@ -1750,3 +1750,11 @@ Design: [md-images.md](../md-images.md).
 - [ ] That `.xopp` opened in Xournal++ (1.3 on the desktop): opens without a message, the page shows the Markdown
       source as text.
 - [ ] The same notes saved as a PDF with notes: the picture shows; Okular lists it among the attachments.
+
+## Text mode deprecated; pictures in .md files with blanks in the name (2026-09-26)
+
+- [ ] The writing button (and its press-and-hold menu) offers only Markdown; Ctrl+Alt+E does nothing; Settings →
+      Shortcuts has no "Text mode". A page written with the old text mode still shows its text, and the text tool
+      edits it.
+- [ ] Paste a picture into `my notes (1).md`: it shows at once, the file has `![](my%20notes%20%281%29.assets/…)`,
+      and the picture is in the `my notes (1).assets` folder. The file shows the picture in Obsidian or VS Code too.

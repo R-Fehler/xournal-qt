@@ -1,4 +1,5 @@
-// Text mode: type the text of the current page like in a word processor. The page shows it as you type, laid out
+// DEPRECATED (2026-09-26): no longer offered in the UI (the writing button writes Markdown on the page); kept for now,
+// see qt/docs/text-mode.md. Text mode: type the text of the current page like in a word processor. The page shows it as you type, laid out
 // from its top-left margin (Xournal++ text boxes, one per heading / paragraph / list item). Formatting is per
 // paragraph: the kind (text, heading 1-3, bullets, numbers), bold, italic, size, color. Markdown shortcuts at the
 // start of a line: "# ", "## ", "### ", "- ", "1. ". Done keeps it (one undo step), Cancel restores the page.
