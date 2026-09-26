@@ -1,5 +1,5 @@
-// The selected sticky note (qt/docs/sticky-notes.md), beside it: its color, cover mode (self-testing), delete. Every
-// change is one undo step. The note itself is moved by dragging it, resized by the handle at its bottom right corner.
+// The selected sticky note (qt/docs/sticky-notes.md), beside it: its color, cover mode (self-testing), copy, cut,
+// delete. Every change is one undo step; paste (Ctrl+V, the context pill) puts a copied note on the page in view. The note itself is moved by dragging it, resized by the handle at its bottom right corner.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -83,6 +83,8 @@ Pane {
             ToolTip.delay: 600
         }
         ToolSeparator {}
+        IconButton { objectName: "noteCopy"; iconName: "xopp-edit-copy"; tip: qsTr("Copy the note (Ctrl+C), to paste it on another page"); onClicked: app.copyStickyNote() }
+        IconButton { objectName: "noteCut"; iconName: "xopp-edit-cut"; tip: qsTr("Cut the note (Ctrl+X): paste it on another page to move it there"); onClicked: app.cutStickyNote() }
         IconButton { objectName: "noteDelete"; iconName: "xqt-delete"; tip: qsTr("Delete the note (Del)"); onClicked: app.deleteStickyNote() }
         IconButton { objectName: "noteDeselect"; iconName: "xqt-close"; tip: qsTr("Deselect (Esc)"); onClicked: app.clearSelection() }
     }

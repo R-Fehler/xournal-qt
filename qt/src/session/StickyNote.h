@@ -5,12 +5,14 @@
  * its paper: a closed, filled rectangle stroke. The other elements of the layer are drawn on the note and clipped to
  * it. Xournal++ opens such a file as it is (a layer with an opaque rectangle and the ink on it); the grouping is
  * ours. This file: recognising notes, their look, making and changing them (with undo), drawing them (in place of
- * upstream's LayerView, see view/LayerView.h) and peeking under covering notes on the screen.
+ * upstream's LayerView, see view/LayerView.h), peeking under covering notes on the screen, and a note on the
+ * clipboard (its format, where it is pasted).
  *
  * @license GNU GPLv2 or later
  */
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -21,6 +23,7 @@
 #include "util/Color.h"
 #include "util/Rectangle.h"
 
+class LayerController;
 class Stroke;
 class XojPage;
 class Document;
@@ -113,5 +116,41 @@ private:
 /// Change a note's look now (applyLook under the document's lock) and have both places drawn again (the page's
 /// listeners hear of the area). Not an undo step by itself: see NoteUndoAction.
 void changeLook(Document& doc, const PageRef& page, Layer& layer, const Look& from, const Look& to);
+
+/// A note went to another page (dragged there): it leaves one page and lies on top of the other with another look.
+class NotePageUndoAction final: public UndoAction {
+public:
+    struct Place {
+        PageRef page;
+        Layer::Index position;  ///< 0-based, as LayerController::insertLayer takes it
+        Look look;
+    };
+    NotePageUndoAction(LayerController* layers, Layer* layer, Place from, Place to, std::string text);
+    bool undo(Control* control) override;
+    bool redo(Control* control) override;
+    std::string getText() override { return text; }
+    /// Move the note now (no undo step by itself)
+    static void move(LayerController* layers, Document& doc, Layer* layer, const Place& from, const Place& to);
+
+private:
+    LayerController* layers;
+    Layer* layer;
+    Place from;
+    Place to;
+    std::string text;
+};
+
+// --- the clipboard -------------------------------------------------------------------------------------------------
+/// The clipboard's format of a whole note (the app's own: its layer's name and every element, the paper first, in
+/// upstream's element serialization). Upstream Xournal++ does not know it; the note is saved like any other.
+inline constexpr const char* CLIPBOARD_MIME = "application/x-xournal-qt-sticky-note";
+/// A note for the clipboard (the caller holds the document's lock); empty if the layer is no note
+std::string serialize(const Layer& layer);
+/// A note from the clipboard (not on a page); nullptr if the data is not a note
+std::unique_ptr<Layer> deserialize(const char* data, size_t size);
+/// Where a pasted note goes on a page of this size: the same place when it fits, else moved inside the page (made
+/// smaller only if it is larger than the page); moved on a little while it would lie exactly on one of `taken`.
+xoj::util::Rectangle<double> pastePlace(xoj::util::Rectangle<double> rect, double pageWidth, double pageHeight,
+                                        const std::vector<xoj::util::Rectangle<double>>& taken);
 
 }  // namespace xqt::sticky

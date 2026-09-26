@@ -2,8 +2,8 @@
  * xournal-qt: sticky notes on the canvas (qt/docs/sticky-notes.md; the format and drawing: session/StickyNote.h).
  *
  * One per view. It places notes, keeps the selected note (an outline and a handle drawn over its page), moves and
- * resizes it, changes its color and cover mode (all undoable), lets covering notes peek when tapped, and hides or
- * shows the notes of a page. Writing on a note is done by the page's usual tools with the note's layer selected for
+ * resizes it (also onto another page), changes its color and cover mode (all undoable), copies, cuts and pastes
+ * notes, lets covering notes peek when tapped, and hides or shows the notes of a page. Writing on a note is done by the page's usual tools with the note's layer selected for
  * the stroke (CanvasPage).
  *
  * @license GNU GPLv2 or later
@@ -48,8 +48,20 @@ public:
     void clearSelection();
     void setColor(Color color);
     void setCover(bool cover);
-    /// Delete the selected note (one undo step)
-    void deleteSelected();
+    /// Delete the selected note (one undo step; `what`: its name in the undo list)
+    void deleteSelected(const char* what = nullptr);
+
+    // --- the clipboard (qt/docs/sticky-notes.md) ----------------------------------------------------------------
+    /// Put the selected note on the clipboard: the whole note (sticky::CLIPBOARD_MIME), and a picture of it for other
+    /// apps. False: no note selected.
+    bool copySelected();
+    /// Copy it, then delete it (one undo step)
+    bool cutSelected();
+    /// The clipboard holds a note
+    static bool clipboardHasNote();
+    /// Paste the note from the clipboard onto a page of this view (the same place when it fits, see
+    /// sticky::pastePlace), on top of its notes, selected. One undo step. False: no note on the clipboard.
+    bool paste(size_t page);
 
     // --- input (page coordinates of the page pressed) ---------------------------------------------------------
     /// A press: on the selected note's handle (any tool) it starts resizing; with a select tool on the selected
@@ -95,6 +107,10 @@ private:
     /// The outline and handle need drawing again
     void repaintSelection(const std::optional<sticky::Look>& look);
     void startDrag(Drag how, double x, double y);
+    /// A note on top of a page's layers, selected (one undo step, named `what`)
+    void place(CanvasPage& page, Layer* layer, const char* what);
+    /// A move that ended over another page: the note goes there (one undo step with the move). False: it did not.
+    bool dropOnOtherPage();
 
     CanvasView& view;
     Layer* selected = nullptr;
@@ -102,6 +118,8 @@ private:
     PageRef selectedPageRef;
     Drag drag = Drag::None;
     QPointF dragFrom;
+    /// Where the pointer is while dragging (page coordinates of the selected note's page, also beyond it)
+    QPointF dragPointer;
     sticky::Look dragStart;
     sticky::Look dragNow;
     Color lastColor;

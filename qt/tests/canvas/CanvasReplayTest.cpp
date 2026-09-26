@@ -22,6 +22,7 @@
 #include <QSignalSpy>
 #include <QGuiApplication>
 #include <QClipboard>
+#include <QMimeData>
 #include <QImage>
 #include <QBuffer>
 #include <QKeyEvent>
@@ -2632,4 +2633,235 @@ TEST_F(CanvasReplayTest, aStickyNoteIsPlacedAndDeletedAsOneStepEach) {
     mouse(QEvent::MouseButtonRelease, viewPos(0, QPointF(10, 10)), Qt::LeftButton, Qt::NoButton);
     processEvents();
     EXPECT_FALSE(view->notes().hasSelection());
+}
+
+// --- sticky notes on the clipboard (qt/sticky-clipboard) -----------------------------------------------------------
+
+namespace {
+/// The ink and texts of a note (after its paper), in order: type, where it starts, what it is (a stroke: its points
+/// with their pressure, its width and color; a text: its text, font and color)
+std::vector<std::tuple<ElementType, double, double, std::string>> contentOf(const Layer& note) {
+    std::vector<std::tuple<ElementType, double, double, std::string>> content;
+    const auto elements = note.getElementsView();
+    for (size_t i = 1; i < elements.size(); ++i) {
+        const Element* e = elements[i];
+        std::string what;
+        double x = 0;
+        double y = 0;
+        if (e->getType() == ELEMENT_TEXT) {
+            const auto* t = static_cast<const Text*>(e);
+            what = t->getText() + " " + t->getFontName() + " " + std::to_string(t->getFontSize()) + " " +
+                   std::to_string(uint32_t(t->getColor()));
+            x = t->getBoundingBox().x;
+            y = t->getBoundingBox().y;
+        } else if (e->getType() == ELEMENT_STROKE) {
+            const auto* s = static_cast<const Stroke*>(e);
+            const auto& points = s->getPointVector();
+            x = points.front().x;
+            y = points.front().y;
+            what = std::to_string(s->getWidth()) + " " + std::to_string(uint32_t(s->getColor()));
+            for (const Point& p: points) {
+                what += " " + std::to_string(std::lround((p.x - x) * 100)) + "," +
+                        std::to_string(std::lround((p.y - y) * 100)) + "," + std::to_string(std::lround(p.z * 100));
+            }
+        }
+        content.emplace_back(e->getType(), x, y, what);
+    }
+    return content;
+}
+}  // namespace
+
+TEST_F(CanvasReplayTest, aCopiedStickyNoteIsPastedWholeOnAnotherPageAsOneStep) {
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    view->notes().setColor(sticky::presetColors()[3]);
+    const auto look = *sticky::lookOf(*note);
+    view->clearSelection();
+    drawLine(0, QPointF(look.rect.x + 20, look.rect.y + 20), QPointF(look.rect.x + 90, look.rect.y + 60));
+    {
+        auto text = std::make_unique<Text>();
+        text->setText("Answer?");
+        text->setFont(XojFont("Sans", 12));
+        text->move(look.rect.x + 10, look.rect.y + 80);
+        std::unique_lock lock(*session->getDocument());
+        note->addElement(std::move(text));
+    }
+    processEvents();
+    ASSERT_EQ(note->getElementsView().size(), 3u) << "the paper, a stroke, a text";
+
+    // Nothing selected: copying keeps what the clipboard has
+    QGuiApplication::clipboard()->setText("kept");
+    EXPECT_FALSE(view->copySelection());
+    EXPECT_EQ(QGuiApplication::clipboard()->text(), "kept");
+
+    // Selected: Ctrl+C copies the whole note, with a picture of it for other apps
+    view->notes().select(*view->getPage(0), note);
+    ASSERT_TRUE(view->copySelection());
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    ASSERT_TRUE(mime->hasFormat(sticky::CLIPBOARD_MIME));
+    ASSERT_TRUE(mime->hasImage());
+    const QImage picture = qvariant_cast<QImage>(mime->imageData());
+    EXPECT_EQ(picture.width(), static_cast<int>(std::ceil(look.rect.width * 2)));
+    const QColor paper = picture.pixelColor(picture.width() - 6, 6);
+    EXPECT_EQ(paper.green(), sticky::presetColors()[3].green) << "the picture shows the note";
+    EXPECT_TRUE(view->notes().hasSelection()) << "copying keeps the selection";
+    EXPECT_EQ(notesOf(*session, 0).size(), 1u);
+
+    // Ctrl+V on the second page: the same note, at the same place, on top, selected; one undo step
+    session->setCurrentPageNo(1);
+    ASSERT_TRUE(view->pasteElements());
+    auto pasted = notesOf(*session, 1);
+    ASSERT_EQ(pasted.size(), 1u);
+    Layer* copy = pasted.front();
+    EXPECT_EQ(*sticky::lookOf(*copy), look) << "its place, size, color";
+    EXPECT_EQ(contentOf(*copy), contentOf(*note)) << "its ink and text, where they were on it";
+    EXPECT_EQ(session->getDocument()->getPage(1)->getLayers().back(), copy) << "the new top note";
+    EXPECT_EQ(view->notes().selectedLayer(), copy);
+    EXPECT_EQ(view->notes().selectedPage(), view->getPage(1));
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Paste sticky note");
+    EXPECT_EQ(notesOf(*session, 0).size(), 1u) << "the original stays";
+    {
+        const auto page1 = session->getDocument()->getPage(1);
+        EXPECT_FALSE(sticky::isNote(*page1->getSelectedLayer())) << "the page's own layer stays selected";
+    }
+
+    // Pasted again: another note (a little further, not exactly on the first copy)
+    ASSERT_TRUE(view->pasteElements());
+    pasted = notesOf(*session, 1);
+    ASSERT_EQ(pasted.size(), 2u);
+    EXPECT_NEAR(sticky::lookOf(*pasted[1])->rect.x, look.rect.x + 16, 1e-6);
+    EXPECT_NEAR(sticky::lookOf(*pasted[1])->rect.y, look.rect.y + 16, 1e-6);
+
+    // Undo takes each paste back, redo brings it again
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 1).size(), 1u);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 1).size(), 0u);
+    EXPECT_FALSE(view->notes().hasSelection());
+    session->getUndoRedoHandler()->redo();
+    ASSERT_EQ(notesOf(*session, 1).size(), 1u);
+    EXPECT_EQ(contentOf(*notesOf(*session, 1).front()), contentOf(*note));
+}
+
+TEST_F(CanvasReplayTest, aStickyNoteIsCutAsOneStepAndACoveringOneStaysCovering) {
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    view->notes().setCover(true);
+    const auto look = *sticky::lookOf(*note);
+    // Peeking under it is not copied
+    view->clearSelection();
+    const QPointF middle = viewPos(0, QPointF(look.rect.x + look.rect.width / 2, look.rect.y + look.rect.height / 2));
+    tablet(QEvent::TabletPress, middle, 0.3, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, middle, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_TRUE(sticky::isPeeking(note));
+
+    // Pasted onto its own page: over the original it goes a little further down and right
+    view->notes().select(*view->getPage(0), note);
+    ASSERT_TRUE(view->copySelection());
+    session->setCurrentPageNo(0);
+    ASSERT_TRUE(view->pasteElements());
+    auto notes = notesOf(*session, 0);
+    ASSERT_EQ(notes.size(), 2u);
+    const auto copied = *sticky::lookOf(*notes[1]);
+    EXPECT_TRUE(copied.cover) << "covering stays covering";
+    EXPECT_EQ(notes[1]->getName(), sticky::COVER_LAYER_NAME);
+    EXPECT_FALSE(sticky::isPeeking(notes[1])) << "it covers (peeking is not copied)";
+    EXPECT_NEAR(copied.rect.x, look.rect.x + 16, 1e-6);
+    EXPECT_NEAR(copied.rect.y, look.rect.y + 16, 1e-6);
+    EXPECT_NEAR(copied.rect.width, look.rect.width, 1e-6);
+
+    // Ctrl+X cuts the selected one (the copy) as one step, onto the clipboard
+    QGuiApplication::clipboard()->clear();
+    ASSERT_TRUE(view->cutSelection());
+    EXPECT_TRUE(StickyNotes::clipboardHasNote());
+    EXPECT_FALSE(view->notes().hasSelection());
+    ASSERT_EQ(notesOf(*session, 0).size(), 1u);
+    EXPECT_EQ(notesOf(*session, 0).front(), note) << "the original stays";
+    EXPECT_EQ(session->getUndoRedoHandler()->undoDescription(), "Undo: Cut sticky note");
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 0).size(), 2u);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(notesOf(*session, 0).size(), 1u);
+
+    // Pasted back: where the copy was (the place it was cut from is free again)
+    ASSERT_TRUE(view->pasteElements());
+    notes = notesOf(*session, 0);
+    ASSERT_EQ(notes.size(), 2u);
+    EXPECT_EQ(*sticky::lookOf(*notes[1]), copied);
+}
+
+TEST_F(CanvasReplayTest, aStickyNoteIsPastedIntoAnotherDocument) {
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    view->clearSelection();
+    drawLine(0, QPointF(sticky::lookOf(*note)->rect.x + 20, sticky::lookOf(*note)->rect.y + 20),
+             QPointF(sticky::lookOf(*note)->rect.x + 90, sticky::lookOf(*note)->rect.y + 60));
+    processEvents();
+    view->notes().select(*view->getPage(0), note);
+    ASSERT_TRUE(view->cutSelection());
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u);
+
+    // Another document (another tab)
+    DocumentSession other(*app);
+    other.insertNewPage(1);
+    other.insertNewPage(2);
+    CanvasView otherView(other);
+    otherView.getViewController().setViewSize(QSizeF(900, 1200));
+    processEvents();
+    other.setCurrentPageNo(2);
+    ASSERT_TRUE(otherView.pasteElements());
+    ASSERT_EQ(notesOf(other, 2).size(), 1u);
+    Layer* pasted = notesOf(other, 2).front();
+    EXPECT_EQ(*sticky::lookOf(*pasted), *sticky::lookOf(*note));
+    EXPECT_EQ(contentOf(*pasted), contentOf(*note));
+    EXPECT_TRUE(otherView.notes().hasSelection());
+    other.getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(other, 2).size(), 0u) << "its own undo";
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u) << "nothing changes in the first document";
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(notesOf(*session, 0).size(), 1u) << "the cut undone";
+}
+
+TEST_F(CanvasReplayTest, aStickyNoteDraggedOntoAnotherPageGoesThereAsOneStep) {
+    app->getSettings()->setSnapGrid(false);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    view->clearSelection();
+    drawLine(0, QPointF(look.rect.x + 20, look.rect.y + 20), QPointF(look.rect.x + 90, look.rect.y + 60));
+    processEvents();
+    const auto ink = contentOf(*note);
+
+    // Held at (30, 40) on the note and let go over the second page at (200, 300)
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    const QPointF grab = viewPos(0, QPointF(look.rect.x + 30, look.rect.y + 40));
+    const QPointF drop = viewPos(1, QPointF(200, 300));
+    mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 20; ++i) {
+        mouse(QEvent::MouseMove, grab + (drop - grab) * i / 20.0, Qt::NoButton, Qt::LeftButton);
+    }
+    mouse(QEvent::MouseButtonRelease, drop, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    EXPECT_EQ(notesOf(*session, 0).size(), 0u) << "gone from its page";
+    ASSERT_EQ(notesOf(*session, 1).size(), 1u);
+    EXPECT_EQ(notesOf(*session, 1).front(), note) << "the same note";
+    const auto moved = *sticky::lookOf(*note);
+    EXPECT_NEAR(moved.rect.x, 170, 0.5) << "held where it was held";
+    EXPECT_NEAR(moved.rect.y, 260, 0.5);
+    EXPECT_NEAR(moved.rect.width, look.rect.width, 1e-6);
+    EXPECT_EQ(view->notes().selectedLayer(), note) << "still selected, on its new page";
+    EXPECT_EQ(view->notes().selectedPage(), view->getPage(1));
+    EXPECT_NEAR(std::get<1>(contentOf(*note).front()), std::get<1>(ink.front()) + 170 - look.rect.x, 0.5)
+            << "its ink goes along";
+
+    // One undo step: back where the drag started, on its page
+    session->getUndoRedoHandler()->undo();
+    ASSERT_EQ(notesOf(*session, 0).size(), 1u);
+    EXPECT_EQ(notesOf(*session, 1).size(), 0u);
+    EXPECT_EQ(*sticky::lookOf(*note), look);
+    EXPECT_EQ(contentOf(*note), ink);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_EQ(notesOf(*session, 1).size(), 1u);
+    EXPECT_NEAR(sticky::lookOf(*note)->rect.x, 170, 0.5);
 }
