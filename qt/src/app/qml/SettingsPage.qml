@@ -405,6 +405,63 @@ Popup {
                             { text: qsTr("Here, in place of this one"), value: "here" }
                         ]
                     }
+                    // Looking up selected text, the papers of references, arXiv (qt/docs/citations.md)
+                    SectionTitle { text: qsTr("Web and citations") }
+                    SwitchRow {
+                        objectName: "webConfirmRow"
+                        key: "webConfirm"
+                        text: qsTr("Ask before opening a web address (it is shown whole)")
+                    }
+                    RowLayout {
+                        id: translatorRow
+                        Layout.fillWidth: true
+                        readonly property string current: (sheet.s.revision, sheet.s.get("translateService"))
+                        readonly property var known: app.citations.translators()
+                        readonly property bool custom: !known.some(function(t) { return t.key === current })
+                        Label { text: qsTr("Translate with"); Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                        ComboBox {
+                            objectName: "translatorChoice"
+                            Layout.preferredWidth: 260
+                            model: translatorRow.known.map(function(t) { return t.name }).concat([qsTr("Custom address…")])
+                            currentIndex: {
+                                for (let i = 0; i < translatorRow.known.length; ++i)
+                                    if (translatorRow.known[i].key === translatorRow.current) return i
+                                return translatorRow.known.length
+                            }
+                            onActivated: function(index) {
+                                if (index < translatorRow.known.length) sheet.s.set("translateService", translatorRow.known[index].key)
+                                else if (!translatorRow.custom) sheet.s.set("translateService", "https://translate.google.com/?sl=auto&tl={lang}&text={text}")
+                            }
+                        }
+                    }
+                    TextField {
+                        objectName: "translatorAddress"
+                        visible: translatorRow.custom
+                        Layout.fillWidth: true
+                        text: translatorRow.current
+                        placeholderText: "https://…{text}…{lang}"
+                        onEditingFinished: sheet.s.set("translateService", text)
+                    }
+                    Hint {
+                        visible: translatorRow.custom
+                        text: qsTr("{text} is replaced by the selected text, {lang} by the language below.")
+                    }
+                    ComboRow {
+                        objectName: "translateLanguageRow"
+                        key: "translateLanguage"
+                        text: qsTr("Translate into")
+                        options: [
+                            { text: qsTr("The system's language (%1)").arg(app.citations.systemLanguage()), value: "" },
+                            { text: "English", value: "en" }, { text: "Deutsch", value: "de" },
+                            { text: "Français", value: "fr" }, { text: "Español", value: "es" },
+                            { text: "Italiano", value: "it" }, { text: "Português", value: "pt" },
+                            { text: "Nederlands", value: "nl" }, { text: "Polski", value: "pl" },
+                            { text: "Čeština", value: "cs" }, { text: "Svenska", value: "sv" },
+                            { text: "Türkçe", value: "tr" }, { text: "Українська", value: "uk" },
+                            { text: "Русский", value: "ru" }, { text: "中文 (简体)", value: "zh-CN" },
+                            { text: "日本語", value: "ja" }, { text: "한국어", value: "ko" }
+                        ]
+                    }
                     SectionTitle { text: qsTr("Hybrid PDF") }
                     Hint {
                         text: qsTr("A PDF with notes (Save as… → \"PDF with notes, editable\") shows your notes in "

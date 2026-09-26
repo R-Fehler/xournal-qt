@@ -171,6 +171,31 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                                                                                                  : std::string("ask"));
             s.customSettingsChanged();
         });
+    // Looking up selected text (qt/docs/citations.md): ask before a web address opens (it is shown whole), the
+    // translator ("google", "deepl", "bing" or an address with {text} and {lang}) and the language translated into
+    // ("": the system's)
+    add("webConfirm",
+        [&s] {
+            bool on = true;
+            s.getCustomElement("xournalQt").getBool("webConfirm", on);
+            return QVariant(on);
+        },
+        [&s](const QVariant& v) {
+            s.getCustomElement("xournalQt").setBool("webConfirm", v.toBool());
+            s.customSettingsChanged();
+        });
+    for (const auto& [key, fallback]: {std::pair{"translateService", "google"}, std::pair{"translateLanguage", ""}}) {
+        add(key,
+            [&s, key = key, fallback = fallback] {
+                std::string v = fallback;
+                s.getCustomElement("xournalQt").getString(key, v);
+                return QVariant(QString::fromStdString(v));
+            },
+            [&s, key = key](const QVariant& v) {
+                s.getCustomElement("xournalQt").setString(key, v.toString().trimmed().toStdString());
+                s.customSettingsChanged();
+            });
+    }
     // Hybrid PDFs (qt/docs/hybrid-pdf.md): notes of an annotated PDF go into the PDF itself (off: "name.notes.pdf");
     // whether that was explained; a .xopp for Xournal++ written next to a hybrid PDF on every save
     for (const char* key: {"hybridIntoPdf", "hybridIntoPdfExplained", "hybridExportXopp"}) {

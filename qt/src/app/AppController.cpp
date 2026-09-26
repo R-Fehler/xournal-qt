@@ -98,6 +98,7 @@
 #include "shell/SettingsModel.h"
 #include "shell/SystemApps.h"
 #include "shell/ReferenceMode.h"
+#include "shell/Citations.h"
 #include "shell/TabManager.h"
 
 using namespace xqt;
@@ -155,6 +156,7 @@ AppController::AppController(QObject* parent): QObject(parent) {
     makeTabs();
     ownLibrary = std::make_unique<LibraryModel>();
     library = ownLibrary.get();
+    citations = std::make_unique<Citations>(*app->getSettings(), library);
     // Open documents take the PDF text the library index read before (their search has all counts at once)
     DocumentTextIndex::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& pdf) {
         LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
@@ -189,6 +191,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     settingsView = mainWindow.settingsView;
     shortcuts = mainWindow.shortcuts;
     library = mainWindow.library;
+    citations = std::make_unique<Citations>(*app->getSettings(), library);
     recent = mainWindow.recent;
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
@@ -2582,6 +2585,7 @@ void AppController::openReceived(const fs::path& folder, const std::vector<fs::p
 }
 
 QObject* AppController::referenceObject() const { return referenceMode.get(); }
+QObject* AppController::citationsObject() const { return citations.get(); }
 
 bool AppController::openAsReference(const QString& path) {
     DocumentSession* main = session();
@@ -3993,6 +3997,8 @@ void AppController::setPdfTextMode(const QString& mode) {
 }
 
 bool AppController::markPdfText(const QString& mode) { return canvas() && canvas()->markPdfText(pdfModeFrom(mode)); }
+QString AppController::selectedText() const { return canvas() ? canvas()->selectedText() : QString(); }
+
 bool AppController::copyPdfText() {
     const bool ok = canvas() && canvas()->copyPdfText();
     if (ok) {

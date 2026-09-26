@@ -93,6 +93,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LocalUrl.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PdfPrinting.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Citations.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Citations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
@@ -167,7 +169,9 @@ set(XQT_QML_FILES
     src/app/qml/SelectionPill.qml
     src/app/qml/Popups.js
     src/app/qml/MarkdownFormatBar.qml
-    src/app/qml/MarkdownTableEditor.qml)
+    src/app/qml/MarkdownTableEditor.qml
+    src/app/qml/LookUpMenu.qml
+    src/app/qml/WebConfirm.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
@@ -217,7 +221,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
         GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")

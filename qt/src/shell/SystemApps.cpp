@@ -58,6 +58,14 @@ bool SystemApps::openWithSystemApp(const QString& path) {
     return QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
+bool SystemApps::openWebAddress(const QUrl& url) {
+    const QString scheme = url.scheme().toLower();
+    if (!url.isValid() || (scheme != QLatin1String("http") && scheme != QLatin1String("https"))) {
+        return false;
+    }
+    return QDesktopServices::openUrl(url);
+}
+
 namespace {
 /// The file manager shows these files, selected (all in one folder, or not: the first one's folder then).
 bool showItems(const QStringList& paths) {

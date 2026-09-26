@@ -1101,6 +1101,19 @@ std::string CanvasView::selectedPdfText() const {
     return pdfSelection && pdfSelection->isFinalized() ? pdfSelection->getSelectedText() : std::string();
 }
 
+QString CanvasView::selectedText() const {
+    if (hasPdfTextSelection()) {
+        return QString::fromStdString(selectedPdfText());
+    }
+    if (markdownEditor) {
+        return markdownEditor->selectedText();
+    }
+    if (textEditor) {
+        return textEditor->selectedText();
+    }
+    return {};
+}
+
 /// The selected text in the coordinates of its page (points); empty when nothing is selected.
 static QRectF selectedTextOnPage(const PdfElemSelection* selection) {
     QRectF box;

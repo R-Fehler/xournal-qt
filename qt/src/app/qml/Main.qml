@@ -223,6 +223,16 @@ ApplicationWindow {
     // Quitting: the saves that run finish first (the window stays usable meanwhile), then the tabs with unsaved
     // changes are asked about one by one.
     property bool waitingToClose: false
+    /// A web address chosen in the look-up menu (qt/docs/citations.md): asked first with the whole address, unless
+    /// that was turned off (the menu showed it)
+    function openWebAddress(url, purpose) {
+        if (url === "") return
+        if ((app.settings.revision, app.settings.get("webConfirm"))) {
+            webConfirm.ask(url, purpose)
+            return
+        }
+        if (app.citations.openWeb(url)) snackbar.show(qsTr("Opened %1 in the browser").arg(app.citations.hostOf(url)), false)
+    }
     function closeWindow() {
         if (app.anySaving) {
             if (!waitingToClose) {
@@ -2689,6 +2699,7 @@ ApplicationWindow {
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
+    WebConfirm { id: webConfirm }
     PdfTextHandles { }
     Connections {
         target: app

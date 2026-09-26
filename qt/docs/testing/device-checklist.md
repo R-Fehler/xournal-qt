@@ -1512,3 +1512,21 @@ Update the table in the user doc with the results.
       reference to a page of the document goes there in the reference.
 - [ ] With `XQT_PERF=1`, a long PDF beside itself, scroll both sides far apart: pages stay sharp, memory stays under
       the limit set in Settings (not twice it).
+
+
+## Citations and arXiv (qt/citations)
+
+- [ ] A paper open: select a sentence with the PDF text tool (or press and hold a word, then drag the knobs). The
+      pill has a magnifier ("Look up"): its menu has "Search in Google Scholar" and "Translate", each with its web
+      address in small letters under it.
+- [ ] "Search in Google Scholar": a dialog shows the whole address and where it goes (scholar.google.com); Cancel
+      opens nothing, "Copy address" puts it on the clipboard, Open opens the browser with the selected text as the
+      search. The same for "Translate" (Google Translate into the system's language).
+- [ ] "Don't ask again" + Open: the next look-up opens at once (a note says so), the menu still shows the address.
+      Settings → Documents → "Web and citations" → "Ask before opening a web address" turns the question on again.
+- [ ] Settings → "Translate with": DeepL, Bing, "Custom address…" (an address with {text} and {lang}; one without
+      {text} or not http(s) offers no "Translate"). "Translate into": another language is in the address (`tl=`).
+- [ ] Our own text: write in a Markdown box or a `.md`, select a few words (Shift+arrows, or drag), right click (or
+      press and hold): the context pill has "Look up…" with the same menu. The reference beside the notes: the same
+      on its selected PDF text.
+- [ ] Android (a test device or the emulator): the menu and the dialog fit a phone; Open starts the browser.

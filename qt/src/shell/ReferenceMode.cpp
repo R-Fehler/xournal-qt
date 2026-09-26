@@ -416,6 +416,8 @@ bool ReferenceMode::markPdfText(const QString& mode) {
     return shownView && editing() && shownView->markPdfText(m);
 }
 
+QString ReferenceMode::selectedText() const { return shownView ? shownView->selectedText() : QString(); }
+
 bool ReferenceMode::copyPdfText() {
     const bool ok = shownView && shownView->copyPdfText();
     if (ok) {
