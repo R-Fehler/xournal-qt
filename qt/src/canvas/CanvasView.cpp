@@ -57,6 +57,7 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
+#include "session/TextDocument.h"
 #include "Perf.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
@@ -1600,15 +1601,46 @@ void CanvasView::textPress(CanvasPage& page, double x, double y) {
     startMarkdown(*idx, true, x, y);
 }
 
+bool CanvasView::typesIntoFlow() const {
+    if (session.textFile() || session.isReadOnly() || readingOnly) {
+        return false;
+    }
+    Document& doc = *session.getDocument();
+    std::shared_lock lock(doc);
+    return TextDocument::isTextDocument(doc);
+}
+
 bool CanvasView::ensureTextEditor() {
     if (markdownEditor) {
         return true;
     }
-    if (!textMode()) {
+    if (textEditor) {
+        return false;  // (a text box is being written)
+    }
+    const size_t page = std::min(currentPageNo(), session.getDocument()->getPageCount() - 1);
+    if (textMode()) {
+        startMarkdown(page, true, TextFlow::MARGIN, TextFlow::MARGIN);
+        return markdownEditor != nullptr;
+    }
+    if (!typesIntoFlow()) {
         return false;
     }
-    startMarkdown(std::min(currentPageNo(), session.getDocument()->getPageCount() - 1), true,
-                  TextFlow::MARGIN, TextFlow::MARGIN);
+    // A text document of notes: its text on the page in view, or at its end when that page is after it
+    size_t end = 1;
+    double w = 0;
+    double h = 0;
+    {
+        Document& doc = *session.getDocument();
+        std::shared_lock lock(doc);
+        TextDocument::flowText(doc, 0, &end);
+        w = doc.getPage(end - 1)->getWidth();
+        h = doc.getPage(end - 1)->getHeight();
+    }
+    if (page < end) {
+        startMarkdown(page, true, TextFlow::MARGIN, TextFlow::MARGIN);
+    } else {
+        startMarkdown(end - 1, true, w, h);  // (the bottom right: the cursor at the end of the text)
+    }
     return markdownEditor != nullptr;
 }
 

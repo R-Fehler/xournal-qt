@@ -63,6 +63,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextDocument.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextDocument.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.h
@@ -147,6 +149,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownEditorTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfTextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/ScreenCalibrationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/SecondViewTest.cpp)
     target_link_libraries(xqt-canvas-tests PRIVATE xqt-canvas Qt6::Test GTest::gtest)

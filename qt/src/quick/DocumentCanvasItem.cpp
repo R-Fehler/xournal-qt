@@ -670,10 +670,12 @@ bool DocumentCanvasItem::event(QEvent* e) {
 
 void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
     xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr;
-    if (!editor && canvasView && canvasView->textMode() && !e->text().isEmpty() && e->text().at(0).isPrint() &&
+    if (!editor && canvasView && !e->text().isEmpty() && e->text().at(0).isPrint() &&
         !(e->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) &&
-        canvasView->ensureTextEditor()) {
-        editor = canvasView->getTextInput();  // a text file: typing starts writing (at the top of the page in view)
+        (canvasView->textMode() || canvasView->typesIntoFlow()) && canvasView->ensureTextEditor()) {
+        // A text file, a text document of notes (qt/docs/md-pdf.md): typing starts writing (at the top of the page in
+        // view)
+        editor = canvasView->getTextInput();
     }
     bool finish = false;
     if (editor && editor->keyPressed(e, finish)) {

@@ -1512,3 +1512,18 @@ Update the table in the user doc with the results.
       reference to a page of the document goes there in the reference.
 - [ ] With `XQT_PERF=1`, a long PDF beside itself, scroll both sides far apart: pages stay sharp, memory stays under
       the limit set in Settings (not twice it).
+
+
+## Text documents as PDF (qt/md-pdf)
+
+- [ ] A text document of notes (a `.md` → ⋮ → "Edit as notes", or a PDF text document): with the pen tool, type on
+      the keyboard without tapping first: the letters go into the text at the top of the page in view (on a page of
+      notes after the text: at the end of the text). The pen still draws ink; Escape ends writing.
+- [ ] Save it as a PDF with notes (Save as… → "PDF with notes"), then in a PDF viewer's attachment list (Okular:
+      Embedded Files; Firefox: the paperclip; Acrobat Reader: the paperclip): `document.xopp` and `name.md`. Save
+      `name.md`: it is the text, without `<!-- xqt:cont -->` lines. `qpdf --show-attachment=name.md name.pdf` prints
+      the same.
+- [ ] Change the text and press Ctrl+S (an incremental save): `name.md` in the viewer is the new text.
+- [ ] Write ink on a text page, then add lines above it: the ink stays where it was (expected; move it by hand).
+- [ ] Export for the archive of a PDF text document: its attachments list `name.md` too; veraPDF (if at hand) still
+      passes it.

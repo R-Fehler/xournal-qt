@@ -311,8 +311,12 @@ public:
     bool textMode() const;
     /// A press in text mode (page coordinates): the cursor goes there (the editor starts if needed).
     void textPress(CanvasPage& page, double x, double y);
-    /// Text mode and no cursor yet: the editor starts at the top of the current page (keys typed go there). True if
-    /// there is an editor now.
+    /// A text document of notes (qt/docs/md-pdf.md: page 1 starts the page's Markdown text) that may be written in:
+    /// typing goes into its text, the tools stay as they are (the pen writes ink).
+    bool typesIntoFlow() const;
+    /// Text mode (or a text document of notes) and no cursor yet: the editor starts at the top of the current page
+    /// (keys typed go there; a text document of notes: at the end of its text when the page in view is after it).
+    /// True if there is an editor now.
     bool ensureTextEditor();
     void endTextEditing();
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
