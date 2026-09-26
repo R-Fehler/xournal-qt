@@ -228,6 +228,40 @@ protected:
         wait(20);
     }
 
+    /// Opens the ⋮ menu down to the entry `name`: through its submenu when it is in one (Document, Export, Page,
+    /// View). Returns the entry once it is shown (nullptr if it is not there).
+    QQuickItem* openMoreMenuAt(const char* name) {
+        QObject* more = find("moreMenu");
+        if (!more) {
+            return nullptr;
+        }
+        QMetaObject::invokeMethod(find("moreButton"), "clicked");
+        if (!waitOpened(more, true)) {
+            return nullptr;
+        }
+        auto* item = find<QQuickItem>(name);
+        if (!item) {
+            return nullptr;
+        }
+        auto* submenu = item->property("menu").value<QObject*>();
+        if (submenu && submenu != more) {
+            const int count = more->property("count").toInt();
+            for (int i = 0; i < count; ++i) {
+                QQuickItem* entry = nullptr;
+                QMetaObject::invokeMethod(more, "itemAt", Q_RETURN_ARG(QQuickItem*, entry), Q_ARG(int, i));
+                if (entry && entry->property("subMenu").value<QObject*>() == submenu) {
+                    click(entry);
+                    break;
+                }
+            }
+            if (!waitOpened(submenu, true)) {
+                return nullptr;
+            }
+        }
+        until([&] { return item->isVisible(); });
+        return item;
+    }
+
     /// Before the window is loaded. Most tests are about a document (the app starts on the home screen).
     virtual void prepareController() { controller->newDocument(); }
 
@@ -1216,16 +1250,12 @@ TEST_F(HomeScreenTest, aNewTextDocumentIsAPdfInPdfFilesMode) {
         std::shared_lock lock(*loaded.document);
         EXPECT_EQ(xqt::TextDocument::flowText(*loaded.document), "Hello world");
     }
-    // ⋮ → Export as Markdown is there (a .md's "Open as PDF document" is not)
-    QObject* more = find("moreMenu");
-    ASSERT_NE(more, nullptr);
-    QMetaObject::invokeMethod(more, "open");
-    ASSERT_TRUE(waitOpened(more, true));
-    auto* exportItem = find<QQuickItem>("exportMarkdownItem");
+    // ⋮ → Export → Export as Markdown is there (a .md's Document → "Open as PDF document" is not)
+    auto* exportItem = openMoreMenuAt("exportMarkdownItem");
     ASSERT_NE(exportItem, nullptr);
-    until([&] { return exportItem->isVisible(); });
     EXPECT_TRUE(exportItem->isVisible());
-    EXPECT_FALSE(find<QQuickItem>("openAsPdfDocumentItem")->isVisible());
+    EXPECT_FALSE(find<QQuickItem>("openAsPdfDocumentItem")->property("offered").toBool());
+    key(Qt::Key_Escape);
     key(Qt::Key_Escape);
 }
 
@@ -7930,11 +7960,8 @@ TEST_F(HomeScreenMarkdownTest, removeUnusedImagesListsThemFirst) {
     wait(100);
     EXPECT_EQ(controller->unusedMarkdownImages(), (QStringList{"old/older.png", "unused.png"}));
 
-    QObject* more = find("moreMenu");
-    QMetaObject::invokeMethod(more, "open");
-    ASSERT_TRUE(waitOpened(more, true));
-    auto* item = find<QQuickItem>("unusedImagesItem");
-    until([&] { return item->isVisible(); });
+    auto* item = openMoreMenuAt("unusedImagesItem");  // (⋮ → Document)
+    ASSERT_NE(item, nullptr);
     click(item);
     auto* dialog = find<QObject>("unusedImagesDialog");
     ASSERT_TRUE(waitOpened(dialog, true));
@@ -8287,10 +8314,7 @@ TEST_F(RenameTest, aDoubleClickOnAnotherTabOnlyShowsIt) {
 // why and OK waits.
 TEST_F(RenameTest, theMoreMenuRenamesInADialog) {
     open("lecture.pdf");
-    QObject* menu = find("moreMenu");
-    QMetaObject::invokeMethod(menu, "open");
-    ASSERT_TRUE(waitOpened(menu, true));
-    click(findItem("renameDocumentItem"));
+    click(openMoreMenuAt("renameDocumentItem"));  // (⋮ → Document)
     QObject* dialog = find("renameDocumentDialog");
     ASSERT_NE(dialog, nullptr);
     ASSERT_TRUE(waitOpened(dialog, true));
@@ -8318,9 +8342,7 @@ TEST_F(RenameTest, theMoreMenuRenamesInADialog) {
     // A new document that was never saved: the name it gets when it is saved
     controller->newDocument();
     wait(50);
-    QMetaObject::invokeMethod(menu, "open");
-    ASSERT_TRUE(waitOpened(menu, true));
-    click(findItem("renameDocumentItem"));
+    click(openMoreMenuAt("renameDocumentItem"));
     ASSERT_TRUE(waitOpened(dialog, true));
     EXPECT_EQ(find<QQuickItem>("renameDocumentExtension")->property("text").toString(), ".xopp");
     type("Ideas");

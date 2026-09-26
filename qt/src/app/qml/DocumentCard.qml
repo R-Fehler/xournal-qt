@@ -483,11 +483,11 @@ Item {
                     height: strip.height
                     onClicked: card.pageActivated(modelData.page)
                     // Press and hold, or a right click: a link to this page (qt/docs/links.md)
-                    onPressAndHold: hitMenu.popup()
-                    TapHandler { acceptedButtons: Qt.RightButton; onTapped: hitMenu.popup() }
-                    Menu {
+                    onPressAndHold: hitMenu.openMenu()
+                    TapHandler { acceptedButtons: Qt.RightButton; onTapped: function(point) { hitMenu.openMenu(point.position) } }
+                    AdaptiveMenu {
                         id: hitMenu
-                        MenuItem {
+                        AdaptiveMenuItem {
                             objectName: "copyHitPageLink"
                             text: qsTr("Copy link to this page")
                             onTriggered: app.copyDocumentLink(card.path, hitPage.modelData.page)

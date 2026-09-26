@@ -212,13 +212,14 @@ Rectangle {
                         }
                     }
                 }
-                Menu {
+                AdaptiveMenu {
                     id: tabMenu
+                    title: tab.title  // (shown at the top of the sheet on phones)
                     objectName: "tabMenu"
                     property bool renameAfter: false
                     // (after the menu is gone: it gives the focus back when it closes)
                     onClosed: if (renameAfter) { renameAfter = false; tab.startRename() }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "renameTabItem"
                         text: qsTr("Rename…")
                         onTriggered: {
@@ -227,14 +228,14 @@ Rectangle {
                             tabMenu.renameAfter = true
                         }
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "undockTabItem"
                         text: app.secondaryWindow ? qsTr("Move to the main window")
                                                   : qsTr("Move to a window of its own")
                         onTriggered: app.secondaryWindow ? strip.dockRequested(tab.index)
                                                          : strip.undockRequested(tab.index)
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "openAsReferenceTabItem"
                         // (beside the current document; the current one itself: a second view of it beside it)
                         text: tab.current ? (tab.isReference ? qsTr("Close the view beside")
@@ -249,12 +250,12 @@ Rectangle {
                             }
                         }
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "shareTabItem"
                         text: qsTr("Share…")
                         onTriggered: strip.shareRequested(tab.index)
                     }
-                    MenuItem { text: qsTr("Close"); onTriggered: strip.closeRequested(tab.index) }
+                    AdaptiveMenuItem { text: qsTr("Close"); onTriggered: strip.closeRequested(tab.index) }
                 }
 
                 background: Item {

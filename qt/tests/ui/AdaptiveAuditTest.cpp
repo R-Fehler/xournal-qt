@@ -169,6 +169,17 @@ protected:
         if (!menu) {
             return "menu=none";
         }
+        // The phone classes: the menu's entries in the bottom sheet (qt/adaptive-menus)
+        QObject* sheet = find("menuSheet");
+        if (sheet && sheet->property("opened").toBool() && !menu->property("opened").toBool()) {
+            auto* flick = findItem("menuSheetList");
+            return QString("sheet h=%1 content=%2 y=%3 w=%4 scrolls=%5")
+                    .arg(sheet->property("height").toDouble())
+                    .arg(flick ? flick->property("contentHeight").toDouble() : -1)
+                    .arg(sheet->property("y").toDouble())
+                    .arg(sheet->property("width").toDouble())
+                    .arg(flick ? flick->property("interactive").toBool() : false);
+        }
         auto* list = menu->property("contentItem").value<QQuickItem*>();
         const double contentH = list ? list->property("contentHeight").toDouble() : -1;
         return QString("menu h=%1 content=%2 y=%3 x=%4 w=%5 scrolls=%6 opened=%7")
