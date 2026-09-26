@@ -8,14 +8,24 @@
 
 #include <cairo.h>
 
+#include "config.h"
 #include "control/Control.h"
+#include "control/layer/LayerController.h"
 #include "model/Document.h"
 #include "model/Element.h"
+#include "model/Image.h"
+#include "model/Link.h"
+#include "model/TexImage.h"
+#include "model/Text.h"
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/XojPage.h"
 #include "render/PageRaster.h"
 #include "util/Range.h"
+#include "util/serializing/BinObjectEncoding.h"
+#include "util/serializing/InputStreamException.h"
+#include "util/serializing/ObjectInputStream.h"
+#include "util/serializing/ObjectOutputStream.h"
 #include "view/LayerView.h"
 #include "view/View.h"
 
@@ -292,6 +302,139 @@ bool NoteUndoAction::redo(Control* control) {
     changeLook(*control->getDocument(), page, *layer, before, after);
     this->undone = false;
     return true;
+}
+
+// --- to another page ------------------------------------------------------------------------------------------
+
+NotePageUndoAction::NotePageUndoAction(LayerController* layers, Layer* layer, Place from, Place to, std::string text):
+        UndoAction("StickyNotePageUndoAction"),
+        layers(layers),
+        layer(layer),
+        from(std::move(from)),
+        to(std::move(to)),
+        text(std::move(text)) {
+    this->page = this->to.page;
+}
+
+void NotePageUndoAction::move(LayerController* layers, Document& doc, Layer* layer, const Place& from,
+                              const Place& to) {
+    layers->removeLayer(from.page, layer);  // (locks the document; the page is drawn again)
+    {
+        std::unique_lock lock(doc);
+        applyLook(*layer, from.look, to.look);
+    }
+    layers->insertLayer(to.page, layer, to.position);
+    leaveNoteLayer(doc, from.page);
+    leaveNoteLayer(doc, to.page);
+}
+
+bool NotePageUndoAction::undo(Control* control) {
+    move(layers, *control->getDocument(), layer, to, from);
+    this->undone = true;
+    return true;
+}
+
+bool NotePageUndoAction::redo(Control* control) {
+    move(layers, *control->getDocument(), layer, from, to);
+    this->undone = false;
+    return true;
+}
+
+// --- the clipboard -------------------------------------------------------------------------------------------------
+
+std::string serialize(const Layer& layer) {
+    if (!isNote(layer)) {
+        return {};
+    }
+    ObjectOutputStream out(new BinObjectEncoding());
+    out.writeString(PROJECT_STRING);
+    out.writeObject("StickyNote");
+    out.writeString(layer.getName());
+    const auto elements = layer.getElementsView();
+    out.writeSizeT(elements.size());
+    for (const Element* e: elements) {
+        e->serialize(out);
+    }
+    out.endObject();
+    GString* data = out.stealData();
+    std::string bytes(data->str, data->len);
+    g_string_free(data, TRUE);
+    return bytes;
+}
+
+std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
+    try {
+        ObjectInputStream in;
+        if (!in.read(data, size)) {
+            return nullptr;
+        }
+        in.readString();  // (the version that wrote it: elements are read the same way since upstream 1.0)
+        in.readObject("StickyNote");
+        auto layer = std::make_unique<Layer>();
+        const std::string name = in.readString();
+        if (!isNoteName(name)) {
+            return nullptr;
+        }
+        layer->setName(name);
+        const size_t count = in.readSizeT();
+        for (size_t i = 0; i < count; ++i) {
+            const std::string type = in.getNextObjectName();
+            ElementPtr element;
+            if (type == "Stroke") {
+                element = std::make_unique<Stroke>();
+            } else if (type == "Image") {
+                element = std::make_unique<Image>();
+            } else if (type == "TexImage") {
+                element = std::make_unique<TexImage>();
+            } else if (type == "Text") {
+                element = std::make_unique<Text>();
+            } else if (type == "Link") {
+                element = std::make_unique<Link>();
+            } else {
+                return nullptr;
+            }
+            element->readSerialized(in);
+            layer->addElement(std::move(element));
+        }
+        in.endObject();
+        if (!isNote(*layer)) {
+            return nullptr;
+        }
+        return layer;
+    } catch (const std::exception& e) {
+        g_warning("Not a sticky note on the clipboard: %s", e.what());
+        return nullptr;
+    }
+}
+
+Rectangle<double> pastePlace(Rectangle<double> r, double pageWidth, double pageHeight,
+                             const std::vector<Rectangle<double>>& taken) {
+    r.width = std::clamp(r.width, std::min(MIN_SIDE, pageWidth), std::max(MIN_SIDE, pageWidth));
+    r.height = std::clamp(r.height, std::min(MIN_SIDE, pageHeight), std::max(MIN_SIDE, pageHeight));
+    const auto inside = [&](double x, double y) {
+        return Rectangle<double>(std::clamp(x, 0.0, std::max(0.0, pageWidth - r.width)),
+                                 std::clamp(y, 0.0, std::max(0.0, pageHeight - r.height)), r.width, r.height);
+    };
+    r = inside(r.x, r.y);
+    const auto isTaken = [&](const Rectangle<double>& c) {
+        return std::any_of(taken.begin(), taken.end(), [&](const Rectangle<double>& t) {
+            return std::abs(t.x - c.x) < 0.5 && std::abs(t.y - c.y) < 0.5 && std::abs(t.width - c.width) < 0.5 &&
+                   std::abs(t.height - c.height) < 0.5;
+        });
+    };
+    // A little further down and right each time (up and left where the page ends), as a stack of copies
+    constexpr double STEP = 16;
+    if (!isTaken(r)) {
+        return r;
+    }
+    for (const double dir: {1.0, -1.0}) {
+        for (int i = 1; i <= 64; ++i) {
+            if (const auto c = inside(r.x + dir * STEP * i, r.y + dir * STEP * i); !isTaken(c)) {
+                return c;
+            }
+        }
+    }
+    return r;
 }
 
 }  // namespace xqt::sticky

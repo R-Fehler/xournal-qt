@@ -367,3 +367,59 @@ TEST_F(StickyNoteTest, theSelectedLayerIsNeverANote) {
     EXPECT_FALSE(sticky::isNote(*only->getSelectedLayer()));
     EXPECT_TRUE(sticky::isNote(*only->getLayers()[1]));
 }
+
+TEST_F(StickyNoteTest, aNoteGoesThroughTheClipboardWhole) {
+    std::string bytes;
+    {
+        std::shared_lock lock(*session->getDocument());
+        bytes = sticky::serialize(*cover);
+        EXPECT_TRUE(sticky::serialize(*session->getDocument()->getPage(0)->getLayers()[0]).empty())
+                << "the page's own layer is no note";
+    }
+    ASSERT_FALSE(bytes.empty());
+    std::unique_ptr<Layer> copy = sticky::deserialize(bytes.data(), bytes.size());
+    ASSERT_TRUE(copy);
+    EXPECT_EQ(*sticky::lookOf(*copy), *sticky::lookOf(*cover)) << "its place, color and cover";
+    EXPECT_EQ(copy->getName(), sticky::COVER_LAYER_NAME);
+    ASSERT_EQ(copy->getElementsView().size(), cover->getElementsView().size());
+    const auto* ink = static_cast<const Stroke*>(copy->getElementsView()[1]);
+    const auto* original = static_cast<const Stroke*>(cover->getElementsView()[1]);
+    EXPECT_EQ(ink->getPointVector().size(), original->getPointVector().size());
+    EXPECT_EQ(ink->getColor(), original->getColor());
+    EXPECT_EQ(ink->getWidth(), original->getWidth());
+
+    {
+        std::shared_lock lock(*session->getDocument());
+        bytes = sticky::serialize(*note);
+    }
+    copy = sticky::deserialize(bytes.data(), bytes.size());
+    ASSERT_TRUE(copy);
+    ASSERT_EQ(copy->getElementsView().size(), 3u);
+    ASSERT_EQ(copy->getElementsView()[2]->getType(), ELEMENT_TEXT);
+    EXPECT_EQ(static_cast<const Text*>(copy->getElementsView()[2])->getText(), "Answer?");
+
+    EXPECT_FALSE(sticky::deserialize("nonsense", 8)) << "not a note";
+    EXPECT_FALSE(sticky::deserialize(bytes.data(), bytes.size() / 2)) << "cut short";
+}
+
+TEST_F(StickyNoteTest, aPastedNoteStaysWhereItWasWhenItFitsOnThePage) {
+    using R = xoj::util::Rectangle<double>;
+    const auto same = [](const R& a, const R& b) {
+        return std::abs(a.x - b.x) < 1e-9 && std::abs(a.y - b.y) < 1e-9 && std::abs(a.width - b.width) < 1e-9 &&
+               std::abs(a.height - b.height) < 1e-9;
+    };
+    // Fits: the same place
+    EXPECT_TRUE(same(sticky::pastePlace({100, 100, 200, 150}, 595, 842, {}), R(100, 100, 200, 150)));
+    // Beyond a smaller page: moved inside it, its size kept
+    EXPECT_TRUE(same(sticky::pastePlace({500, 800, 200, 150}, 595, 842, {}), R(395, 692, 200, 150)));
+    // Larger than the page: as large as the page
+    EXPECT_TRUE(same(sticky::pastePlace({10, 10, 700, 150}, 595, 842, {}), R(0, 10, 595, 150)));
+    // Exactly on a note there (its original): a little further down and right, and further for the next copy
+    const R first = sticky::pastePlace({100, 100, 200, 150}, 595, 842, {R(100, 100, 200, 150)});
+    EXPECT_TRUE(same(first, R(116, 116, 200, 150)));
+    EXPECT_TRUE(same(sticky::pastePlace({100, 100, 200, 150}, 595, 842, {R(100, 100, 200, 150), first}),
+                     R(132, 132, 200, 150)));
+    // In the bottom right corner: up and left instead
+    EXPECT_TRUE(same(sticky::pastePlace({395, 692, 200, 150}, 595, 842, {R(395, 692, 200, 150)}),
+                     R(379, 676, 200, 150)));
+}

@@ -750,22 +750,29 @@ void AppController::currentTabChanged() {
 
 bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
 bool AppController::copySelection() {
-    if (referenceMode->focused() && referenceMode->hasSelection()) {
-        return referenceMode->copy();  // (the keys are for the reference while it has the focus)
+    if (referenceMode->focused() && (referenceMode->hasSelection() ||
+                                     (referenceMode->canvas() && referenceMode->canvas()->notes().hasSelection()))) {
+        return copied(referenceMode->copy());  // (the keys are for the reference while it has the focus)
     }
-    return canvas() && canvas()->copySelection();
+    return copied(canvas() && canvas()->copySelection());  // (also a selected sticky note)
+}
+bool AppController::copied(bool ok) {
+    if (ok) {
+        pagesCopiedLast = false;
+    }
+    return ok;
 }
 CanvasView* AppController::editedReference() const {
     return referenceMode->focused() && referenceMode->editing() ? referenceMode->canvas() : nullptr;
 }
 bool AppController::cutSelection() {
     if (CanvasView* r = editedReference()) {
-        return r->cutSelection();
+        return copied(r->cutSelection());
     }
     if (referenceMode->focused()) {
         return false;  // (the keys are with a reference for reading: nothing is cut, neither there nor in the notes)
     }
-    return canvas() && canvas()->cutSelection();
+    return copied(canvas() && canvas()->cutSelection());
 }
 bool AppController::pasteElements() {
     if (textPagesFixed()) {
@@ -784,7 +791,8 @@ bool AppController::pasteAt(qreal x, qreal y) {
 }
 bool AppController::canPaste() const {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
-    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal"));
+    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal") ||
+                    StickyNotes::clipboardHasNote());
 }
 void AppController::deleteSelection() {
     if (CanvasView* r = editedReference()) {
@@ -866,6 +874,7 @@ void AppController::copyPages(const QList<int>& list) {
     }
     const auto indices = pageList(list);
     pageClipboard->copy(*session(), indices);
+    pagesCopiedLast = true;
     Q_EMIT copiedPagesChanged();
     Q_EMIT pageActionDone(indices.size() == 1 ? tr("Page copied") : tr("%1 pages copied").arg(indices.size()), false);
 }
@@ -3778,6 +3787,13 @@ void AppController::deleteStickyNote() {
     if (canvas()) {
         canvas()->notes().deleteSelected();
     }
+}
+bool AppController::copyStickyNote() { return copied(canvas() && canvas()->notes().copySelected()); }
+bool AppController::cutStickyNote() {
+    return copied(canvas() && !textPagesFixed() && canvas()->notes().cutSelected());
+}
+bool AppController::pastesNoteBeforePages() const {
+    return StickyNotes::clipboardHasNote() && (noteSelected() || pageClipboard->isEmpty() || !pagesCopiedLast);
 }
 bool AppController::pageHasNotes() const {
     return canvas() && canvas()->notes().pageHasNotes(session()->getCurrentPageNo());

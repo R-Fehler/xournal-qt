@@ -915,6 +915,13 @@ public:
     bool noteCovers() const;
     void setNoteCovers(bool covers);
     Q_INVOKABLE void deleteStickyNote();
+    /// The selected note onto the clipboard, whole (its pill; Ctrl+C / Ctrl+X go through copySelection /
+    /// cutSelection). Paste (pasteElements, pasteAt) puts a copied note onto the page in view.
+    Q_INVOKABLE bool copyStickyNote();
+    Q_INVOKABLE bool cutStickyNote();
+    /// Ctrl+V in the page sidebar or grid pastes the copied note rather than the copied pages: a note is on the
+    /// clipboard and it was copied after the pages (or a note is selected, or no pages are copied)
+    Q_INVOKABLE bool pastesNoteBeforePages() const;
     /// Where the selected note is on the canvas (an empty rect: none), for its pill
     Q_INVOKABLE QRectF noteBox() const;
     /// The current page has sticky notes; they are hidden (a view state, not saved)
@@ -1137,6 +1144,8 @@ private:
     /// paste, delete and select all act on it.
     xqt::CanvasView* editedReference() const;
     bool savesWithoutDialog(const xqt::DocumentSession* s) const;
+    /// Something was copied onto the clipboard (`ok`): it is pasted before copied pages (pastesNoteBeforePages)
+    bool copied(bool ok);
     /// ExportHybrid: a hybrid PDF copy (to share); ShareXopp: the export for Xournal++ with an attached PDF.
     enum class SaveWay { Save, SaveAs, Hybrid, ExportXopp, ExportHybrid, ShareXopp };
     /// Hand files to the system (share), or put them on the clipboard.
@@ -1219,6 +1228,8 @@ private:
     int mdPage = -1;
     int mdLastPage = -1;
     double mdOverflow = 0;
+    /// Pages were copied after the last copy onto the clipboard (pastesNoteBeforePages)
+    bool pagesCopiedLast = false;
     std::unique_ptr<xqt::PageClipboard> ownPageClipboard;
     xqt::PageClipboard* pageClipboard = nullptr;  ///< the main window's: pages can be pasted into any window
     std::vector<size_t> pageList(const QList<int>& pages) const;

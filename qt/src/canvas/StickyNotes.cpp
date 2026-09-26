@@ -4,7 +4,11 @@
 #include <cmath>
 #include <shared_mutex>
 
+#include <QClipboard>
 #include <QCoreApplication>
+#include <QGuiApplication>
+#include <QImage>
+#include <QMimeData>
 #include <cairo.h>
 
 #include "control/layer/LayerController.h"
@@ -15,6 +19,7 @@
 #include "undo/RemoveLayerUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Range.h"
+#include "view/View.h"
 #include "view/overlays/OverlayView.h"
 
 #include "CanvasPage.h"
@@ -31,6 +36,54 @@ std::string tr(const char* text) { return QCoreApplication::translate("StickyNot
 
 bool inside(const Rectangle<double>& r, double x, double y) {
     return x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height;
+}
+
+/// Upstream's layer undo actions under the note's own name in the undo list
+class InsertNoteUndoAction final: public InsertLayerUndoAction {
+public:
+    InsertNoteUndoAction(LayerController* layers, const PageRef& page, Layer* layer, Layer::Index position,
+                         std::string text):
+            InsertLayerUndoAction(layers, page, layer, position), text(std::move(text)) {}
+    std::string getText() override { return text; }
+
+private:
+    std::string text;
+};
+class RemoveNoteUndoAction final: public RemoveLayerUndoAction {
+public:
+    RemoveNoteUndoAction(LayerController* layers, const PageRef& page, Layer* layer, Layer::Index position,
+                         std::string text):
+            RemoveLayerUndoAction(layers, page, layer, position), text(std::move(text)) {}
+    std::string getText() override { return text; }
+
+private:
+    std::string text;
+};
+
+/// A picture of a note for other apps (twice the page's resolution; the caller holds the document's lock)
+QImage pictureOf(const Layer& layer) {
+    const auto look = sticky::lookOf(layer);
+    constexpr double SCALE = 2;
+    if (!look) {
+        return {};
+    }
+    const int w = static_cast<int>(std::ceil(look->rect.width * SCALE));
+    const int h = static_cast<int>(std::ceil(look->rect.height * SCALE));
+    if (w <= 0 || h <= 0 || static_cast<double>(w) * h > 4096.0 * 4096.0) {
+        return {};
+    }
+    QImage image(w, h, QImage::Format_ARGB32_Premultiplied);  // (cairo's ARGB32)
+    image.fill(Qt::transparent);
+    cairo_surface_t* surface =
+            cairo_image_surface_create_for_data(image.bits(), CAIRO_FORMAT_ARGB32, w, h, image.bytesPerLine());
+    cairo_t* cr = cairo_create(surface);
+    cairo_scale(cr, SCALE, SCALE);
+    cairo_translate(cr, -look->rect.x, -look->rect.y);
+    sticky::draw(layer, xoj::view::Context::createDefault(cr));  // (as exported: no folded corner, no peeking)
+    cairo_destroy(cr);
+    cairo_surface_flush(surface);
+    cairo_surface_destroy(surface);
+    return image;
 }
 
 /// The outline of the selected note and its handle (bottom right), over its page
@@ -125,8 +178,13 @@ bool StickyNotes::insert() {
     look.rect.height = std::min(sticky::DEFAULT_HEIGHT, ref->getHeight() * 0.8);
     look.rect.x = std::clamp(area.center().x() - look.rect.width / 2, 0.0, ref->getWidth() - look.rect.width);
     look.rect.y = std::clamp(area.center().y() - look.rect.height / 2, 0.0, ref->getHeight() - look.rect.height);
+    place(*page, sticky::makeNote(look), "Insert sticky note");
+    return true;
+}
 
-    Layer* layer = sticky::makeNote(look);
+void StickyNotes::place(CanvasPage& page, Layer* layer, const char* what) {
+    DocumentSession& session = view.getSession();
+    PageRef ref = page.getPage();
     LayerController* layers = session.getLayerController();
     Layer::Index position = 0;
     {
@@ -134,10 +192,87 @@ bool StickyNotes::insert() {
         position = ref->getLayerCount();  // (on top of the page's layers)
     }
     layers->insertLayer(ref, layer, position);  // (locks the document; the view keeps the page's own layer selected)
-    session.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertLayerUndoAction>(layers, ref, layer, position));
+    session.getUndoRedoHandler()->addUndoAction(
+            std::make_unique<InsertNoteUndoAction>(layers, ref, layer, position, tr(what)));
     sticky::leaveNoteLayer(*session.getDocument(), ref);
-    select(*page, layer);
+    select(page, layer);
     Q_EMIT view.notesChanged();
+}
+
+// --- the clipboard -----------------------------------------------------------------------------------------------
+
+bool StickyNotes::copySelected() {
+    if (!selected) {
+        return false;
+    }
+    std::string bytes;
+    QImage picture;
+    {
+        std::shared_lock lock(*view.getSession().getDocument());
+        bytes = sticky::serialize(*selected);
+        if (!bytes.empty()) {
+            picture = pictureOf(*selected);
+        }
+    }
+    if (bytes.empty()) {
+        return false;
+    }
+    auto* mime = new QMimeData;
+    mime->setData(sticky::CLIPBOARD_MIME, QByteArray(bytes.data(), static_cast<qsizetype>(bytes.size())));
+    if (!picture.isNull()) {
+        mime->setImageData(picture);  // (pasted into another app: a picture of the note)
+    }
+    QGuiApplication::clipboard()->setMimeData(mime);
+    return true;
+}
+
+bool StickyNotes::cutSelected() {
+    if (view.getSession().isReadOnly() || view.isReadingOnly() || !copySelected()) {
+        return false;
+    }
+    deleteSelected("Cut sticky note");
+    return true;
+}
+
+bool StickyNotes::clipboardHasNote() {
+    const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    return mime && mime->hasFormat(sticky::CLIPBOARD_MIME);
+}
+
+bool StickyNotes::paste(size_t pNr) {
+    DocumentSession& session = view.getSession();
+    if (pNr >= view.pageCount() || session.isReadOnly() || view.isReadingOnly() || !clipboardHasNote()) {
+        return false;
+    }
+    const QByteArray bytes = QGuiApplication::clipboard()->mimeData()->data(sticky::CLIPBOARD_MIME);
+    std::unique_ptr<Layer> layer = sticky::deserialize(bytes.constData(), static_cast<size_t>(bytes.size()));
+    if (!layer) {
+        return false;
+    }
+    view.endTextEditing();
+    view.clearSelection();
+    CanvasPage* page = view.getPage(pNr);
+    PageRef ref = page->getPage();
+    // Where it was when it fits on this page, not exactly on another note (a copy on the page of its original)
+    std::vector<Rectangle<double>> taken;
+    double width = 0;
+    double height = 0;
+    {
+        std::shared_lock lock(*session.getDocument());
+        for (const Layer* l: ref->getLayersView()) {
+            if (const auto look = sticky::lookOf(*l)) {
+                taken.push_back(look->rect);
+            }
+        }
+        width = ref->getWidth();
+        height = ref->getHeight();
+    }
+    const sticky::Look copied = *sticky::lookOf(*layer);
+    sticky::Look look = copied;
+    look.rect = sticky::pastePlace(copied.rect, width, height, taken);
+    sticky::applyLook(*layer, copied, look);  // (not on a page yet)
+    lastColor = look.color;
+    place(*page, layer.release(), "Paste sticky note");
     return true;
 }
 
@@ -218,7 +353,7 @@ void StickyNotes::setCover(bool cover) {
     }
 }
 
-void StickyNotes::deleteSelected() {
+void StickyNotes::deleteSelected(const char* what) {
     if (!selected) {
         return;
     }
@@ -239,7 +374,13 @@ void StickyNotes::deleteSelected() {
     }
     LayerController* layers = session.getLayerController();
     layers->removeLayer(ref, layer);  // (locks the document)
-    session.getUndoRedoHandler()->addUndoAction(std::make_unique<RemoveLayerUndoAction>(layers, ref, layer, id - 1));
+    if (what) {
+        session.getUndoRedoHandler()->addUndoAction(
+                std::make_unique<RemoveNoteUndoAction>(layers, ref, layer, id - 1, tr(what)));
+    } else {
+        session.getUndoRedoHandler()->addUndoAction(
+                std::make_unique<RemoveLayerUndoAction>(layers, ref, layer, id - 1));
+    }
     sticky::leaveNoteLayer(*session.getDocument(), ref);
     Q_EMIT view.notesChanged();
 }
@@ -264,7 +405,7 @@ void StickyNotes::startDrag(Drag how, double x, double y) {
         return;
     }
     drag = how;
-    dragFrom = QPointF(x, y);
+    dragFrom = dragPointer = QPointF(x, y);
     dragStart = dragNow = *look;
 }
 
@@ -322,6 +463,7 @@ void StickyNotes::dragTo(double x, double y) {
     if (drag == Drag::None || !selected) {
         return;
     }
+    dragPointer = QPointF(x, y);
     const double pageWidth = selectedPageRef->getWidth();
     const double pageHeight = selectedPageRef->getHeight();
     sticky::Look to = dragStart;
@@ -347,13 +489,70 @@ void StickyNotes::dragTo(double x, double y) {
 
 void StickyNotes::endDrag() {
     const Drag was = std::exchange(drag, Drag::None);
-    if (was == Drag::None || !selected || dragNow == dragStart) {
+    if (was == Drag::None || !selected) {
+        return;
+    }
+    if (was == Drag::Move && dropOnOtherPage()) {
+        return;
+    }
+    if (dragNow == dragStart) {
         return;
     }
     view.getSession().getUndoRedoHandler()->addUndoAction(std::make_unique<sticky::NoteUndoAction>(
             selectedPageRef, selected, dragStart, dragNow,
             tr(was == Drag::Move ? "Move sticky note" : "Resize sticky note")));
     Q_EMIT view.noteSelectionChanged();
+}
+
+bool StickyNotes::dropOnOtherPage() {
+    // While it is dragged the note stays on its page (at its edge); released over another page it goes there, the
+    // point it was held by under the pointer
+    const auto fromIdx = selectedOn ? view.indexOf(selectedOn) : std::nullopt;
+    DocumentSession& session = view.getSession();
+    if (!fromIdx || session.isReadOnly() || view.isReadingOnly()) {
+        return false;
+    }
+    const double zoom = view.getViewController().zoom();
+    const DocumentLayout& layout = view.documentLayout();
+    const QPointF content = layout.pageRect(*fromIdx, zoom).topLeft() + dragPointer * zoom;
+    const auto toIdx = layout.pageAt(content, zoom);
+    if (!toIdx || *toIdx == *fromIdx || *toIdx >= view.pageCount()) {
+        return false;
+    }
+    CanvasPage* target = view.getPage(*toIdx);
+    const PageRef toRef = target->getPage();
+    const PageRef fromRef = selectedPageRef;
+    Layer* layer = selected;
+    const QPointF onTarget = (content - layout.pageRect(*toIdx, zoom).topLeft()) / zoom;
+    sticky::Look look = dragStart;
+    look.rect.x = onTarget.x() - (dragFrom.x() - dragStart.rect.x);
+    look.rect.y = onTarget.y() - (dragFrom.y() - dragStart.rect.y);
+    Layer::Index fromPos = 0;
+    Layer::Index toPos = 0;
+    {
+        std::shared_lock lock(*session.getDocument());
+        look.rect = sticky::pastePlace(look.rect, toRef->getWidth(), toRef->getHeight(), {});
+        const Layer::Index id = sticky::layerIdOf(*fromRef, layer);
+        if (id == 0) {
+            return false;
+        }
+        fromPos = id - 1;
+        toPos = toRef->getLayerCount();  // (on top of the other page's layers)
+    }
+    if (peeking.erase(layer)) {
+        sticky::setPeeking(layer, false);
+    }
+    clearSelection();
+    LayerController* layers = session.getLayerController();
+    // The move on its page and the way over are one step: undone, it is back where the drag started
+    sticky::NotePageUndoAction::move(layers, *session.getDocument(), layer, {fromRef, fromPos, dragNow},
+                                     {toRef, toPos, look});
+    session.getUndoRedoHandler()->addUndoAction(std::make_unique<sticky::NotePageUndoAction>(
+            layers, layer, sticky::NotePageUndoAction::Place{fromRef, fromPos, dragStart},
+            sticky::NotePageUndoAction::Place{toRef, toPos, look}, tr("Move sticky note to another page")));
+    select(*target, layer);
+    Q_EMIT view.notesChanged();
+    return true;
 }
 
 bool StickyNotes::tapCover(CanvasPage& page, double x, double y) {

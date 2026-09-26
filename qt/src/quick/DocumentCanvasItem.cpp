@@ -11,6 +11,7 @@
 
 #include <cairo.h>
 
+#include <QKeySequence>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QKeyEvent>
@@ -37,6 +38,7 @@
 #include "CanvasPage.h"
 #include "Perf.h"
 #include "CanvasView.h"
+#include "StickyNotes.h"
 #include "GeometryToolLayer.h"
 #include "GeometryToolPicture.h"
 #include "TextEditor.h"
@@ -663,10 +665,18 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
 
 void DocumentCanvasItem::releaseResources() { viewReplaced = true; }
 
+namespace {
+bool isClipboardKey(QKeyEvent* e) {
+    return e->matches(QKeySequence::Copy) || e->matches(QKeySequence::Cut) || e->matches(QKeySequence::Paste);
+}
+}  // namespace
+
 bool DocumentCanvasItem::event(QEvent* e) {
     // While editing text, typing keys belong to the editor, not to the window's shortcuts (Ctrl+C, Delete, ...).
+    // A selected sticky note takes Ctrl+C/X/V (the window's shortcuts: the whole note), not a text being written.
     if (e->type() == QEvent::ShortcutOverride && canvasView && canvasView->getTextInput() &&
-        canvasView->getTextInput()->wantsKeyEvent(static_cast<QKeyEvent*>(e))) {
+        canvasView->getTextInput()->wantsKeyEvent(static_cast<QKeyEvent*>(e)) &&
+        !(canvasView->notes().hasSelection() && isClipboardKey(static_cast<QKeyEvent*>(e)))) {
         e->accept();
         return true;
     }

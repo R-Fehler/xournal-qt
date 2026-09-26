@@ -407,7 +407,7 @@ void CanvasView::repaintSelection(bool) {
 bool CanvasView::copySelection() {
     // Port of ClipboardHandler::copy (the Xournal part and the text part)
     if (!selection) {
-        return false;
+        return stickyNotes->copySelected();  // (a selected sticky note: the whole note; nothing selected: nothing)
     }
     ObjectOutputStream out(new BinObjectEncoding());
     out.writeString(PROJECT_STRING);
@@ -430,6 +430,9 @@ bool CanvasView::copySelection() {
 }
 
 bool CanvasView::cutSelection() {
+    if (!selection && stickyNotes->hasSelection()) {
+        return stickyNotes->cutSelected();
+    }
     if (!copySelection()) {
         return false;
     }
@@ -574,6 +577,14 @@ bool CanvasView::pasteLinkMarker(std::optional<QPointF> viewPos) {
 bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
     // Port of Control::clipboardPasteXournal
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    // A copied sticky note: onto the page in view of this view (pasted at a place: the page there), where it was
+    if (StickyNotes::clipboardHasNote()) {
+        const size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
+                                             .value_or(currentPageNo())
+                                   : currentPageNo();
+        const auto scope = actingScope(pNr);
+        return stickyNotes->paste(pNr);
+    }
     // A copied link ("Copy link"): a link marker (qt/docs/links.md)
     if (mime && mime->hasFormat(links::MIME)) {
         return pasteLinkMarker(viewPos);

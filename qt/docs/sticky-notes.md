@@ -1,6 +1,7 @@
 # Sticky notes
 
-Status: built in `qt/sticky-notes` (2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
+Status: built in `qt/sticky-notes` (2026-09-26); copy, cut, paste and moving to another page in
+`qt/sticky-clipboard` (2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
 user can write on and move around, with the ink and text on them staying attached; not a PDF popup note that other
 viewers minimise; usable for self-testing by moving them over solutions; adaptable in size.
 
@@ -19,15 +20,52 @@ clipped to it. It lies above the page's ink.
   note (the topmost note under the pen). The eraser erases on the note. Strokes that go beyond its edge are kept whole
   and clipped where they are drawn.
 - **Selecting:** a select tool (rectangle, lasso, object) on a note selects the whole note: an outline, a round
-  handle at the bottom-right corner, and a pill above the note with its colours, "Cover", delete and deselect (Del
-  and Esc work too). A drag on the note moves it right away (pen, mouse, or a finger on the selected note); the
-  handle resizes it (with any tool). A note stays on its page and inside it. Choosing a tool that is not a select
-  tool ends the selection, so that the pen then writes on the note.
+  handle at the bottom-right corner, and a pill above the note with its colours, "Cover", copy, cut, delete and
+  deselect (Ctrl+C, Ctrl+X, Del and Esc work too). A drag on the note moves it right away (pen, mouse, or a finger on
+  the selected note); the handle resizes it (with any tool). While dragged a note stays inside its page; let go over
+  another page, it goes there (see below). Choosing a tool that is not a select tool ends the selection, so that the
+  pen then writes on the note.
 - **Colours:** five pastel presets (yellow, pink, blue, green, orange). A new note is yellow.
 - **Placing:** "Sticky note" in the shapes menu (next to the setsquare and the compass: things put on the page) and
   "Insert sticky note" in the More menu (next to "Insert image…"). The note goes in the middle of the visible part of
   the current page, selected, and the rectangle select tool is chosen (as for an inserted image), so that it can be
   moved and resized right away.
+
+## Copy, cut, paste; moving to another page
+
+The author's request (2026-09-26): copy, cut and paste a selected note (also Ctrl+C, Ctrl+X, Ctrl+V), mainly to copy
+and move notes to other pages.
+
+- **Copy / cut:** the pill's Copy and Cut, Ctrl+C / Ctrl+X, and Copy / Cut in the long-press (right-click) pill act
+  on the selected note: the whole note goes onto the clipboard (its place, size, colour, cover, and everything on
+  it). Cut removes the note's layer as one undo step ("Cut sticky note"). Copying with nothing selected does what it
+  did before (nothing).
+- **Paste:** Ctrl+V, and Paste in the long-press pill (and in the pill on PDF text), put a copied note on the
+  current page of the view pasted in: the page in view (the page pressed, for the long-press pill), the second
+  view's own page when pasting there (self-reference, while it is written in: `CanvasView::actingScope`). Another
+  tab or another window works the same (the system clipboard). The note goes where it was on its old page when it
+  fits; else it is moved inside the page (and made as large as the page only if it is larger). If it would lie
+  exactly on a note of that page (a paste on the original's page, a second paste), it goes 16 points further down
+  and right each time (up and left in the bottom right corner). It is placed on top of the page's layers (the new
+  top note), selected, as one undo step ("Paste sticky note"). A covering note stays covering; peeking is not
+  copied (the copy covers).
+- **Keys that must not go elsewhere:** with a note selected, Ctrl+C/X/V are not taken by a text being written
+  (`DocumentCanvasItem`), there is no selection of elements at the same time (selecting one ends the other), and in
+  the page sidebar or grid (a page clicked there has the keys) Ctrl+C/X copy or cut the note, not the pages. Ctrl+V
+  there pastes a copied note onto the current page when the note was copied after the last page copy (or a note is
+  selected, or no pages are copied); else the pages, as before (`AppController::pastesNoteBeforePages`).
+- **The clipboard format** is the app's own, `application/x-xournal-qt-sticky-note`: the layer's name (cover or
+  not) and every element of the layer, the paper first, in upstream's element serialization (the one of its
+  `application/xournal` clipboard: strokes with their pressure, texts, images). A picture of the note (PNG, twice
+  the page resolution, drawn as in an export: no folded corner) goes along, so pasting into another app gives a
+  picture. Xournal++ itself does not read the note's format; the note is not also put there as upstream's
+  elements, since pasting those here would give loose elements instead of a note.
+- **Moving to another page:** cut, go to the page, paste. Also: drag the selected note past its page's edge and let
+  go over another page: it goes there, the point it was held by under the pointer (inside that page), on top, still
+  selected. While dragged it stays at the edge of its page (a page's picture cannot show it beyond the page); it
+  jumps on release. The drag and the change of page are one undo step ("Move sticky note to another page",
+  `sticky::NotePageUndoAction`: the same layer leaves one page and is inserted in the other).
+- **File format:** unchanged. A pasted or moved note is a note layer like any other.
 
 ## Cover mode (self-testing)
 
@@ -104,7 +142,10 @@ drawn here, clipped content included; its `/Rect` is the note. Never a `/Text` p
 
 ## Undo
 
-- Place and delete: upstream's `InsertLayerUndoAction` / `RemoveLayerUndoAction`.
+- Place, paste, delete and cut: upstream's `InsertLayerUndoAction` / `RemoveLayerUndoAction` (named after what was
+  done).
+- To another page by a drag: `sticky::NotePageUndoAction` (the page, the position among its layers and the look
+  before and after).
 - Move, resize, colour and cover: `sticky::NoteUndoAction` (the note's rectangle, colour and cover before and after;
   a change of the top left moves the content along).
 - Writing and erasing on a note: upstream's stroke and eraser undo actions (they remember the layer).
@@ -113,19 +154,30 @@ drawn here, clipped content included; its `/Rect` is the note. Never a `/Text` p
 ## Code
 
 - `qt/src/session/StickyNote.*`: the format (recognising a note, its look, making one), drawing, peeking, the undo
-  action, the selected-layer rule.
+  actions, the selected-layer rule, the clipboard format (`serialize`, `deserialize`) and where a paste goes
+  (`pastePlace`).
 - `qt/src/canvas/StickyNotes.*`: the canvas side (selection with its outline and handle, moving, resizing, writing
-  on a note, cover taps), used by `CanvasPage`, `CanvasInput` and `CanvasView`.
-- `qt/src/app/qml/NotePill.qml`: colours, cover, delete, at the note. The menu entries and the page pill's eye in
+  on a note, cover taps, copy / cut / paste and the picture for other apps, the drop on another page), used by
+  `CanvasPage`, `CanvasInput` and `CanvasView` (`copySelection`, `cutSelection` and `pasteElements` hand a note to
+  it).
+- `qt/src/app/qml/NotePill.qml`: colours, cover, copy, cut, delete, at the note. `PageKeys.qml`: the sidebar's keys
+  with a note. The menu entries and the page pill's eye in
   `Main.qml`; `AppController` (`insertStickyNote`, `noteSelected`, `noteColor`, `noteCovers`, `pageNotesHidden` ...).
 - `LayersModel` leaves the notes out of the layer panel.
-- Tests: `StickyNoteTest` (session: the format, the round trip, upstream Xournal++ opening the file, every export),
-  `CanvasReplayTest` (`*StickyNote*`: writing on a note and the clipping on the screen, moving and resizing with the
-  content and undo, cover mode and peeking, placing and deleting), `MainWindowTest.theShapesMenuPlacesAStickyNote…`.
+- Tests: `StickyNoteTest` (session: the format, the round trip, upstream Xournal++ opening the file, every export,
+  the clipboard format, where a paste goes), `CanvasReplayTest` (`*StickyNote*`: writing on a note and the clipping
+  on the screen, moving and resizing with the content and undo, cover mode and peeking, placing and deleting, copy
+  and paste on another page, cut, the offset over the original, covering stays covering, paste into another
+  document, the drag onto another page), `MainWindowTest.theShapesMenuPlacesAStickyNote…`,
+  `MainWindowTest.aStickyNoteIsMovedToAnotherPageByCutAndPaste` (the pill's Copy and Cut, Ctrl+X on page 1 and
+  Ctrl+V on page 3, the sidebar's keys).
 
 ## Not yet
 
-- Moving a note to another page (it stays on its page; copy and paste of a note neither).
+- Showing a dragged note over the other page while it is dragged (it waits at its page's edge and jumps on
+  release).
+- Pasting a note into upstream Xournal++ (it does not know the note's clipboard format).
+- A note selected in the second view (self-reference) has no pill of its own: Ctrl+C / X / V work there.
 - Clipping the text box while it is typed (the text being typed shows beyond the note's edge until it is done).
 - Markdown text boxes on notes (a Markdown box goes to the page's Markdown layer, below the notes).
 - A multi-layer selection rectangle that reaches a note selects nothing on the note (a tap selects the note).

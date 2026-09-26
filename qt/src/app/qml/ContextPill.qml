@@ -34,6 +34,8 @@ Popup {
     /// What the clipboard holds cannot be watched, so it is looked at when the pill opens
     property bool pasteAvailable: false
     readonly property bool reading: canvasItem.readingOnly
+    /// Something to copy, cut or delete: selected elements, or a selected sticky note (the notes' canvas)
+    readonly property bool selected: target.hasSelection || (target === app && app.noteSelected)
 
     function openAt(viewPos, pdfText) {
         at = viewPos
@@ -66,19 +68,19 @@ Popup {
         ToolButton {
             objectName: pill.named("contextCopy")
             text: qsTr("Copy")
-            visible: pill.target.hasSelection || pill.onPdfText
+            visible: pill.selected || pill.onPdfText
             onClicked: { pill.onPdfText ? pill.target.copyPdfText() : pill.target.copySelection(); pill.close() }
         }
         ToolButton {
             objectName: pill.named("contextCut")
             text: qsTr("Cut")
-            visible: pill.target.hasSelection && !pill.onPdfText && !pill.reading
+            visible: pill.selected && !pill.onPdfText && !pill.reading
             onClicked: { pill.target.cutSelection(); pill.close() }
         }
         ToolButton {
             objectName: pill.named("contextDelete")
             text: qsTr("Delete")
-            visible: pill.target.hasSelection && !pill.onPdfText && !pill.reading
+            visible: pill.selected && !pill.onPdfText && !pill.reading
             onClicked: { pill.target.deleteSelection(); pill.close() }
         }
         ToolButton {

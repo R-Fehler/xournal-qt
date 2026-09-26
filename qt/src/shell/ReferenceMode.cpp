@@ -18,6 +18,7 @@
 
 #include "CanvasView.h"
 #include "PageSketches.h"
+#include "session/StickyNote.h"
 #include "PagesModel.h"
 #include "Thumbnails.h"
 #include "TabManager.h"
@@ -463,7 +464,8 @@ bool ReferenceMode::pasteAt(qreal x, qreal y) {
 
 bool ReferenceMode::canPaste() const {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
-    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal"));
+    return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal") ||
+                    mime->hasFormat(sticky::CLIPBOARD_MIME));
 }
 
 void ReferenceMode::selectAllOnPage() {

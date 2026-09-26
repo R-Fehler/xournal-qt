@@ -25,6 +25,8 @@
 #include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
+#include <shared_mutex>
+
 #include <QClipboard>
 #include <QMimeData>
 #include <QPointer>
@@ -70,6 +72,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 #include "session/FuzzyQuery.h"
 #include "session/IncrementalPdf.h"
 #include "session/DocumentMode.h"
@@ -3612,6 +3615,88 @@ TEST_F(MainWindowTest, theShapesMenuPlacesAStickyNoteWithItsPill) {
     EXPECT_FALSE(pageNotes->isVisible());
     controller->redo();
     EXPECT_TRUE(controller->pageHasNotes());
+}
+
+// Sticky notes on the clipboard (qt/sticky-clipboard): the pill's Copy and Cut, and a note moved from the first page
+// to the third with Ctrl+X, going there, Ctrl+V.
+TEST_F(MainWindowTest, aStickyNoteIsMovedToAnotherPageByCutAndPaste) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    auto* s = controller->tabManager().currentSession();
+    ASSERT_GE(s->getDocument()->getPageCount(), 3u);
+    auto notesOn = [&](size_t page) {
+        std::vector<Layer*> notes;
+        std::shared_lock lock(*s->getDocument());
+        for (Layer* l: s->getDocument()->getPage(page)->getLayers()) {
+            if (xqt::sticky::isNote(*l)) {
+                notes.push_back(l);
+            }
+        }
+        return notes;
+    };
+    auto clipboardHasNote = [] {
+        const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+        return mime && mime->hasFormat(xqt::sticky::CLIPBOARD_MIME);
+    };
+    ASSERT_TRUE(controller->insertStickyNote());
+    until([&] { return controller->noteSelected(); });
+    auto* pill = find<QQuickItem>("notePill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    ASSERT_EQ(notesOn(0).size(), 1u);
+    const auto look = *xqt::sticky::lookOf(*notesOn(0).front());
+
+    // The pill's Copy: the note onto the clipboard, still selected
+    QGuiApplication::clipboard()->clear();
+    click(findItem("noteCopy"));
+    EXPECT_TRUE(clipboardHasNote());
+    EXPECT_TRUE(controller->noteSelected());
+    EXPECT_EQ(notesOn(0).size(), 1u);
+
+    // Ctrl+X: off its page; on the third page Ctrl+V puts it there, at the same place, selected
+    QGuiApplication::clipboard()->clear();
+    key(Qt::Key_X, Qt::ControlModifier);
+    EXPECT_TRUE(clipboardHasNote());
+    EXPECT_EQ(notesOn(0).size(), 0u);
+    EXPECT_FALSE(controller->noteSelected());
+    controller->goToPage(2);
+    until([&] { return s->getCurrentPageNo() == 2; });
+    ASSERT_EQ(s->getCurrentPageNo(), 2u);
+    key(Qt::Key_V, Qt::ControlModifier);
+    ASSERT_EQ(notesOn(2).size(), 1u);
+    EXPECT_EQ(*xqt::sticky::lookOf(*notesOn(2).front()), look);
+    EXPECT_TRUE(controller->noteSelected());
+    until([&] { return pill->isVisible(); });
+    EXPECT_TRUE(pill->isVisible()) << "its pill, at the pasted note";
+
+    // The pill's Cut: gone again, one undo step brings it back
+    click(findItem("noteCut"));
+    EXPECT_EQ(notesOn(2).size(), 0u);
+    EXPECT_FALSE(controller->noteSelected());
+    controller->undo();
+    EXPECT_EQ(notesOn(2).size(), 1u);
+    controller->undo();  // (the paste)
+    EXPECT_EQ(notesOn(2).size(), 0u);
+    controller->undo();  // (the cut)
+    EXPECT_EQ(notesOn(0).size(), 1u);
+
+    // In the page sidebar (a page clicked there has the keys): Ctrl+V pastes the copied note onto that page, and
+    // with the note selected Ctrl+C / Ctrl+X take the note, not the pages
+    auto* list = find<QQuickItem>("sidebarList");
+    ASSERT_NE(list, nullptr);
+    const int pages = controller->pageCount();
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(itemAt(list, 1)));
+    until([&] { return s->getCurrentPageNo() == 1; });
+    ASSERT_TRUE(clipboardHasNote());
+    key(Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(notesOn(1).size(), 1u) << "the note pasted onto the page clicked";
+    EXPECT_EQ(controller->pageCount(), pages) << "no pages pasted";
+    ASSERT_TRUE(controller->noteSelected());
+    key(Qt::Key_C, Qt::ControlModifier);
+    EXPECT_EQ(controller->copiedPages(), 0) << "the note copied, not the page";
+    key(Qt::Key_X, Qt::ControlModifier);
+    EXPECT_EQ(notesOn(1).size(), 0u) << "the note cut";
+    EXPECT_EQ(controller->pageCount(), pages) << "not the page";
 }
 
 TEST_F(MainWindowTest, theShapesMenuPutsTheSetsquareOnThePage) {

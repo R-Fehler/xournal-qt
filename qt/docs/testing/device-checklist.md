@@ -1648,3 +1648,27 @@ Update the table in the user doc with the results.
 - [ ] Settings → Documents → Web and citations → "Connect to arXiv": Off → the sheet says it is off and its buttons
       are disabled; "Ask the first time" asks again.
 - [ ] Android: the sheets fit a phone (scroll), the download lands in the library folder on the phone's storage.
+
+## Sticky notes: copy, cut, paste (qt/sticky-clipboard)
+
+- [ ] Select a note with ink and text on it (select tool, a tap): its pill has Copy and Cut beside Delete. Copy, go
+      to page 3 (scroll, or a tap on it in the page sidebar), Ctrl+V: the same note (colour, size, ink, text) at the
+      same place on page 3, selected, above that page's other notes. Ctrl+Z takes it away in one step.
+- [ ] Moving a note: Ctrl+X (or Cut in the pill) takes it off its page in one step; on another page Ctrl+V puts it
+      there. The same with the long-press / right-click pill: Copy and Cut are offered for the selected note, Paste
+      at the place pressed puts the note on that page (where it was on its old page, not where pressed).
+- [ ] Paste on the note's own page: the copy lies a little further down and right, not exactly on the original. Paste
+      several times: several notes, each a little further. A note near the bottom right corner: the copy goes up
+      and left instead. A note from a larger page pasted on a smaller one: moved inside the page.
+- [ ] A covering note (Cover on), peeking (tapped): copy and paste it: the copy covers (folded corner), it does not
+      peek. Paste into another tab (another document), and into the second view of the same document (self-reference,
+      with its edit switch on): the note lands on the page shown there.
+- [ ] Paste into another app (a chat, an image editor, a document): a picture of the note. Pasting text or a
+      picture copied elsewhere still works as before; with nothing selected Ctrl+C changes nothing.
+- [ ] While a text is typed on the page, Ctrl+C / Ctrl+V still copy and paste text there. With a note selected and the
+      page sidebar having the keys (a page clicked there): Ctrl+C / Ctrl+X take the note, not the page; after copying
+      a note, Ctrl+V there pastes the note onto the clicked page; after copying pages (later), Ctrl+V pastes the pages.
+- [ ] Drag a selected note with the select tool past the page's edge and let go over the next page: it jumps there,
+      the point where it was held under the pointer; one Ctrl+Z puts it back where the drag started. While dragging it
+      stays at its page's edge (it only jumps on release).
+- [ ] Save, open in upstream Xournal++: the pasted and moved notes are there as any other note.
