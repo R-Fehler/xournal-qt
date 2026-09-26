@@ -7031,6 +7031,12 @@ TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFil
     until([&] { return dialog->property("visible").toBool(); });
     EXPECT_TRUE(dialog->property("visible").toBool()) << "the picker is open";
     QMetaObject::invokeMethod(dialog, "close");
+    // From Qt 6.8 on the picker (Qt Quick's own file dialog, off-screen) is a window of its own, and it keeps the
+    // keyboard focus. A window manager gives the focus back to the main window when it closes; off-screen nothing
+    // does, and the Ctrl+V below would go nowhere. As the window manager does:
+    window->requestActivate();
+    until([&] { return QGuiApplication::focusWindow() == window; });
+    ASSERT_EQ(QGuiApplication::focusWindow(), window);
     // What it gives when a file is picked (the bar's action with the file's URL)
     auto* bar = find<QQuickItem>("markdownFormatBar");
     QMetaObject::invokeMethod(bar, "act", Q_ARG(QVariant, QString("image")),
@@ -7043,6 +7049,7 @@ TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFil
     EXPECT_EQ(editor->text().substr(0, link.size()), link);
     EXPECT_EQ(editor->text().substr(link.size()), start.substr(1));
     EXPECT_EQ(xqt::md::images::resolve("kalman.assets/my%20plot.png"), (assets / "my plot.png").string());
+    EXPECT_TRUE(canvasItem->hasActiveFocus()) << "the text keeps the keys";
 
     // Ctrl+V with a picture on the clipboard: saved as image-YYYY-MM-DD-HHMMSS.png, linked at the cursor
     key(Qt::Key_Return);
