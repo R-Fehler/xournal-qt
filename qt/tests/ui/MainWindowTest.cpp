@@ -7344,15 +7344,23 @@ TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
         ASSERT_FALSE(controller->presenting());
         until([&] { return !window->property("leavingFullScreen").toBool(); }, 2000);
         window->setWidth(2000);
-        wait(100);
+        // (the tool bar lays itself out again after full screen: wait until the button stands still)
+        QPointF was(-1, -1);
+        until([&] {
+            const QPointF now = present->mapToScene(QPointF(0, 0));
+            const bool still = present->isVisible() && now == was;
+            was = now;
+            wait(50);
+            return still;
+        });
         ASSERT_TRUE(present->isVisible());
     };
-    const QPoint at = present->mapToScene(QPointF(present->width() / 2, present->height() / 2)).toPoint();
+    auto at = [&] { return present->mapToScene(QPointF(present->width() / 2, present->height() / 2)).toPoint(); };
 
     // Held
-    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at());
     wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at());
     until([&] { return window->property("fullScreenMode").toBool(); });
     ASSERT_TRUE(controller->presenting());
     EXPECT_TRUE(clean()) << "held: only the page";
@@ -7361,7 +7369,7 @@ TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
     back();
 
     // Right click
-    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, at);
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, at());
     until([&] { return controller->presenting(); });
     ASSERT_TRUE(controller->presenting());
     EXPECT_TRUE(clean()) << "right click: only the page";
