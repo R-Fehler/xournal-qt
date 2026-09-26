@@ -194,6 +194,11 @@ set(XQT_QML_FILES
     src/app/qml/AdaptiveMenuItem.qml
     src/app/qml/MenuSheet.qml
     src/app/qml/MenuSheetHandle.qml
+    src/app/qml/ToolBarPlan.js
+    src/app/qml/ToolGroups.qml
+    src/app/qml/ToolCycleButton.qml
+    src/app/qml/ColorStrip.qml
+    src/app/qml/WidthStrip.qml
     src/app/qml/MarkdownFormatBar.qml
     src/app/qml/MarkdownTableEditor.qml
     src/app/qml/LookUpMenu.qml

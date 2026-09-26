@@ -122,6 +122,13 @@ is built.
   dialog's grow animation (no slide); the Settings sheet is its own popup, not an `AdaptiveDialog`; the tab overview,
   the Markdown table editor, the look-up menu and the small anchored popups (link, page jump, custom width) are
   not adapted; the dialogs are not checked against the bottom safe area (block 8).
+- [ ] Left from block 4 `qt/adaptive-toolbar` (tool bar layouts, "more tools", cycling buttons, the view pill, the
+  sidebar arrow, the text document's bar in the format bar): the format bar itself still scrolls sideways in a narrow
+  window (F7.1, D10: its insert overflow, and docking above the soft keyboard on phones: `qt/adaptive-panels` /
+  `qt/safe-areas-keyboard`); the colors' popups (palette, widths, "more tools") are popups, not sheets, on phones;
+  the phone's final tool layout is the bottom dock of `qt/compact-chrome`; menus still plain `Menu`s: the home
+  screen's New / Import / Sort, the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
+  cell menu; the pen pill's width and colors are not cycling buttons with lists yet.
 
 ---
 

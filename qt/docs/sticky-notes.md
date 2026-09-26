@@ -31,8 +31,9 @@ clipped to it. It lies above the page's ink.
   another page, it goes there (see below). Choosing a tool that is not a select tool ends the selection, so that the
   pen then writes on the note.
 - **Colours:** five pastel presets (yellow, pink, blue, green, orange). A new note is yellow.
-- **Placing:** "Sticky note" in the shapes menu (next to the setsquare and the compass: things put on the page) and
-  "Insert sticky note" in ⋮ → Page (next to "Insert image…"). The note goes in the middle of the visible part of
+- **Placing:** the tool bar's **Sticky note** button (one of the tools that are never hidden; since
+  qt/adaptive-toolbar the only place: the shapes menu is gone and ⋮ → Page has no "Insert sticky note" any more,
+  qt/docs/adaptive-layout.md "One place for each action"). The note goes in the middle of the visible part of
   the current page, selected, and the rectangle select tool is chosen (as for an inserted image), so that it can be
   moved and resized right away.
 
@@ -97,15 +98,16 @@ Everything started inside a note that shows and can be written on (not hidden, n
 topmost note at the point counts. A covering note takes nothing (and nothing goes under it through it: a paste or an
 image there goes onto the page, below it).
 - **Ink, shapes, plain text** (the pen, the highlighter, the shape tools, the text tool): as before.
-- **The note's Markdown text**: a tap with the text tool with "Markdown" on (the font menu's switch) anywhere on the
-  note, a tap on the note's text with the text tool (Markdown on or off), or the pill's **Text** button. See below.
+- **The note's Markdown text**: a tap with the text box tool (always Markdown since qt/adaptive-toolbar) anywhere on
+  the note, a tap on the note's text with the text tool (Markdown on or off), or the pill's **Text** button. See below.
 - **Paste** (Ctrl+V, the pills' Paste) of elements, a picture or plain text goes into a note when a note is selected,
   or when the paste point lies on a note: the pointer (Ctrl+V with the mouse over the note), the place pressed (the
   long-press pill) or, without either, the middle of the visible part of the page. With a note selected the pasted
   things go to the middle of the note. They are pasted selected, as before, and stay in the note when the
   selection ends. A copied link (a link marker, a Markdown text of its own) and a copied note are not put into a
   note (a copied note is pasted as a note, as before).
-- **Insert image** (⋮ → Page, the pill's **Image…** button): into the selected note, or into the note in the
+- **Insert image** (the tool bar's **Image** button, or "more tools" where the bar is short; the pill's **Image…**
+  button): into the selected note, or into the note in the
   middle of the visible part of the page; fitted into the note (at most 80 % of its width and height, never enlarged)
   and centred on it.
 - **Pictures and links dropped** on Markdown being written go into that text, as before; while the note's text is

@@ -2217,3 +2217,62 @@ See [adaptive-layout.md](../adaptive-layout.md), "Dialogs and sheets".
       the sliders are wide, the labels above them; the back button goes back to the list, again closes Settings.
 - [ ] Fold 7 folded, landscape (915 × 412): dialogs take the whole screen and scroll; Settings as in portrait.
 - [ ] Fold 7 unfolded (about 900 × 1000): dialogs in the middle, as on a tablet; Settings with tabs.
+
+## Adaptive tool bar (qt/adaptive-toolbar)
+
+qt/docs/adaptive-layout.md, "The tool bar". Test with a document of notes, a PDF with a table of contents, and a `.md`.
+
+Surface at 200 %, upright (960×1392 after the task bar):
+- [ ] Two rows at the top: the tools on the first (pen/highlighter, eraser, hand, the finger draws, select, text box,
+      write on the page, sticky note, shapes, setsquare/compass, mark PDF text, then search, full screen, present,
+      settings) and ⋮ at its end; on the second all colors, the five widths, image, add a page, new, open, save. No
+      "»" (more tools). The page is as wide as the window; nothing at the sides.
+- [ ] ⋮ → View → Tool bar position → Two rows at the bottom: the rows go below the page, the page moves up; the view
+      pill sits above them. Turn to landscape and back: landscape has its own place, upright comes back at the bottom.
+      "Automatic for this window size" puts it back at the top.
+- [ ] Left / Right: the rail of two columns, ⋮ at its bottom; the sidebar's arrow at the rail's edge, the tab that
+      puts the bar away lower down.
+
+2-in-1 upright (864×1488 at 150 %, 720×1232 at 125 %):
+- [ ] 720: two rows; the pen, eraser, hand, finger, select, text box, writing, sticky note all shown; one width
+      button (a tap: the next width; hold: all five), the current color and the recent ones with a palette button;
+      "»" holds search, full screen, present, settings (with their names). Tap "Settings" in it: it opens, "»" closes.
+- [ ] Choose a color from the palette: it becomes the first after the current one next time (recent).
+
+Desktop, narrow window (drag the edge from 1920 down to 700):
+- [ ] 1920: everything in one row, all colors and widths, no "»". Narrower: first the widths become one button, then
+      the colors the recent ones (more of them when there is room again), then New/Open/Save, Settings, … go into
+      "»". Below about 810 px: two rows by themselves. Dragging slowly across an edge does not make the bar flicker; a
+      stroke in progress changes nothing until the pen is lifted.
+- [ ] ⋮ never moves out of sight; the tab that puts the bar away sits in the middle of the bar's lower edge.
+
+Cycling buttons (pen, eraser, select, shapes, setsquare/compass), by mouse, pen and finger:
+- [ ] Pen in use, tap it: highlighter (the dots move); select, then the pen button: the highlighter again. P / H take
+      pen / highlighter and the button follows. Close and reopen the app: the button shows what was used last.
+- [ ] The eraser: tap cycles standard → whiteout → whole strokes (icons: eraser, roller, small eraser over a stroke).
+- [ ] Shapes: hold (right click) lists line … recognize shapes with icons and "Shapes" on top; pick the arrow, draw
+      an arrow; tap: the next shape; the pen button: freehand again. There is no shapes menu any more.
+- [ ] Setsquare/compass: tap puts the setsquare on the page, tap again the compass; the pill's × takes it away.
+
+The view pill and the zoom percentage:
+- [ ] No − / + in the pill; the contents button next to the page grid opens the contents overview (a PDF with an
+      outline).
+- [ ] Mouse: one click on the percentage opens the fits after a moment (fit width, 100 %, fit height, fit page); a
+      double click fits the page and opens nothing; a right click opens the menu at once.
+- [ ] Finger: one tap opens the menu after the double-tap time, a double tap fits the page, holding it fits the page.
+- [ ] Pen: a tap opens the menu (after the moment), a double tap fits the page.
+- [ ] Pinch, Ctrl+wheel, Ctrl+plus/minus/0 and the middle button still zoom.
+- [ ] With a reference open in portrait: the pill stays above the reference's pill, inside the window.
+
+Labels without hover (finger):
+- [ ] Hold a finger on the hand button: "Hand" appears above the finger; let go: nothing is pressed. A quick tap takes
+      the hand. Hold on Present: it presents without controls (its own long press). The pen hovering over a button
+      shows its tool tip.
+
+The sidebar and text documents:
+- [ ] Portrait: the arrow at the left edge of the page area opens the sidebar as a drawer; "‹" at its edge closes it.
+      Wide window: "‹" hides the docked sidebar, the arrow brings it back. With the finger: the arrow is a finger
+      wide. Not in full screen, reading or presenting.
+- [ ] A `.md` being written: one bar only (the format bar), with "»" and ⋮ at its end; "»" has New, Open, Save, Edit as
+      notes, Open externally, Search, … ⋮ has no Settings, no Full screen, no Insert image (they are buttons).
+- [ ] The text box (T): a new text box is Markdown; tapping an old plain text still edits it as plain text.

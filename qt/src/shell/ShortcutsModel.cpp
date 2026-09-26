@@ -74,7 +74,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"toolPen", tr("Pen"), tools, {"P"}},
             {"toolEraser", tr("Eraser"), tools, {"E"}},
             {"toolHighlighter", tr("Highlighter"), tools, {"H"}},
-            {"toolText", tr("Text"), tools, {"T"}},
+            {"toolText", tr("Text box (Markdown)"), tools, {"T"}},
             {"toolSelect", tr("Select (rectangle)"), tools, {"S"}},
             {"toolLasso", tr("Select (lasso)"), tools, {"L"}},
             {"toolHand", tr("Hand (scroll)"), tools, {"A"}},

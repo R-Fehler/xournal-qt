@@ -57,11 +57,26 @@ Rectangle {
         onClicked: if (tool !== "") bar.act(tool)
     }
 
+    /// At the end of the bar, outside what scrolls: a text document's ⋮ and "more tools" (Main.qml puts them here)
+    property alias trailing: trailingSlot
+    Item {
+        id: trailingSlot
+        objectName: bar.named("formatBarTrailing")
+        anchors.right: parent.right
+        anchors.rightMargin: 6
+        anchors.verticalCenter: parent.verticalCenter
+        width: childrenRect.width
+        height: parent.height
+    }
+
     Flickable {
         id: flick
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: trailingSlot.left
         anchors.leftMargin: 6
-        anchors.rightMargin: 6
+        anchors.rightMargin: trailingSlot.width > 0 ? 4 : 0
         contentWidth: row.implicitWidth
         contentHeight: height
         flickableDirection: Flickable.HorizontalFlick

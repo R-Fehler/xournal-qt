@@ -8,10 +8,10 @@ import QtQuick.Layouts
 Popup {
     id: popup
     objectName: "customWidthPopup"
-    /// Where the tool bar is: "top", "left", "right"
+    /// Where the tool bar is: "top", "bottom", "left", "right"
     property string side: "top"
     x: side === "right" ? -width - 4 : side === "left" ? parent.width + 4 : 0
-    y: side === "top" ? parent.height + 4 : 0
+    y: side === "top" ? parent.height + 4 : side === "bottom" ? -height - 4 : 0
     margins: 8  // inside the window
     padding: 14
     modal: false

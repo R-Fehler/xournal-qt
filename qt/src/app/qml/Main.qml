@@ -7,6 +7,7 @@ import QtQuick.Layouts
 import XournalQt
 import XournalQt.Canvas
 import "Popups.js" as Popups
+import "ToolBarPlan.js" as ToolBarPlan
 
 ApplicationWindow {
     id: win
@@ -88,8 +89,48 @@ ApplicationWindow {
     onHudHiddenChanged: if (hudHidden) quickTools.close()
     function chooseChrome(mode) { chooseLayout("chrome", mode === "full" ? "" : mode) }
 
-    readonly property string toolbarPosition: app.toolbarPosition
+    // --- the tool bar's place (qt/docs/adaptive-layout.md, "The tool bar") ------------------------------------------
+    /// Chosen by hand in this size class (⋮ → View → Tool bar position): "top", "twoRowsTop", "twoRowsBottom",
+    /// "railLeft", "railRight"; "": the automatic place
+    readonly property string toolbarChoice: {
+        const c = layoutChoice("toolbar")
+        return ["top", "twoRowsTop", "twoRowsBottom", "railLeft", "railRight"].indexOf(c) >= 0 ? c : ""
+    }
+    /// The automatic place: two rows at the top on a portrait tablet (a single A4 page keeps the whole width), else
+    /// the place of the older setting (top, left, right)
+    readonly property string toolbarAuto: adaptive.layoutClass === "tabletPortrait" ? "twoRowsTop"
+                                          : app.toolbarPosition === "left" ? "railLeft"
+                                          : app.toolbarPosition === "right" ? "railRight" : "top"
+    /// A window too narrow for the tools that are never hidden in one row (not a phone): two rows automatically
+    readonly property string toolbarAutoLayout: toolbarAuto === "top" && toolArea.autoTwoRows ? "twoRowsTop" : toolbarAuto
+    readonly property string toolbarLayout: toolbarChoice !== "" ? toolbarChoice : toolbarAutoLayout
+    function chooseToolbar(layout) { chooseLayout("toolbar", layout === toolbarAutoLayout ? "" : layout) }
+    /// Its edge: "top", "bottom", "left", "right"
+    readonly property string toolbarPosition: toolbarLayout === "railLeft" ? "left" : toolbarLayout === "railRight" ? "right"
+                                              : toolbarLayout === "twoRowsBottom" ? "bottom" : "top"
     readonly property bool sideToolbar: toolbarPosition === "left" || toolbarPosition === "right"
+    readonly property bool twoToolRows: toolbarLayout === "twoRowsTop" || toolbarLayout === "twoRowsBottom"
+    /// A text document's tool bar is merged into its format bar: one row, ⋮ at its end (F7.2)
+    readonly property bool toolsInFormatBar: textDoc && formatBar.shown && !sideToolbar && fullChrome && !app.toolbarHidden
+    /// The cycling buttons' groups (ToolGroups.qml): the tool bar, the compact chrome's tools and the pen pill
+    readonly property ToolGroups toolGroups: ToolGroups {}
+    /// Opens a menu from an entry of another one: on a phone once the sheet of that one has gone
+    function openAfterMenus(menu) {
+        if (!menuSheet.visible) {
+            Popups.openAt(menu)
+            return
+        }
+        const then = function() {
+            menuSheet.closed.disconnect(then)
+            Popups.openAt(menu)
+        }
+        menuSheet.closed.connect(then)
+    }
+    /// The text box tool: a Markdown text box (the bar offers no plain one; old plain texts are edited as they are)
+    function takeTextBox() {
+        app.textMarkdown = true
+        app.selectTool("text")
+    }
     /// Full screen (F11): the compact chrome - no tab strip, tool bar or page sidebar; a small square shows the current
     /// tool, a tap on it offers the tools (the same ones) and colors. The page / zoom pill stays - in a full-screen
     /// window (windowFullScreen).
@@ -150,10 +191,8 @@ ApplicationWindow {
     }
     /// No tool bar: in the compact or reader chrome, or when it was put away - the small tool square takes over
     readonly property bool noToolbar: !fullChrome || app.toolbarHidden
-    readonly property bool verticalTools: sideToolbar || noToolbar
     /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
     readonly property bool textDoc: app.textDocument !== ""
-    readonly property int toolColumns: noToolbar ? 6 : 2
     Connections {
         target: app
         function onHomeVisibleChanged() { if (app.homeVisible) win.fullScreenMode = false }
@@ -399,18 +438,21 @@ ApplicationWindow {
       }
       ToolBar {
         id: topTools
+        objectName: "topTools"
         width: parent.width
-        visible: !app.homeVisible && !win.sideToolbar && !win.noToolbar
+        visible: !app.homeVisible && win.toolbarPosition === "top" && !win.noToolbar && !win.toolsInFormatBar
         Material.background: "#ffffff"
         Material.foreground: "#303030"
-        height: 56
+        height: win.twoToolRows ? 106 : 56
       }
-      // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/md-editor.md)
+      // Markdown being written (a .md, Markdown on a page): its formatting tools (qt/docs/md-editor.md). A text
+      // document's tool bar is merged into it: ⋮ at its end, its other buttons in "more tools" (F7.2)
       MarkdownFormatBar {
         id: formatBar
         width: parent.width
-        visible: !app.homeVisible && !app.presenting && !win.hudHidden && !markdownPanel.visible
-                 && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable) || app.textNotes)
+        readonly property bool shown: !app.homeVisible && !app.presenting && !win.hudHidden && !markdownPanel.visible
+                                      && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable) || app.textNotes)
+        visible: shown
         format: app.markdownFormat
         onFormatRequested: function(action, arg) {
             app.formatMarkdown(action, arg)
@@ -421,13 +463,24 @@ ApplicationWindow {
         }
       }
     }
+    // Two rows at the bottom (the class's choice; closer to the fingertips, like the address bar of a phone's browser)
+    footer: ToolBar {
+        id: bottomTools
+        objectName: "bottomTools"
+        visible: !app.homeVisible && win.toolbarPosition === "bottom" && !win.noToolbar && !win.toolsInFormatBar
+        Material.background: "#ffffff"
+        Material.foreground: "#303030"
+        height: visible ? 106 + win.safeBottom : 0
+        Rectangle { width: parent.width; height: 1; color: "#d5d8dc" }  // (the line towards the pages)
+    }
     // The table editor of the formatting bar (the notes' canvas; the editor beside the page has its own)
     MarkdownTableEditor {
         id: tableEditor
         onClosed: if (formatBar.visible) canvas.forceActiveFocus()
     }
 
-    // The tools: in the header (top), or a column at the left or right side (setting). One set of tools, moved.
+    // The tools: a row or two at the top, two rows at the bottom, or a column at the left or right side (the layout
+    // for this size class, qt/docs/adaptive-layout.md "The tool bar"). One set of buttons, placed by ToolBarPlan.js.
     Rectangle {
         id: sideTools
         objectName: "sideTools"
@@ -447,517 +500,213 @@ ApplicationWindow {
     }
     Item {
         id: toolArea
-        parent: win.noToolbar ? quickToolsHolder : (win.sideToolbar ? sideTools : topTools)
+        objectName: "toolArea"
+        parent: win.noToolbar ? quickToolsHolder
+                : win.sideToolbar ? sideTools : win.toolbarPosition === "bottom" ? bottomTools : topTools
         anchors.fill: parent
-        anchors.margins: win.verticalTools ? 4 : 0
-        anchors.leftMargin: 6
-        anchors.rightMargin: 6
+        anchors.topMargin: win.noToolbar ? 0 : 4
+        anchors.bottomMargin: win.toolbarPosition === "bottom" ? 4 + win.safeBottom : win.noToolbar ? 0 : 4
+        anchors.leftMargin: win.sideToolbar ? 3 : win.noToolbar ? 0 : 6
+        anchors.rightMargin: win.sideToolbar ? 3 : win.noToolbar ? 0 : 6
         Material.foreground: "#303030"
-        // Scrolls when the window is too small for all tools (sideways on top, up and down at a side).
+
+        /// The layout of the plan: "row", "twoRows", "rail", "grid" (the compact chrome's tools) or "merged"
+        readonly property string planLayout: win.noToolbar ? "grid" : win.toolsInFormatBar ? "merged"
+                                             : win.sideToolbar ? "rail" : win.twoToolRows ? "twoRows" : "row"
+        /// Where the popups of the buttons open: below a top bar, above a bottom one, beside a rail
+        readonly property string popupSide: win.noToolbar ? "left" : win.toolbarPosition
+        /// The plan in effect (ToolBarPlan.plan)
+        property var plan: null
+        property var lastInput: null
+        /// The buttons in "more tools", in their order
+        property var overflowNames: []
+        /// The buttons by their names in the plan, in their order (tools, insert, view, file)
+        readonly property var slots: ({
+            pen: penTool, eraser: eraserTool, hand: handTool, touchDrawing: touchDrawingTool, select: selectTool,
+            text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
+            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, addPage: addPageTool, search: searchTool,
+            fullScreen: fullScreenTool, present: presentTool, settings: settingsTool, new: newTool, open: openTool,
+            save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool
+        })
+        readonly property var order: ["pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
+                                      "shape", "geometry", "pdfText", "emoji", "image", "addPage", "search",
+                                      "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
+                                      "openExternally"]
+        /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
+        readonly property var planKey: [planLayout, width, height, win.textDoc, app.toolbarColors.length,
+                                        colorStrip.others.length, order.map(function(n) { return slots[n].offered !== false })]
+        onPlanKeyChanged: Qt.callLater(relayout)
+        Connections {
+            target: win.adaptive
+            function onHeldChanged() { if (!win.adaptive.held) Qt.callLater(toolArea.relayout) }
+        }
+        Component.onCompleted: {
+            order.forEach(function(n) {
+                const item = slots[n]
+                item.clicked.connect(function() { toolArea.slotUsed(item) })
+            })
+            relayout()
+        }
+
+        function offeredNames() { return order.filter(function(n) { return slots[n].offered !== false }) }
+        /// One row at the top would hide a tool that is never hidden (not on a phone): two rows then, as long as the
+        /// place is the automatic one (with 32 px to spare before it goes back to one row)
+        property bool autoTwoRows: false
+        /// Lays the bar out for the room it has (not while a pointer is held: no change under a stroke)
+        function relayout() {
+            if (win.adaptive.held || width <= 0) return
+            const input = {
+                layout: planLayout, width: width, height: height, items: offeredNames(), colors: !win.textDoc,
+                widths: !win.textDoc, presets: app.toolbarColors.length, recents: colorStrip.others.length
+            }
+            // (the automatic top bar: one row, or two when one would hide the important tools)
+            const autoTop = win.toolbarChoice === "" && win.toolbarAuto === "top" && !win.adaptive.phone
+                            && !win.noToolbar && !win.toolsInFormatBar
+            let two = false
+            if (autoTop) {
+                const room = win.width - 12 - (autoTwoRows ? 32 : 0)
+                two = ToolBarPlan.hidesImportant(ToolBarPlan.plan(Object.assign({}, input, { layout: "row", width: room })))
+            }
+            if (two !== autoTwoRows) {
+                autoTwoRows = two  // (the bar changes its layout; the plan follows)
+                return
+            }
+            let p = ToolBarPlan.plan(input)
+            // The hysteresis: a bar that grows takes a richer plan only once there are 24 px to spare (the same
+            // buttons and layout otherwise: no flicker at an edge)
+            const last = lastInput
+            if (plan && last && last.layout === input.layout && last.items.join() === input.items.join()
+                    && last.presets === input.presets && last.recents === input.recents && last.height === input.height
+                    && input.width > last.width && input.width - last.width < 64) {
+                const slack = Object.assign({}, input, { width: input.width - 24 })
+                const lean = ToolBarPlan.plan(slack)
+                if (ToolBarPlan.richness(lean) <= ToolBarPlan.richness(plan)) {
+                    p = ToolBarPlan.plan(Object.assign({}, input, { width: last.width }))
+                    p = relocate(p, input)
+                    input.width = last.width  // (the plan stays the one of that width)
+                }
+            }
+            lastInput = input
+            apply(p)
+        }
+        /// The same plan, with the end at the bar's end again
+        function relocate(p, input) {
+            if (p.layout === "row" || p.layout === "twoRows") p.end.x += width - input.width
+            return p
+        }
+        function apply(p) {
+            plan = p
+            const shown = []
+            order.forEach(function(n) {
+                const item = slots[n]
+                const at = p.placed[n]
+                if (item.offered === false) {
+                    item.parent = toolBank
+                } else if (at) {
+                    item.parent = barContent
+                    item.x = at.x
+                    item.y = at.y
+                } else if (p.overflow.indexOf(n) >= 0) {
+                    shown.push(n)
+                } else {
+                    item.parent = toolBank
+                }
+            })
+            // "More tools": its buttons in their order, one under the other (two columns when there are many)
+            const columns = shown.length > 8 ? 2 : 1
+            overflowContent.columns = columns
+            shown.forEach(function(n, i) {
+                const item = slots[n]
+                item.parent = overflowContent
+                item.x = (i % columns) * overflowContent.cellWidth
+                item.y = Math.floor(i / columns) * 52
+            })
+            overflowNames = shown
+            // The strips
+            colorStrip.parent = p.placed.colors ? barContent : toolBank
+            widthStrip.parent = p.placed.widths ? barContent : toolBank
+            colorStrip.mode = p.colors
+            colorStrip.recentCount = p.recent
+            widthStrip.mode = p.widths
+            colorStrip.columns = p.stripColumns
+            widthStrip.columns = p.stripColumns
+            colorStrip.cell = p.layout === "rail" || p.layout === "grid" ? p.cell : 40
+            widthStrip.cell = colorStrip.cell
+            if (p.placed.colors) { colorStrip.x = p.placed.colors.x; colorStrip.y = p.placed.colors.y }
+            if (p.placed.widths) { widthStrip.x = p.placed.widths.x; widthStrip.y = p.placed.widths.y }
+            dividerRepeater.model = p.dividers
+            barContent.width = p.contentWidth
+            barContent.height = p.layout === "grid" ? p.contentHeight : Math.min(p.contentHeight, toolFlick.height)
+            barContent.implicitHeight = p.contentHeight
+            // The end: ⋮ and "more tools", at the end of the first row, the bottom of a rail, the format bar's end
+            // for a text document, one more cell of the grid
+            toolEnd.parent = p.layout === "merged" ? formatBar.trailing : p.layout === "grid" ? barContent : toolArea
+            toolEnd.x = p.layout === "merged" ? 0 : p.end.x
+            toolEnd.y = p.layout === "merged" ? -2 : p.layout === "rail" ? toolArea.height - toolEnd.height : p.end.y
+            moreToolsButton.offered = p.overflow.length > 0 && p.layout !== "grid"
+        }
+        /// A button of "more tools" was used: it closes, unless the button opened a menu of its own
+        function slotUsed(item) {
+            if (item.parent !== overflowContent) return
+            Qt.callLater(function() {
+                if (!Popups.hasOpenPopup(item)) moreToolsPopup.close()
+            })
+        }
+
+        // (the buttons not shown: those not offered for this document)
+        Item { id: toolBank; visible: false }
+
         Flickable {
             id: toolFlick
             anchors.fill: parent
-            contentWidth: toolRow.width
-            contentHeight: toolRow.height
-            flickableDirection: win.verticalTools ? Flickable.VerticalFlick : Flickable.HorizontalFlick
+            // (a rail keeps ⋮ at its bottom, outside what could scroll)
+            anchors.bottomMargin: toolArea.planLayout === "rail" ? toolEnd.height + 2 : 0
+            contentWidth: barContent.width
+            contentHeight: barContent.implicitHeight
+            flickableDirection: Flickable.VerticalFlick
             boundsBehavior: Flickable.StopAtBounds
-            interactive: win.verticalTools ? contentHeight > height : contentWidth > width
+            // Only the compact chrome's tools scroll (a small window); the bars fit what they show (the rest is in
+            // "more tools")
+            interactive: toolArea.planLayout === "grid" && contentHeight > height
             clip: true
-        GridLayout {
-            id: toolRow
-            objectName: "toolRow"
-            rows: win.verticalTools ? -1 : 1
-            columns: win.verticalTools ? win.toolColumns : -1
-            height: win.verticalTools ? Math.max(toolFlick.height, implicitHeight) : toolFlick.height
-            width: win.verticalTools ? toolFlick.width : Math.max(toolFlick.width, implicitWidth)
-            rowSpacing: 2
-            columnSpacing: 2
+            Item {
+                id: barContent
+                objectName: "toolRow"
+                Repeater {
+                    id: dividerRepeater
+                    delegate: Rectangle {
+                        required property var modelData
+                        x: modelData.x
+                        y: modelData.y
+                        width: modelData.w
+                        height: modelData.h
+                        color: "#d5d8dc"
+                    }
+                }
+            }
+        }
 
-            IconButton { objectName: "pagesButton"; iconName: "xopp-sidebar-page-preview"; tip: qsTr("Pages"); checked: win.sidebarShown; onClicked: win.showSidebar(!win.sidebarShown) }
-            IconButton {
-                objectName: "contentsButton"
-                iconName: "xqt-toc"
-                tip: qsTr("Contents with the pages of each chapter (Ctrl+Alt+O)")
-                checked: contentsOverview.visible
-                onClicked: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open()
-            }
-            ToolSeparator { orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
-            IconButton { iconName: "xopp-document-new"; tip: qsTr("New document (new tab)"); onClicked: app.newDocument() }
-            IconButton { iconName: "xopp-document-open"; tip: qsTr("Open (in a new tab)"); onClicked: openDialog.open() }
-            IconButton { iconName: "xopp-document-save"; tip: qsTr("Save"); onClicked: saveOrAsk(null) }
-            // A .md, a text file, an image: in the app the system has for it (a code editor, …)
-            // A .md: a copy as notes (a .xopp) to write on with the pen; the .md stays as it is
-            IconButton {
-                objectName: "editAsNotesButton"
-                visible: app.textDocument === "markdown"
-                iconName: "xqt-notebook-pen"
-                tip: qsTr("Edit as notes: a copy to write on with the pen (saved as a .xopp; the .md stays)")
-                onClicked: app.editAsNotes()
-            }
-            IconButton {
-                objectName: "openExternallyButton"
-                visible: app.canOpenExternally
-                iconName: "xqt-external-link"
-                tip: qsTr("Open externally (in the app the system has for this file)")
-                onClicked: win.openExternally()
-            }
-            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
-            IconButton { visible: !win.textDoc; iconName: "xopp-tool-pencil"; tip: qsTr("Pen"); checked: app.tool === "pen"; onClicked: app.selectTool("pen") }
-            IconButton { visible: !win.textDoc; iconName: "xopp-tool-highlighter"; tip: qsTr("Highlighter"); checked: app.tool === "highlighter"; onClicked: app.selectTool("highlighter") }
-            // The eraser: a tap takes it; tapped again, held or right-clicked, it offers how it erases
-            IconButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                objectName: "eraserButton"
-                iconName: "xopp-tool-eraser"
-                tip: qsTr("Eraser (tap again or hold: how it erases)")
-                checked: app.tool === "eraser"
-                onClicked: checked ? Popups.openAt(eraserMenu) : app.selectTool("eraser")
-                onPressAndHold: Popups.openAt(eraserMenu)
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                    onTapped: function(point) { Popups.openAt(eraserMenu, point.position) }
-                }
-                Menu {
-                    id: eraserMenu
-                    objectName: "eraserMenu"
-                    component EraserItem: MenuItem {
-                        property string mode
-                        checkable: true
-                        checked: (app.settings.revision, app.settings.get("eraserMode")) === mode
-                        onTriggered: {
-                            app.settings.set("eraserMode", mode)
-                            app.selectTool("eraser")
-                        }
-                    }
-                    EraserItem { objectName: "eraserStandard"; text: qsTr("Standard (cuts strokes)"); mode: "default" }
-                    EraserItem { objectName: "eraserWholeStrokes"; text: qsTr("Whole strokes"); mode: "deleteStroke" }
-                    EraserItem { objectName: "eraserWhiteout"; text: qsTr("Whiteout (paints white)"); mode: "whiteout" }
-                }
-            }
-            IconButton { visible: !win.textDoc; iconName: "xopp-hand"; tip: qsTr("Hand"); checked: app.tool === "hand"; onClicked: app.selectTool("hand") }
-            // Draw with the finger (one finger draws, two scroll and zoom): a switch, not a tool
-            IconButton {
-                visible: !win.textDoc
-                objectName: "touchDrawingButton"
-                iconName: "xopp-touch-drawing"
-                tip: checked ? qsTr("The finger draws (two fingers scroll) - tap: the finger scrolls")
-                             : qsTr("Draw with the finger (two fingers scroll)")
-                checked: (app.settings.revision, app.settings.get("touchDrawing"))
-                onClicked: app.settings.set("touchDrawing", !checked)
-            }
-            IconButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                objectName: "textButton"
-                iconName: "xopp-tool-text"
-                tip: app.textMarkdown ? qsTr("Markdown text (tap to write; tap a text to edit it; hold for the font)")
-                                      : qsTr("Text (tap to write; tap a text to edit it)")
-                checked: app.tool === "text"
-                onClicked: app.tool === "text" ? fontPopup.open() : app.selectTool("text")
-                onPressAndHold: fontPopup.open()
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                    onTapped: fontPopup.open()
-                }
-                Popup {
-                    id: fontPopup
-                    x: win.toolbarPosition === "left" ? parent.width : win.toolbarPosition === "right" ? -width : 0
-                    y: win.verticalTools ? 0 : parent.height
-                    padding: 12
-                    ColumnLayout {
-                        spacing: 8
-                        Label { text: qsTr("Font"); font.weight: Font.DemiBold }
-                        ComboBox {
-                            id: familyBox
-                            Layout.preferredWidth: 260
-                            model: fontPopup.opened ? app.fontFamilies() : []
-                            currentIndex: model.indexOf(app.fontFamily)
-                            onActivated: app.fontFamily = currentText
-                        }
-                        RowLayout {
-                            Label { text: app.textMarkdown ? qsTr("Size of Markdown text") : qsTr("Size"); Layout.fillWidth: true }
-                            SpinBox {
-                                objectName: "fontSizeBox"
-                                from: 4; to: 200
-                                value: Math.round(app.textMarkdown ? app.markdownFontSize : app.fontSize)
-                                editable: true
-                                onValueModified: app.textMarkdown ? app.markdownFontSize = value : app.fontSize = value
-                            }
-                        }
-                        // New text boxes are Markdown: shown formatted
-                        Switch {
-                            objectName: "textMarkdownSwitch"
-                            text: qsTr("Markdown (shown formatted)")
-                            checked: app.textMarkdown
-                            onToggled: app.textMarkdown = checked
-                        }
-                    }
-                }
-            }
-            // Writing on the page (a text box, Markdown, a text file): the emoji picker
-            ToolButton {
-                id: emojiButton
-                objectName: "emojiButton"
-                visible: canvas.textEditing
-                text: "\u{1F642}"
-                font.family: "Xournal Qt Emoji"
-                font.pixelSize: 22
-                implicitWidth: 48
-                implicitHeight: 48
-                focusPolicy: Qt.NoFocus  // (the text being written keeps the keys)
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Emoji (or type : and a name, like :smile)")
-                ToolTip.delay: 600
-                background: Rectangle { radius: 10; color: emojiButton.pressed ? "#e8e8e8" : "transparent" }
-                onClicked: canvasEmojiPicker.open()
-                EmojiPicker {
-                    id: canvasEmojiPicker
-                    x: win.toolbarPosition === "left" ? parent.width : win.toolbarPosition === "right" ? -width : 0
-                    y: win.verticalTools ? 0 : parent.height
-                    onPicked: function(emoji) { close(); canvas.insertText(emoji) }
-                }
-            }
-            IconButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                objectName: "pdfTextButton"
-                readonly property var icons: ({ "highlight": "xopp-select-pdf-text-ht", "underline": "xqt-underline",
-                                                "strikethrough": "xqt-strikethrough", "select": "xopp-select-pdf-text-area" })
-                iconName: icons[app.pdfTextMode] || "xopp-select-pdf-text-ht"
-                tip: qsTr("Mark PDF text (drag over the text)")
-                checked: app.tool === "selectPdfTextLinear" || app.tool === "selectPdfTextRect"
-                onClicked: checked ? Popups.openAt(pdfTextMenu) : app.selectTool("selectPdfTextLinear")
-                onPressAndHold: Popups.openAt(pdfTextMenu)
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                    onTapped: function(point) { Popups.openAt(pdfTextMenu, point.position) }
-                }
-                Menu {
-                    id: pdfTextMenu
-                    objectName: "pdfTextMenu"
-                    width: 320
-                    component ModeItem: MenuItem {
-                        property string mode
-                        checkable: true
-                        checked: app.pdfTextMode === mode
-                        onTriggered: {
-                            app.pdfTextMode = mode
-                            if (app.tool !== "selectPdfTextRect") app.selectTool("selectPdfTextLinear")
-                        }
-                    }
-                    ModeItem { text: qsTr("Highlight"); mode: "highlight" }
-                    // The highlight color: three presets
-                    RowLayout {
-                        objectName: "highlightColors"
-                        width: parent ? parent.width : implicitWidth
-                        Label { text: qsTr("Highlight color"); Layout.leftMargin: 16; Layout.fillWidth: true; color: "#5f6368" }
-                        HighlightColors { Layout.rightMargin: 8 }
-                    }
-                    ModeItem { text: qsTr("Underline"); mode: "underline" }
-                    ModeItem { text: qsTr("Strike through"); mode: "strikethrough" }
-                    ModeItem { text: qsTr("Select (then copy or mark)"); mode: "select" }
-                    MenuSeparator {}
-                    MenuItem {
-                        text: qsTr("Select by area (columns, tables)")
-                        checkable: true
-                        checked: app.tool === "selectPdfTextRect"
-                        onTriggered: app.selectTool(checked ? "selectPdfTextRect" : "selectPdfTextLinear")
-                    }
-                }
-            }
-            // Writing on the page with the keyboard: Markdown, formatted while typing (hold for its source beside the page).
-            // DEPRECATED (2026-09-26): the text mode (TextFlowPanel, TextFlow) is no longer offered here; its code
-            // stays for now (qt/docs/text-mode.md).
-            IconButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                id: writeButton
-                objectName: "textModeButton"
-                property bool markdownMode: true  // (always; kept for the tests and QML that read it)
-                iconName: "xqt-markdown"
-                tip: qsTr("Markdown: write on the page, shown formatted (Ctrl+Alt+M). Hold for its source beside the page")
-                checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
-                onClicked: {
-                    if (textFlowPanel.visible) textFlowPanel.close(true)
-                    else if (markdownPanel.visible) markdownPanel.close(true)
-                    else if (app.markdownOnPage) app.endMarkdownOnPage()
-                    else app.writeMarkdownOnPage()  // (formatted while typing, on the page)
-                }
-                onPressAndHold: Popups.openAt(writeMenu)
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                    onTapped: function(point) { Popups.openAt(writeMenu, point.position) }
-                }
-                Menu {
-                    id: writeMenu
-                    objectName: "writeModeMenu"
-                    width: 340
-                    MenuItem {
-                        objectName: "markdownItem"
-                        text: qsTr("Markdown (shown formatted, on the page)")
-                        checkable: true
-                        checked: writeButton.markdownMode
-                        onTriggered: { writeButton.markdownMode = true; app.writeMarkdownOnPage() }
-                    }
-                    MenuSeparator {}
-                    MenuItem {
-                        objectName: "markdownSourceItem"
-                        text: qsTr("Markdown source beside the page")
-                        onTriggered: {
-                            const onPage = app.takeMarkdownFromPage()
-                            if (onPage.page === undefined) markdownPanel.open()
-                            else if (onPage.pageText) markdownPanel.open(onPage.page)
-                            else markdownPanel.openBox(onPage.page, onPage.x, onPage.y)
-                        }
-                    }
-                }
-                Connections {
-                    target: markdownPanel
-                    function onVisibleChanged() { if (markdownPanel.visible) writeButton.markdownMode = true }
-                }
-            }
-            IconButton { visible: !win.textDoc; objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
-            // A sticky note in the middle of the visible page, selected (also in the shapes menu and ⋮)
-            IconButton { visible: !win.textDoc; objectName: "stickyNoteButton"; iconName: "xqt-sticky-note"; tip: qsTr("Sticky note (write on it, cover with it)"); onClicked: app.insertStickyNote() }
-            IconButton { visible: !win.textDoc; objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
-            IconButton { visible: !win.textDoc; objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
-            IconButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                objectName: "shapeButton"
-                readonly property var icons: ({
-                    "line": "xopp-draw-line", "rectangle": "xopp-draw-rect", "ellipse": "xopp-draw-ellipse",
-                    "arrow": "xopp-draw-arrow", "doubleArrow": "xopp-draw-double-arrow",
-                    "drawCoordinateSystem": "xopp-draw-coordinate-system", "strokeRecognizer": "xopp-shape-recognizer"
-                })
-                iconName: icons[app.drawingType] || "xqt-shapes"
-                tip: qsTr("Shapes")
-                checked: (app.tool === "pen" || app.tool === "highlighter") && app.drawingType !== "default"
-                onClicked: Popups.openAt(shapeMenu)
-                Menu {
-                    id: shapeMenu
-                    component ShapeItem: MenuItem {
-                        property string type
-                        checkable: true
-                        checked: app.drawingType === type
-                        onTriggered: app.drawingType = type
-                    }
-                    ShapeItem { text: qsTr("Freehand"); type: "default" }
-                    ShapeItem { text: qsTr("Recognize shapes (draw, then it straightens)"); type: "strokeRecognizer" }
-                    MenuSeparator {}
-                    ShapeItem { text: qsTr("Line"); type: "line" }
-                    ShapeItem { text: qsTr("Rectangle"); type: "rectangle" }
-                    ShapeItem { text: qsTr("Ellipse"); type: "ellipse" }
-                    ShapeItem { text: qsTr("Arrow"); type: "arrow" }
-                    ShapeItem { text: qsTr("Double arrow"); type: "doubleArrow" }
-                    ShapeItem { text: qsTr("Coordinate system"); type: "drawCoordinateSystem" }
-                    MenuSeparator {}
-                    // On the page itself, not a way of drawing: drag it where it is needed, draw along its edge
-                    MenuItem {
-                        objectName: "setsquareItem"
-                        text: qsTr("Setsquare (draw along its edge)")
-                        checkable: true
-                        checked: app.geometryTool === "setsquare"
-                        onTriggered: app.toggleSetsquare()
-                    }
-                    MenuItem {
-                        objectName: "compassItem"
-                        text: qsTr("Compass (draw circles around it)")
-                        checkable: true
-                        checked: app.geometryTool === "compass"
-                        onTriggered: app.toggleCompass()
-                    }
-                    // A paper note on the page: write on it, move it, cover answers with it (qt/docs/sticky-notes.md)
-                    MenuItem {
-                        objectName: "stickyNoteItem"
-                        text: qsTr("Sticky note (write on it, cover with it)")
-                        icon.source: app.iconUrl("xqt-sticky-note")
-                        onTriggered: app.insertStickyNote()
-                    }
-                    MenuSeparator {}
-                    // Corners of shapes and moved selections jump onto the half-centimetre grid (upstream's tool bar
-                    // toggle; also in the settings)
-                    MenuItem {
-                        objectName: "snapGridItem"
-                        text: qsTr("Snap to the grid")
-                        checkable: true
-                        checked: (app.settings.revision, app.settings.get("snapGrid"))
-                        onTriggered: app.settings.set("snapGrid", checked)
-                    }
-                }
-            }
-            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
-            // The preset colors: tap to use; press and hold / right click to remove; + adds one.
-            Repeater {
-                model: app.toolbarColors
-                delegate: AbstractButton {
-                    visible: !win.textDoc
-                    id: swatch
-                    required property color modelData
-                    required property int index
-                    objectName: "colorSwatch"
-                    implicitWidth: 40
-                    implicitHeight: 44
-                    onClicked: app.setColor(modelData)
-                    onPressAndHold: Popups.openAt(swatchMenu)
-                    TapHandler {
-                        acceptedButtons: Qt.RightButton
-                        acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                        onTapped: function(point) { Popups.openAt(swatchMenu, point.position) }
-                    }
-                    contentItem: Item {
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 28; height: 28; radius: 14
-                            color: swatch.modelData
-                            border.width: Qt.colorEqual(app.color, swatch.modelData) ? 3 : 1
-                            border.color: Qt.colorEqual(app.color, swatch.modelData) ? Material.accentColor : "#9e9e9e"
-                        }
-                    }
-                    Menu {
-                        id: swatchMenu
-                        MenuItem { text: qsTr("Remove from the tool bar"); onTriggered: app.removeToolbarColor(swatch.index) }
-                        MenuItem { text: qsTr("Add a color…"); onTriggered: colorDialog.open() }
-                        MenuItem { text: qsTr("Default colors"); onTriggered: app.resetToolbarColors() }
-                    }
-                }
-            }
-            AbstractButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                objectName: "addColorButton"
-                implicitWidth: 40
-                implicitHeight: 44
-                onClicked: colorDialog.open()
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Add a color (press and hold a color to remove it)")
-                ToolTip.delay: 600
-                contentItem: Item {
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 28; height: 28; radius: 14
-                        color: "transparent"
-                        border.width: 1
-                        border.color: "#9e9e9e"
-                        Label { anchors.centerIn: parent; text: "+"; font.pixelSize: 18; color: "#5f6368" }
-                    }
-                }
-            }
-            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
-            Repeater {
-                model: [ { size: 1, dot: 6 }, { size: 2, dot: 10 }, { size: 3, dot: 15 }, { size: 4, dot: 21 } ]
-                delegate: AbstractButton {
-                    visible: !win.textDoc
-                    required property var modelData
-                    objectName: "sizeButton" + modelData.size
-                    implicitWidth: 40
-                    implicitHeight: 44
-                    onClicked: app.setSize(modelData.size)
-                    contentItem: Item {
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 32; height: 32; radius: 6
-                            color: app.size === modelData.size ? "#e0e3f5" : "transparent"
-                        }
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: modelData.dot; height: modelData.dot; radius: modelData.dot / 2
-                            color: "#303030"
-                        }
-                    }
-                }
-            }
-            // The fifth width: the tool's own, adjustable (tap it again or press and hold)
-            AbstractButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                id: customSizeButton
-                objectName: "customSizeButton"
-                implicitWidth: 40
-                implicitHeight: 44
-                enabled: app.customWidth > 0
-                opacity: enabled ? 1 : 0.4
-                // As big as the width compared to the very thick size
-                readonly property real dot: {
-                    const ref = app.tool, thick = app.sizeWidth(4)
-                    return thick > 0 ? Math.max(3, Math.min(26, Math.sqrt(app.customWidth / thick) * 21)) : 12
-                }
-                onClicked: app.size === 5 ? customSizePopup.open() : app.setSize(5)
-                onPressAndHold: { app.setSize(5); customSizePopup.open() }
-                ToolTip.visible: hovered && !customSizePopup.visible
-                ToolTip.text: qsTr("Own width (%1 mm): tap again or press and hold to change it").arg(customSizePopup.mmText)
-                ToolTip.delay: 600
-                contentItem: Item {
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 32; height: 32; radius: 6
-                        color: app.size === 5 ? "#e0e3f5" : "transparent"
-                    }
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: customSizeButton.dot; height: width; radius: width / 2
-                        color: "transparent"
-                        border.width: Math.min(width / 2, 2.5)
-                        border.color: "#303030"
-                    }
-                }
-                CustomWidthPopup {
-                    id: customSizePopup
-                    side: !win.fullChrome ? "left" : win.toolbarPosition
-                }
-            }
-            Item { Layout.fillWidth: !win.verticalTools; Layout.fillHeight: win.verticalTools; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1 }
-            IconButton {
-                visible: !win.textDoc  // (a text file: no ink, no pages to add)
-                objectName: "addPageButton"
-                iconName: "xopp-page-add"
-                tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
-                onClicked: app.addPageAfterCurrent()
-                onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                    onTapped: insertPagesDialog.openAt(app.pageNumber)
-                }
-            }
-            ToolSeparator { visible: !win.textDoc; orientation: win.verticalTools ? Qt.Horizontal : Qt.Vertical; Layout.columnSpan: win.verticalTools ? win.toolColumns : 1; Layout.fillWidth: win.verticalTools }
-            IconButton { objectName: "searchButton"; iconName: "xqt-search"; tip: qsTr("Search (Ctrl+F)"); checked: searchBar.visible; onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar() }
-            // Full screen (F11). Not inside full screen itself: the tools there end with "Leave full screen"
-            IconButton {
-                objectName: "fullScreenButton"
-                visible: !win.fullScreenMode
-                iconName: "xopp-fullscreen"
-                tip: qsTr("Full screen (F11)")
-                onClicked: win.fullScreenMode = true
-            }
-            // Present: full screen, page by page (from the current page)
-            // (held or right-clicked: without controls, only the page)
-            IconButton {
-                objectName: "presentButton"
-                visible: !win.fullScreenMode
-                iconName: "xopp-presentation-mode"
-                tip: qsTr("Present (F5; hold: only the page, Ctrl+F5)")
-                onClicked: win.startPresenting()
-                onPressAndHold: win.startPresenting(true)
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                    onTapped: win.startPresenting(true)
-                }
-            }
-            IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
+        // ⋮ and "more tools": pinned at the end, never scrolled away
+        Row {
+            id: toolEnd
+            objectName: "toolEnd"
+            spacing: 2
+            layoutDirection: Qt.RightToLeft  // (⋮ last, at the very end)
             IconButton {
                 objectName: "moreButton"
                 iconName: "xqt-more"
+                label: qsTr("More")
                 tip: qsTr("More")
                 onClicked: Popups.openAt(moreMenu)
-                // The ⋮ menu (qt/docs/adaptive-layout.md, "Menus"): the frequent actions at the top level, the rest in
-                // four submenus (a sheet with drill-in on phones). Every entry of the tool bar that is here too
-                // (image, sticky note, full screen, present) is still one tap there.
+                // The ⋮ menu (qt/docs/adaptive-layout.md, "Menus" and "One place for each action"): what has no button
+                // of its own. Every action with a button in the tool bar (or its "more tools"), the view pill or the
+                // sidebar is not here too (keyboard shortcuts stay); a sheet with drill-in on phones.
                 AdaptiveMenu {
                     id: moreMenu
                     objectName: "moreMenu"
-                    AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
-                    AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
-                    AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
+                    AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); icon.source: app.iconUrl("xopp-document-save"); onTriggered: openSaveDialog(null) }
+                    AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); icon.source: app.iconUrl("xqt-share"); onTriggered: shareDialog.openFor("") }
+                    AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); icon.source: app.iconUrl("xopp-document-print"); onTriggered: printDialog.open() }
                     AdaptiveMenuItem {
                         objectName: "bookmarkPageItem"
                         readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
@@ -977,57 +726,52 @@ ApplicationWindow {
                         onTriggered: app.favourite = !app.favourite
                     }
                     MenuSeparator {}
-                    // The document as a file: its name, other apps, other ways of editing it, links
+                    // The document as a file: its name, other ways of editing it, links (Open externally and Edit as
+                    // notes are buttons of the tool bar)
                     AdaptiveMenu {
                         objectName: "moreDocumentMenu"
                         title: qsTr("Document")
+                        iconName: "xqt-file-text"
                         // Its name (qt/rename): the file, and what belongs to it, as the library renames it
-                        AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
-                        AdaptiveMenuItem {
-                            objectName: "openExternallyItem"
-                            offered: app.canOpenExternally
-                            text: qsTr("Open externally")
-                            onTriggered: win.openExternally()
-                        }
+                        AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); icon.source: app.iconUrl("xqt-pencil"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
                         AdaptiveMenuItem {
                             objectName: "editAnywayItem"
                             offered: app.canEditAnyway
                             text: qsTr("Edit anyway (as plain text)…")
+                            icon.source: app.iconUrl("xqt-file-pen")
                             onTriggered: app.editAnyway(false)
-                        }
-                        AdaptiveMenuItem {
-                            objectName: "editAsNotesItem"
-                            offered: app.textDocument === "markdown"
-                            text: qsTr("Edit as notes (to write on with the pen)")
-                            onTriggered: app.editAsNotes()
                         }
                         // Text documents as PDF (qt/docs/md-pdf.md): a .md as a new PDF text document
                         AdaptiveMenuItem {
                             objectName: "openAsPdfDocumentItem"
                             offered: app.textDocument === "markdown"
                             text: qsTr("Open as PDF document")
+                            icon.source: app.iconUrl("xopp-document-export-pdf")
                             onTriggered: app.openAsPdfDocument()
                         }
                         AdaptiveMenuItem {
                             objectName: "unusedImagesItem"
                             offered: app.textDocument === "markdown"
                             text: qsTr("Remove unused images…")
+                            icon.source: app.iconUrl("xqt-image-off")
                             onTriggered: unusedImagesDialog.show()
                         }
-                        AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); onTriggered: backlinksDialog.show() }
-                        AdaptiveMenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
+                        AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); icon.source: app.iconUrl("xqt-link"); onTriggered: backlinksDialog.show() }
+                        AdaptiveMenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); icon.source: app.iconUrl("xqt-copy"); onTriggered: app.copyPageLink(-1) }
                     }
                     AdaptiveMenu {
                         objectName: "moreExportMenu"
                         title: qsTr("Export")
+                        iconName: "xqt-file-output"
                         // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type
                         // of Save as)
-                        AdaptiveMenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); onTriggered: openExportDialog() }
+                        AdaptiveMenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); icon.source: app.iconUrl("xopp-document-export-pdf"); onTriggered: openExportDialog() }
                         // A PDF/A for keeping: the ink merged into the pages, the Xournal data inside
                         AdaptiveMenuItem {
                             objectName: "exportArchiveItem"
                             offered: !win.textDoc
                             text: qsTr("Export for the archive…")
+                            icon.source: app.iconUrl("xqt-archive")
                             onTriggered: archiveDialog.openFor("")
                         }
                         // The Markdown of the document's page texts as a .md (qt/docs/md-pdf.md)
@@ -1035,66 +779,501 @@ ApplicationWindow {
                             objectName: "exportMarkdownItem"
                             offered: !win.textDoc && app.hasMarkdownText
                             text: qsTr("Export as Markdown")
+                            icon.source: app.iconUrl("xqt-markdown")
                             onTriggered: win.exportMarkdown()
                         }
                     }
-                    // The pages (a text file has none to add)
+                    // The pages (a text file has none to add; an image and a sticky note are buttons of the tool bar)
                     AdaptiveMenu {
                         objectName: "morePageMenu"
                         title: qsTr("Page")
+                        iconName: "xqt-file"
                         offered: !win.textDoc
-                        AdaptiveMenuItem { objectName: "insertPagesItem"; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
-                        AdaptiveMenuItem { objectName: "insertImageItem"; text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
-                        AdaptiveMenuItem { objectName: "insertStickyNoteItem"; text: qsTr("Insert sticky note"); onTriggered: app.insertStickyNote() }
-                        AdaptiveMenuItem { objectName: "pageBackgroundItem"; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
+                        AdaptiveMenuItem { objectName: "insertPagesItem"; text: qsTr("Insert pages…"); icon.source: app.iconUrl("xopp-page-add"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
+                        AdaptiveMenuItem { objectName: "pageBackgroundItem"; text: qsTr("Background of this page…"); icon.source: app.iconUrl("xqt-palette"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
                         // Another paper size for this page, the selected pages or all of them (PageSizeDialog)
-                        AdaptiveMenuItem { objectName: "pageSizeItem"; text: qsTr("Page size…"); onTriggered: pageSizeDialog.openFor([app.pageNumber - 1]) }
+                        AdaptiveMenuItem { objectName: "pageSizeItem"; text: qsTr("Page size…"); icon.source: app.iconUrl("xqt-scaling"); onTriggered: pageSizeDialog.openFor([app.pageNumber - 1]) }
                         // Writing space beside the slides of all pages (qt/docs/note-space.md)
-                        AdaptiveMenuItem { objectName: "noteSpaceItem"; text: qsTr("Space for notes…"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
-                        AdaptiveMenuItem { objectName: "chapterItem"; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
+                        AdaptiveMenuItem { objectName: "noteSpaceItem"; text: qsTr("Space for notes…"); icon.source: app.iconUrl("xqt-note-space"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
+                        AdaptiveMenuItem { objectName: "chapterItem"; text: qsTr("Start a chapter here…"); icon.source: app.iconUrl("xqt-toc"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     }
-                    // How the document is shown: overviews, full screen, presenting, reading, the tool bar
+                    // How the document is shown (all pages, full screen and presenting are buttons of the view pill and
+                    // the tool bar; hiding the tool bar is the tab on its edge)
                     AdaptiveMenu {
                         objectName: "moreViewMenu"
                         title: qsTr("View")
-                        AdaptiveMenuItem { objectName: "allPagesItem"; text: qsTr("All pages (Ctrl+Alt+G)"); onTriggered: pageGrid.open() }
-                        AdaptiveMenuItem { objectName: "allDocumentsItem"; text: qsTr("All open documents"); onTriggered: tabOverview.open() }
-                        MenuSeparator {}
+                        iconName: "xqt-eye"
+                        AdaptiveMenuItem { objectName: "allDocumentsItem"; text: qsTr("All open documents"); icon.source: app.iconUrl("xqt-tabs-grid"); onTriggered: tabOverview.open() }
+                        // Phones: the view pill has no room for the page layout button
                         AdaptiveMenuItem {
-                            objectName: "fullScreenItem"
-                            text: win.fullScreenMode ? qsTr("Leave full screen (F11)") : qsTr("Full screen (F11)")
-                            onTriggered: win.fullScreenMode = !win.fullScreenMode
+                            objectName: "pageLayoutItem"
+                            offered: !viewPill.layoutShown
+                            text: qsTr("Page layout…")
+                            icon.source: app.iconUrl("xqt-book-open")
+                            onTriggered: win.openAfterMenus(layoutMenu)
                         }
-                        AdaptiveMenuItem { objectName: "presentItem"; text: qsTr("Present (F5)"); onTriggered: win.startPresenting() }
-                        AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); onTriggered: win.startPresenting(true) }
+                        AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
                         // The reader chrome of this window size: only the page; the mark in the lower left corner
                         // brings the controls back (qt/docs/adaptive-layout.md)
-                        AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page)"); onTriggered: win.chooseChrome("reader") }
+                        AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page)"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: win.chooseChrome("reader") }
                         MenuSeparator {}
-                        AdaptiveMenuItem {
-                            objectName: "hideToolbarItem"
-                            text: app.toolbarHidden ? qsTr("Show the tool bar") : qsTr("Hide the tool bar")
-                            onTriggered: app.toolbarHidden = !app.toolbarHidden
-                        }
+                        // Where the tool bar is, in this size class (the automatic place: "Automatic")
                         AdaptiveMenu {
                             objectName: "toolbarPositionMenu"
                             title: qsTr("Tool bar position")
+                            iconName: "xqt-panel-top"
                             component PositionItem: AdaptiveMenuItem {
                                 property string position
                                 checkable: true
-                                checked: app.toolbarPosition === position
-                                onTriggered: app.toolbarPosition = position
+                                checked: win.toolbarLayout === position
+                                onTriggered: win.chooseToolbar(position)
                             }
                             PositionItem { objectName: "toolbarTopItem"; text: qsTr("Top"); position: "top" }
-                            PositionItem { objectName: "toolbarLeftItem"; text: qsTr("Left"); position: "left" }
-                            PositionItem { objectName: "toolbarRightItem"; text: qsTr("Right"); position: "right" }
+                            PositionItem { objectName: "toolbarTwoRowsTopItem"; text: qsTr("Two rows at the top"); position: "twoRowsTop" }
+                            PositionItem { objectName: "toolbarTwoRowsBottomItem"; text: qsTr("Two rows at the bottom"); position: "twoRowsBottom" }
+                            PositionItem { objectName: "toolbarLeftItem"; text: qsTr("Left"); position: "railLeft" }
+                            PositionItem { objectName: "toolbarRightItem"; text: qsTr("Right"); position: "railRight" }
+                            MenuSeparator {}
+                            AdaptiveMenuItem {
+                                objectName: "toolbarAutoItem"
+                                text: qsTr("Automatic for this window size")
+                                checkable: true
+                                checked: win.toolbarChoice === ""
+                                onTriggered: win.chooseLayout("toolbar", "")
+                            }
                         }
                     }
-                    MenuSeparator {}
-                    AdaptiveMenuItem { objectName: "settingsItem"; text: qsTr("Settings (Ctrl+,)"); onTriggered: settingsPage.open() }
+                }
+            }
+            // What does not fit into the bar: its buttons, with their names
+            IconButton {
+                id: moreToolsButton
+                objectName: "moreToolsButton"
+                property bool offered: false
+                visible: offered
+                iconName: "xqt-tools-more"
+                label: qsTr("More tools")
+                tip: qsTr("More tools (what does not fit into the bar)")
+                checked: moreToolsPopup.visible
+                onClicked: moreToolsPopup.visible ? moreToolsPopup.close() : moreToolsPopup.open()
+                Popup {
+                    id: moreToolsPopup
+                    objectName: "moreToolsPopup"
+                    // below the bar (above it at the bottom, beside a rail), at the button's end, inside the window
+                    // (margins)
+                    x: win.toolbarPosition === "left" ? parent.width + 4
+                       : win.toolbarPosition === "right" ? -width - 4 : parent.width - width
+                    y: 0
+                    onAboutToShow: {
+                        const bar = toolArea.mapToItem(moreToolsButton, 0, 0)
+                        y = win.toolbarPosition === "bottom" ? bar.y - height - 8
+                            : win.sideToolbar ? moreToolsButton.height - height
+                            : bar.y + toolArea.height + 8
+                    }
+                    margins: 8
+                    padding: 6
+                    modal: false
+                    focus: true  // (Esc closes it)
+                    background: Rectangle {
+                        radius: 12
+                        color: "#ffffff"
+                        border.width: 1
+                        border.color: "#d5d8dc"
+                    }
+                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+                    // (a tool chosen in it: back to writing)
+                    Connections {
+                        target: app
+                        enabled: moreToolsPopup.opened
+                        function onToolChanged() { if (!Popups.hasOpenPopupIn(overflowContent)) moreToolsPopup.close() }
+                    }
+                    contentItem: Flickable {
+                        implicitWidth: overflowContent.width
+                        implicitHeight: overflowContent.height
+                        contentWidth: overflowContent.width
+                        contentHeight: overflowContent.height
+                        interactive: contentHeight > height
+                        boundsBehavior: Flickable.StopAtBounds
+                        clip: true
+                        Item {
+                            id: overflowContent
+                            objectName: "overflowContent"
+                            property int columns: 1
+                            readonly property real cellWidth: Math.min(220, (win.width - 32) / columns)
+                            width: columns * cellWidth
+                            height: Math.ceil(toolArea.overflowNames.length / columns) * 52
+                            // Each button's name beside it; a tap on the name is a tap on the button
+                            Repeater {
+                                model: toolArea.overflowNames
+                                delegate: Label {
+                                    required property string modelData
+                                    required property int index
+                                    readonly property var button: toolArea.slots[modelData]
+                                    objectName: "overflowLabel_" + modelData
+                                    x: (index % overflowContent.columns) * overflowContent.cellWidth + 56
+                                    y: Math.floor(index / overflowContent.columns) * 52
+                                    width: overflowContent.cellWidth - 60
+                                    height: 48
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                    text: button ? button.name : ""
+                                    color: button && button.enabled ? "#303030" : "#9e9e9e"
+                                    TapHandler { onTapped: if (parent.button && parent.button.enabled) parent.button.clicked() }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+
+        // --- the buttons (placed by relayout(); `offered`: there at all for this document) ---
+        ToolCycleButton { id: penTool; objectName: "penButton"; parent: toolBank; group: "pen"; property bool offered: !win.textDoc }
+        ToolCycleButton { id: eraserTool; objectName: "eraserButton"; parent: toolBank; group: "eraser"; property bool offered: !win.textDoc }
+        IconButton {
+            id: handTool
+            objectName: "handButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            iconName: "xopp-hand"
+            label: qsTr("Hand")
+            tip: qsTr("Hand: scroll with the pen or the mouse (A)")
+            checked: app.tool === "hand"
+            onClicked: app.selectTool("hand")
+        }
+        // Draw with the finger (one finger draws, two scroll and zoom): a switch, not a tool
+        IconButton {
+            id: touchDrawingTool
+            objectName: "touchDrawingButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            iconName: "xqt-finger-draw"
+            label: qsTr("The finger draws")
+            tip: checked ? qsTr("The finger draws (two fingers scroll) - tap: the finger scrolls")
+                         : qsTr("Draw with the finger (two fingers scroll)")
+            checked: (app.settings.revision, app.settings.get("touchDrawing"))
+            onClicked: app.settings.set("touchDrawing", !checked)
+        }
+        ToolCycleButton { id: selectTool; objectName: "selectButton"; parent: toolBank; group: "select"; property bool offered: !win.textDoc }
+        // A text box, written in Markdown and shown formatted (the only text box the bar offers; old plain texts are
+        // still edited as they are). Tapped again, held or right-clicked: the font.
+        IconButton {
+            id: textTool
+            objectName: "textButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            iconName: "xqt-text-box"
+            label: qsTr("Text box")
+            tip: qsTr("Text box (T): tap to write, tap a text to edit it; tap again or hold: the font")
+            checked: app.tool === "text"
+            ownHold: true
+            onClicked: checked ? fontPopup.open() : win.takeTextBox()
+            onPressAndHold: fontPopup.open()
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: fontPopup.open()
+            }
+            Popup {
+                id: fontPopup
+                objectName: "fontPopup"
+                x: toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
+                y: toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
+                margins: 8
+                padding: 12
+                ColumnLayout {
+                    spacing: 8
+                    Label { text: qsTr("Text box: the font"); font.weight: Font.DemiBold }
+                    ComboBox {
+                        id: familyBox
+                        Layout.preferredWidth: 260
+                        model: fontPopup.opened ? app.fontFamilies() : []
+                        currentIndex: model.indexOf(app.fontFamily)
+                        onActivated: app.fontFamily = currentText
+                    }
+                    RowLayout {
+                        Label { text: qsTr("Size"); Layout.fillWidth: true }
+                        SpinBox {
+                            objectName: "fontSizeBox"
+                            from: 4; to: 200
+                            value: Math.round(app.textMarkdown ? app.markdownFontSize : app.fontSize)
+                            editable: true
+                            onValueModified: app.textMarkdown ? app.markdownFontSize = value : app.fontSize = value
+                        }
+                    }
+                }
+            }
+        }
+        // Writing on the page with the keyboard: Markdown, formatted while typing (hold: its source beside the page).
+        // DEPRECATED (2026-09-26): the text mode (TextFlowPanel, TextFlow) is no longer offered here; its code stays
+        // for now (qt/docs/text-mode.md).
+        IconButton {
+            id: writeButton
+            objectName: "textModeButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            property bool markdownMode: true  // (always; kept for the tests and QML that read it)
+            iconName: "xqt-page-text"
+            label: qsTr("Write on the page")
+            tip: qsTr("Write on the page: Markdown, shown formatted (Ctrl+Alt+M). Hold: its source beside the page")
+            checked: textFlowPanel.visible || markdownPanel.visible || app.markdownOnPage
+            ownHold: true
+            onClicked: {
+                if (textFlowPanel.visible) textFlowPanel.close(true)
+                else if (markdownPanel.visible) markdownPanel.close(true)
+                else if (app.markdownOnPage) app.endMarkdownOnPage()
+                else app.writeMarkdownOnPage()  // (formatted while typing, on the page)
+            }
+            onPressAndHold: Popups.openAt(writeMenu)
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: function(point) { Popups.openAt(writeMenu, point.position) }
+            }
+            AdaptiveMenu {
+                id: writeMenu
+                objectName: "writeModeMenu"
+                title: qsTr("Write on the page")
+                titleShown: true
+                AdaptiveMenuItem {
+                    objectName: "markdownItem"
+                    text: qsTr("Markdown (shown formatted, on the page)")
+                    icon.source: app.iconUrl("xqt-page-text")
+                    checkable: true
+                    checked: writeButton.markdownMode
+                    onTriggered: { writeButton.markdownMode = true; app.writeMarkdownOnPage() }
+                }
+                AdaptiveMenuItem {
+                    objectName: "markdownSourceItem"
+                    text: qsTr("Markdown source beside the page")
+                    icon.source: app.iconUrl("xqt-markdown")
+                    onTriggered: {
+                        const onPage = app.takeMarkdownFromPage()
+                        if (onPage.page === undefined) markdownPanel.open()
+                        else if (onPage.pageText) markdownPanel.open(onPage.page)
+                        else markdownPanel.openBox(onPage.page, onPage.x, onPage.y)
+                    }
+                }
+            }
+            Connections {
+                target: markdownPanel
+                function onVisibleChanged() { if (markdownPanel.visible) writeButton.markdownMode = true }
+            }
+        }
+        // A sticky note in the middle of the visible page, selected
+        IconButton {
+            id: stickyTool
+            objectName: "stickyNoteButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            iconName: "xqt-sticky-note"
+            label: qsTr("Sticky note")
+            tip: qsTr("Sticky note (write on it, cover with it)")
+            onClicked: app.insertStickyNote()
+        }
+        ToolCycleButton { id: shapeTool; objectName: "shapeButton"; parent: toolBank; group: "shape"; property bool offered: !win.textDoc }
+        ToolCycleButton { id: geometryTool; objectName: "geometryButton"; parent: toolBank; group: "geometry"; property bool offered: !win.textDoc }
+        // Marking PDF text: highlight, underline, strike through, select; tapped again or held: how it marks
+        IconButton {
+            id: pdfTextTool
+            objectName: "pdfTextButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            readonly property var icons: ({ "highlight": "xqt-mark-text", "underline": "xqt-underline",
+                                            "strikethrough": "xqt-strikethrough", "select": "xopp-select-pdf-text-area" })
+            iconName: icons[app.pdfTextMode] || "xqt-mark-text"
+            label: qsTr("Mark PDF text")
+            tip: qsTr("Mark PDF text (drag over the text; tap again or hold: how it marks)")
+            checked: app.tool === "selectPdfTextLinear" || app.tool === "selectPdfTextRect"
+            ownHold: true
+            onClicked: checked ? Popups.openAt(pdfTextMenu) : app.selectTool("selectPdfTextLinear")
+            onPressAndHold: Popups.openAt(pdfTextMenu)
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: function(point) { Popups.openAt(pdfTextMenu, point.position) }
+            }
+            AdaptiveMenu {
+                id: pdfTextMenu
+                objectName: "pdfTextMenu"
+                title: qsTr("Mark PDF text")
+                titleShown: true
+                minimumWidth: 320
+                component ModeItem: AdaptiveMenuItem {
+                    property string mode
+                    checkable: true
+                    checked: app.pdfTextMode === mode
+                    onTriggered: {
+                        app.pdfTextMode = mode
+                        if (app.tool !== "selectPdfTextRect") app.selectTool("selectPdfTextLinear")
+                    }
+                }
+                ModeItem { text: qsTr("Highlight"); mode: "highlight"; icon.source: app.iconUrl("xqt-mark-text") }
+                // The highlight color: three presets
+                RowLayout {
+                    objectName: "highlightColors"
+                    width: parent ? parent.width : implicitWidth
+                    Label { text: qsTr("Highlight color"); Layout.leftMargin: 16; Layout.fillWidth: true; color: "#5f6368" }
+                    HighlightColors { Layout.rightMargin: 8 }
+                }
+                ModeItem { text: qsTr("Underline"); mode: "underline"; icon.source: app.iconUrl("xqt-underline") }
+                ModeItem { text: qsTr("Strike through"); mode: "strikethrough"; icon.source: app.iconUrl("xqt-strikethrough") }
+                ModeItem { text: qsTr("Select (then copy or mark)"); mode: "select"; icon.source: app.iconUrl("xopp-select-pdf-text-area") }
+                MenuSeparator {}
+                AdaptiveMenuItem {
+                    text: qsTr("Select by area (columns, tables)")
+                    checkable: true
+                    checked: app.tool === "selectPdfTextRect"
+                    onTriggered: app.selectTool(checked ? "selectPdfTextRect" : "selectPdfTextLinear")
+                }
+            }
+        }
+        // Writing on the page (a text box, Markdown, a text file): the emoji picker
+        IconButton {
+            id: emojiButton
+            objectName: "emojiButton"
+            parent: toolBank
+            property bool offered: canvas.textEditing
+            label: qsTr("Emoji")
+            tip: qsTr("Emoji (or type : and a name, like :smile)")
+            text: "\u{1F642}"
+            display: AbstractButton.TextOnly
+            font.family: "Xournal Qt Emoji"
+            font.pixelSize: 22
+            focusPolicy: Qt.NoFocus  // (the text being written keeps the keys)
+            onClicked: canvasEmojiPicker.open()
+            EmojiPicker {
+                id: canvasEmojiPicker
+                x: toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
+                y: toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
+                onPicked: function(emoji) { close(); canvas.insertText(emoji) }
+            }
+        }
+        ColorStrip { id: colorStrip; parent: toolBank; side: toolArea.popupSide }
+        WidthStrip { id: widthStrip; parent: toolBank; side: toolArea.popupSide }
+        IconButton {
+            id: imageTool
+            objectName: "imageButton"
+            parent: toolBank
+            property bool offered: !win.textDoc
+            iconName: "xopp-tool-image"
+            label: qsTr("Image")
+            tip: qsTr("Insert an image")
+            onClicked: imageDialog.open()
+        }
+        IconButton {
+            id: addPageTool
+            objectName: "addPageButton"
+            parent: toolBank
+            property bool offered: !win.textDoc  // (a text file: no pages to add)
+            iconName: "xopp-page-add"
+            label: qsTr("Add a page")
+            tip: qsTr("Add a page after the current one (press and hold: background, size, several pages)")
+            ownHold: true
+            onClicked: app.addPageAfterCurrent()
+            onPressAndHold: insertPagesDialog.openAt(app.pageNumber)
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: insertPagesDialog.openAt(app.pageNumber)
+            }
+        }
+        IconButton {
+            id: searchTool
+            objectName: "searchButton"
+            parent: toolBank
+            iconName: "xqt-search"
+            label: qsTr("Search")
+            tip: qsTr("Search (Ctrl+F)")
+            checked: searchBar.visible
+            onClicked: searchBar.visible ? searchBar.closeBar() : searchBar.openBar()
+        }
+        // Full screen (F11). Not inside full screen itself: the tools there end with "Leave full screen"
+        IconButton {
+            id: fullScreenTool
+            objectName: "fullScreenButton"
+            parent: toolBank
+            property bool offered: !win.fullScreenMode
+            iconName: "xopp-fullscreen"
+            label: qsTr("Full screen")
+            tip: qsTr("Full screen (F11)")
+            onClicked: win.fullScreenMode = true
+        }
+        // Present: full screen, page by page (from the current page); held or right-clicked: only the page
+        IconButton {
+            id: presentTool
+            objectName: "presentButton"
+            parent: toolBank
+            property bool offered: !win.fullScreenMode
+            iconName: "xopp-presentation-mode"
+            label: qsTr("Present")
+            tip: qsTr("Present (F5; hold: only the page, Ctrl+F5)")
+            ownHold: true
+            onClicked: win.startPresenting()
+            onPressAndHold: win.startPresenting(true)
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                onTapped: win.startPresenting(true)
+            }
+        }
+        IconButton {
+            id: settingsTool
+            objectName: "settingsButton"
+            parent: toolBank
+            iconName: "xqt-settings"
+            label: qsTr("Settings")
+            tip: qsTr("Settings (Ctrl+,)")
+            onClicked: settingsPage.open()
+        }
+        IconButton {
+            id: newTool
+            objectName: "newButton"
+            parent: toolBank
+            iconName: "xopp-document-new"
+            label: qsTr("New document")
+            tip: qsTr("New document (new tab)")
+            onClicked: app.newDocument()
+        }
+        IconButton {
+            id: openTool
+            objectName: "openButton"
+            parent: toolBank
+            iconName: "xopp-document-open"
+            label: qsTr("Open…")
+            tip: qsTr("Open (in a new tab; Ctrl+O)")
+            onClicked: openDialog.open()
+        }
+        IconButton {
+            id: saveTool
+            objectName: "saveButton"
+            parent: toolBank
+            iconName: "xopp-document-save"
+            label: qsTr("Save")
+            tip: qsTr("Save (Ctrl+S)")
+            onClicked: saveOrAsk(null)
+        }
+        // A .md: a copy as notes (a .xopp) to write on with the pen; the .md stays as it is
+        IconButton {
+            id: editAsNotesTool
+            objectName: "editAsNotesButton"
+            parent: toolBank
+            property bool offered: app.textDocument === "markdown"
+            iconName: "xqt-notebook-pen"
+            label: qsTr("Edit as notes")
+            tip: qsTr("Edit as notes: a copy to write on with the pen (saved as a .xopp; the .md stays)")
+            onClicked: app.editAsNotes()
+        }
+        // A .md, a text file, an image: in the app the system has for it (a code editor, …)
+        IconButton {
+            id: openExternallyTool
+            objectName: "openExternallyButton"
+            parent: toolBank
+            property bool offered: app.canOpenExternally
+            iconName: "xqt-external-link"
+            label: qsTr("Open externally")
+            tip: qsTr("Open externally (in the app the system has for this file)")
+            onClicked: win.openExternally()
         }
     }
 
@@ -1119,6 +1298,49 @@ ApplicationWindow {
             tip: qsTr("Keep the pages beside the page at this window size")
             onClicked: win.dockSidebar()
             background: Rectangle { radius: 12; color: parent.pressed ? "#e8e8e8" : "#ffffff"; border.color: "#d5d8dc" }
+        }
+    }
+    // The page sidebar's tab (qt/docs/adaptive-layout.md, "The page sidebar"): an arrow at the left edge of the canvas
+    // area opens it (beside the page where there is room, else as the drawer); at the sidebar's edge, "‹" closes it.
+    // A finger's size in the touch profile; not in the compact or reader chrome, nor while presenting, nor while the
+    // tool bar is put away (unless the sidebar is open: then it closes it).
+    AbstractButton {
+        id: sidebarArrow
+        objectName: "sidebarArrow"
+        readonly property bool open: sidebar.visible
+        visible: win.fullChrome && !app.homeVisible && !win.hudHidden && !app.presenting && (open || !app.toolbarHidden)
+        z: 50  // (over the drawer and its dimmed page)
+        width: win.adaptive.touchProfile ? win.adaptive.minTarget : 24
+        height: win.adaptive.touchProfile ? 64 : 56
+        // (40 % down: clear of the search bar at the top and the pills at the bottom)
+        x: open ? sidebar.x + sidebar.width : referenceSplit.x
+        y: referenceSplit.y + Math.round(referenceSplit.height * 0.4 - height / 2)
+        focusPolicy: Qt.NoFocus
+        hoverEnabled: true
+        Accessible.name: open ? qsTr("Close the page sidebar") : qsTr("Open the page sidebar")
+        ToolTip.visible: hovered
+        ToolTip.text: open ? qsTr("Close the pages") : qsTr("Pages, layers, contents, annotations")
+        ToolTip.delay: 600
+        onClicked: win.showSidebar(!open)
+        background: null
+        contentItem: Item {
+            Rectangle {  // a slim tab against the edge
+                x: -radius
+                anchors.verticalCenter: parent.verticalCenter
+                width: 18 + radius
+                height: 48
+                radius: 8
+                color: sidebarArrow.pressed ? "#e8e8e8" : "#f2ffffff"
+                border.width: 1
+                border.color: "#c9ccd1"
+                Image {
+                    x: parent.radius + (18 - width) / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    source: app.iconUrl(sidebarArrow.open ? "xqt-chevron-left" : "xqt-chevron-right")
+                    sourceSize.width: 16
+                    sourceSize.height: 16
+                }
+            }
         }
     }
     // Behind the drawer: the page dimmed; a tap there closes the drawer (and does not draw)
@@ -1264,12 +1486,20 @@ ApplicationWindow {
         // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in the
         // reader chrome
         visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden
-        anchors.right: canvas.right
-        anchors.bottom: canvas.bottom
-        anchors.rightMargin: 28
-        anchors.bottomMargin: 24
+        /// The page layout button: not in a phone's portrait (it is in ⋮ → View there)
+        readonly property bool layoutShown: ["phonePortrait", "tiny"].indexOf(win.adaptive.layoutClass) < 0
+        // At the canvas's lower right corner, never out of the window (a narrow canvas: over its neighbour), and
+        // above the reference's pill where the two would meet
+        readonly property rect refPill: Qt.rect(referenceSplit.x + referenceSplit.pillRect.x,
+                                                referenceSplit.y + referenceSplit.pillRect.y,
+                                                referenceSplit.pillRect.width, referenceSplit.pillRect.height)
+        x: Math.max(8, Math.min(canvas.x + canvas.width - 28 - width, parent.width - width - 8))
+        readonly property real lowY: canvas.y + canvas.height - 24 - height
+        readonly property bool meetsReference: refPill.width > 0 && x < refPill.x + refPill.width && x + width > refPill.x
+                                               && lowY < refPill.y + refPill.height && lowY + height > refPill.y
+        y: meetsReference ? refPill.y - height - 12 : lowY
         padding: 2
-        leftPadding: 14
+        leftPadding: 10
         rightPadding: 4
         Material.foreground: "#303030"
         background: Rectangle {
@@ -1301,9 +1531,14 @@ ApplicationWindow {
             ToolSeparator {}
             IconButton {
                 objectName: "layoutButton"
-                iconName: "xqt-columns"
-                tip: qsTr("Page layout")
+                visible: viewPill.layoutShown
+                iconName: app.pairedPages ? "xqt-book-open" : "xqt-page-single"
+                label: qsTr("Page layout")
+                tip: app.pairedPages ? qsTr("Two pages side by side - tap: one page (hold: the page layout)")
+                                     : qsTr("One page - tap: two side by side (hold: the page layout)")
                 implicitWidth: 40; implicitHeight: 40
+                icon.width: 22; icon.height: 22
+                ownHold: true
                 // A tap switches between one page and two side by side; the rest is in the menu (press and hold)
                 onClicked: {
                     if (app.pairedPages) {
@@ -1324,6 +1559,8 @@ ApplicationWindow {
                 AdaptiveMenu {
                     id: layoutMenu
                     objectName: "layoutMenu"
+                    title: qsTr("Page layout")
+                    titleShown: true
                     // A text file (.md, .txt): A4 pages, or one continuous page that grows with the text
                     AdaptiveMenuItem {
                         objectName: "textPagesItem"
@@ -1415,14 +1652,26 @@ ApplicationWindow {
                     }
                 }
             }
-            ToolSeparator {}
+            ToolSeparator { visible: viewPill.layoutShown }
             IconButton {
                 objectName: "pageGridButton"
                 iconName: "xqt-pages-grid"
+                label: qsTr("All pages")
                 tip: qsTr("All pages (Ctrl+Alt+G)")
                 implicitWidth: 40; implicitHeight: 40
                 icon.width: 22; icon.height: 22
                 onClicked: pageGrid.open()
+            }
+            // The table of contents with the pages of each chapter (ContentsOverview)
+            IconButton {
+                objectName: "contentsButton"
+                iconName: "xqt-toc"
+                label: qsTr("Contents")
+                tip: qsTr("Contents with the pages of each chapter (Ctrl+Alt+O)")
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 22; icon.height: 22
+                checked: contentsOverview.visible
+                onClicked: contentsOverview.visible ? contentsOverview.close() : contentsOverview.open()
             }
             // Scrolling sideways: the previous and the next page on either side of the page number
             IconButton {
@@ -1439,7 +1688,8 @@ ApplicationWindow {
                 objectName: "pageNumberLabel"
                 text: app.pageNumber + " / " + app.pageCount
                 color: "#505050"
-                Layout.rightMargin: app.horizontalScrolling ? 0 : 6
+                Layout.leftMargin: 2
+                Layout.rightMargin: app.horizontalScrolling ? 0 : 4
             }
             // Only on a page with sticky notes: hide them all (to see what they cover) and show them again
             IconButton {
@@ -1462,39 +1712,64 @@ ApplicationWindow {
                 onClicked: app.nextPage()
             }
             ToolSeparator {}
-            ToolButton { text: "−"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomOut() }
+            // The zoom, small. A tap: the fits (after the double-tap time, so a double tap does not flash the menu);
+            // a double tap or a long press: the whole page. Pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle
+            // button zoom as before.
             ToolButton {
+                id: zoomButton
                 objectName: "zoomButton"
                 text: app.zoomPercent + " %"
-                implicitWidth: 72
-                onClicked: app.fitWidth()
-                onPressAndHold: Popups.openAt(fitMenu)
+                font.pixelSize: 13
+                implicitWidth: Math.max(48, implicitContentWidth + 16)
+                implicitHeight: 40
+                focusPolicy: Qt.NoFocus
+                /// A tap waits for a second one before the menu opens
+                property bool menuPending: false
+                function fitWhole() {
+                    menuTimer.stop()
+                    app.fitPage()
+                }
+                Timer {
+                    id: menuTimer
+                    interval: Qt.styleHints.mouseDoubleClickInterval
+                    onTriggered: Popups.openAt(fitMenu)
+                }
+                TapHandler {
+                    id: zoomTaps
+                    objectName: "zoomTaps"
+                    acceptedButtons: Qt.LeftButton
+                    onTapped: function(point, button) {
+                        if (tapCount >= 2) zoomButton.fitWhole()
+                        else menuTimer.restart()
+                    }
+                    onLongPressed: zoomButton.fitWhole()
+                }
                 TapHandler {
                     acceptedButtons: Qt.RightButton
                     acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
-                    onTapped: function(point) { Popups.openAt(fitMenu, point.position) }
+                    onTapped: function(point) { menuTimer.stop(); Popups.openAt(fitMenu, point.position) }
                 }
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("Fit the width (press and hold: more)")
+                ToolTip.text: qsTr("Zoom: tap for the fits; double tap or hold: the whole page")
                 ToolTip.delay: 600
-                Menu {
+                AdaptiveMenu {
                     id: fitMenu
                     objectName: "fitMenu"
-                    MenuItem { text: qsTr("Fit the width (Ctrl+0)"); onTriggered: app.fitWidth() }
-                    MenuItem {
+                    title: qsTr("Zoom")
+                    AdaptiveMenuItem { objectName: "fitWidthItem"; text: qsTr("Fit the width (Ctrl+0)"); icon.source: app.iconUrl("xqt-fit-width"); onTriggered: app.fitWidth() }
+                    AdaptiveMenuItem {
                         objectName: "realSizeItem"
                         text: qsTr("Real size, 100 % (Ctrl+1)")
                         onTriggered: app.zoomToRealSize()
                     }
-                    MenuItem { text: qsTr("Fit the height"); onTriggered: app.fitHeight() }
-                    MenuItem {
+                    AdaptiveMenuItem { objectName: "fitHeightItem"; text: qsTr("Fit the height"); onTriggered: app.fitHeight() }
+                    AdaptiveMenuItem {
                         objectName: "fitPageItem"
-                        text: app.currentPageDiffers ? qsTr("Fit this page (its size differs)") : qsTr("Fit the whole page")
+                        text: app.currentPageDiffers ? qsTr("Fit this page (its size differs)") : qsTr("Fit the whole page (double tap)")
                         onTriggered: app.fitPage()
                     }
                 }
             }
-            ToolButton { text: "+"; font.pixelSize: 22; implicitWidth: 44; onClicked: app.zoomIn() }
         }
     }
 
@@ -2904,28 +3179,39 @@ ApplicationWindow {
         }
     }
 
-    // Putting the tool bar away and getting it back: a small tab at its end, and a slim strip while it is away.
-    Rectangle {
+    // Putting the tool bar away and getting it back: a small tab in the middle of its edge towards the pages (⋮ keeps the
+    // end of the bar), and a slim strip while it is away. A finger gets a target of minTarget around the tab.
+    Item {
         objectName: "toolbarToggle"
-        visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden
+        visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden && !win.toolsInFormatBar
         z: 58
-        width: win.sideToolbar ? 18 : 42
-        height: win.sideToolbar ? 42 : 18
-        radius: 6
-        color: "#ffffff"
-        border.width: 1
-        border.color: "#d5d8dc"
-        // At the end of the bar, a little into the pages
-        x: win.toolbarPosition === "left" ? sideTools.width - width / 2
-           : win.toolbarPosition === "right" ? parent.width - sideTools.width - width / 2
-           : parent.width - width - 18
-        y: win.sideToolbar ? Math.round(parent.height / 2) : -height / 2
-        Image {  // towards the bar it puts away: up, left or right
-            anchors.centerIn: parent
-            source: app.iconUrl("xqt-chevron-up")
-            sourceSize.width: 15
-            sourceSize.height: 15
-            rotation: win.toolbarPosition === "left" ? -90 : win.toolbarPosition === "right" ? 90 : 0
+        readonly property string edge: win.toolbarPosition
+        readonly property bool side: edge === "left" || edge === "right"
+        /// The target: a finger's size in the touch profile, reaching into the pages (not over the bar's buttons)
+        readonly property real grip: win.adaptive.touchProfile ? win.adaptive.minTarget : 18
+        width: side ? grip : 42
+        height: side ? 42 : grip
+        // Half over the bar's edge, the rest into the pages
+        x: edge === "left" ? sideTools.width - 9 : edge === "right" ? parent.width - sideTools.width - width + 9
+           : Math.round((parent.width - width) / 2)
+        y: side ? Math.round(parent.height * 0.75) : edge === "bottom" ? parent.height - height + 9 : -9  // (a rail: clear of the sidebar's arrow)
+        Rectangle {
+            x: parent.edge === "right" ? parent.width - width : 0
+            y: parent.edge === "bottom" ? parent.height - height : 0
+            width: parent.side ? 18 : 42
+            height: parent.side ? 42 : 18
+            radius: 6
+            color: "#ffffff"
+            border.width: 1
+            border.color: "#d5d8dc"
+            Image {  // towards the bar it puts away: up, down, left or right
+                anchors.centerIn: parent
+                source: app.iconUrl("xqt-chevron-up")
+                sourceSize.width: 15
+                sourceSize.height: 15
+                rotation: win.toolbarPosition === "left" ? -90 : win.toolbarPosition === "right" ? 90
+                          : win.toolbarPosition === "bottom" ? 180 : 0
+            }
         }
         TapHandler { onTapped: app.toolbarHidden = true }
         ToolTip.visible: hoverHandler.hovered
@@ -2933,28 +3219,28 @@ ApplicationWindow {
         ToolTip.delay: 600
         HoverHandler { id: hoverHandler }
     }
-    // While it is away: a slim strip at the edge where it was (top, left or right) brings it back
+    // While it is away: a slim strip at the edge where it was (top, bottom, left or right) brings it back
     Rectangle {
         id: toolbarShow
         objectName: "toolbarShow"
         visible: !app.homeVisible && win.fullChrome && app.toolbarHidden
-        readonly property string side: win.sideToolbar ? win.toolbarPosition : "top"
+        readonly property string side: win.toolbarPosition
         z: 60  // over the edge of the pen pill, which sits at the right edge by default
-        width: side === "top" ? 96 : 16
-        height: side === "top" ? 16 : 96
+        width: side === "top" || side === "bottom" ? 96 : 16
+        height: side === "top" || side === "bottom" ? 16 : 96
         x: side === "left" ? 0 : side === "right" ? parent.width - width : Math.round((parent.width - width) / 2)
-        y: side === "top" ? 0 : Math.round((parent.height - height) / 2)
+        y: side === "top" ? 0 : side === "bottom" ? parent.height - height : Math.round((parent.height - height) / 2)
         radius: 8
         color: "#f1f3f4"
         border.width: 1
         border.color: "#d5d8dc"
         opacity: showHover.hovered ? 1 : 0.75
-        Image {  // where the bar comes in from: down from the top, into the pages from a side
+        Image {  // where the bar comes in from: down from the top, up from the bottom, into the pages from a side
             anchors.centerIn: parent
             source: app.iconUrl("xqt-chevron-down")
             sourceSize.width: 15
             sourceSize.height: 15
-            rotation: toolbarShow.side === "left" ? -90 : toolbarShow.side === "right" ? 90 : 0
+            rotation: toolbarShow.side === "left" ? -90 : toolbarShow.side === "right" ? 90 : toolbarShow.side === "bottom" ? 180 : 0
         }
         TapHandler { onTapped: app.toolbarHidden = false }
         HoverHandler { id: showHover }
@@ -3040,7 +3326,7 @@ ApplicationWindow {
             Item {
                 id: quickToolsHolder
                 width: parent.width
-                height: Math.max(0, Math.min(toolRow.implicitHeight,
+                height: Math.max(0, Math.min(barContent.implicitHeight,
                                              win.contentItem.height - 16 - quickTools.topPadding - quickTools.bottomPadding
                                              - presentToggle.height - leaveFullScreen.height
                                              - 2 * quickToolsColumn.spacing))
@@ -3205,7 +3491,7 @@ ApplicationWindow {
 
     Shortcut { sequences: win.keysOf("toolEraser"); enabled: toolKeys; onActivated: app.selectTool("eraser") }
     Shortcut { sequences: win.keysOf("toolHighlighter"); enabled: toolKeys; onActivated: app.selectTool("highlighter") }
-    Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: app.selectTool("text") }
+    Shortcut { sequences: win.keysOf("toolText"); enabled: toolKeys; onActivated: win.takeTextBox() }  // (a Markdown text box)
     Shortcut { sequences: win.keysOf("toolSelect"); enabled: toolKeys; onActivated: app.selectTool("selectRect") }
     Shortcut { sequences: win.keysOf("toolLasso"); enabled: toolKeys; onActivated: app.selectTool("selectRegion") }
     Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
