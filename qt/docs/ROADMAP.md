@@ -482,6 +482,15 @@
   Fixed on the way: a Markdown box's leftover cairo point drew a later text box over its last line; flags on
   Android.
 
+- **Space for notes beside slides, `qt/note-space` (2026-09-26).** A page grows by amounts on its left, top, right
+  and bottom (stored on `XojPage`, `notespace="l t r b"` in the `.xopp`, a small upstream seam); the PDF is drawn at
+  the offset from the same cached picture. Text selection, links, search and index boxes, annotations and
+  thumbnails add the offset. Hybrid and archive PDFs get larger MediaBox/CropBox around the untouched page
+  (original boxes kept, so saving twice never grows twice; incremental saves rewrite only changed pages); plain
+  export uses the cairo exporter. Dialog "Space for notes" (page menu: this or selected pages; More: all or all
+  PDF pages), in % or cm, presets, preview, or a blank page after each. 300 pages in ~5 ms, one undo step.
+  Upstream shows the larger page with the PDF at the top left (right/bottom space looks the same).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

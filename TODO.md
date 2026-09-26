@@ -365,7 +365,8 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   page) → open in reference/tab, copy as a link; arXiv import (named by title). Networking is opt-in, and the URL is
   always shown (hover or preview) before anything is opened or downloaded. `.bib` later, after the user flow is
   thought through.
-- [ ] Note space for slides: a margin beside/below each slide (page enlarged, also in the PDF), or a page after each.
+- [x] Note space for slides (`qt/note-space`, merged 2026-09-26). Left: geometry tools do not move with the slide; PDF
+  pages whose crop box is smaller than their media box show the bleed in the space in other viewers.
 - [ ] Forms (only on PDFs that have fields) and a "My signature" stamp. Cryptographic signing: backlog.
 - [ ] **OCR (Tesseract), last of this round**: photo import with cropping, a text layer in PDFs. Never automatic:
   ask before each run, with "remember my choice", and a button in Settings to forget it.
