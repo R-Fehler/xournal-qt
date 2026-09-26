@@ -9,9 +9,11 @@
  * @license GNU GPLv2 or later
  */
 #include <memory>
+#include <string>
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QKeyEvent>
 #include <QPointingDevice>
 #include <QQmlApplicationEngine>
 #include <QQmlProperty>
@@ -37,6 +39,9 @@
 
 #include "CanvasView.h"
 #include "DocumentCanvasItem.h"
+#include "MarkdownBoxResize.h"
+#include "MarkdownEditor.h"
+#include "MdBox.h"
 
 using namespace xqt;
 
@@ -432,4 +437,45 @@ TEST_F(CanvasItemInputTest, theHoveringPenShowsALinksTargetToo) {
     QWindowSystemInterface::flushWindowSystemEvents();
     wait(20);
     EXPECT_TRUE(canvas->hoveredLink().isEmpty());
+}
+
+// The handle that sets a Markdown text box's width (MarkdownBoxResize): the mouse over it shows the horizontal
+// resize cursor, which stays while it is dragged; the drag sets the width.
+TEST_F(CanvasItemInputTest, theMouseOverAMarkdownBoxHandleShowsTheResizeCursor) {
+    app->getToolHandler()->selectTool(TOOL_TEXT);
+    view->setMarkdownText(true, 10, false);
+    view->startMarkdown(0, false, 100, 150);
+    MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    for (const char c: std::string("Some words in a Markdown text box that is resized.")) {
+        QKeyEvent e(QEvent::KeyPress, static_cast<Qt::Key>(QChar(c).toUpper().unicode()), Qt::NoModifier,
+                    QString(QChar(c)));
+        bool finish = false;
+        editor->keyPressed(&e, finish);
+    }
+    wait(100);
+    const auto handle = editor->widthHandle();
+    ASSERT_TRUE(handle);
+    const double zoom = view->getViewController().zoom();
+    const auto scenePos = [&](QPointF onPage) {
+        return canvas->mapToScene(view->pageViewRect(0).topLeft() + onPage * zoom).toPoint();
+    };
+    const double width = editor->boxWidth();
+    QTest::mouseMove(window, scenePos(*handle + QPointF(-100, 60)));
+    wait(20);
+    EXPECT_EQ(canvas->cursor().shape(), Qt::CrossCursor);
+    QTest::mouseMove(window, scenePos(*handle));
+    wait(20);
+    EXPECT_EQ(canvas->cursor().shape(), Qt::SizeHorCursor) << "over the handle";
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scenePos(*handle));
+    for (int i = 1; i <= 10; ++i) {
+        QTest::mouseMove(window, scenePos(*handle - QPointF(10 * i, 0)));
+    }
+    EXPECT_EQ(canvas->cursor().shape(), Qt::SizeHorCursor) << "while it is dragged";
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scenePos(*handle - QPointF(100, 0)));
+    wait(50);
+    EXPECT_NEAR(editor->boxWidth(), width - 100, 2);
+    QTest::mouseMove(window, scenePos(*handle + QPointF(-300, 80)));
+    wait(20);
+    EXPECT_EQ(canvas->cursor().shape(), Qt::CrossCursor) << "away from it";
 }

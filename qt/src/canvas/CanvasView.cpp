@@ -54,6 +54,7 @@
 
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
+#include "MarkdownBoxResize.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
@@ -82,6 +83,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         renderService(*session.getApp().getRenderService()),
         viewController(&layout) {
     stickyNotes = std::make_unique<StickyNotes>(*this);
+    boxResizer = std::make_unique<MarkdownBoxResize>(*this);
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     // (the rendered pages are kept by CanvasMemory: the PDF cache only serves edits of the visible ones)
     pdfCache->setMaxSize(std::min<size_t>(4, static_cast<size_t>(std::max(1, session.getSettings()->getPdfPageCacheSize()))));
@@ -257,6 +259,7 @@ void CanvasView::cancelRenders() {
 
 void CanvasView::rebuildPages() {
     stickyNotes->pageGoing(stickyNotes->selectedPage());
+    boxResizer->pagesGoing();
     geometry.allPagesGoing();
     sharpWanted.clear();
     cancelRenders();

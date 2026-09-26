@@ -66,6 +66,7 @@ class MarkdownEditor;
 class CanvasTextInput;
 class RenderService;
 class StickyNotes;
+class MarkdownBoxResize;
 
 class CanvasView final: public QObject, public XournalView, public Layout, public RasterHost, public DocumentListener {
     Q_OBJECT
@@ -290,6 +291,8 @@ public:
     bool drawGeometryMarks(double spacingCm);
     /// The sticky notes of this view: placing, the selected note, peeking, hiding (qt/docs/sticky-notes.md)
     StickyNotes& notes() const { return *stickyNotes; }
+    /// The handle that sets the width of a Markdown text box (written on the page, or selected)
+    MarkdownBoxResize& boxResize() const { return *boxResizer; }
     /// The setsquare / compass on the canvas.
     GeometryToolLayer& geometryTool() { return geometry; }
     const GeometryToolLayer& geometryTool() const { return geometry; }
@@ -513,6 +516,7 @@ private:
     bool markdownInPanel = false;    ///< Markdown text boxes are edited beside the page (tests; normally on the page)
     GeometryToolLayer geometry{*this};
     std::unique_ptr<StickyNotes> stickyNotes;
+    std::unique_ptr<MarkdownBoxResize> boxResizer;
     std::unique_ptr<PdfElemSelection> pdfSelection;
     CanvasPage* pdfSelectionPage = nullptr;
     PdfTextMode pdfTextMode = PdfTextMode::Highlight;

@@ -413,6 +413,17 @@ double MarkdownSession::setFontSize(double size) {
     return overflow(chain[0]);
 }
 
+double MarkdownSession::setWidth(double width) {
+    if (!active() || pageText || width <= 0 || width == style.width) {
+        return update(last);
+    }
+    style.width = width;
+    if (chain[0].box || !last.empty()) {
+        setBox(chain[0], last);
+    }
+    return overflow(chain[0]);
+}
+
 void MarkdownSession::finish() {
     if (!active()) {
         return;

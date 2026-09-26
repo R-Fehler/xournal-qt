@@ -1904,3 +1904,26 @@ Design: [md-images.md](../md-images.md).
 - [ ] The overview of open documents: double click (mouse) or press and hold (finger) on a card's title edits it in
       place; Escape cancels the name and the overview stays open; Enter renames, the card and the tab follow.
 - [ ] Recent: the same gestures on a card's title rename a document outside the library; it opens again at its page.
+
+## Resizing Markdown boxes (qt/md-box-resize)
+
+- [ ] Text tool with "Markdown" on, tap on a page, type a long paragraph: a white knob with ⟷ sits just outside the
+      middle of the box's right edge. Drag it to the left with the pen: the text flows onto more lines while dragging,
+      the frame grows downwards; to the right: fewer lines, never past the page's right edge; far to the left: it
+      stops at about 2 cm.
+- [ ] The same with a finger and with the mouse; the mouse shows the ⟷ cursor over the knob (and while dragging),
+      the cross elsewhere.
+- [ ] While writing, Ctrl+Z undoes a drag (one at a time), Ctrl+Shift+Z redoes it; the text is untouched. Escape,
+      then the undo button: the whole edit goes back, width included.
+- [ ] Select a box alone (object select tool, or a rectangle around it): its right knob shows ⟷. Drag it: the box
+      reflows while dragging and is selected again afterwards (the selection fits the new box). One undo step
+      restores the width; redo sets it again.
+- [ ] With that selection, the other knobs still work: the middle moves it, a corner scales it, the red knob turns
+      it, the × deletes it. After scaling with a corner, the ⟷ knob still sets the width.
+- [ ] The page's own Markdown text (written with the writing button): no knob while writing it; selected, its right
+      knob has no ⟷ and scales as before.
+- [ ] A page with its own Markdown text and a box beside it: resizing the box does not move the page's text or
+      change its pages.
+- [ ] Save, close, open again: the box keeps its width. Open the file in Xournal++: the source is wrapped at that
+      width.
+- [ ] Zoomed in and out: the knob stays the same size on the screen and is easy to hit with a finger.

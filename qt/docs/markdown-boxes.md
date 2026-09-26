@@ -75,8 +75,26 @@ moved (also to another page: they go into that page's Markdown layer), deleted, 
 the box as it is drawn. While they are selected, the layer "Markdown" is the selected layer; when the selection
 ends, the layer selected before is again (the pen writes where it did).
 
+A text box selected alone has a double arrow (⟷) on the selection's right knob: that knob (and the right edge
+around it) sets the box's width, as below; the other knobs scale, turn, move and delete it as for any selection.
+The page's own text and a selection of several elements keep the plain right knob, which scales.
+
 ## Size
-The body text is drawn at the text's font size: the size Xournal++ shows the source in is the size it is drawn at.
+**Width of a text box.** A Markdown text box has a handle in the middle of its right edge (a white knob with a
+double arrow, as the selection's knobs): while it is written on the page (just outside its frame), and while it is
+selected alone (on the selection's right knob). Dragging it (pen, finger or mouse; the mouse shows the ⟷ cursor over
+it) makes the box narrower or wider: the text flows anew while it is dragged, and the box is as high as its text.
+At least 2 cm, at most to the page's right edge. Undo: written on the page, each drag is an undo step of the text
+being written (Ctrl+Z) and part of the edit's one undo step; selected, the drag is one undo step (the box stays
+selected). The page's own Markdown text has no handle: it goes from margin to margin, and a box beside it does not
+change how it flows over the pages.
+
+The width is upstream's `wrap` attribute of the text element (the wrap width of Xournal++'s text tool, which has a
+handle of its own for it): saved in the `.xopp` and read again, and Xournal++ wraps the source at that width.
+Code: `qt/src/canvas/MarkdownBoxResize.*` (the handle, the drag, the undo step), `MarkdownEditor::widthHandle` and
+`MarkdownSession::setWidth`.
+
+**Font size.** The body text is drawn at the text's font size: the size Xournal++ shows the source in is the size it is drawn at.
 Headings, code and the rest scale from it. New Markdown text gets the Markdown size, which is 60 % of the text font
 by default (a 16 pt text font gives 10 pt). It can be set in the text tool's font menu (with "Markdown" on) and in
 the editor beside the page ("Size", which also changes the text being edited).
