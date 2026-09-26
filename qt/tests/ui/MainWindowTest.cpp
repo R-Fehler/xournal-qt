@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <map>
 #include <future>
 #include <memory>
 
@@ -8353,4 +8354,216 @@ TEST_F(RenameTest, anOverviewCardTitleIsRenamedInPlace) {
     EXPECT_FALSE(fs::exists(root / "notes.xopp"));
     EXPECT_EQ(controller->title(), "Plan.xopp");
     EXPECT_EQ(inside(cell, "overviewTitle")->property("text").toString(), "Plan.xopp");
+}
+
+// --- favourites and bookmarks (qt/docs/bookmarks.md) ---
+
+namespace {
+/// The items of this name below `root` (through the item tree: also those a Repeater made).
+std::vector<QQuickItem*> itemsNamed(QQuickItem* root, const char* name) {
+    std::vector<QQuickItem*> found;
+    std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+        if (i->objectName() == name) {
+            found.push_back(i);
+        }
+        for (QQuickItem* c: i->childItems()) {
+            walk(c);
+        }
+    };
+    walk(root);
+    return found;
+}
+QQuickItem* visibleNamed(QQuickItem* root, const char* name) {
+    for (QQuickItem* i: itemsNamed(root, name)) {
+        if (i->isVisible()) {
+            return i;
+        }
+    }
+    return nullptr;
+}
+
+}  // namespace
+
+
+// The star of a card (under the mouse, or in its menu) and the Favourites chip beside the "Show" filter: only the
+// starred documents of the whole library, no folders; tapping the chip again shows everything
+TEST_F(HomeScreenTest, theFavouritesChipShowsOnlyStarredDocuments) {
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    ASSERT_EQ(gridCount(), 3);
+    QQuickItem* notes = card(rowOf("notes.xopp"));
+    ASSERT_NE(notes, nullptr);
+    QTest::mouseMove(window, notes->mapToScene(QPointF(notes->width() / 2, notes->height() / 2)).toPoint());
+    wait(50);
+    QQuickItem* star = nullptr;
+    for (auto* i: notes->findChildren<QQuickItem*>()) {
+        if (i->objectName() == "cardStar") {
+            star = i;
+        }
+    }
+    ASSERT_NE(star, nullptr);
+    until([&] { return star->isVisible(); });
+    ASSERT_TRUE(star->isVisible()) << "under the mouse: the empty star";
+    click(star);
+    EXPECT_TRUE(library->isFavourite(QString::fromStdString((root / "notes.xopp").string())));
+    EXPECT_EQ(controller->tabCount(), 0) << "the star does not open the card";
+    QTest::mouseMove(window, QPoint(-20, -20));
+    wait(50);
+    EXPECT_TRUE(star->isVisible()) << "a starred card shows its star";
+
+    // The card's menu stars another one (the sheet in the folder Physics)
+    library->setFlat(true);
+    until([&] { return gridCount() == 3; });
+    QObject* menu = find("homeItemMenu");
+    ASSERT_NE(menu, nullptr);
+    QQuickItem* sheet = card(rowOf("Physics/sheet.pdf"));
+    ASSERT_NE(sheet, nullptr);
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier,
+                      sheet->mapToScene(QPointF(sheet->width() / 2, sheet->height() / 3)).toPoint());
+    ASSERT_TRUE(waitOpened(menu, true));
+    auto* item = findItem("favouriteItem");
+    ASSERT_NE(item, nullptr);
+    EXPECT_EQ(item->property("text").toString(), "Add to favourites");
+    click(item);
+    EXPECT_TRUE(controller->isFavouriteFile(QString::fromStdString((root / "Physics" / "sheet.pdf").string())));
+    library->setFlat(false);
+
+    auto* chip = findItem("favouritesChip");
+    ASSERT_NE(chip, nullptr);
+    EXPECT_TRUE(chip->isVisible()) << "directly in the header, not in a menu";
+    click(chip);
+    EXPECT_TRUE(library->favouritesOnly());
+    until([&] { return gridCount() == 2; });
+    EXPECT_EQ(gridCount(), 2) << "notes and the sheet of Physics, no folders";
+    EXPECT_GE(rowOf("Physics/sheet.pdf"), 0);
+    EXPECT_LT(rowOf("lecture.pdf"), 0);
+    click(chip);
+    EXPECT_FALSE(library->favouritesOnly());
+    until([&] { return gridCount() == 3; });
+    EXPECT_EQ(gridCount(), 3);
+}
+
+namespace {
+/// A .xopp of `pages` blank pages with these bookmarks (page -> label).
+void writeBookmarked(const fs::path& xopp, size_t pages, const std::map<size_t, std::string>& marks) {
+    static DocumentHandler handler;
+    Document doc(&handler);
+    for (size_t i = 0; i < pages; ++i) {
+        auto p = std::make_shared<XojPage>(595, 842);
+        if (auto it = marks.find(i); it != marks.end()) {
+            p->setBookmark(it->second);
+        }
+        doc.addPage(p);
+    }
+    ASSERT_TRUE(xqt::DocumentSession::writeDocument(doc, xopp).ok);
+}
+}  // namespace
+
+// The Bookmarks tab of the home screen: the bookmarked pages grouped by document, with their labels; a tap opens the
+// document at that page
+TEST_F(HomeScreenTest, theBookmarksTabOpensADocumentAtItsBookmark) {
+    writeBookmarked(root / "Physics" / "course.xopp", 5, {{3, "Exercises"}, {1, ""}});
+    auto* library = qobject_cast<xqt::LibraryModel*>(controller->libraryModel());
+    library->refresh();
+    until([&] { return !library->indexing() && library->searchIndex()->bookmarks().size() == 2; });
+    click(findItem("bookmarksPageButton"));
+    auto* view = find<QQuickItem>("bookmarksView");
+    ASSERT_NE(view, nullptr);
+    until([&] { return view->isVisible(); });
+    EXPECT_TRUE(view->isVisible());
+    EXPECT_FALSE(grid()->isVisible());
+    auto* list = find<QQuickItem>("bookmarksList");
+    until([&] { return list->property("count").toInt() == 1; });
+    ASSERT_EQ(list->property("count").toInt(), 1) << "one document";
+    std::vector<QQuickItem*> cards;
+    until([&] {
+        cards.clear();
+        for (auto* i: itemsNamed(list, "bookmarkCard")) {
+            if (i->isVisible()) {
+                cards.push_back(i);
+            }
+        }
+        return cards.size() == 2;
+    });
+    ASSERT_EQ(cards.size(), 2u);
+    std::sort(cards.begin(), cards.end(), [](QQuickItem* a, QQuickItem* b) { return a->x() < b->x(); });
+    EXPECT_EQ(cards[0]->property("modelData").toMap().value("label").toString(), "Page 2");
+    EXPECT_EQ(cards[1]->property("modelData").toMap().value("label").toString(), "Exercises");
+    click(cards[1]);
+    until([&] { return controller->tabCount() == 1; });
+    ASSERT_EQ(controller->tabCount(), 1);
+    EXPECT_FALSE(controller->homeVisible());
+    until([&] { return controller->pageNumber() == 4; });
+    EXPECT_EQ(controller->pageNumber(), 4) << "at the bookmarked page";
+    EXPECT_EQ(controller->bookmarks().size(), 2);
+}
+
+// A bookmark from the page menu (the sidebar's ⋮ and press and hold) and from the ⋮ menu: the ribbon on the page's
+// preview, the Bookmarks section of the contents sidebar, renamed in its dialog; each change one undo step
+TEST_F(MainWindowTest, togglingABookmarkOnAPage) {
+    controller->addPageAfterCurrent();
+    controller->addPageAfterCurrent();
+    wait(50);
+    ASSERT_EQ(controller->pageCount(), 3);
+    auto* menu = find<QObject>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    menu->setProperty("page", 1);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    auto* item = find<QQuickItem>("pageMenuBookmark");
+    ASSERT_NE(item, nullptr);
+    EXPECT_EQ(item->property("tip").toString(), "Bookmark this page");
+    click(item);
+    EXPECT_EQ(controller->bookmarkOf(1), "Page 2");
+    ASSERT_EQ(controller->bookmarks().size(), 1);
+    EXPECT_TRUE(controller->modified());
+    until([&] { return visibleNamed(window->contentItem(), "sidebarRibbon") != nullptr; });
+    EXPECT_NE(visibleNamed(window->contentItem(), "sidebarRibbon"), nullptr) << "the ribbon on the page's preview";
+
+    // Renamed in its dialog (the page menu's bookmark on a bookmarked page)
+    menu->setProperty("page", 1);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    EXPECT_EQ(item->property("tip").toString(), "Bookmark: Page 2 (rename or remove)");
+    click(item);
+    QObject* dialog = nullptr;
+    until([&] {
+        for (QObject* d: window->findChildren<QObject*>("bookmarkDialog")) {
+            if (d->property("opened").toBool()) {
+                dialog = d;
+            }
+        }
+        return dialog != nullptr;
+    });
+    ASSERT_NE(dialog, nullptr);
+    key(Qt::Key_A, Qt::ControlModifier);
+    type("Proof");
+    key(Qt::Key_Return);
+    until([&] { return controller->bookmarkOf(1) == "Proof"; });
+    EXPECT_EQ(controller->bookmarkOf(1), "Proof");
+    EXPECT_TRUE(waitOpened(dialog, false));
+
+    // The contents sidebar lists it (the document has no table of contents)
+    click(visibleNamed(window->contentItem(), "sidebarContentsButton"));
+    until([&] { return visibleNamed(window->contentItem(), "bookmarkEntry") != nullptr; });
+    auto* entry = visibleNamed(window->contentItem(), "bookmarkEntry");
+    ASSERT_NE(entry, nullptr);
+    controller->jumpToPage(0);
+    click(entry);
+    until([&] { return controller->pageNumber() == 2; });
+    EXPECT_EQ(controller->pageNumber(), 2);
+
+    // The ⋮ menu: this page's bookmark, removed; undo brings it back, a second undo takes the name back
+    QObject* more = find("moreMenu");
+    QMetaObject::invokeMethod(more, "open");
+    ASSERT_TRUE(waitOpened(more, true));
+    auto* moreItem = findItem("bookmarkPageItem");
+    ASSERT_NE(moreItem, nullptr);
+    EXPECT_EQ(moreItem->property("text").toString(), "Remove the bookmark of this page");
+    click(moreItem);
+    EXPECT_TRUE(controller->bookmarks().isEmpty());
+    EXPECT_TRUE(waitOpened(more, false));
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(controller->bookmarkOf(1), "Proof");
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(controller->bookmarkOf(1), "Page 2");
 }

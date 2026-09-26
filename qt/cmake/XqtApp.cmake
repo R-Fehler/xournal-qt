@@ -106,6 +106,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp)
@@ -144,6 +145,8 @@ set(XQT_QML_FILES
     src/app/qml/HomeView.qml
     src/app/qml/FolderChooser.qml
     src/app/qml/DocumentCard.qml
+    src/app/qml/BookmarksView.qml
+    src/app/qml/BookmarkDialog.qml
     src/app/qml/NewDocumentDialog.qml
     src/app/qml/DocumentModeCards.qml
     src/app/qml/DocumentModeDialog.qml

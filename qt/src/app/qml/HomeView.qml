@@ -19,9 +19,13 @@ Rectangle {
     objectName: "homeView"
     /// A narrow window (a phone): the library search gets a row of its own
     readonly property bool narrow: width < 760
+    /// Wide enough for the words beside the icons of the Bookmarks tab and the Favourites chip (else icons with tips)
+    readonly property bool roomy: width >= 1500
     color: "#eef0f3"
-    /// 0: library, 1: recent documents
+    /// 0: library, 1: recent documents, 2: the library's bookmarks (qt/docs/bookmarks.md)
     property int page: app.library.available ? 0 : 1
+    /// Changes when a star is set or taken away (the Recent cards ask for theirs)
+    property int favouriteRevision: 0
     readonly property var lib: app.library
     readonly property bool searching: lib.searchQuery !== ""
     /// Extended search: each result shows its pages with hits (taller cells).
@@ -62,7 +66,7 @@ Rectangle {
         return qsTr("%1 GB").arg((bytes / (1024 * 1024 * 1024)).toFixed(1))
     }
     function pagesText(n) { return n < 0 ? "" : (n === 1 ? qsTr("1 page") : qsTr("%1 pages").arg(n)) }
-    function focusGrid() { (page === 0 ? libraryGrid : recentGrid).forceActiveFocus() }
+    function focusGrid() { (page === 0 ? libraryGrid : page === 2 ? bookmarksView : recentGrid).forceActiveFocus() }
     function focusSearch() {
         page = 0
         searchField.forceActiveFocus()
@@ -114,7 +118,7 @@ Rectangle {
             app.openLibraryAt(path)
         }
     }
-    readonly property var currentModel: page === 0 ? app.library : app.recent
+    readonly property var currentModel: page === 1 ? app.recent : app.library
     readonly property int selectionCount: currentModel.selectionCount
     /// A tap or click on a card: open it, or (Ctrl / Shift, or while selecting) select it.
     function cardActivated(model, index, modifiers) {
@@ -196,6 +200,10 @@ Rectangle {
     Connections {
         target: app.recent
         function onError(text) { errorDialog.text = text; errorDialog.open() }
+    }
+    Connections {
+        target: app
+        function onFavouriteChanged() { home.favouriteRevision++ }
     }
     Connections {
         target: app
@@ -308,17 +316,24 @@ Rectangle {
                     Repeater {
                         model: [
                             { text: app.library.available ? app.library.name : qsTr("Library"), icon: "xqt-library", enabled: app.library.available },
-                            { text: qsTr("Recent"), icon: "xqt-history", enabled: true }
+                            { text: qsTr("Recent"), icon: "xqt-history", enabled: true },
+                            { text: qsTr("Bookmarks"), icon: "xqt-bookmark", enabled: app.library.available, compact: true }
                         ]
                         delegate: AbstractButton {
                             id: switchButton
                             required property int index
                             required property var modelData
-                            objectName: index === 0 ? "libraryPageButton" : "recentPageButton"
+                            objectName: index === 0 ? "libraryPageButton" : index === 1 ? "recentPageButton" : "bookmarksPageButton"
                             enabled: modelData.enabled
                             implicitHeight: 38
-                            implicitWidth: switchRow.implicitWidth + 28
+                            implicitWidth: switchRow.implicitWidth + (iconOnly ? 14 : 28)
                             onClicked: home.page = index
+                            /// Only its icon (a tip says what it is) while it is not shown and the header is short of room
+                            readonly property bool iconOnly: modelData.compact === true && !home.roomy && home.page !== index
+                            ToolTip.visible: iconOnly && hovered
+                            ToolTip.text: modelData.text
+                            ToolTip.delay: 600
+                            Accessible.name: modelData.text
                             background: Rectangle {
                                 radius: 19
                                 color: home.page === switchButton.index ? "#ffffff" : "transparent"
@@ -330,6 +345,7 @@ Rectangle {
                                     spacing: 6
                                     Image { source: app.iconUrl(switchButton.modelData.icon); sourceSize.width: 18; sourceSize.height: 18 }
                                     Label {
+                                        visible: !switchButton.iconOnly
                                         text: switchButton.modelData.text
                                         font.weight: home.page === switchButton.index ? Font.DemiBold : Font.Normal
                                         color: switchButton.enabled ? "#202124" : "#9aa0a6"
@@ -424,10 +440,10 @@ Rectangle {
             // Search in the whole library (searchGroup, below): here, or in a row of its own when the window is narrow
             Item {
                 id: searchSlot
-                visible: !home.narrow && home.page === 0 && app.library.available
+                visible: !home.narrow && (home.page === 0 || home.page === 2) && app.library.available
                 // As wide as there is room for, up to 380 and the button (the buttons of the row come first)
                 Layout.fillWidth: true
-                Layout.minimumWidth: 180 + 6 + 48
+                Layout.minimumWidth: 150 + 6 + 48
                 Layout.maximumWidth: 380 + 6 + 48
                 Layout.preferredWidth: 380 + 6 + 48
                 Layout.preferredHeight: 48
@@ -517,11 +533,43 @@ Rectangle {
                 checked: app.library.flat
                 onClicked: app.library.flat = !app.library.flat
             }
+            // Only the favourites (starred documents of the whole library): a chip of its own, combined with the kinds
+            // shown and the search; the Bookmarks view follows it too
+            ToolButton {
+                id: favouritesChip
+                objectName: "favouritesChip"
+                visible: (home.page === 0 || home.page === 2) && app.library.available
+                text: qsTr("Favourites")
+                display: home.roomy ? AbstractButton.TextBesideIcon : AbstractButton.IconOnly
+                implicitWidth: home.roomy ? implicitContentWidth + leftPadding + rightPadding : 40
+                Accessible.name: text
+                icon.source: app.iconUrl(checked ? "xqt-star-filled" : "xqt-star")
+                icon.color: "transparent"
+                icon.width: 18
+                icon.height: 18
+                checkable: true
+                checked: app.library.favouritesOnly
+                onToggled: app.library.favouritesOnly = checked
+                implicitHeight: 40
+                font.pixelSize: 13
+                font.weight: checked ? Font.DemiBold : Font.Normal
+                Material.foreground: checked ? "#8a5a00" : "#5f6368"
+                ToolTip.visible: hovered
+                ToolTip.text: checked ? qsTr("Only favourites are shown - tap: all documents")
+                                      : qsTr("Show only favourites (starred documents)")
+                ToolTip.delay: 600
+                background: Rectangle {
+                    radius: 10
+                    color: favouritesChip.checked ? "#fdf1d0" : (favouritesChip.pressed ? "#e8e8e8" : "transparent")
+                    border.width: favouritesChip.checked ? 1 : 0
+                    border.color: "#f4b400"
+                }
+            }
             // Which kinds of files the library shows (a setting of the library), marked when not the default
             IconButton {
                 id: showButton
                 objectName: "showButton"
-                visible: home.page === 0 && app.library.available
+                visible: (home.page === 0 || home.page === 2) && app.library.available
                 iconName: "xqt-filter"
                 tip: app.library.showFiltered ? qsTr("Show: some kinds of files are hidden or added") : qsTr("Show: which kinds of files")
                 checked: app.library.showFiltered
@@ -639,7 +687,7 @@ Rectangle {
         // The search's own row in a narrow window
         Item {
             id: narrowSearchSlot
-            visible: home.narrow && home.selectionCount === 0 && home.page === 0 && app.library.available
+            visible: home.narrow && home.selectionCount === 0 && (home.page === 0 || home.page === 2) && app.library.available
             Layout.fillWidth: true
             Layout.leftMargin: 16
             Layout.rightMargin: 16
@@ -661,13 +709,13 @@ Rectangle {
                 iconName: "xqt-arrow-up"
                 tip: qsTr("Up (Backspace)")
                 implicitWidth: 40; implicitHeight: 40
-                visible: !home.searching && !app.library.flat
+                visible: !home.searching && !app.library.flat && !app.library.favouritesOnly
                 enabled: app.library.folder !== ""
                 onClicked: app.library.goUp()
             }
             Row {
                 id: crumbRow
-                visible: !home.searching && !app.library.flat
+                visible: !home.searching && !app.library.flat && !app.library.favouritesOnly
                 spacing: 0
                 Repeater {
                     model: app.library.breadcrumbs
@@ -707,9 +755,10 @@ Rectangle {
                 }
             }
             Label {
-                visible: home.searching || app.library.flat
+                visible: home.searching || app.library.flat || app.library.favouritesOnly
                 Layout.leftMargin: 8
                 text: home.searching ? (libraryGrid.count === 1 ? qsTr("1 result") : qsTr("%1 results").arg(libraryGrid.count))
+                      : app.library.favouritesOnly ? qsTr("Favourites in %1").arg(app.library.name)
                                      : qsTr("All documents in %1").arg(app.library.name)
                 font.pixelSize: 15
                 color: "#3c4043"
@@ -900,6 +949,8 @@ Rectangle {
                         hitPassages: home.extendedView ? model.hitPassageList : []
                         hitPassageBase: model.hitPassageBase
                         stripHeight: home.extendedView && !model.isFolder ? libraryGrid.stripHeight : 0
+                        favourite: model.favourite
+                        onFavouriteToggled: app.library.setFavourite(model.path, !model.favourite)
                         onPageActivated: function(pageNo) { app.openSearchHitAt(model.path, home.lib.searchQuery, pageNo) }
                         onPassageActivated: function(passage) {
                             app.openSearchHitInPassage(model.path, home.lib.searchQuery, passage)
@@ -958,11 +1009,12 @@ Rectangle {
                         font.pixelSize: 16
                         color: "#5f6368"
                         text: home.searching ? (app.library.indexing ? qsTr("Nothing found yet (still indexing)") : qsTr("Nothing found"))
+                              : app.library.favouritesOnly ? qsTr("No favourites yet: tap the star on a document")
                               : app.library.folder !== "" ? qsTr("This folder is empty")
                               : qsTr("Your library is empty")
                     }
                     Label {
-                        visible: !home.searching
+                        visible: !home.searching && !app.library.favouritesOnly
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.Wrap
@@ -971,7 +1023,7 @@ Rectangle {
                     }
                     // (one below the other when they do not fit side by side)
                     GridLayout {
-                        visible: !home.searching
+                        visible: !home.searching && !app.library.favouritesOnly
                         Layout.alignment: Qt.AlignHCenter
                         columns: emptyNew.implicitWidth + emptyImport.implicitWidth + emptyImportFolder.implicitWidth
                                  + 2 * columnSpacing <= parent.width ? 3 : 1
@@ -1098,6 +1150,8 @@ Rectangle {
                         selectionMode: app.recent.selectionCount > 0
                         highlighted: GridView.isCurrentItem && recentGrid.activeFocus
                         subtitle: home.formatDate(model.opened) + " · " + model.location
+                        favourite: (home.favouriteRevision, !model.isLibrary && app.isFavouriteFile(model.path))
+                        onFavouriteToggled: app.setFavouriteFile(model.path, !favourite)
                         onActivated: function(modifiers) {
                             recentGrid.currentIndex = index
                             recentGrid.forceActiveFocus()
@@ -1133,6 +1187,12 @@ Rectangle {
                         Button { text: qsTr("Open…"); flat: true; onClicked: home.openFileRequested() }
                     }
                 }
+            }
+
+            // --- the library's bookmarks ---
+            BookmarksView {
+                id: bookmarksView
+                shown: home.visible && home.page === 2
             }
         }
     }
@@ -1350,6 +1410,22 @@ Rectangle {
                      && ["notes", "pdf", "md", "image", "text"].indexOf(home.menuKind) >= 0
             height: visible ? implicitHeight : 0
             onTriggered: app.openAsReference(home.menuPath)
+        }
+        MenuItem {
+            id: favouriteItemRef
+            objectName: "favouriteItem"
+            // (asked when the menu opens: the star is kept beside the document)
+            property bool starred: false
+            text: starred ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+            icon.source: app.iconUrl(starred ? "xqt-star-filled" : "xqt-star")
+            icon.color: "transparent"
+            visible: !home.menuMany && !home.menuFolder && ["notes", "pdf", "md", "image", "text"].indexOf(home.menuKind) >= 0
+            height: visible ? implicitHeight : 0
+            onTriggered: app.setFavouriteFile(home.menuPath, !starred)
+            Connections {
+                target: itemMenu
+                function onAboutToShow() { favouriteItemRef.starred = app.isFavouriteFile(home.menuPath) }
+            }
         }
         MenuItem {
             objectName: "openAsLibraryItem"

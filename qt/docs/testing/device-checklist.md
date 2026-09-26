@@ -2045,3 +2045,28 @@ Design: [md-images.md](../md-images.md).
       "Bookmarks" entry with the two pages; tapping one goes to its page. Rename one here, Ctrl+S: the other viewer
       (reloaded) shows the new name.
 - [ ] Remove all bookmarks, Ctrl+S: the "Bookmarks" entry is gone in the other viewer, the chapters are still there.
+- [ ] At 1280 px wide the home header fits without scrolling (the Favourites chip and the Bookmarks tab as icons
+      with tips); wider than 1500 px they have their words.
+- [ ] Library (mouse): point at a card: an empty star at its top left; click it: it fills, the card does not open.
+      Click again: gone. Touch (Fold 7): press and hold a card → "Add to favourites"; a starred card shows the filled
+      star, a tap on it takes it away.
+- [ ] Star a document in a subfolder and one at the top. The "Favourites" chip next to the filter button: only those
+      two, without folders ("Favourites in <library>" above the grid). With the search: only the starred ones that
+      match. Filter button → hide Notes: starred .xopp files go too. Chip again: everything as before.
+- [ ] Rename a starred document in the library, move it into another folder: still starred. Rename it in a file
+      manager: the star is gone (documented). The file's modification time did not change when it was starred.
+- [ ] An open document: ⋮ → "Add to favourites"; the library card shows the star; the overview of open documents
+      (Ctrl+Shift+E) shows it beside the close button and can take it away.
+- [ ] Pages sidebar: ⋮ of page 3 → the ribbon icon (beside "Size…"): a red ribbon on its preview and "3 · Page 3"
+      under it (or the page's first heading); a note offers Undo. The menu is no taller than before. The ribbon icon
+      again: a dialog with the name; type one, Enter. Ctrl+Z twice: the name, then the bookmark go. Press and hold a
+      page (touch): the same menu; "Remove bookmark" in the dialog removes it.
+- [ ] Move the bookmarked page (drag in the sidebar), insert a page before it: the ribbon moves with it, an automatic
+      "Page N" label changes with its place. Delete it, undo: the bookmark is back. Duplicate it: the copy has none.
+- [ ] Contents tab of the sidebar: "Bookmarks" at the top (also in a document without a table of contents), then
+      the chapters; tap one: the page. Press and hold: Rename…, Remove bookmark, Copy link.
+- [ ] Library home → "Bookmarks" tab: the bookmarked pages of all documents, grouped by document with their names;
+      the pictures appear quickly. Tap one: the document opens at that page. Search: only bookmarks whose name (or
+      document name) matches. The library search itself also finds a document by a bookmark's name.
+- [ ] Android (Fold 7, both screens): the Favourites chip and the Bookmarks tab fit in the header (it scrolls
+      sideways when narrow); the stars and ribbons are big enough to tap.

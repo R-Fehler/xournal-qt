@@ -149,6 +149,23 @@ Popup {
                 enabled: menu.visible && app.pageSizeOf(menu.page).possible === true
                 onClicked: { app.requestPageSize(menu.pages); menu.close() }
             }
+            // A bookmark on the page (qt/docs/bookmarks.md): tap to add it (named after the page's first heading or
+            // its PDF chapter, else "Page N"); on a bookmarked page: its name, to rename or remove it
+            PageAction {
+                id: bookmarkAction
+                objectName: "pageMenuBookmark"
+                visible: app.canBookmark
+                implicitHeight: 38
+                readonly property string mark: (app.bookmarks, menu.visible ? app.bookmarkOf(menu.page) : "")
+                iconName: mark !== "" ? "xqt-bookmark-filled" : "xqt-bookmark"
+                icon.color: "transparent"
+                tip: mark !== "" ? qsTr("Bookmark: %1 (rename or remove)").arg(mark) : qsTr("Bookmark this page")
+                onClicked: {
+                    if (mark !== "") bookmarkDialog.openFor(menu.page)
+                    else app.toggleBookmark(menu.page)
+                    menu.close()
+                }
+            }
         }
         PageLine {
             objectName: "insertPagesItem"
@@ -172,4 +189,5 @@ Popup {
             onClicked: { app.pages.selectAll(); menu.close() }
         }
     }
+    BookmarkDialog { id: bookmarkDialog }
 }

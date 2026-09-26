@@ -14,9 +14,11 @@ Rectangle {
     /// "pages", "layers", "contents" or "annotations"
     property string mode: "pages"
     readonly property bool showContents: mode === "contents"
+    /// A table of contents, or bookmarks (listed at the top of it)
+    readonly property bool hasContents: app.outline.available || app.bookmarks.length > 0
     // The annotations are read only while they are shown
     Binding { target: app.annotations; property: "active"; value: sidebar.visible && sidebar.mode === "annotations" }
-    onModeChanged: if (mode === "contents" && !app.outline.available) mode = "pages"
+    onModeChanged: if (mode === "contents" && !hasContents) mode = "pages"
 
     // Pages | Layers | Contents (the last one when the document has a table of contents)
     RowLayout {
@@ -35,7 +37,7 @@ Rectangle {
                 required property int index
                 required property var modelData
                 objectName: "sidebar" + modelData.key.charAt(0).toUpperCase() + modelData.key.slice(1) + "Button"
-                visible: modelData.key !== "contents" || app.outline.available
+                visible: modelData.key !== "contents" || sidebar.hasContents
                 Layout.fillWidth: true
                 implicitHeight: 32
                 readonly property bool active: sidebar.mode === modelData.key
@@ -89,7 +91,7 @@ Rectangle {
         anchors.right: parent.right
     }
     OutlineList {
-        visible: sidebar.showContents && app.outline.available
+        visible: sidebar.showContents && sidebar.hasContents
         anchors.top: switchRow.bottom
         anchors.topMargin: 4
         anchors.bottom: parent.bottom
@@ -150,6 +152,8 @@ Rectangle {
             required property var searchHits
             required property int currentSearchHit
             required property int searchHitCount
+            /// Its bookmark as shown ("": none)
+            required property string bookmark
             width: list.width
             height: frame.height + pageLabel.height + 4
 
@@ -187,6 +191,16 @@ Rectangle {
                 }
                 SelectionMark { visible: entry.selected }
                 HitBadge { count: entry.searchHitCount; anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 4 }
+                // A bookmarked page: the ribbon (qt/docs/bookmarks.md)
+                Image {
+                    objectName: "sidebarRibbon"
+                    visible: entry.bookmark !== ""
+                    anchors.right: parent.right
+                    anchors.rightMargin: 42
+                    y: -3
+                    source: app.iconUrl("xqt-bookmark-filled")
+                    sourceSize: Qt.size(16, 20)
+                }
                 PageArea {
                     dragOverlay: pageDrag
                     pageIndex: entry.pageIndex
@@ -223,7 +237,9 @@ Rectangle {
                 anchors.top: frame.bottom
                 anchors.topMargin: 3
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: entry.pageNumber
+                width: Math.min(implicitWidth, list.width - 16)
+                elide: Text.ElideRight
+                text: entry.bookmark !== "" ? entry.pageNumber + " · " + entry.bookmark : entry.pageNumber
                 color: entry.current ? Material.accentColor : "#5f6368"
                 font.weight: entry.current ? Font.DemiBold : Font.Normal
             }

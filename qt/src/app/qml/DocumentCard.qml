@@ -50,6 +50,12 @@ Item {
     /// Conflict copies of sync apps next to it (their number): a badge that opens "compare / keep one"
     property int conflicts: 0
     property string snippet
+    /// A favourite (starred): a star on the card, tap it to take the star away; the mouse over a card shows an empty
+    /// star to add it (qt/docs/bookmarks.md)
+    property bool favourite: false
+    /// Whether the card offers the star (documents: not folders, libraries or other files)
+    property bool canStar: !isFolder && !isLibrary && kind !== "other"
+    signal favouriteToggled()
     property bool highlighted: false
     property bool selected: false
     /// Items are being selected: the circles are shown on all cards.
@@ -524,8 +530,43 @@ Item {
             }
         }
 
+        // The star of a favourite (beside the circle when that shows)
+        AbstractButton {
+            id: starButton
+            objectName: "cardStar"
+            x: cardCheck.visible ? 44 : 6
+            y: 6
+            z: 2
+            width: 40
+            height: 40
+            visible: card.canStar && (card.favourite || hover.hovered)
+            onClicked: card.favouriteToggled()
+            Accessible.name: card.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+            ToolTip.visible: hovered
+            ToolTip.delay: 600
+            ToolTip.text: Accessible.name
+            contentItem: Item {
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 28
+                    height: 28
+                    radius: 14
+                    color: "#e6ffffff"
+                    visible: card.favourite || starButton.hovered
+                }
+                Image {
+                    anchors.centerIn: parent
+                    source: app.iconUrl(card.favourite ? "xqt-star-filled" : "xqt-star")
+                    sourceSize: Qt.size(20, 20)
+                    opacity: card.favourite || starButton.hovered ? 1 : 0.6
+                }
+            }
+            background: null
+        }
+
         // Select without opening
         AbstractButton {
+            id: cardCheck
             objectName: "cardCheck"
             x: 4
             y: 4
