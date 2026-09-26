@@ -966,6 +966,10 @@ public:
     /// A sticky note is selected (its pill: colors, cover, delete)
     Q_PROPERTY(bool noteSelected READ noteSelected NOTIFY noteSelectionChanged)
     bool noteSelected() const;
+    /// Several notes are selected, or notes with elements of the page (the selection's pill; qt/docs/sticky-notes.md,
+    /// "Several notes at once")
+    Q_PROPERTY(bool notesSelectedTogether READ notesSelectedTogether NOTIFY selectionChanged)
+    bool notesSelectedTogether() const;
     Q_PROPERTY(QColor noteColor READ noteColor WRITE setNoteColor NOTIFY noteSelectionChanged)
     QColor noteColor() const;
     void setNoteColor(const QColor& color);
@@ -978,7 +982,7 @@ public:
     /// end (qt/docs/sticky-notes.md, "Notes as containers")
     Q_INVOKABLE bool writeNoteText();
     /// The selected note onto the clipboard, whole (its pill; Ctrl+C / Ctrl+X go through copySelection /
-    /// cutSelection). Paste (pasteElements, pasteAt) puts a copied note onto the page in view.
+    /// cutSelection); several notes selected together: all of them (and the elements with them). Paste (pasteElements, pasteAt) puts a copied note onto the page in view.
     Q_INVOKABLE bool copyStickyNote();
     Q_INVOKABLE bool cutStickyNote();
     /// Ctrl+V in the page sidebar or grid pastes the copied note rather than the copied pages: a note is on the

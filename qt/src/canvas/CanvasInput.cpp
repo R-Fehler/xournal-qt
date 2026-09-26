@@ -97,7 +97,7 @@ void CanvasInput::startPenHold(const Event& event) {
     // Only with the pen or highlighter (the press began a stroke) or the hand; not on a selection, which the pen
     // moves then, nor on the setsquare or the compass being dragged
     if (event.deviceClass != DeviceClass::Pen || !inputRunning || draggingGeometryTool || view.getSelection() ||
-        !penHoldTool()) {
+        view.mixed().active() || !penHoldTool()) {
         return;
     }
     penHoldPos = event.viewPos;
@@ -367,7 +367,7 @@ bool CanvasInput::clickFollowsLink(bool editing, Qt::KeyboardModifiers modifiers
     if (editing) {
         return false;  // the text being written: the click puts the cursor there
     }
-    if (view.getSelection() || view.notes().hasSelection() || view.hasPdfTextSelection()) {
+    if (view.hasAnySelection() || view.hasPdfTextSelection()) {
         return false;  // the click ends the selection first (as a tap does)
     }
     DocumentSession& s = view.getSession();
@@ -581,12 +581,37 @@ bool CanvasInput::actionStart(const Event& event) {
         return true;
     }
 
+    // Several sticky notes selected (with elements of the page): a press in the selection moves it all; elsewhere it
+    // ends the selection. Ctrl or Shift with a select tool: what is there joins it or leaves it (CanvasPage).
+    if (view.mixed().active()) {
+        const bool add = (event.state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) && isSelectToolType(toolType);
+        if (!add) {
+            CanvasPage* page = view.mixed().selectedPage();
+            const PositionInputData pos = this->getInputDataRelativeToCurrentPage(page, event);
+            const double zoom = view.getViewController().zoom();
+            if (view.mixed().contains(*page, pos.x / zoom, pos.y / zoom)) {
+                if (!view.isReadingOnly()) {
+                    view.mixed().startDrag(pos.x / zoom, pos.y / zoom);
+                }
+                return true;  // (for reading only: it stays, to be copied)
+            }
+            view.clearSelection();
+            changeTool(event);
+            if (toolHandler->isDrawingTool()) {
+                return true;  // a press beside the selection only ends it
+            }
+        }
+    }
+
     // Port of PenInputHandler::actionStart (selection part): a press on the selection moves, resizes or rotates it
     // (or deletes it: the × button); a press elsewhere ends it.
     if (EditSelection* selection = view.getSelection()) {
         bool changeSelection = true;
         if ((event.state & GDK_SHIFT_MASK) && isSelectToolTypeSingleLayer(toolType)) {
             changeSelection = false;  // Shift with a select tool adds to the selection
+        }
+        if ((event.state & GDK_CONTROL_MASK) && isSelectToolType(toolType)) {
+            changeSelection = false;  // xournal-qt: Ctrl too (and a sticky note there joins the selection)
         }
         if (changeSelection) {
             CanvasPage* selectionPage = static_cast<CanvasPage*>(selection->getView());
@@ -689,6 +714,16 @@ bool CanvasInput::actionMotion(const Event& event) {
             const double zoom = view.getViewController().zoom();
             view.notes().dragTo(pos.x / zoom, pos.y / zoom);
         }
+        this->updateLastEvent(event);
+        return true;
+    }
+
+    // Several notes (with elements) being moved (on their page, wherever the pointer is)
+    if (view.mixed().dragging()) {
+        CanvasPage* page = view.mixed().selectedPage();
+        const PositionInputData pos = this->getInputDataRelativeToCurrentPage(page, event);
+        const double zoom = view.getViewController().zoom();
+        view.mixed().dragTo(pos.x / zoom, pos.y / zoom);
         this->updateLastEvent(event);
         return true;
     }
@@ -803,6 +838,9 @@ bool CanvasInput::actionEnd(const Event& event) {
     if (EditSelection* selection = view.getSelection(); selection && (!view.isReadingOnly() || selection->isMoving())) {
         view.endSelectionDrag();  // (mouseUp; a move into or out of a sticky note changes the layer too)
     }
+    if (view.mixed().dragging()) {
+        view.mixed().endDrag();  // (one undo step; let go over another page: there)
+    }
     // A sticky note moved or resized: one undo step; the release goes to its page (where the press was)
     CanvasPage* notePage = view.notes().dragging() ? view.notes().selectedPage() : nullptr;
     if (notePage) {
@@ -835,7 +873,7 @@ bool CanvasInput::actionEnd(const Event& event) {
                          tt == TOOL_SELECT_MULTILAYER_RECT || tt == TOOL_SELECT_MULTILAYER_REGION ||
                          tt == TOOL_SELECT_OBJECT || tt == TOOL_SELECT_PDF_TEXT_LINEAR ||
                          tt == TOOL_SELECT_PDF_TEXT_RECT;
-    if (tapTool && !view.getSelection() && !view.notes().hasSelection() && isClick(event)) {
+    if (tapTool && !view.hasAnySelection() && isClick(event)) {
         view.tapAt(event.viewPos);
     }
 
@@ -861,6 +899,20 @@ bool CanvasInput::startTouchSelection(QPointF viewPos) {
         return true;  // the handle of a Markdown text box: the finger sets its width
     }
     EditSelection* selection = view.getSelection();
+    if (!selection && !view.isReadingOnly() && view.mixed().active()) {
+        // Several notes (with elements): a finger in the selection moves it all
+        CanvasPage* page = view.mixed().selectedPage();
+        Event ev;
+        ev.viewPos = viewPos;
+        ev.pressure = Point::NO_PRESSURE;
+        const PositionInputData pos = getInputDataRelativeToCurrentPage(page, ev);
+        const double zoom = view.getViewController().zoom();
+        if (!view.mixed().contains(*page, pos.x / zoom, pos.y / zoom)) {
+            return false;
+        }
+        view.mixed().startDrag(pos.x / zoom, pos.y / zoom);
+        return true;
+    }
     if (!selection && !view.isReadingOnly() && view.notes().hasSelection()) {
         // The selected sticky note: a finger on it moves it, on its handle resizes it
         CanvasPage* page = view.notes().selectedPage();
@@ -906,6 +958,16 @@ void CanvasInput::moveTouchSelection(QPointF viewPos) {
         view.notes().dragTo(pos.x / zoom, pos.y / zoom);
         return;
     }
+    if (view.mixed().dragging()) {
+        CanvasPage* page = view.mixed().selectedPage();
+        Event ev;
+        ev.viewPos = viewPos;
+        ev.pressure = Point::NO_PRESSURE;
+        const PositionInputData pos = getInputDataRelativeToCurrentPage(page, ev);
+        const double zoom = view.getViewController().zoom();
+        view.mixed().dragTo(pos.x / zoom, pos.y / zoom);
+        return;
+    }
     EditSelection* selection = view.getSelection();
     if (!selection) {
         touchSelection = false;
@@ -928,6 +990,9 @@ void CanvasInput::endTouchSelection() {
     }
     if (view.notes().dragging()) {
         view.notes().endDrag();
+    }
+    if (view.mixed().dragging()) {
+        view.mixed().endDrag();
     }
     if (view.getSelection()) {
         view.endSelectionDrag();

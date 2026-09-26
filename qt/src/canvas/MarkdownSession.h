@@ -20,6 +20,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,7 @@
 #include "model/Element.h"
 #include "model/Layer.h"
 #include "model/PageRef.h"
+#include "session/StickyNote.h"
 
 #include "MdLayout.h"
 #include "MdPaginate.h"
@@ -55,6 +57,8 @@ public:
     bool isPageText() const { return pageText; }
     /// A sticky note's text is edited: its width is the note's (no width of its own)
     bool isNoteText() const { return !pageText && !chain.empty() && chain.front().noteWidth > 0; }
+    /// The note of a note's text: its rectangle and color now (nothing: not a note's text, or the note is gone)
+    std::optional<sticky::Look> noteLook() const;
     bool active() const { return !chain.empty(); }
     /// The first and the last page of the text (0-based; npos: not active).
     size_t pageIndex() const;

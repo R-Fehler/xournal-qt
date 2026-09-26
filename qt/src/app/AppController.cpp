@@ -783,7 +783,10 @@ void AppController::currentTabChanged() {
     Q_EMIT markdownOnPageChanged();
 }
 
-bool AppController::hasSelection() const { return canvas() && canvas()->getSelection(); }
+bool AppController::hasSelection() const {
+    // (elements, or several sticky notes with elements: the selection's pill; a single note has its own)
+    return canvas() && (canvas()->getSelection() || canvas()->mixed().active());
+}
 bool AppController::copySelection() {
     if (referenceMode->focused() && (referenceMode->hasSelection() ||
                                      (referenceMode->canvas() && referenceMode->canvas()->notes().hasSelection()))) {
@@ -827,7 +830,7 @@ bool AppController::pasteAt(qreal x, qreal y) {
 bool AppController::canPaste() const {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
     return mime && (mime->hasImage() || mime->hasText() || mime->hasFormat("application/xournal") ||
-                    StickyNotes::clipboardHasNote());
+                    StickyNotes::clipboardHasNote() || MixedSelection::clipboardHas());
 }
 void AppController::deleteSelection() {
     if (CanvasView* r = editedReference()) {
@@ -3857,6 +3860,7 @@ QVariantList AppController::stickyNoteColors() const {
     return colors;
 }
 bool AppController::noteSelected() const { return canvas() && canvas()->notes().hasSelection(); }
+bool AppController::notesSelectedTogether() const { return canvas() && canvas()->mixed().active(); }
 QColor AppController::noteColor() const {
     if (const auto look = canvas() ? canvas()->notes().selectedLook() : std::nullopt) {
         return QColor(look->color.red, look->color.green, look->color.blue);
@@ -3893,12 +3897,21 @@ bool AppController::writeNoteText() {
     Q_EMIT markdownOnPageChanged();
     return writing;
 }
-bool AppController::copyStickyNote() { return copied(canvas() && canvas()->notes().copySelected()); }
+bool AppController::copyStickyNote() {
+    if (canvas() && canvas()->mixed().active()) {
+        return copied(canvas()->mixed().copy());
+    }
+    return copied(canvas() && canvas()->notes().copySelected());
+}
 bool AppController::cutStickyNote() {
+    if (canvas() && !textPagesFixed() && canvas()->mixed().active()) {
+        return copied(canvas()->mixed().cut());
+    }
     return copied(canvas() && !textPagesFixed() && canvas()->notes().cutSelected());
 }
 bool AppController::pastesNoteBeforePages() const {
-    return StickyNotes::clipboardHasNote() && (noteSelected() || pageClipboard->isEmpty() || !pagesCopiedLast);
+    return (StickyNotes::clipboardHasNote() || MixedSelection::clipboardHas()) &&
+           (noteSelected() || notesSelectedTogether() || pageClipboard->isEmpty() || !pagesCopiedLast);
 }
 bool AppController::pageHasNotes() const {
     return canvas() && canvas()->notes().pageHasNotes(session()->getCurrentPageNo());

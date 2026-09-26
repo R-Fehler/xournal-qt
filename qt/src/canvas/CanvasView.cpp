@@ -85,6 +85,7 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         renderService(*session.getApp().getRenderService()),
         viewController(&layout) {
     stickyNotes = std::make_unique<StickyNotes>(*this);
+    mixedSelection = std::make_unique<MixedSelection>(*this);
     boxResizer = std::make_unique<MarkdownBoxResize>(*this);
     pdfCache = std::make_shared<PdfCache>(session.getDocument()->getPdfDocument(), session.getSettings());
     // (the rendered pages are kept by CanvasMemory: the PDF cache only serves edits of the visible ones)
@@ -144,10 +145,12 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     connect(&session, &DocumentSession::clearSelectionRequested, this, [this] {
         endTextEditing();
         clearPdfTextSelection();
-        if (selection) {
+        if (selection || mixedSelection->active()) {
             clearSelection();
         }
     });
+    // (an undo or a change elsewhere may take away what several notes selected together hold)
+    connect(&session, &DocumentSession::undoRedoStateChanged, this, [this] { mixedSelection->validate(); });
     // Another tool ends the text editing (upstream: ToolHandler listener).
     connect(&session.getApp(), &AppContext::activeToolChanged, this, [this] {
         if ((textEditor || markdownEditor) && this->session.getToolHandler()->getToolType() != TOOL_TEXT &&
@@ -158,6 +161,10 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
         if (stickyNotes->hasSelection() && !stickyNotes->dragging() &&
             !isSelectToolType(this->session.getToolHandler()->getToolType())) {
             stickyNotes->clearSelection();
+        }
+        if (mixedSelection->active() && !mixedSelection->dragging() &&
+            !isSelectToolType(this->session.getToolHandler()->getToolType())) {
+            clearSelection();  // (several notes selected: the same)
         }
     });
     // Column layout changed in the settings: lay out again, keep the current page in view.
@@ -266,6 +273,7 @@ void CanvasView::cancelRenders() {
 
 void CanvasView::rebuildPages() {
     stickyNotes->pageGoing(stickyNotes->selectedPage());
+    mixedSelection->pageGoing(mixedSelection->selectedPage());
     boxResizer->pagesGoing();
     geometry.allPagesGoing();
     sharpWanted.clear();
@@ -354,6 +362,7 @@ void CanvasView::relayout() {
 // --- selection (port of upstream XournalView) ------------------------------------------------------------------
 
 void CanvasView::clearSelection() {
+    mixedSelection->clear();
     stickyNotes->clearSelection();
     // Deleting the EditSelection puts the elements back into their layer.
     const bool ofMarkdown = selection && markdownSelection && markdownSelection->selection == selection.get();
@@ -371,6 +380,10 @@ void CanvasView::clearSelection() {
 void CanvasView::deleteSelection(EditSelection* sel) {
     if (sel == nullptr) {
         sel = selection.get();
+        if (!sel && mixedSelection->active()) {
+            mixedSelection->deleteAll();  // (several notes, with elements: one step)
+            return;
+        }
         if (!sel && stickyNotes->hasSelection()) {
             stickyNotes->deleteSelected();  // (the selection is a sticky note)
             return;
@@ -416,6 +429,9 @@ void CanvasView::repaintSelection(bool) {
 
 bool CanvasView::copySelection() {
     // Port of ClipboardHandler::copy (the Xournal part and the text part)
+    if (!selection && mixedSelection->active()) {
+        return mixedSelection->copy();  // (several notes, with elements: all of it, in its layout)
+    }
     if (!selection) {
         return stickyNotes->copySelected();  // (a selected sticky note: the whole note; nothing selected: nothing)
     }
@@ -440,6 +456,9 @@ bool CanvasView::copySelection() {
 }
 
 bool CanvasView::cutSelection() {
+    if (!selection && mixedSelection->active()) {
+        return mixedSelection->cut();
+    }
     if (!selection && stickyNotes->hasSelection()) {
         return stickyNotes->cutSelected();
     }
@@ -609,6 +628,14 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
                 }
             }
         }
+    }
+    // Several copied notes (with elements): the same, in their layout
+    if (MixedSelection::clipboardHas()) {
+        const size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
+                                             .value_or(currentPageNo())
+                                   : currentPageNo();
+        const auto scope = actingScope(pNr);
+        return mixedSelection->paste(pNr);
     }
     // A copied sticky note: onto the page in view of this view (pasted at a place: the page there), where it was
     if (StickyNotes::clipboardHasNote()) {
@@ -1864,6 +1891,20 @@ bool CanvasView::writeNoteText() {
     return true;
 }
 
+QRectF CanvasView::noteTextHintBox() const {
+    if (!markdownEditor || !markdownEditor->cursorBelowNote()) {
+        return {};
+    }
+    const auto note = markdownEditor->noteRect();
+    const auto idx = indexOf(&markdownEditor->getPage());
+    if (!note || !idx) {
+        return {};
+    }
+    const double zoom = viewController.zoom();
+    const QRectF pageRect = pageViewRect(*idx);
+    return QRectF(pageRect.topLeft() + note->topLeft() * zoom, note->size() * zoom);
+}
+
 bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     std::shared_lock lock(*session.getDocument());
     const PageRef p = page.getPage();
@@ -2377,6 +2418,7 @@ void CanvasView::layerChanged(size_t page) {
         }
     }
     stickyNotes->layersChanged();
+    mixedSelection->validate();
 }
 
 PdfCache* CanvasView::rasterPdfCache(bool background) const {
@@ -2517,6 +2559,7 @@ void CanvasView::pageDeleted(size_t page) {
     const NavPoint here = isPrimary() ? NavPoint{} : currentPlace();
     if (page < pages.size()) {
         stickyNotes->pageGoing(pages[page].get());
+        mixedSelection->pageGoing(pages[page].get());
         geometry.pageGoing(pages[page].get());
         sharpWanted.erase(pages[page].get());
         pages.erase(pages.begin() + static_cast<std::ptrdiff_t>(page));
@@ -2620,6 +2663,113 @@ void CanvasView::markdownSelectionMade(const PageRef& page, Layer::Index before)
         return;
     }
     markdownSelection = MarkdownSelection{selection.get(), {{page, before, nullptr}}};
+}
+
+bool CanvasView::hasAnySelection() const {
+    return selection || stickyNotes->hasSelection() || mixedSelection->active();
+}
+
+void CanvasView::selectTogether(CanvasPage& page, std::vector<Layer*> notes,
+                                std::vector<MixedSelection::Item> items) {
+    clearSelection();
+    if (notes.empty() && items.empty()) {
+        return;
+    }
+    if (notes.size() == 1 && items.empty()) {
+        stickyNotes->select(page, notes.front());  // (one note: its own selection, with its pill and handle)
+        return;
+    }
+    Layer* layer = items.empty() ? nullptr : items.front().layer;
+    if (notes.empty() && std::all_of(items.begin(), items.end(), [&](const auto& i) { return i.layer == layer; })) {
+        // Elements of one layer: an ordinary selection of them (it can be resized, recolored ...)
+        const PageRef ref = page.getPage();
+        InsertionOrderRef refs;
+        Layer::Index before = 0;
+        {
+            std::unique_lock lock(*session.getDocument());
+            before = ref->getSelectedLayerId();
+            const auto layers = ref->getLayersView();
+            const auto at = std::find(layers.begin(), layers.end(), layer);
+            if (at == layers.end()) {
+                return;
+            }
+            ref->setSelectedLayerId(static_cast<Layer::Index>(std::distance(layers.begin(), at) + 1));
+            for (const auto& item: items) {
+                refs.emplace_back(item.element, layer->indexOf(item.element));
+            }
+        }
+        std::sort(refs.begin(), refs.end());
+        setSelection(SelectionFactory::createFromElementsOnActiveLayer(&session, ref, &page, refs).release());
+        if (md::isMarkdownLayer(*layer)) {
+            markdownSelectionMade(ref, before);
+        }
+        return;
+    }
+    mixedSelection->set(page, std::move(notes), std::move(items));
+    session.getToolHandler()->setSelectionEditTools(false, false, false, false);
+    ++selectionRev;
+    Q_EMIT selectionChanged(true);
+    Q_EMIT updateRequested();
+}
+
+std::pair<std::vector<Layer*>, std::vector<MixedSelection::Item>> CanvasView::takeSelected(CanvasPage& page) {
+    std::vector<Layer*> notes;
+    std::vector<MixedSelection::Item> items;
+    if (mixedSelection->active()) {
+        mixedSelection->validate();
+    }
+    if (mixedSelection->active() && mixedSelection->selectedPage() == &page) {
+        notes = mixedSelection->notes();
+        items = mixedSelection->items();
+    } else if (stickyNotes->hasSelection() && stickyNotes->selectedPage() == &page) {
+        notes.push_back(stickyNotes->selectedLayer());
+    } else if (selection && selection->getView() == &page && !selection->isMoving() &&
+               !(markdownSelection && markdownSelection->selection == selection.get() && markdownSelection->inNotes)) {
+        // Selected elements of the page: back into their layer first (they are out of it while selected)
+        std::vector<Element*> elements;
+        for (const Element* e: selection->getElementsView()) {
+            elements.push_back(const_cast<Element*>(e));
+        }
+        clearSelection();
+        const PageRef ref = page.getPage();
+        std::shared_lock lock(*session.getDocument());
+        for (Element* e: elements) {
+            for (Layer* l: ref->getLayers()) {
+                if (l->indexOf(e) != Element::InvalidIndex) {
+                    items.push_back({l, e});
+                    break;
+                }
+            }
+        }
+    }
+    clearSelection();
+    return {std::move(notes), std::move(items)};
+}
+
+void CanvasView::toggleSelected(CanvasPage& page, Layer* note, Element* element) {
+    auto [notes, items] = takeSelected(page);
+    if (note) {
+        if (const auto at = std::find(notes.begin(), notes.end(), note); at != notes.end()) {
+            notes.erase(at);
+        } else {
+            notes.push_back(note);
+        }
+    }
+    if (element) {
+        const auto at = std::find_if(items.begin(), items.end(), [&](const auto& i) { return i.element == element; });
+        if (at != items.end()) {
+            items.erase(at);
+        } else {
+            std::shared_lock lock(*session.getDocument());
+            for (Layer* l: page.getPage()->getLayers()) {
+                if (l->indexOf(element) != Element::InvalidIndex) {
+                    items.push_back({l, element});
+                    break;
+                }
+            }
+        }
+    }
+    selectTogether(page, std::move(notes), std::move(items));
 }
 
 void CanvasView::noteSelectionMade(const PageRef& page, Layer::Index before, Layer* note) {

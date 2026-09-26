@@ -39,6 +39,7 @@
 
 #include "CanvasView.h"
 #include "MdBox.h"
+#include "MixedSelection.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
 #include "render/RenderService.h"
@@ -115,9 +116,13 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
                             toolType == TOOL_SELECT_OBJECT;
     const bool areaTool = toolType == TOOL_SELECT_RECT || toolType == TOOL_SELECT_REGION ||
                           toolType == TOOL_SELECT_MULTILAYER_RECT || toolType == TOOL_SELECT_MULTILAYER_REGION;
+    // Ctrl or Shift with a select tool adds to the selection (a note or an element there joins it or leaves it)
+    const bool add = selectTool && (pos.isShiftDown() || pos.isControlDown());
+    // Whole notes are selected (one, several, or notes with elements): Ctrl or Shift adds to them or takes away
+    const bool together = view.notes().hasSelection() || view.mixed().active();
     if (!view.isReadingOnly()) {
         bool deselected = false;
-        if (view.notes().press(*this, x, y, selectTool, deselected, areaTool)) {
+        if (view.notes().press(*this, x, y, selectTool, deselected, areaTool, add)) {
             return true;
         }
     }
@@ -191,7 +196,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     } else if (h->getToolType() == TOOL_SELECT_PDF_TEXT_LINEAR || h->getToolType() == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextPress(*this, x, y);
     } else if (h->getToolType() == TOOL_SELECT_OBJECT) {
-        const bool aggregate = pos.isShiftDown() && view.getSelection();
+        const bool aggregate = add && (view.getSelection() || together);
         selectObjectAt(x, y, false, aggregate);
     }
     return true;
@@ -200,6 +205,36 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
 bool CanvasPage::selectObjectAt(double x, double y, bool multiLayer, bool aggregate) {
     // Port of SelectObject::at / atAggregate (gui/PageViewFindObjectHelper.h)
     DocumentSession& ctrl = view.getSession();
+    if (aggregate && (view.notes().hasSelection() || view.mixed().active())) {
+        // xournal-qt: whole sticky notes are selected: the element there joins them or leaves them (in its layer:
+        // the selected one or the Markdown texts; a multi-layer tool: the topmost with an element there, no note)
+        Element* found = nullptr;
+        {
+            std::shared_lock lock(*ctrl.getDocument());
+            const Layer* selectedLayer = page->getSelectedLayer();
+            const auto layers = page->getLayersView();
+            for (auto l = layers.rbegin(); l != layers.rend() && !found; ++l) {
+                if (sticky::isNote(**l) || !(*l)->isVisible() ||
+                    (!multiLayer && *l != selectedLayer && !md::isMarkdownLayer(**l))) {
+                    continue;
+                }
+                constexpr double RADIUS = 5.;
+                double best = RADIUS;
+                for (const Element* e: (*l)->getElementsView()) {
+                    if (e->intersectsArea(x - RADIUS, y - RADIUS, 2 * RADIUS, 2 * RADIUS)) {
+                        if (const double d = e->distanceTo(x, y); d < best || d == 0.0) {
+                            best = d;
+                            found = const_cast<Element*>(e);
+                        }
+                    }
+                }
+            }
+        }
+        if (found) {
+            view.toggleSelected(*this, nullptr, found);
+        }
+        return found != nullptr;
+    }
     EditSelection* previous = aggregate ? view.getSelection() : nullptr;
     if (!aggregate) {
         view.clearSelection();
@@ -367,7 +402,14 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
     }
     if (this->selector) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)
-        const bool aggregate = pos.isShiftDown() && view.getSelection();
+        const bool add = pos.isShiftDown() || pos.isControlDown();
+        const bool together = view.notes().hasSelection() || view.mixed().active();
+        const bool aggregate = add && (view.getSelection() || together);
+        if (!this->selector->userTapped(getZoom()) && selectNotesAndElements(aggregate)) {
+            // xournal-qt: whole sticky notes in it (qt/docs/sticky-notes.md, "Several notes at once")
+            this->selector.reset();
+            return false;
+        }
         size_t layerOfFinalizedSel = this->selector->finalize(this->page, aggregate, control.getDocument());
         if (layerOfFinalizedSel) {
             // xournal-qt: a multi-layer selection never takes a sticky note apart (a tap selects the note)
@@ -509,6 +551,71 @@ void CanvasPage::selectInNote(Layer* note, bool tapped) {
     view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, this->page, this, elements).release());
     view.noteSelectionMade(this->page, before, note);
     repaintPage();
+}
+
+bool CanvasPage::selectNotesAndElements(bool add) {
+    DocumentSession& control = view.getSession();
+    Document* doc = control.getDocument();
+    std::vector<Layer*> notes;
+    {
+        // The notes wholly in it (their paper's corners): a note is selected whole, never taken apart
+        std::shared_lock lock(*doc);
+        for (Layer* l: page->getLayers()) {
+            if (const Stroke* paper = sticky::paperOf(*l); paper && l->isVisible() && paper->isInSelection(selector.get())) {
+                notes.push_back(l);
+            }
+        }
+    }
+    if (notes.empty() && !(add && (view.notes().hasSelection() || view.mixed().active()))) {
+        return false;  // (no note: as before)
+    }
+    (void)this->selector->finalize(this->page, true, doc);  // (its picture goes; what it found is looked for below)
+    (void)this->selector->releaseElements();
+    // The page's elements in it: in the selected layer (else the page's Markdown texts), as a selection of elements
+    // takes them; a multi-layer tool: the topmost layer with elements in it that is no note
+    std::vector<MixedSelection::Item> items;
+    {
+        std::shared_lock lock(*doc);
+        const auto inLayer = [&](Layer* l) {
+            for (const Element* e: l->getElementsView()) {
+                if (e->isInSelection(selector.get())) {
+                    items.push_back({l, const_cast<Element*>(e)});
+                }
+            }
+            return !items.empty();
+        };
+        if (selector->isMultiLayerSelection()) {
+            const auto layers = page->getLayers();
+            for (auto l = layers.rbegin(); l != layers.rend(); ++l) {
+                if (!sticky::isNote(**l) && (*l)->isVisible() && inLayer(*l)) {
+                    break;
+                }
+            }
+        } else if (Layer* selected = page->getSelectedLayer(); selected && !sticky::isNote(*selected)) {
+            if (!inLayer(selected)) {
+                if (Layer* mdLayer = md::markdownLayer(page); mdLayer && mdLayer->isVisible() && mdLayer != selected) {
+                    inLayer(mdLayer);
+                }
+            }
+        }
+    }
+    if (add) {
+        // Added to what is selected (on this page)
+        auto [had, hadItems] = view.takeSelected(*this);
+        for (Layer* n: had) {
+            if (std::find(notes.begin(), notes.end(), n) == notes.end()) {
+                notes.push_back(n);
+            }
+        }
+        for (const auto& item: hadItems) {
+            if (std::none_of(items.begin(), items.end(), [&](const auto& i) { return i.element == item.element; })) {
+                items.push_back(item);
+            }
+        }
+    }
+    view.selectTogether(*this, notes, items);
+    repaintPage();
+    return true;
 }
 
 void CanvasPage::leaveNote() {

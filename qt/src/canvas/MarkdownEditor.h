@@ -72,8 +72,14 @@ public:
     std::string textBeforeCursor() const override;
     void replaceBeforeCursor(size_t bytes, const std::string& text) override;
 
-    /// Draws the box with the cursor, the selection and the cursor (page coordinates of getPage()).
+    /// Draws the box with the cursor, the selection and the cursor (page coordinates of getPage()). A sticky note's
+    /// text is clipped to the note, as it is drawn when done (with the "more below" mark when it goes on below).
     void paint(cairo_t* cr) const;
+    /// A sticky note's text: the cursor is below the note's bottom (what is typed there is not seen: the window says
+    /// so, qt/docs/sticky-notes.md)
+    bool cursorBelowNote() const;
+    /// The note of a note's text (page coordinates of getPage(); nothing: not a note's text)
+    std::optional<QRectF> noteRect() const;
     void setFontSize(double size);
     double fontSize() const { return md.fontSize(); }
 
@@ -190,6 +196,8 @@ private:
     bool lastWasTyping = false;
     bool plain = false;  ///< plain text (a .txt): no Markdown keys
     QRectF lastArea;
+    /// A sticky note's text: the note as it is now (its rectangle clips the text; read at every change)
+    std::optional<sticky::Look> note;
 };
 
 }  // namespace xqt

@@ -106,6 +106,14 @@ size_t MarkdownSession::indexOf(const PageRef& page) const {
     return session.getDocument()->indexOf(page);
 }
 
+std::optional<sticky::Look> MarkdownSession::noteLook() const {
+    if (!isNoteText() || !chain.front().layer) {
+        return std::nullopt;
+    }
+    std::shared_lock lock(*session.getDocument());
+    return sticky::lookOf(*chain.front().layer);
+}
+
 size_t MarkdownSession::pageIndex() const { return active() ? indexOf(chain.front().page) : npos; }
 size_t MarkdownSession::lastPageIndex() const { return active() ? indexOf(chain.back().page) : npos; }
 

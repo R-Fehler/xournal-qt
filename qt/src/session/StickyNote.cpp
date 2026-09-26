@@ -347,6 +347,21 @@ bool isPeeking(const Layer* layer) {
     return peeking.count(layer) > 0;
 }
 
+void drawMoreBelow(cairo_t* cr, const Rectangle<double>& rect, Color paper) {
+    const double side = std::min({7.0, rect.width / 6, rect.height / 6});
+    const double cx = rect.x + rect.width - TEXT_PADDING / 2 - side / 2;
+    const double by = rect.y + rect.height - 2;
+    const Color more = edgeColor(paper);
+    cairo_save(cr);
+    cairo_move_to(cr, cx - side / 2, by - side * 0.6);
+    cairo_line_to(cr, cx + side / 2, by - side * 0.6);
+    cairo_line_to(cr, cx, by);
+    cairo_close_path(cr);
+    cairo_set_source_rgb(cr, more.red / 255.0, more.green / 255.0, more.blue / 255.0);
+    cairo_fill(cr);
+    cairo_restore(cr);
+}
+
 bool draw(const Layer& layer, const xoj::view::Context& ctx) {
     const Stroke* paper = paperOf(layer);
     if (!paper) {
@@ -408,16 +423,7 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
         if (const Text* text = textOf(layer); text && !text->getText().empty()) {
             const auto box = text->getBoundingBox();  // (as big as it is drawn: the Markdown sizer)
             if (box.y + box.height > rect.y + rect.height + 0.5) {
-                const double side = std::min({7.0, rect.width / 6, rect.height / 6});
-                const double cx = rect.x + rect.width - TEXT_PADDING / 2 - side / 2;
-                const double by = rect.y + rect.height - 2;
-                const Color more = edgeColor(paper->getColor());
-                cairo_move_to(cr, cx - side / 2, by - side * 0.6);
-                cairo_line_to(cr, cx + side / 2, by - side * 0.6);
-                cairo_line_to(cr, cx, by);
-                cairo_close_path(cr);
-                cairo_set_source_rgb(cr, more.red / 255.0, more.green / 255.0, more.blue / 255.0);
-                cairo_fill(cr);
+                drawMoreBelow(cr, rect, paper->getColor());
             }
         }
     }
@@ -603,6 +609,42 @@ void ContentMoveUndoAction::repaint(double mx, double my) const {
 
 // --- the clipboard -------------------------------------------------------------------------------------------------
 
+namespace {
+/// An element in a stream of its own, written into `out` (see CLIPBOARD_OBJECT)
+void writeElement(ObjectOutputStream& out, const Element& e) {
+    ObjectOutputStream one(new BinObjectEncoding());
+    e.serialize(one);
+    GString* bytes = one.stealData();
+    out.writeImage(std::string_view(bytes->str, bytes->len));
+    g_string_free(bytes, TRUE);
+}
+/// An element written by writeElement (nullptr: not one)
+ElementPtr readElement(ObjectInputStream& in) {
+    const std::string bytes = in.readImage();
+    ObjectInputStream one;
+    if (!one.read(bytes.data(), bytes.size())) {
+        return nullptr;
+    }
+    const std::string type = one.getNextObjectName();
+    ElementPtr element;
+    if (type == "Stroke") {
+        element = std::make_unique<Stroke>();
+    } else if (type == "Image") {
+        element = std::make_unique<Image>();
+    } else if (type == "TexImage") {
+        element = std::make_unique<TexImage>();
+    } else if (type == "Text") {
+        element = std::make_unique<Text>();
+    } else if (type == "Link") {
+        element = std::make_unique<Link>();
+    } else {
+        return nullptr;
+    }
+    element->readSerialized(one);
+    return element;
+}
+}  // namespace
+
 std::string serialize(const Layer& layer) {
     if (!isNote(layer)) {
         return {};
@@ -614,12 +656,7 @@ std::string serialize(const Layer& layer) {
     const auto elements = layer.getElementsView();
     out.writeSizeT(elements.size());
     for (const Element* e: elements) {
-        // Each element in a stream of its own (see CLIPBOARD_OBJECT)
-        ObjectOutputStream one(new BinObjectEncoding());
-        e->serialize(one);
-        GString* bytes = one.stealData();
-        out.writeImage(std::string_view(bytes->str, bytes->len));
-        g_string_free(bytes, TRUE);
+        writeElement(out, *e);  // (each in a stream of its own, see CLIPBOARD_OBJECT)
     }
     out.endObject();
     GString* data = out.stealData();
@@ -644,27 +681,10 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
         layer->setName(name);
         const size_t count = in.readSizeT();
         for (size_t i = 0; i < count; ++i) {
-            const std::string bytes = in.readImage();
-            ObjectInputStream one;
-            if (!one.read(bytes.data(), bytes.size())) {
+            ElementPtr element = readElement(in);
+            if (!element) {
                 return nullptr;
             }
-            const std::string type = one.getNextObjectName();
-            ElementPtr element;
-            if (type == "Stroke") {
-                element = std::make_unique<Stroke>();
-            } else if (type == "Image") {
-                element = std::make_unique<Image>();
-            } else if (type == "TexImage") {
-                element = std::make_unique<TexImage>();
-            } else if (type == "Text") {
-                element = std::make_unique<Text>();
-            } else if (type == "Link") {
-                element = std::make_unique<Link>();
-            } else {
-                return nullptr;
-            }
-            element->readSerialized(one);
             layer->addElement(std::move(element));
         }
         in.endObject();
@@ -678,22 +698,20 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
     }
 }
 
-Rectangle<double> pastePlace(Rectangle<double> r, double pageWidth, double pageHeight,
-                             const std::vector<Rectangle<double>>& taken) {
-    r.width = std::clamp(r.width, std::min(MIN_SIDE, pageWidth), std::max(MIN_SIDE, pageWidth));
-    r.height = std::clamp(r.height, std::min(MIN_SIDE, pageHeight), std::max(MIN_SIDE, pageHeight));
+namespace {
+bool sameRect(const Rectangle<double>& a, const Rectangle<double>& b) {
+    return std::abs(a.x - b.x) < 0.5 && std::abs(a.y - b.y) < 0.5 && std::abs(a.width - b.width) < 0.5 &&
+           std::abs(a.height - b.height) < 0.5;
+}
+/// Where a rectangle of this size goes on the page: its place moved inside the page, then a little further down and
+/// right each time (up and left where the page ends) while `isTaken`, as a stack of copies
+template <typename Taken>
+Rectangle<double> placeInside(Rectangle<double> r, double pageWidth, double pageHeight, const Taken& isTaken) {
     const auto inside = [&](double x, double y) {
         return Rectangle<double>(std::clamp(x, 0.0, std::max(0.0, pageWidth - r.width)),
                                  std::clamp(y, 0.0, std::max(0.0, pageHeight - r.height)), r.width, r.height);
     };
     r = inside(r.x, r.y);
-    const auto isTaken = [&](const Rectangle<double>& c) {
-        return std::any_of(taken.begin(), taken.end(), [&](const Rectangle<double>& t) {
-            return std::abs(t.x - c.x) < 0.5 && std::abs(t.y - c.y) < 0.5 && std::abs(t.width - c.width) < 0.5 &&
-                   std::abs(t.height - c.height) < 0.5;
-        });
-    };
-    // A little further down and right each time (up and left where the page ends), as a stack of copies
     constexpr double STEP = 16;
     if (!isTaken(r)) {
         return r;
@@ -706,6 +724,138 @@ Rectangle<double> pastePlace(Rectangle<double> r, double pageWidth, double pageH
         }
     }
     return r;
+}
+}  // namespace
+
+Rectangle<double> pastePlace(Rectangle<double> r, double pageWidth, double pageHeight,
+                             const std::vector<Rectangle<double>>& taken) {
+    r.width = std::clamp(r.width, std::min(MIN_SIDE, pageWidth), std::max(MIN_SIDE, pageWidth));
+    r.height = std::clamp(r.height, std::min(MIN_SIDE, pageHeight), std::max(MIN_SIDE, pageHeight));
+    return placeInside(r, pageWidth, pageHeight, [&](const Rectangle<double>& c) {
+        return std::any_of(taken.begin(), taken.end(), [&](const Rectangle<double>& t) { return sameRect(t, c); });
+    });
+}
+
+xoj::util::Point<double> groupPastePlace(const Rectangle<double>& bounds,
+                                         const std::vector<Rectangle<double>>& notes, double pageWidth,
+                                         double pageHeight, const std::vector<Rectangle<double>>& taken) {
+    // (the whole selection keeps its size and layout: only moved, never made smaller)
+    const Rectangle<double> placed = placeInside(bounds, pageWidth, pageHeight, [&](const Rectangle<double>& c) {
+        const double dx = c.x - bounds.x;
+        const double dy = c.y - bounds.y;
+        return std::any_of(notes.begin(), notes.end(), [&](const Rectangle<double>& n) {
+            const Rectangle<double> moved(n.x + dx, n.y + dy, n.width, n.height);
+            return std::any_of(taken.begin(), taken.end(),
+                               [&](const Rectangle<double>& t) { return sameRect(t, moved); });
+        });
+    });
+    return {placed.x - bounds.x, placed.y - bounds.y};
+}
+
+// --- several notes and elements together ------------------------------------------------------------------------
+
+namespace {
+constexpr const char* GROUP_CLIPBOARD_OBJECT = "StickyGroup1";
+}
+
+std::string serializeGroup(const Rectangle<double>& bounds, const std::vector<const Layer*>& notes,
+                           const std::vector<const Element*>& elements) {
+    ObjectOutputStream out(new BinObjectEncoding());
+    out.writeString(PROJECT_STRING);
+    out.writeObject(GROUP_CLIPBOARD_OBJECT);
+    out.writeDouble(bounds.x);
+    out.writeDouble(bounds.y);
+    out.writeDouble(bounds.width);
+    out.writeDouble(bounds.height);
+    out.writeSizeT(notes.size());
+    for (const Layer* note: notes) {
+        const std::string bytes = serialize(*note);  // (a whole note, as it is copied alone)
+        out.writeImage(bytes);
+    }
+    out.writeSizeT(elements.size());
+    for (const Element* e: elements) {
+        // (a Markdown box of the page goes into a page's Markdown layer when pasted: its layer made it one)
+        out.writeInt(e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e)->isMarkdown() ? 1 : 0);
+        writeElement(out, *e);
+    }
+    out.endObject();
+    GString* data = out.stealData();
+    std::string bytes(data->str, data->len);
+    g_string_free(data, TRUE);
+    return bytes;
+}
+
+std::optional<Group> deserializeGroup(const char* data, size_t size) {
+    try {
+        ObjectInputStream in;
+        if (!in.read(data, size)) {
+            return std::nullopt;
+        }
+        in.readString();
+        in.readObject(GROUP_CLIPBOARD_OBJECT);
+        Group group;
+        group.bounds.x = in.readDouble();
+        group.bounds.y = in.readDouble();
+        group.bounds.width = in.readDouble();
+        group.bounds.height = in.readDouble();
+        const size_t notes = in.readSizeT();
+        for (size_t i = 0; i < notes; ++i) {
+            const std::string bytes = in.readImage();
+            auto note = deserialize(bytes.data(), bytes.size());
+            if (!note) {
+                return std::nullopt;
+            }
+            group.notes.push_back(std::move(note));
+        }
+        const size_t elements = in.readSizeT();
+        for (size_t i = 0; i < elements; ++i) {
+            const bool markdown = in.readInt() != 0;
+            ElementPtr element = readElement(in);
+            if (!element) {
+                return std::nullopt;
+            }
+            group.elements.push_back(std::move(element));
+            group.markdown.push_back(markdown);
+        }
+        in.endObject();
+        return group;
+    } catch (const std::exception& e) {
+        g_warning("Not a selection of sticky notes on the clipboard: %s", e.what());
+        return std::nullopt;
+    }
+}
+
+// --- undo steps -----------------------------------------------------------------------------------------------
+
+UndoSteps::UndoSteps(std::string text): UndoAction("StickyUndoSteps"), text(std::move(text)) {}
+
+void UndoSteps::add(std::unique_ptr<UndoAction> step) {
+    for (const PageRef& p: step->getPages()) {
+        if (p && std::find(pages.begin(), pages.end(), p) == pages.end()) {
+            pages.push_back(p);
+        }
+    }
+    steps.push_back(std::move(step));
+}
+
+std::vector<PageRef> UndoSteps::getPages() { return pages; }
+
+bool UndoSteps::undo(Control* control) {
+    bool ok = true;
+    for (auto it = steps.rbegin(); it != steps.rend(); ++it) {
+        ok = (*it)->undo(control) && ok;
+    }
+    this->undone = true;
+    return ok;
+}
+
+bool UndoSteps::redo(Control* control) {
+    bool ok = true;
+    for (auto& step: steps) {
+        ok = step->redo(control) && ok;
+    }
+    this->undone = false;
+    return ok;
 }
 
 }  // namespace xqt::sticky

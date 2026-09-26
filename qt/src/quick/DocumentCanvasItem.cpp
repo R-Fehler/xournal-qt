@@ -453,6 +453,11 @@ void DocumentCanvasItem::setView(QObject* object) {
         });
         connect(input.get(), &xqt::CanvasInput::hoverChanged, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::emojiCompletionChanged, this, &DocumentCanvasItem::emojiCompletionChanged);
+        // (the hint that a note's text goes on below the note: with the cursor, and where the note is shown)
+        connect(canvasView, &xqt::CanvasView::markdownCursorChanged, this, &DocumentCanvasItem::noteTextHintChanged);
+        connect(canvasView, &xqt::CanvasView::textEditingChanged, this, &DocumentCanvasItem::noteTextHintChanged);
+        connect(&canvasView->getViewController(), &xqt::ViewController::changed, this,
+                &DocumentCanvasItem::noteTextHintChanged);
         connect(canvasView, &xqt::CanvasView::textEditingChanged, this, [this](bool editing) {
             Q_EMIT textEditingChanged();
             setFlag(ItemAcceptsInputMethod, editing);
@@ -867,6 +872,8 @@ QRectF DocumentCanvasItem::emojiCompletionRect() const {
                    ? inputMethodQuery(Qt::ImCursorRectangle).toRectF()
                    : QRectF();
 }
+
+QRectF DocumentCanvasItem::noteTextHint() const { return canvasView ? canvasView->noteTextHintBox() : QRectF(); }
 
 void DocumentCanvasItem::chooseEmojiCompletion(int index) {
     if (canvasView) {
