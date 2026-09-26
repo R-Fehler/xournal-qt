@@ -659,6 +659,12 @@
   back one level up; `win.safeBottom`). Used for ⋮, library, card, tab, layout and page menus. ⋮ regrouped into 10
   entries (Document / Export / Page / View submenus), about 450 px. Open: the remaining plain menus (shapes first).
 
+- **Adaptive dialogs, `qt/adaptive-dialogs` (2026-09-26).** `AdaptiveDialog` for every dialog and sheet: the body
+  scrolls, title and buttons stay, never taller than the window, above the soft keyboard; on phones forms are
+  full-screen sheets (× left, confirm top right), questions bottom sheets, cards stay centred; footers that don't fit
+  stack; Esc / Android back close. Settings on phones: a list of sections → section pages; labels above sliders and
+  combos below 600 px. The quick-tools popup fits short windows. Open: tab overview, table editor, small popups.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
