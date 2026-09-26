@@ -60,7 +60,7 @@ Written as `#page=12&pdfpage=7`. Viewers that know only `page=` still get close.
 ## Following a link
 
 - A tap on a link (finger, mouse, or the pen with the hand or select tool; the pen keeps writing otherwise, as with
-  PDF links today) shows a small popup: **"Open in a new tab" · "Open as reference" · "Open here"** (the last
+  PDF links today; for the mouse see "Links with the mouse" at the end) shows a small popup: **"Open in a new tab" · "Open as reference" · "Open here"** (the last
   replaces the current view, with Back to return). "Remember my choice" makes it the default, which can be changed
   in Settings → Documents.
 - Back and forward (Alt+Left/Right, the ← → pill) work across documents.
@@ -216,3 +216,38 @@ The author accepted the plan with its proposals:
   changed by another app (they are made from the text).
 - Not handled: a base PDF page that is rotated or has a crop box moved from the origin gets the link boxes offset
   by the crop box only (the ink uses the full placement matrix).
+
+## Links with the mouse, and their address on hover (`qt/link-hover`)
+
+The author (2026-09-26): links should be clickable with the mouse on the desktop, not only with a finger, and hovering
+a link with the mouse or the pen should show where it leads, at the bottom like a browser, without getting in the
+way when the pointer only passes over it.
+
+### A click follows a link (`CanvasInput`, `CanvasView::hoverLinkAt` / `followLinkAt`; tests `LinkMouseTest` in `-L canvas`)
+- A click is a press and release of the left button that moved no further than the platform's drag distance
+  (`QStyleHints::startDragDistance`, about 10 pixels), however long it took. It follows the link as a finger's tap
+  does: `linkTapped`, so the same sheet (new tab, reference, here), the same remembered choice, the same "Go to
+  page N" for a PDF link. In the reference it is the reference's sheet.
+- The links: PDF link annotations, link markers, web addresses and `#Page:N` in text boxes, and the links of
+  Markdown boxes and pages.
+- **Which tool follows on a plain click:**
+  - **the hand, the select tools and the PDF text tools:** yes. The object select tool first selects what it
+    clicks (a link marker is a text box it can take); with nothing selected, the release follows the link, as
+    before;
+  - **the pen, the highlighter (also their shapes), the eraser and the laser pointers:** yes, and nothing is drawn:
+    on a link the press waits whether it becomes a drag. Moving beyond the drag distance starts the stroke where
+    the mouse was pressed, so a stroke that begins on a link is drawn in full. A single dot on a link is not
+    possible with the mouse (the click follows the link); a spline's clicks stay its points;
+  - **the text tool, the image tool, vertical space and the others that place something:** no, the click does what
+    the tool does; Ctrl + click follows;
+  - **text being written** (the Markdown box or page with the cursor, a text box being edited, a `.md` or `.txt`
+    file): a plain click puts the cursor there, as in editors; **Ctrl + click follows**, as before;
+  - **Ctrl + click follows with every tool.**
+  - A document shown only for reading (a `.md` shown, the reference): every tool follows.
+  - With a selection out (elements, a sticky note, PDF text), the click ends it and follows nothing, as a tap does.
+- The pen keeps writing with the drawing tools (a tap of the pen on a link is a dot, as before): only the mouse
+  waits for the click.
+- The links under the mouse come from what each page keeps (`CanvasPage::linkSpots`): looked for once (the PDF's
+  link annotations through poppler, the texts' web addresses, the Markdown layouts' link boxes) and forgotten on
+  any change of the page (a stroke, a text, undo, a layer shown or hidden). A move over the page is a walk over a
+  few rectangles; `CanvasView::linkLookups` counts the searches (a test moves 400 times and sees one).

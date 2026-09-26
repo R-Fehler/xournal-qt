@@ -1750,3 +1750,18 @@ Design: [md-images.md](../md-images.md).
 - [ ] That `.xopp` opened in Xournal++ (1.3 on the desktop): opens without a message, the page shows the Markdown
       source as text.
 - [ ] The same notes saved as a PDF with notes: the picture shows; Okular lists it among the attachments.
+
+## Links with the mouse, and their address on hover (qt/link-hover)
+- [ ] A PDF with links (a paper with references, a table of contents), the pen tool: click a link with the mouse.
+      The sheet ("Open" / "Go to page N" / "In the reference") comes, no dot is drawn. Drag from a link: a stroke,
+      beginning where the mouse was pressed; nothing is followed.
+- [ ] The same with the highlighter, the eraser, a shape (rectangle), the hand, the rectangle select and the PDF
+      text tool: a click follows. The text tool: a click writes; Ctrl + click follows.
+- [ ] A click held down for a second without moving still follows (a slow click is a click).
+- [ ] A link marker (Copy link on a page, paste on another page) and a web address typed in a text box: a click
+      with the pen tool follows (the document sheet: new tab / reference / here, "Remember my choice" as with a
+      finger).
+- [ ] A `.md` open for writing: a click on a link puts the cursor into it; Ctrl + click follows.
+- [ ] The reference beside the notes: a click on a link there follows it as a tap does.
+- [ ] With the pen (tablet), the pen tool: tapping a link still makes a dot (the pen writes).
+

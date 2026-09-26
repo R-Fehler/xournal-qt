@@ -659,9 +659,13 @@ void CanvasPage::repaintPage() const {
     Q_EMIT view.updateRequested();
 }
 
-void CanvasPage::rerenderPage(bool sizeChanged) { raster->rerenderPage(sizeChanged); }
+void CanvasPage::rerenderPage(bool sizeChanged) {
+    links.reset();  // (whatever changed, the links are looked for again)
+    raster->rerenderPage(sizeChanged);
+}
 
 void CanvasPage::rerenderRect(double x, double y, double width, double height) {
+    links.reset();
     raster->rerenderRect(x, y, width, height);
 }
 
@@ -676,6 +680,7 @@ void CanvasPage::deleteViewBuffer() { raster->releaseBuffer(); }
 void CanvasPage::rectChanged(Rectangle<double>& rect) { rerenderRect(rect.x, rect.y, rect.width, rect.height); }
 
 void CanvasPage::rangeChanged(Range& range) {
+    links.reset();
     rerenderRange(range);
     if (view.notes().selectedPage() == this) {
         // (a selected sticky note changed, maybe by undo: its outline and handle too)
@@ -688,6 +693,7 @@ void CanvasPage::rangeChanged(Range& range) {
 void CanvasPage::pageChanged() { rerenderPage(); }
 
 void CanvasPage::elementChanged(const Element* elem) {
+    links.reset();
     /*
      * Upstream: the input handlers issue an elementChanged event when creating an element. There is no need to redraw
      * it: it was already painted to the buffer via drawAndDeleteToolView. Exceptions: the element is not on the
@@ -702,6 +708,7 @@ void CanvasPage::elementChanged(const Element* elem) {
 }
 
 void CanvasPage::elementsChanged(const std::vector<const Element*>&, const Range& range) {
+    links.reset();
     if (!range.empty()) {
         rerenderRange(range);
     }
