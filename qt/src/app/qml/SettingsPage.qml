@@ -430,7 +430,8 @@ Popup {
                     ComboRow {
                         objectName: "networkAccessRow"
                         key: "networkAccess"
-                        text: qsTr("Connect to arXiv (searching sends the title's words; downloading fetches the PDF)")
+                        text: qsTr("Connect to the web: arXiv (searching sends the title's words; downloading fetches the PDF), "
+                                   + "web pictures of Markdown texts (when \"Load image\" is chosen)")
                         options: [
                             { text: qsTr("Ask the first time"), value: "ask" },
                             { text: qsTr("Allowed"), value: "on" },

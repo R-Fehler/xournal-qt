@@ -70,6 +70,9 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextDocument.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextDocument.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentImages.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentImages.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PictureSaveHandler.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.h
@@ -124,6 +127,10 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MdImageDecoder.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MdImageDecoder.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownImages.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownImages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasTextInput.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/StickyNotes.cpp

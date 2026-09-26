@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -20,9 +21,11 @@
 
 #include "model/Document.h"
 #include "model/XojPage.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
+#include "session/TextFile.h"
 
 #include "SystemApps.h"
 
@@ -274,6 +277,38 @@ bool transfer(const fs::path& from, const fs::path& to, bool copy, std::string& 
     return true;
 }
 
+/// Moves or copies a folder with everything in it (a .md's "name.assets"); on a different file system a move is a copy
+/// and a delete.
+bool transferFolder(const fs::path& from, const fs::path& to, bool copy, std::string& error) {
+    std::error_code ec;
+    if (fs::exists(to, ec)) {
+        error = "\"" + to.filename().string() + "\" already exists.";
+        return false;
+    }
+    if (!copy) {
+        fs::rename(from, to, ec);
+        if (!ec) {
+            return true;
+        }
+        if (ec != std::errc::cross_device_link) {
+            error = "Could not move \"" + from.filename().string() + "\": " + ec.message();
+            return false;
+        }
+        ec.clear();
+    }
+    fs::copy(from, to, fs::copy_options::recursive, ec);
+    if (ec) {
+        std::error_code ignored;
+        fs::remove_all(to, ignored);
+        error = "Could not copy \"" + from.filename().string() + "\": " + ec.message();
+        return false;
+    }
+    if (!copy) {
+        fs::remove_all(from, ec);
+    }
+    return true;
+}
+
 /// Undo steps of a half-done operation (run in reverse order on failure).
 struct Rollback {
     std::vector<std::function<void()>> steps;
@@ -284,6 +319,17 @@ struct Rollback {
                 (*it)();
             }
         }
+    }
+    void transferredFolder(const fs::path& from, const fs::path& to, bool copy) {
+        steps.emplace_back([from, to, copy] {
+            std::error_code ec;
+            if (copy) {
+                fs::remove_all(to, ec);
+            } else {
+                std::string ignored;
+                transferFolder(to, from, false, ignored);
+            }
+        });
     }
     void transferred(const fs::path& from, const fs::path& to, bool copy) {
         steps.emplace_back([from, to, copy] {
@@ -311,11 +357,13 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
     // The .xopp must be rewritten if it uses a PDF by its path: the path changes (relative to the .xopp). The same
     // for the image it annotates.
     std::unique_ptr<Document> doc;
+    std::shared_ptr<md::images::RootHandle> pictures;  // (its Markdown's pictures, while it is written again)
     if (!item.xopp.empty() && lower(item.xopp.extension().string()) == ".xopp") {
         auto loaded = DocumentSession::loadFile(item.xopp);
         if (!loaded.document) {
             return failure(loaded.error);
         }
+        pictures = loaded.pictures;
         if (!item.image.empty()) {
             // Pages with its image (or a lost one, repaired with the image next to it) as background, by path
             std::error_code ec;
@@ -458,6 +506,38 @@ DocumentFiles::Result relocate(const DocumentItem& item, const fs::path& folder,
             }
         }
     }
+    if (!item.md.empty()) {
+        // Its pictures ("name.assets" next to it) go along; its links to them follow a new name
+        // (qt/docs/md-images.md)
+        const fs::path assets = DocumentImages::assetsFolder(item.md);
+        const fs::path newAssets = DocumentImages::assetsFolder(newMd);
+        if (isDir(assets) && assets != newAssets) {
+            if (!transferFolder(assets, newAssets, copy, error)) {
+                return failure(error);
+            }
+            rollback.transferredFolder(assets, newAssets, copy);
+            if (!copy) {
+                r.moved.emplace_back(assets, newAssets);
+            }
+        }
+        const std::string oldName = DocumentImages::assetsName(item.md);
+        const std::string newName = DocumentImages::assetsName(newMd);
+        if (oldName != newName) {
+            std::ifstream in(newMd, std::ios::binary);
+            const std::string bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+            in.close();
+            const std::string renamed = DocumentImages::renamedAssetLinks(bytes, oldName, newName);
+            if (renamed != bytes) {
+                if (!TextFile::writeAtomically(newMd, renamed, error)) {
+                    return failure(error);
+                }
+                rollback.steps.emplace_back([newMd, bytes] {
+                    std::string ignored;
+                    TextFile::writeAtomically(newMd, bytes, ignored);
+                });
+            }
+        }
+    }
     if (!newXopp.empty() && !copy) {
         r.moved.emplace_back(item.xopp, newXopp);
         if (rewritten) {
@@ -593,6 +673,11 @@ std::vector<fs::path> filesOf(const DocumentItem& item) {
             files.push_back(img);
         }
     }
+    if (!item.md.empty()) {
+        if (const fs::path assets = DocumentImages::assetsFolder(item.md); isDir(assets)) {
+            files.push_back(assets);  // (its pictures: one document with the .md)
+        }
+    }
     return files;
 }
 
@@ -712,6 +797,16 @@ Listing scan(const fs::path& dir, unsigned include) {
         l.items.push_back(std::move(item));
     }
     foldConflicts(l.items);
+    // A .md's pictures ("name.assets" next to it) are part of it, not a folder of the library (qt/docs/md-images.md)
+    if (!mds.empty()) {
+        std::set<std::string> assets;
+        for (const auto& md: mds) {
+            assets.insert(DocumentImages::assetsName(md));
+        }
+        l.folders.erase(std::remove_if(l.folders.begin(), l.folders.end(),
+                                       [&](const fs::path& f) { return assets.count(f.filename().string()) > 0; }),
+                        l.folders.end());
+    }
     std::sort(l.folders.begin(), l.folders.end(),
               [](const fs::path& a, const fs::path& b) { return naturalLess(a.filename().string(), b.filename().string()); });
     std::stable_sort(l.items.begin(), l.items.end(),
@@ -816,6 +911,9 @@ bool nameTaken(const fs::path& folder, const std::string& name) {
         if (fileExists(folder / (name + ext))) {
             return true;
         }
+    }
+    if (isDir(folder / (name + ".assets"))) {
+        return true;  // (the pictures of a .md of that name, or left behind by one)
     }
     return !imageNamed(folder, name).empty();
 }

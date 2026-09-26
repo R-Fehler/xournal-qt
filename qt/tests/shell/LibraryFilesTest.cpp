@@ -26,6 +26,7 @@
 #include "model/DocumentHandler.h"
 #include "model/PageType.h"
 #include "model/XojPage.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
@@ -50,6 +51,11 @@ namespace {
 void writeFile(const fs::path& p, const std::string& content) {
     fs::create_directories(p.parent_path());
     std::ofstream(p, std::ios::binary) << content;
+}
+
+std::string readFile(const fs::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 std::vector<std::string> names(const std::vector<DocumentItem>& items) {
@@ -387,6 +393,64 @@ TEST_F(LibraryFilesTest, markdownFilesAreRenamedMovedAndCopied) {
     EXPECT_TRUE(fs::exists(root / "Physics" / "vault" / "a.md"));
     EXPECT_TRUE(fs::exists(root / "Physics" / "vault" / "b.png"));
     EXPECT_FALSE(fs::exists(root / "Physics" / "vault" / "c.txt"));
+}
+
+// qt/docs/md-images.md: a .md and its pictures in "name.assets/" are one document. The library shows one card and
+// no folder; rename, move, copy and trash take both; a new name rewrites the links to the pictures (and nothing else).
+TEST_F(LibraryFilesTest, aMarkdownFileAndItsPicturesAreOneDocument) {
+    const std::string text = "# Notes\n\n![](notes.assets/a.png)\n\n![x](./notes.assets/b%20c.png \"t\") and "
+                             "![y](<notes.assets/b c.png>)\n\n![ref][r]\n\n<img src=\"notes.assets/a.png\">\n\n"
+                             "Not links: notes.assets/a.png, other.assets/x.png, ![z](other.assets/x.png)\n\n"
+                             "[r]: notes.assets/a.png\n";
+    writeFile(root / "notes.md", text);
+    makeImage(root / "notes.assets" / "a.png", 10, 10);
+    makeImage(root / "notes.assets" / "b c.png", 10, 10);
+    fs::create_directories(root / "lonely.assets");  // (no .md of its name: a folder)
+    writeFile(root / "notes (conflicted copy).md", text);
+
+    // One card: the folder is part of the .md; its pictures are no documents; a conflict copy is on the card
+    auto listing = DocumentFiles::scan(root);
+    EXPECT_EQ(listing.folders, (std::vector<fs::path>{root / "lonely.assets"}));
+    ASSERT_EQ(listing.items.size(), 1u);
+    EXPECT_EQ(listing.items[0].md, root / "notes.md");
+    EXPECT_EQ(listing.items[0].conflicts, (std::vector<fs::path>{root / "notes (conflicted copy).md"}));
+    EXPECT_EQ(DocumentFiles::scanRecursive(root, DocumentFiles::AllFiles).size(), 1u) << "all files: still one";
+    auto files = DocumentFiles::filesOf(listing.items[0]);
+    EXPECT_EQ(files, (std::vector<fs::path>{root / "notes.md", root / "notes.assets"})) << "trashed together";
+
+    // Renamed: the folder goes along, the links follow (written as they were: <> keeps blanks, else %20)
+    auto r = DocumentFiles::rename(listing.items[0], "Kalman filter");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(fs::exists(root / "Kalman filter.assets" / "b c.png"));
+    EXPECT_FALSE(fs::exists(root / "notes.assets"));
+    EXPECT_NE(std::find(r.moved.begin(), r.moved.end(),
+                        std::pair<fs::path, fs::path>(root / "notes.assets", root / "Kalman filter.assets")),
+              r.moved.end());
+    const std::string renamed = readFile(root / "Kalman filter.md");
+    EXPECT_EQ(renamed,
+              "# Notes\n\n![](Kalman%20filter.assets/a.png)\n\n![x](./Kalman%20filter.assets/b%20c.png \"t\") and "
+              "![y](<Kalman filter.assets/b c.png>)\n\n![ref][r]\n\n<img src=\"Kalman%20filter.assets/a.png\">\n\n"
+              "Not links: notes.assets/a.png, other.assets/x.png, ![z](other.assets/x.png)\n\n"
+              "[r]: Kalman%20filter.assets/a.png\n");
+    EXPECT_EQ(DocumentImages::renamedAssetLinks(renamed, "Kalman filter.assets", "notes.assets"), text)
+            << "and back";
+
+    // Moved: the folder too; copied (a free name): a copy of the folder, the copy's links to its own
+    fs::create_directories(root / "Physics");
+    r = DocumentFiles::move(r.item, root / "Physics");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(fs::exists(root / "Physics" / "Kalman filter.assets" / "a.png"));
+    EXPECT_FALSE(fs::exists(root / "Kalman filter.assets"));
+    r = DocumentFiles::import(root / "Physics" / "Kalman filter.md", root / "Physics");
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_EQ(r.item.md, root / "Physics" / "Kalman filter (2).md");
+    EXPECT_TRUE(fs::exists(root / "Physics" / "Kalman filter (2).assets" / "a.png"));
+    EXPECT_TRUE(fs::exists(root / "Physics" / "Kalman filter.assets" / "a.png"));
+    EXPECT_NE(readFile(root / "Physics" / "Kalman filter (2).md").find("![](Kalman%20filter%20%282%29.assets/a.png)"),
+              std::string::npos);
+    // A name whose pictures' folder is there (left behind) is taken
+    fs::create_directories(root / "Physics" / "taken.assets");
+    EXPECT_FALSE(DocumentFiles::rename(DocumentFiles::itemOf(root / "Physics" / "Kalman filter (2).md"), "taken").ok);
 }
 
 TEST_F(LibraryFilesTest, theLibraryShowsWhatKindEachDocumentIs) {

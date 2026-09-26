@@ -27,6 +27,7 @@
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "Grapheme.h"
+#include "MarkdownImages.h"
 #include "MdBox.h"
 #include "MdDocument.h"
 #include "MdTexDelimiters.h"
@@ -570,6 +571,10 @@ bool MarkdownEditor::toggleCheckBox(CanvasPage& onPage, double x, double y) {
             continue;
         }
         const QPointF o = originOf(i);
+        if (const auto button = md::imageButtonAt(layoutOf(i), x - o.x(), y - o.y())) {
+            Q_EMIT view.imageLoadRequested(QString::fromStdString(button->url));  // (a web picture's "Load image")
+            return true;
+        }
         const auto box = md::checkBoxAt(layoutOf(i), x - o.x(), y - o.y());
         if (!box || box->mark < parts[i].part.prefix) {
             continue;
@@ -929,6 +934,20 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
                 if (const auto link = links::fromMime(QGuiApplication::clipboard()->mimeData())) {
                     insert(links::markdownFor(*link, session.documentFile()).toStdString(), EditKind::Other);
                     return true;
+                }
+                // Pictures (a copied picture, copied picture files): saved with the document, their Markdown pasted
+                // (qt/docs/md-images.md)
+                if (!plain) {
+                    QString error;
+                    if (auto pictures = MarkdownImages::pastedPictures(session, QGuiApplication::clipboard()->mimeData(),
+                                                                       error)) {
+                        if (pictures->empty()) {
+                            Q_EMIT view.messageRequested(QObject::tr("Paste picture"), error);
+                        } else {
+                            insert(*pictures, EditKind::Other);
+                        }
+                        return true;
+                    }
                 }
                 std::string pasted = QGuiApplication::clipboard()->text().toStdString();
                 pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());  // (the text's lines end in "\n")

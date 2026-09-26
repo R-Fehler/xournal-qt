@@ -7,6 +7,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import "Popups.js" as Popups
 
@@ -169,11 +170,21 @@ Rectangle {
                     focus: false
                     MenuItem { objectName: bar.named("mdMathBlockItem"); text: qsTr("Formula block ($$ … $$)"); icon.source: app.iconUrl("xqt-sigma"); onTriggered: bar.act("mathBlock") }
                     MenuItem { objectName: bar.named("mdRuleItem"); text: qsTr("Horizontal rule (---)"); icon.source: app.iconUrl("xqt-rule"); onTriggered: bar.act("rule") }
-                    MenuItem { objectName: bar.named("mdImageItem"); text: qsTr("Image (a placeholder to fill in)"); icon.source: app.iconUrl("xopp-tool-image"); onTriggered: bar.act("image") }
+                    MenuItem { objectName: bar.named("mdImageItem"); text: qsTr("Image…"); icon.source: app.iconUrl("xopp-tool-image"); onTriggered: imagePicker.open() }
                     MenuItem { objectName: bar.named("mdPageBreakItem"); text: qsTr("Page break"); icon.source: app.iconUrl("xqt-page-break"); onTriggered: bar.act("pageBreak") }
                 }
             }
             Item { Layout.fillWidth: true }
         }
+    }
+
+    // The image of the insert menu: a picture file, saved with the document and linked at the cursor
+    // (qt/docs/md-images.md)
+    FileDialog {
+        id: imagePicker
+        objectName: bar.named("mdImageDialog")
+        title: qsTr("Insert image")
+        nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.gif *.webp *.svg *.bmp)"), qsTr("All files (*)")]
+        onAccepted: bar.act("image", selectedFile.toString())
     }
 }

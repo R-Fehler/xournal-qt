@@ -236,6 +236,13 @@ public:
                 links.push_back(static_cast<int>(doc.links.size()));
                 doc.links.push_back(attributeText(static_cast<MD_SPAN_IMG_DETAIL*>(detail)->src));
                 doc.wikiLinks.push_back(false);
+                if (image) {
+                    ++image->nested;  // (an image in an image's alt text: its text is alt text)
+                } else {
+                    image.emplace();
+                    image->scanFrom = parsedEnd;
+                    image->link = links.back();
+                }
                 break;
             case MD_SPAN_WIKILINK:
                 flag = Link;
@@ -251,6 +258,13 @@ public:
     int leaveSpan(MD_SPANTYPE type) {
         if ((type == MD_SPAN_LATEXMATH || type == MD_SPAN_LATEXMATH_DISPLAY) && math) {
             endFormula();
+        }
+        if (type == MD_SPAN_IMG && image) {
+            if (image->nested > 0) {
+                --image->nested;
+            } else {
+                endImage();
+            }
         }
         if (!spans.empty()) {
             spans.pop_back();
@@ -310,7 +324,7 @@ public:
             math->runs.push_back(std::move(r));
             return 0;
         }
-        textTarget().runs.push_back(std::move(r));
+        runTarget().push_back(std::move(r));
         return 0;
     }
 
@@ -323,9 +337,9 @@ private:
         const bool blankOnly = std::all_of(f.runs.begin(), f.runs.end(), [](const Run& r) {
             return r.text.find_first_not_of(" \t\r\n") == std::string::npos;
         });
-        Block& target = textTarget();
+        std::vector<Run>& target = runTarget();
         if (!blankOnly) {
-            std::move(f.runs.begin(), f.runs.end(), std::back_inserter(target.runs));
+            std::move(f.runs.begin(), f.runs.end(), std::back_inserter(target));
             return;
         }
         // Its marks: before its first text (else the first "$" after the text before it), and the next "$" after
@@ -334,7 +348,7 @@ private:
         const size_t open = f.firstAt != NO_SOURCE && f.firstAt >= mark ? f.firstAt - mark : source.find('$', f.scanFrom);
         const size_t close = open == std::string_view::npos ? open : source.find('$', open + mark);
         if (close == std::string_view::npos || close + mark > source.size()) {
-            std::move(f.runs.begin(), f.runs.end(), std::back_inserter(target.runs));
+            std::move(f.runs.begin(), f.runs.end(), std::back_inserter(target));
             return;
         }
         Run r;
@@ -348,8 +362,126 @@ private:
         std::replace(r.text.begin(), r.text.end(), '\n', ' ');  // (a line break in it: a space, as elsewhere)
         std::replace(r.text.begin(), r.text.end(), '\r', ' ');
         parsedEnd = std::max(parsedEnd, close + mark);
-        target.runs.push_back(std::move(r));
+        target.push_back(std::move(r));
     }
+
+    /// The end of an image: one run for it, whose text is its alt text and whose source is the whole "![…](…)" (as a
+    /// formula's run is its whole "$…$"), so the layout draws the picture in its place. If its marks cannot be found,
+    /// its alt text stays as it was (text).
+    void endImage() {
+        PendingImage img = std::move(*image);
+        image.reset();
+        std::vector<Run>& target = runTarget();
+        const size_t open = source.find("![", img.scanFrom);
+        const size_t end = open == std::string_view::npos ? open : imageEnd(source, open);
+        if (end == std::string_view::npos) {
+            std::move(img.runs.begin(), img.runs.end(), std::back_inserter(target));
+            return;
+        }
+        Run r;
+        for (size_t i = 0; i + 1 < spans.size(); ++i) {  // (the formatting around it)
+            r.flags |= spans[i];
+        }
+        r.flags |= Image;
+        r.link = img.link;
+        for (const Run& alt: img.runs) {
+            r.text += alt.text;
+        }
+        r.source = toOriginal(open);
+        r.sourceLength = toOriginal(end) - r.source;
+        parsedEnd = std::max(parsedEnd, end);
+        target.push_back(std::move(r));
+    }
+
+    /// Where an image's Markdown that starts at `at` ("![") ends: after its ")" (inline), its "[label]" or its "]"
+    /// (references). npos if its alt text is not closed.
+    static size_t imageEnd(std::string_view s, size_t at) {
+        const size_t n = s.size();
+        size_t i = at + 2;
+        int depth = 1;
+        while (i < n) {
+            const char c = s[i];
+            if (c == '\\') {
+                i += 2;
+                continue;
+            }
+            if (c == '`') {  // (a code span in the alt text: brackets in it do not count)
+                size_t ticks = 0;
+                while (i + ticks < n && s[i + ticks] == '`') {
+                    ++ticks;
+                }
+                const size_t close = s.find(std::string(ticks, '`'), i + ticks);
+                i = close == std::string_view::npos ? i + ticks : close + ticks;
+                continue;
+            }
+            if (c == '[') {
+                ++depth;
+            } else if (c == ']' && --depth == 0) {
+                break;
+            }
+            ++i;
+        }
+        if (i >= n) {
+            return std::string_view::npos;
+        }
+        const size_t afterAlt = ++i;
+        const auto space = [&](size_t k) { return k < n && (s[k] == ' ' || s[k] == '\t' || s[k] == '\n' || s[k] == '\r'); };
+        if (i < n && s[i] == '(') {
+            ++i;
+            while (space(i)) {
+                ++i;
+            }
+            if (i < n && s[i] == '<') {  // <destination with spaces>
+                while (i < n && s[i] != '>' && s[i] != '\n') {
+                    i += s[i] == '\\' ? 2 : 1;
+                }
+                ++i;
+            } else {
+                int parens = 0;
+                while (i < n && !space(i)) {
+                    if (s[i] == '\\') {
+                        i += 2;
+                        continue;
+                    }
+                    if (s[i] == '(') {
+                        ++parens;
+                    } else if (s[i] == ')') {
+                        if (parens == 0) {
+                            break;
+                        }
+                        --parens;
+                    }
+                    ++i;
+                }
+            }
+            while (space(i)) {
+                ++i;
+            }
+            if (i < n && (s[i] == '"' || s[i] == '\'' || s[i] == '(')) {  // a title
+                const char close = s[i] == '(' ? ')' : s[i];
+                ++i;
+                while (i < n && s[i] != close) {
+                    i += s[i] == '\\' ? 2 : 1;
+                }
+                ++i;
+                while (space(i)) {
+                    ++i;
+                }
+            }
+            if (i < n && s[i] == ')') {
+                return i + 1;
+            }
+            return afterAlt;  // (not an inline image after all: a reference followed by a parenthesis)
+        }
+        if (i < n && s[i] == '[') {
+            const size_t close = s.find(']', i);
+            return close == std::string_view::npos ? afterAlt : close + 1;
+        }
+        return afterAlt;
+    }
+
+    /// Where the runs of text go: an image's alt text, or the block's text.
+    std::vector<Run>& runTarget() { return image ? image->runs : textTarget().runs; }
 
     size_t toOriginal(size_t offset) const { return rewritten.changes.empty() ? offset : rewritten.toSource(offset); }
 
@@ -405,6 +537,14 @@ private:
         std::vector<Run> runs;
     };
     std::optional<Formula> math;
+    /// The image being read: its alt text waits for its end (endImage)
+    struct PendingImage {
+        size_t scanFrom = 0;  ///< the end of the text before it (in the parsed text)
+        int link = -1;
+        int nested = 0;       ///< images inside its alt text
+        std::vector<Run> runs;
+    };
+    std::optional<PendingImage> image;
     size_t parsedEnd = 0;  ///< the end of the last text that is in the parsed text
     size_t blockEvents = 0;
     size_t implicitAt = static_cast<size_t>(-1);

@@ -43,6 +43,8 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdLayout.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdMath.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdMath.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdImages.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdImages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBox.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdHighlight.h
@@ -90,7 +92,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiFontTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/EmojiDataTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdTexDelimitersTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdFormatTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdFormatTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/MdImagesTest.cpp)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
     target_compile_definitions(xqt-markdown-tests PRIVATE
         XQT_MARKDOWN_GOLDEN="${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/golden"

@@ -385,6 +385,20 @@ public:
     /// A formatting tool (md::format::actionNamed: "bold", "heading2", "codeBlock" with the language as `arg`, ...)
     /// on the Markdown written on the page or in the .md: one undo step. False if no Markdown is written.
     Q_INVOKABLE bool formatMarkdown(const QString& action, const QString& arg = QString());
+    /// Pictures (files: the formatting bar's picker, a drop) into the Markdown written on the page or in the .md:
+    /// saved where the document keeps its pictures ("name.assets/"), their Markdown at the cursor, one undo step
+    /// (qt/docs/md-images.md). False if nothing was inserted (a message says why when a picture could not be saved).
+    Q_INVOKABLE bool insertMarkdownImages(const QList<QUrl>& files);
+    /// Fetch the web picture at `url` (its "Load image" was tapped, the window showed the address and the user
+    /// agreed; qt/docs/md-images.md) into the app cache, and lay out the texts that show it again. Choosing it is the
+    /// opt-in to networking when that was not decided yet; false (a message) when networking is off.
+    Q_INVOKABLE bool loadWebImage(const QString& url);
+    /// "Remove unused images" of a .md: the files in its "name.assets" folder that its text (as it is now) does not
+    /// link to, as paths relative to that folder; empty when there are none (or it is no .md).
+    Q_INVOKABLE QStringList unusedMarkdownImages() const;
+    /// Move these files of the .md's "name.assets" folder (as unusedMarkdownImages gives them) to the trash. The count
+    /// moved.
+    Q_INVOKABLE int trashMarkdownImages(const QStringList& files);
     /// The same on the source beside the page (its TextArea's document: one undo step there). The selection after it:
     /// {anchor, caret} (the text's offsets); empty if nothing was done.
     Q_INVOKABLE QVariantMap formatMarkdownIn(QQuickTextDocument* document, int anchor, int caret,
@@ -639,6 +653,11 @@ public:
     void setFingerDrawingDefault(bool on);
 
 private:
+    std::optional<std::string> pictureLinkFor(const QString& arg);
+    /// A text file open in `s` was renamed or moved (`from` -> `to`, the library): its tab follows.
+    void followTextFile(xqt::DocumentSession& s, const fs::path& from, const fs::path& to);
+    /// The Markdown texts of every open document that show this picture: laid out again and drawn.
+    void relayoutPictures(const std::string& link);
     void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);
 
 public:
@@ -1113,6 +1132,9 @@ Q_SIGNALS:
     void archiveExportsChanged();
     /// A page operation happened (e.g. "3 pages deleted"); the UI offers to undo it.
     void pageActionDone(const QString& text, bool undoable);
+    /// A web picture's "Load image" was tapped: the window shows the address (and what networking means, when
+    /// `access` is "ask") before loadWebImage fetches it.
+    void webImageRequested(const QString& url, const QString& host, const QString& access);
     /// receiveFiles is done: `opened` documents were opened.
     void filesReceived(int opened);
     /// The text file of the current tab changed on disk while it has changes here: the window asks what to keep

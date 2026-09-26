@@ -59,6 +59,7 @@
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
 #include "session/DocumentMode.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 #include "shell/ContentFiles.h"
 #include "shell/DocumentFiles.h"
@@ -80,6 +81,7 @@
 #include "ImageFile.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
+#include "MdImageDecoder.h"
 #include "MarkdownSession.h"
 #include "MdBox.h"
 #include "MdPassages.h"
@@ -113,6 +115,8 @@ Color toColor(const QColor& c) {
 
 AppController::AppController(QObject* parent): QObject(parent) {
     app = std::make_shared<AppContext>(AppContext::defaultResourceDir());
+    MdImageDecoder::install();  // the pictures of Markdown texts, read with Qt (qt/docs/md-images.md)
+    DocumentImages::pruneWorkFolders();  // (work folders of documents not opened for 60 days; before any opens)
     colors = std::make_shared<Palette>(app->getResourceDir() / "palettes" / "xournal.gpl");
     try {
         colors->load();
@@ -718,6 +722,17 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
         currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
+        currentConnections.push_back(connect(v, &CanvasView::imageLoadRequested, this, [this](const QString& url) {
+            std::string access;
+            app->getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
+            Q_EMIT webImageRequested(url, QUrl(url).host(),
+                                     access == "on" || access == "off" ? QString::fromStdString(access)
+                                                                       : QStringLiteral("ask"));
+        }));
+        currentConnections.push_back(connect(v, &CanvasView::messageRequested, this,
+                                             [this](const QString& title, const QString& text) {
+                                                 Q_EMIT message(title, text, true);
+                                             }));
         currentConnections.push_back(
                 connect(v, &CanvasView::pdfTextSelectionCleared, this, &AppController::pdfTextSelectionCleared));
         // Whoever changes the selection (a press on the page, copying, marking, a page change): the knobs and the
@@ -2287,6 +2302,10 @@ void AppController::filesChanged(const DocumentFiles::Result& r) {
     for (const auto& [from, to]: r.moved) {
         for (int i = 0; i < tabs->count(); ++i) {
             DocumentSession* s = tabs->session(i);
+            if (s->textFile() && !s->hasFilePath()) {
+                followTextFile(*s, from, to);
+                continue;
+            }
             const fs::path file = s->hasFilePath() ? s->getFilePath() : fs::path();
             const fs::path pdf = s->getDocument()->getPdfFilepath();
             const fs::path newFile = file.empty() ? file : DocumentFiles::remap(file, from, to);
@@ -3341,9 +3360,51 @@ QString AppController::shareStep() const {
     return savesWithoutDialog(s) ? QStringLiteral("save") : QStringLiteral("saveAs");
 }
 
-bool AppController::handOver(const QStringList& files, bool toClipboard) {
-    if (files.isEmpty()) {
+void AppController::followTextFile(xqt::DocumentSession& s, const fs::path& from, const fs::path& to) {
+    const fs::path old = s.textFile()->path();
+    const fs::path now = DocumentFiles::remap(old, from, to);
+    if (now == old) {
+        return;
+    }
+    const bool modified = s.isModified();
+    s.relocateTextFile(now);
+    // A new name: its links to its pictures were rewritten in the file (DocumentFiles::rename); the text here the same
+    // (one undo step), and the file's new bytes are what it was read as (unchanged text is not modified)
+    const std::string oldAssets = DocumentImages::assetsName(old);
+    const std::string newAssets = DocumentImages::assetsName(now);
+    if (oldAssets != newAssets && DocumentFiles::isMarkdownFile(now)) {
+        const std::string text = s.currentText();
+        const std::string renamed = DocumentImages::renamedAssetLinks(text, oldAssets, newAssets);
+        if (renamed != text) {
+            MarkdownFile::setText(s, renamed);
+        }
+        std::string bytes;
+        if (s.textChangedOnDisk(bytes)) {
+            if (modified) {
+                s.keepTextOverDisk();
+            } else {
+                s.textReloaded(std::move(bytes));
+            }
+        }
+    }
+    watchTextFiles();
+}
+
+bool AppController::handOver(const QStringList& given, bool toClipboard) {
+    if (given.isEmpty()) {
         return false;
+    }
+    // A .md with its pictures: the "name.assets" folder next to it goes along (qt/docs/md-images.md)
+    QStringList files;
+    for (const QString& f: given) {
+        files.push_back(f);
+        const fs::path p(f.toStdString());
+        if (DocumentFiles::isMarkdownFile(p)) {
+            const fs::path assets = DocumentImages::assetsFolder(p);
+            if (QFileInfo(QString::fromStdString(assets.string())).isDir()) {
+                files.push_back(QString::fromStdString(assets.string()));
+            }
+        }
     }
     const QString name = QFileInfo(files.first()).fileName();
     if (toClipboard) {

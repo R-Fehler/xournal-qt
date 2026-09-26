@@ -33,6 +33,7 @@
 #include "undo/UndoRedoHandler.h"  // for UndoRedoListener
 
 #include "HeadlessViews.h"
+#include "MdImages.h"
 #include "SessionActions.h"
 #include "filesystem.h"
 
@@ -65,6 +66,9 @@ public:
         bool hybrid = false;
         /// A hybrid PDF whose annotations of ours another app changed, moved or deleted (their names)
         std::vector<std::string> hybridChanged;
+        /// A hybrid PDF: the root of the pictures its Markdown carries (qt/docs/md-images.md), registered while this
+        /// lives (a session registers its own).
+        std::shared_ptr<md::images::RootHandle> pictures;
     };
     /// Load a .xopp, .xoj or .pdf file (a PDF gets one page per PDF page; a hybrid PDF is its embedded document). Does not touch any session, so it may
     /// run on a worker thread before the tab is created.
@@ -237,11 +241,16 @@ public:
     /// The text the pages hold now (the parts of the page's Markdown text joined). `lock`: under the document's read
     /// lock (not in a crash handler).
     std::string currentText(bool lock = true) const;
+    /// Where the relative links of its Markdown point, and where its pictures are kept (qt/docs/md-images.md);
+    /// nullptr: nowhere (a notes document not saved yet).
+    const md::images::Root* imageRootOf() const { return imageRoot.active() ? &imageRoot.root() : nullptr; }
     /// The text changed (the pages' boxes): the modified state follows.
     void textEdited();
     /// The text is on one continuous page that grows with it (else on pages; MarkdownFile::relayout switches).
     bool isTextContinuous() const { return textContinuous; }
     void setTextContinuous(bool on) { textContinuous = on; }
+    /// The text file was renamed or moved (the library): it is `file` now.
+    void relocateTextFile(const fs::path& file);
     /// The text file changed on disk since it was read or written (by another program). `bytes`: what it holds now.
     /// Not while a save runs (asked again after it).
     bool textChangedOnDisk(std::string& bytes);
@@ -511,6 +520,11 @@ private:
     /// generated background are kept from there). Forgotten when the pages of the background PDF may be renumbered.
     std::unordered_map<const XojPage*, std::pair<std::weak_ptr<XojPage>, size_t>> hybridBase;
     std::unique_ptr<TextFile> text;  ///< a text file edited (or shown read-only)
+    /// Where the relative links of the document's Markdown point (its pictures, qt/docs/md-images.md): registered
+    /// while it is open, kept up to date with its file (updateImageRoot).
+    md::images::RootHandle imageRoot;
+    md::images::RootHandle folderImageRoot;  ///< (a PDF with notes: the folder it is in)
+    void updateImageRoot();
     bool textModified = false;
     bool textContinuous = false;
     fs::path madeSuggestion;  ///< setMadeFrom

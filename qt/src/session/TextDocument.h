@@ -52,9 +52,16 @@ struct Attachment {
     std::string description;
     /// PDF/A-3's /AFRelationship in an archive PDF (e.g. "/Alternative")
     std::string relationship;
+    /// Its data never changes under its name (a picture): an incremental save keeps the one the file has, and adds
+    /// it only when the file has none.
+    bool fixed = false;
 };
 /// What the PDF `pdfName` written from this document carries for other apps: a text document its "name.md" (the
-/// flow). qt/md-images adds the images ("name.assets/…") here.
+/// flow) and the pictures its Markdown links to (also in notes), under the paths the links name ("name.assets/…";
+/// qt/docs/md-images.md). The pictures are found through the roots (md::images): the document's work folder while it
+/// is open.
 std::vector<Attachment> attachments(Document& doc, const std::string& pdfName);
+/// The MIME type of a picture by its name ("image/png", "image/jpeg", …; "application/octet-stream" if unknown).
+std::string pictureMime(const std::string& name);
 
 }  // namespace xqt::TextDocument

@@ -12,6 +12,7 @@
 
 #include <cairo.h>
 
+#include "session/DocumentImages.h"
 #include "session/TextMatch.h"
 
 #include "HitPages.h"
@@ -150,6 +151,7 @@ QImage MdSnippetProvider::render(const fs::path& file, int passage, const QStrin
         return {};
     }
     const md::Passage& p = parsed->passages[static_cast<size_t>(passage)];
+    const md::images::RootHandle pictures(DocumentImages::markdownRoot(file));  // (its pictures, qt/docs/md-images.md)
     md::Style style = MarkdownFile::style();
     style.width = TEXT_WIDTH;
     const md::Layout layout = md::layout(md::snippet(parsed->doc, p), style);

@@ -1,7 +1,7 @@
 # Text documents as PDF (`qt/md-pdf`)
 
 Status: design agreed with the author 2026-09-25/26 (TODO.md, "Ideas round of 2026-09-25/26", "Markdown inside the
-PDF with notes"); built as `qt/md-pdf`. Images in Markdown (`name.assets/…`) are the next block, `qt/md-images`.
+PDF with notes"); built as `qt/md-pdf`. Its pictures (`name.assets/…`): `qt/md-images`, [md-images.md](md-images.md).
 The user guide for getting the Markdown out again is [user/markdown-from-pdf.md](user/markdown-from-pdf.md).
 
 ## One model
@@ -47,10 +47,13 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
 - **The hook:** `TextDocument::attachments(document, pdfName)` gives the files a hybrid PDF carries for other apps;
   `HybridPdf` asks it while it prepares a write (under the document's lock) and writes them as embedded files. They
   are listed in the marker's `/Files` with the attached images, so the clean copy (the background when opening)
-  never carries them and each write puts the current ones. `qt/md-images` adds `name.assets/…` there.
+  never carries them and each write puts the current ones. The pictures the text links to are attachments too, under
+  the paths the links name (`name.assets/image-….png`, [md-images.md](md-images.md)).
 - An incremental save replaces the data of `name.md` in its file specification (a new stream, as for the
-  `document.xopp`). When the set of attachments changes (the first save of a text document written by an older
-  build, the file renamed, the text removed), the file is written anew in full once.
+  `document.xopp`). A picture the file does not have yet is added (a new file specification in the name tree); the
+  ones it has stay as they are, also those the text no longer links to (a full write drops them). When the set of
+  the other attachments changes (the first save of a text document written by an older build, the file renamed, the
+  text removed), the file is written anew in full once.
 
 ## Conversions
 
@@ -58,8 +61,9 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
   writes `name.md`, the flows of the document in page order (several flows joined with a page break between
   them). In Xournal++ files mode it goes next to the document (asking before it replaces a file); in PDF files
   mode, and for a document not saved yet, a save dialog asks where (nothing is written next to files unasked).
-  Images: `name.assets/` once `qt/md-images` is there.
-- **Open as PDF document** (⋮ of a `.md`): a new PDF text document from the text
+  Its pictures go into `name.assets/` next to it (links into another `….assets/` folder, from an older name of the
+  document, are rewritten to it).
+- **Open as PDF document** (⋮ of a `.md`; its pictures are packed into the PDF): a new PDF text document from the text
   as it is now (unsaved changes included), built as "Edit as notes" builds its notes, saved at once as a PDF with
   notes next to the `.md` (`name.pdf`, or `name (2).pdf` when that name is taken), and opened with the cursor in the
   text. The `.md` is not touched.
@@ -99,7 +103,5 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
 
 ## Not yet
 
-- Images (`qt/md-images`): `name.assets/…` attachments, packed by "Open as PDF document", unpacked by "Export as
-  Markdown".
 - A "text" badge on the library card.
 - Ink anchored to text (decided against for now).

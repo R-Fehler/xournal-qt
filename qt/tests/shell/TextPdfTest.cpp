@@ -5,12 +5,17 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <shared_mutex>
 #include <string>
 
+#include <QDateTime>
+#include <QImage>
 #include <QTemporaryDir>
+#include <zlib.h>
 #include <QUrl>
 #include <gtest/gtest.h>
 #include <qpdf/QPDF.hh>
@@ -19,6 +24,7 @@
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "session/AppContext.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
@@ -30,6 +36,8 @@
 #include "AppController.h"
 #include "CanvasView.h"
 #include "MarkdownFile.h"
+#include "MarkdownImages.h"
+#include "MdImages.h"
 
 using namespace xqt;
 
@@ -40,6 +48,19 @@ std::string bytesOf(const fs::path& p) {
 }
 void writeFile(const fs::path& p, const std::string& bytes) { std::ofstream(p, std::ios::binary) << bytes; }
 QString qstr(const fs::path& p) { return QString::fromStdString(p.string()); }
+/// The XML of a .xopp
+std::string gunzip(const fs::path& p) {
+    gzFile in = gzopen(p.string().c_str(), "r");
+    std::string out;
+    char buf[65536];
+    for (int n; in && (n = gzread(in, buf, sizeof buf)) > 0;) {
+        out.append(buf, static_cast<size_t>(n));
+    }
+    if (in) {
+        gzclose(in);
+    }
+    return out;
+}
 QUrl url(const fs::path& p) { return QUrl::fromLocalFile(qstr(p)); }
 
 /// The data of an attachment of a PDF (read with qpdf); "<none>" when it has none of that name.
@@ -209,6 +230,164 @@ TEST_F(TextPdf, exportAsMarkdownWritesTheText) {
     c.newDocument();
     EXPECT_FALSE(c.hasMarkdownText());
     EXPECT_FALSE(c.textNotes());
+}
+
+// qt/docs/md-images.md: a PDF text document carries its pictures as attachments "name.assets/…" (nothing is written
+// next to it); opened, they are in its work folder in the app cache; an incremental save adds a new one and keeps the
+// ones it has; a full write drops those the text does not link to; Export as Markdown writes them next to the .md;
+// Open as PDF document packs a .md's pictures.
+TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
+    AppController c;
+    Choice choice(c);
+    c.setLibraryRoot(root);
+    DocumentMode::store(*c.context().getSettings(), DocumentMode::Mode::Pdf);
+    ASSERT_TRUE(c.createTextDocument("Report"));
+    view(c)->endTextEditing();
+    const fs::path pdf = root / "Report.pdf";
+    // A pasted picture: into the work folder, linked as Report.assets/…
+    QImage red(40, 20, QImage::Format_RGB32);
+    red.fill(Qt::red);
+    QString error;
+    const auto first = MarkdownImages::savePicture(current(c), red, error, QDateTime(QDate(2026, 9, 26), QTime(10, 11, 12)));
+    ASSERT_TRUE(first) << error.toStdString();
+    EXPECT_EQ(*first, "Report.assets/image-2026-09-26-101112.png");
+    EXPECT_TRUE(fs::exists(DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png"));
+    MarkdownFile::setText(current(c), "# Report\n\n![](" + *first + ")\n");
+    ASSERT_TRUE(c.save());
+    EXPECT_FALSE(fs::exists(root / "Report.assets")) << "nothing next to the PDF";
+    const std::string png = bytesOf(DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png");
+    EXPECT_EQ(attachment(pdf, "Report.assets/image-2026-09-26-101112.png"), png);
+    EXPECT_EQ(attachment(pdf, "Report.md"), "# Report\n\n![](Report.assets/image-2026-09-26-101112.png)\n");
+
+    // Opened again (its work folder gone: it comes from the PDF): the picture is found
+    c.closeTab(c.tabManager().currentIndex());
+    fs::remove_all(DocumentImages::workFolder(pdf));
+    {
+        auto loaded = DocumentSession::loadFile(pdf);
+        ASSERT_TRUE(loaded.document);
+        EXPECT_EQ(md::images::resolve(*first),
+                  (DocumentImages::workFolder(pdf) / "Report.assets" / "image-2026-09-26-101112.png").string());
+    }
+    ASSERT_TRUE(c.openPath(qstr(pdf)));
+    EXPECT_FALSE(md::images::resolve(*first).empty());
+
+    // A second picture: an incremental save adds it, the first one stays as it was (the file is small: a picture
+    // would make it grow by more than the share that writes it anew)
+    const double compactAbove = HybridPdf::compactAbove;
+    HybridPdf::compactAbove = 100;
+    struct Restore {
+        double v;
+        ~Restore() { HybridPdf::compactAbove = v; }
+    } restore{compactAbove};
+    const auto second = MarkdownImages::savePicture(current(c), red, error, QDateTime(QDate(2026, 9, 26), QTime(10, 11, 13)));
+    ASSERT_TRUE(second);
+    MarkdownFile::setText(current(c), "# Report\n\n![](" + *first + ")\n\n![](" + *second + ")\n");
+    const auto sizeBefore = fs::file_size(pdf);
+    DocumentSession::SaveRequest save;
+    const auto r = current(c).saveNow(save);
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental) << "a new picture is appended";
+    EXPECT_LT(fs::file_size(pdf) - sizeBefore, 2 * png.size() + 20000) << "the first one is not written again";
+    EXPECT_EQ(attachment(pdf, *second), png);
+    EXPECT_EQ(attachment(pdf, *first), png);
+
+    // The first one no longer linked: kept by an incremental save, dropped by a full write
+    MarkdownFile::setText(current(c), "# Report\n\n![](" + *second + ")\n");
+    ASSERT_TRUE(current(c).saveNow(save).ok);
+    EXPECT_EQ(attachment(pdf, *first), png);
+    save.compact = true;
+    ASSERT_TRUE(current(c).saveNow(save).ok);
+    EXPECT_EQ(attachment(pdf, *first), "<none>");
+    EXPECT_EQ(attachment(pdf, *second), png);
+    EXPECT_FALSE(HybridPdf::hasEarlierRevisions(pdf));
+    // (the clean copy the document shows its pages from never carries them)
+
+    // Export as Markdown: the text and Report.assets/ next to it
+    fs::create_directories(root / "out");
+    ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Report.md")));
+    EXPECT_EQ(bytesOf(root / "out" / "Report.md"), "# Report\n\n![](" + *second + ")\n");
+    EXPECT_EQ(bytesOf(root / "out" / "Report.assets" / "image-2026-09-26-101113.png"), png);
+    // Under another name: the links follow the name of its folder
+    ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Other name.md")));
+    EXPECT_EQ(bytesOf(root / "out" / "Other name.md"), "# Report\n\n![](Other%20name.assets/image-2026-09-26-101113.png)\n");
+    EXPECT_TRUE(fs::exists(root / "out" / "Other name.assets" / "image-2026-09-26-101113.png"));
+
+    // Open as PDF document of a .md with a picture: the PDF carries it
+    writeFile(root / "notes.md", "# Notes\n\n![](notes.assets/a.png)\n");
+    fs::create_directories(root / "notes.assets");
+    ASSERT_TRUE(red.save(qstr(root / "notes.assets" / "a.png")));
+    ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
+    ASSERT_TRUE(c.openAsPdfDocument());
+    EXPECT_EQ(attachment(root / "notes.pdf", "notes.assets/a.png"), bytesOf(root / "notes.assets" / "a.png"));
+}
+
+// qt/docs/md-images.md: the Markdown of notes (.xopp) carries its pictures inside the .xopp, as extra <preview xqt-file>
+// elements at the end (Xournal++ ignores them); a .xopp without pictures is written as before; opened again, they
+// are in its work folder; a PDF with notes made from it carries them as attachments.
+TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
+    AppController c;
+    c.setLibraryRoot(root);
+    c.newDocument();
+    const fs::path xopp = root / "lecture.xopp";
+    ASSERT_TRUE(current(c).saveAs(xopp).ok);
+    const std::string before = gunzip(xopp);
+    EXPECT_EQ(before.find("xqt-file"), std::string::npos) << "no pictures: as upstream writes it";
+
+    // A picture pasted into the page's Markdown text of the saved notes: kept in its work folder until saved
+    QImage blue(30, 10, QImage::Format_RGB32);
+    blue.fill(Qt::blue);
+    QString error;
+    const auto link = MarkdownImages::savePicture(current(c), blue, error, QDateTime(QDate(2026, 9, 26), QTime(9, 0)));
+    ASSERT_TRUE(link) << error.toStdString();
+    EXPECT_EQ(*link, "lecture.assets/image-2026-09-26-090000.png");
+    MarkdownFile::setText(current(c), "# Lecture\n\n![](" + *link + ")\n");
+    ASSERT_TRUE(current(c).save().ok);
+    EXPECT_FALSE(fs::exists(root / "lecture.assets")) << "nothing next to the .xopp";
+    const std::string xml = gunzip(xopp);
+    EXPECT_NE(xml.find("<preview xqt-file=\"lecture.assets/image-2026-09-26-090000.png\">"), std::string::npos);
+    EXPECT_LT(xml.find("<preview>"), xml.find("<preview xqt-file")) << "the document's own preview first";
+    if (const char* keep = std::getenv("XQT_KEEP_XOPP")) {  // (to open it in Xournal++: qt/docs/md-images.md)
+        fs::copy_file(xopp, keep, fs::copy_options::overwrite_existing);
+    }
+    const auto carried = DocumentImages::xoppPictures(xopp);
+    ASSERT_EQ(carried.size(), 1u);
+    EXPECT_EQ(carried[0].second,
+              bytesOf(DocumentImages::workFolder(xopp) / "lecture.assets" / "image-2026-09-26-090000.png"));
+
+    // Opened again, its work folder gone: the picture comes from the file
+    c.closeTab(c.tabManager().currentIndex());
+    fs::remove_all(DocumentImages::workFolder(xopp));
+    {
+        auto loaded = DocumentSession::loadFile(xopp);
+        ASSERT_TRUE(loaded.document);
+        EXPECT_EQ(md::images::info(*link).state, md::images::Info::State::Ok);
+        EXPECT_EQ(md::images::info(*link).width, 30);
+    }
+    // Moved in the library (not open): the picture is still in it
+    fs::create_directories(root / "Physics");
+    auto moved = DocumentFiles::move(DocumentFiles::itemOf(xopp), root / "Physics");
+    ASSERT_TRUE(moved.ok) << moved.error;
+    EXPECT_EQ(DocumentImages::xoppPictures(root / "Physics" / "lecture.xopp").size(), 1u);
+    // Saved as a PDF with notes: an attachment
+    ASSERT_TRUE(c.openPath(qstr(root / "Physics" / "lecture.xopp")));
+    ASSERT_TRUE(current(c).saveAsHybrid(root / "Physics" / "lecture.pdf").ok);
+    EXPECT_EQ(attachment(root / "Physics" / "lecture.pdf", *link), carried[0].second);
+}
+
+// The work folders in the app cache have an owner (qt/docs/md-images.md): those not used for 60 days go at start; a
+// document opened marks its own as used.
+TEST_F(TextPdf, oldWorkFoldersArePruned) {
+    const fs::path used = DocumentImages::workFolder(root / "used.xopp");
+    const fs::path old = DocumentImages::workFolder(root / "old.xopp");
+    fs::create_directories(used / "used.assets");
+    fs::create_directories(old / "old.assets");
+    std::ofstream(old / "old.assets" / "a.png") << "x";
+    fs::last_write_time(old, fs::file_time_type::clock::now() - std::chrono::hours(24 * 61));
+    fs::last_write_time(used, fs::file_time_type::clock::now() - std::chrono::hours(24 * 61));
+    DocumentImages::touchWorkFolder(root / "used.xopp");
+    EXPECT_GE(DocumentImages::pruneWorkFolders(), 1u);
+    EXPECT_FALSE(fs::exists(old));
+    EXPECT_TRUE(fs::exists(used / "used.assets"));
 }
 
 // The library's index reads the text of a PDF text document: its words are found

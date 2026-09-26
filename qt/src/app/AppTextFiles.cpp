@@ -22,6 +22,7 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "session/AppContext.h"
+#include "session/DocumentImages.h"
 #include "session/DocumentMode.h"
 #include "session/DocumentSession.h"
 #include "session/TextDocument.h"
@@ -304,6 +305,8 @@ bool AppController::openAsPdfDocument() {
     for (int i = 2; fs::exists(pdf, ec); ++i) {
         pdf = md.parent_path() / (md.stem().string() + " (" + std::to_string(i) + ").pdf");
     }
+    // Its pictures go into the PDF: into its work folder first, packed by the save (qt/docs/md-images.md)
+    DocumentImages::copyLinked(text, DocumentImages::workFolder(pdf));
     if (!makeTextPdf(text, pdf)) {
         return false;
     }
@@ -364,7 +367,9 @@ bool AppController::exportMarkdown(const QUrl& file) {
         std::shared_lock lock(*s->getDocument());
         text = TextDocument::markdown(*s->getDocument());
     }
-    // (the images of the text go into "name.assets/" once qt/md-images is there)
+    // Its pictures: into "name.assets/" next to it, the links to them written so (qt/docs/md-images.md)
+    size_t pictures = 0;
+    text = DocumentImages::exportPictures(text, target, pictures);
     const QString path = QString::fromStdString(target.string());
     QSaveFile out(path);
     if (!out.open(QIODevice::WriteOnly) || out.write(text.data(), static_cast<qint64>(text.size())) < 0 ||

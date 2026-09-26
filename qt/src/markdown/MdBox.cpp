@@ -16,6 +16,7 @@
 #include "util/Matrix.h"
 #include "model/MarkdownText.h"
 #include "EmojiFont.h"
+#include "MdImages.h"
 
 namespace xqt::md {
 
@@ -52,7 +53,8 @@ const Layout& cachedLayout(const std::string& source, const Style& style, size_t
     key += style.family;
     key += '\x1f';
     key += std::to_string(style.size) + '/' + std::to_string(uint32_t(style.color)) + '/' +
-           std::to_string(style.width) + '@' + std::to_string(active);
+           std::to_string(style.width) + '@' + std::to_string(active) + '#' +
+           std::to_string(images::generation());  // (a picture written or fetched: laid out again)
     for (auto it = cache.begin(); it != cache.end(); ++it) {
         if (it->key == key) {
             cache.splice(cache.begin(), cache, it);
@@ -124,6 +126,14 @@ std::optional<MathHit> mathAt(const Text& text, double x, double y) {
         hit->rect.y += shift.y;
     }
     return hit;
+}
+
+std::optional<std::string> imageButtonAt(const Text& text, double x, double y) {
+    const auto& shift = text.getTransformation().shift;
+    if (const auto hit = imageButtonAt(cachedLayout(text.getText(), styleOf(text)), x - shift.x, y - shift.y)) {
+        return hit->url;
+    }
+    return std::nullopt;
 }
 
 std::optional<size_t> checkBoxAt(const Text& text, double x, double y) {

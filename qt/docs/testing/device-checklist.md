@@ -1700,3 +1700,53 @@ Update the table in the user doc with the results.
       library is being read, the window stays responsive.
 - [ ] Replace a PDF text document by a plain PDF of the same name with another program: after the library has read
       it again, the card reads "PDF".
+
+## Images in Markdown (qt/md-images)
+Design: [md-images.md](../md-images.md).
+- [ ] A `.md` with `![](name.assets/photo.jpg)` (a big photo from the phone), `![](name.assets/diagram.svg)` and a
+      GIF: each alone in its paragraph is as wide as the text (a small one keeps its size), upright (a photo taken
+      in portrait is not lying on its side), sharp when zoomed in; the GIF shows its first frame.
+- [ ] An image inside a sentence (`an icon ![](icon.png) here`) is as high as the line; the line does not jump.
+- [ ] A missing file: its alt text and path in red, in the text. Create the file (another app): shown once the text
+      is laid out again (type a key).
+- [ ] Put the cursor on the image's line: its Markdown shows, dimmed, and the picture stays below it; the arrows and
+      a tap move through the source as usual.
+- [ ] A very tall image (a screenshot of a long page) fits a page: its page is not longer than the others.
+- [ ] Scrolling through a text with 20 photos stays smooth (after the first time they are drawn); typing in it
+      does not stutter.
+- [ ] The same text in: full-page mode, one continuous page, the library card's thumbnail, Print, Export as PDF
+      (the PDF shows the photos; a JPEG is as sharp as the original).
+- [ ] In a `.md`: copy a picture (a browser's "Copy image", a screenshot tool), put the cursor on an empty line,
+      Ctrl+V: `![](name.assets/image-2026-…png)` appears and the picture shows; the file is in `name.assets/` next
+      to the `.md` (the file manager). Ctrl+Z takes the link away; the file stays.
+- [ ] Copy cells of a spreadsheet (LibreOffice Calc) and paste: the text comes, not a picture of the cells.
+- [ ] Formatting bar → **+** → Image…: the system's file picker (Android: the photo picker / documents); a picked
+      photo is copied into `name.assets/` under its name and linked with its name as alt text.
+- [ ] Drag two picture files from the file manager onto the page (desktop): both copied and linked, one Ctrl+Z
+      takes both away.
+- [ ] Library: a `.md` with pictures is one card; its `name.assets` folder is not shown (also in "all files" and
+      in a search of the library). Rename it (also while it is open in a tab): the folder has the new name, the
+      pictures still show, the links in the file say `newname.assets/`, the tab is not marked modified. Move it to
+      another folder, copy it, move it to the trash: the folder goes along each time.
+- [ ] Share → "Copy to clipboard" of a `.md` with pictures, paste in the file manager: the `.md` and its folder.
+- [ ] PDF files mode: a new text document, paste a photo, save. Nothing appears next to the PDF. Okular / Firefox's
+      attachment list shows `name.md` and `name.assets/image-….png`; `qpdf --list-attachments` too. Close and open
+      the PDF again (also after a restart): the photo shows.
+- [ ] Paste a second photo and save (Ctrl+S): quick (appended); both are in the attachment list. Delete the first
+      link, save, then Share (written anew): the first photo is gone from the attachments.
+- [ ] ⋮ → Export as Markdown: `name.md` and `name.assets/` with the photos; open the `.md` in another editor
+      (Typora, Obsidian, VS Code's preview): the photos show.
+- [ ] A `.md` with pictures → ⋮ → Open as PDF document: the new PDF shows them and carries them as attachments.
+- [ ] A `.md` with `![Logo](https://…/logo.png)`: shows "Logo ⤓ Load image", nothing is fetched (no network
+      traffic; flight mode makes no difference). Tap "Load image" (pen, finger, mouse): the whole address and its
+      host are shown; the first time also what connecting means. Cancel: nothing. Load: the picture appears; open
+      the file again (or restart): shown at once from the cache, without asking.
+- [ ] Settings → Web and citations → "Connect to the web": Off → "Load image" says it is off and sends nothing.
+- [ ] A `.md`: paste two pictures, delete the link of one. ⋮ → Remove unused images…: it lists that one (not the
+      other, not a PDF the text links to in the folder); Cancel keeps it; Move to trash: it is in the system's
+      trash (Android: deleted after this question).
+- [ ] Notes (`.xopp`, saved): write Markdown on the page, paste a picture: it shows; save, close, open again (also
+      after moving the file in the library): it shows. Nothing appears next to the `.xopp`.
+- [ ] That `.xopp` opened in Xournal++ (1.3 on the desktop): opens without a message, the page shows the Markdown
+      source as text.
+- [ ] The same notes saved as a PDF with notes: the picture shows; Okular lists it among the attachments.

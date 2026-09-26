@@ -159,6 +159,8 @@ struct Opened {
     /// Our annotations that another app changed, moved or deleted since we wrote them (their /NM).
     std::vector<std::string> changed;
     fs::path base;  ///< the clean copy: the document's background PDF
+    /// A folder with the pictures a text document carries, under their names ("name.assets/…"; qt/docs/md-images.md)
+    fs::path pictures;
 };
 /// Open a hybrid PDF: its embedded document, with the clean copy as background PDF. The document's file path is
 /// `pdf`. Works on any thread.

@@ -61,7 +61,7 @@ it; it is not drawn ([md-editor.md](md-editor.md), "Page breaks").
 
 A part that continues the page before starts with a comment, `<!-- xqt:cont … -->` (not shown), which says what was
 added for the page (a fence, a table header), so the parts give exactly the text again. A block that cannot be split
-and is higher than a page (a long quote, a big image) stays on its page and goes below its bottom margin; the editor
+and is higher than a page (a long quote) stays on its page and goes below its bottom margin; the editor
 says so.
 
 Code: `qt/src/markdown/MdPaginate.*`, `qt/src/canvas/MarkdownSession.*`.
@@ -195,6 +195,9 @@ the pen goes on top of it, into the layer it went into before.
 - **Wrap width:** the width of the box.
 - **Position:** the top left of the box.
 
+Pictures of the Markdown (`![](name.assets/…)`) are carried at the end of the `.xopp` as extra `<preview>` elements,
+which Xournal++ ignores ([md-images.md](md-images.md), "Markdown boxes in a `.xopp`").
+
 Xournal++ shows the source as plain text and keeps it unchanged. xournal-qt draws it formatted everywhere a page is
 drawn (canvas, thumbnails, previews, PDF export) through small seams in upstream's `Text`, `Layer` and `TextView`: a text in a Markdown layer knows it is one, is drawn formatted and is as big as it is drawn (ADR-0002).
 
@@ -206,8 +209,12 @@ Code: `qt/src/markdown/` (parser `MdDocument`, layout `MdLayout`, boxes `MdBox`)
 
 `.md` files are edited the same way, on their own pages: [md-editor.md](md-editor.md).
 
+## Images
+`![alt](path)` is drawn in the text (a picture alone in its paragraph as wide as the column, one in a line as high
+as the line); a missing file shows its alt text and path in red, and a web picture is never fetched unasked:
+[md-images.md](md-images.md).
+
 ## Not yet
-- Images.
 - Flattening into Text mode.
 - Math: the error of a formula on a touch screen (no mouse to rest on it); per-formula editing inside a block (the
   whole block shows its source, as for the other marks).

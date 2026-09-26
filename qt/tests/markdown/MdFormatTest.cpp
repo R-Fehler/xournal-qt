@@ -116,6 +116,9 @@ TEST(MdFormat, links) {
 TEST(MdFormat, imagePlaceholder) {
     EXPECT_EQ(run("‸", Action::Image), "![image](⟨image.png⟩)");
     EXPECT_EQ(run("⟨Plot⟩", Action::Image, "fig/plot.png"), "![Plot](fig/plot.png)‸");
+    // A picture added (qt/docs/md-images.md): at the cursor, its alt text empty
+    EXPECT_EQ(run("See ‸ here", Action::Image, "notes.assets/image-2026-09-26-101112.png"),
+              "See ![](notes.assets/image-2026-09-26-101112.png)‸ here");
 }
 
 // --- line marks --------------------------------------------------------------------------------------------------

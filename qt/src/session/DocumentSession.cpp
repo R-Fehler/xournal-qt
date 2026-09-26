@@ -45,11 +45,13 @@
 #include "AppContext.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
+#include "DocumentImages.h"
 #include "DocumentSearch.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PageOrderUndoAction.h"
 #include "PdfPageKeeper.h"
+#include "PictureSaveHandler.h"
 #include "MdBox.h"
 #include "MdPaginate.h"
 #include "TextFile.h"
@@ -131,6 +133,10 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
                 result.warnings = std::move(opened.warnings);
                 result.hybrid = true;
                 result.hybridChanged = std::move(opened.changed);
+                // The pictures its Markdown carries: into its work folder, found there from now on (while the result
+                // lives, and then by the session's own root; qt/docs/md-images.md)
+                DocumentImages::unpack(path, opened.pictures);
+                result.pictures = std::make_shared<md::images::RootHandle>(DocumentImages::embeddedRoot(path));
                 prepareLoaded(*result.document);
                 return result;
             }
@@ -153,6 +159,11 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
         result.attachedPdfMissing = loadHandler.isAttachedPdfMissing();
         result.fileVersion = loadHandler.getFileVersion();
         if (result.document) {
+            // The pictures its Markdown carries (qt/docs/md-images.md): into its work folder, found there while the
+            // result lives (its boxes are sized with them below)
+            if (!DocumentImages::carriedPicturesOf(*result.document).empty() && DocumentImages::unpackXopp(path)) {
+                result.pictures = std::make_shared<md::images::RootHandle>(DocumentImages::embeddedRoot(path));
+            }
             prepareLoaded(*result.document);
         }
     } catch (const std::exception& e) {
@@ -229,6 +240,39 @@ void DocumentSession::init() {
     });
     updatePageActions();
     firePageSelected(0);  // LayerController tracks the current page through the document events
+    connect(this, &DocumentSession::filePathChanged, this, &DocumentSession::updateImageRoot);
+    updateImageRoot();
+}
+
+void DocumentSession::updateImageRoot() {
+    const auto setRoot = [](md::images::RootHandle& handle, const md::images::Root& root) {
+        if (!handle.active() || handle.root().baseDir != root.baseDir || handle.root().assetsDir != root.assetsDir) {
+            handle.set(root);
+        }
+    };
+    // A .md (edited, or shown read-only): its folder and "name.assets" next to it
+    const fs::path file = text ? text->path() : shownPath;
+    if (!file.empty() && !hasFilePath()) {
+        folderImageRoot.reset();
+        setRoot(imageRoot, DocumentImages::markdownRoot(file));
+        return;
+    }
+    // A PDF with notes (a PDF text document) or a .xopp: the pictures it carries are in its work folder in the app
+    // cache; the folder it is in for other relative links. Saved under another name: its pictures go along.
+    const fs::path document = hasFilePath() ? getFilePath() : fs::path();
+    if (!document.empty()) {
+        const md::images::Root root = DocumentImages::embeddedRoot(document);
+        if (imageRoot.active() && imageRoot.root().baseDir != root.baseDir && !imageRoot.root().baseDir.empty()) {
+            const std::string from = imageRoot.root().baseDir;
+            DocumentImages::unpack(document, fs::path(std::u8string(from.begin(), from.end())));
+        }
+        setRoot(folderImageRoot, DocumentImages::folderRoot(document));
+        setRoot(imageRoot, root);  // (the newer one: looked in first)
+        DocumentImages::touchWorkFolder(document);  // (in use: not pruned)
+        return;
+    }
+    folderImageRoot.reset();
+    imageRoot.reset();
 }
 
 DocumentSession::~DocumentSession() {
@@ -899,6 +943,15 @@ bool DocumentSession::textChangedOnDisk(std::string& bytes) {
     return text->changedOnDisk(&bytes);
 }
 
+void DocumentSession::relocateTextFile(const fs::path& file) {
+    if (!text || text->path() == file) {
+        return;
+    }
+    text->setPath(file);
+    shownPath = file;
+    Q_EMIT filePathChanged();
+}
+
 void DocumentSession::keepTextOverDisk() {
     if (text) {
         text->setStamp(TextFile::stampOf(text->path()));
@@ -1052,10 +1105,12 @@ auto DocumentSession::writeDocument(Document& doc, const fs::path& target) -> Sa
     doc.lock();
     doc.setFilepath(target);  // an attached background PDF is written next to it
     doc.unlock();
-    SaveHandler h;
+    PictureSaveHandler h;
     doc.lock_shared();
     h.prepareSave(&doc, target);
+    const std::vector<std::string> carried = DocumentImages::carriedPicturesOf(doc);
     doc.unlock_shared();
+    h.addPictures(DocumentImages::picturesData(carried));  // (its Markdown's pictures: qt/docs/md-images.md)
     h.saveTo(target);
     if (!h.getErrorMessage().empty()) {
         return {false, FS(_F("Save file error: {1}") % h.getErrorMessage())};
@@ -1296,13 +1351,15 @@ fs::path DocumentSession::exportPdfFor(const fs::path& xopp) {
 
 auto DocumentSession::autosave() -> SaveResult {
     // Port of AutosaveJob::run
-    SaveHandler handler;
+    PictureSaveHandler handler;
     undoRedo->documentAutosaved();
 
     const fs::path filepath = autosavePath();
     doc->lock_shared();
     handler.prepareSave(doc.get(), filepath);
+    const std::vector<std::string> carried = DocumentImages::carriedPicturesOf(*doc);
     doc->unlock_shared();
+    handler.addPictures(DocumentImages::picturesData(carried));  // (recovered, its pictures come back)
 
     g_message("%s", FS(_F("Autosaving to {1}") % filepath.string()).c_str());
 
