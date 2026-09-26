@@ -14,8 +14,12 @@
 #include <QKeyEvent>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
+#include <sstream>
+
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
+#include <qpdf/QPDFJob.hh>
+#include <qpdf/QPDFLogger.hh>
 #include <qpdf/QPDFPageDocumentHelper.hh>
 
 #include "model/Document.h"
@@ -27,10 +31,13 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
+#include "session/PageBookmarks.h"
 #include "session/PageNoteSpace.h"
+#include "session/PdfBookmarks.h"
 #include "session/TextDocument.h"
 
 #include "CanvasView.h"
+#include "MarkdownBookmarks.h"
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MarkdownSession.h"
@@ -366,4 +373,95 @@ TEST_F(PdfTextDocumentTest, typingGoesIntoTheText) {
     show(MarkdownFile::document("", MarkdownFile::style()));
     EXPECT_FALSE(view->typesIntoFlow());
     EXPECT_FALSE(view->ensureTextEditor());
+}
+
+namespace {
+/// qpdf --check: its exit code (0: no errors or warnings).
+int qpdfCheck(const fs::path& pdf, std::string* report = nullptr) {
+    std::ostringstream out, err;
+    QPDFJob job;
+    auto logger = QPDFLogger::create();
+    logger->setOutputStreams(&out, &err);
+    job.setLogger(logger);
+    const std::string file = pdf.string();
+    const char* argv[] = {"qpdf", "--check", file.c_str(), nullptr};
+    job.initializeFromArgv(argv);
+    job.run();
+    if (report) {
+        *report = out.str() + err.str();
+    }
+    return job.getExitCode();
+}
+
+/// Our "Bookmarks" item of a PDF's outline: (page index, title) of each entry.
+std::vector<std::pair<int, std::string>> outlineBookmarks(const fs::path& pdf) {
+    QPDF q;
+    q.setSuppressWarnings(true);
+    q.processFile(pdf.string().c_str());
+    const auto pages = QPDFPageDocumentHelper(q).getAllPages();
+    std::vector<std::pair<int, std::string>> out;
+    for (const auto& e: PdfBookmarks::read(q)) {
+        int index = -1;
+        for (size_t i = 0; i < pages.size(); ++i) {
+            if (pages[i].getObjectHandle().getObjGen() == e.page.getObjGen()) {
+                index = static_cast<int>(i);
+            }
+        }
+        out.emplace_back(index, e.title);
+    }
+    return out;
+}
+}  // namespace
+
+// A PDF text document: the bookmarks are comments in its Markdown (and so in its name.md), and every save writes them
+// into the PDF's outline too ("Bookmarks"), for other PDF viewers
+TEST_F(PdfTextDocumentTest, theTextsBookmarksGoIntoTheOutline) {
+    std::string text = longText();
+    text.insert(text.find("Paragraph 12 "), "<!-- xqt:bookmark Twelve -->\n");
+    show(MarkdownFile::notesDocument(text));
+    const size_t page12 = MarkdownFile::pageOf(*session->getDocument(), text.find("Paragraph 12 "));
+    ASSERT_GT(page12, 0u);
+    const fs::path pdf = path("Marks.pdf");
+    auto r = session->saveAsHybrid(pdf);
+    ASSERT_TRUE(r.ok) << r.error;
+    using Entries = std::vector<std::pair<int, std::string>>;
+    EXPECT_EQ(outlineBookmarks(pdf), (Entries{{static_cast<int>(page12), "Twelve"}}));
+    std::string report;
+    EXPECT_EQ(qpdfCheck(pdf, &report), 0) << report;
+    EXPECT_NE(attachment(pdf, "Marks.md").find("<!-- xqt:bookmark Twelve -->\n"), std::string::npos);
+
+    // "Bookmark this page" on page 1 (named after its heading), saved incrementally
+    auto added = MarkdownBookmarks::edit(*session, view.get(), 0, MarkdownBookmarks::Change::Add);
+    ASSERT_TRUE(added.changed);
+    r = session->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    EXPECT_EQ(outlineBookmarks(pdf), (Entries{{0, "Report"}, {static_cast<int>(page12), "Twelve"}}));
+    EXPECT_EQ(qpdfCheck(pdf, &report), 0) << report;
+    EXPECT_EQ(attachment(pdf, "Marks.md").rfind("<!-- xqt:bookmark -->\n# Report", 0), 0u);
+
+    // Opened again: the same bookmarks, from the text
+    {
+        auto loaded = DocumentSession::loadFile(pdf);
+        ASSERT_TRUE(loaded.document) << loaded.error;
+        std::shared_lock lock(*loaded.document);
+        const auto marks = PageBookmarks::of(*loaded.document);
+        ASSERT_EQ(marks.size(), 2u);
+        EXPECT_EQ(marks[0].label, "Report");
+        EXPECT_EQ(marks[1].page, page12);
+    }
+    // Removed in the text: gone from the outline
+    ASSERT_TRUE(MarkdownBookmarks::edit(*session, view.get(), page12, MarkdownBookmarks::Change::Remove).changed);
+    ASSERT_TRUE(MarkdownBookmarks::edit(*session, view.get(), 0, MarkdownBookmarks::Change::Remove).changed);
+    r = session->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(outlineBookmarks(pdf).empty());
+    EXPECT_EQ(qpdfCheck(pdf, &report), 0) << report;
+    EXPECT_EQ(flowOf(*session->getDocument()), longText());
+
+    // A page of notes after the text keeps a bookmark of its own (the page's, not the text's)
+    {
+        std::shared_lock lock(*session->getDocument());
+        EXPECT_FALSE(MarkdownBookmarks::isTextPage(*session->getDocument(), session->getDocument()->getPageCount()));
+    }
 }

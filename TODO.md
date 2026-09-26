@@ -384,7 +384,12 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   does not toggle; not offered in a view that is only for reading.
 - [x] Favourites and page bookmarks (`qt/bookmarks`, merged 2026-09-26): stars beside the document (DocumentPlaces),
   bookmarks in it (`.xopp` page attribute, PDF outline item "Bookmarks"), Favourites chip and Bookmarks tab. Left:
-  - [ ] Bookmarks for Markdown documents (headings already act as chapters).
+  - [x] Bookmarks for Markdown documents (`qt/md-bookmarks`): `<!-- xqt:bookmark label -->` before the marked block,
+    in `.md` files and PDF text documents (qt/docs/bookmarks.md, "Markdown"). Left:
+    - [ ] A continuous page (`textContinuous`): go to the comment's place on the long page (today every bookmark is
+      on the one page; the library lists the pages the file has on pages).
+    - [ ] Markdown text boxes and flows that start after page 1 of a `.xopp` keep the page attribute; a page
+      attribute written by the `qt/bookmarks` build on a page of a text document is not migrated to a comment.
   - [ ] Plain PDF export: write the current bookmarks into the outline (upstream's exporter copies the outline as
     read, so it can carry an out-of-date "Bookmarks" item).
   - [ ] Read back bookmarks changed in other PDF apps (today the embedded `.xopp` wins on the next save).

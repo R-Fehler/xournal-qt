@@ -31,4 +31,22 @@ Bookmarks are **part of the document**:
   browsers and phone apps list them too. The PDF's own table of contents stays as it was.
 - In a `.xopp` file they are stored with each page. Xournal++ opens such files normally, but **saving in Xournal++
   removes the bookmarks**.
-- Markdown files have no bookmarks: their headings are their table of contents.
+- In a **Markdown file** (`.md`), and in the text of a PDF text document, a bookmark is a line in the text itself,
+  right before the paragraph, heading or list it marks:
+
+  ```markdown
+  <!-- xqt:bookmark Proof of theorem 3.2 -->
+  ## Proof
+  ```
+
+  It is an HTML comment, so GitHub, Obsidian, Typora, pandoc and other Markdown apps do not show it, and it moves
+  with the text when you edit the file anywhere. You can type it yourself, in the app or in another editor: the
+  label is everything between `xqt:bookmark` and `-->`, on one line. Leave the label out (`<!-- xqt:bookmark -->`)
+  and the bookmark is named after the heading it marks, or the first heading of its page, or "Page 5". The page a
+  bookmark belongs to is the page where the marked paragraph or heading starts.
+
+  **Bookmark this page** puts such a line before the first paragraph, heading or list that starts on the page. If
+  the whole page is the middle of one long block (a long list or code block), it goes before that block, so the
+  bookmark is on the page where the block starts. In the app you do not see the line on the page (only the ribbon);
+  the cursor skips it, and Backspace or Delete next to it removes it (Ctrl+Z brings it back). A plain text file
+  (`.txt`) has no bookmarks.

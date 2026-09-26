@@ -14,6 +14,7 @@
 #include "model/XojPage.h"
 
 #include "DocumentImages.h"
+#include "MdBookmarks.h"
 #include "MdBox.h"
 #include "MdImages.h"
 #include "MdPaginate.h"
@@ -21,13 +22,6 @@
 #include "TextFile.h"
 
 namespace xqt::TextDocument {
-
-namespace {
-std::string sliceOf(const PageRef& page) {
-    const Text* box = pageBoxOf(page);
-    return box ? box->getText() : std::string();
-}
-}  // namespace
 
 Text* pageBoxOf(const PageRef& page) {
     const Layer* layer = page ? md::markdownLayer(page) : nullptr;
@@ -56,7 +50,7 @@ bool hasMarkdownText(Document& doc) {
     return false;
 }
 
-std::string flowText(Document& doc, size_t first, size_t* end) {
+std::string flowText(Document& doc, size_t first, size_t* end, std::vector<md::Part>* parts) {
     std::vector<std::string> slices;
     size_t i = first;
     for (; i < doc.getPageCount(); ++i) {
@@ -69,7 +63,61 @@ std::string flowText(Document& doc, size_t first, size_t* end) {
     if (end) {
         *end = std::max(i, first + 1);
     }
-    return slices.empty() ? std::string() : md::join(slices);
+    if (parts) {
+        parts->clear();
+    }
+    return slices.empty() ? std::string() : md::join(slices, parts);
+}
+
+bool hasTextBookmarks(Document& doc, size_t* end) {
+    if (doc.getPageCount() == 0) {
+        return false;
+    }
+    const Text* first = pageBoxOf(doc.getPage(0));
+    if (!first || md::isPlain(first->getText())) {
+        return false;  // (no text on page 1: bookmarks are the pages' own; a plain text has none)
+    }
+    size_t i = 1;
+    while (i < doc.getPageCount()) {
+        const Text* box = pageBoxOf(doc.getPage(i));
+        if (!box || !md::continues(box->getText())) {
+            break;
+        }
+        ++i;
+    }
+    if (end) {
+        *end = i;
+    }
+    return true;
+}
+
+std::vector<std::pair<PageRef, std::optional<std::string>>> bookmarkChanges(Document& doc) {
+    std::vector<std::pair<PageRef, std::optional<std::string>>> changes;
+    size_t end = 0;
+    if (!hasTextBookmarks(doc, &end)) {
+        return changes;
+    }
+    for (size_t i = 0; i < end; ++i) {
+        const PageRef page = doc.getPage(i);
+        std::optional<std::string> label;
+        if (const Text* box = pageBoxOf(page)) {
+            if (const auto mark = md::bookmarks::ofPage(box->getText())) {
+                label = mark->label;
+            }
+        }
+        if (page->getBookmark() != label) {
+            changes.emplace_back(page, std::move(label));
+        }
+    }
+    return changes;
+}
+
+bool syncBookmarks(Document& doc) {
+    const auto changes = bookmarkChanges(doc);
+    for (const auto& [page, label]: changes) {
+        page->setBookmark(label);
+    }
+    return !changes.empty();
 }
 
 std::string markdown(Document& doc) {

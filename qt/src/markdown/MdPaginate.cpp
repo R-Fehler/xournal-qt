@@ -45,16 +45,27 @@ public:
         if (auto s = inside(k)) {
             return *s;
         }
-        // Before the block; a heading goes with it
-        size_t j = k;
-        while (j > 0 && blocks[j - 1].kind == BlockKind::Heading && spans[j - 1].begin > contentStart) {
+        // Before the block; a heading goes with it, and so do the comments right before it (a bookmark,
+        // MdBookmarks.h: its page is the page of the block it marks)
+        size_t c = k;
+        while (c > 0 && isComment(c - 1) && spans[c - 1].begin > contentStart) {
+            --c;
+        }
+        size_t j = c;
+        while (j > 0 && (blocks[j - 1].kind == BlockKind::Heading || isComment(j - 1)) &&
+               spans[j - 1].begin > contentStart) {
             --j;
         }
         if (spans[j].begin > contentStart) {
             return {spans[j].begin, "", marker("block"), 0};
         }
-        if (spans[k].begin > contentStart) {
-            return {spans[k].begin, "", marker("block"), 0};
+        // (a heading first on the page stays; nothing but comments before it is no page of its own: it would be empty)
+        bool shownBefore = false;
+        for (size_t i = 0; i < c; ++i) {
+            shownBefore = shownBefore || (spans[i].begin >= contentStart && !isComment(i));
+        }
+        if (spans[c].begin > contentStart && shownBefore) {
+            return {spans[c].begin, "", marker("block"), 0};
         }
         // Not even the first block fits: it stays on the page (below its bottom margin)
         size_t after = k + 1;
@@ -235,6 +246,18 @@ private:
             }
         }
         return best;
+    }
+
+    /// Whether top-level block k is a comment (not drawn).
+    bool isComment(size_t k) const {
+        const Block& b = doc.root.children[k];
+        if (b.kind != BlockKind::Html) {
+            return false;
+        }
+        const std::string_view s = std::string_view(rest).substr(spans[k].begin, spans[k].end - spans[k].begin);
+        const size_t a = s.find_first_not_of(" \t\r\n");
+        const size_t z = s.find_last_not_of(" \t\r\n");
+        return a != std::string_view::npos && z >= a + 6 && s.substr(a, 4) == "<!--" && s.substr(z - 2, 3) == "-->";
     }
 
     /// Whether block k is the first block after the continuation lines.

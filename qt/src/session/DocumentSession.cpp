@@ -50,6 +50,7 @@
 #include "HybridPdf.h"
 #include "MergedPdf.h"
 #include "PageBookmarks.h"
+#include "TextDocument.h"
 #include "PageOrderUndoAction.h"
 #include "PdfPageKeeper.h"
 #include "PictureSaveHandler.h"
@@ -111,6 +112,7 @@ bool DocumentSession::LoadResult::isNewerFileVersion() const { return fileVersio
 namespace {
 void prepareLoaded(Document& doc) {
     doc.setDocumentHandler(&detachedHandler());  // the LoadHandler's handler dies with it
+    TextDocument::syncBookmarks(doc);  // (a text document: its bookmarks are its text's, qt/docs/bookmarks.md)
     // Element sizes are computed lazily, also by the (parallel) renderers: compute them once, here, before any
     // renderer sees the document.
     for (size_t i = 0; i < doc.getPageCount(); ++i) {
@@ -733,6 +735,17 @@ bool DocumentSession::movePages(std::vector<size_t> pages, size_t target) {
 // --- undo/redo ---------------------------------------------------------------------------------------------------
 
 void DocumentSession::undoRedoChanged() {
+    if (!textBookmarksQueued) {
+        // An undone or redone text: its bookmark comments (later: the undo handler may call this under the lock)
+        textBookmarksQueued = true;
+        QMetaObject::invokeMethod(
+                this,
+                [this] {
+                    textBookmarksQueued = false;
+                    syncTextBookmarks();
+                },
+                Qt::QueuedConnection);
+    }
     actions.enableAction(Action::UNDO, undoRedo->canUndo());
     actions.enableAction(Action::REDO, undoRedo->canRedo());
     Q_EMIT undoRedoStateChanged();
@@ -812,6 +825,24 @@ bool DocumentSession::setBookmark(size_t page, std::optional<std::string> label)
             p, std::move(before), std::move(label),
             [this](const PageRef& target, const std::optional<std::string>& l) { applyBookmark(target, l); }));
     return true;
+}
+
+void DocumentSession::syncTextBookmarks() {
+    std::vector<std::pair<PageRef, std::optional<std::string>>> changes;
+    {
+        std::shared_lock lock(*doc);  // (while typing: read, and changed only when a bookmark did)
+        changes = TextDocument::bookmarkChanges(*doc);
+    }
+    if (changes.empty()) {
+        return;
+    }
+    {
+        std::unique_lock lock(*doc);
+        for (const auto& [page, label]: changes) {
+            page->setBookmark(label);
+        }
+    }
+    Q_EMIT bookmarksChanged();
 }
 
 void DocumentSession::applyBookmark(const PageRef& page, const std::optional<std::string>& label) {

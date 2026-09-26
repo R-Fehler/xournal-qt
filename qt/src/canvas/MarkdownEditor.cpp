@@ -29,6 +29,7 @@
 #include "Grapheme.h"
 #include "MarkdownBoxResize.h"
 #include "MarkdownImages.h"
+#include "MdBookmarks.h"
 #include "MdBox.h"
 #include "MdDocument.h"
 #include "MdTexDelimiters.h"
@@ -462,6 +463,11 @@ void MarkdownEditor::changed(bool textChanged) {
     if (parts.empty()) {
         return;
     }
+    // Never on the line of a bookmark comment (not drawn): past it, the way the cursor went
+    const bool together = anchor == caret;
+    caret = outsideBookmark(caret, caret >= lastCaret);
+    anchor = together ? caret : outsideBookmark(anchor, anchor >= lastCaret);
+    lastCaret = caret;
     setCurrent(partOf(caret));
     if (editing) {
         // The block with the cursor is drawn as its source: the search marks what is drawn (searched again when
@@ -682,6 +688,53 @@ void MarkdownEditor::mouseMoved(double x, double y) {
 size_t MarkdownEditor::prevChar(size_t pos) const { return text::graphemeStep(md.text(), pos, false); }
 
 size_t MarkdownEditor::nextChar(size_t pos) const { return text::graphemeStep(md.text(), pos, true); }
+
+std::optional<std::pair<size_t, size_t>> MarkdownEditor::bookmarkLineAt(size_t pos) const {
+    using namespace md::text;
+    const std::string& t = md.text();
+    if (plain || parts.empty() || pos > t.size()) {
+        return std::nullopt;
+    }
+    const size_t ls = lineStart(t, pos);
+    if (!md::bookmarks::labelOf(lineAt(t, ls))) {
+        return std::nullopt;  // (most lines: not even the look of one)
+    }
+    // A comment of its own, not an example in a code block: as its page's text is parsed
+    const size_t part = partOf(ls);
+    const Text* box = parts[part].box;
+    if (!box || ls < parts[part].part.begin) {
+        return std::nullopt;
+    }
+    const size_t local = localOf(part, ls);
+    for (const auto& m: md::bookmarks::find(box->getText())) {
+        if (m.begin == local) {
+            return std::make_pair(ls, nextLine(t, ls));
+        }
+    }
+    return std::nullopt;
+}
+
+size_t MarkdownEditor::outsideBookmark(size_t pos, bool forward) const {
+    const size_t size = md.text().size();
+    for (int i = 0; i < 1000; ++i) {  // (comments on consecutive lines)
+        const auto line = bookmarkLineAt(pos);
+        if (!line) {
+            return pos;
+        }
+        const bool canForward = line->second < size || (size > 0 && md.text()[size - 1] == '\n');
+        const bool canBack = line->first > 0;
+        if ((forward && canForward) || !canBack) {
+            if (!canForward) {
+                return line->first;  // (nothing but the comment: before it)
+            }
+            pos = line->second;
+            forward = true;
+        } else {
+            pos = line->first - 1;  // (the end of the line before it)
+        }
+    }
+    return pos;
+}
 
 size_t MarkdownEditor::wordBoundary(size_t pos, bool forward) const {
     const std::string& t = md.text();
@@ -962,14 +1015,29 @@ bool MarkdownEditor::keyPressed(const QKeyEvent* e, bool& finish) {
             } else if (const size_t mark = emptyItemMark(); mark != std::string::npos) {
                 edit(mark, caret, "");  // an empty list item or quote line: its mark goes at once (as in Ghostwriter)
             } else if (caret > 0) {
-                edit(ctrl ? wordBoundary(caret, false) : prevChar(caret), caret, "");
+                size_t from = ctrl ? wordBoundary(caret, false) : prevChar(caret);
+                if (const auto line = bookmarkLineAt(from)) {
+                    from = std::min(from, line->first);  // (a bookmark comment: its whole line)
+                }
+                edit(from, caret, "");
             }
             return true;
         case Qt::Key_Delete:
             if (hasSelection()) {
                 removeSelection();
             } else if (caret < t.size()) {
-                edit(caret, ctrl ? wordBoundary(caret, true) : nextChar(caret), "");
+                size_t to = ctrl ? wordBoundary(caret, true) : nextChar(caret);
+                if (const auto line = bookmarkLineAt(to); line && to <= line->first + 1 && !ctrl) {
+                    // (the line break before a bookmark comment: the comment; the cursor stays)
+                    const size_t keep = caret;
+                    edit(line->first, line->second, "");
+                    caret = anchor = keep;
+                    changed(false);
+                    return true;
+                } else if (line) {
+                    to = std::max(to, line->second);  // (its whole line)
+                }
+                edit(caret, to, "");
             }
             return true;
         case Qt::Key_Return:

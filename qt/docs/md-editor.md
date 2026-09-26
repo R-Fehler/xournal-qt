@@ -20,6 +20,9 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
 - The formatting bar (below) is shown for a `.md`; a `.txt` has none.
 - Backspace right after the mark of an empty list item or quote line (`- `, `1. `, `- [ ] `, `> `) removes the
   whole mark (as in Ghostwriter).
+- Bookmarks are lines `<!-- xqt:bookmark label -->` before the block they mark ([bookmarks.md](bookmarks.md),
+  "Markdown"). Such a line is not drawn and takes no room; the cursor goes past it, and Backspace / Delete next to it
+  remove the whole line. "Bookmark this page" (page menu, ⋮) writes one as a step of the text being written.
 - Undo / redo (Ctrl+Z / Ctrl+Shift+Z and the undo button) go step by step through the text being written (a word,
   a line break, a deletion). The editor keeps changes, not copies of the text, so a long file stays cheap.
 

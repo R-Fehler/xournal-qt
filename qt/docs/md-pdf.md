@@ -55,6 +55,12 @@ The user guide for getting the Markdown out again is [user/markdown-from-pdf.md]
   the other attachments changes (the first save of a text document written by an older build, the file renamed, the
   text removed), the file is written anew in full once.
 
+## Bookmarks
+
+The bookmarks of the text are comments in it (`<!-- xqt:bookmark … -->`, [bookmarks.md](bookmarks.md), "Markdown"),
+so they are in `name.md` too; each save also lists them in the PDF's outline item "Bookmarks". A page of notes after
+the text has a bookmark of its own (the page's).
+
 ## Conversions
 
 - **Export as Markdown** (⋮, shown for a PDF text document and for any notes document with a page Markdown text):

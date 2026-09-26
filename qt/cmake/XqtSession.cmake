@@ -135,6 +135,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/EmojiCompletion.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownFile.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownBookmarks.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ImageFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MdImageDecoder.h

@@ -10,11 +10,14 @@
 #include <QVariantMap>
 
 #include "AppController.h"
+#include "MarkdownBookmarks.h"
 #include "model/Document.h"
 #include "model/DocumentOutline.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "session/PageBookmarks.h"
+#include "session/TextDocument.h"
+#include "session/TextFile.h"
 #include "shell/DocumentChapters.h"
 #include "shell/DocumentPlaces.h"
 #include "shell/LibraryBookmarks.h"
@@ -37,7 +40,8 @@ QObject* AppController::libraryBookmarksModel() const { return libraryBookmarks;
 
 bool AppController::canBookmark() const {
     DocumentSession* s = session();
-    return s && !s->textFile() && !s->isReadOnly();
+    // (a .md: its bookmarks are comments in its text; a plain text file has none)
+    return s && !s->isReadOnly() && (!s->textFile() || s->textFile()->kind() == TextFile::Kind::Markdown);
 }
 
 QVariantList AppController::bookmarks() const {
@@ -113,10 +117,42 @@ QString AppController::defaultBookmarkLabel(int page) const {
     return e ? QString::fromStdString(e->title) : QString();
 }
 
+bool AppController::editTextBookmark(int page, int change, const QString& label, bool& handled) {
+    DocumentSession* s = session();
+    {
+        std::shared_lock lock(*s->getDocument());
+        handled = MarkdownBookmarks::isTextPage(*s->getDocument(), static_cast<size_t>(page));
+    }
+    if (!handled) {
+        return false;  // (a page of its own: its bookmark is the page's, PageBookmarks.h)
+    }
+    endMarkdown(true);  // (the source beside the page ends, kept: the text is changed on the pages)
+    using MarkdownBookmarks::Change;
+    const auto r = MarkdownBookmarks::edit(*s, canvas(), static_cast<size_t>(page),
+                                           change > 0 ? Change::Add : change < 0 ? Change::Remove : Change::Rename,
+                                           label.simplified().toStdString());
+    if (change > 0 && r.changed) {
+        Q_EMIT pageActionDone(r.earlier ? tr("Bookmark added on page %1, where the text of this page begins")
+                                                  .arg(static_cast<int>(r.page) + 1)
+                                        : tr("Bookmark added: %1").arg(bookmarkOf(page)),
+                              true);
+    } else if (change > 0 && r.earlier) {
+        Q_EMIT pageActionDone(tr("This page goes on with the text of an earlier page, which has a bookmark"), false);
+    } else if (change < 0 && r.changed) {
+        Q_EMIT pageActionDone(tr("Bookmark removed"), true);
+    }
+    return r.changed;
+}
+
 bool AppController::toggleBookmark(int page) {
     DocumentSession* s = session();
     if (!canBookmark() || page < 0 || static_cast<size_t>(page) >= s->getDocument()->getPageCount()) {
         return false;
+    }
+    bool handled = false;
+    const bool done = editTextBookmark(page, isBookmarked(page) ? -1 : 1, {}, handled);
+    if (handled) {
+        return done;  // (a page of a Markdown text: a comment in the text)
     }
     const bool on = !isBookmarked(page);
     const std::optional<std::string> label =
@@ -132,6 +168,11 @@ bool AppController::renameBookmark(int page, const QString& label) {
     DocumentSession* s = session();
     if (!canBookmark() || page < 0 || static_cast<size_t>(page) >= s->getDocument()->getPageCount()) {
         return false;
+    }
+    bool handled = false;
+    const bool done = editTextBookmark(page, 0, label, handled);
+    if (handled) {
+        return done;
     }
     std::string text = label.simplified().toStdString();
     if (PageBookmarks::isAutomaticLabel(text, static_cast<size_t>(page))) {

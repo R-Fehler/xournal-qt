@@ -374,6 +374,7 @@ double MarkdownSession::distribute(const std::string& source) {
     if (continuous) {
         fitContinuousPage();
     }
+    session.syncTextBookmarks();  // (its bookmark comments: on the pages they are on now)
     return pages.overflow;
 }
 
@@ -554,7 +555,11 @@ void MarkdownSession::cancel() {
         }
         changedOnPage(p.page);
     }
+    const bool wasPageText = pageText;
     end();
+    if (wasPageText) {
+        session.syncTextBookmarks();
+    }
     if (session.textFile()) {
         session.textEdited();
     }

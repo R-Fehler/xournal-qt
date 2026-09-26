@@ -12,10 +12,14 @@
  */
 #pragma once
 
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "model/PageRef.h"
+
+#include "MdPaginate.h"
 
 class Document;
 class Text;
@@ -32,8 +36,18 @@ bool isTextDocument(Document& doc);
 bool hasMarkdownText(Document& doc);
 
 /// The Markdown of the flow that starts on page `first` (its parts joined, without the continuation lines), and the
-/// page after its last one (`end`). Empty when the page has no page text.
-std::string flowText(Document& doc, size_t first = 0, size_t* end = nullptr);
+/// page after its last one (`end`). Empty when the page has no page text. `parts`: what of the text each page holds.
+std::string flowText(Document& doc, size_t first = 0, size_t* end = nullptr, std::vector<md::Part>* parts = nullptr);
+
+/// The pages whose bookmarks are the comments of their Markdown (qt/docs/bookmarks.md, "Markdown"): the pages of the
+/// flow that starts on page 1 (a text document, a .md; not a plain text) are [0, *end). False if none.
+bool hasTextBookmarks(Document& doc, size_t* end = nullptr);
+/// The bookmarks of those pages read again from their text (MdBookmarks.h: a page's first bookmark comment, its
+/// label or the automatic one), into XojPage::bookmark (which the pages sidebar, the contents, the library and the
+/// PDF's outline read). Other pages keep theirs. Returns whether one changed. The caller holds the lock (unique).
+bool syncBookmarks(Document& doc);
+/// What syncBookmarks would change (the pages and their new bookmarks), read under a shared lock.
+std::vector<std::pair<PageRef, std::optional<std::string>>> bookmarkChanges(Document& doc);
 /// The Markdown of all flows of the document in page order: one flow as it is; several joined with a page break
 /// between them (Export as Markdown).
 std::string markdown(Document& doc);

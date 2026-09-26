@@ -641,7 +641,7 @@ public:
     // --- bookmarks and favourites (AppBookmarks.cpp, qt/docs/bookmarks.md) ---
     /// The bookmarks of the current document, in page order: [{ page (0-based), label (as shown), automatic }]
     Q_PROPERTY(QVariantList bookmarks READ bookmarks NOTIFY bookmarksChanged)
-    /// The current document can have bookmarks (not a text file)
+    /// The current document can have bookmarks (not a plain text file)
     Q_PROPERTY(bool canBookmark READ canBookmark NOTIFY titleChanged)
     /// The current document is a favourite (starred; kept beside it, DocumentPlaces)
     Q_PROPERTY(bool favourite READ favourite WRITE setFavourite NOTIFY favouriteChanged)
@@ -710,6 +710,10 @@ public:
 
 private:
     std::optional<std::string> pictureLinkFor(const QString& arg);
+    /// A page of the current document whose bookmark is a comment in its Markdown (a .md, a PDF text document;
+    /// qt/docs/bookmarks.md, "Markdown"): add (+1), remove (-1) or rename (0) it as an edit of that text, one undo step
+    /// as a typed one. Nothing (false, `handled` false) if the page is not such a page.
+    bool editTextBookmark(int page, int change, const QString& label, bool& handled);
     /// A text file open in `s` was renamed or moved (`from` -> `to`, the library): its tab follows.
     void followTextFile(xqt::DocumentSession& s, const fs::path& from, const fs::path& to);
     /// The file a new document shows (an image written on, a file shown read-only) was renamed or moved: the tab and

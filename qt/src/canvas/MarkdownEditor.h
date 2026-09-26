@@ -167,6 +167,11 @@ private:
     size_t verticalMove(bool down) const;
     size_t prevChar(size_t pos) const;
     size_t nextChar(size_t pos) const;
+    /// The line of a bookmark comment (qt/docs/bookmarks.md, "Markdown") that `pos` is on: [its start, the start of
+    /// the next line). It is not drawn, so the cursor is never on it: it goes past it (the way it moved; see
+    /// outsideBookmark), and deleting next to it deletes the whole line.
+    std::optional<std::pair<size_t, size_t>> bookmarkLineAt(size_t pos) const;
+    size_t outsideBookmark(size_t pos, bool forward) const;
     size_t wordBoundary(size_t pos, bool forward) const;
     void undoEdit(bool redo);
 
@@ -180,6 +185,7 @@ private:
     size_t rawBegin = md::NO_SOURCE;  ///< where the block drawn as its source begins (in the box's text)
     size_t caret = 0;
     size_t anchor = 0;
+    size_t lastCaret = 0;         ///< the cursor as last shown (which way it moved)
     std::string preedit;          ///< the input method's text not yet typed
     /// A change of the text: source[at, at + removed.size()) was `removed` and is `inserted` since (whole texts
     /// would be too much for a long file).
