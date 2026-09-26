@@ -618,6 +618,14 @@
   written, a note's text is clipped to the note with the "more below" mark, and a label under the note says when the
   cursor is below it. Open: adding by touch, colour/cover/resize for several notes, partly enclosed notes.
 
+- **"Select more" for touch; selecting in the self-reference view as in the main view, `qt/touch-multiselect`
+  (2026-09-26).** With the rectangle or lasso tool the selection's pill and the note's pill have a "Select more"
+  toggle and a count; while on, a tap (finger, pen, mouse) adds or removes a note or an element through the same
+  path as Ctrl+click, a tap on empty paper keeps the selection, a rectangle beside the selection adds what it
+  encloses; toggling is never an undo step. It ends with the last item, any other end of the selection, a tool, page
+  or tab change. The view beside now has the pills for notes and for notes selected together, and its Deselect
+  clears every kind. Also: the eraser redraws every view of the page (the self-reference view kept erased ink).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
