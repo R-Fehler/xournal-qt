@@ -57,6 +57,9 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     int count() const { return static_cast<int>(tabs.size()); }
+    /// The tallest page of the tabs' current pages (height / width; 1.414 without tabs): the tab overview's cells
+    /// follow it, so a portrait page fills its card and a landscape slide does not leave half of it empty
+    Q_INVOKABLE double tallestPageAspect() const;
     int currentIndex() const { return current; }
     void setCurrentIndex(int index);
 
