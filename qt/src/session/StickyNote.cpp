@@ -16,6 +16,7 @@
 #include "model/Element.h"
 #include "model/Image.h"
 #include "model/Link.h"
+#include "model/MarkdownText.h"
 #include "model/TexImage.h"
 #include "model/Text.h"
 #include "model/Point.h"
@@ -171,16 +172,23 @@ void applyLook(Layer& layer, const Look& from, const Look& to) {
     if (elements.empty() || elements.front()->getType() != ELEMENT_STROKE) {
         return;
     }
+    Text* text = textOf(layer);  // (found at the old place: the paper and the text still agree)
     auto* paper = static_cast<Stroke*>(elements.front().get());
     paper->setPointVector(paperPoints(to.rect));
     paper->setColor(to.color);
-    layer.setName(to.cover ? COVER_LAYER_NAME : LAYER_NAME);
     const double dx = to.rect.x - from.rect.x;
     const double dy = to.rect.y - from.rect.y;
     if (dx != 0 || dy != 0) {
         for (size_t i = 1; i < elements.size(); ++i) {
             elements[i]->move(dx, dy);
         }
+    }
+    if (text && text->getWrap() != textWidth(to)) {
+        text->setWrap(textWidth(to));  // the note's text flows in its new width (ink and pictures keep their size)
+    }
+    // (last: a new name flags the layer's texts again, which needs the text at its place on the paper)
+    if (const char* name = to.cover ? COVER_LAYER_NAME : LAYER_NAME; layer.getName() != name) {
+        layer.setName(name);
     }
 }
 
@@ -206,6 +214,42 @@ Layer* noteAt(const XojPage& page, double x, double y) {
         }
         if (const Stroke* paper = paperOf(*layer); paper && contains(rectOf(*paper), x, y)) {
             return layer;
+        }
+    }
+    return nullptr;
+}
+
+Layer* openNoteAt(const XojPage& page, double x, double y) {
+    Layer* note = noteAt(page, x, y);
+    return note && note->getName() != COVER_LAYER_NAME ? note : nullptr;
+}
+
+xoj::util::Point<double> textOrigin(const Look& look) {
+    return {look.rect.x + TEXT_PADDING, look.rect.y + TEXT_PADDING};
+}
+
+double textWidth(const Look& look) { return std::max(MIN_TEXT_WIDTH, look.rect.width - 2 * TEXT_PADDING); }
+
+bool isNoteText(const Layer& layer, const Text& text) {
+    if (text.getWrap() <= 0) {
+        return false;
+    }
+    const Stroke* paper = paperOf(layer);
+    if (!paper) {
+        return false;
+    }
+    const Rectangle<double> r = rectOf(*paper);
+    const auto& at = text.getTransformation().shift;
+    return std::abs(at.x - (r.x + TEXT_PADDING)) < 0.5 && std::abs(at.y - (r.y + TEXT_PADDING)) < 0.5;
+}
+
+Text* textOf(const Layer& layer) {
+    if (!isNote(layer)) {
+        return nullptr;
+    }
+    for (const Element* e: layer.getElementsView()) {
+        if (e->getType() == ELEMENT_TEXT && isNoteText(layer, *static_cast<const Text*>(e))) {
+            return const_cast<Text*>(static_cast<const Text*>(e));
         }
     }
     return nullptr;
@@ -252,6 +296,19 @@ Layer::Index layerIdOf(const XojPage& page, const Layer* layer) {
     return 0;
 }
 
+namespace {
+/// The notes that stay selected (holdLayer); the UI thread's
+std::unordered_set<const Layer*> held;
+}  // namespace
+
+void holdLayer(const Layer* layer, bool hold) {
+    if (hold) {
+        held.insert(layer);
+    } else {
+        held.erase(layer);
+    }
+}
+
 bool leaveNoteLayer(Document& doc, const PageRef& page) {
     if (!page) {
         return false;
@@ -259,7 +316,8 @@ bool leaveNoteLayer(Document& doc, const PageRef& page) {
     std::unique_lock lock(doc);
     const Layer::Index selected = page->getSelectedLayerId();
     const auto layers = page->getLayersView();
-    if (selected == 0 || selected > layers.size() || !isNote(*layers[selected - 1])) {
+    if (selected == 0 || selected > layers.size() || !isNote(*layers[selected - 1]) ||
+        held.count(layers[selected - 1])) {
         return false;
     }
     for (size_t i = layers.size(); i > 0; --i) {
@@ -345,6 +403,24 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
         }
         cairo_restore(cr);
     }
+    if (screen && !peek) {
+        // The note's text goes on below its bottom (clipped): a small triangle at the bottom right says so
+        if (const Text* text = textOf(layer); text && !text->getText().empty()) {
+            const auto box = text->getBoundingBox();  // (as big as it is drawn: the Markdown sizer)
+            if (box.y + box.height > rect.y + rect.height + 0.5) {
+                const double side = std::min({7.0, rect.width / 6, rect.height / 6});
+                const double cx = rect.x + rect.width - TEXT_PADDING / 2 - side / 2;
+                const double by = rect.y + rect.height - 2;
+                const Color more = edgeColor(paper->getColor());
+                cairo_move_to(cr, cx - side / 2, by - side * 0.6);
+                cairo_line_to(cr, cx + side / 2, by - side * 0.6);
+                cairo_line_to(cr, cx, by);
+                cairo_close_path(cr);
+                cairo_set_source_rgb(cr, more.red / 255.0, more.green / 255.0, more.blue / 255.0);
+                cairo_fill(cr);
+            }
+        }
+    }
     const Color edge = edgeColor(paper->getColor());
     const double er = edge.red / 255.0;
     const double eg = edge.green / 255.0;
@@ -387,7 +463,10 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
     return true;
 }
 
-void installDrawer() { xoj::view::layerDrawer.store(&draw); }
+void installDrawer() {
+    xoj::view::layerDrawer.store(&draw);
+    xoj::markdown::classifier.store(&isNoteText, std::memory_order_release);  // (a note's text is a Markdown text)
+}
 
 NoteUndoAction::NoteUndoAction(const PageRef& page, Layer* layer, const Look& before, const Look& after,
                                std::string text):
@@ -447,6 +526,79 @@ bool NotePageUndoAction::redo(Control* control) {
     move(layers, *control->getDocument(), layer, from, to);
     this->undone = false;
     return true;
+}
+
+// --- content moved between layers ----------------------------------------------------------------------------
+
+ContentMoveUndoAction::ContentMoveUndoAction(const PageRef& page, std::vector<Element*> elements, Layer* from,
+                                             std::vector<Element::Index> indices, Layer* to, double dx, double dy,
+                                             std::string text):
+        UndoAction("StickyNoteContentMoveUndoAction"),
+        elements(std::move(elements)),
+        from(from),
+        indices(std::move(indices)),
+        to(to),
+        dx(dx),
+        dy(dy),
+        text(std::move(text)) {
+    this->page = page;
+}
+
+bool ContentMoveUndoAction::undo(Control* control) {
+    {
+        std::unique_lock lock(*control->getDocument());
+        std::vector<ElementPtr> owned;
+        owned.reserve(elements.size());
+        for (Element* e: elements) {
+            owned.push_back(to->removeElement(e).e);
+            e->move(-dx, -dy);
+        }
+        // (back at their places, from the lowest up: as upstream's undo of a deletion)
+        for (size_t i = 0; i < owned.size(); ++i) {
+            if (!owned[i]) {
+                continue;
+            }
+            if (indices[i] == Element::InvalidIndex) {
+                from->addElement(std::move(owned[i]));
+            } else {
+                from->insertElement(std::move(owned[i]), indices[i]);
+            }
+        }
+    }
+    repaint(-dx, -dy);
+    this->undone = true;
+    return true;
+}
+
+bool ContentMoveUndoAction::redo(Control* control) {
+    {
+        std::unique_lock lock(*control->getDocument());
+        for (Element* e: elements) {
+            if (auto owned = from->removeElement(e).e) {
+                owned->move(dx, dy);
+                to->addElement(std::move(owned));
+            }
+        }
+    }
+    repaint(dx, dy);
+    this->undone = false;
+    return true;
+}
+
+void ContentMoveUndoAction::repaint(double mx, double my) const {
+    if (elements.empty()) {
+        return;
+    }
+    // Where they were and where they are now (a note shows only on its paper: the notes are drawn again there)
+    Range range;
+    for (const Element* e: elements) {
+        range = range.unite(Range(e->getBoundingBox()));
+    }
+    Range before = range;
+    before.translate(-mx, -my);
+    range = range.unite(before);
+    range.addPadding(DRAWN_MARGIN + 1);
+    page->fireRangeChanged(range);
 }
 
 // --- the clipboard -------------------------------------------------------------------------------------------------

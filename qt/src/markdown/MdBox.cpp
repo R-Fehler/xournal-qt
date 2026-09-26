@@ -222,6 +222,30 @@ bool isMarkdownLayer(const Layer& layer) {
     return layer.hasName() && xoj::markdown::isMarkdownLayerName(layer.getName());
 }
 
+bool holdsBoxes(const Layer& layer) {
+    if (isMarkdownLayer(layer)) {
+        return true;
+    }
+    for (const auto& e: layer.getElementsView()) {
+        if (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e)->isMarkdown()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<Text*> boxesOf(const XojPage& page) {
+    std::vector<Text*> boxes;
+    for (const Layer* l: page.getLayersView()) {
+        for (const auto& e: l->getElementsView()) {
+            if (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e)->isMarkdown()) {
+                boxes.push_back(const_cast<Text*>(static_cast<const Text*>(e)));
+            }
+        }
+    }
+    return boxes;
+}
+
 Layer* markdownLayer(const PageRef& page) {
     for (Layer* l: page->getLayers()) {
         if (isMarkdownLayer(*l)) {
@@ -246,7 +270,7 @@ Text* pageBoxOf(const Layer& layer, double x, double y) {
 Text* boxAt(const Layer& layer, double x, double y) {
     Text* found = nullptr;
     for (const auto& e: layer.getElementsView()) {
-        if (e->getType() == ELEMENT_TEXT) {
+        if (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e)->isMarkdown()) {
             const auto* t = static_cast<const Text*>(e);
             const auto r = boxRect(*t);
             // (at least a line high: an empty box can be tapped as well)

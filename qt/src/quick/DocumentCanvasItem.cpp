@@ -376,6 +376,7 @@ void DocumentCanvasItem::endLinkHover(Qt::CursorShape shape) {
 
 void DocumentCanvasItem::mouseHovers(QPointF scenePos) {
     hoverScenePos = scenePos;
+    mouseOverWindow = true;
     if (!mathErrorText.isEmpty() && !mathErrorArea.contains(mapFromScene(scenePos))) {
         setMathError({}, {});
     }
@@ -392,6 +393,9 @@ void DocumentCanvasItem::setMathError(const QString& error, const QRectF& rect) 
 }
 
 DocumentCanvasItem::~DocumentCanvasItem() {
+    if (canvasView) {
+        canvasView->setMousePointerSource({});
+    }
     auto& items = allCanvases();
     items.erase(std::remove(items.begin(), items.end(), this), items.end());
     qApp->removeEventFilter(this);
@@ -409,6 +413,7 @@ void DocumentCanvasItem::setView(QObject* object) {
     }
     if (canvasView) {
         disconnect(canvasView, nullptr, this, nullptr);
+        canvasView->setMousePointerSource({});
         // (two canvases that swap their views: the other one may show it already)
         if (!shownByAnother(canvasView)) {
             canvasView->setShown(false);
@@ -422,6 +427,13 @@ void DocumentCanvasItem::setView(QObject* object) {
     if (canvasView) {
         canvasView->setShown(true);
         canvasView->setReadingOnly(reading);
+        // (a paste with the keys asks where the mouse rests: over a sticky note it goes into the note)
+        canvasView->setMousePointerSource([this]() -> std::optional<QPointF> {
+            if (!mouseOverWindow || !claims(hoverScenePos)) {
+                return std::nullopt;
+            }
+            return mapFromScene(hoverScenePos);
+        });
         input = std::make_unique<xqt::CanvasInput>(*canvasView);
         connect(canvasView, &xqt::CanvasView::updateRequested, this, &QQuickItem::update);
         connect(canvasView, &xqt::CanvasView::pagesChanged, this, &QQuickItem::update);
@@ -753,6 +765,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             }
             return false;
         case QEvent::Leave:
+            mouseOverWindow = false;
             if (linkHoverAt && linkHoverByMouse) {
                 endLinkHover();  // the mouse left the window
             }

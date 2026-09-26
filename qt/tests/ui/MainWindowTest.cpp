@@ -66,6 +66,7 @@
 #include "canvas/CanvasView.h"
 #include "canvas/CanvasMemory.h"
 #include "canvas/CanvasPage.h"
+#include "canvas/StickyNotes.h"
 #include "markdown/MdBox.h"
 #include "markdown/MdImages.h"
 #include "session/TextFile.h"
@@ -3832,6 +3833,57 @@ TEST_F(MainWindowTest, theShapesMenuPlacesAStickyNoteWithItsPill) {
     EXPECT_FALSE(pageNotes->isVisible());
     controller->redo();
     EXPECT_TRUE(controller->pageHasNotes());
+}
+
+// qt/sticky-containers: the note's pill writes the note's Markdown text ("Text": on the page, with the formatting bar)
+// and puts an image on the note ("Image…": the window's file dialog, then insertImage)
+TEST_F(MainWindowTest, theNotePillWritesTheNotesTextAndPutsAnImageOnIt) {
+    xqt::CanvasView* view = controller->tabManager().currentView();
+    ASSERT_NE(view, nullptr);
+    ASSERT_TRUE(controller->insertStickyNote());
+    auto* pill = find<QQuickItem>("notePill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    auto* textButton = find<QQuickItem>("noteTextButton");
+    auto* imageButton = find<QQuickItem>("noteImageButton");
+    ASSERT_NE(textButton, nullptr);
+    ASSERT_NE(imageButton, nullptr);
+    EXPECT_TRUE(imageButton->isEnabled());
+    Layer* note = view->notes().selectedLayer();
+    ASSERT_NE(note, nullptr);
+
+    click(textButton);
+    until([&] { return view->getMarkdownEditor() != nullptr; });
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_TRUE(controller->markdownOnPage()) << "written on the page, with the formatting bar";
+    EXPECT_FALSE(controller->noteSelected());
+    type("Hello");
+    EXPECT_EQ(view->getMarkdownEditor()->text(), "Hello");
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        // (a longer text for the picture: it goes on below the note, which says so at its bottom right)
+        type(" **world**, this is a note with a text that is longer than the note is high, so it goes on below it.\r"
+             "- one\rtwo\rthree\rfour\rfive\rsix\rseven\reight\rnine\rten\releven\rtwelve\rthirteen\rfourteen\rfifteen");
+        controller->endMarkdownOnPage();
+        nextFrame();
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+        return;
+    }
+    controller->endMarkdownOnPage();
+    ASSERT_NE(xqt::sticky::textOf(*note), nullptr);
+    EXPECT_EQ(xqt::sticky::textOf(*note)->getText(), "Hello");
+    EXPECT_TRUE(xqt::sticky::textOf(*note)->isMarkdown());
+
+    // The image chosen in the dialog goes onto the selected note
+    QTemporaryDir tmp;
+    QImage picture(120, 90, QImage::Format_RGB32);
+    picture.fill(Qt::darkBlue);
+    ASSERT_TRUE(picture.save(tmp.filePath("picture.png")));
+    view->notes().select(*view->getPage(0), note);
+    const size_t before = note->getElementsView().size();
+    ASSERT_TRUE(controller->insertImage(QUrl::fromLocalFile(tmp.filePath("picture.png"))));
+    controller->clearSelection();
+    ASSERT_EQ(note->getElementsView().size(), before + 1);
+    EXPECT_EQ(note->getElementsView().back()->getType(), ELEMENT_IMAGE);
 }
 
 // Sticky notes on the clipboard (qt/sticky-clipboard): the pill's Copy and Cut, and a note moved from the first page

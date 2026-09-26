@@ -44,10 +44,16 @@ void Layer::addElement(ElementPtr e) {
     this->elements.emplace_back(std::move(e));
 }
 
-// xournal-qt: a text is a Markdown text while it is in a layer named "Markdown" (see model/MarkdownText.h)
+// xournal-qt: a text is a Markdown text while it is in a layer named "Markdown", or where the frontend says so (see
+// model/MarkdownText.h)
 void Layer::markdownFlag(Element* e) const {
     if (e->getType() == ELEMENT_TEXT) {
-        static_cast<Text*>(e)->setMarkdown(this->name && xoj::markdown::isMarkdownLayerName(*this->name));
+        auto* text = static_cast<Text*>(e);
+        bool markdown = this->name && xoj::markdown::isMarkdownLayerName(*this->name);
+        if (auto classify = xoj::markdown::classifier.load(std::memory_order_acquire); !markdown && classify) {
+            markdown = classify(*this, *text);
+        }
+        text->setMarkdown(markdown);
     }
 }
 

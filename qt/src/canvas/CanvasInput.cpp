@@ -601,6 +601,7 @@ bool CanvasInput::actionStart(const Event& event) {
                     selection->copySelection();
                 }
                 selection->mouseDown(selType, selectionPos.x, selectionPos.y);
+                view.selectionDragStarts(selType);  // (a move may end in a sticky note, or leave one)
                 return true;
             }
             view.clearSelection();
@@ -800,7 +801,7 @@ bool CanvasInput::actionEnd(const Event& event) {
         return false;
     }
     if (EditSelection* selection = view.getSelection(); selection && (!view.isReadingOnly() || selection->isMoving())) {
-        selection->mouseUp();
+        view.endSelectionDrag();  // (mouseUp; a move into or out of a sticky note changes the layer too)
     }
     // A sticky note moved or resized: one undo step; the release goes to its page (where the press was)
     CanvasPage* notePage = view.notes().dragging() ? view.notes().selectedPage() : nullptr;
@@ -886,6 +887,7 @@ bool CanvasInput::startTouchSelection(QPointF viewPos) {
         return false;  // beside the selection: the finger scrolls as usual
     }
     selection->mouseDown(type, pos.x, pos.y);
+    view.selectionDragStarts(type);
     return true;
 }
 
@@ -927,8 +929,8 @@ void CanvasInput::endTouchSelection() {
     if (view.notes().dragging()) {
         view.notes().endDrag();
     }
-    if (EditSelection* selection = view.getSelection()) {
-        selection->mouseUp();
+    if (view.getSelection()) {
+        view.endSelectionDrag();
     }
     touchSelection = false;
     touchSelectionId = -1;

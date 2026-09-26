@@ -960,6 +960,9 @@ public:
     bool noteCovers() const;
     void setNoteCovers(bool covers);
     Q_INVOKABLE void deleteStickyNote();
+    /// The selected note's Markdown text (its pill's "Text"): written on the page, started or with the cursor at its
+    /// end (qt/docs/sticky-notes.md, "Notes as containers")
+    Q_INVOKABLE bool writeNoteText();
     /// The selected note onto the clipboard, whole (its pill; Ctrl+C / Ctrl+X go through copySelection /
     /// cutSelection). Paste (pasteElements, pasteAt) puts a copied note onto the page in view.
     Q_INVOKABLE bool copyStickyNote();

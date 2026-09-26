@@ -18,6 +18,9 @@ dialect is CommonMark with GitHub's extensions (tables, strikethrough, task list
   on the page.
 - **Markdown text boxes** go anywhere on a page. Turn on "Markdown" in the text tool's font menu (hold the text
   button, or tap it again), then tap where the text should go. A tap on a box (text tool) edits it again.
+- **A sticky note's text**: a tap with the text tool (Markdown on) on a sticky note writes the note's one Markdown
+  text, which lies in the note's layer at its top left and is as wide as the note (it flows again when the note is
+  resized); the note pill's "Text" does the same. See [sticky-notes.md](sticky-notes.md), "Notes as containers".
 
 Writing:
 - **On the page** (the default): as in Typora or Obsidian's live preview. The text is shown formatted while it is
@@ -77,7 +80,9 @@ Markdown text boxes (and the page's text) are selected and moved like everything
 around them, or a tap with the object select tool, when nothing of the selected layer is there. Then they can be
 moved (also to another page: they go into that page's Markdown layer), deleted, copied or cut. The selection is
 the box as it is drawn. While they are selected, the layer "Markdown" is the selected layer; when the selection
-ends, the layer selected before is again (the pen writes where it did).
+ends, the layer selected before is again (the pen writes where it did). They are not put into a sticky note when
+dragged onto one (they stay in the Markdown layer). A sticky note's text moves with its note and is not selected
+on its own.
 
 A text box selected alone has a double arrow (⟷) on the selection's right knob: that knob (and the right edge
 around it) sets the box's width, as below; the other knobs scale, turn, move and delete it as for any selection.
@@ -91,7 +96,8 @@ it) makes the box narrower or wider: the text flows anew while it is dragged, an
 At least 2 cm, at most to the page's right edge. Undo: written on the page, each drag is an undo step of the text
 being written (Ctrl+Z) and part of the edit's one undo step; selected, the drag is one undo step (the box stays
 selected). The page's own Markdown text has no handle: it goes from margin to margin, and a box beside it does not
-change how it flows over the pages.
+change how it flows over the pages. A sticky note's text has no handle either: it is as wide as its note, whose own
+handle (bottom right) sets the width ([sticky-notes.md](sticky-notes.md)); it is never selected alone.
 
 The width is upstream's `wrap` attribute of the text element (the wrap width of Xournal++'s text tool, which has a
 handle of its own for it): saved in the `.xopp` and read again, and Xournal++ wraps the source at that width.
@@ -213,7 +219,15 @@ text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem
 
 ## How it is stored (Xournal++ compatible)
 A box is an ordinary Xournal++ text element in a layer named "Markdown" at the bottom of the page. Ink written with
-the pen goes on top of it, into the layer it went into before.
+the pen goes on top of it, into the layer it went into before. A sticky note's text is such a text element in the
+note's layer, at the note's top left plus its padding, with a wrap width ([sticky-notes.md](sticky-notes.md)).
+
+**Which layers hold boxes** (`md::holdsBoxes`, `md::boxesOf`): the page's Markdown layer, and sticky notes with
+their text. Editing, hit tests (links, check boxes, formulas, "Load image"), the search, the chapters, the
+annotations, the pictures carried in the file and the exports see both; the page's own text (the one at its
+margins, flowing over pages: `pageBoxOf`, pagination) is only ever in the Markdown layer. A text knows it is a
+Markdown text (`Text::isMarkdown`): by its layer's name, or, for a note's text, by the frontend's
+`xoj::markdown::classifier` (ADR-0002).
 - **Text:** the Markdown source.
 - **Font:** the body text's family and size.
 - **Color:** the text color.

@@ -35,6 +35,7 @@
 #include "MdBox.h"
 #include "TextFlow.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 
 namespace xqt {
 
@@ -67,8 +68,9 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
     Text* existing = nullptr;
     {
         std::shared_lock lock(*session.getDocument());
-        // xournal-qt: a Markdown text drawn here (where it is drawn, not where its source would be)
-        Layer* mdLayer = md::markdownLayer(pageRef);
+        // xournal-qt: a Markdown text drawn here (where it is drawn, not where its source would be); not through a
+        // sticky note lying on it
+        Layer* mdLayer = sticky::noteAt(*pageRef, x, y) ? nullptr : md::markdownLayer(pageRef);
         if (mdLayer && mdLayer->isVisible()) {
             existing = md::boxAt(*mdLayer, x, y);
         }

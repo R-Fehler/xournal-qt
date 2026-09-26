@@ -29,6 +29,7 @@
 #include "DocumentChapters.h"
 #include "DocumentLinks.h"
 #include "LinkRewrite.h"
+#include "MdBox.h"
 #include "MdDocument.h"
 #include "session/DocumentTextIndex.h"
 #include "session/PageNoteSpace.h"
@@ -49,7 +50,7 @@ QRectF rectOf(const xoj::util::Rectangle<double>& r) { return QRectF(r.x, r.y, r
 uint32_t rgbOf(Color c);
 
 /// The sticky notes of a page (qt/docs/sticky-notes.md), the NoteSource used unless another is set: a note's texts
-/// as its text, "(handwriting)" for a note with ink only.
+/// as its text (its Markdown text first, as shown), "(handwriting)" for a note with ink only.
 void stickyNotesOf(const XojPage& page, std::vector<Item>& notes) {
     for (const Layer* layer: page.getLayersView()) {
         if (!layer->isVisible() || !sticky::isNote(*layer)) {
@@ -62,9 +63,20 @@ void stickyNotesOf(const XojPage& page, std::vector<Item>& notes) {
         QStringList texts;
         bool ink = false;
         const Stroke* paper = sticky::paperOf(*layer);
+        // The note's Markdown text first, as it is shown (not its source), then its other texts
+        if (const Text* text = sticky::textOf(*layer)) {
+            QStringList shown;
+            for (const std::string& s: md::shownTexts(*text)) {
+                shown << QString::fromStdString(s).trimmed();
+            }
+            shown.removeAll(QString());
+            texts << shown.join(u'\n');
+        }
         for (const Element* e: layer->getElementsView()) {
             if (e->getType() == ELEMENT_TEXT) {
-                texts << QString::fromStdString(static_cast<const Text*>(e)->getText()).trimmed();
+                if (!static_cast<const Text*>(e)->isMarkdown()) {
+                    texts << QString::fromStdString(static_cast<const Text*>(e)->getText()).trimmed();
+                }
             } else if (e != paper) {
                 ink = true;
             }

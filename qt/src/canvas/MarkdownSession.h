@@ -7,7 +7,8 @@
  * the pages added go again when it gets shorter. At the end, pages that only held an emptied box go as well.
  *
  * Other boxes in the layer are text boxes placed with the text tool; beginBox edits one of them (or a new one at a
- * point). They do not flow.
+ * point). They do not flow. On a sticky note beginBox edits the note's one Markdown text, in the note's layer, at
+ * its top left and as wide as the note (qt/docs/sticky-notes.md, "Notes as containers").
  *
  * A new box goes into a layer "Markdown" at the bottom of the page (ink written with the pen goes on top of it, into
  * the layer it went into before); the page's text from the top-left margin to the right margin, a text box from its
@@ -52,6 +53,8 @@ public:
     std::string beginBox(size_t page, const md::Style& style, double x, double y);
     /// The page's text (not a text box) is edited.
     bool isPageText() const { return pageText; }
+    /// A sticky note's text is edited: its width is the note's (no width of its own)
+    bool isNoteText() const { return !pageText && !chain.empty() && chain.front().noteWidth > 0; }
     bool active() const { return !chain.empty(); }
     /// The first and the last page of the text (0-based; npos: not active).
     size_t pageIndex() const;
@@ -87,8 +90,9 @@ private:
     /// A page of the text and its box.
     struct Page {
         PageRef page;
-        Layer* layer = nullptr;            ///< its layer "Markdown"
+        Layer* layer = nullptr;            ///< its layer "Markdown" (a sticky note's: the note's layer)
         Text* box = nullptr;               ///< nullptr: none yet
+        double noteWidth = 0;              ///< a sticky note's text: the width the note gives it (else 0)
         std::unique_ptr<Text> original;    ///< a copy of the box at the start (nullptr: there was none)
         double x = 0;                      ///< the box's top left
         double y = 0;

@@ -16,6 +16,7 @@
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
 #include "session/PageMargins.h"
+#include "session/StickyNote.h"
 #include "undo/GroupUndoAction.h"
 #include "undo/InsertDeletePageUndoAction.h"
 #include "undo/UndoAction.h"
@@ -119,6 +120,24 @@ MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, dou
     p.page = page;
     p.x = x;
     p.y = y;
+    if (!pageText) {
+        // A sticky note there: its one Markdown text, in the note's layer, the note being its frame (the text at its
+        // top left, as wide as the note; qt/docs/sticky-notes.md)
+        std::shared_lock lock(*session.getDocument());
+        if (Layer* note = sticky::openNoteAt(*page, x, y)) {
+            const sticky::Look look = *sticky::lookOf(*note);
+            const auto origin = sticky::textOrigin(look);
+            p.layer = note;
+            p.noteWidth = sticky::textWidth(look);
+            p.x = origin.x;
+            p.y = origin.y;
+            p.box = sticky::textOf(*note);
+            if (p.box) {
+                p.original = p.box->cloneText();
+            }
+            return p;
+        }
+    }
     {
         std::shared_lock lock(*session.getDocument());
         p.layer = md::markdownLayer(page);
@@ -171,6 +190,8 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
         Page p = pageOf(page, x, y);
         if (p.box) {
             style = md::styleOf(*p.box);
+        } else if (p.noteWidth > 0) {
+            style.width = p.noteWidth;  // (a sticky note's new text: at its top left, as wide as the note)
         } else {
             p.y = y - style.size * 0.75;
             std::shared_lock lock(*doc);
@@ -226,6 +247,10 @@ void MarkdownSession::setBox(Page& p, const std::string& text) {
         if (!p.box) {
             auto t = std::make_unique<Text>();
             t->setTransformation(xoj::util::Matrix::TRANSLATION(p.x, p.y));
+            // (its width before it goes into the layer: a sticky note's text is told by it, sticky::isNoteText)
+            t->setFont(XojFont(style.family, style.size));
+            t->setColor(style.color);
+            t->setWrap(style.width);
             p.box = t.get();
             p.layer->addElement(std::move(t));
         }

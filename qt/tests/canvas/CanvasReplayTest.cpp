@@ -64,6 +64,8 @@
 #include "../SearchHits.h"
 #include "config-test.h"
 #include "TextEditor.h"
+#include "MarkdownEditor.h"
+#include "MdBox.h"
 
 using namespace xqt;
 
@@ -2462,10 +2464,14 @@ TEST_F(CanvasReplayTest, aStickyNoteMovesWithWhatIsWrittenOnItAndIsResizedByItsH
     const auto inkBox = [&] { return note->getElementsView().back()->getBoundingBox(); };
     const auto ink = inkBox();
 
-    // The select tool takes the whole note: a drag moves it with its ink
+    // The select tool takes the whole note: a tap selects it, a drag moves it with its ink (qt/sticky-containers: a
+    // drag on a note that is not selected draws a rectangle in it)
     app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
     const double zoom = view->getViewController().zoom();
     const QPointF grab = viewPos(0, QPointF(look.rect.x + look.rect.width - 20, look.rect.y + look.rect.height - 30));
+    mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, grab, Qt::LeftButton, Qt::NoButton);
+    ASSERT_TRUE(view->notes().hasSelection()) << "a tap selects the note";
     mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
     for (int i = 1; i <= 10; ++i) {
         mouse(QEvent::MouseMove, grab + QPointF(5 * i, 3 * i) * zoom, Qt::NoButton, Qt::LeftButton);
@@ -2836,10 +2842,12 @@ TEST_F(CanvasReplayTest, aStickyNoteDraggedOntoAnotherPageGoesThereAsOneStep) {
     processEvents();
     const auto ink = contentOf(*note);
 
-    // Held at (30, 40) on the note and let go over the second page at (200, 300)
+    // Held at (30, 40) on the note (selected by a tap first) and let go over the second page at (200, 300)
     app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
     const QPointF grab = viewPos(0, QPointF(look.rect.x + 30, look.rect.y + 40));
     const QPointF drop = viewPos(1, QPointF(200, 300));
+    mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, grab, Qt::LeftButton, Qt::NoButton);
     mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
     for (int i = 1; i <= 20; ++i) {
         mouse(QEvent::MouseMove, grab + (drop - grab) * i / 20.0, Qt::NoButton, Qt::LeftButton);
@@ -2982,6 +2990,340 @@ TEST_F(CanvasReplayTest, aPastedOrCutStickyNoteIsDrawnWhereItIs) {
 
 /// XQT_BENCH_STICKY=1: copy, paste and cut of a note with 300 strokes on it (Ctrl+C, Ctrl+V, Ctrl+X), in ms: what
 /// happens at the key press, and the page drawn again after it (until the render workers are idle).
+// --- sticky notes as containers (qt/sticky-containers, qt/docs/sticky-notes.md) ------------------------------------
+
+namespace {
+/// The Markdown texts of a layer
+size_t markdownTextsOn(const Layer& layer) {
+    size_t n = 0;
+    for (const Element* e: layer.getElementsView()) {
+        n += e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e)->isMarkdown();
+    }
+    return n;
+}
+/// The page's own layer (its first that is no note)
+Layer* ownLayerOf(DocumentSession& session, size_t page) {
+    for (Layer* l: session.getDocument()->getPage(page)->getLayers()) {
+        if (!sticky::isNote(*l)) {
+            return l;
+        }
+    }
+    return nullptr;
+}
+QByteArray pngPicture(int w, int h) {
+    QImage image(w, h, QImage::Format_RGB32);
+    image.fill(QColor(0x30, 0x60, 0xc0));
+    QByteArray png;
+    QBuffer buffer(&png);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, "PNG");
+    return png;
+}
+}  // namespace
+
+TEST_F(CanvasReplayTest, aStickyNoteHoldsOneMarkdownTextThatFlowsInItsWidth) {
+    app->getSettings()->setSnapGrid(false);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    view->clearSelection();
+    Document* doc = session->getDocument();
+    const PageRef page = doc->getPage(0);
+
+    // A tap with the text tool (Markdown on) anywhere on the note: the note's text, at its top left, as wide as it
+    view->setMarkdownText(true, 10, false);
+    app->getToolHandler()->selectTool(TOOL_TEXT);
+    const QPointF tap = viewPos(0, QPointF(look.rect.x + 120, look.rect.y + 100));
+    tablet(QEvent::TabletPress, tap, 0.5, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, tap, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    const std::string source = "**Keys** are the words that a sentence needs to wrap over several lines of this note";
+    ASSERT_TRUE(view->insertAtTextCursor(source));
+    view->endTextEditing();
+    processEvents();
+    Text* text = sticky::textOf(*note);
+    ASSERT_NE(text, nullptr) << "the note's text is in the note's layer";
+    EXPECT_EQ(text->getText(), source);
+    EXPECT_TRUE(text->isMarkdown()) << "a Markdown text: drawn formatted";
+    EXPECT_NEAR(text->getTransformation().shift.x, look.rect.x + sticky::TEXT_PADDING, 1e-6);
+    EXPECT_NEAR(text->getTransformation().shift.y, look.rect.y + sticky::TEXT_PADDING, 1e-6);
+    EXPECT_NEAR(text->getWrap(), look.rect.width - 2 * sticky::TEXT_PADDING, 1e-6) << "as wide as the note";
+    const Layer* mdLayer = md::markdownLayer(page);
+    EXPECT_TRUE(!mdLayer || mdLayer->getElementsView().size() == 0) << "nothing in the page's Markdown layer";
+    EXPECT_GT(darkPixels(*view->getPage(0), QRectF(look.rect.x + 10, look.rect.y + 8, 60, 14)), 5)
+            << "it shows on the note";
+
+    // One undo step for the text
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(sticky::textOf(*note), nullptr);
+    session->getUndoRedoHandler()->redo();
+    ASSERT_EQ(sticky::textOf(*note), text);
+
+    // Another tap elsewhere on the note edits the same text: one text per note
+    const QPointF again = viewPos(0, QPointF(look.rect.x + 30, look.rect.y + look.rect.height - 15));
+    tablet(QEvent::TabletPress, again, 0.5, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, again, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_EQ(view->getMarkdownEditor()->text(), source);
+    view->getMarkdownEditor()->setCursorPosition(source.size());
+    view->insertAtTextCursor(" too");
+    view->endTextEditing();
+    processEvents();
+    EXPECT_EQ(markdownTextsOn(*note), 1u);
+    EXPECT_EQ(text->getText(), source + " too");
+
+    // Narrower: the text flows again (more lines); undone, as wide as before
+    const auto height = [&] {
+        std::shared_lock lock(*doc);
+        return md::contentHeight(*sticky::textOf(*note));
+    };
+    const double before = height();
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    view->notes().select(*view->getPage(0), note);
+    const double zoom = view->getViewController().zoom();
+    const QPointF handle = viewPos(0, QPointF(look.rect.x + look.rect.width, look.rect.y + look.rect.height));
+    mouse(QEvent::MouseButtonPress, handle, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 10; ++i) {
+        mouse(QEvent::MouseMove, handle + QPointF(-8 * i, 0) * zoom, Qt::NoButton, Qt::LeftButton);
+    }
+    mouse(QEvent::MouseButtonRelease, handle + QPointF(-80, 0) * zoom, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    const auto narrow = *sticky::lookOf(*note);
+    ASSERT_NEAR(narrow.rect.width, look.rect.width - 80, 0.5);
+    EXPECT_NEAR(sticky::textOf(*note)->getWrap(), narrow.rect.width - 2 * sticky::TEXT_PADDING, 1e-6);
+    EXPECT_GT(height(), before + 5) << "more lines";
+    session->getUndoRedoHandler()->undo();
+    EXPECT_NEAR(sticky::textOf(*note)->getWrap(), look.rect.width - 2 * sticky::TEXT_PADDING, 1e-6);
+    EXPECT_NEAR(height(), before, 0.01);
+    session->getUndoRedoHandler()->redo();
+    EXPECT_NEAR(sticky::textOf(*note)->getWrap(), narrow.rect.width - 2 * sticky::TEXT_PADDING, 1e-6);
+
+    // Moving the note moves its text
+    view->notes().select(*view->getPage(0), note);
+    const QPointF grab = viewPos(0, QPointF(look.rect.x + 30, look.rect.y + look.rect.height - 20));
+    mouse(QEvent::MouseButtonPress, grab, Qt::LeftButton, Qt::LeftButton);
+    for (int i = 1; i <= 10; ++i) {
+        mouse(QEvent::MouseMove, grab + QPointF(4 * i, 6 * i) * zoom, Qt::NoButton, Qt::LeftButton);
+    }
+    mouse(QEvent::MouseButtonRelease, grab + QPointF(40, 60) * zoom, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    const auto moved = *sticky::lookOf(*note);
+    ASSERT_NEAR(moved.rect.x, look.rect.x + 40, 0.5);
+    ASSERT_EQ(sticky::textOf(*note), text) << "still the note's text";
+    EXPECT_NEAR(text->getTransformation().shift.x, moved.rect.x + sticky::TEXT_PADDING, 1e-6);
+    EXPECT_NEAR(text->getTransformation().shift.y, moved.rect.y + sticky::TEXT_PADDING, 1e-6);
+
+    // The pill's "Text": the note's text with the cursor at its end
+    ASSERT_TRUE(view->notes().hasSelection());
+    ASSERT_TRUE(view->writeNoteText());
+    EXPECT_FALSE(view->notes().hasSelection());
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    EXPECT_EQ(view->getMarkdownEditor()->text(), text->getText());
+    EXPECT_EQ(view->getMarkdownEditor()->cursorPosition(), text->getText().size());
+    EXPECT_FALSE(view->getMarkdownEditor()->widthHandle()) << "no width handle: the note's handle sets its width";
+    view->endTextEditing();
+
+    // Copied and pasted with the note: its text goes along, as the copy's Markdown text
+    view->notes().select(*view->getPage(0), note);
+    ASSERT_TRUE(view->notes().copySelected());
+    ASSERT_TRUE(view->notes().paste(1));
+    ASSERT_EQ(notesOf(*session, 1).size(), 1u);
+    const Text* copied = sticky::textOf(*notesOf(*session, 1).front());
+    ASSERT_NE(copied, nullptr);
+    EXPECT_TRUE(copied->isMarkdown());
+    EXPECT_EQ(copied->getText(), text->getText());
+    view->clearSelection();
+
+    // The search finds it as it is shown ("Keys are", not "**Keys** are"), on both pages
+    QSignalSpy searched(&session->search(), &DocumentSearch::finished);
+    session->search().setQuery("Keys are", false);
+    ASSERT_TRUE(searched.wait(3000));
+    const auto placed = xqt::test::placedHits(session->search());
+    ASSERT_EQ(placed.size(), 2u);
+    EXPECT_EQ(placed[0].page, 0u);
+    EXPECT_TRUE(QRectF(moved.rect.x, moved.rect.y, moved.rect.width, moved.rect.height).contains(placed[0].rect.center()))
+            << "the hit is on the note";
+    session->search().clear();
+}
+
+TEST_F(CanvasReplayTest, pastedAndInsertedThingsGoIntoTheStickyNoteThere) {
+    app->getSettings()->setSnapGrid(false);
+    // Ink on the page, copied
+    drawLine(0, QPointF(40, 700), QPointF(100, 720));
+    processEvents();
+    view->selectAllOnPage();
+    ASSERT_NE(view->getSelection(), nullptr);
+    ASSERT_TRUE(view->copySelection());
+    view->clearSelection();
+    Layer* own = ownLayerOf(*session, 0);
+    ASSERT_EQ(own->getElementsView().size(), 1u);
+
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    const QPointF middle(look.rect.x + look.rect.width / 2, look.rect.y + look.rect.height / 2);
+
+    // A note selected: pasted into it, in its middle; one undo step
+    ASSERT_TRUE(view->notes().hasSelection());
+    ASSERT_TRUE(view->pasteElements());
+    ASSERT_NE(view->getSelection(), nullptr);
+    view->clearSelection();
+    ASSERT_EQ(note->getElementsView().size(), 2u) << "the paper and the pasted ink";
+    const auto box = note->getElementsView().back()->getBoundingBox();
+    EXPECT_NEAR(box.x + box.width / 2, middle.x(), 3);
+    EXPECT_NEAR(box.y + box.height / 2, middle.y(), 3);
+    EXPECT_EQ(own->getElementsView().size(), 1u);
+    EXPECT_NE(session->getDocument()->getPage(0)->getSelectedLayer(), note) << "the page's own layer again";
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(note->getElementsView().size(), 1u);
+
+    // Pasted at a place on the note (the long-press pill): into it; beside it: onto the page
+    ASSERT_TRUE(view->pasteElements(viewPos(0, QPointF(look.rect.x + 50, look.rect.y + 50))));
+    view->clearSelection();
+    EXPECT_EQ(note->getElementsView().size(), 2u);
+    ASSERT_TRUE(view->pasteElements(viewPos(0, QPointF(60, 60))));
+    view->clearSelection();
+    EXPECT_EQ(note->getElementsView().size(), 2u);
+    EXPECT_EQ(own->getElementsView().size(), 2u);
+
+    // Plain text pasted on the note: a text on the note
+    QGuiApplication::clipboard()->setText("A pasted line");
+    ASSERT_TRUE(view->pasteElements(viewPos(0, QPointF(look.rect.x + 30, look.rect.y + 90))));
+    ASSERT_EQ(note->getElementsView().size(), 3u);
+    EXPECT_EQ(note->getElementsView().back()->getType(), ELEMENT_TEXT);
+    EXPECT_FALSE(static_cast<const Text*>(note->getElementsView().back())->isMarkdown()) << "a plain text";
+
+    // An image, the note selected: into it, fitted into it; one undo step
+    view->notes().select(*view->getPage(0), note);
+    ASSERT_TRUE(view->insertImage(pngPicture(800, 600)));
+    ASSERT_NE(view->getSelection(), nullptr);
+    view->clearSelection();
+    ASSERT_EQ(note->getElementsView().size(), 4u);
+    const Element* image = note->getElementsView().back();
+    EXPECT_EQ(image->getType(), ELEMENT_IMAGE);
+    const auto ib = image->getBoundingBox();
+    EXPECT_LE(ib.width, look.rect.width * 0.8 + 0.5);
+    EXPECT_LE(ib.height, look.rect.height * 0.8 + 0.5);
+    EXPECT_NEAR(ib.x + ib.width / 2, middle.x(), 1);
+    EXPECT_NEAR(ib.y + ib.height / 2, middle.y(), 1);
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(note->getElementsView().size(), 3u);
+    // Nothing selected: into the note in the middle of the view (where the note was put)
+    ASSERT_TRUE(view->insertImage(pngPicture(80, 60)));
+    view->clearSelection();
+    EXPECT_EQ(note->getElementsView().size(), 4u);
+
+    // A covering note takes nothing: onto the page below it
+    view->notes().select(*view->getPage(0), note);
+    view->notes().setCover(true);
+    view->clearSelection();
+    const size_t onPage = own->getElementsView().size();
+    ASSERT_TRUE(view->pasteElements(viewPos(0, QPointF(look.rect.x + 50, look.rect.y + 50))));
+    view->clearSelection();
+    EXPECT_EQ(note->getElementsView().size(), 4u);
+    EXPECT_EQ(own->getElementsView().size(), onPage + 1);
+}
+
+TEST_F(CanvasReplayTest, aRectangleInAStickyNoteSelectsItsElementsThatLeaveAndJoinItByADrag) {
+    app->getSettings()->setSnapGrid(false);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    const double x = look.rect.x;
+    const double y = look.rect.y;
+    // On the note: its Markdown text (the pill's Text) and ink; beside it, ink on the page
+    ASSERT_TRUE(view->writeNoteText());
+    view->insertAtTextCursor("Title");
+    view->endTextEditing();
+    drawLine(0, QPointF(x + 40, y + 60), QPointF(x + 90, y + 80));
+    drawLine(0, QPointF(x + look.rect.width + 30, y + 30), QPointF(x + look.rect.width + 70, y + 50));
+    processEvents();
+    ASSERT_EQ(note->getElementsView().size(), 3u) << "the paper, the text, the ink";
+    Layer* own = ownLayerOf(*session, 0);
+    ASSERT_EQ(own->getElementsView().size(), 1u);
+    const Element* ink = note->getElementsView().back();
+    const auto inkBox = ink->getBoundingBox();
+    const PageRef page = session->getDocument()->getPage(0);
+    const double zoom = view->getViewController().zoom();
+    const auto drag = [&](QPointF from, QPointF to) {
+        mouse(QEvent::MouseButtonPress, viewPos(0, from), Qt::LeftButton, Qt::LeftButton);
+        for (int i = 1; i <= 12; ++i) {
+            mouse(QEvent::MouseMove, viewPos(0, from + (to - from) * i / 12.0), Qt::NoButton, Qt::LeftButton);
+        }
+        mouse(QEvent::MouseButtonRelease, viewPos(0, to), Qt::LeftButton, Qt::NoButton);
+        processEvents();
+    };
+    (void)zoom;
+
+    // A rectangle started on the note, around all of it: its ink, not the note, its paper or its text
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    drag(QPointF(x + 5, y + 5), QPointF(x + look.rect.width + 20, y + look.rect.height + 20));
+    EXPECT_FALSE(view->notes().hasSelection());
+    ASSERT_NE(view->getSelection(), nullptr);
+    ASSERT_EQ(view->getSelection()->getElementsView().size(), 1u);
+    EXPECT_EQ(view->getSelection()->getElementsView().front(), ink);
+    EXPECT_EQ(page->getSelectedLayer(), note) << "the note is the selected layer while its elements are selected";
+
+    // Dragged out of the note onto the page: it leaves the note (one undo step)
+    const QPointF onInk(inkBox.x + inkBox.width / 2, inkBox.y + inkBox.height / 2);
+    const QPointF below(onInk.x(), y + look.rect.height + 120);
+    drag(onInk, below);
+    ASSERT_NE(view->getSelection(), nullptr) << "still selected";
+    view->clearSelection();
+    EXPECT_EQ(note->getElementsView().size(), 2u) << "the paper and the text";
+    ASSERT_EQ(own->getElementsView().size(), 2u);
+    EXPECT_EQ(own->getElementsView().back(), ink);
+    EXPECT_NE(page->getSelectedLayer(), note);
+    EXPECT_NEAR(ink->getBoundingBox().y, inkBox.y + (below.y() - onInk.y()), 1);
+    session->getUndoRedoHandler()->undo();
+    ASSERT_EQ(note->getElementsView().size(), 3u) << "back on the note";
+    EXPECT_EQ(note->getElementsView().back(), ink);
+    EXPECT_EQ(own->getElementsView().size(), 1u);
+    EXPECT_NEAR(ink->getBoundingBox().y, inkBox.y, 1e-6) << "where it was";
+    session->getUndoRedoHandler()->redo();
+    ASSERT_EQ(own->getElementsView().size(), 2u);
+
+    // A rectangle on the note around nothing of it selects nothing
+    drag(QPointF(x + 5, y + 40), QPointF(x + 60, y + look.rect.height - 5));  // (nothing of the note in it now)
+    EXPECT_EQ(view->getSelection(), nullptr);
+
+    // Page ink dragged onto the note joins it (one undo step)
+    const Element* pageInk = own->getElementsView().front();
+    const auto pb = pageInk->getBoundingBox();
+    drag(QPointF(pb.x - 5, pb.y - 5), QPointF(pb.x + pb.width + 5, pb.y + pb.height + 5));  // (begun beside the note)
+    ASSERT_NE(view->getSelection(), nullptr);
+    ASSERT_EQ(view->getSelection()->getElementsView().size(), 1u);
+    drag(QPointF(pb.x + pb.width / 2, pb.y + pb.height / 2), QPointF(x + 60, y + 70));
+    view->clearSelection();
+    ASSERT_EQ(note->getElementsView().size(), 3u);
+    EXPECT_EQ(note->getElementsView().back(), pageInk);
+    EXPECT_EQ(own->getElementsView().size(), 1u);
+    processEvents();
+    EXPECT_GT(darkPixels(*view->getPage(0), QRectF(x + 45, y + 60, 30, 20)), 2) << "drawn on the note";
+    session->getUndoRedoHandler()->undo();
+    EXPECT_EQ(note->getElementsView().size(), 2u);
+    EXPECT_EQ(own->getElementsView().size(), 2u);
+    EXPECT_NEAR(pageInk->getBoundingBox().x, pb.x, 1e-6);
+
+    // Moved inside the note: it stays there (its layer does not change)
+    session->getUndoRedoHandler()->redo();
+    drag(QPointF(x + 5, y + 40), QPointF(x + look.rect.width - 5, y + look.rect.height - 5));
+    ASSERT_NE(view->getSelection(), nullptr);
+    drag(QPointF(x + 60, y + 70), QPointF(x + 70, y + 90));
+    view->clearSelection();
+    EXPECT_EQ(note->getElementsView().size(), 3u);
+
+    // A tap selects the whole note
+    mouse(QEvent::MouseButtonPress, viewPos(0, QPointF(x + 20, y + look.rect.height - 10)), Qt::LeftButton,
+          Qt::LeftButton);
+    mouse(QEvent::MouseButtonRelease, viewPos(0, QPointF(x + 20, y + look.rect.height - 10)), Qt::LeftButton,
+          Qt::NoButton);
+    EXPECT_TRUE(view->notes().hasSelection());
+    EXPECT_EQ(view->getSelection(), nullptr);
+}
+
 TEST_F(CanvasReplayTest, benchmarkStickyNoteClipboard) {
     if (!qEnvironmentVariableIsSet("XQT_BENCH_STICKY")) {
         GTEST_SKIP() << "a benchmark: set XQT_BENCH_STICKY=1";

@@ -3883,6 +3883,15 @@ void AppController::deleteStickyNote() {
         canvas()->notes().deleteSelected();
     }
 }
+bool AppController::writeNoteText() {
+    if (!canvas() || textPagesFixed() || session()->isReadOnly()) {
+        return false;
+    }
+    endMarkdown(true);  // (the Markdown written beside the page is done first)
+    const bool writing = canvas()->writeNoteText();
+    Q_EMIT markdownOnPageChanged();
+    return writing;
+}
 bool AppController::copyStickyNote() { return copied(canvas() && canvas()->notes().copySelected()); }
 bool AppController::cutStickyNote() {
     return copied(canvas() && !textPagesFixed() && canvas()->notes().cutSelected());

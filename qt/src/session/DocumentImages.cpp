@@ -191,15 +191,9 @@ size_t copyLinked(const std::string& markdown, const fs::path& folder) {
 std::vector<std::string> carriedPicturesOf(Document& doc) {
     std::vector<std::string> out;
     for (size_t i = 0; i < doc.getPageCount(); ++i) {
-        const Layer* layer = md::markdownLayer(doc.getPage(i));
-        if (!layer) {
-            continue;
-        }
-        for (const auto* e: layer->getElementsView()) {
-            if (e->getType() != ELEMENT_TEXT) {
-                continue;
-            }
-            const std::string& text = static_cast<const Text*>(e)->getText();
+        // (every Markdown text: the Markdown layer's and the sticky notes' texts)
+        for (const Text* box: md::boxesOf(*doc.getPage(i))) {
+            const std::string& text = box->getText();
             if (text.find("![") == std::string::npos) {
                 continue;  // (no picture: not parsed)
             }

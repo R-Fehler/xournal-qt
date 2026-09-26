@@ -21,6 +21,7 @@
 #include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "util/Matrix.h"
 #include "session/StickyNote.h"
 #include "session/DocumentLink.h"
 #include "session/DocumentSession.h"
@@ -258,6 +259,25 @@ TEST(Annotations, aStickyNoteIsListedAsANoteNotAsItsTextOrInk) {
     EXPECT_TRUE(ofKind(items, an::Kind::Text).empty()) << "the note's text is the note's, not a text box of the page";
     ASSERT_EQ(ofKind(items, an::Kind::Ink).size(), 1u) << "only the page's own handwriting";
     EXPECT_GT(ofKind(items, an::Kind::Ink)[0].rect.top(), 600);
+}
+
+// qt/sticky-containers: a note's Markdown text is its caption, as it is shown, before its other texts
+TEST(Annotations, aStickyNotesMarkdownTextIsItsCaptionAsShown) {
+    xqt::sticky::installDrawer();  // (a note's text is a Markdown text from now on, as in the app)
+    XojPage page(595, 842);
+    const xqt::sticky::Look look{{100, 100, 200, 150}, Color(0xfff59d), false};
+    Layer* note = xqt::sticky::makeNote(look);
+    text(note, "A plain line", 120, 200);
+    auto t = std::make_unique<Text>();
+    t->setText("**Gain** of the filter");
+    t->setFont(XojFont("Sans", 10));
+    t->setWrap(xqt::sticky::textWidth(look));
+    t->setTransformation(xoj::util::Matrix::TRANSLATION(xqt::sticky::textOrigin(look).x, xqt::sticky::textOrigin(look).y));
+    note->addElement(std::move(t));
+    page.getLayers().push_back(note);
+    const auto notes = ofKind(an::itemsOf(an::read(page), 0, nullptr), an::Kind::Note);
+    ASSERT_EQ(notes.size(), 1u);
+    EXPECT_EQ(notes[0].text, QStringLiteral("Gain of the filter\nA plain line"));
 }
 
 TEST(Annotations, handwritingWrittenApartIsTwoPieces) {

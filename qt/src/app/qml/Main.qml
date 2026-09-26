@@ -1435,6 +1435,7 @@ ApplicationWindow {
         id: notePill
         objectName: "notePill"
         canvasItem: canvas
+        onImageRequested: imageDialog.open()
         hidden: pageGrid.visible
     }
 

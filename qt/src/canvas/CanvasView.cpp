@@ -39,6 +39,7 @@
 #include "undo/UndoRedoHandler.h"
 #include "undo/DeleteUndoAction.h"
 #include "model/Stroke.h"
+#include "control/Tool.h"
 #include "control/ToolHandler.h"
 #include "control/layer/LayerController.h"
 #include "control/tools/CursorSelectionType.h"
@@ -180,6 +181,11 @@ CanvasView::~CanvasView() {
     endTextEditing();
     pdfSelection.reset();
     selection.reset();  // the selected elements go back into the document
+    if (markdownSelection) {
+        for (const Layer* note: markdownSelection->notes) {
+            sticky::holdLayer(note, false);  // (a selection in a sticky note: the note is let go)
+        }
+    }
     session.removeView(this);
     unregisterListener();
     pages.clear();  // detaches and cancels the rasters
@@ -446,9 +452,28 @@ bool CanvasView::cutSelection() {
 
 // Text from the clipboard: a text element where the user pasted it (or in the middle of the page)
 bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPos) {
-    const size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
-                                         .value_or(currentPageNo())
-                               : currentPageNo();
+    size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
+                                   .value_or(currentPageNo())
+                         : currentPageNo();
+    const auto pointOn = [&](size_t index) {
+        const double zoom = viewController.zoom();
+        const QRectF pageRect = layout.pageRect(index, zoom);
+        if (viewPos) {
+            return (viewController.viewToContent(*viewPos) - pageRect.topLeft()) / zoom;
+        }
+        const QRectF visible = pageRect.intersected(viewController.visibleContentRect());
+        return ((visible.isEmpty() ? pageRect : visible).center() - pageRect.topLeft()) / zoom;
+    };
+    QPointF onPage = pointOn(pNr);
+    // Into a sticky note: the selected one (at its left, half way down), or the one there (qt/docs/sticky-notes.md)
+    const auto note = noteTarget(pNr, onPage);
+    if (note) {
+        pNr = note->page;
+        if (note->selected) {
+            onPage = QPointF(note->look.rect.x + sticky::TEXT_PADDING,
+                             note->look.rect.y + note->look.rect.height / 2);
+        }
+    }
     const auto scope = actingScope(pNr);
     Document* doc = session.getDocument();
     PageRef page;
@@ -459,19 +484,10 @@ bool CanvasView::pasteText(const QString& content, std::optional<QPointF> viewPo
             return false;
         }
         page = doc->getPage(pNr);
-        layer = page->getSelectedLayer();
+        layer = note ? note->note : page->getSelectedLayer();
     }
     if (!layer) {
         return false;
-    }
-    const double zoom = viewController.zoom();
-    const QRectF pageRect = layout.pageRect(pNr, zoom);
-    QPointF onPage(72, 72);
-    if (viewPos) {
-        onPage = (viewController.viewToContent(*viewPos) - pageRect.topLeft()) / zoom;
-    } else {
-        const QRectF visible = pageRect.intersected(viewController.visibleContentRect());
-        onPage = ((visible.isEmpty() ? pageRect : visible).center() - pageRect.topLeft()) / zoom;
     }
     auto text = std::make_unique<Text>();
     text->setText(content.toStdString());
@@ -581,6 +597,19 @@ bool CanvasView::pasteLinkMarker(std::optional<QPointF> viewPos) {
 bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
     // Port of Control::clipboardPasteXournal
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+    // The keys with the mouse resting on a sticky note: pasted into the note, where the mouse is
+    if (!viewPos && mousePointer) {
+        if (const auto at = mousePointer()) {
+            if (const auto idx = layout.pageAt(viewController.viewToContent(*at), viewController.zoom())) {
+                const QPointF onPage = (viewController.viewToContent(*at) -
+                                        layout.pageRect(*idx, viewController.zoom()).topLeft()) /
+                                       viewController.zoom();
+                if (noteTarget(*idx, onPage) && !stickyNotes->hasSelection()) {
+                    viewPos = at;
+                }
+            }
+        }
+    }
     // A copied sticky note: onto the page in view of this view (pasted at a place: the page there), where it was
     if (StickyNotes::clipboardHasNote()) {
         const size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
@@ -604,27 +633,46 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
         QBuffer buffer(&png);
         buffer.open(QIODevice::WriteOnly);
         qvariant_cast<QImage>(mime->imageData()).save(&buffer, "PNG");
-        return insertImage(png);
+        return insertImage(png, viewPos);
     }
     if (!mime || !mime->hasFormat(XOURNAL_MIME)) {
         return false;
     }
     const QByteArray bytes = mime->data(XOURNAL_MIME);
-    const size_t pNr = currentPageNo();
-    const auto scope = actingScope(pNr);
+    size_t pNr = currentPageNo();
     if (pNr >= pages.size()) {
         return false;
     }
+    // Into a sticky note: the selected one, or the one at the paste point (qt/docs/sticky-notes.md)
+    const auto pastePoint = [&](size_t index) {
+        const double zoom = viewController.zoom();
+        const QRectF pageRect = layout.pageRect(index, zoom);
+        QRectF visible = pageRect.intersected(viewController.visibleContentRect());
+        if (visible.isEmpty()) {
+            visible = pageRect;
+        }
+        return viewPos ? (viewController.viewToContent(*viewPos) - pageRect.topLeft()) / zoom
+                       : (visible.center() - pageRect.topLeft()) / zoom;
+    };
+    const auto note = noteTarget(pNr, pastePoint(pNr));
+    if (note) {
+        pNr = note->page;
+    }
+    const auto scope = actingScope(pNr);
     clearSelection();
     Document* doc = session.getDocument();
     doc->lock();
     PageRef page = doc->getPage(pNr);
-    Layer* layer = page->getSelectedLayer();
-    auto sel = std::make_unique<EditSelection>(&session, page, layer, pages[pNr].get());
+    Layer* layer = note ? note->note : page->getSelectedLayer();
     doc->unlock();
+    const Layer::Index before = note ? selectNoteLayer(page, layer) : 0;  // (dropped into the note)
+    auto sel = std::make_unique<EditSelection>(&session, page, layer, pages[pNr].get());
     try {
         ObjectInputStream in;
         if (!in.read(bytes.constData(), static_cast<size_t>(bytes.size()))) {
+            if (note) {
+                restoreSelectedLayer(page, before);
+            }
             return false;
         }
         const std::string version = in.readString();
@@ -657,33 +705,50 @@ bool CanvasView::pasteElements(std::optional<QPointF> viewPos) {
         session.getUndoRedoHandler()->addUndoAction(std::move(undo));
 
         // Paste target: where the user asked for it, else the middle of the visible part of the page (upstream
-        // XournalView::getPasteTarget).
-        const double zoom = viewController.zoom();
-        const QRectF pageRect = layout.pageRect(pNr, zoom);
-        QRectF visible = pageRect.intersected(viewController.visibleContentRect());
-        if (visible.isEmpty()) {
-            visible = pageRect;
-        }
-        const QPointF target = viewPos ? (viewController.viewToContent(*viewPos) - pageRect.topLeft()) / zoom
-                                       : (visible.center() - pageRect.topLeft()) / zoom;
+        // XournalView::getPasteTarget); the middle of a selected sticky note
+        const QPointF target = note && note->selected ? QPointF(note->look.rect.x + note->look.rect.width / 2,
+                                                                note->look.rect.y + note->look.rect.height / 2)
+                                                      : pastePoint(pNr);
         const double x = std::max(0.0, target.x() - sel->getWidth() / 2);
         const double y = std::max(0.0, target.y() - sel->getHeight() / 2);
         sel->moveSelection(x - sel->getXOnView(), y - sel->getYOnView());
         sel->mouseUp();
         setSelection(sel.release());
+        if (note) {
+            noteSelectionMade(page, before, layer);
+        }
         return true;
     } catch (const std::exception& e) {
         g_warning("could not paste: %s", e.what());
+        if (note) {
+            restoreSelectedLayer(page, before);
+        }
         return false;
     }
 }
 
-bool CanvasView::insertImage(const QByteArray& data) {
-    const size_t pNr = currentPageNo();
-    const auto scope = actingScope(pNr);
+bool CanvasView::insertImage(const QByteArray& data, std::optional<QPointF> viewPos) {
+    size_t pNr = viewPos ? layout.pageAt(viewController.viewToContent(*viewPos), viewController.zoom())
+                                   .value_or(currentPageNo())
+                         : currentPageNo();
     if (pNr >= pages.size() || data.isEmpty()) {
         return false;
     }
+    // A sticky note takes it: the selected one, or the one where it goes (qt/docs/sticky-notes.md)
+    std::optional<QPointF> point;
+    {
+        const double zoom = viewController.zoom();
+        const QRectF pageRect = layout.pageRect(pNr, zoom);
+        const QRectF visible = pageRect.intersected(viewController.visibleContentRect());
+        point = ((viewPos ? viewController.viewToContent(*viewPos) : (visible.isEmpty() ? pageRect : visible).center()) -
+                 pageRect.topLeft()) /
+                zoom;
+    }
+    const auto note = noteTarget(pNr, point);
+    if (note) {
+        pNr = note->page;
+    }
+    const auto scope = actingScope(pNr);
     endTextEditing();
     clearSelection();
     auto img = std::make_unique<Image>();
@@ -704,16 +769,23 @@ bool CanvasView::insertImage(const QByteArray& data) {
     if (visible.isEmpty()) {
         visible = pageRect;
     }
-    const QRectF area((visible.topLeft() - pageRect.topLeft()) / zoom, visible.size() / zoom);
+    QRectF area((visible.topLeft() - pageRect.topLeft()) / zoom, visible.size() / zoom);
+    if (note) {
+        area = QRectF(note->look.rect.x, note->look.rect.y, note->look.rect.width, note->look.rect.height);
+    }
     const double scale = std::min({1.0, area.width() * 0.8 / w, area.height() * 0.8 / h});
     const QPointF origin = area.center() - QPointF(w * scale / 2, h * scale / 2);
     img->setTransformation({scale, 0, 0, scale, {std::max(0.0, origin.x()), std::max(0.0, origin.y())}});
 
     PageRef page = pages[pNr]->getPage();
-    Layer* layer = page->getSelectedLayer();
+    Layer* layer = note ? note->note : page->getSelectedLayer();
+    const Layer::Index before = note ? selectNoteLayer(page, layer) : 0;  // (dropped into the note)
     session.getUndoRedoHandler()->addUndoAction(std::make_unique<InsertUndoAction>(page, layer, img.get()));
     auto sel = SelectionFactory::createFromFloatingElement(&session, page, layer, pages[pNr].get(), std::move(img));
     setSelection(sel.release());
+    if (note) {
+        noteSelectionMade(page, before, layer);
+    }
     return true;
 }
 
@@ -873,13 +945,15 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
     std::optional<size_t> mark;
     {
         std::shared_lock lock(*doc);
-        layer = md::markdownLayer(p);
+        // The page's Markdown layer, or the sticky note there (it lies on top; its text only where the note is)
+        const Layer* note = sticky::noteAt(*p, x, y);
+        layer = note ? (sticky::openNoteAt(*p, x, y) ? const_cast<Layer*>(note) : nullptr) : md::markdownLayer(p);
         if (!layer || !layer->isVisible()) {
             return false;
         }
         for (const Element* e: layer->getElementsView()) {
             const auto* text = static_cast<const Text*>(e);
-            if (e->getType() == ELEMENT_TEXT && !text->isInEditing()) {
+            if (e->getType() == ELEMENT_TEXT && text->isMarkdown() && !text->isInEditing()) {
                 if (const auto m = md::checkBoxAt(*text, x, y)) {
                     hit = text;
                     mark = m;
@@ -1189,11 +1263,11 @@ std::optional<CanvasView::MathError> CanvasView::mathErrorAt(QPointF viewPos) co
         return std::nullopt;
     }
     for (const Layer* layer: page->getLayersView()) {
-        if (!layer->isVisible() || !md::isMarkdownLayer(*layer)) {
+        if (!layer->isVisible() || !md::holdsBoxes(*layer)) {
             continue;
         }
         for (const Element* element: layer->getElementsView()) {
-            if (element->getType() != ELEMENT_TEXT) {
+            if (element->getType() != ELEMENT_TEXT || !static_cast<const Text*>(element)->isMarkdown()) {
                 continue;
             }
             const auto hit = md::mathAt(*static_cast<const Text*>(element), onPage.x(), onPage.y());
@@ -1725,19 +1799,26 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
     if (!idx || toggleMarkdownCheckBox(page, x, y)) {
         return;
     }
-    // Markdown: the page's text and text boxes, written on the page (formatted while typing) or beside it
-    const bool onPageText = markdownBoxAt(page, x, y);
+    // Markdown: the page's text and text boxes, written on the page (formatted while typing) or beside it. On a
+    // sticky note: the note's one Markdown text (the Markdown session finds the note; qt/docs/sticky-notes.md)
+    bool onNote = false;
     bool onBox = false;
     bool onText = false;
     {
         std::shared_lock lock(*session.getDocument());
         const PageRef p = page.getPage();
-        const Layer* mdLayer = md::markdownLayer(p);
-        onBox = mdLayer && mdLayer->isVisible() && md::boxAt(*mdLayer, x, y);
+        if (const Layer* note = sticky::openNoteAt(*p, x, y)) {
+            onNote = true;
+            onBox = md::boxAt(*note, x, y) != nullptr;  // (the note's text: its only Markdown text)
+        } else {
+            const Layer* mdLayer = md::markdownLayer(p);
+            onBox = mdLayer && mdLayer->isVisible() && md::boxAt(*mdLayer, x, y);
+        }
         for (const Element* e: p->getSelectedLayer()->getElementsView()) {
             onText = onText || (e->getType() == ELEMENT_TEXT && e->hasBoundingBoxContaining(x, y));
         }
     }
+    const bool onPageText = !onNote && markdownBoxAt(page, x, y);
     if (onPageText || onBox || (markdownText && !onText)) {  // (an ordinary text there is edited as it is)
         if (markdownInPanel) {
             if (onPageText) {
@@ -1756,6 +1837,31 @@ void CanvasView::startText(CanvasPage& page, double x, double y) {
     textEditor = std::make_unique<TextEditor>(session, page, x, y, how);
     page.addOverlayView(textEditor->createView());
     Q_EMIT textEditingChanged(true);
+}
+
+bool CanvasView::writeNoteText() {
+    Layer* note = stickyNotes->selectedLayer();
+    CanvasPage* page = stickyNotes->selectedPage();
+    const auto look = stickyNotes->selectedLook();
+    const auto idx = page ? indexOf(page) : std::nullopt;
+    if (!note || !look || look->cover || !idx || session.isReadOnly() || readingOnly) {
+        return false;
+    }
+    stickyNotes->clearSelection();
+    const auto origin = sticky::textOrigin(*look);
+    // (a point on the note's text: the Markdown session takes the note there, see startText)
+    const double x = origin.x + 1;
+    const double y = origin.y + 1;
+    if (markdownInPanel) {
+        Q_EMIT markdownBoxRequested(static_cast<int>(*idx), x, y);
+        return true;
+    }
+    startMarkdown(*idx, false, x, y);
+    if (!markdownEditor) {
+        return false;
+    }
+    markdownEditor->setCursorPosition(markdownEditor->text().size());  // (at the end of what is written)
+    return true;
 }
 
 bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
@@ -1852,7 +1958,8 @@ void CanvasView::startMarkdown(size_t pageNo, bool pageText, double x, double y)
     }
     pango_font_description_free(d);
     style.size = markdownTextSize;
-    style.color = pageText ? Color(0, 0, 0) : session.getToolHandler()->getColor();
+    // (the text tool's color, also when started otherwise: the sticky note pill's "Text" with a select tool)
+    style.color = pageText ? Color(0, 0, 0) : session.getToolHandler()->getTool(TOOL_TEXT).getColor();
     markdownEditor = std::make_unique<MarkdownEditor>(*this, session, pageNo, pageText, x, y, style);
     Q_EMIT textEditingChanged(true);
     Q_EMIT updateRequested();
@@ -2443,8 +2550,9 @@ void CanvasView::markdownSelectionOnPage(size_t pageNo) {
     }
     // A selection of Markdown texts moved to another page is dropped into that page's Markdown layer (made if
     // needed): it is its selected layer for now.
-    if (!selection || !markdownSelection || markdownSelection->selection != selection.get()) {
-        return;
+    if (!selection || !markdownSelection || markdownSelection->selection != selection.get() ||
+        markdownSelection->inNotes) {
+        return;  // (elements of a sticky note moved there: onto that page's own layer, or a note at the end of the move)
     }
     Document* doc = session.getDocument();
     PageRef page;
@@ -2514,11 +2622,172 @@ void CanvasView::markdownSelectionMade(const PageRef& page, Layer::Index before)
     markdownSelection = MarkdownSelection{selection.get(), {{page, before, nullptr}}};
 }
 
+void CanvasView::noteSelectionMade(const PageRef& page, Layer::Index before, Layer* note) {
+    if (!selection) {
+        restoreSelectedLayer(page, before);
+        return;
+    }
+    sticky::holdLayer(note, true);  // (the note stays the page's selected layer: the selection is dropped there)
+    markdownSelection = MarkdownSelection{selection.get(), {{page, before, nullptr}}, {note}, true};
+}
+
+Layer::Index CanvasView::selectNoteLayer(const PageRef& page, const Layer* note) {
+    std::unique_lock lock(*session.getDocument());
+    const Layer::Index before = page->getSelectedLayerId();
+    if (const Layer::Index id = sticky::layerIdOf(*page, note)) {
+        page->setSelectedLayerId(id);
+    }
+    return before;
+}
+
+std::optional<CanvasView::NoteTarget> CanvasView::noteTarget(size_t pNr, std::optional<QPointF> pagePoint) const {
+    // The selected note (one that can be written on), else the note there (qt/docs/sticky-notes.md)
+    if (const auto look = stickyNotes->selectedLook(); look && !look->cover) {
+        if (const auto idx = stickyNotes->selectedPage() ? indexOf(stickyNotes->selectedPage()) : std::nullopt) {
+            return NoteTarget{stickyNotes->selectedLayer(), *idx, *look, true};
+        }
+    }
+    if (!pagePoint) {
+        return std::nullopt;
+    }
+    std::shared_lock lock(*session.getDocument());
+    if (pNr >= session.getDocument()->getPageCount()) {
+        return std::nullopt;
+    }
+    const PageRef page = session.getDocument()->getPage(pNr);
+    Layer* note = sticky::openNoteAt(*page, pagePoint->x(), pagePoint->y());
+    const auto look = note ? sticky::lookOf(*note) : std::nullopt;
+    if (!look) {
+        return std::nullopt;
+    }
+    return NoteTarget{note, pNr, *look, false};
+}
+
+void CanvasView::selectionDragStarts(CursorSelectionType type) {
+    selectionDrag = type;
+    if (selection) {
+        selectionDragFrom = QPointF(selection->getXOnView(), selection->getYOnView());
+        selectionDragPage = selection->getView();
+    }
+}
+
+void CanvasView::endSelectionDrag() {
+    EditSelection* sel = selection.get();
+    const CursorSelectionType type = std::exchange(selectionDrag, CURSOR_SELECTION_NONE);
+    if (!sel) {
+        return;
+    }
+    // Only a move of elements changes where they are: the note under the middle of the selection takes them, else the
+    // page (qt/docs/sticky-notes.md, "Selecting in a note"). Never the page's Markdown texts.
+    const bool ofMarkdown = markdownSelection && markdownSelection->selection == sel && !markdownSelection->inNotes;
+    auto* page = static_cast<CanvasPage*>(sel->getView());
+    if (type != CURSOR_SELECTION_MOVE || !sel->isMoving() || ofMarkdown || !page || readingOnly ||
+        session.isReadOnly()) {
+        sel->mouseUp();
+        return;
+    }
+    const PageRef ref = page->getPage();
+    const auto r = sel->getRect();
+    Layer* from = nullptr;
+    Layer* to = nullptr;
+    Layer::Index own = 0;  // the page's own layer (the one selected before a selection in a note)
+    {
+        std::shared_lock lock(*session.getDocument());
+        from = ref->getSelectedLayer();
+        to = sticky::openNoteAt(*ref, r.x + r.width / 2, r.y + r.height / 2);
+        if (!to && sticky::isNote(*from)) {
+            if (markdownSelection && markdownSelection->selection == sel) {
+                for (const auto& p: markdownSelection->pages) {
+                    if (p.page == ref) {
+                        own = p.before;
+                    }
+                }
+            }
+            const auto layers = ref->getLayersView();
+            if (own == 0 || own > layers.size() || sticky::isNote(*layers[own - 1])) {
+                own = 0;
+                for (size_t i = layers.size(); i > 0 && own == 0; --i) {
+                    if (!sticky::isNote(*layers[i - 1])) {
+                        own = static_cast<Layer::Index>(i);
+                    }
+                }
+            }
+            to = own ? const_cast<Layer*>(layers[own - 1]) : nullptr;
+        }
+    }
+    if (!to || to == from || r.x + r.width / 2 < 0 || r.y + r.height / 2 < 0 ||
+        r.x + r.width / 2 > ref->getWidth() || r.y + r.height / 2 > ref->getHeight()) {
+        sel->mouseUp();  // (beside the page: upstream's move puts it back)
+        return;
+    }
+    const bool intoNote = sticky::isNote(*to);
+    if (page != selectionDragPage) {
+        // Moved onto another page: upstream's move changes the layer too (to that page's selected layer) as one step
+        const Layer::Index before = selectNoteLayer(ref, to);
+        sel->mouseUp();
+        if (intoNote) {
+            sticky::holdLayer(to, true);
+            if (!markdownSelection || markdownSelection->selection != sel) {
+                markdownSelection = MarkdownSelection{sel, {}, {}, true};
+            }
+            markdownSelection->pages.push_back({ref, before, nullptr});
+            markdownSelection->notes.push_back(to);
+        }
+        return;
+    }
+    // On the same page: the move of this drag and the change of layer are one undo step (upstream's move keeps the
+    // layer on the page)
+    const double dx = sel->getXOnView() - selectionDragFrom.x();
+    const double dy = sel->getYOnView() - selectionDragFrom.y();
+    InsertionOrder order = sel->makeMoveEffective();  // (the elements where they are shown, out of the selection)
+    std::vector<Element*> elements;
+    std::vector<Element::Index> indices;
+    for (const auto& [e, index]: order) {
+        elements.push_back(e.get());
+        indices.push_back(index);
+    }
+    clearSelection();  // (it holds nothing any more; the page's layer as before a selection in a note)
+    {
+        std::unique_lock lock(*session.getDocument());
+        for (auto& [e, index]: order) {
+            to->addElement(std::move(e));
+        }
+    }
+    const bool outOfNote = sticky::isNote(*from);
+    session.getUndoRedoHandler()->addUndoAction(std::make_unique<sticky::ContentMoveUndoAction>(
+            ref, elements, from, indices, to, dx, dy,
+            QCoreApplication::translate("StickyNotes", !intoNote   ? "Move out of sticky note"
+                                                       : outOfNote ? "Move to another sticky note"
+                                                                   : "Move into sticky note")
+                    .toStdString()));
+    // Selected again, in their new layer
+    InsertionOrderRef refs;
+    Layer::Index before = 0;
+    {
+        std::unique_lock lock(*session.getDocument());
+        for (Element* e: elements) {
+            refs.emplace_back(e, to->indexOf(e));
+        }
+        before = ref->getSelectedLayerId();
+        ref->setSelectedLayerId(sticky::layerIdOf(*ref, to));
+    }
+    std::sort(refs.begin(), refs.end());
+    setSelection(SelectionFactory::createFromElementsOnActiveLayer(&session, ref, page, refs).release());
+    if (intoNote) {
+        noteSelectionMade(ref, before, to);
+    }
+    page->rerenderPage();
+    Q_EMIT updateRequested();
+}
+
 void CanvasView::endMarkdownSelection() {
     auto ended = std::move(markdownSelection);
     markdownSelection.reset();
     if (!ended) {
         return;
+    }
+    for (const Layer* note: ended->notes) {
+        sticky::holdLayer(note, false);
     }
     for (const auto& p: ended->pages) {
         Layer::Index before = p.before;
