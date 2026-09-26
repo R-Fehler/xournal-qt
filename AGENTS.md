@@ -63,7 +63,9 @@ The machine is a slow 2-in-1, so every build and test run costs real time.
   absolute path. Ubuntu 22.04 ships 4.5; 4.14 is installed in `~/.local/bin`.
 - Feature blocks are usually done by subagents. The main session works on architecture and integration, merging
   blocks into `master-qt`.
-- Run at most two worktree builds at a time; the machine has 8 threads and 16 GB.
+- Run at most two worktree builds at a time; the machine has 8 threads and 16 GB. When several agents work at once,
+  run every build and test through `qt/scripts/build-slot.sh` (two slots, each capped at 3 CPUs and 4 GB, low
+  priority) with `-j3`: five unlimited builds once froze the machine (RAM and swap full).
 - [VISION.md](VISION.md) holds the author's goals. Read it before planning. Don't add anything the author did not
   say.
 
