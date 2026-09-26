@@ -149,6 +149,33 @@ INSTANTIATE_TEST_SUITE_P(Fixtures, PageRasterTest,
                                            std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.5, 1.0),
                                            std::make_tuple(u8"packaged_xopp/pdfBackground/old.xopp", 1.0, 1.25)));
 
+// Space for notes (qt/docs/note-space.md): the canvas draws the PDF at the page's offset, as every export does
+TEST(PageRaster, aPageWithSpaceForNotesMatchesUpstreamsDrawing) {
+    Settings settings(fs::path{});
+    auto loaded = load(u8"packaged_xopp/pdfBackground/old.xopp");
+    ASSERT_TRUE(loaded.doc);
+    const PageRef page = loaded.doc->getPage(0);
+    page->setNoteSpace(NoteSpace{37, 21, 50, 10});
+    page->setSize(page->getWidth() + 87, page->getHeight() + 31);
+    TestHost host(loaded.doc.get(), &settings, RasterParams{1.5, 1.0});
+    RenderService service(1);
+    auto raster = std::make_shared<PageRaster>(&host, &service, page);
+    raster->rerenderPage();
+    service.waitForIdle();
+    pumpUiThread();
+    auto reference = referenceRender(loaded.doc.get(), &settings, page, host.params);
+    EXPECT_EQ(compareWithRaster(*raster, reference), 0);
+    // And the PDF is not at the top left: the corner is the white space
+    raster->withBuffer([&](xoj::view::Mask& buffer) {
+        cairo_surface_t* s = cairo_get_target(buffer.get());
+        cairo_surface_flush(s);
+        const auto* px = reinterpret_cast<const uint32_t*>(cairo_image_surface_get_data(s));
+        EXPECT_EQ(px[0], 0xffffffffU) << "white, opaque";
+        return 0;
+    });
+    raster->detach();
+}
+
 TEST(PageRaster, aPdfBackgroundIsRenderedOnceForTheScreenScale) {
     // A page on a 2x screen at zoom 1 has exactly the pixels of the page at zoom 2 on a 1x screen. The PDF background
     // came out different: its buffer took the screen scale twice (4x the pixels, then scaled down when painted).

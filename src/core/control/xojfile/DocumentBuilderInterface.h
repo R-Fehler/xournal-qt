@@ -43,6 +43,8 @@ public:
     virtual void addDocument(std::u8string creator, int fileVersion) = 0;
     virtual void finalizeDocument() = 0;
     virtual void addPage(double width, double height) = 0;
+    /// xournal-qt: the page's space for notes (model/NoteSpace.h); after addPage
+    virtual void setPageNoteSpace(double /*left*/, double /*top*/, double /*right*/, double /*bottom*/) {}
     virtual void finalizePage() = 0;
     virtual void addAudioAttachment(const fs::path& filename) = 0;
     virtual void setBgName(const std::string& name) = 0;

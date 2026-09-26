@@ -192,6 +192,37 @@ TEST(Annotations, collectsHighlightsBoxesHandwritingAndLinks) {
     }
 }
 
+// Space for notes (qt/docs/note-space.md): the PDF is drawn at an offset on a larger page, the ink moved with it; the
+// highlights still find the text under them, and the PDF's own highlights are placed where they are drawn
+TEST(Annotations, withSpaceForNotesHighlightsFindTheTextUnderThem) {
+    QTemporaryDir tmp;
+    const fs::path pdf = makePdf(tmp);
+    auto doc = makeDocument(pdf);
+    ASSERT_TRUE(doc);
+    for (size_t i = 0; i < doc->getPageCount(); ++i) {  // (as notespace::apply does it)
+        PageRef p = doc->getPage(i);
+        p->setNoteSpace(NoteSpace{100, 50, 0, 0});
+        p->setSize(p->getWidth() + 100, p->getHeight() + 50);
+        for (Layer* l: p->getLayers()) {
+            for (auto& e: l->getElements()) {
+                e->move(100, 50);
+            }
+        }
+    }
+    PdfLayoutReader reader(pdf);
+    const auto items = an::collect(*doc, &reader);
+    const auto highlights = ofKind(items, an::Kind::Highlight);
+    ASSERT_EQ(highlights.size(), 1u);
+    EXPECT_EQ(highlights[0].text, "Kalman filters estimate the hidden state.");
+    const auto pdfHighlights = ofKind(items, an::Kind::PdfHighlight);
+    ASSERT_EQ(pdfHighlights.size(), 1u);
+    EXPECT_EQ(pdfHighlights[0].text, "The update step weighs the measurement.");
+    EXPECT_NEAR(pdfHighlights[0].rect.left(), 155, 1) << "where it is drawn on the page";
+    EXPECT_NEAR(pdfHighlights[0].rect.top(), 842 - 756 + 50, 1);
+    const auto ink = ofKind(items, an::Kind::Ink);
+    ASSERT_EQ(ink.size(), 1u) << "the stroke through the text is still a mark, not a note";
+}
+
 TEST(Annotations, aStickyNoteIsListedAsANoteNotAsItsTextOrInk) {
     XojPage page(595, 842);
     stroke(page.getSelectedLayer(), StrokeTool::PEN, 1.4, {{400, 700}, {450, 710}});  // the page's own handwriting

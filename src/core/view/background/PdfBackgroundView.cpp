@@ -1,5 +1,7 @@
 #include "PdfBackgroundView.h"
 
+#include <cmath>  // for round (xournal-qt)
+
 #include <glib.h>  // for g_warning
 
 #include "control/PdfCache.h"                // for PdfCache
@@ -11,7 +13,44 @@ using namespace xoj::view;
 PdfBackgroundView::PdfBackgroundView(double pageWidth, double pageHeight, size_t pageNo, PdfCache* pdfCache):
         BackgroundView(pageWidth, pageHeight), pageNo(pageNo), pdfCache(pdfCache) {}
 
+PdfBackgroundView::PdfBackgroundView(double pageWidth, double pageHeight, size_t pageNo, PdfCache* pdfCache,
+                                     double offsetX, double offsetY, bool withSpace):
+        BackgroundView(pageWidth, pageHeight),
+        pageNo(pageNo),
+        pdfCache(pdfCache),
+        offsetX(offsetX),
+        offsetY(offsetY),
+        withSpace(withSpace) {}
+
 void PdfBackgroundView::draw(cairo_t* cr) const {
+    // xournal-qt: space for notes (model/NoteSpace.h): white paper, the PDF at its offset, at its own scale
+    if (withSpace) {
+        cairo_save(cr);
+        cairo_set_source_rgb(cr, 1., 1., 1.);
+        cairo_rectangle(cr, 0, 0, pageWidth, pageHeight);
+        cairo_fill(cr);
+        cairo_restore(cr);
+    }
+    const bool shifted = offsetX != 0 || offsetY != 0;
+    if (shifted) {
+        cairo_save(cr);
+        double dx = offsetX, dy = offsetY;
+        if (cairo_surface_get_type(cairo_get_target(cr)) == CAIRO_SURFACE_TYPE_IMAGE) {
+            // On pixels: a whole number of them, so the cached picture of the PDF stays sharp (not resampled)
+            cairo_user_to_device_distance(cr, &dx, &dy);
+            dx = std::round(dx);
+            dy = std::round(dy);
+            cairo_device_to_user_distance(cr, &dx, &dy);
+        }
+        cairo_translate(cr, dx, dy);
+    }
+    drawPdf(cr);
+    if (shifted) {
+        cairo_restore(cr);
+    }
+}
+
+void PdfBackgroundView::drawPdf(cairo_t* cr) const {
     if (pdfCache) {
         // get zoom from cairo
         cairo_matrix_t matrix = {0};

@@ -59,6 +59,7 @@
 #include "MergedPdf.h"
 #include "PdfPageKeeper.h"
 #include "TextFile.h"
+#include "PageNoteSpace.h"
 
 namespace xqt {
 
@@ -143,7 +144,7 @@ xoj::util::CairoSurfaceSPtr previewOf(const PageRef& page, const XojPdfPageSPtr&
     xoj::view::BackgroundFlags flags = xoj::view::BACKGROUND_SHOW_ALL;
     if (page->getBackgroundType().isPdfPage()) {
         if (pdf) {
-            pdf->render(cr);  // (poppler draws one page of a document at a time: its own lock)
+            notespace::renderPdf(cr, *page, *pdf);  // (poppler draws one page of a document at a time: its own lock)
         }
         flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
     } else {

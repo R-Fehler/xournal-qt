@@ -1512,3 +1512,26 @@ Update the table in the user doc with the results.
       reference to a page of the document goes there in the reference.
 - [ ] With `XQT_PERF=1`, a long PDF beside itself, scroll both sides far apart: pages stay sharp, memory stays under
       the limit set in Settings (not twice it).
+
+## Note space beside slides (qt/note-space)
+
+- [ ] Open a lecture PDF (16:9 slides). Page menu (⋮ on a page in the sidebar or the page grid) → the icon "Space for
+      notes beside the slide…": the dialog shows a preview of the page with the slide in it. "Half the width on the
+      right" → the preview widens; Apply: the page is wider, the slide unchanged at its place, white space on the right.
+- [ ] Write in the space and on the slide; scroll, zoom in and out: the slide stays sharp (not blurred at the offset),
+      the ink stays on it. The sidebar thumbnail and the page grid show the wider page.
+- [ ] More menu → "Space for notes…": "All pages with a PDF background" is chosen with the number of pages. "Below: as
+      high as the slide", switch to cm (the amounts convert), Apply on a long PDF (300+ pages): it is done at once, the
+      view does not stutter, scrolling far away shows the pages with the space. Ctrl+Z undoes all of it in one step.
+- [ ] Space on the left and at the top (e.g. 3 cm each) on a page with ink and a sticky note: the ink, the note, text
+      and Markdown boxes move with the slide. Set everything to 0 ("None"): the page is exactly as before.
+- [ ] With space on the left: select PDF text with the text tool (drag, long press with a finger), highlight it: the
+      selection and the highlight lie on the words. Tap a link of the PDF: it opens. Search a word: the hit box is on it.
+      The annotations panel lists the highlight with its text.
+- [ ] Save as "PDF with notes" and open it in another viewer (Okular, a browser, Xodo): the page is larger, the slide at
+      its place, the ink on it, the viewer's search finds the slide's words where they are. Change the space and press
+      Ctrl+S: the file is appended to and shows the new space; open it again in xournal-qt: the same.
+- [ ] Export as plain PDF and print a page with space: the larger page with the slide at its place.
+- [ ] "A blank page after each instead" in the dialog: a plain page follows each chosen slide; one undo.
+- [ ] Open a `.xopp` saved with space in Xournal++ (GTK): space on the right/below looks the same; with space on the
+      left/top the slide is at the top left (documented in qt/docs/note-space.md).

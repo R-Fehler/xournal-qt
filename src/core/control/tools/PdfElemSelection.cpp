@@ -1,6 +1,7 @@
 #include "PdfElemSelection.h"
 
 #include <algorithm>  // for max, min
+#include <cmath>      // for lround (xournal-qt)
 #include <limits>   // for numeric_limits
 #include <memory>   // for __shared_ptr_access
 #include <utility>  // for move
@@ -33,6 +34,9 @@ PdfElemSelection::PdfElemSelection(double x, double y, Control* control):
         doc->unlock_shared();
 
         this->selectionPageNr = pNr;
+        // xournal-qt: space for notes (model/NoteSpace.h)
+        this->offsetX = control->getCurrentPage()->getNoteSpace().left;
+        this->offsetY = control->getCurrentPage()->getNoteSpace().top;
     }
 
     this->toolType = control->getToolHandler()->getToolType();
@@ -56,10 +60,19 @@ auto PdfElemSelection::finalizeSelectionAndRepaint(XojPdfPageSelectionStyle styl
 bool PdfElemSelection::finalizeSelection(XojPdfPageSelectionStyle style) {
     this->finalized = true;
 
-    XojPdfPage::TextSelection selection = this->pdf->selectTextLines(this->bounds, style);
+    // xournal-qt: in PDF coordinates, the results in page coordinates (space for notes)
+    XojPdfPage::TextSelection selection = this->pdf->selectTextLines(inPdf(this->bounds), style);
     this->selectedTextRegion = std::move(selection.region);
     this->selectedTextRects = std::move(selection.rects);
-    this->selectedText = this->pdf->selectText(this->bounds, style);
+    if (this->offsetX != 0 || this->offsetY != 0) {
+        if (this->selectedTextRegion) {
+            toPage(this->selectedTextRegion.get());
+        }
+        for (XojPdfRectangle& r: this->selectedTextRects) {
+            r = XojPdfRectangle(r.x1 + offsetX, r.y1 + offsetY, r.x2 + offsetX, r.y2 + offsetY);
+        }
+    }
+    this->selectedText = this->pdf->selectText(inPdf(this->bounds), style);
 #ifndef XOJ_NO_GTK  // xournal-qt: the Qt canvas sets the primary selection itself (QClipboard::Selection)
     // Informs the windowing system of the selection -- i.e. for accessibility purposes
     gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), this->selectedText.c_str(),
@@ -101,7 +114,8 @@ void PdfElemSelection::currentPos(double x, double y, XojPdfPageSelectionStyle s
         case XojPdfPageSelectionStyle::Linear:
         case XojPdfPageSelectionStyle::Word:
         case XojPdfPageSelectionStyle::Line:
-            this->selectedTextRegion.reset(this->pdf->selectTextRegion(this->bounds, style), xoj::util::adopt);
+            this->selectedTextRegion.reset(this->pdf->selectTextRegion(inPdf(this->bounds), style), xoj::util::adopt);
+            toPage(this->selectedTextRegion.get());  // xournal-qt
             break;
         case XojPdfPageSelectionStyle::Area: {
             cairo_rectangle_int_t rect;
@@ -119,6 +133,17 @@ void PdfElemSelection::currentPos(double x, double y, XojPdfPageSelectionStyle s
     rg = rg.unite(getRegionBbox());
     if (!rg.empty()) {
         this->viewPool->dispatch(xoj::view::PdfElementSelectionView::FLAG_DIRTY_REGION_REQUEST, rg);
+    }
+}
+
+// xournal-qt: space for notes (model/NoteSpace.h)
+XojPdfRectangle PdfElemSelection::inPdf(const XojPdfRectangle& r) const {
+    return XojPdfRectangle(r.x1 - offsetX, r.y1 - offsetY, r.x2 - offsetX, r.y2 - offsetY);
+}
+
+void PdfElemSelection::toPage(cairo_region_t* region) const {
+    if (region && (offsetX != 0 || offsetY != 0)) {
+        cairo_region_translate(region, static_cast<int>(std::lround(offsetX)), static_cast<int>(std::lround(offsetY)));
     }
 }
 

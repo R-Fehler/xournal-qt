@@ -22,6 +22,7 @@
 
 #include "BackgroundImage.h"  // for BackgroundImage
 #include "Layer.h"            // for Layer, Layer::Index
+#include "NoteSpace.h"        // for NoteSpace (xournal-qt)
 #include "PageHandler.h"      // for PageHandler
 #include "PageType.h"         // for PageType
 
@@ -56,6 +57,13 @@ public:
     double getHeight() const;
 
     size_t getPdfPageNr() const;
+
+    /**
+     * xournal-qt: space for notes around the page's content (included in its size); the PDF background is drawn at
+     * (left, top). See model/NoteSpace.h.
+     */
+    const NoteSpace& getNoteSpace() const;
+    void setNoteSpace(const NoteSpace& space);
 
     bool isAnnotated() const;
 
@@ -116,6 +124,11 @@ private:
      * If the page has a PDF background, the page number of the PDF Page
      */
     size_t pdfBackgroundPage = npos;
+
+    /**
+     * xournal-qt: space for notes around the content (see model/NoteSpace.h)
+     */
+    NoteSpace noteSpace;
 
     /**
      * The background color if the background type is plain

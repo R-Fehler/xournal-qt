@@ -88,6 +88,7 @@ private:
     void addDocument(std::u8string creator, int fileVersion) override;
     void finalizeDocument() override;
     void addPage(double width, double height) override;
+    void setPageNoteSpace(double left, double top, double right, double bottom) override;  // xournal-qt
     void finalizePage() override;
     void addAudioAttachment(const fs::path& filename) override;
     void setBgName(const std::string& name) override;
