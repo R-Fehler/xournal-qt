@@ -13,6 +13,8 @@
 
 #include "model/Layer.h"
 
+#include <algorithm>
+#include <cstdlib>
 #include <memory>
 #include <optional>
 
@@ -83,6 +85,8 @@ public:
     void setFont(const XojFont& font);
     void setColor(uint32_t argb);
     const QString& text() const { return content; }
+    /// The selected part of the text ("": nothing selected), for the look-up actions (qt/docs/citations.md).
+    QString selectedText() const { return content.mid(std::min(anchor, cursor), std::abs(cursor - anchor)); }
     /// A Markdown text is edited (its source).
     bool isMarkdown() const { return markdown; }
     double fontSize() const;

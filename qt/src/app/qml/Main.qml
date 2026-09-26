@@ -223,6 +223,21 @@ ApplicationWindow {
     // Quitting: the saves that run finish first (the window stays usable meanwhile), then the tabs with unsaved
     // changes are asked about one by one.
     property bool waitingToClose: false
+    /// A web address chosen in the look-up menu (qt/docs/citations.md): asked first with the whole address, unless
+    /// that was turned off (the menu showed it)
+    function openWebAddress(url, purpose) {
+        if (url === "") return
+        if ((app.settings.revision, app.settings.get("webConfirm"))) {
+            webConfirm.ask(url, purpose)
+            return
+        }
+        if (app.citations.openWeb(url)) snackbar.show(qsTr("Opened %1 in the browser").arg(app.citations.hostOf(url)), false)
+    }
+    /// "Find this paper": the library searched for the title of a bibliography entry (qt/docs/citations.md)
+    function findPaper(text) { findPaperSheet.openFor(text) }
+    /// arXiv: a search by title, or one paper by its ID (qt/docs/citations.md)
+    function arxivSearch(title) { arxivSheet.openSearch(title) }
+    function arxivPaper(id) { arxivSheet.openId(id) }
     function closeWindow() {
         if (app.anySaving) {
             if (!waitingToClose) {
@@ -2795,6 +2810,9 @@ ApplicationWindow {
     PrintDialog { id: printDialog }
     ChapterDialog { id: chapterDialog }
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
+    WebConfirm { id: webConfirm }
+    FindPaperSheet { id: findPaperSheet }
+    ArxivSheet { id: arxivSheet }
     PdfTextHandles { }
     Connections {
         target: app

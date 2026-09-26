@@ -2,11 +2,13 @@
 // inside the window. Paste puts the clipboard at that very place; with something selected it also copies, cuts or
 // deletes it. On selected PDF text only copying and marking make sense, so the rest is not offered. One per canvas:
 // the notes (target app), the reference beside them (target app.reference); on a canvas for reading only: copy,
-// select all, go to a page, fit width - nothing that changes it.
+// select all, go to a page, fit width - nothing that changes it. Selected text (PDF text or the text being written)
+// can be looked up (qt/docs/citations.md).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import "Popups.js" as Popups
 
 Popup {
     id: pill
@@ -27,6 +29,8 @@ Popup {
     /// Where it was asked for, in canvas coordinates
     property point at: Qt.point(0, 0)
     property bool onPdfText: false
+    /// Selected text (PDF text, or of the text being written) to look up (qt/docs/citations.md); read when it opens
+    property string lookUpText: ""
     /// What the clipboard holds cannot be watched, so it is looked at when the pill opens
     property bool pasteAvailable: false
     readonly property bool reading: canvasItem.readingOnly
@@ -35,6 +39,7 @@ Popup {
         at = viewPos
         onPdfText = pdfText === true
         pasteAvailable = target.canPaste()
+        lookUpText = target.selectedText()
         const origin = canvasItem.mapToItem(win.contentItem, 0, 0)  // (the notes: their x, y in the window)
         const x0 = origin.x + viewPos.x - implicitWidth / 2
         const y0 = origin.y + viewPos.y + 18
@@ -75,6 +80,21 @@ Popup {
             text: qsTr("Delete")
             visible: pill.target.hasSelection && !pill.onPdfText && !pill.reading
             onClicked: { pill.target.deleteSelection(); pill.close() }
+        }
+        ToolButton {
+            id: lookUpButton
+            objectName: pill.named("contextLookUp")
+            text: qsTr("Look up…")
+            visible: pill.lookUpText !== ""
+            onClicked: {
+                lookUpMenu.text = pill.lookUpText
+                Popups.openAt(lookUpMenu)
+            }
+            LookUpMenu {
+                id: lookUpMenu
+                namePrefix: pill.namePrefix === "" ? "context" : pill.namePrefix + "Context"
+                onClosed: pill.close()
+            }
         }
         ToolButton {
             objectName: pill.named("contextSelectAll")

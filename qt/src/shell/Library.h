@@ -189,6 +189,8 @@ public:
     int documentsRead() const { return docsRead.load(); }
     int pdfPagesRead() const { return pdfRead.load(); }
     int packsWritten() const { return packWrites.load(); }
+    /// PDF titles read for entries that had none (PdfTitle.h; tests).
+    int titlesRead() const { return titleReads.load(); }
     /// Called on the worker for each document of an update once it was found on disk, before its entry is looked at
     /// (tests: a move that lands just then). Set it while the index is idle.
     void setCheckHook(std::function<void(const fs::path&)> hook) { checkHook = std::move(hook); }
@@ -258,6 +260,27 @@ public:
     /// The indexed documents with a page whose text (of its text elements) has this fingerprint (DocumentLink.h).
     std::vector<fs::path> filesWithPageText(const QString& fingerprint) const;
 
+    /// A document whose title matches a reference's (qt/docs/citations.md).
+    struct TitleHit {
+        fs::path file;
+        QString title;    ///< what it is called: its /Title, else its largest first-page text, else its name
+        double score = 0; ///< 0..1
+        QString matched;  ///< what matched best: "title" (/Title), "heading", "name", "text" (the first page)
+    };
+    /// The documents whose title matches `title` (a guessed title: cite::guessTitle), best first, from `minScore` on,
+    /// at most `max`. Each document is matched by its PDF's /Title, the largest text of its first page, its file name
+    /// and the start of its first page's text (where its title would be: the first 400 characters; cite::titleMatch),
+    /// and - for a title of 3 words or more - by how much
+    /// of its title is in the whole `entry` (cite::titleInText), whatever the entry's style. `typos`: the typo
+    /// tolerance (WordMatch.h). `exclude`: documents left out (the one the reference is in). Safe on any thread.
+    std::vector<TitleHit> findTitle(const QString& title, const QString& entry, int typos, double minScore = 0.5,
+                                    size_t max = 20, const std::set<fs::path>& exclude = {}) const;
+    /// The same in two steps: the entries are taken now (under the lock), the returned call matches them on any
+    /// thread, also after the index is gone (it keeps what it needs).
+    using TitleSearch = std::function<std::vector<TitleHit>()>;
+    TitleSearch titleSearch(const QString& title, const QString& entry, int typos, double minScore = 0.5,
+                            size_t max = 20, const std::set<fs::path>& exclude = {}) const;
+
     /// Format of the stored entries (packs of another one are read anew).
     static constexpr int FORMAT = 4;
     /// Text files up to this size are indexed with their text, bigger ones by name only.
@@ -294,10 +317,18 @@ private:
         /// The links of its Markdown boxes were read (notes indexed before links were: read again once, without
         /// their PDF text)
         bool linksRead = true;
+        /// Its PDF's title (PdfTitle.h): the /Title if it looks like one, and the largest text of the first page it
+        /// shows. Kept with its PDF's stamp in "notes".
+        QString title;
+        QString heading;
+        /// They were read (entries of PDFs indexed before titles were: only the title is read, once)
+        bool titleRead = true;
         int pageCount() const { return static_cast<int>(elementText.size()); }
         bool showsPdfPages() const;
         /// Nothing changed since it was read.
         bool upToDate(const DocumentItem& item) const;
+        /// Nothing changed, but its PDF's title was never read (an entry from before titles were kept).
+        bool onlyTitleMissing(const DocumentItem& item) const;
     };
     using EntryPtr = std::shared_ptr<const Entry>;
     /// The vocabularies of an entry: per passage (a Markdown or text file), else per page (Vocabulary.h).
@@ -324,6 +355,10 @@ private:
     /// The pages of a document (locked by the caller) into `e`; PDF text from `donor`, else read (`readMissing`) or
     /// give up (false).
     bool fillPages(Entry& e, Document& doc, const EntryPtr& donor, bool readMissing);
+    static std::vector<TitleHit> matchTitles(const std::vector<EntryPtr>& entries, const QString& title,
+                                              const QString& entry, int typos, double minScore, size_t max);
+    /// The title of its PDF into `e` (from `donor` when that has it for the same PDF and page, else read).
+    void fillTitle(Entry& e, const EntryPtr& donor);
     /// Read the packs of a folder, if not done yet (the lock is not held).
     void load(const fs::path& folder);
     /// The entry of a document (the lock is held).
@@ -361,7 +396,7 @@ private:
     std::atomic<bool> running{false};
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};
-    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0};
+    std::atomic<int> docsRead{0}, pdfRead{0}, packWrites{0}, conversions{0}, handedOver{0}, titleReads{0};
     std::function<void(const fs::path&)> checkHook;
 };
 

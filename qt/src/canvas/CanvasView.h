@@ -261,6 +261,9 @@ public:
     void scrollToPdfSelection();
     /// The selected PDF text ("" if none).
     std::string selectedPdfText() const;
+    /// The selected text for the look-up actions (qt/docs/citations.md): the selected PDF text, else the selection of
+    /// the text being written (a Markdown box, a text element, a .md). "": none.
+    QString selectedText() const;
     /// The canvas page showing this page of the document (none: not shown).
     CanvasPage* canvasPageOf(const XojPage* page) const;
     /// Draw the marks of the setsquare's scale onto its page, every `spacingCm`, with the pen's color and width (one

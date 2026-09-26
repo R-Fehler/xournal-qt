@@ -142,6 +142,10 @@ public:
     /// Mark the selected PDF text ("highlight", "underline", "strikethrough"): only while the reference is written in.
     Q_INVOKABLE bool markPdfText(const QString& mode);
     Q_INVOKABLE bool copyPdfText();
+    /// The selected text of the reference (PDF text, or of the text being written in it): the look-up actions.
+    Q_INVOKABLE QString selectedText() const;
+    /// The file of the document shown ("" without one).
+    QString shownFile() const;
     Q_INVOKABLE void clearPdfTextSelection();
     Q_INVOKABLE bool copySelection();
     /// Cut, delete, paste, insert: only while the reference is written in.

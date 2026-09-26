@@ -40,6 +40,7 @@ class QWindow;
 
 namespace xqt {
 class AppContext;
+class Citations;
 class CanvasView;
 class LibraryArchive;
 class LibraryMove;
@@ -220,6 +221,8 @@ class AppController: public QObject {
     Q_PROPERTY(QString pdfTextMode READ pdfTextMode WRITE setPdfTextMode NOTIFY pdfTextModeChanged)
     /// Reference mode: another document beside the current one (xqt::ReferenceMode).
     Q_PROPERTY(QObject* reference READ referenceObject CONSTANT)
+    /// Looking up selected text, papers of references, arXiv (Citations.h, qt/docs/citations.md)
+    Q_PROPERTY(QObject* citations READ citationsObject CONSTANT)
     /// Documents of a crashed previous run that can be recovered: [{ title, time }]. Empty when there are none.
     Q_PROPERTY(QVariantList recoveryItems READ recoveryItems NOTIFY recoveryChanged)
     /// How documents are kept (session/DocumentMode.h): "xopp" (Xournal++ files) or "pdf" (PDF files: every document
@@ -647,6 +650,7 @@ public:
     /// copy as its reference.
     Q_INVOKABLE bool compareConflict(const QString& document, const QString& copy);
     QObject* referenceObject() const;
+    QObject* citationsObject() const;
     xqt::ReferenceMode& reference() const { return *referenceMode; }
     /// Ctrl+S: while the reference has the keys and is written in, it is saved (true). When it needs a file first,
     /// its tab becomes the current one and false is returned (the window then asks for the file as for any
@@ -804,6 +808,12 @@ public:
     /// The selected PDF text (select mode): mark it ("highlight", "underline", "strikethrough") or copy it.
     Q_INVOKABLE bool markPdfText(const QString& mode);
     Q_INVOKABLE bool copyPdfText();
+    /// The selected text of the current document: its selected PDF text, else the selection of the text being written
+    /// (a Markdown box, a text element, a .md). For the look-up actions (qt/docs/citations.md). "": none.
+    Q_INVOKABLE QString selectedText() const;
+    /// The files of the documents shown (the tab's, the reference's): the paper of a reference is not looked for in
+    /// the document the reference is in.
+    Q_INVOKABLE QStringList shownDocumentFiles() const;
     /// Select the word of the PDF at this place on the canvas (again at the same word: its whole line).
     Q_INVOKABLE bool selectPdfTextAt(qreal x, qreal y);
     /// Drag one end of that selection (true: the beginning).
@@ -1191,6 +1201,7 @@ private:
     std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::ReferenceMode> referenceMode;  ///< (after `tabs`, reset before it)
+    std::unique_ptr<xqt::Citations> citations;
     bool replacePristine = true;  ///< opening a file replaces an untouched new document (not for a reference)
     std::unique_ptr<xqt::PagesModel> pages;
     std::unique_ptr<xqt::PageFilterModel> filteredPages;

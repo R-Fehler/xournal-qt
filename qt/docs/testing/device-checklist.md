@@ -1598,3 +1598,50 @@ Update the table in the user doc with the results.
       "Choose another place…", "Cancel"). The file is the text as typed, page breaks as
       `<div style="page-break-after: always"></div>`. Notes with Markdown text on a later page have the entry too;
       notes without any do not.
+
+
+## Citations and arXiv (qt/citations)
+
+- [ ] A paper open: select a sentence with the PDF text tool (or press and hold a word, then drag the knobs). The
+      pill has a magnifier ("Look up"): its menu has "Search in Google Scholar" and "Translate", each with its web
+      address in small letters under it.
+- [ ] "Search in Google Scholar": a dialog shows the whole address and where it goes (scholar.google.com); Cancel
+      opens nothing, "Copy address" puts it on the clipboard, Open opens the browser with the selected text as the
+      search. The same for "Translate" (Google Translate into the system's language).
+- [ ] "Don't ask again" + Open: the next look-up opens at once (a note says so), the menu still shows the address.
+      Settings → Documents → "Web and citations" → "Ask before opening a web address" turns the question on again.
+- [ ] Settings → "Translate with": DeepL, Bing, "Custom address…" (an address with {text} and {lang}; one without
+      {text} or not http(s) offers no "Translate"). "Translate into": another language is in the address (`tl=`).
+- [ ] Our own text: write in a Markdown box or a `.md`, select a few words (Shift+arrows, or drag), right click (or
+      press and hold): the context pill has "Look up…" with the same menu. The reference beside the notes: the same
+      on its selected PDF text.
+- [ ] Android (a test device or the emulator): the menu and the dialog fit a phone; Open starts the browser.
+- [ ] A library with arXiv papers named by numbers (`1706.03762.pdf`): open another paper, select an entry of its
+      reference list (IEEE with quotes, APA, ACM; press and hold, then drag the knobs over the whole entry) → Look
+      up → "Find this paper in the library": the sheet shows the guessed title (the quoted part, or the sentence
+      after the authors), the entry below it, and the paper by its title (not its file name) with folder, file name
+      and a percentage. The paper that cites it is not in the list.
+- [ ] A reference with a typo, or in a style that the guess gets wrong: still found (the whole entry is compared
+      with each title). Change the title in the field: the list follows as you type.
+- [ ] "Open as reference": the paper opens beside the notes. "New tab": in a tab. "Copy link": then Ctrl+V on the
+      page (or on the citation number, with a long press → Paste) makes a link marker; tapping it opens the paper.
+- [ ] Nothing found: "No document of the library has this title.", with "Search in Google Scholar" and its address
+      under it (asked with the whole address, as above).
+- [ ] While the library is still being read (a new, big library), the sheet says so.
+- [ ] A big library (1,000+ papers): the sheet answers within a second, the window does not stutter while it looks.
+- [ ] arXiv: select a reference with an arXiv ID (`arXiv:1706.03762`, or an `arxiv.org/abs/…` address) → Look up:
+      "arXiv 1706.03762: into the library…" with the API's address under it, and "… on arxiv.org" (browser).
+- [ ] The arXiv sheet shows the address next to "Look it up on arXiv". The first time: "Connect to arXiv?" explains
+      what is sent where; "Not now" sends nothing; "Allow" looks it up (and is not asked again).
+- [ ] The result shows title, authors, year, the file name it will get and the PDF's address. "Save into" lists the
+      library's folders (the one the library shows is chosen). "Download into the library": after a moment "In the
+      library: Attention Is All You Need (1706.03762).pdf", the file is in that folder (the library shows it, found
+      by its title), "Open as reference" opens it beside the notes.
+- [ ] The same paper again: "In the library" at once, nothing downloaded twice.
+- [ ] No hit in the library → "Search arXiv" (with its address) → the arXiv sheet searches by the title; several
+      requests in a row wait their turn ("Waiting for arXiv (one request every 3 seconds)…").
+- [ ] Without network (flight mode): a clear error ("export.arxiv.org did not answer within 20 s." or the system's
+      message), nothing half-written in the library.
+- [ ] Settings → Documents → Web and citations → "Connect to arXiv": Off → the sheet says it is off and its buttons
+      are disabled; "Ask the first time" asks again.
+- [ ] Android: the sheets fit a phone (scroll), the download lands in the library folder on the phone's storage.

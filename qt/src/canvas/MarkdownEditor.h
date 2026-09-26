@@ -19,11 +19,13 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include <QString>
 #include <cairo.h>
 
 #include "CanvasTextInput.h"
@@ -87,6 +89,11 @@ public:
     /// The cursor and the other end of the selection (source offsets).
     size_t cursorPosition() const { return caret; }
     size_t anchorPosition() const { return anchor; }
+    /// The selected part of the source ("": nothing selected), for the look-up actions (qt/docs/citations.md).
+    QString selectedText() const {
+        const size_t from = std::min(caret, anchor), to = std::max(caret, anchor);
+        return QString::fromStdString(md.text().substr(from, to - from));
+    }
     /// Put the cursor at a source offset (e.g. where it was before the text was read again).
     void setCursorPosition(size_t offset);
     /// A change made by a formatting tool (md::format, the formatting bar): text[from, to) is replaced, then the

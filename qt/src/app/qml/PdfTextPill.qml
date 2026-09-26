@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import "Popups.js" as Popups
 
 Pane {
     id: pill
@@ -79,6 +80,17 @@ Pane {
         IconButton { objectName: pill.named("pdfUnderlineButton"); visible: !pill.readingOnly; iconName: "xqt-underline"; tip: qsTr("Underline"); onClicked: pill.target.markPdfText("underline") }
         IconButton { objectName: pill.named("pdfStrikeButton"); visible: !pill.readingOnly; iconName: "xqt-strikethrough"; tip: qsTr("Strike through"); onClicked: pill.target.markPdfText("strikethrough") }
         IconButton { objectName: pill.named("pdfCopyTextButton"); iconName: "xopp-edit-copy"; tip: qsTr("Copy text"); onClicked: pill.target.copyPdfText() }
+        // Look up: the paper of a reference, Google Scholar, a translator (qt/docs/citations.md)
+        IconButton {
+            objectName: pill.named("pdfLookUpButton")
+            iconName: "xqt-search"
+            tip: qsTr("Look up: find the paper, search the web, translate")
+            onClicked: {
+                lookUpMenu.text = pill.target.selectedText()
+                Popups.openAt(lookUpMenu)
+            }
+            LookUpMenu { id: lookUpMenu; namePrefix: pill.namePrefix }
+        }
         ToolSeparator { visible: pill.pasteOffered }
         IconButton {
             objectName: pill.named("pdfTextPaste")
