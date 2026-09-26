@@ -1,5 +1,6 @@
 #include "RuledBackgroundView.h"
 
+#include <cmath>   // xournal-qt: for floor
 #include <memory>  // for allocator
 
 #include "model/BackgroundConfig.h"                  // for BackgroundConfig
@@ -15,6 +16,12 @@ RuledBackgroundView::RuledBackgroundView(double pageWidth, double pageHeight, Co
         OneColorBackgroundView(pageWidth, pageHeight, backgroundColor, config, DEFAULT_LINE_WIDTH, DEFAULT_H_LINE_COLOR,
                                ALT_DEFAULT_H_LINE_COLOR) {
     config.loadValue(CFG_RASTER, lineSpacing);
+    // xournal-qt: a small page to scale (ruledScale); the first line stays on upstream's grid of lines
+    if (RuledScale f = ruledScale.load(std::memory_order_relaxed); f && lineSpacing > 0) {
+        scale = f(pageWidth, pageHeight);
+        header -= std::floor((HEADER_SIZE - HEADER_SIZE * scale) / lineSpacing) * lineSpacing;
+        footer *= scale;
+    }
 }
 
 void RuledBackgroundView::draw(cairo_t* cr) const {
@@ -31,12 +38,12 @@ void RuledBackgroundView::draw(cairo_t* cr) const {
     //  Add a 0.5 * lineWidth padding in case the line is just outside the mask but its thickness still makes it
     //  (partially) visible
     auto [indexMinY, indexMaxY] =
-            getIndexBounds(minY - HEADER_SIZE - 0.5 * lineWidth, maxY - HEADER_SIZE + 0.5 * lineWidth, lineSpacing, 0.0,
-                           pageHeight - HEADER_SIZE - FOOTER_SIZE);
+            getIndexBounds(minY - header - 0.5 * lineWidth, maxY - header + 0.5 * lineWidth, lineSpacing, 0.0,
+                           pageHeight - header - footer);
 
     for (int i = indexMinY; i <= indexMaxY; ++i) {
-        cairo_move_to(cr, minX, HEADER_SIZE + i * lineSpacing);
-        cairo_line_to(cr, maxX, HEADER_SIZE + i * lineSpacing);
+        cairo_move_to(cr, minX, header + i * lineSpacing);
+        cairo_line_to(cr, maxX, header + i * lineSpacing);
     }
 
     cairo_save(cr);

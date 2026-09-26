@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include <atomic>  // xournal-qt: for ruledScale
+
 #include <cairo.h>  // for cairo_t
 
 #include "util/Color.h"  // for Color
@@ -20,6 +22,13 @@
 class BackgroundConfig;
 
 namespace xoj::view {
+/// xournal-qt: a frontend may draw the ruling of small pages to scale (qt/src/session/PageMargins.cpp). The space
+/// above and below the lines and the default margin line of a lined page are multiplied by what it returns for the
+/// page's size; the lines stay where upstream's are (the first one moves up by whole lines). nullptr (upstream): as
+/// upstream on every size.
+using RuledScale = double (*)(double pageWidth, double pageHeight);
+inline std::atomic<RuledScale> ruledScale{nullptr};
+
 class RuledBackgroundView: public OneColorBackgroundView {
 public:
     RuledBackgroundView(double pageWidth, double pageHeight, Color backgroundColor, const BackgroundConfig& config);
@@ -36,5 +45,10 @@ protected:
 
     constexpr static double HEADER_SIZE = 80.0;
     constexpr static double FOOTER_SIZE = 60.0;
+
+    // xournal-qt: the header and footer of this page, and the scale (ruledScale)
+    double scale = 1.0;
+    double header = HEADER_SIZE;
+    double footer = FOOTER_SIZE;
 };
 };  // namespace xoj::view

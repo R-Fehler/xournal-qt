@@ -1949,3 +1949,12 @@ Design: [md-images.md](../md-images.md).
 - [ ] Export the poster to PDF: an A0 page (841 × 1189 mm in the PDF viewer's document properties), the strokes
       sharp at any zoom.
 
+## Changing a page's size; margin lines on small cards (qt/page-size-change)
+- [ ] An A7 card with "Ruled with vertical line" (lined): the pink margin line is about 1.3 cm from the left edge
+      (half an inch), not 2.5 cm; the blue lines begin higher up and go on further down than before. An A6 card: the
+      line at about 1.8 cm. A5 and A4: exactly as before (1 inch, the first line 2.8 cm down).
+- [ ] Write the page's Markdown text on the A7 lined card: it starts just right of the pink line, not 2.9 cm in.
+- [ ] Export the lined A7 card to PDF, and save it as a PDF with notes (hybrid): in a PDF viewer the margin line is
+      where the app shows it.
+- [ ] Open the lined A7 card in upstream Xournal++: it draws its own line at 1 inch (expected: upstream does not
+      scale it); the text is where xournal-qt put it.

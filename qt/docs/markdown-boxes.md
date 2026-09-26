@@ -9,7 +9,8 @@ dialect is CommonMark with GitHub's extensions (tables, strikethrough, task list
 - **The page's Markdown text** starts at the top-left margin and goes to the right margin. It flows onto the next
   pages (see below). The margins are 2 cm on A5 and bigger pages; a smaller page (A6, A7 flashcards) has them in
   proportion to its short side, as A5 has them (13.5 %), at least 5 mm: about 14 mm on A6, 10 mm on A7. On a ruled
-  page with a margin line the text starts after the line (upstream draws it 1 inch from the edge on every size).
+  page with a margin line the text starts after the line (1 inch from the edge on A5 and bigger, as upstream draws
+  it; on a smaller page to the same scale as the margins: half an inch on A7).
   Text of a small page written at 2 cm before is still found there, and moves to the new margins when it is edited
   (`qt/src/session/PageMargins.h`). The writing button (in its Markdown mode) or Ctrl+Alt+M writes it **on the page**, formatted
   while typing, with the cursor at the end of what the current page holds; the button again (or Escape) is done.
