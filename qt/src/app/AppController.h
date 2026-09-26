@@ -783,6 +783,9 @@ public:
     /// The selected text of the current document: its selected PDF text, else the selection of the text being written
     /// (a Markdown box, a text element, a .md). For the look-up actions (qt/docs/citations.md). "": none.
     Q_INVOKABLE QString selectedText() const;
+    /// The files of the documents shown (the tab's, the reference's): the paper of a reference is not looked for in
+    /// the document the reference is in.
+    Q_INVOKABLE QStringList shownDocumentFiles() const;
     /// Select the word of the PDF at this place on the canvas (again at the same word: its whole line).
     Q_INVOKABLE bool selectPdfTextAt(qreal x, qreal y);
     /// Drag one end of that selection (true: the beginning).

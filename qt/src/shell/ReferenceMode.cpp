@@ -416,6 +416,10 @@ bool ReferenceMode::markPdfText(const QString& mode) {
     return shownView && editing() && shownView->markPdfText(m);
 }
 
+QString ReferenceMode::shownFile() const {
+    return shownSession ? QString::fromStdString(shownSession->documentFile().string()) : QString();
+}
+
 QString ReferenceMode::selectedText() const { return shownView ? shownView->selectedText() : QString(); }
 
 bool ReferenceMode::copyPdfText() {

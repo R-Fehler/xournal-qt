@@ -7,11 +7,16 @@
 
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QPointer>
+#include <QThreadPool>
 #include <QVariantMap>
 
 #include "control/settings/Settings.h"
 #include "session/Citation.h"
+#include "session/FuzzyQuery.h"
 
+#include "Library.h"
+#include "LibraryModel.h"
 #include "SystemApps.h"
 
 namespace xqt {
@@ -82,5 +87,51 @@ QVariantList Citations::translators() const {
 QString Citations::systemLanguage() const { return cite::systemLanguage(); }
 
 QString Citations::cleanText(const QString& text) const { return cite::cleanText(text); }
+
+QVariantMap Citations::guessTitle(const QString& entry) const {
+    const cite::TitleGuess g = cite::guessTitle(entry);
+    return {{QStringLiteral("title"), g.title}, {QStringLiteral("raw"), g.raw}, {QStringLiteral("how"), g.how}};
+}
+
+void Citations::findPapers(const QString& title, const QString& raw, const QStringList& exclude) {
+    const quint64 generation = ++searchGeneration;
+    LibraryIndex* index = library ? library->searchIndex() : nullptr;
+    if (!index || !library->library() || title.trimmed().isEmpty()) {
+        hits.clear();
+        searching = false;
+        Q_EMIT papersChanged();
+        return;
+    }
+    const fs::path root = library->library()->root();
+    std::set<fs::path> excluded;
+    for (const QString& f: exclude) {
+        excluded.insert(fs::path(f.toStdString()));
+    }
+    auto search = index->titleSearch(title, raw, FuzzyQuery::typoTolerance(), 0.5, 20, excluded);
+    searching = true;
+    Q_EMIT papersChanged();
+    QThreadPool::globalInstance()->start([self = QPointer<Citations>(this), search = std::move(search), root,
+                                          generation] {
+        QVariantList found;
+        for (const LibraryIndex::TitleHit& h: search()) {
+            const fs::path folder = h.file.parent_path().lexically_relative(root);
+            found << QVariantMap{{QStringLiteral("path"), QString::fromStdString(h.file.string())},
+                                 {QStringLiteral("title"), h.title},
+                                 {QStringLiteral("folder"),
+                                  folder == "." ? QString() : QString::fromStdString(folder.generic_string())},
+                                 {QStringLiteral("fileName"), QString::fromStdString(h.file.filename().string())},
+                                 {QStringLiteral("score"), static_cast<int>(h.score * 100 + 0.5)},
+                                 {QStringLiteral("matched"), h.matched}};
+        }
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [self, found = std::move(found), generation] {
+            if (!self || self->searchGeneration != generation) {
+                return;  // (a newer search, or gone)
+            }
+            self->hits = found;
+            self->searching = false;
+            Q_EMIT self->papersChanged();
+        });
+    });
+}
 
 }  // namespace xqt

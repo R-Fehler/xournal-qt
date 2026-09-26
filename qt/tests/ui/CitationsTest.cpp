@@ -1,6 +1,6 @@
 /*
  * xournal-qt: citations in the real window (qt/docs/citations.md): selected text is looked up - Google Scholar and a
- * translator in the browser, the address always shown before it opens.
+ * translator in the browser, the address always shown before it opens; a reference finds its paper in the library.
  *
  * No test touches the network or starts a browser: the browser is a fake SystemApps.
  *
@@ -26,6 +26,8 @@
 #include "canvas/ViewController.h"
 #include "session/DocumentSession.h"
 #include "shell/Citations.h"
+#include "shell/LibraryModel.h"
+#include "shell/ReferenceMode.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
 #include "shell/PageSketches.h"
@@ -68,6 +70,14 @@ protected:
         settings()->set("translateLanguage", "de");
         xqt::test::makePdf((root / "refs.pdf").string(), "",
                            {{"References", 14, 150, REF_X}, {REFERENCE, 8, REF_Y, REF_X}});
+        // The papers, named by numbers as arXiv names them
+        fs::create_directories(root / "Papers");
+        xqt::test::makePaper((root / "Papers" / "1706.03762.pdf").string(), "Attention Is All You Need",
+                             "Attention Is All You Need", "Ashish Vaswani, Noam Shazeer", "arXiv:1706.03762v7 [cs.CL]");
+        xqt::test::makePaper((root / "Papers" / "2010.13154.pdf").string(), "",
+                             "Attention is All You Need in Speech Separation", "Cem Subakan, Mirco Ravanelli");
+        xqt::test::makePaper((root / "Papers" / "1512.03385.pdf").string(), "",
+                             "Deep Residual Learning for Image Recognition", "Kaiming He, Xiangyu Zhang");
         controller->setLibraryRoot(root);
         qobject_cast<xqt::RecentFiles*>(controller->recentModel())->clear();
         engine = std::make_unique<QQmlApplicationEngine>();
@@ -109,9 +119,29 @@ protected:
             wait(20);
         }
     }
+    /// By objectName: a QObject child of the window, else an item of the scene (delegates of lists have no QObject
+    /// parent there)
     template <typename T = QObject>
     T* find(const char* name) const {
-        return window->findChild<T*>(name);
+        if (T* o = window->findChild<T*>(name)) {
+            return o;
+        }
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* item) -> QQuickItem* {
+            if (item->objectName() == QLatin1String(name)) {
+                return item;
+            }
+            for (QQuickItem* c: item->childItems()) {
+                if (QQuickItem* f = walk(c)) {
+                    return f;
+                }
+            }
+            return nullptr;
+        };
+        QQuickItem* top = window->contentItem();
+        while (top->parentItem()) {
+            top = top->parentItem();
+        }
+        return qobject_cast<T*>(walk(top));
     }
     bool shown(const char* name) const {
         auto* o = find(name);
@@ -159,6 +189,12 @@ protected:
         until([&] { return shown("pdfLookUpButton"); });
         ASSERT_TRUE(controller->pdfTextIsSelected());
         EXPECT_TRUE(controller->selectedText().contains("Attention is all you need")) << controller->selectedText().toStdString();
+    }
+
+    xqt::LibraryModel* library() const { return qobject_cast<xqt::LibraryModel*>(controller->libraryModel()); }
+    void waitForTheIndex() {
+        until([&] { return library()->indexTotal() > 0 && !library()->indexing(); }, 15000);
+        ASSERT_FALSE(library()->indexing());
     }
 
     QTemporaryDir tmp;
@@ -266,4 +302,98 @@ TEST_F(CitationsTest, textBeingWrittenIsLookedUpToo) {
     until([&] { return shown("contextLookUp"); });
     EXPECT_TRUE(shown("contextLookUp"));
     QTest::keyClick(window, Qt::Key_Escape);
+}
+
+// A reference (selected in a PDF) finds its paper in the library by the paper's title - the file is named by its
+// arXiv number -, and it opens beside the notes. Copy link puts a link to it on the clipboard.
+TEST_F(CitationsTest, aReferenceFindsItsPaperInTheLibraryAndOpensItAsReference) {
+    waitForTheIndex();
+    selectReference();
+    click("pdfLookUpButton");
+    shot("3-lookup-menu-find");
+    click("lookUpFindPaper");
+    until([&] { return shown("findPaperSheet"); });
+    ASSERT_TRUE(shown("findPaperSheet"));
+    EXPECT_EQ(find("findPaperTitle")->property("text").toString(), "Attention is all you need") << "the guessed title";
+    auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
+    until([&] { return !citations->searchingPapers() && !citations->paperHits().isEmpty(); });
+    const QVariantList hits = citations->paperHits();
+    QStringList names;
+    for (const QVariant& h: hits) {
+        names << h.toMap()["fileName"].toString();
+    }
+    ASSERT_EQ(hits.size(), 2) << "the paper and the one with a longer title; not the others, not refs.pdf itself: "
+                              << names.join(", ").toStdString();
+    const QVariantMap first = hits.front().toMap();
+    EXPECT_EQ(first["fileName"].toString(), "1706.03762.pdf");
+    EXPECT_EQ(first["title"].toString(), "Attention Is All You Need");
+    EXPECT_EQ(first["folder"].toString(), "Papers");
+    EXPECT_EQ(first["score"].toInt(), 100);
+    EXPECT_EQ(hits[1].toMap()["fileName"].toString(), "2010.13154.pdf");
+    until([&] { return find("findPaperHitTitle") != nullptr; });
+    ASSERT_NE(find("findPaperHitTitle"), nullptr);
+    EXPECT_EQ(find("findPaperHitTitle")->property("text").toString(), "Attention Is All You Need") << "listed";
+    EXPECT_TRUE(find("findPaperScholarUrl")->property("text").toString().startsWith("https://scholar.google.com/"))
+            << "the web search's address is shown too";
+    shot("4-find-paper");
+
+    // A corrected title searches again
+    auto* field = find<QQuickItem>("findPaperTitle");
+    field->setProperty("text", "Deep residual learning");
+    QMetaObject::invokeMethod(find("findPaperSheet"), "search");
+    until([&] { return !citations->searchingPapers() && !citations->paperHits().isEmpty() &&
+                       citations->paperHits().front().toMap()["fileName"] == "1512.03385.pdf"; });
+    EXPECT_EQ(citations->paperHits().front().toMap()["fileName"].toString(), "1512.03385.pdf")
+            << find("findPaperTitle")->property("text").toString().toStdString() << " / "
+            << citations->paperHits().size();
+    field->setProperty("text", "Attention is all you need");
+    QMetaObject::invokeMethod(find("findPaperSheet"), "search");
+    until([&] { return !citations->searchingPapers() && citations->paperHits().size() == 2; });
+
+    // Open as reference: beside the notes
+    click("findPaperReference");
+    until([&] { return controller->reference().active(); });
+    ASSERT_TRUE(controller->reference().active());
+    EXPECT_EQ(controller->reference().title(), "1706.03762.pdf");
+    until([&] { return !shown("findPaperSheet"); });
+    EXPECT_FALSE(shown("findPaperSheet"));
+    EXPECT_EQ(QString::fromStdString(controller->tabManager().currentSession()->documentFile().filename().string()),
+              "refs.pdf") << "the notes stay";
+    shot("5-reference");
+}
+
+TEST_F(CitationsTest, copyLinkOfAHitIsALinkToThePaper) {
+    waitForTheIndex();
+    selectReference();
+    click("pdfLookUpButton");
+    click("lookUpFindPaper");
+    auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
+    until([&] { return !citations->searchingPapers() && !citations->paperHits().isEmpty(); });
+    click("findPaperCopyLink");
+    until([&] { return !controller->clipboardLinkMarkdown().isEmpty(); });
+    EXPECT_TRUE(controller->clipboardLinkMarkdown().contains("1706.03762.pdf"))
+            << controller->clipboardLinkMarkdown().toStdString();
+}
+
+// Nothing in the library: the web search is offered, its address shown.
+TEST_F(CitationsTest, withoutAHitGoogleScholarIsOffered) {
+    waitForTheIndex();
+    controller->newDocument();
+    wait(100);
+    QMetaObject::invokeMethod(find("findPaperSheet"), "openFor",
+                              Q_ARG(QVariant, QVariant("[4] S. Hochreiter and J. Schmidhuber, \"Long short-term memory,\" "
+                                                       "Neural Comput., vol. 9, no. 8, pp. 1735-1780, 1997.")));
+    auto* citations = qobject_cast<xqt::Citations*>(controller->citationsObject());
+    until([&] { return shown("findPaperSheet") && !citations->searchingPapers(); });
+    EXPECT_TRUE(citations->paperHits().isEmpty());
+    EXPECT_TRUE(find("findPaperStatus")->property("text").toString().startsWith("No document"));
+    const QString shownUrl = find("findPaperScholarUrl")->property("text").toString();
+    EXPECT_TRUE(shownUrl.contains("Long short-term memory")) << shownUrl.toStdString();
+    click("findPaperScholar");
+    until([&] { return shown("webConfirm"); });
+    EXPECT_TRUE(shown("webConfirm")) << "asked with the address first";
+    click("webConfirmOpen");
+    until([&] { return !browser.opened.isEmpty(); });
+    ASSERT_EQ(browser.opened.size(), 1);
+    EXPECT_EQ(QUrlQuery(browser.opened.front()).queryItemValue("q", QUrl::FullyDecoded), "Long short-term memory");
 }

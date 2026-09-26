@@ -1530,3 +1530,16 @@ Update the table in the user doc with the results.
       press and hold): the context pill has "Look up…" with the same menu. The reference beside the notes: the same
       on its selected PDF text.
 - [ ] Android (a test device or the emulator): the menu and the dialog fit a phone; Open starts the browser.
+- [ ] A library with arXiv papers named by numbers (`1706.03762.pdf`): open another paper, select an entry of its
+      reference list (IEEE with quotes, APA, ACM; press and hold, then drag the knobs over the whole entry) → Look
+      up → "Find this paper in the library": the sheet shows the guessed title (the quoted part, or the sentence
+      after the authors), the entry below it, and the paper by its title (not its file name) with folder, file name
+      and a percentage. The paper that cites it is not in the list.
+- [ ] A reference with a typo, or in a style that the guess gets wrong: still found (the whole entry is compared
+      with each title). Change the title in the field: the list follows as you type.
+- [ ] "Open as reference": the paper opens beside the notes. "New tab": in a tab. "Copy link": then Ctrl+V on the
+      page (or on the citation number, with a long press → Paste) makes a link marker; tapping it opens the paper.
+- [ ] Nothing found: "No document of the library has this title.", with "Search in Google Scholar" and its address
+      under it (asked with the whole address, as above).
+- [ ] While the library is still being read (a new, big library), the sheet says so.
+- [ ] A big library (1,000+ papers): the sheet answers within a second, the window does not stutter while it looks.

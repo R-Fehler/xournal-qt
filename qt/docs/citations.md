@@ -68,18 +68,24 @@ box, a text element, a `.md` being written: the editor's selection). Both offer 
 
    Both are read where the index reads the PDF's text (`LibraryIndex::read`, the worker thread), from a poppler
    instance of its own (`qt/src/session/PdfTitle.*`), and tied to the PDF's stamp like its text. **No format bump**:
-   an entry written before has no `title` key, and its document is read once more without its PDF text (as the
-   `links` key was added), so an existing library is not read anew. A Markdown file's title is its first heading.
+   an entry written before has no `title` key, and only its title is read, once (the PDF opened, its first page's
+   text attributes; not the document, not its text), so an existing library is not read anew. A Markdown file's
+   title is its first heading (from the index, nothing stored).
 3. **Matching** (`LibraryIndex::findTitle`, on a worker thread): the words of the guessed title (case folded as the
    search folds them, without stop words of English and German) are compared with each candidate - the `/Title`,
-   the heading, the file name (without extension), and the first 1,500 characters of the first page's text:
+   the heading, the file name (without extension), and the first 400 characters of the first page's text (where a
+   title is; a reference list further down would make every citing paper a hit):
    - a word counts 1 when it is the candidate's word, or one starts with the other with at most 3 letters more
      ("network"/"networks"); 0.7 when it is the word with a typo (WordMatch's Damerau-Levenshtein distance with the
      typo tolerance of Settings → Search);
    - a title-like candidate (`/Title`, heading, name) scores 0.75 × the share of the query's words found + 0.25 ×
      the share of its own words that were found (so a long heading that happens to contain the words ranks lower);
      the first page scores 0.9 × the share found (its length says nothing);
-   - the document's score is its best candidate's; hits from 0.5 up, best first, at most 20.
+   - a title-like candidate of 3 words or more also scores 0.95 × the share of its words found in the whole entry:
+     a document whose title is in the entry is found even when the guess went wrong (IEEE without quotes). Once the
+     title in the sheet is changed by hand, only the changed title is matched;
+   - the document's score is its best candidate's; hits from 0.5 up, best first, at most 20. The documents shown (the
+     tab's and the reference's) are left out: the reference is in one of them, which has its title in its text.
 4. **The hits**: each row has the document's title (the heading or `/Title`, else the name), its folder and file
    name, the score as a percentage, and three actions: **Reference** (beside the notes, `openAsReference`), **Tab**
    (a new tab), **Copy link** (the app's document link, `copyDocumentLink`: pasted onto the page it makes a link

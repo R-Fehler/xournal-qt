@@ -1,4 +1,5 @@
-// "Look up" on selected text (qt/docs/citations.md): the pill of selected PDF text and the context pill open it. Each
+// "Look up" on selected text (qt/docs/citations.md): the pill of selected PDF text and the context pill open it. A
+// bibliography entry finds its paper in the library (FindPaperSheet). Each
 // entry that leads to the web shows its address under its name, so the address is seen before it is chosen; the
 // window then asks with the whole address (WebConfirm) unless that was turned off.
 import QtQuick
@@ -42,6 +43,13 @@ Menu {
         onTriggered: win.openWebAddress(url, purpose)
     }
 
+    MenuItem {
+        objectName: menu.named("lookUpFindPaper")
+        text: qsTr("Find this paper in the library")
+        enabled: menu.text !== ""
+        onTriggered: win.findPaper(menu.text)
+    }
+    MenuSeparator {}
     WebItem {
         objectName: menu.named("lookUpScholar")
         label: qsTr("Search in Google Scholar")

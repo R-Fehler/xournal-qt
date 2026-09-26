@@ -233,6 +233,8 @@ ApplicationWindow {
         }
         if (app.citations.openWeb(url)) snackbar.show(qsTr("Opened %1 in the browser").arg(app.citations.hostOf(url)), false)
     }
+    /// "Find this paper": the library searched for the title of a bibliography entry (qt/docs/citations.md)
+    function findPaper(text) { findPaperSheet.openFor(text) }
     function closeWindow() {
         if (app.anySaving) {
             if (!waitingToClose) {
@@ -2700,6 +2702,7 @@ ApplicationWindow {
     ChapterDialog { id: chapterDialog }
     ContextPill { id: contextPill; onImageRequested: imageDialog.open() }
     WebConfirm { id: webConfirm }
+    FindPaperSheet { id: findPaperSheet }
     PdfTextHandles { }
     Connections {
         target: app

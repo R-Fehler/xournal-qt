@@ -29,7 +29,9 @@
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfPage.h"
 #include "session/DocumentSession.h"
+#include "session/Citation.h"
 #include "session/FuzzyQuery.h"
+#include "session/PdfTitle.h"
 #include "session/TextMatch.h"
 #include "session/Vocabulary.h"
 #include "util/PathUtil.h"
@@ -420,8 +422,13 @@ bool LibraryIndex::Entry::showsPdfPages() const {
     return std::any_of(pdfPage.begin(), pdfPage.end(), [](int p) { return p >= 0; });
 }
 
+bool LibraryIndex::Entry::onlyTitleMissing(const DocumentItem& item) const {
+    return !titleRead && file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf) && linksRead;
+}
+
 bool LibraryIndex::Entry::upToDate(const DocumentItem& item) const {
-    return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf) && linksRead;
+    return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf) && linksRead &&
+           titleRead;
 }
 
 // --- the packs: entries by file name
@@ -446,6 +453,10 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
                    {QStringLiteral("text"), text},         {QStringLiteral("aspects"), aspects}};
     if (!e.sample.isEmpty()) {
         notes.insert(QStringLiteral("sample"), e.sample);
+    }
+    if (e.showsPdfPages() && e.titleRead) {
+        notes.insert(QStringLiteral("title"), e.title);
+        notes.insert(QStringLiteral("heading"), e.heading);
     }
     if (e.kind == QLatin1String("md")) {
         QCborArray levels;
@@ -528,6 +539,12 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
         for (const auto& l: notes.value(QStringLiteral("wikiLinks")).toArray()) {
             e->wikiLinks << l.toString();
         }
+    }
+    if (e->showsPdfPages()) {
+        // Its PDF's title (added 2026-09: an entry without it is read once more, without its PDF text)
+        e->titleRead = notes.contains(QStringLiteral("title"));
+        e->title = notes.value(QStringLiteral("title")).toString();
+        e->heading = notes.value(QStringLiteral("heading")).toString();
     }
     if (e->showsPdfPages()) {
         const QCborMap t = text.toMap();
@@ -734,6 +751,7 @@ void LibraryIndex::convert(const fs::path& dir) {
             e->elementText << o["text"].toString();
             e->aspects.push_back(o["aspect"].toDouble());
         }
+        e->titleRead = !e->showsPdfPages();
         byFolder[file.parent_path()].push_back(std::move(e));
     }
     for (const auto& [folder, entries]: byFolder) {
@@ -824,8 +842,36 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
     // changes with every version of the file)
     e->pdf = loaded.hybrid ? item.main() : doc.getPdfFilepath();
     e->pdfStamp = fileStamp(e->pdf);
-    fillPages(*e, doc, donorFor(*e, previous), true);
+    const EntryPtr donor = donorFor(*e, previous);
+    fillPages(*e, doc, donor, true);
+    lock.unlock();
+    fillTitle(*e, donor);
     return e;
+}
+
+namespace {
+/// The first PDF page an entry shows (-1: none)
+int firstPdfPage(const std::vector<int>& pdfPage) {
+    const auto it = std::find_if(pdfPage.begin(), pdfPage.end(), [](int p) { return p >= 0; });
+    return it == pdfPage.end() ? -1 : *it;
+}
+}  // namespace
+
+void LibraryIndex::fillTitle(Entry& e, const EntryPtr& donor) {
+    e.titleRead = true;
+    const int page = firstPdfPage(e.pdfPage);
+    if (page < 0 || e.pdf.empty()) {
+        return;
+    }
+    if (donor && donor->titleRead && donor->pdf == e.pdf && donor->pdfStamp == e.pdfStamp &&
+        firstPdfPage(donor->pdfPage) == page) {
+        e.title = donor->title;
+        e.heading = donor->heading;
+        return;
+    }
+    const pdftitle::Titles t = pdftitle::read(e.pdf, page);
+    e.title = t.meta;
+    e.heading = t.heading;
 }
 
 LibraryIndex::EntryPtr LibraryIndex::donorFor(const Entry& e, const EntryPtr& previous) const {
@@ -925,6 +971,14 @@ bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std:
     }
     if (!fillPages(*e, doc, known, false)) {
         return false;  // (PDF text that is not known yet: the next update reads it)
+    }
+    // The title of its PDF as before (else the next update reads it)
+    e->titleRead = !e->showsPdfPages();
+    if (previous && previous->titleRead && previous->pdf == e->pdf && previous->pdfStamp == e->pdfStamp &&
+        firstPdfPage(previous->pdfPage) == firstPdfPage(e->pdfPage)) {
+        e->title = previous->title;
+        e->heading = previous->heading;
+        e->titleRead = true;
     }
     lock.unlock();
     std::lock_guard entriesLock(mtx);
@@ -1087,6 +1141,13 @@ void LibraryIndex::run(std::vector<DocumentItem> items, quint64 gen) {
                 std::lock_guard lock(mtx);
                 put(current);
             }
+        } else if (current && current->onlyTitleMissing(item)) {
+            // An entry from before titles were kept: only its PDF's title is read (PdfTitle.h), not the document
+            auto withTitle = std::make_shared<Entry>(*current);
+            fillTitle(*withTitle, nullptr);
+            ++titleReads;
+            std::lock_guard lock(mtx);
+            put(std::move(withTitle));
         } else if (auto fresh = read(item, current)) {
             std::error_code ec;
             if (fs::exists(file, ec)) {
@@ -1618,6 +1679,98 @@ std::vector<fs::path> LibraryIndex::filesWithPageText(const QString& fingerprint
         }
     }
     return found;
+}
+
+std::vector<LibraryIndex::TitleHit> LibraryIndex::findTitle(const QString& title, const QString& entry, int typos,
+                                                             double minScore, size_t max,
+                                                             const std::set<fs::path>& exclude) const {
+    return titleSearch(title, entry, typos, minScore, max, exclude)();
+}
+
+LibraryIndex::TitleSearch LibraryIndex::titleSearch(const QString& title, const QString& entry, int typos,
+                                                    double minScore, size_t max,
+                                                    const std::set<fs::path>& exclude) const {
+    std::vector<EntryPtr> entries;
+    {
+        std::lock_guard lock(mtx);
+        for (const auto& [folder, f]: folders) {
+            for (const auto& [name, e]: f.docs) {
+                if (!exclude.count(e->file) && !(e->pdf.empty() ? false : exclude.count(e->pdf))) {
+                    entries.push_back(e);
+                }
+            }
+        }
+    }
+    return [entries = std::move(entries), title, entry, typos, minScore, max] {
+        return matchTitles(entries, title, entry, typos, minScore, max);
+    };
+}
+
+std::vector<LibraryIndex::TitleHit> LibraryIndex::matchTitles(const std::vector<EntryPtr>& entries,
+                                                               const QString& title, const QString& entry, int typos,
+                                                               double minScore, size_t max) {
+    const QStringList query = cite::titleWords(title);
+    const QStringList entryWordList = cite::titleWords(entry);
+    const QSet<QString> entryWords(entryWordList.begin(), entryWordList.end());
+    constexpr qsizetype FIRST_PAGE_CHARS = 400;  // (where a title is; a reference list further down is not)
+    std::vector<TitleHit> hits;
+    for (const EntryPtr& e: entries) {
+        // A Markdown file's title: its first heading
+        QString mdTitle;
+        for (size_t i = 0; i < e->blockLevel.size() && mdTitle.isEmpty(); ++i) {
+            if (e->blockLevel[i] > 0) {
+                mdTitle = e->blockText[static_cast<qsizetype>(i)];
+            }
+        }
+        // The start of its first page's text
+        QString firstPage;
+        if (const int page = firstPdfPage(e->pdfPage); page >= 0 && e->pdfText.count(page)) {
+            firstPage = e->pdfText.at(page).left(FIRST_PAGE_CHARS);
+        } else if (!e->blockText.isEmpty()) {
+            firstPage = e->blockText.join(QLatin1Char(' ')).left(FIRST_PAGE_CHARS);
+        } else if (!e->elementText.isEmpty()) {
+            firstPage = e->elementText.front().left(FIRST_PAGE_CHARS);
+        }
+        const QString name = QString::fromStdString(e->file.stem().string());
+        struct Candidate {
+            QString text;
+            const char* what;
+            bool titleLike;
+        };
+        const Candidate candidates[] = {{e->title, "title", true},
+                                        {e->heading, "heading", true},
+                                        {mdTitle, "heading", true},
+                                        {name, "name", true},
+                                        {firstPage, "text", false}};
+        TitleHit hit;
+        for (const Candidate& c: candidates) {
+            if (c.text.isEmpty()) {
+                continue;
+            }
+            const QStringList words = cite::titleWords(c.text);
+            double score = cite::titleMatch(query, words, c.titleLike, typos);
+            if (c.titleLike && !entryWords.isEmpty()) {
+                score = std::max(score, 0.95 * cite::titleInText(words, entryWords, typos));
+            }
+            if (score > hit.score) {
+                hit.score = score;
+                hit.matched = QString::fromLatin1(c.what);
+            }
+        }
+        if (hit.score < minScore) {
+            continue;
+        }
+        hit.file = e->file;
+        hit.title = !e->title.isEmpty() ? e->title : !e->heading.isEmpty() ? e->heading : !mdTitle.isEmpty() ? mdTitle : name;
+        hits.push_back(std::move(hit));
+    }
+    std::sort(hits.begin(), hits.end(), [](const TitleHit& a, const TitleHit& b) {
+        return a.score != b.score ? a.score > b.score : a.file < b.file;
+    });
+    if (hits.size() > max) {
+        hits.resize(max);
+    }
+    return hits;
 }
 
 QString LibraryIndex::simplified(const QString& text) { return text.simplified(); }

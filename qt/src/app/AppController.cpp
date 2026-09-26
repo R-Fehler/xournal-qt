@@ -3997,6 +3997,17 @@ void AppController::setPdfTextMode(const QString& mode) {
 }
 
 bool AppController::markPdfText(const QString& mode) { return canvas() && canvas()->markPdfText(pdfModeFrom(mode)); }
+QStringList AppController::shownDocumentFiles() const {
+    QStringList files;
+    if (DocumentSession* s = tabs ? tabs->currentSession() : nullptr; s && !s->documentFile().empty()) {
+        files << QString::fromStdString(s->documentFile().string());  // (a PDF without notes yet: the PDF)
+    }
+    if (referenceMode && !referenceMode->shownFile().isEmpty()) {
+        files << referenceMode->shownFile();
+    }
+    return files;
+}
+
 QString AppController::selectedText() const { return canvas() ? canvas()->selectedText() : QString(); }
 
 bool AppController::copyPdfText() {
