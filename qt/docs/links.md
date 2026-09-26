@@ -251,3 +251,31 @@ way when the pointer only passes over it.
   link annotations through poppler, the texts' web addresses, the Markdown layouts' link boxes) and forgotten on
   any change of the page (a stroke, a text, undo, a layer shown or hidden). A move over the page is a walk over a
   few rectangles; `CanvasView::linkLookups` counts the searches (a test moves 400 times and sees one).
+
+### The pointing hand and the status line (`DocumentCanvasItem::linkHovers`, `LinkStatusLine.qml`, `AppController::linkPreview`; tests `CanvasItemInputTest` in `-L quick`, `DocumentLinksTest` in `-L ui`)
+- Over a link that a click follows (the rules above, with the Ctrl key as it is now) the mouse's cursor is a
+  pointing hand, else the tool's cross. Over text being written it is the hand only while Ctrl is held; pressing or
+  letting go of Ctrl updates it without moving. The hovering pen keeps its cursor (it writes on links).
+- **The status line**, as in a browser: a small line at the bottom left of the canvas the pointer is over (the
+  notes, or the reference beside them: each has its own), showing where the link leads:
+  - a web or mail address: in full;
+  - a page of this document (a PDF link inside the PDF, `#Page:N`, a link to a place in this document): "Page 12",
+    with its chapter when the document has one there ("Page 12 · Prediction step");
+  - a PDF link to a page the document does not have: "PDF page 9 (not in this document)";
+  - a link to another document: its file name and the place ("kalman.xopp, chapter “Prediction step”",
+    "turbines.md, heading “blade-design”", "lecture.pdf, page 3"), a wiki link by the file it finds;
+  - a document that is not there: "lost.xopp (not found)" (the search for a moved file is only done when the
+    link is followed);
+  - any other target of a Markdown link: as written.
+- It comes once the pointer rested on a link for 300 ms (passing over links shows nothing), fades in quickly and
+  out quickly (150 ms) when the pointer leaves; moving from one link straight to another changes it at once.
+- It never takes a press or the focus (`enabled: false`, looked through by the canvas's hit test), and it never
+  covers the pointer: when the pointer is where it would be, it moves to the bottom right.
+- Its colours follow the Material theme (a light grey in the light theme, a dark grey in the dark one); the text
+  is elided in the middle beyond 60 % of the canvas width.
+- The mouse (and a touchpad) and the pen's hover (tablet moves without a button while it is near) show it; a
+  control, a menu or a popup over the canvas hides it (the canvas item's hit test is asked only when the link under
+  the pointer changes). Touch has no hover: on a phone or tablet without a pen it never shows. It is not shown on a
+  long press either (that opens the context menu).
+- The text is made when the link changes (`app.linkPreview`: the file's existence, the chapters), not per move.
+

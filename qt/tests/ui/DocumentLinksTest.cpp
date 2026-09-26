@@ -161,6 +161,29 @@ protected:
         wait(80);
     }
     bool popupOpen() const { return find("linkPopup")->property("opened").toBool(); }
+    /// The middle of the words `text` on the current text document's page (window coordinates), scrolled into view
+    QPoint textPlace(const std::string& text) {
+        auto* canvasItem = find<QQuickItem>("canvas");
+        auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+        const size_t page = current()->getCurrentPageNo();
+        const Text* box = xqt::md::boxOf(*xqt::md::markdownLayer(current()->getDocument()->getPage(page)));
+        const auto rects = xqt::md::findText(*box, text);
+        if (rects.empty()) {
+            ADD_FAILURE() << text;
+            return {};
+        }
+        const auto& r = rects.front();
+        view->getViewController().scrollToPageRect(page, QRectF(r.x, r.y, r.width, r.height));
+        wait(100);
+        const QPointF at = view->pageViewRect(page).topLeft() +
+                           QPointF(r.x + r.width / 2, r.y + r.height / 2) * view->getViewController().zoom();
+        return canvasItem->mapToScene(at).toPoint();
+    }
+    /// The status line under the canvas: its text while it is shown, else ""
+    QString statusLine() const {
+        auto* line = find<QQuickItem>("linkStatusLine");
+        return line && line->property("shown").toBool() ? line->property("text").toString() : QString();
+    }
 
     QTemporaryDir tmp;
     fs::path root;
@@ -468,4 +491,54 @@ TEST_F(DocumentLinksTest, aLinkWhoseFileWasMovedElsewhereIsFoundOrLocated) {
     ASSERT_TRUE(controller->relinkTo(QUrl::fromLocalFile(QString::fromStdString((root / "Archive" / "kalman.xopp").string()))));
     EXPECT_EQ(currentFile(), "kalman.xopp") << "followed";
     EXPECT_NE(note->currentText().find("[lost](../Archive/kalman.xopp#page=1)"), std::string::npos) << note->currentText();
+}
+
+// Links with the mouse (qt/docs/links.md): resting on a link shows where it leads in a line at the bottom of the
+// canvas; in a text being written a plain click puts the cursor there, Ctrl + click follows.
+TEST_F(DocumentLinksTest, hoveringALinkShowsWhereItLeadsAndAClickInWrittenTextPutsTheCursor) {
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "Notes" / "a.md").string())));
+    wait(200);
+    ASSERT_EQ(currentFile(), "a.md");
+    auto* canvasItem = find<QQuickItem>("canvas");
+
+    const QPoint kalman = textPlace("Kalman");
+    QTest::mouseMove(window, kalman + QPoint(-2, 0));
+    QTest::mouseMove(window, kalman);
+    wait(60);
+    EXPECT_EQ(statusLine(), "") << "not at once";
+    until([&] { return !statusLine().isEmpty(); });
+    EXPECT_EQ(statusLine(), "kalman.xopp, chapter “Prediction step”");
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(300);  // (faded in)
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    auto* line = find<QQuickItem>("linkStatusLine");
+    const QPointF corner = line->mapToItem(canvasItem, QPointF(0, line->height()));
+    EXPECT_LT(corner.x(), 20) << "at the bottom left";
+    EXPECT_GT(corner.y(), canvasItem->height() - 20);
+
+    const QPoint lost = textPlace("lost");
+    QTest::mouseMove(window, lost);
+    until([&] { return statusLine() == "lost.xopp (not found)"; });
+    EXPECT_EQ(statusLine(), "lost.xopp (not found)");
+
+    // Off the link: it goes
+    QTest::mouseMove(window, textPlace("Notes"));
+    until([&] { return statusLine().isEmpty(); });
+    EXPECT_EQ(statusLine(), "");
+
+    // A plain click on a link in the text being written: the cursor goes there, nothing is followed
+    const QPoint link = textPlace("Kalman");
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, link);
+    wait(150);
+    EXPECT_FALSE(popupOpen());
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view->getMarkdownEditor(), nullptr);
+    const size_t at = current()->currentText().find("Kalman");
+    EXPECT_GE(view->getMarkdownEditor()->cursorPosition(), at);
+    EXPECT_LE(view->getMarkdownEditor()->cursorPosition(), at + 6);
+    // Ctrl + click follows it
+    QTest::mouseClick(window, Qt::LeftButton, Qt::ControlModifier, link);
+    until([&] { return popupOpen(); });
+    EXPECT_TRUE(popupOpen());
 }

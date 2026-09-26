@@ -74,6 +74,10 @@ Item {
 
         // The same scroll bars, knobs and pills as the notes have, for the reference (app.reference acts on it; for
         // reading only they offer copying, nothing that changes it)
+        LinkStatusLine {
+            canvasItem: referenceCanvas
+            namePrefix: "reference"
+        }
         CanvasScrollBars {
             canvasItem: referenceCanvas
             namePrefix: "reference"
