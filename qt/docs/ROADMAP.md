@@ -604,6 +604,12 @@
   that note, one undo step. `md::holdsBoxes` / `boxesOf` generalise "the Markdown layer" to notes. A drag no longer
   moves an unselected note: tap it first.
 
+- **Changing the size of existing pages; small lined pages to scale, `qt/page-size-change` (2026-09-26).** "Page
+  size…" in the More menu (this page / all pages) and "Size…" in the page menu; PDF pages are left as they are. One
+  undo step (`PageSizeUndoAction`) that also reflows the page's Markdown text. On pages smaller than A5 the margin line
+  and the ruling scale with the page (`PageMargins::rulingScale` through the `xoj::view::ruledScale` seam), so a
+  flashcard is not one wide margin with three lines.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
