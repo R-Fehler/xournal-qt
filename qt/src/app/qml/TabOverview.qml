@@ -92,6 +92,15 @@ Popup {
         searchField.forceActiveFocus()
         searchField.selectAll()
     }
+    /// Open with a search for this text, run right away (selected text: the look-up menu)
+    function searchFor(text) {
+        if (!visible) open()
+        searchTyping.stop()
+        searchTyping.pending = false
+        searchField.text = text
+        runSearch(text)
+        grid.forceActiveFocus()
+    }
     /// Short texts (fewer than 4 characters) are searched on Enter or the search icon only, not while typing.
     function typed() {
         searchTyping.pending = searchField.text.length > 0 && searchField.text.length < 4

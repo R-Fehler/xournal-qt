@@ -197,7 +197,9 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
                     .setString("networkAccess", how == "on" || how == "off" ? how.toStdString() : std::string("ask"));
             s.customSettingsChanged();
         });
-    for (const auto& [key, fallback]: {std::pair{"translateService", "google"}, std::pair{"translateLanguage", ""}}) {
+    // (webSearch: an engine's key or a custom address with {text}, cite::searchEngines)
+    for (const auto& [key, fallback]: {std::pair{"translateService", "google"}, std::pair{"translateLanguage", ""},
+                                       std::pair{"webSearch", "google"}}) {
         add(key,
             [&s, key = key, fallback = fallback] {
                 std::string v = fallback;

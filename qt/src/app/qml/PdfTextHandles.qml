@@ -13,7 +13,7 @@ Item {
     property var target: app
     property string namePrefix: ""
     anchors.fill: canvasItem
-    visible: target.pdfTextIsSelected
+    visible: target.pdfTextIsSelected && !app.homeVisible  // (not over the library, which is above the canvas)
     z: 55
     /// Only the knobs take presses; everything else goes to the canvas under them (see DocumentCanvasItem).
     property bool inputTransparent: true

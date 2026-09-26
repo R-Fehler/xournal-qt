@@ -45,6 +45,26 @@ QUrl translateUrl(const QString& pattern, const QString& text, const QString& la
 /// The system's language as a translator takes it: "de" for de_DE, "en" for en_US, "zh-CN" / "zh-TW", "pt".
 QString systemLanguage();
 
+/// The longest text the searches of selected text take (the document, the open tabs, the library, the web search):
+/// the first 200 characters, cut at a word.
+constexpr int QUERY_CHARS = 200;
+
+/// A web search engine the settings offer: its key (the setting `webSearch`), its name, its address with `{text}`.
+struct SearchEngine {
+    QString key;
+    QString name;
+    QString pattern;
+};
+/// Google (the default), DuckDuckGo, Bing, Ecosia, Startpage, Brave Search, Qwant.
+const std::vector<SearchEngine>& searchEngines();
+/// A custom search address the settings accept: http(s) with a host, and `{text}` in it (not in the host).
+bool isSearchTemplate(const QString& pattern);
+/// The address pattern of the setting `webSearch`: an engine's key, or a custom pattern. "" when it is neither.
+QString searchEnginePattern(const QString& setting);
+/// The engine's address for the text: `{text}` replaced by the text (cleanText, QUERY_CHARS), percent-encoded as a
+/// URL query takes it. Invalid for an empty pattern or text.
+QUrl webSearchUrl(const QString& pattern, const QString& text);
+
 /// A web address the app may hand to the browser: http or https with a host.
 bool isWebAddress(const QUrl& url);
 

@@ -438,6 +438,48 @@ Popup {
                             { text: qsTr("Off"), value: "off" }
                         ]
                     }
+                    // The web search of selected text (the look-up menu): an engine, or an address with {text}
+                    RowLayout {
+                        id: webSearchRow
+                        Layout.fillWidth: true
+                        readonly property string current: (sheet.s.revision, sheet.s.get("webSearch"))
+                        readonly property var known: app.citations.searchEngines()
+                        readonly property bool custom: !known.some(function(e) { return e.key === current })
+                        Label { text: qsTr("Search the web with"); Layout.fillWidth: true; wrapMode: Text.WordWrap }
+                        ComboBox {
+                            objectName: "webSearchChoice"
+                            Layout.preferredWidth: 260
+                            model: webSearchRow.known.map(function(e) { return e.name }).concat([qsTr("Custom…")])
+                            currentIndex: {
+                                for (let i = 0; i < webSearchRow.known.length; ++i)
+                                    if (webSearchRow.known[i].key === webSearchRow.current) return i
+                                return webSearchRow.known.length
+                            }
+                            onActivated: function(index) {
+                                if (index < webSearchRow.known.length) sheet.s.set("webSearch", webSearchRow.known[index].key)
+                                else if (!webSearchRow.custom) sheet.s.set("webSearch", "https://www.google.com/search?q={text}")
+                            }
+                        }
+                    }
+                    TextField {
+                        id: webSearchAddress
+                        objectName: "webSearchAddress"
+                        visible: webSearchRow.custom
+                        Layout.fillWidth: true
+                        text: webSearchRow.current
+                        placeholderText: "https://…{text}…"
+                        readonly property bool valid: app.citations.isSearchTemplate(text)
+                        // (only a valid address is kept: the menu's entry needs one)
+                        onEditingFinished: if (valid) sheet.s.set("webSearch", text)
+                    }
+                    Hint {
+                        objectName: "webSearchHint"
+                        visible: webSearchRow.custom
+                        color: webSearchAddress.valid ? "#6b6f75" : "#b3261e"
+                        text: webSearchAddress.valid
+                              ? qsTr("{text} is replaced by the selected text.")
+                              : qsTr("The address must start with http:// or https:// and contain {text}.")
+                    }
                     RowLayout {
                         id: translatorRow
                         Layout.fillWidth: true

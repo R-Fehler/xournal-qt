@@ -233,6 +233,29 @@ ApplicationWindow {
         }
         if (app.citations.openWeb(url)) snackbar.show(qsTr("Opened %1 in the browser").arg(app.citations.hostOf(url)), false)
     }
+    /// The searches of selected text (the look-up menu, qt/docs/citations.md): the document's search bar with the
+    /// text, run (the bar follows a search set from elsewhere); the open tabs' search in their overview; the library's
+    /// search on the home screen, in the library shown.
+    function searchInDocument(text) {
+        if (text === "") return
+        pageGrid.close()
+        tabOverview.close()
+        searchBar.openBar()
+        app.searchQuery = text
+    }
+    function searchOpenTabs(text) {
+        if (text === "") return
+        pageGrid.close()
+        app.homeVisible = false
+        tabOverview.searchFor(text)
+    }
+    function searchLibraryFor(text) {
+        if (text === "") return
+        tabOverview.close()
+        pageGrid.close()
+        app.homeVisible = true
+        Qt.callLater(function() { homeView.searchFor(text) })  // (after the home screen is shown, as searchLibrary())
+    }
     /// "Find this paper": the library searched for the title of a bibliography entry (qt/docs/citations.md)
     function findPaper(text) { findPaperSheet.openFor(text) }
     /// arXiv: a search by title, or one paper by its ID (qt/docs/citations.md)
