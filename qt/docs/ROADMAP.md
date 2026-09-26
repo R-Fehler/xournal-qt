@@ -507,6 +507,12 @@
   search through the export API, download named by the title into the library, "Open as reference". Networking is
   opt-in (ask/on/off), one arXiv request per 3 s.
 
+- **Sticky notes on the clipboard, `qt/sticky-clipboard` (2026-09-26).** Copy and cut a selected note (Ctrl+C/X, the
+  note pill, the long-press pill) whole, as `application/x-xournal-qt-sticky-note` plus a PNG; paste (Ctrl+V and
+  the pills) puts it on the current page of the view pasted in (other tabs, windows, the second view), at the same
+  place when it fits, offset over an identical note, one undo step. A note dragged onto another page moves there
+  (one undo step). Upstream Xournal++ cannot paste a note.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
