@@ -1512,6 +1512,9 @@ Update the table in the user doc with the results.
       reference to a page of the document goes there in the reference.
 - [ ] With `XQT_PERF=1`, a long PDF beside itself, scroll both sides far apart: pages stay sharp, memory stays under
       the limit set in Settings (not twice it).
+- [ ] (qt/two-views-memory) The same with the reference, then scroll the notes quickly and stop: once the pages
+      have settled, `XQT_PERF=1`'s memory line stays under the limit (the side scrolled before does not keep pages it
+      was still rendering in advance).
 
 ## Emoji (qt/emoji)
 

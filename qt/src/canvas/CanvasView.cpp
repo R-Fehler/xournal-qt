@@ -1933,6 +1933,12 @@ void CanvasView::setShown(bool value) {
 }
 
 void CanvasView::pageRendered(const CanvasPage* page) {
+    if (trimmed) {
+        // (the window of an earlier plan, when it was the current view, does not hold any more: its renders in
+        // advance still running when it was trimmed land now, beyond what it was allowed; and so do its visible pages)
+        CanvasMemory::instance().replan();
+        return;
+    }
     const auto [from, to] = window;
     if (from > to) {
         return;  // (no plan yet)
@@ -1966,6 +1972,7 @@ qint64 CanvasView::pageBytes(size_t index) const {
 }
 
 qint64 CanvasView::planCache(qint64 share) {
+    trimmed = false;
     const size_t n = pages.size();
     if (n == 0) {
         window = {1, 0};
@@ -2047,6 +2054,7 @@ void CanvasView::evictPdfCache(std::unordered_set<size_t> keep) {
 }
 
 qint64 CanvasView::trimTo(qint64 allowed) {
+    trimmed = true;
     evictPdfCache({});
     const auto [first, last] = visiblePages();
     const auto current = static_cast<std::ptrdiff_t>(currentPageNo());
