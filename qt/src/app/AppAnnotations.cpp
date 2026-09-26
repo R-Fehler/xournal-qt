@@ -98,7 +98,7 @@ void AppController::exportAnnotations(const QUrl& url) {
                     }
                 }
                 if (page) {
-                    annotations::drawArea(doc, page, item.rect.adjusted(-3, -3, 3, 3), 3)
+                    annotations::drawArea(doc, page, annotations::pictureRect(item.rect), 3)
                             .save(QString::fromStdString((target.parent_path() / p.file.toStdString()).string()));
                 }
             }

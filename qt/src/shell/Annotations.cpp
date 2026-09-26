@@ -7,6 +7,7 @@
 #include <mutex>
 #include <shared_mutex>
 
+#include <QPolygonF>
 #include <QRegularExpression>
 #include <QStringList>
 #include <cairo.h>
@@ -19,14 +20,18 @@
 #include "model/Stroke.h"
 #include "model/Text.h"
 #include "model/XojPage.h"
+#include "pdf/base/XojPdfPage.h"
 #include "view/LayerView.h"
 #include "view/View.h"
+#include "view/background/BackgroundFlags.h"
+#include "view/background/BackgroundView.h"
 
 #include "DocumentChapters.h"
 #include "DocumentLinks.h"
 #include "LinkRewrite.h"
 #include "MdDocument.h"
 #include "session/DocumentTextIndex.h"
+#include "session/PageNoteSpace.h"
 #include "session/StickyNote.h"
 
 namespace xqt::annotations {
@@ -78,6 +83,11 @@ uint32_t rgbOf(Color c) { return uint32_t(c) & 0xffffffU; }
 
 /// Strokes written one after another this near (points, about 6 mm) are one piece of handwriting.
 constexpr double INK_NEAR = 18;
+/// A piece of handwriting smaller than this (points) is a dot or a short mark: it joins the piece next to it (within
+/// twice INK_NEAR), else it is listed by itself.
+constexpr double INK_TINY = 4;
+/// The PDF text a piece of handwriting is on: at most this many characters.
+constexpr qsizetype MAX_CAPTION = 300;
 
 double distance(const QRectF& a, const QRectF& b) {
     const double dx = std::max({0.0, a.left() - b.right(), b.left() - a.right()});
@@ -135,6 +145,104 @@ QString coveredText(const PdfPageLayout& layout, const std::vector<char>& covere
         last = i;
     }
     return out.simplified();
+}
+
+PageContent::Mark markOf(const Stroke& s) {
+    PageContent::Mark m;
+    m.box = rectOf(s.getBoundingBox());
+    m.width = s.getWidth();
+    m.color = rgbOf(s.getColor());
+    m.points.reserve(s.getPointCount());
+    for (const Point& p: s.getPointVector()) {
+        m.points.emplace_back(p.x, p.y);
+    }
+    return m;
+}
+
+/// A stroke that comes back to where it began (a circle, a box around something): it encloses what is inside it.
+bool closedStroke(const PageContent::Mark& m) {
+    if (m.points.size() < 4 || m.box.width() < 6 || m.box.height() < 6) {
+        return false;
+    }
+    const QPointF d = m.points.back() - m.points.front();
+    return std::hypot(d.x(), d.y()) <= std::max(8.0, 0.2 * std::max(m.box.width(), m.box.height()));
+}
+
+/// The PDF text a piece of handwriting is on: the characters its strokes go through or under (a strike through, an
+/// underline: as a highlighter stroke covers them) and those inside a stroke that closes (a circle, a box), as whole
+/// words. Pieces of fewer than three characters that are not a whole word are left out: a note written across a line
+/// crosses a letter here and there, which says nothing.
+QString inkCaption(const PdfPageLayout& layout, const std::vector<const PageContent::Mark*>& strokes,
+                   const QRectF& rect) {
+    if (layout.text.isEmpty()) {
+        return {};
+    }
+    std::vector<QPolygonF> closed;
+    for (const auto* m: strokes) {
+        if (closedStroke(*m)) {
+            closed.emplace_back(QList<QPointF>(m->points.begin(), m->points.end()));
+        }
+    }
+    const qsizetype n = layout.text.size();
+    std::vector<char> covered(static_cast<size_t>(n), 0);
+    bool any = false;
+    for (size_t i = 0; i < layout.boxes.size() && i < static_cast<size_t>(n); ++i) {
+        const QRectF& b = layout.boxes[i];
+        if (b.isNull() || !b.intersects(rect.adjusted(-1, -b.height(), 1, b.height()))) {
+            continue;
+        }
+        bool on = std::any_of(closed.begin(), closed.end(),
+                              [&](const QPolygonF& poly) { return poly.containsPoint(b.center(), Qt::OddEvenFill); });
+        for (size_t k = 0; k < strokes.size() && !on; ++k) {
+            on = covers(*strokes[k], b);
+        }
+        covered[i] = on ? 1 : 0;
+        any = any || on;
+    }
+    if (!any) {
+        return {};
+    }
+    // Pieces: covered characters with at most spaces between them
+    for (qsizetype i = 0; i < n;) {
+        if (!covered[static_cast<size_t>(i)]) {
+            ++i;
+            continue;
+        }
+        qsizetype end = i;  // the last covered character of the piece
+        int letters = 0;
+        for (qsizetype k = i; k < n && (covered[static_cast<size_t>(k)] || layout.text[k].isSpace()); ++k) {
+            if (covered[static_cast<size_t>(k)]) {
+                end = k;
+                ++letters;
+            }
+        }
+        const bool wholeWord = (i == 0 || layout.text[i - 1].isSpace()) && (end + 1 >= n || layout.text[end + 1].isSpace() ||
+                                                                              layout.text[end + 1].isPunct());
+        if (letters < 3 && !wholeWord) {
+            for (qsizetype k = i; k <= end; ++k) {
+                covered[static_cast<size_t>(k)] = 0;
+            }
+            i = end + 1;
+            continue;
+        }
+        // Whole words: a mark over part of a word marks the word
+        qsizetype from = i;
+        while (from > 0 && !layout.text[from - 1].isSpace()) {
+            --from;
+        }
+        while (end + 1 < n && !layout.text[end + 1].isSpace()) {
+            ++end;
+        }
+        for (qsizetype k = from; k <= end; ++k) {
+            covered[static_cast<size_t>(k)] = 1;
+        }
+        i = end + 1;
+    }
+    QString text = coveredText(layout, covered);
+    if (text.size() > MAX_CAPTION) {
+        text = text.left(MAX_CAPTION - 1).trimmed() + QChar(0x2026);
+    }
+    return text;
 }
 
 struct MarkGroup {
@@ -336,17 +444,11 @@ PageContent read(const XojPage& page) {
             } else if (e->getType() == ELEMENT_STROKE) {
                 const auto* s = static_cast<const Stroke*>(e);
                 if (s->getToolType() == StrokeTool::HIGHLIGHTER) {
-                    PageContent::Mark m;
-                    m.box = rectOf(s->getBoundingBox());
-                    m.width = s->getWidth();
-                    m.color = rgbOf(s->getColor());
-                    m.points.reserve(s->getPointCount());
-                    for (const Point& p: s->getPointVector()) {
-                        m.points.emplace_back(p.x, p.y);
-                    }
-                    c.marks.push_back(std::move(m));
+                    c.marks.push_back(markOf(*s));
                 } else if (s->getToolType() == StrokeTool::PEN) {
-                    c.ink.push_back(rectOf(s->getBoundingBox()));
+                    // (every pen stroke: by hand, the ruler, the shapes and the stroke recogniser draw pen strokes;
+                    // the whiteout eraser's strokes hide ink, they are not ink)
+                    c.ink.push_back(markOf(*s));
                 }
             }
         }
@@ -377,7 +479,10 @@ std::vector<Item> itemsOf(const PageContent& c, size_t index, PdfLayoutReader* p
         layoutRead = true;
         return pageLayout;
     };
-    std::vector<QRectF> ink = c.ink;
+    std::vector<const PageContent::Mark*> ink;
+    for (const auto& m: c.ink) {
+        ink.push_back(&m);
+    }
 
     // Highlights: the text under the highlighter's strokes
     for (const MarkGroup& g: groupMarks(c.marks)) {
@@ -416,7 +521,7 @@ std::vector<Item> itemsOf(const PageContent& c, size_t index, PdfLayoutReader* p
         }
         if (item.text.isEmpty()) {
             for (size_t k: g.marks) {
-                ink.push_back(c.marks[k].box);
+                ink.push_back(&c.marks[k]);
             }
             continue;
         }
@@ -449,25 +554,55 @@ std::vector<Item> itemsOf(const PageContent& c, size_t index, PdfLayoutReader* p
         items.push_back(std::move(item));
     }
 
-    // Handwriting in the margins and free areas: not the groups mostly over PDF text (marks, underlines, circles)
-    const std::vector<QRectF> lines =
-            ink.empty() ? std::vector<QRectF>() : textLayout().rects(0, textLayout().text.size());
-    for (const auto& group: groupInk(ink)) {
+    // Handwriting: every piece, with the PDF text it is on (an underline, a circle, a strike through, a note written
+    // over the slide)
+    std::vector<QRectF> boxes;
+    boxes.reserve(ink.size());
+    for (const auto* m: ink) {
+        boxes.push_back(m->box);
+    }
+    auto groups = groupInk(boxes);
+    std::vector<QRectF> rects;
+    for (const auto& group: groups) {
         QRectF rect;
-        size_t onText = 0;
         for (size_t k: group) {
-            rect |= ink[k];
-            if (std::any_of(lines.begin(), lines.end(), [&](const QRectF& l) { return l.intersects(ink[k]); })) {
-                ++onText;
+            rect |= boxes[k];
+        }
+        rects.push_back(rect);
+    }
+    // Dots and short marks join the nearest piece around them
+    const auto tiny = [&](size_t g) { return std::max(rects[g].width(), rects[g].height()) < INK_TINY; };
+    for (size_t g = 0; g < groups.size();) {
+        size_t nearest = SIZE_MAX;
+        double best = 2 * INK_NEAR;
+        if (tiny(g)) {
+            for (size_t h = 0; h < groups.size(); ++h) {
+                if (h != g && !tiny(h) && distance(rects[g], rects[h]) <= best) {
+                    best = distance(rects[g], rects[h]);
+                    nearest = h;
+                }
             }
         }
-        if (2 * onText > group.size() || std::max(rect.width(), rect.height()) < 4) {
+        if (nearest == SIZE_MAX) {
+            ++g;
             continue;
         }
+        groups[nearest].insert(groups[nearest].end(), groups[g].begin(), groups[g].end());
+        rects[nearest] |= rects[g];
+        groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(g));
+        rects.erase(rects.begin() + static_cast<std::ptrdiff_t>(g));
+    }
+    for (size_t g = 0; g < groups.size(); ++g) {
         Item item;
         item.kind = Kind::Ink;
         item.page = index;
-        item.rect = rect;
+        item.rect = rects[g];
+        std::vector<const PageContent::Mark*> strokes;
+        for (size_t k: groups[g]) {
+            strokes.push_back(ink[k]);
+        }
+        item.color = strokes.front()->color;
+        item.text = inkCaption(textLayout(), strokes, item.rect);
         items.push_back(std::move(item));
     }
 
@@ -504,7 +639,19 @@ std::vector<Item> collect(Document& doc, PdfLayoutReader* pdf) {
     return out;
 }
 
-QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double scale) {
+QRectF pictureRect(const QRectF& r) {
+    QRectF out = r.adjusted(-PICTURE_MARGIN, -PICTURE_MARGIN, PICTURE_MARGIN, PICTURE_MARGIN);
+    // (a dot shows where it is: some of the page around it)
+    if (out.width() < PICTURE_MIN_WIDTH) {
+        out.adjust(-(PICTURE_MIN_WIDTH - out.width()) / 2, 0, (PICTURE_MIN_WIDTH - out.width()) / 2, 0);
+    }
+    if (out.height() < PICTURE_MIN_HEIGHT) {
+        out.adjust(0, -(PICTURE_MIN_HEIGHT - out.height()) / 2, 0, (PICTURE_MIN_HEIGHT - out.height()) / 2);
+    }
+    return out;
+}
+
+QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double scale, bool background) {
     const int w = std::max(1, static_cast<int>(std::ceil(rect.width() * scale)));
     const int h = std::max(1, static_cast<int>(std::ceil(rect.height() * scale)));
     QImage img(w, h, QImage::Format_ARGB32_Premultiplied);
@@ -515,7 +662,33 @@ QImage drawArea(Document& doc, const PageRef& page, const QRectF& rect, double s
     cairo_scale(cr, scale, scale);
     cairo_translate(cr, -rect.x(), -rect.y());
     cairo_rectangle(cr, rect.x(), rect.y(), rect.width(), rect.height());
-    cairo_clip(cr);
+    cairo_clip(cr);  // (poppler and the views draw only this part: the rest is clipped before it is rasterised)
+    if (background) {
+        // The page under the ink: its PDF page (drawn without the document lock, like the thumbnails: poppler has its
+        // own), else its image or paper colour. Rulings (lined, graph paper) are left out: at this size they look
+        // like strokes and say nothing about the note.
+        XojPdfPageSPtr pdfPage;
+        {
+            std::shared_lock lock(doc);
+            if (page->getBackgroundType().isPdfPage()) {
+                pdfPage = doc.getPdfPage(page->getPdfPageNr());
+            }
+        }
+        if (pdfPage) {
+            notespace::renderPdf(cr, *page, *pdfPage);
+        } else {
+            std::shared_lock lock(doc);
+            constexpr xoj::view::BackgroundFlags flags = {
+                    xoj::view::HIDE_PDF_BACKGROUND, xoj::view::SHOW_IMAGE_BACKGROUND, xoj::view::HIDE_RULING_BACKGROUND,
+                    xoj::view::FORCE_AT_LEAST_BACKGROUND_COLOR, xoj::view::FORCE_VISIBLE};
+            if (auto view = xoj::view::BackgroundView::createForPage(page, flags)) {
+                view->draw(cr);
+            }
+        }
+        // Dimmed, so the ink stands out: a light wash of white
+        cairo_set_source_rgba(cr, 1, 1, 1, BACKGROUND_WASH);
+        cairo_paint(cr);
+    }
     {
         std::shared_lock lock(doc);
         for (const Layer* layer: page->getLayersView()) {
@@ -767,7 +940,11 @@ std::string markdown(const std::vector<Item>& items, const ExportInput& input, c
                 out += QStringLiteral("- [%1](%2) (").arg(title, target) + place + QStringLiteral(")\n");
                 break;
             }
-            case Kind::Ink:
+            case Kind::Ink: {
+                // (the PDF text it is on, quoted)
+                const QString onText = item.text.isEmpty()
+                                               ? QString()
+                                               : u' ' + QObject::tr("on “%1”").arg(escaped(item.text.simplified()));
                 if (input.inkImages && pictures) {
                     const fs::path folder = assetsFolder(markdownFile);
                     const QString file =
@@ -775,13 +952,14 @@ std::string markdown(const std::vector<Item>& items, const ExportInput& input, c
                     links::Link image;
                     image.path = QString::fromStdString(folder.filename().string()) + u'/' + file;
                     pictures->push_back({image.path, idx});
-                    out += QStringLiteral("- ![%1](%2) (")
+                    out += QStringLiteral("- ![%1](%2)")
                                    .arg(QObject::tr("Handwriting, page %1").arg(item.page + 1), links::write(image)) +
-                           place + QStringLiteral(")\n");
+                           onText + QStringLiteral(" (") + place + QStringLiteral(")\n");
                 } else {
-                    out += QStringLiteral("- ") + place + u' ' + QObject::tr("(handwriting)") + u'\n';
+                    out += QStringLiteral("- ") + place + u' ' + QObject::tr("(handwriting)") + onText + u'\n';
                 }
                 break;
+            }
             case Kind::Note:
                 out += bullet(QObject::tr("Note: %1").arg(escaped(item.text))) + QStringLiteral(" (") + place +
                        QStringLiteral(")\n");

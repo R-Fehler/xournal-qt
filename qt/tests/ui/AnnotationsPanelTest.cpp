@@ -7,6 +7,7 @@
  */
 #include <fstream>
 #include <functional>
+#include <iostream>
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -163,6 +164,8 @@ TEST_F(AnnotationsPanelTest, listsJumpsFollowsEditsFiltersAndExports) {
     const QModelIndex ink = model()->index(1);
     EXPECT_EQ(model()->data(ink, xqt::AnnotationsModel::KindRole).toString(), "ink");
     EXPECT_TRUE(model()->data(ink, xqt::AnnotationsModel::PictureRole).toString().startsWith("image://annotation/"));
+    until([&] { return xqt::AnnotationImageProvider::renderCount() > 0; });
+    EXPECT_GT(xqt::AnnotationImageProvider::renderCount(), 0) << "its picture is drawn";
 
     // A tap goes to the item's page
     until([&] { return itemAt(list, 2) != nullptr; });
@@ -245,4 +248,73 @@ TEST_F(AnnotationsPanelTest, pdfFilesModeAsksWhereToExport) {
     EXPECT_TRUE(controller->annotationsFile().isEmpty()) << "nothing is written next to files in PDF files mode";
     EXPECT_EQ(controller->suggestedAnnotationsFile().toLocalFile().toStdString(), (root / "notes.annotations.md").string());
     controller->setDocumentMode("xopp");  // (the settings outlive the test)
+}
+
+// A big document: the pictures of handwriting are drawn for the rows in view only, not for the whole list, and
+// scrolling through the list does not wait for them
+TEST_F(AnnotationsPanelTest, aHundredPagesDrawOnlyThePicturesInView) {
+    const int before = xqt::AnnotationImageProvider::renderCount();  // (of the tests before)
+    const fs::path file = root / "many.xopp";
+    {
+        Document doc(nullptr);
+        for (int i = 0; i < 100; ++i) {
+            auto page = std::make_shared<XojPage>(595.0, 842.0);
+            page->getLayers().push_back(new Layer());  // (the page owns it)
+            auto s = std::make_unique<Stroke>();
+            s->setWidth(1.4);
+            s->addPoint(Point(500, 300));
+            s->addPoint(Point(540, 310));
+            s->addPoint(Point(560, 300));
+            page->getLayers()[0]->addElement(std::move(s));
+            doc.addPage(page);
+        }
+        ASSERT_TRUE(xqt::DocumentSession::writeDocument(doc, file).ok);
+    }
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(file.string())));
+    wait(100);
+    window->setProperty("sidebarShown", true);
+    wait(50);
+    click(find<QQuickItem>("sidebarAnnotationsButton"));
+    auto* list = find<QQuickItem>("annotationList");
+    ASSERT_NE(list, nullptr);
+    until([&] { return list->isVisible() && list->property("count").toInt() == 100; });
+    ASSERT_EQ(list->property("count").toInt(), 100);
+    wait(500);  // (the pictures of the first rows)
+    const int first = xqt::AnnotationImageProvider::renderCount() - before;
+
+    EXPECT_GT(first, 0);
+    EXPECT_LT(first, 30) << "the rows in view";
+
+    // To the end at once (the scroll bar dragged): the rows in between are not drawn
+    const double end = list->property("contentHeight").toDouble() - list->height();
+    ASSERT_GT(end, 2000) << "a long list";
+    list->setProperty("contentY", end);
+    wait(1000);
+    const int atEnd = xqt::AnnotationImageProvider::renderCount() - before;
+    EXPECT_LT(atEnd - first, 30) << "only the rows at the end";
+
+    // Back to the top a step a frame, as a quick flick does it: it does not wait for the pictures, and no row is
+    // drawn twice
+    QElapsedTimer step;
+    qint64 worst = 0;
+    for (double y = end; y >= 0; y -= end / 40) {
+        step.start();
+        list->setProperty("contentY", y);
+        wait(16);
+        worst = std::max(worst, step.elapsed());
+    }
+    list->setProperty("contentY", 0.0);
+    wait(1500);
+    const int after = xqt::AnnotationImageProvider::renderCount() - before;
+    EXPECT_LT(worst, 250) << "a step of the scrolling took " << worst << " ms";
+    EXPECT_LE(after, 100) << "at most a picture per row, each drawn once";
+
+    // Down again a little: the pictures drawn are kept, not drawn again
+    list->setProperty("contentY", 300.0);
+    wait(300);
+    list->setProperty("contentY", 0.0);
+    wait(800);
+    EXPECT_EQ(xqt::AnnotationImageProvider::renderCount() - before, after) << "the pictures drawn were kept";
+    std::cout << "pictures drawn: " << first << " at first, " << atEnd << " after the jump to the end, " << after
+              << " after scrolling back; slowest step " << worst << " ms\n";
 }

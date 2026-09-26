@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <list>
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
@@ -58,8 +59,7 @@ QThreadPool& picturePool() {
 
 unsigned bitOf(annotations::Kind kind) { return 1U << static_cast<unsigned>(annotations::groupOf(kind)); }
 
-/// (a place with some room around the handwriting)
-QRectF pictureRect(const QRectF& r) { return r.adjusted(-3, -3, 3, 3); }
+using annotations::pictureRect;
 }  // namespace
 
 /// What is kept per open document: the items of each page by its revision (read on the worker only), and the last
@@ -456,7 +456,51 @@ public:
     QImage image;
     std::atomic<bool> cancelled{false};
 };
+
+std::atomic<int> pictureRenders{0};
+
+/// The pictures drawn last, by their id and width, up to PICTURE_CACHE_BYTES (the least recently used go first):
+/// scrolling back in the panel shows them at once. Their ids hold the page's revision, so an edited page's pictures
+/// are simply not asked for again.
+class PictureCache {
+public:
+    QImage find(const QString& key) {
+        std::lock_guard lock(mtx);
+        auto it = index.find(key);
+        if (it == index.end()) {
+            return {};
+        }
+        entries.splice(entries.begin(), entries, it->second);
+        return it->second->second;
+    }
+    void put(const QString& key, const QImage& img) {
+        std::lock_guard lock(mtx);
+        if (index.count(key)) {
+            return;
+        }
+        entries.emplace_front(key, img);
+        index[key] = entries.begin();
+        bytes += img.sizeInBytes();
+        while (bytes > AnnotationImageProvider::PICTURE_CACHE_BYTES && entries.size() > 1) {
+            bytes -= entries.back().second.sizeInBytes();
+            index.erase(entries.back().first);
+            entries.pop_back();
+        }
+    }
+
+private:
+    std::mutex mtx;
+    std::list<std::pair<QString, QImage>> entries;
+    std::unordered_map<QString, std::list<std::pair<QString, QImage>>::iterator> index;
+    qint64 bytes = 0;
+};
+PictureCache& pictureCache() {
+    static PictureCache cache;
+    return cache;
+}
 }  // namespace
+
+int AnnotationImageProvider::renderCount() { return pictureRenders.load(); }
 
 QQuickImageResponse* AnnotationImageProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
     auto* response = new PictureResponse;
@@ -467,14 +511,28 @@ QQuickImageResponse* AnnotationImageProvider::requestImageResponse(const QString
     const QStringList r = parts.value(2).split(u',');
     const QRectF rect(r.value(0).toDouble(), r.value(1).toDouble(), r.value(2).toDouble(), r.value(3).toDouble());
     const int width = requestedSize.width() > 0 ? requestedSize.width() : 240;
-    picturePool().start([response, sessionId, revision, rect, width] {
+    const QString key = id + u'@' + QString::number(width);
+    if (QImage kept = pictureCache().find(key); !kept.isNull()) {
+        response->image = std::move(kept);
+        QMetaObject::invokeMethod(response, &QQuickImageResponse::finished, Qt::QueuedConnection);
+        return response;
+    }
+    // The one asked for last first: that is what is in view now (the rows scrolled past are cancelled)
+    static std::atomic<int> order{0};
+    picturePool().start(QRunnable::create([response, sessionId, revision, rect, width, key] {
         QImage img;
+        if (!response->cancelled) {
+            // Not while the canvas has pages in view to draw (the PDF is drawn with the document's instance)
+            RenderService::waitForVisiblePages(std::chrono::milliseconds(300));
+        }
         if (!response->cancelled && rect.width() > 0 && rect.height() > 0) {
             if (DocumentSession* s = ThumbnailProvider::acquireSession(sessionId)) {
                 if (auto stamp = s->pageOfRevision(revision)) {
                     // (at most 4 pixels per point: a tiny dot is not drawn as a poster)
                     img = annotations::drawArea(*s->getDocument(), stamp->page, rect,
                                                 std::min(4.0, width / rect.width()));
+                    ++pictureRenders;
+                    pictureCache().put(key, img);
                 }
                 ThumbnailProvider::releaseSession(sessionId);
             }
@@ -486,7 +544,7 @@ QQuickImageResponse* AnnotationImageProvider::requestImageResponse(const QString
                     Q_EMIT response->finished();
                 },
                 Qt::QueuedConnection);
-    });
+    }), ++order);
     return response;
 }
 
