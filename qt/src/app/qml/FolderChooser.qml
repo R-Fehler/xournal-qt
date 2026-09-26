@@ -5,7 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: chooser
     objectName: "folderChooser"
     /// Where the list starts and above which it does not go (the phone's storage)
@@ -35,12 +35,10 @@ Dialog {
         return [qsTr("Phone storage")].concat(rest).join(" / ")
     }
 
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     title: qsTr("Open a folder as library")
-    width: Math.min(parent ? parent.width - 32 : 480, 480)
-    height: Math.min(parent ? parent.height - 64 : 640, 640)
+    preferredWidth: 480
+    fillBody: true
+    preferredHeight: 640
 
     ColumnLayout {
         anchors.fill: parent

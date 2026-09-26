@@ -7,18 +7,11 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Popup {
+AdaptiveDialog {
     id: sheet
-    parent: Overlay.overlay
-    modal: true
-    focus: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-    x: Math.round((parent ? parent.width : 800) / 2 - width / 2)
-    y: Math.round((parent ? parent.height : 600) / 2 - height / 2)
-    width: Math.min(parent ? parent.width - 32 : 720, 720)
-    height: Math.min(parent ? parent.height - 48 : 700, 760)
-    padding: 0
-    background: Rectangle { color: "#ffffff"; radius: 12; border.width: 1; border.color: "#d5d8dc" }
+    preferredWidth: 720
+    closeButton: true
+    title: qsTr("Fuzzy search")
 
     /// The typo tolerance as it is set (Settings → Search)
     readonly property int typos: (app.settings.revision, app.settings.get("fuzzyTypos"))
@@ -58,100 +51,79 @@ Popup {
     ]
 
     ColumnLayout {
-        anchors.fill: parent
-        spacing: 0
-        RowLayout {
+        id: content
+        width: sheet.availableWidth
+        spacing: 10
+        Label {
             Layout.fillWidth: true
-            Layout.margins: 16
-            Label { text: qsTr("Fuzzy search"); font.pixelSize: 20; font.weight: Font.DemiBold; Layout.fillWidth: true }
-            IconButton { iconName: "xqt-close"; tip: qsTr("Close (Esc)"); onClicked: sheet.close() }
+            wrapMode: Text.WordWrap
+            textFormat: Text.StyledText
+            text: qsTr("<b>Names</b> (and folders) match when their letters come in the typed order, "
+                       + "like fzf; the best matches come first, their matched letters are marked.")
         }
-        Flickable {
+        Label {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.leftMargin: 16
-            Layout.rightMargin: 16
-            Layout.bottomMargin: 16
-            contentHeight: content.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar {}
-            ColumnLayout {
-                id: content
-                width: parent.width - 8
-                spacing: 10
+            wrapMode: Text.WordWrap
+            textFormat: Text.StyledText
+            text: qsTr("<b>Text</b> is matched word by word: a word matches when it contains the typed "
+                       + "letters, or starts with the first one and has all of them in this order with few "
+                       + "letters between (tbine: \"turbine\", not \"tambourine\"). The whole word is marked. "
+                       + "Words of 1-2 letters and terms with other characters are found as typed. "
+                       + "Documents with the word as typed come before fuzzy matches.")
+                + " " + sheet.typoText
+        }
+        // The syntax: per row what is typed, and below what it finds, an example
+        Repeater {
+            objectName: "fuzzyHelpRows"
+            model: sheet.rows
+            delegate: RowLayout {
+                required property var modelData
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 14
                 Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    textFormat: Text.StyledText
-                    text: qsTr("<b>Names</b> (and folders) match when their letters come in the typed order, "
-                               + "like fzf; the best matches come first, their matched letters are marked.")
+                    Layout.preferredWidth: 84
+                    Layout.alignment: Qt.AlignTop
+                    text: modelData.typed
+                    font.family: "monospace"
+                    font.weight: Font.DemiBold
                 }
-                Label {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    textFormat: Text.StyledText
-                    text: qsTr("<b>Text</b> is matched word by word: a word matches when it contains the typed "
-                               + "letters, or starts with the first one and has all of them in this order with few "
-                               + "letters between (tbine: \"turbine\", not \"tambourine\"). The whole word is marked. "
-                               + "Words of 1-2 letters and terms with other characters are found as typed. "
-                               + "Documents with the word as typed come before fuzzy matches.")
-                        + " " + sheet.typoText
-                }
-                // The syntax: per row what is typed, and below what it finds, an example
-                Repeater {
-                    objectName: "fuzzyHelpRows"
-                    model: sheet.rows
-                    delegate: RowLayout {
-                        required property var modelData
+                    spacing: 2
+                    Label {
                         Layout.fillWidth: true
-                        Layout.topMargin: 4
-                        spacing: 14
-                        Label {
-                            Layout.preferredWidth: 84
-                            Layout.alignment: Qt.AlignTop
-                            text: modelData.typed
-                            font.family: "monospace"
-                            font.weight: Font.DemiBold
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-                            Label {
-                                Layout.fillWidth: true
-                                wrapMode: Text.WordWrap
-                                textFormat: Text.StyledText
-                                text: modelData.finds
-                            }
-                            Label {
-                                Layout.fillWidth: true
-                                wrapMode: Text.WordWrap
-                                textFormat: Text.StyledText
-                                color: "#6b6f75"
-                                font.pixelSize: 13
-                                text: qsTr("e.g. %1").arg(modelData.example)
-                            }
-                        }
+                        wrapMode: Text.WordWrap
+                        textFormat: Text.StyledText
+                        text: modelData.finds
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        textFormat: Text.StyledText
+                        color: "#6b6f75"
+                        font.pixelSize: 13
+                        text: qsTr("e.g. %1").arg(modelData.example)
                     }
                 }
-                Label {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 6
-                    wrapMode: Text.WordWrap
-                    textFormat: Text.StyledText
-                    text: qsTr("<b>Pages with hits</b> (the pages button): the pages on which the whole expression "
-                               + "holds, a term counting as found on a page when the page, the name or the folder "
-                               + "has it; if it holds on no single page (the words are on different pages), all "
-                               + "pages with hits. The count on a card is the hits of the terms that are not negated.")
-                }
-                Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                    color: "#6b6f75"
-                    text: qsTr("Case never matters. An expression that is not complete (a ( not closed, a | "
-                               + "alone) is searched as plain text, with a short hint next to the field.")
-                }
             }
+        }
+        Label {
+            Layout.fillWidth: true
+            Layout.topMargin: 6
+            wrapMode: Text.WordWrap
+            textFormat: Text.StyledText
+            text: qsTr("<b>Pages with hits</b> (the pages button): the pages on which the whole expression "
+                       + "holds, a term counting as found on a page when the page, the name or the folder "
+                       + "has it; if it holds on no single page (the words are on different pages), all "
+                       + "pages with hits. The count on a card is the hits of the terms that are not negated.")
+        }
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            color: "#6b6f75"
+            text: qsTr("Case never matters. An expression that is not complete (a ( not closed, a | "
+                       + "alone) is searched as plain text, with a short hint next to the field.")
         }
     }
 }

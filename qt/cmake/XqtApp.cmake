@@ -126,6 +126,7 @@ endif()
 set(XQT_QML_FILES
     src/app/qml/Main.qml
     src/app/qml/IconButton.qml
+    src/app/qml/AdaptiveDialog.qml
     src/app/qml/InlineRename.qml
     src/app/qml/RenameDialog.qml
     src/app/qml/RenameGestures.qml

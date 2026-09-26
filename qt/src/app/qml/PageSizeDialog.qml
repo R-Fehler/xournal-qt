@@ -6,14 +6,11 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: dlg
     objectName: "pageSizeDialog"
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     title: qsTr("Page size")
-    width: Math.min(parent ? parent.width * 0.94 : 520, 520)
+    preferredWidth: 520
 
     /// The page it was opened for (0-based), and the selected pages (more than one, else none)
     property int page: 0

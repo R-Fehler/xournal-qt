@@ -280,14 +280,12 @@ Item {
         nameFilters: [qsTr("Markdown (*.md)")]
         onAccepted: app.exportAnnotations(selectedFile)
     }
-    Dialog {
+    AdaptiveDialog {
         id: replaceDialog
         objectName: "annotationReplaceDialog"
+        kind: "question"
         property url file
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(420, parent ? parent.width - 32 : 420)
+        preferredWidth: 420
         title: qsTr("Replace the exported annotations?")
         Label {
             width: replaceDialog.availableWidth

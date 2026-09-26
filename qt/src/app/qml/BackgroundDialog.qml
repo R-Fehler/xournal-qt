@@ -5,15 +5,12 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: dlg
     objectName: "backgroundDialog"
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     title: pages.length === 1 ? qsTr("Background of page %1").arg(pages[0] + 1)
                               : qsTr("Background of %1 pages").arg(pages.length)
-    width: Math.min(parent ? parent.width * 0.94 : 640, 660)
+    preferredWidth: 660
     standardButtons: Dialog.Cancel | Dialog.Ok
 
     /// 0-based page numbers

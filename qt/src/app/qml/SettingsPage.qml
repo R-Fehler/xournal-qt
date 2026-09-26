@@ -1126,13 +1126,11 @@ Popup {
     }
 
     // Shown once, when "Save notes into the PDF itself" is turned on
-    Dialog {
+    AdaptiveDialog {
         id: intoPdfExplanation
         objectName: "intoPdfExplanation"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(480, parent ? parent.width - 32 : 480)
+        kind: "card"
+        preferredWidth: 480
         title: qsTr("Notes in the PDF itself")
         standardButtons: Dialog.Ok
         Label {
@@ -1147,13 +1145,11 @@ Popup {
     }
 
     // Removing the cache folders: says what happens (the app closes afterwards)
-    Dialog {
+    AdaptiveDialog {
         id: removeCaches
         objectName: "removeCachesDialog"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(480, parent ? parent.width - 32 : 480)
+        kind: "question"
+        preferredWidth: 480
         title: qsTr("Remove the cache folders?")
         ColumnLayout {
             width: removeCaches.availableWidth
@@ -1191,15 +1187,13 @@ Popup {
     }
 
     // Catches the keys for one shortcut
-    Dialog {
+    AdaptiveDialog {
         id: capture
         objectName: "shortcutCapture"
+        kind: "card"
         property int row: -1
         property string actionId: ""
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: 360
+        preferredWidth: 360
         title: qsTr("Press the keys")
         standardButtons: Dialog.Cancel
         onOpened: catcher.forceActiveFocus()

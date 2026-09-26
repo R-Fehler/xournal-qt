@@ -7,17 +7,12 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Popup {
+AdaptiveDialog {
     id: sheet
     objectName: "findPaperSheet"
-    modal: true
-    focus: true
-    parent: Overlay.overlay
-    anchors.centerIn: Overlay.overlay
-    width: Math.min(parent ? parent.width - 24 : 640, 640)
-    height: Math.min(parent ? parent.height - 48 : 640, 640)
-    padding: 0
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    preferredWidth: 640
+    closeButton: true
+    title: qsTr("Find this paper in the library")
 
     /// The cleaned entry (the fallback; the whole of it is matched as well)
     property string raw: ""
@@ -44,26 +39,13 @@ Popup {
         app.citations.findPapers(titleField.text, titleField.text === guessed ? raw : "", shownFiles)
     }
 
-    background: Rectangle { color: "#fafafa"; radius: 14; border.width: 1; border.color: "#d5d8dc" }
 
     Timer { id: typing; interval: 300; onTriggered: sheet.search() }
 
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 16
+        width: sheet.availableWidth
         spacing: 8
 
-        RowLayout {
-            Layout.fillWidth: true
-            Label {
-                text: qsTr("Find this paper in the library")
-                font.pixelSize: 18
-                font.weight: Font.DemiBold
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-            }
-            IconButton { iconName: "xqt-close"; tip: qsTr("Close"); onClicked: sheet.close() }
-        }
         Label { text: qsTr("Title"); color: "#50555b"; font.pixelSize: 13 }
         TextField {
             id: titleField
@@ -107,8 +89,9 @@ Popup {
             id: list
             objectName: "findPaperHits"
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
+            // (all of them: the sheet's body scrolls)
+            Layout.preferredHeight: contentHeight
+            interactive: false
             spacing: 6
             model: sheet.hits
             delegate: Rectangle {

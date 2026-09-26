@@ -5,14 +5,11 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: dialog
     objectName: "documentModeDialog"
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     closePolicy: Popup.NoAutoClose
-    width: Math.min(520, parent ? parent.width - 32 : 520)
+    preferredWidth: 520
     title: qsTr("How do you want to keep your documents?")
     /// After the choice (the window goes on with what waited: the recovery question)
     signal chosen()

@@ -4,15 +4,12 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: bookmarkDialog
     objectName: "bookmarkDialog"
     property int page: 0
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     title: qsTr("Bookmark of page %1").arg(page + 1)
-    width: Math.min(parent ? parent.width * 0.9 : 400, 400)
+    preferredWidth: 400
     function openFor(p) {
         page = p
         bookmarkField.text = app.bookmarkOf(p)

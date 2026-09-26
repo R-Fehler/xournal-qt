@@ -5,16 +5,11 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Popup {
+AdaptiveDialog {
     id: dlg
     objectName: "unusedImagesDialog"
-    modal: true
-    focus: true
-    parent: Overlay.overlay
-    anchors.centerIn: Overlay.overlay
-    width: Math.min(parent ? parent.width - 32 : 480, 480)
-    padding: 16
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    preferredWidth: 480
+    title: qsTr("Remove unused images")
 
     property var files: []
 
@@ -23,18 +18,11 @@ Popup {
         open()
     }
 
-    background: Rectangle { color: "#ffffff"; radius: 12; border.width: 1; border.color: "#d5d8dc" }
+    onAccepted: app.trashMarkdownImages(dlg.files)
 
     ColumnLayout {
-        anchors.left: parent.left
-        anchors.right: parent.right
+        width: dlg.availableWidth
         spacing: 8
-        Label {
-            text: qsTr("Remove unused images")
-            font.pixelSize: 17
-            font.weight: Font.DemiBold
-            Layout.fillWidth: true
-        }
         Label {
             objectName: "unusedImagesSummary"
             text: dlg.files.length === 0 ? qsTr("Every image in the document's folder of images is used by its text.")
@@ -60,25 +48,20 @@ Popup {
                 bottomPadding: 2
             }
         }
-        RowLayout {
-            Layout.fillWidth: true
-            Item { Layout.fillWidth: true }
-            Button {
-                objectName: "unusedImagesCancel"
-                text: dlg.files.length === 0 ? qsTr("Close") : qsTr("Cancel")
-                flat: true
-                onClicked: dlg.close()
-            }
-            Button {
-                objectName: "unusedImagesTrash"
-                visible: dlg.files.length > 0
-                text: qsTr("Move to trash")
-                highlighted: true
-                onClicked: {
-                    app.trashMarkdownImages(dlg.files)
-                    dlg.close()
-                }
-            }
+    }
+    footer: DialogButtonBox {
+        Button {
+            objectName: "unusedImagesCancel"
+            text: dlg.files.length === 0 ? qsTr("Close") : qsTr("Cancel")
+            flat: true
+            DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+        }
+        Button {
+            objectName: "unusedImagesTrash"
+            visible: dlg.files.length > 0
+            text: qsTr("Move to trash")
+            highlighted: true
+            DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
         }
     }
 }

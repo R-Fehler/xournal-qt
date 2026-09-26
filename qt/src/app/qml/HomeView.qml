@@ -1523,14 +1523,11 @@ Rectangle {
         }
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: renameDialog
         objectName: "renameDialog"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: home.menuFolder ? qsTr("Rename folder") : qsTr("Rename document")
-        width: Math.min(parent ? parent.width * 0.9 : 440, 440)
+        preferredWidth: 440
         onAboutToShow: { renameField.text = home.menuName; renameField.selectAll(); renameField.forceActiveFocus() }
         ColumnLayout {
             width: renameDialog.availableWidth
@@ -1556,15 +1553,12 @@ Rectangle {
         onAccepted: if (renameField.text.trim() !== "" && home.menuModel) home.menuModel.rename(home.menuRow, renameField.text)
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: folderNameDialog
         objectName: "folderNameDialog"
         property int row: -1
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("New folder")
-        width: Math.min(parent ? parent.width * 0.9 : 440, 440)
+        preferredWidth: 440
         onAboutToShow: { folderField.text = ""; folderField.forceActiveFocus() }
         TextField {
             id: folderField
@@ -1581,16 +1575,13 @@ Rectangle {
 
     // "New text document" (a PDF text document, ".pdf"), "New Markdown file" / "New text file": its name (made in the
     // current folder and opened to write in)
-    Dialog {
+    AdaptiveDialog {
         id: textFileDialog
         objectName: "textFileDialog"
         property string extension: ".md"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: extension === ".pdf" ? qsTr("New text document") : extension === ".md" ? qsTr("New Markdown file")
                                                                                      : qsTr("New text file")
-        width: Math.min(parent ? parent.width * 0.9 : 440, 440)
+        preferredWidth: 440
         onAboutToShow: { textFileField.text = ""; textFileField.forceActiveFocus() }
         RowLayout {
             width: textFileDialog.availableWidth
@@ -1611,20 +1602,18 @@ Rectangle {
     }
 
     // Where to copy / move documents and folders: a folder of this library or of another one.
-    Dialog {
+    AdaptiveDialog {
         id: transferDialog
         objectName: "transferDialog"
         property var paths: []
         property bool copy: false
         property var libraries: []
         property string targetRoot: ""
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: (copy ? qsTr("Copy %1 to") : qsTr("Move %1 to"))
                    .arg(paths.length === 1 ? "“" + paths[0].substring(paths[0].lastIndexOf("/") + 1) + "”" : home.countText(paths.length))
-        width: Math.min(parent ? parent.width * 0.9 : 480, 480)
-        height: Math.min(parent ? parent.height * 0.85 : 560, 580)
+        preferredWidth: 480
+        fillBody: true
+        preferredHeight: 580
         standardButtons: Dialog.Cancel
         onAboutToShow: {
             libraries = app.libraries()
@@ -1687,14 +1676,12 @@ Rectangle {
         }
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: trashDialog
         objectName: "trashDialog"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
+        kind: "question"
         title: qsTr("Move to trash?")
-        width: Math.min(parent ? parent.width * 0.9 : 460, 460)
+        preferredWidth: 460
         ColumnLayout {
             width: trashDialog.availableWidth
             Label {
@@ -1714,16 +1701,14 @@ Rectangle {
     }
 
     // Android: why "All files access" is asked for, before the system's page for it
-    Dialog {
+    AdaptiveDialog {
         id: storageAccessDialog
         objectName: "storageAccessDialog"
+        kind: "question"
         property string folder: ""  // then opened as library ("": the folder picker)
         function ask(path) { folder = path; open() }
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("Allow access to your files?")
-        width: Math.min(parent ? parent.width - 32 : 520, 520)
+        preferredWidth: 520
         Label {
             width: storageAccessDialog.availableWidth
             wrapMode: Text.Wrap
@@ -1751,16 +1736,14 @@ Rectangle {
 
     // Android: the libraries belong in the phone's Documents folder (they are in the app's own folder, which Android
     // deletes with the app): explained, then "All files access" and the move (AppController::moveLibrariesHome)
-    Dialog {
+    AdaptiveDialog {
         id: librariesHomeDialog
         objectName: "librariesHomeDialog"
+        kind: "question"
         property string toMove: ""
         onAboutToShow: toMove = app.librariesToMove()
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("Keep libraries on the phone?")
-        width: Math.min(parent ? parent.width - 32 : 520, 520)
+        preferredWidth: 520
         Label {
             width: librariesHomeDialog.availableWidth
             wrapMode: Text.Wrap
@@ -1799,16 +1782,14 @@ Rectangle {
     }
 
     // The move in progress: copied, checked, then the old copies removed
-    Dialog {
+    AdaptiveDialog {
         id: libraryMoveDialog
         objectName: "libraryMoveDialog"
+        kind: "card"
         readonly property var move: app.libraryMove
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         closePolicy: Popup.NoAutoClose
         title: qsTr("Moving the libraries")
-        width: Math.min(parent ? parent.width - 32 : 480, 480)
+        preferredWidth: 480
         Connections {
             target: app.libraryMove
             function onRunningChanged() {
@@ -1854,13 +1835,10 @@ Rectangle {
         }
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: newLibraryDialog
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("New library")
-        width: Math.min(parent ? parent.width * 0.9 : 460, 460)
+        preferredWidth: 460
         onAboutToShow: { libraryName.text = ""; libraryName.forceActiveFocus() }
         ColumnLayout {
             width: newLibraryDialog.availableWidth
@@ -1890,13 +1868,10 @@ Rectangle {
     }
 
     // Export library as archive: what it does, the whole library or this folder, then a folder outside the library
-    Dialog {
+    AdaptiveDialog {
         id: libraryArchiveDialog
         objectName: "libraryArchiveDialog"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(540, parent ? parent.width - 32 : 540)
+        preferredWidth: 540
         title: qsTr("Export library as archive")
         onAboutToShow: archiveWholeLibrary.checked = true
         ColumnLayout {
@@ -1954,14 +1929,13 @@ Rectangle {
         onAccepted: app.exportLibraryArchive(selectedFolder, onlyFolder)
     }
     // While it runs: progress and Cancel
-    Dialog {
+    AdaptiveDialog {
         id: libraryArchiveProgress
         objectName: "libraryArchiveProgress"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
+        kind: "card"
         modal: false
         closePolicy: Popup.NoAutoClose
-        width: Math.min(460, parent ? parent.width - 32 : 460)
+        preferredWidth: 460
         title: qsTr("Writing the archive…")
         visible: app.libraryArchive.running
         ColumnLayout {
@@ -1993,14 +1967,12 @@ Rectangle {
         }
     }
     // At the end: what was done
-    Dialog {
+    AdaptiveDialog {
         id: libraryArchiveSummary
         objectName: "libraryArchiveSummary"
+        kind: "card"
         property var summary: ({})
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(560, parent ? parent.width - 32 : 560)
+        preferredWidth: 560
         title: summary.cancelled ? qsTr("Archive cancelled") : qsTr("Archive written")
         ColumnLayout {
             width: libraryArchiveSummary.availableWidth
@@ -2077,15 +2049,13 @@ Rectangle {
         }
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: temporaryImportDialog
         objectName: "temporaryImportDialog"
+        kind: "question"
         property var action: null
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("Import into Downloads?")
-        width: Math.min(parent ? parent.width * 0.9 : 520, 520)
+        preferredWidth: 520
         ColumnLayout {
             width: temporaryImportDialog.availableWidth
             Label {
@@ -2111,7 +2081,7 @@ Rectangle {
 
     // Sync conflicts of a document (the badge on its card): compare side by side, or keep one (the other goes to the
     // trash; where there is none, deleted after asking)
-    Dialog {
+    AdaptiveDialog {
         id: conflictDialog
         objectName: "conflictDialog"
         property string documentPath: ""
@@ -2121,84 +2091,74 @@ Rectangle {
             items = app.library.conflictsOf(path)
             if (items.length > 1) open()
         }
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("Sync conflict")
-        width: Math.min(parent ? parent.width - 32 : 560, 560)
-        height: Math.min(implicitHeight, parent ? parent.height - 64 : 800)
+        preferredWidth: 560
         standardButtons: Dialog.Close
-        contentItem: Flickable {
-            implicitHeight: conflictColumn.implicitHeight
-            contentHeight: conflictColumn.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            ColumnLayout {
-                id: conflictColumn
-                width: parent.width
-                spacing: 12
-                Label {
+        ColumnLayout {
+            id: conflictColumn
+            width: conflictDialog.availableWidth
+            spacing: 12
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("A sync app found this document changed in two places and kept both versions. Compare "
+                           + "them side by side, then keep one; the other goes to the trash.")
+                      + (app.library.canTrash ? "" : " " + qsTr("(There is no trash here: it is deleted.)"))
+            }
+            Repeater {
+                model: conflictDialog.items
+                delegate: Frame {
+                    id: conflictRow
+                    required property var modelData
                     Layout.fillWidth: true
-                    wrapMode: Text.Wrap
-                    text: qsTr("A sync app found this document changed in two places and kept both versions. Compare "
-                               + "them side by side, then keep one; the other goes to the trash.")
-                          + (app.library.canTrash ? "" : " " + qsTr("(There is no trash here: it is deleted.)"))
-                }
-                Repeater {
-                    model: conflictDialog.items
-                    delegate: Frame {
-                        id: conflictRow
-                        required property var modelData
-                        Layout.fillWidth: true
-                        ColumnLayout {
-                            width: parent.width
-                            spacing: 4
-                            Label {
-                                Layout.fillWidth: true
-                                wrapMode: Text.WrapAnywhere
-                                font.weight: Font.DemiBold
-                                text: conflictRow.modelData.original ? qsTr("This document: %1").arg(conflictRow.modelData.name)
-                                                                     : conflictRow.modelData.name
+                    ColumnLayout {
+                        width: parent.width
+                        spacing: 4
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WrapAnywhere
+                            font.weight: Font.DemiBold
+                            text: conflictRow.modelData.original ? qsTr("This document: %1").arg(conflictRow.modelData.name)
+                                                                 : conflictRow.modelData.name
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                            font.pixelSize: 12
+                            color: "#5f6368"
+                            text: {
+                                const d = conflictRow.modelData
+                                let parts = []
+                                if (!d.original && d.app) parts.push(qsTr("Conflict copy (%1)").arg(d.app))
+                                else if (!d.original) parts.push(qsTr("Conflict copy"))
+                                parts.push(qsTr("changed %1").arg(d.modified.toLocaleString(Qt.locale(), Locale.ShortFormat)))
+                                parts.push(home.sizeText(d.size))
+                                return parts.join(" · ")
                             }
-                            Label {
-                                Layout.fillWidth: true
-                                wrapMode: Text.Wrap
-                                font.pixelSize: 12
-                                color: "#5f6368"
-                                text: {
-                                    const d = conflictRow.modelData
-                                    let parts = []
-                                    if (!d.original && d.app) parts.push(qsTr("Conflict copy (%1)").arg(d.app))
-                                    else if (!d.original) parts.push(qsTr("Conflict copy"))
-                                    parts.push(qsTr("changed %1").arg(d.modified.toLocaleString(Qt.locale(), Locale.ShortFormat)))
-                                    parts.push(home.sizeText(d.size))
-                                    return parts.join(" · ")
+                        }
+                        Flow {
+                            Layout.fillWidth: true
+                            visible: !conflictRow.modelData.original
+                            spacing: 8
+                            Button {
+                                objectName: "conflictCompareButton"
+                                text: qsTr("Compare")
+                                onClicked: {
+                                    conflictDialog.close()
+                                    app.compareConflict(conflictDialog.documentPath, conflictRow.modelData.path)
                                 }
                             }
-                            Flow {
-                                Layout.fillWidth: true
-                                visible: !conflictRow.modelData.original
-                                spacing: 8
-                                Button {
-                                    objectName: "conflictCompareButton"
-                                    text: qsTr("Compare")
-                                    onClicked: {
-                                        conflictDialog.close()
-                                        app.compareConflict(conflictDialog.documentPath, conflictRow.modelData.path)
-                                    }
-                                }
-                                Button {
-                                    objectName: "conflictKeepDocumentButton"
-                                    text: qsTr("Keep the document")
-                                    onClicked: conflictConfirm.ask(conflictRow.modelData.path, false,
-                                                                   conflictRow.modelData.name)
-                                }
-                                Button {
-                                    objectName: "conflictKeepCopyButton"
-                                    text: qsTr("Keep this copy")
-                                    onClicked: conflictConfirm.ask(conflictRow.modelData.path, true,
-                                                                   conflictDialog.items[0].name)
-                                }
+                            Button {
+                                objectName: "conflictKeepDocumentButton"
+                                text: qsTr("Keep the document")
+                                onClicked: conflictConfirm.ask(conflictRow.modelData.path, false,
+                                                               conflictRow.modelData.name)
+                            }
+                            Button {
+                                objectName: "conflictKeepCopyButton"
+                                text: qsTr("Keep this copy")
+                                onClicked: conflictConfirm.ask(conflictRow.modelData.path, true,
+                                                               conflictDialog.items[0].name)
                             }
                         }
                     }
@@ -2207,9 +2167,10 @@ Rectangle {
         }
     }
     // Keep one: without a trash (Android), what goes is deleted - asked first
-    Dialog {
+    AdaptiveDialog {
         id: conflictConfirm
         objectName: "conflictConfirm"
+        kind: "question"
         property string copyPath: ""
         property bool keepCopy: false
         property string goes: ""
@@ -2226,11 +2187,8 @@ Rectangle {
                 if (conflictDialog.items.length < 2) conflictDialog.close()
             }
         }
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("Delete the other version?")
-        width: Math.min(parent ? parent.width - 32 : 480, 480)
+        preferredWidth: 480
         standardButtons: Dialog.Cancel | Dialog.Ok
         Label {
             width: conflictConfirm.availableWidth
@@ -2240,14 +2198,12 @@ Rectangle {
         onAccepted: resolve()
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: errorDialog
+        kind: "card"
         property alias text: errorLabel.text
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("That did not work")
-        width: Math.min(parent ? parent.width * 0.9 : 520, 520)
+        preferredWidth: 520
         standardButtons: Dialog.Ok
         Label { id: errorLabel; width: errorDialog.availableWidth; wrapMode: Text.Wrap }
     }

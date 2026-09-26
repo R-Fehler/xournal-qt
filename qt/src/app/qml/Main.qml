@@ -1826,9 +1826,10 @@ ApplicationWindow {
         }
     }
     // Share…: the PDF with notes (shown in the file manager, or copied), or a copy for Xournal++ users
-    Dialog {
+    AdaptiveDialog {
         id: shareDialog
         objectName: "shareDialog"
+        kind: "question"
         property string file: ""  // a PDF of the library; "": the current document
         /// A Markdown or text file (the current document's, or a card's): shared as the file itself, never as a PDF
         property string textFile: ""
@@ -1837,10 +1838,7 @@ ApplicationWindow {
             textFile = app.sharedTextFile(path)
             open()
         }
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(460, parent ? parent.width - 32 : 460)
+        preferredWidth: 460
         title: qsTr("Share")
         standardButtons: Dialog.Cancel
         ColumnLayout {
@@ -1900,13 +1898,11 @@ ApplicationWindow {
         }
     }
     // Share → PDF of a .xopp: saved as a PDF with notes (the document becomes it), or a PDF copy
-    Dialog {
+    AdaptiveDialog {
         id: shareXoppDialog
         objectName: "shareXoppDialog"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(500, parent ? parent.width - 32 : 500)
+        kind: "question"
+        preferredWidth: 500
         title: qsTr("Share as a PDF with notes")
         Label {
             width: shareXoppDialog.availableWidth
@@ -1969,7 +1965,7 @@ ApplicationWindow {
         }
     }
     // Export for the archive: what it means, where it goes; then the PDF/A report
-    Dialog {
+    AdaptiveDialog {
         id: archiveDialog
         objectName: "archiveDialog"
         property string file: ""  // a library card's document; "": the current document
@@ -1983,10 +1979,7 @@ ApplicationWindow {
                 archiveInFolder.checked = true
             open()
         }
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(520, parent ? parent.width - 32 : 520)
+        preferredWidth: 520
         title: qsTr("Export for the archive")
         ColumnLayout {
             width: archiveDialog.availableWidth
@@ -2052,17 +2045,15 @@ ApplicationWindow {
         title: qsTr("Folder for the archive PDF")
         onAccepted: app.exportArchive(app.archiveFileIn(selectedFolder, file), file)
     }
-    Dialog {
+    AdaptiveDialog {
         id: archiveReportDialog
         objectName: "archiveReportDialog"
+        kind: "card"
         property string path: ""
         property bool pdfa: false
         property var problems: []
         property var adjusted: []
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(520, parent ? parent.width - 32 : 520)
+        preferredWidth: 520
         title: pdfa ? qsTr("Archive PDF written") : qsTr("Written, but not as PDF/A")
         ColumnLayout {
             width: archiveReportDialog.availableWidth
@@ -2117,9 +2108,10 @@ ApplicationWindow {
         }
     }
     // Saving a "name.xopp" as a PDF with notes: what happens to the .xopp (asked once, before it is written)
-    Dialog {
+    AdaptiveDialog {
         id: oldXoppDialog
         objectName: "oldXoppDialog"
+        kind: "question"
         property string file: ""
         property var url
         property var afterSave: null
@@ -2137,10 +2129,7 @@ ApplicationWindow {
             afterSave = null
             close()
         }
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(520, parent ? parent.width - 32 : 520)
+        preferredWidth: 520
         title: qsTr("The PDF holds everything")
         ColumnLayout {
             width: oldXoppDialog.availableWidth
@@ -2155,23 +2144,31 @@ ApplicationWindow {
                 id: trashChoice
                 objectName: "oldXoppTrash"
                 ButtonGroup.group: oldXoppChoices
+                Layout.fillWidth: true
+                Component.onCompleted: contentItem.wrapMode = Text.Wrap
                 text: qsTr("Move %1 to the trash (the PDF now holds everything)").arg(oldXoppDialog.file)
             }
             RadioButton {
                 id: updateChoice
                 objectName: "oldXoppUpdate"
                 ButtonGroup.group: oldXoppChoices
+                Layout.fillWidth: true
+                Component.onCompleted: contentItem.wrapMode = Text.Wrap
                 text: qsTr("Keep it updated for Xournal++")
             }
             RadioButton {
                 id: keepChoice
                 objectName: "oldXoppKeep"
                 ButtonGroup.group: oldXoppChoices
+                Layout.fillWidth: true
+                Component.onCompleted: contentItem.wrapMode = Text.Wrap
                 text: qsTr("Keep it as it is (not updated)")
             }
             CheckBox {
                 id: dontAsk
                 objectName: "oldXoppDontAsk"
+                Layout.fillWidth: true
+                Component.onCompleted: contentItem.wrapMode = Text.Wrap
                 text: qsTr("Don't ask again (Settings → Documents)")
             }
         }
@@ -2190,14 +2187,12 @@ ApplicationWindow {
         onRejected: afterSave = null
     }
     // A hybrid PDF whose ink another app changed: keep ours, or take theirs as plain annotations
-    Dialog {
+    AdaptiveDialog {
         id: hybridEditedDialog
         objectName: "hybridEditedDialog"
+        kind: "question"
         property string file: ""
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(520, parent ? parent.width - 32 : 520)
+        preferredWidth: 520
         title: qsTr("Edited in another app")
         closePolicy: Popup.NoAutoClose
         Label {
@@ -2255,13 +2250,11 @@ ApplicationWindow {
         }
     }
     // Open externally with unsaved changes: save them first?
-    Dialog {
+    AdaptiveDialog {
         id: externalSaveDialog
         objectName: "externalSaveDialog"
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(480, parent ? parent.width - 32 : 480)
+        kind: "question"
+        preferredWidth: 480
         title: qsTr("Save before opening it elsewhere?")
         Label {
             width: externalSaveDialog.availableWidth
@@ -2289,14 +2282,12 @@ ApplicationWindow {
         onAccepted: saveOrAsk(function() { app.openExternally() })
     }
     // "Edit anyway" for a code, LaTeX, JSON... file: once per file, what editing it here means
-    Dialog {
+    AdaptiveDialog {
         id: editAnywayDialog
         objectName: "editAnywayDialog"
+        kind: "question"
         property string file: ""
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(520, parent ? parent.width - 32 : 520)
+        preferredWidth: 520
         title: qsTr("Edit %1 as plain text?").arg(file)
         standardButtons: Dialog.Ok | Dialog.Cancel
         Label {
@@ -2309,15 +2300,12 @@ ApplicationWindow {
         onAccepted: app.editAnyway(true)
     }
     // "Linked from": the documents of the library that link to this one (qt/docs/links.md)
-    Dialog {
+    AdaptiveDialog {
         id: backlinksDialog
         objectName: "backlinksDialog"
         property var items: []
         function show() { items = app.backlinks(); open() }
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(460, parent ? parent.width - 32 : 460)
+        preferredWidth: 460
         title: qsTr("Linked from")
         standardButtons: Dialog.Close
         ColumnLayout {
@@ -2342,15 +2330,13 @@ ApplicationWindow {
         }
     }
     // A followed link's file was gone: found elsewhere (update the link?) or not at all (locate it?)
-    Dialog {
+    AdaptiveDialog {
         id: linkFoundDialog
         objectName: "linkFoundDialog"
+        kind: "question"
         property string file: ""
         property string folder: ""
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(480, parent ? parent.width - 32 : 480)
+        preferredWidth: 480
         title: qsTr("The linked document was moved")
         standardButtons: Dialog.Yes | Dialog.No
         Label {
@@ -2361,14 +2347,12 @@ ApplicationWindow {
         }
         onAccepted: app.updateFoundLink()
     }
-    Dialog {
+    AdaptiveDialog {
         id: linkMissingDialog
         objectName: "linkMissingDialog"
+        kind: "question"
         property string file: ""
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(480, parent ? parent.width - 32 : 480)
+        preferredWidth: 480
         title: qsTr("Document not found")
         standardButtons: Dialog.Open | Dialog.Cancel
         Label {
@@ -2386,15 +2370,13 @@ ApplicationWindow {
         onAccepted: app.relinkTo(selectedFile)
     }
     // A text file changed on disk (another program) while it has changes here: which version stays
-    Dialog {
+    AdaptiveDialog {
         id: textChangedDialog
         objectName: "textChangedDialog"
+        kind: "question"
         property string file: ""
         property bool document: false  // a .xopp or PDF (reloading it cannot be undone)
-        parent: Overlay.overlay
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(520, parent ? parent.width - 32 : 520)
+        preferredWidth: 520
         title: qsTr("Changed in another app")
         closePolicy: Popup.NoAutoClose
         Label {
@@ -2447,14 +2429,13 @@ ApplicationWindow {
         nameFilters: [qsTr("Markdown (*.md)")]
         onAccepted: app.exportMarkdown(selectedFile)
     }
-    Dialog {
+    AdaptiveDialog {
         id: markdownReplaceDialog
         objectName: "markdownReplaceDialog"
+        kind: "question"
         property url file
-        anchors.centerIn: parent
-        modal: true
         title: qsTr("Replace the Markdown file?")
-        width: Math.min(win.width * 0.9, 440)
+        preferredWidth: 440
         Label {
             width: markdownReplaceDialog.availableWidth
             wrapMode: Text.WordWrap
@@ -2502,13 +2483,12 @@ ApplicationWindow {
         onAccepted: app.insertImage(selectedFile)
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: unsavedDialog
         objectName: "unsavedDialog"
-        anchors.centerIn: parent
-        modal: true
+        kind: "question"
         title: qsTr("Unsaved changes")
-        width: Math.min(win.width * 0.9, 480)
+        preferredWidth: 480
         Label {
             width: unsavedDialog.availableWidth
             wrapMode: Text.Wrap
@@ -2532,14 +2512,13 @@ ApplicationWindow {
     }
 
     // After a crash: offer the documents with unsaved changes (from emergency and autosave files).
-    Dialog {
+    AdaptiveDialog {
         id: recoveryDialog
         objectName: "recoveryDialog"
+        kind: "question"
         onClosed: homeView.offerLibrariesHomeAtStart()
-        anchors.centerIn: parent
-        modal: true
         closePolicy: Popup.NoAutoClose
-        width: Math.min(win.width * 0.9, 560)
+        preferredWidth: 560
         title: qsTr("Recover unsaved changes?")
         ColumnLayout {
             width: recoveryDialog.availableWidth
@@ -2586,12 +2565,11 @@ ApplicationWindow {
         else homeView.offerLibrariesHomeAtStart()
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: closeAllDialog
         objectName: "closeAllDialog"
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(win.width * 0.8, 480)
+        kind: "question"
+        preferredWidth: 480
         title: qsTr("Close all documents?")
         standardButtons: Dialog.Cancel | Dialog.Ok
         ColumnLayout {
@@ -2606,12 +2584,11 @@ ApplicationWindow {
         onAccepted: { tabOverview.close(); closeAllTabs() }
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: messageDialog
         objectName: "messageDialog"
-        anchors.centerIn: parent
-        modal: true
-        width: Math.min(win.width * 0.8, 640)
+        kind: "card"
+        preferredWidth: 640
         standardButtons: Dialog.Ok
         property alias text: messageLabel.text
         Label { id: messageLabel; wrapMode: Text.Wrap; width: parent.width }

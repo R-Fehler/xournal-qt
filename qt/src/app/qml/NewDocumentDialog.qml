@@ -4,30 +4,12 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
-import QtQuick.Window
 
-Dialog {
+AdaptiveDialog {
     id: dlg
     objectName: "newDocumentDialog"
-    parent: Overlay.overlay
-    // In the middle, or above the soft keyboard while it is open: then it is as high as there is room above the
-    // keyboard, and what is in it scrolls, so that Create stays in reach
-    readonly property real keyboardTop: {
-        const r = Qt.inputMethod.keyboardRectangle
-        // (Android reports it in the screen's pixels, not in the window's units)
-        return Qt.inputMethod.visible && r.height > 0 ? r.y / (Qt.platform.os === "android" ? Screen.devicePixelRatio : 1)
-                                                      : Infinity
-    }
-    /// (the status bar over the window's top, Main.qml)
-    readonly property real safeTop: ApplicationWindow.window && ApplicationWindow.window.safeTop !== undefined
-                                    ? ApplicationWindow.window.safeTop : 0
-    readonly property real room: parent ? Math.min(parent.height, keyboardTop) - safeTop - 16 : 600
-    x: parent ? Math.round((parent.width - width) / 2) : 0
-    y: parent ? Math.round(Math.max(safeTop + 8, Math.min((parent.height - height) / 2, keyboardTop - height - 8))) : 0
-    height: Math.min(implicitHeight, room)
-    modal: true
     title: qsTr("New document")
-    width: Math.min(parent ? parent.width * 0.94 : 640, 660)
+    preferredWidth: 660
     readonly property var s: app.settings
     readonly property bool canSaveInLibrary: app.library.available
     property int bgIndex: 0
@@ -61,17 +43,9 @@ Dialog {
         dlg.close()
     }
 
-    Flickable {
-        id: body
-        anchors.fill: parent
-        implicitWidth: column.implicitWidth
-        implicitHeight: column.implicitHeight
-        contentHeight: column.implicitHeight
-        boundsBehavior: Flickable.StopAtBounds
-        clip: true
     ColumnLayout {
         id: column
-        width: body.width
+        width: dlg.availableWidth
         spacing: 12
 
         TextField {
@@ -152,8 +126,6 @@ Dialog {
                 return qsTr("Save in the library: %1").arg(crumbs.join(" › "))
             }
         }
-    }
-
     }
 
     footer: DialogButtonBox {

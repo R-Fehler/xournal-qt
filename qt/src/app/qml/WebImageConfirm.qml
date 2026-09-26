@@ -6,16 +6,12 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Popup {
+AdaptiveDialog {
     id: dlg
     objectName: "webImageConfirm"
-    modal: true
-    focus: true
-    parent: Overlay.overlay
-    anchors.centerIn: Overlay.overlay
-    width: Math.min(parent ? parent.width - 32 : 520, 520)
-    padding: 16
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    kind: "question"
+    preferredWidth: 520
+    title: qsTr("Load this picture from the web?")
 
     property string url: ""
     property string host: ""
@@ -33,19 +29,11 @@ Popup {
         open()
     }
 
-    background: Rectangle { color: "#ffffff"; radius: 12; border.width: 1; border.color: "#d5d8dc" }
+    onAccepted: app.loadWebImage(dlg.url)
 
     ColumnLayout {
-        anchors.left: parent.left
-        anchors.right: parent.right
+        width: dlg.availableWidth
         spacing: 8
-        Label {
-            text: qsTr("Load this picture from the web?")
-            font.pixelSize: 17
-            font.weight: Font.DemiBold
-            Layout.fillWidth: true
-            wrapMode: Text.WordWrap
-        }
         Label {
             objectName: "webImageHost"
             text: qsTr("It is fetched from %1 and kept in the app's cache (not in the document):").arg(dlg.host)
@@ -76,25 +64,19 @@ Popup {
             color: "#6b6f75"
             font.pixelSize: 12
         }
-        RowLayout {
-            Layout.fillWidth: true
-            Item { Layout.fillWidth: true }
-            Button {
-                objectName: "webImageCancel"
-                text: qsTr("Cancel")
-                flat: true
-                onClicked: dlg.close()
-            }
-            Button {
-                objectName: "webImageLoad"
-                text: qsTr("Load")
-                highlighted: true
-                onClicked: {
-                    const u = dlg.url
-                    dlg.close()
-                    app.loadWebImage(u)
-                }
-            }
+    }
+    footer: DialogButtonBox {
+        Button {
+            objectName: "webImageCancel"
+            text: qsTr("Cancel")
+            flat: true
+            DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+        }
+        Button {
+            objectName: "webImageLoad"
+            text: qsTr("Load")
+            highlighted: true
+            DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
         }
     }
 }

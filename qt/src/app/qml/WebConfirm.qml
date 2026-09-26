@@ -6,16 +6,12 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Popup {
+AdaptiveDialog {
     id: dlg
     objectName: "webConfirm"
-    modal: true
-    focus: true
-    parent: Overlay.overlay
-    anchors.centerIn: Overlay.overlay
-    width: Math.min(parent ? parent.width - 32 : 520, 520)
-    padding: 16
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    kind: "question"
+    preferredWidth: 520
+    title: dlg.what !== "" ? dlg.what : qsTr("Open in the browser?")
 
     /// The address (exactly what is opened) and what it is for ("Search in Google Scholar")
     property string url: ""
@@ -35,19 +31,11 @@ Popup {
         app.citations.openWeb(u)
     }
 
-    background: Rectangle { color: "#ffffff"; radius: 12; border.width: 1; border.color: "#d5d8dc" }
+    onAccepted: openIt()
 
     ColumnLayout {
-        anchors.left: parent.left
-        anchors.right: parent.right
+        width: dlg.availableWidth
         spacing: 8
-        Label {
-            text: dlg.what !== "" ? dlg.what : qsTr("Open in the browser?")
-            font.pixelSize: 17
-            font.weight: Font.DemiBold
-            Layout.fillWidth: true
-            wrapMode: Text.WordWrap
-        }
         Label {
             objectName: "webConfirmHost"
             text: qsTr("Opens this address on %1 in the browser:").arg(dlg.host)
@@ -73,28 +61,26 @@ Popup {
             text: qsTr("Don't ask again (the menu still shows each address)")
             Layout.fillWidth: true
         }
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 4
-            Button {
-                objectName: "webConfirmCopy"
-                text: qsTr("Copy address")
-                flat: true
-                onClicked: { app.citations.copyText(dlg.url); dlg.close() }
-            }
-            Item { Layout.fillWidth: true }
-            Button {
-                objectName: "webConfirmCancel"
-                text: qsTr("Cancel")
-                flat: true
-                onClicked: dlg.close()
-            }
-            Button {
-                objectName: "webConfirmOpen"
-                text: qsTr("Open")
-                highlighted: true
-                onClicked: dlg.openIt()
-            }
+    }
+    footer: DialogButtonBox {
+        Button {
+            objectName: "webConfirmCopy"
+            text: qsTr("Copy address")
+            flat: true
+            DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+            onClicked: { app.citations.copyText(dlg.url); dlg.close() }
+        }
+        Button {
+            objectName: "webConfirmCancel"
+            text: qsTr("Cancel")
+            flat: true
+            DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+        }
+        Button {
+            objectName: "webConfirmOpen"
+            text: qsTr("Open")
+            highlighted: true
+            DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
         }
     }
 }

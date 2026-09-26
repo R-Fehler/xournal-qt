@@ -5,14 +5,11 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: dlg
     objectName: "printDialog"
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     title: qsTr("Print")
-    width: Math.min(parent ? parent.width * 0.9 : 460, 460)
+    preferredWidth: 460
     standardButtons: Dialog.Cancel | Dialog.Ok
 
     property bool withAnnotations: true
