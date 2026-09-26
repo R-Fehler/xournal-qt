@@ -37,6 +37,7 @@
 #include "InputLog.h"
 #include "CanvasPage.h"
 #include "Perf.h"
+#include "MarkdownBoxResize.h"
 #include "CanvasView.h"
 #include "StickyNotes.h"
 #include "GeometryToolLayer.h"
@@ -314,7 +315,8 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
         link = canvasView->hoverLinkAt(itemPos);  // (the links each page keeps: cheap for every move)
     }
     if (!link) {
-        endLinkHover();
+        const bool width = mouse && canvasView && input && canvasView->boxResize().onHandle(itemPos);
+        endLinkHover(width ? Qt::SizeHorCursor : Qt::CrossCursor);  // (the handle that sets a box's width)
         linkHoverAt = itemPos;
         return;
     }
@@ -350,13 +352,14 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
     }
     // The mouse's cursor: a pointing hand where a click follows the link
     const bool hand = mouse && !linkCovered && input->clickFollowsLink(link->editing, modifiers);
-    const Qt::CursorShape shape = hand ? Qt::PointingHandCursor : Qt::CrossCursor;
+    const bool width = mouse && !hand && canvasView->boxResize().onHandle(itemPos);
+    const Qt::CursorShape shape = hand ? Qt::PointingHandCursor : width ? Qt::SizeHorCursor : Qt::CrossCursor;
     if (cursor().shape() != shape) {
         setCursor(shape);
     }
 }
 
-void DocumentCanvasItem::endLinkHover() {
+void DocumentCanvasItem::endLinkHover(Qt::CursorShape shape) {
     linkHoverAt.reset();
     linkId = {nullptr, 0};
     linkCovered = false;
@@ -365,8 +368,8 @@ void DocumentCanvasItem::endLinkHover() {
         linkShown.clear();
         Q_EMIT hoveredLinkChanged();
     }
-    if (cursor().shape() != Qt::CrossCursor) {
-        setCursor(Qt::CrossCursor);
+    if (cursor().shape() != shape) {
+        setCursor(shape);
     }
 }
 
@@ -710,7 +713,9 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             }
             setMathError({}, {});
             if (e->type() == QEvent::MouseButtonPress) {
-                endLinkHover();  // (a click may follow it: the sheet or the page comes)
+                // (a click may follow it: the sheet or the page comes; a Markdown box's width handle keeps its
+                // cursor while it is dragged)
+                endLinkHover(cursor().shape() == Qt::SizeHorCursor ? Qt::SizeHorCursor : Qt::CrossCursor);
             }
             const bool inside = !heldByAnother(&DocumentCanvasItem::mouseGrab) && claims(m->scenePosition());
             xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
@@ -917,6 +922,7 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
         cairo_scale(cr, dpr, dpr);
         cairo_translate(cr, -region.x(), -region.y());
         sel->paint(cr, zoom);
+        canvasView->boxResize().paintOverSelection(cr, zoom);  // (a Markdown text box: its right knob sets the width)
         cairo_destroy(cr);
         cairo_surface_destroy(surface);
         const bool fresh = !root->selection;

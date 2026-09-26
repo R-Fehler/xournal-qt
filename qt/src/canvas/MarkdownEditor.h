@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#include <QPointF>
 #include <QString>
 #include <cairo.h>
 
@@ -75,6 +76,18 @@ public:
     void paint(cairo_t* cr) const;
     void setFontSize(double size);
     double fontSize() const { return md.fontSize(); }
+
+    /// The handle that sets the width of a text box (MarkdownBoxResize): where it is (page coordinates of getPage(),
+    /// at the middle of the box's right edge, just outside it). Nothing for the page's text, which goes from margin to
+    /// margin.
+    std::optional<QPointF> widthHandle() const;
+    /// The text box's left edge and width (its wrap width; points).
+    double boxLeft() const { return parts.empty() ? 0 : originOf(0).x(); }
+    double boxWidth() const { return md.boxStyle().width; }
+    /// A new width of the text box: its text flows anew at once (a drag; not an undo step, see recordWidthChange).
+    void setBoxWidth(double width);
+    /// The box's width was changed from `before` (a drag ended): one undo step in the text being written.
+    void recordWidthChange(double before);
 
     /// What is written, to open it beside the page: a page (the page's text: its first page) and, for a text box, a
     /// point on it.
@@ -169,6 +182,8 @@ private:
         std::string removed;
         std::string inserted;
         size_t caretBefore = 0;
+        double widthBefore = 0;  ///< a change of the box's width (the text stays): from, to (0: not one)
+        double widthAfter = 0;
     };
     std::vector<Change> undoStack;
     std::vector<Change> redoStack;

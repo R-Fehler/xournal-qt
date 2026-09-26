@@ -27,6 +27,7 @@
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "Grapheme.h"
+#include "MarkdownBoxResize.h"
 #include "MarkdownImages.h"
 #include "MdBox.h"
 #include "MdDocument.h"
@@ -364,6 +365,11 @@ void MarkdownEditor::paint(cairo_t* cr) const {
     cairo_rectangle(cr, c.x(), c.y(), c.width(), c.height());
     Util::cairo_set_source_rgbi(cr, s.color);
     cairo_fill(cr);
+
+    // A text box: the handle that sets its width
+    if (const auto h = widthHandle(); h && page) {
+        MarkdownBoxResize::drawHandle(cr, h->x(), h->y(), 1.0 / page->getZoom(), selectionColor);
+    }
 }
 
 // --- changes -----------------------------------------------------------------------------------------------------
@@ -440,9 +446,10 @@ void MarkdownEditor::changed(bool textChanged) {
             drawnAsWrittenChanged(parts[current].page);
         }
     }
-    // Repaint where the box was and is; show the cursor
-    const QRectF now = boxRect(current).adjusted(-FRAME_MARGIN * 2, -FRAME_MARGIN * 2, FRAME_MARGIN * 2,
-                                                  FRAME_MARGIN * 2);
+    // Repaint where the box was and is (with the handle of a text box); show the cursor
+    const double handle = page && !md.isPageText() ? MarkdownBoxResize::handleReach(page->getZoom()) : 0;
+    const QRectF now = boxRect(current).adjusted(-FRAME_MARGIN * 2, -FRAME_MARGIN * 2,
+                                                  FRAME_MARGIN * 2 + handle, FRAME_MARGIN * 2);
     if (page) {
         const QRectF area = lastArea.isNull() ? now : lastArea.united(now);
         page->flagDirtyRegion(Range(area.left(), area.top(), area.right(), area.bottom()));
@@ -502,6 +509,13 @@ void MarkdownEditor::undoEdit(bool redo) {
     }
     Change c = std::move(from.back());
     from.pop_back();
+    if (c.widthAfter > 0) {
+        md.setWidth(redo ? c.widthAfter : c.widthBefore);
+        to.push_back(std::move(c));
+        lastWasTyping = false;
+        changed(false);
+        return;
+    }
     std::string text = md.text();
     if (redo) {
         text.replace(std::min(c.at, text.size()), c.removed.size(), c.inserted);
@@ -524,6 +538,38 @@ void MarkdownEditor::setCursorPosition(size_t offset) {
 void MarkdownEditor::setFontSize(double size) {
     md.setFontSize(size);
     changed(false);
+}
+
+std::optional<QPointF> MarkdownEditor::widthHandle() const {
+    if (parts.empty() || md.isPageText() || plain || !page) {
+        return std::nullopt;
+    }
+    // (just outside the frame: the knob does not cover the end of the lines being written)
+    const QRectF r = boxRect(0);
+    const double knob = MarkdownBoxResize::HANDLE_RADIUS_PX / page->getZoom();
+    return QPointF(r.right() + FRAME_MARGIN + knob, r.center().y());
+}
+
+void MarkdownEditor::setBoxWidth(double width) {
+    if (md.isPageText() || width <= 0 || width == boxWidth()) {
+        return;
+    }
+    md.setWidth(width);
+    changed(false);
+}
+
+void MarkdownEditor::recordWidthChange(double before) {
+    if (md.isPageText() || before <= 0 || before == boxWidth()) {
+        return;
+    }
+    Change c;
+    c.at = caret;
+    c.caretBefore = caret;
+    c.widthBefore = before;
+    c.widthAfter = boxWidth();
+    undoStack.push_back(std::move(c));
+    redoStack.clear();
+    lastWasTyping = false;
 }
 
 // --- input -------------------------------------------------------------------------------------------------------
