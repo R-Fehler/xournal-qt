@@ -7,7 +7,7 @@
 
 A keyboard-oriented way to write the text of a page, like in a word processor (toolbar button "Text mode",
 Ctrl+Alt+E). The editor opens beside the pages (on the right; the page is zoomed to fit next to it and gets its
-zoom back afterwards). The page shows the text while you type, laid out from its top-left margin (2 cm; on a ruled
+zoom back afterwards). The page shows the text while you type, laid out from its top-left margin (2 cm, less on pages smaller than A5 as in [markdown-boxes.md](markdown-boxes.md); on a ruled
 page with a margin line: beside the line) and broken into lines at the right margin.
 
 ## What it can do

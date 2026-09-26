@@ -1872,4 +1872,7 @@ Design: [md-images.md](../md-images.md).
       copies the current page's size.
 - [ ] Settings → New pages → Paper size: A0 … A7 are there, and the New document dialog preselects what is chosen
       there. (A size that is none of them, set in Xournal++, shows as "Other: … mm": covered by the tests.)
-
+- [ ] An A7 card on plain paper: write the page's Markdown text (the writing button): it starts 1 cm from the top
+      and left edges and wraps 1 cm from the right one; a longer text flows onto more A7 cards. On A6 about 1.4 cm;
+      on A5 and A4 still 2 cm.
+- [ ] "Start a chapter here…" on an A7 card: the heading sits at the card's margins, not 2 cm in.

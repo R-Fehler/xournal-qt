@@ -55,6 +55,7 @@
 #include "CanvasView.h"
 #include "PenHover.h"
 #include "StickyNotes.h"
+#include "session/PageMargins.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
@@ -4510,7 +4511,6 @@ bool AppController::addChapter(int page, const QString& title, int level) {
     text->setText(DocumentChapters::headingText(title.trimmed().toStdString(), level));
     text->setFont(XojFont("Sans Bold", DocumentChapters::headingSize(level)));
     text->setColor(Color(0, 0, 0));
-    text->move(TextFlow::MARGIN, TextFlow::MARGIN);
     const Text* raw = text.get();
     Layer* layer = nullptr;
     PageRef pageRef;
@@ -4519,6 +4519,8 @@ bool AppController::addChapter(int page, const QString& title, int level) {
         pageRef = doc->getPage(index);
         layer = pageRef ? pageRef->getSelectedLayer() : nullptr;
         if (layer) {
+            const PageMargins::Margins m = PageMargins::of(pageRef);  // (a small page: smaller margins)
+            text->move(m.left, m.top);
             layer->addElement(std::move(text));
         }
         doc->unlock();

@@ -15,6 +15,7 @@
 #include "model/Text.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/PageMargins.h"
 #include "undo/GroupUndoAction.h"
 #include "undo/InsertDeletePageUndoAction.h"
 #include "undo/UndoAction.h"
@@ -78,9 +79,7 @@ private:
 /// The text of the page's own box (at its margins), empty if none.
 std::string pageTextOf(const PageRef& page) {
     const Layer* layer = md::markdownLayer(page);
-    const Text* box = layer ? md::pageBoxOf(*layer, TextFlow::styleFor(page, TextFlow::Style{}).leftMargin,
-                                            TextFlow::MARGIN)
-                            : nullptr;
+    const Text* box = layer ? PageMargins::pageBox(*layer, page) : nullptr;
     return box ? box->getText() : std::string();
 }
 
@@ -88,7 +87,8 @@ std::string pageTextOf(const PageRef& page) {
 md::Frame frameOf(const PageRef& page, bool continuous = false) {
     const TextFlow::Style m = TextFlow::styleFor(page, TextFlow::Style{});
     return {std::max(50.0, page->getWidth() - m.leftMargin - m.rightMargin),
-            continuous ? MarkdownFile::CONTINUOUS_FRAME : std::max(50.0, page->getHeight() - 2 * TextFlow::MARGIN)};
+            continuous ? MarkdownFile::CONTINUOUS_FRAME
+                       : std::max(50.0, page->getHeight() - m.topMargin - m.bottomMargin)};
 }
 }  // namespace
 
@@ -124,13 +124,16 @@ MarkdownSession::Page MarkdownSession::pageOf(const PageRef& page, double x, dou
         p.layer = md::markdownLayer(page);
         p.selectedBefore = page->getSelectedLayerId();
         if (p.layer) {
-            p.box = pageText ? md::pageBoxOf(*p.layer, x, y)
+            // (the page's text: at the margins, or where older text of a small page is, PageMargins::pageBox)
+            p.box = pageText ? PageMargins::pageBox(*p.layer, page)
                              : (p.layer->isVisible() ? md::boxAt(*p.layer, x, y) : nullptr);
         }
         if (p.box) {
             p.original = p.box->cloneText();
-            p.x = p.box->getTransformation().shift.x;
-            p.y = p.box->getTransformation().shift.y;
+            if (!pageText) {  // (the page's text stays at the margins: older text of a small page moves there)
+                p.x = p.box->getTransformation().shift.x;
+                p.y = p.box->getTransformation().shift.y;
+            }
         }
     }
     if (!p.layer) {
@@ -199,7 +202,7 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
             std::shared_lock lock(*doc);
             m = TextFlow::styleFor(p, TextFlow::Style{});
         }
-        chain.push_back(pageOf(p, m.leftMargin, TextFlow::MARGIN));
+        chain.push_back(pageOf(p, m.leftMargin, m.topMargin));
         slices.push_back(chain.back().box ? chain.back().box->getText() : std::string());
     }
     if (chain.front().box) {
@@ -243,6 +246,9 @@ void MarkdownSession::setBox(Page& p, const std::string& text) {
         // Changed in place (the element stays the same: the undo step refers to it). An empty text is not drawn
         // and not saved (upstream's SaveHandler leaves empty texts out).
         std::unique_lock lock(*doc);
+        if (const auto& at = p.box->getTransformation().shift; std::abs(at.x - p.x) > 0.5 || std::abs(at.y - p.y) > 0.5) {
+            p.box->setTransformation(xoj::util::Matrix::TRANSLATION(p.x, p.y));  // (to the page's margins)
+        }
         p.box->setText(text);
         p.box->setFont(XojFont(style.family, style.size));
         p.box->setColor(style.color);
@@ -308,7 +314,7 @@ double MarkdownSession::distribute(const std::string& source) {
             std::shared_lock lock(*doc);
             m = TextFlow::styleFor(page, TextFlow::Style{});
         }
-        Page p = pageOf(page, m.leftMargin, TextFlow::MARGIN);
+        Page p = pageOf(page, m.leftMargin, m.topMargin);
         p.createdPage = true;
         chain.push_back(std::move(p));
     }
@@ -360,7 +366,8 @@ double MarkdownSession::overflow(const Page& p) const {
         return 0;
     }
     const auto rect = md::boxRect(*p.box);
-    return std::max(0.0, rect.y + rect.height - (p.page->getHeight() - TextFlow::MARGIN));
+    return std::max(0.0, rect.y + rect.height -
+                                 (p.page->getHeight() - TextFlow::styleFor(p.page, TextFlow::Style{}).bottomMargin));
 }
 
 double MarkdownSession::update(const std::string& source) {

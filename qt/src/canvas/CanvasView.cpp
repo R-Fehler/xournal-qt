@@ -57,6 +57,7 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
+#include "session/PageMargins.h"
 #include "session/TextDocument.h"
 #include "PageNoteSpace.h"
 #include "Perf.h"
@@ -1761,7 +1762,7 @@ bool CanvasView::markdownBoxAt(CanvasPage& page, double x, double y) const {
     if (!layer || !layer->isVisible()) {
         return false;
     }
-    const Text* box = md::pageBoxOf(*layer, TextFlow::styleFor(p, TextFlow::Style{}).leftMargin, TextFlow::MARGIN);
+    const Text* box = PageMargins::pageBox(*layer, p);
     return box && box == md::boxAt(*layer, x, y);
 }
 

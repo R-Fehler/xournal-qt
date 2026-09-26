@@ -66,6 +66,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HeadlessViews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageMargins.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageMargins.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextDocument.h
