@@ -379,6 +379,16 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   German? ML Kit on Android as an opt-in flavour or not at all? +64 MB per model in packages, or a one-time
   download from our release page? corrections in the `.xopp` or only in the cache? defer fine-tuning?
   Note: points in this codebase carry no time, only x, y and pressure (stroke order is there).
+- [x] Touch multi-select (`qt/touch-multiselect`, merged 2026-09-26): "Select more" toggle + count in the pills;
+  selecting in the self-reference view as in the main view. Left: a rectangle in the mode only adds; long press
+  does not toggle; not offered in a view that is only for reading.
+- [x] Favourites and page bookmarks (`qt/bookmarks`, merged 2026-09-26): stars beside the document (DocumentPlaces),
+  bookmarks in it (`.xopp` page attribute, PDF outline item "Bookmarks"), Favourites chip and Bookmarks tab. Left:
+  - [ ] Bookmarks for Markdown documents (headings already act as chapters).
+  - [ ] Plain PDF export: write the current bookmarks into the outline (upstream's exporter copies the outline as
+    read, so it can carry an out-of-date "Bookmarks" item).
+  - [ ] Read back bookmarks changed in other PDF apps (today the embedded `.xopp` wins on the next save).
+  - [ ] Remember the Favourites chip across starts; a star in the tab overview for annotated PDFs without a path.
 - Backlog: visual text diff between PDF versions; cryptographic signing.
 
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)

@@ -626,6 +626,16 @@
   or tab change. The view beside now has the pills for notes and for notes selected together, and its Deselect
   clears every kind. Also: the eraser redraws every view of the page (the self-reference view kept erased ink).
 
+- **Favourites and page bookmarks, `qt/bookmarks` (2026-09-26).** Stars are kept beside the document
+  (`DocumentPlaces`, taken along by renames and moves in the app), never in the file. Bookmarks are in the document:
+  a `xqt-bookmark` attribute on `<page>` in `.xopp` (seam `XojPage::bookmark`; Xournal++ opens such files without a
+  message and drops them when it saves), and in PDFs with notes a last top-level outline item "Bookmarks" for other
+  viewers (the PDF's own contents untouched; incremental saves touch it only when the bookmarks changed). The
+  library index caches them; the home has a Favourites chip beside "Show" and a Bookmarks tab (page pictures by
+  document, opening at the page); search matches labels. In a document: page menu and ⋮ → bookmark (named after the
+  first heading or chapter, else "Page N"), ribbons on page pictures, a Bookmarks section in the contents sidebar,
+  one undo step each. Open: Markdown documents, plain PDF export, reading back edits made in other PDF apps.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
