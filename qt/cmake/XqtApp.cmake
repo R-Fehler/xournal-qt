@@ -220,6 +220,7 @@ if(XQT_BUILD_TESTS)
     add_executable(xqt-quick-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasItemInputTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/BigPageTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasItemRenderTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/GeometryToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp)

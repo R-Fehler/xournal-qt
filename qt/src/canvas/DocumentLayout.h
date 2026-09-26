@@ -63,6 +63,8 @@ public:
 
     size_t pageCount() const { return sizes.size(); }
     QSizeF pageSize(size_t page) const { return sizes[page]; }
+    /// The widest and the highest page's size (points; none: empty)
+    QSizeF largestPage() const { return largest; }
     size_t columns() const { return cols; }
     size_t rows() const { return rowCount; }
     bool horizontal() const { return config.horizontal; }
@@ -112,6 +114,7 @@ private:
 
     Config config;
     std::vector<QSizeF> sizes;
+    QSizeF largest;
     size_t cols = 1;
     size_t rowCount = 0;
     size_t offset = 0;

@@ -1876,3 +1876,13 @@ Design: [md-images.md](../md-images.md).
       and left edges and wraps 1 cm from the right one; a longer text flows onto more A7 cards. On A6 about 1.4 cm;
       on A5 and A4 still 2 cm.
 - [ ] "Start a chapter here…" on an A7 card: the heading sits at the card's margins, not 2 cm in.
+- [ ] An A0 poster with a few hundred strokes (or a PDF poster opened and annotated): fit page (and pinching out)
+      shows the whole page; the zoom goes below 30 % for it. Zoom to 100 %, 300 %, 700 %: what is in view gets sharp
+      after the zoom rests, the app stays responsive, and its memory (XQT_PERF=1, or the system monitor) stays low:
+      about the view's size in pixels four times over per page, not the whole poster (was 1.2 GB at 300 %, nothing
+      drawn at 700 %).
+- [ ] Scroll quickly over the A0 page at 200 %: the part that comes into view shows the page's preview for a moment
+      and then gets sharp; no stutter. Write on it at 300 % near the edge of the view, scroll on: the stroke is there.
+- [ ] Export the poster to PDF: an A0 page (841 × 1189 mm in the PDF viewer's document properties), the strokes
+      sharp at any zoom.
+

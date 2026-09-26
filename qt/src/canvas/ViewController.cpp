@@ -22,6 +22,18 @@ ViewController::ViewController(const DocumentLayout* layout, QObject* parent): Q
     connect(&settleTimer, &QTimer::timeout, this, &ViewController::zoomSettled);
 }
 
+double ViewController::minZoom() const {
+    double lowest = 0.3 * z100;
+    if (const QSizeF page = layout->largestPage(); !view.isEmpty() && !page.isEmpty()) {
+        const double pad = 2 * layout->padding();
+        const double whole = std::min((view.width() - pad) / page.width(), (view.height() - pad) / page.height());
+        if (whole > 0) {
+            lowest = std::min(lowest, whole);
+        }
+    }
+    return lowest;
+}
+
 void ViewController::setViewSize(QSizeF size) {
     jumped = true;
     if (size.isEmpty()) {

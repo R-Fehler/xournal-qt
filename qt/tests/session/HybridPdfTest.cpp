@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include <QSizeF>
 #include <QTemporaryDir>
 #include <cairo-pdf.h>
 #include <cairo.h>
@@ -599,6 +600,57 @@ TEST_F(HybridPdfTest, notesSavedIntoThePdfItselfKeepTheOriginalOnce) {
     EXPECT_EQ(describe(*again.document), describe(*session.getDocument()));
     std::ifstream in(path("lecture.original.pdf"), std::ios::binary);
     EXPECT_EQ(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()), original);
+}
+
+// Posters and flashcards (qt/page-sizes): an A0 page and an A7 card keep their size in the PDF export (vector: the
+// strokes stay strokes at any size) and in a PDF with our annotations (the page's /MediaBox), and open again so.
+TEST_F(HybridPdfTest, postersAndFlashcardsKeepTheirSizeInPdfs) {
+    constexpr double MM = 72.0 / 25.4;
+    const QSizeF a0(841 * MM, 1189 * MM), a7(74 * MM, 105 * MM);
+    DocumentSession session(*app);
+    Document* doc = session.getDocument();
+    doc->getPage(0)->setSize(a0.width(), a0.height());
+    doc->getPage(0)->setBackgroundType(PageType(PageTypeFormat::Graph));
+    addStroke(doc->getPage(0)->getSelectedLayer(), StrokeTool::PEN, Color(0xff0000ffU), 2,
+              {Point(100, 100), Point(2200, 3200)});
+    auto card = std::make_shared<XojPage>(a7.height(), a7.width());  // (landscape)
+    card->setBackgroundType(PageType(PageTypeFormat::Ruled));
+    addStroke(card->getSelectedLayer(), StrokeTool::PEN, Color(0xffcc0000U), 1, {Point(20, 20), Point(250, 180)});
+    doc->insertPage(card, 1);
+    auto mediaBoxes = [](const fs::path& pdf) {
+        QPDF q;
+        q.processFile(pdf.string().c_str());
+        std::vector<QSizeF> sizes;
+        for (auto& page: QPDFPageDocumentHelper(q).getAllPages()) {
+            const auto box = page.getMediaBox().getArrayAsRectangle();
+            sizes.emplace_back(box.urx - box.llx, box.ury - box.lly);
+        }
+        return sizes;
+    };
+    auto near = [](QSizeF a, QSizeF b) { return std::abs(a.width() - b.width()) < 0.01 && std::abs(a.height() - b.height()) < 0.01; };
+
+    const fs::path exported = path("poster.pdf");
+    ExportHelper::exportPdf(doc, exported, nullptr, nullptr, EXPORT_BACKGROUND_ALL, false);
+    auto sizes = mediaBoxes(exported);
+    ASSERT_EQ(sizes.size(), 2u);
+    EXPECT_TRUE(near(sizes[0], a0)) << sizes[0].width() << " x " << sizes[0].height();
+    EXPECT_TRUE(near(sizes[1], a7.transposed())) << sizes[1].width() << " x " << sizes[1].height();
+    EXPECT_LT(fs::file_size(exported), 200'000u) << "vector, not a picture of the poster";
+
+    const fs::path hybrid = path("poster.notes.pdf");
+    const auto r = HybridPdf::write(*doc, hybrid);
+    ASSERT_TRUE(r.ok) << r.error;
+    sizes = mediaBoxes(hybrid);
+    ASSERT_EQ(sizes.size(), 2u);
+    EXPECT_TRUE(near(sizes[0], a0));
+    EXPECT_TRUE(near(sizes[1], a7.transposed()));
+    auto loaded = DocumentSession::loadFile(hybrid);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    ASSERT_EQ(loaded.document->getPageCount(), 2u);
+    EXPECT_NEAR(loaded.document->getPage(0)->getWidth(), a0.width(), 0.01);
+    EXPECT_NEAR(loaded.document->getPage(0)->getHeight(), a0.height(), 0.01);
+    EXPECT_NEAR(loaded.document->getPage(1)->getWidth(), a7.height(), 0.01);
+    EXPECT_NEAR(loaded.document->getPage(1)->getHeight(), a7.width(), 0.01);
 }
 
 TEST_F(HybridPdfTest, exportsAPlainXoppForXournalpp) {

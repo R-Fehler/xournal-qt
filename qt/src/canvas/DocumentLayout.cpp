@@ -44,7 +44,9 @@ void DocumentLayout::update(Document& doc, const std::vector<PageRef>& pages, Co
 
     colWidth.assign(cols, 0);
     rowHeight.assign(rowCount, 0);
+    largest = QSizeF();
     for (size_t i = 0; i < n; ++i) {
+        largest = largest.expandedTo(sizes[i]);
         const Cell c = cellOf(i);
         colWidth[c.col] = std::max(colWidth[c.col], sizes[i].width());
         rowHeight[c.row] = std::max(rowHeight[c.row], sizes[i].height());
