@@ -1868,6 +1868,8 @@ Design: [md-images.md](../md-images.md).
 ## Heading buttons; arrows in the full-screen tab bar (2026-09-26)
 
 - [ ] The formatting bar has ¶, H1, H2, H3 as buttons (no menu); the one of the line with the cursor is highlighted.
+- [ ] The tool bar has a sticky-note button (next to "Insert image"): a tap places a note in the middle of the visible
+      page, selected.
 - [ ] Full screen with several documents: the slim bar at the top has small ‹ and › arrows at its ends that go to the
       previous / next document (dimmed at the first / last one); a tap between them still opens the overview, a swipe
       still switches. With a finger and with the mouse.

@@ -3770,6 +3770,17 @@ TEST_F(MainWindowTest, aPressOnTheCanvasClosesAnOpenMenu) {
 }
 
 // The setsquare and the compass sit in the shapes menu (they are not a way of drawing, they lie on the page).
+TEST_F(MainWindowTest, theToolBarHasAStickyNoteButton) {
+    auto* button = find<QQuickItem>("stickyNoteButton");
+    ASSERT_NE(button, nullptr);
+    until([&] { return button->isVisible(); });
+    ASSERT_TRUE(button->isVisible());
+    EXPECT_FALSE(controller->noteSelected());
+    click(button);
+    until([&] { return controller->noteSelected(); });
+    EXPECT_TRUE(controller->noteSelected()) << "a note is placed and selected";
+}
+
 TEST_F(MainWindowTest, theShapesMenuPlacesAStickyNoteWithItsPill) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

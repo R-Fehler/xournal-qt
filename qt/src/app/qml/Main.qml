@@ -648,6 +648,8 @@ ApplicationWindow {
                 }
             }
             IconButton { visible: !win.textDoc; objectName: "imageButton"; iconName: "xopp-tool-image"; tip: qsTr("Insert image"); onClicked: imageDialog.open() }
+            // A sticky note in the middle of the visible page, selected (also in the shapes menu and ⋮)
+            IconButton { visible: !win.textDoc; objectName: "stickyNoteButton"; iconName: "xqt-sticky-note"; tip: qsTr("Sticky note (write on it, cover with it)"); onClicked: app.insertStickyNote() }
             IconButton { visible: !win.textDoc; objectName: "selectRectButton"; iconName: "xopp-select-rect"; tip: qsTr("Select (rectangle)"); checked: app.tool === "selectRect"; onClicked: app.selectTool("selectRect") }
             IconButton { visible: !win.textDoc; objectName: "lassoButton"; iconName: "xopp-select-lasso"; tip: qsTr("Select (lasso)"); checked: app.tool === "selectRegion"; onClicked: app.selectTool("selectRegion") }
             IconButton {
@@ -699,6 +701,7 @@ ApplicationWindow {
                     MenuItem {
                         objectName: "stickyNoteItem"
                         text: qsTr("Sticky note (write on it, cover with it)")
+                        icon.source: app.iconUrl("xqt-sticky-note")
                         onTriggered: app.insertStickyNote()
                     }
                     MenuSeparator {}
