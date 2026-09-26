@@ -21,10 +21,12 @@
 #include "model/PageRef.h"
 #include "undo/UndoAction.h"
 #include "util/Color.h"
+#include "util/Point.h"
 #include "util/Rectangle.h"
 
 class LayerController;
 class Stroke;
+class Text;
 class XojPage;
 class Document;
 
@@ -50,6 +52,11 @@ inline constexpr double MIN_SIDE = 24;
 /// A new note (points)
 inline constexpr double DEFAULT_WIDTH = 200;
 inline constexpr double DEFAULT_HEIGHT = 140;
+
+/// Between the note's edge and its Markdown text (points, about 3.5 mm)
+inline constexpr double TEXT_PADDING = 10;
+/// The narrowest the note's text is laid out (points; a note is at least MIN_SIDE wide)
+inline constexpr double MIN_TEXT_WIDTH = 8;
 
 /// The pastel colors offered (the first is a new note's)
 const std::vector<Color>& presetColors();
@@ -86,6 +93,19 @@ void applyLook(Layer& layer, const Look& from, const Look& to);
 
 /// The topmost visible note of a page at a point (page coordinates; nullptr: none). Call under the document's lock.
 Layer* noteAt(const XojPage& page, double x, double y);
+/// The note that takes what is started at a point (the topmost visible note there, if it does not cover; nullptr:
+/// the page takes it). Call under the document's lock.
+Layer* openNoteAt(const XojPage& page, double x, double y);
+
+// --- the note's Markdown text (qt/docs/sticky-notes.md, "Notes as containers") ------------------------------------
+/// Where a note's Markdown text begins (its top left) and how wide it is laid out
+xoj::util::Point<double> textOrigin(const Look& look);
+double textWidth(const Look& look);
+/// Whether a text of a layer is its note's Markdown text: the layer is a note, the text has a wrap width and lies
+/// at the note's text origin. (The frontend's xoj::markdown::classifier: such a text is a Markdown text.)
+bool isNoteText(const Layer& layer, const Text& text);
+/// The note's Markdown text (nullptr: none yet). Call under the document's lock.
+Text* textOf(const Layer& layer);
 /// Whether a page has notes (`visibleOnly`: shown ones)
 bool hasNotes(const XojPage& page, bool visibleOnly = false);
 /// While a note's layer comes onto a page or leaves it (on this thread): only where the note is drawn changes, so a
@@ -103,6 +123,10 @@ private:
 };
 /// Where the note changing now (NoteLayerChange) is drawn; nothing if no note layer is changing on this thread
 std::optional<xoj::util::Rectangle<double>> changingNoteArea();
+
+/// While a selection of a note's elements lives, the note is its page's selected layer (they are dropped there):
+/// leaveNoteLayer leaves it alone. Held and let go by the canvas (qt/docs/sticky-notes.md, "Selecting in a note").
+void holdLayer(const Layer* layer, bool hold);
 
 /// The layer id (1-based, as upstream counts) of a note layer, 0 if it is not on the page
 Layer::Index layerIdOf(const XojPage& page, const Layer* layer);
@@ -169,6 +193,28 @@ private:
     Layer* layer;
     Place from;
     Place to;
+    std::string text;
+};
+
+/// Elements moved into a note, out of it onto the page, or from one note to another on the same page, by a drag of a
+/// selection: the move and the change of layer as one step. Undone, they are back at their places in the layer they
+/// came from (their positions there, `indices`; Element::InvalidIndex: on top).
+class ContentMoveUndoAction final: public UndoAction {
+public:
+    ContentMoveUndoAction(const PageRef& page, std::vector<Element*> elements, Layer* from,
+                          std::vector<Element::Index> indices, Layer* to, double dx, double dy, std::string text);
+    bool undo(Control* control) override;
+    bool redo(Control* control) override;
+    std::string getText() override { return text; }
+
+private:
+    void repaint(double dx, double dy) const;
+    std::vector<Element*> elements;
+    Layer* from;
+    std::vector<Element::Index> indices;
+    Layer* to;
+    double dx;
+    double dy;
     std::string text;
 };
 

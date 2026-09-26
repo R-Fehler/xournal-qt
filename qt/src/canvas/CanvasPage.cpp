@@ -28,6 +28,7 @@
 #include "model/Document.h"
 #include "model/Element.h"
 #include "model/Stroke.h"
+#include "model/Text.h"
 #include "model/XojPage.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/Color.h"
@@ -112,9 +113,11 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     const bool selectTool = toolType == TOOL_SELECT_RECT || toolType == TOOL_SELECT_REGION ||
                             toolType == TOOL_SELECT_MULTILAYER_RECT || toolType == TOOL_SELECT_MULTILAYER_REGION ||
                             toolType == TOOL_SELECT_OBJECT;
+    const bool areaTool = toolType == TOOL_SELECT_RECT || toolType == TOOL_SELECT_REGION ||
+                          toolType == TOOL_SELECT_MULTILAYER_RECT || toolType == TOOL_SELECT_MULTILAYER_REGION;
     if (!view.isReadingOnly()) {
         bool deselected = false;
-        if (view.notes().press(*this, x, y, selectTool, deselected)) {
+        if (view.notes().press(*this, x, y, selectTool, deselected, areaTool)) {
             return true;
         }
     }
@@ -178,6 +181,9 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
             this->overlayViews.emplace_back(
                     std::make_unique<xoj::view::SelectorView>(this->selector.get(), this,
                                                               control.getSettings()->getSelectionColor()));
+            // xournal-qt: started on a sticky note (that can be written on): it selects in the note
+            std::shared_lock lock(*control.getDocument());
+            this->selectorNote = view.isReadingOnly() ? nullptr : sticky::openNoteAt(*page, x, y);
         }
     } else if (h->getToolType() == TOOL_TEXT) {
         view.startText(*this, x, y);
@@ -354,6 +360,11 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         t == TOOL_SELECT_PDF_TEXT_LINEAR || t == TOOL_SELECT_PDF_TEXT_RECT) {
         view.pdfTextRelease(*this);
     }
+    if (this->selector && this->selectorNote) {
+        // xournal-qt: a rectangle or lasso started on a sticky note: the note's elements (a tap: the note)
+        selectInNote(std::exchange(this->selectorNote, nullptr), this->selector->userTapped(getZoom()));
+        this->selector.reset();
+    }
     if (this->selector) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)
         const bool aggregate = pos.isShiftDown() && view.getSelection();
@@ -460,6 +471,44 @@ bool CanvasPage::pressOnNote(double x, double y) {
     }
     noteClip = look->rect;
     return false;
+}
+
+void CanvasPage::selectInNote(Layer* note, bool tapped) {
+    DocumentSession& control = view.getSession();
+    Document* doc = control.getDocument();
+    {
+        std::shared_lock lock(*doc);
+        if (!sticky::layerIdOf(*page, note) || !sticky::isNote(*note)) {
+            note = nullptr;  // (gone meanwhile)
+        }
+    }
+    if (!note) {
+        (void)this->selector->finalize(this->page, true, doc);  // (its picture goes)
+        return;
+    }
+    const Layer::Index before = view.selectNoteLayer(this->page, note);
+    (void)this->selector->finalize(this->page, true, doc);  // (the selected layer: the note's)
+    InsertionOrderRef elements = this->selector->releaseElements();
+    {
+        // Never the paper, never the note's Markdown text: they are the note (its frame)
+        std::shared_lock lock(*doc);
+        const Element* paper = sticky::paperOf(*note);
+        const Element* text = sticky::textOf(*note);
+        elements.erase(std::remove_if(elements.begin(), elements.end(),
+                                      [&](const InsertionPositionRef& r) { return r.e == paper || r.e == text; }),
+                       elements.end());
+    }
+    if (tapped || elements.empty()) {
+        view.restoreSelectedLayer(this->page, before);
+        if (tapped) {
+            view.notes().select(*this, note);  // a tap selects the whole note
+        }
+        repaintPage();
+        return;
+    }
+    view.setSelection(SelectionFactory::createFromElementsOnActiveLayer(&control, this->page, this, elements).release());
+    view.noteSelectionMade(this->page, before, note);
+    repaintPage();
 }
 
 void CanvasPage::leaveNote() {

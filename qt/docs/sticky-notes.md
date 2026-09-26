@@ -2,7 +2,8 @@
 
 Status: built in `qt/sticky-notes` (2026-09-26); copy, cut, paste and moving to another page in
 `qt/sticky-clipboard` (2026-09-26); the darker edge and the shade, cheaper copy / cut / paste in `qt/sticky-look`
-(2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
+(2026-09-26); notes as containers (their Markdown text, paste and images into them, selecting in them) in
+`qt/sticky-containers` (2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
 user can write on and move around, with the ink and text on them staying attached; not a PDF popup note that other
 viewers minimise; usable for self-testing by moving them over solutions; adaptable in size.
 
@@ -20,10 +21,12 @@ clipped to it. It lies above the page's ink.
 - **Writing on it:** a press with the pen, the highlighter, a shape tool or the text tool on a note writes on the
   note (the topmost note under the pen). The eraser erases on the note. Strokes that go beyond its edge are kept whole
   and clipped where they are drawn.
-- **Selecting:** a select tool (rectangle, lasso, object) on a note selects the whole note: an outline, a round
-  handle at the bottom-right corner, and a pill above the note with its colours, "Cover", copy, cut, delete and
-  deselect (Ctrl+C, Ctrl+X, Del and Esc work too). A drag on the note moves it right away (pen, mouse, or a finger on
-  the selected note); the handle resizes it (with any tool). While dragged a note stays inside its page; let go over
+- **Selecting:** a tap with a select tool (rectangle, lasso, object) on a note selects the whole note: an outline, a
+  round handle at the bottom-right corner, and a pill above the note with its colours, "Cover", "Text", "Image…",
+  copy, cut, delete and deselect (Ctrl+C, Ctrl+X, Del and Esc work too). A drag on the selected note moves it (pen,
+  mouse, or a finger); the handle resizes it (with any tool). A rectangle or lasso drawn on a note that is not
+  selected selects what is on it (see "Notes as containers"); the object select tool, and any select tool on a
+  covering note, still take the whole note at the press, and a drag moves it right away. While dragged a note stays inside its page; let go over
   another page, it goes there (see below). Choosing a tool that is not a select tool ends the selection, so that the
   pen then writes on the note.
 - **Colours:** five pastel presets (yellow, pink, blue, green, orange). A new note is yellow.
@@ -79,6 +82,92 @@ and move notes to other pages.
   jumps on release. The drag and the change of page are one undo step ("Move sticky note to another page",
   `sticky::NotePageUndoAction`: the same layer leaves one page and is inserted in the other).
 - **File format:** unchanged. A pasted or moved note is a note layer like any other.
+
+## Notes as containers (qt/sticky-containers)
+
+The author's request (2026-09-26): "I want sticky notes to work like containers: if I put text, ink, a pasted image,
+a shape, whatever into the sticky note, I want it to be movable as a containerised unit. When starting a Markdown
+text box, it should just use the sticky note's extent as the frame." Decided with it: **one Markdown text per
+note** (the note is its text frame), and **a rectangle or lasso drawn inside a note selects its contents**; a tap
+selects the whole note.
+
+### What goes into a note
+Everything started inside a note that shows and can be written on (not hidden, not covering) goes into it; the
+topmost note at the point counts. A covering note takes nothing (and nothing goes under it through it: a paste or an
+image there goes onto the page, below it).
+- **Ink, shapes, plain text** (the pen, the highlighter, the shape tools, the text tool): as before.
+- **The note's Markdown text**: a tap with the text tool with "Markdown" on (the font menu's switch) anywhere on the
+  note, a tap on the note's text with the text tool (Markdown on or off), or the pill's **Text** button. See below.
+- **Paste** (Ctrl+V, the pills' Paste) of elements, a picture or plain text goes into a note when a note is selected,
+  or when the paste point lies on a note: the pointer (Ctrl+V with the mouse over the note), the place pressed (the
+  long-press pill) or, without either, the middle of the visible part of the page. With a note selected the pasted
+  things go to the middle of the note. They are pasted selected, as before, and stay in the note when the
+  selection ends. A copied link (a link marker, a Markdown text of its own) and a copied note are not put into a
+  note (a copied note is pasted as a note, as before).
+- **Insert image** (the More menu, the pill's **Image…** button): into the selected note, or into the note in the
+  middle of the visible part of the page; fitted into the note (at most 80 % of its width and height, never enlarged)
+  and centred on it.
+- **Pictures and links dropped** on Markdown being written go into that text, as before; while the note's text is
+  written, that is the note's text.
+- One undo step each, as before (a paste or an inserted image is one step, wherever it goes).
+
+### The note's Markdown text
+- It is an ordinary Markdown text (a Xournal++ text element whose text is the Markdown source) in the **note's
+  layer**, at the note's top left plus a padding of 10 points (about 3.5 mm) on each side: its wrap width is the note's
+  width minus twice the padding. It is written on the page (formatted while typing, with the formatting bar) like the
+  other Markdown texts.
+- **One per note**: a tap with the text tool (Markdown on) anywhere on the note edits the same text; the cursor goes
+  where the tap was on the text (at its end when the tap is below it). The pill's **Text** starts it, or edits it with
+  the cursor at its end. Ink written first stays where it is: the text is drawn over it (the content of a layer in
+  its order; the text is added after what is there).
+- **Resizing the note** changes the text's wrap width: the text flows again (its lines change). Ink and pictures keep
+  their size and place, as before. The width follows the note in the undo of a resize too.
+- What goes beyond the note's bottom is clipped, as any content of a note. On the screen a small triangle in the
+  paper's edge colour at the bottom right says that there is more below (made larger, the note shows the rest).
+- It moves, is copied, cut, pasted and dragged to another page with the note (it is the note's layer's). It is
+  **not** taken by a rectangle or lasso inside the note (it is the note's frame, like the paper): it stays at the
+  top left.
+- **How the text is told apart** (the file has no attribute of our own, see below): in a note's layer, the text whose
+  top left is the note's top left plus the padding (within half a point) and which has a wrap width is the note's
+  Markdown text. Any other text on a note is a plain text (the text tool's, or one from Xournal++). Upstream's model
+  flags Markdown texts by their layer (`Text::isMarkdown`, set by `Layer`); a small seam lets the frontend flag
+  other texts too (`xoj::markdown::classifier` in `model/MarkdownText.h`, set by `sticky::installDrawer`), so the
+  note's text is drawn formatted everywhere a page is drawn (the canvas, thumbnails, the exports, the hybrid PDF) and
+  is as big as it is drawn. Without the frontend (upstream Xournal++) it is a text that wraps at the note's width and
+  shows its source.
+- **Where Markdown boxes are**: they were the texts of the page's layer "Markdown". Now "a layer that holds Markdown
+  boxes" is the page's Markdown layer or a note's layer (`md::holdsBoxes`), and a page's boxes are the texts flagged
+  as Markdown in those (`md::boxesOf`). Editing (the text tool's tap, the Markdown session), hit tests (links, check
+  boxes, formulas' errors, the "Load image" button), the search (its text index and the marks), the annotations
+  panel (the note's shown text as its caption, before its other texts), the chapters, the pictures carried in the
+  file (qt/md-images: a picture in a note's text is carried like any other) and the exports see the note's text. The
+  page's own text (the text at the page's margins that flows over pages, `pageBoxOf`, pagination) stays the page's
+  Markdown layer's only.
+
+### Selecting in a note
+- **A tap** with a select tool (rectangle, lasso, object) on a note selects the whole note, as before; the selected
+  note moves with a drag, the handle resizes it, and it is copied, cut, deleted with everything on it.
+- **A rectangle or a lasso started inside a note** (on its paper, the note not selected) selects the note's
+  elements inside it, not the note: never its paper, never its Markdown text. A drag started on a note therefore no
+  longer moves an unselected note right away: tap it first, then drag it. (A covering note is the exception: its
+  content cannot be changed, so a drag on it still moves it right away.)
+- **The object select tool** always takes the whole note (a tap).
+- **Moving the selection**: where it ends decides where the elements go. When a move ends, the note that shows
+  (not covering) under the middle of the selection takes them; no note there: the page (its own layer, the one that
+  was selected before). So elements dragged within their note stay in it, dragged out of it onto the page they leave
+  it, dragged from the page (or from another note) onto a note they join it. The move and the change of layer are one
+  undo step ("Move into sticky note", "Move out of sticky note", "Move to another sticky note"). A move to another
+  page goes into the note under it there, or onto that page. Resizing and rotating the selection never change its
+  layer. A selection of the page's Markdown boxes is not put into a note (its boxes stay in the Markdown layer).
+- A rectangle or lasso that starts outside every note behaves as before (the page's layer; a multi-layer one skips
+  notes).
+- While a selection of a note's elements lives, the note is the page's selected layer (like the Markdown layer for a
+  selection of Markdown boxes, see "The selected layer"); when it ends, the layer selected before is again.
+
+### File format
+Nothing new: what is on a note is in the note's layer, as before; the note's Markdown text is a text element with a
+wrap width there. Xournal++ opens such a file and shows the note's text as its source, wrapped at the note's width,
+and its pictures as images, unclipped (as for everything on a note).
 
 ## Cover mode (self-testing)
 
@@ -203,13 +292,23 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
 - Move, resize, colour and cover: `sticky::NoteUndoAction` (the note's rectangle, colour and cover before and after;
   a change of the top left moves the content along).
 - Writing and erasing on a note: upstream's stroke and eraser undo actions (they remember the layer).
+- The note's Markdown text: the Markdown edit's step (as for any Markdown text); pasting or inserting into a note:
+  upstream's (they remember the layer).
+- Elements dragged into a note, out of it or to another note on the same page: `sticky::ContentMoveUndoAction` (the
+  move of that drag and the change of layer; undone, they are back at their places in their old layer). Onto another
+  page: upstream's move (it changes the layer too).
 - Peeking and hiding are view states, not undo steps.
 
 ## Code
 
 - `qt/src/session/StickyNote.*`: the format (recognising a note, its look, making one), drawing, peeking, the undo
   actions, the selected-layer rule, the clipboard format (`serialize`, `deserialize`) and where a paste goes
-  (`pastePlace`).
+  (`pastePlace`); the note's Markdown text (`textOf`, `isNoteText`, `textOrigin`, `textWidth`, the "more below"
+  mark), the note that takes content (`openNoteAt`), `holdLayer`, `ContentMoveUndoAction`.
+- Containers (qt/sticky-containers): `md::holdsBoxes` / `md::boxesOf` (`MdBox`); `MarkdownSession::pageOf` (a
+  note's text); `CanvasView::startText`, `writeNoteText`, `pasteElements`, `pasteText`, `insertImage`,
+  `noteTarget`, `noteSelectionMade`, `endSelectionDrag`; `CanvasPage::selectInNote`; `StickyNotes::press`
+  (`areaTool`); `DocumentCanvasItem` (where the mouse rests, for Ctrl+V).
 - `qt/src/canvas/StickyNotes.*`: the canvas side (selection with its outline and handle, moving, resizing, writing
   on a note, cover taps, copy / cut / paste and the picture for other apps, the drop on another page), used by
   `CanvasPage`, `CanvasInput` and `CanvasView` (`copySelection`, `cutSelection` and `pasteElements` hand a note to
@@ -227,6 +326,17 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   after a paste, a cut and its undo), `MainWindowTest.theShapesMenuPlacesAStickyNote…`,
   `MainWindowTest.aStickyNoteIsMovedToAnotherPageByCutAndPaste` (the pill's Copy and Cut, Ctrl+X on page 1 and
   Ctrl+V on page 3, the sidebar's keys).
+- Tests of the containers: `StickyNoteTest.aNotesMarkdownTextIsToldByItsPlaceAndFlowsInTheNotesWidth` (told apart,
+  flagged, the width follows a resize, moved and renamed, saved and loaded, the text index, `md::boxesOf`) and
+  `upstreamXournalppOpensTheFileAndShowsTheNotes` (with a note's text); `CanvasReplayTest`:
+  `aStickyNoteHoldsOneMarkdownTextThatFlowsInItsWidth` (the tap, one undo step, one text per note, the resize
+  reflows it and its undo, moved with the note, the pill's Text, copied and pasted with the note, the search),
+  `pastedAndInsertedThingsGoIntoTheStickyNoteThere` (paste with the note selected, at a place on it and beside it,
+  plain text, an image fitted into it, a covering note takes nothing),
+  `aRectangleInAStickyNoteSelectsItsElementsThatLeaveAndJoinItByADrag` (never the paper or the text, dragged out and
+  in, one undo step each, a tap selects the note); `AnnotationsTest.aStickyNotesMarkdownTextIsItsCaptionAsShown`;
+  `MainWindowTest.theNotePillWritesTheNotesTextAndPutsAnImageOnIt` (`XQT_TEST_SHOT=<png>` saves a picture of a note
+  whose text goes on below it).
 
 ## Not yet
 
@@ -234,7 +344,11 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   release).
 - Pasting a note into upstream Xournal++ (it does not know the note's clipboard format).
 - A note selected in the second view (self-reference) has no pill of its own: Ctrl+C / X / V work there.
-- Clipping the text box while it is typed (the text being typed shows beyond the note's edge until it is done).
-- Markdown text boxes on notes (a Markdown box goes to the page's Markdown layer, below the notes).
-- A multi-layer selection rectangle that reaches a note selects nothing on the note (a tap selects the note).
+- Clipping the text box while it is typed (the text being typed shows beyond the note's edge until it is done; the
+  note's Markdown text too, while it is written).
+- A multi-layer selection rectangle that starts beside a note and reaches it selects nothing on the note (one
+  started on the note selects in it; a tap selects the note).
+- A selection of elements from several notes, or from a note and the page, at once (a selection is in one layer).
+- Pictures dropped on a note that is not being written (drops are taken while Markdown is written).
+- Scrolling the note's text (what goes below the note shows when the note is made larger).
 - Hiding the notes of the whole document at once (the eye in the page pill hides those of the current page).

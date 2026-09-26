@@ -151,6 +151,11 @@ private:
     std::optional<Layer::Index> layerBeforeNote;  ///< the page's selected layer while writing on a note
     std::optional<xoj::util::Rectangle<double>> noteClip;  ///< the note written on: the stroke is drawn clipped to it
     std::optional<std::pair<double, double>> coverPress;  ///< a press on a covering note (a tap: it peeks)
+    /// A rectangle or lasso started on this note: its elements (a tap: the whole note; qt/docs/sticky-notes.md)
+    Layer* selectorNote = nullptr;
+    /// The rectangle or lasso started on a note ends: its elements inside it (never its paper or its text) are
+    /// selected, or the note when it was a tap.
+    void selectInNote(Layer* note, bool tapped);
 
     std::optional<std::vector<LinkSpot>> links;  ///< linkSpots()
 

@@ -1871,3 +1871,38 @@ Design: [md-images.md](../md-images.md).
 - [ ] Full screen with several documents: the slim bar at the top has small ‹ and › arrows at its ends that go to the
       previous / next document (dimmed at the first / last one); a tap between them still opens the overview, a swipe
       still switches. With a finger and with the mouse.
+
+## Sticky notes as containers (qt/sticky-containers)
+- [ ] Place a note (shapes menu → Sticky note). Its pill has "Text" and "Image…" next to the colours and "Cover".
+- [ ] "Text": the cursor is on the note, at its top left; the formatting bar shows. Type `**Keys** are …` and a few
+      list items: shown formatted, as wide as the note (a margin of about 3.5 mm on each side). Escape: done. Ctrl+Z
+      takes the whole text away, Ctrl+Shift+Z brings it back.
+- [ ] The text tool with "Markdown" on (its font menu): a tap anywhere on the note edits the same text (never a
+      second one); a tap on the page beside the note starts an ordinary Markdown box as before. With Markdown off a
+      tap on the note's text still edits it; elsewhere on the note it writes a plain text on the note.
+- [ ] Write more than the note holds: what goes below the bottom is cut off and a small triangle at the bottom right
+      says there is more. Drag the handle to make the note larger: the rest shows, the triangle goes. Make it
+      narrower: the lines break again (the text flows); ink and pictures keep their size. Ctrl+Z: the width back.
+- [ ] Tap the note (select tool) and drag it: its text, ink and pictures go along. Copy it (pill), paste on another
+      page: the copy has its text.
+- [ ] Ctrl+F for a word of the note's text: found and marked on the note. The annotations panel lists the note with
+      its text as shown (no `**`).
+- [ ] Copy some ink from the page; select the note; Ctrl+V: the ink is pasted into the middle of the note (clipped
+      to it, it moves with the note). Without a note selected, the mouse resting over the note: Ctrl+V pastes there,
+      into the note; over the page: onto the page. Long-press the note → Paste: into the note.
+- [ ] "Image…" on the pill: choose a picture; it goes onto the note, fitted into it. The More menu's "Insert image…"
+      while the middle of the view is on the note: onto the note too. Undo takes each away in one step.
+- [ ] Switch the note to "Cover": Text and Image… are greyed out; Ctrl+V with the mouse over it pastes onto the page
+      (below the note).
+- [ ] Rectangle (or lasso) select tool: draw a rectangle starting on the note around its ink: the ink is selected,
+      not the note (no outline around the note), and never the note's text. Drag the selection off the note onto the
+      page: after deselecting, it is page ink (not clipped any more; moving the note leaves it). Ctrl+Z: back on the
+      note in one step. Select page ink (a rectangle begun beside the note) and drag it onto the note: it joins the
+      note (clipped, moves with it); Ctrl+Z in one step.
+- [ ] A tap on the note with the rectangle tool selects the whole note (outline, handle, pill); then a drag moves it.
+      On a covering note a drag moves it right away, as before.
+- [ ] Save, close, open again: the note, its text (formatted), ink and pictures are there. Open the file in
+      Xournal++: it opens without errors; the note's text shows as its Markdown source wrapped at the note's width,
+      pictures and ink unclipped.
+- [ ] Android (Fold 7): the pill's buttons fit (folded and unfolded); "Text" brings the on-screen keyboard; a finger
+      drag of a selection inside a note works the same.

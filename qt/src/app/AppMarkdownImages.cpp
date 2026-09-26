@@ -109,17 +109,10 @@ void AppController::relayoutPictures(const std::string& link) {
                 bool shows = false;
                 {
                     std::unique_lock lock(*doc);
-                    Layer* layer = md::markdownLayer(page);
-                    if (!layer) {
-                        continue;
-                    }
-                    for (const auto* e: layer->getElementsView()) {
-                        if (e->getType() == ELEMENT_TEXT) {
-                            auto* text = const_cast<Text*>(static_cast<const Text*>(e));
-                            if (text->getText().find(link) != std::string::npos) {
-                                text->setText(text->getText());  // (its size again: the picture's)
-                                shows = true;
-                            }
+                    for (Text* text: md::boxesOf(*page)) {  // (the Markdown layer's and the sticky notes' texts)
+                        if (text->getText().find(link) != std::string::npos) {
+                            text->setText(text->getText());  // (its size again: the picture's)
+                            shows = true;
                         }
                     }
                 }

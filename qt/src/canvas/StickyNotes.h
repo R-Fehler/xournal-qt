@@ -66,8 +66,10 @@ public:
     // --- input (page coordinates of the page pressed) ---------------------------------------------------------
     /// A press: on the selected note's handle (any tool) it starts resizing; with a select tool on the selected
     /// note, or on any other note, it selects it and starts moving it. A press elsewhere ends the selection.
+    /// `areaTool` (a rectangle or lasso select tool): on a note that is not selected (and does not cover) the press is
+    /// not the note's: the rectangle or lasso selects in the note (CanvasPage; a tap selects the note then).
     /// Returns true when the press was the note's (nothing else happens); `deselected`: it only ended a selection.
-    bool press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected);
+    bool press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected, bool areaTool = false);
     /// A finger on the selected note (view coordinates): it moves it or its handle resizes it. False: not on it.
     bool pressTouch(CanvasPage& page, double x, double y);
     bool dragging() const { return drag != Drag::None; }

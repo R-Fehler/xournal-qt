@@ -39,7 +39,10 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
+#include "session/DocumentTextIndex.h"
 #include "session/StickyNote.h"
+#include "util/Matrix.h"
+#include "MdBox.h"
 #include "undo/UndoRedoHandler.h"
 #include "view/DocumentView.h"
 
@@ -289,6 +292,18 @@ TEST_F(StickyNoteTest, upstreamXournalppOpensTheFileAndShowsTheNotes) {
     if (!QFileInfo(upstream).isExecutable()) {
         GTEST_SKIP() << "no upstream xournalpp at " << upstream.toStdString() << " (set XOJ_UPSTREAM_BIN)";
     }
+    // (qt/sticky-containers) the note's Markdown text: Xournal++ shows its source, wrapped at the note's width
+    {
+        const auto look = *sticky::lookOf(*note);
+        auto t = std::make_unique<Text>();
+        t->setText("Upstream **shows** this");
+        t->setFont(XojFont("Sans", 10));
+        t->setColor(INK);
+        t->setWrap(sticky::textWidth(look));
+        t->setTransformation(xoj::util::Matrix::TRANSLATION(sticky::textOrigin(look).x, sticky::textOrigin(look).y));
+        note->addElement(std::move(t));
+        ASSERT_NE(sticky::textOf(*note), nullptr);
+    }
     ASSERT_TRUE(session->saveAs(path("notes.xopp")).ok);
     QProcess p;
     // Its own configuration and caches: never the user's (AGENTS.md)
@@ -312,6 +327,71 @@ TEST_F(StickyNoteTest, upstreamXournalppOpensTheFileAndShowsTheNotes) {
     // (Upstream does not clip: the stroke goes on beyond the note's edge, as documented)
     EXPECT_TRUE(near(pixel(s, 330, 200), BLUE, 60)) << str(pixel(s, 330, 200));
     cairo_surface_destroy(s);
+}
+
+// qt/sticky-containers: the note's one Markdown text (qt/docs/sticky-notes.md, "Notes as containers")
+TEST_F(StickyNoteTest, aNotesMarkdownTextIsToldByItsPlaceAndFlowsInTheNotesWidth) {
+    const auto look = *sticky::lookOf(*note);
+    const auto origin = sticky::textOrigin(look);
+    EXPECT_EQ(sticky::textOf(*note), nullptr) << "the plain text \"Answer?\" is no Markdown text (no wrap width)";
+    auto t = std::make_unique<Text>();
+    t->setText("# Title\n\n**Keys** are the words that a sentence needs to wrap over several lines of this note");
+    t->setFont(XojFont("Sans", 10));
+    t->setColor(INK);
+    t->setWrap(sticky::textWidth(look));
+    t->setTransformation(xoj::util::Matrix::TRANSLATION(origin.x, origin.y));
+    Text* text = t.get();
+    note->addElement(std::move(t));
+    EXPECT_TRUE(text->isMarkdown()) << "flagged when it comes into the note's layer";
+    EXPECT_EQ(sticky::textOf(*note), text);
+    EXPECT_FALSE(static_cast<const Text*>(note->getElementsView()[2])->isMarkdown()) << "the plain text stays plain";
+    // Elsewhere on the note, or on an ordinary layer, a text with a wrap width is plain
+    auto other = text->cloneText();
+    other->setTransformation(xoj::util::Matrix::TRANSLATION(origin.x + 30, origin.y + 40));
+    EXPECT_FALSE(sticky::isNoteText(*note, *other));
+    Layer plain;
+    auto third = text->cloneText();
+    Text* onPlain = third.get();
+    plain.addElement(std::move(third));
+    EXPECT_FALSE(onPlain->isMarkdown());
+
+    // Narrower: its width follows (more lines); moved: it goes along and stays the note's text; renamed (cover): too
+    const double height = md::contentHeight(*text);
+    sticky::Look narrow = look;
+    narrow.rect.width = 120;
+    sticky::applyLook(*note, look, narrow);
+    EXPECT_NEAR(text->getWrap(), 120 - 2 * sticky::TEXT_PADDING, 1e-9);
+    EXPECT_GT(md::contentHeight(*text), height + 5);
+    sticky::Look moved = narrow;
+    moved.rect.x += 40;
+    moved.rect.y += 30;
+    moved.cover = true;
+    sticky::applyLook(*note, narrow, moved);
+    EXPECT_TRUE(text->isMarkdown()) << "renamed to a covering note: still its text";
+    EXPECT_EQ(sticky::textOf(*note), text);
+    EXPECT_NEAR(text->getTransformation().shift.x, origin.x + 40, 1e-9);
+    sticky::applyLook(*note, moved, look);
+    EXPECT_NEAR(text->getWrap(), sticky::textWidth(look), 1e-9);
+
+    // Saved and loaded: the note's text again (a Markdown text, its width); the text index shows it as drawn
+    ASSERT_TRUE(session->saveAs(path("text.xopp")).ok);
+    auto loaded = DocumentSession::loadFile(path("text.xopp"));
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    const Layer* n = loaded.document->getPage(0)->getLayers()[1];
+    const Text* again = sticky::textOf(*n);
+    ASSERT_NE(again, nullptr);
+    EXPECT_TRUE(again->isMarkdown());
+    EXPECT_EQ(again->getText(), text->getText());
+    EXPECT_NEAR(again->getWrap(), sticky::textWidth(look), 1e-6);
+    bool shown = false;
+    for (const ElementText& piece: elementTexts(*loaded.document->getPage(0))) {
+        shown = shown || (piece.element == again && piece.shown.startsWith("Keys are"));
+    }
+    EXPECT_TRUE(shown) << "searched as it is shown";
+    // Pictures in it are carried with the file (qt/md-images) like those of the page's Markdown texts
+    EXPECT_EQ(md::boxesOf(*loaded.document->getPage(0)).size(), 1u);
+    EXPECT_TRUE(md::holdsBoxes(*n));
+    EXPECT_FALSE(md::holdsBoxes(*loaded.document->getPage(0)->getLayers()[0]));
 }
 
 TEST_F(StickyNoteTest, pdfExportAndPrintDrawTheNotesClipped) {

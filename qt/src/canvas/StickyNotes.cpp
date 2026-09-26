@@ -454,7 +454,7 @@ void StickyNotes::startDrag(Drag how, double x, double y) {
     dragStart = dragNow = *look;
 }
 
-bool StickyNotes::press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected) {
+bool StickyNotes::press(CanvasPage& page, double x, double y, bool selectTool, bool& deselected, bool areaTool) {
     deselected = false;
     if (selected) {
         if (onHandle(page, x, y)) {
@@ -477,12 +477,14 @@ bool StickyNotes::press(CanvasPage& page, double x, double y, bool selectTool, b
         return false;
     }
     Layer* note = nullptr;
+    bool open = false;
     {
         std::shared_lock lock(*view.getSession().getDocument());
         note = sticky::noteAt(*page.getPage(), x, y);
+        open = sticky::openNoteAt(*page.getPage(), x, y) != nullptr;
     }
-    if (!note) {
-        return false;
+    if (!note || (areaTool && open)) {
+        return false;  // (a rectangle or lasso on a note selects in it, a tap selects it: CanvasPage)
     }
     select(page, note);
     startDrag(Drag::Move, x, y);  // (a drag moves it right away)

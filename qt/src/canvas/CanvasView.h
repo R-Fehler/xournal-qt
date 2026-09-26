@@ -38,6 +38,7 @@
 #include "model/PageRef.h"
 #include "render/PageRaster.h"
 
+#include "control/tools/CursorSelectionType.h"
 #include "control/zoom/ZoomControl.h"
 
 #include "DocumentLayout.h"
@@ -48,6 +49,7 @@
 #include "GeometryToolLayer.h"
 #include "ScreenCalibration.h"
 #include "session/DocumentSession.h"
+#include "session/StickyNote.h"
 
 class EditSelection;
 class Settings;
@@ -212,8 +214,12 @@ public:
     void selectAllOnPage();
     /// Insert an image (file contents: PNG, JPEG, ...) on the current page, in the middle of its visible part and
     /// fitted into it, as a selection to move or resize (port of ImageHandler::addImageToDocument). False if the data
-    /// is not an image.
-    bool insertImage(const QByteArray& data);
+    /// is not an image. Into a sticky note when one is selected or lies there (`viewPos`: where it was pasted, else the
+    /// middle of the visible part), fitted into the note (qt/docs/sticky-notes.md, "Notes as containers").
+    bool insertImage(const QByteArray& data, std::optional<QPointF> viewPos = std::nullopt);
+    /// Where the mouse rests on this view's canvas (view coordinates; nothing: not over the canvas), asked by a paste
+    /// with the keys: over a sticky note it goes into the note. Set by the canvas item that shows the view.
+    void setMousePointerSource(std::function<std::optional<QPointF>()> source) { mousePointer = std::move(source); }
 
     // --- PDF links ---
     struct LinkTarget {
@@ -359,6 +365,9 @@ public:
     bool insertAtTextCursor(const std::string& text);
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
+    /// Write the selected sticky note's Markdown text (the note's pill: "Text"): started, or edited with the cursor at
+    /// its end. False: no note selected (or a covering one).
+    bool writeNoteText();
     /// A tap on the check box of a task in a Markdown text (page coordinates): it is switched, one undo step.
     bool toggleMarkdownCheckBox(CanvasPage& page, double x, double y);
     /// New texts of the text tool: Markdown text boxes of this size, or ordinary texts. `inPanel`: Markdown text
@@ -378,6 +387,17 @@ public:
     bool isMarkdownLayer(const PageRef& page, Layer::Index layer) const;
     /// The selection just set is of Markdown texts from `page`, whose selected layer was `before`.
     void markdownSelectionMade(const PageRef& page, Layer::Index before);
+    /// The selection just set is of elements in the sticky note `note` (its own, or pasted or inserted into it): the
+    /// note is the page's selected layer while it lives (they are dropped there; sticky::holdLayer), `before` again
+    /// after (qt/docs/sticky-notes.md, "Selecting in a note").
+    void noteSelectionMade(const PageRef& page, Layer::Index before, Layer* note);
+    /// Make a note the page's selected layer for a selection in it; returns the layer selected before
+    Layer::Index selectNoteLayer(const PageRef& page, const Layer* note);
+    /// A drag of the selection begins (a press on it: `type`, move or a handle) and ends. At the end of a move the
+    /// sticky note under the middle of the selection takes it, or the page when there is none: the move and the
+    /// change of layer are one undo step. endSelectionDrag ends the drag in place of EditSelection::mouseUp.
+    void selectionDragStarts(CursorSelectionType type);
+    void endSelectionDrag();
 
     // Layout (upstream gui/Layout, content pixels)
     XojPageView* getPageViewAt(int x, int y) const override;
@@ -505,8 +525,24 @@ private:
             Layer* created = nullptr;
         };
         std::vector<Page> pages;
+        /// A selection in sticky notes (not of Markdown texts): the notes that are their pages' selected layers
+        std::vector<const Layer*> notes;
+        bool inNotes = false;
     };
     std::optional<MarkdownSelection> markdownSelection;
+    /// Where things pasted or inserted go: the selected sticky note (`selected`), or the one that can be written on at a
+    /// point of a page (nothing: the page takes them)
+    struct NoteTarget {
+        Layer* note = nullptr;
+        size_t page = 0;
+        sticky::Look look;
+        bool selected = false;
+    };
+    std::optional<NoteTarget> noteTarget(size_t page, std::optional<QPointF> pagePoint) const;
+    std::function<std::optional<QPointF>()> mousePointer;
+    CursorSelectionType selectionDrag{};
+    QPointF selectionDragFrom;
+    const XojPageView* selectionDragPage = nullptr;
     void endMarkdownSelection();
     bool markdownText = false;       ///< the text tool makes Markdown text boxes
     double markdownTextSize = 10;    ///< of this font size

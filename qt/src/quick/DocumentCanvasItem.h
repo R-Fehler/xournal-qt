@@ -187,6 +187,7 @@ private:
     bool mouseElsewhere = false;  ///< a mouse drag that began outside the canvas (e.g. on a scroll bar)
     QTimer hoverTimer;            ///< the mouse rests (mouseHovers)
     QPointF hoverScenePos;
+    bool mouseOverWindow = false;  ///< hoverScenePos is where the mouse is (it did not leave the window)
     QString mathErrorText;
     QRectF mathErrorArea;
     // the link hovered (linkHovers)

@@ -21,6 +21,7 @@
 
 #include <cairo.h>  // for cairo_t
 
+class Layer;
 class Text;
 typedef struct _PangoLayout PangoLayout;
 
@@ -42,6 +43,12 @@ using Sizer = Size (*)(const Text& text);
 /// Set once by the frontend (drawing and sizes are asked from several threads). nullptr: texts are texts.
 inline std::atomic<Renderer> renderer{nullptr};
 inline std::atomic<Sizer> sizer{nullptr};
+
+/// Whether a text of a layer not named "Markdown" is a Markdown text too (asked by Layer when the text comes into
+/// the layer, or the layer is renamed; xournal-qt: a sticky note's text, qt/src/session/StickyNote.h). Set once by the
+/// frontend. nullptr: only the texts of a layer "Markdown" are.
+using Classifier = bool (*)(const Layer& layer, const Text& text);
+inline std::atomic<Classifier> classifier{nullptr};
 
 /// Draws the Pango layout of a text (TextView, at the current point). Set once by the frontend (xournal-qt: colour
 /// emoji as sharp pictures in PDFs, qt/src/markdown/EmojiFont.h). nullptr: pango_cairo_show_layout.

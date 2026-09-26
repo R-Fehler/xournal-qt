@@ -1,5 +1,5 @@
-// The selected sticky note (qt/docs/sticky-notes.md), beside it: its color, cover mode (self-testing), copy, cut,
-// delete. Every change is one undo step; paste (Ctrl+V, the context pill) puts a copied note on the page in view. The note itself is moved by dragging it, resized by the handle at its bottom right corner.
+// The selected sticky note (qt/docs/sticky-notes.md), beside it: its color, cover mode (self-testing), its Markdown
+// text, an image onto it, copy, cut, delete. Every change is one undo step; paste (Ctrl+V, the context pill) puts a copied note on the page in view. The note itself is moved by dragging it, resized by the handle at its bottom right corner.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -9,6 +9,8 @@ Pane {
     id: pill
     property Item canvasItem
     property bool hidden: false
+    /// "Image…": the window's file dialog; the image goes onto the selected note (app.insertImage)
+    signal imageRequested()
     visible: app.noteSelected && !hidden
     /// Above the note (below it where there is no room), going along with it; at the top of the canvas when the
     /// note is out of sight
@@ -80,6 +82,25 @@ Pane {
             ToolTip.visible: hovered
             ToolTip.text: app.noteCovers ? qsTr("Covers: the pen leaves it alone, a tap lets you peek under it. Tap to write on it again.")
                                          : qsTr("Cover what is below (self-testing): the pen leaves it alone, a tap lets you peek under it")
+            ToolTip.delay: 600
+        }
+        ToolSeparator {}
+        ToolButton {
+            objectName: "noteTextButton"
+            text: qsTr("Text")
+            enabled: !app.noteCovers
+            onClicked: app.writeNoteText()
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Write on the note: its Markdown text, as wide as the note")
+            ToolTip.delay: 600
+        }
+        ToolButton {
+            objectName: "noteImageButton"
+            text: qsTr("Image…")
+            enabled: !app.noteCovers
+            onClicked: pill.imageRequested()
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Put an image on the note")
             ToolTip.delay: 600
         }
         ToolSeparator {}

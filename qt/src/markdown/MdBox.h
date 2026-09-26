@@ -23,6 +23,7 @@
 
 class Layer;
 class Text;
+class XojPage;
 
 namespace xqt::md {
 
@@ -70,8 +71,14 @@ std::vector<Rect> shownRects(const Text& text, size_t index, int from, int to);
 /// A box written on the page is drawn with the block of the cursor as its source (layout() with `active`): the
 /// cursor's offset in the box's text, NO_SOURCE when it is not written any more. Any thread may read it.
 void setWritingCursor(const Text& text, size_t active);
-/// Whether a text is a box: in a Markdown layer.
+/// Whether a layer is the page's layer "Markdown" (every text of it is a box).
 bool isMarkdownLayer(const Layer& layer);
+/// Whether a layer holds Markdown boxes: the page's layer "Markdown", or a layer with a Markdown text of its own (a
+/// sticky note with its text, session/StickyNote.h; Text::isMarkdown).
+bool holdsBoxes(const Layer& layer);
+/// Every box of a page, in the order they are drawn (the Markdown layer's, the sticky notes' texts; hidden layers'
+/// too). Call under the document's lock.
+std::vector<Text*> boxesOf(const XojPage& page);
 
 /// The page's Markdown layer (nullptr if none).
 Layer* markdownLayer(const PageRef& page);
@@ -79,7 +86,8 @@ Layer* markdownLayer(const PageRef& page);
 Text* boxOf(const Layer& layer);
 /// The page's Markdown text: the box whose top left is at (x, y), the page's margins (nullptr if none).
 Text* pageBoxOf(const Layer& layer, double x, double y);
-/// The box drawn at a point of the page (the topmost; nullptr if none).
+/// The box of a layer drawn at a point of the page (the topmost; nullptr if none). Texts of the layer that are not
+/// Markdown texts (a plain text on a sticky note) are no boxes.
 Text* boxAt(const Layer& layer, double x, double y);
 
 /// The size of new Markdown text, from the size of the text font: smaller, as Markdown has headings.
