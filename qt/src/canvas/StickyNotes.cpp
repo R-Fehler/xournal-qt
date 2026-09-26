@@ -576,7 +576,7 @@ bool StickyNotes::tapCover(CanvasPage& page, double x, double y) {
     }
     sticky::setPeeking(note, peek);
     // Only the screen shows it: no page change (thumbnails, the file), the note is drawn again here
-    const double pad = 2 / page.getZoom() + sticky::PAPER_WIDTH;
+    const double pad = 2 / page.getZoom() + sticky::DRAWN_MARGIN;  // (its shadow too)
     page.rerenderRect(look->rect.x - pad, look->rect.y - pad, look->rect.width + 2 * pad, look->rect.height + 2 * pad);
     return true;
 }

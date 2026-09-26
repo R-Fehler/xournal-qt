@@ -37,8 +37,14 @@ namespace xqt::sticky {
 /// Names of a note's layer (saved; fixed English, like "Markdown")
 inline constexpr const char* LAYER_NAME = "Sticky note";
 inline constexpr const char* COVER_LAYER_NAME = "Sticky note (cover)";
-/// The paper's outline (points; drawn in the paper's color)
+/// The paper's outline as saved (points, in the paper's color: what upstream Xournal++ draws)
 inline constexpr double PAPER_WIDTH = 0.5;
+/// The paper's edge as we draw it (points): a darker shade of the paper's color (edgeColor)
+inline constexpr double EDGE_WIDTH = 0.8;
+/// The edge's color: the paper's color times this
+inline constexpr double EDGE_SHADE = 0.78;
+/// How far a note's picture (its edge and its shadow) reaches beyond its rectangle (points)
+inline constexpr double DRAWN_MARGIN = 4;
 /// The smallest side of a note (points)
 inline constexpr double MIN_SIDE = 24;
 /// A new note (points)
@@ -59,6 +65,11 @@ struct Look {
     }
     bool operator!=(const Look& o) const { return !(*this == o); }
 };
+
+/// The color of the edge of a note of this color
+Color edgeColor(Color paper);
+/// Where a note of this rectangle is drawn: the rectangle and its shadow (what is drawn again when it changes)
+xoj::util::Rectangle<double> drawnRect(const xoj::util::Rectangle<double>& rect);
 
 /// Whether a layer name is a note's
 bool isNoteName(const std::string& name);
@@ -91,9 +102,14 @@ void setPeeking(const Layer* layer, bool peeking);
 bool isPeeking(const Layer* layer);
 
 // --- drawing ---------------------------------------------------------------------------------------------------
-/// Draw a note (in page coordinates): the paper, then its content clipped to it. False if the layer is no note (the
-/// drawer of upstream's LayerView, see view/LayerView.h).
+/// Draw a note (in page coordinates): a soft shadow, the paper, its content clipped to it, and the paper's darker
+/// edge (a look of our renderer: nothing of it is in the file). False if the layer is no note (the drawer of
+/// upstream's LayerView, see view/LayerView.h).
 bool draw(const Layer& layer, const xoj::view::Context& ctx);
+/// What is drawn around a note's paper: `Full` (the edge and the shadow) in the app; the others for measuring what
+/// they cost (the benchmark in StickyNoteTest). `Flat` is the paper as upstream draws it. Any thread may ask.
+enum class Finish { Flat, Edge, Full };
+void setFinish(Finish finish);
 /// Notes are drawn as notes from now on, everywhere a page is drawn (idempotent)
 void installDrawer();
 

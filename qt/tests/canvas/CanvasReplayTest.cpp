@@ -5,7 +5,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <memory>
 
@@ -40,6 +42,7 @@
 #include "model/Document.h"
 #include "model/GeometryTool.h"
 #include "model/Layer.h"
+#include "model/PageType.h"
 #include "model/Stroke.h"
 #include "model/Font.h"
 #include "model/Text.h"
@@ -2864,4 +2867,80 @@ TEST_F(CanvasReplayTest, aStickyNoteDraggedOntoAnotherPageGoesThereAsOneStep) {
     session->getUndoRedoHandler()->redo();
     EXPECT_EQ(notesOf(*session, 1).size(), 1u);
     EXPECT_NEAR(sticky::lookOf(*note)->rect.x, 170, 0.5);
+}
+
+// --- the look of a note on the screen (qt/sticky-look) ------------------------------------------------------------
+
+namespace {
+/// The screen's pixels of a page (its buffer and what is drawn over it) in this part (page coordinates)
+QImage screenOf(CanvasPage& page, const QRectF& area) {
+    const auto info = page.bufferInfo();
+    const double s = info.zoom * info.dpiScale;
+    return page.composeTile(QRect(static_cast<int>(area.x() * s), static_cast<int>(area.y() * s),
+                                  std::max(1, static_cast<int>(area.width() * s)),
+                                  std::max(1, static_cast<int>(area.height() * s))));
+}
+/// The darkest pixel of an image
+QColor darkestOf(const QImage& image) {
+    QColor darkest(Qt::white);
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (qGray(image.pixel(x, y)) < qGray(darkest.rgb())) {
+                darkest = image.pixelColor(x, y);
+            }
+        }
+    }
+    return darkest;
+}
+int sumOf(const QColor& c) { return c.red() + c.green() + c.blue(); }
+/// Plain white pages (no ruling in the pixels looked at), drawn
+void plainPages(DocumentSession& session, CanvasView& view) {
+    for (size_t i = 0; i < view.pageCount(); ++i) {
+        session.getDocument()->getPage(i)->setBackgroundType(PageType(PageTypeFormat::Plain));
+        view.getPage(i)->rerenderPage();
+    }
+}
+}  // namespace
+
+TEST_F(CanvasReplayTest, aStickyNoteHasADarkerEdgeOnTheScreenAlsoWhilePeeking) {
+    plainPages(*session, *view);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    const Color paper = look.color;
+    view->clearSelection();
+    processEvents();
+    const int paperSum = paper.red + paper.green + paper.blue;
+    // Across its left edge (a strip 4 pt wide, 20 pt high): the darkest pixel is the edge, a darker shade of the paper
+    const QRectF across(look.rect.x - 2, look.rect.y + 40, 4, 20);
+    const QColor edge = darkestOf(screenOf(*view->getPage(0), across));
+    if (qEnvironmentVariableIsSet("XQT_STICKY_SHOTS")) {
+        screenOf(*view->getPage(0), QRectF(look.rect.x - 10, look.rect.y - 10, look.rect.width + 20,
+                                           look.rect.height + 20))
+                .save(qEnvironmentVariable("XQT_STICKY_SHOTS") + "/screen-note.png");
+    }
+    EXPECT_LT(sumOf(edge), paperSum - 40) << "darker than the paper: " << edge.name().toStdString();
+    EXPECT_GT(qGray(edge.rgb()), 110) << "not black: " << edge.name().toStdString();
+    EXPECT_LE(edge.blue(), edge.red()) << "its own color's shade (yellow), not gray: " << edge.name().toStdString();
+    // Its shade: below the note a little darker than the page, above it nothing
+    const QColor below = darkestOf(
+            screenOf(*view->getPage(0), QRectF(look.rect.x + 40, look.rect.y + look.rect.height + 1, 20, 1.5)));
+    const QColor above = darkestOf(screenOf(*view->getPage(0), QRectF(look.rect.x + 40, look.rect.y - 3, 20, 1.5)));
+    EXPECT_LT(qGray(below.rgb()), 250) << below.name().toStdString();
+    EXPECT_GT(qGray(below.rgb()), 190) << "a light shade " << below.name().toStdString();
+    EXPECT_GE(qGray(above.rgb()), 253) << above.name().toStdString();
+
+    // Covering and peeking: see-through, and its edge stays visible (dashed)
+    view->notes().select(*view->getPage(0), note);
+    view->notes().setCover(true);
+    view->clearSelection();
+    const QPointF middle = viewPos(0, QPointF(look.rect.x + look.rect.width / 2, look.rect.y + look.rect.height / 2));
+    tablet(QEvent::TabletPress, middle, 0.3, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, middle, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_TRUE(sticky::isPeeking(note));
+    const QColor inside = darkestOf(screenOf(*view->getPage(0), QRectF(look.rect.x + 30, look.rect.y + 30, 4, 4)));
+    EXPECT_GT(sumOf(inside), paperSum + 20) << "see-through " << inside.name().toStdString();
+    const QColor peekEdge = darkestOf(screenOf(*view->getPage(0), across));
+    EXPECT_LT(sumOf(peekEdge), 3 * 255 - 150) << "the edge while peeking " << peekEdge.name().toStdString();
 }

@@ -1436,6 +1436,12 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
       tap covers again. Close and reopen the file: covered again (peeking is not saved).
 - [ ] A page with notes has an eye button beside the page number: it hides all notes of the page (thumbnail too) and
       shows them again. The layer panel does not list the notes.
+- [ ] (qt/sticky-look) Notes of all five colours on a white page and on a PDF page, at 100 % and zoomed in: each has
+      a thin edge in a darker shade of its own colour (not black, not gray) and a soft light shade below and right
+      of it, none above or left. It looks like a paper note, not like a frame. The same in a thumbnail, the plain PDF
+      export, the archive, the hybrid PDF (Okular, a browser) and print; in upstream Xournal++ the note stays flat.
+      A covering note looks the same (plus its folded corner); peeking, its dashed edge shows clearly. Writing fast
+      on a note, and scrolling a page with many notes, is as smooth as before (Surface Pro, Fold 7).
 
 ## Markdown out of a PDF text document, other viewers (qt/docs/user/markdown-from-pdf.md)
 
