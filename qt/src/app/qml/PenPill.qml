@@ -11,7 +11,7 @@ Rectangle {
     id: pill
     objectName: "penPill"
     z: 59
-    visible: win.noToolbar && !app.homeVisible && (app.tool === "pen" || app.tool === "highlighter")
+    visible: win.noToolbar && !app.homeVisible && !win.cleanPage && (app.tool === "pen" || app.tool === "highlighter")
     radius: 18
     color: "#f7ffffff"
     border.width: 1

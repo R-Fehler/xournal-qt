@@ -1795,3 +1795,19 @@ Design: [md-images.md](../md-images.md).
 - [ ] With the pen (Surface Pro, Wacom): its barrel button never fits the page (it still lends its tool).
 - [ ] Linux: select some text in another app, then middle click on the canvas: nothing is pasted.
 - [ ] Touch pad with a three-finger tap as the middle click (if the desktop sends one): it fits the page as well.
+
+## Clean presentation (qt/present-clean)
+- [ ] Ctrl+F5 (or hold / right-click the presentation button in the tool bar, or ⋮ → "Present without controls"):
+      presenting starts with only the page: no pen pill, no tool square, no "12 / 40", no back / forward pill, no
+      link address line. F5 and a click on the button present as before, with the pill and the tool square.
+- [ ] The lower left corner has a faint grey dot (a few pixels). Look at it on a projector or a large screen, on a
+      white slide and on the black beside a 4:3 page: it should not catch the eye. The mouse or the pen over it makes
+      it a little clearer.
+- [ ] Tap the corner with a finger (the dot need not be hit exactly: about 1 cm around it counts): the pen pill and
+      the tool square come back; tap again: gone. Ctrl+F5 while presenting does the same. The dot shows in normal
+      presenting too; the back / forward pill sits beside it.
+- [ ] Without controls: Space, the arrows, Page Up / Down, Home / End, a presenter remote, a swipe and a typed page
+      number with Enter page as usual; the pen and the highlighter write.
+      Escape ends presenting as before, F5 too; the next F5 presents with the controls again.
+- [ ] Settings → Shortcuts lists "Present without controls" on Ctrl+F5; other keys given there work.
+- [ ] With a reference open: presenting without controls shows the notes alone; the reference comes back after.
