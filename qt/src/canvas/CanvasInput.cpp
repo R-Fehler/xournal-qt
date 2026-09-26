@@ -52,6 +52,8 @@ constexpr double TAP_SLOP_PX = 16.0;  // Krita's TOUCH_SLOP
 /// A pen held down counts as held still while it stays this close to where it went down (a hand shakes a little;
 /// a pen is more precise than a finger, and a short slow stroke must stay a stroke)
 constexpr double PEN_HOLD_SLOP_PX = 6.0;
+/// A middle click (the page fits): pressed and let go within this time (and not moved beyond the drag distance)
+constexpr guint32 MIDDLE_CLICK_MS = 500;
 /// How long a finger or the pen is held still for what can be done here
 constexpr int LONG_PRESS_MS = 500;
 
@@ -266,6 +268,8 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
             if (deviceClassPressed) {
                 break;  // upstream MouseInputHandler: one button at a time
             }
+            linkPress.reset();  // (of a press whose release was lost)
+            middlePress.reset();
             // The right button shows what can be done here, unless it was given a tool of its own
             if (e->button() == Qt::RightButton &&
                 view.getSession().getSettings()->getButtonConfig(BUTTON_MOUSE_RIGHT)->getAction() == TOOL_NONE) {
@@ -285,6 +289,13 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
             modifier3 = e->button() == Qt::RightButton;
             deviceClassPressed = true;
             runningDeviceClass = DeviceClass::Mouse;
+            // The middle button: a click fits the page as two taps do, a drag is the button's tool (the hand). Only
+            // the mouse's: a barrel button reported as the middle button of the mouse (the pen near) stays the pen's.
+            if (e->button() == Qt::MiddleButton && !penNear()) {
+                middlePress = ev;
+                view.getViewController().stopMomentum();
+                return true;
+            }
             // A link under a tool that a click on it follows: wait whether it is a click or a drag. (The object select
             // tool selects what it clicks; with nothing there it follows the link on the release, as with a tap.)
             if (e->button() == Qt::LeftButton &&
@@ -299,13 +310,14 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
             actionStart(ev);
             break;
         case QEvent::MouseMove:
-            if (linkPress && deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
-                if (std::hypot(viewPos.x() - linkPress->viewPos.x(), viewPos.y() - linkPress->viewPos.y()) <=
+            if (std::optional<Event>& held = linkPress ? linkPress : middlePress;
+                held && deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
+                if (std::hypot(viewPos.x() - held->viewPos.x(), viewPos.y() - held->viewPos.y()) <=
                     QGuiApplication::styleHints()->startDragDistance()) {
                     break;  // (still a click)
                 }
                 // A drag: the tool starts where the mouse was pressed, as it would have
-                const Event press = *std::exchange(linkPress, std::nullopt);
+                const Event press = *std::exchange(held, std::nullopt);
                 actionStart(press);
             }
             if (deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
@@ -321,6 +333,18 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
                 modifier2 = modifier3 = false;
                 view.followLinkAt(at);
                 break;
+            }
+            if (middlePress && deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
+                const Event press = *std::exchange(middlePress, std::nullopt);
+                if (ev.timestamp - press.timestamp <= MIDDLE_CLICK_MS) {
+                    // A middle click: the page fits (or its column, or the width), as with two taps
+                    deviceClassPressed = false;
+                    runningDeviceClass.reset();
+                    modifier2 = modifier3 = false;
+                    view.doubleTapAt(press.viewPos);
+                    break;
+                }
+                actionStart(press);  // held still for long: the button's tool pressed and let go, as before
             }
             if (deviceClassPressed && runningDeviceClass == DeviceClass::Mouse) {
                 actionEnd(ev);

@@ -9,6 +9,8 @@
  * Touchpad: two-finger scrolling with momentum after the fingers are lifted (Wayland reports no kinetic scrolling,
  * GTK/upstream Xournal++ add it themselves), pinch zoom; Ctrl + wheel zooms.
  *
+ * Mouse: a middle click fits the page (as two taps do), a middle drag is the button's tool (the hand).
+ *
  * Touch: navigation (pan with momentum, anchored pinch zoom), 2-finger tap = undo, 3-finger tap = redo, and
  * Krita-style palm rejection: touch is ignored while the pen is in proximity, pressed or was used recently, and a
  * pen press cancels a running touch gesture. Drawing with the finger (upstream's "touchDrawing" setting, the tool
@@ -126,6 +128,9 @@ private:
     /// (then the press starts the tool where it was, and it draws as always) or is released (then the link is
     /// followed, and no dot is drawn).
     std::optional<Event> linkPress;
+    /// A press of the mouse's middle button, the same way: a click (released soon, not moved beyond the drag
+    /// distance) fits the page as two taps do (CanvasView::doubleTapAt); a drag starts the button's tool (the hand).
+    std::optional<Event> middlePress;
 
     // pen proximity / hover / palm rejection
     bool penInProximity = false;
