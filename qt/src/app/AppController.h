@@ -1248,6 +1248,7 @@ private:
     std::unique_ptr<xqt::MarkdownSession> markdown;
     xqt::DocumentSession* mdSession = nullptr;
     int mdPage = -1;
+    bool mdInPanel = false;  ///< markdownInPanel() (tests only; the text tool writes Markdown on the page)
     int mdLastPage = -1;
     double mdOverflow = 0;
     /// Pages were copied after the last copy onto the clipboard (pastesNoteBeforePages)

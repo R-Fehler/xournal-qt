@@ -491,14 +491,6 @@ ApplicationWindow {
                             checked: app.textMarkdown
                             onToggled: app.textMarkdown = checked
                         }
-                        // Markdown: written on the page (formatted while typing, the block with the cursor showing its
-                        // Markdown), or its source beside the page
-                        Switch {
-                            objectName: "markdownInPanelSwitch"
-                            text: qsTr("Write Markdown beside the page (its source)")
-                            checked: app.markdownInPanel
-                            onToggled: app.markdownInPanel = checked
-                        }
                     }
                 }
             }

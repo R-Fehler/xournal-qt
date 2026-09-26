@@ -1511,16 +1511,14 @@ void AppController::setMarkdownFontSize(double size) {
 
 double AppController::markdownBoxSize() const { return markdownActive() ? markdown->fontSize() : markdownFontSize(); }
 
-bool AppController::markdownInPanel() const {
-    bool on = false;  // (written on the page, formatted while typing)
-    app->getSettings()->getCustomElement(CUSTOM).getBool("markdownInPanel", on);
-    return on;
-}
+// Markdown boxes and the page's text are written on the page, formatted while typing, as in a .md; their source beside
+// the page is the writing button's menu (and Ctrl+Alt+M). The setting that sent the text tool there is gone: a value
+// stored by an earlier version ("markdownInPanel") is not read. Only tests still switch it, for this run.
+bool AppController::markdownInPanel() const { return mdInPanel; }
 
 void AppController::setMarkdownInPanel(bool on) {
-    if (on != markdownInPanel()) {
-        app->getSettings()->getCustomElement(CUSTOM).setBool("markdownInPanel", on);
-        app->getSettings()->customSettingsChanged();
+    if (on != mdInPanel) {
+        mdInPanel = on;
         applyMarkdownText();
         Q_EMIT fontChanged();
     }

@@ -37,8 +37,10 @@ Writing:
   - Ctrl+Z / Ctrl+Shift+Z undo and redo in the text being written; once it is done, the whole edit is one undo step.
   - Escape (or a tap elsewhere) is done.
   - Ctrl+Alt+M opens the same text beside the page.
-- **Beside the page** (the text tool's font menu: "Write Markdown beside the page"): the source in an editor beside
-  the page, and the page shows it formatted while typing.
+- **Beside the page** (the writing button's menu: "Markdown source beside the page", or Ctrl+Alt+M while writing on
+  the page, which takes the box or text being written along): the source in an editor beside the page, and the page
+  shows it formatted while typing. The text tool always writes on the page, as in a `.md`; the font menu's switch
+  that sent it beside the page is gone (2026-09-26), and a value an earlier version stored is not read.
 
 ## Flowing onto pages
 The page's Markdown text goes on on the next pages when it is longer than the page: while typing, it is split onto
@@ -80,8 +82,9 @@ by default (a 16 pt text font gives 10 pt). It can be set in the text tool's fon
 the editor beside the page ("Size", which also changes the text being edited).
 
 ## Using it
-- Open the editor with the writing button in the tool bar (hold or right-click it and choose "Markdown"; after that a
-  tap opens Markdown again) or with Ctrl+Alt+M. The editor opens beside the page and shows the source.
+- Write on the page with the writing button in the tool bar (hold or right-click it and choose "Markdown"; after that
+  a tap writes Markdown again), with Ctrl+Alt+M, or with a tap of the text tool (Markdown on in its font menu). The
+  source editor beside the page is the writing button's "Markdown source beside the page".
 - The formatting bar above the source has the same tools as on the page (the table editor too), acting on the
   source, each one undo step of the source. Enter continues a list, and Enter on an empty item ends it.
 - Keys: Ctrl+B / I / E (code) / K (link), Ctrl+1-3 for headings (Ctrl+0: paragraph), Tab / Shift+Tab to indent list

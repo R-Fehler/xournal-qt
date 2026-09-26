@@ -490,7 +490,7 @@ private:
     void endMarkdownSelection();
     bool markdownText = false;       ///< the text tool makes Markdown text boxes
     double markdownTextSize = 10;    ///< of this font size
-    bool markdownInPanel = true;     ///< Markdown text boxes are edited beside the page
+    bool markdownInPanel = false;    ///< Markdown text boxes are edited beside the page (tests; normally on the page)
     GeometryToolLayer geometry{*this};
     std::unique_ptr<StickyNotes> stickyNotes;
     std::unique_ptr<PdfElemSelection> pdfSelection;
