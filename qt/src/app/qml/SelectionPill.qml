@@ -16,9 +16,19 @@ Pane {
     function named(n) { return namePrefix === "" ? n : namePrefix + n.charAt(0).toUpperCase() + n.slice(1) }
     readonly property bool readingOnly: canvasItem.readingOnly
     visible: target.hasSelection && !hidden
-    anchors.bottom: canvasItem.bottom
-    anchors.bottomMargin: 24
+    /// Its distance from the canvas's bottom
+    property real bottomMargin: 24
+    /// A pill at the same bottom edge to keep clear of (the notes' view pill): where the two would meet, this one goes
+    /// above it
+    property Item avoid: null
+    readonly property real lowY: canvasItem.y + canvasItem.height - bottomMargin - height
+    readonly property bool meets: avoid !== null && avoid.visible && x - 8 < avoid.x + avoid.width && x + width + 8 > avoid.x
+                                  && lowY < avoid.y + avoid.height && lowY + height > avoid.y
+    y: meets ? avoid.y - height - 12 : lowY
     anchors.horizontalCenter: canvasItem.horizontalCenter
+    /// Smaller where the canvas is narrower than the pill (a phone, half of the window beside a reference)
+    scale: Math.min(1, Math.max(0.5, (canvasItem.width - 16) / Math.max(1, width)))
+    transformOrigin: Item.Bottom
     padding: 2
     leftPadding: 8
     rightPadding: 8

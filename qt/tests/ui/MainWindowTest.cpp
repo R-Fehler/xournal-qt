@@ -7907,8 +7907,8 @@ TEST_F(MainWindowTest, theFormattingBarAndTheTableEditor) {
     ASSERT_NE(editor, nullptr);
     type("Title");
 
-    // The heading buttons (no menu): Heading 1; its button is the one highlighted at the cursor
-    EXPECT_EQ(find<QObject>("mdHeadingMenu"), nullptr);
+    // The heading buttons (a wide window: no menu): Heading 1; its button is the one highlighted at the cursor
+    EXPECT_FALSE(find<QQuickItem>("mdBlockButton")->isVisible()) << "room for the kinds as buttons";
     EXPECT_TRUE(findItem("mdParagraph")->property("highlighted").toBool());
     click(findItem("mdHeading1"));
     EXPECT_EQ(editor->text(), "# Title");
@@ -8071,7 +8071,7 @@ TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFil
     ASSERT_TRUE(red.save(QString::fromStdString((outside / "my plot.png").string())));
 
     // The image of the insert menu: a file picker
-    EXPECT_EQ(find<QObject>("mdInsertMenu"), nullptr) << "no tool hidden behind a menu";
+    EXPECT_FALSE(find<QQuickItem>("mdInsertButton")->isVisible()) << "room: no tool hidden behind a menu";
     click(find<QQuickItem>("mdImage"));
     auto* dialog = find<QObject>("mdImageDialog");
     ASSERT_NE(dialog, nullptr);

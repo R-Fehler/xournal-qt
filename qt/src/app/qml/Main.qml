@@ -54,26 +54,98 @@ ApplicationWindow {
     property bool sidebarDrawerOpen: false
     readonly property bool sidebarShown: sidebarDocked || sidebarDrawerOpen
     readonly property bool sidebarAsDrawer: !sidebarDocked
-    onSidebarDockedChanged: sidebarDrawerOpen = false
+    onSidebarDockedChanged: closeDrawerNow()
     readonly property string layoutClass: adaptive.layoutClass
-    onLayoutClassChanged: sidebarDrawerOpen = false  // (a drawer is for the moment, in the size it was opened in)
+    onLayoutClassChanged: closeDrawerNow()  // (a drawer is for the moment, in the size it was opened in)
+    /// The drawer slides in from the left and out again (0: out of sight, 1: in place); beside the page there is no
+    /// slide. Only a tap (the arrow, the dimmed page, a page picked, Esc, the back key) slides it; a change of the size
+    /// class takes it away at once.
+    property real drawerSlide: 0
+    NumberAnimation {
+        id: drawerSlideAnimation
+        target: win
+        property: "drawerSlide"
+        duration: 180
+        easing.type: Easing.OutCubic
+    }
+    function slideDrawer(open) {
+        drawerSlideAnimation.stop()
+        drawerSlideAnimation.to = open ? 1 : 0
+        drawerSlideAnimation.start()
+    }
+    function closeDrawerNow() {
+        sidebarDrawerOpen = false
+        drawerSlideAnimation.stop()
+        drawerSlide = 0
+    }
+    /// The drawer's width: the sidebar's 210 px; on a phone up to 85 % of the window (larger thumbnails), 260 px when
+    /// the phone is held sideways (a page's thumbnail stays shorter than the window)
+    readonly property real drawerWidth: !adaptive.phone ? 210
+                                        : layoutClass === "phoneShort" ? 260 : Math.min(360, Math.round(width * 0.85))
     /// The Pages button: hides the sidebar (remembered for this size class), or shows it again - beside the page where
     /// there is room, else as a drawer (for the moment, not remembered)
     function showSidebar(shown) {
         if (shown) {
             if (sidebarDocked) return
-            if (adaptive.roomForSidebar) chooseLayout("sidebar", "")  // (it was hidden by hand: automatic again)
-            else sidebarDrawerOpen = true
+            if (adaptive.roomForSidebar) {
+                chooseLayout("sidebar", "")  // (it was hidden by hand: automatic again)
+            } else {
+                sidebarDrawerOpen = true
+                slideDrawer(true)
+            }
         } else {
+            if (sidebarDrawerOpen) slideDrawer(false)
             sidebarDrawerOpen = false
             if (sidebarDocked) chooseLayout("sidebar", adaptive.roomForSidebar ? "hidden" : "")
         }
     }
     /// The drawer's pin: keep the sidebar beside the page in this size class, although room is short
     function dockSidebar() {
-        sidebarDrawerOpen = false
+        closeDrawerNow()
         chooseLayout("sidebar", adaptive.roomForSidebar ? "" : "shown")
     }
+
+    /// A pill at the canvas's bottom edge (`lowY`: where it would sit) goes above the pills it would meet there
+    /// (`others`, from the bottom up): the view pill keeps the lower right corner (audit F6)
+    function clearOfPills(item, lowY, others) {
+        let y = lowY
+        for (let i = 0; i < others.length; ++i) {
+            const o = others[i]
+            if (o && o.visible && item.x - 8 < o.x + o.width && item.x + item.width + 8 > o.x
+                    && y - 8 < o.y + o.height && y + item.height + 8 > o.y)
+                y = o.y - item.height - 12
+        }
+        return y
+    }
+
+    // --- the source panels: the Markdown source (and the deprecated text flow) beside or below the page ------------
+    // (qt/docs/adaptive-layout.md, "Panels")
+    /// The panel open now, or null
+    readonly property Item sourcePanel: markdownPanel.visible ? markdownPanel : textFlowPanel.visible ? textFlowPanel : null
+    /// Below the page (the page above, its source below, a divider between them) in a portrait tablet or phone, and in
+    /// any portrait window too narrow for a panel beside the page; else beside it, at the right (a desktop, narrow or
+    /// wide, a phone held sideways). "Adapt the layout" off: beside it, as before.
+    readonly property bool sourceAtBottom: {
+        const c = adaptive.layoutClass
+        if (c === "tabletPortrait" || c === "phonePortrait") return true
+        if (c !== "desktopNarrow" && c !== "tiny") return false
+        return contentItem.height > width - sideTools.width
+    }
+    /// Beside the page: 38 % of the window, 360 to 600 px, never more than half of it (a small window keeps its page)
+    readonly property real sourceSideWidth: {
+        const room = width - sideTools.width
+        return Math.round(Math.min(600, Math.max(Math.min(360, room * 0.5), width * 0.38)))
+    }
+    /// Below the page: the page's share of the height, dragged at the divider and remembered per size class
+    /// (layout/<class>/sourceSplit); half on a tablet, 40 % on a phone (the source gets the bottom 60 %)
+    readonly property real sourcePageShare: {
+        const v = parseFloat(layoutChoice("sourceSplit"))
+        return v >= 0.2 && v <= 0.8 ? v : (adaptive.phone ? 0.4 : 0.5)
+    }
+    /// While the divider is dragged: the share under the finger (-1: not dragged)
+    property real sourceShareLive: -1
+    readonly property real sourceBottomHeight: Math.round(contentItem.height
+                                                          * (1 - (sourceShareLive >= 0 ? sourceShareLive : sourcePageShare)))
 
     // The chrome: "full" (tab strip, tool bar, sidebar), "compact" (full screen's: the tab dots, the tool square, the
     // pen pill, the view pill) or "reader" (no HUD; the corner mark brings it back). Separate from the window's state
@@ -1282,9 +1354,10 @@ ApplicationWindow {
         objectName: "sidebar"
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.left: win.toolbarPosition === "left" ? sideTools.right : parent.left
-        width: 210
-        visible: win.sidebarShown && win.fullChrome
+        // As a drawer it slides in from the left edge (win.drawerSlide)
+        x: (win.toolbarPosition === "left" ? sideTools.width : 0) - (win.sidebarDocked ? 0 : Math.round((1 - win.drawerSlide) * width))
+        width: win.sidebarDocked ? 210 : win.drawerWidth
+        visible: win.fullChrome && (win.sidebarShown || (win.sidebarAsDrawer && win.drawerSlide > 0))
         // As a drawer (no room beside the page): over the page, below the home screen; it closes once a page is picked
         z: win.sidebarAsDrawer ? 49 : 0
         onPagePicked: if (win.sidebarAsDrawer) win.showSidebar(false)
@@ -1307,7 +1380,7 @@ ApplicationWindow {
     AbstractButton {
         id: sidebarArrow
         objectName: "sidebarArrow"
-        readonly property bool open: sidebar.visible
+        readonly property bool open: win.sidebarShown && sidebar.visible
         visible: win.fullChrome && !app.homeVisible && !win.hudHidden && !app.presenting && (open || !app.toolbarHidden)
         z: 50  // (over the drawer and its dimmed page)
         width: win.adaptive.touchProfile ? win.adaptive.minTarget : 24
@@ -1350,10 +1423,18 @@ ApplicationWindow {
         anchors.fill: parent
         z: 48
         color: "#4d000000"
+        opacity: win.drawerSlide
         MouseArea {
             anchors.fill: parent
+            enabled: win.sidebarDrawerOpen
             onClicked: win.showSidebar(false)
         }
+    }
+    // Esc and Android's back key close the drawer
+    Shortcut {
+        sequences: ["Escape", "Back"]
+        enabled: win.sidebarDrawerOpen && sidebar.visible
+        onActivated: win.showSidebar(false)
     }
 
     DocumentCanvas {
@@ -1361,9 +1442,9 @@ ApplicationWindow {
         objectName: "canvas"
         // The canvas area, or the main document's side of it when the tab shows a reference beside it
         x: referenceSplit.x + referenceSplit.mainX
-        y: referenceSplit.y
+        y: referenceSplit.y + referenceSplit.mainY
         width: referenceSplit.mainWidth
-        height: referenceSplit.height
+        height: referenceSplit.mainHeight
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
 
@@ -1422,9 +1503,8 @@ ApplicationWindow {
     ReferenceSplit {
         id: referenceSplit
         anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: textFlowPanel.visible ? textFlowPanel.left
-                       : markdownPanel.visible ? markdownPanel.left
+        anchors.bottom: win.sourcePanel && win.sourceAtBottom ? win.sourcePanel.top : parent.bottom
+        anchors.right: win.sourcePanel && !win.sourceAtBottom ? win.sourcePanel.left
                        : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible && !win.sidebarAsDrawer ? sidebar.right
                       : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
@@ -1437,12 +1517,15 @@ ApplicationWindow {
         property string closedFor: ""
         visible: app.shownFileNote !== "" && closedFor !== app.title && !pageGrid.visible && !contentsOverview.visible
                  && !win.hudHidden
-        // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right)
-        anchors.bottom: canvas.bottom
+        // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right; above them where it
+        // would meet them in a narrow canvas)
         anchors.left: canvas.left
-        anchors.bottomMargin: 24
         anchors.leftMargin: presentCornerMark.visible ? 56 : 24  // (presenting, reading: beside the corner mark)
-        width: Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560))
+        // (through a property of its own: a binding of y that reads the geometry itself crashes Qt 6.7)
+        readonly property real clearY: win.clearOfPills(shownFileNote, canvas.y + canvas.height - 24 - height, [viewPill, navPill])
+        y: clearY
+        width: Math.min(canvas.width - anchors.leftMargin - 16,
+                        Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560)))
         padding: 2
         leftPadding: 14
         background: Rectangle {
@@ -1486,14 +1569,19 @@ ApplicationWindow {
         // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in the
         // reader chrome
         visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden
-        /// The page layout button: not in a phone's portrait (it is in ⋮ → View there)
-        readonly property bool layoutShown: ["phonePortrait", "tiny"].indexOf(win.adaptive.layoutClass) < 0
-        // At the canvas's lower right corner, never out of the window (a narrow canvas: over its neighbour), and
+        /// The compact pill, in a canvas under 520 px wide (a phone, a half beside the reference or the source): undo,
+        /// redo, the page number (a tap: all pages), the contents and the zoom; the page layout is in ⋮ → View then
+        readonly property bool compact: canvas.width < 520
+        /// Narrower than the compact pill (a very small window): no redo (Ctrl+Y) and no separators
+        readonly property bool tight: canvas.width < 360
+        /// The page layout button: not in a phone's portrait nor in the compact pill (it is in ⋮ → View there)
+        readonly property bool layoutShown: ["phonePortrait", "tiny"].indexOf(win.adaptive.layoutClass) < 0 && !compact
+        // At the canvas's lower right corner, always inside the canvas (8 px from its edges where 28 is too much), and
         // above the reference's pill where the two would meet
         readonly property rect refPill: Qt.rect(referenceSplit.x + referenceSplit.pillRect.x,
                                                 referenceSplit.y + referenceSplit.pillRect.y,
                                                 referenceSplit.pillRect.width, referenceSplit.pillRect.height)
-        x: Math.max(8, Math.min(canvas.x + canvas.width - 28 - width, parent.width - width - 8))
+        x: Math.max(canvas.x + 8, canvas.x + canvas.width - width - (canvas.width - width >= 56 ? 28 : 8))
         readonly property real lowY: canvas.y + canvas.height - 24 - height
         readonly property bool meetsReference: refPill.width > 0 && x < refPill.x + refPill.width && x + width > refPill.x
                                                && lowY < refPill.y + refPill.height && lowY + height > refPill.y
@@ -1521,6 +1609,7 @@ ApplicationWindow {
             }
             IconButton {
                 objectName: "redoButton"
+                visible: !viewPill.tight
                 iconName: "xopp-edit-redo"
                 tip: qsTr("Redo (Ctrl+Y)")
                 implicitWidth: 40; implicitHeight: 40
@@ -1528,7 +1617,7 @@ ApplicationWindow {
                 enabled: app.canRedo
                 onClicked: app.redo()
             }
-            ToolSeparator {}
+            ToolSeparator { visible: !viewPill.tight }
             IconButton {
                 objectName: "layoutButton"
                 visible: viewPill.layoutShown
@@ -1655,6 +1744,7 @@ ApplicationWindow {
             ToolSeparator { visible: viewPill.layoutShown }
             IconButton {
                 objectName: "pageGridButton"
+                visible: !viewPill.compact  // (the compact pill: its page number opens them)
                 iconName: "xqt-pages-grid"
                 label: qsTr("All pages")
                 tip: qsTr("All pages (Ctrl+Alt+G)")
@@ -1676,7 +1766,7 @@ ApplicationWindow {
             // Scrolling sideways: the previous and the next page on either side of the page number
             IconButton {
                 objectName: "previousPageButton"
-                visible: app.horizontalScrolling
+                visible: app.horizontalScrolling && !viewPill.compact  // (compact: a swipe turns the page)
                 iconName: "xqt-chevron-left"
                 tip: qsTr("Previous page (←, Page Up)")
                 implicitWidth: 36; implicitHeight: 40
@@ -1686,10 +1776,28 @@ ApplicationWindow {
             }
             Label {
                 objectName: "pageNumberLabel"
+                visible: !viewPill.compact
                 text: app.pageNumber + " / " + app.pageCount
                 color: "#505050"
                 Layout.leftMargin: 2
                 Layout.rightMargin: app.horizontalScrolling ? 0 : 4
+            }
+            // The compact pill: the page number opens all pages (the grid button's place)
+            ToolButton {
+                objectName: "pageNumberButton"
+                visible: viewPill.compact
+                text: app.pageNumber + " / " + app.pageCount
+                font.pixelSize: 14
+                implicitHeight: 40
+                leftPadding: 8
+                rightPadding: 8
+                focusPolicy: Qt.NoFocus
+                Material.foreground: "#505050"
+                Accessible.name: qsTr("All pages")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("All pages (Ctrl+Alt+G)")
+                ToolTip.delay: 600
+                onClicked: pageGrid.open()
             }
             // Only on a page with sticky notes: hide them all (to see what they cover) and show them again
             IconButton {
@@ -1703,7 +1811,7 @@ ApplicationWindow {
             }
             IconButton {
                 objectName: "nextPageButton"
-                visible: app.horizontalScrolling
+                visible: app.horizontalScrolling && !viewPill.compact
                 iconName: "xqt-chevron-right"
                 tip: qsTr("Next page (→, Page Down)")
                 implicitWidth: 36; implicitHeight: 40
@@ -1711,7 +1819,7 @@ ApplicationWindow {
                 enabled: app.pageNumber < app.pageCount
                 onClicked: app.nextPage()
             }
-            ToolSeparator {}
+            ToolSeparator { visible: !viewPill.tight }
             // The zoom, small. A tap: the fits (after the double-tap time, so a double tap does not flash the menu);
             // a double tap or a long press: the whole page. Pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle
             // button zoom as before.
@@ -1808,21 +1916,76 @@ ApplicationWindow {
             }
         }
     }
-    // Text mode: beside the pages (right), the canvas makes room
+    // Text mode (deprecated): beside the pages (right), or below them in portrait; the canvas makes room
     TextFlowPanel {
         id: textFlowPanel
-        anchors.top: parent.top
+        atBottom: win.sourceAtBottom
         anchors.bottom: parent.bottom
         anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
-        width: visible ? Math.min(Math.max(360, win.width * 0.38), 600) : 0
+        width: !visible ? 0 : atBottom ? referenceSplit.width : win.sourceSideWidth
+        height: atBottom ? win.sourceBottomHeight : parent.height
     }
-    // Markdown box: the same place
+    // Markdown box, or the Markdown of a page: the same place
     MarkdownPanel {
         id: markdownPanel
-        anchors.top: parent.top
+        atBottom: win.sourceAtBottom
         anchors.bottom: parent.bottom
         anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
-        width: visible ? Math.min(Math.max(360, win.width * 0.38), 600) : 0
+        width: !visible ? 0 : atBottom ? referenceSplit.width : win.sourceSideWidth
+        height: atBottom ? win.sourceBottomHeight : parent.height
+    }
+    // Between the page and its source below it: dragged, the page's share of the height is remembered for this size
+    // class (a grip in the middle, touch sized; the whole edge takes a drag)
+    Item {
+        id: sourceDivider
+        objectName: "sourceDivider"
+        visible: win.sourcePanel !== null && win.sourceAtBottom && !app.homeVisible
+        x: win.sourcePanel ? win.sourcePanel.x : 0
+        width: win.sourcePanel ? win.sourcePanel.width : 0
+        height: 24
+        y: (win.sourcePanel ? win.sourcePanel.y : 0) - height / 2
+        z: 3
+        Rectangle {
+            objectName: "sourceDividerGrip"
+            anchors.centerIn: parent
+            width: 72
+            height: 16
+            radius: 8
+            color: sourceDrag.active ? Material.accentColor : "#e8eaed"
+            border.width: 1
+            border.color: "#80000000"
+            Row {
+                anchors.centerIn: parent
+                spacing: 4
+                Repeater {
+                    model: 3
+                    Rectangle { width: 2; height: 6; radius: 1; color: sourceDrag.active ? "#ffffff" : "#5f6368" }
+                }
+            }
+        }
+        HoverHandler { cursorShape: Qt.SplitVCursor }
+        DragHandler {
+            id: sourceDrag
+            target: null
+            xAxis.enabled: false
+            property real startTop: 0
+            onActiveChanged: {
+                if (active) {
+                    startTop = win.sourcePanel.y
+                    win.sourceShareLive = win.sourcePageShare
+                } else {
+                    const share = win.sourceShareLive
+                    win.sourceShareLive = -1
+                    const auto = win.adaptive.phone ? 0.4 : 0.5
+                    win.chooseLayout("sourceSplit", Math.abs(share - auto) < 0.01 ? "" : share.toFixed(3))
+                }
+            }
+            onTranslationChanged: {
+                if (!active) return
+                const h = Math.max(1, sourceDivider.parent.height)
+                win.sourceShareLive = Math.max(0.2, Math.min(0.8, (startTop + translation.y) / h))
+            }
+        }
     }
     Connections {
         target: app
@@ -1853,6 +2016,7 @@ ApplicationWindow {
         objectName: "selectionBar"
         canvasItem: canvas
         hidden: pageGrid.visible
+        avoid: viewPill
     }
 
     // The selected sticky note: its color, cover mode, delete.
@@ -1860,6 +2024,7 @@ ApplicationWindow {
         id: notePill
         objectName: "notePill"
         canvasItem: canvas
+        avoid: viewPill
         onImageRequested: imageDialog.open()
         hidden: pageGrid.visible
     }
@@ -1878,9 +2043,9 @@ ApplicationWindow {
         objectName: "navPill"
         visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.hudHidden
         anchors.left: canvas.left
-        anchors.bottom: canvas.bottom
         anchors.leftMargin: presentCornerMark.visible ? 56 : 20  // (presenting, reading: beside the corner mark)
-        anchors.bottomMargin: 24
+        readonly property real clearY: win.clearOfPills(navPill, canvas.y + canvas.height - 24 - height, [viewPill])
+        y: clearY
         padding: 2
         Material.foreground: "#303030"
         background: Rectangle {
@@ -3250,7 +3415,7 @@ ApplicationWindow {
     }
 
     // Without a tool bar and with an ink tool: colors, width and pen / highlighter at a side of the screen
-    PenPill {}
+    PenPill { avoid: viewPill }
     // The setsquare / compass: what it can do, and putting it aside for a moment
     GeometryPill {
         anchors.top: canvas.top
@@ -3598,7 +3763,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("paste"); enabled: docKeys; onActivated: app.pasteElements() }
     Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.deleteSelection() }
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
-    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.clearSelection() }
+    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected) && !win.sidebarDrawerOpen; onActivated: app.clearSelection() }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }

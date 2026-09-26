@@ -72,6 +72,7 @@ is stored per class in the app's settings (the `xournalQt` part of `settings.xml
 | `sidebar` | `shown`, `hidden` (none: automatic) | this block |
 | `chrome` | `compact`, `reader` (none: automatic, the full chrome) | this block |
 | `toolbar` | `top`, `twoRowsTop`, `twoRowsBottom`, `railLeft`, `railRight` (none: automatic) | `qt/adaptive-toolbar` (below) |
+| `sourceSplit` | the page's share of the height above the Markdown source below it, `0.2` to `0.8` (none: 0.5, a phone 0.4) | `qt/adaptive-panels` (below) |
 
 `app.settings.layoutChoice(class, what)`, `setLayoutChoice(class, what, value)` ("" or "auto" removes it),
 `hasLayoutChoices()` and `resetLayoutChoices()` (`SettingsModel`). A change counts as a settings revision, so QML
@@ -104,6 +105,17 @@ size, "Controls at this size" (the chrome choice of this class), and "Reset the 
 
 `win.showSidebar(shown)` and `win.dockSidebar()` are the functions; `sidebarDocked`, `sidebarAsDrawer` and
 `sidebarDrawerOpen` the state.
+
+The drawer (qt/adaptive-panels):
+- it **slides** in from the left and out again (180 ms, `win.drawerSlide` 0 → 1), the dimmed page fades with it. Only
+  a tap slides it (the arrow, the dimmed page, a page, a chapter or an annotation picked, Esc, the back key); a change
+  of the size class takes it away at once;
+- **Esc and Android's back key** close it;
+- its width (`win.drawerWidth`): 210 px on a tablet and a desktop; on a phone up to 85 % of the window (at most
+  360 px: 350 at 412), so the thumbnails are larger (the list is one column as wide as the drawer); a phone held
+  sideways 260 px (a page's thumbnail stays shorter than the window);
+- Pages, Layers, Contents and Annotations work the same in it; a page, a chapter or an annotation picked closes it,
+  choosing a mode does not. On a tablet it stays until tapped away or a page is picked.
 
 ## The chrome, apart from the window state
 
@@ -317,9 +329,23 @@ small **zoom percentage** (no − / + any more):
 - a double click / double tap, or a long press: the whole page; a right click: the menu at once;
 - pinch, Ctrl+wheel, Ctrl+plus / minus / 0 and the middle button zoom as before.
 
-It never runs out of the window (clamped 8 px inside; in a narrow canvas it lies over the neighbour), and it moves up
-above the reference's pill where the two would meet. In phone portrait (and tiny) the page layout button is left out:
-⋮ → View → Page layout… opens its menu.
+It never runs out of its canvas (since qt/adaptive-panels: 28 px from the canvas's right edge, 8 where that is too
+much; beside a reference or the Markdown source it stays in its own half), and it moves up above the reference's
+pill where the two would meet. In phone portrait (and tiny) the page layout button is left out: ⋮ → View → Page
+layout… opens its menu.
+
+**The compact pill** (`viewPill.compact`, qt/adaptive-panels): in a canvas under 520 px wide (a phone upright, a half
+beside the reference or the source): undo, redo, the contents, **the page number as a button** (a tap: all pages, the
+page grid button's place), the zoom percentage (its menu as above). No page layout button (⋮ → View → Page layout…
+is offered whenever the pill has none), no page grid button, no ‹ › of sideways scrolling (a swipe turns the page).
+Under 360 px also no redo (Ctrl+Y) and no separators.
+
+**Pills that meet** (audit F6): the view pill keeps the canvas's lower right corner; the others go above it where
+they would meet it: the selection's pill (centred at the bottom; smaller where the canvas is narrower than it), the
+back / forward pill and the "shown read-only" note (lower left), the sticky note's pill, and the pen pill of the
+compact chrome (at a side; its buttons are 44 px in the touch profile, F6.3). `win.clearOfPills(item, lowY, others)`
+does it for the pills of `Main.qml`. (Qt 6.7 crashes when a binding of `y` reads the geometry of items itself through
+a function: the result goes through a property of its own, `clearY`.)
 
 ### One place for each action
 
@@ -339,9 +365,9 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Settings (was also ⋮) | tool bar / more tools | Ctrl+, | the tool square's popup; the home screen's settings |
 | New, Open, Save | tool bar / more tools | Ctrl+Shift+N, Ctrl+O, Ctrl+S | the tab strip's + |
 | Edit as notes, Open externally (were also ⋮ → Document) | tool bar / more tools (a `.md`: more tools in the format bar) | | |
-| All pages (was also ⋮ → View) | view pill | Ctrl+Alt+G | the view pill stays in the compact chrome |
+| All pages (was also ⋮ → View) | view pill (the compact pill: its page number) | Ctrl+Alt+G | the view pill stays in the compact chrome |
 | Contents overview (was the tool bar) | view pill | Ctrl+Alt+O | as above |
-| Page layout | view pill (long press: the menu); phone portrait: ⋮ → View → Page layout… | | |
+| Page layout | view pill (long press: the menu); phone portrait and the compact pill: ⋮ → View → Page layout… | | |
 | Zoom fits | view pill's percentage | Ctrl+0, Ctrl+1 | |
 | The page sidebar (was the tool bar's Pages button) | the arrow at the canvas's edge / the sidebar's edge | | not in the compact or reader chrome |
 | Hide the tool bar (was also ⋮ → View) | the tab on the bar's edge | | the strip at the edge shows it again |
@@ -350,6 +376,63 @@ The author's rule: only one way to do things, to reduce menu clutter. No ⋮ ent
 | Plain text box (removed) | – (T and the text box make Markdown text boxes; plain texts are still edited) | | |
 
 The reader chrome hides everything; its corner mark brings the full chrome back (as before).
+
+## Panels (`qt/adaptive-panels`)
+
+The author's rule stays: a single A4 page stays well visible; nothing at the side narrows the page in portrait.
+
+### The Markdown source panel
+
+The source of Markdown on a page (and of a Markdown text box; the deprecated text flow panel the same) goes where the
+window has room for it (`win.sourceAtBottom`, `win.sourcePanel`):
+
+| Where | When | Size |
+| --- | --- | --- |
+| **beside the page** (right) | desktop wide and narrow, a phone held sideways (915×412), "Adapt the layout" off | 38 % of the window, 360 to 600 px, never more than half of it (`win.sourceSideWidth`) |
+| **below the page** | tablet portrait, phone portrait, and a desktop-narrow or tiny window whose area is portrait (600×800) | the page above keeps the whole width; the source takes the bottom half on a tablet, the bottom 60 % on a phone |
+
+Below the page, the **divider** between them (`sourceDivider`, a touch-sized grip; the whole edge takes a drag) moves
+the split between 20 % and 80 %; the page's share is remembered per size class (`layout/<class>/sourceSplit`).
+
+Why the split and not a full-screen sheet on a phone: the page formats as one types, and that is the point of the
+panel; a sheet would hide it. At 412×915 the page above is 412 px wide (fit to the width) and about 330 px high,
+the source below about 490 px (title, format bar, size, and the text). The soft keyboard (qt/compact-chrome) will
+cover the lower part of the source; the page stays visible above it.
+
+### The reference split
+
+Side by side where the canvas area is landscape, top and bottom where it is portrait (`referenceSplit.vertical`,
+16 px of margin around square). The divider keeps its ratio when that flips. In a half under 480 px wide the
+reference's pill is its page number and a ⋮ with the rest (`referenceMoreButton`, `referenceMenu`). See
+[reference-view.md](reference-view.md).
+
+### The format bar
+
+`MarkdownFormatBar.qml` is a flexible filler like the tool bar. On a desktop and a tablet it takes the richest form
+that fits the room left of its trailing buttons (a text document's » and ⋮), in this order:
+
+1. everything as buttons: ¶ H1 H2 H3 | the six marks | the four lists | code block, table, formula block, image, rule,
+   page break;
+2. the six blocks go into **"+ Insert"** (`mdInsertButton`, `mdInsertMenu`: an AdaptiveMenu with Code block ▸ the
+   languages, Table…, Formula block, Image…, Horizontal rule, Page break);
+3. "Insert" without its word (a "+"), where the headings as buttons still fit with it;
+4. else ¶ H1 H2 H3 become one button with the level at the cursor and a menu (`mdBlockButton`, `mdBlockMenu`), and
+   "Insert" gets its word back if it fits then;
+5. only then (a window under ~680 px, 600×800) the row scrolls.
+
+A text document's merged bar (» and ⋮ at its end): all buttons at 1024 px and wider, "¶ ▾ … + Insert" at 800, "¶ ▾ … +"
+at 720 (a 2-in-1 upright), scrolling at 600.
+
+The marks and the lists always stay in the row. On a phone the row scrolls sideways (the norm of mobile editors), with
+fading edges where there is more (`formatBarFadeLeft`, `formatBarFadeRight`); docking it above the soft keyboard is
+qt/compact-chrome's. The level buttons are 40 px wide in the touch profile (F7.4); a finger held on any button shows
+its name. The panel's own bar (beside or below the page) follows the same rules for its own width.
+
+### What qt/compact-chrome can use
+
+`win.sourceAtBottom` and `win.sourceBottomHeight` (the panel's place; a keyboard can shrink it), `win.drawerWidth`,
+`viewPill.compact`, `MarkdownFormatBar.phone` (its scrolling form, the one to dock above the keyboard),
+`win.clearOfPills` (for a bottom dock: the pills go above it the same way).
 
 ## Dialogs and sheets: `AdaptiveDialog` (qt/adaptive-dialogs)
 
@@ -487,7 +570,7 @@ The author's decisions of 2026-09-26 on the audit's proposals:
 | Step | When (automatic) | What changes | Block |
 | --- | --- | --- | --- |
 | 0 | desktop wide, room for the sidebar | everything as today; the tool bar grouped (colors, widths), ⋮ pinned (**done**) | `qt/adaptive-toolbar` |
-| 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer (**done**) | this block |
+| 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer (**done**; the slide, Esc and the phone width: qt/adaptive-panels); the Markdown source below the page in portrait, the reference top and bottom (**done**) | this block, `qt/adaptive-panels` |
 | 1b | tablet portrait (a 2-in-1 or Surface upright) | **two tool rows** at the top by default, all important tools shown; "two rows at the bottom" (closer to the fingertips) as the class's choice; no side chrome that narrows the page: an A4 page stays well visible (**done**) | `qt/adaptive-toolbar` |
 | 2 | phone portrait (w < 600) or short (h < 560) | the compact chrome in the window: tab dots, and a **bottom tool dock** in phone portrait (the tool square with the pen pill in landscape); dialogs and menus as sheets (menus: **done**) | `qt/compact-chrome`, `qt/adaptive-menus`, `qt/adaptive-dialogs` |
 | 3 | **tiny only** (w or h < 360) | the reader chrome, automatically; everywhere else "Read" is a manual choice | `qt/compact-chrome` |
@@ -513,10 +596,21 @@ that rework their screens:
 
 | Where | Threshold | Block |
 | --- | --- | --- |
-| `Main.qml` Markdown panel | `min(max(360, 0.38 w), 600)` | `qt/adaptive-panels` |
-| `ReferenceSplit.qml` | always side by side | `qt/adaptive-panels` |
 | `NewDocumentDialog.qml` | its body < 520 → one column (its own width: fine as it is) | – |
 | `ShortcutSheet.qml`, `AppendPages.qml` | their own widths (620, 260): fine as they are | – |
+
+The panels' own thresholds (qt/adaptive-panels) are widths of the canvas or the half they are in, not of the window,
+so they are not size classes either:
+
+| Where | Threshold | What |
+| --- | --- | --- |
+| `Main.qml` `sourceAtBottom` | the class (tablet portrait, phone portrait), or a portrait area in desktop narrow / tiny | the Markdown source below the page |
+| `Main.qml` `sourceSideWidth` | `min(600, max(min(360, area / 2), 0.38 w))` | the source beside the page |
+| `Main.qml` `drawerWidth` | 210; phone: `min(360, 0.85 w)`; phone held sideways: 260 | the sidebar as a drawer |
+| `Main.qml` `viewPill.compact`, `tight` | canvas < 520, < 360 | the compact view pill |
+| `ReferenceSplit.qml` `vertical` | the area h > w (16 px margin) | top and bottom |
+| `ReferenceSplit.qml` `narrow` | the reference's half < 480 | the pill: page and ⋮ |
+| `MarkdownFormatBar.qml` | the room of its row against the widths of its forms | Insert menu, block menu, scrolling |
 
 ## Tests
 
@@ -557,6 +651,13 @@ that rework their screens:
   `sidebarArrowOpensAndCloses`, `viewPillWithContentsInsideAndClearOfTheReference` (five sizes, a reference open).
   `XQT_TOOLBAR_SHOTS=<folder> ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.toolBarPictures'` saves pictures of
   the layouts (about 20 s).
+- The panels (qt/adaptive-panels), label `ui`: `sourcePanelBesideOrBelowThePage` (the five sizes: beside, below at
+  half, below at 60 %; the page's width; the view pill inside it), `sourceDividerIsDraggedAndRememberedPerClass`,
+  `referenceSplitFollowsTheAreaAndItsPillsStayApart` (the five sizes: orientation, the ratio kept, both pills inside
+  their halves and apart, the narrow pill and its ⋮ sheet), `compactViewPillOnAPhone`, `sidebarDrawerKeysAndPhoneWidth`
+  (Esc, the back key, 85 %, larger thumbnails, the modes), `formatBarFoldsIntoInsertInsteadOfScrolling` (no
+  scrolling at 1920, 1280, 960, 800, 720; the Insert menu fits and its rule goes in; 40 px headings with touch; a
+  phone scrolls with fading edges), `pillsKeepClearOfTheViewPill` (selection, back / forward, the pen pill).
 - `MainWindowTest.zoomPercentageTapDoubleTapAndHold`, `cyclingToolButtons`, `theEraserButtonCyclesHowItErases`,
   `theGeometryButtonPutsTheSetsquareOnThePage`, `aFingerHeldOnAButtonShowsItsName`.
 - The home screen (`checkHomeScreens`, part of `classesSidebarAndControlsAtFiveSizes` and of the full walk): each of
