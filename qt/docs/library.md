@@ -53,8 +53,8 @@ the tooltip and the accessible name say it in words):
 | --- | --- | --- |
 | `plain` | a PDF (without our marker) | red "PDF" |
 | `notes` | a PDF with notes (a hybrid PDF, [hybrid-pdf.md](hybrid-pdf.md)) | red "PDF ✎" (as a PDF with its `.xopp`) |
-| `text` | a PDF text document: a PDF with notes whose page 1 starts the page's Markdown text ([md-pdf.md](md-pdf.md)); it opens with the formatting bar | blue "PDF Aa", "PDF text document" |
-| `archive`, `archive-text` | an archive PDF (PDF/A-3 with its notes), of a text document | "PDF/A ✎", blue "PDF/A Aa" |
+| `text` | a PDF text document: a PDF with notes whose page 1 starts the page's Markdown text ([md-pdf.md](md-pdf.md)); it opens with the formatting bar | blue "PDF M↓" (the Markdown mark), "PDF text document" |
+| `archive`, `archive-text` | an archive PDF (PDF/A-3 with its notes), of a text document | "PDF/A ✎", blue "PDF/A M↓" |
 
 - **Where it comes from:** the library index keeps it per PDF in `notes.pack` (`pdfKind`), tied to the PDF's stamp
   like the rest of the entry (`LibraryIndex::pdfKind`, a look-up; `PdfKind` in `DocumentFiles.h`). It is found out

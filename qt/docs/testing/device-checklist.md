@@ -1686,13 +1686,13 @@ Update the table in the user doc with the results.
 
 ## Kinds of PDFs in the library (qt/library-kinds)
 - [ ] A library with a plain PDF, a PDF with notes (a PDF annotated and saved in PDF files mode) and a PDF text
-      document (New text document… in PDF files mode): the badges read "PDF" (red), "PDF ✎" (red) and "PDF Aa"
+      document (New text document… in PDF files mode): the badges read "PDF" (red), "PDF ✎" (red) and "PDF M↓"
       (blue). Hovering a badge (desktop) says "PDF", "PDF with notes", "PDF text document". A PDF with its `.xopp`
       next to it still reads "PDF ✎", an image "IMG", a Markdown file "MD".
-- [ ] An archive PDF (⋮ → Export for the archive…) reads "PDF/A ✎"; one of a text document "PDF/A Aa" (blue).
+- [ ] An archive PDF (⋮ → Export for the archive…) reads "PDF/A ✎"; one of a text document "PDF/A M↓" (blue).
 - [ ] The badges are the same in the flat list (all documents) and in the Recent grid for documents of the library.
 - [ ] Annotate a plain PDF and save: its card turns from "PDF" into "PDF ✎" within a second or two. "Open as PDF
-      document" of a `.md`: the new card reads "PDF Aa".
+      document" of a `.md`: the new card reads "PDF M↓".
 - [ ] Show → "Only PDFs with notes": the plain PDFs go at once, no pause of the window (also in a library with
       hundreds of PDFs). Show → "Only PDF text documents": only the text documents stay (and notes, Markdown files,
       images as set). "Defaults" brings everything back.

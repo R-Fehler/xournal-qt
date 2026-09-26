@@ -2282,7 +2282,7 @@ protected:
 // document have badges of their own (the text document's in another colour), said in words in the tooltip; "Only PDF
 // text documents" shows only those.
 TEST_F(HomeScreenKindsTest, theCardsTellPlainPdfsPdfsWithNotesAndTextDocumentsApart) {
-    ASSERT_TRUE(waitFor([&] { return badgeOf("essay.pdf") == "PDF Aa"; }, 20000)) << badgeOf("essay.pdf").toStdString();
+    ASSERT_TRUE(waitFor([&] { return badgeOf("essay.pdf") == "PDF M↓"; }, 20000)) << badgeOf("essay.pdf").toStdString();
     EXPECT_EQ(badgeOf("lecture.pdf"), "PDF");
     EXPECT_EQ(badgeOf("memo.pdf"), "PDF ✎");
     EXPECT_FALSE(child(card(rowOf("notes.xopp")), "kindBadge")->isVisible()) << "notes alone: no badge";
