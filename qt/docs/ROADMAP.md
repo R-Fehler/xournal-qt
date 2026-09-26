@@ -462,6 +462,19 @@
   `\hbar` is ħ. `\[` counts only at a line's start and `\]` at its end (`see \[1\]` stays text); a pair next to a
   letter (`\(n\)th`) stays as written, as md4c ignores such a `$`.
 
+- **Markdown formatting bar and table editor, `qt/md-toolbar` (2026-09-26).** A row of tools under the tool bar while
+  Markdown is written (always in a `.md`; also in the source panel): paragraph/headings, bold, italic, strike, code,
+  link, `$…$`, lists (bullet, numbered, task), quote, code block with a language, table, `$$` block, rule, image
+  placeholder, page break; the buttons show the state at the cursor; every tool is one undo step
+  (`qt/src/markdown/MdFormat`). A table editor in a popup (a grid: Tab moves, rows and columns added and removed,
+  alignment, the current row and column shown) writes a padded GFM table. `<div style="page-break-after: always">`
+  ends the page.
+- **The same document beside itself, `qt/self-reference` (2026-09-26).** One session, two views: the second view has
+  its own page, zoom, selection and history, is read-only unless its pill's pen is on, and shares the render memory
+  limit. Opened from the tab menu, the tab overview (at the page in view), the page menu, sidebar and grid (at that
+  page); links into the same document offer "In the reference". The page-subset view was built and removed again
+  on the author's clarification ("not some page range limiting the canvas scroll"), pending confirmation.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
