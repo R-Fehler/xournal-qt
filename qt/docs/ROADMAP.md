@@ -569,6 +569,13 @@
   Qwant, custom `{text}` address), Scholar and Translate, each web address confirmed first; 200 characters at most.
   PDF text handles no longer show over the library.
 
+- **Sticky notes look like paper, copy/paste without waits, `qt/sticky-look` (2026-09-26).** A 0.8 pt edge in the
+  note's colour darkened 22 % and a soft shade to the bottom-right (three 5.5 % boxes; 1–2.3 % of a page render,
+  nothing while writing on a note), the same vector drawing everywhere; the file is unchanged. Copy/cut 25–35 ms →
+  under 1 ms (the clipboard picture is drawn only when another app asks), paste 11–15 → 1–2 ms (each element in its
+  own stream: upstream's reader copied the whole buffer per stroke), and only the note's area is redrawn after
+  paste/cut/undo. A note copied by an earlier build does not paste.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
