@@ -87,14 +87,22 @@ ApplicationWindow {
     Connections {
         target: app
         function onHomeVisibleChanged() { if (app.homeVisible) win.fullScreenMode = false }
+        function onPresentingChanged() { if (!app.presenting) win.presentClean = false }
     }
 
-    /// Present from the current page: full screen, a page fills it
-    function startPresenting() {
+    /// Present from the current page: full screen, a page fills it. `clean`: without controls (below)
+    function startPresenting(clean) {
         if (app.homeVisible) return
+        presentClean = clean === true
         fullScreenMode = true
         app.presenting = true
     }
+    /// Presenting without controls (Ctrl+F5, or holding the presentation button): only the page shows, no pen pill,
+    /// no tool square, no other overlay; the faint mark in the lower left corner (presentCornerMark) or Ctrl+F5
+    /// brings them back and hides them again. Every presentation starts as it is asked for: F5 with the controls.
+    property bool presentClean: false
+    readonly property bool cleanPage: app.presenting && presentClean
+    onCleanPageChanged: if (cleanPage) quickTools.close()
 
     function withSavedChanges(action) {
         if (!app.modified) {
@@ -825,12 +833,19 @@ ApplicationWindow {
                 onClicked: win.fullScreenMode = true
             }
             // Present: full screen, page by page (from the current page)
+            // (held or right-clicked: without controls, only the page)
             IconButton {
                 objectName: "presentButton"
                 visible: !win.fullScreenMode
                 iconName: "xopp-presentation-mode"
-                tip: qsTr("Present (F5)")
+                tip: qsTr("Present (F5; hold: only the page, Ctrl+F5)")
                 onClicked: win.startPresenting()
+                onPressAndHold: win.startPresenting(true)
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
+                    onTapped: win.startPresenting(true)
+                }
             }
             IconButton { objectName: "settingsButton"; iconName: "xqt-settings"; tip: qsTr("Settings (Ctrl+,)"); onClicked: settingsPage.open() }
             IconButton {
@@ -924,6 +939,11 @@ ApplicationWindow {
                         onTriggered: win.startPresenting()
                     }
                     MenuItem {
+                        objectName: "presentCleanItem"
+                        text: qsTr("Present without controls (Ctrl+F5)")
+                        onTriggered: win.startPresenting(true)
+                    }
+                    MenuItem {
                         objectName: "fullScreenItem"
                         text: win.fullScreenMode ? qsTr("Leave full screen (F11)") : qsTr("Full screen (F11)")
                         onTriggered: win.fullScreenMode = !win.fullScreenMode
@@ -1015,11 +1035,12 @@ ApplicationWindow {
         objectName: "shownFileNote"
         property string closedFor: ""
         visible: app.shownFileNote !== "" && closedFor !== app.title && !pageGrid.visible && !contentsOverview.visible
+                 && !win.cleanPage
         // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right)
         anchors.bottom: canvas.bottom
         anchors.left: canvas.left
         anchors.bottomMargin: 24
-        anchors.leftMargin: 24
+        anchors.leftMargin: app.presenting ? 56 : 24  // (presenting: beside the corner mark)
         width: Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560))
         padding: 2
         leftPadding: 14
@@ -1401,10 +1422,10 @@ ApplicationWindow {
     Pane {
         id: navPill
         objectName: "navPill"
-        visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible
+        visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.cleanPage
         anchors.left: canvas.left
         anchors.bottom: canvas.bottom
-        anchors.leftMargin: 20
+        anchors.leftMargin: app.presenting ? 56 : 20  // (presenting: beside the corner mark)
         anchors.bottomMargin: 24
         padding: 2
         Material.foreground: "#303030"
@@ -1579,6 +1600,7 @@ ApplicationWindow {
     // Where the link under the mouse or the hovering pen leads (qt/docs/links.md, "Links with the mouse")
     LinkStatusLine {
         canvasItem: canvas
+        visible: !win.cleanPage
     }
     // Scroll bars over the canvas: wide enough to be dragged with a finger or the pen.
     CanvasScrollBars {
@@ -2543,7 +2565,7 @@ ApplicationWindow {
         id: presentIndicator
         objectName: "presentPageIndicator"
         z: 90
-        visible: app.presenting && opacity > 0
+        visible: app.presenting && !win.presentClean && opacity > 0  // (without controls: not even the number)
         opacity: 0
         anchors.horizontalCenter: canvas.horizontalCenter
         anchors.bottom: canvas.bottom
@@ -2576,6 +2598,42 @@ ApplicationWindow {
             function onPageChanged() { presentIndicator.flash() }
             function onPresentingChanged() { if (app.presenting) presentIndicator.flash(); else presentIndicator.opacity = 0 }
         }
+    }
+    // Presenting: a faint mark in the lower left corner; a tap (click, pen) hides the controls - the pen pill, the
+    // tool square - or shows them again, as Ctrl+F5 does (qt/present-clean). The mark is a few pixels, barely there
+    // on a projector; the target around it is a finger wide. The pointer or the pen over it makes it clearer.
+    AbstractButton {
+        id: presentCornerMark
+        objectName: "presentCornerMark"
+        visible: app.presenting
+        z: 91
+        anchors.left: canvas.left
+        anchors.bottom: canvas.bottom
+        width: 48
+        height: 48
+        focusPolicy: Qt.NoFocus  // (the keys stay with the page)
+        hoverEnabled: true
+        readonly property bool lit: hovered || markHover.hovered || pressed
+        Accessible.name: win.presentClean ? qsTr("Show the controls") : qsTr("Hide the controls")
+        background: null
+        contentItem: Item {
+            Rectangle {
+                objectName: "presentCornerDot"
+                x: 10
+                y: parent.height - height - 10
+                width: 6
+                height: 6
+                radius: 3
+                // grey: as faint on a white slide as on the black around it
+                color: "#9e9e9e"
+                border.width: 1
+                border.color: "#80ffffff"
+                opacity: presentCornerMark.lit ? 0.6 : 0.14
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+            }
+        }
+        HoverHandler { id: markHover; acceptedDevices: PointerDevice.Mouse | PointerDevice.Stylus }
+        onClicked: win.presentClean = !win.presentClean
     }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {
@@ -2725,8 +2783,9 @@ ApplicationWindow {
     Rectangle {
         id: quickToolSquare
         objectName: "quickToolSquare"
-        // Only in full screen: with the bar merely put away, the arrow strip brings it back at once
-        visible: win.fullScreenMode && !app.homeVisible
+        // Only in full screen: with the bar merely put away, the arrow strip brings it back at once. Not while
+        // presenting without controls.
+        visible: win.fullScreenMode && !app.homeVisible && !win.cleanPage
         z: 60
         x: canvas.x + 16  // (over the main document, also when a reference is beside it)
         y: canvas.y + 16
@@ -2792,6 +2851,12 @@ ApplicationWindow {
                 onClicked: {
                     quickTools.close()
                     app.presenting = !app.presenting
+                }
+                // held: without controls (only the page)
+                onPressAndHold: {
+                    quickTools.close()
+                    if (app.presenting) win.presentClean = true
+                    else win.startPresenting(true)
                 }
             }
             Button {
@@ -2994,6 +3059,12 @@ ApplicationWindow {
         onActivated: app.presenting ? (app.presenting = false) : win.startPresenting()
     }
     Shortcut { sequence: "Escape"; enabled: app.presenting && !app.hasSelection; onActivated: app.presenting = false }
+    // Without controls: Ctrl+F5 starts presenting so, and while presenting hides or shows the controls
+    Shortcut {
+        sequences: win.keysOf("presentClean")
+        enabled: !app.homeVisible
+        onActivated: app.presenting ? (win.presentClean = !win.presentClean) : win.startPresenting(true)
+    }
     Shortcut { sequences: win.keysOf("export"); enabled: docKeys; onActivated: openExportDialog() }
     Shortcut { sequences: win.keysOf("print"); enabled: docKeys; onActivated: printDialog.open() }
     Shortcut { sequences: win.keysOf("back"); enabled: docKeys; onActivated: app.navigateBack() }

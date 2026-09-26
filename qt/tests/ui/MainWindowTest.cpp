@@ -6401,6 +6401,216 @@ TEST_F(MainWindowTest, presentingGoesPageByPageAndBackToEditing) {
     EXPECT_FALSE(window->property("fullScreenMode").toBool()) << "the second Escape leaves full screen";
 }
 
+// qt/present-clean: Ctrl+F5 presents without controls: no pen pill, no tool square, no page number, only a faint
+// mark in the lower left corner, a finger wide. A tap on it (finger or mouse) brings the controls back, another hides
+// them; Ctrl+F5 does the same while presenting. The keys and the pen work as ever. Escape ends it; F5 presents with
+// the controls. The mark is not there outside presenting.
+TEST_F(MainWindowTest, presentingWithoutControls) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    controller->selectTool("pen");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    auto& vc = view->getViewController();
+    auto settle = [&] {
+        until([&] { return !vc.isAnimating(); }, 2000);
+        wait(30);
+    };
+    auto* penPill = find<QQuickItem>("penPill");
+    auto* square = find<QQuickItem>("quickToolSquare");
+    auto* mark = find<QQuickItem>("presentCornerMark");
+    auto* number = find<QQuickItem>("presentPageIndicator");
+    ASSERT_NE(penPill, nullptr);
+    ASSERT_NE(square, nullptr);
+    ASSERT_NE(mark, nullptr);
+    ASSERT_NE(number, nullptr);
+    EXPECT_FALSE(mark->isVisible()) << "no mark while editing";
+    auto clean = [&] { return window->property("presentClean").toBool(); };
+
+    key(Qt::Key_F5, Qt::ControlModifier);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    ASSERT_TRUE(controller->presenting());
+    wait(100);
+    EXPECT_TRUE(clean());
+    EXPECT_TRUE(view->isPresenting());
+    EXPECT_FALSE(penPill->isVisible()) << "no pill";
+    EXPECT_FALSE(square->isVisible()) << "no tool square";
+    EXPECT_FALSE(number->isVisible()) << "not even the page number";
+    EXPECT_FALSE(find<QQuickItem>("viewPill")->isVisible());
+    EXPECT_FALSE(find<QQuickItem>("fullScreenTabs")->isVisible());
+    ASSERT_TRUE(mark->isVisible()) << "the mark in the corner";
+
+    // In the lower left corner, a finger wide; what shows of it is a few faint pixels
+    const QRectF target = mark->mapRectToScene(QRectF(0, 0, mark->width(), mark->height()));
+    EXPECT_GE(target.width(), 40);
+    EXPECT_GE(target.height(), 40);
+    EXPECT_NEAR(target.left(), 0, 1);
+    EXPECT_NEAR(target.bottom(), window->contentItem()->height(), 1);
+    auto* dot = findItem("presentCornerDot");
+    ASSERT_NE(dot, nullptr);
+    EXPECT_LE(dot->width(), 8);
+    EXPECT_LE(dot->opacity(), 0.2) << "barely there";
+    // The pointer over it: clearer
+    const QPoint markCenter = target.center().toPoint();
+    QTest::mouseMove(window, markCenter);
+    until([&] { return dot->opacity() > 0.4; }, 2000);
+    EXPECT_GT(dot->opacity(), 0.4);
+    QTest::mouseMove(window, canvasItem->mapToScene(QPointF(canvasItem->width() / 2, 40)).toPoint());
+    until([&] { return dot->opacity() < 0.2; }, 2000);
+    EXPECT_LE(dot->opacity(), 0.2);
+
+    // The keys page, the pen writes
+    key(Qt::Key_Space);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 2);
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    auto strokes = [&] { return s->getDocument()->getPage(1)->getSelectedLayer()->getElementsView().size(); };
+    const size_t before = strokes();
+    const QPoint a = canvasItem->mapToScene(view->pageViewRect(1).center()).toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (int i = 1; i <= 8; ++i) {
+        QTest::mouseMove(window, a + QPoint(-20 * i, 10 * i));
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(-160, 80));
+    settle();
+    EXPECT_EQ(strokes(), before + 1) << "written";
+
+    // A finger taps the mark: the controls are back, still presenting
+    static QPointingDevice* finger = QTest::createTouchDevice(QInputDevice::DeviceType::TouchScreen);
+    QTest::touchEvent(window, finger).press(0, markCenter);
+    QTest::touchEvent(window, finger).release(0, markCenter);
+    wait(50);
+    EXPECT_FALSE(clean());
+    EXPECT_TRUE(controller->presenting());
+    EXPECT_TRUE(penPill->isVisible()) << "the pill is back";
+    EXPECT_TRUE(square->isVisible()) << "the tool square is back";
+    EXPECT_TRUE(mark->isVisible()) << "the mark stays, to hide them again";
+    EXPECT_EQ(strokes(), before + 1) << "the tap did not write";
+    key(Qt::Key_Space);
+    settle();
+    EXPECT_EQ(controller->pageNumber(), 3) << "the keys stay with the page";
+    // Another tap (the mouse this time): hidden again
+    click(mark);
+    EXPECT_TRUE(clean());
+    EXPECT_FALSE(penPill->isVisible());
+    EXPECT_FALSE(square->isVisible());
+    // Ctrl+F5 while presenting does the same
+    key(Qt::Key_F5, Qt::ControlModifier);
+    EXPECT_FALSE(clean());
+    EXPECT_TRUE(square->isVisible());
+    EXPECT_TRUE(controller->presenting());
+    key(Qt::Key_F5, Qt::ControlModifier);
+    EXPECT_TRUE(clean());
+    EXPECT_FALSE(square->isVisible());
+
+    // Escape ends presenting: full-screen editing with its tools, no mark
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_FALSE(clean());
+    EXPECT_TRUE(window->property("fullScreenMode").toBool());
+    EXPECT_TRUE(square->isVisible());
+    EXPECT_FALSE(mark->isVisible());
+
+    // F5: with the controls (a clean presentation is not remembered), and the mark to hide them
+    key(Qt::Key_F5);
+    ASSERT_TRUE(controller->presenting());
+    wait(50);
+    EXPECT_FALSE(clean());
+    EXPECT_TRUE(square->isVisible());
+    EXPECT_TRUE(penPill->isVisible());
+    EXPECT_TRUE(mark->isVisible());
+    key(Qt::Key_Escape);
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->presenting());
+    EXPECT_FALSE(window->property("fullScreenMode").toBool());
+    EXPECT_FALSE(mark->isVisible());
+}
+
+// qt/present-clean: holding the presentation button (or a right click on it, or ⋮ → "Present without controls")
+// presents without controls; a click presents with them. The shortcut is in Settings → Shortcuts.
+TEST_F(MainWindowTest, presentButtonHeldPresentsWithoutControls) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setWidth(2000);  // (room for the whole tool bar)
+    wait(100);
+    auto* present = findItem("presentButton");
+    ASSERT_NE(present, nullptr);
+    ASSERT_TRUE(present->isVisible());
+    auto clean = [&] { return window->property("presentClean").toBool(); };
+    auto back = [&] {
+        key(Qt::Key_Escape);
+        key(Qt::Key_Escape);
+        ASSERT_FALSE(controller->presenting());
+        until([&] { return !window->property("leavingFullScreen").toBool(); }, 2000);
+        window->setWidth(2000);
+        wait(100);
+        ASSERT_TRUE(present->isVisible());
+    };
+    const QPoint at = present->mapToScene(QPointF(present->width() / 2, present->height() / 2)).toPoint();
+
+    // Held
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 300);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at);
+    until([&] { return window->property("fullScreenMode").toBool(); });
+    ASSERT_TRUE(controller->presenting());
+    EXPECT_TRUE(clean()) << "held: only the page";
+    EXPECT_FALSE(find<QQuickItem>("quickToolSquare")->isVisible());
+    EXPECT_TRUE(find<QQuickItem>("presentCornerMark")->isVisible());
+    back();
+
+    // Right click
+    QTest::mouseClick(window, Qt::RightButton, Qt::NoModifier, at);
+    until([&] { return controller->presenting(); });
+    ASSERT_TRUE(controller->presenting());
+    EXPECT_TRUE(clean()) << "right click: only the page";
+    back();
+
+    // A click: with the controls
+    click(present);
+    until([&] { return controller->presenting(); });
+    ASSERT_TRUE(controller->presenting());
+    EXPECT_FALSE(clean());
+    EXPECT_TRUE(find<QQuickItem>("quickToolSquare")->isVisible());
+    back();
+
+    // The ⋮ menu has it too
+    auto* item = find<QObject>("presentCleanItem");
+    ASSERT_NE(item, nullptr);
+    QMetaObject::invokeMethod(item, "triggered");
+    until([&] { return controller->presenting(); });
+    EXPECT_TRUE(controller->presenting());
+    EXPECT_TRUE(clean());
+    back();
+
+    // Settings → Shortcuts lists it, on Ctrl+F5, and it can have other keys
+    auto* shortcuts = qobject_cast<QAbstractItemModel*>(controller->shortcutsModel());
+    ASSERT_NE(shortcuts, nullptr);
+    const auto roles = shortcuts->roleNames();
+    const int idRole = roles.key("actionId"), nameRole = roles.key("name"), keysRole = roles.key("keys");
+    int row = -1;
+    for (int r = 0; r < shortcuts->rowCount(); ++r) {
+        if (shortcuts->data(shortcuts->index(r, 0), idRole).toString() == "presentClean") {
+            row = r;
+        }
+    }
+    ASSERT_GE(row, 0) << "listed";
+    EXPECT_EQ(shortcuts->data(shortcuts->index(row, 0), nameRole).toString(), "Present without controls");
+    EXPECT_EQ(shortcuts->data(shortcuts->index(row, 0), keysRole).toString(), "Ctrl+F5");
+    bool changed = false;
+    QMetaObject::invokeMethod(shortcuts, "setKeys", Q_RETURN_ARG(bool, changed), Q_ARG(QString, "presentClean"),
+                              Q_ARG(QString, "Ctrl+Alt+F5"));
+    ASSERT_TRUE(changed);
+    wait(50);
+    key(Qt::Key_F5, Qt::ControlModifier);
+    EXPECT_FALSE(controller->presenting()) << "not the old keys";
+    key(Qt::Key_F5, Qt::ControlModifier | Qt::AltModifier);
+    until([&] { return controller->presenting(); });
+    EXPECT_TRUE(controller->presenting());
+    EXPECT_TRUE(clean()) << "the new keys";
+    QMetaObject::invokeMethod(shortcuts, "resetAll");
+}
+
 // Full screen (editing): a slim bar at the top shows the tabs as dots; a tap opens the overview of the documents, a
 // swipe along it goes to the next or previous document (its title shows for a moment). Not with one tab, not while
 // presenting; with many tabs "3 / 17" instead of dots.

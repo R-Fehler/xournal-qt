@@ -62,6 +62,8 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"realSize", tr("Real size (100 %, as large as the paper)"), view, {"Ctrl+1"}},
             {"fullScreen", tr("Full screen"), view, {"F11"}},
             {"present", tr("Present (full screen, page by page)"), view, {"F5"}},
+            // (only the page: no pill, no tool square; again while presenting: the controls back)
+            {"presentClean", tr("Present without controls"), view, {"Ctrl+F5"}},
             {"back", tr("Back"), view, standard(QKeySequence::Back)},
             {"forward", tr("Forward"), view, standard(QKeySequence::Forward)},
             {"settings", tr("Settings"), view, {"Ctrl+,"}},
