@@ -32,6 +32,7 @@
 #include "shell/DocumentFiles.h"
 #include "shell/LinkRewrite.h"
 #include "MarkdownFile.h"
+#include "MarkdownImages.h"
 #include "MdTexDelimiters.h"
 #include "model/Element.h"
 #include "model/Layer.h"
@@ -359,6 +360,22 @@ bool AppController::pasteMarkdown(QQuickTextDocument* document, int from, int to
     QTextDocument* doc = document ? document->textDocument() : nullptr;
     if (!doc) {
         return false;
+    }
+    // Pictures (a copied picture, picture files): saved with the document, their Markdown pasted (md-images.md)
+    QString error;
+    if (DocumentSession* s = session()) {
+        if (const auto pictures = MarkdownImages::pastedPictures(*s, QGuiApplication::clipboard()->mimeData(), error)) {
+            if (pictures->empty()) {
+                Q_EMIT message(tr("Paste picture"), error, true);
+                return true;
+            }
+            const int length = static_cast<int>(doc->toPlainText().size());
+            QTextCursor cursor(doc);
+            cursor.setPosition(std::clamp(from, 0, length));
+            cursor.setPosition(std::clamp(to, std::clamp(from, 0, length), length), QTextCursor::KeepAnchor);
+            cursor.insertText(QString::fromStdString(*pictures));
+            return true;
+        }
     }
     std::string pasted = QGuiApplication::clipboard()->text().toStdString();
     pasted.erase(std::remove(pasted.begin(), pasted.end(), '\r'), pasted.end());

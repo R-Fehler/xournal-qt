@@ -31,6 +31,7 @@
 #include <QSignalSpy>
 #include <QQmlContext>
 #include <QQuickItem>
+#include <QQuickTextDocument>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -6795,6 +6796,33 @@ TEST_F(MainWindowTest, theFormattingBarAndTheTableEditor) {
     QMetaObject::invokeMethod(area, "undo");
     EXPECT_EQ(area->property("text").toString().toStdString(), before);
     click(find<QQuickItem>("markdownCancel"));
+}
+
+// Beside the page (qt/docs/md-images.md): a picture pasted into the Markdown of saved notes is kept with the notes and
+// linked; in notes not saved yet the text is pasted as before.
+TEST_F(MainWindowTest, aPicturePastedBesideThePageIsKeptWithTheNotes) {
+    QTemporaryDir dir;
+    const fs::path xopp = fs::path(dir.path().toStdString()) / "board.xopp";
+    ASSERT_TRUE(controller->tabManager().currentSession()->saveAs(xopp).ok);
+    auto* panel = find<QQuickItem>("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    QMetaObject::invokeMethod(panel, "openBox", Q_ARG(QVariant, 0), Q_ARG(QVariant, 60.0), Q_ARG(QVariant, 300.0));
+    until([&] { return panel->isVisible(); });
+    auto* area = find<QQuickItem>("markdownArea");
+    ASSERT_NE(area, nullptr);
+    auto* document = area->property("textDocument").value<QQuickTextDocument*>();
+    ASSERT_NE(document, nullptr);
+    auto* mime = new QMimeData;
+    QImage red(12, 12, QImage::Format_RGB32);
+    red.fill(Qt::red);
+    mime->setImageData(red);
+    QGuiApplication::clipboard()->setMimeData(mime);
+    ASSERT_TRUE(controller->pasteMarkdown(document, 0, 0));
+    const QString text = area->property("text").toString();
+    EXPECT_TRUE(text.startsWith("![](board.assets/image-")) << text.toStdString();
+    const QString name = text.mid(QString("![](").size()).section(')', 0, 0);
+    EXPECT_FALSE(xqt::md::images::resolve(name.toStdString()).empty());
+    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
 }
 
 // A .md: the bar is there all the time (its text is written with the keyboard); a tool starts writing if needed.

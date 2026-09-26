@@ -40,10 +40,12 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
 
 ## Adding images
 
-- Paste (Ctrl+V with a picture on the clipboard), a dropped image file, or the formatting bar's image button (a
-  file picker) saves the picture and inserts `![](name.assets/image-YYYY-MM-DD-HHMMSS.png)` at the cursor (Typora's
-  names; a dropped or picked file keeps its name and kind, made unique in the folder). The alt text is empty. It is
-  one undo step of the text; undo leaves the file (see clean-up).
+- Paste (Ctrl+V with a picture on the clipboard: on the page, in a `.md`, and in the editor beside the page), a
+  dropped image file, or the formatting bar's image button (a file picker) saves the picture and inserts
+  `![](name.assets/image-YYYY-MM-DD-HHMMSS.png)` at the cursor (Typora's names; a dropped or picked file keeps its
+  name and kind, made unique in the folder, and its name is the alt text). A pasted picture's alt text is empty. It is
+  one undo step of the text; undo leaves the file (see clean-up). A copied text that also carries a picture (a
+  spreadsheet's cells) is pasted as text.
 - Where the file goes, by document (`MarkdownImages::placeOf`: the document's root):
   - a `.md`: `name.assets/` next to it;
   - a PDF text document, any PDF with notes, a `.xopp`: `name.assets/` in its work folder in the app cache (carried
