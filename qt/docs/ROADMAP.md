@@ -588,6 +588,14 @@
   selection's right knob of a single selected box, set the box's wrap width (2 cm to the page edge; live reflow; one
   undo step); stored in Xournal++'s `wrap` attribute. The page's own Markdown text has none.
 
+- **Paper sizes A0–A7, big pages drawn around the view, `qt/page-sizes` (2026-09-26).** One paper list (A0 … A7,
+  Letter, Legal, 16:9; both orientations) for new documents, inserted pages and Settings; a size that matches none
+  shows as "Other: w × h mm" (before, entry 0 was used). Text margins on pages smaller than A5: 13.5 % of the short
+  side, at least 5 mm (`PageMargins`). `PageRaster` draws pages above 24 Mpx or 16384 px a side only around the view
+  (view + half its size each side; PDF drawn straight into the part; `CanvasMemory` plans by the part): an A0 page at
+  300 % holds 17 MB instead of 1.33 GB, and at 700 % it draws at all; the minimum zoom goes below 30 % when a page
+  needs it to fit.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
