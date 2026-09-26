@@ -1,7 +1,8 @@
 # Sticky notes
 
 Status: built in `qt/sticky-notes` (2026-09-26); copy, cut, paste and moving to another page in
-`qt/sticky-clipboard` (2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
+`qt/sticky-clipboard` (2026-09-26); the darker edge and the shade, cheaper copy / cut / paste in `qt/sticky-look`
+(2026-09-26). The author's request (2026-09-25): permanent sticky notes that the
 user can write on and move around, with the ink and text on them staying attached; not a PDF popup note that other
 viewers minimise; usable for self-testing by moving them over solutions; adaptable in size.
 
@@ -55,11 +56,23 @@ and move notes to other pages.
   there pastes a copied note onto the current page when the note was copied after the last page copy (or a note is
   selected, or no pages are copied); else the pages, as before (`AppController::pastesNoteBeforePages`).
 - **The clipboard format** is the app's own, `application/x-xournal-qt-sticky-note`: the layer's name (cover or
-  not) and every element of the layer, the paper first, in upstream's element serialization (the one of its
-  `application/xournal` clipboard: strokes with their pressure, texts, images). A picture of the note (PNG, twice
-  the page resolution, drawn as in an export: no folded corner) goes along, so pasting into another app gives a
-  picture. Xournal++ itself does not read the note's format; the note is not also put there as upstream's
-  elements, since pasting those here would give loose elements instead of a note.
+  not) and every element of the layer, the paper first, each in upstream's element serialization (the one of its
+  `application/xournal` clipboard: strokes with their pressure, texts, images) in a stream of its own. Why each on
+  its own: upstream's `ObjectInputStream::readData` copies the stream's whole buffer for every stroke it reads, so
+  one stream for a note with 300 strokes took 15 ms to read (quadratic); now 1–3 ms. (Upstream's own paste of a
+  large selection has the same cost; not changed here.) The object is named `StickyNote2`: a note copied by an older
+  version is not pasted. A picture of the note (PNG, twice the page resolution, drawn as in an export: no folded
+  corner, no shade) is offered too, so pasting into another app gives a picture; it is drawn only when an app asks
+  for it (`NoteMimeData`), not at every copy. Xournal++ itself does not read the note's format; the note is not
+  also put there as upstream's elements, since pasting those here would give loose elements instead of a note.
+- **Cost** (`CanvasReplayTest.benchmarkStickyNoteClipboard`, `XQT_BENCH_STICKY=1`, a note with 300 strokes; before →
+  now, ms, the ranges from runs with more or less load from other builds): copy 25–35 → 0.2–0.7 (the picture is no
+  longer drawn at every copy); cut the same; paste 11–15 → 1–2; the redraw after a paste or a cut: the whole page
+  (52–105 on a page with 600 strokes of its own) → only the note's area (26–54 after a paste: the note's own
+  strokes; 6–12 after a cut). Another app asking for the picture: 25–55 to draw it and 19–40 for Qt to make the PNG
+  (at the page's resolution instead of twice it, about half). A note coming onto a page or leaving it (place,
+  paste, cut, delete, the drop on another page, and their undo) draws only its part of the page again
+  (`sticky::NoteLayerChange`, read by `CanvasView::layerChanged`).
 - **Moving to another page:** cut, go to the page, paste. Also: drag the selected note past its page's edge and let
   go over another page: it goes there, the point it was held by under the pointer (inside that page), on top, still
   selected. While dragged it stays at the edge of its page (a page's picture cannot show it beyond the page); it
@@ -129,8 +142,8 @@ not list notes.
 
 ## Where it is drawn
 
-A note is drawn by `xqt::sticky::draw` in place of upstream's `LayerView::draw` for its layer: the paper, then the
-content clipped to the paper. The hook is one seam in `src/core/view/LayerView.{h,cpp}` (a function pointer the
+A note is drawn by `xqt::sticky::draw` in place of upstream's `LayerView::draw` for its layer (see "How a note is
+drawn" below). The hook is one seam in `src/core/view/LayerView.{h,cpp}` (a function pointer the
 frontend sets, like the Markdown renderer; ADR-0002). Every picture of a page goes through `LayerView`, so the note
 is the same on the screen (`PageRaster`), in thumbnails and previews, in the PDF export, in print (the PDF export),
 in the archive export (PDF/A) and in the hybrid PDF. Screen renders (and only they) add the folded corner of a
@@ -138,7 +151,48 @@ covered note and the peeking look.
 
 In the **hybrid PDF** a note is its layer's annotation, flattened in the appearance stream like our ink: a `/Stamp`
 (not `/Ink`, so viewers that redraw ink from `/InkList` do not draw the paper as a line) whose `/AP` is the note as
-drawn here, clipped content included; its `/Rect` is the note. Never a `/Text` popup note.
+drawn here, clipped content included; its `/Rect` is the note and its shade (`sticky::drawnRect`). Never a `/Text`
+popup note.
+
+### How a note is drawn
+
+The author's request (2026-09-26): notes looked flat; a slightly darker edge or a shade at the edge, like paper notes,
+but only a shadow if it is really fast to draw. In this order, in page coordinates (`sticky::draw`):
+
+1. **The shade**: a soft shadow a little to the bottom right (0.8 pt right, 1.4 pt down), fading out over about
+   2.4 pt. No bitmap and no blur: three rectangles of black at 5.5 % opacity, each reaching 0.8 pt further out at
+   the bottom and the right and beginning 0.8 pt nearer the bottom-left and top-right corners, so the shade is
+   darkest (about 16 %) next to the paper and fades outwards and towards those corners. Only the strips that the
+   paper does not hide are filled (a box at the right and one at the bottom per rectangle). Nothing is drawn above
+   or left of the note.
+2. **The paper**: its outline (the paper stroke's points) filled with its colour (at the stroke's fill opacity,
+   255 in our files).
+3. **The content**, clipped to the paper.
+4. **The edge**: the paper's outline stroked 0.8 pt wide (`EDGE_WIDTH`) in the paper's colour times 0.78
+   (`EDGE_SHADE`, `sticky::edgeColor`): an olive edge on yellow, a darker pink on pink, and so on; never black or
+   gray. It lies over the content, as a paper's edge would.
+5. On the screen only: the folded corner of a covering note, and the peeking look (the whole note, shade included,
+   at a quarter opacity, and a dashed edge in a darker shade still).
+
+The shade and the edge are a drawing effect of our renderer, the same on the screen, in thumbnails and previews, in
+the PDF export, print, the archive and the hybrid PDF (vector paths there, no images). The file does not change:
+the paper stroke is still saved with width 0.5 in the note's colour, and upstream Xournal++ draws it as it did (a
+flat rectangle). A note's picture reaches `DRAWN_MARGIN` (4 pt) beyond its rectangle: what is drawn again when the
+note moves, changes or peeks.
+
+**Cost** (`StickyNoteTest.benchmarkTheLook`, `XQT_BENCH_STICKY=1`; a page with 1, 5 and 20 notes of 30 strokes
+each, the machine loaded by other builds, so a few percent is noise):
+
+| | 1 note | 5 notes | 20 notes |
+| --- | --- | --- | --- |
+| whole page at 2 px/pt, flat / edge / edge + shade (ms) | 2.70 / 2.70 / 2.76 | 11.1 / 11.0 / 11.2 | 42.6 / 42.3 / 43.6 |
+| thumbnail at 0.25 px/pt | 0.99 / 0.99 / 0.99 | 4.78 / 4.77 / 4.83 | 19.1 / 19.0 / 19.1 |
+| a stroke's area inside a note (writing on it) | 0.21 / 0.21 / 0.21 | 0.21 / 0.20 / 0.20 | 0.21 / 0.20 / 0.20 |
+
+The edge costs nothing measurable. The shade costs 1–2.3 % of a whole page's render, under 1 % of a thumbnail, and
+nothing while writing on a note: an area drawn again that lies inside the paper draws neither the shade nor the
+edge. The first tries cost more: five rounded rectangles up to 9 %, three rectangles filled as even-odd rings
+(cairo's slower path) 4–6 %; plain boxes are cairo's quickest fill.
 
 ## Undo
 
@@ -165,10 +219,12 @@ drawn here, clipped content included; its `/Rect` is the note. Never a `/Text` p
   `Main.qml`; `AppController` (`insertStickyNote`, `noteSelected`, `noteColor`, `noteCovers`, `pageNotesHidden` ...).
 - `LayersModel` leaves the notes out of the layer panel.
 - Tests: `StickyNoteTest` (session: the format, the round trip, upstream Xournal++ opening the file, every export,
-  the clipboard format, where a paste goes), `CanvasReplayTest` (`*StickyNote*`: writing on a note and the clipping
+  the clipboard format, where a paste goes, the edge and the shade of every colour in every picture and nothing of
+  them in the file; `XQT_STICKY_SHOTS=<dir>` saves the palette's pictures), `CanvasReplayTest` (`*StickyNote*`: writing on a note and the clipping
   on the screen, moving and resizing with the content and undo, cover mode and peeking, placing and deleting, copy
   and paste on another page, cut, the offset over the original, covering stays covering, paste into another
-  document, the drag onto another page), `MainWindowTest.theShapesMenuPlacesAStickyNote…`,
+  document, the drag onto another page, the edge on the screen and while peeking, the note's area drawn again
+  after a paste, a cut and its undo), `MainWindowTest.theShapesMenuPlacesAStickyNote…`,
   `MainWindowTest.aStickyNoteIsMovedToAnotherPageByCutAndPaste` (the pill's Copy and Cut, Ctrl+X on page 1 and
   Ctrl+V on page 3, the sidebar's keys).
 

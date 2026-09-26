@@ -1,6 +1,7 @@
 #include "StickyNote.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <mutex>
 #include <shared_mutex>
@@ -86,7 +87,59 @@ bool contains(const Rectangle<double>& r, double x, double y) {
 
 std::mutex peekMutex;
 std::unordered_set<const Layer*> peeking;
+
+// The shadow under a note (points): a little to the bottom right, soft. A blur without a bitmap: three rectangles of
+// low opacity, each reaching a little further, so that the shade fades outwards (a few paths in a PDF, little to fill
+// on a screen). Its cost is measured by StickyNoteTest.benchmarkTheLook (qt/docs/sticky-notes.md).
+constexpr double SHADOW_DX = 0.8;
+constexpr double SHADOW_DY = 1.4;
+constexpr int SHADOW_RINGS = 3;
+constexpr double SHADOW_STEP = 0.8;
+constexpr double SHADOW_ALPHA = 0.055;  ///< each one's (black): about 16 % where all three lie
+static_assert(SHADOW_DY + SHADOW_RINGS * SHADOW_STEP <= DRAWN_MARGIN && SHADOW_DX <= SHADOW_DY);
+
+std::atomic<Finish> finishNow{Finish::Full};
+
+void drawShadow(cairo_t* cr, const Rectangle<double>& r) {
+    const double x1 = r.x + r.width;
+    const double y1 = r.y + r.height;
+    cairo_save(cr);
+    cairo_set_source_rgba(cr, 0, 0, 0, SHADOW_ALPHA);
+    // Each reaches a step further out at the bottom and the right and begins a step nearer the other corners (the
+    // shade fades there): nothing shows above or left of the note. Only what the paper does not hide is filled: a
+    // strip at the right and one at the bottom (boxes: cairo's quickest fill).
+    for (int i = 1; i <= SHADOW_RINGS; ++i) {
+        const double out = i * SHADOW_STEP;
+        const double in = (SHADOW_RINGS + 1 - i) * SHADOW_STEP;
+        const double right = x1 + SHADOW_DX + out;
+        const double bottom = y1 + SHADOW_DY + out;
+        cairo_rectangle(cr, x1, r.y + SHADOW_DY + in, right - x1, y1 - (r.y + SHADOW_DY + in));
+        cairo_rectangle(cr, r.x + SHADOW_DX + in, y1, right - (r.x + SHADOW_DX + in), bottom - y1);
+        cairo_fill(cr);
+    }
+    cairo_restore(cr);
+}
+
+/// The paper's outline as a path (its points: a rectangle, unless upstream Xournal++ changed it)
+void paperPath(cairo_t* cr, const Stroke& paper) {
+    cairo_new_path(cr);
+    for (const Point& p: paper.getPointVector()) {
+        cairo_line_to(cr, p.x, p.y);
+    }
+    cairo_close_path(cr);
+}
 }  // namespace
+
+Color edgeColor(Color paper) {
+    const auto shade = [](uint8_t c) { return static_cast<uint8_t>(std::lround(c * EDGE_SHADE)); };
+    return Color(shade(paper.red), shade(paper.green), shade(paper.blue));
+}
+
+Rectangle<double> drawnRect(const Rectangle<double>& r) {
+    return {r.x - DRAWN_MARGIN, r.y - DRAWN_MARGIN, r.width + 2 * DRAWN_MARGIN, r.height + 2 * DRAWN_MARGIN};
+}
+
+void setFinish(Finish finish) { finishNow.store(finish, std::memory_order_relaxed); }
 
 std::optional<Look> lookOf(const Layer& layer) {
     const Stroke* paper = paperOf(layer);
@@ -136,11 +189,11 @@ void changeLook(Document& doc, const PageRef& page, Layer& layer, const Look& fr
         std::unique_lock lock(doc);
         applyLook(layer, from, to);
     }
-    // Only the paper shows (the content is clipped to it): the old and the new place
+    // Only the note shows (the content is clipped to it): the old and the new place
     Rectangle<double> area = from.rect;
     area.unite(to.rect);
     Range range(area);
-    range.addPadding(PAPER_WIDTH + 1);
+    range.addPadding(DRAWN_MARGIN + 1);  // (its shadow)
     page->fireRangeChanged(range);
 }
 
@@ -166,6 +219,28 @@ bool hasNotes(const XojPage& page, bool visibleOnly) {
     }
     return false;
 }
+
+namespace {
+thread_local std::optional<Rectangle<double>> changingNote;
+
+/// The clipboard's note: its layer's name, then each element in a stream of its own. Upstream's ObjectInputStream
+/// copies its whole buffer for each stroke it reads (ObjectInputStream::readData), so one stream for a note with
+/// hundreds of strokes took quadratic time (15 ms to read a note with 300 strokes, now 1-3 ms). The name changed
+/// with the format: a note copied by an older version is not pasted (not misread).
+constexpr const char* CLIPBOARD_OBJECT = "StickyNote2";
+}  // namespace
+
+NoteLayerChange::NoteLayerChange(const Layer& layer): before(changingNote) {
+    if (const auto look = lookOf(layer)) {
+        changingNote = drawnRect(look->rect);
+    } else {
+        changingNote.reset();
+    }
+}
+
+NoteLayerChange::~NoteLayerChange() { changingNote = before; }
+
+std::optional<Rectangle<double>> changingNoteArea() { return changingNote; }
 
 Layer::Index layerIdOf(const XojPage& page, const Layer* layer) {
     const auto layers = page.getLayersView();
@@ -225,35 +300,63 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
     double maxX = 0;
     double maxY = 0;
     cairo_clip_extents(cr, &minX, &minY, &maxX, &maxY);
-    if (!paper->intersectsArea(minX, minY, maxX - minX, maxY - minY)) {
+    const Rectangle<double> rect = rectOf(*paper);
+    const Rectangle<double> drawn = drawnRect(rect);
+    if (drawn.x > maxX || drawn.y > maxY || drawn.x + drawn.width < minX || drawn.y + drawn.height < minY) {
         return true;  // (nothing of the note in the area drawn: nothing of its content either)
     }
-    const Rectangle<double> rect = rectOf(*paper);
+    const Finish finish = finishNow.load(std::memory_order_relaxed);
     const bool screen = PageRaster::drawingForScreen();
     const bool cover = layer.getName() == COVER_LAYER_NAME;
     const bool peek = screen && cover && isPeeking(&layer);
+    const ColorU8 c = paper->getColor();
 
     cairo_save(cr);
     if (peek) {
         cairo_push_group(cr);
     }
-    xoj::view::ElementView::createFromElement(paper)->draw(ctx);
-    cairo_save(cr);
-    cairo_rectangle(cr, rect.x, rect.y, rect.width, rect.height);
-    cairo_clip(cr);
-    cairo_clip_extents(cr, &minX, &minY, &maxX, &maxY);
-    const auto elements = layer.getElementsView();
-    for (size_t i = 1; i < elements.size(); ++i) {
-        const Element* e = elements[i];
-        if (e->intersectsArea(minX, minY, maxX - minX, maxY - minY)) {
-            xoj::view::ElementView::createFromElement(e)->draw(ctx);
+    // Only an area inside the paper drawn again (what is written on it): no edge, no shadow to draw
+    const double inset = EDGE_WIDTH;
+    const bool inside = minX >= rect.x + inset && minY >= rect.y + inset && maxX <= rect.x + rect.width - inset &&
+                        maxY <= rect.y + rect.height - inset;
+    if (finish == Finish::Flat) {
+        xoj::view::ElementView::createFromElement(paper)->draw(ctx);
+    } else {
+        if (finish == Finish::Full && !inside) {
+            drawShadow(cr, rect);
         }
+        paperPath(cr, *paper);
+        cairo_set_source_rgba(cr, c.red / 255.0, c.green / 255.0, c.blue / 255.0, paper->getFill() / 255.0);
+        cairo_fill(cr);
     }
-    cairo_restore(cr);
-    const ColorU8 c = paper->getColor();
-    const double dr = c.red / 255.0 * 0.8;
-    const double dg = c.green / 255.0 * 0.8;
-    const double db = c.blue / 255.0 * 0.8;
+    const bool contentShows = rect.x <= maxX && rect.y <= maxY && rect.x + rect.width >= minX &&
+                              rect.y + rect.height >= minY;
+    if (contentShows) {
+        cairo_save(cr);
+        cairo_rectangle(cr, rect.x, rect.y, rect.width, rect.height);
+        cairo_clip(cr);
+        cairo_clip_extents(cr, &minX, &minY, &maxX, &maxY);
+        const auto elements = layer.getElementsView();
+        for (size_t i = 1; i < elements.size(); ++i) {
+            const Element* e = elements[i];
+            if (e->intersectsArea(minX, minY, maxX - minX, maxY - minY)) {
+                xoj::view::ElementView::createFromElement(e)->draw(ctx);
+            }
+        }
+        cairo_restore(cr);
+    }
+    const Color edge = edgeColor(paper->getColor());
+    const double er = edge.red / 255.0;
+    const double eg = edge.green / 255.0;
+    const double eb = edge.blue / 255.0;
+    if (finish != Finish::Flat && !inside) {
+        // The paper's edge, over what is written on it: a darker shade of its color, as a paper note's edge looks
+        paperPath(cr, *paper);
+        cairo_set_line_width(cr, EDGE_WIDTH);
+        cairo_set_line_join(cr, CAIRO_LINE_JOIN_MITER);
+        cairo_set_source_rgb(cr, er, eg, eb);
+        cairo_stroke(cr);
+    }
     if (screen && cover) {
         // A folded corner: this note covers (the pen does not write on it, a tap lets it peek)
         const double side = std::min({16.0, rect.width / 4, rect.height / 4});
@@ -262,7 +365,7 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
         cairo_line_to(cr, x1, rect.y + side);
         cairo_line_to(cr, x1 - side, rect.y + side);
         cairo_close_path(cr);
-        cairo_set_source_rgb(cr, dr, dg, db);
+        cairo_set_source_rgb(cr, c.red / 255.0 * 0.8, c.green / 255.0 * 0.8, c.blue / 255.0 * 0.8);
         cairo_fill(cr);
     }
     if (peek) {
@@ -276,7 +379,7 @@ bool draw(const Layer& layer, const xoj::view::Context& ctx) {
         const double dash[] = {4 * pixel, 3 * pixel};
         cairo_set_dash(cr, dash, 2, 0);
         cairo_set_line_width(cr, 1.5 * pixel);
-        cairo_set_source_rgb(cr, dr * 0.8, dg * 0.8, db * 0.8);
+        cairo_set_source_rgb(cr, er * 0.8, eg * 0.8, eb * 0.8);
         cairo_rectangle(cr, rect.x, rect.y, rect.width, rect.height);
         cairo_stroke(cr);
     }
@@ -318,12 +421,18 @@ NotePageUndoAction::NotePageUndoAction(LayerController* layers, Layer* layer, Pl
 
 void NotePageUndoAction::move(LayerController* layers, Document& doc, Layer* layer, const Place& from,
                               const Place& to) {
-    layers->removeLayer(from.page, layer);  // (locks the document; the page is drawn again)
+    {
+        NoteLayerChange change(*layer);  // (only the note's part of the page is drawn again)
+        layers->removeLayer(from.page, layer);  // (locks the document)
+    }
     {
         std::unique_lock lock(doc);
         applyLook(*layer, from.look, to.look);
     }
-    layers->insertLayer(to.page, layer, to.position);
+    {
+        NoteLayerChange change(*layer);
+        layers->insertLayer(to.page, layer, to.position);
+    }
     leaveNoteLayer(doc, from.page);
     leaveNoteLayer(doc, to.page);
 }
@@ -348,12 +457,17 @@ std::string serialize(const Layer& layer) {
     }
     ObjectOutputStream out(new BinObjectEncoding());
     out.writeString(PROJECT_STRING);
-    out.writeObject("StickyNote");
+    out.writeObject(CLIPBOARD_OBJECT);
     out.writeString(layer.getName());
     const auto elements = layer.getElementsView();
     out.writeSizeT(elements.size());
     for (const Element* e: elements) {
-        e->serialize(out);
+        // Each element in a stream of its own (see CLIPBOARD_OBJECT)
+        ObjectOutputStream one(new BinObjectEncoding());
+        e->serialize(one);
+        GString* bytes = one.stealData();
+        out.writeImage(std::string_view(bytes->str, bytes->len));
+        g_string_free(bytes, TRUE);
     }
     out.endObject();
     GString* data = out.stealData();
@@ -369,7 +483,7 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
             return nullptr;
         }
         in.readString();  // (the version that wrote it: elements are read the same way since upstream 1.0)
-        in.readObject("StickyNote");
+        in.readObject(CLIPBOARD_OBJECT);
         auto layer = std::make_unique<Layer>();
         const std::string name = in.readString();
         if (!isNoteName(name)) {
@@ -378,7 +492,12 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
         layer->setName(name);
         const size_t count = in.readSizeT();
         for (size_t i = 0; i < count; ++i) {
-            const std::string type = in.getNextObjectName();
+            const std::string bytes = in.readImage();
+            ObjectInputStream one;
+            if (!one.read(bytes.data(), bytes.size())) {
+                return nullptr;
+            }
+            const std::string type = one.getNextObjectName();
             ElementPtr element;
             if (type == "Stroke") {
                 element = std::make_unique<Stroke>();
@@ -393,7 +512,7 @@ std::unique_ptr<Layer> deserialize(const char* data, size_t size) {
             } else {
                 return nullptr;
             }
-            element->readSerialized(in);
+            element->readSerialized(one);
             layer->addElement(std::move(element));
         }
         in.endObject();

@@ -5,7 +5,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <iostream>
 #include <memory>
 
@@ -40,6 +42,7 @@
 #include "model/Document.h"
 #include "model/GeometryTool.h"
 #include "model/Layer.h"
+#include "model/PageType.h"
 #include "model/Stroke.h"
 #include "model/Font.h"
 #include "model/Text.h"
@@ -2864,4 +2867,217 @@ TEST_F(CanvasReplayTest, aStickyNoteDraggedOntoAnotherPageGoesThereAsOneStep) {
     session->getUndoRedoHandler()->redo();
     EXPECT_EQ(notesOf(*session, 1).size(), 1u);
     EXPECT_NEAR(sticky::lookOf(*note)->rect.x, 170, 0.5);
+}
+
+// --- the look of a note on the screen; drawing only its part of a page again (qt/sticky-look) ----------------------
+
+namespace {
+/// The screen's pixels of a page (its buffer and what is drawn over it) in this part (page coordinates)
+QImage screenOf(CanvasPage& page, const QRectF& area) {
+    const auto info = page.bufferInfo();
+    const double s = info.zoom * info.dpiScale;
+    return page.composeTile(QRect(static_cast<int>(area.x() * s), static_cast<int>(area.y() * s),
+                                  std::max(1, static_cast<int>(area.width() * s)),
+                                  std::max(1, static_cast<int>(area.height() * s))));
+}
+/// The darkest pixel of an image
+QColor darkestOf(const QImage& image) {
+    QColor darkest(Qt::white);
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (qGray(image.pixel(x, y)) < qGray(darkest.rgb())) {
+                darkest = image.pixelColor(x, y);
+            }
+        }
+    }
+    return darkest;
+}
+int sumOf(const QColor& c) { return c.red() + c.green() + c.blue(); }
+/// Plain white pages (no ruling in the pixels looked at), drawn
+void plainPages(DocumentSession& session, CanvasView& view) {
+    for (size_t i = 0; i < view.pageCount(); ++i) {
+        session.getDocument()->getPage(i)->setBackgroundType(PageType(PageTypeFormat::Plain));
+        view.getPage(i)->rerenderPage();
+    }
+}
+}  // namespace
+
+TEST_F(CanvasReplayTest, aStickyNoteHasADarkerEdgeOnTheScreenAlsoWhilePeeking) {
+    plainPages(*session, *view);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    const Color paper = look.color;
+    view->clearSelection();
+    processEvents();
+    const int paperSum = paper.red + paper.green + paper.blue;
+    // Across its left edge (a strip 4 pt wide, 20 pt high): the darkest pixel is the edge, a darker shade of the paper
+    const QRectF across(look.rect.x - 2, look.rect.y + 40, 4, 20);
+    const QColor edge = darkestOf(screenOf(*view->getPage(0), across));
+    if (qEnvironmentVariableIsSet("XQT_STICKY_SHOTS")) {
+        screenOf(*view->getPage(0), QRectF(look.rect.x - 10, look.rect.y - 10, look.rect.width + 20,
+                                           look.rect.height + 20))
+                .save(qEnvironmentVariable("XQT_STICKY_SHOTS") + "/screen-note.png");
+    }
+    EXPECT_LT(sumOf(edge), paperSum - 40) << "darker than the paper: " << edge.name().toStdString();
+    EXPECT_GT(qGray(edge.rgb()), 110) << "not black: " << edge.name().toStdString();
+    EXPECT_LE(edge.blue(), edge.red()) << "its own color's shade (yellow), not gray: " << edge.name().toStdString();
+    // Its shade: below the note a little darker than the page, above it nothing
+    const QColor below = darkestOf(
+            screenOf(*view->getPage(0), QRectF(look.rect.x + 40, look.rect.y + look.rect.height + 1, 20, 1.5)));
+    const QColor above = darkestOf(screenOf(*view->getPage(0), QRectF(look.rect.x + 40, look.rect.y - 3, 20, 1.5)));
+    EXPECT_LT(qGray(below.rgb()), 250) << below.name().toStdString();
+    EXPECT_GT(qGray(below.rgb()), 190) << "a light shade " << below.name().toStdString();
+    EXPECT_GE(qGray(above.rgb()), 253) << above.name().toStdString();
+
+    // Covering and peeking: see-through, and its edge stays visible (dashed)
+    view->notes().select(*view->getPage(0), note);
+    view->notes().setCover(true);
+    view->clearSelection();
+    const QPointF middle = viewPos(0, QPointF(look.rect.x + look.rect.width / 2, look.rect.y + look.rect.height / 2));
+    tablet(QEvent::TabletPress, middle, 0.3, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, middle, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_TRUE(sticky::isPeeking(note));
+    const QColor inside = darkestOf(screenOf(*view->getPage(0), QRectF(look.rect.x + 30, look.rect.y + 30, 4, 4)));
+    EXPECT_GT(sumOf(inside), paperSum + 20) << "see-through " << inside.name().toStdString();
+    const QColor peekEdge = darkestOf(screenOf(*view->getPage(0), across));
+    EXPECT_LT(sumOf(peekEdge), 3 * 255 - 150) << "the edge while peeking " << peekEdge.name().toStdString();
+}
+
+TEST_F(CanvasReplayTest, aPastedOrCutStickyNoteIsDrawnWhereItIs) {
+    // Only the note's part of the page is drawn again when it comes or goes: that part must show it (or not)
+    plainPages(*session, *view);
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    ASSERT_TRUE(view->copySelection());
+    processEvents();
+    const QRectF centre(look.rect.x + look.rect.width / 2, look.rect.y + look.rect.height / 2, 2, 2);
+    const QRectF shade(look.rect.x + 40, look.rect.y + look.rect.height + 1, 20, 1.5);
+    EXPECT_EQ(darkestOf(screenOf(*view->getPage(1), centre)), QColor(Qt::white));
+    session->setCurrentPageNo(1);
+    ASSERT_TRUE(view->pasteElements());
+    ASSERT_EQ(notesOf(*session, 1).size(), 1u);
+    view->clearSelection();
+    processEvents();
+    EXPECT_EQ(screenOf(*view->getPage(1), centre).pixelColor(0, 0).rgb() & 0xffffff,
+              QColor(look.color.red, look.color.green, look.color.blue).rgb() & 0xffffff)
+            << "pasted: drawn there";
+    EXPECT_LT(qGray(darkestOf(screenOf(*view->getPage(1), shade)).rgb()), 250) << "with its shade";
+    Layer* copy = notesOf(*session, 1).front();
+    view->notes().select(*view->getPage(1), copy);
+    ASSERT_TRUE(view->cutSelection());
+    processEvents();
+    EXPECT_EQ(darkestOf(screenOf(*view->getPage(1), centre)), QColor(Qt::white)) << "cut: gone";
+    EXPECT_EQ(darkestOf(screenOf(*view->getPage(1), shade)), QColor(Qt::white)) << "its shade too";
+    session->getUndoRedoHandler()->undo();
+    processEvents();
+    EXPECT_EQ(screenOf(*view->getPage(1), centre).pixelColor(0, 0).rgb() & 0xffffff,
+              QColor(look.color.red, look.color.green, look.color.blue).rgb() & 0xffffff)
+            << "the cut undone: drawn again";
+}
+
+// --- what copy, cut and paste of a note cost (qt/sticky-look) ------------------------------------------------------
+
+/// XQT_BENCH_STICKY=1: copy, paste and cut of a note with 300 strokes on it (Ctrl+C, Ctrl+V, Ctrl+X), in ms: what
+/// happens at the key press, and the page drawn again after it (until the render workers are idle).
+TEST_F(CanvasReplayTest, benchmarkStickyNoteClipboard) {
+    if (!qEnvironmentVariableIsSet("XQT_BENCH_STICKY")) {
+        GTEST_SKIP() << "a benchmark: set XQT_BENCH_STICKY=1";
+    }
+    ASSERT_TRUE(view->notes().insert());
+    Layer* note = notesOf(*session, 0).front();
+    const auto look = *sticky::lookOf(*note);
+    {
+        std::unique_lock lock(*session->getDocument());
+        for (int k = 0; k < 300; ++k) {
+            auto s = std::make_unique<Stroke>();
+            s->setToolType(StrokeTool::PEN);
+            s->setWidth(1.2);
+            s->setColor(Color(0x10, 0x20, 0xc0));
+            for (int j = 0; j < 40; ++j) {
+                s->addPoint(Point(look.rect.x + 5 + j * 4.5, look.rect.y + 5 + (k % 30) * 4.3 + 2 * std::sin(j + k),
+                                  0.4 + 0.01 * j));
+            }
+            note->addElement(std::move(s));
+        }
+    }
+    {
+        // The page it is pasted on has ink of its own (600 strokes below the note): drawn again or not
+        std::unique_lock lock(*session->getDocument());
+        Layer* own = session->getDocument()->getPage(1)->getLayers().front();
+        for (int k = 0; k < 600; ++k) {
+            auto s = std::make_unique<Stroke>();
+            s->setToolType(StrokeTool::PEN);
+            s->setWidth(1.2);
+            s->setColor(Color(0, 0, 0));
+            for (int j = 0; j < 40; ++j) {
+                s->addPoint(Point(40 + j * 12, 450 + (k % 60) * 6 + 2 * std::sin(j + k), 0.4 + 0.01 * j));
+            }
+            own->addElement(std::move(s));
+        }
+    }
+    const auto settle = [&] {
+        for (int i = 0; i < 3; ++i) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents);
+            app->getRenderService()->waitForIdle();
+        }
+    };
+    settle();
+    QElapsedTimer t;
+    const auto ms = [&] { return t.nsecsElapsed() / 1e6; };
+    const auto median = [](std::vector<double> v) {
+        std::sort(v.begin(), v.end());
+        return v[v.size() / 2];
+    };
+    std::vector<double> serialize, deserialize, copy, picture, png, paste, pasteDrawn, cut, cutDrawn, redraw;
+    for (int round = 0; round < 15; ++round) {
+        view->notes().select(*view->getPage(0), note);
+        t.start();
+        std::string bytes;
+        {
+            std::shared_lock lock(*session->getDocument());
+            bytes = sticky::serialize(*note);
+        }
+        serialize.push_back(ms());
+        t.start();
+        (void)sticky::deserialize(bytes.data(), bytes.size());
+        deserialize.push_back(ms());
+        t.start();
+        ASSERT_TRUE(view->copySelection());
+        copy.push_back(ms());
+        {
+            // What another app (or a clipboard manager) asking for the picture costs: the picture and its PNG
+            t.start();
+            const QImage image = qvariant_cast<QImage>(QGuiApplication::clipboard()->mimeData()->imageData());
+            picture.push_back(ms());
+            QByteArray bytes;
+            QBuffer buffer(&bytes);
+            buffer.open(QIODevice::WriteOnly);
+            t.start();
+            image.save(&buffer, "PNG");
+            png.push_back(ms());
+        }
+        session->setCurrentPageNo(1);
+        t.start();
+        ASSERT_TRUE(view->pasteElements());
+        paste.push_back(ms());
+        settle();
+        pasteDrawn.push_back(ms());
+        t.start();
+        ASSERT_TRUE(view->cutSelection());  // (the pasted one)
+        cut.push_back(ms());
+        settle();
+        cutDrawn.push_back(ms());
+        t.start();
+        view->getPage(1)->rerenderPage();
+        settle();
+        redraw.push_back(ms());
+    }
+    std::printf("note with 300 strokes: serialize %.2f, deserialize %.2f, copy %.2f (for another app: the picture "
+                "%.2f, its PNG %.2f), paste %.2f (then drawn %.2f), cut %.2f (then drawn %.2f); the page pasted on "
+                "drawn again %.2f ms\n",
+                median(serialize), median(deserialize), median(copy), median(picture), median(png), median(paste),
+                median(pasteDrawn), median(cut), median(cutDrawn), median(redraw));
 }

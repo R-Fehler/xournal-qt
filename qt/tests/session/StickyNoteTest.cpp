@@ -5,7 +5,9 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <shared_mutex>
@@ -16,6 +18,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QTemporaryDir>
+#include <cairo-pdf.h>
 #include <cairo.h>
 #include <gtest/gtest.h>
 #include <qpdf/QPDF.hh>
@@ -89,8 +92,8 @@ std::string str(Rgb a) {
     return "rgb(" + std::to_string(a.r) + ", " + std::to_string(a.g) + ", " + std::to_string(a.b) + ")";
 }
 
-/// A page of a PDF as poppler draws it (annotations too), white behind, 1 px per point.
-cairo_surface_t* renderPdf(const fs::path& pdf, size_t page) {
+/// A page of a PDF as poppler draws it (annotations too), white behind, `scale` px per point.
+cairo_surface_t* renderPdf(const fs::path& pdf, size_t page, double scale = 1) {
     XojPdfDocument doc;
     GError* error = nullptr;
     EXPECT_TRUE(doc.load(pdf, "", &error)) << pdf;
@@ -98,14 +101,87 @@ cairo_surface_t* renderPdf(const fs::path& pdf, size_t page) {
         g_error_free(error);
     }
     XojPdfPageSPtr p = doc.getPage(page);
-    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, static_cast<int>(std::ceil(p->getWidth())),
-                                                    static_cast<int>(std::ceil(p->getHeight())));
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+                                                    static_cast<int>(std::ceil(p->getWidth() * scale)),
+                                                    static_cast<int>(std::ceil(p->getHeight() * scale)));
     cairo_t* cr = cairo_create(s);
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
+    cairo_scale(cr, scale, scale);
     p->render(cr);
     cairo_destroy(cr);
     return s;
+}
+
+/// A page's picture as thumbnails and previews draw it (upstream's DocumentView), white behind, `scale` px per point
+cairo_surface_t* renderPage(Document& doc, size_t page, double scale) {
+    std::shared_lock lock(doc);
+    PageRef p = doc.getPage(page);
+    cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, static_cast<int>(p->getWidth() * scale),
+                                                    static_cast<int>(p->getHeight() * scale));
+    cairo_t* cr = cairo_create(s);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_paint(cr);
+    cairo_scale(cr, scale, scale);
+    DocumentView().drawPage(p, cr, true);
+    cairo_destroy(cr);
+    return s;
+}
+
+/// A note of each color of the palette in a row, with a stroke on each; their rectangles
+std::vector<xoj::util::Rectangle<double>> addPalette(XojPage& page) {
+    std::vector<xoj::util::Rectangle<double>> rects;
+    const auto& colors = sticky::presetColors();
+    for (size_t i = 0; i < colors.size(); ++i) {
+        const xoj::util::Rectangle<double> r(40 + 105.0 * i, 60, 90, 70);
+        Layer* n = sticky::makeNote({r, colors[i], false});
+        addStroke(n, BLUE, 1.5, {Point(r.x + 10, r.y + 20), Point(r.x + 60, r.y + 30), Point(r.x + 80, r.y + 20)});
+        page.getLayers().push_back(n);
+        rects.push_back(r);
+    }
+    return rects;
+}
+
+/// The palette's notes in a picture at 4 px per point: each paper has its color, its edge is a darker shade of it
+/// (not black), and below each note lies a light shade (the page there: `ground`).
+void expectPaperLook(cairo_surface_t* s, const std::vector<xoj::util::Rectangle<double>>& rects, Color ground,
+                     const char* what) {
+    constexpr int SCALE = 4;
+    const auto& colors = sticky::presetColors();
+    for (size_t i = 0; i < rects.size(); ++i) {
+        const auto& r = rects[i];
+        const Color paper = colors[i];
+        const Color edge = sticky::edgeColor(paper);
+        const std::string at = std::string(what) + ", note " + std::to_string(i) + ": ";
+        const int midY = static_cast<int>((r.y + r.height / 2) * SCALE);
+        const int midX = static_cast<int>((r.x + r.width / 2) * SCALE);
+        EXPECT_TRUE(near(pixel(s, static_cast<int>((r.x + 5) * SCALE), midY), paper)) << at << "the paper";
+        // The edge lies on the rectangle's border (0.8 pt wide: 3 px here); the left, right, top and bottom ones
+        const std::vector<std::pair<int, int>> onEdge{{static_cast<int>(r.x * SCALE), midY},
+                                                      {static_cast<int>((r.x + r.width) * SCALE), midY},
+                                                      {midX, static_cast<int>(r.y * SCALE)},
+                                                      {midX, static_cast<int>((r.y + r.height) * SCALE)}};
+        for (const auto& [x, y]: onEdge) {
+            const Rgb e = pixel(s, x, y);
+            EXPECT_TRUE(near(e, edge, 14)) << at << "the edge's color at " << x << "," << y << ": " << str(e);
+            EXPECT_TRUE(e.r <= paper.red && e.g <= paper.green && e.b <= paper.blue &&
+                        e.r + e.g + e.b < paper.red + paper.green + paper.blue - 60)
+                    << at << "the edge is darker than the paper " << str(e);
+            EXPECT_GT(e.r + e.g + e.b, 3 * 90) << at << "and not black " << str(e);
+        }
+        // The shade: below the note (a little), not above it
+        const Rgb below = pixel(s, midX, static_cast<int>((r.y + r.height + 1.5) * SCALE));
+        const Rgb above = pixel(s, midX, static_cast<int>((r.y - 2) * SCALE));
+        EXPECT_TRUE(below.r < ground.red - 8 && below.r > ground.red - 60) << at << "a light shade below " << str(below);
+        EXPECT_TRUE(near(above, ground, 3)) << at << "nothing above " << str(above);
+    }
+}
+
+/// Where the pictures of the look test go when XQT_STICKY_SHOTS is set (to look at them)
+void saveShot(cairo_surface_t* s, const char* name) {
+    if (const char* dir = std::getenv("XQT_STICKY_SHOTS")) {
+        cairo_surface_write_to_png(s, (fs::path(dir) / name).string().c_str());
+    }
 }
 
 class StickyNoteTest: public ::testing::Test {
@@ -269,8 +345,9 @@ TEST_F(StickyNoteTest, theHybridPdfShowsANoteAsAStampWithItsLook) {
             if (name == "xopp:p1-l2") {
                 // As big as the note (the stroke beyond its edge is not drawn)
                 auto rect = annot.getKey("/Rect").getArrayAsRectangle();
-                EXPECT_NEAR(rect.urx - rect.llx, 200, 6);
-                EXPECT_NEAR(rect.ury - rect.lly, 150, 6);
+                // (and its shadow: sticky::DRAWN_MARGIN, a few points around it)
+                EXPECT_NEAR(rect.urx - rect.llx, 200, 14);
+                EXPECT_NEAR(rect.ury - rect.lly, 150, 14);
             }
         } else if (subtype == "/Ink") {
             ink++;
@@ -422,4 +499,152 @@ TEST_F(StickyNoteTest, aPastedNoteStaysWhereItWasWhenItFitsOnThePage) {
     // In the bottom right corner: up and left instead
     EXPECT_TRUE(same(sticky::pastePlace({395, 692, 200, 150}, 595, 842, {R(395, 692, 200, 150)}),
                      R(379, 676, 200, 150)));
+}
+
+// --- the look: a darker edge and a soft shade (qt/sticky-look) -----------------------------------------------------
+
+TEST_F(StickyNoteTest, everyColorHasADarkerEdgeAndAShadeInEveryPicture) {
+    // On a white page: the PDF export (print, the archive: the same drawing), and a thumbnail
+    auto page = std::make_shared<XojPage>(595, 300, true);
+    page->setBackgroundType(PageType(PageTypeFormat::Plain));
+    const auto rects = addPalette(*page);
+    session->getDocument()->addPage(page);
+    const size_t last = session->getDocument()->getPageCount() - 1;
+    ExportHelper::exportPdf(session->getDocument(), path("palette.pdf"), nullptr, nullptr, EXPORT_BACKGROUND_ALL,
+                            false);
+    cairo_surface_t* s = renderPdf(path("palette.pdf"), last, 4);
+    saveShot(s, "palette-white-export.png");
+    expectPaperLook(s, rects, Color(0xff, 0xff, 0xff), "PDF export");
+    cairo_surface_destroy(s);
+    s = renderPage(*session->getDocument(), last, 4);
+    saveShot(s, "palette-white-thumbnail.png");
+    expectPaperLook(s, rects, Color(0xff, 0xff, 0xff), "thumbnail");
+    cairo_surface_destroy(s);
+
+    // The hybrid PDF (the note is its annotation's appearance)
+    ASSERT_TRUE(HybridPdf::write(*session->getDocument(), path("palette.notes.pdf")).ok);
+    s = renderPdf(path("palette.notes.pdf"), last, 4);
+    saveShot(s, "palette-white-hybrid.png");
+    expectPaperLook(s, rects, Color(0xff, 0xff, 0xff), "hybrid PDF");
+    cairo_surface_destroy(s);
+
+    // On a page of a PDF (light gray there, with lines of "text")
+    const fs::path pdf = path("base.pdf");
+    {
+        cairo_surface_t* base = cairo_pdf_surface_create(pdf.string().c_str(), 595, 300);
+        cairo_t* cr = cairo_create(base);
+        cairo_set_source_rgb(cr, 0.9, 0.9, 0.9);
+        cairo_paint(cr);
+        cairo_set_source_rgb(cr, 0.2, 0.2, 0.2);
+        for (double y = 20; y < 300; y += 14) {
+            cairo_rectangle(cr, 20, y, 555, 3);
+        }
+        cairo_fill(cr);
+        cairo_destroy(cr);
+        cairo_surface_destroy(base);
+    }
+    auto loaded = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    DocumentSession onPdf(*app, std::move(loaded.document));
+    std::vector<xoj::util::Rectangle<double>> onPdfRects;
+    {
+        std::unique_lock lock(*onPdf.getDocument());
+        onPdfRects = addPalette(*onPdf.getDocument()->getPage(0));
+    }
+    ExportHelper::exportPdf(onPdf.getDocument(), path("palette-pdf.pdf"), nullptr, nullptr, EXPORT_BACKGROUND_ALL,
+                            false);
+    s = renderPdf(path("palette-pdf.pdf"), 0, 4);
+    saveShot(s, "palette-pdf-export.png");
+    // (the shade is checked between the lines of text: 1.5 pt below each note is gray paper there)
+    expectPaperLook(s, onPdfRects, Color(0xe6, 0xe6, 0xe6), "on a PDF page");
+    cairo_surface_destroy(s);
+}
+
+TEST_F(StickyNoteTest, theLookIsDrawnNotSaved) {
+    // Drawn (everywhere), saved, loaded: the note is still its paper and its content, the paper as it was
+    cairo_surface_destroy(renderPage(*session->getDocument(), 0, 1));
+    ASSERT_TRUE(HybridPdf::write(*session->getDocument(), path("look.notes.pdf")).ok);
+    ASSERT_TRUE(session->saveAs(path("look.xopp")).ok);
+    for (const char* file: {"look.xopp", "look.notes.pdf"}) {
+        auto loaded = DocumentSession::loadFile(path(file));
+        ASSERT_TRUE(loaded.document) << file << ": " << loaded.error;
+        PageRef page = loaded.document->getPage(0);
+        ASSERT_EQ(page->getLayerCount(), 3u) << file;
+        const Layer* n = page->getLayers()[1];
+        ASSERT_EQ(n->getElementsView().size(), 3u) << file << ": the paper, the stroke, the text: nothing added";
+        const auto* paper = static_cast<const Stroke*>(n->getElementsView()[0]);
+        EXPECT_EQ(paper->getColor(), YELLOW) << file;
+        EXPECT_DOUBLE_EQ(paper->getWidth(), sticky::PAPER_WIDTH) << file << ": the outline as upstream draws it";
+        EXPECT_EQ(paper->getFill(), 255) << file;
+        EXPECT_EQ(paper->getPointCount(), 5u) << file;
+    }
+}
+
+/// What the edge and the shadow cost (XQT_BENCH_STICKY=1): a page with 1, 5 and 20 notes, each with 30 strokes of
+/// handwriting, drawn flat (the paper as upstream draws it), with the edge, and with the edge and the shadow: the
+/// whole page at 2 px per point (a screen), a thumbnail (0.25 px per point), and the area of a stroke being written
+/// on a note (20 x 20 pt: what is drawn again while writing).
+TEST_F(StickyNoteTest, benchmarkTheLook) {
+    if (!std::getenv("XQT_BENCH_STICKY")) {
+        GTEST_SKIP() << "a benchmark: set XQT_BENCH_STICKY=1";
+    }
+    struct Case {
+        const char* name;
+        double scale;
+        double x, y, w, h;  // (the area drawn, points)
+        int reps;
+    };
+    const std::vector<Case> cases{{"screen page", 2, 0, 0, 595, 842, 10},
+                                  {"thumbnail", 0.25, 0, 0, 595, 842, 60},
+                                  {"stroke area", 2, 60, 60, 20, 20, 2000}};
+    const std::vector<std::pair<const char*, sticky::Finish>> finishes{
+            {"flat", sticky::Finish::Flat}, {"edge", sticky::Finish::Edge}, {"edge+shadow", sticky::Finish::Full}};
+    for (const int count: {1, 5, 20}) {
+        auto page = std::make_shared<XojPage>(595, 842, true);
+        page->setBackgroundType(PageType(PageTypeFormat::Plain));
+        for (int i = 0; i < count; ++i) {
+            const double x = 20 + (i % 4) * 142.0;
+            const double y = 20 + (i / 4) * 162.0;
+            Layer* n = sticky::makeNote({{x, y, 130, 150}, sticky::presetColors()[i % 5], i % 3 == 2});
+            for (int k = 0; k < 30; ++k) {
+                std::vector<Point> pts;
+                for (int j = 0; j < 40; ++j) {
+                    pts.emplace_back(x + 5 + j * 3, y + 10 + k * 4.5 + 2 * std::sin(j * 0.8 + k), 0.5);
+                }
+                addStroke(n, BLUE, 1.2, pts);
+            }
+            page->getLayers().push_back(n);
+        }
+        for (const Case& c: cases) {
+            cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, static_cast<int>(c.w * c.scale),
+                                                            static_cast<int>(c.h * c.scale));
+            cairo_t* cr = cairo_create(s);
+            cairo_scale(cr, c.scale, c.scale);
+            cairo_translate(cr, -c.x, -c.y);
+            cairo_rectangle(cr, c.x, c.y, c.w, c.h);
+            cairo_clip(cr);
+            std::vector<double> best(finishes.size(), 1e9);
+            for (int round = 0; round < 5; ++round) {
+                for (size_t f = 0; f < finishes.size(); ++f) {
+                    sticky::setFinish(finishes[f].second);
+                    const auto t0 = std::chrono::steady_clock::now();
+                    for (int r = 0; r < c.reps; ++r) {
+                        DocumentView().drawPage(page, cr, true);
+                    }
+                    const double ms =
+                            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() /
+                            c.reps;
+                    best[f] = std::min(best[f], ms);
+                }
+            }
+            cairo_destroy(cr);
+            cairo_surface_destroy(s);
+            std::printf("%2d notes, %-11s:", count, c.name);
+            for (size_t f = 0; f < finishes.size(); ++f) {
+                std::printf("  %s %.3f ms (%+.1f %%)", finishes[f].first, best[f], 100 * (best[f] / best[0] - 1));
+            }
+            std::printf("\n");
+        }
+    }
+    sticky::setFinish(sticky::Finish::Full);
 }

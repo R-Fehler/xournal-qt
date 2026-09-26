@@ -776,12 +776,13 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
                 a.x0 = a.y0 = std::numeric_limits<double>::max();
                 a.x1 = a.y1 = std::numeric_limits<double>::lowest();
                 bool colored = false;
-                // A sticky note: a /Stamp as big as the note (its content is drawn clipped to it), no /InkList (a
-                // viewer that draws ink from it would draw the paper as a line)
+                // A sticky note: a /Stamp as big as the note and its shadow (its content is drawn clipped to it), no
+                // /InkList (a viewer that draws ink from it would draw the paper as a line)
                 const Element* notePaper = sticky::paperOf(*layer);
                 for (const auto& e: layer->getElementsView()) {
                     if (!notePaper || e == notePaper) {
-                        const auto& box = e->getBoundingBox();
+                        const auto box = notePaper ? sticky::drawnRect(sticky::lookOf(*layer)->rect)
+                                                   : e->getBoundingBox();
                         a.x0 = std::min(a.x0, box.x);
                         a.y0 = std::min(a.y0, box.y);
                         a.x1 = std::max(a.x1, box.x + box.width);

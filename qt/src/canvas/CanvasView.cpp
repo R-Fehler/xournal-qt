@@ -2242,7 +2242,12 @@ void CanvasView::layerChanged(size_t page) {
     if (page < pages.size()) {
         // Layers came or went (also by undo): the page's own layer stays the selected one, not a sticky note
         sticky::leaveNoteLayer(*session.getDocument(), pages[page]->getPage());
-        pages[page]->rerenderPage();
+        if (const auto note = sticky::changingNoteArea()) {
+            // A sticky note came or went: only where it is drawn changed (not the rest of the page, its PDF)
+            pages[page]->rerenderRect(note->x, note->y, note->width, note->height);
+        } else {
+            pages[page]->rerenderPage();
+        }
     }
     stickyNotes->layersChanged();
 }

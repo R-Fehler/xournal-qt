@@ -37,8 +37,14 @@ namespace xqt::sticky {
 /// Names of a note's layer (saved; fixed English, like "Markdown")
 inline constexpr const char* LAYER_NAME = "Sticky note";
 inline constexpr const char* COVER_LAYER_NAME = "Sticky note (cover)";
-/// The paper's outline (points; drawn in the paper's color)
+/// The paper's outline as saved (points, in the paper's color: what upstream Xournal++ draws)
 inline constexpr double PAPER_WIDTH = 0.5;
+/// The paper's edge as we draw it (points): a darker shade of the paper's color (edgeColor)
+inline constexpr double EDGE_WIDTH = 0.8;
+/// The edge's color: the paper's color times this
+inline constexpr double EDGE_SHADE = 0.78;
+/// How far a note's picture (its edge and its shadow) reaches beyond its rectangle (points)
+inline constexpr double DRAWN_MARGIN = 4;
 /// The smallest side of a note (points)
 inline constexpr double MIN_SIDE = 24;
 /// A new note (points)
@@ -60,6 +66,11 @@ struct Look {
     bool operator!=(const Look& o) const { return !(*this == o); }
 };
 
+/// The color of the edge of a note of this color
+Color edgeColor(Color paper);
+/// Where a note of this rectangle is drawn: the rectangle and its shadow (what is drawn again when it changes)
+xoj::util::Rectangle<double> drawnRect(const xoj::util::Rectangle<double>& rect);
+
 /// Whether a layer name is a note's
 bool isNoteName(const std::string& name);
 /// The paper of a note: its layer's first element if that is a filled stroke (nullptr: the layer is no note)
@@ -77,6 +88,22 @@ void applyLook(Layer& layer, const Look& from, const Look& to);
 Layer* noteAt(const XojPage& page, double x, double y);
 /// Whether a page has notes (`visibleOnly`: shown ones)
 bool hasNotes(const XojPage& page, bool visibleOnly = false);
+/// While a note's layer comes onto a page or leaves it (on this thread): only where the note is drawn changes, so a
+/// view draws that part of the page again, not the whole page (CanvasView::layerChanged). Set around the layer
+/// controller's insertLayer / removeLayer (and the undo of them); nothing if the layer is no note.
+class NoteLayerChange {
+public:
+    explicit NoteLayerChange(const Layer& layer);
+    ~NoteLayerChange();
+    NoteLayerChange(const NoteLayerChange&) = delete;
+    NoteLayerChange& operator=(const NoteLayerChange&) = delete;
+
+private:
+    std::optional<xoj::util::Rectangle<double>> before;
+};
+/// Where the note changing now (NoteLayerChange) is drawn; nothing if no note layer is changing on this thread
+std::optional<xoj::util::Rectangle<double>> changingNoteArea();
+
 /// The layer id (1-based, as upstream counts) of a note layer, 0 if it is not on the page
 Layer::Index layerIdOf(const XojPage& page, const Layer* layer);
 
@@ -91,9 +118,14 @@ void setPeeking(const Layer* layer, bool peeking);
 bool isPeeking(const Layer* layer);
 
 // --- drawing ---------------------------------------------------------------------------------------------------
-/// Draw a note (in page coordinates): the paper, then its content clipped to it. False if the layer is no note (the
-/// drawer of upstream's LayerView, see view/LayerView.h).
+/// Draw a note (in page coordinates): a soft shadow, the paper, its content clipped to it, and the paper's darker
+/// edge (a look of our renderer: nothing of it is in the file). False if the layer is no note (the drawer of
+/// upstream's LayerView, see view/LayerView.h).
 bool draw(const Layer& layer, const xoj::view::Context& ctx);
+/// What is drawn around a note's paper: `Full` (the edge and the shadow) in the app; the others for measuring what
+/// they cost (the benchmark in StickyNoteTest). `Flat` is the paper as upstream draws it. Any thread may ask.
+enum class Finish { Flat, Edge, Full };
+void setFinish(Finish finish);
 /// Notes are drawn as notes from now on, everywhere a page is drawn (idempotent)
 void installDrawer();
 
@@ -141,8 +173,9 @@ private:
 };
 
 // --- the clipboard -------------------------------------------------------------------------------------------------
-/// The clipboard's format of a whole note (the app's own: its layer's name and every element, the paper first, in
-/// upstream's element serialization). Upstream Xournal++ does not know it; the note is saved like any other.
+/// The clipboard's format of a whole note (the app's own: its layer's name and every element, the paper first, each
+/// in upstream's element serialization, in a stream of its own). Upstream Xournal++ does not know it; the note is
+/// saved like any other.
 inline constexpr const char* CLIPBOARD_MIME = "application/x-xournal-qt-sticky-note";
 /// A note for the clipboard (the caller holds the document's lock); empty if the layer is no note
 std::string serialize(const Layer& layer);
