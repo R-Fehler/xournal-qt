@@ -10,6 +10,7 @@
 #include "model/DocumentOutline.h"
 #include "model/XojPage.h"
 #include "session/DocumentSession.h"
+#include "session/PageBookmarks.h"
 
 namespace xqt {
 
@@ -49,6 +50,9 @@ void OutlineModel::rebuild() {
         std::shared_lock lock(*doc);
         std::function<void(const DocumentOutline&, int)> walk = [&](const DocumentOutline& entries, int level) {
             for (const auto& e: entries) {
+                if (level == 0 && PageBookmarks::isOutlineItem(e)) {
+                    continue;  // (our bookmarks: the contents sidebar lists them apart)
+                }
                 Entry x;
                 x.title = QString::fromStdString(e.title);
                 x.level = level;

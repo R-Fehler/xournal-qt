@@ -50,6 +50,8 @@
 #include "session/ArchivePdf.h"
 #include "session/HybridPdf.h"
 #include "session/IncrementalPdf.h"
+#include "session/PageBookmarks.h"
+#include "session/PdfBookmarks.h"
 #include "undo/UndoRedoHandler.h"
 
 #include "config.h"
@@ -2095,4 +2097,112 @@ TEST_F(IncrementalSaveTest, aFileOfAnEarlierVersionIsAppendedTo) {
         EXPECT_TRUE(again.hybridChanged.empty());
         EXPECT_EQ(describe(*again.document), describeAsXopp(*s.getDocument(), path("same.xopp")));
     }
+}
+
+namespace {
+/// A PDF of three pages with an outline of its own ("Chapter 1" to page 1, "Chapter 2" to page 3).
+void makeBookPdf(const fs::path& p) {
+    cairo_surface_t* s = cairo_pdf_surface_create(p.string().c_str(), 595, 842);
+    cairo_t* cr = cairo_create(s);
+    cairo_pdf_surface_add_outline(s, CAIRO_PDF_OUTLINE_ROOT, "Chapter 1", "page=1", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+    cairo_pdf_surface_add_outline(s, CAIRO_PDF_OUTLINE_ROOT, "Chapter 2", "page=3", CAIRO_PDF_OUTLINE_FLAG_OPEN);
+    for (int i = 0; i < 3; ++i) {
+        cairo_move_to(cr, 72, 100);
+        cairo_show_text(cr, ("page " + std::to_string(i + 1)).c_str());
+        cairo_show_page(cr);
+    }
+    cairo_destroy(cr);
+    cairo_surface_destroy(s);
+}
+
+/// The top-level titles of the outline, and our item's entries (page index, title).
+std::pair<std::vector<std::string>, std::vector<std::pair<int, std::string>>> outlineOf(const fs::path& pdf) {
+    QPDF q;
+    q.processFile(pdf.string().c_str());
+    std::vector<std::string> titles;
+    for (QPDFObjectHandle c = q.getRoot().getKey("/Outlines").getKey("/First"); c.isDictionary();
+         c = c.getKey("/Next")) {
+        titles.push_back(c.getKey("/Title").getUTF8Value());
+    }
+    const auto pages = QPDFPageDocumentHelper(q).getAllPages();
+    std::vector<std::pair<int, std::string>> entries;
+    for (const auto& e: PdfBookmarks::read(q)) {
+        int index = -1;
+        for (size_t i = 0; i < pages.size(); ++i) {
+            if (pages[i].getObjectHandle().getObjGen() == e.page.getObjGen()) {
+                index = static_cast<int>(i);
+            }
+        }
+        entries.emplace_back(index, e.title);
+    }
+    return {titles, entries};
+}
+}  // namespace
+
+// A PDF with notes lists the bookmarks in its own outline ("Bookmarks", after the document's table of contents, which
+// stays): written with the whole file, then appended by Ctrl+S only when they changed; the embedded document keeps
+// them too, so the file opens with them
+TEST_F(IncrementalSaveTest, bookmarksGoIntoTheOutline) {
+    using Outline = std::pair<std::vector<std::string>, std::vector<std::pair<int, std::string>>>;
+    using Entries = std::vector<std::pair<int, std::string>>;
+    makeBookPdf(path("book.pdf"));
+    auto loaded = DocumentSession::loadFile(path("book.pdf"));
+    ASSERT_TRUE(loaded.document);
+    auto s = std::make_unique<DocumentSession>(*app, std::move(loaded.document));
+    ASSERT_TRUE(s->setBookmark(0, std::string("Intro")));
+    ASSERT_TRUE(s->setBookmark(2, std::string()));
+    const fs::path out = path("book.notes.pdf");
+    auto r = s->saveAsHybrid(out);
+    ASSERT_TRUE(r.ok) << r.error;
+    int code = -1;
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    EXPECT_EQ(outlineOf(out), (Outline{{"Chapter 1", "Chapter 2", "Bookmarks"}, Entries{{0, "Intro"}, {2, "Page 3"}}}));
+    {
+        auto reopened = DocumentSession::loadFile(out);
+        ASSERT_TRUE(reopened.document);
+        const auto marks = PageBookmarks::of(*reopened.document);
+        ASSERT_EQ(marks.size(), 2u);
+        EXPECT_EQ(marks[0].label, "Intro");
+        EXPECT_EQ(marks[1].page, 2u);
+        EXPECT_EQ(marks[1].label, "") << "the automatic label stays automatic";
+        size_t ours = 0;
+        for (const auto& e: reopened.document->getOutline()) {
+            ours += PageBookmarks::isOutlineItem(e) ? 1 : 0;
+        }
+        EXPECT_EQ(ours, 1u) << "poppler sees our item (the table of contents leaves it out)";
+    }
+    // A stroke only: the outline is not touched
+    drawOn(*s, 1, 400);
+    const std::string before = fileBytes(out);
+    r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    EXPECT_EQ(fileBytes(out).substr(before.size()).find("/Title"), std::string::npos) << "no outline item written";
+    // Renamed, one more: appended
+    ASSERT_TRUE(s->setBookmark(0, std::string("Introduction")));
+    ASSERT_TRUE(s->setBookmark(1, std::string("Middle")));
+    r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    EXPECT_EQ(outlineOf(out), (Outline{{"Chapter 1", "Chapter 2", "Bookmarks"},
+                                       Entries{{0, "Introduction"}, {1, "Middle"}, {2, "Page 3"}}}));
+    // Pages moved: the entries go to the pages where they are now (and "Page N" follows)
+    ASSERT_TRUE(s->movePages({2}, 0));
+    r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    EXPECT_EQ(outlineOf(out).second, (Entries{{0, "Page 1"}, {1, "Introduction"}, {2, "Middle"}}));
+    // None left: the item goes, the document's own outline stays
+    for (int page: {0, 1, 2}) {
+        s->setBookmark(static_cast<size_t>(page), std::nullopt);
+    }
+    r = s->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    EXPECT_EQ((qpdfCheck(out, code), code), 0);
+    EXPECT_EQ(outlineOf(out), (Outline{{"Chapter 1", "Chapter 2"}, Entries{}}));
+    auto reopened = DocumentSession::loadFile(out);
+    ASSERT_TRUE(reopened.document);
+    EXPECT_TRUE(PageBookmarks::of(*reopened.document).empty());
 }

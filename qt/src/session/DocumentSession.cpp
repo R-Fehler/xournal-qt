@@ -49,6 +49,7 @@
 #include "DocumentSearch.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
+#include "PageBookmarks.h"
 #include "PageOrderUndoAction.h"
 #include "PdfPageKeeper.h"
 #include "PictureSaveHandler.h"
@@ -145,6 +146,7 @@ auto DocumentSession::loadFile(const fs::path& path, bool attachPdf) -> LoadResu
         // Port of Control::openPdfFile: annotate a PDF, one page per PDF page.
         auto doc = std::make_unique<Document>(&detachedHandler());
         if (doc->readPdf(path, /*initPages=*/true, attachPdf)) {
+            PageBookmarks::adoptOutline(*doc);  // (a PDF with our "Bookmarks" outline item but not our data)
             result.document = std::move(doc);
         } else {
             result.error = FS(_F("Error reading PDF file \"{1}\"\n{2}") % path.u8string() % doc->getLastErrorMsg());
@@ -787,7 +789,37 @@ void DocumentSession::duplicatePage() {
         return;
     }
     auto pageCopy = std::make_shared<XojPage>(*page);
+    pageCopy->setBookmark(std::nullopt);  // (xournal-qt: a copy starts without the bookmark)
     insertPage(pageCopy, getCurrentPageNo() + 1);
+}
+
+bool DocumentSession::setBookmark(size_t page, std::optional<std::string> label) {
+    PageRef p;
+    std::optional<std::string> before;
+    {
+        std::shared_lock lock(*doc);
+        if (page >= doc->getPageCount()) {
+            return false;
+        }
+        p = doc->getPage(page);
+        before = p->getBookmark();
+    }
+    if (before == label) {
+        return false;
+    }
+    applyBookmark(p, label);
+    undoRedo->addUndoAction(std::make_unique<PageBookmarks::BookmarkUndoAction>(
+            p, std::move(before), std::move(label),
+            [this](const PageRef& target, const std::optional<std::string>& l) { applyBookmark(target, l); }));
+    return true;
+}
+
+void DocumentSession::applyBookmark(const PageRef& page, const std::optional<std::string>& label) {
+    {
+        std::unique_lock lock(*doc);
+        page->setBookmark(label);
+    }
+    Q_EMIT bookmarksChanged();
 }
 
 void DocumentSession::movePageTowardsBeginning() {

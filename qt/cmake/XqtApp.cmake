@@ -67,6 +67,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ShortcutsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryBookmarks.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentLinks.h
@@ -104,6 +106,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp)
@@ -142,6 +145,8 @@ set(XQT_QML_FILES
     src/app/qml/HomeView.qml
     src/app/qml/FolderChooser.qml
     src/app/qml/DocumentCard.qml
+    src/app/qml/BookmarksView.qml
+    src/app/qml/BookmarkDialog.qml
     src/app/qml/NewDocumentDialog.qml
     src/app/qml/DocumentModeCards.qml
     src/app/qml/DocumentModeDialog.qml
@@ -260,6 +265,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ExternalChangesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SyncConflictsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/FavouritesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp

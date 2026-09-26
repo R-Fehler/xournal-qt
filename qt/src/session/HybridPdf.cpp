@@ -61,6 +61,8 @@
 #include "IncrementalPdf.h"
 #include "MdBox.h"
 #include "MergedPdf.h"
+#include "PageBookmarks.h"
+#include "PdfBookmarks.h"
 #include "StickyNote.h"
 #include "TextDocument.h"
 #include "config.h"
@@ -617,6 +619,7 @@ struct PageSpec {
     size_t annotsFrom = npos; ///< a drawn page: the annotations of other apps on this page of the background PDF
     std::string sig;          ///< a drawn page: what it shows (its background as saved, its size)
     NoteSpace space;          ///< a page of the background PDF: its space for notes (qt/docs/note-space.md)
+    std::string bookmark;     ///< the title of its bookmark in the outline (qt/docs/bookmarks.md); "": none
 };
 
 struct AnnotSpec {
@@ -742,6 +745,9 @@ Prepared prepare(Document& doc, const std::string& pdfName, const fs::path& work
             PageSpec spec;
             spec.width = p->getWidth();
             spec.height = p->getHeight();
+            if (const auto& b = p->getBookmark()) {
+                spec.bookmark = PageBookmarks::displayLabelUtf8(*b, i);
+            }
             if (!out.bg.empty() && p->getBackgroundType().isPdfPage() && p->getPdfPageNr() < bgPages) {
                 spec.pdfPage = p->getPdfPageNr();
                 spec.space = p->getNoteSpace();
@@ -1312,6 +1318,17 @@ QPDFObjectHandle spacesList(const Prepared& prep) {
     return list;
 }
 
+/// The document's bookmarks for the outline (qt/docs/bookmarks.md): the base page of each bookmarked page.
+std::vector<PdfBookmarks::Entry> bookmarksOf(const Prepared& prep, const std::vector<QPDFObjectHandle>& order) {
+    std::vector<PdfBookmarks::Entry> entries;
+    for (size_t i = 0; i < prep.pages.size() && i < order.size(); ++i) {
+        if (!prep.pages[i].bookmark.empty()) {
+            entries.push_back({order[i], prep.pages[i].bookmark});
+        }
+    }
+    return entries;
+}
+
 /// The PDF with the base pages (and, by `mode`, our drawing, data and marker), written to `target`.
 Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const std::string& xoppExport = {},
                 const std::string& title = {}) {
@@ -1344,6 +1361,7 @@ Result assemble(const Prepared& prep, const fs::path& target, Mode mode, const s
     const std::vector<QPDFObjectHandle> order = basePages(out, drawn, prep, hybrid);
     r.pages = order.size();
     step("base pages");
+    PdfBookmarks::write(out, bookmarksOf(prep, order));  // (also the base pages for Xournal++: as they are now)
     if (hybrid) {
         QPDFObjectHandle hashes;
         QPDFObjectHandle flattened = QPDFObjectHandle::newArray();
@@ -1756,6 +1774,7 @@ public:
             }
         }
         step("annotations");
+        PdfBookmarks::write(q, bookmarksOf(prep, order), &u);
         embedData();
         mark(xoppExport);
         if (archive) {

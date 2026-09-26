@@ -885,6 +885,26 @@ ApplicationWindow {
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
                     // Its name (qt/rename): the file, and what belongs to it, as the library renames it
                     MenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
+                    // A favourite: a star kept beside the file, never in it (qt/docs/bookmarks.md)
+                    MenuItem {
+                        objectName: "favouriteDocumentItem"
+                        visible: app.canFavourite
+                        height: visible ? implicitHeight : 0
+                        text: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+                        icon.source: app.iconUrl(app.favourite ? "xqt-star-filled" : "xqt-star")
+                        icon.color: "transparent"
+                        onTriggered: app.favourite = !app.favourite
+                    }
+                    MenuItem {
+                        objectName: "bookmarkPageItem"
+                        readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
+                        visible: app.canBookmark
+                        height: visible ? implicitHeight : 0
+                        text: marked ? qsTr("Remove the bookmark of this page") : qsTr("Bookmark this page")
+                        icon.source: app.iconUrl(marked ? "xqt-bookmark-filled" : "xqt-bookmark")
+                        icon.color: "transparent"
+                        onTriggered: app.toggleBookmark(app.pageNumber - 1)
+                    }
                     MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
                     MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
                     MenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); onTriggered: backlinksDialog.show() }

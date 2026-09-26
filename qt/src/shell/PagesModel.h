@@ -49,7 +49,9 @@ public:
         /// The page is selected (for page operations in the sidebar and the page grid)
         SelectedRole,
         /// URL of the page's sketch, shown at once under the thumbnail (PageSketches); empty while it has none
-        SketchRole
+        SketchRole,
+        /// The page's bookmark as shown ("Page N" for the automatic one); "": not bookmarked (qt/docs/bookmarks.md)
+        BookmarkRole
     };
 
     static constexpr int MAX_THUMBNAIL_HITS = 50;

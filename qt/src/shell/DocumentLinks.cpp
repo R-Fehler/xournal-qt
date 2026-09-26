@@ -18,6 +18,7 @@
 #include "MarkdownFile.h"
 #include "session/DocumentSession.h"
 #include "session/TextFile.h"
+#include "session/PageBookmarks.h"
 
 namespace xqt::DocumentLinks {
 
@@ -71,6 +72,9 @@ std::vector<links::Chapter> chaptersOf(Document& doc) {
         }
         std::function<void(const DocumentOutline&)> walk = [&](const DocumentOutline& entries) {
             for (const auto& e: entries) {
+                if (&entries == &doc.getOutline() && PageBookmarks::isOutlineItem(e)) {
+                    continue;  // (our bookmarks, not a chapter)
+                }
                 if (auto it = firstPageOf.find(e.dest.getPdfPage()); it != firstPageOf.end()) {
                     chapters.push_back({QString::fromStdString(e.title), it->second});
                 }

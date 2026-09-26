@@ -43,6 +43,7 @@ class AppContext;
 class Citations;
 class CanvasView;
 class LibraryArchive;
+class LibraryBookmarksModel;
 class LibraryMove;
 namespace LibraryMigration {
 struct Plan;
@@ -637,6 +638,39 @@ public:
     Q_INVOKABLE void openSearchResult(int index);
     /// The same, at the first hit on or after `page` (a page of the extended search).
     Q_INVOKABLE void openSearchResultAt(int index, int page);
+    // --- bookmarks and favourites (AppBookmarks.cpp, qt/docs/bookmarks.md) ---
+    /// The bookmarks of the current document, in page order: [{ page (0-based), label (as shown), automatic }]
+    Q_PROPERTY(QVariantList bookmarks READ bookmarks NOTIFY bookmarksChanged)
+    /// The current document can have bookmarks (not a text file)
+    Q_PROPERTY(bool canBookmark READ canBookmark NOTIFY titleChanged)
+    /// The current document is a favourite (starred; kept beside it, DocumentPlaces)
+    Q_PROPERTY(bool favourite READ favourite WRITE setFavourite NOTIFY favouriteChanged)
+    /// It has a file to keep a star for
+    Q_PROPERTY(bool canFavourite READ canFavourite NOTIFY titleChanged)
+    /// The library's Bookmarks view (LibraryBookmarksModel)
+    Q_PROPERTY(QObject* libraryBookmarks READ libraryBookmarksModel CONSTANT)
+    QVariantList bookmarks() const;
+    bool canBookmark() const;
+    /// A page's bookmark as shown ("": none).
+    Q_INVOKABLE QString bookmarkOf(int page) const;
+    Q_INVOKABLE bool isBookmarked(int page) const;
+    /// Bookmark a page (its label: its first heading, or the PDF's table of contents entry for it, else "Page N") or
+    /// remove its bookmark. One undo step.
+    Q_INVOKABLE bool toggleBookmark(int page);
+    /// Name a page's bookmark ("" or "Page N": the automatic label). One undo step.
+    Q_INVOKABLE bool renameBookmark(int page, const QString& label);
+    /// What a new bookmark of the page is called ("": the automatic label).
+    Q_INVOKABLE QString defaultBookmarkLabel(int page) const;
+    bool favourite() const;
+    void setFavourite(bool on);
+    bool canFavourite() const;
+    /// The star of any document (a tab's file, a card's path).
+    Q_INVOKABLE bool isFavouriteFile(const QString& path) const;
+    Q_INVOKABLE void setFavouriteFile(const QString& path, bool on);
+    /// Open a document at a page (a bookmark of the library's Bookmarks view).
+    Q_INVOKABLE bool openBookmark(const QString& path, int page);
+    QObject* libraryBookmarksModel() const;
+
     /// The title page of the current document (its preview in the library and the overview; 0-based, -1: the
     /// document has no file yet, so there is nowhere to keep it).
     Q_PROPERTY(int titlePage READ titlePage NOTIFY titlePageChanged)
@@ -1165,6 +1199,8 @@ Q_SIGNALS:
     /// Something was selected or unselected: `pdfTextIsSelected` and the ends of the selection are different now.
     void pdfTextSelectionChanged();
     void titlePageChanged();
+    void bookmarksChanged();
+    void favouriteChanged();
     /// A long press or right click on the canvas: the window shows the action pill there.
     void contextRequested(QPointF viewPos);
     /// A PDF link was tapped: uri (external) or page (of this document, -1: none); rect in canvas coordinates.
@@ -1331,6 +1367,8 @@ private:
     std::unique_ptr<xqt::SettingsModel> ownSettingsView;
     int lastTabCount = 0;  ///< tabs before the last change of their number (a document opened: handWhenOpening)
     std::unique_ptr<xqt::LibraryModel> ownLibrary;
+    std::unique_ptr<xqt::LibraryBookmarksModel> ownLibraryBookmarks;
+    xqt::LibraryBookmarksModel* libraryBookmarks = nullptr;
     std::unique_ptr<xqt::RecentFiles> ownRecent;
     xqt::SettingsModel* settingsView = nullptr;
     xqt::LibraryModel* library = nullptr;

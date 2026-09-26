@@ -139,6 +139,9 @@ void setRead(const fs::path& document, qint64 when) {
     set(document, "read", when >= 0 ? when : QDateTime::currentSecsSinceEpoch(), -1);
 }
 
+bool favourite(const fs::path& document) { return get(document, "star", 0) != 0; }
+void setFavourite(const fs::path& document, bool on) { set(document, "star", on ? 1 : 0, 0); }
+
 void moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
     for (const auto& [from, to]: moves) {
         auto& s = state();

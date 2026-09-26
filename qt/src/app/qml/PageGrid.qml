@@ -123,6 +123,7 @@ Rectangle {
             required property int currentSearchHit
             required property int searchHitCount
             required property bool selected
+            required property string bookmark
             width: grid.cellWidth
             height: grid.cellHeight
 
@@ -176,6 +177,15 @@ Rectangle {
                     anchors.margins: 4
                 }
                 SelectionMark { visible: cell.selected }
+                // A bookmarked page: the ribbon (qt/docs/bookmarks.md)
+                Image {
+                    visible: cell.bookmark !== ""
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    y: -3
+                    source: app.iconUrl("xqt-bookmark-filled")
+                    sourceSize: Qt.size(18, 22)
+                }
                 // Keyboard position
                 Rectangle {
                     anchors.fill: parent
@@ -191,7 +201,9 @@ Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
                 height: pageGrid.labelHeight
                 verticalAlignment: Text.AlignVCenter
-                text: cell.pageNumber
+                width: Math.min(implicitWidth, cell.width - 8)
+                elide: Text.ElideRight
+                text: cell.bookmark !== "" ? cell.pageNumber + " · " + cell.bookmark : cell.pageNumber
                 font.pixelSize: 12
                 color: cell.current ? "#ffffff" : "#d0d3d8"
                 font.weight: cell.current ? Font.DemiBold : Font.Normal

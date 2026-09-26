@@ -111,6 +111,12 @@ void LoadHandler::setPageNoteSpace(double left, double top, double right, double
     this->page->setNoteSpace(NoteSpace{left, top, right, bottom});
 }
 
+// xournal-qt: bookmarks (qt/docs/bookmarks.md)
+void LoadHandler::setPageBookmark(const std::string& label) {
+    xoj_assert(this->page);
+    this->page->setBookmark(label);
+}
+
 void LoadHandler::finalizePage() {
     xoj_assert(this->page);
 

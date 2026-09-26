@@ -39,6 +39,12 @@ Popup {
     enter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 120 } }
     exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: 100 } }
 
+    /// Changes when a star is set or taken away (the cards ask for theirs again)
+    property int favouriteRevision: 0
+    Connections {
+        target: app
+        function onFavouriteChanged() { overview.favouriteRevision++ }
+    }
     readonly property bool searching: searchField.text !== ""
     /// Extended search: each document shows its pages with hits (as in the library)
     property bool extended: false
@@ -291,6 +297,9 @@ Popup {
                 required property bool searchRunning
                 required property bool searchMatch
                 required property var hitPages
+                required property string filePath
+                /// A favourite (qt/docs/bookmarks.md): asked again when a star changes anywhere
+                readonly property bool favourite: (overview.favouriteRevision, filePath !== "" && app.isFavouriteFile(filePath))
                 width: grid.cellWidth
                 height: grid.cellHeight
                 readonly property bool highlighted: GridView.isCurrentItem && grid.activeFocus
@@ -535,6 +544,25 @@ Popup {
                                                                        : qsTr("Show this document beside"))
                                      : cell.isReference ? qsTr("Close the reference") : qsTr("Open as reference")
                     }
+                    // The star of a favourite: shown on starred documents (and on the others under the mouse)
+                    ToolButton {
+                        id: overviewStar
+                        objectName: "overviewStar"
+                        visible: cell.filePath !== "" && (cell.favourite || cellHover.hovered)
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.rightMargin: 42
+                        anchors.topMargin: 2
+                        implicitWidth: 40
+                        implicitHeight: 40
+                        icon.source: app.iconUrl(cell.favourite ? "xqt-star-filled" : "xqt-star")
+                        icon.color: "transparent"
+                        display: AbstractButton.IconOnly
+                        onClicked: app.setFavouriteFile(cell.filePath, !cell.favourite)
+                        ToolTip.visible: hovered
+                        ToolTip.text: cell.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+                    }
+                    HoverHandler { id: cellHover }
                     ToolButton {
                         anchors.top: parent.top
                         anchors.right: parent.right

@@ -124,6 +124,7 @@ std::vector<PageRef> PageClipboard::pagesFor(DocumentSession& target, bool* adde
     std::vector<PageRef> result;
     for (size_t i = 0; i < pages.size(); ++i) {
         auto copy = std::make_shared<XojPage>(*pages[i]);
+        copy->setBookmark(std::nullopt);  // (a copy starts without the bookmark, qt/docs/bookmarks.md)
         if (copy->getBackgroundType().isPdfPage() && !samePdf) {
             if (first != npos && pdfIndex[i] != npos) {
                 copy->setBackgroundPdfPageNr(first + pdfIndex[i]);

@@ -34,6 +34,7 @@
 #include "session/DocumentTextIndex.h"
 #include "session/PageNoteSpace.h"
 #include "session/StickyNote.h"
+#include "session/PageBookmarks.h"
 
 namespace xqt::annotations {
 
@@ -729,6 +730,9 @@ std::vector<Chapter> chaptersOf(Document& doc) {
         }
         std::function<void(const DocumentOutline&, int)> walk = [&](const DocumentOutline& entries, int level) {
             for (const auto& e: entries) {
+                if (level == 0 && PageBookmarks::isOutlineItem(e)) {
+                    continue;  // (our bookmarks, not a chapter)
+                }
                 if (auto it = firstPageOf.find(e.dest.getPdfPage()); it != firstPageOf.end()) {
                     chapters.push_back({QString::fromStdString(e.title), level, it->second});
                 }
