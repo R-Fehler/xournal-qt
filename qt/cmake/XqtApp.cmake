@@ -246,7 +246,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveAuditTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
         GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
