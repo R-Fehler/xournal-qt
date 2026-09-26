@@ -3122,6 +3122,7 @@ TEST_F(CanvasReplayTest, aStickyNoteHoldsOneMarkdownTextThatFlowsInItsWidth) {
     ASSERT_NE(view->getMarkdownEditor(), nullptr);
     EXPECT_EQ(view->getMarkdownEditor()->text(), text->getText());
     EXPECT_EQ(view->getMarkdownEditor()->cursorPosition(), text->getText().size());
+    EXPECT_FALSE(view->getMarkdownEditor()->widthHandle()) << "no width handle: the note's handle sets its width";
     view->endTextEditing();
 
     // Copied and pasted with the note: its text goes along, as the copy's Markdown text

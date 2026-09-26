@@ -541,7 +541,8 @@ void MarkdownEditor::setFontSize(double size) {
 }
 
 std::optional<QPointF> MarkdownEditor::widthHandle() const {
-    if (parts.empty() || md.isPageText() || plain || !page) {
+    // (a sticky note's text: the note's handle sets its width)
+    if (parts.empty() || md.isPageText() || md.isNoteText() || plain || !page) {
         return std::nullopt;
     }
     // (just outside the frame: the knob does not cover the end of the lines being written)
@@ -551,7 +552,7 @@ std::optional<QPointF> MarkdownEditor::widthHandle() const {
 }
 
 void MarkdownEditor::setBoxWidth(double width) {
-    if (md.isPageText() || width <= 0 || width == boxWidth()) {
+    if (md.isPageText() || md.isNoteText() || width <= 0 || width == boxWidth()) {
         return;
     }
     md.setWidth(width);

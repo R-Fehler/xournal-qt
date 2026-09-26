@@ -96,7 +96,8 @@ it) makes the box narrower or wider: the text flows anew while it is dragged, an
 At least 2 cm, at most to the page's right edge. Undo: written on the page, each drag is an undo step of the text
 being written (Ctrl+Z) and part of the edit's one undo step; selected, the drag is one undo step (the box stays
 selected). The page's own Markdown text has no handle: it goes from margin to margin, and a box beside it does not
-change how it flows over the pages.
+change how it flows over the pages. A sticky note's text has no handle either: it is as wide as its note, whose own
+handle (bottom right) sets the width ([sticky-notes.md](sticky-notes.md)); it is never selected alone.
 
 The width is upstream's `wrap` attribute of the text element (the wrap width of Xournal++'s text tool, which has a
 handle of its own for it): saved in the `.xopp` and read again, and Xournal++ wraps the source at that width.

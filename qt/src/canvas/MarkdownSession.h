@@ -53,6 +53,8 @@ public:
     std::string beginBox(size_t page, const md::Style& style, double x, double y);
     /// The page's text (not a text box) is edited.
     bool isPageText() const { return pageText; }
+    /// A sticky note's text is edited: its width is the note's (no width of its own)
+    bool isNoteText() const { return !pageText && !chain.empty() && chain.front().noteWidth > 0; }
     bool active() const { return !chain.empty(); }
     /// The first and the last page of the text (0-based; npos: not active).
     size_t pageIndex() const;
