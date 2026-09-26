@@ -166,7 +166,20 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
             !isSelectToolType(this->session.getToolHandler()->getToolType())) {
             clearSelection();  // (several notes selected: the same)
         }
+        if (selectMore && this->session.getToolHandler()->getToolType() != selectMoreTool) {
+            setSelectingMore(false);  // (another tool: select more ends; the selection stays as it may)
+        }
     });
+    // Select more ends with the selection (checked once whatever changed it is done: toggling takes the selection
+    // apart and makes it again)
+    const auto checkSelectMore = [this] {
+        if (selectMore) {
+            QMetaObject::invokeMethod(
+                    this, [this] { setSelectingMore(selectMore && canSelectMore()); }, Qt::QueuedConnection);
+        }
+    };
+    connect(this, &CanvasView::selectionChanged, this, checkSelectMore);
+    connect(this, &CanvasView::noteSelectionChanged, this, checkSelectMore);
     // Column layout changed in the settings: lay out again, keep the current page in view.
     connect(&session.getApp(), &AppContext::settingsChanged, this, [this] {
         applyZoom100();  // (a screen was calibrated)
@@ -2770,6 +2783,136 @@ void CanvasView::toggleSelected(CanvasPage& page, Layer* note, Element* element)
         }
     }
     selectTogether(page, std::move(notes), std::move(items));
+}
+
+CanvasPage* CanvasView::selectionPage() const {
+    if (mixedSelection->active()) {
+        return mixedSelection->selectedPage();
+    }
+    if (stickyNotes->hasSelection()) {
+        return stickyNotes->selectedPage();
+    }
+    return selection ? static_cast<CanvasPage*>(selection->getView()) : nullptr;
+}
+
+int CanvasView::selectedCount() const {
+    if (mixedSelection->active()) {
+        return static_cast<int>(mixedSelection->notes().size() + mixedSelection->items().size());
+    }
+    if (stickyNotes->hasSelection()) {
+        return 1;
+    }
+    return selection ? static_cast<int>(selection->getElementsView().size()) : 0;
+}
+
+bool CanvasView::offersSelectMore() const {
+    const ToolType tt = session.getToolHandler()->getToolType();
+    const bool areaTool = tt == TOOL_SELECT_RECT || tt == TOOL_SELECT_REGION || tt == TOOL_SELECT_MULTILAYER_RECT ||
+                          tt == TOOL_SELECT_MULTILAYER_REGION;
+    return areaTool && !readingOnly && !session.isReadOnly() && !textMode();
+}
+
+bool CanvasView::canSelectMore() const {
+    if (!offersSelectMore()) {
+        return false;
+    }
+    if (mixedSelection->active() || stickyNotes->hasSelection()) {
+        return true;
+    }
+    // Elements of the page (not inside a note: those stay a selection of their own)
+    return selection && !(markdownSelection && markdownSelection->selection == selection.get() &&
+                          markdownSelection->inNotes);
+}
+
+void CanvasView::setSelectingMore(bool on) {
+    on = on && canSelectMore();
+    if (on == selectMore) {
+        return;
+    }
+    selectMore = on;
+    selectMoreTool = session.getToolHandler()->getToolType();
+    Q_EMIT selectMoreChanged();
+}
+
+bool CanvasView::movingSelection() const {
+    return mixedSelection->dragging() || stickyNotes->moving() ||
+           (selection && selectionDrag == CURSOR_SELECTION_MOVE);
+}
+
+bool CanvasView::toggleAt(QPointF viewPos) {
+    CanvasPage* page = pageAt(viewPos);
+    const auto idx = page ? indexOf(page) : std::nullopt;
+    if (!idx) {
+        return false;
+    }
+    const QRectF r = pageViewRect(*idx);
+    const double zoom = viewController.zoom();
+    return toggleAt(*page, (viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom);
+}
+
+bool CanvasView::toggleAt(CanvasPage& page, double x, double y) {
+    if (selectionPage() != &page) {
+        setSelectingMore(false);  // (another page: what is tapped there is selected alone, as a tap selects)
+    }
+    const ToolType tt = session.getToolHandler()->getToolType();
+    const bool multiLayer = tt == TOOL_SELECT_MULTILAYER_RECT || tt == TOOL_SELECT_MULTILAYER_REGION;
+    constexpr double RADIUS = 5.;  // (as a tap selects an element: SelectObject)
+    const auto nearest = [&](const auto& elements, double& best) {
+        const Element* found = nullptr;
+        for (const Element* e: elements) {
+            if (e->intersectsArea(x - RADIUS, y - RADIUS, 2 * RADIUS, 2 * RADIUS)) {
+                if (const double d = e->distanceTo(x, y); d < best || d == 0.0) {
+                    best = d;
+                    found = e;
+                }
+            }
+        }
+        return found;
+    };
+    // What is there: a selected element (a selection of elements holds them out of their layer), else the topmost
+    // layer with a note or an element there (the selected layer, the page's Markdown texts, the layers of what is
+    // selected; a multi-layer tool: any layer that is no note)
+    Layer* note = nullptr;
+    Element* element = nullptr;
+    if (selection && selectionPage() == &page) {
+        double best = RADIUS;
+        element = const_cast<Element*>(nearest(selection->getElementsView(), best));
+    }
+    if (!element) {
+        std::shared_lock lock(*session.getDocument());
+        const PageRef ref = page.getPage();
+        const Layer* selectedLayer = ref->getSelectedLayer();
+        const auto layers = ref->getLayersView();
+        for (auto l = layers.rbegin(); l != layers.rend() && !note && !element; ++l) {
+            Layer* layer = const_cast<Layer*>(*l);
+            if (!layer->isVisible()) {
+                continue;
+            }
+            if (const Stroke* paper = sticky::paperOf(*layer)) {
+                const auto box = paper->getBoundingBox();
+                if (x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height) {
+                    note = layer;
+                }
+                continue;
+            }
+            const bool holdsSelected =
+                    mixedSelection->active() && std::any_of(mixedSelection->items().begin(),
+                                                            mixedSelection->items().end(),
+                                                            [&](const auto& i) { return i.layer == layer; });
+            if (multiLayer || layer == selectedLayer || md::isMarkdownLayer(*layer) || holdsSelected) {
+                double best = RADIUS;
+                element = const_cast<Element*>(nearest(layer->getElementsView(), best));
+            }
+        }
+    }
+    if (!note && !element) {
+        return false;  // (empty paper: the selection stays as it is)
+    }
+    toggleSelected(page, note, element);
+    if (!hasAnySelection()) {
+        setSelectingMore(false);  // (the last one taken away)
+    }
+    return true;
 }
 
 void CanvasView::noteSelectionMade(const PageRef& page, Layer::Index before, Layer* note) {

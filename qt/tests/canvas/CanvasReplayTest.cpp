@@ -3741,6 +3741,180 @@ TEST_F(StickySelectTest, aSelectionOfNotesAndInkIsDraggedOntoAnotherPageAsOneSte
     EXPECT_EQ(pageInkOf(*session, 1).size(), 1u);
 }
 
+// --- Select more (qt/touch-multiselect): the touch way of Ctrl + click ----------------------------------------------
+
+class SelectMoreTest: public StickySelectTest {
+protected:
+    /// A tap of a finger at a point of a page
+    void fingerTap(size_t page, QPointF at) {
+        using S = QEventPoint::State;
+        const QPointF p = viewPos(page, at);
+        touch(*input, touchscreen, QEvent::TouchBegin, S::Pressed, p);
+        touch(*input, touchscreen, QEvent::TouchEnd, S::Released, p);
+        processEvents();
+    }
+    /// A drag of a finger from a point of a page to another one
+    void fingerDrag(size_t page, QPointF from, QPointF to) {
+        using S = QEventPoint::State;
+        const QPointF a = viewPos(page, from);
+        const QPointF b = viewPos(page, to);
+        touch(*input, touchscreen, QEvent::TouchBegin, S::Pressed, a);
+        for (int i = 1; i <= 16; ++i) {
+            touch(*input, touchscreen, QEvent::TouchUpdate, S::Updated, a + (b - a) * i / 16.0);
+        }
+        touch(*input, touchscreen, QEvent::TouchEnd, S::Released, b);
+        processEvents();
+    }
+    std::string lastStep() { return session->getUndoRedoHandler()->undoDescription(); }
+};
+
+TEST_F(SelectMoreTest, tapsWithTheFingerAddNotesAndElementsAndTakeThemAway) {
+    app->getSettings()->setTouchDrawingEnabled(true);  // (the finger works the tool: the rectangle)
+    EXPECT_FALSE(view->canSelectMore()) << "nothing selected";
+    view->setSelectingMore(true);
+    EXPECT_FALSE(view->selectingMore());
+
+    // A tap selects a note (as without select more); then it can be switched on
+    fingerTap(0, QPointF(100, 180));
+    ASSERT_TRUE(view->notes().hasSelection());
+    EXPECT_EQ(view->selectedCount(), 1);
+    ASSERT_TRUE(view->canSelectMore());
+    QSignalSpy switched(view.get(), &CanvasView::selectMoreChanged);
+    view->setSelectingMore(true);
+    ASSERT_TRUE(view->selectingMore());
+    EXPECT_EQ(switched.count(), 1);
+    const std::string step = lastStep();
+
+    // A tap on the other note: both; on the ink between them: it joins them
+    fingerTap(0, QPointF(350, 200));
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a, b}));
+    EXPECT_EQ(view->selectedCount(), 2);
+    fingerTap(0, QPointF(230, 165));
+    EXPECT_EQ(selectedElements(), (std::vector<const Element*>{between}));
+    EXPECT_EQ(view->selectedCount(), 3);
+    EXPECT_TRUE(view->selectingMore());
+
+    // A tap on empty paper keeps it all (and draws nothing)
+    fingerTap(0, QPointF(500, 700));
+    EXPECT_EQ(view->selectedCount(), 3);
+    EXPECT_TRUE(view->selectingMore());
+    EXPECT_EQ(pageInkOf(*session, 0).size(), 2u);
+
+    // A tap on a selected note or element (in the selection's box): it leaves, nothing moves
+    const auto lookA = *sticky::lookOf(*a);
+    fingerTap(0, QPointF(100, 180));
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{b}));
+    EXPECT_EQ(view->selectedCount(), 2);
+    EXPECT_EQ(*sticky::lookOf(*a), lookA);
+    fingerTap(0, QPointF(230, 165));
+    EXPECT_FALSE(view->mixed().active());
+    ASSERT_TRUE(view->notes().hasSelection()) << "one note left: its own selection";
+    EXPECT_EQ(view->notes().selectedLayer(), b);
+    EXPECT_TRUE(view->selectingMore());
+    EXPECT_EQ(lastStep(), step) << "toggling is no undo step";
+
+    // A drag on the selection still moves it (one step); the mode stays
+    const auto lookB = *sticky::lookOf(*b);
+    fingerDrag(0, QPointF(350, 200), QPointF(380, 230));
+    EXPECT_NEAR(sticky::lookOf(*b)->rect.x, lookB.rect.x + 30, 0.5);
+    EXPECT_EQ(lastStep(), "Undo: Move sticky note");
+    EXPECT_TRUE(view->notes().hasSelection());
+    EXPECT_TRUE(view->selectingMore());
+
+    // The last one taken away: nothing selected, select more ends
+    fingerTap(0, QPointF(350, 200));
+    EXPECT_FALSE(view->hasAnySelection());
+    EXPECT_FALSE(view->selectingMore());
+    EXPECT_EQ(view->selectedCount(), 0);
+
+    // Off: a tap selects the one note alone again (as before)
+    fingerTap(0, QPointF(100, 180));
+    fingerTap(0, QPointF(350, 200));
+    EXPECT_FALSE(view->mixed().active());
+    EXPECT_EQ(view->notes().selectedLayer(), b);
+}
+
+TEST_F(SelectMoreTest, aSelectionOfInkTakesMoreByTapsAndByARectangleWithThePenAndTheMouse) {
+    // Ink selected by a rectangle (an ordinary selection): select more
+    drag(0, QPointF(190, 140), 0, QPointF(270, 190));
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_EQ(view->selectedCount(), 1);
+    view->setSelectingMore(true);
+    ASSERT_TRUE(view->selectingMore());
+
+    // A click on the ink below: both, still an ordinary selection (one layer); a click on a selected one: it leaves
+    click(0, QPointF(90, 510));
+    ASSERT_NE(view->getSelection(), nullptr);
+    EXPECT_EQ(view->getSelection()->getElementsView().size(), 2u);
+    EXPECT_EQ(view->selectedCount(), 2);
+    click(0, QPointF(230, 165));
+    ASSERT_NE(view->getSelection(), nullptr);
+    ASSERT_EQ(view->getSelection()->getElementsView().size(), 1u);
+    EXPECT_EQ(view->getSelection()->getElementsView().front(), below);
+    EXPECT_EQ(pageInkOf(*session, 0).size(), 1u) << "(the selected ink is out of its layer while selected)";
+
+    // A tap of the pen on a note: the note and the ink together
+    const QPointF onA = viewPos(0, QPointF(100, 180));
+    tablet(QEvent::TabletPress, onA, 0.5, Qt::LeftButton, Qt::LeftButton);
+    tablet(QEvent::TabletRelease, onA, 0.0, Qt::LeftButton, Qt::NoButton);
+    processEvents();
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a}));
+    EXPECT_EQ(selectedElements(), (std::vector<const Element*>{below}));
+
+    // A rectangle beside the selection adds what it encloses (the other note, the ink between)
+    drag(0, QPointF(190, 100), 0, QPointF(440, 230));
+    ASSERT_TRUE(view->mixed().active());
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a, b}));
+    EXPECT_EQ(view->selectedCount(), 4);
+    EXPECT_TRUE(view->selectingMore());
+
+    // Another tool ends it (the selection stays with a select tool); so does ending the selection
+    app->getToolHandler()->selectTool(TOOL_SELECT_REGION);
+    app->getToolHandler()->fireToolChanged();
+    processEvents();
+    EXPECT_FALSE(view->selectingMore()) << "the tool changed";
+    EXPECT_TRUE(view->mixed().active());
+    ASSERT_TRUE(view->canSelectMore()) << "the lasso offers it too";
+    view->setSelectingMore(true);
+    ASSERT_TRUE(view->selectingMore());
+    view->clearSelection();
+    processEvents();
+    EXPECT_FALSE(view->selectingMore()) << "the selection ended";
+
+    // A tap on another page ends it: what is there is selected alone
+    Layer* onOther = noteAt(*session, *view, 1, {100, 100, 120, 90});
+    ASSERT_NE(onOther, nullptr);
+    app->getToolHandler()->selectTool(TOOL_SELECT_RECT);
+    app->getToolHandler()->fireToolChanged();
+    click(0, QPointF(100, 180));
+    click(0, QPointF(350, 200), Qt::ControlModifier);
+    ASSERT_TRUE(view->mixed().active());
+    view->setSelectingMore(true);
+    ASSERT_TRUE(view->selectingMore());
+    click(1, QPointF(150, 150));
+    EXPECT_FALSE(view->selectingMore()) << "another page";
+    EXPECT_FALSE(view->mixed().active());
+    ASSERT_TRUE(view->notes().hasSelection()) << "the note tapped there, alone";
+    EXPECT_EQ(view->notes().selectedLayer(), onOther);
+}
+
+TEST_F(SelectMoreTest, aFingerThatScrollsTapsToAddAndTakeAway) {
+    ASSERT_FALSE(app->getSettings()->getTouchDrawingEnabled());  // (the finger scrolls; a tap is a tap)
+    click(0, QPointF(100, 180));
+    view->setSelectingMore(true);
+    fingerTap(0, QPointF(350, 200));
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a, b}));
+    fingerTap(0, QPointF(90, 510));
+    EXPECT_EQ(selectedElements(), (std::vector<const Element*>{below}));
+    fingerTap(0, QPointF(500, 700));
+    EXPECT_EQ(view->selectedCount(), 3) << "a tap on empty paper keeps it";
+    fingerTap(0, QPointF(350, 200));
+    EXPECT_EQ(selectedNotes(), (std::vector<Layer*>{a}));
+    EXPECT_EQ(view->selectedCount(), 2);
+}
+
 TEST_F(CanvasReplayTest, benchmarkStickyNoteClipboard) {
     if (!qEnvironmentVariableIsSet("XQT_BENCH_STICKY")) {
         GTEST_SKIP() << "a benchmark: set XQT_BENCH_STICKY=1";

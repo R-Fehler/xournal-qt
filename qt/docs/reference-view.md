@@ -33,6 +33,11 @@ For cross-referencing within one large document: the tab's own document shows in
   or deleted elsewhere it stays on the page its reader was on.
 - **Read-only by default**, with the pill's pen button, as for another document. Undo in either side undoes the
   last change of the document.
+- **Selecting works as on the notes** (qt/touch-multiselect): the selection's pill for elements and for notes
+  selected together (with the count and "Select more"), the note's pill at a selected note (`NotePill` with
+  `target: app.reference`; colours, cover, text, image, cut and delete while the view is written in, copy and
+  deselect for reading only), Ctrl + click and "Select more" to add and take away (qt/docs/sticky-notes.md, "Select
+  more"). Each view has its own selection and its own select more.
 - **Memory.** Both views register with `CanvasMemory` like any view: the limit is shared, not doubled; the view used
   last gets the larger part, the other one keeps its visible pages. Previews and thumbnails are per document, so
   they are shared too.

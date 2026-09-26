@@ -82,6 +82,8 @@ public:
     /// A finger on the selected note (view coordinates): it moves it or its handle resizes it. False: not on it.
     bool pressTouch(CanvasPage& page, double x, double y);
     bool dragging() const { return drag != Drag::None; }
+    /// The selected note is being moved (not resized)
+    bool moving() const { return drag == Drag::Move; }
     /// The pointer moved while dragging (page coordinates of the selected note's page, also beyond it)
     void dragTo(double x, double y);
     /// The drag ended: one undo step if the note changed

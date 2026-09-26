@@ -555,6 +555,7 @@ bool CanvasInput::actionStart(const Event& event) {
     this->sequenceStartPage = currentPage;
     this->pressViewPos = event.viewPos;
     this->pressTimeMs = monotonicMs();
+    this->toggleOnTap.reset();
     // A text file edited: the pen and the mouse put the cursor into the text, whatever the tool (a drag selects)
     if (view.textMode() && toolType != TOOL_HAND) {
         this->textPress = true;
@@ -581,6 +582,11 @@ bool CanvasInput::actionStart(const Event& event) {
         return true;
     }
 
+    // Select more (qt/touch-multiselect): a press on the selection moves it, and if it does not move it was a tap that
+    // takes away what is there (actionEnd); a press beside it keeps it: a tap there adds what is there, a rectangle or
+    // lasso what it encloses (CanvasPage)
+    const bool selectMore = view.selectingMore();
+
     // Several sticky notes selected (with elements of the page): a press in the selection moves it all; elsewhere it
     // ends the selection. Ctrl or Shift with a select tool: what is there joins it or leaves it (CanvasPage).
     if (view.mixed().active()) {
@@ -592,9 +598,14 @@ bool CanvasInput::actionStart(const Event& event) {
             if (view.mixed().contains(*page, pos.x / zoom, pos.y / zoom)) {
                 if (!view.isReadingOnly()) {
                     view.mixed().startDrag(pos.x / zoom, pos.y / zoom);
+                    if (selectMore) {
+                        toggleOnTap = event.viewPos;
+                    }
                 }
                 return true;  // (for reading only: it stays, to be copied)
             }
+        }
+        if (!add && !selectMore) {
             view.clearSelection();
             changeTool(event);
             if (toolHandler->isDrawingTool()) {
@@ -627,13 +638,18 @@ bool CanvasInput::actionStart(const Event& event) {
                 }
                 selection->mouseDown(selType, selectionPos.x, selectionPos.y);
                 view.selectionDragStarts(selType);  // (a move may end in a sticky note, or leave one)
+                if (selectMore && selType == CURSOR_SELECTION_MOVE) {
+                    toggleOnTap = event.viewPos;
+                }
                 return true;
             }
-            view.clearSelection();
-            changeTool(event);
-            // Stop here: a tap outside the selection only deselects, it does not also draw.
-            if (toolHandler->isDrawingTool()) {
-                return true;
+            if (!selectMore) {
+                view.clearSelection();
+                changeTool(event);
+                // Stop here: a tap outside the selection only deselects, it does not also draw.
+                if (toolHandler->isDrawingTool()) {
+                    return true;
+                }
             }
         }
     }
@@ -664,7 +680,11 @@ bool CanvasInput::actionStart(const Event& event) {
             pressureMode = PressureMode::NO_PRESSURE;
         }
         pos.pressure = this->filterPressure(pos, currentPage);
-        return currentPage->onButtonPressEvent(pos);
+        const bool handled = currentPage->onButtonPressEvent(pos);
+        if (selectMore && view.notes().moving()) {
+            toggleOnTap = event.viewPos;  // (the selected note: moved, or a tap takes it away)
+        }
+        return handled;
     }
     return true;
 }
@@ -698,6 +718,15 @@ bool CanvasInput::actionMotion(const Event& event) {
         }
         this->updateLastEvent(event);
         return true;
+    }
+
+    // Select more: the selection pressed moves once the pointer went further than a tap does (a tap moves nothing)
+    if (toggleOnTap) {
+        if (barelyMoved(event)) {
+            this->updateLastEvent(event);
+            return true;
+        }
+        toggleOnTap.reset();
     }
 
     // The width of a Markdown text box being dragged (wherever the pointer is)
@@ -807,8 +836,18 @@ bool CanvasInput::isClick(const Event& release) const {
     return monotonicMs() - pressTimeMs <= TAP_MAX_MS * 1.5 && moved <= TAP_SLOP_PX / 2;
 }
 
+bool CanvasInput::barelyMoved(const Event& release) const {
+    const double moved = std::hypot(release.viewPos.x() - pressViewPos.x(), release.viewPos.y() - pressViewPos.y());
+    return moved <= (release.deviceClass == DeviceClass::Mouse ? QGuiApplication::styleHints()->startDragDistance()
+                                                               : TAP_SLOP_PX / 2);
+}
+
 bool CanvasInput::actionEnd(const Event& event) {
     ToolHandler* toolHandler = view.getSession().getToolHandler();
+    // Select more: the selection was pressed and not moved (a tap on it): what is there leaves it (or joins it)
+    const std::optional<QPointF> tapped = std::exchange(toggleOnTap, std::nullopt);
+    const std::optional<QPointF> toggle =
+            tapped && barelyMoved(event) && view.movingSelection() ? tapped : std::nullopt;
     if (std::exchange(this->textPress, false)) {
         this->sequenceStartPage = nullptr;
         this->inputRunning = false;
@@ -867,13 +906,17 @@ bool CanvasInput::actionEnd(const Event& event) {
         }
     }
 
+    if (toggle) {
+        view.toggleAt(*toggle);
+    }
+
     // A tap with the hand or a select tool that selected nothing: maybe a PDF link.
     const ToolType tt = toolHandler->getToolType();
     const bool tapTool = tt == TOOL_HAND || tt == TOOL_SELECT_RECT || tt == TOOL_SELECT_REGION ||
                          tt == TOOL_SELECT_MULTILAYER_RECT || tt == TOOL_SELECT_MULTILAYER_REGION ||
                          tt == TOOL_SELECT_OBJECT || tt == TOOL_SELECT_PDF_TEXT_LINEAR ||
                          tt == TOOL_SELECT_PDF_TEXT_RECT;
-    if (tapTool && !view.hasAnySelection() && isClick(event)) {
+    if (tapTool && !toggle && !view.hasAnySelection() && isClick(event)) {
         view.tapAt(event.viewPos);
     }
 
@@ -895,6 +938,17 @@ bool CanvasInput::actionEnd(const Event& event) {
 // --- a finger on a selection of elements: the handles are for fingers too, not only for pen and mouse ---
 
 bool CanvasInput::startTouchSelection(QPointF viewPos) {
+    toggleOnTap.reset();
+    if (!pressTouchSelection(viewPos)) {
+        return false;
+    }
+    if (view.selectingMore() && view.movingSelection()) {
+        toggleOnTap = viewPos;  // (select more: let go without moving it, it was a tap: endTouchSelection)
+    }
+    return true;
+}
+
+bool CanvasInput::pressTouchSelection(QPointF viewPos) {
     if (view.boxResize().press(viewPos, true)) {
         return true;  // the handle of a Markdown text box: the finger sets its width
     }
@@ -944,6 +998,13 @@ bool CanvasInput::startTouchSelection(QPointF viewPos) {
 }
 
 void CanvasInput::moveTouchSelection(QPointF viewPos) {
+    if (toggleOnTap) {
+        // Select more: it moves once the finger went further than a tap does (a tap moves nothing)
+        if (std::hypot(viewPos.x() - toggleOnTap->x(), viewPos.y() - toggleOnTap->y()) <= TAP_SLOP_PX) {
+            return;
+        }
+        toggleOnTap.reset();
+    }
     if (view.boxResize().dragging()) {
         view.boxResize().dragTo(viewPos);
         return;
@@ -985,6 +1046,9 @@ void CanvasInput::moveTouchSelection(QPointF viewPos) {
 }
 
 void CanvasInput::endTouchSelection() {
+    // Select more: the finger on the selection did not move it (a tap): what is there leaves it, or joins it
+    const std::optional<QPointF> tapped = std::exchange(toggleOnTap, std::nullopt);
+    const std::optional<QPointF> toggle = tapped && view.movingSelection() ? tapped : std::nullopt;
     if (view.boxResize().dragging()) {
         view.boxResize().endDrag();
     }
@@ -999,6 +1063,9 @@ void CanvasInput::endTouchSelection() {
     }
     touchSelection = false;
     touchSelectionId = -1;
+    if (toggle) {
+        view.toggleAt(*toggle);
+    }
 }
 
 bool CanvasInput::penNear() const {
@@ -1358,6 +1425,8 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                 if (view.hasPdfTextSelection() && !view.pdfTextSelectionContains(touchSessionStartPos)) {
                     view.clearPdfTextSelection();  // a tap beside the selected text unselects it and nothing else
                     lastTapMs = 0;
+                } else if (view.selectingMore() && view.toggleAt(touchSessionStartPos)) {
+                    lastTapMs = 0;  // select more (the finger scrolls): what was tapped joined the selection or left it
                 } else if (view.tapAt(touchSessionStartPos)) {
                     lastTapMs = 0;  // it was a PDF link: never the first tap of a double tap
                 } else if (now - lastTapMs <= DOUBLE_TAP_MS &&

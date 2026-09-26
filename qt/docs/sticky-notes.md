@@ -192,8 +192,50 @@ somewhere else."
   selects that note alone; the object select tool takes one note. One note alone is always the note's own selection
   (its outline, its handle, its pill); elements alone are an ordinary selection (resized, rotated, recoloured as
   before). Only two or more notes, or notes with elements, make the selection described here.
-- **Touch** has no way to add yet: Ctrl and Shift need a keyboard (a finger on the selection moves it, as a finger
-  moves any selection).
+- **Touch: "Select more"** in the selection's pill (next section): the touch way of Ctrl + click.
+
+### Select more (qt/touch-multiselect)
+
+The author's request (2026-09-26): "When using the rectangular or lasso select with touch (so when the tool is used),
+once I clicked on an annotation or sticky note I want a button in the selection pill to appear that when clicked
+enables multiselect mode. Then I can add selections by touching the items and remove by touching again, and the pill
+keeps track of the number of items and offers the usual copy, cut, paste etc. options when we select things."
+
+- **The button**: with the rectangle or lasso select tool (also the multi-layer ones) the pills of a selection show
+  "Select more" (a dashed selection with a plus, `xqt-select-more`): the selection's pill (elements, notes selected
+  together) and the note's pill (one note). It is highlighted while on; a tap on it again turns it off. It is greyed
+  for a selection of elements inside a note (those stay a selection of their own, see "Selecting in a note"), and not
+  shown with the other tools or in a view for reading only. The selection's pill shows **how many** notes and
+  elements are selected (a note counts as one, whatever is on it); the note's pill shows "1" while select more is on.
+- **While it is on**, a tap (finger, pen or mouse, the same for all) on a note or an element adds it to the
+  selection, or takes it away when it is selected. It is Ctrl + click (`CanvasView::toggleSelected`): what is tapped
+  goes through the same `selectTogether`, so one note alone is the note's own selection (its pill), elements of one
+  layer an ordinary selection, anything else a MixedSelection. What a tap finds (`CanvasView::toggleAt`): a selected
+  element (an ordinary selection holds them out of their layer), else the topmost layer with a note or an element
+  there: a note's paper takes the whole note; elements of the selected layer, of the page's Markdown texts and of
+  the layers of what is selected (a multi-layer tool: of any layer that is no note), within 5 points as a tap
+  selects.
+  - A finger that draws (the tool bar's touch drawing): a tap is a tap of the tool. A finger that scrolls: a tap
+    toggles too (a drag scrolls).
+  - **A tap on empty paper does nothing** (the selection stays; it is easy to miss a thin stroke, and losing a
+    selection of many things to that would be worse than having to tap "Deselect").
+  - **A drag on the selection moves it**, as always (one undo step). It begins once the pointer went further than a
+    tap does (8 pixels for the pen, 16 for a finger), so a tap on the selection never moves it by a hair.
+  - **A rectangle or lasso started beside the selection adds what it encloses** (the notes it encloses whole and the
+    page's elements in it), as with Ctrl. It never selects inside a note while select more is on.
+  - A tap on the selected note's handle still resizes it (a tap there does not take it away).
+- **Taking the last one away** ends the selection and select more.
+- **It ends** when the selection ends any other way (Deselect, Esc, Delete, Cut, an undo), when the tool changes
+  (even rectangle → lasso), when a tap or rectangle goes to another page (what is tapped there is selected alone, as
+  a tap selects), when the document shown changes (another tab; the view beside a reference), and with the button.
+  Checked once whatever changed the selection is done (toggling takes the selection apart and makes it again).
+- **Undo**: adding and taking away are no undo steps; copy, cut, paste, delete and the moves are as before.
+- Unchanged while it is off: a tap selects one thing alone, a rectangle started inside a note selects in it.
+- **The view beside (self-reference)** works the same, while it is written in (its edit switch): the selection's
+  pill with the count and "Select more", the note's pill (colours, cover, text, image, copy, cut, delete) at the
+  note, Ctrl + click. For reading only it keeps selecting to copy: the selection's pill and the note's pill offer
+  copy and deselect, no "Select more". (Before, a note or notes selected together in that view had no pill at all,
+  and its pill's Deselect left a note selected.)
 
 ### What it does
 - It is drawn over its page: an outline around each note, a thin box around each element (up to 200), a dashed box
@@ -390,6 +432,13 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   on a note, cover taps, copy / cut / paste and the picture for other apps, the drop on another page), used by
   `CanvasPage`, `CanvasInput` and `CanvasView` (`copySelection`, `cutSelection` and `pasteElements` hand a note to
   it).
+- Select more (qt/touch-multiselect): `CanvasView::offersSelectMore`, `canSelectMore`, `setSelectingMore`,
+  `toggleAt`, `selectedCount`, `selectionPage`, `movingSelection`; `CanvasInput` (`toggleOnTap`: a tap on the
+  selection; the drag after a tap's travel; the finger's tap), `CanvasPage::onButtonPressEvent` /
+  `onButtonReleaseEvent` (the rectangle beside it adds, a tap toggles); `AppController` and `ReferenceMode`:
+  `selectMoreOffered`, `selectMoreAvailable`, `selectingMore`, `selectedCount` (and the note's pill's API on
+  `ReferenceMode`); `SelectionPill.qml`, `NotePill.qml` (a `target`, as the selection's pill has; made smaller where the
+  canvas is narrower than it), `ReferenceSplit.qml` (the reference's note pill).
 - Several notes at once (qt/sticky-select): `qt/src/canvas/MixedSelection.*` (the selection, its drawing, drag, drop
   on another page, copy, cut, delete, paste, the picture for other apps); `CanvasView::selectTogether`,
   `toggleSelected`, `takeSelected`, `hasAnySelection`; `CanvasPage::selectNotesAndElements` and Ctrl / Shift in
@@ -423,6 +472,15 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
   `CanvasReplayTest.aNotesTextIsClippedToTheNoteWhileItIsWrittenAndAHintSaysWhenTheCursorIsBelow` (no pixel of the
   text or its frame below the note while it is written, the triangle, the hint's place, gone with the cursor on the
   note and when done, the note keeps its size).
+- Tests of select more: `SelectMoreTest` (canvas): `tapsWithTheFingerAddNotesAndElementsAndTakeThemAway` (a finger
+  that draws: on, a note and ink added, empty paper keeps it, taken away in the box without moving, no undo step, a
+  drag still moves, the last one taken away ends it, off as before),
+  `aSelectionOfInkTakesMoreByTapsAndByARectangleWithThePenAndTheMouse` (an ordinary selection grows and shrinks, the
+  pen adds a note, a rectangle adds, the tool change and the selection's end end it, a tap on another page),
+  `aFingerThatScrollsTapsToAddAndTakeAway`; `MainWindowTest.thePillsOfASelectionOfferSelectMoreAndCountWhatIsSelected`
+  (the button only with the rectangle or lasso, highlighted, the counts, off, a tool change);
+  `ReferenceWindowTest.selectingInTheSameDocumentBesideItselfWorksAsOnTheNotes` (the view beside: the selection's
+  pill with the count, Ctrl + click, select more, the note's pill and its Deselect, for reading only: copy).
 - Tests of several notes at once: `StickySelectTest` (canvas): `ctrlClickAddsAndTakesAwayNotesAndElements` (mouse
   and pen, a selection of ink joined by a note, back to one note's own selection),
   `aRectangleBesideTheNotesSelectsThemWholeWithThePagesInkAndMovesThemAsOneStep` (the notes whole, the ink between
@@ -438,16 +496,15 @@ edge. The first tries cost more: five rounded rectangles up to 9 %, three rectan
 - Showing a dragged note over the other page while it is dragged (it waits at its page's edge and jumps on
   release).
 - Pasting a note into upstream Xournal++ (it does not know the note's clipboard format).
-- A note selected in the second view (self-reference) has no pill of its own: Ctrl+C / X / V work there.
 - Clipping a plain text box (the text tool with Markdown off) while it is typed on a note: it shows beyond the
   note's edge until it is done. (The note's Markdown text is clipped while it is written.)
 - A rectangle that starts beside a note and reaches only part of it selects nothing on the note (one that encloses
   it selects it whole; one started on the note selects in it).
 - A selection of elements from inside several notes, or from inside a note and the page, at once (a selection of
   elements is in one layer; whole notes with page elements: "Several notes at once").
-- Several notes selected together: no colour or cover for all of them at once, no resize; Ctrl + click on touch
-  screens (no way to add without a keyboard); a selection of several notes in the second view (self-reference) has no
-  pill of its own (the keys work).
+- Several notes selected together: no colour or cover for all of them at once, no resize.
+- Select more: a long press is not used for it (the finger's long press opens the context pill); a lasso or rectangle
+  that takes away what it encloses (it only adds); select more in a view for reading only.
 - Pictures dropped on a note that is not being written (drops are taken while Markdown is written).
 - Scrolling the note's text (what goes below the note shows when the note is made larger).
 - Hiding the notes of the whole document at once (the eye in the page pill hides those of the current page).

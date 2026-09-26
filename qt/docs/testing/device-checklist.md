@@ -2010,7 +2010,6 @@ Design: [md-images.md](../md-images.md).
       responsive, and the thumbnails of the pages in view follow; the others when they are scrolled to.
 - [ ] A page of a size none of the formats (e.g. made in Xournal++): the dialog shows "Other: w × h mm" for it.
 - [ ] Save, close, open again: the pages keep their new sizes; upstream Xournal++ opens the file with them too.
-||||||| ee22a070f
 
 ## Selecting several sticky notes; the note's text clipped while typing (qt/sticky-select)
 - [ ] Place a note, "Text" in its pill, type a dozen short paragraphs (Enter after each): the lines stop at the
@@ -2036,3 +2035,35 @@ Design: [md-images.md](../md-images.md).
       Ctrl+V pastes them onto the page clicked.
 - [ ] Android (Fold 7): a rectangle drawn with the pen around two notes selects both; a finger drag in the dashed box
       moves them; the selection's pill fits.
+
+## Touch multi-select (qt/touch-multiselect)
+- [ ] Place two notes side by side, draw ink between them and some far below. Touch drawing on (the tool bar's
+      finger button), rectangle select tool: tap a note with the finger. Its pill shows a "Select more" button (a
+      dashed square with a plus), not highlighted. Tap it: highlighted, the pill shows "1".
+- [ ] Tap the other note: both selected (outlines, a dashed box), the selection's pill with "2" and "Select more"
+      still highlighted, plus copy, cut, paste, delete, deselect. Tap the ink between the notes: "3". Tap the ink far
+      below: "4".
+- [ ] Tap empty paper: nothing changes (still "4", nothing drawn). Tap a selected note inside the dashed box: it
+      leaves ("3"), nothing moves by even a hair. Tap it again: back ("4").
+- [ ] Drag inside the dashed box: everything moves together; one Ctrl+Z (or the two-finger tap) puts it back.
+      "Select more" is still on.
+- [ ] Draw a rectangle with the finger starting on empty paper around something not yet selected: it is added.
+- [ ] Take the items away one by one: at one note left the note's pill comes back (with "1" and the highlighted
+      button); tapping that note ends the selection and "Select more".
+- [ ] Turning it off: tap the highlighted button; a tap on a note selects it alone again. Switching rectangle →
+      lasso ends it (the selection stays); the lasso offers the button too. The pen or the hand ends it with the
+      selection. Esc / Deselect ends it. Another tab ends it.
+- [ ] Touch drawing off (the finger scrolls): with select more on, a tap on a note or ink still adds or takes it
+      away; one finger dragging scrolls.
+- [ ] The pen and the mouse do the same as the finger (tap adds / takes away, drag on the selection moves).
+- [ ] An ordinary ink selection (rectangle around ink only): "Select more" adds more ink by taps and it stays a
+      normal selection (resize handles, colour); a tap on a note makes it a selection of notes and ink.
+- [ ] A rectangle started inside a note (the note's ink selected): the button is greyed. With "Select more" off
+      nothing behaves differently from before.
+- [ ] Self-reference (the document beside itself), edit switch on: select ink with a rectangle in the view beside:
+      its pill shows the count and "Select more"; Ctrl + click (mouse) or "Select more" + tap on a note adds it; one
+      note alone shows the note's pill next to the note, fitting into that half (colours, cover, text, image, copy,
+      cut, delete work there); Deselect clears it. Edit switch off: a rectangle around a note shows its pill with
+      copy and deselect only.
+- [ ] Android (Fold 7, folded and unfolded): the button and the count fit in the pill; finger taps add and take
+      away reliably on small strokes.

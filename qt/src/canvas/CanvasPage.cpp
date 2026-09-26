@@ -144,9 +144,14 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
     const bool add = selectTool && (pos.isShiftDown() || pos.isControlDown());
     // Whole notes are selected (one, several, or notes with elements): Ctrl or Shift adds to them or takes away
     const bool together = view.notes().hasSelection() || view.mixed().active();
+    // Select more (qt/touch-multiselect): the selected note moves (a tap on it takes it away: CanvasInput) and its
+    // handle resizes it; anywhere else the rectangle or lasso starts, never in a note: a tap adds what is there or
+    // takes it away, a drag adds what it encloses (onButtonReleaseEvent)
+    const bool selectMore = areaTool && view.selectingMore();
     if (!view.isReadingOnly()) {
         bool deselected = false;
-        if (view.notes().press(*this, x, y, selectTool, deselected, areaTool, add)) {
+        if (selectMore ? view.notes().pressTouch(*this, x, y)
+                       : view.notes().press(*this, x, y, selectTool, deselected, areaTool, add)) {
             return true;
         }
     }
@@ -212,7 +217,7 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
                                                               control.getSettings()->getSelectionColor()));
             // xournal-qt: started on a sticky note (that can be written on): it selects in the note
             std::shared_lock lock(*control.getDocument());
-            this->selectorNote = view.isReadingOnly() ? nullptr : sticky::openNoteAt(*page, x, y);
+            this->selectorNote = view.isReadingOnly() || selectMore ? nullptr : sticky::openNoteAt(*page, x, y);
         }
     } else if (h->getToolType() == TOOL_TEXT) {
         view.startText(*this, x, y);
@@ -424,9 +429,25 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
         selectInNote(std::exchange(this->selectorNote, nullptr), this->selector->userTapped(getZoom()));
         this->selector.reset();
     }
+    if (this->selector && view.selectingMore()) {
+        // Select more (qt/touch-multiselect): a tap adds what is there or takes it away (on another page: select more
+        // ends, and what is there is selected alone); a drag adds what the rectangle or lasso encloses (below)
+        const double zoom = getZoom();
+        if (this->selector->userTapped(zoom)) {
+            (void)this->selector->finalize(this->page, true, control.getDocument());  // (its picture goes)
+            (void)this->selector->releaseElements();
+            this->selector.reset();
+            view.toggleAt(*this, pos.x / zoom, pos.y / zoom);
+            repaintPage();
+            return false;
+        }
+        if (view.selectionPage() != this) {
+            view.setSelectingMore(false);  // (a rectangle on another page: as without it)
+        }
+    }
     if (this->selector) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)
-        const bool add = pos.isShiftDown() || pos.isControlDown();
+        const bool add = pos.isShiftDown() || pos.isControlDown() || view.selectingMore();
         const bool together = view.notes().hasSelection() || view.mixed().active();
         const bool aggregate = add && (view.getSelection() || together);
         if (!this->selector->userTapped(getZoom()) && selectNotesAndElements(aggregate)) {

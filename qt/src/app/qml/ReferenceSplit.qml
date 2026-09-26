@@ -104,6 +104,15 @@ Item {
             hidden: referenceGrid.visible
             anchors.bottomMargin: 84  // (above the reference's own pill)
         }
+        // The selected sticky note of the reference: the same pill as on the notes (for reading only: copy, deselect)
+        NotePill {
+            objectName: "referenceNotePill"
+            canvasItem: referenceCanvas
+            target: app.reference
+            namePrefix: "reference"
+            hidden: referenceGrid.visible
+            onImageRequested: referenceImageDialog.open()
+        }
         ContextPill {
             id: referenceContextPill
             canvasItem: referenceCanvas

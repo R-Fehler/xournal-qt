@@ -216,6 +216,14 @@ class AppController: public QObject {
     Q_PROPERTY(bool presenting READ presenting WRITE setPresenting NOTIFY presentingChanged)
     /// Elements are selected on the canvas (select tools).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
+    /// "Select more" (qt/touch-multiselect; qt/docs/sticky-notes.md, "Several notes at once"): the selection's pills
+    /// offer it with the rectangle or lasso select tool (selectMoreOffered; it can be switched on: selectMoreAvailable,
+    /// not for elements inside a note); while it is on (selectingMore), a tap adds a note or an element to the selection
+    /// or takes it away. selectedCount: notes and elements selected.
+    Q_PROPERTY(bool selectMoreOffered READ selectMoreOffered NOTIFY selectMoreChanged)
+    Q_PROPERTY(bool selectMoreAvailable READ selectMoreAvailable NOTIFY selectMoreChanged)
+    Q_PROPERTY(bool selectingMore READ selectingMore WRITE setSelectingMore NOTIFY selectMoreChanged)
+    Q_PROPERTY(int selectedCount READ selectedCount NOTIFY selectMoreChanged)
     // Page operations (sidebar, page grid) go onto the one undo stack of the document (these are the same as undo)
     Q_PROPERTY(bool canUndoPages READ canUndoPages NOTIFY pageUndoChanged)
     Q_PROPERTY(bool canRedoPages READ canRedoPages NOTIFY pageUndoChanged)
@@ -445,6 +453,11 @@ public:
     void setSearchFuzzy(bool fuzzy);
     QString searchHint() const;
     bool hasSelection() const;
+    bool selectMoreOffered() const;
+    bool selectMoreAvailable() const;
+    bool selectingMore() const;
+    void setSelectingMore(bool on);
+    int selectedCount() const;
     bool canGoBack() const;
     QString pdfTextMode() const { return pdfMode; }
     void setPdfTextMode(const QString& mode);
@@ -1141,6 +1154,8 @@ Q_SIGNALS:
     void presentingChanged();
     void pageUndoChanged();
     void selectionChanged();
+    /// Select more became available or not, was switched on or off, or what is selected changed (its count)
+    void selectMoreChanged();
     void fontChanged();
     void navigationChanged();
     void pdfTextModeChanged();
@@ -1328,6 +1343,8 @@ private:
     void applyPdfTextMode();
     void storeToolbarColors(const QVariantList& colors);
     std::vector<QMetaObject::Connection> currentConnections;
+    /// The view of the current tab (another tab: select more ends in the one before)
+    QPointer<xqt::CanvasView> currentCanvas;
 
     // --- text files (AppTextFiles.cpp) ---
     /// Open a Markdown or text file as a text document (editable when it can be). nullptr: not such a file.

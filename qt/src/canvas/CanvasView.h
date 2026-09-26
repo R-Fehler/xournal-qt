@@ -38,6 +38,7 @@
 #include "model/PageRef.h"
 #include "render/PageRaster.h"
 
+#include "control/ToolEnums.h"
 #include "control/tools/CursorSelectionType.h"
 #include "control/zoom/ZoomControl.h"
 
@@ -314,6 +315,32 @@ public:
     /// What is selected on a page as notes and elements (the selection ends: elements selected go back into their
     /// layer); nothing when the selection is elsewhere, or elements inside a note are selected.
     std::pair<std::vector<Layer*>, std::vector<MixedSelection::Item>> takeSelected(CanvasPage& page);
+    /// The page what is selected is on (nullptr: nothing selected)
+    CanvasPage* selectionPage() const;
+    /// How many things are selected: notes and elements (0: nothing)
+    int selectedCount() const;
+
+    // --- "Select more" (qt/touch-multiselect; qt/docs/sticky-notes.md, "Several notes at once") -----------------
+    // The touch way of Ctrl + click: while it is on, a tap (finger, pen, mouse) on a note or an element adds it to the
+    // selection or takes it away (toggleAt), a tap on empty paper does nothing, a drag on the selection moves it and a
+    // rectangle or lasso beside it adds what it encloses. It ends with the selection, when the tool changes, when a
+    // tap goes to another page, and when it is switched off.
+    /// Can it be switched on: the rectangle or lasso select tool, and a selection that more can join (notes, elements
+    /// of the page; not elements inside a note), in a view that is written in
+    bool canSelectMore() const;
+    /// The tool and the view offer it (the rectangle or lasso select tool, a view that is written in), whatever is
+    /// selected (the pills show its button then, enabled when canSelectMore)
+    bool offersSelectMore() const;
+    bool selectingMore() const { return selectMore; }
+    void setSelectingMore(bool on);
+    /// Select more: what is at this place (page coordinates of `page`) joins the selection, or leaves it. On another
+    /// page than the selection, select more ends and what is there is selected alone. False: nothing there.
+    bool toggleAt(CanvasPage& page, double x, double y);
+    /// The same at a place of the view (view coordinates)
+    bool toggleAt(QPointF viewPos);
+    /// The drag of the selection that started now is a move (a tap on it toggles what is there when select more is
+    /// on): elements, a note, several notes
+    bool movingSelection() const;
     /// The handle that sets the width of a Markdown text box (written on the page, or selected)
     MarkdownBoxResize& boxResize() const { return *boxResizer; }
     /// The setsquare / compass on the canvas.
@@ -439,6 +466,8 @@ Q_SIGNALS:
     void selectionChanged(bool hasSelection);
     /// A sticky note was selected or unselected, or the selected one changed (color, cover).
     void noteSelectionChanged();
+    /// "Select more" was switched on or off (selectingMore())
+    void selectMoreChanged();
     /// Sticky notes came, went, were hidden or shown.
     void notesChanged();
     /// Text editing started or ended (keyboard / input method for the canvas).
@@ -597,6 +626,8 @@ private:
     /// selection of Markdown texts moved there
     void markdownSelectionOnPage(size_t page);
     quint64 selectionRev = 0;
+    bool selectMore = false;
+    ToolType selectMoreTool = TOOL_NONE;  ///< the tool it was switched on with (another tool ends it)
 };
 
 }  // namespace xqt
