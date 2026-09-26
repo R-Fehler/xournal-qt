@@ -560,6 +560,15 @@
   opacity in the lower-left corner (48 px touch target, brighter on hover) toggles the controls. F5 presents with
   them as before.
 
+- **Fuzzy toggle in the document search, `qt/doc-search-fuzzy` (2026-09-26).** The search bar has the FuzzyToggle
+  (one shared setting with the library and Settings → Search; a document's search keeps its mode; a handed-over
+  fuzzy query shows the toggle on). Vocabularies are built on the text index's worker while fuzzy is on (except a
+  query handed over while the document opens).
+- **Search selected text, `qt/selection-search` (2026-09-26).** The look-up menu of selected text: this document,
+  open tabs, the library, then the web ("Search the web with": Google, DuckDuckGo, Bing, Ecosia, Startpage, Brave,
+  Qwant, custom `{text}` address), Scholar and Translate, each web address confirmed first; 200 characters at most.
+  PDF text handles no longer show over the library.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
