@@ -209,9 +209,13 @@ int main(int argc, char* argv[]) {
     AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
     // Edge to edge (Android 15 and newer): the status bar lies over the top of the window, so the tab strip starts
-    // below it (Main.qml's safeTop; 0 on the desktop)
+    // below it (Main.qml's safeTop; 0 on the desktop), and the navigation bar over the bottom, above which the menus'
+    // bottom sheets end (safeBottom)
     if (auto* w = qobject_cast<QQuickWindow*>(engine.rootObjects().value(0))) {
-        auto applySafeArea = [w] { w->setProperty("safeTop", w->safeAreaMargins().top()); };
+        auto applySafeArea = [w] {
+            w->setProperty("safeTop", w->safeAreaMargins().top());
+            w->setProperty("safeBottom", w->safeAreaMargins().bottom());
+        };
         QObject::connect(w, &QWindow::safeAreaMarginsChanged, w, applySafeArea);
         applySafeArea();
     }

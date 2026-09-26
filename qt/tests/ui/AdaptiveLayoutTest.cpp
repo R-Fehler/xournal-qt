@@ -4,6 +4,10 @@
  * the hysteresis and a held pointer, the chrome apart from the window state, and no control of the home screen or the
  * document outside the window.
  *
+ * The menus (qt/adaptive-menus): at each size ⋮ (and its submenus), the page menu, the library menu and a card's menu
+ * fit in the window, as wide as their entries and clear of their buttons; in the phone classes they are a bottom sheet
+ * with drill-in.
+ *
  * What later blocks fix is listed as known (knownOutside, expectLater): the test passes now and is made stricter by
  * the block that fixes it. The walk over all 18 sizes of the audit runs with XQT_UI_ADAPTIVE=1.
  *
@@ -272,7 +276,243 @@ protected:
         const QRectF view = flick ? flick->mapRectToScene(QRectF(0, 0, flick->width(), flick->height())) : r;
         return view.contains(r) && QRectF(0, 0, window->width(), window->height()).contains(r);
     }
-    void checkSizes(const std::vector<WindowSize>& sizes);
+    /// `layout`: the class, the sidebar, nothing outside the window; `menus`: the menus fit (checkMoreMenu, …)
+    void checkSizes(const std::vector<WindowSize>& sizes, bool layout, bool menus);
+
+    // --- menus (qt/adaptive-menus) ---
+    bool phoneClass() const {
+        const QString c = adaptive->property("layoutClass").toString();
+        return c == "phonePortrait" || c == "phoneShort" || c == "tiny";
+    }
+    QRectF sceneRect(QQuickItem* item) const {
+        return item->mapRectToScene(QRectF(0, 0, item->width(), item->height()));
+    }
+    /// A popup's rectangle in the window (its item: the parent of its content item)
+    QRectF popupRect(QObject* popup) const {
+        auto* content = popup->property("contentItem").value<QQuickItem*>();
+        QQuickItem* item = content ? content->parentItem() : nullptr;
+        return item ? sceneRect(item) : QRectF();
+    }
+    bool insideWindow(const QRectF& r) const {
+        return r.isValid() && QRectF(0, 0, window->width(), window->height()).contains(r.adjusted(1, 1, -1, -1));
+    }
+    bool opened(QObject* popup, bool open) {
+        until([&] { return popup->property("opened").toBool() == open && popup->property("visible").toBool() == open; });
+        return popup->property("opened").toBool() == open;
+    }
+    QObject* sheet() const { return window->findChild<QObject*>("menuSheet"); }
+    /// Until a popup's enter transition is over (a menu grows in, a sheet slides in): it is where it stays
+    void settled(QObject* popup) {
+        until([&] {
+            return popup->property("scale").toDouble() == 1.0 && popup->property("opacity").toDouble() == 1.0 &&
+                   (!popup->property("slide").isValid() || popup->property("slide").toDouble() == 0.0);
+        });
+    }
+    std::vector<QQuickItem*> menuEntries(QObject* menu) const {
+        std::vector<QQuickItem*> entries;
+        const int n = menu->property("count").toInt();
+        for (int i = 0; i < n; ++i) {
+            QQuickItem* it = nullptr;
+            QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem*, it), Q_ARG(int, i));
+            const QVariant offered = it ? it->property("offered") : QVariant();
+            if (it && !it->inherits("QQuickMenuSeparator") && (!offered.isValid() || offered.toBool())) {
+                entries.push_back(it);
+            }
+        }
+        return entries;
+    }
+    /// The entry of `menu` that opens the submenu `name`
+    QQuickItem* submenuEntry(QObject* menu, const char* name) const {
+        for (QQuickItem* it: menuEntries(menu)) {
+            auto* sub = it->property("subMenu").value<QObject*>();
+            if (sub && sub->objectName() == name) {
+                return it;
+            }
+        }
+        return nullptr;
+    }
+    /// The rows of the menu sheet, shown now
+    std::vector<QQuickItem*> sheetRows() const {
+        std::vector<QQuickItem*> rows;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (i->objectName() == "menuSheetRow" && i->isVisible()) {
+                rows.push_back(i);
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(sheet()->property("contentItem").value<QQuickItem*>());
+        return rows;
+    }
+    /// The sheet's row for the menu entry `name` (or the entry of the submenu `name`)
+    QQuickItem* sheetRow(const char* name) const {
+        for (QQuickItem* row: sheetRows()) {
+            auto* entry = row->property("menuEntry").value<QObject*>();
+            auto* sub = entry ? entry->property("subMenu").value<QObject*>() : nullptr;
+            if (entry && (entry->objectName() == name || (sub && sub->objectName() == name))) {
+                return row;
+            }
+        }
+        return nullptr;
+    }
+    /// A button of the window, shown (not scrolled away, inside the window)
+    bool shownInWindow(QQuickItem* item) const {
+        if (!item || !item->isVisible()) {
+            return false;
+        }
+        const QRectF r = sceneRect(item);
+        for (QQuickItem* p = item->parentItem(); p; p = p->parentItem()) {
+            if (p->clip() && !sceneRect(p).contains(r.adjusted(1, 1, -1, -1))) {
+                return false;
+            }
+        }
+        return insideWindow(r);
+    }
+    /// The menu `menu` has been opened (from `button`, if it has one): in the desktop classes inside the window, no
+    /// taller than it, as wide as its widest entry, and not over its button; in the phone classes the sheet shows it,
+    /// at the bottom of the window, with rows as tall as a finger needs and nothing cut off. Closed again afterwards.
+    void checkOpenMenu(const std::string& at, QObject* menu, QQuickItem* button = nullptr, bool noScrolling = false) {
+        const std::string name = menu->objectName().toStdString();
+        if (phoneClass()) {
+            QObject* s = sheet();
+            ASSERT_NE(s, nullptr);
+            ASSERT_TRUE(opened(s, true)) << at << ": " << name << " opens as a sheet";
+            EXPECT_EQ(s->property("menu").value<QObject*>(), menu) << at << ": " << name;
+            EXPECT_FALSE(menu->property("visible").toBool()) << at << ": " << name << ": the menu itself stays closed";
+            settled(s);
+            const QRectF r = popupRect(s);
+            EXPECT_TRUE(insideWindow(r)) << at << ": " << name << " sheet at " << r.x() << "," << r.y() << " "
+                                         << r.width() << "x" << r.height();
+            EXPECT_NEAR(r.bottom(), window->height(), 1.5) << at << ": " << name << ": at the bottom";
+            EXPECT_LE(r.height(), 0.85 * window->height() + 1) << at << ": " << name;
+            const auto rows = sheetRows();
+            EXPECT_FALSE(rows.empty()) << at << ": " << name;
+            for (QQuickItem* row: rows) {
+                const QString text = row->property("text").toString();
+                EXPECT_GE(row->height(), 48) << at << ": " << name << ": " << text.toStdString();
+                auto* content = row->property("contentItem").value<QQuickItem*>();
+                ASSERT_NE(content, nullptr);
+                const double needed = content->implicitWidth() + row->property("leftPadding").toDouble() +
+                                      row->property("rightPadding").toDouble();
+                EXPECT_LE(needed, row->width() + 0.5) << at << ": " << name << ": \"" << text.toStdString()
+                                                      << "\" cut off";
+            }
+            QTest::keyClick(window, Qt::Key_Escape);
+            EXPECT_TRUE(opened(s, false)) << at << ": " << name << ": Esc closes the sheet";
+            return;
+        }
+        ASSERT_TRUE(opened(menu, true)) << at << ": " << name;
+        EXPECT_FALSE(sheet()->property("visible").toBool()) << at << ": " << name << ": a menu, no sheet";
+        settled(menu);
+        checkMenuGeometry(at, menu, button, noScrolling);
+        QMetaObject::invokeMethod(menu, "close");
+        EXPECT_TRUE(opened(menu, false)) << at << ": " << name;
+    }
+    void checkMenuGeometry(const std::string& at, QObject* menu, QQuickItem* button, bool noScrolling) {
+        const std::string name = menu->objectName().toStdString();
+        const QRectF r = popupRect(menu);
+        EXPECT_TRUE(insideWindow(r)) << at << ": " << name << " at " << r.x() << "," << r.y() << " " << r.width()
+                                     << "x" << r.height();
+        EXPECT_LE(r.height(), window->height()) << at << ": " << name;
+        const double room = menu->property("availableWidth").toDouble();
+        for (QQuickItem* it: menuEntries(menu)) {
+            EXPECT_LE(it->implicitWidth(), room + 0.5)
+                    << at << ": " << name << ": \"" << it->property("text").toString().toStdString() << "\" cut off";
+        }
+        if (button && shownInWindow(button)) {
+            EXPECT_FALSE(r.adjusted(1, 1, -1, -1).intersects(sceneRect(button)))
+                    << at << ": " << name << " lies over the button it came from";
+        }
+        if (noScrolling) {
+            auto* list = menu->property("contentItem").value<QQuickItem*>();
+            ASSERT_NE(list, nullptr);
+            EXPECT_LE(list->property("contentHeight").toDouble(), list->height() + 0.5)
+                    << at << ": " << name << " fits without scrolling";
+        }
+    }
+    /// ⋮: at most 12 entries at the top; each of its submenus fits too (desktop, if `submenus`)
+    void checkMoreMenu(const std::string& at, bool submenus) {
+        auto* button = findItem("moreButton");
+        auto* more = window->findChild<QObject*>("moreMenu");
+        ASSERT_NE(button, nullptr);
+        ASSERT_NE(more, nullptr);
+        EXPECT_LE(menuEntries(more).size(), 12u) << at << ": ⋮ has at most 12 entries at the top";
+        QMetaObject::invokeMethod(button, "clicked");
+        checkOpenMenu(at, more, button, sizeClass() == "desktopWide");
+        if (phoneClass() || !submenus) {
+            return;
+        }
+        QMetaObject::invokeMethod(button, "clicked");
+        ASSERT_TRUE(opened(more, true));
+        for (const char* subName: {"moreDocumentMenu", "moreExportMenu", "morePageMenu", "moreViewMenu"}) {
+            QQuickItem* entry = submenuEntry(more, subName);
+            ASSERT_NE(entry, nullptr) << at << ": " << subName;
+            auto* sub = entry->property("subMenu").value<QObject*>();
+            QTest::mouseMove(window, centerOf(entry));
+            QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(entry));
+            ASSERT_TRUE(opened(sub, true)) << at << ": " << subName;
+            settled(sub);
+            checkMenuGeometry(at, sub, nullptr, false);
+            EXPECT_TRUE(more->property("visible").toBool()) << at << ": ⋮ stays open beside " << subName;
+        }
+        QMetaObject::invokeMethod(more, "dismiss");
+        EXPECT_TRUE(opened(more, false));
+        QTest::mouseMove(window, QPoint(-20, -20));
+    }
+    /// The page menu of the sidebar (a popup of its own): inside the window, or a sheet at the bottom on phones
+    void checkPageMenu(const std::string& at) {
+        QObject* pageMenu = findItem("sidebar")->findChild<QObject*>("pageMenu");
+        ASSERT_NE(pageMenu, nullptr);
+        QMetaObject::invokeMethod(pageMenu, "openFor", Q_ARG(QVariant, 0),
+                                  Q_ARG(QVariant, QVariant::fromValue(static_cast<QObject*>(window->contentItem()))),
+                                  Q_ARG(QVariant, window->width() - 20), Q_ARG(QVariant, window->height() - 20));
+        ASSERT_TRUE(opened(pageMenu, true)) << at;
+        wait(50);
+        const QRectF r = popupRect(pageMenu);
+        EXPECT_TRUE(insideWindow(r)) << at << ": the page menu at " << r.x() << "," << r.y() << " " << r.width()
+                                     << "x" << r.height();
+        EXPECT_EQ(pageMenu->property("asSheet").toBool(), phoneClass()) << at;
+        if (phoneClass()) {
+            EXPECT_NEAR(r.bottom(), window->height(), 1.5) << at << ": the page menu's sheet at the bottom";
+        }
+        QTest::keyClick(window, Qt::Key_Escape);
+        EXPECT_TRUE(opened(pageMenu, false)) << at;
+    }
+    void checkHomeMenus(const std::string& at) {
+        auto* libraryButton = findItem("libraryMenuButton");
+        auto* libraryMenu = window->findChild<QObject*>("libraryMenu");
+        ASSERT_NE(libraryButton, nullptr);
+        ASSERT_NE(libraryMenu, nullptr);
+        QMetaObject::invokeMethod(libraryButton, "clicked");
+        checkOpenMenu(at, libraryMenu, libraryButton);
+        // A card's ⋮ (in a short window the grid is scrolled to show one)
+        QQuickItem* cardButton = nullptr;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (!cardButton && i->objectName() == "cardMenuButton" && i->isVisible()) {
+                cardButton = i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(window->contentItem());
+        if (cardButton && !shownInWindow(cardButton)) {
+            QQuickItem* flick = cardButton->parentItem();
+            while (flick && !flick->inherits("QQuickFlickable")) {
+                flick = flick->parentItem();
+            }
+            auto* content = flick ? flick->property("contentItem").value<QQuickItem*>() : nullptr;
+            if (content) {
+                const QRectF r = cardButton->mapRectToItem(content, QRectF(0, 0, cardButton->width(), cardButton->height()));
+                flick->setProperty("contentY", r.bottom() + 8 - flick->height());
+                wait(100);
+            }
+        }
+        ASSERT_NE(cardButton, nullptr) << at << ": a card with its ⋮";
+        QMetaObject::invokeMethod(cardButton, "clicked");
+        checkOpenMenu(at, window->findChild<QObject*>("homeItemMenu"), cardButton);
+    }
 
     QTemporaryDir tmp;
     fs::path root;
@@ -284,24 +524,37 @@ protected:
 };
 
 // At each size: the class, the sidebar (beside the page only where there is room), and nothing of the home screen and
-// the document outside the window
-void AdaptiveLayoutTest::checkSizes(const std::vector<WindowSize>& sizes) {
+// the document outside the window; the menus: ⋮ (its submenus at 1280x800 and in the full walk), the page menu, the
+// library menu and a card's menu fit in the window, or are a sheet in the phone classes
+void AdaptiveLayoutTest::checkSizes(const std::vector<WindowSize>& sizes, bool layout, bool menus) {
     openDocument();
+    const bool fullWalk = !qEnvironmentVariableIsEmpty("XQT_UI_ADAPTIVE");
     for (const WindowSize& s: sizes) {
         resize(s.w, s.h);
         const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
-        EXPECT_EQ(sizeClass(), xqt::AdaptiveLayout::classify(s.w, s.h)) << at;
-        const bool room = sizeClass().startsWith("desktop") && s.w >= xqt::adaptive::SIDEBAR_ROOM_PX;
-        EXPECT_EQ(flag("sidebarShown"), room) << at << ": the page sidebar beside the page only where there is room";
-        EXPECT_EQ(findItem("sidebar")->isVisible(), room) << at;
-        expectInside("doc");
-        if (sizeClass() == "desktopWide") {
-            expectLater(moreButtonShown(), at + ": the tool bar's ⋮ shown without scrolling",
-                        "qt/adaptive-toolbar: ⋮ pinned outside the scrolling row");
+        if (layout) {
+            EXPECT_EQ(sizeClass(), xqt::AdaptiveLayout::classify(s.w, s.h)) << at;
+            const bool room = sizeClass().startsWith("desktop") && s.w >= xqt::adaptive::SIDEBAR_ROOM_PX;
+            EXPECT_EQ(flag("sidebarShown"), room) << at << ": the page sidebar beside the page only where there is room";
+            EXPECT_EQ(findItem("sidebar")->isVisible(), room) << at;
+            expectInside("doc");
+            if (sizeClass() == "desktopWide") {
+                expectLater(moreButtonShown(), at + ": the tool bar's ⋮ shown without scrolling",
+                            "qt/adaptive-toolbar: ⋮ pinned outside the scrolling row");
+            }
+        }
+        if (menus) {
+            checkMoreMenu(at, fullWalk || (s.w == 1280 && s.h == 800));
+            checkPageMenu(at);
         }
         controller->setHomeVisible(true);
         wait(250);
-        expectInside("home");
+        if (layout) {
+            expectInside("home");
+        }
+        if (menus) {
+            checkHomeMenus(at);
+        }
         controller->setHomeVisible(false);
         wait(150);
     }
@@ -309,28 +562,131 @@ void AdaptiveLayoutTest::checkSizes(const std::vector<WindowSize>& sizes) {
 
 }  // namespace
 
-TEST_F(AdaptiveLayoutTest, classesSidebarAndControlsAtFiveSizes) {
-    checkSizes({{1920, 1080, "desktop-fhd"},
-                {1280, 800, "laptop-16x10"},
-                {960, 1392, "surface-200-portrait"},
-                {412, 915, "phone-portrait"},
-                {915, 412, "phone-landscape"}});
+const std::vector<WindowSize> fiveSizes{{1920, 1080, "desktop-fhd"},
+                                        {1280, 800, "laptop-16x10"},
+                                        {960, 1392, "surface-200-portrait"},
+                                        {412, 915, "phone-portrait"},
+                                        {915, 412, "phone-landscape"}};
 
-    // The ⋮ menu is taller than a laptop's window (F3.1)
-    resize(1280, 800);
+TEST_F(AdaptiveLayoutTest, classesSidebarAndControlsAtFiveSizes) {
+    checkSizes(fiveSizes, true, false);
+}
+
+// The menus (qt/adaptive-menus): no menu taller or wider than the window, none of its entries cut off, none over the
+// button it came from; ⋮ has at most 12 entries at the top and fits without scrolling in a wide desktop window; in the
+// phone classes the menus are a bottom sheet
+TEST_F(AdaptiveLayoutTest, menusFitAtFiveSizes) {
+    checkSizes(fiveSizes, false, true);
+}
+
+// On a phone the menus are a bottom sheet: a submenu drills in (the sheet shows its entries, with a back arrow and its
+// title), Esc goes back a level, and a row does what its entry does. A row of controls (the layout menu's columns)
+// comes along into the sheet and goes back into the menu. The tab menu's rename starts once the sheet is gone.
+TEST_F(AdaptiveLayoutTest, menusAreSheetsOnPhones) {
+    openDocument();
+    resize(412, 915);
+    ASSERT_EQ(sizeClass(), "phonePortrait");
+    QObject* s = sheet();
+    ASSERT_NE(s, nullptr);
+    auto* more = window->findChild<QObject*>("moreMenu");
+    auto menuShown = [&] {
+        auto* m = s->property("menu").value<QObject*>();
+        return m ? m->objectName().toStdString() : std::string();
+    };
+
     QMetaObject::invokeMethod(findItem("moreButton"), "clicked");
-    auto* menu = window->findChild<QObject*>("moreMenu");
-    ASSERT_NE(menu, nullptr);
-    until([&] { return menu->property("opened").toBool(); });
-    auto* list = menu->property("contentItem").value<QQuickItem*>();
-    expectLater(list && list->property("contentHeight").toDouble() <= window->height(),
-                "1280x800: the ⋮ menu fits without scrolling", "qt/adaptive-menus: the ⋮ regrouping");
-    QMetaObject::invokeMethod(menu, "close");
+    ASSERT_TRUE(opened(s, true));
+    settled(s);
+    auto* back = findItem("menuSheetBack");
+    ASSERT_NE(back, nullptr);
+    EXPECT_FALSE(back->isVisible()) << "at the top: no way back";
+    ASSERT_NE(sheetRow("moreDocumentMenu"), nullptr);
+    EXPECT_EQ(sheetRow("renameDocumentItem"), nullptr) << "inside Document";
+    click(sheetRow("moreDocumentMenu"));
+    EXPECT_EQ(menuShown(), "moreDocumentMenu") << "drilled in";
+    EXPECT_NE(sheetRow("renameDocumentItem"), nullptr);
+    EXPECT_EQ(sheetRow("shareItem"), nullptr);
+    EXPECT_TRUE(back->isVisible());
+    EXPECT_EQ(findItem("menuSheetTitle")->property("text").toString(), "Document");
+    click(back);
+    EXPECT_EQ(s->property("menu").value<QObject*>(), more) << "back at the top";
+    EXPECT_NE(sheetRow("shareItem"), nullptr);
+
+    // Two levels deep; Esc goes up one
+    click(sheetRow("moreViewMenu"));
+    ASSERT_NE(sheetRow("toolbarPositionMenu"), nullptr);
+    click(sheetRow("toolbarPositionMenu"));
+    EXPECT_NE(sheetRow("toolbarLeftItem"), nullptr);
+    QTest::keyClick(window, Qt::Key_Escape);
+    wait(50);
+    EXPECT_EQ(menuShown(), "moreViewMenu") << "Esc: a level up";
+    EXPECT_TRUE(s->property("opened").toBool());
+
+    // A row triggers its entry, and the sheet closes
+    click(sheetRow("allPagesItem"));
+    EXPECT_TRUE(opened(s, false));
+    auto* grid = findItem("pageGrid");
+    ASSERT_NE(grid, nullptr);
+    until([&] { return grid->isVisible(); });
+    EXPECT_TRUE(grid->isVisible()) << "View → All pages";
+    QMetaObject::invokeMethod(grid, "close");
+    until([&] { return !grid->isVisible(); });
+
+    // The layout menu's columns come along, and go back into the menu
+    auto* layoutButton = findItem("layoutButton");
+    ASSERT_NE(layoutButton, nullptr);
+    QMetaObject::invokeMethod(layoutButton, "pressAndHold");
+    ASSERT_TRUE(opened(s, true));
+    EXPECT_EQ(menuShown(), "layoutMenu");
+    settled(s);
+    auto* moreColumns = findItem("moreColumnsButton");
+    ASSERT_NE(moreColumns, nullptr);
+    EXPECT_TRUE(moreColumns->isVisible()) << "the columns row, in the sheet";
+    EXPECT_TRUE(insideWindow(sceneRect(moreColumns)));
+    const int columns = controller->property("viewColumns").toInt();
+    click(moreColumns);
+    EXPECT_EQ(controller->property("viewColumns").toInt(), columns + 1);
+    EXPECT_TRUE(s->property("opened").toBool()) << "a row of controls leaves the sheet open";
+    QTest::keyClick(window, Qt::Key_Escape);
+    EXPECT_TRUE(opened(s, false));
+
+    // The tab menu: its title on top; Rename starts the rename in the tab once the sheet is gone
+    auto* list = findItem("tabList");
+    ASSERT_NE(list, nullptr);
+    QQuickItem* tab = nullptr;
+    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, tab), Q_ARG(int, controller->currentTab()));
+    ASSERT_NE(tab, nullptr);
+    QObject* tabMenu = tab->findChild<QObject*>("tabMenu");
+    ASSERT_NE(tabMenu, nullptr);
+    QMetaObject::invokeMethod(tabMenu, "openMenu", Q_ARG(QVariant, QVariant()), Q_ARG(QVariant, QVariant()));
+    ASSERT_TRUE(opened(s, true));
+    EXPECT_EQ(findItem("menuSheetTitle")->property("text").toString(), tab->property("title").toString());
+    settled(s);
+    click(sheetRow("renameTabItem"));
+    EXPECT_TRUE(opened(s, false));
+    until([&] { return tab->property("renaming").toBool(); });
+    EXPECT_TRUE(tab->property("renaming").toBool()) << "the rename starts once the sheet is gone";
+    QTest::keyClick(window, Qt::Key_Escape);
+    wait(50);
+
+    // Back on the desktop: the layout menu is a menu again, with its columns
+    resize(1280, 800);
+    QMetaObject::invokeMethod(layoutButton, "pressAndHold");
+    auto* layoutMenu = window->findChild<QObject*>("layoutMenu");
+    ASSERT_TRUE(opened(layoutMenu, true));
+    EXPECT_FALSE(s->property("visible").toBool());
+    settled(layoutMenu);
+    EXPECT_TRUE(moreColumns->isVisible());
+    EXPECT_TRUE(popupRect(layoutMenu).contains(sceneRect(moreColumns))) << "the columns row given back to the menu";
+    checkMenuGeometry("1280x800", layoutMenu, layoutButton, true);
+    QMetaObject::invokeMethod(layoutMenu, "close");
+    EXPECT_TRUE(opened(layoutMenu, false));
 }
 
 // (skipped in SetUp unless XQT_UI_ADAPTIVE is set: about a minute)
 TEST_F(AdaptiveLayoutTest, allSizesOfTheAudit) {
-    checkSizes(std::vector<WindowSize>(std::begin(xqt::uitest::auditSizes), std::end(xqt::uitest::auditSizes)));
+    checkSizes(std::vector<WindowSize>(std::begin(xqt::uitest::auditSizes), std::end(xqt::uitest::auditSizes)), true,
+               true);
 }
 
 // The sidebar hidden by hand stays hidden in that class only; without room its button opens it as a drawer, which a

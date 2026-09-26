@@ -63,16 +63,16 @@ the text has a bookmark of its own (the page's).
 
 ## Conversions
 
-- **Export as Markdown** (⋮, shown for a PDF text document and for any notes document with a page Markdown text):
-  writes `name.md`, the flows of the document in page order (several flows joined with a page break between
+- **Export as Markdown** (⋮ → Export, shown for a PDF text document and for any notes document with a page Markdown
+  text): writes `name.md`, the flows of the document in page order (several flows joined with a page break between
   them). In Xournal++ files mode it goes next to the document (asking before it replaces a file); in PDF files
   mode, and for a document not saved yet, a save dialog asks where (nothing is written next to files unasked).
   Its pictures go into `name.assets/` next to it (links into another `….assets/` folder, from an older name of the
   document, are rewritten to it).
-- **Open as PDF document** (⋮ of a `.md`; its pictures are packed into the PDF): a new PDF text document from the text
-  as it is now (unsaved changes included), built as "Edit as notes" builds its notes, saved at once as a PDF with
-  notes next to the `.md` (`name.pdf`, or `name (2).pdf` when that name is taken), and opened with the cursor in the
-  text. The `.md` is not touched.
+- **Open as PDF document** (⋮ → Document of a `.md`; its pictures are packed into the PDF): a new PDF text document from
+  the text as it is now (unsaved changes included), built as "Edit as notes" builds its notes, saved at once as a PDF
+  with notes next to the `.md` (`name.pdf`, or `name (2).pdf` when that name is taken), and opened with the cursor in
+  the text. The `.md` is not touched.
 
 ## Editing a PDF text document
 

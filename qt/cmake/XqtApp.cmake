@@ -189,6 +189,10 @@ set(XQT_QML_FILES
     src/app/qml/NotePill.qml
     src/app/qml/SelectionPill.qml
     src/app/qml/Popups.js
+    src/app/qml/AdaptiveMenu.qml
+    src/app/qml/AdaptiveMenuItem.qml
+    src/app/qml/MenuSheet.qml
+    src/app/qml/MenuSheetHandle.qml
     src/app/qml/MarkdownFormatBar.qml
     src/app/qml/MarkdownTableEditor.qml
     src/app/qml/LookUpMenu.qml

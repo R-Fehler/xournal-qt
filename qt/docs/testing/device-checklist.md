@@ -2162,3 +2162,33 @@ See [adaptive-layout.md](../adaptive-layout.md).
       drawer; the sidebar switch is finger-sized.
 - [ ] Fold 7 unfolded (about 900 × 1000): "a tablet in portrait" (not a phone): the drawer, not a docked sidebar.
       Fold and unfold: the class follows, and each keeps its own choice.
+
+## Adaptive menus (qt/adaptive-menus)
+See [adaptive-layout.md](../adaptive-layout.md), "Menus". Entries of ⋮ named in older sections of this list now sit
+one level deeper: Rename…, Open externally, Edit anyway…, Edit as notes, Open as PDF document, Remove unused images…,
+Linked from… and Copy link to this page under **Document**; the exports under **Export**; Insert pages / image / sticky
+note, Background, Page size, Space for notes and Start a chapter under **Page**; All pages, All open documents, Full
+screen, Present, Present without controls, Hide the tool bar and Tool bar position under **View**.
+- [ ] Desktop, a document, window maximized: ⋮ has Save as…, Share…, Print… (Ctrl+P), Bookmark this page, Add to
+      favourites, Document ▸, Export ▸, Page ▸, View ▸, Settings (Ctrl+,). It opens below the ⋮ button, nothing is
+      cut off ("Bookmark this page", "Export for the archive…" whole), and it needs no scrolling.
+- [ ] Hover or click Document, Export, Page, View: each submenu opens beside ⋮ and fits in the window. View → Tool bar
+      position → Left: the tools move to the left. The keyboard: arrows, Right into a submenu, Left out, Return, Esc.
+- [ ] A `.md`: Document has Edit as notes, Open as PDF document, Remove unused images…; there is no Save as and no
+      Page. A PDF text document: Export → Export as Markdown.
+- [ ] A small window (800 × 600): ⋮ still opens below its button; the rest scrolls, and a scroll bar shows it. It
+      never covers the tab strip or the ⋮ button.
+- [ ] The library's ▾ menu (the libraries), a card's ⋮, a tab's menu (right click), the layout menu (right click the
+      columns button of the view pill): as wide as their entries, inside the window, not over their button.
+- [ ] View → Read (only the page): the tool bar and pills go; the faint dot in the lower left corner brings them back.
+- [ ] Android, Fold 7 folded (412 wide): ⋮ opens as a sheet from the bottom with a handle, the page dimmed, rows as
+      tall as a finger. Tap Document: the sheet shows its entries with a back arrow and "Document"; the arrow goes
+      back. View → Tool bar position: a second level. The back key: a level up, then closes the sheet.
+- [ ] Drag the sheet's handle down: it follows the finger and closes; a short drag springs back. A tap on the dimmed
+      page closes it without drawing.
+- [ ] Phone: the library ▾ menu, a card's ⋮ (the file's name on top), press and hold a tab (its name on top; Rename
+      starts the rename in the tab), the layout menu (press and hold the columns button: the Columns − n + row works in
+      the sheet), a page in the sidebar drawer (press and hold: the page menu as a sheet with bigger buttons). All
+      above the navigation bar (gesture bar or three buttons), nothing under it.
+- [ ] Fold 7 in landscape (short): the sheet is 640 px wide in the middle, at most 85 % of the height, and scrolls.
+- [ ] Unfold while a sheet is open: it closes; ⋮ is a menu again on the unfolded screen.

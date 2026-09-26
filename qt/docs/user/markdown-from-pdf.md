@@ -18,8 +18,8 @@ The links in `name.md` point to `name.assets/…`. So the images must end up in 
 to `name.md`, and then every Markdown editor shows them.
 
 ## The easy way: xournal-qt
-Open the PDF in xournal-qt and choose **⋮ → Export as Markdown**. It writes `name.md` and the `name.assets` folder
-with its pictures where you choose; when you keep your documents as Xournal++ files it writes
+Open the PDF in xournal-qt and choose **⋮ → Export → Export as Markdown**. It writes `name.md` and the `name.assets`
+folder with its pictures where you choose; when you keep your documents as Xournal++ files it writes
 `name.md` next to the document instead, and asks before it replaces a file of that name. This works on Linux,
 Windows and Android.
 
@@ -56,8 +56,8 @@ With poppler (`pdfdetach`, in `poppler-utils`): `pdfdetach -list name.pdf`, then
 each file, and move the images into `name.assets`.
 
 ## Going the other way
-Open a `.md` in xournal-qt and choose **⋮ → Open as PDF document**: a new `name.pdf` is made next to it (`name
-(2).pdf` when that name is taken) and opened; the `.md` stays as it is. The PDF carries `name.md` again and the
+Open a `.md` in xournal-qt and choose **⋮ → Document → Open as PDF document**: a new `name.pdf` is made next to it
+(`name (2).pdf` when that name is taken) and opened; the `.md` stays as it is. The PDF carries `name.md` again and the
 pictures the text shows as `name.assets/…`.
 
 Handwriting on a text page stays where you drew it when the text above it gets longer or shorter: move it yourself

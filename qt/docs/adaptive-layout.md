@@ -121,6 +121,68 @@ Three separate things (audit D5):
 
 This block changes the chrome only by hand. Automatic chrome per class comes with `qt/compact-chrome`.
 
+## Menus (`qt/adaptive-menus`)
+
+`AdaptiveMenu.qml` is the menu of the app's main menus: ⋮, the library menu, the card menus of the home screen (and
+the page-with-hits menu of a card), the tab menu and the layout menu. `PageMenu.qml` (the page menu of the sidebar
+and the page grid, a popup of icons) follows the same rules.
+
+- **Desktop and tablet classes**: a `Menu`
+  - as wide as its widest entry (`entryWidth`, a binding over the entries offered; 200 to 420 px, never wider than
+    the window minus 16), so no entry is cut off;
+  - never taller than the window; what does not fit scrolls, with a scroll bar that shows it (`menuScrollBar`);
+  - never over the button it came from: from a button (an anchor up to 96 px high) in the upper half of the window it
+    opens below it and at most down to the window's bottom, from one in the lower half above it. A menu opened at a
+    press on something big (a card, a page) opens at the press;
+  - rows of `minTarget` (48 in the touch profile, 40 without), keyboard navigation and Esc as a `Menu` has them.
+- **Phone classes** (the layout class is phone portrait, phone short or tiny; "Adapt the layout" off keeps the menus):
+  the menu itself stays closed and **`MenuSheet.qml`** shows its entries, one sheet per window (`menuSheet` in
+  `Main.qml`):
+  - a bottom sheet, as wide as the window (at most 640 px, centred), at most 85 % of the window high (the rest
+    scrolls), above the bottom safe area (`win.safeBottom`, set by `main.cpp` from the window's safe area margins on
+    Qt 6.9+);
+  - rows of at least 48 px; a check mark for a checked choice, an arrow for a submenu;
+  - **a submenu drills in**: the sheet shows its entries, with a back arrow and its title (and deeper: View → Tool
+    bar position). A menu with a `title` (the tab menu: the tab's name; a card's menu: the file's name) shows it on
+    top;
+  - a drag down on the handle or a tap beside it closes it; **Esc and Android's back key** go back a level, and close it
+    at the top; the arrow keys, Return and Space work too;
+  - a row triggers its entry as the menu would (a checkable one toggles first), and the menu's `aboutToShow`,
+    `aboutToHide` and `closed` are sent as if it had opened (the tab menu starts its rename on `closed`);
+  - what is not an entry comes along: a separator as a line, a label as a caption, anything else (the layout menu's
+    columns row) is borrowed from the menu while the sheet shows it and given back after.
+  The page menu is a sheet of its own in the phone classes (`asSheet`: across the bottom, with the handle, buttons of
+  `minTarget`).
+
+How a menu uses it:
+
+- Open it with `Popups.openAt(menu, pos)` or `menu.openMenu(pos, anchor)`, not `popup()`: only these know the sheet
+  and keep it clear of its button.
+- Entries that come and go are `AdaptiveMenuItem`s with **`offered`**, not `visible`: every item of a closed menu
+  reads as invisible, and the sheet asks while the menu is closed. A separator that comes and goes gets a `property
+  bool offered` too. A submenu is an `AdaptiveMenu` with a `title`, and its `offered` hides its entry.
+
+### The ⋮ menu
+
+Ten entries at the top (about 450 px high, 530 with the touch profile), the rest one level deeper:
+
+| Top level | Inside |
+| --- | --- |
+| Save as… (not for text files) | |
+| Share… | |
+| Print… (Ctrl+P) | |
+| Bookmark this page / Remove the bookmark of this page | |
+| Add to favourites / Remove from favourites | |
+| **Document ▸** | Rename…, Open externally, Edit anyway (as plain text)…, Edit as notes, Open as PDF document, Remove unused images…, Linked from…, Copy link to this page |
+| **Export ▸** | Export as plain PDF…, Export for the archive…, Export as Markdown |
+| **Page ▸** (not for text files) | Insert pages…, Insert image…, Insert sticky note, Background of this page…, Page size…, Space for notes…, Start a chapter here… |
+| **View ▸** | All pages (Ctrl+Alt+G), All open documents, Full screen (F11), Present (F5), Present without controls (Ctrl+F5), Read (only the page: the reader chrome of this size class), Hide the tool bar, Tool bar position ▸ (Top, Left, Right) |
+| Settings (Ctrl+,) | |
+
+Entries that depend on the document (a `.md`: Edit as notes, Open as PDF document, Remove unused images; a text
+file: no Save as, no Page) are left out as before. "Markdown source beside the page" stays in the menu of the writing
+button.
+
 ## The collapse ladder (what the later blocks build)
 
 The author's decisions of 2026-09-26 on the audit's proposals:
@@ -130,7 +192,7 @@ The author's decisions of 2026-09-26 on the audit's proposals:
 | 0 | desktop wide, room for the sidebar | everything as today; the tool bar grouped (colors, widths), ⋮ pinned | `qt/adaptive-toolbar` |
 | 1 | window < ~1110 px, or tablet portrait | the sidebar is a drawer (**done**) | this block |
 | 1b | tablet portrait (a 2-in-1 or Surface upright) | **two tool rows** at the top by default, all important tools shown; "two rows at the bottom" (closer to the fingertips) as the class's choice; no side chrome that narrows the page: an A4 page stays well visible | `qt/adaptive-toolbar` |
-| 2 | phone portrait (w < 600) or short (h < 560) | the compact chrome in the window: tab dots, and a **bottom tool dock** in phone portrait (the tool square with the pen pill in landscape); dialogs and menus as sheets | `qt/compact-chrome`, `qt/adaptive-menus`, `qt/adaptive-dialogs` |
+| 2 | phone portrait (w < 600) or short (h < 560) | the compact chrome in the window: tab dots, and a **bottom tool dock** in phone portrait (the tool square with the pen pill in landscape); dialogs and menus as sheets (menus: **done**) | `qt/compact-chrome`, `qt/adaptive-menus`, `qt/adaptive-dialogs` |
 | 3 | **tiny only** (w or h < 360) | the reader chrome, automatically; everywhere else "Read" is a manual choice | `qt/compact-chrome` |
 
 ## How a later block plugs in
@@ -173,8 +235,15 @@ that rework their screens:
   profile, and the chrome apart from the window state. What a later block fixes is listed as known in the test
   (`knownOutside`, `expectLater`): it prints `[ KNOWN ]` with the block's name, and `[ NOW HOLDS ]` once fixed, so
   that block makes the check strict.
-- `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizes*'`: the same checks at all 18 sizes of
-  the audit (about 15 s), with a `[ WALK ]` line per screen (outside, hidden by scrolling, small).
+- `AdaptiveLayoutTest.menusFitAtFiveSizes` (about 15 s): at the same five sizes, ⋮ (its four submenus at 1280×800),
+  the page menu, the library menu and a card's menu lie inside the window, no taller than it, no entry cut off, not
+  over their button; ⋮ has at most 12 entries at the top and needs no scrolling in desktop wide; in the phone classes
+  they open as the sheet, at the bottom, with rows of 48 px. `AdaptiveLayoutTest.menusAreSheetsOnPhones`: the drill-in
+  (two levels), the back arrow, Esc a level up, a row that triggers its entry, the layout menu's columns row borrowed
+  and given back, the tab menu's rename after the sheet closed.
+- `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizes*'`: the same checks (with the menus
+  and all submenus) at all 18 sizes of the audit (about 70 s), with a `[ WALK ]` line per screen (outside, hidden by
+  scrolling, small).
 - `SettingsModelTest.layoutChoicesPerSizeClass` (label `shell`): the storage.
 - The audit's own walk (`XQT_UI_AUDIT`, pictures and `report.tsv`, now with the class) shares the walker
   (`qt/tests/ui/LayoutWalk.h`).

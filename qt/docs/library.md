@@ -132,8 +132,8 @@ Where:
 - **A tab**: a **double click** with the mouse on the title of the tab that is shown edits it in place, the same way
   (the extension stays beside it). A double click on another tab only shows that tab (its first click does). The tab's
   menu (right click, or press and hold with a finger) has **Rename…**, which shows that tab and edits its name.
-- **⋮ → Rename…**: a dialog with the name and the extension as fixed text, what goes with it (its PDF, its pictures),
-  and why a name cannot be used (OK waits for one that can).
+- **⋮ → Document → Rename…**: a dialog with the name and the extension as fixed text, what goes with it (its PDF, its
+  pictures), and why a name cannot be used (OK waits for one that can).
 - **The overview of open documents**: a double click (mouse) or a press and hold on a card's title edits it in place;
   Escape cancels the name, not the overview.
 

@@ -116,8 +116,8 @@ the last line break takes room only while the cursor is on it.
 
 ## Other text files (code, LaTeX, JSON, …)
 They open read-only, as before (one code block, highlighted by its extension), with a note that offers **Edit
-anyway** (also in ⋮). The first time for a file it warns: "This file is edited as plain text; the app does not know
-its format…" (OK / Cancel). OK edits it as plain text (as a `.txt`, in the same tab), and the file opens for
+anyway** (also in ⋮ → Document). The first time for a file it warns: "This file is edited as plain text; the app does
+not know its format…" (OK / Cancel). OK edits it as plain text (as a `.txt`, in the same tab), and the file opens for
 editing from then on without asking; the accepted files are listed in the config folder
 (`~/.config/xournal-qt/edit-as-text.json`, the last 500). A file that is not UTF-8, is over 2 MB or cannot be
 written says why and stays read-only.
@@ -141,22 +141,22 @@ written says why and stays read-only.
 
 ## Open externally
 Every file the app does not keep as a `.xopp` or PDF (a `.md`, a `.txt`, another text file, an image being written
-on) has **Open externally**: a button in the tool bar (an arrow out of a box), an entry in ⋮, and "Open externally"
-in the library card's menu (Markdown, text and other files, images; a `.xopp` that annotates an image hands over
-the image). It hands the file to the app the system has for it (`SystemApps`: `xdg-open` on Linux). A text file
+on) has **Open externally**: a button in the tool bar (an arrow out of a box), an entry in ⋮ → Document, and "Open
+externally" in the library card's menu (Markdown, text and other files, images; a `.xopp` that annotates an image hands
+over the image). It hands the file to the app the system has for it (`SystemApps`: `xdg-open` on Linux). A text file
 with unsaved changes asks first: **Save and open**, **Open without saving** or Cancel. When the other app changed
 the file, the tab reads it again (below) as soon as the window is looked at again.
 
 ## Edit as notes
-A `.md` has **Edit as notes** (a button in the tool bar, a notebook with a pen, and ⋮): it makes a new document of
-notes from the text as it is now, in a new tab next to the `.md`: the same A4 pages with the text as the page's
-Markdown text flowing over them (a Markdown box per page, drawn formatted; the text tool edits it as in any
+A `.md` has **Edit as notes** (a button in the tool bar, a notebook with a pen, and ⋮ → Document): it makes a new
+document of notes from the text as it is now, in a new tab next to the `.md`: the same A4 pages with the text as the
+page's Markdown text flowing over them (a Markdown box per page, drawn formatted; the text tool edits it as in any
 `.xopp`), and the pen writes on top of it. The `.md` stays as it is; ink never goes into a `.md`. The new tab is
 titled `name.xopp`, counts as unsaved until it is saved (closing asks), and saving suggests `name.xopp` next to the
 `.md`.
 
-**Open as PDF document** (⋮ of a `.md`) does the same and saves the notes at once as a PDF text document next to
-the `.md` (`name.pdf`, or `name (2).pdf`): a PDF with notes that also carries the text as `name.md` inside
+**Open as PDF document** (⋮ → Document of a `.md`) does the same and saves the notes at once as a PDF text document next
+to the `.md` (`name.pdf`, or `name (2).pdf`): a PDF with notes that also carries the text as `name.md` inside
 ([md-pdf.md](md-pdf.md)). The `.md` is not touched.
 
 **In the library the two are two cards** ("MD" and the notes), not one: after "Edit as notes" they go their own

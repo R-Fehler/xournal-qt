@@ -185,7 +185,7 @@ Rectangle {
         menuModel = model; menuRow = row; menuName = name; menuPath = path; menuFolder = isFolder
         menuKind = kind || ""
         menuPaths = model.pathsFor(row)
-        itemMenu.popup(item, x, y)
+        itemMenu.openMenu(Qt.point(x, y), item)
     }
 
     Connections {
@@ -365,10 +365,10 @@ Rectangle {
                 implicitWidth: 36
                 onClicked: Popups.openAt(libraryMenu)
                 // The libraries: this window shows one (highlighted); another one opens in a new window.
-                Menu {
+                AdaptiveMenu {
                     id: libraryMenu
                     objectName: "libraryMenu"
-                    width: 320
+                    minimumWidth: 300
                     property var libraries: []
                     onAboutToShow: libraries = app.libraries()
                     Label {
@@ -386,7 +386,7 @@ Rectangle {
                     Instantiator {
                         id: libraryList
                         model: libraryMenu.libraries
-                        delegate: MenuItem {
+                        delegate: AdaptiveMenuItem {
                             id: libraryItem
                             objectName: "libraryMenuEntry"
                             required property var modelData
@@ -408,25 +408,24 @@ Rectangle {
                         onObjectRemoved: function(index, object) { libraryMenu.removeItem(object) }
                     }
                     MenuSeparator {}
-                    MenuItem {
+                    AdaptiveMenuItem {
                         text: app.libraryWindows ? qsTr("New library… (new window)") : qsTr("New library…")
                         onTriggered: newLibraryDialog.open()
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "openFolderAsLibraryItem"
                         text: app.libraryWindows ? qsTr("Open a folder as library… (new window)") : qsTr("Open a folder as library…")
                         onTriggered: home.pickLibraryFolder()
                     }
                     // (not on Android: there is no file manager the app could show a folder in reliably)
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "libraryShowInFileManagerItem"
                         text: qsTr("Show in file manager")
                         enabled: app.library.available
-                        visible: app.canShowInFileManager
-                        height: visible ? implicitHeight : 0
+                        offered: app.canShowInFileManager
                         onTriggered: app.showInFileManager(app.library.rootPath)
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "exportLibraryArchiveItem"
                         text: qsTr("Export library as archive…")
                         enabled: app.library.available && !app.libraryArchive.running
@@ -1393,25 +1392,25 @@ Rectangle {
         }
     }
 
-    Menu {
+    AdaptiveMenu {
         id: itemMenu
         objectName: "homeItemMenu"
-        MenuItem {
+        title: home.menuMany ? home.countText(home.menuPaths.length) : home.menuName  // (at the top of the sheet on phones)
+        AdaptiveMenuItem {
             text: home.menuMany ? qsTr("Open %1").arg(home.countText(home.menuPaths.length))
                                 : home.menuKind === "library" ? qsTr("Open library")
                                 : home.menuFolder ? qsTr("Open folder") : qsTr("Open")
             onTriggered: home.openAll(home.menuPaths, home.menuModel)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "openAsReferenceItem"
             text: qsTr("Open as reference")
             // Beside the document open now (without one it is simply opened)
-            visible: !home.menuMany && !home.menuFolder && app.tabs.count > 0
+            offered: !home.menuMany && !home.menuFolder && app.tabs.count > 0
                      && ["notes", "pdf", "md", "image", "text"].indexOf(home.menuKind) >= 0
-            height: visible ? implicitHeight : 0
             onTriggered: app.openAsReference(home.menuPath)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             id: favouriteItemRef
             objectName: "favouriteItem"
             // (asked when the menu opens: the star is kept beside the document)
@@ -1419,55 +1418,48 @@ Rectangle {
             text: starred ? qsTr("Remove from favourites") : qsTr("Add to favourites")
             icon.source: app.iconUrl(starred ? "xqt-star-filled" : "xqt-star")
             icon.color: "transparent"
-            visible: !home.menuMany && !home.menuFolder && ["notes", "pdf", "md", "image", "text"].indexOf(home.menuKind) >= 0
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && !home.menuFolder && ["notes", "pdf", "md", "image", "text"].indexOf(home.menuKind) >= 0
             onTriggered: app.setFavouriteFile(home.menuPath, !starred)
             Connections {
                 target: itemMenu
                 function onAboutToShow() { favouriteItemRef.starred = app.isFavouriteFile(home.menuPath) }
             }
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "openAsLibraryItem"
             text: app.libraryWindows ? qsTr("Open as library (new window)") : qsTr("Open as library")
-            visible: !home.menuMany && home.menuFolder && home.menuModel === app.library
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && home.menuFolder && home.menuModel === app.library
             onTriggered: app.openLibraryAt(home.menuPath)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "selectItem"
             text: qsTr("Select")
-            visible: !home.menuMany && home.menuModel && home.menuModel.selectionCount === 0 && home.menuKind !== "library"
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && home.menuModel && home.menuModel.selectionCount === 0 && home.menuKind !== "library"
             onTriggered: home.menuModel.toggleSelected(home.menuRow)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "renameItem"
             text: qsTr("Rename…")
-            visible: !home.menuMany && home.menuKind !== "library"
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && home.menuKind !== "library"
             onTriggered: renameDialog.open()
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "copyToItem"
             text: qsTr("Copy to…")
             enabled: app.library.available
-            visible: home.menuKind !== "library"
-            height: visible ? implicitHeight : 0
+            offered: home.menuKind !== "library"
             onTriggered: home.askTransfer(home.menuPaths, true)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "moveToItem"
             text: qsTr("Move to…")
             enabled: app.library.available
-            visible: home.menuKind !== "library"
-            height: visible ? implicitHeight : 0
+            offered: home.menuKind !== "library"
             onTriggered: home.askTransfer(home.menuPaths, false)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             text: qsTr("Show in its folder")
-            visible: !home.menuMany && home.menuModel === app.library && (home.searching || app.library.flat) && !home.menuFolder
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && home.menuModel === app.library && (home.searching || app.library.flat) && !home.menuFolder
             onTriggered: {
                 searchField.text = ""
                 app.library.searchQuery = ""
@@ -1475,50 +1467,44 @@ Rectangle {
                 app.library.folder = app.library.relativeFolder(home.menuPath.substring(0, home.menuPath.lastIndexOf("/")))
             }
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "openWithSystemAppItem"
             text: qsTr("Open externally")
             // Markdown, text and other files, images: in the app the system has for them (not notes and PDFs)
             readonly property string file: !home.menuMany && ["md", "image", "text", "other"].indexOf(home.menuKind) >= 0
                                            ? app.externalFileOf(home.menuPath) : ""
-            visible: file !== ""
-            height: visible ? implicitHeight : 0
+            offered: file !== ""
             onTriggered: app.openWithSystemApp(file)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "copyLinkItem"
             text: qsTr("Copy link")
             // A link to the document, to paste into notes (qt/docs/links.md)
-            visible: !home.menuMany && !home.menuFolder && home.menuKind !== "library" && home.menuKind !== "other"
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && !home.menuFolder && home.menuKind !== "library" && home.menuKind !== "other"
             onTriggered: app.copyDocumentLink(home.menuPath)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "shareCardItem"
             text: qsTr("Share…")
-            visible: !home.menuMany && !home.menuFolder && ["pdf", "notes", "md", "text"].indexOf(home.menuKind) >= 0
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && !home.menuFolder && ["pdf", "notes", "md", "text"].indexOf(home.menuKind) >= 0
             onTriggered: home.shareRequested(home.menuPath)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "showInFileManagerItem"
             text: qsTr("Show in file manager")
-            visible: !home.menuMany && app.canShowInFileManager
-            height: visible ? implicitHeight : 0
+            offered: !home.menuMany && app.canShowInFileManager
             onTriggered: app.showInFileManager(home.menuPath)
         }
         MenuSeparator {}
-        MenuItem {
+        AdaptiveMenuItem {
             text: qsTr("Remove from this list")
-            visible: home.menuModel === app.recent
-            height: visible ? implicitHeight : 0
+            offered: home.menuModel === app.recent
             onTriggered: app.recent.removePaths(home.menuPaths)
         }
-        MenuItem {
+        AdaptiveMenuItem {
             objectName: "trashItem"
             text: qsTr("Move to trash…")
-            visible: home.menuKind !== "library"  // (a library is never trashed from the Recent grid)
-            height: visible ? implicitHeight : 0
+            offered: home.menuKind !== "library"  // (a library is never trashed from the Recent grid)
             onTriggered: home.askTrash(home.menuModel, home.menuPaths)
         }
     }

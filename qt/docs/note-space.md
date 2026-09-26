@@ -118,7 +118,7 @@ crop box as before (`placementOf`), so they land at the right places; an archive
 
 ## The dialog "Space for notes"
 
-`NoteSpaceDialog.qml`, from the page menu (an icon in its grid: this page, or the selected pages) and from the More menu
+`NoteSpaceDialog.qml`, from the page menu (an icon in its grid: this page, or the selected pages) and from ⋮ → Page
 ("Space for notes…": all pages; all pages with a PDF background when there are any).
 
 - Four amounts (left, right, top, bottom) in **% of the slide** (the default: the presets are relative) or in **cm**

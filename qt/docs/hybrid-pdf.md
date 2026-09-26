@@ -353,9 +353,9 @@ check failed.
 
 ### Export for the archive (per document)
 
-- **⋮ → Export for the archive…** (not for Markdown and text files) and **Share… → For the archive (PDF/A)** (the tab
-  menu and a library card's Share too) open a dialog that says what it means, in the author's words: "A PDF made for
-  keeping (PDF/A-3). It stays readable for decades in any PDF viewer. Your ink is merged into the pages, so no
+- **⋮ → Export → Export for the archive…** (not for Markdown and text files) and **Share… → For the archive (PDF/A)**
+  (the tab menu and a library card's Share too) open a dialog that says what it means, in the author's words: "A PDF
+  made for keeping (PDF/A-3). It stays readable for decades in any PDF viewer. Your ink is merged into the pages, so no
   viewer can hide or lose it. The full Xournal data is embedded, so this app can still open it for editing."
 - Where it goes: **next to the document as `name.archive.pdf`** (the default; `lecture.notes.pdf` gives
   `lecture.archive.pdf`; an archive PDF itself gets `name.archive (2).pdf`, never its own file), or **in a folder I

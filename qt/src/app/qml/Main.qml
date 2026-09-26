@@ -25,6 +25,8 @@ ApplicationWindow {
     property var afterDiscardCheck: null
     /// The part of the window's top under the system's status bar (edge to edge on Android; set by main.cpp)
     property real safeTop: 0
+    /// The part of the window's bottom under the system's navigation bar (edge to edge on Android; set by main.cpp)
+    property real safeBottom: 0
     property bool quitting: false
 
     // --- the layout for the window's size (qt/docs/adaptive-layout.md) --------------------------------------------
@@ -40,6 +42,8 @@ ApplicationWindow {
     /// What was chosen by hand in this size class ("": the automatic choice): "sidebar", "chrome", later "toolbar"
     function layoutChoice(what) { return (app.settings.revision, app.settings.layoutChoice(adaptive.layoutClass, what)) }
     function chooseLayout(what, value) { app.settings.setLayoutChoice(adaptive.layoutClass, what, value) }
+    /// The bottom sheet that the menus (AdaptiveMenu) become in the phone classes, one for the window
+    MenuSheet { id: menuSheet }
 
     // The page sidebar: beside the page when there is room for it (the page keeps ~900 px; not in portrait or on a
     // phone), unless it was hidden or shown by hand in this size class. Without room, its button opens it as a
@@ -945,137 +949,149 @@ ApplicationWindow {
                 iconName: "xqt-more"
                 tip: qsTr("More")
                 onClicked: Popups.openAt(moreMenu)
-                Menu {
+                // The ⋮ menu (qt/docs/adaptive-layout.md, "Menus"): the frequent actions at the top level, the rest in
+                // four submenus (a sheet with drill-in on phones). Every entry of the tool bar that is here too
+                // (image, sticky note, full screen, present) is still one tap there.
+                AdaptiveMenu {
                     id: moreMenu
                     objectName: "moreMenu"
-                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
-                    // Its name (qt/rename): the file, and what belongs to it, as the library renames it
-                    MenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
-                    // A favourite: a star kept beside the file, never in it (qt/docs/bookmarks.md)
-                    MenuItem {
-                        objectName: "favouriteDocumentItem"
-                        visible: app.canFavourite
-                        height: visible ? implicitHeight : 0
-                        text: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
-                        icon.source: app.iconUrl(app.favourite ? "xqt-star-filled" : "xqt-star")
-                        icon.color: "transparent"
-                        onTriggered: app.favourite = !app.favourite
-                    }
-                    MenuItem {
+                    AdaptiveMenuItem { objectName: "saveAsItem"; offered: !win.textDoc; text: qsTr("Save as…"); onTriggered: openSaveDialog(null) }
+                    AdaptiveMenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
+                    AdaptiveMenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
+                    AdaptiveMenuItem {
                         objectName: "bookmarkPageItem"
                         readonly property bool marked: (app.bookmarks, app.isBookmarked(app.pageNumber - 1))
-                        visible: app.canBookmark
-                        height: visible ? implicitHeight : 0
+                        offered: app.canBookmark
                         text: marked ? qsTr("Remove the bookmark of this page") : qsTr("Bookmark this page")
                         icon.source: app.iconUrl(marked ? "xqt-bookmark-filled" : "xqt-bookmark")
                         icon.color: "transparent"
                         onTriggered: app.toggleBookmark(app.pageNumber - 1)
                     }
-                    MenuItem { objectName: "shareItem"; text: qsTr("Share…"); onTriggered: shareDialog.openFor("") }
-                    MenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
-                    MenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); onTriggered: backlinksDialog.show() }
-                    MenuItem {
-                        objectName: "editAsNotesItem"
-                        visible: app.textDocument === "markdown"
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Edit as notes (to write on with the pen)")
-                        onTriggered: app.editAsNotes()
+                    // A favourite: a star kept beside the file, never in it (qt/docs/bookmarks.md)
+                    AdaptiveMenuItem {
+                        objectName: "favouriteDocumentItem"
+                        offered: app.canFavourite
+                        text: app.favourite ? qsTr("Remove from favourites") : qsTr("Add to favourites")
+                        icon.source: app.iconUrl(app.favourite ? "xqt-star-filled" : "xqt-star")
+                        icon.color: "transparent"
+                        onTriggered: app.favourite = !app.favourite
                     }
-                    // Text documents as PDF (qt/docs/md-pdf.md): a .md as a new PDF text document; the Markdown of
-                    // a document's page texts as a .md
-                    MenuItem {
-                        objectName: "openAsPdfDocumentItem"
-                        visible: app.textDocument === "markdown"
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Open as PDF document")
-                        onTriggered: app.openAsPdfDocument()
-                    }
-                    MenuItem {
-                        objectName: "unusedImagesItem"
-                        visible: app.textDocument === "markdown"
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Remove unused images…")
-                        onTriggered: unusedImagesDialog.show()
-                    }
-                    MenuItem {
-                        objectName: "exportMarkdownItem"
-                        visible: !win.textDoc && app.hasMarkdownText
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Export as Markdown")
-                        onTriggered: win.exportMarkdown()
-                    }
-                    MenuItem {
-                        objectName: "openExternallyItem"
-                        visible: app.canOpenExternally
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Open externally")
-                        onTriggered: win.openExternally()
-                    }
-                    MenuItem {
-                        objectName: "editAnywayItem"
-                        visible: app.canEditAnyway
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Edit anyway (as plain text)…")
-                        onTriggered: app.editAnyway(false)
-                    }
-                    // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type of
-                    // Save as)
-                    MenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); onTriggered: openExportDialog() }
-                    // A PDF/A for keeping: the ink merged into the pages, the Xournal data inside
-                    MenuItem {
-                        objectName: "exportArchiveItem"
-                        visible: !win.textDoc
-                        height: visible ? implicitHeight : 0
-                        text: qsTr("Export for the archive…")
-                        onTriggered: archiveDialog.openFor("")
-                    }
-                    MenuItem { objectName: "printItem"; text: qsTr("Print… (Ctrl+P)"); onTriggered: printDialog.open() }
-                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
                     MenuSeparator {}
-                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
-                    MenuItem { objectName: "insertStickyNoteItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert sticky note"); onTriggered: app.insertStickyNote() }
-                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
-                    MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
-                    // Another paper size for this page, the selected pages or all of them (PageSizeDialog)
-                    MenuItem { objectName: "pageSizeItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Page size…"); onTriggered: pageSizeDialog.openFor([app.pageNumber - 1]) }
-                    // Writing space beside the slides of all pages (qt/docs/note-space.md)
-                    MenuItem { objectName: "noteSpaceItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Space for notes…"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
-                    MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
-                    MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
-                    MenuSeparator {}
-                    MenuItem { text: qsTr("Settings"); onTriggered: settingsPage.open() }
-                    MenuItem {
-                        objectName: "hideToolbarItem"
-                        text: app.toolbarHidden ? qsTr("Show the tool bar") : qsTr("Hide the tool bar")
-                        onTriggered: app.toolbarHidden = !app.toolbarHidden
-                    }
-                    MenuItem {
-                        objectName: "presentItem"
-                        text: qsTr("Present (F5)")
-                        onTriggered: win.startPresenting()
-                    }
-                    MenuItem {
-                        objectName: "presentCleanItem"
-                        text: qsTr("Present without controls (Ctrl+F5)")
-                        onTriggered: win.startPresenting(true)
-                    }
-                    MenuItem {
-                        objectName: "fullScreenItem"
-                        text: win.fullScreenMode ? qsTr("Leave full screen (F11)") : qsTr("Full screen (F11)")
-                        onTriggered: win.fullScreenMode = !win.fullScreenMode
-                    }
-                    Menu {
-                        title: qsTr("Tool bar position")
-                        component PositionItem: MenuItem {
-                            property string position
-                            checkable: true
-                            checked: app.toolbarPosition === position
-                            onTriggered: app.toolbarPosition = position
+                    // The document as a file: its name, other apps, other ways of editing it, links
+                    AdaptiveMenu {
+                        objectName: "moreDocumentMenu"
+                        title: qsTr("Document")
+                        // Its name (qt/rename): the file, and what belongs to it, as the library renames it
+                        AdaptiveMenuItem { objectName: "renameDocumentItem"; text: qsTr("Rename…"); onTriggered: renameDocumentDialog.openFor(app.currentTab) }
+                        AdaptiveMenuItem {
+                            objectName: "openExternallyItem"
+                            offered: app.canOpenExternally
+                            text: qsTr("Open externally")
+                            onTriggered: win.openExternally()
                         }
-                        PositionItem { text: qsTr("Top"); position: "top" }
-                        PositionItem { text: qsTr("Left"); position: "left" }
-                        PositionItem { text: qsTr("Right"); position: "right" }
+                        AdaptiveMenuItem {
+                            objectName: "editAnywayItem"
+                            offered: app.canEditAnyway
+                            text: qsTr("Edit anyway (as plain text)…")
+                            onTriggered: app.editAnyway(false)
+                        }
+                        AdaptiveMenuItem {
+                            objectName: "editAsNotesItem"
+                            offered: app.textDocument === "markdown"
+                            text: qsTr("Edit as notes (to write on with the pen)")
+                            onTriggered: app.editAsNotes()
+                        }
+                        // Text documents as PDF (qt/docs/md-pdf.md): a .md as a new PDF text document
+                        AdaptiveMenuItem {
+                            objectName: "openAsPdfDocumentItem"
+                            offered: app.textDocument === "markdown"
+                            text: qsTr("Open as PDF document")
+                            onTriggered: app.openAsPdfDocument()
+                        }
+                        AdaptiveMenuItem {
+                            objectName: "unusedImagesItem"
+                            offered: app.textDocument === "markdown"
+                            text: qsTr("Remove unused images…")
+                            onTriggered: unusedImagesDialog.show()
+                        }
+                        AdaptiveMenuItem { objectName: "linkedFromItem"; text: qsTr("Linked from…"); onTriggered: backlinksDialog.show() }
+                        AdaptiveMenuItem { objectName: "copyPageLinkItem"; text: qsTr("Copy link to this page"); onTriggered: app.copyPageLink(-1) }
                     }
+                    AdaptiveMenu {
+                        objectName: "moreExportMenu"
+                        title: qsTr("Export")
+                        // A plain PDF: the notes drawn into the pages (a PDF with notes that stays editable is a type
+                        // of Save as)
+                        AdaptiveMenuItem { objectName: "exportPdfItem"; text: qsTr("Export as plain PDF…"); onTriggered: openExportDialog() }
+                        // A PDF/A for keeping: the ink merged into the pages, the Xournal data inside
+                        AdaptiveMenuItem {
+                            objectName: "exportArchiveItem"
+                            offered: !win.textDoc
+                            text: qsTr("Export for the archive…")
+                            onTriggered: archiveDialog.openFor("")
+                        }
+                        // The Markdown of the document's page texts as a .md (qt/docs/md-pdf.md)
+                        AdaptiveMenuItem {
+                            objectName: "exportMarkdownItem"
+                            offered: !win.textDoc && app.hasMarkdownText
+                            text: qsTr("Export as Markdown")
+                            onTriggered: win.exportMarkdown()
+                        }
+                    }
+                    // The pages (a text file has none to add)
+                    AdaptiveMenu {
+                        objectName: "morePageMenu"
+                        title: qsTr("Page")
+                        offered: !win.textDoc
+                        AdaptiveMenuItem { objectName: "insertPagesItem"; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
+                        AdaptiveMenuItem { objectName: "insertImageItem"; text: qsTr("Insert image…"); onTriggered: imageDialog.open() }
+                        AdaptiveMenuItem { objectName: "insertStickyNoteItem"; text: qsTr("Insert sticky note"); onTriggered: app.insertStickyNote() }
+                        AdaptiveMenuItem { objectName: "pageBackgroundItem"; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
+                        // Another paper size for this page, the selected pages or all of them (PageSizeDialog)
+                        AdaptiveMenuItem { objectName: "pageSizeItem"; text: qsTr("Page size…"); onTriggered: pageSizeDialog.openFor([app.pageNumber - 1]) }
+                        // Writing space beside the slides of all pages (qt/docs/note-space.md)
+                        AdaptiveMenuItem { objectName: "noteSpaceItem"; text: qsTr("Space for notes…"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
+                        AdaptiveMenuItem { objectName: "chapterItem"; text: qsTr("Start a chapter here…"); onTriggered: chapterDialog.openFor(app.pageNumber - 1) }
+                    }
+                    // How the document is shown: overviews, full screen, presenting, reading, the tool bar
+                    AdaptiveMenu {
+                        objectName: "moreViewMenu"
+                        title: qsTr("View")
+                        AdaptiveMenuItem { objectName: "allPagesItem"; text: qsTr("All pages (Ctrl+Alt+G)"); onTriggered: pageGrid.open() }
+                        AdaptiveMenuItem { objectName: "allDocumentsItem"; text: qsTr("All open documents"); onTriggered: tabOverview.open() }
+                        MenuSeparator {}
+                        AdaptiveMenuItem {
+                            objectName: "fullScreenItem"
+                            text: win.fullScreenMode ? qsTr("Leave full screen (F11)") : qsTr("Full screen (F11)")
+                            onTriggered: win.fullScreenMode = !win.fullScreenMode
+                        }
+                        AdaptiveMenuItem { objectName: "presentItem"; text: qsTr("Present (F5)"); onTriggered: win.startPresenting() }
+                        AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); onTriggered: win.startPresenting(true) }
+                        // The reader chrome of this window size: only the page; the mark in the lower left corner
+                        // brings the controls back (qt/docs/adaptive-layout.md)
+                        AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page)"); onTriggered: win.chooseChrome("reader") }
+                        MenuSeparator {}
+                        AdaptiveMenuItem {
+                            objectName: "hideToolbarItem"
+                            text: app.toolbarHidden ? qsTr("Show the tool bar") : qsTr("Hide the tool bar")
+                            onTriggered: app.toolbarHidden = !app.toolbarHidden
+                        }
+                        AdaptiveMenu {
+                            objectName: "toolbarPositionMenu"
+                            title: qsTr("Tool bar position")
+                            component PositionItem: AdaptiveMenuItem {
+                                property string position
+                                checkable: true
+                                checked: app.toolbarPosition === position
+                                onTriggered: app.toolbarPosition = position
+                            }
+                            PositionItem { objectName: "toolbarTopItem"; text: qsTr("Top"); position: "top" }
+                            PositionItem { objectName: "toolbarLeftItem"; text: qsTr("Left"); position: "left" }
+                            PositionItem { objectName: "toolbarRightItem"; text: qsTr("Right"); position: "right" }
+                        }
+                    }
+                    MenuSeparator {}
+                    AdaptiveMenuItem { objectName: "settingsItem"; text: qsTr("Settings (Ctrl+,)"); onTriggered: settingsPage.open() }
                 }
             }
         }
@@ -1305,30 +1321,28 @@ ApplicationWindow {
                     acceptedDevices: PointerDevice.Mouse  // not a finger: touch has no buttons
                     onTapped: function(point) { Popups.openAt(layoutMenu, point.position) }
                 }
-                Menu {
+                AdaptiveMenu {
                     id: layoutMenu
                     objectName: "layoutMenu"
                     // A text file (.md, .txt): A4 pages, or one continuous page that grows with the text
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "textPagesItem"
-                        visible: win.textDoc && app.textEditable
-                        height: visible ? implicitHeight : 0
+                        offered: win.textDoc && app.textEditable
                         text: qsTr("Text on pages")
                         checkable: true
                         checked: !app.textContinuous
                         onTriggered: app.textContinuous = false
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "textContinuousItem"
-                        visible: win.textDoc && app.textEditable
-                        height: visible ? implicitHeight : 0
+                        offered: win.textDoc && app.textEditable
                         text: qsTr("Text on one continuous page")
                         checkable: true
                         checked: app.textContinuous
                         onTriggered: app.textContinuous = true
                     }
-                    MenuSeparator { visible: win.textDoc && app.textEditable; height: visible ? implicitHeight : 0 }
-                    MenuItem {
+                    MenuSeparator { property bool offered: win.textDoc && app.textEditable; visible: offered; height: offered ? implicitHeight : 0 }
+                    AdaptiveMenuItem {
                         objectName: "onePageItem"
                         text: app.horizontalScrolling ? qsTr("Pages in one row") : qsTr("One page per row")
                         checkable: true
@@ -1339,13 +1353,13 @@ ApplicationWindow {
                             else app.viewColumns = 1
                         }
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         text: qsTr("Two pages side by side")
                         checkable: true
                         checked: app.pairedPages && app.pairsOffset === 0
                         onTriggered: { app.viewColumns = 2; app.pairsOffset = 0; app.pairedPages = true }
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         text: qsTr("Book (cover page alone)")
                         checkable: true
                         checked: app.pairedPages && app.pairsOffset === 1
@@ -1384,14 +1398,14 @@ ApplicationWindow {
                         }
                     }
                     MenuSeparator {}
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "sidewaysItem"
                         text: qsTr("Scroll sideways")
                         checkable: true
                         checked: app.horizontalScrolling
                         onTriggered: app.horizontalScrolling = !app.horizontalScrolling
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "snapPagesItem"
                         text: qsTr("Stop on whole pages")
                         enabled: app.horizontalScrolling

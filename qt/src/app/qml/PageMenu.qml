@@ -12,7 +12,17 @@ Popup {
     objectName: "pageMenu"
     parent: Overlay.overlay
     padding: 6
+    focus: true  // (Esc, Android's back: closes it)
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    // In the phone classes a bottom sheet (as the menus, AdaptiveMenu): across the bottom, with a handle to drag it
+    // away, the page dimmed; the buttons as big as a finger needs (qt/docs/adaptive-layout.md, "Menus")
+    readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
+    property bool asSheet: false
+    readonly property int target: adaptiveLayout && adaptiveLayout.touchProfile ? adaptiveLayout.minTarget : 44
+    readonly property real safeBottom: typeof win !== "undefined" && win && win.safeBottom ? win.safeBottom : 0
+    modal: asSheet
+    dim: asSheet
+    bottomPadding: asSheet ? 12 + safeBottom : 6
 
     property int page: 0
     /// The document was shown beside itself at the page (the page grid closes then)
@@ -22,35 +32,62 @@ Popup {
     readonly property int lastPage: pages[pages.length - 1]
 
     /// Open it where the page was pressed (`x`, `y` in the coordinates of `item`), and keep it inside the window.
+    /// In the phone classes: a sheet at the bottom instead.
     function openFor(p, item, x, y) {
         page = p
-        const at = item.mapToItem(Overlay.overlay, x, y)
-        menu.x = Math.max(8, Math.min(at.x, Overlay.overlay.width - menu.width - 8))
-        menu.y = Math.max(8, Math.min(at.y, Overlay.overlay.height - menu.height - 8))
+        asSheet = adaptiveLayout !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptiveLayout.layoutClass) >= 0
+        if (asSheet) {
+            handle.offset = 0
+            menu.width = Qt.binding(function() { return Math.min(Overlay.overlay.width, 640) })
+            menu.x = Qt.binding(function() { return Math.round((Overlay.overlay.width - menu.width) / 2) })
+            menu.y = Qt.binding(function() { return Overlay.overlay.height - menu.height + handle.offset })
+        } else {
+            menu.width = Qt.binding(function() { return menu.implicitWidth })
+            // (bindings: its size is known only once it is laid out)
+            const at = item.mapToItem(Overlay.overlay, x, y)
+            menu.x = Qt.binding(function() { return Math.max(8, Math.min(at.x, Overlay.overlay.width - menu.width - 8)) })
+            menu.y = Qt.binding(function() { return Math.max(8, Math.min(at.y, Overlay.overlay.height - menu.height - 8)) })
+        }
         open()
     }
 
     background: Rectangle {
-        radius: 12
+        radius: menu.asSheet ? 16 : 12
         color: "#ffffff"
-        border.width: 1
+        border.width: menu.asSheet ? 0 : 1
         border.color: "#d5d8dc"
+        Rectangle {  // (a sheet: square at the bottom, where it rests on the window's edge)
+            visible: menu.asSheet
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: parent.radius
+            color: parent.color
+        }
     }
 
     component PageAction: IconButton {
-        implicitWidth: 44
-        implicitHeight: 44
+        implicitWidth: menu.target
+        implicitHeight: menu.target
         icon.width: 21
         icon.height: 21
     }
     component PageLine: ItemDelegate {
         Layout.fillWidth: true
-        implicitHeight: 38
+        implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
         font.pixelSize: 14
     }
 
     ColumnLayout {
+        width: parent ? parent.width : implicitWidth  // (a sheet: as wide as the window)
         spacing: 2
+        MenuSheetHandle {
+            id: handle
+            objectName: "pageMenuHandle"
+            visible: menu.asSheet
+            Layout.fillWidth: true
+            onDismissed: menu.close()
+        }
         GridLayout {
             columns: 6
             columnSpacing: 0
@@ -155,7 +192,7 @@ Popup {
                 id: bookmarkAction
                 objectName: "pageMenuBookmark"
                 visible: app.canBookmark
-                implicitHeight: 38
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
                 readonly property string mark: (app.bookmarks, menu.visible ? app.bookmarkOf(menu.page) : "")
                 iconName: mark !== "" ? "xqt-bookmark-filled" : "xqt-bookmark"
                 icon.color: "transparent"
