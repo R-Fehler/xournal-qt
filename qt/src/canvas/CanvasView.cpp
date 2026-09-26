@@ -90,6 +90,9 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     rebuildPages();
     // (a tap or a drag moves the cursor of the text being written: the emoji suggestions follow)
     connect(this, &CanvasView::updateRequested, this, &CanvasView::refreshEmojiCompletion);
+    // (and every change of the Markdown being written, also one that only moves the cursor or selects: the
+    // formatting bar's edits, MarkdownEditor::applyEdit, do not come as keys)
+    connect(this, &CanvasView::markdownCursorChanged, this, &CanvasView::refreshEmojiCompletion);
 
     connect(&viewController, &ViewController::zoomChanged, this, [this] {
         // Like upstream: while zooming, show the existing buffers scaled and render sharp only once the zoom is stable.
