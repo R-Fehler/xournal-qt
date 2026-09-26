@@ -636,6 +636,14 @@
   first heading or chapter, else "Page N"), ribbons on page pictures, a Bookmarks section in the contents sidebar,
   one undo step each. Open: Markdown documents, plain PDF export, reading back edits made in other PDF apps.
 
+- **Bookmarks in Markdown, `qt/md-bookmarks` (2026-09-26).** `<!-- xqt:bookmark label -->` on its own line before a
+  block, in `.md` files and PDF text documents (found by md4c: only top-level HTML blocks, never in code); hidden in
+  the in-place editor (no space; the cursor skips it; Backspace/Delete remove the line), kept with the next block by
+  pagination, so its page follows the text. "Bookmark this page" edits the text (one undo step); the comments feed
+  the page bookmark field, so ribbons, the contents section and the PDF outline work unchanged. The library caches
+  them (Bookmarks tab, search). Page-attribute bookmarks on text pages from the earlier build become comments on
+  load. Open: continuous page mode, Markdown boxes and texts starting after page 1 keep the page attribute.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
