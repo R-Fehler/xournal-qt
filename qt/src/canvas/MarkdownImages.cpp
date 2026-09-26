@@ -67,7 +67,9 @@ std::string freeName(const fs::path& folder, const std::string& given) {
 }
 
 std::string linkFor(const Place& place, const std::string& name) {
-    return place.prefix + DocumentImages::linkEncoded(name);
+    // The folder is written as an address too ("my notes.assets/" -> "my%20notes.assets/"): a link with blanks or
+    // brackets as they are is not a link in Markdown. (linkEncoded keeps the '/'.)
+    return DocumentImages::linkEncoded(place.prefix) + DocumentImages::linkEncoded(name);
 }
 
 bool isPictureName(const QString& name) {

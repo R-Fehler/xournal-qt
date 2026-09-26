@@ -236,6 +236,27 @@ TEST_F(TextPdf, exportAsMarkdownWritesTheText) {
 // next to it); opened, they are in its work folder in the app cache; an incremental save adds a new one and keeps the
 // ones it has; a full write drops those the text does not link to; Export as Markdown writes them next to the .md;
 // Open as PDF document packs a .md's pictures.
+// A .md whose name has blanks: the link to its picture is written as an address ("my%20notes.assets/…"), so that it
+// resolves (the author: a link with the blanks as they are did not).
+TEST_F(TextPdf, aPictureOfAMarkdownFileWithBlanksInItsNameIsLinkedSoItResolves) {
+    AppController c;
+    c.setLibraryRoot(root);
+    const fs::path md = root / "my notes (draft).md";
+    std::ofstream(md) << "# Notes\n";
+    ASSERT_TRUE(c.openPath(QString::fromStdString(md.string())));
+    QImage green(30, 10, QImage::Format_RGB32);
+    green.fill(Qt::green);
+    QString error;
+    const auto link = MarkdownImages::savePicture(current(c), green, error, QDateTime(QDate(2026, 9, 26), QTime(8, 0)));
+    ASSERT_TRUE(link) << error.toStdString();
+    EXPECT_EQ(*link, "my%20notes%20%28draft%29.assets/image-2026-09-26-080000.png");
+    EXPECT_TRUE(fs::exists(root / "my notes (draft).assets" / "image-2026-09-26-080000.png"));
+    const std::string found = md::images::resolve(*link);
+    ASSERT_FALSE(found.empty()) << "the link resolves";
+    EXPECT_TRUE(fs::equivalent(fs::path(std::u8string(found.begin(), found.end())),
+                               root / "my notes (draft).assets" / "image-2026-09-26-080000.png"));
+}
+
 TEST_F(TextPdf, picturesAreCarriedInsideAPdfTextDocument) {
     AppController c;
     Choice choice(c);
