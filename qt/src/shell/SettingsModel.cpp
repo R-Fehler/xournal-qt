@@ -108,6 +108,16 @@ QSizeF SettingsModel::paperSize(int index) {
     return {PAPER_FORMATS[static_cast<size_t>(index)].width, PAPER_FORMATS[static_cast<size_t>(index)].height};
 }
 
+int SettingsModel::paperFormatOf(double width, double height) {
+    const double w = std::min(width, height), h = std::max(width, height);
+    for (size_t i = 0; i < PAPER_FORMATS.size(); ++i) {
+        if (std::abs(PAPER_FORMATS[i].width - w) < 1 && std::abs(PAPER_FORMATS[i].height - h) < 1) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
 SettingsModel::SettingsModel(AppContext& app, QObject* parent):
         QObject(parent), app(app), settings(*app.getSettings()) {
     Settings& s = settings;

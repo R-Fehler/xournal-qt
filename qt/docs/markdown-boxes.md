@@ -66,6 +66,10 @@ shows each page's source). A page is split only where the rest reads the same on
 A page break (`<div style="page-break-after: always"></div>`, the formatting bar's "Page break") ends the page after
 it; it is not drawn ([md-editor.md](md-editor.md), "Page breaks").
 
+When the pages get another size (the page menu's "Page size…"), the text flows anew on them at their new width and
+margins: cards added or gone as with typing, all in the one undo step of the size change
+(`qt/src/canvas/PageResize.h`).
+
 A part that continues the page before starts with a comment, `<!-- xqt:cont … -->` (not shown), which says what was
 added for the page (a fence, a table header), so the parts give exactly the text again. A block that cannot be split
 and is higher than a page (a long quote) stays on its page and goes below its bottom margin; the editor

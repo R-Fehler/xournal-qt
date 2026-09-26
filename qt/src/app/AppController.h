@@ -904,6 +904,20 @@ public:
                                    double bottom, bool relative);
     /// A blank page (the size of the slide) after each page of `scope` instead. One undo step. Returns how many.
     Q_INVOKABLE int insertBlankAfterPages(int scope, const QList<int>& pages);
+    /// Changing the size of pages (qt/src/canvas/PageResize.h). Ask the window for its dialog, for these pages
+    /// (0-based; empty: the current page; several: the selection).
+    Q_INVOKABLE void requestPageSize(const QList<int>& pages) { Q_EMIT pageSizeRequested(pages); }
+    /// A page's size: { width, height (points), paper (index in paperFormats, either way round; -1: none), landscape,
+    /// text ("74 × 105 mm", portrait), pdf, possible (not in a text file) }.
+    Q_INVOKABLE QVariantMap pageSizeOf(int page) const;
+    /// All pages (0-based), for the dialog's "all pages".
+    Q_INVOKABLE QList<int> allPages() const;
+    /// What giving these pages width × height (points) would do: { pages (that change), pdfPages (left out: a PDF
+    /// background), outside (elements that would reach beyond the smaller page) }.
+    Q_INVOKABLE QVariantMap pageSizePreview(const QList<int>& pages, double width, double height) const;
+    /// Give these pages width × height (points): the content stays where it is, PDF pages keep theirs, the page's
+    /// text flows anew. One undo step. Returns how many pages changed.
+    Q_INVOKABLE int applyPageSize(const QList<int>& pages, double width, double height);
     /// Ask the window for the "new chapter" dialog on that page.
     Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
     /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.
@@ -1143,6 +1157,7 @@ Q_SIGNALS:
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QList<int>& pages);
     void noteSpaceRequested(const QList<int>& pages, bool allPages);
+    void pageSizeRequested(const QList<int>& pages);
     void printRequested(const QList<int>& pages);
     void chapterRequested(int page);
     void toolbarPositionChanged();

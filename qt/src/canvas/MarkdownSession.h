@@ -65,6 +65,11 @@ public:
     /// The width of a text box (points, its wrap width): its text flows anew. Returns the overflow. Not for the
     /// page's text, whose width is the page's between its margins.
     double setWidth(double width);
+    /// The page's text anew on its pages as they are now (their size changed: qt/src/canvas/PageResize.h), at their
+    /// margins. Returns the overflow.
+    double reflow();
+    /// The changes go into `group` instead of an undo step of their own (set before begin; nullptr: their own).
+    void recordInto(GroupUndoAction* group) { external = group; }
     /// Done. The edit is one undo step (made at the first change, so the document counts as modified).
     void finish();
     /// Back to the text as it was (pages added go again).
@@ -123,6 +128,7 @@ private:
     md::Pagination split;             ///< the last split onto the pages, of the text `splitText` (typing: splits again
     std::string splitText;            ///< from there, only the pages around the change)
     GroupUndoAction* undo = nullptr;  ///< the edit's undo step (on the undo stack since the first change)
+    GroupUndoAction* external = nullptr;  ///< recordInto
     bool pageText = true;
 };
 

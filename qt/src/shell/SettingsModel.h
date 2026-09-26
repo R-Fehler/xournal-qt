@@ -37,6 +37,8 @@ public:
     explicit SettingsModel(AppContext& app, QObject* parent = nullptr);
     /// Portrait size (points) of the paper format at `index` of paperFormats (invalid: none).
     static QSizeF paperSize(int index);
+    /// The paper format of a page of this size (points), either way round; -1: none.
+    static int paperFormatOf(double width, double height);
     /// Memory for kept page thumbnails (MB, setting "previewMemory"); applyPreviewMemory hands it to them.
     static int previewMemory(Settings& settings);
     static void applyPreviewMemory(Settings& settings);
@@ -60,6 +62,8 @@ public:
     QStringList paperFormats() const;
     /// The paper format at `index` is meant to be landscape (16:9): choosing it turns the page.
     Q_INVOKABLE bool paperIsWide(int index) const;
+    /// Portrait size (points) of the paper format at `index` (for QML: paperSize).
+    Q_INVOKABLE QSizeF paperFormatSize(int index) const { return paperSize(index); }
     /// The size of new pages as text ("100 × 150 mm"): for a size that is none of the paperFormats (paperFormat -1,
     /// e.g. set in Xournal++), which the dialogs offer as it is.
     Q_INVOKABLE QString templatePaperSize() const;
