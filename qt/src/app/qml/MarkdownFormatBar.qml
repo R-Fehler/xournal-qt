@@ -159,26 +159,17 @@ Rectangle {
                 tip: bar.format.table ? qsTr("Edit the table (rows, columns, alignment)") : qsTr("Insert a table")
                 onClicked: bar.tableRequested()
             }
-            FormatButton {
-                objectName: bar.named("mdInsert")
-                iconName: "xqt-plus"
-                tip: qsTr("Insert: formula, rule, image, page break")
-                onClicked: Popups.openAt(insertMenu)
-                Menu {
-                    id: insertMenu
-                    objectName: bar.named("mdInsertMenu")
-                    focus: false
-                    MenuItem { objectName: bar.named("mdMathBlockItem"); text: qsTr("Formula block ($$ … $$)"); icon.source: app.iconUrl("xqt-sigma"); onTriggered: bar.act("mathBlock") }
-                    MenuItem { objectName: bar.named("mdRuleItem"); text: qsTr("Horizontal rule (---)"); icon.source: app.iconUrl("xqt-rule"); onTriggered: bar.act("rule") }
-                    MenuItem { objectName: bar.named("mdImageItem"); text: qsTr("Image…"); icon.source: app.iconUrl("xopp-tool-image"); onTriggered: imagePicker.open() }
-                    MenuItem { objectName: bar.named("mdPageBreakItem"); text: qsTr("Page break"); icon.source: app.iconUrl("xqt-page-break"); onTriggered: bar.act("pageBreak") }
-                }
-            }
+            // Each tool is a button of its own: the row scrolls sideways when the window is too narrow, so nothing is
+            // hidden behind a menu (the author, 2026-09-26)
+            FormatButton { objectName: bar.named("mdMathBlock"); iconName: "xqt-sigma-block"; tool: "mathBlock"; tip: qsTr("Formula block ($$ … $$)") }
+            FormatButton { objectName: bar.named("mdImage"); iconName: "xopp-tool-image"; tip: qsTr("Image… (a picture file, saved with the document)"); onClicked: imagePicker.open() }
+            FormatButton { objectName: bar.named("mdRule"); iconName: "xqt-rule"; tool: "rule"; tip: qsTr("Horizontal rule (---)") }
+            FormatButton { objectName: bar.named("mdPageBreak"); iconName: "xqt-page-break"; tool: "pageBreak"; tip: qsTr("Page break") }
             Item { Layout.fillWidth: true }
         }
     }
 
-    // The image of the insert menu: a picture file, saved with the document and linked at the cursor
+    // The image button: a picture file, saved with the document and linked at the cursor
     // (qt/docs/md-images.md)
     FileDialog {
         id: imagePicker

@@ -40,8 +40,9 @@ without knowing Markdown's marks, grouped as in Typora, Obsidian and Zettlr:
   a line becomes a heading or a list item.
 - **Blocks**, on lines of their own with a blank line before and after (on an empty line; before the line when the
   cursor is at its start; else after the line): code block (a menu of languages; selected lines go inside the fence),
-  table (below), and in the **+** menu: formula block (`$$` lines), horizontal rule, image (a file picker: the
-  picture is copied into `name.assets/` and linked at the cursor, [md-images.md](md-images.md)), page break (below).
+  table (below), formula block (`$$` lines), image (a file picker: the
+  picture is copied into `name.assets/` and linked at the cursor, [md-images.md](md-images.md)), horizontal rule and
+  page break (below), each a button of its own (no "+" menu: the row scrolls sideways when the window is narrow).
 - **Pictures**: Ctrl+V with a picture on the clipboard saves it as `name.assets/image-YYYY-MM-DD-HHMMSS.png` and
   links it at the cursor; picture files dropped on the page are copied there and linked. One undo step each; undo
   leaves the files ([md-images.md](md-images.md)).

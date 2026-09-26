@@ -1490,8 +1490,8 @@ Update the table in the user doc with the results.
       each and ">" on the empty line.
 - [ ] Code block: its menu of languages; the fence goes on lines of its own with a blank line around it and the
       cursor inside; with lines selected, they go inside the fence.
-- [ ] + menu: formula block (`$$` lines, cursor inside), horizontal rule, image (a placeholder `![image](image.png)`
-      with the file name selected), page break. After a page break in a `.md` on pages, the next text starts on a new
+- [ ] Buttons (no "+" menu any more): formula block (`$$` lines, cursor inside; Σ in a frame), image (a file
+      picker), horizontal rule, page break. After a page break in a `.md` on pages, the next text starts on a new
       page; the break itself is not drawn (in the continuous page: nothing shows). Print to PDF: the same pages.
 - [ ] Every tool is one step of undo (Ctrl+Z, the undo button in a `.md`).
 - [ ] Table: tap it outside a table: "Insert table" with 3 columns, header and 2 rows. Type, Tab / Shift+Tab move,

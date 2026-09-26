@@ -7367,9 +7367,8 @@ TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFil
     ASSERT_TRUE(red.save(QString::fromStdString((outside / "my plot.png").string())));
 
     // The image of the insert menu: a file picker
-    click(find<QQuickItem>("mdInsert"));
-    ASSERT_TRUE(waitOpened(find<QObject>("mdInsertMenu"), true));
-    click(findItem("mdImageItem"));
+    EXPECT_EQ(find<QObject>("mdInsertMenu"), nullptr) << "no tool hidden behind a menu";
+    click(find<QQuickItem>("mdImage"));
     auto* dialog = find<QObject>("mdImageDialog");
     ASSERT_NE(dialog, nullptr);
     until([&] { return dialog->property("visible").toBool(); });
