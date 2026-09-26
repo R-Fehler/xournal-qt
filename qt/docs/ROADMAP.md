@@ -610,6 +610,14 @@
   and the ruling scale with the page (`PageMargins::rulingScale` through the `xoj::view::ruledScale` seam), so a
   flashcard is not one wide margin with three lines.
 
+- **Several notes selected at once; a note's text clipped while written, `qt/sticky-select` (2026-09-26).** Ctrl/Shift+
+  click with a select tool adds or removes a note or element; a rectangle or lasso started outside any note takes the
+  notes it fully encloses plus the page's elements. `MixedSelection` holds them in place (nothing leaves its layer);
+  one note alone keeps its own pill, one layer's elements stay an ordinary selection. Move (also onto another page),
+  delete, cut, paste are one undo step each; clipboard `application/x-xournal-qt-selection` + a PNG on request. While
+  written, a note's text is clipped to the note with the "more below" mark, and a label under the note says when the
+  cursor is below it. Open: adding by touch, colour/cover/resize for several notes, partly enclosed notes.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
