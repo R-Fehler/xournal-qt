@@ -1153,7 +1153,7 @@ TEST_F(HomeScreenTest, newMarkdownAndTextFilesAreMadeInTheFolderAndOpened) {
 
 // A new text document in PDF files mode (qt/docs/md-pdf.md): the menu offers "New text document…", which makes
 // "name.pdf", a PDF with notes, and opens it with the cursor in its text and the formatting bar; typing writes into
-// the text, and the pen stays the pen.
+// the text, the pen stays the pen, and ⋮ offers "Export as Markdown".
 TEST_F(HomeScreenTest, aNewTextDocumentIsAPdfInPdfFilesMode) {
     Settings& settings = *controller->context().getSettings();
     struct Back {  // (the tests share the config folder)
@@ -1200,6 +1200,17 @@ TEST_F(HomeScreenTest, aNewTextDocumentIsAPdfInPdfFilesMode) {
         std::shared_lock lock(*loaded.document);
         EXPECT_EQ(xqt::TextDocument::flowText(*loaded.document), "Hello world");
     }
+    // ⋮ → Export as Markdown is there (a .md's "Open as PDF document" is not)
+    QObject* more = find("moreMenu");
+    ASSERT_NE(more, nullptr);
+    QMetaObject::invokeMethod(more, "open");
+    ASSERT_TRUE(waitOpened(more, true));
+    auto* exportItem = find<QQuickItem>("exportMarkdownItem");
+    ASSERT_NE(exportItem, nullptr);
+    until([&] { return exportItem->isVisible(); });
+    EXPECT_TRUE(exportItem->isVisible());
+    EXPECT_FALSE(find<QQuickItem>("openAsPdfDocumentItem")->isVisible());
+    key(Qt::Key_Escape);
 }
 
 TEST_F(HomeScreenTest, severalDocumentsAreSelectedAndMovedIntoAFolder) {

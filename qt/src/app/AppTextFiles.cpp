@@ -292,9 +292,89 @@ bool AppController::createTextDocument(const QString& name) {
     return makeTextPdf(std::string(), pdf);
 }
 
+bool AppController::openAsPdfDocument() {
+    DocumentSession* s = session();
+    if (!s || !s->textFile() || s->hasFilePath() || s->textFile()->kind() != TextFile::Kind::Markdown) {
+        return false;
+    }
+    const fs::path md = s->textFile()->path();
+    const std::string text = s->currentText();  // (as it is here, saved or not)
+    fs::path pdf = md.parent_path() / (md.stem().string() + ".pdf");
+    std::error_code ec;
+    for (int i = 2; fs::exists(pdf, ec); ++i) {
+        pdf = md.parent_path() / (md.stem().string() + " (" + std::to_string(i) + ").pdf");
+    }
+    if (!makeTextPdf(text, pdf)) {
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("%1 made from %2, which stays as it is")
+                                  .arg(QString::fromStdString(pdf.filename().string()),
+                                       QString::fromStdString(md.filename().string())),
+                          false);
+    return true;
+}
+
 bool AppController::textNotes() const {
     const CanvasView* v = canvas();
     return v && v->typesIntoFlow();
+}
+
+bool AppController::hasMarkdownText() const {
+    DocumentSession* s = session();
+    if (!s || s->textFile()) {
+        return false;
+    }
+    std::shared_lock lock(*s->getDocument());
+    return TextDocument::isTextDocument(*s->getDocument()) || TextDocument::hasMarkdownText(*s->getDocument());
+}
+
+QUrl AppController::markdownExportFile() const {
+    const DocumentSession* s = session();
+    if (!s || s->documentFile().empty() || pdfOnly()) {
+        return {};  // (PDF files: nothing is written next to files, the window asks)
+    }
+    const fs::path doc = s->documentFile();
+    return QUrl::fromLocalFile(QString::fromStdString((doc.parent_path() / (doc.stem().string() + ".md")).string()));
+}
+
+QUrl AppController::suggestedMarkdownExport() const {
+    const DocumentSession* s = session();
+    if (!s) {
+        return {};
+    }
+    fs::path target = s->documentFile();
+    if (target.empty()) {
+        target = fs::path(suggestedSaveFile().toLocalFile().toStdString());
+    }
+    target.replace_extension(".md");
+    return QUrl::fromLocalFile(QString::fromStdString(target.string()));
+}
+
+bool AppController::exportMarkdown(const QUrl& file) {
+    DocumentSession* s = session();
+    fs::path target(localPathOf(file).toStdString());
+    if (!s || s->textFile() || target.empty()) {
+        return false;
+    }
+    if (target.extension().empty()) {
+        target += ".md";
+    }
+    std::string text;
+    {
+        std::shared_lock lock(*s->getDocument());
+        text = TextDocument::markdown(*s->getDocument());
+    }
+    // (the images of the text go into "name.assets/" once qt/md-images is there)
+    const QString path = QString::fromStdString(target.string());
+    QSaveFile out(path);
+    if (!out.open(QIODevice::WriteOnly) || out.write(text.data(), static_cast<qint64>(text.size())) < 0 ||
+        !out.commit()) {
+        Q_EMIT message(tr("Export as Markdown failed"), tr("\"%1\" cannot be written.").arg(path), true);
+        return false;
+    }
+    library->refresh();
+    Q_EMIT pageActionDone(tr("Markdown written: %1").arg(QString::fromStdString(target.filename().string())), false);
+    return true;
 }
 
 QString AppController::externalFileOf(const QString& path) const {

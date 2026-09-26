@@ -232,7 +232,8 @@ class AppController: public QObject {
     /// The current document is a text document of notes (qt/docs/md-pdf.md: page 1 starts the page's Markdown text; a
     /// PDF text document): typing goes into its text, the formatting bar is shown.
     Q_PROPERTY(bool textNotes READ textNotes NOTIFY markdownOnPageChanged)
-
+    /// The current document (notes) has a page's Markdown text: "Export as Markdown" is offered.
+    Q_PROPERTY(bool hasMarkdownText READ hasMarkdownText NOTIFY markdownOnPageChanged)
 public:
     explicit AppController(QObject* parent = nullptr);
     /// A window of its own: the settings, tools, library and rendering of the main window, own tabs.
@@ -276,7 +277,20 @@ public:
     /// flowing over pages, to write on with the pen. The .md stays as it is; saving suggests "name.xopp" next to it
     /// (the library shows the two as two documents: they go their own ways).
     Q_INVOKABLE bool editAsNotes();
+    /// "Open as PDF document" (qt/docs/md-pdf.md): the current .md as a new PDF text document next to it ("name.pdf",
+    /// or "name (2).pdf" when taken), built as editAsNotes builds its notes, saved at once as a PDF with notes and
+    /// opened in a new tab with the cursor in its text. The .md stays as it is.
+    Q_INVOKABLE bool openAsPdfDocument();
     bool textNotes() const;
+    bool hasMarkdownText() const;
+    /// "Export as Markdown": where it writes without asking ("name.md" next to the document, Xournal++ files mode);
+    /// empty when the window asks where (PDF files mode, a document without a file).
+    Q_INVOKABLE QUrl markdownExportFile() const;
+    /// Where the dialog of "Export as Markdown" starts: "name.md" next to the document, else in the library's folder.
+    Q_INVOKABLE QUrl suggestedMarkdownExport() const;
+    /// Write the Markdown of the current document's page texts (TextDocument::markdown) to `file` (".md" added when it
+    /// has no extension). The window says what was written (pageActionDone) or why not (message).
+    Q_INVOKABLE bool exportMarkdown(const QUrl& file);
     /// The file "Open externally" hands over for a library card's path ("" for notes and PDFs): the Markdown, text or
     /// other file, the image a .xopp annotates.
     Q_INVOKABLE QString externalFileOf(const QString& path) const;

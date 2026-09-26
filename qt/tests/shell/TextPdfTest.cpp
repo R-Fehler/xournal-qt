@@ -149,6 +149,68 @@ TEST_F(TextPdf, newTextDocumentsFollowTheSettingAndMarkdownFilesStayMarkdown) {
     EXPECT_FALSE(fs::exists(root / "Memo.md"));
 }
 
+// "Open as PDF document": a new PDF text document next to the .md, which is not touched
+TEST_F(TextPdf, openAsPdfDocumentMakesAPdfAndLeavesTheMarkdownFile) {
+    writeFile(root / "notes.md", TEXT);
+    const auto before = fs::last_write_time(root / "notes.md");
+    AppController c;
+    c.setLibraryRoot(root);
+    ASSERT_TRUE(c.openPath(qstr(root / "notes.md")));
+    DocumentSession* md = &current(c);
+    ASSERT_TRUE(c.openAsPdfDocument());
+    ASSERT_EQ(c.tabManager().count(), 2);
+    DocumentSession& pdf = current(c);
+    ASSERT_NE(&pdf, md);
+    EXPECT_EQ(pdf.getFilePath(), root / "notes.pdf");
+    EXPECT_TRUE(pdf.isHybrid());
+    EXPECT_FALSE(pdf.isModified());
+    EXPECT_TRUE(c.textNotes());
+    EXPECT_EQ(flowOf(pdf), TEXT);
+    EXPECT_EQ(attachment(root / "notes.pdf", "notes.md"), TEXT);
+    EXPECT_GE(pdf.getDocument()->getPageCount(), 2u) << "the page break";
+    EXPECT_EQ(bytesOf(root / "notes.md"), TEXT);
+    EXPECT_EQ(fs::last_write_time(root / "notes.md"), before);
+    EXPECT_FALSE(c.openAsPdfDocument()) << "only from a .md";
+    // Unsaved changes of the .md go along (the .md stays as it is on disk); the name is taken: "notes (2).pdf"
+    c.tabManager().setCurrentIndex(c.tabManager().indexOf(md));
+    MarkdownFile::setText(*md, "# Changed\n");
+    ASSERT_TRUE(c.openAsPdfDocument());
+    EXPECT_EQ(current(c).getFilePath(), root / "notes (2).pdf");
+    EXPECT_EQ(flowOf(current(c)), "# Changed\n");
+    EXPECT_EQ(bytesOf(root / "notes.md"), TEXT);
+    // The library: the .md and the PDFs are documents of their own
+    EXPECT_EQ(DocumentFiles::scan(root).items.size(), 3u);
+}
+
+// "Export as Markdown": the text of the page texts; next to the document in Xournal++ files mode, else where asked
+TEST_F(TextPdf, exportAsMarkdownWritesTheText) {
+    AppController c;
+    Choice choice(c);
+    Settings& settings = *c.context().getSettings();
+    c.setLibraryRoot(root);
+    DocumentMode::store(settings, DocumentMode::Mode::Pdf);
+    ASSERT_TRUE(c.createTextDocument("Report"));
+    view(c)->endTextEditing();
+    MarkdownFile::setText(current(c), TEXT);
+    EXPECT_TRUE(c.hasMarkdownText());
+    EXPECT_TRUE(c.markdownExportFile().isEmpty()) << "PDF files: the window asks where";
+    EXPECT_EQ(c.suggestedMarkdownExport(), url(root / "Report.md"));
+    fs::create_directories(root / "out");
+    ASSERT_TRUE(c.exportMarkdown(url(root / "out" / "Report")));  // (".md" added)
+    EXPECT_EQ(bytesOf(root / "out" / "Report.md"), TEXT) << "unsaved changes included, no continuation lines";
+
+    // Xournal++ files: next to the document, without asking
+    DocumentMode::store(settings, DocumentMode::Mode::Xopp);
+    EXPECT_EQ(c.markdownExportFile(), url(root / "Report.md"));
+    ASSERT_TRUE(c.exportMarkdown(c.markdownExportFile()));
+    EXPECT_EQ(bytesOf(root / "Report.md"), TEXT);
+
+    // Notes without a page's Markdown text: nothing to export
+    c.newDocument();
+    EXPECT_FALSE(c.hasMarkdownText());
+    EXPECT_FALSE(c.textNotes());
+}
+
 // The library's index reads the text of a PDF text document: its words are found
 TEST_F(TextPdf, theLibrarySearchFindsTheTextOfAPdfTextDocument) {
     {

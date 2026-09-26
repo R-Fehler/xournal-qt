@@ -1535,3 +1535,11 @@ Update the table in the user doc with the results.
       the library shows the typeset first page. With "Markdown file": "New Markdown file…" makes `name.md` as before.
 - [ ] Existing `.md` files open in the `.md` editor in both modes and save as `.md`; no PDF appears next to them.
 - [ ] Library search: a word of a PDF text document's text finds its card and page.
+- [ ] A `.md` → ⋮ → "Open as PDF document": `name.pdf` appears next to it (a second time: `name (2).pdf`) and opens
+      with the cursor in its text (at the end of page 1); the `.md` card is unchanged (its time too). Unsaved
+      changes of the `.md` are in the PDF, not in the `.md`.
+- [ ] A PDF text document → ⋮ → "Export as Markdown": in PDF files mode a save dialog (`name.md` suggested); in
+      Xournal++ files mode `name.md` is written next to it, and when that file exists a question ("Replace",
+      "Choose another place…", "Cancel"). The file is the text as typed, page breaks as
+      `<div style="page-break-after: always"></div>`. Notes with Markdown text on a later page have the entry too;
+      notes without any do not.
