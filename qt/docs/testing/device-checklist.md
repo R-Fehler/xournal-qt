@@ -1376,3 +1376,5 @@ Emulator first (the AVD of `qt/android-basics`), the Fold 7 at the end.
 - [ ] A page with a Markdown box and, below it, an ordinary text box (Markdown switched off for the text tool):
       on the canvas, in the thumbnail, in the PDF export and in the PDF with notes the text box is where it was
       written (it was drawn over the box's last line in the PDF with notes before).
+- [ ] Android: a flag (🇩🇪, pasted or from the picker) in a text box and in a Markdown box is a colour flag, not two
+      boxed letters (Android's symbol font has them as letters; Pango 1.58 asks for the family "emoji").

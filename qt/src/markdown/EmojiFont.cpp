@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include <fontconfig/fontconfig.h>
@@ -20,15 +21,20 @@ namespace {
 
 std::atomic<bool> registered{false};
 
-/// Emoji (Pango asks for them with the language "und-zsye") in the app's font first, whatever the text's font and
-/// the system's rules say: the same pictures on every system, and one that Cairo can draw.
+/// Emoji in the app's font first, whatever the text's font and the system's rules say: the same pictures on every
+/// system, and one that Cairo can draw. Pango asks for emoji with the language "und-zsye" (before 1.52) or as the
+/// family "emoji" (1.52 and newer, e.g. on Android and MSYS2; for a flag without caring for colour, so that a symbol
+/// font that draws flags as boxed letters came first on Android).
 std::string preferRule() {
-    return std::string("  <match target=\"pattern\">\n"
-                       "    <test name=\"lang\"><string>und-zsye</string></test>\n"
-                       "    <edit name=\"family\" mode=\"prepend_first\" binding=\"strong\"><string>") +
-           FONT_FAMILY +
-           "</string></edit>\n"
-           "  </match>\n";
+    std::string out;
+    for (const auto& [name, value]: {std::pair<const char*, const char*>{"lang", "und-zsye"}, {"family", "emoji"}}) {
+        out += std::string("  <match target=\"pattern\">\n"
+                           "    <test name=\"") + name + "\"><string>" + value + "</string></test>\n"
+               "    <edit name=\"family\" mode=\"prepend_first\" binding=\"strong\"><string>" + FONT_FAMILY +
+               "</string></edit>\n"
+               "  </match>\n";
+    }
+    return out;
 }
 
 /// fontconfig's 10-scale-bitmap-fonts.conf, the part for colour bitmap fonts: their glyphs at the size asked.

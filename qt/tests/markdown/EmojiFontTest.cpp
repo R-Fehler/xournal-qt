@@ -190,6 +190,61 @@ TEST(EmojiFont, emojiAreTakenFromTheAppsColourFont) {
     }
 }
 
+/// Which font draws the flag 🇩🇪 when fontconfig is asked as Pango asks for emoji: Pango 1.52 and newer (Android's,
+/// MSYS2's) by the family "emoji", colour "don't care" (a flag has no VS16); older ones by the language
+/// "und-zsye". Asked of a configuration like Android's: the app's rules and fonts, a text font, and a symbol font
+/// that draws flags as letters (Android's Noto Sans Symbols does; tests/markdown/fonts), no conf.d.
+TEST(EmojiFont, flagsComeFromTheAppsFontHoweverPangoAsks) {
+    // (copies in a folder of the test's own: fontconfig writes a .uuid into the folders it scans)
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / ("xqt-emoji-fonts-" + std::to_string(getpid()));
+    fs::create_directories(dir / "fonts");
+    fs::copy_file(XQT_EMOJI_FONT, dir / "fonts" / emoji::FONT_FILE, fs::copy_options::overwrite_existing);
+    fs::copy_file(fs::path(XQT_MARKDOWN_TEST_FONTS) / "RegionalLetters.ttf", dir / "fonts" / "RegionalLetters.ttf",
+                  fs::copy_options::overwrite_existing);
+    const std::string conf = "<?xml version=\"1.0\"?>\n<fontconfig>\n  <dir>" + (dir / "fonts").string() +
+                             "</dir>\n  <cachedir>" + (dir / "cache").string() +
+                             "</cachedir>\n  <dir>/usr/share/fonts/truetype/dejavu</dir>\n"
+                             "  <match target=\"pattern\"><edit name=\"family\" mode=\"append_last\">"
+                             "<string>DejaVu Sans</string></edit></match>\n" +
+                             emoji::fontconfigRules(true) + "</fontconfig>\n";
+    FcConfig* config = FcConfigCreate();
+    ASSERT_TRUE(FcConfigParseAndLoadFromMemory(config, reinterpret_cast<const FcChar8*>(conf.c_str()), FcTrue));
+    ASSERT_TRUE(FcConfigBuildFonts(config));
+    // The first font of the fallback list with the flag's letter (as Pango takes it)
+    auto flagFont = [config](const char* family, const char* lang, FcBool color) {
+        FcPattern* p = FcPatternCreate();
+        FcPatternAddString(p, FC_FAMILY, reinterpret_cast<const FcChar8*>(family));
+        if (lang) {
+            FcPatternAddString(p, FC_LANG, reinterpret_cast<const FcChar8*>(lang));
+        }
+        FcPatternAddBool(p, FC_COLOR, color);
+        FcConfigSubstitute(config, p, FcMatchPattern);
+        FcDefaultSubstitute(p);
+        FcResult r;
+        FcFontSet* set = FcFontSort(config, p, FcTrue, nullptr, &r);
+        std::string out;
+        for (int i = 0; set && i < set->nfont && out.empty(); ++i) {
+            FcCharSet* cs = nullptr;
+            FcChar8* file = nullptr;
+            if (FcPatternGetCharSet(set->fonts[i], FC_CHARSET, 0, &cs) == FcResultMatch && FcCharSetHasChar(cs, 0x1F1E9) &&
+                FcPatternGetString(set->fonts[i], FC_FILE, 0, &file) == FcResultMatch) {
+                out = std::filesystem::path(reinterpret_cast<const char*>(file)).filename().string();
+            }
+        }
+        if (set) {
+            FcFontSetDestroy(set);
+        }
+        FcPatternDestroy(p);
+        return out;
+    };
+    EXPECT_EQ(flagFont("emoji", nullptr, FcDontCare), emoji::FONT_FILE) << "Pango 1.52+";
+    EXPECT_EQ(flagFont("emoji", nullptr, FcTrue), emoji::FONT_FILE) << "Pango 1.52+, with VS16";
+    EXPECT_EQ(flagFont("Sans", "und-zsye", FcDontCare), emoji::FONT_FILE) << "Pango before 1.52";
+    FcConfigDestroy(config);
+    fs::remove_all(dir);
+}
+
 /// The emoji as drawn on a page (a picture looked at; XQT_EMOJI_GOLDEN_UPDATE=1 writes it anew). Only emoji: the
 /// text fonts differ between systems, the emoji font comes with the app.
 TEST(EmojiFont, goldenPicture) {

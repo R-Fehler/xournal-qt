@@ -88,7 +88,8 @@ if(XQT_BUILD_TESTS)
     target_link_libraries(xqt-markdown-tests PRIVATE xqt-markdown GTest::gtest)
     target_compile_definitions(xqt-markdown-tests PRIVATE
         XQT_MARKDOWN_GOLDEN="${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/golden"
-        XQT_EMOJI_FONT="${CMAKE_CURRENT_LIST_DIR}/../resources/fonts/XqtEmoji.ttf")
+        XQT_EMOJI_FONT="${CMAKE_CURRENT_LIST_DIR}/../resources/fonts/XqtEmoji.ttf"
+        XQT_MARKDOWN_TEST_FONTS="${CMAKE_CURRENT_LIST_DIR}/../tests/markdown/fonts")
     set_target_properties(xqt-markdown-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
     gtest_discover_tests(xqt-markdown-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS markdown)
 endif()
