@@ -69,7 +69,7 @@ Every place that maps between a PDF page and our page coordinates adds `(left, t
 | Thumbnails, page sketches (page grid, sidebar), the preview in the file, pasted PDF pages | `notespace::renderPdf` (`qt/src/session/PageNoteSpace.*`): `ThumbnailProvider::renderPage`, `DocumentSave::previewOf`, `DocumentSession`'s preview, the pending page of `PageRaster` |
 | Plain PDF export, print (it prints that export), PNG/SVG export | `XojCairoPdfExport::exportPage`, `ImageExport::exportImagePage` (seams); the export factory takes the cairo backend for documents with note space, because upstream's qpdf backend lays the drawing over the PDF page's own box. The PDF's text stays text (poppler draws it into the cairo PDF). |
 | PDF text selection, highlight/underline/strike marking, copy | `PdfElemSelection` (seam): poppler is asked in PDF coordinates; bounds, rectangles and the drawn region are page coordinates |
-| PDF links, text columns (double tap) | `CanvasView::linkAt`, `textColumnAt` |
+| PDF links, text columns (double tap, middle click) | `CanvasView::linkAt`, `textColumnAt` |
 | Search hits and their boxes | `DocumentSearch::place` (the text index's character boxes), `findOnPage` (poppler), `termRects` (the library's pictures of pages with hits) |
 | Document text index | unchanged: it keeps text and character boxes per **PDF** page, in PDF coordinates; the offset is added where boxes are placed on a page |
 | Annotations panel | `annotations::read` carries the offset; the PDF's character boxes and the PDF's own highlights are moved by it before they are compared with our highlighter strokes |

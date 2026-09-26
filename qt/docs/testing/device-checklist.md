@@ -22,6 +22,7 @@ cd build-qt
 - [ ] Two fingers: pinch zoom anchored under the fingers. The page is sharp again about 0.3 s after the fingers stop.
 - [ ] Two-finger tap: undo. Three-finger tap: redo.
 - [ ] Two taps with one finger on a page zoom in on what was tapped; on a paper with columns the column under the finger fills the view. Two taps again (zoomed in) show the whole page.
+- [ ] The mouse: a middle click does the same as two taps (see "Middle click fits the page" at the end).
 - [ ] A tap on a PDF link still follows the link and never zooms; a single tap alone changes nothing.
 - [ ] Four-finger tap (touch screen): all pages of the document; again: back. Five fingers: all open documents; again: back.
 - [ ] Four or five fingers pinched together ("zoom out") do the same; pinched apart they close the overview. The pages do not move while doing it.
@@ -1784,3 +1785,13 @@ Design: [md-images.md](../md-images.md).
 - [ ] Dark theme (if set): the line is dark grey with light text.
 - [ ] Android (Fold 7, fingers only): no line ever appears; with the S Pen hovering, it does.
 
+## Middle click fits the page (qt/middle-click-fit)
+- [ ] Zoomed in on a page, click the mouse's middle button (the wheel): the whole page shows again. At the whole page
+      a middle click fits the width; on a PDF with two columns it zooms in on the column under the mouse.
+- [ ] Middle drag: the page follows the mouse (the hand) and the zoom stays; with the pen tool nothing is drawn.
+- [ ] Middle button pressed and held still for a second, then released: nothing happens (no fit, no dot).
+- [ ] The reference beside the notes: a middle click fits the reference only. Presenting: zoomed in, a middle click
+      fills the screen with the slide again.
+- [ ] With the pen (Surface Pro, Wacom): its barrel button never fits the page (it still lends its tool).
+- [ ] Linux: select some text in another app, then middle click on the canvas: nothing is pasted.
+- [ ] Touch pad with a three-finger tap as the middle click (if the desktop sends one): it fits the page as well.
