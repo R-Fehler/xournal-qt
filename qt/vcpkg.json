@@ -1,7 +1,7 @@
 {
   "$comment": "C dependencies of xournal-qt for builds through vcpkg (Android). The desktop build does not use this file. See docs/android.md.",
   "name": "xournal-qt",
-  "version-string": "0.2.0",
+  "version-string": "0.3.0",
   "builtin-baseline": "dc1232a6e05dcc49703091e83743e3b4df9b9b7c",
   "dependencies": [
     "zlib",
