@@ -6,7 +6,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: dialog
     objectName: "renameDocumentDialog"
     property int tab: -1
@@ -23,10 +23,7 @@ Dialog {
         problem = app.tabRenameProblem(tab, field.text)
         if (problem === "") accept()
     }
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
-    width: Math.min(460, parent ? parent.width - 32 : 460)
+    preferredWidth: 460
     title: info.unsaved ? qsTr("Name the document") : qsTr("Rename")
     standardButtons: Dialog.Ok | Dialog.Cancel
     Component.onCompleted: standardButton(Dialog.Ok).enabled = Qt.binding(function() { return dialog.problem === "" })

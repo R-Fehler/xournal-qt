@@ -12,6 +12,8 @@ Popup {
     signal picked(string emoji)
     width: 360
     height: 400
+    // (kept inside the window, and less high in a phone's landscape: F13.4)
+    margins: 8
     padding: 8
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent

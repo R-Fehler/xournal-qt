@@ -5,14 +5,11 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: dlg
     objectName: "chapterDialog"
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     title: qsTr("Start a chapter")
-    width: Math.min(parent ? parent.width * 0.9 : 420, 420)
+    preferredWidth: 420
     standardButtons: Dialog.Cancel | Dialog.Ok
 
     property int page: 0

@@ -123,13 +123,11 @@ Item {
         }
     }
 
-    Dialog {
+    AdaptiveDialog {
         id: renameDialog
         objectName: "layerRenameDialog"
         property int row: -1
-        anchors.centerIn: Overlay.overlay
-        modal: true
-        width: 320
+        preferredWidth: 320
         title: qsTr("Rename the layer")
         standardButtons: Dialog.Cancel | Dialog.Ok
         onOpened: { renameField.forceActiveFocus(); renameField.selectAll() }

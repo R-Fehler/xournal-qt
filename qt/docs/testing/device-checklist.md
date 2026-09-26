@@ -2192,3 +2192,28 @@ screen, Present, Present without controls, Hide the tool bar and Tool bar positi
       above the navigation bar (gesture bar or three buttons), nothing under it.
 - [ ] Fold 7 in landscape (short): the sheet is 640 px wide in the middle, at most 85 % of the height, and scrolls.
 - [ ] Unfold while a sheet is open: it closes; ⋮ is a menu again on the unfolded screen.
+
+## Adaptive dialogs and Settings (qt/adaptive-dialogs)
+See [adaptive-layout.md](../adaptive-layout.md), "Dialogs and sheets".
+- [ ] Desktop, maximized: Insert pages, Page size, Background, Space for notes, New document, Print, Rename, Share,
+      Export for the archive, the unsaved-changes question: as before, in the middle, with their buttons at the bottom.
+- [ ] Make the window short (about 1024 × 700, then 1280 × 500): Insert pages is not taller than the window, its title
+      and buttons stay, the body scrolls (a scroll bar at its right) down to the count and "before / after page". At
+      1280 × 500 it takes the whole window, with × at the left and Insert at the top right.
+- [ ] A narrow window (about 600 × 800): Settings keeps its tabs; the slider rows (Pen → Minimum pressure) show the
+      label above a slider that is wide enough to use.
+- [ ] Esc closes each dialog as Cancel does.
+- [ ] Full screen (F11) in a short window (1280 × 500 or a tiled half): the tool square's popup shows "Present" and
+      "Leave full screen" inside the window; the tools above them scroll.
+- [ ] Android, Fold 7 folded (412 wide): Insert pages from the page menu takes the whole screen: × at the left,
+      "Insert" at the top right, no buttons at the bottom; all fields reachable by scrolling; Insert adds the page,
+      × adds nothing. The same for New document (the name field: the keyboard opens, the dialog stays above it and
+      Create stays at the top), Rename, Page size.
+- [ ] Fold 7 folded: Share, the unsaved-changes question (close a changed document) and a web address (Look up →
+      Scholar) come up from the bottom; "Save before opening it elsewhere?" (Open externally with changes) shows its
+      three buttons one below the other, Save and open first.
+- [ ] Fold 7 folded: the back button closes a dialog, a sheet and the Fuzzy help, as Cancel does.
+- [ ] Fold 7 folded: Settings takes the whole screen and lists the sections; Pen opens as a page with ‹ at the left;
+      the sliders are wide, the labels above them; the back button goes back to the list, again closes Settings.
+- [ ] Fold 7 folded, landscape (915 × 412): dialogs take the whole screen and scroll; Settings as in portrait.
+- [ ] Fold 7 unfolded (about 900 × 1000): dialogs in the middle, as on a tablet; Settings with tabs.

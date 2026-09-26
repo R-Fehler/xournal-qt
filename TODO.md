@@ -116,6 +116,12 @@ is built.
   phone-landscape window). On a phone the tool bar buttons that went into ⋮'s overflow should come back in the sheet
   (with `qt/adaptive-toolbar`). The sheet is not checked on the Fold 7 yet (Android back key, the navigation bar via
   `safeBottom`). Unchecked choices show no box in the sheet (only a check mark when chosen).
+- [x] Block 3 `qt/adaptive-dialogs`: `AdaptiveDialog` for all dialogs and sheets (scrolling body, full-screen sheet,
+  bottom sheet, stacked footer buttons, back key), Settings as a list of sections on phones, the quick tools popup.
+- [ ] Left from block 3: the bottom sheet keeps Material's rounded corners at the bottom edge and opens with the
+  dialog's grow animation (no slide); the Settings sheet is its own popup, not an `AdaptiveDialog`; the tab overview,
+  the Markdown table editor, the look-up menu and the small anchored popups (link, page jump, custom width) are
+  not adapted; the dialogs are not checked against the bottom safe area (block 8).
 
 ---
 

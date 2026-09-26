@@ -58,8 +58,8 @@ let go, never under it. The setting **Settings → Touch → Buttons sized for f
 off) overrides it.
 
 `minTarget` is 48 with the touch profile and 40 without. So far it sizes the page sidebar's switch (Pages, Layers,
-Contents, Annotations) and the full-screen tab bar (36 px high, arrows 48 wide). The later blocks size their own
-targets with it (audit F14).
+Contents, Annotations), the full-screen tab bar (36 px high, arrows 48 wide), and the title row and stacked buttons
+of the dialogs (below). The later blocks size their own targets with it (audit F14).
 
 ## Choices made by hand, per class
 
@@ -183,6 +183,64 @@ Entries that depend on the document (a `.md`: Edit as notes, Open as PDF documen
 file: no Save as, no Page) are left out as before. "Markdown source beside the page" stays in the menu of the writing
 button.
 
+## Dialogs and sheets: `AdaptiveDialog` (qt/adaptive-dialogs)
+
+`qt/src/app/qml/AdaptiveDialog.qml` is a `Dialog` that fits every window. Every dialog and sheet of the app is one
+(Main, HomeView, Settings, the layer and annotation lists, the dialog files, and the former popup sheets: web confirm,
+web picture, unused images, Find paper, arXiv and its opt-in, Fuzzy help, Shortcuts).
+
+- **The body scrolls.** What is declared inside the dialog is its body (the default property): it lies in a
+  `Flickable` (`bodyFlickable`) with a scroll bar in the right padding, while the title row and the footer stay in
+  place. The body's children size themselves as in a plain `Dialog` (`width: dlg.availableWidth`); they must not use
+  `anchors.fill: parent`, except with `fillBody` (below).
+- **Where it goes** (`placement`) follows `win.adaptive.layoutClass` and the dialog's `kind`:
+
+  | `kind` | desktop, tablet | phone portrait | phone landscape, short, tiny |
+  | --- | --- | --- | --- |
+  | `form` (default: fields, choices, lists) | `centered` | `fullScreen` | `fullScreen` |
+  | `question` (unsaved changes, recovery, share, web confirm, trash, …) | `centered` | `bottom` | `fullScreen` |
+  | `card` (a message, a report, "press the keys") | `centered` | `centered` | `centered` |
+
+  - `centered`: `min(preferredWidth, window − 32)` wide, at most the window's height less 48 px, above the soft
+    keyboard (`keyboardTop`, the logic `NewDocumentDialog` had), below `safeTop`.
+  - `fullScreen`: the whole window below `safeTop` (above the keyboard), no rounded corners, 16 px side padding. The
+    title row has × at the left (`dialogCloseButton`: rejects, as Cancel and Esc) and, when the footer holds nothing
+    but the confirm button and Cancel, the confirm button at the top right (`dialogConfirmButton`, the text and
+    enabled state of the footer's button; a click clicks it). The footer then has no height and is not shown.
+  - `bottom`: at the window's bottom edge, at most 640 wide, at most the window's height less 32.
+  - Cards stay in the middle everywhere, also in a short window (they are a few lines; their body scrolls if not).
+- **Footer buttons that do not fit in one row** (long labels on a phone: "Open without saving", "Import the other
+  app's changes") are shown one below the other instead (`footerStacked`), the confirm button on top, Cancel last;
+  each does what its footer button does (the stacked button's objectName is the footer button's plus `Stacked`).
+- `fillBody: true` with `preferredHeight`: the body takes the dialog's whole height and its own list scrolls (the
+  folder chooser, Move / Copy to). Sheets with a list that grows (Find paper, arXiv) instead show the whole list in the
+  scrolling body.
+- `closeButton: true`: a × in the title row also in the middle of a window (the sheets without a Cancel button).
+- A field that gets the keys is scrolled into view, again when the keyboard makes the dialog smaller.
+- **Esc and Android's back key** close it (reject). Qt closes a popup on the back key only while the popup has the keys,
+  so the base adds a `Back` shortcut (a shortcut of the top-most popup only, so stacked dialogs do not compete).
+- For the tests: `placement`, `confirmItem` (the confirm button where it is shown now), `bodyFlickable`.
+
+A new dialog: `AdaptiveDialog { kind: "question"; preferredWidth: 480; title: …; <body>; footer: DialogButtonBox {…} }`,
+without `parent`, `modal`, `anchors.centerIn`, `width`, `height`, `x` or `y` (the base sets them).
+
+### Settings
+
+`SettingsPage.qml` keeps its own sheet (sections of fixed rows):
+
+- On a desktop or a tablet: the tabs, in a sheet `min(920, window − 32)` wide and the window's height less 48, above
+  the soft keyboard. Each section scrolls.
+- On a phone (`phonePortrait`, `phoneShort`, `tiny`): the whole screen, the sections as a list (`settingsSectionList`,
+  items `settingsSection<i>`), each opening as a page with a back arrow (`settingsBackButton`, `sectionShown`). Esc and
+  the back key go back to the list first, then close. Shortcuts stays the last section.
+- Below 600 px (the sheet's own width): the slider, combo and other two-part rows put their label above the control
+  (`narrow`); a slider keeps at least 120 px.
+
+### The quick tools of the compact chrome
+
+The tool popup of the tool square gives the tools what is left above "Present" and "Leave full screen" / "Show the tabs
+and the tool bar", so both stay inside a short window; the tools scroll.
+
 ## The collapse ladder (what the later blocks build)
 
 The author's decisions of 2026-09-26 on the audit's proposals:
@@ -221,7 +279,6 @@ that rework their screens:
 | `TabOverview.qml` | the header row's width, cells of ≥ 280 px, 1.25 × high | `qt/adaptive-home` |
 | `Main.qml` Markdown panel | `min(max(360, 0.38 w), 600)` | `qt/adaptive-panels` |
 | `ReferenceSplit.qml` | always side by side | `qt/adaptive-panels` |
-| `SettingsPage.qml` | `width - 32` × `height - 48`, rows with fixed label widths | `qt/adaptive-dialogs` |
 | `NewDocumentDialog.qml` | its body < 520 → one column (its own width: fine as it is) | – |
 | `ShortcutSheet.qml`, `AppendPages.qml` | their own widths (620, 260): fine as they are | – |
 
@@ -244,6 +301,16 @@ that rework their screens:
 - `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizes*'`: the same checks (with the menus
   and all submenus) at all 18 sizes of the audit (about 70 s), with a `[ WALK ]` line per screen (outside, hidden by
   scrolling, small).
+- `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizes*'`: the same checks at all 18 sizes of
+  the audit (about 15 s), with a `[ WALK ]` line per screen (outside, hidden by scrolling, small).
+- `AdaptiveLayoutTest.dialogsFitTheWindow` (about 5 s): eight dialogs at 1920×1080, 1024×700, 1280×500, 412×915 and
+  915×412: inside the window, the confirm button too, every control of the body reachable by scrolling it to its end
+  and none wider than the window, and the placement of its kind. `aPhoneSheetAndTheBackKey`: × and the confirm button
+  of a full-screen sheet, the footer back in a wide window, Esc and the back key. `settingsOnAPhoneAreAListOfSections`
+  and `quickToolsFitAShortWindow`.
+- `XQT_UI_ADAPTIVE=1 ./xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.allSizesDialogs'`: the same for all 48 dialogs
+  (document, library, settings) at the 18 sizes (about a minute). `XQT_UI_DIALOG_SHOTS=<folder>` saves a picture of
+  each (without the dialogs' backgrounds off-screen, except full-screen sheets).
 - `SettingsModelTest.layoutChoicesPerSizeClass` (label `shell`): the storage.
 - The audit's own walk (`XQT_UI_AUDIT`, pictures and `report.tsv`, now with the class) shares the walker
   (`qt/tests/ui/LayoutWalk.h`).

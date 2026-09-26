@@ -6,14 +6,11 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Dialog {
+AdaptiveDialog {
     id: dlg
     objectName: "noteSpaceDialog"
-    parent: Overlay.overlay
-    anchors.centerIn: parent
-    modal: true
     title: qsTr("Space for notes")
-    width: Math.min(parent ? parent.width * 0.94 : 560, 560)
+    preferredWidth: 560
 
     /// 0-based pages it was opened for (the page menu: the page or the selection)
     property var pages: []

@@ -6,17 +6,12 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Popup {
+AdaptiveDialog {
     id: sheet
     objectName: "arxivSheet"
-    modal: true
-    focus: true
-    parent: Overlay.overlay
-    anchors.centerIn: Overlay.overlay
-    width: Math.min(parent ? parent.width - 24 : 640, 640)
-    height: Math.min(parent ? parent.height - 48 : 680, 680)
-    padding: 0
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    preferredWidth: 640
+    closeButton: true
+    title: sheet.mode === "id" ? qsTr("arXiv %1").arg(sheet.arxivId) : qsTr("Search arXiv")
 
     /// "search" (by title) or "id" (one arXiv ID)
     property string mode: "search"
@@ -65,7 +60,6 @@ Popup {
         c.arxivDownload(index, folder)
     }
 
-    background: Rectangle { color: "#fafafa"; radius: 14; border.width: 1; border.color: "#d5d8dc" }
 
     Connections {
         target: sheet.c
@@ -73,21 +67,9 @@ Popup {
     }
 
     ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 16
+        width: sheet.availableWidth
         spacing: 8
 
-        RowLayout {
-            Layout.fillWidth: true
-            Label {
-                text: sheet.mode === "id" ? qsTr("arXiv %1").arg(sheet.arxivId) : qsTr("Search arXiv")
-                font.pixelSize: 18
-                font.weight: Font.DemiBold
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-            }
-            IconButton { iconName: "xqt-close"; tip: qsTr("Close"); onClicked: sheet.close() }
-        }
         TextField {
             id: titleField
             objectName: "arxivTitle"
@@ -148,8 +130,9 @@ Popup {
             id: list
             objectName: "arxivResults"
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
+            // (all of them: the sheet's body scrolls)
+            Layout.preferredHeight: contentHeight
+            interactive: false
             spacing: 6
             model: sheet.c.arxivResults
             delegate: Rectangle {
@@ -243,25 +226,22 @@ Popup {
     }
 
     // The first request: what the app sends where, and the choice (kept in Settings)
-    Popup {
+    AdaptiveDialog {
         id: optIn
         objectName: "networkOptIn"
-        modal: true
-        parent: Overlay.overlay
-        anchors.centerIn: Overlay.overlay
-        width: Math.min(parent ? parent.width - 32 : 480, 480)
-        padding: 16
+        kind: "question"
+        preferredWidth: 480
+        title: qsTr("Connect to arXiv?")
         property var then: null
-        background: Rectangle { color: "#ffffff"; radius: 12; border.width: 1; border.color: "#d5d8dc" }
+        onAccepted: {
+            app.settings.set("networkAccess", "on")
+            const f = optIn.then
+            optIn.then = null
+            if (f) f()
+        }
         ColumnLayout {
-            anchors.left: parent.left
-            anchors.right: parent.right
+            width: optIn.availableWidth
             spacing: 10
-            Label {
-                text: qsTr("Connect to arXiv?")
-                font.pixelSize: 17
-                font.weight: Font.DemiBold
-            }
             Label {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
@@ -276,27 +256,19 @@ Popup {
                 font.pixelSize: 12
                 text: qsTr("You can turn this off in Settings → Documents → Web and citations.")
             }
-            RowLayout {
-                Layout.fillWidth: true
-                Item { Layout.fillWidth: true }
-                Button {
-                    objectName: "networkOptInNo"
-                    text: qsTr("Not now")
-                    flat: true
-                    onClicked: optIn.close()
-                }
-                Button {
-                    objectName: "networkOptInAllow"
-                    text: qsTr("Allow")
-                    highlighted: true
-                    onClicked: {
-                        app.settings.set("networkAccess", "on")
-                        optIn.close()
-                        const f = optIn.then
-                        optIn.then = null
-                        if (f) f()
-                    }
-                }
+        }
+        footer: DialogButtonBox {
+            Button {
+                objectName: "networkOptInNo"
+                text: qsTr("Not now")
+                flat: true
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                objectName: "networkOptInAllow"
+                text: qsTr("Allow")
+                highlighted: true
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
             }
         }
     }

@@ -23,9 +23,12 @@
 #include <QElapsedTimer>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQmlEngine>
+#include <QQmlExpression>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTemporaryDir>
+#include <QUrl>
 #include <QTest>
 #include <gtest/gtest.h>
 
@@ -117,7 +120,7 @@ const Known knownOutside[] = {
 class AdaptiveLayoutTest: public ::testing::Test {
 protected:
     void SetUp() override {
-        if (std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()) == "allSizesOfTheAudit" &&
+        if (std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()).rfind("allSizes", 0) == 0 &&
             qEnvironmentVariableIsEmpty("XQT_UI_ADAPTIVE")) {
             GTEST_SKIP() << "set XQT_UI_ADAPTIVE=1 (all 18 sizes)";
         }
@@ -514,6 +517,39 @@ protected:
         checkOpenMenu(at, window->findChild<QObject*>("homeItemMenu"), cardButton);
     }
 
+    // --- dialogs (qt/adaptive-dialogs) ---
+    /// The items under this one (its visual children, theirs, …)
+    static QList<QQuickItem*> itemsUnder(QQuickItem* item) {
+        QList<QQuickItem*> all;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            for (QQuickItem* c: i->childItems()) {
+                all << c;
+                walk(c);
+            }
+        };
+        walk(item);
+        return all;
+    }
+    /// A dialog of the window: its objectName, how it is opened, and its kind (AdaptiveDialog.kind)
+    struct DialogCase {
+        const char* name;
+        const char* method;
+        QVariantList args;
+        const char* kind;
+    };
+    static std::vector<DialogCase> documentDialogs(bool all);
+    /// ... of the library (the home screen shown), and of the settings (opened over them)
+    std::vector<DialogCase> homeDialogs() const;
+    static std::vector<DialogCase> settingsDialogs();
+    /// Opens each, checks it and closes it again
+    void checkDialogCases(const std::vector<DialogCase>& cases, const WindowSize& s);
+    QObject* openDialog(const DialogCase& c);
+    void closeDialog(QObject* dialog);
+    /// The dialog lies inside the window, its confirm button too, and every control of it can be reached: those of the
+    /// body once it is scrolled, none wider than the window
+    void checkDialog(QObject* dialog, const std::string& at);
+    void checkDialogs(const std::vector<WindowSize>& sizes, bool all);
+
     QTemporaryDir tmp;
     fs::path root;
     std::unique_ptr<AppController> controller;
@@ -557,6 +593,232 @@ void AdaptiveLayoutTest::checkSizes(const std::vector<WindowSize>& sizes, bool l
         }
         controller->setHomeVisible(false);
         wait(150);
+    }
+}
+
+// --- dialogs (qt/adaptive-dialogs) ---------------------------------------------------------------------------------
+
+std::vector<AdaptiveLayoutTest::DialogCase> AdaptiveLayoutTest::documentDialogs(bool all) {
+    const QVariant firstPage = QVariantList{0};
+    const QString longUrl("https://www.example.org/search/a/rather/long/address?q=adaptive+dialogs&hl=en&num=20");
+    std::vector<DialogCase> list{
+            {"insertPagesDialog", "openAt", {1}, "form"},  // (731 px high on a desktop: F13.1)
+            {"pageSizeDialog", "openFor", {firstPage}, "form"},
+            {"newDocumentDialog", "open", {}, "form"},
+            {"renameDocumentDialog", "openFor", {0}, "form"},
+            {"shareDialog", "openFor", {QString()}, "question"},
+            {"unsavedDialog", "open", {}, "question"},
+            {"webConfirm", "ask", {longUrl, QString("Search the web")}, "question"},
+            {"messageDialog", "open", {}, "card"},
+    };
+    if (all) {
+        const std::vector<DialogCase> more{
+                {"backgroundDialog", "openFor", {firstPage}, "form"},
+                {"noteSpaceDialog", "openFor", {firstPage, false}, "form"},
+                {"printDialog", "openFor", {QVariant(QVariantList{0, 1})}, "form"},
+                {"chapterDialog", "openFor", {0}, "form"},
+                {"bookmarkDialog", "openFor", {0}, "form"},
+                {"documentModeDialog", "open", {}, "form"},
+                {"archiveDialog", "openFor", {QString()}, "form"},
+                {"backlinksDialog", "show", {}, "form"},
+                {"findPaperSheet", "openFor", {QString("A. Vaswani et al. Attention is all you need. NIPS 2017.")}, "form"},
+                {"arxivSheet", "openSearch", {QString("Attention is all you need")}, "form"},
+                {"shortcutSheet", "open", {}, "form"},
+                {"searchFuzzyHelp", "open", {}, "form"},
+                {"unusedImagesDialog", "show", {}, "form"},
+                {"oldXoppDialog", "ask", {QString("notes.xopp"), QUrl("file:///tmp/notes.pdf"), QVariant()}, "question"},
+                {"recoveryDialog", "open", {}, "question"},
+                {"closeAllDialog", "open", {}, "question"},
+                {"shareXoppDialog", "open", {}, "question"},
+                {"externalSaveDialog", "open", {}, "question"},
+                {"textChangedDialog", "open", {}, "question"},
+                {"hybridEditedDialog", "open", {}, "question"},
+                {"linkFoundDialog", "open", {}, "question"},
+                {"linkMissingDialog", "open", {}, "question"},
+                {"editAnywayDialog", "open", {}, "question"},
+                {"markdownReplaceDialog", "open", {}, "question"},
+                {"webImageConfirm", "ask", {longUrl, QString("www.example.org"), QString("ask")}, "question"},
+                {"archiveReportDialog", "open", {}, "card"},
+        };
+        list.insert(list.end(), more.begin(), more.end());
+    }
+    return list;
+}
+
+std::vector<AdaptiveLayoutTest::DialogCase> AdaptiveLayoutTest::homeDialogs() const {
+    return {
+            {"renameDialog", "open", {}, "form"},
+            {"folderNameDialog", "open", {}, "form"},
+            {"textFileDialog", "open", {}, "form"},
+            {"transferDialog", "open", {}, "form"},
+            {"libraryArchiveDialog", "open", {}, "form"},
+            {"conflictDialog", "open", {}, "form"},
+            {"folderChooser", "openAt", {QString::fromStdString(root.string())}, "form"},
+            {"trashDialog", "open", {}, "question"},
+            {"storageAccessDialog", "ask", {QString()}, "question"},
+            {"librariesHomeDialog", "open", {}, "question"},
+            {"temporaryImportDialog", "open", {}, "question"},
+    };
+}
+
+std::vector<AdaptiveLayoutTest::DialogCase> AdaptiveLayoutTest::settingsDialogs() {
+    return {
+            {"removeCachesDialog", "open", {}, "question"},
+            {"intoPdfExplanation", "open", {}, "card"},
+            {"shortcutCapture", "open", {}, "card"},
+    };
+}
+
+QObject* AdaptiveLayoutTest::openDialog(const DialogCase& c) {
+    QObject* d = window->findChild<QObject*>(c.name);
+    if (!d) {
+        ADD_FAILURE() << c.name << " not found";
+        return nullptr;
+    }
+    // (no animation: the test waits for it to be open and closed)
+    QQmlExpression(qmlContext(d), d, "enter = null; exit = null").evaluate();
+    const QVariantList& a = c.args;
+    bool ok = false;
+    switch (a.size()) {
+        case 0: ok = QMetaObject::invokeMethod(d, c.method); break;
+        case 1: ok = QMetaObject::invokeMethod(d, c.method, Q_ARG(QVariant, a[0])); break;
+        case 2: ok = QMetaObject::invokeMethod(d, c.method, Q_ARG(QVariant, a[0]), Q_ARG(QVariant, a[1])); break;
+        default:
+            ok = QMetaObject::invokeMethod(d, c.method, Q_ARG(QVariant, a[0]), Q_ARG(QVariant, a[1]),
+                                           Q_ARG(QVariant, a[2]));
+    }
+    EXPECT_TRUE(ok) << c.name << "." << c.method;
+    until([&] { return d->property("opened").toBool(); });
+    EXPECT_TRUE(d->property("opened").toBool()) << c.name;
+    wait(50);  // (laid out: the layouts are polished before a frame is drawn)
+    return d;
+}
+
+void AdaptiveLayoutTest::closeDialog(QObject* dialog) {
+    QMetaObject::invokeMethod(dialog, "close");
+    until([&] { return !dialog->property("visible").toBool(); });
+}
+
+void AdaptiveLayoutTest::checkDialog(QObject* dialog, const std::string& at) {
+    const std::string name = dialog->objectName().toStdString() + " " + at;
+    auto* content = dialog->property("contentItem").value<QQuickItem*>();
+    ASSERT_NE(content, nullptr) << name;
+    QQuickItem* popupItem = content->parentItem();
+    ASSERT_NE(popupItem, nullptr) << name;
+    auto sceneRect = [](QQuickItem* i) { return i->mapRectToScene(QRectF(0, 0, i->width(), i->height())); };
+    const QRectF win = QRectF(0, 0, window->width(), window->height()).adjusted(-1, -1, 1, 1);
+    const QRectF box = sceneRect(popupItem);
+    EXPECT_TRUE(win.contains(box)) << name << ": the dialog lies outside the window (" << box.x() << "," << box.y()
+                                   << " " << box.width() << "x" << box.height() << ")";
+    if (auto* confirm = dialog->property("confirmItem").value<QQuickItem*>()) {
+        EXPECT_TRUE(confirm->isVisible()) << name << ": its confirm button";
+        EXPECT_TRUE(win.contains(sceneRect(confirm))) << name << ": its confirm button lies outside the window";
+    }
+    // The body scrolled to its end
+    auto* body = dialog->property("bodyFlickable").value<QQuickItem*>();
+    ASSERT_NE(body, nullptr) << name;
+    const double end = std::max(0.0, body->property("contentHeight").toDouble() - body->height());
+    body->setProperty("contentY", end);
+    wait(20);
+    QQuickItem* last = nullptr;  // the control lowest in the body
+    double lastBottom = -1;
+    std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+        if (!i->isVisible() || i->opacity() <= 0.01) {
+            return;
+        }
+        const bool control = i->inherits("QQuickAbstractButton") || i->inherits("QQuickTextInput") ||
+                             i->inherits("QQuickTextEdit") || i->inherits("QQuickComboBox") ||
+                             i->inherits("QQuickSpinBox") || i->inherits("QQuickSlider");
+        if (control && i->isEnabled() && i->width() > 1 && i->height() > 1) {
+            const std::string what = name + ": " + xqt::uitest::labelOf(i).toStdString();
+            QQuickItem* f = i->parentItem();  // the scrolling area it is in (the body, or a list in it)
+            while (f && f != popupItem && !f->inherits("QQuickFlickable")) {
+                f = f->parentItem();
+            }
+            if (f && f != body && !body->isAncestorOf(f)) {
+                f = nullptr;  // (the footer's row of buttons)
+            }
+            if (f) {
+                auto* fc = f->property("contentItem").value<QQuickItem*>();
+                const QRectF r = i->mapRectToItem(fc, QRectF(0, 0, i->width(), i->height()));
+                const double w = std::max(f->width(), f->property("contentWidth").toDouble());
+                const double h = std::max(f->height(), f->property("contentHeight").toDouble());
+                EXPECT_GE(r.left(), -1) << what << ": cut at the left";
+                EXPECT_LE(r.right(), w + 1) << what << ": wider than the dialog";
+                EXPECT_LE(r.bottom(), h + 1) << what << ": below the end of what scrolls";
+                EXPECT_TRUE(box.adjusted(-1, -1, 1, 1).contains(sceneRect(f))) << what << ": its scrolling area";
+                if (f == body && r.bottom() > lastBottom) {
+                    lastBottom = r.bottom();
+                    last = i;
+                }
+            } else {
+                EXPECT_TRUE(win.contains(sceneRect(i))) << what << ": outside the window";
+            }
+        }
+        for (QQuickItem* c: i->childItems()) {
+            walk(c);
+        }
+    };
+    walk(popupItem);
+    if (last) {
+        const QRectF view = sceneRect(body).adjusted(-1, -1, 1, 1);
+        EXPECT_TRUE(view.contains(sceneRect(last)))
+                << name << ": " << xqt::uitest::labelOf(last).toStdString() << " not shown with the body at its end";
+    }
+    body->setProperty("contentY", 0);
+}
+
+void AdaptiveLayoutTest::checkDialogCases(const std::vector<DialogCase>& cases, const WindowSize& s) {
+    const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+    const QString cls = sizeClass();
+    for (const DialogCase& c: cases) {
+        QObject* d = openDialog(c);
+        if (!d) {
+            continue;
+        }
+        EXPECT_EQ(d->property("kind").toString(), c.kind) << c.name;
+        // Where it goes: a form takes the whole screen on a phone, a question comes up from the bottom in portrait
+        const QString kind = c.kind;
+        const bool portrait = cls == "phonePortrait";
+        const bool shortPhone = cls == "phoneShort" || cls == "tiny";
+        const QString expected = kind == "card"                   ? "centered"
+                                 : portrait && kind == "question" ? "bottom"
+                                 : portrait || shortPhone         ? "fullScreen"
+                                                                  : "centered";
+        EXPECT_EQ(d->property("placement").toString(), expected) << c.name << " " << at;
+        checkDialog(d, at);
+        if (const QString dir = qEnvironmentVariable("XQT_UI_DIALOG_SHOTS"); !dir.isEmpty()) {
+            // (to look at: XQT_UI_DIALOG_SHOTS=<folder>; the off-screen pictures lack the dialogs' backgrounds)
+            window->grabWindow().save(QString("%1/%2-%3.png").arg(dir, c.name, QString::fromStdString(at)));
+        }
+        if (expected == "fullScreen") {
+            auto* item = d->property("contentItem").value<QQuickItem*>()->parentItem();
+            EXPECT_NEAR(item->width(), s.w, 1) << c.name << " " << at << ": the whole width";
+        }
+        closeDialog(d);
+    }
+}
+
+void AdaptiveLayoutTest::checkDialogs(const std::vector<WindowSize>& sizes, bool all) {
+    openDocument();
+    const auto cases = documentDialogs(all);
+    for (const WindowSize& s: sizes) {
+        resize(s.w, s.h);
+        checkDialogCases(cases, s);
+        if (!all) {
+            continue;
+        }
+        auto* settingsPage = window->findChild<QObject*>("settingsPage");
+        QMetaObject::invokeMethod(settingsPage, "open");
+        until([&] { return settingsPage->property("opened").toBool(); });
+        checkDialogCases(settingsDialogs(), s);
+        QMetaObject::invokeMethod(settingsPage, "close");
+        until([&] { return !settingsPage->property("visible").toBool(); });
+        controller->setHomeVisible(true);
+        wait(150);
+        checkDialogCases(homeDialogs(), s);
+        controller->setHomeVisible(false);
+        wait(100);
     }
 }
 
@@ -937,4 +1199,175 @@ TEST_F(AdaptiveLayoutTest, chromeModeApartFromTheWindowState) {
     wait(50);
     EXPECT_FALSE(controller->property("presenting").toBool());
     EXPECT_FALSE(flag("windowFullScreen"));
+}
+
+// Every dialog fits the window at the five sizes: inside it, its confirm button too, every field and button reachable
+// by scrolling the body, nothing wider than the window; a full-screen sheet on a phone (qt/adaptive-dialogs)
+TEST_F(AdaptiveLayoutTest, dialogsFitTheWindow) {
+    checkDialogs({{1920, 1080, "desktop-fhd"},
+                  {1024, 700, "small-desktop"},
+                  {1280, 500, "short-wide"},
+                  {412, 915, "phone-portrait"},
+                  {915, 412, "phone-landscape"}},
+                 false);
+}
+
+// (skipped in SetUp unless XQT_UI_ADAPTIVE is set) All the dialogs and sheets at all 18 sizes
+TEST_F(AdaptiveLayoutTest, allSizesDialogs) {
+    checkDialogs(std::vector<WindowSize>(std::begin(xqt::uitest::auditSizes), std::end(xqt::uitest::auditSizes)), true);
+}
+
+// A full-screen sheet on a phone: × at the left closes it, the confirm button is at the top right (the footer is
+// gone); Esc and Android's back key close a dialog
+TEST_F(AdaptiveLayoutTest, aPhoneSheetAndTheBackKey) {
+    openDocument();
+    resize(412, 915);
+    QObject* d = openDialog({"insertPagesDialog", "openAt", {1}, "form"});
+    ASSERT_NE(d, nullptr);
+    auto* confirm = d->property("confirmItem").value<QQuickItem*>();
+    ASSERT_NE(confirm, nullptr);
+    EXPECT_EQ(confirm->objectName(), "dialogConfirmButton") << "at the top right";
+    EXPECT_EQ(confirm->property("text").toString(), "Insert");
+    EXPECT_GT(confirm->mapToScene(QPointF(0, 0)).x(), window->width() / 2.0);
+    EXPECT_LT(confirm->mapToScene(QPointF(0, 0)).y(), 80);
+    auto* footer = d->property("footer").value<QQuickItem*>();
+    ASSERT_NE(footer, nullptr);
+    EXPECT_TRUE(footer->opacity() < 0.01 && footer->height() < 1) << "its buttons are in the title row";
+    const int pages = controller->pageCount();
+    click(confirm);
+    until([&] { return !d->property("visible").toBool(); });
+    EXPECT_EQ(controller->pageCount(), pages + 1) << "the confirm button at the top inserted the page";
+
+    d = openDialog({"insertPagesDialog", "openAt", {1}, "form"});
+    QQuickItem* close = nullptr;
+    for (auto* i: itemsUnder(d->property("contentItem").value<QQuickItem*>()->parentItem())) {
+        if (i->objectName() == "dialogCloseButton" && i->isVisible()) {
+            close = i;
+        }
+    }
+    ASSERT_NE(close, nullptr);
+    EXPECT_LT(close->mapToScene(QPointF(0, 0)).x(), 40) << "× at the left";
+    click(close);
+    until([&] { return !d->property("visible").toBool(); });
+    EXPECT_FALSE(d->property("visible").toBool());
+    EXPECT_EQ(controller->pageCount(), pages + 1) << "× inserted nothing";
+
+    // Back to a wide window: in the middle, with its footer again
+    resize(1280, 800);
+    d = openDialog({"insertPagesDialog", "openAt", {1}, "form"});
+    EXPECT_EQ(d->property("placement").toString(), "centered");
+    EXPECT_TRUE(footer->isVisible() && footer->opacity() > 0.99 && footer->height() > 20);
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !d->property("visible").toBool(); });
+    EXPECT_FALSE(d->property("visible").toBool()) << "Esc";
+    d = openDialog({"shareDialog", "openFor", {QString()}, "question"});
+    QTest::keyClick(window, Qt::Key_Back);
+    until([&] { return !d->property("visible").toBool(); });
+    EXPECT_FALSE(d->property("visible").toBool()) << "the back key";
+}
+
+// Settings: tabs on a desktop; on a phone the whole screen, a list of the sections, each a page with a back arrow;
+// sliders keep their width (F12.2)
+TEST_F(AdaptiveLayoutTest, settingsOnAPhoneAreAListOfSections) {
+    openDocument();
+    auto* sheet = window->findChild<QObject*>("settingsPage");
+    ASSERT_NE(sheet, nullptr);
+    auto popupItem = [&]() -> QQuickItem* { return sheet->property("contentItem").value<QQuickItem*>()->parentItem(); };
+    auto visibleIn = [&](const char* name) {
+        for (auto* i: itemsUnder(popupItem())) {
+            if (i->objectName() == name) {
+                return i->isVisible();
+            }
+        }
+        return false;
+    };
+    resize(1280, 800);
+    QMetaObject::invokeMethod(sheet, "open");
+    until([&] { return sheet->property("opened").toBool(); });
+    EXPECT_TRUE(visibleIn("displayTab")) << "tabs on a desktop";
+    EXPECT_FALSE(visibleIn("settingsSectionList"));
+    EXPECT_LT(popupItem()->width(), window->width());
+    QMetaObject::invokeMethod(sheet, "close");
+    until([&] { return !sheet->property("visible").toBool(); });
+
+    for (const WindowSize& s: {WindowSize{412, 915, "phone-portrait"}, WindowSize{915, 412, "phone-landscape"}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        QMetaObject::invokeMethod(sheet, "open");
+        until([&] { return sheet->property("opened").toBool(); });
+        EXPECT_NEAR(popupItem()->width(), s.w, 1) << at << ": the whole screen";
+        EXPECT_NEAR(popupItem()->height(), s.h, 1) << at;
+        EXPECT_TRUE(visibleIn("settingsSectionList")) << at << ": the sections as a list";
+        EXPECT_FALSE(visibleIn("displayTab")) << at;
+        EXPECT_FALSE(visibleIn("settingsSections")) << at;
+        // Pen: the section as a page, its sliders not squeezed to their knob
+        QQuickItem* pen = nullptr;
+        until([&] {
+            for (auto* i: itemsUnder(popupItem())) {
+                if (i->objectName() == "settingsSection0") {
+                    pen = i;
+                }
+            }
+            return pen != nullptr;
+        });
+        ASSERT_NE(pen, nullptr) << at;
+        const QString shots = qEnvironmentVariable("XQT_UI_DIALOG_SHOTS");
+        if (!shots.isEmpty()) {
+            window->grabWindow().save(QString("%1/settingsList-%2.png").arg(shots, QString::fromStdString(at)));
+        }
+        click(pen);
+        if (!shots.isEmpty()) {
+            wait(50);
+            window->grabWindow().save(QString("%1/settingsPen-%2.png").arg(shots, QString::fromStdString(at)));
+        }
+        EXPECT_TRUE(sheet->property("sectionShown").toBool()) << at;
+        EXPECT_TRUE(visibleIn("settingsSections")) << at;
+        EXPECT_FALSE(visibleIn("settingsSectionList")) << at;
+        wait(50);
+        int sliders = 0;
+        for (auto* i: itemsUnder(popupItem())) {
+            if (i->inherits("QQuickSlider") && i->isVisible()) {
+                ++sliders;
+                EXPECT_GE(i->width(), 120) << at << ": a slider of the Pen section";
+                EXPECT_LE(i->mapToScene(QPointF(i->width(), 0)).x(), s.w + 1) << at;
+            }
+        }
+        EXPECT_GE(sliders, 2) << at;
+        // Esc (the back key): back to the list first, then closed
+        QTest::keyClick(window, Qt::Key_Escape);
+        wait(50);
+        EXPECT_FALSE(sheet->property("sectionShown").toBool()) << at << ": back to the list";
+        EXPECT_TRUE(sheet->property("visible").toBool()) << at;
+        QTest::keyClick(window, Qt::Key_Escape);
+        until([&] { return !sheet->property("visible").toBool(); });
+        EXPECT_FALSE(sheet->property("visible").toBool()) << at;
+    }
+}
+
+// The quick tools of the compact chrome (F6.4, F9.4): Present and "Show the tabs and the tool bar" stay inside a
+// short window, the tools scroll
+TEST_F(AdaptiveLayoutTest, quickToolsFitAShortWindow) {
+    openDocument();
+    for (const WindowSize& s: {WindowSize{1024, 700, "small-desktop"}, WindowSize{1280, 500, "short-wide"},
+                               WindowSize{915, 412, "phone-landscape"}, WindowSize{412, 915, "phone-portrait"}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+        wait(50);
+        auto* popup = window->findChild<QObject*>("quickTools");
+        ASSERT_NE(popup, nullptr);
+        QMetaObject::invokeMethod(popup, "open");
+        until([&] { return popup->property("opened").toBool(); });
+        for (const char* name: {"presentToggleButton", "leaveFullScreenButton"}) {
+            auto* b = findItem(name);
+            ASSERT_NE(b, nullptr) << name;
+            const QRectF r = b->mapRectToScene(QRectF(0, 0, b->width(), b->height()));
+            EXPECT_TRUE(QRectF(0, 0, s.w, s.h).adjusted(-1, -1, 1, 1).contains(r))
+                    << at << ": " << name << " at " << r.y() << ".." << r.bottom();
+        }
+        QMetaObject::invokeMethod(popup, "close");
+        until([&] { return !popup->property("visible").toBool(); });
+        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+        wait(30);
+    }
 }
