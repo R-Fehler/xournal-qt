@@ -74,7 +74,8 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
   `TextDocument::attachments`). Nothing is written next to the PDF.
 - Opening extracts them with the clean copy (the cache entry of the file's version, `pictures/`) and copies them into
   the document's **work folder** in the app cache, `<cache>/md-assets/<hash of the PDF's path>/` (a folder per
-  document, so that pictures pasted and not saved yet are still there after a crash). While the document (or a
+  document, so that pictures pasted and not saved yet are still there after a crash; a work folder not used for 60
+  days is removed at start, `DocumentImages::pruneWorkFolders`: the document unpacks it anew when it is opened). While the document (or a
   `LoadResult` of it: a library preview) is open, its root is that folder (every relative link is looked for there,
   and pictures added go into `name.assets/` in it), after it the folder the PDF is in. Saved under another name, the
   document takes its work folder's pictures along.

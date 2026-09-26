@@ -5,6 +5,7 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -371,6 +372,22 @@ TEST_F(TextPdf, picturesOfNotesAreCarriedInsideTheXopp) {
     ASSERT_TRUE(c.openPath(qstr(root / "Physics" / "lecture.xopp")));
     ASSERT_TRUE(current(c).saveAsHybrid(root / "Physics" / "lecture.pdf").ok);
     EXPECT_EQ(attachment(root / "Physics" / "lecture.pdf", *link), carried[0].second);
+}
+
+// The work folders in the app cache have an owner (qt/docs/md-images.md): those not used for 60 days go at start; a
+// document opened marks its own as used.
+TEST_F(TextPdf, oldWorkFoldersArePruned) {
+    const fs::path used = DocumentImages::workFolder(root / "used.xopp");
+    const fs::path old = DocumentImages::workFolder(root / "old.xopp");
+    fs::create_directories(used / "used.assets");
+    fs::create_directories(old / "old.assets");
+    std::ofstream(old / "old.assets" / "a.png") << "x";
+    fs::last_write_time(old, fs::file_time_type::clock::now() - std::chrono::hours(24 * 61));
+    fs::last_write_time(used, fs::file_time_type::clock::now() - std::chrono::hours(24 * 61));
+    DocumentImages::touchWorkFolder(root / "used.xopp");
+    EXPECT_GE(DocumentImages::pruneWorkFolders(), 1u);
+    EXPECT_FALSE(fs::exists(old));
+    EXPECT_TRUE(fs::exists(used / "used.assets"));
 }
 
 // The library's index reads the text of a PDF text document: its words are found

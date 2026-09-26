@@ -268,6 +268,7 @@ void DocumentSession::updateImageRoot() {
         }
         setRoot(folderImageRoot, DocumentImages::folderRoot(document));
         setRoot(imageRoot, root);  // (the newer one: looked in first)
+        DocumentImages::touchWorkFolder(document);  // (in use: not pruned)
         return;
     }
     folderImageRoot.reset();

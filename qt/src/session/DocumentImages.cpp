@@ -1,6 +1,7 @@
 #include "DocumentImages.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -58,6 +59,28 @@ fs::path workFolder(const fs::path& document) {
     char name[20];
     std::snprintf(name, sizeof name, "%016llx", static_cast<unsigned long long>(h));
     return Util::getCacheSubfolder("md-assets") / name;
+}
+
+void touchWorkFolder(const fs::path& document) {
+    const fs::path work = workFolder(document);
+    std::error_code ec;
+    fs::create_directories(work, ec);
+    fs::last_write_time(work, fs::file_time_type::clock::now(), ec);
+}
+
+size_t pruneWorkFolders() {
+    const fs::path all = Util::getCacheSubfolder("md-assets");
+    const auto limit = fs::file_time_type::clock::now() - std::chrono::hours(24 * WORK_FOLDER_DAYS);
+    size_t removed = 0;
+    std::error_code ec;
+    for (auto it = fs::directory_iterator(all, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        std::error_code fec;
+        if (it->is_directory(fec) && fs::last_write_time(it->path(), fec) < limit && !fec) {
+            fs::remove_all(it->path(), fec);
+            removed += !fec;
+        }
+    }
+    return removed;
 }
 
 md::images::Root embeddedRoot(const fs::path& document) {

@@ -31,6 +31,12 @@ md::images::Root markdownRoot(const fs::path& markdownFile);
 /// The folder in the app cache where the pictures a document carries are while it is open (one per document, by its
 /// path): "<cache>/md-assets/<hash>". Links resolve there, and pictures added go there.
 fs::path workFolder(const fs::path& document);
+/// Work folders not used for this long are removed (pruneWorkFolders): a document opened again unpacks them anew.
+constexpr int WORK_FOLDER_DAYS = 60;
+/// Mark the document's work folder as used now.
+void touchWorkFolder(const fs::path& document);
+/// Remove the work folders not used for WORK_FOLDER_DAYS (at start, on a worker). Returns how many.
+size_t pruneWorkFolders();
 /// The root of such a document: its work folder (for every relative link, as the document's pictures are named),
 /// with "name.assets" in it for new pictures.
 md::images::Root embeddedRoot(const fs::path& document);

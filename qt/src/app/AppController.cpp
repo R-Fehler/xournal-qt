@@ -116,6 +116,7 @@ Color toColor(const QColor& c) {
 AppController::AppController(QObject* parent): QObject(parent) {
     app = std::make_shared<AppContext>(AppContext::defaultResourceDir());
     MdImageDecoder::install();  // the pictures of Markdown texts, read with Qt (qt/docs/md-images.md)
+    DocumentImages::pruneWorkFolders();  // (work folders of documents not opened for 60 days; before any opens)
     colors = std::make_shared<Palette>(app->getResourceDir() / "palettes" / "xournal.gpl");
     try {
         colors->load();
