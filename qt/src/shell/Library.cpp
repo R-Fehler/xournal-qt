@@ -485,6 +485,13 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
     if (e.pdfKind != PdfKind::Unknown) {
         notes.insert(QStringLiteral("pdfKind"), QLatin1String(pdfKindName(e.pdfKind)));
     }
+    if (!e.bookmarks.empty()) {
+        QCborMap marks;
+        for (const auto& [page, label]: e.bookmarks) {
+            marks.insert(page, label);
+        }
+        notes.insert(QStringLiteral("bookmarks"), marks);
+    }
     if (e.kind == QLatin1String("md")) {
         QCborArray levels;
         for (int level: e.blockLevel) {
@@ -567,6 +574,13 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
             e->wikiLinks << l.toString();
         }
     }
+    // Its bookmarks (added 2026-09 with qt/bookmarks: an entry without them had none)
+    const QCborMap marks = notes.value(QStringLiteral("bookmarks")).toMap();
+    for (auto it = marks.cbegin(); it != marks.cend(); ++it) {
+        if (const qint64 page = it.key().toInteger(-1); page >= 0 && page < texts.size()) {
+            e->bookmarks[static_cast<int>(page)] = it.value().toString();
+        }
+    }
     // What its PDF is (added 2026-09: an entry without it gets only that read, from the PDF's marker)
     e->pdfKind = e->isPdf() ? pdfKindNamed(notes.value(QStringLiteral("pdfKind")).toString()) : PdfKind::Unknown;
     if (e->showsPdfPages()) {
@@ -625,6 +639,7 @@ void LibraryIndex::load(const fs::path& folder) {
         }
         f.docs = std::move(stored);
         ++kindChanges;  // (the kinds stored in its packs are known now)
+        ++markChanges;  // (and their bookmarks)
     }
 }
 
@@ -648,6 +663,9 @@ void LibraryIndex::put(const EntryPtr& e) {
     if ((slot ? slot->pdfKind : PdfKind::Unknown) != e->pdfKind) {
         ++kindChanges;
     }
+    if ((slot ? slot->bookmarks : std::map<int, QString>()) != e->bookmarks) {
+        ++markChanges;
+    }
     slot = e;
     scheduler->changed();
 }
@@ -656,6 +674,7 @@ void LibraryIndex::erase(const fs::path& file) {
     auto f = folders.find(file.parent_path());
     if (f != folders.end() && f->second.docs.erase(file.filename().string())) {
         ++kindChanges;
+        ++markChanges;
         f->second.notesChanged = f->second.textChanged = true;
         scheduler->changed();
     }
@@ -977,6 +996,9 @@ bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, boo
         }
         e.elementText << simplified(elements);
         e.aspects.push_back(page->getWidth() > 0 ? page->getHeight() / page->getWidth() : 0);
+        if (const auto& mark = page->getBookmark()) {
+            e.bookmarks[static_cast<int>(i)] = QString::fromStdString(*mark);
+        }
     }
     return true;
 }
@@ -1320,6 +1342,20 @@ void LibraryIndex::applyMoves(const std::vector<std::pair<fs::path, fs::path>>& 
     }
 }
 
+std::vector<LibraryIndex::Bookmark> LibraryIndex::bookmarks() const {
+    std::vector<Bookmark> out;
+    std::lock_guard lock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [name, e]: f.docs) {
+            for (const auto& [page, label]: e->bookmarks) {
+                const double aspect = page < e->pageCount() ? e->aspects[static_cast<size_t>(page)] : 0;
+                out.push_back({e->file, page, label, aspect});
+            }
+        }
+    }
+    return out;
+}
+
 std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const {
     const QString q = simplified(query).trimmed();
     const QString folded = textmatch::prepare(q);
@@ -1386,6 +1422,9 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
                 }
             }
             n += count(e->elementText[p]);
+            if (auto mark = e->bookmarks.find(p); mark != e->bookmarks.end()) {
+                n += count(mark->second);  // (its bookmark's label)
+            }
             if (n > 0) {
                 h.count += n;
                 ++h.pages;
@@ -1483,7 +1522,9 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
                 }
             }
             const QString& elements = e->elementText[p];
-            if (Unit u = examine(p, {pdfText ? QStringView(*pdfText) : QStringView(), elements}); u.count > 0) {
+            const auto mark = e->bookmarks.find(p);
+            const QStringView label = mark != e->bookmarks.end() ? QStringView(mark->second) : QStringView();
+            if (Unit u = examine(p, {pdfText ? QStringView(*pdfText) : QStringView(), elements, label}); u.count > 0) {
                 if (!snippetText) {
                     // (from the PDF text if that has hits, else from the text elements)
                     snippetText = pdfText && !textmatch::find(*pdfText, marks).empty() ? pdfText : &elements;

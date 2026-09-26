@@ -15,6 +15,7 @@
 
 #include "PageSketches.h"
 #include "Thumbnails.h"
+#include "session/PageBookmarks.h"
 
 namespace xqt {
 
@@ -49,6 +50,11 @@ void PagesModel::setSession(DocumentSession* s) {
                                       [this](qulonglong page) { markChanged(page); }));
         connections.push_back(connect(s, &DocumentSession::currentPageChanged, this, [this](qulonglong page) {
             pageSelected(page);
+        }));
+        connections.push_back(connect(s, &DocumentSession::bookmarksChanged, this, [this] {
+            if (rowCount() > 0) {
+                Q_EMIT dataChanged(index(0), index(rowCount() - 1), {BookmarkRole});
+            }
         }));
         connections.push_back(connect(&s->search(), &DocumentSearch::changed, this, [this] {
             if (rowCount() > 0) {
@@ -105,6 +111,18 @@ QVariant PagesModel::data(const QModelIndex& index, int role) const {
             return index.row() == current;
         case PageIndexRole:
             return index.row();
+        case BookmarkRole: {
+            if (!session) {
+                return QString();
+            }
+            Document* doc = session->getDocument();
+            std::shared_lock lock(*doc);
+            if (row >= doc->getPageCount()) {
+                return QString();
+            }
+            const auto& mark = doc->getPage(row)->getBookmark();
+            return mark ? PageBookmarks::displayLabel(*mark, row) : QString();
+        }
         case SketchRole:
             return session ? PageSketches::instance().url(sessionId, session->pageId(row)) : QString();
         case SelectedRole:
@@ -153,7 +171,8 @@ QHash<int, QByteArray> PagesModel::roleNames() const {
             {ThumbnailRole, "thumbnail"},       {CurrentRole, "current"},
             {SearchHitsRole, "searchHits"},     {CurrentSearchHitRole, "currentSearchHit"},
             {SearchHitCountRole, "searchHitCount"}, {PageIndexRole, "pageIndex"},
-            {SelectedRole, "selected"},         {SketchRole, "sketch"}};
+            {SelectedRole, "selected"},         {SketchRole, "sketch"},
+            {BookmarkRole, "bookmark"}};
 }
 
 QString PagesModel::thumbnailUrl(int page) const {

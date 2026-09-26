@@ -248,6 +248,17 @@ public:
     /// Make the vocabularies of all documents in the background (the fuzzy search is on: its first search does not
     /// wait for them). Documents that have them are skipped.
     void prepareWords();
+    /// A bookmarked page of an indexed document (qt/docs/bookmarks.md).
+    struct Bookmark {
+        fs::path file;      ///< the document's main file
+        int page = 0;       ///< 0-based
+        QString label;      ///< "": the automatic one ("Page N")
+        double aspect = 0;  ///< height / width of the page (0: unknown)
+    };
+    /// The bookmarks of all indexed documents (by file, then page): read from the index, no document is opened.
+    std::vector<Bookmark> bookmarks() const;
+    /// Changes when the bookmarks of a document changed, or a document with bookmarks came or went.
+    quint64 bookmarkChanges() const { return markChanges.load(); }
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
     /// What an indexed PDF is, the main file of a document (a PDF alone, a PDF with notes): PdfKind::Unknown when it
@@ -323,6 +334,9 @@ private:
         std::vector<int> blockLevel;     ///< per passage: a heading's level (0: not a heading)
         QStringList links;               ///< link targets (for backlinks)
         QStringList wikiLinks;           ///< [[wiki link]] targets
+        /// Its bookmarks (qt/docs/bookmarks.md): page -> label ("": the automatic one). Stored in "notes" when there
+        /// are any; entries of older versions have none (their files had none: a file changed since is read again).
+        std::map<int, QString> bookmarks;
         /// The links of its Markdown boxes were read (notes indexed before links were: read again once, without
         /// their PDF text)
         bool linksRead = true;
@@ -408,6 +422,7 @@ private:
     bool firstRun = true;                ///< (the worker's) the stored packs of all folders are read once
     std::atomic<quint64> generation{0};
     std::atomic<quint64> kindChanges{0};
+    std::atomic<quint64> markChanges{0};
     std::atomic<bool> running{false};
     std::atomic<bool> discarded{false};
     std::atomic<int> doneCount{0}, totalCount{0};

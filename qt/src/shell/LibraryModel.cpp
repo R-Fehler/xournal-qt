@@ -264,6 +264,35 @@ void LibraryModel::setFlat(bool flat) {
     }
 }
 
+void LibraryModel::setFavouritesOnly(bool on) {
+    if (on != onlyFavourites) {
+        onlyFavourites = on;
+        Q_EMIT favouritesOnlyChanged();
+        rebuild();
+    }
+}
+
+bool LibraryModel::isFavourite(const QString& path) const {
+    return !path.isEmpty() && DocumentPlaces::favourite(DocumentPlaces::keyOf(toPath(path)));
+}
+
+void LibraryModel::setFavourite(const QString& path, bool on) {
+    if (path.isEmpty() || isFavourite(path) == on) {
+        return;
+    }
+    DocumentPlaces::setFavourite(DocumentPlaces::keyOf(toPath(path)), on);
+    favouritesChanged();
+    Q_EMIT favouriteToggled(path, on);
+}
+
+void LibraryModel::favouritesChanged() {
+    if (onlyFavourites) {
+        rebuild();
+    } else if (!rows.empty()) {
+        Q_EMIT dataChanged(index(0), index(static_cast<int>(rows.size()) - 1), {FavouriteRole});
+    }
+}
+
 void LibraryModel::placesChanged() {
     if (sortKey == "read") {
         rebuild();  // (the order may be another one now)
@@ -559,7 +588,7 @@ void LibraryModel::rebuild() {
             std::move(otherRows.begin(), otherRows.end(), std::back_inserter(newRows));
         } else {
             std::vector<Row> folderRows, docRows;
-            if (flatView) {
+            if (flatView || onlyFavourites) {
                 for (const auto& item: allShown()) {
                     docRows.push_back(itemRow(item));
                 }
@@ -595,7 +624,7 @@ void LibraryModel::rebuild() {
                 auto newer = [](const Row& a, const Row& b) { return a.modified > b.modified; };
                 std::stable_sort(folderRows.begin(), folderRows.end(), newer);
                 std::stable_sort(docRows.begin(), docRows.end(), newer);
-            } else if (flatView) {
+            } else if (flatView || onlyFavourites) {
                 std::stable_sort(docRows.begin(), docRows.end(), [](const Row& a, const Row& b) {
                     return DocumentFiles::namesLess(a.name, b.name);
                 });
@@ -608,6 +637,12 @@ void LibraryModel::rebuild() {
 }
 
 void LibraryModel::setRows(std::vector<Row> newRows) {
+    if (onlyFavourites) {
+        // Only starred documents (no folders), whatever else lists them (the search, the kinds shown)
+        std::erase_if(newRows, [](const Row& r) {
+            return r.isFolder || !DocumentPlaces::favourite(DocumentPlaces::keyOf(r.item));
+        });
+    }
     std::set<fs::path> shown;
     for (const auto& r: newRows) {
         shown.insert(r.path);
@@ -737,6 +772,8 @@ QVariant LibraryModel::data(const QModelIndex& i, int role) const {
             }
             return list;
         }
+        case FavouriteRole:
+            return !r.isFolder && DocumentPlaces::favourite(DocumentPlaces::keyOf(r.item));
         case ConflictsRole: {
             QStringList list;
             for (const fs::path& c: r.item.conflicts) {
@@ -778,7 +815,8 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
             {SizeRole, "size"},
             {FileIconRole, "fileIcon"},
             {NameMarksRole, "nameMarks"},
-            {ConflictsRole, "conflicts"}};
+            {ConflictsRole, "conflicts"},
+            {FavouriteRole, "favourite"}};
 }
 
 void LibraryModel::setShowFilter(const ShowFilter& f) {

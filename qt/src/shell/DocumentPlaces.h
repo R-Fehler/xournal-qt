@@ -1,12 +1,13 @@
 /*
  * xournal-qt: the pages of a document that matter besides its content - the title page (its preview in the library
  * and in the overview of open documents; the first page unless chosen otherwise) and the page it was left at (to
- * open it there again, if wanted).
+ * open it there again, if wanted) - and whether it is a favourite (starred).
  *
  * A .xopp has no place for them, so they are kept aside, in a small JSON file: for the documents of the library in
  * the library's folder in the config ("~/.config/xournal-qt/libraries/<key>/pages.json", by their path in the
  * library; not in its cache folders, which can be removed at any time), for the others in the user's cache (by
- * their whole path). Renaming and moving in the app take the entries along.
+ * their whole path). Renaming and moving in the app take the entries along; moved or renamed by another program, a
+ * document loses them.
  *
  * Safe from any thread (previews are drawn by workers).
  *
@@ -48,6 +49,10 @@ void setLastPage(const fs::path& document, int page);
 qint64 lastRead(const fs::path& document);
 /// It is read now (or at `when`, seconds since 1970).
 void setRead(const fs::path& document, qint64 when = -1);
+/// The document is a favourite (starred; qt/docs/bookmarks.md). The star is the user's relation to the file, not
+/// its content: kept here, never written into the file.
+bool favourite(const fs::path& document);
+void setFavourite(const fs::path& document, bool on);
 /// Files or folders renamed or moved (old, new): their entries follow.
 void moved(const std::vector<std::pair<fs::path, fs::path>>& moves);
 

@@ -48,6 +48,9 @@ class LibraryModel final: public QAbstractListModel {
     /// The search looks at names only: of the documents, and of the folders when they are shown (not in the flat
     /// list) - not at what is written in the documents.
     Q_PROPERTY(bool namesOnly READ namesOnly WRITE setNamesOnly NOTIFY namesOnlyChanged)
+    /// Only the favourites (starred documents; DocumentPlaces): all of the library's, without folders, like the flat
+    /// list; combined with the "Show" filter and the search (qt/docs/bookmarks.md)
+    Q_PROPERTY(bool favouritesOnly READ favouritesOnly WRITE setFavouritesOnly NOTIFY favouritesOnlyChanged)
     /// "name" or "modified"
     Q_PROPERTY(QString sortBy READ sortBy WRITE setSortBy NOTIFY sortByChanged)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchChanged)
@@ -125,6 +128,8 @@ public:
         /// A document whose file is a PDF: what the PDF is, from the index (pdfKindName: "plain", "notes", "text",
         /// "archive", "archive-text"; "" until it is indexed, and for other documents and folders)
         PdfKindRole,
+        /// The document is a favourite (starred)
+        FavouriteRole,
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
@@ -156,6 +161,13 @@ public:
     void setFlat(bool flat);
     bool namesOnly() const { return onlyNames; }
     void setNamesOnly(bool namesOnly);
+    bool favouritesOnly() const { return onlyFavourites; }
+    void setFavouritesOnly(bool on);
+    /// Star a document (its main file, a card's path) or take its star away; kept beside it (DocumentPlaces).
+    Q_INVOKABLE void setFavourite(const QString& path, bool on);
+    Q_INVOKABLE bool isFavourite(const QString& path) const;
+    /// A star was set or taken away elsewhere (an open document's menu): shown anew.
+    void favouritesChanged();
     QString sortBy() const { return sortKey; }
     void setSortBy(const QString& key);
     QString searchQuery() const { return query; }
@@ -267,6 +279,9 @@ Q_SIGNALS:
     void folderChanged();
     void flatChanged();
     void namesOnlyChanged();
+    void favouritesOnlyChanged();
+    /// A document was starred or unstarred here (other views follow).
+    void favouriteToggled(const QString& path, bool on);
     void fuzzySearchChanged();
     void sortByChanged();
     void searchChanged();
@@ -329,6 +344,7 @@ private:
     QString currentFolder;
     bool flatView = false;
     bool onlyNames = false;
+    bool onlyFavourites = false;
     QString sortKey = "name";
     QString query;
     bool fuzzy = false;

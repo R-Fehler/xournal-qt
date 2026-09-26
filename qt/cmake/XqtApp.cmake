@@ -67,6 +67,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ShortcutsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LayersModel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryBookmarks.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentLinks.h
@@ -260,6 +262,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/RecoveryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ExternalChangesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/SyncConflictsTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/FavouritesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryFilesTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/LibraryArchiveTest.cpp
