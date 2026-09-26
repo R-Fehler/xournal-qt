@@ -2101,3 +2101,34 @@ Design: [md-images.md](../md-images.md).
       document name) matches. The library search itself also finds a document by a bookmark's name.
 - [ ] Android (Fold 7, both screens): the Favourites chip and the Bookmarks tab fit in the header (it scrolls
       sideways when narrow); the stars and ribbons are big enough to tap.
+
+## Adaptive layout: foundation (qt/adaptive-foundation)
+See [adaptive-layout.md](../adaptive-layout.md).
+- [ ] Desktop, a document open, window maximized (1920 wide or so): everything as before, the page sidebar beside the
+      page. Settings → Display → Window size: "a wide desktop window (1920 × …)".
+- [ ] Drag the window's right edge slowly to the left: below about 1080 px the sidebar goes away (not back and forth
+      while the edge is near 1110). Drag it wider again: it comes back past about 1140 px.
+- [ ] Narrow window (about 1000 px): the Pages button opens the sidebar over the page, the page dimmed. Tap a page in
+      it: that page, the sidebar closes. Open it again, tap the dimmed page: it closes and nothing is drawn. Open it,
+      the button beside its edge: the sidebar stays beside the page; make the window wide and narrow again: still
+      there at the narrow size.
+- [ ] Wide window: hide the sidebar with the Pages button. Make the window narrow and wide again: hidden in the wide
+      window, as chosen. Settings → Display → "Reset the layout choices": shown again when wide.
+- [ ] Write a long stroke while making the window narrower with the other hand (or a keyboard shortcut of the
+      desktop that resizes it): the sidebar does not change during the stroke, only after the pen is lifted.
+- [ ] "Adapt the layout to the window size" off: a narrow window keeps the sidebar beside the page; on again: as
+      before.
+- [ ] F11 and F5, Ctrl+F5, Escape: full screen and presenting exactly as before (tab dots, tool square, pen pill,
+      "Leave full screen").
+- [ ] Settings → Display → "Controls at this size" → Compact: the tab strip and tool bar go, the tool square and the
+      tab dots show, the window stays a window. The tool square → "Show the tabs and the tool bar": back. "None
+      (reading)": only the page; the faint dot in the lower left corner brings the controls back.
+- [ ] Surface / 2-in-1 upright (portrait): Settings says "a tablet in portrait"; the sidebar is not beside the page,
+      the Pages button opens it as a drawer. Turn it to landscape and back: each keeps its own sidebar choice.
+- [ ] 2-in-1 with a touch screen: touch the screen with a finger: the sidebar's Pages / Layers / Contents switch gets
+      taller; use the mouse or the touch pad: smaller again; the pen changes nothing. Settings → Touch → "Buttons
+      sized for fingers": Always / Never.
+- [ ] Android, Fold 7 folded (412 wide): "a phone in portrait"; no sidebar at first, the Pages button opens the
+      drawer; the sidebar switch is finger-sized.
+- [ ] Fold 7 unfolded (about 900 × 1000): "a tablet in portrait" (not a phone): the drawer, not a docked sidebar.
+      Fold and unfold: the class follows, and each keeps its own choice.
