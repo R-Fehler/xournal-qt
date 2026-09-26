@@ -499,6 +499,14 @@
   "Export as Markdown" and "Open as PDF document" (the `.md` stays as it is). Existing `.md` files are never
   converted. User guide: `qt/docs/user/markdown-from-pdf.md`. Left: images (`qt/md-images`), a "text" badge.
 
+- **Citations, `qt/citations` (2026-09-26).** Look up selected text (PDF text pill, context pill): Google Scholar and
+  a configurable translator, the exact web address confirmed first (Open / Copy / Cancel, "don't ask again").
+  "Find this paper": a title guessed from a bibliography entry (IEEE, APA, ACM, LNCS, DIN, arXiv) is matched in the
+  library against PDF titles and the largest text of page 1 (new `title`/`heading` fields per PDF in the index
+  packs, no format bump), typo-tolerant; hits open beside, in a tab, or as a link. arXiv: ids recognised, title
+  search through the export API, download named by the title into the library, "Open as reference". Networking is
+  opt-in (ask/on/off), one arXiv request per 3 s.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

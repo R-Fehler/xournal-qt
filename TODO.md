@@ -361,7 +361,7 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   interactive table editor (a grid in a popup: cells, add/remove rows and columns, alignment, the current row and
   column shown), writing a normal pipe table. A page break needs a syntax that other tools ignore or understand
   (proposal: `<div style="page-break-after: always"></div>`, as Typora and Obsidian's PDF export use).
-- [ ] Citations: Scholar/translate on selected text; bibliography entry → library hits (fuzzy, by title and first
+- [x] Citations (`qt/citations`, merged 2026-09-26; left: look-up in the Markdown source panel and text mode, `.bib`): Scholar/translate on selected text; bibliography entry → library hits (fuzzy, by title and first
   page) → open in reference/tab, copy as a link; arXiv import (named by title). Networking is opt-in, and the URL is
   always shown (hover or preview) before anything is opened or downloaded. `.bib` later, after the user flow is
   thought through.
@@ -435,6 +435,8 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   `XQT_LOG_WINDOW=1` and look for a touch cancel, or an odd touch end, just before the resize.
 
 ### Flaky tests
+- [~] `CanvasMemoryTest.twoViewsOfOneDocumentShareTheLimit` (qt/self-reference) is about one page over the limit in
+  about half the runs alone (2026-09-26); being fixed in `qt/two-views-memory`.
 - [x] `MainWindowTest.theSelectedPdfTextTakesItsHandlesAndActionsAlong` failed once in the full suite under
   `-j6` load (2026-09-24), at the check after "the way back brings it into view again". It passed 3 of 3 alone.
   The wait for the scroll back is probably too short under load.
