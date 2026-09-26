@@ -537,7 +537,7 @@ bool CanvasPage::eraserInNote(double& x, double& y) const {
 // --- display -----------------------------------------------------------------------------------------------------
 
 auto CanvasPage::bufferInfo() -> BufferInfo {
-    return raster->withBuffer([](xoj::view::Mask& buffer) {
+    return raster->withPlacedBuffer([](xoj::view::Mask& buffer, const PageRaster::Placement& place) {
         BufferInfo info;
         if (!buffer.isInitialized()) {
             return info;
@@ -547,6 +547,9 @@ auto CanvasPage::bufferInfo() -> BufferInfo {
         info.zoom = buffer.getZoom();
         cairo_surface_get_device_scale(s, &info.dpiScale, &info.dpiScale);
         info.pixelSize = QSize(cairo_image_surface_get_width(s), cairo_image_surface_get_height(s));
+        info.whole = place.whole;
+        info.origin = QPoint(place.x, place.y);
+        info.area = QRectF(place.area.x, place.area.y, place.area.width, place.area.height);
         return info;
     });
 }
@@ -554,7 +557,7 @@ auto CanvasPage::bufferInfo() -> BufferInfo {
 QImage CanvasPage::composeTile(const QRect& pixelRect) {
     QImage img(pixelRect.size(), QImage::Format_ARGB32_Premultiplied);
     img.fill(Qt::white);
-    raster->withBuffer([&](xoj::view::Mask& buffer) {
+    raster->withPlacedBuffer([&](xoj::view::Mask& buffer, const PageRaster::Placement& place) {
         if (!buffer.isInitialized()) {
             return;
         }
@@ -567,7 +570,7 @@ QImage CanvasPage::composeTile(const QRect& pixelRect) {
                 img.bits(), CAIRO_FORMAT_ARGB32, img.width(), img.height(), static_cast<int>(img.bytesPerLine()));
         cairo_surface_set_device_scale(surface, dpiScale, dpiScale);
         cairo_t* cr = cairo_create(surface);
-        cairo_translate(cr, -pixelRect.x() / dpiScale, -pixelRect.y() / dpiScale);
+        cairo_translate(cr, -pixelRect.x() / dpiScale - place.x, -pixelRect.y() / dpiScale - place.y);
         cairo_scale(cr, bufferZoom, bufferZoom);  // page coordinates
         buffer.paintTo(cr);
         // Upstream XojPageView::paintPage: the overlays draw in page coordinates on top of the buffer.
@@ -596,12 +599,16 @@ std::vector<QRect> CanvasPage::takeDirty(const BufferInfo& info, bool& all) {
     if (!all) {
         const double s = info.zoom * info.dpiScale;
         const QRect bounds(QPoint(0, 0), info.pixelSize);
+        // (from the buffer's top left: a page drawn in part)
+        const double ox = info.origin.x() * info.dpiScale, oy = info.origin.y() * info.dpiScale;
         for (const Range& r: dirtyRanges) {
             if (!r.isValid() || r.empty()) {
                 continue;
             }
-            QRect px(QPoint(static_cast<int>(std::floor(r.minX * s)) - 1, static_cast<int>(std::floor(r.minY * s)) - 1),
-                     QPoint(static_cast<int>(std::ceil(r.maxX * s)) + 1, static_cast<int>(std::ceil(r.maxY * s)) + 1));
+            QRect px(QPoint(static_cast<int>(std::floor(r.minX * s - ox)) - 1,
+                            static_cast<int>(std::floor(r.minY * s - oy)) - 1),
+                     QPoint(static_cast<int>(std::ceil(r.maxX * s - ox)) + 1,
+                            static_cast<int>(std::ceil(r.maxY * s - oy)) + 1));
             px = px.intersected(bounds);
             if (!px.isEmpty()) {
                 rects.push_back(px);

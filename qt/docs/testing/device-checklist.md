@@ -1868,9 +1868,86 @@ Design: [md-images.md](../md-images.md).
 ## Heading buttons; arrows in the full-screen tab bar (2026-09-26)
 
 - [ ] The formatting bar has ¶, H1, H2, H3 as buttons (no menu); the one of the line with the cursor is highlighted.
+- [ ] The tool bar has a sticky-note button (next to "Insert image"): a tap places a note in the middle of the visible
+      page, selected.
 - [ ] Full screen with several documents: the slim bar at the top has small ‹ and › arrows at its ends that go to the
       previous / next document (dimmed at the first / last one); a tap between them still opens the overview, a swipe
       still switches. With a finger and with the mouse.
+
+## Renaming documents (qt/rename)
+- [ ] Open a `.xopp` from the library. Double click (mouse) on its tab's title: the title becomes a field with the
+      name selected and ".xopp" beside it in grey. Type a new name, Enter: the tab shows the new name, the library
+      shows the card under it, and the document opens again at the page it was left at.
+- [ ] The same, Escape instead of Enter: nothing is renamed; again, then click on the page: nothing is renamed.
+- [ ] Type the name of another document of that folder (also one of another kind, e.g. a PDF's): the field turns
+      red and says the name is taken; Enter keeps the field open. `a/b` says why too.
+- [ ] Two tabs: double click on the tab that is not shown: it is shown, no field. A double click on it now renames.
+- [ ] Touch (Fold 7 / the 2-in-1 as tablet): press and hold a tab: its menu has "Rename…"; it shows that tab and
+      edits its title in place (the keyboard comes up, the field is not hidden by it).
+- [ ] ⋮ → Rename…: a dialog with the name and the extension (".xopp", ".pdf", ".md") beside the field; a taken name
+      or an empty one says why and OK is greyed; a new name renames the file, the tab follows.
+- [ ] A `.xopp` with its PDF next to it (lecture.xopp + lecture.pdf): the dialog says both are renamed; after it, both
+      have the new name and the document still shows its PDF pages. A PDF with notes: the PDF is renamed.
+- [ ] A `.md` with pictures (`name.assets/`), open with unsaved text: rename it from the tab: the folder is renamed
+      too, the pictures still show, the links in the text use the new folder name; the unsaved text is still there
+      and saving writes it to the new file. Documents that link to it get the new link.
+- [ ] A new document (never saved): ⋮ → Rename… "Name the document", type "Ideas": the tab says "Ideas"; Save as
+      suggests "Ideas.xopp".
+- [ ] A read-only file (e.g. `chmod a-w` on Linux, a file of a read-only folder): the rename field or dialog says it
+      is read-only, and nothing is renamed.
+- [ ] Library: press and hold (finger) on a card's name: the name becomes a field (not the menu, no drag); press and
+      hold on the preview still opens the menu, and holding then moving still drags. Enter renames the card.
+- [ ] Library with the mouse: a double click on a card's name renames in place; a single click on the name opens the
+      document (a moment later); a click on the preview opens at once. Right click on the name: the menu.
+- [ ] A text file (`.py`) in the library: the field shows the name without ".py", ".py" beside it; it stays.
+- [ ] A folder's name: press and hold renames the folder; its documents keep their places and previews.
+- [ ] The overview of open documents: double click (mouse) or press and hold (finger) on a card's title edits it in
+      place; Escape cancels the name and the overview stays open; Enter renames, the card and the tab follow.
+- [ ] Recent: the same gestures on a card's title rename a document outside the library; it opens again at its page.
+
+## Resizing Markdown boxes (qt/md-box-resize)
+
+- [ ] Text tool with "Markdown" on, tap on a page, type a long paragraph: a white knob with ⟷ sits just outside the
+      middle of the box's right edge. Drag it to the left with the pen: the text flows onto more lines while dragging,
+      the frame grows downwards; to the right: fewer lines, never past the page's right edge; far to the left: it
+      stops at about 2 cm.
+- [ ] The same with a finger and with the mouse; the mouse shows the ⟷ cursor over the knob (and while dragging),
+      the cross elsewhere.
+- [ ] While writing, Ctrl+Z undoes a drag (one at a time), Ctrl+Shift+Z redoes it; the text is untouched. Escape,
+      then the undo button: the whole edit goes back, width included.
+- [ ] Select a box alone (object select tool, or a rectangle around it): its right knob shows ⟷. Drag it: the box
+      reflows while dragging and is selected again afterwards (the selection fits the new box). One undo step
+      restores the width; redo sets it again.
+- [ ] With that selection, the other knobs still work: the middle moves it, a corner scales it, the red knob turns
+      it, the × deletes it. After scaling with a corner, the ⟷ knob still sets the width.
+- [ ] The page's own Markdown text (written with the writing button): no knob while writing it; selected, its right
+      knob has no ⟷ and scales as before.
+- [ ] A page with its own Markdown text and a box beside it: resizing the box does not move the page's text or
+      change its pages.
+- [ ] Save, close, open again: the box keeps its width. Open the file in Xournal++: the source is wrapped at that
+      width.
+- [ ] Zoomed in and out: the knob stays the same size on the screen and is easy to hit with a finger.
+
+## Page sizes from A0 to A7 (qt/page-sizes)
+- [ ] New document: the Paper list starts with A0, A1, A2, A3, A4, A5, A6, A7, then Letter, Legal, 16:9. Create an
+      A0 poster (portrait) and an A7 card (landscape): the page grid and the canvas show the right shape.
+- [ ] Insert pages (page menu): A6 and A7 cards after an A4 page, portrait and landscape; "Like this page" still
+      copies the current page's size.
+- [ ] Settings → New pages → Paper size: A0 … A7 are there, and the New document dialog preselects what is chosen
+      there. (A size that is none of them, set in Xournal++, shows as "Other: … mm": covered by the tests.)
+- [ ] An A7 card on plain paper: write the page's Markdown text (the writing button): it starts 1 cm from the top
+      and left edges and wraps 1 cm from the right one; a longer text flows onto more A7 cards. On A6 about 1.4 cm;
+      on A5 and A4 still 2 cm.
+- [ ] "Start a chapter here…" on an A7 card: the heading sits at the card's margins, not 2 cm in.
+- [ ] An A0 poster with a few hundred strokes (or a PDF poster opened and annotated): fit page (and pinching out)
+      shows the whole page; the zoom goes below 30 % for it. Zoom to 100 %, 300 %, 700 %: what is in view gets sharp
+      after the zoom rests, the app stays responsive, and its memory (XQT_PERF=1, or the system monitor) stays low:
+      about the view's size in pixels four times over per page, not the whole poster (was 1.2 GB at 300 %, nothing
+      drawn at 700 %).
+- [ ] Scroll quickly over the A0 page at 200 %: the part that comes into view shows the page's preview for a moment
+      and then gets sharp; no stutter. Write on it at 300 % near the edge of the view, scroll on: the stroke is there.
+- [ ] Export the poster to PDF: an A0 page (841 × 1189 mm in the PDF viewer's document properties), the strokes
+      sharp at any zoom.
 
 ## Sticky notes as containers (qt/sticky-containers)
 - [ ] Place a note (shapes menu → Sticky note). Its pill has "Text" and "Image…" next to the colours and "Cover".

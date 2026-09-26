@@ -35,15 +35,23 @@ struct PaperFormat {
     double width, height;  ///< portrait, in points
     bool wide = false;     ///< meant to be landscape (choosing it turns the page)
 };
-// The common formats of upstream's page format dialog (GtkPaperSize), in points, and a 16:9 slide as PowerPoint
-// makes it (13.33 x 7.5 in): a plain page size in the .xopp, as upstream stores any other.
-constexpr std::array<PaperFormat, 6> PAPER_FORMATS{{{"A5", 419.527559, 595.275591},
-                                                     {"A4", 595.275591, 841.889764},
-                                                     {"A3", 841.889764, 1190.551181},
-                                                     {"Letter", 612, 792},
-                                                     {"Legal", 612, 1008},
-                                                     {QT_TRANSLATE_NOOP("SettingsModel", "16:9 (presentation)"), 540, 960,
-                                                      true}}};
+/// Millimetres in points (upstream stores page sizes in points, 1/72 inch)
+constexpr double mm(double v) { return v * 72.0 / 25.4; }
+// ISO A0 (posters) down to A7 (flashcards), then the common formats of upstream's page format dialog (GtkPaperSize)
+// in points, and a 16:9 slide as PowerPoint makes it (13.33 x 7.5 in): a plain page size in the .xopp, as upstream
+// stores any other. The settings keep a size, not an index: the order can change.
+constexpr std::array<PaperFormat, 11> PAPER_FORMATS{{{"A0", mm(841), mm(1189)},
+                                                      {"A1", mm(594), mm(841)},
+                                                      {"A2", mm(420), mm(594)},
+                                                      {"A3", mm(297), mm(420)},
+                                                      {"A4", mm(210), mm(297)},
+                                                      {"A5", mm(148), mm(210)},
+                                                      {"A6", mm(105), mm(148)},
+                                                      {"A7", mm(74), mm(105)},
+                                                      {"Letter", 612, 792},
+                                                      {"Legal", 612, 1008},
+                                                      {QT_TRANSLATE_NOOP("SettingsModel", "16:9 (presentation)"), 540, 960,
+                                                       true}}};
 
 /// How long touch waits once the pen is away ("touch" / "timeout"), in milliseconds. Upstream waits a second; with a
 /// pen that tells when it is near, touch is ignored while it is anyway, so here it does not wait at all.
@@ -477,6 +485,13 @@ QStringList SettingsModel::paperFormats() const {
         names << tr(f.name);
     }
     return names;
+}
+
+QString SettingsModel::templatePaperSize() const {
+    const auto& tpl = settings.getPageTemplateSettings();
+    const auto inMm = [](double pt) { return QString::number(std::lround(pt * 25.4 / 72.0)); };
+    //: A page size, width x height
+    return tr("%1 × %2 mm").arg(inMm(tpl.getPageWidth()), inMm(tpl.getPageHeight()));
 }
 
 bool SettingsModel::paperIsWide(int index) const {

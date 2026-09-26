@@ -17,25 +17,12 @@
 #include "MdBox.h"
 #include "MdImages.h"
 #include "MdPaginate.h"
+#include "PageMargins.h"
 #include "TextFile.h"
 
 namespace xqt::TextDocument {
 
 namespace {
-/// The left margin of the page's text (as TextFlow::styleFor: a ruled page with a margin line starts after it).
-double leftMargin(const PageRef& page) {
-    double left = TextFile::PAGE_MARGIN;
-    const PageType bg = page->getBackgroundType();
-    if (bg.format == PageTypeFormat::Lined) {
-        double margin = 72;  // (upstream's default: 1 inch; negative: on the right)
-        BackgroundConfig(bg.config).loadValue(background_config_strings::CFG_MARGIN, margin);
-        if (margin >= 0) {
-            left = std::max(left, margin + 10);
-        }
-    }
-    return left;
-}
-
 std::string sliceOf(const PageRef& page) {
     const Text* box = pageBoxOf(page);
     return box ? box->getText() : std::string();
@@ -44,7 +31,7 @@ std::string sliceOf(const PageRef& page) {
 
 Text* pageBoxOf(const PageRef& page) {
     const Layer* layer = page ? md::markdownLayer(page) : nullptr;
-    return layer ? md::pageBoxOf(*layer, leftMargin(page), TextFile::PAGE_MARGIN) : nullptr;
+    return layer ? PageMargins::pageBox(*layer, page) : nullptr;
 }
 
 bool isTextDocument(Document& doc) {

@@ -55,6 +55,7 @@
 #include "CanvasView.h"
 #include "PenHover.h"
 #include "StickyNotes.h"
+#include "session/PageMargins.h"
 #include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentTextIndex.h"
@@ -2325,6 +2326,10 @@ void AppController::filesChanged(const DocumentFiles::Result& r) {
                 followTextFile(*s, from, to);
                 continue;
             }
+            if (!s->hasFilePath() && !s->shownFile().empty() && s->annotatedPdf().empty()) {
+                followShownFile(*s, from, to);  // (an image written on, a file shown read-only)
+                continue;
+            }
             const fs::path file = s->hasFilePath() ? s->getFilePath() : fs::path();
             const fs::path pdf = s->getDocument()->getPdfFilepath();
             const fs::path newFile = file.empty() ? file : DocumentFiles::remap(file, from, to);
@@ -4519,7 +4524,6 @@ bool AppController::addChapter(int page, const QString& title, int level) {
     text->setText(DocumentChapters::headingText(title.trimmed().toStdString(), level));
     text->setFont(XojFont("Sans Bold", DocumentChapters::headingSize(level)));
     text->setColor(Color(0, 0, 0));
-    text->move(TextFlow::MARGIN, TextFlow::MARGIN);
     const Text* raw = text.get();
     Layer* layer = nullptr;
     PageRef pageRef;
@@ -4528,6 +4532,8 @@ bool AppController::addChapter(int page, const QString& title, int level) {
         pageRef = doc->getPage(index);
         layer = pageRef ? pageRef->getSelectedLayer() : nullptr;
         if (layer) {
+            const PageMargins::Margins m = PageMargins::of(pageRef);  // (a small page: smaller margins)
+            text->move(m.left, m.top);
             layer->addElement(std::move(text));
         }
         doc->unlock();

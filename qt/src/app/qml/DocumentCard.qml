@@ -1,7 +1,9 @@
 // A document or folder in the library / recent grids: first-page preview (or a folder), name and details.
 // Tap to open (while items are selected: to select it too); Ctrl / Shift + click and the circle in the corner select;
 // right click, the ⋮ button or press and hold (without moving) for the menu; press and hold, then move to drag it
-// (with the other selected items) onto a folder (when `dragOverlay` is set).
+// (with the other selected items) onto a folder (when `dragOverlay` is set). On the title (name and details) a press
+// and hold, or a double click with the mouse, edits the name in place instead (qt/rename; a click there opens a
+// moment later, the time a double click may take).
 // Extended library search (`stripHeight` > 0): below the title, the pages with hits (marked), side by side;
 // tapping one opens the document at that page. A Markdown file shows a card per passage with hits instead: the
 // passage drawn as it is formatted, the headings above it on top; tapping one opens the file there.
@@ -72,6 +74,20 @@ Item {
     signal toggleRequested()
     signal conflictsRequested()
     signal menuRequested(Item item, real x, real y)
+    /// Its title can be edited in place (qt/rename): a press and hold on the title, or a double click with the mouse
+    property bool renamable: !isLibrary
+    /// The name as the model's rename takes it (a text or other file: with its extension)
+    signal renameAccepted(string name)
+    /// A text or other file: the extension of its name stays as it is when it is renamed in place
+    readonly property string nameExtension: {
+        if (isFolder || (kind !== "other" && kind !== "text")) return ""
+        const dot = name.lastIndexOf(".")
+        return dot > 0 ? name.substring(dot) : ""
+    }
+    function startRename() {
+        titleRename.extension = nameExtension
+        titleRename.start(name.substring(0, name.length - nameExtension.length), "")
+    }
 
     HoverHandler { id: hover }
 
@@ -302,24 +318,53 @@ Item {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 0
-                ColumnLayout {
+                Item {
                     Layout.fillWidth: true
-                    spacing: 0
-                    Label {
-                        objectName: "cardName"
-                        Layout.fillWidth: true
-                        text: card.markedName !== "" ? card.markedName : card.name
-                        textFormat: card.markedName !== "" ? Text.StyledText : Text.AutoText
-                        elide: Text.ElideMiddle
-                        font.weight: Font.DemiBold
-                        color: "#202124"
+                    implicitHeight: titleColumn.implicitHeight
+                    ColumnLayout {
+                        id: titleColumn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        spacing: 0
+                        Label {
+                            objectName: "cardName"
+                            visible: !titleRename.active
+                            Layout.fillWidth: true
+                            text: card.markedName !== "" ? card.markedName : card.name
+                            textFormat: card.markedName !== "" ? Text.StyledText : Text.AutoText
+                            elide: Text.ElideMiddle
+                            font.weight: Font.DemiBold
+                            color: "#202124"
+                        }
+                        InlineRename {
+                            id: titleRename
+                            objectName: "cardRename"
+                            visible: active
+                            Layout.fillWidth: true
+                            check: function(typed) {
+                                return app.renameProblem(card.path, typed.trim() + titleRename.extension)
+                            }
+                            onAccepted: function(typed) { card.renameAccepted(typed + titleRename.extension) }
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: card.subtitle
+                            elide: Text.ElideMiddle
+                            font.pixelSize: 12
+                            color: "#6b6f75"
+                        }
                     }
-                    Label {
-                        Layout.fillWidth: true
-                        text: card.subtitle
-                        elide: Text.ElideMiddle
-                        font.pixelSize: 12
-                        color: "#6b6f75"
+                    // The title: a press and hold or a double click (mouse) edits the name in place; a tap opens,
+                    // a right click opens the menu, as on the rest of the card
+                    RenameGestures {
+                        id: titleArea
+                        objectName: "cardTitleArea"
+                        anchors.fill: titleColumn
+                        visible: !titleRename.active
+                        renamable: card.renamable
+                        onTapped: function(modifiers) { card.activated(modifiers) }
+                        onMenuRequested: function(x, y) { card.menuRequested(titleArea, x, y) }
+                        onRenameRequested: card.startRename()
                     }
                 }
                 ToolButton {

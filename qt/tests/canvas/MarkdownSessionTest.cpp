@@ -23,6 +23,9 @@
 #include "undo/UndoRedoHandler.h"
 #include "util/Matrix.h"
 #include "model/MarkdownText.h"
+#include "model/PageType.h"
+#include "session/PageMargins.h"
+#include "session/TextDocument.h"
 
 #include "MarkdownSession.h"
 #include "MdBox.h"
@@ -86,6 +89,87 @@ TEST_F(MarkdownSessionTest, boxAtTheBottomAndOneUndoStep) {
     EXPECT_EQ(source(), "changed");
     edit.cancel();
     EXPECT_EQ(source(), "# Title\n\nSome *text*.");
+}
+
+// Flashcards (qt/page-sizes): the page's text on a page smaller than A5 has margins in proportion to the short side
+// (A5's 2 cm of 148 mm), at least 5 mm: 10 mm on A7, about 14 mm on A6. A5 and bigger keep 2 cm. It flows onto more
+// cards of the same size, and text written at 2 cm before moves to the new margins when it is edited.
+TEST_F(MarkdownSessionTest, theTextOfASmallPageHasSmallerMargins) {
+    const double mm = 72.0 / 25.4;
+    EXPECT_DOUBLE_EQ(PageMargins::forSize(210 * mm, 297 * mm), TextFlow::MARGIN) << "A4";
+    EXPECT_DOUBLE_EQ(PageMargins::forSize(148 * mm, 210 * mm), TextFlow::MARGIN) << "A5";
+    EXPECT_DOUBLE_EQ(PageMargins::forSize(841 * mm, 1189 * mm), TextFlow::MARGIN) << "A0";
+    EXPECT_NEAR(PageMargins::forSize(105 * mm, 148 * mm) / mm, 14.2, 0.05) << "A6";
+    EXPECT_NEAR(PageMargins::forSize(74 * mm, 105 * mm) / mm, 10.0, 0.05) << "A7";
+    EXPECT_NEAR(PageMargins::forSize(105 * mm, 74 * mm) / mm, 10.0, 0.05) << "A7 landscape: by the short side";
+    EXPECT_DOUBLE_EQ(PageMargins::forSize(20 * mm, 30 * mm), PageMargins::MIN) << "at least 5 mm";
+
+    // An A7 card (plain: no margin line)
+    const PageRef card = page();
+    card->setSize(74 * mm, 105 * mm);
+    card->setBackgroundType(PageType(PageTypeFormat::Plain));
+    const double m = PageMargins::forSize(card->getWidth(), card->getHeight());
+    const auto margins = TextFlow::styleFor(card, TextFlow::Style{});
+    EXPECT_DOUBLE_EQ(margins.leftMargin, m);
+    EXPECT_DOUBLE_EQ(margins.topMargin, m);
+    EXPECT_DOUBLE_EQ(margins.rightMargin, m);
+    EXPECT_DOUBLE_EQ(margins.bottomMargin, m);
+    MarkdownSession edit(*session);
+    edit.begin(0, style);
+    edit.update("**Mitochondrion**\n\nthe powerhouse of the cell");
+    edit.finish();
+    const Text* box = md::boxOf(*md::markdownLayer(card));
+    ASSERT_NE(box, nullptr);
+    EXPECT_DOUBLE_EQ(box->getTransformation().shift.x, m);
+    EXPECT_DOUBLE_EQ(box->getTransformation().shift.y, m);
+    EXPECT_NEAR(box->getWrap(), card->getWidth() - 2 * m, 1e-9) << "as wide as the card less its margins";
+    EXPECT_EQ(TextDocument::pageBoxOf(card), box) << "found at its margins";
+
+    // Longer: more cards of the same size, each with the text at its margins
+    std::string many;
+    for (int i = 0; i < 12; ++i) {
+        many += "Line " + std::to_string(i) + "\n\n";
+    }
+    edit.begin(0, style);
+    EXPECT_EQ(edit.update(many), 0);
+    edit.finish();
+    ASSERT_GT(session->getDocument()->getPageCount(), 1u);
+    const PageRef second = session->getDocument()->getPage(1);
+    EXPECT_DOUBLE_EQ(second->getWidth(), card->getWidth());
+    const Text* next = TextDocument::pageBoxOf(second);
+    ASSERT_NE(next, nullptr);
+    EXPECT_DOUBLE_EQ(next->getTransformation().shift.y, m);
+    EXPECT_LE(md::boxRect(*box).y + md::boxRect(*box).height, card->getHeight() - m + 0.5) << "above the bottom margin";
+
+    // Text of a card written with the 2 cm margins: still its text, and at the new margins once edited
+    auto session2 = std::make_unique<DocumentSession>(*app);
+    const PageRef old = session2->getDocument()->getPage(0);
+    old->setSize(74 * mm, 105 * mm);
+    old->setBackgroundType(PageType(PageTypeFormat::Plain));
+    auto* layer = new Layer();
+    layer->setName(std::string(xoj::markdown::LAYER_NAME));
+    old->getLayers().insert(old->getLayers().begin(), layer);
+    auto t = std::make_unique<Text>();
+    t->setText("older text");
+    t->setWrap(old->getWidth() - 2 * TextFlow::MARGIN);
+    t->setTransformation(xoj::util::Matrix::TRANSLATION(TextFlow::MARGIN, TextFlow::MARGIN));
+    const Text* oldBox = t.get();
+    layer->addElement(std::move(t));
+    EXPECT_EQ(TextDocument::pageBoxOf(old), oldBox) << "the page's text, at 2 cm";
+    MarkdownSession edit2(*session2);
+    EXPECT_EQ(edit2.begin(0, style), "older text");
+    edit2.update("older text, edited");
+    edit2.finish();
+    const Text* moved = TextDocument::pageBoxOf(old);
+    ASSERT_NE(moved, nullptr);
+    EXPECT_EQ(moved->getText(), "older text, edited");
+    EXPECT_DOUBLE_EQ(moved->getTransformation().shift.x, m);
+    EXPECT_DOUBLE_EQ(moved->getTransformation().shift.y, m);
+    session2->getUndoRedoHandler()->undo();
+    const Text* back = TextDocument::pageBoxOf(old);
+    ASSERT_NE(back, nullptr);
+    EXPECT_EQ(back->getText(), "older text");
+    EXPECT_DOUBLE_EQ(back->getTransformation().shift.x, TextFlow::MARGIN) << "undo puts it back";
 }
 
 TEST_F(MarkdownSessionTest, nothingWrittenLeavesNoLayer) {

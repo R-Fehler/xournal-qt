@@ -874,18 +874,24 @@ QString LibraryModel::fileIconOf(const fs::path& file) {
 }
 
 void LibraryModel::filesMoved(const DocumentFiles::Result& r) {
-    if (idx && !r.moved.empty()) {
+    if (!r.moved.empty()) {
         followMoves(r.moved);
-        refresh();
+        if (idx) {
+            refresh();
+        }
     }
 }
 
 void LibraryModel::followMoves(const std::vector<std::pair<fs::path, fs::path>>& moves) {
-    if (idx && !moves.empty()) {
-        idx->moved(moves);
-        DocumentPlaces::moved(moves);  // before the refresh: the entries are not read again
-        PreviewCache::moved(moves);
+    if (moves.empty()) {
+        return;
     }
+    if (idx) {
+        idx->moved(moves);
+    }
+    // (also for documents outside the library: their places are kept in the cache, by their whole path)
+    DocumentPlaces::moved(moves);  // before the refresh: the entries are not read again
+    PreviewCache::moved(moves);
 }
 
 void LibraryModel::applyResult(const DocumentFiles::Result& r) {

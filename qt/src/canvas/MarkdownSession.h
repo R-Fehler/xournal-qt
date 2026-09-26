@@ -63,6 +63,9 @@ public:
     /// The size of the body text (points; the text's font size): the drawing follows. Returns the overflow.
     double setFontSize(double size);
     double fontSize() const { return style.size; }
+    /// The width of a text box (points, its wrap width): its text flows anew. Returns the overflow. Not for the
+    /// page's text, whose width is the page's between its margins.
+    double setWidth(double width);
     /// Done. The edit is one undo step (made at the first change, so the document counts as modified).
     void finish();
     /// Back to the text as it was (pages added go again).

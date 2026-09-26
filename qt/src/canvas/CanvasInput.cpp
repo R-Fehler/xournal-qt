@@ -32,6 +32,7 @@
 #include "CanvasPage.h"
 #include "CanvasView.h"
 #include "StickyNotes.h"
+#include "MarkdownBoxResize.h"
 #include "MarkdownEditor.h"
 #include "session/DocumentSession.h"
 
@@ -575,6 +576,11 @@ bool CanvasInput::actionStart(const Event& event) {
         return true;  // the hand tool does not change the selection (scrolling keeps it)
     }
 
+    // The handle of a Markdown text box (written on the page, or selected alone): a drag sets its width
+    if (view.boxResize().press(event.viewPos)) {
+        return true;
+    }
+
     // Port of PenInputHandler::actionStart (selection part): a press on the selection moves, resizes or rotates it
     // (or deletes it: the × button); a press elsewhere ends it.
     if (EditSelection* selection = view.getSelection()) {
@@ -665,6 +671,13 @@ bool CanvasInput::actionMotion(const Event& event) {
         if (this->deviceClassPressed) {
             this->handleScrollEvent(event);
         }
+        this->updateLastEvent(event);
+        return true;
+    }
+
+    // The width of a Markdown text box being dragged (wherever the pointer is)
+    if (view.boxResize().dragging()) {
+        view.boxResize().dragTo(event.viewPos);
         this->updateLastEvent(event);
         return true;
     }
@@ -777,6 +790,16 @@ bool CanvasInput::actionEnd(const Event& event) {
         this->inputRunning = false;
         return false;
     }
+    if (view.boxResize().dragging()) {
+        // The width of a Markdown text box: one undo step (nothing else: no tap, no release on a page)
+        view.boxResize().endDrag();
+        this->sequenceStartPage = nullptr;
+        if (toolHandler->pointActiveToolToToolbarTool()) {
+            toolHandler->fireToolChanged();
+        }
+        this->inputRunning = false;
+        return false;
+    }
     if (EditSelection* selection = view.getSelection(); selection && (!view.isReadingOnly() || selection->isMoving())) {
         view.endSelectionDrag();  // (mouseUp; a move into or out of a sticky note changes the layer too)
     }
@@ -834,6 +857,9 @@ bool CanvasInput::actionEnd(const Event& event) {
 // --- a finger on a selection of elements: the handles are for fingers too, not only for pen and mouse ---
 
 bool CanvasInput::startTouchSelection(QPointF viewPos) {
+    if (view.boxResize().press(viewPos, true)) {
+        return true;  // the handle of a Markdown text box: the finger sets its width
+    }
     EditSelection* selection = view.getSelection();
     if (!selection && !view.isReadingOnly() && view.notes().hasSelection()) {
         // The selected sticky note: a finger on it moves it, on its handle resizes it
@@ -866,6 +892,10 @@ bool CanvasInput::startTouchSelection(QPointF viewPos) {
 }
 
 void CanvasInput::moveTouchSelection(QPointF viewPos) {
+    if (view.boxResize().dragging()) {
+        view.boxResize().dragTo(viewPos);
+        return;
+    }
     if (view.notes().dragging()) {
         CanvasPage* page = view.notes().selectedPage();
         Event ev;
@@ -893,6 +923,9 @@ void CanvasInput::moveTouchSelection(QPointF viewPos) {
 }
 
 void CanvasInput::endTouchSelection() {
+    if (view.boxResize().dragging()) {
+        view.boxResize().endDrag();
+    }
     if (view.notes().dragging()) {
         view.notes().endDrag();
     }
@@ -993,6 +1026,9 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
 
     if (e->type() == QEvent::TouchCancel) {
         cancelFingerStroke();
+        if (view.boxResize().dragging()) {
+            view.boxResize().endDrag();  // (the width as far as it was dragged)
+        }
         if (pinching) {
             vc.pinchEnd();
         }

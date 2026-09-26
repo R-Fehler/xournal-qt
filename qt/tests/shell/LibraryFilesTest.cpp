@@ -13,6 +13,7 @@
 #include <QCborMap>
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QColor>
 #include <QImage>
 #include <QBuffer>
@@ -393,6 +394,39 @@ TEST_F(LibraryFilesTest, markdownFilesAreRenamedMovedAndCopied) {
     EXPECT_TRUE(fs::exists(root / "Physics" / "vault" / "a.md"));
     EXPECT_TRUE(fs::exists(root / "Physics" / "vault" / "b.png"));
     EXPECT_FALSE(fs::exists(root / "Physics" / "vault" / "c.txt"));
+}
+
+// qt/rename: every entry point asks the same check before it renames (the name fields say why while the name is
+// typed): an empty name, a slash, a hidden name, a taken name, a read-only file.
+TEST_F(LibraryFilesTest, aRenameSaysWhyANameCannotBeUsed) {
+    using P = DocumentFiles::RenameProblem;
+    writeFile(root / "notes.md", "# Notes\n");
+    writeFile(root / "plan.xopp", "x");
+    fs::create_directories(root / "Physics");
+    const DocumentItem notes = DocumentFiles::itemOf(root / "notes.md");
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, ""), P::Empty);
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, "a/b"), P::Separator);
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, "a\\b"), P::Separator);
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, ".hidden"), P::Invalid);
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, "plan"), P::Taken) << "a document of another kind has the name";
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, "notes"), P::None) << "its own name: nothing to do";
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, "Kalman"), P::None);
+    EXPECT_EQ(DocumentFiles::folderRenameProblem(root / "Physics", "notes.md"), P::Taken);
+    EXPECT_EQ(DocumentFiles::folderRenameProblem(root / "Physics", "Maths"), P::None);
+    EXPECT_EQ(DocumentFiles::renameProblem(DocumentFiles::itemOf(root / "gone.md"), "x"), P::Missing);
+
+    fs::permissions(root / "notes.md", fs::perms::owner_read, fs::perm_options::replace);
+    if (QFileInfo(qstr(root / "notes.md")).isWritable()) {
+        fs::permissions(root / "notes.md", fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
+        GTEST_SKIP() << "files are writable anyway (root)";
+    }
+    EXPECT_EQ(DocumentFiles::renameProblem(notes, "Kalman"), P::ReadOnly);
+    const auto r = DocumentFiles::rename(notes, "Kalman");
+    EXPECT_FALSE(r.ok);
+    EXPECT_NE(r.error.find("read-only"), std::string::npos) << r.error;
+    EXPECT_TRUE(fs::exists(root / "notes.md"));
+    EXPECT_FALSE(fs::exists(root / "Kalman.md"));
+    fs::permissions(root / "notes.md", fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
 }
 
 // qt/docs/md-images.md: a .md and its pictures in "name.assets/" are one document. The library shows one card and

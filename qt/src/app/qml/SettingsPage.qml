@@ -876,7 +876,10 @@ Popup {
                     ComboRow {
                         key: "paperFormat"; text: qsTr("Paper size")
                         enabled: !(sheet.s.revision, sheet.s.get("copyLastPageSize"))
+                        // (a size that is none of them, set in Xournal++: shown as it is)
                         options: sheet.s.paperFormats.map(function(name, i) { return { text: name, value: i } })
+                                 .concat((sheet.s.revision, sheet.s.get("paperFormat")) < 0
+                                         ? [{ text: qsTr("Other: %1").arg(sheet.s.templatePaperSize()), value: -1 }] : [])
                     }
                     SwitchRow {
                         key: "landscape"; text: qsTr("Landscape")

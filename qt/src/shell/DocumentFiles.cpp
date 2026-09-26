@@ -15,6 +15,7 @@
 
 #include <QCollator>
 #include <QFile>
+#include <QFileInfo>
 #include <QImageReader>
 #include <QLocale>
 #include <QString>
@@ -955,12 +956,77 @@ std::string freeNameIn(const fs::path& folder, const DocumentItem& item) {
 }
 }  // namespace
 
-Result rename(const DocumentItem& item, const std::string& newName) {
-    if (!item.valid()) {
-        return failure("The document does not exist.");
+namespace {
+/// A file or folder the app may rename (it and the folder it is in can be written)
+bool writable(const fs::path& p) {
+    return QFileInfo(QString::fromStdString(p.string())).isWritable() &&
+           QFileInfo(QString::fromStdString(p.parent_path().string())).isWritable();
+}
+}  // namespace
+
+RenameProblem nameProblem(const std::string& newName) {
+    if (newName.empty()) {
+        return RenameProblem::Empty;
     }
-    if (!validName(newName)) {
-        return failure("\"" + newName + "\" cannot be used as a name.");
+    if (newName.find_first_of("/\\") != std::string::npos) {
+        return RenameProblem::Separator;
+    }
+    return validName(newName) ? RenameProblem::None : RenameProblem::Invalid;
+}
+
+bool renamable(const DocumentItem& item) {
+    const auto files = filesOf(item);
+    return std::all_of(files.begin(), files.end(), writable);
+}
+
+RenameProblem renameProblem(const DocumentItem& item, const std::string& newName) {
+    if (!item.valid() || !fileExists(item.main())) {
+        return RenameProblem::Missing;
+    }
+    if (const RenameProblem p = nameProblem(newName); p != RenameProblem::None) {
+        return p;
+    }
+    if (newName == item.name()) {
+        return RenameProblem::None;
+    }
+    const fs::path folder = item.folder();
+    if (isOtherItem(item) ? fileExists(folder / newName) : nameTaken(folder, newName)) {
+        return RenameProblem::Taken;
+    }
+    return renamable(item) ? RenameProblem::None : RenameProblem::ReadOnly;
+}
+
+RenameProblem folderRenameProblem(const fs::path& folder, const std::string& newName) {
+    if (!isDir(folder)) {
+        return RenameProblem::Missing;
+    }
+    if (const RenameProblem p = nameProblem(newName); p != RenameProblem::None) {
+        return p;
+    }
+    const fs::path target = folder.parent_path() / newName;
+    if (target == folder) {
+        return RenameProblem::None;
+    }
+    if (fileExists(target)) {
+        return RenameProblem::Taken;
+    }
+    return writable(folder) ? RenameProblem::None : RenameProblem::ReadOnly;
+}
+
+Result rename(const DocumentItem& item, const std::string& newName) {
+    switch (renameProblem(item, newName)) {
+        case RenameProblem::None:
+            break;
+        case RenameProblem::Missing:
+            return failure("The document does not exist.");
+        case RenameProblem::Empty:
+        case RenameProblem::Separator:
+        case RenameProblem::Invalid:
+            return failure("\"" + newName + "\" cannot be used as a name.");
+        case RenameProblem::Taken:
+            return failure("A document named \"" + newName + "\" already exists here.");
+        case RenameProblem::ReadOnly:
+            return failure("\"" + item.main().filename().string() + "\" is read-only: it cannot be renamed.");
     }
     if (newName == item.name()) {
         Result r;
@@ -968,11 +1034,7 @@ Result rename(const DocumentItem& item, const std::string& newName) {
         r.item = item;
         return r;
     }
-    const fs::path folder = item.folder();
-    if (isOtherItem(item) ? fileExists(folder / newName) : nameTaken(folder, newName)) {
-        return failure("A document named \"" + newName + "\" already exists here.");
-    }
-    return relocate(item, folder, newName, false);
+    return relocate(item, item.folder(), newName, false);
 }
 
 Result move(const DocumentItem& item, const fs::path& folder) {
@@ -1093,6 +1155,9 @@ Result renameFolder(const fs::path& folder, const std::string& newName) {
     }
     if (fileExists(target)) {
         return failure("\"" + newName + "\" already exists.");
+    }
+    if (folderRenameProblem(folder, newName) == RenameProblem::ReadOnly) {
+        return failure("\"" + folder.filename().string() + "\" is read-only: it cannot be renamed.");
     }
     std::error_code ec;
     fs::rename(folder, target, ec);

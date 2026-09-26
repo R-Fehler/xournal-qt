@@ -66,6 +66,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/HeadlessViews.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/SessionActions.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageMargins.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageMargins.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/TextDocument.h
@@ -121,6 +123,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownBoxResize.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownBoxResize.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/EmojiCompletion.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/EmojiCompletion.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownFile.h
@@ -170,6 +174,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextFlowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownEditorTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownBoxResizeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfTextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/EmojiEditingTest.cpp

@@ -171,8 +171,8 @@ private:
     /// The mouse (`mouse`) or the hovering pen is at this place (item coordinates): the link there, if any, is shown
     /// after LINK_HOVER_MS, and the mouse's cursor becomes a pointing hand where a click follows it.
     void linkHovers(QPointF itemPos, Qt::KeyboardModifiers modifiers, bool mouse);
-    /// Nothing is hovered any more (left, pressed, the pen went away)
-    void endLinkHover();
+    /// Nothing is hovered any more (left, pressed, the pen went away): the cursor is `shape` again
+    void endLinkHover(Qt::CursorShape shape = Qt::CrossCursor);
 
     QPointer<xqt::CanvasView> canvasView;
     std::unique_ptr<xqt::CanvasInput> input;

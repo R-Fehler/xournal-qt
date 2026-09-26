@@ -4,6 +4,7 @@
  * @license GNU GPLv2 or later
  */
 #include <memory>
+#include <vector>
 
 #include <QColor>
 #include <QFile>
@@ -184,6 +185,86 @@ TEST_F(SettingsModelTest, newPageTemplate) {
     DocumentSession session(*app);
     session.insertNewPage(1);
     EXPECT_NEAR(session.getDocument()->getPage(1)->getWidth(), 792, 0.01);
+}
+
+// Posters and flashcards (qt/page-sizes): A0 to A7 first, in order, with their sizes in millimetres as points
+// (1 pt = 1/72 in), each portrait and landscape; the other formats after them. A size that is none of them (set in
+// Xournal++) stays: -1, shown as text.
+TEST_F(SettingsModelTest, isoSizesFromA0ToA7) {
+    struct Iso {
+        const char* name;
+        double w, h;  // mm
+    };
+    const std::vector<Iso> iso{{"A0", 841, 1189}, {"A1", 594, 841}, {"A2", 420, 594}, {"A3", 297, 420},
+                               {"A4", 210, 297},  {"A5", 148, 210}, {"A6", 105, 148}, {"A7", 74, 105}};
+    const QStringList names = model->paperFormats();
+    ASSERT_GE(names.size(), static_cast<int>(iso.size()) + 3);
+    const auto& tpl = [&]() -> const PageTemplateSettings& { return app->getSettings()->getPageTemplateSettings(); };
+    for (size_t i = 0; i < iso.size(); ++i) {
+        const int index = static_cast<int>(i);
+        EXPECT_EQ(names[index].toStdString(), iso[i].name) << "A0 ... A7 first, in order";
+        const QSizeF size = SettingsModel::paperSize(index);
+        EXPECT_NEAR(size.width(), iso[i].w / 25.4 * 72, 1e-9) << iso[i].name;
+        EXPECT_NEAR(size.height(), iso[i].h / 25.4 * 72, 1e-9) << iso[i].name;
+        EXPECT_FALSE(model->paperIsWide(index));
+        model->set("landscape", false);
+        model->set("paperFormat", index);
+        EXPECT_DOUBLE_EQ(tpl().getPageWidth(), size.width()) << iso[i].name;
+        EXPECT_DOUBLE_EQ(tpl().getPageHeight(), size.height()) << iso[i].name;
+        EXPECT_EQ(model->get("paperFormat").toInt(), index);
+        model->set("landscape", true);
+        EXPECT_DOUBLE_EQ(tpl().getPageWidth(), size.height()) << iso[i].name << " landscape";
+        EXPECT_DOUBLE_EQ(tpl().getPageHeight(), size.width()) << iso[i].name << " landscape";
+        EXPECT_EQ(model->get("paperFormat").toInt(), index) << iso[i].name << " landscape";
+    }
+    EXPECT_NEAR(SettingsModel::paperSize(0).width(), 2383.937, 0.001);  // (A0: 841 mm)
+    EXPECT_NEAR(SettingsModel::paperSize(7).height(), 297.638, 0.001);  // (A7: 105 mm)
+    for (const char* other: {"Letter", "Legal", "16:9 (presentation)"}) {
+        EXPECT_GT(names.indexOf(other), 7) << other << " after the A sizes";
+    }
+
+    // Another size (Xournal++'s custom size): none of them, and it stays as it is
+    PageTemplateSettings custom = tpl();
+    custom.setPageWidth(100);
+    custom.setPageHeight(200);
+    app->getSettings()->setPageTemplateSettings(custom);
+    EXPECT_EQ(model->get("paperFormat").toInt(), -1);
+    EXPECT_EQ(model->templatePaperSize(), QString("35 × 71 mm"));
+    model->set("paperFormat", -1);
+    EXPECT_DOUBLE_EQ(tpl().getPageWidth(), 100);
+}
+
+// A new A0 poster and an A7 flashcard have their size, and keep it when saved and opened again.
+TEST_F(SettingsModelTest, newA0AndA7DocumentsKeepTheirSize) {
+    for (const char* name: {"A0", "A7"}) {
+        const int index = model->paperFormats().indexOf(name);
+        ASSERT_GE(index, 0);
+        const QSizeF size = SettingsModel::paperSize(index);
+        for (const bool landscape: {false, true}) {
+            model->set("paperFormat", index);
+            model->set("landscape", landscape);
+            const QSizeF want = landscape ? size.transposed() : size;
+            const fs::path file = fs::path(tmp.filePath(QString("%1-%2.xopp").arg(name).arg(landscape)).toStdString());
+            {
+                DocumentSession session(*app);
+                session.insertNewPage(1);
+                ASSERT_EQ(session.getDocument()->getPageCount(), 2u);
+                for (size_t p = 0; p < 2; ++p) {
+                    EXPECT_DOUBLE_EQ(session.getDocument()->getPage(p)->getWidth(), want.width()) << name;
+                    EXPECT_DOUBLE_EQ(session.getDocument()->getPage(p)->getHeight(), want.height()) << name;
+                }
+                auto saved = session.saveAs(file);
+                ASSERT_TRUE(saved.ok) << saved.error;
+            }
+            auto loaded = DocumentSession::loadFile(file);
+            ASSERT_TRUE(loaded.document) << loaded.error;
+            DocumentSession reopened(*app, std::move(loaded.document));
+            ASSERT_EQ(reopened.getDocument()->getPageCount(), 2u);
+            // (the file keeps points with a few decimals)
+            EXPECT_NEAR(reopened.getDocument()->getPage(1)->getWidth(), want.width(), 0.01) << name;
+            EXPECT_NEAR(reopened.getDocument()->getPage(1)->getHeight(), want.height(), 0.01) << name;
+        }
+    }
 }
 
 TEST_F(SettingsModelTest, savedOnceWhenTheScreenCloses) {

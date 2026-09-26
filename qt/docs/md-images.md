@@ -61,8 +61,9 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
   `oldname.assets/` becomes `newname.assets/` (links written as `./oldname.assets/…` and `<oldname.assets/…>` too).
 - Sync conflicts: the conflict copies of the `.md` are shown on its card as before (they link to the same
   `name.assets/`); the folder is hidden and goes with the `.md` it belongs to.
-- An open `.md` renamed in the library follows in its tab: the path, the links in its text (one undo step), and the
-  file's new bytes are taken as read (no question about a change on disk).
+- An open `.md` renamed in the library, or from its own tab (a double click on its title, ⋮ → Rename…, the overview
+  of open documents: the library's rename, [library.md](library.md) "Renaming"), follows in its tab: the path, the
+  links in its text (one undo step), and the file's new bytes are taken as read (no question about a change on disk).
 - Clean-up: images in `name.assets/` that the text no longer links to are not deleted automatically (undo may bring
   a link back). ⋮ → **Remove unused images…** lists the files of the folder that the text as it is now does not link
   to (images, links, reference definitions, HTML `src`: a linked PDF there counts as used) and moves them to the

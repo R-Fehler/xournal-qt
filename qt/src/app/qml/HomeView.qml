@@ -2,8 +2,8 @@
 // opened documents, as grids of first-page previews.
 //  - Library: folders (tap to enter, breadcrumbs to go back) or all documents at once; search in folder names and
 //    the text and names of all documents; new document, import (files or whole folder trees, also by dropping them),
-//    new folder; rename, move (drag onto a folder or a breadcrumb, or "Move to"), move to trash. A .xopp and its PDF
-//    are one document.
+//    new folder; rename (the menu, F2, or in place: press and hold or double click on a card's title), move (drag
+//    onto a folder or a breadcrumb, or "Move to"), move to trash. A .xopp and its PDF are one document.
 //  - Recent: documents opened lately that still exist; rename, remove from the list, copy / move into the library.
 //  - Several documents and folders can be selected (Ctrl / Shift + click, the circle on a card, or "Select" in the
 //    menu; then taps select more) and opened, copied, moved or trashed together.
@@ -935,6 +935,7 @@ Rectangle {
                             libraryGrid.currentIndex = index
                             home.showMenu(app.library, index, model.name, model.path, model.isFolder, item, x, y, model.kind)
                         }
+                        onRenameAccepted: function(newName) { app.library.rename(index, newName) }
                     }
                 }
 
@@ -1107,6 +1108,7 @@ Rectangle {
                             recentGrid.currentIndex = index
                             home.showMenu(app.recent, index, model.name, model.path, false, item, x, y, model.kind)
                         }
+                        onRenameAccepted: function(newName) { app.recent.rename(index, newName) }
                     }
                 }
                 ColumnLayout {

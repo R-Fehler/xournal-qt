@@ -37,6 +37,7 @@
 #include "InputLog.h"
 #include "CanvasPage.h"
 #include "Perf.h"
+#include "MarkdownBoxResize.h"
 #include "CanvasView.h"
 #include "StickyNotes.h"
 #include "GeometryToolLayer.h"
@@ -133,6 +134,7 @@ public:
     double bufferZoom = 0;
     double dpiScale = 0;
     QSize pixelSize;
+    QPoint origin;  ///< the buffer's top left (a big page drawn in part), logical pixels of the buffer's zoom
 };
 
 /// A rectangular clip (the page of the setsquare or compass: it is cut at the page's edges, as when it was drawn into
@@ -314,7 +316,8 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
         link = canvasView->hoverLinkAt(itemPos);  // (the links each page keeps: cheap for every move)
     }
     if (!link) {
-        endLinkHover();
+        const bool width = mouse && canvasView && input && canvasView->boxResize().onHandle(itemPos);
+        endLinkHover(width ? Qt::SizeHorCursor : Qt::CrossCursor);  // (the handle that sets a box's width)
         linkHoverAt = itemPos;
         return;
     }
@@ -350,13 +353,14 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
     }
     // The mouse's cursor: a pointing hand where a click follows the link
     const bool hand = mouse && !linkCovered && input->clickFollowsLink(link->editing, modifiers);
-    const Qt::CursorShape shape = hand ? Qt::PointingHandCursor : Qt::CrossCursor;
+    const bool width = mouse && !hand && canvasView->boxResize().onHandle(itemPos);
+    const Qt::CursorShape shape = hand ? Qt::PointingHandCursor : width ? Qt::SizeHorCursor : Qt::CrossCursor;
     if (cursor().shape() != shape) {
         setCursor(shape);
     }
 }
 
-void DocumentCanvasItem::endLinkHover() {
+void DocumentCanvasItem::endLinkHover(Qt::CursorShape shape) {
     linkHoverAt.reset();
     linkId = {nullptr, 0};
     linkCovered = false;
@@ -365,8 +369,8 @@ void DocumentCanvasItem::endLinkHover() {
         linkShown.clear();
         Q_EMIT hoveredLinkChanged();
     }
-    if (cursor().shape() != Qt::CrossCursor) {
-        setCursor(Qt::CrossCursor);
+    if (cursor().shape() != shape) {
+        setCursor(shape);
     }
 }
 
@@ -722,7 +726,9 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             }
             setMathError({}, {});
             if (e->type() == QEvent::MouseButtonPress) {
-                endLinkHover();  // (a click may follow it: the sheet or the page comes)
+                // (a click may follow it: the sheet or the page comes; a Markdown box's width handle keeps its
+                // cursor while it is dragged)
+                endLinkHover(cursor().shape() == Qt::SizeHorCursor ? Qt::SizeHorCursor : Qt::CrossCursor);
             }
             const bool inside = !heldByAnother(&DocumentCanvasItem::mouseGrab) && claims(m->scenePosition());
             xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
@@ -930,6 +936,7 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
         cairo_scale(cr, dpr, dpr);
         cairo_translate(cr, -region.x(), -region.y());
         sel->paint(cr, zoom);
+        canvasView->boxResize().paintOverSelection(cr, zoom);  // (a Markdown text box: its right knob sets the width)
         cairo_destroy(cr);
         cairo_surface_destroy(surface);
         const bool fresh = !root->selection;
@@ -1181,7 +1188,9 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         node->shadow->setRect(QRectF(QPointF(2 / scale, 2 / scale), bufferLogical));
 
         const bool rebuild = fresh || node->bufferZoom != info.zoom || node->dpiScale != info.dpiScale ||
-                             node->pixelSize != info.pixelSize;
+                             node->pixelSize != info.pixelSize || node->origin != info.origin;
+        // The tiles cover the buffer: the whole page, or the part of a big page drawn (from its top left, origin)
+        const QPointF origin = info.origin;
         if (rebuild) {
             node->clearTiles();
             node->cols = (info.pixelSize.width() + TILE - 1) / TILE;
@@ -1189,12 +1198,13 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
             node->bufferZoom = info.zoom;
             node->dpiScale = info.dpiScale;
             node->pixelSize = info.pixelSize;
+            node->origin = info.origin;
             for (int t = 0; t < node->cols * node->rows; ++t) {
                 auto* tile = new TileNode;
                 tile->setFiltering(QSGTexture::Linear);
                 const QRect px = tileRect(t, node->cols, info.pixelSize);
-                tile->setRect(QRectF(px.x() / info.dpiScale, px.y() / info.dpiScale, px.width() / info.dpiScale,
-                                     px.height() / info.dpiScale));
+                tile->setRect(QRectF(origin.x() + px.x() / info.dpiScale, origin.y() + px.y() / info.dpiScale,
+                                     px.width() / info.dpiScale, px.height() / info.dpiScale));
                 node->tiles.push_back(tile);
             }
             node->composed.assign(node->tiles.size(), false);
@@ -1221,7 +1231,8 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
                 continue;
             }
             const QRect px = tileRect(t, node->cols, info.pixelSize);
-            const QRectF inItem(r.x() + px.x() / info.dpiScale * scale, r.y() + px.y() / info.dpiScale * scale,
+            const QRectF inItem(r.x() + (origin.x() + px.x() / info.dpiScale) * scale,
+                                r.y() + (origin.y() + px.y() / info.dpiScale) * scale,
                                 px.width() / info.dpiScale * scale, px.height() / info.dpiScale * scale);
             if (!inItem.intersects(viewport)) {
                 continue;  // (composed when it comes into view)
@@ -1244,7 +1255,16 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
                 node->insertChildNodeBefore(tile, node->searchRoot);
             }
         }
-        if (missing > 0) {
+        // A big page drawn in part whose part in view is not all drawn (scrolled on; drawn anew in a moment): the
+        // preview under the tiles
+        bool uncovered = false;
+        if (!info.whole) {
+            const QRectF inView = r.intersected(QRectF(0, 0, width(), height()));
+            const QRectF drawn(r.x() + info.area.x() * zoom, r.y() + info.area.y() * zoom, info.area.width() * zoom,
+                               info.area.height() * zoom);
+            uncovered = !inView.isEmpty() && !drawn.adjusted(-1, -1, 1, 1).contains(inView);
+        }
+        if (missing > 0 || uncovered) {
             node->showPreview(window(), canvasView->preview(i), bufferLogical);
             more = true;
         } else {

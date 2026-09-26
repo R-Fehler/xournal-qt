@@ -51,7 +51,7 @@ struct TextBlock {
 
 namespace TextFlow {
 constexpr const char* LAYER_NAME = "Text";
-constexpr double MARGIN = 56.7;       ///< 2 cm
+constexpr double MARGIN = 56.7;       ///< 2 cm (A5 and bigger; smaller pages less: session/PageMargins.h)
 constexpr double LIST_INDENT = 20.0;  ///< per list level
 
 struct Style {
@@ -59,8 +59,11 @@ struct Style {
     double bodySize = 12;
     double leftMargin = MARGIN;
     double rightMargin = MARGIN;
+    double topMargin = MARGIN;
+    double bottomMargin = MARGIN;
 };
-/// The style with the page's margins: beside the margin line of a ruled page with one (upstream's "lined").
+/// The style with the page's margins (PageMargins::of): smaller on pages smaller than A5, beside the margin line of a
+/// ruled page with one (upstream's "lined").
 Style styleFor(const PageRef& page, Style style);
 double headingSize(TextBlock::Kind kind);
 /// The page's text layer (nullptr if none).

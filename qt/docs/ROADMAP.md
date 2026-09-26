@@ -576,6 +576,18 @@
   own stream: upstream's reader copied the whole buffer per stroke), and only the note's area is redrawn after
   paste/cut/undo. A note copied by an earlier build does not paste.
 
+- **Tool bar and bar details (2026-09-26).** The Markdown formatting bar has no "+" menu (formula block, image, rule,
+  page break are buttons; the block formula has its own icon) and ¶/H1/H2/H3 as buttons; the full-screen tab bar has
+  ‹ › arrows at its ends; a sticky-note button next to "Insert image".
+- **Renaming documents, `qt/rename` (2026-09-26).** One rename path (`DocumentFiles::rename` + `followMoves` +
+  `filesChanged`, validation `renameProblem`) from a double-click on the current tab (inline, extension fixed), the
+  tab's menu and ⋮ "Rename…", and the titles of library, Recent and tab-overview cards (press-and-hold or a mouse
+  double-click). A `.xopp` and its same-name PDF, a PDF with its Xournal++ copy, and a `.md` with `name.assets/` are
+  renamed together; an unsaved document gets the name used at its first save.
+- **Resizable Markdown boxes, `qt/md-box-resize` (2026-09-26).** A ⟷ knob right of a box being written, and the
+  selection's right knob of a single selected box, set the box's wrap width (2 cm to the page edge; live reflow; one
+  undo step); stored in Xournal++'s `wrap` attribute. The page's own Markdown text has none.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

@@ -31,13 +31,19 @@ Dialog {
     readonly property var s: app.settings
     readonly property bool canSaveInLibrary: app.library.available
     property int bgIndex: 0
-    property int paper: 1
+    /// Index in paperFormats; -1: the size of new pages is none of them (set in Xournal++): it stays
+    property int paper: -1
+    /// That size as text ("" when it is one of the formats)
+    property string otherPaper: ""
     property bool landscape: false
 
     onAboutToShow: {
         nameField.text = ""
         bgIndex = Math.max(0, s.get("pageBackground"))
-        paper = Math.max(0, s.get("paperFormat"))
+        paper = s.get("paperFormat")
+        otherPaper = paper < 0 ? s.templatePaperSize() : ""
+        // (after the model: a choice made before took the box's binding away)
+        paperBox.currentIndex = paper < 0 ? s.paperFormats.length : paper
         landscape = s.get("landscape")
         libraryBox.checked = canSaveInLibrary
         // The name field gets the keys at once, but not on a phone or tablet: there that opens the soft keyboard over
@@ -48,7 +54,8 @@ Dialog {
 
     function create() {
         s.set("pageBackground", bgIndex)
-        s.set("paperFormat", paper)
+        if (paper >= 0)
+            s.set("paperFormat", paper)
         s.set("landscape", landscape)
         app.createDocument(nameField.text, libraryBox.checked)
         dlg.close()
@@ -99,10 +106,12 @@ Dialog {
                 id: paperBox
                 objectName: "paperBox"
                 Layout.preferredWidth: 210
-                model: dlg.s.paperFormats
-                currentIndex: dlg.paper
+                // A0 (posters) to A7 (flashcards), Letter, ...; then the size of new pages if it is none of them
+                model: dlg.otherPaper ? dlg.s.paperFormats.concat([qsTr("Other: %1").arg(dlg.otherPaper)])
+                                      : dlg.s.paperFormats
+                currentIndex: dlg.paper < 0 ? dlg.s.paperFormats.length : dlg.paper
                 onActivated: {
-                    dlg.paper = currentIndex
+                    dlg.paper = currentIndex < dlg.s.paperFormats.length ? currentIndex : -1
                     if (dlg.s.paperIsWide(currentIndex)) dlg.landscape = true  // (a slide is landscape)
                 }
             }
