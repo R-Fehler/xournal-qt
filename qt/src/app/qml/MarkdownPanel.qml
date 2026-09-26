@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import XournalQt.Canvas
 
 Pane {
     id: panel
@@ -46,6 +47,61 @@ Pane {
         target: app
         // Another tab or the home screen: editing ended there
         function onMarkdownChanged() { if (!app.markdownActive && panel.visible) { pageUpdate.stop(); panel.visible = false } }
+    }
+
+    // --- emoji ------------------------------------------------------------------------------------------------------
+    /// ":smi" before the cursor: the emoji suggested ({emoji, name} each); Escape closes them for that shortcode
+    property var emojiSuggestions: []
+    property int emojiCurrent: 0
+    property string emojiQuery: ""
+    property string emojiDismissed: ""
+    function updateEmoji() {
+        const pos = area.cursorPosition
+        const name = area.selectedText === "" ? Emoji.typedShortcode(area.text.substring(lineStart(pos), pos) + area.preeditText) : ""
+        if (name === emojiQuery) return
+        emojiQuery = name
+        if (emojiDismissed !== "" && !name.startsWith(emojiDismissed)) emojiDismissed = ""
+        emojiSuggestions = name !== "" && emojiDismissed === "" ? Emoji.completions(name) : []
+        emojiCurrent = 0
+    }
+    /// Suggestion `index` in place of the shortcode typed
+    function chooseEmoji(index) {
+        const e = emojiSuggestions[index].emoji
+        Qt.inputMethod.commit()
+        const pos = area.cursorPosition
+        const from = pos - emojiQuery.length - 1
+        area.remove(from, pos)
+        area.insert(from, e)
+        area.cursorPosition = from + e.length
+        emojiSuggestions = []
+        area.forceActiveFocus()
+    }
+    function insertEmoji(e) {
+        if (area.selectedText !== "") area.remove(area.selectionStart, area.selectionEnd)
+        area.insert(area.cursorPosition, e)
+        area.forceActiveFocus()
+    }
+    /// Left / Right / Backspace / Delete over a whole emoji (👩‍💻, 🇩🇪): Qt 6.7 splits flags
+    function graphemeKey(event) {
+        const shift = event.modifiers & Qt.ShiftModifier
+        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return false
+        const pos = area.cursorPosition
+        const hasSelection = area.selectionStart !== area.selectionEnd
+        if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+            if (hasSelection && !shift) return false
+            const to = Emoji.graphemeStep(area.text, pos, event.key === Qt.Key_Right)
+            if (shift) area.moveCursorSelection(to, TextEdit.SelectCharacters)
+            else area.cursorPosition = to
+            return true
+        }
+        if ((event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) && !hasSelection) {
+            const forward = event.key === Qt.Key_Delete
+            const to = Emoji.graphemeStep(area.text, pos, forward)
+            if (to === pos) return true
+            area.remove(Math.min(pos, to), Math.max(pos, to))
+            return true
+        }
+        return false
     }
 
     // --- editing helpers (on the source) ---------------------------------------------------------------------------
@@ -141,6 +197,28 @@ Pane {
                 focusPolicy: Qt.NoFocus
                 onValueModified: { app.setMarkdownBoxSize(value); area.forceActiveFocus() }
             }
+            ToolSeparator {}
+            // Emoji (or ":" and a name typed: the suggestions below the cursor)
+            ToolButton {
+                id: emojiButton
+                objectName: "markdownEmoji"
+                text: "\u{1F642}"
+                font.family: "Xournal Qt Emoji"
+                font.pixelSize: 18
+                implicitWidth: 40
+                implicitHeight: 40
+                focusPolicy: Qt.NoFocus
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Emoji (or type : and a name, like :smile)")
+                ToolTip.delay: 600
+                onClicked: panelEmojiPicker.open()
+                EmojiPicker {
+                    id: panelEmojiPicker
+                    y: parent.height
+                    x: Math.min(0, panel.width - width - emojiButton.mapToItem(panel, 0, 0).x - 8)
+                    onPicked: function(emoji) { close(); panel.insertEmoji(emoji) }
+                }
+            }
         }
 
         // The text does not fit on the page
@@ -176,13 +254,26 @@ Pane {
                 background: null
                 padding: 14
                 placeholderText: qsTr("Markdown: # heading, **bold**, *italic*, - list, 1. list, > quote, ``` code")
-                onTextChanged: if (panel.visible) pageUpdate.restart()
-                onCursorPositionChanged: panel.updateFormat()
+                onTextChanged: { if (panel.visible) pageUpdate.restart(); panel.updateEmoji() }
+                onCursorPositionChanged: { panel.updateFormat(); panel.updateEmoji() }
                 onSelectionStartChanged: panel.updateFormat()
                 onSelectionEndChanged: panel.updateFormat()
+                onPreeditTextChanged: panel.updateEmoji()
+                onSelectedTextChanged: panel.updateEmoji()
+
                 Keys.onPressed: function(event) {
                     const ctrl = event.modifiers & Qt.ControlModifier
-                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
+                    const n = panel.emojiSuggestions.length
+                    if (n > 0 && !ctrl && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
+                        panel.emojiCurrent = (panel.emojiCurrent + (event.key === Qt.Key_Down ? 1 : n - 1)) % n
+                        event.accepted = true
+                    } else if (n > 0 && !ctrl && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Tab)) {
+                        panel.chooseEmoji(panel.emojiCurrent); event.accepted = true
+                    } else if (n > 0 && event.key === Qt.Key_Escape) {
+                        panel.emojiDismissed = panel.emojiQuery; panel.emojiSuggestions = []; event.accepted = true
+                    } else if (panel.graphemeKey(event)) {
+                        event.accepted = true
+                    } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
                         event.accepted = panel.returnPressed()
                     } else if (event.key === Qt.Key_Tab) {
                         area.insert(panel.lineStart(area.cursorPosition), "  "); event.accepted = true
@@ -220,5 +311,14 @@ Pane {
         id: panelTable
         namePrefix: "panel"
         onClosed: area.forceActiveFocus()
+    }
+
+    // ":smi" typed: the emoji suggested, below the cursor (over the panel, not clipped by the text's scroll view)
+    EmojiSuggestions {
+        objectName: "markdownEmojiSuggestions"
+        model: panel.emojiSuggestions
+        current: panel.emojiCurrent
+        cursor: panel.emojiSuggestions.length > 0 ? area.mapToItem(parent, area.cursorRectangle) : Qt.rect(0, 0, 0, 0)
+        onChosen: function(index) { panel.chooseEmoji(index) }
     }
 }

@@ -475,6 +475,13 @@
   page); links into the same document offer "In the reference". The page-subset view was built and removed again
   on the author's clarification ("not some page range limiting the canvas scroll"), pending confirmation.
 
+- **Emoji, `qt/emoji` (2026-09-26).** Noto Color Emoji 2.051 is bundled (as "Xournal Qt Emoji", CBDT, 10.7 MB, OFL;
+  cairo 1.16 on Ubuntu 22.04 draws no COLRv1) and registered for this process only; PDFs get sharp colour images
+  at the font's resolution. `:smile:` is shown as 😄 but kept in the file (not in code); `:` + two letters opens
+  suggestions, a 🙂 picker with search; the cursor and deletion go by grapheme cluster (ZWJ, flags, skin tones).
+  Fixed on the way: a Markdown box's leftover cairo point drew a later text box over its last line; flags on
+  Android.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

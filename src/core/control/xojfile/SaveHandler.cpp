@@ -288,6 +288,9 @@ void SaveHandler::visitPage(XmlNode* root, ConstPageRef p, const Document* doc, 
     root->addChild(page);
     page->setAttrib(xoj::xml_attrs::WIDTH_STR, p->getWidth());
     page->setAttrib(xoj::xml_attrs::HEIGHT_STR, p->getHeight());
+    if (const NoteSpace& s = p->getNoteSpace(); !s.empty()) {  // xournal-qt: model/NoteSpace.h
+        page->setAttrib(xoj::xml_attrs::NOTESPACE_STR, std::vector<double>{s.left, s.top, s.right, s.bottom});
+    }
 
     auto* background = new XmlNode(TAG_NAMES[TagType::BACKGROUND]);
     page->addChild(background);

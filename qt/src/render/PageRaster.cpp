@@ -131,6 +131,7 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
     size_t pdfPageNo = 0;
     double width = 0;
     double height = 0;
+    NoteSpace space;  // (qt/docs/note-space.md)
     {
         std::shared_lock lock(*doc);
         const auto pt = page->getBackgroundType();
@@ -138,14 +139,23 @@ void PageRaster::renderToBuffer(cairo_t* cr, const RasterParams&, bool backgroun
         pdfPageNo = page->getPdfPageNr();
         width = page->getWidth();
         height = page->getHeight();
+        space = page->getNoteSpace();
     }
     if (renderPdfFirst) {
         if (XojPdfPageSPtr pending = host->rasterPendingPdfPage(pdfPageNo)) {
             cairo_save(cr);
+            if (!space.empty()) {  // (space for notes: white paper, the PDF at its offset)
+                cairo_set_source_rgb(cr, 1, 1, 1);
+                cairo_paint(cr);
+                cairo_translate(cr, space.left, space.top);
+                cairo_rectangle(cr, 0, 0, width - space.left - space.right, height - space.top - space.bottom);
+                cairo_clip(cr);
+            }
             pending->render(cr);  // (a pasted page: from the pasted PDF until the merged PDF is written)
             cairo_restore(cr);
         } else {
-            xoj::view::PdfBackgroundView(width, height, pdfPageNo, pdfCache).draw(cr);
+            xoj::view::PdfBackgroundView(width, height, pdfPageNo, pdfCache, space.left, space.top, !space.empty())
+                    .draw(cr);
         }
         flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
     }
@@ -198,7 +208,8 @@ void PageRaster::run(bool background) {
     }
 
     if (complete) {
-        xoj::view::Mask newMask = createMask(Range(0, 0, page->getWidth(), page->getHeight()), params);
+        const double width = page->getWidth(), height = page->getHeight();
+        xoj::view::Mask newMask = createMask(Range(0, 0, width, height), params);
         renderToBuffer(newMask.get(), params, background);
         {
             std::lock_guard lock(this->drawingMutex);
@@ -210,6 +221,9 @@ void PageRaster::run(bool background) {
         }
         (void)resized;  // the host repaints the whole page in both cases
         notifyUpdated(std::nullopt);
+        if (page->getWidth() != width || page->getHeight() != height) {
+            rerenderPage(true);  // (its size changed while it was drawn: this picture is of the old size)
+        }
     } else {
         for (const auto& rect: rects) {
             rerenderRectangle(rect, params);

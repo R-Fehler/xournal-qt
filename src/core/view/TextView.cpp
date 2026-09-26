@@ -77,5 +77,10 @@ void TextView::draw(const Context& ctx) const {
         pango_attr_list_unref(attributes);
     }
 
-    pango_cairo_show_layout(ctx.cr, layout.get());
+    // xournal-qt: through the frontend's painter when it has one (model/MarkdownText.h)
+    if (auto painter = xoj::markdown::layoutPainter.load(std::memory_order_acquire)) {
+        painter(ctx.cr, layout.get());
+    } else {
+        pango_cairo_show_layout(ctx.cr, layout.get());
+    }
 }

@@ -1513,6 +1513,61 @@ Update the table in the user doc with the results.
 - [ ] With `XQT_PERF=1`, a long PDF beside itself, scroll both sides far apart: pages stay sharp, memory stays under
       the limit set in Settings (not twice it).
 
+## Emoji (qt/emoji)
+
+- [ ] A Markdown box and a text box with `😄 👩‍💻 🇩🇪 👍🏽 ❤️` (copied from a web page): each shows as one colour
+      picture, the same on every system (the app's Noto Color Emoji), also on a system without an emoji font.
+- [ ] Export as PDF and as the hybrid PDF, open in Okular and evince: the emoji are in colour and sharp at 400 %.
+      Print (Ctrl+P) to a PDF file: the same. The page's thumbnail and the sidebar previews show them.
+- [ ] A `.md` file with emoji, on pages and on one continuous page: the same.
+- [ ] Windows and Android: the same box shows its emoji in colour (Noto's pictures, not Segoe's or Android's).
+- [ ] Shortcodes: a Markdown box with `Hi :smile: :+1: :heart_eyes:` shows 😄 👍 😍 once the cursor has left the
+      paragraph; the paragraph with the cursor shows `:smile:`. Saved and opened again (and in the `.md` file on
+      disk) it is still `:smile:`. In `` `:smile:` `` and in a code block it stays text; `:nope:` stays text; a `.txt`
+      file shows `:smile:` as it is.
+- [ ] Copy `👩‍💻🇩🇪👍🏽` from a browser, paste into a text box and into Markdown written on the page: the arrows step
+      over each emoji at once, Backspace and Delete remove each whole. Copy them back out (Ctrl+C) into a browser:
+      the same three emoji.
+- [ ] Completion: in a text box, in Markdown on the page, in a `.md` file and in the Markdown editor beside the page,
+      type `:smi`: a list below the cursor (😄 smile, 😃 smiley, 😏 smirk, ...). Up / Down move in it, Enter or Tab
+      (or a tap) puts the emoji in place of `:smi`, Escape closes it and typing goes on. `:s` (one letter), `10:30`
+      and `std::ve` show nothing.
+- [ ] Android: Gboard, type `:smi` (the keyboard underlines it as a word being typed): the list shows; a tap on 😄
+      puts the emoji there and the keyboard does not type `:smi` again.
+- [ ] Beside the page, the arrows and Backspace go over a whole flag (🇩🇪).
+- [ ] Picker: while writing on the page (text box, Markdown, `.md` file) the tool bar shows 🙂; beside the page it is
+      in the Markdown buttons. It opens a search and the emoji by category (the row on top jumps to one). Search
+      `heart`, `happy`, `flag`: a tap (or Enter: the first found) puts the emoji at the cursor, the picker closes and
+      the keys go to the text again. The button is gone when the writing ends.
+- [ ] A page with a Markdown box and, below it, an ordinary text box (Markdown switched off for the text tool):
+      on the canvas, in the thumbnail, in the PDF export and in the PDF with notes the text box is where it was
+      written (it was drawn over the box's last line in the PDF with notes before).
+- [ ] Android: a flag (🇩🇪, pasted or from the picker) in a text box and in a Markdown box is a colour flag, not two
+      boxed letters (Android's symbol font has them as letters; Pango 1.58 asks for the family "emoji").
+
+## Note space beside slides (qt/note-space)
+
+- [ ] Open a lecture PDF (16:9 slides). Page menu (⋮ on a page in the sidebar or the page grid) → the icon "Space for
+      notes beside the slide…": the dialog shows a preview of the page with the slide in it. "Half the width on the
+      right" → the preview widens; Apply: the page is wider, the slide unchanged at its place, white space on the right.
+- [ ] Write in the space and on the slide; scroll, zoom in and out: the slide stays sharp (not blurred at the offset),
+      the ink stays on it. The sidebar thumbnail and the page grid show the wider page.
+- [ ] More menu → "Space for notes…": "All pages with a PDF background" is chosen with the number of pages. "Below: as
+      high as the slide", switch to cm (the amounts convert), Apply on a long PDF (300+ pages): it is done at once, the
+      view does not stutter, scrolling far away shows the pages with the space. Ctrl+Z undoes all of it in one step.
+- [ ] Space on the left and at the top (e.g. 3 cm each) on a page with ink and a sticky note: the ink, the note, text
+      and Markdown boxes move with the slide. Set everything to 0 ("None"): the page is exactly as before.
+- [ ] With space on the left: select PDF text with the text tool (drag, long press with a finger), highlight it: the
+      selection and the highlight lie on the words. Tap a link of the PDF: it opens. Search a word: the hit box is on it.
+      The annotations panel lists the highlight with its text.
+- [ ] Save as "PDF with notes" and open it in another viewer (Okular, a browser, Xodo): the page is larger, the slide at
+      its place, the ink on it, the viewer's search finds the slide's words where they are. Change the space and press
+      Ctrl+S: the file is appended to and shows the new space; open it again in xournal-qt: the same.
+- [ ] Export as plain PDF and print a page with space: the larger page with the slide at its place.
+- [ ] "A blank page after each instead" in the dialog: a plain page follows each chosen slide; one undo.
+- [ ] Open a `.xopp` saved with space in Xournal++ (GTK): space on the right/below looks the same; with space on the
+      left/top the slide is at the top left (documented in qt/docs/note-space.md).
+
 
 ## Text documents as PDF (qt/md-pdf)
 

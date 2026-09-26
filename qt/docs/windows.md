@@ -61,7 +61,9 @@ So the app and the CLI start with ([WindowsFonts.cpp](../src/app/WindowsFonts.cp
 - `PANGOCAIRO_BACKEND=fc`, and `FONTCONFIG_FILE` pointing to a `fonts.conf` of their own, written at every start to
   `%LOCALAPPDATA%\cache\xournal-qt\fontconfig\` (the cache folder, `XDG_CACHE_HOME` when set). It lists
   `C:\Windows\Fonts` and the user's own fonts (`%LOCALAPPDATA%\Microsoft\Windows\Fonts`), puts fontconfig's cache
-  in the same folder, and includes the rules of the program folder's `etc\fonts\conf.d`.
+  in the same folder, and includes the rules of the program folder's `etc\fonts\conf.d`. The app (not the CLI) also
+  lists its own fonts (`share\xournal-qt\fonts`: the colour emoji font, `qt/resources/fonts/README.md`) with the
+  rule that takes emoji from it, so text boxes and Markdown show Noto's emoji, not Segoe's.
 - The generic names that Xournal++ files carry map to the fonts Pango's Windows backend and upstream Xournal++ on
   Windows use, so that text boxes keep their size and line breaks: Sans → Arial, Serif → Times New Roman,
   Monospace → Courier New.

@@ -89,6 +89,7 @@
 #include "session/ArchivePdf.h"
 #include "session/HybridPdf.h"
 #include "session/MergedPdf.h"
+#include "session/PageNoteSpace.h"
 #include "session/TextFile.h"
 #include "shell/PageClipboard.h"
 #include "shell/RecentFiles.h"
@@ -4078,6 +4079,85 @@ bool AppController::insertPages(int position, int background, int paper, bool la
     s->getScrollHandler()->scrollToPage(at);
     Q_EMIT pageActionDone(count == 1 ? tr("Page inserted") : tr("%1 pages inserted").arg(count), true);
     return true;
+}
+
+// --- space for notes beside slides (qt/docs/note-space.md) --------------------------------------------------------
+
+QVariantMap AppController::noteSpaceOf(int page) const {
+    DocumentSession* s = session();
+    if (!s || page < 0) {
+        return {};
+    }
+    Document* doc = s->getDocument();
+    std::shared_lock lock(*doc);
+    if (static_cast<size_t>(page) >= doc->getPageCount()) {
+        return {};
+    }
+    const PageRef p = doc->getPage(static_cast<size_t>(page));
+    const NoteSpace& space = p->getNoteSpace();
+    const QSizeF slide = notespace::slideSize(*p);
+    return {{"left", space.left},
+            {"top", space.top},
+            {"right", space.right},
+            {"bottom", space.bottom},
+            {"slideWidth", slide.width()},
+            {"slideHeight", slide.height()},
+            {"pdf", p->getBackgroundType().isPdfPage()},
+            {"possible", notespace::canHaveSpace(*p) && !textPagesFixed()}};
+}
+
+QList<int> AppController::noteSpacePages(int scope, const QList<int>& pages) const {
+    DocumentSession* s = session();
+    if (!s) {
+        return {};
+    }
+    if (scope == 0) {
+        return pages.isEmpty() ? QList<int>{static_cast<int>(s->getCurrentPageNo())} : pages;
+    }
+    QList<int> out;
+    Document* doc = s->getDocument();
+    std::shared_lock lock(*doc);
+    for (size_t i = 0; i < doc->getPageCount(); ++i) {
+        if (scope == 1 || doc->getPage(i)->getBackgroundType().isPdfPage()) {
+            out.push_back(static_cast<int>(i));
+        }
+    }
+    return out;
+}
+
+int AppController::applyNoteSpace(int scope, const QList<int>& pages, double left, double top, double right,
+                                  double bottom, bool relative) {
+    DocumentSession* s = session();
+    if (!s || textPagesFixed()) {
+        return 0;
+    }
+    notespace::Amounts a;
+    a.left = left;
+    a.top = top;
+    a.right = right;
+    a.bottom = bottom;
+    a.relative = relative;
+    const size_t n = notespace::apply(*s, pageList(noteSpacePages(scope, pages)), a);
+    if (n > 0) {
+        const bool none = left == 0 && top == 0 && right == 0 && bottom == 0;
+        Q_EMIT pageActionDone(none ? (n == 1 ? tr("Space for notes removed")
+                                             : tr("Space for notes removed from %1 pages").arg(n))
+                                   : (n == 1 ? tr("Space for notes added") : tr("Space for notes on %1 pages").arg(n)),
+                              true);
+    }
+    return static_cast<int>(n);
+}
+
+int AppController::insertBlankAfterPages(int scope, const QList<int>& pages) {
+    DocumentSession* s = session();
+    if (!s || textPagesFixed()) {
+        return 0;
+    }
+    const size_t n = notespace::insertBlankAfter(*s, pageList(noteSpacePages(scope, pages)));
+    if (n > 0) {
+        Q_EMIT pageActionDone(n == 1 ? tr("Page inserted") : tr("%1 pages inserted").arg(n), true);
+    }
+    return static_cast<int>(n);
 }
 
 bool AppController::pagesHavePdfBackground(const QList<int>& pages) const {

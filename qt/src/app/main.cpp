@@ -12,6 +12,7 @@
 #include <clocale>
 
 #include <QCommandLineParser>
+#include <QFontDatabase>
 #include <QApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
@@ -28,6 +29,7 @@
 #include <optional>
 
 #include "AppController.h"
+#include "EmojiFont.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
 #include "shell/AnnotationsModel.h"
@@ -68,6 +70,16 @@ int main(int argc, char* argv[]) {
 #ifdef Q_OS_WIN
     // UTF-8 for std::filesystem's narrow strings, GLib's cache folder, fontconfig (see qt/docs/windows.md).
     xqt::windows::prepareEnvironment();
+#endif
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN)
+    // The app's colour emoji font (EmojiFont.h) for Qt's text as well (Pango gets it in AppContext). Windows and
+    // Android have emoji fonts that Qt draws.
+    if (QFontDatabase::addApplicationFont(QString::fromStdString(
+                (xqt::AppContext::defaultResourceDir() / "fonts" / xqt::emoji::FONT_FILE).string())) >= 0) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+        QFontDatabase::addApplicationEmojiFontFamily(QString::fromUtf8(xqt::emoji::FONT_FAMILY));
+#endif
+    }
 #endif
     // The program icon (the desktop file gives it to the window when installed; this covers the build tree)
     QGuiApplication::setWindowIcon(QIcon::fromTheme(

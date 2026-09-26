@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 #include <qpdf/QPDF.hh>
 #include <qpdf/QPDFEmbeddedFileDocumentHelper.hh>
+#include <qpdf/QPDFPageDocumentHelper.hh>
 
 #include "model/Document.h"
 #include "model/Layer.h"
@@ -26,6 +27,7 @@
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
+#include "session/PageNoteSpace.h"
 #include "session/TextDocument.h"
 
 #include "CanvasView.h"
@@ -257,6 +259,54 @@ TEST_F(PdfTextDocumentTest, aPdfTextDocumentCarriesItsMarkdownAndOpensEditable) 
     EXPECT_FALSE(r.incremental) << "the attachments changed";
     attachment(pdf, "Report.md", &found);
     EXPECT_FALSE(found);
+}
+
+namespace {
+/// The width of the media box of each page of a PDF (qpdf).
+std::vector<double> mediaWidths(const fs::path& pdf) {
+    QPDF q;
+    q.setSuppressWarnings(true);
+    q.processFile(pdf.string().c_str());
+    std::vector<double> out;
+    for (auto& p: QPDFPageDocumentHelper(q).getAllPages()) {
+        const auto m = p.getMediaBox().getArrayAsRectangle();
+        out.push_back(m.urx - m.llx);
+    }
+    return out;
+}
+}  // namespace
+
+// Space for notes (qt/note-space) on a page of a PDF text document: its larger page box and the name.md both survive
+// full and incremental saves
+TEST_F(PdfTextDocumentTest, spaceForNotesAndTheMarkdownBothSurviveSaves) {
+    const std::string text = longText();
+    show(MarkdownFile::notesDocument(text));
+    const fs::path pdf = path("Spaced.pdf");
+    notespace::Amounts right;
+    right.right = 100;
+    ASSERT_EQ(notespace::apply(*session, {0}, right), 1u);
+    auto r = session->saveAsHybrid(pdf);  // (in full)
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_EQ(attachment(pdf, "Spaced.md"), text);
+    auto widths = mediaWidths(pdf);
+    ASSERT_GE(widths.size(), 2u);
+    EXPECT_NEAR(widths[0], MarkdownFile::PAGE_WIDTH + 100, 0.01);
+    EXPECT_NEAR(widths[1], MarkdownFile::PAGE_WIDTH, 0.01);
+
+    // The text changed and space on page 2 too: appended; both are in the file
+    setFlow("# Spaced\n\n" + text);
+    ASSERT_EQ(notespace::apply(*session, {1}, right), 1u);
+    r = session->save();
+    ASSERT_TRUE(r.ok) << r.error;
+    EXPECT_TRUE(r.incremental);
+    EXPECT_EQ(attachment(pdf, "Spaced.md"), "# Spaced\n\n" + text);
+    widths = mediaWidths(pdf);
+    EXPECT_NEAR(widths[0], MarkdownFile::PAGE_WIDTH + 100, 0.01);
+    EXPECT_NEAR(widths[1], MarkdownFile::PAGE_WIDTH + 100, 0.01);
+    auto loaded = DocumentSession::loadFile(pdf);
+    ASSERT_TRUE(loaded.document);
+    EXPECT_EQ(flowOf(*loaded.document), "# Spaced\n\n" + text);
+    EXPECT_EQ(loaded.document->getPage(1)->getNoteSpace(), (NoteSpace{0, 0, 100, 0}));
 }
 
 // An empty PDF text document (New text document) keeps its empty text on page 1: it opens as a text document

@@ -26,6 +26,7 @@
 #include "DocumentSession.h"
 #include "MdBox.h"
 #include "TextMatch.h"
+#include "PageNoteSpace.h"
 #include "util/PathUtil.h"
 
 namespace xqt {
@@ -234,9 +235,11 @@ std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const s
     }
     if (pdf && page.getBackgroundType().isPdfPage()) {
         const PdfPageLayout layout = pdf->layout(static_cast<int>(page.getPdfPageNr()));
+        const QPointF offset = notespace::offsetOf(page);  // (the PDF at its offset: space for notes)
         for (const auto& m: textmatch::find(layout.text, terms)) {
-            const auto rects = layout.rects(m.start, m.end);
-            out.insert(out.end(), rects.begin(), rects.end());
+            for (const QRectF& r: layout.rects(m.start, m.end)) {
+                out.push_back(r.translated(offset));
+            }
         }
     }
     for (const ElementText& piece: elementTexts(page)) {

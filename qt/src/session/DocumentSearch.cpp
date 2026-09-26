@@ -15,6 +15,7 @@
 #include "DocumentSession.h"
 #include "MdBox.h"
 #include "TextMatch.h"
+#include "PageNoteSpace.h"
 
 namespace xqt {
 
@@ -281,8 +282,20 @@ void DocumentSearch::place(size_t page) {
             waiting.insert(page);  // (placed when it is read)
             return;
         }
+        QPointF offset;  // where the PDF is drawn on the page (space for notes)
+        {
+            Document* doc = session.getDocument();
+            std::shared_lock lock(*doc);
+            if (page < doc->getPageCount()) {
+                offset = notespace::offsetOf(*doc->getPage(page));
+            }
+        }
         for (const auto& m: textmatch::find(layout->text, terms)) {
-            add(layout->rects(m.start, m.end));
+            auto rects = layout->rects(m.start, m.end);
+            for (QRectF& r: rects) {
+                r.translate(offset);
+            }
+            add(std::move(rects));
         }
     }
     {
@@ -497,6 +510,10 @@ std::vector<QRectF> DocumentSearch::findOnPage(Document& document, size_t pageNo
         if (page->getBackgroundType().isPdfPage()) {
             if (auto pdf = doc->getPdfPage(page->getPdfPageNr())) {
                 results = pdf->findText(utf8);
+                const NoteSpace& s = page->getNoteSpace();  // (the PDF at its offset on the page)
+                for (XojPdfRectangle& r: results) {
+                    r = XojPdfRectangle(r.x1 + s.left, r.y1 + s.top, r.x2 + s.left, r.y2 + s.top);
+                }
             }
         }
         for (Layer* l: page->getLayers()) {

@@ -487,6 +487,29 @@ ApplicationWindow {
                     }
                 }
             }
+            // Writing on the page (a text box, Markdown, a text file): the emoji picker
+            ToolButton {
+                id: emojiButton
+                objectName: "emojiButton"
+                visible: canvas.textEditing
+                text: "\u{1F642}"
+                font.family: "Xournal Qt Emoji"
+                font.pixelSize: 22
+                implicitWidth: 48
+                implicitHeight: 48
+                focusPolicy: Qt.NoFocus  // (the text being written keeps the keys)
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Emoji (or type : and a name, like :smile)")
+                ToolTip.delay: 600
+                background: Rectangle { radius: 10; color: emojiButton.pressed ? "#e8e8e8" : "transparent" }
+                onClicked: canvasEmojiPicker.open()
+                EmojiPicker {
+                    id: canvasEmojiPicker
+                    x: win.toolbarPosition === "left" ? parent.width : win.toolbarPosition === "right" ? -width : 0
+                    y: win.verticalTools ? 0 : parent.height
+                    onPicked: function(emoji) { close(); canvas.insertText(emoji) }
+                }
+            }
             IconButton {
                 visible: !win.textDoc  // (a text file: no ink, no pages to add)
                 objectName: "pdfTextButton"
@@ -881,6 +904,8 @@ ApplicationWindow {
                     MenuItem { objectName: "insertStickyNoteItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert sticky note"); onTriggered: app.insertStickyNote() }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
+                    // Writing space beside the slides of all pages (qt/docs/note-space.md)
+                    MenuItem { objectName: "noteSpaceItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Space for notes…"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
                     MenuItem { text: qsTr("All open documents"); onTriggered: tabOverview.open() }
                     MenuSeparator {}
@@ -947,6 +972,16 @@ ApplicationWindow {
             x: Math.max(0, Math.min(canvas.mathErrorRect.x, canvas.width - width))
             y: canvas.mathErrorRect.y + canvas.mathErrorRect.height + 4
         }
+    }
+    // ":smi" typed on the page: the emoji suggested (Up / Down / Enter go to the canvas's editor; a tap chooses).
+    // Beside the canvas, not in it: the canvas takes the presses on its own items.
+    EmojiSuggestions {
+        objectName: "emojiSuggestions"
+        model: canvas.emojiCompletions
+        current: canvas.emojiCompletionIndex
+        cursor: Qt.rect(canvas.x + canvas.emojiCompletionRect.x, canvas.y + canvas.emojiCompletionRect.y,
+                        canvas.emojiCompletionRect.width, canvas.emojiCompletionRect.height)
+        onChosen: function(index) { canvas.chooseEmojiCompletion(index) }
     }
     // Reference mode: another document beside this one (the canvas area is split)
     ReferenceSplit {
@@ -2782,6 +2817,11 @@ ApplicationWindow {
         function onPrintRequested(pages) { printDialog.openFor(pages) }
     }
     BackgroundDialog { id: backgroundDialog }
+    NoteSpaceDialog { id: noteSpaceDialog }
+    Connections {
+        target: app
+        function onNoteSpaceRequested(pages, allPages) { noteSpaceDialog.openFor(pages, allPages) }
+    }
     Connections {
         target: app
         function onPageBackgroundRequested(pages) { backgroundDialog.openFor(pages) }

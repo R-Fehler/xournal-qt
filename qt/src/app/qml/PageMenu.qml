@@ -116,6 +116,14 @@ Popup {
                 onClicked: { app.copyPageLink(menu.page); menu.close() }
             }
             // The document beside itself (qt/self-reference), at this page: a second view with its own scrolling
+            // Writing space beside the slide on this page (or the selected pages): qt/docs/note-space.md
+            PageAction {
+                objectName: "pageMenuNoteSpace"
+                iconName: "xqt-note-space"
+                tip: qsTr("Space for notes beside the slide…")
+                enabled: menu.visible && app.noteSpaceOf(menu.page).possible === true
+                onClicked: { app.requestNoteSpace(menu.pages, false); menu.close() }
+            }
             PageAction {
                 objectName: "pageMenuShowBeside"
                 iconName: "xqt-reference"

@@ -74,7 +74,10 @@ auto BackgroundView::createForPage(ConstPageRef page, BackgroundFlags bgFlags, P
                 break;
             case PageTypeFormat::Pdf:
                 if (bgFlags.showPDF) {
-                    return std::make_unique<PdfBackgroundView>(width, height, page->getPdfPageNr(), pdfCache);
+                    // xournal-qt: space for notes (model/NoteSpace.h)
+                    const NoteSpace& s = page->getNoteSpace();
+                    return std::make_unique<PdfBackgroundView>(width, height, page->getPdfPageNr(), pdfCache, s.left,
+                                                               s.top, !s.empty());
                 }
                 break;
             default:

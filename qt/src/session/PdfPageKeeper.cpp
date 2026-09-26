@@ -1,5 +1,7 @@
 #include "PdfPageKeeper.h"
 
+#include "PageNoteSpace.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -319,7 +321,7 @@ bool PdfPageKeeper::toImageBackground(XojPage& page, const XojPdfPage& pdf, doub
     cairo_set_source_rgb(cr, 1, 1, 1);
     cairo_paint(cr);
     cairo_scale(cr, scale, scale);
-    pdf.render(cr);
+    notespace::renderPdf(cr, page, pdf);  // (the whole page: with space for notes, the slide at its offset)
     cairo_destroy(cr);
     std::vector<unsigned char> png;
     const bool ok = cairo_surface_write_to_png_stream(surface, appendPng, &png) == CAIRO_STATUS_SUCCESS;
@@ -342,6 +344,7 @@ bool PdfPageKeeper::toImageBackground(XojPage& page, const XojPdfPage& pdf, doub
     img.setAttach(true);  // stored in the .xopp
     page.setBackgroundImage(img);
     page.setBackgroundType(PageType(PageTypeFormat::Image));
+    page.setNoteSpace({});  // (the space is part of the picture now: qt/docs/note-space.md)
     return true;
 }
 

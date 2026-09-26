@@ -832,6 +832,23 @@ public:
     Q_INVOKABLE void requestInsertPages(int position) { Q_EMIT insertPagesRequested(position); }
     /// Ask the window for the background dialog for these pages (0-based).
     Q_INVOKABLE void requestPageBackground(const QList<int>& pages) { Q_EMIT pageBackgroundRequested(pages); }
+    /// Space for notes beside slides (qt/docs/note-space.md). Ask the window for its dialog, for these pages (0-based;
+    /// empty: the current page, `allPages`: offer all pages first).
+    Q_INVOKABLE void requestNoteSpace(const QList<int>& pages, bool allPages = false) {
+        Q_EMIT noteSpaceRequested(pages, allPages);
+    }
+    /// A page's space for notes and its slide: { left, top, right, bottom, slideWidth, slideHeight (points), pdf,
+    /// possible (not an image background) }.
+    Q_INVOKABLE QVariantMap noteSpaceOf(int page) const;
+    /// The pages a choice of the dialog means: 0 these pages, 1 all pages, 2 all pages with a PDF background.
+    Q_INVOKABLE QList<int> noteSpacePages(int scope, const QList<int>& pages) const;
+    /// Give the pages of `scope` this space for notes: points, or (`relative`) fractions of the slide's width (left,
+    /// right) and height (top, bottom). Replaces what they had; all 0 removes it. One undo step. Returns how many
+    /// pages changed.
+    Q_INVOKABLE int applyNoteSpace(int scope, const QList<int>& pages, double left, double top, double right,
+                                   double bottom, bool relative);
+    /// A blank page (the size of the slide) after each page of `scope` instead. One undo step. Returns how many.
+    Q_INVOKABLE int insertBlankAfterPages(int scope, const QList<int>& pages);
     /// Ask the window for the "new chapter" dialog on that page.
     Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
     /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.
@@ -1057,6 +1074,7 @@ Q_SIGNALS:
     void toolbarColorsChanged();
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QList<int>& pages);
+    void noteSpaceRequested(const QList<int>& pages, bool allPages);
     void printRequested(const QList<int>& pages);
     void chapterRequested(int page);
     void toolbarPositionChanged();

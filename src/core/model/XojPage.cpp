@@ -31,6 +31,7 @@ XojPage::XojPage(XojPage const& page):
         currentLayer(page.currentLayer),
         bgType(page.bgType),
         pdfBackgroundPage(page.pdfBackgroundPage),
+        noteSpace(page.noteSpace),  // xournal-qt
         backgroundColor(page.backgroundColor) {
     this->layer.reserve(page.layer.size());
     std::transform(begin(page.layer), end(page.layer), std::back_inserter(this->layer),
@@ -131,6 +132,10 @@ auto XojPage::getWidth() const -> double { return this->width; }
 auto XojPage::getHeight() const -> double { return this->height; }
 
 auto XojPage::getPdfPageNr() const -> size_t { return this->pdfBackgroundPage; }
+
+// xournal-qt: space for notes (model/NoteSpace.h)
+auto XojPage::getNoteSpace() const -> const NoteSpace& { return this->noteSpace; }
+void XojPage::setNoteSpace(const NoteSpace& space) { this->noteSpace = space; }
 
 auto XojPage::isAnnotated() const -> bool {
     for (Layer* l: this->layer) {

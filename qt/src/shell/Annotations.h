@@ -76,6 +76,7 @@ struct Item {
 /// What a page shows that its items are made of, read under the document's lock (plain values).
 struct PageContent {
     int pdfPage = -1;  ///< the PDF page it shows (0-based), -1: none
+    QPointF pdfOffset;  ///< where the PDF page is on the page (space for notes, qt/docs/note-space.md)
     double width = 0, height = 0;
     struct Box {
         bool markdown = false;

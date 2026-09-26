@@ -58,6 +58,7 @@
 #include "MarkdownFile.h"
 #include "MdBox.h"
 #include "session/TextDocument.h"
+#include "PageNoteSpace.h"
 #include "Perf.h"
 #include "StickyNotes.h"
 #include "TextEditor.h"
@@ -89,6 +90,11 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
     session.addView(this, &zoomControl);  // (the first one is the primary view)
     ownPage = std::min(session.getCurrentPageNo(), session.getDocument()->getPageCount());
     rebuildPages();
+    // (a tap or a drag moves the cursor of the text being written: the emoji suggestions follow)
+    connect(this, &CanvasView::updateRequested, this, &CanvasView::refreshEmojiCompletion);
+    // (and every change of the Markdown being written, also one that only moves the cursor or selects: the
+    // formatting bar's edits, MarkdownEditor::applyEdit, do not come as keys)
+    connect(this, &CanvasView::markdownCursorChanged, this, &CanvasView::refreshEmojiCompletion);
 
     connect(&viewController, &ViewController::zoomChanged, this, [this] {
         // Like upstream: while zooming, show the existing buffers scaled and render sharp only once the zoom is stable.
@@ -704,6 +710,7 @@ std::optional<CanvasView::LinkTarget> CanvasView::linkAt(QPointF viewPos) const 
     }
     Document* doc = session.getDocument();
     XojPdfPageSPtr pdf;
+    QPointF offset;  // where the PDF is on the page (space for notes)
     {
         std::shared_lock lock(*doc);
         PageRef page = doc->getPage(*idx);
@@ -711,19 +718,20 @@ std::optional<CanvasView::LinkTarget> CanvasView::linkAt(QPointF viewPos) const 
             return std::nullopt;
         }
         pdf = doc->getPdfPage(page->getPdfPageNr());
+        offset = notespace::offsetOf(*page);
     }
     if (!pdf) {
         return std::nullopt;
     }
     const double zoom = viewController.zoom();
     const QRectF pageRect = pageViewRect(*idx);
-    const QPointF pt = (viewPos - pageRect.topLeft()) / zoom;
+    const QPointF pt = (viewPos - pageRect.topLeft()) / zoom - offset;  // (on the PDF page)
     for (auto&& [rect, action]: pdf->getLinks()) {
         if (!(rect.x1 <= pt.x() && pt.x() <= rect.x2 && rect.y1 <= pt.y() && pt.y() <= rect.y2)) {
             continue;
         }
         LinkTarget t;
-        t.viewRect = QRectF(pageRect.topLeft() + QPointF(rect.x1, rect.y1) * zoom,
+        t.viewRect = QRectF(pageRect.topLeft() + (QPointF(rect.x1, rect.y1) + offset) * zoom,
                             QSizeF(rect.x2 - rect.x1, rect.y2 - rect.y1) * zoom);
         auto dest = action->getDestination();
         if (!dest) {
@@ -749,6 +757,7 @@ std::optional<QRectF> CanvasView::textColumnAt(size_t index, QPointF pagePoint) 
     XojPdfPageSPtr pdf;
     double width = 0;
     double height = 0;
+    QPointF offset;
     {
         std::shared_lock lock(*doc);
         if (index >= doc->getPageCount()) {
@@ -759,12 +768,16 @@ std::optional<QRectF> CanvasView::textColumnAt(size_t index, QPointF pagePoint) 
             return std::nullopt;
         }
         pdf = doc->getPdfPage(page->getPdfPageNr());
-        width = page->getWidth();
-        height = page->getHeight();
+        // (the slide: the PDF page, without the space for notes around it)
+        const QSizeF slide = notespace::slideSize(*page);
+        width = slide.width();
+        height = slide.height();
+        offset = notespace::offsetOf(*page);
     }
     if (!pdf || width <= 0) {
         return std::nullopt;
     }
+    pagePoint -= offset;  // (on the PDF page)
     const auto lines = pdf->selectTextLines(XojPdfRectangle(0, 0, width, height), XojPdfPageSelectionStyle::Line);
     if (lines.rects.size() < 4) {
         return std::nullopt;  // hardly a text page
@@ -806,7 +819,7 @@ std::optional<QRectF> CanvasView::textColumnAt(size_t index, QPointF pagePoint) 
             }
         }
         if (bottom > top) {
-            return QRectF(x1, top, x2 - x1, bottom - top);
+            return QRectF(x1, top, x2 - x1, bottom - top).translated(offset);
         }
     }
     return std::nullopt;
@@ -1686,6 +1699,7 @@ void CanvasView::endTextEditing() {
         editor.reset();                           // finishes (one undo step)
         Q_EMIT textEditingChanged(false);
         Q_EMIT updateRequested();
+        refreshEmojiCompletion();
     }
     if (!textEditor) {
         return;
@@ -1695,6 +1709,7 @@ void CanvasView::endTextEditing() {
     textEditor.reset();  // finishes (undo action)
     Q_EMIT textEditingChanged(false);
     Q_EMIT updateRequested();
+    refreshEmojiCompletion();
 }
 
 CanvasTextInput* CanvasView::getTextInput() const {
@@ -1702,6 +1717,49 @@ CanvasTextInput* CanvasView::getTextInput() const {
         return textEditor.get();
     }
     return markdownEditor.get();
+}
+
+bool CanvasView::textKeyPressed(const QKeyEvent* e, bool& finish) {
+    finish = false;
+    CanvasTextInput* editor = getTextInput();
+    if (!editor) {
+        return false;
+    }
+    if (completion.keyPressed(e, *editor)) {
+        Q_EMIT emojiCompletionChanged();
+        refreshEmojiCompletion();
+        return true;
+    }
+    const bool taken = editor->keyPressed(e, finish);
+    if (taken && finish) {
+        endTextEditing();
+    }
+    refreshEmojiCompletion();
+    return taken;
+}
+
+void CanvasView::refreshEmojiCompletion() {
+    if (completion.update(getTextInput())) {
+        Q_EMIT emojiCompletionChanged();
+    }
+}
+
+void CanvasView::chooseEmojiCompletion(int index) {
+    if (CanvasTextInput* editor = getTextInput()) {
+        completion.choose(index, *editor);
+        Q_EMIT emojiCompletionChanged();
+        refreshEmojiCompletion();
+    }
+}
+
+bool CanvasView::insertAtTextCursor(const std::string& text) {
+    CanvasTextInput* editor = getTextInput();
+    if (!editor) {
+        return false;
+    }
+    editor->replaceBeforeCursor(0, text);
+    refreshEmojiCompletion();
+    return true;
 }
 
 double CanvasView::getZoom() const { return viewController.zoom(); }
@@ -2111,7 +2169,13 @@ void CanvasView::documentChanged(DocumentChangeType type) {
 
 void CanvasView::pageSizeChanged(size_t page) {
     if (page < pages.size()) {
-        pages[page]->rerenderPage(true);
+        // A page in view, or one with a picture, is rendered again; the others when they come into view
+        // (updateVisibility), so that a change of many pages at once (space for notes on all of them) does not render
+        // every page of the document
+        const auto [first, last] = visiblePages();
+        if ((page >= first && page <= last) || pages[page]->bufferInfo().valid) {
+            pages[page]->rerenderPage(true);
+        }
     }
     refreshLayout();
 }

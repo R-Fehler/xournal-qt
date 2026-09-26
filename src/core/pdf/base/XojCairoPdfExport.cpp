@@ -197,7 +197,10 @@ void XojCairoPdfExport::exportPage(size_t page, bool exportPdfBackground) {
         auto pgNo = p->getPdfPageNr();
         XojPdfPageSPtr popplerPage = doc->getPdfPage(pgNo);
 
+        cairo_save(cr);  // xournal-qt: space for notes, the PDF at its offset (model/NoteSpace.h)
+        cairo_translate(cr, p->getNoteSpace().left, p->getNoteSpace().top);
         popplerPage->renderForPrinting(cr);
+        cairo_restore(cr);
     }
 
     xoj::view::BackgroundFlags flags;

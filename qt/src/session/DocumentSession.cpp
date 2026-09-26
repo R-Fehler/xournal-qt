@@ -54,6 +54,7 @@
 #include "MdPaginate.h"
 #include "TextFile.h"
 #include "config.h"  // for FILE_FORMAT_VERSION
+#include "PageNoteSpace.h"
 
 namespace xqt {
 
@@ -334,6 +335,7 @@ void DocumentSession::insertNewPage(size_t position, bool automatedInsertion) {
     if (bg.isPdfPage()) {
         page->setSize(current->getWidth(), current->getHeight());
         page->setBackgroundPdfPageNr(current->getPdfPageNr());
+        page->setNoteSpace(current->getNoteSpace());  // (the PDF where it is on the page it copies)
     } else if (bg.isImagePage()) {
         page->setSize(current->getWidth(), current->getHeight());
         page->setBackgroundImage(current->getBackgroundImage());
@@ -1028,7 +1030,7 @@ void DocumentSession::updatePreview(Document& document) {
         // No PdfCache here: render the PDF background by hand (as upstream).
         if (page->getBackgroundType().isPdfPage()) {
             if (XojPdfPageSPtr pdfPage = doc->getPdfPage(page->getPdfPageNr())) {
-                pdfPage->render(cr);
+                notespace::renderPdf(cr, *page, *pdfPage);
             }
             flags.showPDF = xoj::view::HIDE_PDF_BACKGROUND;
         } else {

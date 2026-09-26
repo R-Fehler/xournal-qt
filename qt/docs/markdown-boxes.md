@@ -165,6 +165,27 @@ and the paste is one undo step as any other. In the panel it is the keyboard's p
 Code: `qt/src/markdown/MdMath.*` (MicroTeX, the recording as paths, the cache), `MdLayout.cpp` (the shapes in the
 text, `searchText`, `mathAt`), `CanvasView::mathErrorAt` and `DocumentCanvasItem` (the tool tip).
 
+## Emoji
+- **Colour, the same everywhere**: emoji in Markdown and text boxes are drawn from the app's own Noto Color Emoji
+  (`qt/resources/fonts`, README there), on every system, in the thumbnails, the PDF export, the hybrid PDF and print.
+  In PDFs each emoji is a picture of the font's resolution (Cairo alone puts a blurred 16-pixel one there).
+  Sequences (👩‍💻, 🇩🇪, 👍🏽, ❤️) are one picture. Code: `qt/src/markdown/EmojiFont.*`.
+- **Shortcodes**: `:smile:` is shown as 😄 and stays `:smile:` in the file, as on GitHub (its names: gemoji,
+  `qt/3rdparty/gemoji`). Not in code, not in a plain text; the block with the cursor shows `:smile:`. The emoji stands
+  for the whole shortcode, as an entity does (a tap on it is its start or end). Code: `qt/src/markdown/EmojiData.*`,
+  `MdLayout.cpp` (`withEmoji`).
+- **Completion**: `:` and two letters (`:smi`) in a text box, in Markdown on the page, a `.md` file or the editor
+  beside the page open a list of emoji below the cursor (one-word names first: smile, smiley, smirk, then smile_cat,
+  then names with a later word, then tags). Enter, Tab or a tap put the emoji itself (not the shortcode) in the text;
+  Escape closes the list for that shortcode. Not after a letter, digit or colon (`10:30`, `std::`). An on-screen
+  keyboard's word being typed counts. Code: `qt/src/canvas/EmojiCompletion.*` (the canvas), `MarkdownPanel.qml` and
+  `qt/src/quick/EmojiNames.*` (beside the page), `EmojiSuggestions.qml` (the list).
+- **Picker**: the 🙂 button (in the tool bar while writing on the page, among the Markdown buttons beside it) opens
+  a search over names, tags and descriptions and the emoji by category; a tap puts one at the cursor.
+  `EmojiPicker.qml`.
+- **One character**: the cursor, Backspace and Delete go over a whole emoji sequence (Pango's grapheme clusters,
+  `qt/src/markdown/Grapheme.*`; also beside the page, where Qt 6.7 splits flags).
+
 ## How it is stored (Xournal++ compatible)
 A box is an ordinary Xournal++ text element in a layer named "Markdown" at the bottom of the page. Ink written with
 the pen goes on top of it, into the layer it went into before.

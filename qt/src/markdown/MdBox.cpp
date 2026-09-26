@@ -15,6 +15,7 @@
 #include "model/XojPage.h"
 #include "util/Matrix.h"
 #include "model/MarkdownText.h"
+#include "EmojiFont.h"
 
 namespace xqt::md {
 
@@ -81,6 +82,7 @@ xoj::markdown::Size drawnSize(const Text& text) {
 void installRenderer() {
     xoj::markdown::sizer.store(&drawnSize, std::memory_order_release);
     xoj::markdown::renderer.store(&drawText, std::memory_order_release);
+    xoj::markdown::layoutPainter.store(&xqt::emoji::showLayout, std::memory_order_release);
 }
 
 double contentHeight(const Text& text) { return cachedLayout(text.getText(), styleOf(text)).height; }
