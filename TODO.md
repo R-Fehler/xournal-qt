@@ -106,6 +106,12 @@ is built.
 - [ ] Left from block 1: `HomeView` (760, 1500), `TabOverview`, the Markdown panel and the reference split still keep
   their own widths (table in adaptive-layout.md); the tab strip's 38 px buttons and the other F14 targets are not
   sized by `minTarget` yet; the drawer has no slide animation; Escape does not close it.
+- [x] Block 3 `qt/adaptive-dialogs`: `AdaptiveDialog` for all dialogs and sheets (scrolling body, full-screen sheet,
+  bottom sheet, stacked footer buttons, back key), Settings as a list of sections on phones, the quick tools popup.
+- [ ] Left from block 3: the bottom sheet keeps Material's rounded corners at the bottom edge and opens with the
+  dialog's grow animation (no slide); the Settings sheet is its own popup, not an `AdaptiveDialog`; the tab overview,
+  the Markdown table editor, the look-up menu and the small anchored popups (link, page jump, custom width) are
+  not adapted; the dialogs are not checked against the bottom safe area (block 8).
 
 ---
 
