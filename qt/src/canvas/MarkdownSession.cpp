@@ -236,7 +236,8 @@ std::string MarkdownSession::start(size_t pageNo, const md::Style& s, bool isPag
 void MarkdownSession::setBox(Page& p, const std::string& text) {
     Document* doc = session.getDocument();
     if (p.box && p.box->getText() == text && p.box->getFontSize() == style.size && p.box->getWrap() == style.width &&
-        p.box->getColor() == style.color) {
+        p.box->getColor() == style.color && std::abs(p.box->getTransformation().shift.x - p.x) <= 0.5 &&
+        std::abs(p.box->getTransformation().shift.y - p.y) <= 0.5) {
         return;
     }
     if (!p.recorded) {
@@ -257,7 +258,10 @@ void MarkdownSession::setBox(Page& p, const std::string& text) {
         lock.unlock();
         auto action = std::make_unique<MarkdownUndoAction>(p.page, p.layer, p.box,
                                                             p.original ? p.original->clone() : ElementPtr());
-        if (!undo) {
+        if (!undo && external) {
+            undo = external;  // (recordInto)
+            undo->addAction(std::move(action));
+        } else if (!undo) {
             auto group = std::make_unique<GroupUndoAction>();
             undo = group.get();
             group->addAction(std::move(action));
@@ -445,6 +449,23 @@ double MarkdownSession::setFontSize(double size) {
     return overflow(chain[0]);
 }
 
+double MarkdownSession::reflow() {
+    if (!active() || !pageText) {
+        return 0;
+    }
+    {
+        std::shared_lock lock(*session.getDocument());
+        for (Page& p: chain) {
+            const TextFlow::Style m = TextFlow::styleFor(p.page, TextFlow::Style{});
+            p.x = m.leftMargin;
+            p.y = m.topMargin;
+        }
+    }
+    split = {};  // (other widths: all pages again)
+    splitText.clear();
+    return distribute(last);
+}
+
 double MarkdownSession::setWidth(double width) {
     if (!active() || pageText || width <= 0 || width == style.width) {
         return update(last);
@@ -518,6 +539,7 @@ void MarkdownSession::cancel() {
                 p.box->setFont(p.original->getFont());
                 p.box->setColor(p.original->getColor());
                 p.box->setWrap(p.original->getWrap());
+                p.box->setTransformation(p.original->getTransformation());  // (moved to the margins: back)
             } else {
                 p.box->setText("");
             }

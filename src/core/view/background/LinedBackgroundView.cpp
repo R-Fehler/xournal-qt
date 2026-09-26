@@ -19,7 +19,9 @@ LinedBackgroundView::LinedBackgroundView(double pageWidth, double pageHeight, Co
         vLineColor = getColorOr(config, CFG_ALT_FOREGROUND_COLOR_2, ALT_DEFAULT_V_LINE_COLOR);
     }
 
-    config.loadValue(CFG_MARGIN, margin);
+    if (!config.loadValue(CFG_MARGIN, margin)) {
+        margin *= scale;  // xournal-qt: the default line of a small page to scale (ruledScale)
+    }
     if (margin < 0) {
         // A negative value puts the margin line on the right hand side
         margin += pageWidth;

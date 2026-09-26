@@ -121,6 +121,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownSession.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageResize.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PageResize.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownEditor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MarkdownBoxResize.h
@@ -175,6 +177,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownSessionTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownEditorTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/MarkdownBoxResizeTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PageSizeTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/TextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/PdfTextDocumentTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/canvas/EmojiEditingTest.cpp

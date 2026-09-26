@@ -950,6 +950,8 @@ ApplicationWindow {
                     MenuItem { objectName: "insertStickyNoteItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert sticky note"); onTriggered: app.insertStickyNote() }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Insert pages…"); onTriggered: insertPagesDialog.openAt(app.pageNumber) }
                     MenuItem { visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Background of this page…"); onTriggered: backgroundDialog.openFor([app.pageNumber - 1]) }
+                    // Another paper size for this page, the selected pages or all of them (PageSizeDialog)
+                    MenuItem { objectName: "pageSizeItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Page size…"); onTriggered: pageSizeDialog.openFor([app.pageNumber - 1]) }
                     // Writing space beside the slides of all pages (qt/docs/note-space.md)
                     MenuItem { objectName: "noteSpaceItem"; visible: !win.textDoc; height: visible ? implicitHeight : 0; text: qsTr("Space for notes…"); onTriggered: noteSpaceDialog.openFor([app.pageNumber - 1], true) }
                     MenuItem { text: qsTr("All pages"); onTriggered: pageGrid.open() }
@@ -2978,6 +2980,11 @@ ApplicationWindow {
     }
     BackgroundDialog { id: backgroundDialog }
     NoteSpaceDialog { id: noteSpaceDialog }
+    PageSizeDialog { id: pageSizeDialog }
+    Connections {
+        target: app
+        function onPageSizeRequested(pages) { pageSizeDialog.openFor(pages) }
+    }
     Connections {
         target: app
         function onNoteSpaceRequested(pages, allPages) { noteSpaceDialog.openFor(pages, allPages) }

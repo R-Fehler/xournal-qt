@@ -3402,6 +3402,121 @@ TEST_F(MainWindowTest, spaceForNotesFromThePageMenuAndForAllPages) {
     }
 }
 
+// Changing a page's size (qt/page-size-change): "Page size…" in the page menu opens the dialog for the page; A7 makes
+// it a card (what no longer fits is counted in the dialog and kept), one undo step; then the selection and all pages
+TEST_F(MainWindowTest, pageSizeFromThePageMenu) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(80);
+    auto* s = controller->tabManager().currentSession();
+    auto pageOf = [&](size_t i) { return s->getDocument()->getPage(i); };
+    auto sizeIs = [&](size_t i, QSizeF size) {
+        return std::abs(pageOf(i)->getWidth() - size.width()) < 0.01 &&
+               std::abs(pageOf(i)->getHeight() - size.height()) < 0.01;
+    };
+    const size_t pages = s->getDocument()->getPageCount();
+    ASSERT_GE(pages, 3u);
+    const QSizeF a4(pageOf(0)->getWidth(), pageOf(0)->getHeight());
+    std::vector<QSizeF> sizes;  // (the last page is a small one)
+    for (size_t i = 0; i < pages; ++i) {
+        sizes.emplace_back(pageOf(i)->getWidth(), pageOf(i)->getHeight());
+    }
+    const QStringList formats = controller->settingsModel()->property("paperFormats").toStringList();
+    const int a4Index = formats.indexOf("A4"), a7 = formats.indexOf("A7");
+    ASSERT_GE(a7, 0);
+    ASSERT_TRUE(sizeIs(0, xqt::SettingsModel::paperSize(a4Index)));
+    {
+        // A stroke at the right of the page: beyond an A7 card
+        auto stroke = std::make_unique<Stroke>();
+        stroke->setWidth(2);
+        stroke->addPoint(Point(400, 100));
+        stroke->addPoint(Point(450, 120));
+        std::unique_lock lock(*s->getDocument());
+        pageOf(0)->getSelectedLayer()->addElement(std::move(stroke));
+    }
+
+    auto* menu = find<QObject>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    menu->setProperty("page", 0);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    auto* item = find<QQuickItem>("pageMenuPageSize");
+    ASSERT_NE(item, nullptr);
+    EXPECT_TRUE(item->isEnabled());
+    click(item);
+    auto* dialog = find<QObject>("pageSizeDialog");
+    ASSERT_NE(dialog, nullptr);
+    until([&] { return dialog->property("opened").toBool(); });
+    ASSERT_TRUE(dialog->property("visible").toBool());
+    EXPECT_EQ(dialog->property("scope").toInt(), 0) << "this page";
+    EXPECT_EQ(dialog->property("paper").toInt(), a4Index) << "the page's own format";
+    EXPECT_FALSE(dialog->property("landscape").toBool());
+
+    auto* paper = find<QQuickItem>("pageSizePaper");
+    ASSERT_NE(paper, nullptr);
+    EXPECT_EQ(paper->property("count").toInt(), formats.size()) << "an A4 page: no \"Other\"";
+    paper->setProperty("currentIndex", a7);
+    QMetaObject::invokeMethod(paper, "activated", Q_ARG(int, a7));
+    EXPECT_EQ(dialog->property("paper").toInt(), a7);
+    auto* outside = find<QQuickItem>("pageSizeOutside");
+    ASSERT_NE(outside, nullptr);
+    until([&] { return outside->isVisible(); });
+    EXPECT_TRUE(outside->isVisible()) << "the stroke would be outside the card";
+    EXPECT_TRUE(outside->property("text").toString().startsWith("1 element")) << outside->property("text").toString().toStdString();
+    EXPECT_FALSE(find<QQuickItem>("pageSizePdfNote")->isVisible());
+    if (qEnvironmentVariableIsSet("XQT_TEST_SHOT")) {
+        wait(400);
+        window->grabWindow().save(qEnvironmentVariable("XQT_TEST_SHOT"));
+    }
+    click(find<QQuickItem>("pageSizeApply"));
+    until([&] { return !dialog->property("visible").toBool(); });
+    EXPECT_TRUE(sizeIs(0, xqt::SettingsModel::paperSize(a7))) << "an A7 card";
+    EXPECT_TRUE(sizeIs(1, a4)) << "only this page";
+    controller->undoPages();
+    EXPECT_TRUE(sizeIs(0, a4)) << "one step to undo";
+
+    // The selected pages (from the page menu on a selection), landscape
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QVariant::fromValue(QVariantList{1, 2})));
+    until([&] { return dialog->property("opened").toBool(); });
+    EXPECT_EQ(dialog->property("scope").toInt(), 1) << "the selection";
+    click(find<QQuickItem>("pageSizeLandscape"));
+    EXPECT_TRUE(dialog->property("landscape").toBool());
+    click(find<QQuickItem>("pageSizeApply"));
+    until([&] { return !dialog->property("visible").toBool(); });
+    EXPECT_TRUE(sizeIs(0, a4));
+    EXPECT_TRUE(sizeIs(1, a4.transposed()));
+    EXPECT_TRUE(sizeIs(2, a4.transposed()));
+    controller->undoPages();
+
+    // All pages: A5
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QVariant::fromValue(QVariantList{0})));
+    until([&] { return dialog->property("opened").toBool(); });
+    dialog->setProperty("scope", 2);
+    EXPECT_EQ(dialog->property("targets").toList().size(), static_cast<qsizetype>(pages));
+    const int a5 = formats.indexOf("A5");
+    paper->setProperty("currentIndex", a5);
+    QMetaObject::invokeMethod(paper, "activated", Q_ARG(int, a5));
+    click(find<QQuickItem>("pageSizeApply"));
+    until([&] { return !dialog->property("visible").toBool(); });
+    for (size_t i = 0; i < pages; ++i) {
+        EXPECT_TRUE(sizeIs(i, xqt::SettingsModel::paperSize(a5))) << i;
+    }
+    controller->undoPages();
+    for (size_t i = 0; i < pages; ++i) {
+        EXPECT_TRUE(sizeIs(i, sizes[i])) << "all in one step: " << i;
+    }
+
+    // A size that is none of the formats: offered as "Other", as it is
+    ASSERT_EQ(controller->applyPageSize({0}, 300, 500), 1);
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, QVariant::fromValue(QVariantList{0})));
+    until([&] { return dialog->property("opened").toBool(); });
+    EXPECT_EQ(dialog->property("paper").toInt(), -1);
+    EXPECT_EQ(paper->property("count").toInt(), formats.size() + 1);
+    EXPECT_EQ(paper->property("currentIndex").toInt(), formats.size());
+    EXPECT_EQ(paper->property("currentText").toString(), QString::fromUtf8("Other: 106 × 176 mm"));
+    EXPECT_EQ(dialog->property("info").toMap().value("pages").toInt(), 0) << "its own size: nothing to change";
+    QMetaObject::invokeMethod(dialog, "reject");
+}
+
 TEST_F(MainWindowTest, rightClickOffersPasteWhereItWasClicked) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);

@@ -3,10 +3,15 @@
  *
  * 2 cm on A5 and bigger pages, as before. A smaller page (A6, A7 flashcards) has margins in proportion to its short
  * side, the proportion A5 has (2 cm of 148 mm, 13.5 %), at least 5 mm: A6 about 14 mm, A7 10 mm. A ruled page with a
- * margin line (upstream's "lined") starts its text after the line, as upstream's line is at a fixed distance.
+ * margin line (upstream's "lined") starts its text after the line.
+ *
+ * The ruling of such a small page is drawn to the same scale (rulingScale, through upstream's xoj::view::ruledScale):
+ * its margin line (1 inch on A5 and bigger, upstream's), and the space above and below the lines. A7: the line at
+ * half an inch.
  *
  * The page's text is found by where its box is (at the top-left margin, md::pageBoxOf). A page smaller than A5 whose
- * text was written before the margins scaled has its box at 2 cm: that one counts as well (pageBox).
+ * text was written before the margins scaled has its box at 2 cm, and a small lined page's text written before its
+ * line scaled is after the line at 1 inch: those count as well (pageBox).
  *
  * @license GNU GPLv2 or later
  */
@@ -28,6 +33,10 @@ inline constexpr double A5_SHORT_SIDE = 148.0 * 72.0 / 25.4;
 
 /// The margin of a page of this size (points), the same on all sides.
 double forSize(double width, double height);
+/// The scale of the ruling of a page of this size (forSize / FULL): 1 on A5 and bigger pages.
+double rulingScale(double width, double height);
+/// Draw the ruling of small pages to scale (sets upstream's xoj::view::ruledScale; AppContext does it).
+void installRuling();
 
 struct Margins {
     double left = FULL, top = FULL, right = FULL, bottom = FULL;

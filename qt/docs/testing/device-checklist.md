@@ -1983,3 +1983,30 @@ Design: [md-images.md](../md-images.md).
       pictures and ink unclipped.
 - [ ] Android (Fold 7): the pill's buttons fit (folded and unfolded); "Text" brings the on-screen keyboard; a finger
       drag of a selection inside a note works the same.
+## Changing a page's size; margin lines on small cards (qt/page-size-change)
+- [ ] An A7 card with "Ruled with vertical line" (lined): the pink margin line is about 1.3 cm from the left edge
+      (half an inch), not 2.5 cm; the blue lines begin higher up and go on further down than before. An A6 card: the
+      line at about 1.8 cm. A5 and A4: exactly as before (1 inch, the first line 2.8 cm down).
+- [ ] Write the page's Markdown text on the A7 lined card: it starts just right of the pink line, not 2.9 cm in.
+- [ ] Export the lined A7 card to PDF, and save it as a PDF with notes (hybrid): in a PDF viewer the margin line is
+      where the app shows it.
+- [ ] Open the lined A7 card in upstream Xournal++: it draws its own line at 1 inch (expected: upstream does not
+      scale it); the text is where xournal-qt put it.
+- [ ] More menu → "Page size…": the dialog shows the page's paper (A4, portrait) and
+      "This page (n)". Choose A7: the page becomes a card at once after Apply, the pages around it stay A4; the
+      strokes stay where they were, from the top left. Undo (page undo) makes it A4 again in one step.
+- [ ] A page with writing on its right half, made A7: the dialog says how many elements would be outside ("… kept
+      there, beyond the edge") before Apply; after it they are not drawn on the card, and making it A4 again shows
+      them where they were.
+- [ ] Sidebar or page grid: select a few pages, long-press (or right-click) one → "Size…" (beside "Background of n
+      pages…"): the dialog offers "The n selected pages" first; landscape A5 changes exactly those pages. The page
+      menu is no taller than before.
+- [ ] "All pages" on a PDF with a few blank pages inserted: the PDF pages keep their size, and the dialog says so
+      ("PDF pages keep the PDF's size; use Space for notes to enlarge them").
+- [ ] A page whose Markdown text (the writing button) fills two A4 pages: make all pages A7. The text flows onto
+      more cards, each at the card's margins, nothing cut off; A4 again: back to two pages, the extra cards gone.
+      One undo brings the cards back.
+- [ ] A long document (a few hundred pages): "All pages" → A5 takes well under a second, the canvas stays
+      responsive, and the thumbnails of the pages in view follow; the others when they are scrolled to.
+- [ ] A page of a size none of the formats (e.g. made in Xournal++): the dialog shows "Other: w × h mm" for it.
+- [ ] Save, close, open again: the pages keep their new sizes; upstream Xournal++ opens the file with them too.

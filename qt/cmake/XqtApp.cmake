@@ -150,6 +150,7 @@ set(XQT_QML_FILES
     src/app/qml/BackgroundChooser.qml
     src/app/qml/InsertPagesDialog.qml
     src/app/qml/NoteSpaceDialog.qml
+    src/app/qml/PageSizeDialog.qml
     src/app/qml/ContentsOverview.qml
     src/app/qml/OutlineList.qml
     src/app/qml/AnnotationList.qml

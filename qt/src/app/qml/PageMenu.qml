@@ -132,10 +132,23 @@ Popup {
             }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: "#e2e5e9" }
-        PageLine {
-            text: menu.pages.length > 1 ? qsTr("Background of %1 pages…").arg(menu.pages.length)
-                                        : qsTr("Background of this page…")
-            onClicked: { app.requestPageBackground(menu.pages); menu.close() }
+        // The page's background and its size, side by side (the menu stays short)
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 0
+            PageLine {
+                text: menu.pages.length > 1 ? qsTr("Background of %1 pages…").arg(menu.pages.length)
+                                            : qsTr("Background…")
+                onClicked: { app.requestPageBackground(menu.pages); menu.close() }
+            }
+            // Another paper size (PageSizeDialog): for the page, or the selection
+            PageLine {
+                objectName: "pageMenuPageSize"
+                Layout.fillWidth: false
+                text: qsTr("Size…")
+                enabled: menu.visible && app.pageSizeOf(menu.page).possible === true
+                onClicked: { app.requestPageSize(menu.pages); menu.close() }
+            }
         }
         PageLine {
             objectName: "insertPagesItem"

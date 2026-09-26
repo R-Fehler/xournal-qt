@@ -84,6 +84,7 @@
 #include "MarkdownFile.h"
 #include "MdImageDecoder.h"
 #include "MarkdownSession.h"
+#include "PageResize.h"
 #include "MdBox.h"
 #include "MdPassages.h"
 #include "session/FuzzyQuery.h"
@@ -4293,6 +4294,66 @@ int AppController::insertBlankAfterPages(int scope, const QList<int>& pages) {
     const size_t n = notespace::insertBlankAfter(*s, pageList(noteSpacePages(scope, pages)));
     if (n > 0) {
         Q_EMIT pageActionDone(n == 1 ? tr("Page inserted") : tr("%1 pages inserted").arg(n), true);
+    }
+    return static_cast<int>(n);
+}
+
+// --- the size of pages (qt/src/canvas/PageResize.h) ------------------------------------------------------------------
+
+QVariantMap AppController::pageSizeOf(int page) const {
+    DocumentSession* s = session();
+    if (!s || page < 0) {
+        return {};
+    }
+    Document* doc = s->getDocument();
+    std::shared_lock lock(*doc);
+    if (static_cast<size_t>(page) >= doc->getPageCount()) {
+        return {};
+    }
+    const PageRef p = doc->getPage(static_cast<size_t>(page));
+    const double w = p->getWidth(), h = p->getHeight();
+    const auto inMm = [](double pt) { return QString::number(std::lround(pt * 25.4 / 72.0)); };
+    //: A page size, width x height
+    const QString text = tr("%1 × %2 mm").arg(inMm(std::min(w, h)), inMm(std::max(w, h)));
+    return {{"width", w},
+            {"height", h},
+            {"paper", SettingsModel::paperFormatOf(w, h)},
+            {"landscape", w > h},
+            {"text", text},
+            {"pdf", p->getBackgroundType().isPdfPage()},
+            {"possible", !textPagesFixed()}};
+}
+
+QList<int> AppController::allPages() const {
+    QList<int> out;
+    if (DocumentSession* s = session()) {
+        std::shared_lock lock(*s->getDocument());
+        for (size_t i = 0; i < s->getDocument()->getPageCount(); ++i) {
+            out.push_back(static_cast<int>(i));
+        }
+    }
+    return out;
+}
+
+QVariantMap AppController::pageSizePreview(const QList<int>& pages, double width, double height) const {
+    DocumentSession* s = session();
+    if (!s || textPagesFixed()) {
+        return {{"pages", 0}, {"pdfPages", 0}, {"outside", 0}};
+    }
+    const pagesize::Preview p = pagesize::preview(*s->getDocument(), pageList(pages), width, height);
+    return {{"pages", static_cast<int>(p.pages)},
+            {"pdfPages", static_cast<int>(p.pdfPages)},
+            {"outside", static_cast<int>(p.outside)}};
+}
+
+int AppController::applyPageSize(const QList<int>& pages, double width, double height) {
+    DocumentSession* s = session();
+    if (!s || textPagesFixed()) {
+        return 0;
+    }
+    const size_t n = pagesize::apply(*s, pageList(pages), width, height);
+    if (n > 0) {
+        Q_EMIT pageActionDone(n == 1 ? tr("Page size changed") : tr("Size of %1 pages changed").arg(n), true);
     }
     return static_cast<int>(n);
 }
