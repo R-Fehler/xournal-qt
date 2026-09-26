@@ -1864,3 +1864,12 @@ Design: [md-images.md](../md-images.md).
       the notes (the reference has no search of its own); the other entries as above. With the notes' own document
       as reference, the entry reads "Search in this document".
 - [ ] Android (Fold 7): the menu fits the screen (folded and unfolded), the entries are easy to tap.
+
+## Page sizes from A0 to A7 (qt/page-sizes)
+- [ ] New document: the Paper list starts with A0, A1, A2, A3, A4, A5, A6, A7, then Letter, Legal, 16:9. Create an
+      A0 poster (portrait) and an A7 card (landscape): the page grid and the canvas show the right shape.
+- [ ] Insert pages (page menu): A6 and A7 cards after an A4 page, portrait and landscape; "Like this page" still
+      copies the current page's size.
+- [ ] Settings → New pages → Paper size: A0 … A7 are there, and the New document dialog preselects what is chosen
+      there. (A size that is none of them, set in Xournal++, shows as "Other: … mm": covered by the tests.)
+

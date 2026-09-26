@@ -50,6 +50,7 @@
 #include <qpdf/QPDFPageObjectHelper.hh>
 #include <qpdf/QPDFWriter.hh>
 
+#include "control/settings/PageTemplateSettings.h"
 #include "control/settings/Settings.h"
 #include "model/Document.h"
 #include "model/DocumentHandler.h"
@@ -6310,6 +6311,76 @@ TEST_F(MainWindowTest, sixteenByNinePagesForPresenting) {
     ASSERT_TRUE(waitOpened(insert, false));
     ASSERT_EQ(controller->pageCount(), 2);
     EXPECT_EQ(sizeOf(1), QSizeF(960, 540));
+}
+
+// Posters and flashcards (qt/page-sizes): A0 in the New document dialog, A7 cards inserted after it (landscape), and a
+// size of new pages that is none of the formats (Xournal++'s custom size) stays when a document is made with it.
+TEST_F(MainWindowTest, postersAndFlashcardsFromTheDialogs) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    const QStringList formats = settings->paperFormats();
+    const int a0 = formats.indexOf("A0"), a7 = formats.indexOf("A7");
+    ASSERT_EQ(a0, 0);
+    ASSERT_EQ(a7, 7);
+    auto sizeOf = [&](int page) {
+        auto* s = controller->tabManager().currentSession();
+        const PageRef p = s->getDocument()->getPage(static_cast<size_t>(page));
+        return QSizeF(p->getWidth(), p->getHeight());
+    };
+    auto near = [](QSizeF a, QSizeF b) { return std::abs(a.width() - b.width()) < 0.01 && std::abs(a.height() - b.height()) < 0.01; };
+    QObject* newDialog = find("newDocumentDialog");
+    ASSERT_NE(newDialog, nullptr);
+    auto openNew = [&]() -> QQuickItem* {
+        QMetaObject::invokeMethod(newDialog, "open");
+        EXPECT_TRUE(waitOpened(newDialog, true));
+        auto* box = findItem("paperBox");
+        return box ? box : find<QQuickItem>("paperBox");
+    };
+    QQuickItem* paperBox = openNew();
+    ASSERT_NE(paperBox, nullptr);
+    EXPECT_EQ(paperBox->property("count").toInt(), formats.size()) << "all formats, nothing else";
+    newDialog->setProperty("landscape", false);
+    paperBox->setProperty("currentIndex", a0);
+    QMetaObject::invokeMethod(paperBox, "activated", Q_ARG(int, a0));
+    const int tabs = controller->tabCount();
+    QMetaObject::invokeMethod(newDialog, "create");
+    ASSERT_TRUE(waitOpened(newDialog, false));
+    ASSERT_EQ(controller->tabCount(), tabs + 1);
+    EXPECT_TRUE(near(sizeOf(0), xqt::SettingsModel::paperSize(a0))) << "A0: 841 x 1189 mm";
+
+    // A7 flashcards after it, landscape
+    QObject* insert = find("insertPagesDialog");
+    ASSERT_NE(insert, nullptr);
+    QMetaObject::invokeMethod(insert, "openAt", Q_ARG(QVariant, QVariant::fromValue(1)));
+    ASSERT_TRUE(waitOpened(insert, true));
+    auto* insertBox = findItem("insertPaperBox");
+    if (!insertBox) {
+        insertBox = find<QQuickItem>("insertPaperBox");
+    }
+    ASSERT_NE(insertBox, nullptr);
+    insertBox->setProperty("currentIndex", a7 + 1);
+    QMetaObject::invokeMethod(insertBox, "activated", Q_ARG(int, a7 + 1));
+    insert->setProperty("landscape", true);
+    QMetaObject::invokeMethod(insert, "insert");
+    ASSERT_TRUE(waitOpened(insert, false));
+    ASSERT_EQ(controller->pageCount(), 2);
+    EXPECT_TRUE(near(sizeOf(1), xqt::SettingsModel::paperSize(a7).transposed())) << "A7 landscape: 105 x 74 mm";
+
+    // Another size (set in Xournal++): offered as it is, and kept
+    auto* s = controller->tabManager().currentSession();
+    PageTemplateSettings tpl = s->getSettings()->getPageTemplateSettings();
+    tpl.setPageWidth(300);
+    tpl.setPageHeight(500);
+    s->getSettings()->setPageTemplateSettings(tpl);
+    paperBox = openNew();
+    ASSERT_NE(paperBox, nullptr);
+    EXPECT_EQ(paperBox->property("count").toInt(), formats.size() + 1);
+    EXPECT_EQ(paperBox->property("currentIndex").toInt(), formats.size()) << "the other size, not A0";
+    EXPECT_EQ(newDialog->property("otherPaper").toString(), QString("106 × 176 mm"));
+    newDialog->setProperty("landscape", false);
+    QMetaObject::invokeMethod(newDialog, "create");
+    ASSERT_TRUE(waitOpened(newDialog, false));
+    EXPECT_EQ(sizeOf(0), QSizeF(300, 500));
 }
 
 // Scrolling sideways from the layout menu: the pages in a row, ‹ › in the pill and the arrow keys go from page to
