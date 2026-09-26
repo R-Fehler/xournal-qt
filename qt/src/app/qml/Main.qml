@@ -54,24 +54,54 @@ ApplicationWindow {
     property bool sidebarDrawerOpen: false
     readonly property bool sidebarShown: sidebarDocked || sidebarDrawerOpen
     readonly property bool sidebarAsDrawer: !sidebarDocked
-    onSidebarDockedChanged: sidebarDrawerOpen = false
+    onSidebarDockedChanged: closeDrawerNow()
     readonly property string layoutClass: adaptive.layoutClass
-    onLayoutClassChanged: sidebarDrawerOpen = false  // (a drawer is for the moment, in the size it was opened in)
+    onLayoutClassChanged: closeDrawerNow()  // (a drawer is for the moment, in the size it was opened in)
+    /// The drawer slides in from the left and out again (0: out of sight, 1: in place); beside the page there is no
+    /// slide. Only a tap (the arrow, the dimmed page, a page picked, Esc, the back key) slides it; a change of the size
+    /// class takes it away at once.
+    property real drawerSlide: 0
+    NumberAnimation {
+        id: drawerSlideAnimation
+        target: win
+        property: "drawerSlide"
+        duration: 180
+        easing.type: Easing.OutCubic
+    }
+    function slideDrawer(open) {
+        drawerSlideAnimation.stop()
+        drawerSlideAnimation.to = open ? 1 : 0
+        drawerSlideAnimation.start()
+    }
+    function closeDrawerNow() {
+        sidebarDrawerOpen = false
+        drawerSlideAnimation.stop()
+        drawerSlide = 0
+    }
+    /// The drawer's width: the sidebar's 210 px; on a phone up to 85 % of the window (larger thumbnails), 260 px when
+    /// the phone is held sideways (a page's thumbnail stays shorter than the window)
+    readonly property real drawerWidth: !adaptive.phone ? 210
+                                        : layoutClass === "phoneShort" ? 260 : Math.min(360, Math.round(width * 0.85))
     /// The Pages button: hides the sidebar (remembered for this size class), or shows it again - beside the page where
     /// there is room, else as a drawer (for the moment, not remembered)
     function showSidebar(shown) {
         if (shown) {
             if (sidebarDocked) return
-            if (adaptive.roomForSidebar) chooseLayout("sidebar", "")  // (it was hidden by hand: automatic again)
-            else sidebarDrawerOpen = true
+            if (adaptive.roomForSidebar) {
+                chooseLayout("sidebar", "")  // (it was hidden by hand: automatic again)
+            } else {
+                sidebarDrawerOpen = true
+                slideDrawer(true)
+            }
         } else {
+            if (sidebarDrawerOpen) slideDrawer(false)
             sidebarDrawerOpen = false
             if (sidebarDocked) chooseLayout("sidebar", adaptive.roomForSidebar ? "hidden" : "")
         }
     }
     /// The drawer's pin: keep the sidebar beside the page in this size class, although room is short
     function dockSidebar() {
-        sidebarDrawerOpen = false
+        closeDrawerNow()
         chooseLayout("sidebar", adaptive.roomForSidebar ? "" : "shown")
     }
 
@@ -1282,9 +1312,10 @@ ApplicationWindow {
         objectName: "sidebar"
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.left: win.toolbarPosition === "left" ? sideTools.right : parent.left
-        width: 210
-        visible: win.sidebarShown && win.fullChrome
+        // As a drawer it slides in from the left edge (win.drawerSlide)
+        x: (win.toolbarPosition === "left" ? sideTools.width : 0) - (win.sidebarDocked ? 0 : Math.round((1 - win.drawerSlide) * width))
+        width: win.sidebarDocked ? 210 : win.drawerWidth
+        visible: win.fullChrome && (win.sidebarShown || (win.sidebarAsDrawer && win.drawerSlide > 0))
         // As a drawer (no room beside the page): over the page, below the home screen; it closes once a page is picked
         z: win.sidebarAsDrawer ? 49 : 0
         onPagePicked: if (win.sidebarAsDrawer) win.showSidebar(false)
@@ -1307,7 +1338,7 @@ ApplicationWindow {
     AbstractButton {
         id: sidebarArrow
         objectName: "sidebarArrow"
-        readonly property bool open: sidebar.visible
+        readonly property bool open: win.sidebarShown && sidebar.visible
         visible: win.fullChrome && !app.homeVisible && !win.hudHidden && !app.presenting && (open || !app.toolbarHidden)
         z: 50  // (over the drawer and its dimmed page)
         width: win.adaptive.touchProfile ? win.adaptive.minTarget : 24
@@ -1350,10 +1381,18 @@ ApplicationWindow {
         anchors.fill: parent
         z: 48
         color: "#4d000000"
+        opacity: win.drawerSlide
         MouseArea {
             anchors.fill: parent
+            enabled: win.sidebarDrawerOpen
             onClicked: win.showSidebar(false)
         }
+    }
+    // Esc and Android's back key close the drawer
+    Shortcut {
+        sequences: ["Escape", "Back"]
+        enabled: win.sidebarDrawerOpen && sidebar.visible
+        onActivated: win.showSidebar(false)
     }
 
     DocumentCanvas {
@@ -3596,9 +3635,9 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("copy"); enabled: docKeys; onActivated: app.copySelection() }
     Shortcut { sequences: win.keysOf("cut"); enabled: docKeys; onActivated: app.cutSelection() }
     Shortcut { sequences: win.keysOf("paste"); enabled: docKeys; onActivated: app.pasteElements() }
-    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.deleteSelection() }
+    Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.hasSelection || app.noteSelected) && !win.sidebarDrawerOpen; onActivated: app.deleteSelection() }
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
-    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.clearSelection() }
+    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected) && !win.sidebarDrawerOpen; onActivated: app.clearSelection() }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }

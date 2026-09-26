@@ -1076,6 +1076,8 @@ TEST_F(AdaptiveLayoutTest, sidebarChoicesAreKeptPerSizeClass) {
     const auto strokesBefore = controller->property("modified").toBool();
     QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, QPoint(window->width() - 100, window->height() / 2));
     wait(60);
+    EXPECT_FALSE(flag("sidebarShown"));
+    until([&] { return !sidebar->isVisible(); });  // (it slides out)
     EXPECT_FALSE(sidebar->isVisible());
     EXPECT_EQ(controller->property("modified").toBool(), strokesBefore) << "the tap did not draw";
 
@@ -1626,6 +1628,7 @@ TEST_F(AdaptiveLayoutTest, sidebarArrowOpensAndCloses) {
     EXPECT_TRUE(sidebar->isVisible()) << "open (a drawer here)";
     EXPECT_NEAR(sceneRect(arrow).left(), sceneRect(sidebar).right(), 1) << "at the sidebar's edge";
     click(arrow);
+    until([&] { return !sidebar->isVisible(); });  // (it slides out)
     EXPECT_FALSE(sidebar->isVisible()) << "closed again";
     // The touch profile: a finger's size
     QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "on"));
@@ -1668,6 +1671,43 @@ TEST_F(AdaptiveLayoutTest, viewPillWithContentsInsideAndClearOfTheReference) {
         EXPECT_FALSE(sceneRect(pill).intersects(sceneRect(refPill))) << at << ": clear of the reference's pill";
     }
     controller->reference().close();
+}
+
+// The drawer: slides in; Esc and the back key close it; on a phone up to 85 % of the width
+TEST_F(AdaptiveLayoutTest, sidebarDrawerKeysAndPhoneWidth) {
+    openDocument();
+    resize(960, 1392);
+    auto* sidebar = findItem("sidebar");
+    auto* arrow = findItem("sidebarArrow");
+    for (Qt::Key k: {Qt::Key_Escape, Qt::Key_Back}) {
+        click(arrow);
+        EXPECT_TRUE(sidebar->isVisible());
+        until([&] { return window->property("drawerSlide").toDouble() >= 1.0; });
+        EXPECT_NEAR(sceneRect(sidebar).left(), 0, 1) << "slid in";
+        EXPECT_NEAR(sidebar->width(), 210, 1) << "a tablet: the sidebar's width";
+        QTest::keyClick(window, k);
+        EXPECT_FALSE(flag("sidebarShown")) << k;
+        until([&] { return !sidebar->isVisible(); });
+        EXPECT_FALSE(sidebar->isVisible()) << k << " closes the drawer";
+    }
+    resize(412, 915);
+    click(arrow);
+    until([&] { return window->property("drawerSlide").toDouble() >= 1.0; });
+    EXPECT_NEAR(sidebar->width(), std::round(412 * 0.85), 1) << "a phone: 85 % of the width";
+    EXPECT_TRUE(insideWindow(sceneRect(sidebar)));
+    auto* list = findItem("sidebarList");
+    until([&] { return list->property("count").toInt() > 0; });
+    QQuickItem* first = nullptr;
+    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, first), Q_ARG(int, 0));
+    ASSERT_NE(first, nullptr);
+    EXPECT_GT(first->width(), 300) << "larger thumbnails";
+    // Its other modes, the same in the drawer
+    click(findItem("sidebarLayersButton"));
+    EXPECT_TRUE(sidebar->isVisible()) << "choosing a mode keeps it open";
+    click(findItem("sidebarPagesButton"));
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(first));
+    until([&] { return !sidebar->isVisible(); });
+    EXPECT_FALSE(sidebar->isVisible()) << "a page picked: closed";
 }
 
 // Pictures of the tool bar in its layouts, to look at (skipped unless XQT_TOOLBAR_SHOTS=<folder>)
