@@ -246,6 +246,8 @@ public:
     /// The text is on one continuous page that grows with it (else on pages; MarkdownFile::relayout switches).
     bool isTextContinuous() const { return textContinuous; }
     void setTextContinuous(bool on) { textContinuous = on; }
+    /// The text file was renamed or moved (the library): it is `file` now.
+    void relocateTextFile(const fs::path& file);
     /// The text file changed on disk since it was read or written (by another program). `bytes`: what it holds now.
     /// Not while a save runs (asked again after it).
     bool textChangedOnDisk(std::string& bytes);

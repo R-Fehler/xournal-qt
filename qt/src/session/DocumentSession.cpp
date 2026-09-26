@@ -915,6 +915,15 @@ bool DocumentSession::textChangedOnDisk(std::string& bytes) {
     return text->changedOnDisk(&bytes);
 }
 
+void DocumentSession::relocateTextFile(const fs::path& file) {
+    if (!text || text->path() == file) {
+        return;
+    }
+    text->setPath(file);
+    shownPath = file;
+    Q_EMIT filePathChanged();
+}
+
 void DocumentSession::keepTextOverDisk() {
     if (text) {
         text->setStamp(TextFile::stampOf(text->path()));

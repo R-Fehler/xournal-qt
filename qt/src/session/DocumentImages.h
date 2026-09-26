@@ -23,4 +23,14 @@ fs::path assetsFolder(const fs::path& markdownFile);
 /// The root of a `.md` (or a text file shown as one): its folder, and "name.assets" next to it.
 md::images::Root markdownRoot(const fs::path& markdownFile);
 
+/// A file name as a link to it is written: what Markdown or a web address would read otherwise %-encoded (" " is
+/// "%20", "(" "%28", …).
+std::string linkEncoded(const std::string& name);
+
+/// The text with its links into "oldName/" (a `.md`'s "name.assets" folder) pointing into "newName/" instead: the
+/// document was renamed (qt/docs/md-images.md). Links as Markdown writes them: "](old/…", "](./old/…", "](<old/…",
+/// a reference definition "]: old/…", an HTML src="old/…"; the name written as it is or %-encoded (then the new one
+/// is written so too). Nothing else changes, byte for byte.
+std::string renamedAssetLinks(const std::string& text, const std::string& oldName, const std::string& newName);
+
 }  // namespace xqt::DocumentImages

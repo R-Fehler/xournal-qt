@@ -8,6 +8,7 @@
 #include <QSaveFile>
 #include <QUrl>
 
+#include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
 
 #include "MdImages.h"
@@ -66,38 +67,7 @@ std::string freeName(const fs::path& folder, const std::string& given) {
 }
 
 std::string linkFor(const Place& place, const std::string& name) {
-    std::string out = place.prefix;
-    for (const char c: name) {
-        switch (c) {
-            case ' ':
-                out += "%20";
-                break;
-            case '(':
-                out += "%28";
-                break;
-            case ')':
-                out += "%29";
-                break;
-            case '<':
-                out += "%3C";
-                break;
-            case '>':
-                out += "%3E";
-                break;
-            case '%':
-                out += "%25";
-                break;
-            case '#':
-                out += "%23";
-                break;
-            case '?':
-                out += "%3F";
-                break;
-            default:
-                out += c;
-        }
-    }
-    return out;
+    return place.prefix + DocumentImages::linkEncoded(name);
 }
 
 bool isPictureName(const QString& name) {

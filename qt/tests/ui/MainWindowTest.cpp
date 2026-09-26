@@ -63,6 +63,7 @@
 #include "canvas/CanvasPage.h"
 #include "markdown/MdBox.h"
 #include "markdown/MdImages.h"
+#include "session/TextFile.h"
 #include "canvas/PenHover.h"
 #include "canvas/ScreenCalibration.h"
 #include "canvas/MarkdownEditor.h"
@@ -6921,6 +6922,39 @@ TEST_F(HomeScreenMarkdownTest, picturesArePickedPastedAndDroppedIntoAMarkdownFil
     }
     editor->undo();
     EXPECT_TRUE(editor->text() == beforeDrop) << "one undo step";
+}
+
+// A .md open in a tab, renamed in the library (qt/docs/md-images.md): its pictures' folder goes along, the links in the
+// file and in the tab are rewritten, the tab is not modified by it, and its pictures are still found.
+TEST_F(HomeScreenMarkdownTest, aRenamedMarkdownFileTakesItsPicturesAlongAlsoWhenOpen) {
+    std::ofstream(root / "photo.md") << "# Photo\n\n![](photo.assets/a.png)\n";
+    fs::create_directories(root / "photo.assets");
+    QImage img(20, 10, QImage::Format_RGB32);
+    img.fill(Qt::red);
+    ASSERT_TRUE(img.save(QString::fromStdString((root / "photo.assets" / "a.png").string())));
+    controller->libraryModel()->setProperty("rootPath", QString::fromStdString(root.string()));
+    QMetaObject::invokeMethod(controller->libraryModel(), "refresh");
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "photo.md").string())));
+    wait(100);
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_FALSE(xqt::md::images::resolve("photo.assets/a.png").empty());
+    int row = -1;
+    QMetaObject::invokeMethod(controller->libraryModel(), "rowOf", Q_RETURN_ARG(int, row),
+                              Q_ARG(QString, QString::fromStdString((root / "photo.md").string())));
+    ASSERT_GE(row, 0);
+    bool ok = false;
+    QMetaObject::invokeMethod(controller->libraryModel(), "rename", Q_RETURN_ARG(bool, ok), Q_ARG(int, row),
+                              Q_ARG(QString, QString("Holiday")));
+    ASSERT_TRUE(ok);
+    wait(100);
+    EXPECT_TRUE(fs::exists(root / "Holiday.assets" / "a.png"));
+    EXPECT_EQ(s->textFile()->path(), root / "Holiday.md") << "the tab follows";
+    EXPECT_EQ(s->currentText(), "# Photo\n\n![](Holiday.assets/a.png)\n");
+    EXPECT_FALSE(s->isModified()) << "the file has the same text";
+    EXPECT_EQ(xqt::md::images::resolve("Holiday.assets/a.png"), (root / "Holiday.assets" / "a.png").string());
+    std::string bytes;
+    EXPECT_FALSE(s->textChangedOnDisk(bytes)) << "no question about a change on disk";
 }
 
 // Emoji on the page: ":smi" typed in a text box shows the suggestions below the cursor, a tap takes one; the emoji

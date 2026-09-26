@@ -51,10 +51,15 @@ Related: [markdown-boxes.md](markdown-boxes.md) (drawing, formulas as inline sha
 
 ## `.md` and `name.assets/`: one document
 
-- The library shows one card for the pair and never lists `.assets` folders (the index and "all files" too).
+- The library shows one card for the pair and does not list its `name.assets` folder (the index and "all files"
+  neither; `DocumentFiles::scan`). A `.assets` folder without a `.md` of its name is shown as a folder: whatever
+  is in it stays visible.
 - Move, rename, delete (to the trash) and share take both. A rename rewrites the links in the `.md`: the prefix
   `oldname.assets/` becomes `newname.assets/` (links written as `./oldname.assets/…` and `<oldname.assets/…>` too).
-- Sync conflicts: the conflict copies of the `.md` are shown as before; the folder goes with the `.md` it belongs to.
+- Sync conflicts: the conflict copies of the `.md` are shown on its card as before (they link to the same
+  `name.assets/`); the folder is hidden and goes with the `.md` it belongs to.
+- An open `.md` renamed in the library follows in its tab: the path, the links in its text (one undo step), and the
+  file's new bytes are taken as read (no question about a change on disk).
 - Clean-up: images in `name.assets/` that the text no longer links to are not deleted automatically. ⋮ → **Remove
   unused images** lists them and moves them to the trash.
 

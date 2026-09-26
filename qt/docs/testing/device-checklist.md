@@ -1672,3 +1672,8 @@ Design: [md-images.md](../md-images.md).
       photo is copied into `name.assets/` under its name and linked with its name as alt text.
 - [ ] Drag two picture files from the file manager onto the page (desktop): both copied and linked, one Ctrl+Z
       takes both away.
+- [ ] Library: a `.md` with pictures is one card; its `name.assets` folder is not shown (also in "all files" and
+      in a search of the library). Rename it (also while it is open in a tab): the folder has the new name, the
+      pictures still show, the links in the file say `newname.assets/`, the tab is not marked modified. Move it to
+      another folder, copy it, move it to the trash: the folder goes along each time.
+- [ ] Share → "Copy to clipboard" of a `.md` with pictures, paste in the file manager: the `.md` and its folder.

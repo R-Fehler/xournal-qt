@@ -644,6 +644,8 @@ public:
 
 private:
     std::optional<std::string> pictureLinkFor(const QString& arg);
+    /// A text file open in `s` was renamed or moved (`from` -> `to`, the library): its tab follows.
+    void followTextFile(xqt::DocumentSession& s, const fs::path& from, const fs::path& to);
     void openReceived(const fs::path& folder, const std::vector<fs::path>& files, const QStringList& errors);
 
 public:

@@ -34,7 +34,11 @@ A **library** is a plain folder of documents that a window works in, like a work
   pair is one card that opens the hybrid PDF (such pairs look into the PDF; lone PDFs do not). A `.xopp` changed more
   than a minute after the hybrid PDF (edited in Xournal++) is listed as a document of its own beside it.
   Its search text is its pages' text plus its text elements.
-- **Markdown files** (`.md`) are documents: a card with a preview of their start, opened for editing (below).
+- **Markdown files** (`.md`) are documents: a card with a preview of their start, opened for editing (below). Their
+  pictures in `name.assets/` next to them are part of them: that folder is not listed (nor its pictures, in any view
+  or the index); renaming, moving, copying, the trash and sharing take it along, and a new name rewrites the
+  links to it in the `.md` (and in its open tab) ([md-images.md](md-images.md)). A `name.assets` folder without its
+  `.md` is an ordinary folder, and it keeps its name from being given to another document there.
 - **Images** (`.png`, `.jpg` / `.jpeg`, `.webp`, and `.heic` / `.heif` where Qt can read them) are documents: a card
   with a thumbnail. `name.xopp` next to `name.jpg` is one document, like a PDF and its `.xopp`: it opens as the `.xopp`
   (the image is the background of its page). A `.xopp` next to a PDF of its name belongs to the PDF; of several
