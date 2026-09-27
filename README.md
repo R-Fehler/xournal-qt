@@ -104,8 +104,6 @@ cmake --build build-qt
 ./build-qt/xournal-qt
 ```
 
-<img src="qt/docs/screenshots/overview.png" width="100%" alt="The overview of the open documents, searched: the pages with hits under each document">
-
 More: [what it can do and where it is going](qt/docs/ROADMAP.md) · [the adaptive layout](qt/docs/adaptive-layout.md)
 · [Markdown](qt/docs/md-editor.md) · [the library](qt/docs/library.md) · [Android](qt/docs/android.md) ·
 [macOS](qt/docs/macos.md) · [how the fork is kept](FORK.md)
