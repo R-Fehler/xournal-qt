@@ -2743,6 +2743,19 @@ void AppController::previousTab() {
     }
 }
 
+QList<int> AppController::tabsByUse() const {
+    const auto order = tabs->usedOrder();
+    return QList<int>(order.begin(), order.end());
+}
+
+void AppController::previousUsedTab() {
+    if (home && tabs->count() > 0) {
+        setHomeVisible(false);
+    } else if (const int previous = tabs->previousUsed(); previous >= 0) {
+        tabs->setCurrentIndex(previous);
+    }
+}
+
 int AppController::tabCount() const { return tabs->count(); }
 bool AppController::tabModified(int index) const { return tabs->session(index) && tabs->session(index)->isModified(); }
 

@@ -18,6 +18,11 @@ Rectangle {
     property real cellTarget: 200
     /// Touch: taps select pages instead of opening them.
     property bool selectionMode: false
+    /// The phone chrome (its page number opens the grid): the contents and the zoom are here, the columns follow the
+    /// pinch (no − / +: no room)
+    property bool phoneTools: false
+    signal contentsRequested()
+    signal zoomRequested()
     readonly property int columns: Math.max(1, Math.min(12, Math.round(grid.width / cellTarget)))
     readonly property int spacing: 6
     readonly property int labelHeight: 18
@@ -310,9 +315,10 @@ Rectangle {
 
     // Zoom and close
     Pane {
+        objectName: "pageGridPill"
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.rightMargin: 28
+        anchors.rightMargin: pageGrid.phoneTools ? 12 : 28
         anchors.bottomMargin: 24
         padding: 2
         leftPadding: 4
@@ -339,8 +345,9 @@ Rectangle {
                 ToolTip.visible: hovered
                 ToolTip.text: qsTr("Tap pages to select them (Ctrl/Shift+click also works)")
             }
-            ToolSeparator {}
+            ToolSeparator { visible: !pageGrid.phoneTools }
             ToolButton {
+                visible: !pageGrid.phoneTools
                 text: "−"; font.pixelSize: 22; implicitWidth: 44
                 enabled: pageGrid.columns < 12
                 onClicked: pageGrid.setColumns(pageGrid.columns + 1)
@@ -348,18 +355,45 @@ Rectangle {
             }
             Label {
                 objectName: "pageGridColumns"
+                visible: !pageGrid.phoneTools
                 text: pageGrid.columns === 1 ? qsTr("1 column") : qsTr("%1 columns").arg(pageGrid.columns)
                 color: "#505050"
                 Layout.minimumWidth: 80
                 horizontalAlignment: Text.AlignHCenter
             }
             ToolButton {
+                visible: !pageGrid.phoneTools
                 text: "+"; font.pixelSize: 22; implicitWidth: 44
                 enabled: pageGrid.columns > 1
                 onClicked: pageGrid.setColumns(pageGrid.columns - 1)
                 ToolTip.visible: hovered; ToolTip.text: qsTr("Bigger previews")
             }
             ToolSeparator {}
+            // The phone chrome: the contents with the pages of each chapter, and the zoom of the page (its fits)
+            IconButton {
+                objectName: "pageGridContentsButton"
+                visible: pageGrid.phoneTools
+                iconName: "xqt-toc"
+                label: qsTr("Contents")
+                tip: qsTr("Contents with the pages of each chapter (Ctrl+Alt+O)")
+                implicitWidth: 44; implicitHeight: 44
+                onClicked: pageGrid.contentsRequested()
+            }
+            ToolButton {
+                objectName: "pageGridZoomButton"
+                visible: pageGrid.phoneTools
+                text: app.zoomPercent + " %"
+                font.pixelSize: 13
+                implicitWidth: Math.max(52, implicitContentWidth + 16)
+                implicitHeight: 44
+                focusPolicy: Qt.NoFocus
+                Accessible.name: qsTr("Zoom")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Zoom: fit the width, real size, fit the height, the whole page")
+                ToolTip.delay: 600
+                onClicked: pageGrid.zoomRequested()
+            }
+            ToolSeparator { visible: pageGrid.phoneTools }
             IconButton {
                 iconName: "xqt-close"; tip: qsTr("Back to the page (Esc)")
                 implicitWidth: 44; implicitHeight: 44

@@ -382,6 +382,31 @@ void AdaptiveAuditTest::walk() {
     if (wanted("tabs")) {
         shot("tabs", toolbarFit());
     }
+    // The phone chrome (qt/phone-chrome): the sheet of all tools, the documents used lately, the pages from the dock
+    auto* dockTools = findItem("dockToolsButton");
+    if (wanted("allTools") && dockTools && dockTools->isVisible()) {
+        QMetaObject::invokeMethod(dockTools, "clicked");
+        wait(500);
+        shot("allTools");
+        closePopups();
+    }
+    auto* appBar = findItem("phoneAppBar");
+    if (wanted("recentTabs") && appBar && appBar->isVisible()) {
+        QMetaObject::invokeMethod(appBar, "recentRequested");
+        wait(500);
+        shot("recentTabs");
+        closePopups();
+    }
+    auto* dockPage = findItem("dockPageButton");
+    if (wanted("dockPages") && dockPage && dockPage->isVisible()) {
+        QMetaObject::invokeMethod(dockPage, "clicked");
+        wait(700);
+        shot("dockPages");
+        if (auto* grid = find("pageGrid"); grid && grid->property("visible").toBool()) {
+            QMetaObject::invokeMethod(grid, "close");
+        }
+        wait(200);
+    }
     if (wanted("overview")) {
         if (QObject* o = find("tabOverview")) {
             QMetaObject::invokeMethod(o, "open");
@@ -401,7 +426,7 @@ void AdaptiveAuditTest::walk() {
     }
 
     // Full-screen chrome and presenting inside a normal window of this size (the author's step 2 and 3)
-    if (wanted("chrome")) {
+    if (wanted("chrome") || wanted("presenting")) {
         controller->setProperty("currentTab", 0);
         window->setProperty("fullScreenMode", true);
         wait(300);

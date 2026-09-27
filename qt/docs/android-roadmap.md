@@ -9,8 +9,9 @@ keyboard. Mobile UI work waits until mobile testing is a real concern. Items are
 
 - (O) The **selection bar** of the library (items selected) and long **breadcrumbs** are still one row that does not
   scroll: on the cover screen they can run past the right edge.
-- (O) The **document tool bar** scrolls sideways on the cover screen (about half of the tools are off-screen); a
-  compact tool bar for phones is the real fix.
+- Done (`qt/phone-chrome`): the **document tool bar** on the cover screen: the phone chrome replaces it with an app
+  bar at the top and a tool dock at the bottom (a rail at the side in landscape), every tool in its "All tools" sheet
+  (qt/docs/adaptive-layout.md, "The phone chrome").
 - (O) **Markdown file being edited** in the emulator: the text shows overlapping, smeared glyphs while the cursor is
   in it (the same file reads fine). Probably the emulator's ARM translation, like the dark bars below; check on the
   phone.
@@ -101,10 +102,11 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
 - (E) **Fold posture and split screen**: the activity is resizable (manifest), and Qt gets `screenSize` changes
   without a restart. Check that the canvas keeps the page and zoom when the Fold opens or closes, and in split
   screen / pop-up view. Consider `WindowManager` fold features (hinge position) for a two-page layout later.
-- (E) **Tabs and tool bar on a phone-wide screen** (folded, 6.5"): the tab strip and the tool bar are made for
-  desktop widths. Needs a compact layout.
-- (E) **Undocked windows** (a document in a window of its own) make no sense on Android; the action should open a
-  tab.
+- Done (`qt/phone-chrome`): **tabs and tool bar on a phone-wide screen** (folded, 6.5"): the app bar (the title,
+  tab dots, a swipe for the next document, the tab count: all documents, the one before, the ones used lately) and the
+  tool dock; unfolded (900 × 1000) the tablet's layout.
+- Done (`qt/phone-chrome`): **undocked windows** make no sense on Android: no tab is dragged out of the tab strip
+  and the tab menu offers no window of its own there.
 - (E) **Safe areas**: the status bar and the gesture bar overlap the window in edge-to-edge mode (target SDK 35+
   forces edge-to-edge). Qt 6.9+ exposes `SafeArea` margins in QML; the tool bar and the bottom sheets need them.
 - (E) **Density**: Qt scales by the device pixel ratio; the Material style's touch targets are fine, the canvas

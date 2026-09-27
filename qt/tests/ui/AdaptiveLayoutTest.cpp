@@ -13,6 +13,11 @@
  * place chosen per size class; the colors' and widths' forms by the room; the sidebar's arrow; the view pill inside the
  * window, with the contents button, clear of the reference's pill.
  *
+ * The phone chrome (qt/phone-chrome; PhoneChromeTest): in the phone classes the app bar (the library, the title with
+ * the tab dots, the tab count, ⋮) instead of the tab strip, the tool dock instead of the tool bar and the pills, the
+ * sheets of all tools, the colors and the widths, the reader of a tiny window, the presenting's tap field, one window
+ * on Android and iOS, the library's top without breadcrumbs, the Fold 7 folded and unfolded.
+ *
  * What later blocks fix is listed as known (knownOutside, expectLater): the test passes now and is made stricter by
  * the block that fixes it. The walk over all 18 sizes of the audit runs with XQT_UI_ADAPTIVE=1.
  *
@@ -28,6 +33,8 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <QJSValue>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -326,9 +333,75 @@ protected:
         }
         return n;
     }
+    // --- the phone chrome (qt/phone-chrome) ---
+    bool phoneChrome() const { return window->property("phoneChrome").toBool(); }
+    /// The phone chrome instead of the tool bar: the app bar at the top (the library, the title, the tab count, ⋮;
+    /// no tab strip), the dock at the bottom or the side (the tool in use, all tools, the color, the width, undo, redo,
+    /// the page number; above the bottom safe area), no view pill and no pen pill; the tools that are never hidden in
+    /// the dock or in the sheet of all tools
+    void checkPhoneChrome(const std::string& at) {
+        auto* bar = named("phoneAppBar");
+        ASSERT_NE(bar, nullptr);
+        EXPECT_TRUE(bar->isVisible()) << at << ": the app bar";
+        EXPECT_FALSE(named("tabStrip")->isVisible()) << at << ": no tab strip";
+        EXPECT_FALSE(named("topTools")->isVisible()) << at << ": no tool bar";
+        EXPECT_FALSE(named("viewPill")->isVisible()) << at << ": the dock has the view pill's buttons";
+        EXPECT_FALSE(named("penPill")->isVisible()) << at << ": the dock has the pen pill's buttons";
+        const QRectF barRect = sceneRect(bar);
+        EXPECT_NEAR(barRect.top(), 0, 1) << at << ": at the top";
+        EXPECT_LE(barRect.height(), 48 + window->property("safeTop").toDouble() + 1) << at << ": slim";
+        for (const char* name: {"phoneHomeButton", "phoneTitle", "phoneTabCount", "moreButton"}) {
+            auto* item = findItem(name);
+            ASSERT_NE(item, nullptr) << name;
+            EXPECT_TRUE(shownInWindow(item)) << at << ": " << name;
+            EXPECT_TRUE(barRect.adjusted(-1, -1, 1, 1).contains(sceneRect(item))) << at << ": " << name << " in the app bar "
+                    << sceneRect(item).x() << "," << sceneRect(item).y() << " " << sceneRect(item).width() << "x"
+                    << sceneRect(item).height() << " bar " << barRect.width() << "x" << barRect.height();
+        }
+        EXPECT_FALSE(inScrollingArea(named("moreButton"))) << at;
+        auto* dock = named("phoneDock");
+        ASSERT_NE(dock, nullptr);
+        EXPECT_TRUE(dock->isVisible()) << at << ": the dock";
+        const double safeBottom = window->property("safeBottom").toDouble();
+        for (const char* name: {"dockToolButton", "dockToolsButton", "colorCycleButton", "widthButton", "dockUndoButton",
+                                "dockRedoButton", "dockPageButton"}) {
+            auto* item = findItem(name);
+            ASSERT_NE(item, nullptr) << at << ": " << name;
+            EXPECT_TRUE(shownInWindow(item)) << at << ": " << name;
+            EXPECT_TRUE(sceneRect(dock).adjusted(-1, -1, 1, 1).contains(sceneRect(item))) << at << ": " << name << " in the dock";
+            EXPECT_LE(sceneRect(item).bottom(), window->height() - safeBottom + 0.5)
+                    << at << ": " << name << " above the bottom safe area";
+        }
+        EXPECT_FALSE(named("moreToolsButton")->isVisible()) << at << ": no \"more tools\": the dock's \"All tools\"";
+        // The tools that are never hidden: the one in use in the dock, all of them in the sheet
+        auto* toolSheet = window->findChild<QObject*>("phoneToolSheet");
+        ASSERT_NE(toolSheet, nullptr);
+        click(findItem("dockToolsButton"));
+        ASSERT_TRUE(opened(toolSheet, true)) << at << ": All tools";
+        settled(toolSheet);
+        const QRectF r = popupRect(toolSheet);
+        EXPECT_TRUE(insideWindow(r)) << at << ": the sheet of all tools";
+        EXPECT_NEAR(r.bottom(), window->height(), 1.5) << at << ": at the bottom";
+        for (const char* cell: {"toolCell_pen_pen", "toolCell_pen_highlighter", "toolCell_eraser_default", "toolCell_hand",
+                                "toolCell_touchDrawing", "toolCell_select_selectRect", "toolCell_select_selectRegion",
+                                "toolCell_text", "toolCell_write", "toolCell_sticky"}) {
+            auto* c = findItem(cell);
+            ASSERT_NE(c, nullptr) << at << ": " << cell;
+            EXPECT_TRUE(c->isVisible()) << at << ": " << cell;
+            EXPECT_TRUE(r.adjusted(-1, -1, 1, 1).contains(sceneRect(c)) || inScrollingArea(c)) << at << ": " << cell;
+            EXPECT_FALSE(c->property("name").toString().isEmpty()) << at << ": " << cell << ": its name under it";
+        }
+        QTest::keyClick(window, Qt::Key_Escape);
+        EXPECT_TRUE(opened(toolSheet, false)) << at;
+    }
     /// ⋮ inside the window, not in a scrolling area; the tools never hidden shown (on phones: shown or in "more
-    /// tools"), the colors (the current one and at least 4 more; phones: the one cycling button) and the widths
+    /// tools"), the colors (the current one and at least 4 more; phones: the one cycling button) and the widths. The
+    /// phone chrome: checkPhoneChrome.
     void checkToolBar(const std::string& at) {
+        if (phoneChrome()) {
+            checkPhoneChrome(at);
+            return;
+        }
         auto* more = named("moreButton");
         ASSERT_NE(more, nullptr);
         EXPECT_TRUE(shownInWindow(more)) << at << ": ⋮ shown";
@@ -766,11 +839,13 @@ void AdaptiveLayoutTest::checkHomeScreens(const std::string& at) {
                 << at << ": the search in a row of its own below";
     }
     if (sizeClass() == "phoneShort") {
-        // Held sideways: one header row with the breadcrumbs in it
+        // Held sideways: one header row with the search (and the breadcrumbs, below) in it
         const double row = sceneRect(findItem("homeViewButton")).center().y();
-        EXPECT_NEAR(sceneRect(findItem("crumbArea")).center().y(), row, 4) << at << ": the breadcrumbs in the header";
-        EXPECT_NEAR(sceneRect(findItem("librarySearchField")).center().y(), row, 4) << at << ": the search too";
+        EXPECT_NEAR(sceneRect(findItem("librarySearchField")).center().y(), row, 4) << at << ": the search in the header";
     }
+    // At the library's top no breadcrumbs: they would only repeat its name (qt/phone-chrome)
+    EXPECT_FALSE(findItem("crumbArea")->isVisible()) << at << ": no breadcrumbs at the library's top";
+    EXPECT_FALSE(findItem("crumbRow")->isVisible()) << at << ": no row for them";
 
     // A folder deep down (and empty): the breadcrumbs elide from the middle, the last one shows
     library->setProperty("folder", deepFolder);
@@ -790,6 +865,11 @@ void AdaptiveLayoutTest::checkHomeScreens(const std::string& at) {
         }
     }
     ASSERT_NE(last, nullptr) << at;
+    EXPECT_TRUE(crumbArea->isVisible()) << at << ": the breadcrumbs in a folder";
+    if (sizeClass() == "phoneShort") {
+        EXPECT_NEAR(area.center().y(), sceneRect(findItem("homeViewButton")).center().y(), 4)
+                << at << ": held sideways the breadcrumbs are in the header";
+    }
     EXPECT_EQ(last->property("text").toString(), "Exercise sheets") << at << ": the folder shown";
     EXPECT_TRUE(area.adjusted(-1, -1, 1, 1).contains(sceneRect(last))) << at << ": the last breadcrumb is not cut off";
     EXPECT_GE(last->width(), 40) << at;
@@ -1105,7 +1185,8 @@ TEST_F(AdaptiveLayoutTest, menusFitAtFiveSizes) {
 
 // On a phone the menus are a bottom sheet: a submenu drills in (the sheet shows its entries, with a back arrow and its
 // title), Esc goes back a level, and a row does what its entry does. A row of controls (the layout menu's columns)
-// comes along into the sheet and goes back into the menu. The tab menu's rename starts once the sheet is gone.
+// comes along into the sheet and goes back into the menu. (The tab menu: phones have no tab strip since
+// qt/phone-chrome; their recent tabs are a sheet, PhoneChromeTest.)
 TEST_F(AdaptiveLayoutTest, menusAreSheetsOnPhones) {
     openDocument();
     resize(412, 915);
@@ -1136,25 +1217,27 @@ TEST_F(AdaptiveLayoutTest, menusAreSheetsOnPhones) {
     EXPECT_EQ(s->property("menu").value<QObject*>(), more) << "back at the top";
     EXPECT_NE(sheetRow("shareItem"), nullptr);
 
-    // Two levels deep; Esc goes up one
+    // Esc goes up a level (the phone classes have no tool bar position: their dock; nor "All open documents": the
+    // app bar's tab count)
     click(sheetRow("moreViewMenu"));
-    ASSERT_NE(sheetRow("toolbarPositionMenu"), nullptr);
-    click(sheetRow("toolbarPositionMenu"));
-    EXPECT_NE(sheetRow("toolbarLeftItem"), nullptr);
+    EXPECT_EQ(sheetRow("toolbarPositionMenu"), nullptr) << "the dock instead";
+    EXPECT_EQ(sheetRow("allDocumentsItem"), nullptr) << "the tab count instead";
+    ASSERT_NE(sheetRow("pageLayoutItem"), nullptr);
     QTest::keyClick(window, Qt::Key_Escape);
     wait(50);
-    EXPECT_EQ(menuShown(), "moreViewMenu") << "Esc: a level up";
+    EXPECT_EQ(s->property("menu").value<QObject*>(), more) << "Esc: a level up";
     EXPECT_TRUE(s->property("opened").toBool());
 
     // A row triggers its entry, and the sheet closes
-    click(sheetRow("allDocumentsItem"));
+    click(sheetRow("moreDocumentMenu"));
+    click(sheetRow("linkedFromItem"));
     EXPECT_TRUE(opened(s, false));
-    auto* overview = window->findChild<QObject*>("tabOverview");
-    ASSERT_NE(overview, nullptr);
-    until([&] { return overview->property("visible").toBool(); });
-    EXPECT_TRUE(overview->property("visible").toBool()) << "View → All open documents";
-    QMetaObject::invokeMethod(overview, "close");
-    until([&] { return !overview->property("visible").toBool(); });
+    auto* backlinks = window->findChild<QObject*>("backlinksDialog");
+    ASSERT_NE(backlinks, nullptr);
+    until([&] { return backlinks->property("visible").toBool(); });
+    EXPECT_TRUE(backlinks->property("visible").toBool()) << "Document → Linked from…";
+    QMetaObject::invokeMethod(backlinks, "close");
+    until([&] { return !backlinks->property("visible").toBool(); });
 
     // The layout menu's columns come along, and go back into the menu (in phone portrait the pill has no room for the
     // layout button: ⋮ → View → Page layout)
@@ -1179,25 +1262,6 @@ TEST_F(AdaptiveLayoutTest, menusAreSheetsOnPhones) {
     EXPECT_TRUE(s->property("opened").toBool()) << "a row of controls leaves the sheet open";
     QTest::keyClick(window, Qt::Key_Escape);
     EXPECT_TRUE(opened(s, false));
-
-    // The tab menu: its title on top; Rename starts the rename in the tab once the sheet is gone
-    auto* list = findItem("tabList");
-    ASSERT_NE(list, nullptr);
-    QQuickItem* tab = nullptr;
-    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, tab), Q_ARG(int, controller->currentTab()));
-    ASSERT_NE(tab, nullptr);
-    QObject* tabMenu = tab->findChild<QObject*>("tabMenu");
-    ASSERT_NE(tabMenu, nullptr);
-    QMetaObject::invokeMethod(tabMenu, "openMenu", Q_ARG(QVariant, QVariant()), Q_ARG(QVariant, QVariant()));
-    ASSERT_TRUE(opened(s, true));
-    EXPECT_EQ(findItem("menuSheetTitle")->property("text").toString(), tab->property("title").toString());
-    settled(s);
-    click(sheetRow("renameTabItem"));
-    EXPECT_TRUE(opened(s, false));
-    until([&] { return tab->property("renaming").toBool(); });
-    EXPECT_TRUE(tab->property("renaming").toBool()) << "the rename starts once the sheet is gone";
-    QTest::keyClick(window, Qt::Key_Escape);
-    wait(50);
 
     // Back on the desktop: the layout menu is a menu again, with its columns
     resize(1280, 800);
@@ -2039,8 +2103,14 @@ TEST_F(AdaptiveLayoutTest, viewPillWithContentsInsideAndClearOfTheReference) {
         resize(s.w, s.h);
         wait(100);
         const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
-        EXPECT_TRUE(insideWindow(sceneRect(pill))) << at << ": the view pill inside the window";
         ASSERT_TRUE(refPill->isVisible()) << at;
+        EXPECT_TRUE(insideWindow(sceneRect(refPill))) << at << ": the reference's pill inside the window";
+        if (phoneChrome()) {  // (the dock has the view pill's buttons, the contents in the page grid)
+            EXPECT_FALSE(pill->isVisible()) << at;
+            EXPECT_TRUE(shownInWindow(named("dockPageButton"))) << at;
+            continue;
+        }
+        EXPECT_TRUE(insideWindow(sceneRect(pill))) << at << ": the view pill inside the window";
         EXPECT_FALSE(sceneRect(pill).intersects(sceneRect(refPill))) << at << ": clear of the reference's pill";
     }
     controller->reference().close();
@@ -2085,7 +2155,9 @@ TEST_F(AdaptiveLayoutTest, sourcePanelBesideOrBelowThePage) {
             EXPECT_TRUE(named("sourceDivider")->isVisible()) << at;
         }
         // The view pill stays inside the page
-        EXPECT_TRUE(page.adjusted(-1, -1, 1, 1).contains(sceneRect(named("viewPill")))) << at << ": the view pill";
+        if (named("viewPill")->isVisible()) {  // (the phone chrome: its dock instead)
+            EXPECT_TRUE(page.adjusted(-1, -1, 1, 1).contains(sceneRect(named("viewPill")))) << at << ": the view pill";
+        }
         QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
         until([&] { return !panel->isVisible(); });
     }
@@ -2159,9 +2231,11 @@ TEST_F(AdaptiveLayoutTest, referenceSplitFollowsTheAreaAndItsPillsStayApart) {
             EXPECT_NEAR(main.width() / (area.width() - 8), 0.6, 0.01) << at << ": the ratio kept";
         }
         ASSERT_TRUE(refPill->isVisible()) << at;
-        EXPECT_TRUE(main.adjusted(-1, -1, 1, 1).contains(sceneRect(pill))) << at << ": the view pill inside its half";
         EXPECT_TRUE(ref.adjusted(-1, -1, 1, 1).contains(sceneRect(refPill))) << at << ": the reference's pill";
-        EXPECT_FALSE(sceneRect(pill).intersects(sceneRect(refPill))) << at << ": the pills apart";
+        if (pill->isVisible()) {  // (the phone chrome: its dock instead)
+            EXPECT_TRUE(main.adjusted(-1, -1, 1, 1).contains(sceneRect(pill))) << at << ": the view pill inside its half";
+            EXPECT_FALSE(sceneRect(pill).intersects(sceneRect(refPill))) << at << ": the pills apart";
+        }
         const bool narrow = ref.width() < 480;
         EXPECT_EQ(findItem("referenceMoreButton")->isVisible(), narrow) << at;
         EXPECT_EQ(findItem("referenceGridButton")->isVisible(), !narrow) << at;
@@ -2202,6 +2276,10 @@ TEST_F(AdaptiveLayoutTest, compactViewPillOnAPhone) {
     EXPECT_TRUE(named("pageGridButton")->isVisible());
     EXPECT_FALSE(named("pageNumberButton")->isVisible());
     resize(412, 915);
+    // (the phone chrome has its dock instead of the view pill: the compact pill is the compact chrome's here)
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    wait(100);
+    ASSERT_TRUE(pill->isVisible());
     ASSERT_TRUE(pill->property("compact").toBool());
     for (const char* name: {"undoButton", "redoButton", "pageNumberButton", "contentsButton", "zoomButton"}) {
         EXPECT_TRUE(shownInWindow(named(name))) << name << " in the compact pill";
@@ -2217,6 +2295,7 @@ TEST_F(AdaptiveLayoutTest, compactViewPillOnAPhone) {
     EXPECT_TRUE(grid->isVisible()) << "the page number opens all pages";
     QMetaObject::invokeMethod(grid, "close");
     until([&] { return !grid->isVisible(); });
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
     // Beside the Markdown source of a desktop window made small: the compact pill too, and ⋮ offers the page layout
     resize(1024, 700);
     auto* panel = findItem("markdownPanel");
@@ -2347,12 +2426,16 @@ TEST_F(AdaptiveLayoutTest, pillsKeepClearOfTheViewPill) {
         until([&] { return selection->isVisible(); });
         wait(50);
         ASSERT_TRUE(selection->isVisible()) << at;
-        EXPECT_FALSE(sceneRect(selection).intersects(sceneRect(pill))) << at << ": the selection pill";
+        if (pill->isVisible()) {
+            EXPECT_FALSE(sceneRect(selection).intersects(sceneRect(pill))) << at << ": the selection pill";
+        } else {  // (the phone chrome: above its dock, inside the page)
+            EXPECT_TRUE(sceneRect(named("canvas")).adjusted(-1, -1, 1, 1).contains(sceneRect(selection))) << at;
+        }
         EXPECT_TRUE(insideWindow(sceneRect(selection))) << at;
         controller->clearSelection();
         controller->jumpToPage(2);
         wait(50);
-        if (nav->isVisible()) {
+        if (nav->isVisible() && pill->isVisible()) {
             EXPECT_FALSE(sceneRect(nav).intersects(sceneRect(pill))) << at << ": the back / forward pill";
         }
     }
@@ -2429,8 +2512,9 @@ TEST_F(AdaptiveLayoutTest, toolBarPictures) {
     shot("bar-800x600-narrow");
     resize(412, 915);
     shot("bar-412x915-phone");
-    openPopup("moreToolsButton", "moreToolsPopup");
-    shot("bar-412x915-more-tools");
+    openPopup("dockToolsButton", "phoneToolSheet");
+    shot("bar-412x915-all-tools");
+    QMetaObject::invokeMethod(window->findChild<QObject*>("phoneToolSheet"), "close");
     closePopups();
     // The zoom's menu, a text document's merged bar
     resize(960, 1392);
@@ -2480,5 +2564,379 @@ TEST_F(AdaptiveLayoutTest, moreMenuRepeatsNoButton) {
     for (const char* button: {"settingsButton", "fullScreenButton", "presentButton", "pageGridButton", "imageButton",
                               "stickyNoteButton", "contentsButton", "sidebarArrow"}) {
         EXPECT_NE(named(button), nullptr) << button;
+    }
+}
+
+// --- the phone chrome (qt/phone-chrome) -----------------------------------------------------------------------------
+
+namespace {
+/// The phone chrome: the app bar and the tool dock of the phone classes, the reader of a tiny window, the presenting's
+/// tap field, one window on Android and iOS, the library's top without breadcrumbs, the Fold 7 folded and unfolded
+class PhoneChromeTest: public AdaptiveLayoutTest {
+protected:
+    /// Three documents open, A B C, used in that order (C is the current one)
+    void openThree() {
+        openDocument();
+        for (const char* name: {"notes.xopp", "lecture.pdf"}) {
+            ASSERT_TRUE(controller->openPath(QString::fromStdString((root / name).string())));
+            wait(150);
+        }
+        ASSERT_EQ(controller->tabCount(), 3);
+        ASSERT_EQ(controller->currentTab(), 2);
+    }
+    /// A swipe with the mouse along an item, from its right part to its left part (or back)
+    void swipe(QQuickItem* item, bool toLeft) {
+        const QRectF r = sceneRect(item);
+        const QPoint from((toLeft ? r.left() + r.width() * 0.8 : r.left() + r.width() * 0.2), r.center().y());
+        const QPoint to((toLeft ? r.left() + r.width() * 0.2 : r.left() + r.width() * 0.8), r.center().y());
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from);
+        for (int i = 1; i <= 10; ++i) {
+            QTest::mouseMove(window, from + (to - from) * i / 10);
+            wait(16);
+        }
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to);
+        wait(80);
+    }
+};
+}  // namespace
+
+// At a phone's sizes (upright, sideways, a tiny window with the full chrome chosen), with the navigation bar's 24 px at
+// the bottom: no tab strip, the app bar with the library, the title, the tab dots, the tab count and ⋮ inside the
+// window; the dock inside the window and above the navigation bar (a rail at the side when held sideways); every tool
+// that is never hidden in the dock or its sheet of all tools
+TEST_F(PhoneChromeTest, theAppBarAndTheDockAtAPhonesSizes) {
+    openThree();
+    window->setProperty("safeBottom", 24);
+    for (const WindowSize& s: {WindowSize{412, 915, "phone-portrait"}, WindowSize{915, 412, "phone-landscape"},
+                               WindowSize{340, 700, "tiny"}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        if (sizeClass() == "tiny") {
+            QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+            wait(100);
+        }
+        ASSERT_TRUE(phoneChrome()) << at;
+        checkPhoneChrome(at);
+        EXPECT_TRUE(shownInWindow(findItem("phoneTabDots"))) << at << ": the dots under the title";
+        EXPECT_GT(sceneRect(findItem("phoneTabDots")).top(), sceneRect(findItem("phoneTitle")).center().y()) << at;
+        const QRectF dock = sceneRect(named("phoneDock"));
+        const QRectF canvas = sceneRect(named("canvas"));
+        if (s.w > s.h) {
+            EXPECT_NEAR(dock.right(), s.w, 1) << at << ": a rail at the right side";
+            EXPECT_LE(canvas.right(), dock.left() + 1) << at << ": the page beside it";
+        } else {
+            EXPECT_NEAR(dock.bottom(), s.h, 1) << at << ": at the bottom";
+            EXPECT_LE(canvas.bottom(), dock.top() + 1) << at << ": the page above it";
+            EXPECT_GE(canvas.width(), s.w - 1) << at << ": the page keeps the whole width";
+        }
+        expectInside("doc");
+    }
+    window->setProperty("safeBottom", 0);
+}
+
+// A swipe along the app bar goes to the next document (to the left) or the previous one (to the right); on the page it
+// does not
+TEST_F(PhoneChromeTest, aSwipeOnTheAppBarSwitchesTabs) {
+    openThree();
+    resize(412, 915);
+    auto* title = findItem("phoneTitleArea");
+    ASSERT_NE(title, nullptr);
+    EXPECT_EQ(findItem("phoneTitle")->property("text").toString(), controller->title());
+    swipe(title, true);
+    EXPECT_EQ(controller->currentTab(), 0) << "to the left: the next one (round the end)";
+    EXPECT_EQ(findItem("phoneTitle")->property("text").toString(), controller->title()) << "its title in the bar";
+    swipe(title, false);
+    EXPECT_EQ(controller->currentTab(), 2) << "to the right: the previous one";
+    swipe(title, false);
+    EXPECT_EQ(controller->currentTab(), 1);
+    // Ctrl+Tab and Ctrl+Shift+Tab as before
+    QTest::keyClick(window, Qt::Key_Tab, Qt::ControlModifier);
+    wait(50);
+    EXPECT_EQ(controller->currentTab(), 2) << "Ctrl+Tab";
+    QTest::keyClick(window, Qt::Key_Backtab, Qt::ControlModifier | Qt::ShiftModifier);
+    wait(50);
+    EXPECT_EQ(controller->currentTab(), 1) << "Ctrl+Shift+Tab";
+}
+
+// The tab count: a tap shows all documents once the double-tap time is over; a double tap goes back to the document used
+// before (after A → B → C: B, then C again); a long press lists the documents used lately, the current one first
+TEST_F(PhoneChromeTest, theTabCountTapDoubleTapAndLongPress) {
+    openThree();
+    resize(412, 915);
+    controller->setCurrentTab(0);  // A
+    controller->setCurrentTab(1);  // B
+    controller->setCurrentTab(2);  // C
+    wait(50);
+    auto* count = findItem("phoneTabCount");
+    ASSERT_NE(count, nullptr);
+    EXPECT_EQ(findItem("phoneTabCountText")->property("text").toString(), "3");
+    QObject* overview = window->findChild<QObject*>("tabOverview");
+    QQmlExpression(qmlContext(overview), overview, "enter = null; exit = null").evaluate();
+
+    // A tap: the overview, after the double-tap time
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(count));
+    wait(30);
+    EXPECT_FALSE(overview->property("visible").toBool()) << "not at once: a second tap may follow";
+    EXPECT_TRUE(count->property("pending").toBool());
+    ASSERT_TRUE(opened(overview, true)) << "then the overview";
+    QMetaObject::invokeMethod(overview, "close");
+    ASSERT_TRUE(opened(overview, false));
+
+    // A double tap: the one used before, and back again
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(count));
+    wait(30);
+    QTest::mouseDClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(count));
+    wait(QGuiApplication::styleHints()->mouseDoubleClickInterval() + 150);
+    EXPECT_EQ(controller->currentTab(), 1) << "C → B";
+    EXPECT_FALSE(overview->property("visible").toBool()) << "no overview after a double tap";
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(count));
+    wait(30);
+    QTest::mouseDClick(window, Qt::LeftButton, Qt::NoModifier, centerOf(count));
+    wait(QGuiApplication::styleHints()->mouseDoubleClickInterval() + 150);
+    EXPECT_EQ(controller->currentTab(), 2) << "B → C";
+
+    // A long press: the documents used lately, as a sheet (C, B, A); one picked
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, centerOf(count));
+    wait(QGuiApplication::styleHints()->mousePressAndHoldInterval() + 200);
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, centerOf(count));
+    QObject* s = sheet();
+    ASSERT_TRUE(opened(s, true)) << "a long press: the documents used lately";
+    EXPECT_EQ(s->property("menu").value<QObject*>(), window->findChild<QObject*>("recentTabsMenu"));
+    settled(s);
+    const auto rows = sheetRows();
+    ASSERT_EQ(rows.size(), 3u);
+    const QStringList expected{controller->tabTitle(2), controller->tabTitle(1), controller->tabTitle(0)};
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_TRUE(rows[i]->property("text").toString().endsWith(expected[i]))
+                << i << ": " << rows[i]->property("text").toString().toStdString() << " (the one used last first)";
+    }
+    EXPECT_FALSE(overview->property("visible").toBool());
+    click(rows[2]);
+    EXPECT_TRUE(opened(s, false));
+    EXPECT_EQ(controller->currentTab(), 0) << "picked: A";
+}
+
+// The palette, the widths and all tools are sheets at the bottom on a phone; a cell of the tools takes its variant, and
+// the dock shows it
+TEST_F(PhoneChromeTest, thePaletteTheWidthsAndAllToolsAreSheets) {
+    openDocument();
+    resize(412, 915);
+    auto atTheBottom = [&](QObject* popup, const char* what) {
+        ASSERT_TRUE(opened(popup, true)) << what;
+        settled(popup);
+        const QRectF r = popupRect(popup);
+        EXPECT_TRUE(insideWindow(r)) << what;
+        EXPECT_NEAR(r.bottom(), window->height(), 1.5) << what << ": at the bottom";
+        EXPECT_GE(r.width(), window->width() - 1) << what << ": across the window";
+        QTest::keyClick(window, Qt::Key_Escape);
+        EXPECT_TRUE(opened(popup, false)) << what;
+    };
+    QMetaObject::invokeMethod(named("colorCycleButton"), "pressAndHold");
+    atTheBottom(window->findChild<QObject*>("colorPalette"), "the palette");
+    QMetaObject::invokeMethod(named("widthButton"), "pressAndHold");
+    atTheBottom(window->findChild<QObject*>("widthChoices"), "the widths");
+    click(findItem("dockToolsButton"));
+    atTheBottom(window->findChild<QObject*>("phoneToolSheet"), "all tools");
+
+    // A variant from the sheet: the eraser's whiteout; the dock's tool button shows it and cycles on
+    click(findItem("dockToolsButton"));
+    auto* toolSheet = window->findChild<QObject*>("phoneToolSheet");
+    ASSERT_TRUE(opened(toolSheet, true));
+    settled(toolSheet);
+    click(findItem("toolCell_eraser_whiteout"));
+    EXPECT_TRUE(opened(toolSheet, false)) << "a tool taken: back to the page";
+    EXPECT_EQ(controller->property("tool").toString(), "eraser");
+    auto* dockTool = findItem("dockToolButton");
+    ASSERT_NE(dockTool, nullptr);
+    EXPECT_EQ(dockTool->property("iconName").toString(), "xqt-eraser-whiteout");
+    click(dockTool);
+    EXPECT_EQ(findItem("dockToolButton")->property("iconName").toString(), "xqt-eraser-stroke") << "a tap: the next variant";
+    // The hand has no variants: its own button
+    click(findItem("dockToolsButton"));
+    ASSERT_TRUE(opened(toolSheet, true));
+    settled(toolSheet);
+    click(findItem("toolCell_hand"));
+    until([&] { return controller->property("tool").toString() == "hand"; });
+    EXPECT_EQ(controller->property("tool").toString(), "hand");
+    EXPECT_EQ(findItem("dockToolButton")->property("iconName").toString(), "xopp-hand");
+    controller->selectTool("pen");
+}
+
+// The page number of the dock opens all pages; there the contents and the zoom (its fits, as a sheet; a fit goes back
+// to the page)
+TEST_F(PhoneChromeTest, thePageNumberOpensThePagesWithTheContentsAndTheZoom) {
+    openDocument();
+    resize(412, 915);
+    auto* grid = named("pageGrid");
+    click(findItem("dockPageButton"));
+    until([&] { return grid->isVisible(); });
+    ASSERT_TRUE(grid->isVisible());
+    for (const char* name: {"pageGridContentsButton", "pageGridZoomButton", "selectModeButton"}) {
+        EXPECT_TRUE(shownInWindow(findItem(name))) << name;
+    }
+    EXPECT_FALSE(findItem("pageGridColumns")->isVisible()) << "the columns follow the pinch";
+    click(findItem("pageGridZoomButton"));
+    QObject* s = sheet();
+    ASSERT_TRUE(opened(s, true));
+    EXPECT_EQ(s->property("menu").value<QObject*>(), window->findChild<QObject*>("fitMenu"));
+    settled(s);
+    click(sheetRow("fitWidthItem"));
+    EXPECT_TRUE(opened(s, false));
+    until([&] { return !grid->isVisible(); });
+    EXPECT_FALSE(grid->isVisible()) << "a fit chosen: back to the page";
+    click(findItem("dockPageButton"));
+    until([&] { return grid->isVisible(); });
+    click(findItem("pageGridContentsButton"));
+    auto* contents = findItem("contentsOverview");
+    if (contents) {
+        until([&] { return contents->isVisible(); });
+        EXPECT_TRUE(contents->isVisible()) << "the contents";
+        QMetaObject::invokeMethod(contents, "close");
+    }
+    EXPECT_FALSE(grid->isVisible());
+}
+
+// The reader (no HUD) is the automatic chrome only of a tiny window (under 360 px either way); a phone keeps its
+// tools. Its corner field brings them back, for this size class.
+TEST_F(PhoneChromeTest, theReaderIsAutomaticOnlyInATinyWindow) {
+    openDocument();
+    auto chrome = [&] { return window->property("chromeMode").toString(); };
+    for (const WindowSize& s: {WindowSize{412, 915, ""}, WindowSize{915, 412, ""}, WindowSize{1280, 500, ""},
+                               WindowSize{960, 1392, ""}}) {
+        resize(s.w, s.h);
+        EXPECT_EQ(chrome(), "full") << s.w << "x" << s.h;
+    }
+    for (const WindowSize& s: {WindowSize{340, 700, ""}, WindowSize{700, 340, ""}}) {
+        resize(s.w, s.h);
+        ASSERT_EQ(sizeClass(), "tiny");
+        EXPECT_EQ(chrome(), "reader") << s.w << "x" << s.h << ": the reader, automatically";
+        EXPECT_TRUE(flag("hudHidden"));
+        EXPECT_FALSE(named("phoneAppBar")->isVisible());
+        EXPECT_FALSE(named("phoneDock")->isVisible());
+        EXPECT_TRUE(findItem("presentCornerMark")->isVisible()) << "the corner field";
+    }
+    click(findItem("presentCornerMark"));
+    EXPECT_EQ(chrome(), "full") << "the field brings the tools back";
+    EXPECT_EQ(choice("tiny", "chrome"), "full") << "remembered for tiny windows";
+    EXPECT_TRUE(named("phoneDock")->isVisible());
+    resize(412, 915);
+    // "Read" by hand on a phone (⋮ → View → Read)
+    QMetaObject::invokeMethod(window->findChild<QObject*>("readItem"), "triggered");
+    wait(50);
+    EXPECT_EQ(chrome(), "reader");
+    EXPECT_EQ(choice("phonePortrait", "chrome"), "reader");
+    click(findItem("presentCornerMark"));
+    EXPECT_EQ(chrome(), "full");
+    EXPECT_EQ(choice("phonePortrait", "chrome"), "") << "the automatic chrome again";
+}
+
+// Presenting: the corner field is clearly there while the tools show (it pulses once at the start) and faint while
+// they are hidden; its name says what a tap does
+TEST_F(PhoneChromeTest, thePresentationTapField) {
+    openDocument();
+    resize(1280, 800);
+    auto* mark = findItem("presentCornerMark");
+    auto* dot = findItem("presentCornerDot");
+    ASSERT_NE(mark, nullptr);
+    ASSERT_NE(dot, nullptr);
+    QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));
+    wait(100);
+    EXPECT_TRUE(mark->isVisible());
+    EXPECT_GT(mark->property("pulse").toDouble(), 0) << "it pulses when presenting starts";
+    EXPECT_TRUE(mark->property("highlighted").toBool()) << "the tools show: clearly visible";
+    EXPECT_EQ(mark->property("labelText").toString(), "Hide the tools");
+    until([&] { return mark->property("pulse").toDouble() == 0; });
+    EXPECT_GE(dot->property("opacity").toDouble(), 0.9);
+    EXPECT_TRUE(findItem("presentCornerRing")->isVisible()) << "a ring around it";
+    click(mark);
+    EXPECT_TRUE(flag("presentClean")) << "a tap hides the tools";
+    EXPECT_FALSE(mark->property("highlighted").toBool());
+    EXPECT_EQ(mark->property("labelText").toString(), "Show the tools");
+    QTest::mouseMove(window, QPoint(window->width() / 2, window->height() / 2));  // (the pointer over it lights it up)
+    wait(250);
+    EXPECT_LE(dot->property("opacity").toDouble(), 0.3) << "faint while they are hidden";
+    EXPECT_FALSE(findItem("presentCornerRing")->isVisible());
+    click(mark);
+    EXPECT_FALSE(flag("presentClean")) << "and shows them again";
+    controller->setProperty("presenting", false);
+    window->setProperty("fullScreenMode", false);
+    wait(100);
+    window->showNormal();
+}
+
+// Android and iOS have one window: no tab is dragged out into a window of its own, and the tab menu offers no window of
+// its own (the platform, not the size: here a tablet's tab strip)
+TEST_F(PhoneChromeTest, oneWindowOnAndroidAndIos) {
+    openThree();
+    resize(960, 1392);
+    auto* strip = named("tabStrip");
+    ASSERT_TRUE(strip->isVisible());
+    auto* list = findItem("tabList");
+    QQuickItem* tab = nullptr;
+    QMetaObject::invokeMethod(list, "itemAtIndex", Q_RETURN_ARG(QQuickItem*, tab), Q_ARG(int, 0));
+    ASSERT_NE(tab, nullptr);
+    auto* undock = tab->findChild<QObject*>("undockTabItem");
+    ASSERT_NE(undock, nullptr);
+    QObject* drag = nullptr;
+    for (QObject* o: tab->findChildren<QObject*>()) {
+        if (o->inherits("QQuickDragHandler")) {
+            drag = o;
+        }
+    }
+    ASSERT_NE(drag, nullptr);
+    EXPECT_TRUE(undock->property("offered").toBool()) << "a desktop: a window of its own";
+    EXPECT_TRUE(drag->property("enabled").toBool());
+    adaptive->setProperty("mobilePlatform", true);
+    wait(50);
+    EXPECT_FALSE(undock->property("offered").toBool()) << "Android: no window of its own";
+    EXPECT_FALSE(drag->property("enabled").toBool()) << "Android: no tab dragged out";
+    adaptive->setProperty("mobilePlatform", false);
+}
+
+// The library's top: no row of breadcrumbs that only repeats its name (every size); inside a folder they are there
+TEST_F(PhoneChromeTest, theLibrarysTopHasNoBreadcrumbs) {
+    QObject* library = controller->libraryModel();
+    for (const WindowSize& s: {WindowSize{1920, 1080, ""}, WindowSize{412, 915, ""}, WindowSize{915, 412, ""}}) {
+        resize(s.w, s.h);
+        const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+        library->setProperty("folder", "");
+        wait(100);
+        EXPECT_FALSE(findItem("crumbArea")->isVisible()) << at;
+        EXPECT_FALSE(findItem("folderUpButton")->isVisible()) << at;
+        library->setProperty("folder", "Physics");
+        wait(100);
+        EXPECT_TRUE(findItem("crumbArea")->isVisible()) << at;
+        EXPECT_TRUE(shownInWindow(findItem("folderUpButton"))) << at;
+        library->setProperty("folder", "");
+        wait(50);
+    }
+}
+
+// The Galaxy Fold 7: folded (412 x 915) the phone chrome, unfolded (900 x 1000) the tablet's (the tab strip, two tool
+// rows at the top); unfolding and folding switch at once, and back
+TEST_F(PhoneChromeTest, theFold7FoldedAndUnfolded) {
+    openThree();
+    for (int round = 0; round < 2; ++round) {
+        resize(412, 915);
+        EXPECT_EQ(sizeClass(), "phonePortrait");
+        EXPECT_TRUE(phoneChrome());
+        EXPECT_TRUE(named("phoneAppBar")->isVisible());
+        EXPECT_TRUE(named("phoneDock")->isVisible());
+        EXPECT_FALSE(named("tabStrip")->isVisible());
+        EXPECT_FALSE(named("topTools")->isVisible());
+        for (const WindowSize& s: {WindowSize{900, 1000, "fold7-inner"}, WindowSize{960, 1392, ""}}) {
+            resize(s.w, s.h);
+            const std::string at = std::to_string(s.w) + "x" + std::to_string(s.h);
+            EXPECT_EQ(sizeClass(), "tabletPortrait") << at << ": at once (a jump)";
+            EXPECT_FALSE(phoneChrome()) << at;
+            EXPECT_FALSE(named("phoneAppBar")->isVisible()) << at;
+            EXPECT_FALSE(named("phoneDock")->isVisible()) << at;
+            EXPECT_TRUE(named("tabStrip")->isVisible()) << at << ": the tab strip";
+            EXPECT_TRUE(named("topTools")->isVisible()) << at;
+            EXPECT_EQ(toolPlan().value("layout").toString(), "twoRows") << at << ": two tool rows";
+            EXPECT_TRUE(named("viewPill")->isVisible()) << at;
+            checkToolBar(at);
+            expectInside("doc");
+        }
     }
 }

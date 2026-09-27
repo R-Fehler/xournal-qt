@@ -943,11 +943,12 @@ Popup {
                         // The chrome chosen for this kind of window (stored as a layout choice, not a setting)
                         objectName: "chromeChoiceRow"
                         text: qsTr("Controls at this size")
-                        options: [{ text: qsTr("All (tabs, tool bar)"), value: "" },
+                        // (automatic: all, and in a tiny window none)
+                        options: [{ text: win.phoneLayout ? qsTr("All (app bar, tool dock)") : qsTr("All (tabs, tool bar)"), value: "full" },
                                   { text: qsTr("Compact (as in full screen)"), value: "compact" },
                                   { text: qsTr("None (reading)"), value: "reader" }]
-                        getter: function() { return win.chromeChoice }
-                        setter: function(v) { win.chooseChrome(v === "" ? "full" : v) }
+                        getter: function() { return win.chromeSetting }
+                        setter: function(v) { win.chooseChrome(v) }
                     }
                     Button {
                         objectName: "resetLayoutButton"

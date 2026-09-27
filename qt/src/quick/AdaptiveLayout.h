@@ -78,6 +78,9 @@ class AdaptiveLayout: public QObject {  // (not final: QML derives from it)
     Q_PROPERTY(bool touchProfile READ touchProfile NOTIFY touchChanged)
     /// The smallest target for the pointer in use: 48 with the touch profile, else 40
     Q_PROPERTY(int minTarget READ minTarget NOTIFY touchChanged)
+    /// Android or iOS (the platform, not the size): one window, so no tab is dragged out into a window of its own and
+    /// no entry offers a new window. Written by the tests only (to try the phone's platform on the desktop).
+    Q_PROPERTY(bool mobilePlatform READ mobilePlatform WRITE setMobilePlatform NOTIFY platformChanged)
 public:
     explicit AdaptiveLayout(QObject* parent = nullptr);
     ~AdaptiveLayout() override;
@@ -102,6 +105,8 @@ public:
     void setTouchSetting(const QString& mode);
     bool touchProfile() const;
     int minTarget() const { return touchProfile() ? adaptive::MIN_TARGET_TOUCH : adaptive::MIN_TARGET; }
+    bool mobilePlatform() const { return mobile; }
+    void setMobilePlatform(bool on);
 
     /// The class of a size, for QML and tests (no hysteresis)
     Q_INVOKABLE static QString classify(double width, double height);
@@ -116,6 +121,7 @@ Q_SIGNALS:
     void changed();
     void heldChanged();
     void touchChanged();
+    void platformChanged();
 
 private:
     bool pointerHeld() const { return mouseDown || penDown || fingersDown; }
@@ -143,6 +149,11 @@ private:
     QString touchMode = QStringLiteral("auto");
     bool fingerLast = false;  ///< the last pointer that touched was a finger (not the mouse; the pen changes nothing)
     bool fingerSeen = false;  ///< ... as seen while it is still held (fingerLast follows once it is let go)
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    bool mobile = true;
+#else
+    bool mobile = false;
+#endif
 };
 
 }  // namespace xqt
