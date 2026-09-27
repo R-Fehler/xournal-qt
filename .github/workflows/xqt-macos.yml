@@ -1,0 +1,156 @@
+# xournal-qt for macOS: build the Qt frontend with Homebrew's libraries, make xournal-qt.app (macdeployqt) and a .dmg,
+# and publish it as the artifact "xournal-qt-macos-<arch>". Unsigned (an ad-hoc signature only). See qt/docs/macos.md.
+# Runs only when asked, for the release workflow, or for pushes to the qt/macos-build branch.
+name: xournal-qt macOS
+
+on:
+  workflow_dispatch:
+  workflow_call:  # (for the release workflow)
+  push:
+    branches: [qt/macos-build]
+
+concurrency:
+  group: xqt-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS ${{ matrix.arch }} (Homebrew, Qt 6)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon. macos-15 (Sequoia), not macos-14: Homebrew has bottles (prebuilt packages) of glib, cairo,
+          # pango and qpdf for macOS 15 and newer only; on 14 it would compile them. The app then needs macOS 15.
+          - arch: arm64
+            runner: macos-15
+          # Intel: GitHub still has Intel runners (macos-15-intel), but Homebrew no longer builds bottles for Intel
+          # Macs (Tier 3 since September 2026): every library, Qt included, would be compiled from source in the job,
+          # for hours. See qt/docs/macos.md, "Intel Macs".
+          # - arch: x86_64
+          #   runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+      CCACHE_COMPILERCHECK: content
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+      HOMEBREW_NO_ENV_HINTS: 1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Homebrew packages
+        run: |
+          set -euo pipefail
+          brew update --quiet || true
+          # qtbase has macdeployqt; qtdeclarative the QML modules (Controls, Dialogs, Layouts, ...); qtsvg the SVG
+          # icons. librsvg only draws the program icon for the .icns. No KSyntaxHighlighting in Homebrew: code blocks
+          # in Markdown are not highlighted (it is optional).
+          brew install cmake ninja ccache pkgconf gettext glib cairo pango fontconfig poppler libzip qpdf gdk-pixbuf \
+            qtbase qtdeclarative qtsvg librsvg
+
+      - name: What was installed
+        run: |
+          set -euo pipefail
+          sw_vers
+          uname -m
+          xcodebuild -version | head -1 || true
+          clang --version | head -1
+          cmake --version | head -1
+          ccache --version | head -1
+          brew list --versions qtbase qtdeclarative qtsvg glib cairo pango poppler qpdf libzip gdk-pixbuf gettext \
+            fontconfig librsvg || true
+          echo "Qt tools:"
+          command -v qtpaths6 qtpaths macdeployqt macdeployqt6 || true
+          ls "$(brew --prefix)/opt/qtbase/bin" || true
+          qtpaths --query QT_INSTALL_PLUGINS || true
+          qtpaths --query QT_INSTALL_QML || true
+          echo "gdk-pixbuf loaders:"
+          ls "$(brew --prefix)/lib/gdk-pixbuf-2.0/2.10.0/loaders" 2> /dev/null || echo "(none: built in)"
+          pkg-config --modversion glib-2.0 cairo pangocairo poppler-glib gdk-pixbuf-2.0 libzip fontconfig || true
+
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: xqt-macos-${{ matrix.arch }}-ccache-${{ github.sha }}
+          restore-keys: xqt-macos-${{ matrix.arch }}-ccache-
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          mkdir -p build-logs
+          # The deployment target is the one of Homebrew's bottles on this runner (they are built for it).
+          target=$(sw_vers -productVersion | cut -d. -f1).0
+          # -g1: function names and lines for lldb's backtraces in the smoke test.
+          cmake -S qt -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_C_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -g1 -DNDEBUG" \
+            "-DCMAKE_PREFIX_PATH=$(brew --prefix)" "-DCMAKE_OSX_DEPLOYMENT_TARGET=$target" \
+            -DXQT_BUILD_TESTS=OFF -DXQT_BUILD_SPIKES=OFF -DXQT_BUILD_CLI=ON \
+            2>&1 | tee build-logs/configure.log
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          ccache --zero-stats > /dev/null
+          # -k 0: keep going, so that one run shows every file that does not compile.
+          if ! cmake --build build -j "$(sysctl -n hw.ncpu)" -- -k 0 2>&1 | tee build-logs/build.log; then
+            echo "::group::The errors"
+            grep -nE 'error:|Error [0-9]|Undefined symbols|FAILED:' build-logs/build.log | head -200 || true
+            echo "::endgroup::"
+            {
+              echo "### Build errors"
+              echo '```'
+              grep -E 'error:|Undefined symbols|referenced from' build-logs/build.log | sort -u | head -60 || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          ccache --show-stats || true
+
+      - name: App bundle and disk image
+        run: |
+          set -euo pipefail
+          bash qt/scripts/macos-deploy.sh build dist 2>&1 | tee build-logs/deploy.log
+
+      - name: Publish the disk image (xournal-qt-macos-${{ matrix.arch }}.zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: xournal-qt-macos-${{ matrix.arch }}
+          path: |
+            dist/*.dmg
+          compression-level: 0  # (a .dmg is compressed already)
+          if-no-files-found: error
+
+      - name: Smoke test (CLI exports, the app off-screen; lldb backtraces of what fails)
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          bash qt/scripts/macos-smoke.sh dist/xournal-qt.app smoke
+
+      - name: Keep the smoke test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-macos-${{ matrix.arch }}
+          path: |
+            smoke/
+            !smoke/home/
+          if-no-files-found: ignore
+
+      - name: Keep the build logs of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-macos-${{ matrix.arch }}
+          path: |
+            build-logs/
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeConfigureLog.yaml
+            build/.ninja_log
+          if-no-files-found: ignore
