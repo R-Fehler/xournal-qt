@@ -2,17 +2,49 @@
 
 # xournal-qt
 
-**Handwritten notes, PDF annotation and Markdown in one app — from a desktop to a pen tablet to a phone.**
-A Qt 6 fork of [Xournal++](https://github.com/xournalpp/xournalpp): same file format, same drawing core, a new
-interface.
+**Write on your PDFs with a pen — and keep them yours.** Handwritten notes, PDF annotation and Markdown in one free
+app, on Linux, Windows, macOS and Android, from a desktop to a pen tablet to a phone. A Qt 6 fork of
+[Xournal++](https://github.com/xournalpp/xournalpp).
 
 <br clear="left">
 
 <img src="qt/docs/screenshots/adaptive.png" width="100%" alt="The same page of notes on a desktop (with the page sidebar), an upright tablet (two rows of tools) and a phone (a top bar and a tool dock)">
 
-A `.xopp` written here opens in Xournal++ and the other way round: the document model, file format, rendering, undo
-and tools are upstream's. What is new is everything around them ([FORK.md](FORK.md) explains how the two share one
-tree).
+## Why
+
+Lecture slides, papers, contracts, textbooks, your own notes: most knowledge work today happens on documents, and a
+pen is still the best way to think on them. Yet the notes we write on our devices mostly end up locked away — in an
+app's private library, behind a subscription, synced only through its maker's cloud, readable only on the platforms it
+chose to support. Drawboard PDF, for years the one app that simply let you write on a PDF and kept it a PDF, has
+turned towards business customers and subscriptions. On Linux and Android there is hardly anything that takes a pen
+seriously at all.
+
+[Xournal++](https://github.com/xournalpp/xournalpp) has been the free answer for a decade: a wonderful project,
+open files, a drawing core that feels right under a pen, built by volunteers. xournal-qt stands on that core
+unchanged — its documents *are* Xournal++ documents — and adds what it takes to live in it every day, on every
+device.
+
+Your notes should outlive the app you wrote them with.
+
+## Your notes are PDFs
+
+- **A document is a PDF.** Write on a lecture's slides or a paper and save: the ink goes into the PDF itself as
+  standard PDF annotations, drawn exactly as you see it. Every PDF viewer shows it — a browser, Preview, Acrobat,
+  Okular, the viewer on your phone — so you can send the file to anyone, and it opens.
+- **The editable original travels inside.** The full notes (every stroke still editable, layers, Markdown, page
+  backgrounds) are embedded in that same PDF; open it here again and nothing was flattened. A text document carries
+  its plain Markdown source and its pictures as attachments, which any PDF viewer can save
+  ([how](qt/docs/user/markdown-from-pdf.md)).
+- **Your PDF is appended to, not rewritten.** After the first save, saving adds your changes to the end of the file
+  instead of writing it anew; the original of a PDF you annotate is kept for 30 days.
+- **Made to last.** "Export for the archive" writes PDF/A-3b — the ISO standard made for keeping documents readable
+  for decades, checked with veraPDF — for one document or a whole library, folders and links included.
+- **No lock-in anywhere.** Documents are files in your own folders (PDF, `.xopp`, `.md`); a library is just a folder,
+  synced with whatever you already use. The app is free software (GPL). If xournal-qt disappeared tomorrow, every
+  note would still open everywhere.
+
+Prefer Xournal++'s own format? Pick "Xournal++ files" at the first start: a `.xopp` written here opens in Xournal++
+and the other way round ([FORK.md](FORK.md) explains how the two share one tree).
 
 ## What it adds to Xournal++
 
@@ -29,9 +61,8 @@ tree).
 - **Markdown on the page.** Write Markdown on a page (or a sticky note) and see it formatted as you type: formulas
   (`$…$`, no LaTeX installation needed), pictures, tables, code, check lists, with a formatting bar for those who do
   not know the syntax. Plain `.md` files open as documents of their own.
-- **PDFs that stay PDFs.** Notes on a PDF can be saved into the PDF itself, which every viewer shows, with the
-  editable notes inside it. Saving appends to the file instead of rewriting it. Space for notes can be added beside
-  slides.
+- **Built for slides and papers.** Space for notes beside slides; all annotations of a document in one list,
+  exportable as Markdown.
 - **Sticky notes, bookmarks, citations.** Notes that hold ink, text and pictures and can cover an answer for
   self-testing; bookmarks that other PDF viewers show; Scholar and arXiv lookups for a selected reference (network
   use is opt-in, and every address is shown first).
@@ -46,6 +77,7 @@ Not there yet: searching handwriting, audio recording, and Xournal++'s plugins a
 
 |  | xournal-qt | Xournal++ | GoodNotes | Drawboard PDF |
 | --- | --- | --- | --- | --- |
+| Notes on a PDF | **saved in the PDF** (standard annotations, editable original inside) | a `.xopp` beside the PDF; export as a new PDF | imported into the app; export as a new PDF | saved in the PDF |
 | Platforms | Linux, Windows, macOS, Android; iOS planned | Linux, Windows, macOS | iPad, iPhone, Mac; Windows and Android versions | Windows |
 | Price, license | free, GPL | free, GPL | free tier, then paid | free tier, then subscription |
 | Where your notes live | files in your folders (`.xopp`, PDF, `.md`) | files | the app's own library | PDF files |
