@@ -2475,3 +2475,32 @@ Menus as sheets, folded:
       page field, above the keyboard.
 - [ ] The home screen: hold a finger on its icon buttons (View, Settings, Sort, …): a short name ("View", "Settings"),
       not the long tip.
+
+## macOS build (qt/macos-build)
+
+On a Mac with Apple Silicon and macOS 15 or newer, with the `.dmg` from the workflow "xournal-qt macOS" (artifact
+`xournal-qt-macos-arm64`; see qt/docs/macos.md). Nobody has run it on a real Mac yet.
+
+Installing:
+- [ ] The `.dmg` opens and shows xournal-qt.app, the Applications link and README.txt; the app has the fork's icon.
+- [ ] Drag it to Applications and start it: macOS refuses; System Settings → Privacy & Security → "Open Anyway"
+      starts it. (Or `xattr -dr com.apple.quarantine /Applications/xournal-qt.app`.)
+- [ ] It starts without Homebrew installed (on a Mac that has Homebrew: it still takes nothing from /opt/homebrew;
+      Activity Monitor → the process → Open Files and Ports lists only files inside the app).
+
+Using it:
+- [ ] The first start: the question how to keep documents, then the default library in ~/Documents/Xournal_Libraries.
+- [ ] Open a .xopp with text, a PDF with text and a Markdown box with emoji and a formula: the text looks right (Helvetica
+      for "Sans"), the emoji are Apple's, the formula is drawn.
+- [ ] Write with the trackpad / mouse; with a Wacom tablet or an iPad as Sidecar display with the Apple Pencil, if there
+      is one: the pressure changes the width.
+- [ ] Pinch to zoom and two-finger scrolling on the trackpad.
+- [ ] Shortcuts with ⌘ (⌘S saves, ⌘Z undoes, ⌘W closes the tab, ⌘Q quits).
+- [ ] Save, close, reopen: the document is as saved; the settings are kept (~/.config/xournal-qt).
+- [ ] Print (⌘P) and export a PDF.
+- [ ] "Show in Finder" on a document of the library selects it in Finder.
+
+Finder:
+- [ ] Double-click a .xopp in Finder: it opens in Xournal Qt (also while Xournal Qt is running already).
+- [ ] Right-click a PDF and a .md file → Open With → Xournal Qt: it opens.
+- [ ] Drop a PDF on the Dock icon: it opens.

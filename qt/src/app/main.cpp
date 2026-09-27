@@ -26,7 +26,11 @@
 #include <QDir>
 #include <QFileInfo>
 
+#include <functional>
 #include <optional>
+#ifdef Q_OS_MACOS
+#include <QFileOpenEvent>
+#endif
 
 #include "AppController.h"
 #include "EmojiFont.h"
@@ -86,6 +90,27 @@ void watchSafeArea(QQuickWindow* w) {
         w->setProperty("fakeKeyboardHeight", keyboard);
     }
 }
+#ifdef Q_OS_MACOS
+/// The documents Finder opens with the app (QFileOpenEvent, docs/macos.md), handed to `open`.
+class FileOpenFilter: public QObject {
+public:
+    FileOpenFilter(std::function<void(const QString&)> open, QObject* parent): QObject(parent), open(std::move(open)) {}
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override {
+        if (event->type() == QEvent::FileOpen) {
+            if (const QString file = static_cast<QFileOpenEvent*>(event)->file(); !file.isEmpty()) {
+                open(file);
+                return true;
+            }
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    std::function<void(const QString&)> open;
+};
+#endif
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -107,9 +132,9 @@ int main(int argc, char* argv[]) {
     // UTF-8 for std::filesystem's narrow strings, GLib's cache folder, fontconfig (see qt/docs/windows.md).
     xqt::windows::prepareEnvironment();
 #endif
-#if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN)
-    // The app's colour emoji font (EmojiFont.h) for Qt's text as well (Pango gets it in AppContext). Windows and
-    // Android have emoji fonts that Qt draws.
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
+    // The app's colour emoji font (EmojiFont.h) for Qt's text as well (Pango gets it in AppContext). Windows, macOS
+    // and Android have emoji fonts that Qt draws.
     if (QFontDatabase::addApplicationFont(QString::fromStdString(
                 (xqt::AppContext::defaultResourceDir() / "fonts" / xqt::emoji::FONT_FILE).string())) >= 0) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
@@ -211,6 +236,10 @@ int main(int argc, char* argv[]) {
         controller.startSession(files);
     }
     QObject::connect(&instance, &xqt::SingleInstance::filesRequested, &controller, &AppController::openPaths);
+#ifdef Q_OS_MACOS
+    // Finder hands documents over as events, not as arguments: a double click, "Open With", a drop on the Dock icon.
+    qapp.installEventFilter(new FileOpenFilter([&controller](const QString& f) { controller.openPaths({f}); }, &qapp));
+#endif
 
     QQmlApplicationEngine engine;
     engine.addImageProvider("thumbnail", new xqt::ThumbnailProvider);  // the engine takes ownership

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- xournal-qt.app's Info.plist. qt/scripts/macos-deploy.sh fills in @VERSION@ and @MINIMUM_SYSTEM@ (docs/macos.md). -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>xournal-qt</string>
+  <key>CFBundleIdentifier</key>
+  <string>org.xournalqt.app</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>Xournal Qt</string>
+  <key>CFBundleDisplayName</key>
+  <string>Xournal Qt</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@VERSION@</string>
+  <key>CFBundleVersion</key>
+  <string>@VERSION@</string>
+  <key>CFBundleIconFile</key>
+  <string>xournal-qt.icns</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>GPL-2.0-or-later</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.productivity</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>@MINIMUM_SYSTEM@</string>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+  <key>NSRequiresAquaSystemAppearance</key>
+  <false/>
+  <key>LSSupportsOpeningDocumentsInPlace</key>
+  <true/>
+
+  <!-- What the app opens (Finder hands them over as QFileOpenEvent, main.cpp). Xournal++'s own types are declared
+       by Xournal++ (com.github.xournalpp.*), so they are imported here, not exported. -->
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Xournal++ Document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Default</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>com.github.xournalpp.xopp</string>
+      </array>
+      <key>CFBundleTypeIconFile</key>
+      <string>xournal-qt.icns</string>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Xournal Document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Default</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>net.sourceforge.xournal.xoj</string>
+      </array>
+      <key>CFBundleTypeIconFile</key>
+      <string>xournal-qt.icns</string>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>PDF Document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>com.adobe.pdf</string>
+      </array>
+    </dict>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Markdown Document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>net.daringfireball.markdown</string>
+      </array>
+    </dict>
+  </array>
+
+  <key>UTImportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.github.xournalpp.xopp</string>
+      <key>UTTypeDescription</key>
+      <string>Xournal++ Document</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+        <string>org.gnu.gnu-zip-archive</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>xopp</string>
+        </array>
+        <key>public.mime-type</key>
+        <array>
+          <string>application/x-xopp</string>
+        </array>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>net.sourceforge.xournal.xoj</string>
+      <key>UTTypeDescription</key>
+      <string>Xournal Document</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+        <string>org.gnu.gnu-zip-archive</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>xoj</string>
+        </array>
+        <key>public.mime-type</key>
+        <array>
+          <string>application/x-xojpp</string>
+        </array>
+      </dict>
+    </dict>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>net.daringfireball.markdown</string>
+      <key>UTTypeDescription</key>
+      <string>Markdown Document</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.plain-text</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>md</string>
+          <string>markdown</string>
+        </array>
+        <key>public.mime-type</key>
+        <array>
+          <string>text/markdown</string>
+        </array>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>

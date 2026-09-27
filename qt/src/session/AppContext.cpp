@@ -25,9 +25,10 @@ AppContext::AppContext(fs::path resourceDir, fs::path settingsFile, int renderTh
     md::installRenderer();  // Markdown boxes are drawn formatted (on the canvas, in thumbnails, exports, ...)
     sticky::installDrawer();  // sticky notes: their content clipped to them, everywhere a page is drawn
     PageMargins::installRuling();  // the ruling of pages smaller than A5 to scale (its margin line), everywhere too
-#if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN)
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_WIN) && !defined(Q_OS_MACOS)
     // The colour emoji font that comes with the app, for Pango (Windows and Android have it in the fonts.conf they
-    // write at start: WindowsSetup.cpp, AndroidSetup.cpp)
+    // write at start: WindowsSetup.cpp, AndroidSetup.cpp). Not on macOS: Pango draws with Core Text there, not
+    // fontconfig, and takes Apple's colour emoji (docs/macos.md).
     if (!emoji::fontRegistered()) {
         emoji::registerFont((this->resourceDir / "fonts" / emoji::FONT_FILE).string());
     }
@@ -85,6 +86,13 @@ fs::path AppContext::defaultResourceDir() {
     }
     // Installed: <prefix>/bin/xournal-qt and <prefix>/share/xournal-qt; else the build tree.
     const auto appDir = fs::path(QCoreApplication::applicationDirPath().toStdString());
+#ifdef Q_OS_MACOS
+    // The app bundle: xournal-qt.app/Contents/MacOS/xournal-qt, Contents/Resources/share/xournal-qt (docs/macos.md)
+    const fs::path bundled = appDir.parent_path() / "Resources" / "share" / "xournal-qt";
+    if (std::error_code ec; fs::exists(bundled / "pagetemplates.ini", ec)) {
+        return bundled;
+    }
+#endif
     const fs::path installed = appDir.parent_path() / "share" / "xournal-qt";
     if (std::error_code ec; fs::exists(installed / "pagetemplates.ini", ec)) {
         return installed;
