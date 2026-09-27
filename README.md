@@ -35,8 +35,9 @@ Your notes should outlive the app you wrote them with.
   backgrounds) are embedded in that same PDF; open it here again and nothing was flattened. A text document carries
   its plain Markdown source and its pictures as attachments, which any PDF viewer can save
   ([how](qt/docs/user/markdown-from-pdf.md)).
-- **Your PDF is appended to, not rewritten.** After the first save, saving adds your changes to the end of the file
-  instead of writing it anew; the original of a PDF you annotate is kept for 30 days.
+- **Quick saves, clean files.** Saving appends your changes to the PDF instead of writing it anew; once the additions
+  grow past a quarter of the file, and always before you share it (so deleted ink does not linger in older
+  revisions), it is written in one clean piece again.
 - **Made to last.** "Export for the archive" writes PDF/A-3b — the ISO standard made for keeping documents readable
   for decades, checked with veraPDF — for one document or a whole library, folders and links included.
 - **No lock-in anywhere.** Documents are files in your own folders (PDF, `.xopp`, `.md`); a library is just a folder,
