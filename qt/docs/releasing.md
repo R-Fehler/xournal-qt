@@ -84,13 +84,13 @@ Android (vcpkg, qpdf 12.4) use their package manager's qpdf, which is new enough
 Since 0.4.0 every release also carries the **Windows** portable zip and the **Android** APK: the release workflow
 calls `xqt-windows.yml` and `xqt-android.yml` (both also run by hand) and puts `xournal-qt-<version>-windows-x64.zip`
 and `xournal-qt-<version>-android-arm64.apk` (signed with the release key from the repository secrets; Android 9 or
-newer, arm64) into the draft. **macOS** is built as well, but not yet part of a release:
+newer, arm64) into the draft, and (also since 0.4.0) the unsigned **macOS** `.dmg` from `xqt-macos.yml`:
 
 - **macOS**: a first build exists (`xqt-macos.yml`, [macos.md](macos.md)): Homebrew's libraries and Qt on GitHub's
   `macos-15` runner (Apple Silicon), `macdeployqt -qmldir=qt/src/app/qml`, `xournal-qt.app` in a `.dmg`
   (`xournal-qt-<version>-macos-arm64.dmg`, artifact `xournal-qt-macos-arm64`). It has an ad-hoc signature only, so
-  macOS asks before the first start ("Open Anyway"), and it needs macOS 15 or newer. The workflow can be called
-  (`workflow_call`), but the release workflow does not call it yet. Missing: Apple's signing and notarization (a
+  macOS asks before the first start ("Open Anyway"), and it needs macOS 15 or newer. The release workflow calls it.
+  Missing: Apple's signing and notarization (a
   Developer ID certificate and an App Store Connect API key as secrets, see macos.md), an Intel build (Homebrew has
   no Intel bottles any more), and a try on a real Mac.
 - **Windows**: a first build exists (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,

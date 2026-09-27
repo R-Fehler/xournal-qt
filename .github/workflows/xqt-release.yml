@@ -1,7 +1,7 @@
 # xournal-qt: the artifacts of a release. Push a tag "v1.2.3" (or start this by hand) and a draft release with the
 # packages appears; look at it, write the notes and publish it. Linux (.deb, AppImage) is built here; Windows (a
-# portable zip) and Android (the APK, signed with the release key from the repository secrets) by their own
-# workflows, called from here.
+# portable zip), Android (the APK, signed with the release key from the repository secrets) and macOS (an unsigned
+# .dmg for Apple Silicon) by their own workflows, called from here.
 #
 # Qt 6.5 or newer is needed, which the runners' own Ubuntu 24.04 does not have (6.4), so every job builds in a
 # container: one on Ubuntu 22.04 with KDE neon's packages (Qt 6.7, as on the author's machine), one on Debian 13
@@ -141,9 +141,13 @@ jobs:
     uses: ./.github/workflows/xqt-android.yml
     secrets: inherit
 
+  macos:
+    name: macOS
+    uses: ./.github/workflows/xqt-macos.yml
+
   draft:
     name: Draft release
-    needs: [packages, appimage, windows, android]
+    needs: [packages, appimage, windows, android, macos]
     # Also when one of them did not manage: what was packaged still goes into the draft.
     if: always() && !cancelled()
     runs-on: ubuntu-latest
@@ -165,6 +169,12 @@ jobs:
         with:
           name: xournal-qt-android-arm64
           path: android
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: xournal-qt-macos-*
+          merge-multiple: true
+          path: macos
 
       - name: Write the draft
         env:
@@ -179,6 +189,8 @@ jobs:
           if [ -f android/xournal-qt-arm64.apk ]; then
               cp android/xournal-qt-arm64.apk "artifacts/xournal-qt-${version}-android-arm64.apk"
           fi
+          # macOS: the disk images as they are (named with the version and the architecture)
+          cp macos/*.dmg artifacts/ 2>/dev/null || true
           ls -l artifacts || true
           if [ -z "$(ls -A artifacts 2>/dev/null)" ]; then
               echo "::error::nothing was packaged - look at the jobs above"
