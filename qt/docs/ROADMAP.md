@@ -688,6 +688,14 @@
   sidebar drawer slides, closes with Esc / back, 85 % wide on phones. The format bar folds into "+ Insert" instead of
   scrolling (desktop, tablet); fading edges on phones.
 
+- **Phone chrome, `qt/phone-chrome` (2026-09-27).** In the phone classes no tab strip: a 48 px top bar (library
+  button; the title with tab dots, a swipe on the bar = next / previous document; the tab-count square: tap =
+  overview, double tap = the document used before, long press = "Used lately"; ⋮). A bottom tool dock replaces the
+  tool bar, pen pill and view pill (current tool, All tools sheet, colour, width, undo, redo, page number); a rail at
+  the right edge in phone landscape. Palette and widths as sheets. Reader automatic only in tiny windows; the
+  presentation tap field highlighted with the tools, faint without. No tab windows on Android / iOS. TabManager keeps
+  the order of use. The unfolded Fold 7 keeps the tablet layout.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
