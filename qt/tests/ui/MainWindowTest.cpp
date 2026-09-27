@@ -1086,7 +1086,8 @@ TEST_F(ShotOfTheCanvas, onAPhone) {
     canvasShot(412, 915, "canvas-phone");
 }
 
-// Markdown written on a page, with its source beside it.
+// Markdown written on a page, formatted while it is typed (the block with the cursor shows its marks), with the
+// formatting bar above the page.
 TEST_F(MainWindowTest, shotOfMarkdown) {
     if (!wantShots()) {
         GTEST_SKIP() << "set XQT_SHOTS";
@@ -1099,14 +1100,15 @@ TEST_F(MainWindowTest, shotOfMarkdown) {
         controller->closeTab(0);
     }
     QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, false));  // (a binding: shown by its button)
-    auto* panel = find<QQuickItem>("markdownPanel");
-    ASSERT_NE(panel, nullptr);
-    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, 0));
-    wait(200);
-    find<QQuickItem>("markdownArea")->setProperty("text", QStringLiteral(
+    ASSERT_TRUE(controller->writeMarkdownOnPage());
+    until([&] { return controller->markdownOnPage(); });
+    auto* canvas = find<QQuickItem>("canvas");
+    ASSERT_NE(canvas, nullptr);
+    bool inserted = false;
+    QMetaObject::invokeMethod(canvas, "insertText", Q_RETURN_ARG(bool, inserted), Q_ARG(QString, QStringLiteral(
             "# Seminar, week 3\n\n"
-            "Wave equation, **separation of variables**. The ansatz `u(x,t) = X(x)T(t)` gives two problems that are\n"
-            "each of one variable.\n\n"
+            "Wave equation, **separation of variables**. The ansatz $u(x,t) = X(x)\\,T(t)$ gives two problems of one "
+            "variable each, with $\\lambda_k = (k\\pi / L)^2$.\n\n"
             "## To do\n\n"
             "- [x] read chapter 4\n"
             "- [ ] exercise 4.2 (the boundary conditions!)\n"
@@ -1116,11 +1118,13 @@ TEST_F(MainWindowTest, shotOfMarkdown) {
             "def modes(n, L):\n"
             "    return [k * pi / L for k in range(1, n + 1)]\n"
             "```\n\n"
-            "| mode | n | note |\n| --- | --- | --- |\n| fundamental | 1 | drawn below |\n| first | 2 | node in the middle |\n"));
+            "| mode | n | note |\n| --- | --- | --- |\n| fundamental | 1 | drawn below |\n| first | 2 | node in the middle |\n\n"
+            "The modes, drawn by hand:")));
+    ASSERT_TRUE(inserted);
     restPointer(window);
-    wait(900);
+    wait(1200);
     saveShot(window, "markdown");
-    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, true));
+    controller->endMarkdownOnPage();
 }
 
 // All pages of a document at once.

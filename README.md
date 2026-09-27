@@ -40,7 +40,7 @@ tree).
 
 Not there yet: searching handwriting, audio recording, and Xournal++'s plugins and LaTeX tool.
 
-<img src="qt/docs/screenshots/markdown.png" width="100%" alt="Markdown written on a page, formatted, with its source and the formatting bar beside it">
+<img src="qt/docs/screenshots/markdown.png" width="100%" alt="Markdown written directly on a page and formatted as it is typed: headings, formulas, a check list, a quote, code and a table, with the formatting bar above the page">
 
 ## Compared with other note apps
 
