@@ -681,6 +681,13 @@
   Import, Sort, Show are `AdaptiveMenu`s. Tab overview: the header wraps, 2 columns on a phone, 4 sideways, cells as
   tall as the pages.
 
+- **Adaptive panels, `qt/adaptive-panels` (2026-09-27).** The Markdown source (and text flow) panel goes below the
+  page in a portrait area (half on tablets, 60 % on phones; divider remembered per class), beside it otherwise and
+  never wider than half the window. The reference split is top/bottom in a portrait area (ratio kept), with a narrow
+  reference pill (page + ⋮) in narrow halves. Compact view pill under 520 px; pills keep clear of the view pill. The
+  sidebar drawer slides, closes with Esc / back, 85 % wide on phones. The format bar folds into "+ Insert" instead of
+  scrolling (desktop, tablet); fading edges on phones.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
