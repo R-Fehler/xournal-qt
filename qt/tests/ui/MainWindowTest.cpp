@@ -980,7 +980,7 @@ TEST_F(MainWindowTest, pageGridDragAndDropMovesSelectedPages) {
 }
 
 // XQT_SHOTS=<folder>: writes the pictures for the README (off-screen, so no display is needed).
-//   XQT_SHOTS=/tmp/shots ./xqt-ui-tests --gtest_filter='*shot*'
+//   XQT_SHOTS=/tmp/shots ./xqt-ui-tests --gtest_filter='*shot*:ShotOfTheCanvas.*'
 namespace {
 bool wantShots() { return qEnvironmentVariableIsSet("XQT_SHOTS"); }
 
@@ -1015,45 +1015,75 @@ void drawCurve(QQuickWindow* window, QPoint origin, int width, int height, doubl
 }
 }  // namespace
 
-// A page of notes: Markdown written on the page, a curve drawn by hand, the pages beside it.
-TEST_F(MainWindowTest, shotOfTheCanvas) {
+// A page of notes: Markdown written on the page, a curve drawn by hand, the pages beside it - on a desktop, an upright
+// Surface (two rows of tools) and a phone (the app bar and the dock): the README's picture of the adaptive layout.
+namespace {
+class ShotOfTheCanvas: public MainWindowTest {
+protected:
+    void canvasShot(int w, int h, const char* name) {
+        window->resize(w, h);
+        restPointer(window);  // (no tool tip of a hovered button in the picture)
+        wait(200);
+        ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+        if (w >= 1280) {
+            QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));  // (a binding: shown by its button)
+        }
+        controller->goToPage(7);  // squared paper
+        wait(600);
+
+        // The note where the page is seen, and the curve under it
+        auto* panel = find<QQuickItem>("markdownPanel");
+        ASSERT_NE(panel, nullptr);
+        QMetaObject::invokeMethod(panel, "openBox", Q_ARG(QVariant, 7), Q_ARG(QVariant, 60.0), Q_ARG(QVariant, 300.0));
+        wait(200);
+        find<QQuickItem>("markdownArea")
+                ->setProperty("text", QStringLiteral("## Damped oscillation\n\n"
+                                                     "Measured on the shaker at 12 Hz. The envelope follows `exp(-t/tau)`, "
+                                                     "with tau about 0.8 s.\n\n"
+                                                     "- [x] set up the sensor\n- [ ] repeat it with the heavier mass\n"));
+        wait(500);
+        QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, true));
+        wait(1200);  // (closing puts the zoom back to what it was before it opened)
+        controller->goToPage(7);
+        wait(600);
+
+        auto* canvas = findItem("canvas");
+        ASSERT_NE(canvas, nullptr);
+        // (in the page's points: above the note, the same on every size)
+        xqt::CanvasView* view = controller->tabManager().currentView();
+        const double zoom = view->getViewController().zoom();
+        const QPointF page = view->pageViewRect(7).topLeft();
+        auto onPage = [&](double x, double y) { return canvas->mapToScene(page + QPointF(x, y) * zoom).toPoint(); };
+        const QPoint origin = onPage(190, 190);
+        const int width = static_cast<int>(320 * zoom);
+        drawCurve(window, origin, width, static_cast<int>(110 * zoom), 2.5);
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, onPage(170, 190));  // the axis
+        QTest::mouseMove(window, onPage(530, 190));
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, onPage(530, 190));
+        restPointer(window);
+        wait(900);  // (the thumbnails of the pages follow)
+        saveShot(window, name);
+    }
+};
+}  // namespace
+
+TEST_F(ShotOfTheCanvas, onADesktop) {
     if (!wantShots()) {
         GTEST_SKIP() << "set XQT_SHOTS";
     }
-    window->resize(1280, 820);
-    restPointer(window);  // (no tool tip of a hovered button in the picture)
-    wait(200);
-    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
-    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));  // (a binding: shown by its button)
-    controller->goToPage(7);  // squared paper
-    wait(600);
-
-    // The note where the page is seen, and the curve under it
-    auto* panel = find<QQuickItem>("markdownPanel");
-    ASSERT_NE(panel, nullptr);
-    QMetaObject::invokeMethod(panel, "openBox", Q_ARG(QVariant, 7), Q_ARG(QVariant, 60.0), Q_ARG(QVariant, 300.0));
-    wait(200);
-    find<QQuickItem>("markdownArea")
-            ->setProperty("text", QStringLiteral("## Damped oscillation\n\n"
-                                                 "Measured on the shaker at 12 Hz. The envelope follows `exp(-t/tau)`, "
-                                                 "with tau about 0.8 s.\n\n"
-                                                 "- [x] set up the sensor\n- [ ] repeat it with the heavier mass\n"));
-    wait(500);
-    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, true));
-    wait(1200);  // (closing puts the zoom back to what it was before it opened)
-    controller->goToPage(7);
-    wait(600);
-
-    auto* canvas = findItem("canvas");
-    ASSERT_NE(canvas, nullptr);
-    const QPoint origin = canvas->mapToScene(QPointF(canvas->width() * 0.32, canvas->height() * 0.42)).toPoint();
-    drawCurve(window, origin, 430, 150, 2.5);
-    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, origin - QPoint(30, 0));  // the axis
-    QTest::mouseMove(window, origin + QPoint(460, 0));
-    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, origin + QPoint(460, 0));
-    restPointer(window);
-    wait(900);  // (the thumbnails of the pages follow)
-    saveShot(window, "canvas");
+    canvasShot(1440, 900, "canvas");
+}
+TEST_F(ShotOfTheCanvas, onAnUprightTablet) {
+    if (!wantShots()) {
+        GTEST_SKIP() << "set XQT_SHOTS";
+    }
+    canvasShot(960, 1392, "canvas-tablet");
+}
+TEST_F(ShotOfTheCanvas, onAPhone) {
+    if (!wantShots()) {
+        GTEST_SKIP() << "set XQT_SHOTS";
+    }
+    canvasShot(412, 915, "canvas-phone");
 }
 
 // Markdown written on a page, with its source beside it.
@@ -1061,7 +1091,7 @@ TEST_F(MainWindowTest, shotOfMarkdown) {
     if (!wantShots()) {
         GTEST_SKIP() << "set XQT_SHOTS";
     }
-    window->resize(1280, 820);
+    window->resize(1440, 900);
     restPointer(window);  // (no tool tip of a hovered button in the picture)
     wait(200);
     controller->newDocument();
@@ -1098,7 +1128,7 @@ TEST_F(MainWindowTest, shotOfThePageGrid) {
     if (!wantShots()) {
         GTEST_SKIP() << "set XQT_SHOTS";
     }
-    window->resize(1280, 820);
+    window->resize(1440, 900);
     restPointer(window);  // (no tool tip of a hovered button in the picture)
     wait(200);
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
@@ -1114,7 +1144,7 @@ TEST_F(MainWindowTest, shotOfTheOverview) {
     if (!wantShots()) {
         GTEST_SKIP() << "set XQT_SHOTS";
     }
-    window->resize(1280, 820);
+    window->resize(1440, 900);
     restPointer(window);  // (no tool tip of a hovered button in the picture)
     wait(200);
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));

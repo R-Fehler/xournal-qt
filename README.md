@@ -2,86 +2,67 @@
 
 # xournal-qt
 
-**Handwritten notes and PDF annotation on a pen tablet — a Qt 6 fork of [Xournal++](https://github.com/xournalpp/xournalpp).**
-Same documents, same proven core, a new interface built for a pen in one hand and a finger in the other.
+**Handwritten notes, PDF annotation and Markdown in one app — from a desktop to a pen tablet to a phone.**
+A Qt 6 fork of [Xournal++](https://github.com/xournalpp/xournalpp): same file format, same drawing core, a new
+interface.
 
 <br clear="left">
 
-<img src="qt/docs/screenshots/canvas.png" width="900" alt="A page of notes: a curve drawn by hand and a Markdown note under it, the pages of the document beside them">
+<img src="qt/docs/screenshots/adaptive.png" width="100%" alt="The same page of notes on a desktop (with the page sidebar), an upright tablet (two rows of tools) and a phone (a top bar and a tool dock)">
 
-Its files *are* Xournal++ files. A document written here opens in Xournal++, and one written there opens here: the
-document model, the `.xopp` file format, the cairo rendering, the undo stack and the tools are upstream's, unchanged.
-What is new is everything around them — see [FORK.md](FORK.md) for how the two live in one tree.
+A `.xopp` written here opens in Xournal++ and the other way round: the document model, file format, rendering, undo
+and tools are upstream's. What is new is everything around them ([FORK.md](FORK.md) explains how the two share one
+tree).
 
 ## What it adds to Xournal++
 
-| | |
-| --- | --- |
-| **Tabs and an overview** | Several documents at once, an overview of them all, and a tab can be dragged into a window of its own. |
-| **A library** | Your folders of documents with previews, read where you left off, and title pages you choose. |
-| **Search on three levels** | In the page you are on, in every open document at once, or in the whole library — the text of documents you have not opened for months included. |
-| **Markdown on the page** | Write Markdown on a page and see it formatted as you type. It flows onto the next pages, its headings become chapters, and it is stored as ordinary Xournal++ text. |
-| **Pen, finger and mouse told apart** | The pen writes while your hand rests on the screen, a finger scrolls and zooms, the side buttons erase. Tuned on a convertible under Wayland. |
-| **Pages at a glance** | A page sidebar and a zoomable grid of all pages, with copy, move, insert, delete and drag and drop. |
-| **Made to keep up** | Pages are rendered ahead of where you read and kept in memory (you set the limit), every page has a preview drawn in the background, and previews are stored for the next opening. Flying through a 500-page PDF shows pages that turn sharp where you stop, not blanks. |
-| **Built for touch** | Big handles, a movable tool pill in full screen, popups where your finger is, gestures for the overviews. |
+- **One interface for every screen.** It lays itself out for a wide desktop, an upright 2-in-1 or Surface (two rows
+  of tools, the A4 page keeps its width), a foldable, and a phone (a top bar, a tool dock within thumb reach, sheets
+  instead of menus). Pen, finger and mouse are told apart: the pen writes with your hand on the screen, a finger
+  scrolls and zooms.
+- **Tabs, an overview and a reference view.** Several documents at once, a grid of all of them, and a second document
+  (or the same one) beside or above the one you write in.
+- **A library that is just folders.** Point it at a folder: previews, favourites, page bookmarks, reading positions.
+  Nothing is imported; sync the folder with whatever you already use.
+- **Search on three levels.** This document, all open documents, or the whole library, including the text of PDFs you
+  have not opened in months. Hits are shown on the pages, not as a list of file names; fuzzy search if you want it.
+- **Markdown on the page.** Write Markdown on a page (or a sticky note) and see it formatted as you type: formulas
+  (`$…$`, no LaTeX installation needed), pictures, tables, code, check lists, with a formatting bar for those who do
+  not know the syntax. Plain `.md` files open as documents of their own.
+- **PDFs that stay PDFs.** Notes on a PDF can be saved into the PDF itself, which every viewer shows, with the
+  editable notes inside it. Saving appends to the file instead of rewriting it. Space for notes can be added beside
+  slides.
+- **Sticky notes, bookmarks, citations.** Notes that hold ink, text and pictures and can cover an answer for
+  self-testing; bookmarks that other PDF viewers show; Scholar and arXiv lookups for a selected reference (network
+  use is opt-in, and every address is shown first).
+- **Fast on big documents.** Pages are drawn ahead of where you read, within a memory limit you set; a 500-page PDF
+  scrolls without blank pages, and an A0 poster zooms without running out of memory.
 
-Not there yet: audio recording, the plugin console and the LaTeX tool of Xournal++, and Windows and macOS builds
-(the fork is Linux only so far).
+Not there yet: searching handwriting, audio recording, and Xournal++'s plugins and LaTeX tool.
 
-## What that makes possible
+<img src="qt/docs/screenshots/markdown.png" width="100%" alt="Markdown written on a page, formatted, with its source and the formatting bar beside it">
 
-- **Follow a lecture on one device.** The slides as a PDF in one tab, your own notes in another, both in the library.
-  Write on the slides, jump between the two with `Ctrl+Tab`, and when you look for that one word weeks later, the
-  library search finds it in a document you have not opened since.
-- **Keep a lab or reading notebook that is still text.** Type the parts that are text as Markdown — headings, task
-  lists, tables, code — and draw the rest by hand on the same page. The headings become the table of contents.
-- **Work through a thick PDF.** Open it, scroll or fling; the pages are already rendered. The page grid shows
-  everything at once, the search marks its hits on the page pictures, and the document opens where you left it.
-- **Keep your notes where your files are.** No import, no hidden database: a library is a folder.
+## Compared with other note apps
 
-<img src="qt/docs/screenshots/markdown.png" width="900" alt="Markdown written beside the page and shown formatted on it">
+|  | xournal-qt | Xournal++ | GoodNotes | Drawboard PDF |
+| --- | --- | --- | --- | --- |
+| Platforms | Linux, Windows, macOS, Android; iOS planned | Linux, Windows, macOS | iPad, iPhone, Mac; Windows and Android versions | Windows |
+| Price, license | free, GPL | free, GPL | free tier, then paid | free tier, then subscription |
+| Where your notes live | files in your folders (`.xopp`, PDF, `.md`) | files | the app's own library | PDF files |
+| Sync | any folder sync (Nextcloud, Syncthing, OneDrive, …) | any | iCloud | cloud storage of your choice |
+| Adapts to phone and tablet | yes | desktop layout | yes | tablet and desktop |
+| Typed text | live Markdown with formulas, on the page | text boxes, LaTeX tool | text boxes | text annotations |
+| Search | all your documents, PDF text included | the open document | all notebooks, **handwriting too** | PDF text |
 
-## A library is just a folder
+Where others are ahead: GoodNotes searches handwriting and is the more polished iPad app; Drawboard PDF has more PDF
+markup tools (stamps, measurements).
 
-Point it at a folder and that folder is a library. The documents in it are the files you already have; subfolders are
-its shelves. Nothing is imported, copied or hidden away, and the folder stays yours to move, sync or back up with
-whatever you already use.
+## Getting it
 
-- The libraries it offers by default live in **`~/Documents/Xournal_Libraries/`** (`Default` is the one it starts
-  with). Your Downloads folder is offered as a quick library too.
-- **Any folder can be opened as a library** — from the home screen, from the command line
-  (`xournal-qt ~/some/folder`), or from Dolphin's "Open as Xournal Qt library".
-- Each library keeps its own notes about itself in **`.xournal_library/`** inside it: the search index, the page
-  previews, and which page of a document is its title page and where you stopped reading. It is a cache, not your
-  data — delete it and it is built again the next time, and the documents are untouched.
-
-## Search that reaches further than the page
-
-Xournal++ searches the document you are in. Here the same search goes three ways, and every hit is shown where it
-stands on the page, not as a list of file names.
-
-- **In this document** (`Ctrl+F`) — the PDF's text, text you typed, and Markdown boxes (there the hit is marked where
-  the text is *drawn*, not where it sits in the source). Hits are marked on the page, `Enter` and `Shift+Enter` step
-  through them, and the page sidebar and the page grid mark them on the pictures of the pages with a count.
-- **In every open document** (`Ctrl+Shift+F`) — the overview searches all tabs at once and puts the pages that have
-  hits under each document; tapping one opens that document at that page. It reads the documents as they are at this
-  moment, so unsaved changes count too (a 179-page PDF takes about 0.1 s).
-- **In the whole library** (`Ctrl+Alt+F`) — every document in the folder, opened or not. Each library keeps an index
-  of its documents' text in its `.xournal_library/` folder, built and kept up to date in the background: the text of
-  a PDF is read once, a renamed or moved document keeps what was read, and annotating one does not make its PDF text
-  be read again. Results show the pages with hits, drawn with the hits marked on them, and a "Names" button narrows
-  the search to the documents' names.
-
-Short words are searched when you press `Enter`, not while typing: one letter in a 300-page PDF is hundreds of
-thousands of hits, and nobody meant to ask for those.
-
-<img src="qt/docs/screenshots/overview.png" width="900" alt="The overview of the open documents with a search over all of them, showing the pages that have hits">
-
-## Trying it
-
-Linux, Qt 6.5 or newer. Packages of a release and which one fits which system:
-[qt/docs/releasing.md](qt/docs/releasing.md). From source:
+Releases have packages for Linux (`.deb` for KDE neon / Ubuntu 22.04 and Debian 13 / Ubuntu 25.04, an AppImage),
+Windows (a portable zip), Android 9 and newer (an APK) and macOS 15 on Apple Silicon (an unsigned `.dmg`):
+[releases](https://github.com/R-Fehler/xournal-qt/releases), and [qt/docs/releasing.md](qt/docs/releasing.md) for
+which one fits. From source (Linux, Qt 6.5 or newer):
 
 ```sh
 qt/scripts/linux-deps.sh                                          # Debian / Ubuntu: what the build needs
@@ -90,10 +71,11 @@ cmake --build build-qt
 ./build-qt/xournal-qt
 ```
 
-More: [what it can do and where it is going](qt/docs/ROADMAP.md) · [Markdown boxes](qt/docs/markdown-boxes.md) ·
-[the library](qt/docs/library.md) · [text mode](qt/docs/text-mode.md) · [how the fork is kept](FORK.md)
+<img src="qt/docs/screenshots/overview.png" width="100%" alt="The overview of the open documents, searched: the pages with hits under each document">
 
-<img src="qt/docs/screenshots/page-grid.png" width="900" alt="All pages of a document as a grid">
+More: [what it can do and where it is going](qt/docs/ROADMAP.md) · [the adaptive layout](qt/docs/adaptive-layout.md)
+· [Markdown](qt/docs/md-editor.md) · [the library](qt/docs/library.md) · [Android](qt/docs/android.md) ·
+[macOS](qt/docs/macos.md) · [how the fork is kept](FORK.md)
 
 ---
 
