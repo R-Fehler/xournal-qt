@@ -696,6 +696,15 @@
   presentation tap field highlighted with the tools, faint without. No tab windows on Android / iOS. TabManager keeps
   the order of use. The unfolded Fold 7 keeps the tablet layout.
 
+- **Safe areas and the soft keyboard, `qt/safe-areas-keyboard` (2026-09-27).** `safeInsets` on all four edges (from
+  the window's safe area margins on Qt 6.9+; `XQT_SAFE_AREA` fakes them): bars, dock, rails, drawer, pills, sheets,
+  dialogs and the snackbar keep clear, the page draws edge to edge. `keyboardTop` / `keyboardOpen`: the window's
+  footer makes room above the keyboard, the dock hides, on phones the format bar docks above the keyboard, the
+  canvas and the source panel keep the cursor in view. Touch targets of the tab strip, overview cards, layer and
+  annotation lists at `minTarget`; the remaining menus (layers, annotation filter, bookmarks, chapters, look-up,
+  table cell, pen colours) and the emoji picker / page field as sheets on phones. This completes the adaptive-UI
+  blocks of the audit; next: the device pass on the Fold 7 and the Surface.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
