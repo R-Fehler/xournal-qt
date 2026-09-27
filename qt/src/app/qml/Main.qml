@@ -12,6 +12,20 @@ import "ToolBarPlan.js" as ToolBarPlan
 
 ApplicationWindow {
     id: win
+    // While text is written on the page, the page keeps the focus: a closing popup gives it back to whatever had it
+    // when it opened (the window itself, or a button), and on Android the on-screen keyboard closes as soon as
+    // something that takes no text has the focus. Text fields (the Markdown source, a search) keep it.
+    onActiveFocusItemChanged: {
+        const item = activeFocusItem
+        if (!item || item === canvas || !canvas.textEditing || item.cursorPosition !== undefined)
+            return
+        for (let p = item; p; p = p.parent) {
+            if (p === Overlay.overlay)
+                return  // (in a popup, a sheet or a dialog: its own)
+        }
+        if (item === contentItem || item === contentItem.parent || item.focusPolicy !== undefined)
+            Qt.callLater(function() { if (canvas.textEditing && activeFocusItem === item) canvas.forceActiveFocus() })
+    }
     width: 1280
     height: 900
     // Maximized when the app starts (people make it smaller with the tiling of their desktop); the size above is

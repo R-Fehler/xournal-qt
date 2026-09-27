@@ -62,6 +62,10 @@ class DocumentCanvasItem: public QQuickItem {
     Q_PROPERTY(QPointF hoveredLinkPointer READ hoveredLinkPointer NOTIFY hoveredLinkPointerChanged)
     /// Text is being written on the canvas (a text box, Markdown): the emoji picker inserts there.
     Q_PROPERTY(bool textEditing READ textEditing NOTIFY textEditingChanged)
+    /// What the text being written is like, for the on-screen keyboard. Qt's Android input takes the keyboard's text
+    /// only from a focus object that has this property (as TextInput and TextEdit do): without it every letter is
+    /// dropped and only keys like Enter arrive.
+    Q_PROPERTY(Qt::InputMethodHints inputMethodHints READ inputMethodHints CONSTANT)
     /// The emoji suggested for the shortcode being typed (":smi"; EmojiCompletion): {emoji, name} each, the one chosen
     /// with Up / Down, and the cursor (item coordinates; empty when there are none).
     Q_PROPERTY(QVariantList emojiCompletions READ emojiCompletions NOTIFY emojiCompletionChanged)
@@ -87,6 +91,7 @@ public:
     static constexpr int LINK_HOVER_MS = 300;
 
     bool textEditing() const;
+    Qt::InputMethodHints inputMethodHints() const { return Qt::ImhMultiLine; }
     QVariantList emojiCompletions() const;
     int emojiCompletionIndex() const;
     QRectF emojiCompletionRect() const;

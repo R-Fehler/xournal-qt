@@ -4138,7 +4138,7 @@ TEST_F(MainWindowTest, theNotePillWritesTheNotesTextAndPutsAnImageOnIt) {
     until([&] { return !hint->isVisible(); });
     EXPECT_FALSE(hint->isVisible());
     ASSERT_NE(xqt::sticky::textOf(*note), nullptr);
-    EXPECT_EQ(xqt::sticky::textOf(*note)->getText().rfind("Hello\n\n2", 0), 0u);
+    EXPECT_EQ(xqt::sticky::textOf(*note)->getText().rfind("Hello  \n2", 0), 0u);  // (Enter: a line break)
     EXPECT_TRUE(xqt::sticky::textOf(*note)->isMarkdown());
 
     // The image chosen in the dialog goes onto the selected note
@@ -4917,7 +4917,9 @@ TEST_F(MainWindowTest, tabOverviewHitPicturesStayWhenMoreHitsCome) {
     until([&] { return picture->property("status").toInt() == 1 /* Image.Ready */; });
     ASSERT_EQ(picture->property("status").toInt(), 1);
 
-    // As if another hit came: the list is built again
+    // As if another hit came: the list is built again (the search once more; the extended button takes no focus, so
+    // Return goes to the search field again)
+    find<QQuickItem>("overviewSearchField")->forceActiveFocus();
     key(Qt::Key_Return);
     wait(300);
     picture = findItem("overviewHitPagePicture");

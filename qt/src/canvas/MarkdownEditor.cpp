@@ -862,10 +862,38 @@ void MarkdownEditor::newLine(bool soft) {
         insert("\n" + m[1].str() + next, EditKind::Other);
         return;
     }
-    if (soft) {
-        insert("\n", EditKind::Other);  // a line of the same paragraph
-    } else if (blank(line) && lineAt(t, ls).find_first_not_of(" \t") == std::string_view::npos) {
-        insert("\n", EditKind::Other);  // (on an empty line: one more)
+    // Enter: a line break of the same paragraph, two spaces at the line's end (a single newline shows as a space);
+    // Enter at once again, on the empty line, makes it a paragraph. Shift+Enter: a paragraph at once. One rule on
+    // every device, as note apps do it (a phone's keyboard has no Shift+Enter).
+    // (only in a paragraph's text: after a heading, a code fence, a table, a formula's closing "$$" or "\]" Enter
+    // starts the next block as before)
+    bool inParagraph = true;
+    for (size_t i = 0; i < spans.size(); ++i) {
+        if (spans[i].begin <= from && (from < spans[i].end || (from == spans[i].end && from == t.size()))) {
+            inParagraph = doc.root.children[i].kind == md::BlockKind::Paragraph;
+        }
+    }
+    {
+        const std::string_view whole = lineAt(t, ls);
+        const size_t e = whole.find_last_not_of(" \t");
+        const std::string_view trimmed = e == std::string_view::npos ? std::string_view() : whole.substr(0, e + 1);
+        if (trimmed.size() >= 2 && (trimmed.substr(trimmed.size() - 2) == "$$" || trimmed.substr(trimmed.size() - 2) == "\\]")) {
+            inParagraph = false;
+        }
+    }
+    const bool lineBreak = !soft && inParagraph;
+    const bool emptyLine = blank(line) && lineAt(t, ls).find_first_not_of(" \t") == std::string_view::npos;
+    if (emptyLine && !soft && ls >= 3 && t.compare(ls - 3, 3, "  \n") == 0) {
+        edit(ls - 3, from, "\n\n", EditKind::Other);  // the line break before becomes a paragraph
+    } else if (blank(line)) {
+        insert("\n", EditKind::Other);  // (on an empty line, or before a line's text: one line more)
+    } else if (lineBreak) {
+        // (spaces the line already ends with count: two in all)
+        size_t spaces = 0;
+        while (spaces < line.size() && line[line.size() - 1 - spaces] == ' ') {
+            ++spaces;
+        }
+        edit(from - spaces, from, "  \n", EditKind::Other);
     } else {
         insert("\n\n", EditKind::Other);  // a new paragraph
     }
@@ -1206,7 +1234,9 @@ QVariant MarkdownEditor::inputMethodQuery(Qt::InputMethodQuery query) const {
         case Qt::ImHints:
             return static_cast<int>(Qt::ImhMultiLine);
         case Qt::ImEnterKeyType:
-            return static_cast<int>(Qt::EnterKeyReturn);
+            // Default, as Qt's multi-line text areas: with Return, Qt's Android input makes Enter the keyboard's
+            // "done" key for a multi-line text, which closes the keyboard instead of starting a new line
+            return static_cast<int>(Qt::EnterKeyDefault);
         default:
             return {};
     }

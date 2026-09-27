@@ -9,6 +9,9 @@ import QtQuick.Controls.Material
 
 ToolButton {
     id: control
+    // A tap or click does not take the focus (the keys stay with the page, and the text being written keeps the
+    // on-screen keyboard); Tab still reaches it
+    focusPolicy: Qt.TabFocus
     property string iconName: ""
     /// What the tool tip says (may name the shortcut and what a long press does)
     property string tip: ""

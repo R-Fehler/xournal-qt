@@ -13,6 +13,7 @@
 #include <cairo.h>
 
 #include <QKeySequence>
+#include <QLoggingCategory>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QKeyEvent>
@@ -467,7 +468,11 @@ void DocumentCanvasItem::setView(QObject* object) {
             if (editing) {
                 forceActiveFocus(Qt::OtherFocusReason);
                 QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
-                QGuiApplication::inputMethod()->show();  // tablets: the on-screen keyboard
+                // Android: the canvas took the focus (at the press) before it took text, and the keyboard was bound
+                // to no input then; reset() makes it bind again, now to the text. Without it the keyboard shows,
+                // but what is typed goes nowhere.
+                QGuiApplication::inputMethod()->reset();
+                QGuiApplication::inputMethod()->show();  // tablets and phones: the on-screen keyboard
             } else {
                 QGuiApplication::inputMethod()->hide();
                 QGuiApplication::inputMethod()->update(Qt::ImEnabled);
@@ -638,6 +643,11 @@ void DocumentCanvasItem::takeKeyboardFocus() {
     // sidebar or grid that may have had the focus.
     if (!hasActiveFocus()) {
         forceActiveFocus(Qt::MouseFocusReason);
+    }
+    // A tap on the text being written brings the on-screen keyboard back (Android shows it only when asked)
+    if (textEditing() && !QGuiApplication::inputMethod()->isVisible()) {
+        QGuiApplication::inputMethod()->update(Qt::ImQueryAll);
+        QGuiApplication::inputMethod()->show();
     }
 }
 
@@ -829,7 +839,12 @@ bool DocumentCanvasItem::event(QEvent* e) {
     return QQuickItem::event(e);
 }
 
+// The text the on-screen keyboard (or an input method) sends, and what it asks: QT_LOGGING_RULES="xqt.input.text=true"
+// (on Android through the launch intent, qt/docs/android.md)
+Q_LOGGING_CATEGORY(lcInputText, "xqt.input.text", QtWarningMsg)
+
 void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
+    qCDebug(lcInputText) << "keyPressEvent" << e->key() << e->text();
     xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr;
     if (!editor && canvasView && !e->text().isEmpty() && e->text().at(0).isPrint() &&
         !(e->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) &&
@@ -852,6 +867,9 @@ void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
 }
 
 void DocumentCanvasItem::inputMethodEvent(QInputMethodEvent* e) {
+    qCDebug(lcInputText) << "inputMethodEvent commit" << e->commitString() << "preedit" << e->preeditString()
+                         << "replace" << e->replacementStart() << e->replacementLength() << "editing"
+                         << (canvasView && canvasView->getTextInput() != nullptr);
     if (xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr) {
         editor->inputMethodEvent(e);
         canvasView->refreshEmojiCompletion();
@@ -909,6 +927,9 @@ bool DocumentCanvasItem::insertText(const QString& text) {
 
 QVariant DocumentCanvasItem::inputMethodQuery(Qt::InputMethodQuery query) const {
     xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr;
+    if (lcInputText().isDebugEnabled() && query != Qt::ImCursorRectangle && query != Qt::ImAnchorRectangle) {
+        qCDebug(lcInputText) << "inputMethodQuery" << query << "editing" << (editor != nullptr);
+    }
     if (!editor) {
         return query == Qt::ImEnabled ? QVariant(false) : QQuickItem::inputMethodQuery(query);
     }

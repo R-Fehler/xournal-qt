@@ -55,6 +55,22 @@ adb shell am start -n org.xournalqt.app/.XournalActivity
 adb logcat --pid=$(adb shell pidof org.xournalqt.app)       # the app's log (Qt warnings have the tag "default")
 ```
 
+Logging categories go in through the launch intent (the APK is debuggable; `extraenvvars_<NAME>` sets `<NAME>` before
+Qt starts). The on-screen keyboard, for example: what Qt's Android input does (`qt.qpa.input.methods`, "@@@ COMMIT"
+and so on), where the focus goes (`qt.quick.focus`) and what the page gets and answers (`xqt.input.text`):
+
+```sh
+adb shell "am start -n org.xournalqt.app/.XournalActivity --es extraenvvars_QT_LOGGING_RULES \
+  'qt.qpa.input.methods=true;qt.quick.focus=true;xqt.input.text=true'"
+```
+
+(The quotes matter: the phone's shell splits at the semicolons otherwise. The app must not be running already.)
+What the keyboard needs from the page (learnt 2026-09-27 on the Fold 7): the focus stays on it while text is
+written (a closing popup gives the focus back to its button or the window: the page takes it back), it has a Qt
+property `inputMethodHints` (else Qt's Android input drops every letter; only Enter arrives), reset() when it starts
+taking text (the keyboard binds again), an explicit show() on a tap, and `ImEnterKeyType` Default for a multi-line
+text (Return makes Enter the "done" key, which closes the keyboard).
+
 Or copy the APK to the phone and open it (allow installing from the file manager). The app is "Xournal Qt",
 package `org.xournalqt.app`. A document can be opened at start from adb (debug builds only):
 `adb shell am start -S -n org.xournalqt.app/.XournalActivity -e applicationArguments <path>`.

@@ -9,7 +9,11 @@ into a `.md`. Plain text files (`.txt`) are edited the same way, as plain text (
   [markdown-boxes.md](markdown-boxes.md), "Flowing onto pages"). It is written as a Markdown text on the page: the
   block with the cursor shows its Markdown (the marks dimmed), the others are shown formatted, and the pages follow
   while typing. All keys of the Markdown text written on the page work (Enter continues a list, Ctrl+B / I / E / K,
-  Ctrl+1 / 2 / 3 / 0, Tab / Shift+Tab, …). Formulas (`$…$`, `$$…$$`) are drawn, and the block with the cursor
+  Ctrl+1 / 2 / 3 / 0, Tab / Shift+Tab, …). **Enter** in a paragraph is a line break of the same paragraph (two
+  spaces at the line's end, as Markdown needs: a single newline shows as a space), and Enter at once again, on the
+  empty line, makes it a new paragraph; Shift+Enter starts a paragraph at once. One rule on every device, as note
+  apps do it (a phone's keyboard has no Shift+Enter; decided 2026-09-27). After a heading, a code fence, a table or
+  a formula block Enter starts the next block as before. Formulas (`$…$`, `$$…$$`) are drawn, and the block with the cursor
   shows their source ([markdown-boxes.md](markdown-boxes.md), "Math"). So are images (`![](name.assets/…)`,
   [md-images.md](md-images.md)).
 - **Whatever the tool**, the pen and the mouse put the cursor where they press, and a drag selects. A finger

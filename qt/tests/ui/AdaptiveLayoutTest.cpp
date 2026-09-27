@@ -3487,3 +3487,49 @@ TEST_F(SafeAreasKeyboardTest, theHomeScreensIconButtonsHaveShortLabels) {
     walk(named("homeView"));
     EXPECT_GE(seen, 10);
 }
+
+// Writing on the page chosen from the sheet of all tools keeps the focus on the page, also after the sheet's closing
+// animation (a closing popup gives the focus back to what had it: the window or the button; on Android the on-screen
+// keyboard closes as soon as something that takes no text has the focus); a tap on a dock button takes no focus
+TEST_F(PhoneChromeTest, writingChosenFromTheSheetKeepsTheFocusOnThePage) {
+    openDocument();
+    resize(412, 915);
+    auto* canvas = named("canvas");
+    ASSERT_NE(canvas, nullptr);
+    click(findItem("dockToolsButton"));
+    auto* toolSheet = window->findChild<QObject*>("phoneToolSheet");
+    ASSERT_TRUE(opened(toolSheet, true));
+    settled(toolSheet);
+    click(findItem("toolCell_write"));
+    EXPECT_TRUE(opened(toolSheet, false));
+    until([&] { return controller->markdownOnPage(); });
+    ASSERT_TRUE(controller->markdownOnPage());
+    wait(600);  // (the sheet's closing animation is over)
+    EXPECT_TRUE(canvas->hasActiveFocus()) << "the page keeps the focus while its text is written";
+    EXPECT_TRUE(canvas->property("textEditing").toBool());
+    EXPECT_EQ(canvas->inputMethodQuery(Qt::ImEnabled).toBool(), true);
+    // Qt's Android input drops the keyboard's text for a focus object without this property (only Enter arrives)
+    EXPECT_TRUE(canvas->property("inputMethodHints").isValid()) << "the keyboard's text reaches the page";
+    // Enter starts a new line: with EnterKeyReturn, Qt's Android input makes it the "done" key of a multi-line text,
+    // which closes the keyboard
+    EXPECT_EQ(canvas->inputMethodQuery(Qt::ImEnterKeyType).toInt(), static_cast<int>(Qt::EnterKeyDefault));
+    EXPECT_TRUE(canvas->inputMethodQuery(Qt::ImHints).toInt() & Qt::ImhMultiLine);
+
+    // What Android does (the device's log): the closing sheet gives the focus back to the button that opened it, or to
+    // the window; the page takes it back while its text is written
+    findItem("dockToolsButton")->forceActiveFocus();
+    until([&] { return canvas->hasActiveFocus(); });
+    EXPECT_TRUE(canvas->hasActiveFocus()) << "back from the button";
+    window->contentItem()->forceActiveFocus();
+    until([&] { return canvas->hasActiveFocus(); });
+    EXPECT_TRUE(canvas->hasActiveFocus()) << "back from the window";
+    // A tap on a tool button never takes the focus (Tab still reaches it)
+    EXPECT_EQ(findItem("dockUndoButton")->property("focusPolicy").toInt(), static_cast<int>(Qt::TabFocus));
+    EXPECT_EQ(findItem("dockToolsButton")->property("focusPolicy").toInt(), static_cast<int>(Qt::TabFocus));
+    // Not while nothing is written: the button keeps it then
+    controller->endMarkdownOnPage();
+    until([&] { return !canvas->property("textEditing").toBool(); });
+    findItem("dockToolsButton")->forceActiveFocus();
+    wait(100);
+    EXPECT_FALSE(canvas->hasActiveFocus()) << "no text written: the focus stays where it went";
+}

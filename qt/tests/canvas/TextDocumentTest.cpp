@@ -166,7 +166,7 @@ TEST_F(TextDocumentTest, anEditIsWrittenBackAndTheRestStaysByteForByte) {
     EXPECT_FALSE(session->isModified());
     // A new line in a Windows file ends in "\r\n"
     cursorBefore("The end.");
-    key(Qt::Key_Return, "\r", Qt::ShiftModifier);  // (a line of the same paragraph)
+    key(Qt::Key_Return, "\r", Qt::ShiftModifier);  // (before a line's text: one line more)
     ASSERT_TRUE(session->save().ok);
     expected.insert(expected.find("The end."), "\r\n");
     EXPECT_EQ(readFile(p), expected);

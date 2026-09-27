@@ -239,7 +239,7 @@ TEST_F(MarkdownEditorTest, searchHitsFollowTheTextAsItIsDrawnWhileWriting) {
 // a formula drawn puts the cursor into its source (its block shows it then).
 TEST_F(MarkdownEditorTest, formulaBlocksAreWrittenAndATapGoesIntoAFormula) {
     MarkdownEditor& ed = start();
-    type("Energy $E=mc^2$ here\n");
+    type("Energy $E=mc^2$ here\n\n");  // (Enter twice: a paragraph)
     type("$$\n\\sum_k k\n$$\n");
     type("After");
     EXPECT_EQ(ed.text(), "Energy $E=mc^2$ here\n\n$$\n\\sum_k k\n$$\n\nAfter");
@@ -281,7 +281,7 @@ TEST_F(MarkdownEditorTest, formulaBlocksAreWrittenAndATapGoesIntoAFormula) {
 // where they were tapped; Enter in a "\[" block that is not closed is a line of the formula.
 TEST_F(MarkdownEditorTest, texDelimitersKeepThePlacesOfTheText) {
     MarkdownEditor& ed = start();
-    type("Energy \\(x^2\\) and \\(y\\) then words\n");
+    type("Energy \\(x^2\\) and \\(y\\) then words\n\n");  // (Enter twice: a paragraph)
     type("\\[\nz\n\\]\n");
     type("After");
     EXPECT_EQ(ed.text(), "Energy \\(x^2\\) and \\(y\\) then words\n\n\\[\nz\n\\]\n\nAfter");
@@ -316,7 +316,7 @@ TEST_F(MarkdownEditorTest, texDelimitersKeepThePlacesOfTheText) {
 // Obsidian and GitHub too), in one undo step; not in code, not next to a letter.
 TEST_F(MarkdownEditorTest, pastedTexDelimitersBecomeDollars) {
     MarkdownEditor& ed = start();
-    type("Intro\n");
+    type("Intro\n\n");  // (Enter twice: a paragraph)
     QGuiApplication::clipboard()->setText("The energy \\(E = mc^2\\) and\r\n\\[\r\n\\sum_k k\r\n\\]\r\nthe \\(n\\)th");
     key(Qt::Key_V, {}, Qt::ControlModifier);
     EXPECT_EQ(ed.text(), "Intro\n\nThe energy $E = mc^2$ and\n$$\n\\sum_k k\n$$\nthe \\(n\\)th");
@@ -334,7 +334,7 @@ TEST_F(MarkdownEditorTest, pastedTexDelimitersBecomeDollars) {
 TEST_F(MarkdownEditorTest, formattingToolsAreOneUndoStepEach) {
     MarkdownEditor& editor = start();
     QSignalSpy cursorMoved(view.get(), &CanvasView::markdownCursorChanged);
-    type("one\ntwo");
+    type("one\n\ntwo");  // (Enter twice: a paragraph)
     EXPECT_GT(cursorMoved.count(), 0);
     EXPECT_EQ(editor.text(), "one\n\ntwo");
     // Both paragraphs selected: a bullet list, one step
@@ -365,4 +365,22 @@ TEST_F(MarkdownEditorTest, formattingToolsAreOneUndoStepEach) {
     EXPECT_EQ(editor.text(), "- one\n\ntwo");
     editor.undo();
     EXPECT_EQ(editor.text(), "- one\n\n## two") << "each tool: one step";
+}
+
+// Enter writes a line break of the same paragraph, two spaces at the line's end (a single newline shows as a space);
+// Enter at once again, on the empty line, makes it a paragraph; Shift+Enter starts a paragraph; a list goes on
+TEST_F(MarkdownEditorTest, enterIsALineBreakAndEnterTwiceAParagraph) {
+    MarkdownEditor& editor = start();
+    type("one\ntwo ");
+    EXPECT_EQ(editor.text(), "one  \ntwo ");
+    key(Qt::Key_Return);
+    type("three");
+    EXPECT_EQ(editor.text(), "one  \ntwo  \nthree") << "(a space already typed counts: two in all)";
+    key(Qt::Key_Return);
+    key(Qt::Key_Return);
+    type("four");
+    EXPECT_EQ(editor.text(), "one  \ntwo  \nthree\n\nfour") << "Enter twice: a paragraph";
+    key(Qt::Key_Return, {}, Qt::ShiftModifier);
+    type("five\n\n- a\nb");
+    EXPECT_EQ(editor.text(), "one  \ntwo  \nthree\n\nfour\n\nfive\n\n- a\n- b") << "Shift+Enter a paragraph; the list goes on";
 }

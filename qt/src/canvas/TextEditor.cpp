@@ -440,7 +440,9 @@ QVariant TextEditor::inputMethodQuery(Qt::InputMethodQuery query) const {
         case Qt::ImHints:
             return static_cast<int>(Qt::ImhMultiLine);
         case Qt::ImEnterKeyType:
-            return static_cast<int>(Qt::EnterKeyReturn);
+            // Default, as Qt's multi-line text areas: with Return, Qt's Android input makes Enter the keyboard's
+            // "done" key for a multi-line text, which closes the keyboard instead of starting a new line
+            return static_cast<int>(Qt::EnterKeyDefault);
         default:
             return {};
     }
