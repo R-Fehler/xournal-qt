@@ -2617,6 +2617,20 @@ TEST_F(PhoneChromeTest, theAppBarAndTheDockAtAPhonesSizes) {
             QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
             wait(100);
         }
+        // (under load the bar and the dock lay themselves out a little after the resize)
+        until([&] {
+            auto* bar = named("phoneAppBar");
+            if (!phoneChrome() || !bar || !named("phoneDock") || !named("phoneDock")->isVisible()) {
+                return false;
+            }
+            for (const char* name: {"phoneHomeButton", "phoneTitle", "phoneTabCount", "moreButton", "dockPageButton"}) {
+                auto* item = findItem(name);
+                if (!item || !shownInWindow(item)) {
+                    return false;
+                }
+            }
+            return sceneRect(bar).adjusted(-1, -1, 1, 1).contains(sceneRect(findItem("moreButton")));
+        });
         ASSERT_TRUE(phoneChrome()) << at;
         checkPhoneChrome(at);
         EXPECT_TRUE(shownInWindow(findItem("phoneTabDots"))) << at << ": the dots under the title";
