@@ -116,6 +116,13 @@ AdaptiveLayout::~AdaptiveLayout() {
     qApp->removeEventFilter(this);
 }
 
+void AdaptiveLayout::setMobilePlatform(bool on) {
+    if (on != mobile) {
+        mobile = on;
+        Q_EMIT platformChanged();
+    }
+}
+
 void AdaptiveLayout::watchBeforeCanvases() {
     for (AdaptiveLayout* a: instances()) {
         qApp->installEventFilter(a);  // (installed again: moved to the front)

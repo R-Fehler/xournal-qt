@@ -34,6 +34,7 @@ void TabManager::searchChanged(const DocumentSession* s, bool finished) {
 }
 
 TabManager::TabManager(AppContext& app, QObject* parent): QAbstractListModel(parent), app(app) {
+    connect(this, &TabManager::currentIndexChanged, this, &TabManager::noteUsed);
     searchRefresh.setSingleShot(true);
     searchRefresh.setInterval(150);
     connect(&searchRefresh, &QTimer::timeout, this, [this] {
@@ -261,6 +262,7 @@ std::unique_ptr<TabManager::Tab> TabManager::takeTab(int index) {
     disconnect(&s->search(), nullptr, this, nullptr);
     searchPending.erase(s);
 
+    forgetUsed(s);
     std::unique_ptr<Tab> tab;
     beginRemoveRows(QModelIndex(), index, index);
     tab = std::make_unique<Tab>(std::move(tabs[static_cast<size_t>(index)]));
@@ -296,6 +298,7 @@ void TabManager::closeTab(int index) {
         return;
     }
     const bool wasCurrent = index == current;
+    forgetUsed(tabs[static_cast<size_t>(index)].session.get());
     rememberPlace(tabs[static_cast<size_t>(index)].session.get());
     searchPending.erase(tabs[static_cast<size_t>(index)].session.get());
     beginRemoveRows(QModelIndex(), index, index);
@@ -356,6 +359,43 @@ void TabManager::setCurrentIndex(int index) {
     backgroundChanged(old);
     Q_EMIT currentIndexChanged();
     Q_EMIT currentTabChanged();
+}
+
+void TabManager::noteUsed() {
+    const DocumentSession* s = session(current);
+    if (!s || (!used.empty() && used.front() == s)) {
+        return;
+    }
+    std::erase(used, s);
+    used.insert(used.begin(), s);
+    Q_EMIT usedOrderChanged();
+}
+
+void TabManager::forgetUsed(const DocumentSession* s) {
+    if (std::erase(used, s) > 0) {
+        Q_EMIT usedOrderChanged();
+    }
+}
+
+std::vector<int> TabManager::usedOrder() const {
+    std::vector<int> order;
+    for (const DocumentSession* s: used) {
+        if (const int row = rowOf(s); row >= 0) {
+            order.push_back(row);
+        }
+    }
+    // (tabs never shown yet, e.g. opened together in the background: after the used ones, in their order)
+    for (int i = 0; i < count(); ++i) {
+        if (std::find(order.begin(), order.end(), i) == order.end()) {
+            order.push_back(i);
+        }
+    }
+    return order;
+}
+
+int TabManager::previousUsed() const {
+    const auto order = usedOrder();
+    return order.size() > 1 && order.front() == current ? order[1] : -1;
 }
 
 void TabManager::backgroundChanged(int oldCurrent) {

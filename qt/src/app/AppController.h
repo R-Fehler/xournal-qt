@@ -757,6 +757,11 @@ public:
     Q_INVOKABLE void moveTab(int from, int to);
     Q_INVOKABLE void nextTab();
     Q_INVOKABLE void previousTab();
+    /// The open documents in the order they were used, the current one first (a phone's sheet of recent tabs)
+    Q_INVOKABLE QList<int> tabsByUse() const;
+    /// Back to the document used before the current one, like Alt+Tab (a double tap on a phone's tab count); from the
+    /// home screen: the document behind it
+    Q_INVOKABLE void previousUsedTab();
     Q_INVOKABLE int tabCount() const;
     Q_INVOKABLE bool tabModified(int index) const;
     Q_INVOKABLE QString tabTitle(int index) const;

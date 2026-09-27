@@ -161,6 +161,34 @@ TEST(Tabs, modelDataAndMoving) {
     EXPECT_EQ(tabs.data(tabs.index(1), TabManager::TitleRole).toString(), "test1.xoj");
 }
 
+// The order of use (a phone's recent tabs, the double tap on its tab count): the current one first, then the one used
+// before it, like Alt+Tab; a closed tab leaves it, moving a tab keeps it
+TEST(Tabs, theOrderOfUse) {
+    AppController c;
+    c.newDocument();
+    c.newDocument();
+    c.newDocument();
+    ASSERT_EQ(c.tabCount(), 3);  // A B C, C current
+    EXPECT_EQ(c.tabsByUse(), (QList<int>{2, 1, 0}));
+    c.setCurrentTab(0);  // A
+    c.setCurrentTab(2);  // C
+    EXPECT_EQ(c.tabsByUse(), (QList<int>{2, 0, 1}));
+    c.previousUsedTab();
+    EXPECT_EQ(c.currentTab(), 0) << "back to the one used before";
+    c.previousUsedTab();
+    EXPECT_EQ(c.currentTab(), 2) << "and again: to and fro";
+    c.moveTab(2, 0);  // C A B
+    EXPECT_EQ(c.tabsByUse(), (QList<int>{0, 1, 2})) << "moving keeps the order of use";
+    c.closeTab(1);  // A goes: C B
+    EXPECT_EQ(c.tabsByUse(), (QList<int>{0, 1}));
+    c.previousUsedTab();
+    EXPECT_EQ(c.currentTab(), 1);
+    c.setHomeVisible(true);
+    c.previousUsedTab();
+    EXPECT_FALSE(c.homeVisible()) << "from the home screen: the document behind it";
+    EXPECT_EQ(c.currentTab(), 1);
+}
+
 TEST(SingleInstanceTest, filesAreHandedToTheRunningInstance) {
     const QString key = QString("xqt-test-%1").arg(QCoreApplication::applicationPid());
     SingleInstance primary(key);

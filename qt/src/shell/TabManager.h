@@ -120,6 +120,11 @@ public:
     bool referenceEditable(int index) const;
     void setReferenceEditable(int index, bool on);
 
+    /// The tabs in the order they were used, the current one first (the order of Alt+Tab; a phone's recent-tabs sheet)
+    std::vector<int> usedOrder() const;
+    /// The tab used before the current one (-1: none): a double tap on a phone's tab count goes back to it
+    int previousUsed() const;
+
     /// The picture of a tab may be another one now (its title page was chosen).
     void thumbnailChanged(const DocumentSession* s) { tabDataChanged(s, {ThumbnailRole}); }
 
@@ -134,6 +139,8 @@ Q_SIGNALS:
     void pdfPagesFailed(const QString& error);
     /// A tab got another reference, or lost it (its reference was closed or moved to another window).
     void referencesChanged();
+    /// Another tab was used, or one went (usedOrder)
+    void usedOrderChanged();
 
 private:
     /// The tab reports to this list (and stops reporting to the one it came from).
@@ -146,6 +153,10 @@ private:
     void forgetReferencesTo(const DocumentSession* s);
     /// Which tab is marked as the reference of the current one (ReferenceRole)
     void referenceMarksChanged();
+    /// The current tab is the one used last now (usedOrder)
+    void noteUsed();
+    /// A tab goes: out of the order of use
+    void forgetUsed(const DocumentSession* s);
 
     /// Hits found while a search runs are told in one go now and then (rebuilding the list of pages with hits
     /// makes the overview build its previews again).
@@ -156,6 +167,8 @@ private:
     QTimer searchRefresh;
     std::set<const DocumentSession*> searchPending;
     int current = -1;
+    /// The sessions in the order they were used, the one used last first
+    std::vector<const DocumentSession*> used;
 };
 
 }  // namespace xqt
