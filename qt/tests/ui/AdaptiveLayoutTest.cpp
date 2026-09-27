@@ -464,6 +464,12 @@ protected:
         return popup->property("opened").toBool() == open;
     }
     QObject* sheet() const { return window->findChild<QObject*>("menuSheet"); }
+    /// The keys go to the menu sheet (its Esc and back: a level up)
+    bool sheetHasTheKeys() const {
+        auto* content = sheet()->property("contentItem").value<QQuickItem*>();
+        QQuickItem* focus = window->activeFocusItem();
+        return content && focus && (focus == content || content->isAncestorOf(focus));
+    }
     /// Until a popup's enter transition is over (a menu grows in, a sheet slides in): it is where it stays
     void settled(QObject* popup) {
         until([&] {
@@ -1296,6 +1302,9 @@ TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
         QObject* newMenu = window->findChild<QObject*>("newMenu");
         QObject* viewMenu = window->findChild<QObject*>("homeViewMenu");
         auto openMenu = [&](QObject* menu, const char* button) {
+            // (after an entry is chosen the menu fades out for a moment: a click on its button meanwhile does not
+            // open it again, in Qt 6.8)
+            until([&] { return !(phone ? sheet() : menu)->property("visible").toBool(); });
             click(findItem(button));
             ASSERT_TRUE(opened(phone ? sheet() : menu, true)) << at << ": " << button;
             settled(phone ? sheet() : menu);
@@ -1352,6 +1361,11 @@ TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
             QMetaObject::invokeMethod(d, "close");
             until([&] { return !d->property("visible").toBool(); });
             ASSERT_FALSE(d->property("visible").toBool()) << e.dialog;
+            // (Qt 6.8's own file and folder dialogs are windows of their own; off-screen nothing gives the keys back
+            // to the app's window when one closes, as a window manager does)
+            window->requestActivate();
+            until([&] { return QGuiApplication::focusWindow() == window; });
+            ASSERT_EQ(QGuiApplication::focusWindow(), window) << e.dialog;
             wait(100);
         }
 
@@ -1406,6 +1420,10 @@ TEST_F(AdaptiveLayoutTest, theHomeScreensPlusAndViewMenusWork) {
                 << at << ": still open";
         click(findItem("viewShowDefaults"));
         EXPECT_FALSE(library->property("showFiltered").toBool()) << at << ": Defaults";
+        if (phone) {
+            // (Esc and back go to it, below)
+            EXPECT_TRUE(sheetHasTheKeys()) << at << ": Esc and back still reach the sheet";
+        }
         closeMenus();
 
         // View: the size of the cards (the menu stays open)
