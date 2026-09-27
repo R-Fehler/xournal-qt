@@ -7,6 +7,7 @@
 | `.github/workflows/xqt-build.yml` | every push and pull request to `master-qt` | builds in a Debian 13 container (Qt 6.8) and runs all tests |
 | `.github/workflows/xqt-release.yml` | a tag `v1.2.3`, or started by hand | builds, tests, packages, and opens a **draft** release with the packages |
 | `.github/workflows/xqt-windows.yml` | started by hand, or a push to `qt/windows-build` | builds for Windows in MSYS2 UCRT64 and publishes a portable zip ([windows.md](windows.md)) |
+| `.github/workflows/xqt-macos.yml` | started by hand, or a push to `qt/macos-build` | builds for macOS (Apple Silicon) with Homebrew and publishes an unsigned `.dmg` ([macos.md](macos.md)) |
 
 The upstream Xournal++ workflows in the same folder stay dormant here: they only run for pull requests to `master`
 or carry `if: github.repository == 'xournalpp/xournalpp'`.
@@ -65,17 +66,18 @@ Android (vcpkg, qpdf 12.4) use their package manager's qpdf, which is new enough
 Since 0.4.0 every release also carries the **Windows** portable zip and the **Android** APK: the release workflow
 calls `xqt-windows.yml` and `xqt-android.yml` (both also run by hand) and puts `xournal-qt-<version>-windows-x64.zip`
 and `xournal-qt-<version>-android-arm64.apk` (signed with the release key from the repository secrets; Android 9 or
-newer, arm64) into the draft. **macOS** would need no other machine either (GitHub's `macos-14` runners); what is
-missing is the environment, the packaging and, for a smooth first start, Apple's signing and notarization:
+newer, arm64) into the draft. **macOS** is built as well, but not yet part of a release:
 
-- **macOS**: Homebrew has everything the core needs (`glib`, `cairo`, `pango`, `poppler`, `libzip`, `qpdf`,
-  `gdk-pixbuf`, `qt@6`, and `kf6-syntax-highlighting` for code blocks). The app bundle and the `.dmg` come from
-  `macdeployqt` (it takes the QML modules with `-qmldir=qt/src/app/qml`). Upstream's `mac-setup/` does the same for
-  the GTK build and shows the shape of the job.
+- **macOS**: a first build exists (`xqt-macos.yml`, [macos.md](macos.md)): Homebrew's libraries and Qt on GitHub's
+  `macos-15` runner (Apple Silicon), `macdeployqt -qmldir=qt/src/app/qml`, `xournal-qt.app` in a `.dmg`
+  (`xournal-qt-<version>-macos-arm64.dmg`, artifact `xournal-qt-macos-arm64`). It has an ad-hoc signature only, so
+  macOS asks before the first start ("Open Anyway"), and it needs macOS 15 or newer. The workflow can be called
+  (`workflow_call`), but the release workflow does not call it yet. Missing: Apple's signing and notarization (a
+  Developer ID certificate and an App Store Connect API key as secrets, see macos.md), an Intel build (Homebrew has
+  no Intel bottles any more), and a try on a real Mac.
 - **Windows**: a first build exists (`xqt-windows.yml`, [windows.md](windows.md)): MSYS2 (UCRT64) packages,
   `windeployqt --qmldir qt/src/app/qml`, a portable zip, no installer yet. Upstream's `windows-setup/` builds an
   NSIS installer that can be reused ([windows-roadmap.md](windows-roadmap.md)).
 - Open questions on both: the pen and touch input (Qt's tablet events on Windows Ink and on macOS), the file
-  associations, and the places where the fork writes its settings and cache (`Util::getCacheSubfolder`).
-
-Until then macOS is not built; Windows has no installer and no file associations yet.
+  associations (declared in the macOS bundle, untested; none on Windows yet), and the places where the fork writes
+  its settings and cache (`Util::getCacheSubfolder`: GLib's XDG folders, `~/.config` and `~/.cache` on macOS).

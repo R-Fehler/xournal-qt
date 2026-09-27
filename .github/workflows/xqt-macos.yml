@@ -24,9 +24,9 @@ jobs:
           # pango and qpdf for macOS 15 and newer only; on 14 it would compile them. The app then needs macOS 15.
           - arch: arm64
             runner: macos-15
-          # Intel: GitHub still has Intel runners (macos-15-intel), but Homebrew no longer builds bottles for Intel
-          # Macs (Tier 3 since September 2026): every library, Qt included, would be compiled from source in the job,
-          # for hours. See qt/docs/macos.md, "Intel Macs".
+          # Intel: GitHub still has Intel runners (macos-15-intel), but Homebrew no longer publishes bottles for Intel
+          # Macs (qtbase, glib, pango, poppler, qpdf: Apple Silicon and Linux only): every library, Qt included, would
+          # be compiled from source in the job, for hours. See qt/docs/macos.md, "Intel Macs".
           # - arch: x86_64
           #   runner: macos-15-intel
     runs-on: ${{ matrix.runner }}
