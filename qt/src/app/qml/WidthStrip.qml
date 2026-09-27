@@ -139,16 +139,33 @@ Item {
         id: widthChoices
         objectName: "widthChoices"
         focus: true  // (Esc closes it)
-        background: Rectangle { radius: 12; color: "#ffffff"; border.width: 1; border.color: "#d5d8dc" }
-        parent: widthButton
-        x: strip.side === "left" ? parent.width + 4 : strip.side === "right" ? -width - 4 : 0
-        y: strip.side === "top" ? parent.height + 4 : strip.side === "bottom" ? -height - 4 : 0
-        margins: 8
+        background: Rectangle {
+            radius: widthChoices.asSheet ? 16 : 12
+            color: "#ffffff"
+            border.width: widthChoices.asSheet ? 0 : 1
+            border.color: "#d5d8dc"
+        }
+        /// In the phone classes a bottom sheet (qt/docs/adaptive-layout.md, "The phone chrome")
+        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout
+        modal: asSheet
+        dim: asSheet
+        width: asSheet && parent ? Math.min(parent.width, 640) : implicitWidth
+        bottomPadding: asSheet && typeof win !== "undefined" && win ? 8 + 8 + win.safeBottom : 8
+        parent: asSheet ? Overlay.overlay : widthButton
+        x: asSheet ? Math.round((parent.width - width) / 2)
+           : strip.side === "left" ? parent.width + 4 : strip.side === "right" ? -width - 4 : 0
+        y: asSheet ? parent.height - height
+           : strip.side === "top" ? parent.height + 4 : strip.side === "bottom" ? -height - 4 : 0
+        margins: asSheet ? 0 : 8
         padding: 8
+        leftPadding: asSheet ? 16 : 8
+        rightPadding: asSheet ? 16 : 8
         Column {
             spacing: 4
+            Shortcut { sequence: "Back"; enabled: widthChoices.opened; onActivated: widthChoices.close() }  // (Android's back key)
             Label { text: qsTr("Width"); font.weight: Font.DemiBold; color: "#5f6368"; leftPadding: 4 }
             Row {
+                spacing: widthChoices.asSheet ? 8 : 0
                 Repeater {
                     model: 5
                     delegate: WidthButton {

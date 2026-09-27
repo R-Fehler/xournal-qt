@@ -394,7 +394,7 @@ Rectangle {
             // Where we are in the library (crumbBar): here on a phone held sideways, else in a row of its own below
             Item {
                 id: headerCrumbSlot
-                visible: home.shortLayout && home.page === 0 && app.library.available
+                visible: home.shortLayout && home.page === 0 && app.library.available && crumbBar.needed
                 Layout.fillWidth: true
                 Layout.minimumWidth: 80
                 Layout.preferredWidth: 320
@@ -706,7 +706,8 @@ Rectangle {
         // --- where we are in the library (crumbBar; on a phone held sideways in the header instead) ---
         Item {
             id: crumbRowSlot
-            visible: !home.shortLayout && home.page === 0 && app.library.available
+            objectName: "crumbRow"
+            visible: !home.shortLayout && home.page === 0 && app.library.available && crumbBar.needed
             Layout.fillWidth: true
             Layout.leftMargin: 16
             Layout.rightMargin: 16
@@ -1574,6 +1575,11 @@ Rectangle {
         anchors.fill: parent
         spacing: 2
         readonly property bool showCrumbs: !home.searching && !app.library.flat && !app.library.favouritesOnly
+        /// At the library's top the breadcrumbs would only repeat its name (the switch shows it): no row for them then,
+        /// unless it says what the library is doing (importing, indexing)
+        readonly property bool atRoot: showCrumbs && app.library.folder === ""
+        readonly property bool needed: !atRoot || app.library.importing
+                                       || (app.library.indexing && app.library.indexTotal > 0)
 
         IconButton {
             objectName: "folderUpButton"
@@ -1581,14 +1587,14 @@ Rectangle {
             tip: qsTr("Up (Backspace)")
             implicitWidth: home.touch ? 44 : 40
             implicitHeight: home.touch ? 44 : 40
-            visible: crumbBar.showCrumbs
+            visible: crumbBar.showCrumbs && !crumbBar.atRoot
             enabled: app.library.folder !== ""
             onClicked: app.library.goUp()
         }
         Item {
             id: crumbArea
             objectName: "crumbArea"
-            visible: crumbBar.showCrumbs
+            visible: crumbBar.showCrumbs && !crumbBar.atRoot
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumWidth: 0

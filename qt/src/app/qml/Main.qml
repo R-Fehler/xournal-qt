@@ -133,7 +133,7 @@ ApplicationWindow {
     }
     /// Beside the page: 38 % of the window, 360 to 600 px, never more than half of it (a small window keeps its page)
     readonly property real sourceSideWidth: {
-        const room = width - sideTools.width
+        const room = width - sideTools.width - (dockRail ? phoneDock.width : 0)
         return Math.round(Math.min(600, Math.max(Math.min(360, room * 0.5), width * 0.38)))
     }
     /// Below the page: the page's share of the height, dragged at the divider and remembered per size class
@@ -147,19 +147,39 @@ ApplicationWindow {
     readonly property real sourceBottomHeight: Math.round(contentItem.height
                                                           * (1 - (sourceShareLive >= 0 ? sourceShareLive : sourcePageShare)))
 
-    // The chrome: "full" (tab strip, tool bar, sidebar), "compact" (full screen's: the tab dots, the tool square, the
-    // pen pill, the view pill) or "reader" (no HUD; the corner mark brings it back). Separate from the window's state
-    // (windowFullScreen) and from presenting (black, page by page). Full screen (F11, fullScreenMode) is the compact
-    // chrome in a full-screen window; otherwise the chrome is what was chosen for this size class, else "full" (the
-    // automatic choices per class come with qt/compact-chrome).
+    // The chrome: "full" (tab strip, tool bar, sidebar; in the phone classes the app bar and the tool dock), "compact"
+    // (full screen's: the tab dots, the tool square, the pen pill, the view pill) or "reader" (no HUD; the corner mark
+    // brings it back). Separate from the window's state (windowFullScreen) and from presenting (black, page by page).
+    // Full screen (F11, fullScreenMode) is the compact chrome in a full-screen window; otherwise the chrome is what was
+    // chosen for this size class, else the automatic one: the reader in a tiny window, everywhere else "full".
     readonly property string chromeChoice: layoutChoice("chrome")
-    readonly property string chromeMode: chromeChoice === "reader" && !app.presenting ? "reader"
-                                         : (fullScreenMode || chromeChoice === "compact") ? "compact" : "full"
+    /// The automatic chrome of this size class: the reader only in a tiny window (under 360 px either way: split
+    /// screen, a pop-up window); elsewhere "Read" is chosen by hand (⋮ → View)
+    readonly property string chromeAuto: adaptive.layoutClass === "tiny" ? "reader" : "full"
+    /// The chrome of this size class: chosen by hand, else the automatic one
+    readonly property string chromeSetting: ["full", "compact", "reader"].indexOf(chromeChoice) >= 0 ? chromeChoice : chromeAuto
+    readonly property string chromeMode: chromeSetting === "reader" && !app.presenting ? "reader"
+                                         : (fullScreenMode || chromeSetting === "compact") ? "compact" : "full"
     readonly property bool fullChrome: chromeMode === "full"
     /// Nothing over the page but the page: presenting without controls, or the reader chrome
     readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible)
-    onHudHiddenChanged: if (hudHidden) quickTools.close()
-    function chooseChrome(mode) { chooseLayout("chrome", mode === "full" ? "" : mode) }
+    onHudHiddenChanged: if (hudHidden) { quickTools.close(); phoneToolSheet.close() }
+    function chooseChrome(mode) { chooseLayout("chrome", mode === chromeAuto ? "" : mode) }
+
+    // --- the phone chrome (qt/docs/adaptive-layout.md, "The phone chrome") -------------------------------------------
+    /// A phone class (by the layout class: "Adapt the layout" off keeps the desktop layout at every size)
+    readonly property bool phoneLayout: ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptive.layoutClass) >= 0
+    /// The full chrome of a phone: the app bar at the top (the library, the title, the tab count, ⋮) instead of the tab
+    /// strip, and the tool dock at the bottom instead of the tool bar, the pen pill and the view pill
+    readonly property bool phoneChrome: phoneLayout && fullChrome
+    /// The app bar: the phone chrome, and the home screen of a phone class in any chrome (the way back to the documents)
+    readonly property bool appBarShown: phoneLayout && (fullChrome || app.homeVisible)
+    /// The dock is a rail at the right side where the window is held sideways (a phone in landscape, or a tiny window
+    /// in landscape); in phone portrait always at the bottom
+    readonly property bool dockVertical: adaptive.orientation === "landscape" && adaptive.layoutClass !== "phonePortrait"
+    readonly property bool dockShown: phoneChrome && !app.homeVisible
+    /// The dock beside the page (a rail): what sits at the window's right edge ends at it
+    readonly property bool dockRail: dockShown && dockVertical
 
     // --- the tool bar's place (qt/docs/adaptive-layout.md, "The tool bar") ------------------------------------------
     /// Chosen by hand in this size class (⋮ → View → Tool bar position): "top", "twoRowsTop", "twoRowsBottom",
@@ -184,6 +204,7 @@ ApplicationWindow {
     readonly property bool twoToolRows: toolbarLayout === "twoRowsTop" || toolbarLayout === "twoRowsBottom"
     /// A text document's tool bar is merged into its format bar: one row, ⋮ at its end (F7.2)
     readonly property bool toolsInFormatBar: textDoc && formatBar.shown && !sideToolbar && fullChrome && !app.toolbarHidden
+                                             && !phoneChrome
     /// The cycling buttons' groups (ToolGroups.qml): the tool bar, the compact chrome's tools and the pen pill
     readonly property ToolGroups toolGroups: ToolGroups {}
     /// Opens a menu from an entry of another one: on a phone once the sheet of that one has gone
@@ -261,8 +282,9 @@ ApplicationWindow {
             else showNormal()
         }
     }
-    /// No tool bar: in the compact or reader chrome, or when it was put away - the small tool square takes over
-    readonly property bool noToolbar: !fullChrome || app.toolbarHidden
+    /// No tool bar: in the compact or reader chrome, or when it was put away - the small tool square takes over. (The
+    /// phone chrome has its dock instead, and nothing to put away.)
+    readonly property bool noToolbar: !fullChrome || (app.toolbarHidden && !phoneChrome)
     /// The document is a text file (a .md, a .txt): written with the keyboard, no ink tools (qt/docs/md-editor.md)
     readonly property bool textDoc: app.textDocument !== ""
     Connections {
@@ -492,12 +514,46 @@ ApplicationWindow {
     }
 
     header: Column {
+      // The phone classes: the app bar instead of the tab strip (qt/docs/adaptive-layout.md, "The phone chrome")
+      PhoneAppBar {
+        id: phoneAppBar
+        width: parent.width
+        topInset: win.safeTop
+        visible: win.appBarShown
+        onOverviewRequested: tabOverview.open()
+        onRecentRequested: Popups.openAt(recentTabsMenu)
+        // The documents used lately, the current one first: pick one
+        AdaptiveMenu {
+            id: recentTabsMenu
+            objectName: "recentTabsMenu"
+            title: qsTr("Used lately")
+            titleShown: true
+            property var order: []
+            onAboutToShow: order = app.tabsByUse()
+            Instantiator {
+                model: recentTabsMenu.order
+                delegate: AdaptiveMenuItem {
+                    required property int modelData
+                    objectName: "recentTab_" + modelData
+                    text: (recentTabsMenu.order, (app.tabModified(modelData) ? "● " : "") + app.tabTitle(modelData))
+                    checkable: true
+                    checked: modelData === app.currentTab && !app.homeVisible
+                    onTriggered: app.currentTab = modelData
+                }
+                onObjectAdded: function(index, object) { recentTabsMenu.insertItem(index, object) }
+                onObjectRemoved: function(index, object) { recentTabsMenu.removeItem(object) }
+            }
+        }
+      }
       TabStrip {
         id: tabStrip
         objectName: "tabStrip"
         width: parent.width
         topInset: win.safeTop
-        visible: win.fullChrome || app.homeVisible  // (the home screen keeps it: the way back to the documents)
+        // (the home screen keeps it: the way back to the documents; the phone classes have the app bar instead)
+        visible: (win.fullChrome || app.homeVisible) && !win.phoneLayout
+        /// Android and iOS have one window: no tab is dragged out into a window of its own
+        undockable: !win.adaptive.mobilePlatform
         onCloseRequested: function(index) { requestCloseTab(index) }
         onOverviewRequested: tabOverview.open()
         onUndockRequested: function(index) { app.undockTab(index) }
@@ -513,6 +569,7 @@ ApplicationWindow {
         objectName: "topTools"
         width: parent.width
         visible: !app.homeVisible && win.toolbarPosition === "top" && !win.noToolbar && !win.toolsInFormatBar
+                 && !win.phoneChrome
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: win.twoToolRows ? 106 : 56
@@ -536,15 +593,36 @@ ApplicationWindow {
       }
     }
     // Two rows at the bottom (the class's choice; closer to the fingertips, like the address bar of a phone's browser)
-    footer: ToolBar {
+    footer: Column {
+      id: footerColumn
+      ToolBar {
         id: bottomTools
         objectName: "bottomTools"
+        width: parent.width
         visible: !app.homeVisible && win.toolbarPosition === "bottom" && !win.noToolbar && !win.toolsInFormatBar
+                 && !win.phoneChrome
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: visible ? 106 + win.safeBottom : 0
         Rectangle { width: parent.width; height: 1; color: "#d5d8dc" }  // (the line towards the pages)
+      }
     }
+    // The phone's tool dock: at the bottom (in the footer, above the navigation bar), or a rail at the right side when
+    // the phone is held sideways (qt/docs/adaptive-layout.md, "The phone chrome")
+    PhoneDock {
+        id: phoneDock
+        vertical: win.dockVertical
+        visible: win.dockShown
+        parent: vertical ? win.contentItem : footerColumn
+        width: vertical ? implicitWidth : (parent ? parent.width : 0)
+        height: vertical ? (parent ? parent.height : 0) : (visible ? implicitHeight : 0)
+        x: vertical && parent ? parent.width - width : 0
+        z: 3
+        safeBottom: win.safeBottom
+        onToolsRequested: phoneToolSheet.open()
+        onPagesRequested: pageGrid.open()
+    }
+    PhoneToolSheet { id: phoneToolSheet }
     // The table editor of the formatting bar (the notes' canvas; the editor beside the page has its own)
     MarkdownTableEditor {
         id: tableEditor
@@ -556,7 +634,7 @@ ApplicationWindow {
     Rectangle {
         id: sideTools
         objectName: "sideTools"
-        visible: !app.homeVisible && win.sideToolbar && !win.noToolbar
+        visible: !app.homeVisible && win.sideToolbar && !win.noToolbar && !win.phoneChrome
         width: visible ? 104 : 0
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -605,7 +683,7 @@ ApplicationWindow {
                                       "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
                                       "openExternally"]
         /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
-        readonly property var planKey: [planLayout, width, height, win.textDoc, app.toolbarColors.length,
+        readonly property var planKey: [planLayout, win.phoneChrome, width, height, win.textDoc, app.toolbarColors.length,
                                         colorStrip.others.length, order.map(function(n) { return slots[n].offered !== false })]
         onPlanKeyChanged: Qt.callLater(relayout)
         Connections {
@@ -694,28 +772,32 @@ ApplicationWindow {
                 item.y = Math.floor(i / columns) * 52
             })
             overflowNames = shown
-            // The strips
-            colorStrip.parent = p.placed.colors ? barContent : toolBank
-            widthStrip.parent = p.placed.widths ? barContent : toolBank
-            colorStrip.mode = p.colors
+            // The strips (the phone chrome: its dock's cycling buttons)
+            const dock = win.phoneChrome
+            colorStrip.parent = dock ? phoneDock.colorSlot : p.placed.colors ? barContent : toolBank
+            widthStrip.parent = dock ? phoneDock.widthSlot : p.placed.widths ? barContent : toolBank
+            colorStrip.mode = dock ? "single" : p.colors
             colorStrip.recentCount = p.recent
-            widthStrip.mode = p.widths
+            widthStrip.mode = dock ? "single" : p.widths
             colorStrip.columns = p.stripColumns
             widthStrip.columns = p.stripColumns
             colorStrip.cell = p.layout === "rail" || p.layout === "grid" ? p.cell : 40
             widthStrip.cell = colorStrip.cell
-            if (p.placed.colors) { colorStrip.x = p.placed.colors.x; colorStrip.y = p.placed.colors.y }
-            if (p.placed.widths) { widthStrip.x = p.placed.widths.x; widthStrip.y = p.placed.widths.y }
+            if (dock) { colorStrip.x = 0; colorStrip.y = 0; widthStrip.x = 0; widthStrip.y = 0 }
+            if (p.placed.colors && !dock) { colorStrip.x = p.placed.colors.x; colorStrip.y = p.placed.colors.y }
+            if (p.placed.widths && !dock) { widthStrip.x = p.placed.widths.x; widthStrip.y = p.placed.widths.y }
             dividerRepeater.model = p.dividers
             barContent.width = p.contentWidth
             barContent.height = p.layout === "grid" ? p.contentHeight : Math.min(p.contentHeight, toolFlick.height)
             barContent.implicitHeight = p.contentHeight
             // The end: ⋮ and "more tools", at the end of the first row, the bottom of a rail, the format bar's end
-            // for a text document, one more cell of the grid
-            toolEnd.parent = p.layout === "merged" ? formatBar.trailing : p.layout === "grid" ? barContent : toolArea
-            toolEnd.x = p.layout === "merged" ? 0 : p.end.x
-            toolEnd.y = p.layout === "merged" ? -2 : p.layout === "rail" ? toolArea.height - toolEnd.height : p.end.y
-            moreToolsButton.offered = p.overflow.length > 0 && p.layout !== "grid"
+            // for a text document, one more cell of the grid; the phone chrome: ⋮ at the end of the app bar (its
+            // "All tools" holds what does not fit)
+            toolEnd.parent = dock ? phoneAppBar.moreSlot : p.layout === "merged" ? formatBar.trailing
+                             : p.layout === "grid" ? barContent : toolArea
+            toolEnd.x = dock || p.layout === "merged" ? 0 : p.end.x
+            toolEnd.y = dock ? 0 : p.layout === "merged" ? -2 : p.layout === "rail" ? toolArea.height - toolEnd.height : p.end.y
+            moreToolsButton.offered = p.overflow.length > 0 && p.layout !== "grid" && !dock
         }
         /// A button of "more tools" was used: it closes, unless the button opened a menu of its own
         function slotUsed(item) {
@@ -875,7 +957,8 @@ ApplicationWindow {
                         objectName: "moreViewMenu"
                         title: qsTr("View")
                         iconName: "xqt-eye"
-                        AdaptiveMenuItem { objectName: "allDocumentsItem"; text: qsTr("All open documents"); icon.source: app.iconUrl("xqt-tabs-grid"); onTriggered: tabOverview.open() }
+                        // (the phone chrome: its tab count)
+                        AdaptiveMenuItem { objectName: "allDocumentsItem"; offered: !win.phoneChrome; text: qsTr("All open documents"); icon.source: app.iconUrl("xqt-tabs-grid"); onTriggered: tabOverview.open() }
                         // Phones: the view pill has no room for the page layout button
                         AdaptiveMenuItem {
                             objectName: "pageLayoutItem"
@@ -889,9 +972,11 @@ ApplicationWindow {
                         // brings the controls back (qt/docs/adaptive-layout.md)
                         AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page)"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: win.chooseChrome("reader") }
                         MenuSeparator {}
-                        // Where the tool bar is, in this size class (the automatic place: "Automatic")
+                        // Where the tool bar is, in this size class (the automatic place: "Automatic"); the phone
+                        // classes have their dock instead
                         AdaptiveMenu {
                             objectName: "toolbarPositionMenu"
+                            offered: !win.phoneLayout
                             title: qsTr("Tool bar position")
                             iconName: "xqt-panel-top"
                             component PositionItem: AdaptiveMenuItem {
@@ -1049,8 +1134,12 @@ ApplicationWindow {
             Popup {
                 id: fontPopup
                 objectName: "fontPopup"
-                x: toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
-                y: toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
+                // (the phone chrome: its button is not shown; in the middle, above the dock)
+                parent: win.phoneChrome ? Overlay.overlay : textTool
+                x: win.phoneChrome ? Math.round((parent.width - width) / 2)
+                   : toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
+                y: win.phoneChrome ? parent.height - height - phoneDock.height - 8
+                   : toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
                 margins: 8
                 padding: 12
                 ColumnLayout {
@@ -1216,8 +1305,11 @@ ApplicationWindow {
             onClicked: canvasEmojiPicker.open()
             EmojiPicker {
                 id: canvasEmojiPicker
-                x: toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
-                y: toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
+                parent: win.phoneChrome ? Overlay.overlay : emojiButton
+                x: win.phoneChrome ? Math.round((parent.width - width) / 2)
+                   : toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
+                y: win.phoneChrome ? parent.height - height - phoneDock.height - 8
+                   : toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
                 onPicked: function(emoji) { close(); canvas.insertText(emoji) }
             }
         }
@@ -1381,7 +1473,8 @@ ApplicationWindow {
         id: sidebarArrow
         objectName: "sidebarArrow"
         readonly property bool open: win.sidebarShown && sidebar.visible
-        visible: win.fullChrome && !app.homeVisible && !win.hudHidden && !app.presenting && (open || !app.toolbarHidden)
+        visible: win.fullChrome && !app.homeVisible && !win.hudHidden && !app.presenting
+                 && (open || !app.toolbarHidden || win.phoneChrome)
         z: 50  // (over the drawer and its dimmed page)
         width: win.adaptive.touchProfile ? win.adaptive.minTarget : 24
         height: win.adaptive.touchProfile ? 64 : 56
@@ -1505,6 +1598,7 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.bottom: win.sourcePanel && win.sourceAtBottom ? win.sourcePanel.top : parent.bottom
         anchors.right: win.sourcePanel && !win.sourceAtBottom ? win.sourcePanel.left
+                       : win.dockRail ? phoneDock.left
                        : (win.toolbarPosition === "right" ? sideTools.left : parent.right)
         anchors.left: sidebar.visible && !win.sidebarAsDrawer ? sidebar.right
                       : (win.toolbarPosition === "left" ? sideTools.right : parent.left)
@@ -1568,7 +1662,7 @@ ApplicationWindow {
         objectName: "viewPill"
         // also in full screen; presenting only the page number, for a moment (presentPageIndicator); not in the
         // reader chrome
-        visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden
+        visible: !pageGrid.visible && !contentsOverview.visible && !app.presenting && !win.hudHidden && !win.phoneChrome
         /// The compact pill, in a canvas under 520 px wide (a phone, a half beside the reference or the source): undo,
         /// redo, the page number (a tap: all pages), the contents and the zoom; the page layout is in ⋮ → View then
         readonly property bool compact: canvas.width < 520
@@ -1576,6 +1670,7 @@ ApplicationWindow {
         readonly property bool tight: canvas.width < 360
         /// The page layout button: not in a phone's portrait nor in the compact pill (it is in ⋮ → View there)
         readonly property bool layoutShown: ["phonePortrait", "tiny"].indexOf(win.adaptive.layoutClass) < 0 && !compact
+                                            && !win.phoneChrome
         // At the canvas's lower right corner, always inside the canvas (8 px from its edges where 28 is too much), and
         // above the reference's pill where the two would meet
         readonly property rect refPill: Qt.rect(referenceSplit.x + referenceSplit.pillRect.x,
@@ -1864,17 +1959,19 @@ ApplicationWindow {
                     id: fitMenu
                     objectName: "fitMenu"
                     title: qsTr("Zoom")
-                    AdaptiveMenuItem { objectName: "fitWidthItem"; text: qsTr("Fit the width (Ctrl+0)"); icon.source: app.iconUrl("xqt-fit-width"); onTriggered: app.fitWidth() }
+                    /// A fit chosen in the page grid of the phone chrome: back to the page, to see it
+                    function done() { if (pageGrid.visible && pageGrid.phoneTools) pageGrid.close() }
+                    AdaptiveMenuItem { objectName: "fitWidthItem"; text: qsTr("Fit the width (Ctrl+0)"); icon.source: app.iconUrl("xqt-fit-width"); onTriggered: { app.fitWidth(); fitMenu.done() } }
                     AdaptiveMenuItem {
                         objectName: "realSizeItem"
                         text: qsTr("Real size, 100 % (Ctrl+1)")
-                        onTriggered: app.zoomToRealSize()
+                        onTriggered: { app.zoomToRealSize(); fitMenu.done() }
                     }
-                    AdaptiveMenuItem { objectName: "fitHeightItem"; text: qsTr("Fit the height"); onTriggered: app.fitHeight() }
+                    AdaptiveMenuItem { objectName: "fitHeightItem"; text: qsTr("Fit the height"); onTriggered: { app.fitHeight(); fitMenu.done() } }
                     AdaptiveMenuItem {
                         objectName: "fitPageItem"
                         text: app.currentPageDiffers ? qsTr("Fit this page (its size differs)") : qsTr("Fit the whole page (double tap)")
-                        onTriggered: app.fitPage()
+                        onTriggered: { app.fitPage(); fitMenu.done() }
                     }
                 }
             }
@@ -1885,6 +1982,10 @@ ApplicationWindow {
         id: pageGrid
         objectName: "pageGrid"
         anchors.fill: canvas
+        // The phone chrome: the contents and the zoom are here (its page number opens the grid)
+        phoneTools: win.phoneChrome
+        onContentsRequested: contentsOverview.open()
+        onZoomRequested: Popups.openAt(fitMenu)
     }
 
     // While a tab is dragged off the strip: what happens when it is let go
@@ -1921,7 +2022,7 @@ ApplicationWindow {
         id: textFlowPanel
         atBottom: win.sourceAtBottom
         anchors.bottom: parent.bottom
-        anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
+        anchors.right: win.dockRail ? phoneDock.left : win.toolbarPosition === "right" ? sideTools.left : parent.right
         width: !visible ? 0 : atBottom ? referenceSplit.width : win.sourceSideWidth
         height: atBottom ? win.sourceBottomHeight : parent.height
     }
@@ -1930,7 +2031,7 @@ ApplicationWindow {
         id: markdownPanel
         atBottom: win.sourceAtBottom
         anchors.bottom: parent.bottom
-        anchors.right: win.toolbarPosition === "right" ? sideTools.left : parent.right
+        anchors.right: win.dockRail ? phoneDock.left : win.toolbarPosition === "right" ? sideTools.left : parent.right
         width: !visible ? 0 : atBottom ? referenceSplit.width : win.sourceSideWidth
         height: atBottom ? win.sourceBottomHeight : parent.height
     }
@@ -3233,10 +3334,12 @@ ApplicationWindow {
             function onPresentingChanged() { if (app.presenting) presentIndicator.flash(); else presentIndicator.opacity = 0 }
         }
     }
-    // Presenting: a faint mark in the lower left corner; a tap (click, pen) hides the controls - the pen pill, the
-    // tool square - or shows them again, as Ctrl+F5 does (qt/present-clean). The mark is a few pixels, barely there
-    // on a projector; the target around it is a finger wide. The pointer or the pen over it makes it clearer.
-    // In the reader chrome (no HUD) it is the way back to the chrome.
+    // Presenting: a mark in the lower left corner; a tap (click, pen, finger) hides the controls - the pen pill, the
+    // tool square - or shows them again, as Ctrl+F5 does (qt/present-clean). While the controls show it is clearly there
+    // (a dot of the accent color in a ring; it pulses once when presenting starts), while they are hidden it is faint,
+    // barely there on a projector. Its name ("Hide the tools" / "Show the tools") on hover and while a finger is held
+    // on it (letting go then does not tap it). The target around it is a finger wide.
+    // In the reader chrome (no HUD) it is the way back to the chrome, the same field.
     AbstractButton {
         id: presentCornerMark
         objectName: "presentCornerMark"
@@ -3249,27 +3352,81 @@ ApplicationWindow {
         height: 48
         focusPolicy: Qt.NoFocus  // (the keys stay with the page)
         hoverEnabled: true
+        /// The controls are shown: the field is clearly visible
+        readonly property bool highlighted: app.presenting && !win.presentClean
         readonly property bool lit: hovered || markHover.hovered || pressed
-        Accessible.name: win.presentClean || reading ? qsTr("Show the controls") : qsTr("Hide the controls")
+        /// Its name (hover, a finger held on it)
+        readonly property string labelText: highlighted ? qsTr("Hide the tools") : qsTr("Show the tools")
+        property bool heldLabel: false
+        property bool heldPointer: false
+        Accessible.name: labelText
+        ToolTip.visible: heldLabel || ((hovered || markHover.hovered) && !pressed)
+        ToolTip.text: labelText
+        ToolTip.delay: heldLabel ? 0 : 600
+        /// 0 → 1 → 0 once: when presenting (or reading) starts, so the field is found
+        property real pulse: 0
+        SequentialAnimation {
+            id: pulseAnimation
+            NumberAnimation { target: presentCornerMark; property: "pulse"; from: 0; to: 1; duration: 450; easing.type: Easing.OutQuad }
+            NumberAnimation { target: presentCornerMark; property: "pulse"; to: 0; duration: 650; easing.type: Easing.InQuad }
+        }
+        function pulseOnce() { pulseAnimation.restart() }
+        onReadingChanged: if (reading) pulseOnce()
+        Connections {
+            target: app
+            function onPresentingChanged() { if (app.presenting) presentCornerMark.pulseOnce() }
+        }
         background: null
         contentItem: Item {
+            Rectangle {  // the ring (the controls are shown), wider while it pulses
+                objectName: "presentCornerRing"
+                visible: presentCornerMark.highlighted || presentCornerMark.pulse > 0
+                readonly property real size: 22 + presentCornerMark.pulse * 18
+                x: 13 - size / 2
+                y: parent.height - 13 - size / 2
+                width: size
+                height: size
+                radius: size / 2
+                color: "transparent"
+                border.width: 2
+                border.color: Material.accentColor
+                opacity: (presentCornerMark.highlighted ? 0.55 : 0) + presentCornerMark.pulse * 0.45
+            }
             Rectangle {
                 objectName: "presentCornerDot"
-                x: 10
-                y: parent.height - height - 10
-                width: 6
-                height: 6
-                radius: 3
-                // grey: as faint on a white slide as on the black around it
-                color: "#9e9e9e"
+                readonly property real size: presentCornerMark.highlighted ? 12 : 6
+                x: 13 - size / 2
+                y: parent.height - 13 - size / 2
+                width: size
+                height: size
+                radius: size / 2
+                // shown: the accent color; hidden: grey, as faint on a white slide as on the black around it
+                color: presentCornerMark.highlighted ? Material.accentColor : "#9e9e9e"
                 border.width: 1
                 border.color: "#80ffffff"
-                opacity: presentCornerMark.lit ? 0.6 : 0.14
+                opacity: presentCornerMark.highlighted ? 0.95
+                         : Math.max(presentCornerMark.pulse, presentCornerMark.lit ? 0.6 : 0.14)
                 Behavior on opacity { NumberAnimation { duration: 150 } }
             }
         }
         HoverHandler { id: markHover; acceptedDevices: PointerDevice.Mouse | PointerDevice.Stylus }
-        onClicked: {
+        // A finger held on it shows its name; a mouse or a pen held long still taps it
+        PointHandler { id: markFinger; acceptedDevices: PointerDevice.TouchScreen }
+        onPressAndHold: {
+            if (markFinger.active) heldLabel = true
+            else heldPointer = true
+        }
+        onReleased: {
+            if (heldLabel) {
+                heldLabel = false
+            } else if (heldPointer) {
+                heldPointer = false
+                switchTools()
+            }
+        }
+        onCanceled: { heldLabel = false; heldPointer = false }
+        onClicked: switchTools()
+        function switchTools() {
             if (reading) win.chooseChrome("full")
             else win.presentClean = !win.presentClean
         }
@@ -3348,7 +3505,7 @@ ApplicationWindow {
     // end of the bar), and a slim strip while it is away. A finger gets a target of minTarget around the tab.
     Item {
         objectName: "toolbarToggle"
-        visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden && !win.toolsInFormatBar
+        visible: !app.homeVisible && win.fullChrome && !app.toolbarHidden && !win.toolsInFormatBar && !win.phoneChrome
         z: 58
         readonly property string edge: win.toolbarPosition
         readonly property bool side: edge === "left" || edge === "right"
@@ -3388,7 +3545,7 @@ ApplicationWindow {
     Rectangle {
         id: toolbarShow
         objectName: "toolbarShow"
-        visible: !app.homeVisible && win.fullChrome && app.toolbarHidden
+        visible: !app.homeVisible && win.fullChrome && app.toolbarHidden && !win.phoneChrome
         readonly property string side: win.toolbarPosition
         z: 60  // over the edge of the pen pill, which sits at the right edge by default
         width: side === "top" || side === "bottom" ? 96 : 16

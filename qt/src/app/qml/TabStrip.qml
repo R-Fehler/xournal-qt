@@ -14,6 +14,8 @@ Rectangle {
     property int dragIndex: -1
     property real dragDistance: 0
     readonly property real undockDistance: 60
+    /// A tab can get a window of its own (not on Android and iOS: one window there)
+    property bool undockable: true
     signal overviewRequested()
     /// The tab should get a window of its own (dragged off the strip), or go back to the main window.
     signal undockRequested(int index)
@@ -197,7 +199,7 @@ Rectangle {
                 opacity: tabDrag.active ? 0.85 : 1
                 DragHandler {
                     id: tabDrag
-                    enabled: !tab.renaming
+                    enabled: !tab.renaming && strip.undockable
                     target: null
                     onActiveChanged: {
                         if (active) {
@@ -230,6 +232,7 @@ Rectangle {
                     }
                     AdaptiveMenuItem {
                         objectName: "undockTabItem"
+                        offered: strip.undockable
                         text: app.secondaryWindow ? qsTr("Move to the main window")
                                                   : qsTr("Move to a window of its own")
                         onTriggered: app.secondaryWindow ? strip.dockRequested(tab.index)

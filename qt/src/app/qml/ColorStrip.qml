@@ -173,18 +173,37 @@ Item {
         id: palettePopup
         objectName: "colorPalette"
         focus: true  // (Esc closes it)
-        background: Rectangle { radius: 12; color: "#ffffff"; border.width: 1; border.color: "#d5d8dc" }
-        parent: lastCell
+        background: Rectangle {
+            radius: palettePopup.asSheet ? 16 : 12
+            color: "#ffffff"
+            border.width: palettePopup.asSheet ? 0 : 1
+            border.color: "#d5d8dc"
+        }
+        /// In the phone classes a bottom sheet (qt/docs/adaptive-layout.md, "The phone chrome")
+        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout
+        modal: asSheet
+        dim: asSheet
+        width: asSheet && parent ? Math.min(parent.width, 640) : implicitWidth
+        bottomPadding: asSheet && typeof win !== "undefined" && win ? 10 + 8 + win.safeBottom : 10
+        parent: asSheet ? Overlay.overlay : lastCell
         // (margins: kept inside the window)
-        x: strip.side === "left" ? parent.width + 4 : strip.side === "right" ? -width - 4 : 0
-        y: strip.side === "top" ? parent.height + 4 : strip.side === "bottom" ? -height - 4 : 0
-        margins: 8
+        x: asSheet ? Math.round((parent.width - width) / 2)
+           : strip.side === "left" ? parent.width + 4 : strip.side === "right" ? -width - 4 : 0
+        y: asSheet ? parent.height - height
+           : strip.side === "top" ? parent.height + 4 : strip.side === "bottom" ? -height - 4 : 0
+        margins: asSheet ? 0 : 8
         padding: 10
+        leftPadding: asSheet ? 16 : 10
+        rightPadding: asSheet ? 16 : 10
+        /// Swatches per row: six, as many as fit across a sheet
+        readonly property int columns: asSheet ? Math.max(6, Math.floor((width - 32) / 48)) : 6
         Column {
             spacing: 6
+            Shortcut { sequence: "Back"; enabled: palettePopup.opened; onActivated: palettePopup.close() }  // (Android's back key)
             Label { text: qsTr("Colors"); font.weight: Font.DemiBold; color: "#5f6368" }
             Grid {
-                columns: 6
+                columns: palettePopup.columns
+                columnSpacing: palettePopup.asSheet ? 8 : 0
                 Repeater {
                     model: palettePopup.opened ? strip.palette : []
                     delegate: Swatch {
@@ -204,7 +223,8 @@ Item {
                 font.pixelSize: 13
             }
             Grid {
-                columns: 6
+                columns: palettePopup.columns
+                columnSpacing: palettePopup.asSheet ? 8 : 0
                 Repeater {
                     id: recentGrid
                     model: palettePopup.opened ? win.toolGroups.recentColors.filter(function(c) { return strip.paletteIndexOf(c) < 0 }) : []

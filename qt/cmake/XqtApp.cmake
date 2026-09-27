@@ -206,7 +206,11 @@ set(XQT_QML_FILES
     src/app/qml/WebImageConfirm.qml
     src/app/qml/UnusedImagesDialog.qml
     src/app/qml/FindPaperSheet.qml
-    src/app/qml/ArxivSheet.qml)
+    src/app/qml/ArxivSheet.qml
+    src/app/qml/BottomSheet.qml
+    src/app/qml/PhoneAppBar.qml
+    src/app/qml/PhoneDock.qml
+    src/app/qml/PhoneToolSheet.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
