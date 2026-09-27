@@ -2733,6 +2733,13 @@ TEST_F(PhoneChromeTest, thePaletteTheWidthsAndAllToolsAreSheets) {
         QTest::keyClick(window, Qt::Key_Escape);
         EXPECT_TRUE(opened(popup, false)) << what;
     };
+    // (the dock laid out with the cycling buttons in it: a loaded machine may take a moment after the resize)
+    until([&] {
+        auto* dock = named("phoneDock");
+        auto* color = named("colorCycleButton");
+        return dock && color && dock->isVisible() && color->isVisible() &&
+               sceneRect(dock).adjusted(-1, -1, 1, 1).contains(sceneRect(color));
+    });
     QMetaObject::invokeMethod(named("colorCycleButton"), "pressAndHold");
     atTheBottom(window->findChild<QObject*>("colorPalette"), "the palette");
     QMetaObject::invokeMethod(named("widthButton"), "pressAndHold");
