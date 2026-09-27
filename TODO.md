@@ -123,15 +123,14 @@ is built.
   not adapted; the dialogs are not checked against the bottom safe area (block 8).
 - [ ] Left from block 4 `qt/adaptive-toolbar` (tool bar layouts, "more tools", cycling buttons, the view pill, the
   sidebar arrow, the text document's bar in the format bar): docking the format bar above the soft keyboard on
-  phones (`qt/compact-chrome` / `qt/safe-areas-keyboard`); the colors' popups (palette, widths, "more tools") are popups, not sheets, on phones;
-  the phone's final tool layout is the bottom dock of `qt/compact-chrome`; menus still plain `Menu`s: the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
+  phones (`qt/safe-areas-keyboard`); (done in `qt/phone-chrome`: the palette and the widths as sheets on phones, the
+  bottom dock, "more tools" as the dock's "All tools" sheet); menus still plain `Menu`s: the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
   cell menu; the pen pill's width and colors are not cycling buttons with lists yet.
 - [ ] Left from block 6 `qt/adaptive-home` (the switch as name ▾ + Recent / ★ / Bookmarks icons, the library header's
   ladder with "+" and View, the floating "+", the
   breadcrumbs "…", the selection's bar at the bottom, the tab overview's wrapping header and aspect cells): give the
   home screen's `IconButton`s a short `label` once `qt/adaptive-toolbar`'s long-press label is merged (until then a
-  held finger shows their tip); the phone tab strip (the current title, a count, the overview) belongs to
-  `qt/adaptive-toolbar` / `qt/compact-chrome`; a list view of the library for phones (audit D7, "consider") is not
+  held finger shows their tip); (the phone's tab strip: done, the app bar of `qt/phone-chrome`); a list view of the library for phones (audit D7, "consider") is not
   built; the overview cards' ×, star and reference buttons are 40 px, not `minTarget`.
 - [x] Block 5 `qt/adaptive-panels`: the Markdown source below the page in portrait (a draggable divider, remembered per
   class), the reference top and bottom in a portrait area (ratio kept), the reference's narrow pill (page + ⋮), the
@@ -139,7 +138,20 @@ is built.
   bar's Insert overflow and fading edges.
 - [ ] Left from block 5: the format bar still scrolls below ~680 px on a desktop (600×800); the Markdown panel's
   title and size rows are not made smaller on a phone; the reference pill's page popup and the source panel's emoji
-  picker are plain popups; the pen pill is still tall in phone landscape (its redesign is qt/compact-chrome's dock).
+  picker are plain popups; the pen pill is still tall in phone landscape (only in the compact chrome now: the phone
+  chrome has the dock).
+- [x] Block 7 `qt/phone-chrome` (was `qt/compact-chrome`): in the phone classes the app bar (the library, the title
+  with tab dots and a swipe for the next / previous document, the tab count: tap all, double tap the one before, hold
+  the ones used lately; ⋮) instead of the tab strip, the tool dock at the bottom (a rail at the side in landscape)
+  instead of the tool bar, the pen pill and the view pill, "All tools" as a sheet with every variant, the palette and
+  the widths as sheets; the reader automatic only in tiny windows; the presenting / reader corner field highlighted
+  with its names; no windows of their own on Android / iOS; no breadcrumbs at the library's top; `PhoneChromeTest`.
+- [ ] Left from block 7: the dock and the app bar are not checked on the Fold 7 yet (device checklist, "Phone
+  chrome"); the left / right safe areas and cut-outs (the rail's side), the soft keyboard (the format bar above it, the
+  caret into view, the dock under it) and the remaining F14 targets are `qt/safe-areas-keyboard`'s; the compact chrome
+  (chosen by hand on a phone) still has the tool square, the pen pill and the tab dots of full screen; the tab menu
+  (rename, reference, share) is not reachable from the phone's app bar (the overview's cards have rename, reference and
+  close; ⋮ has share and rename); the page layout on a phone is only in ⋮ → View.
 
 ---
 

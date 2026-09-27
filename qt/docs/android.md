@@ -119,7 +119,7 @@ adb shell am start -a android.intent.action.SEND -t application/octet-stream \
 put the URI into the clip data, which carries the grant. So test SEND with a file of the app's own folder.) While
 the phone is locked the app's event loop is paused: a file handed over then opens when it is unlocked.
 
-**Opening and importing through Android's pickers.** "Open…" (tool bar, Recent), "Import files…" and "Import a
+**Opening and importing through Android's pickers.** "Open…" (tool bar, on a phone "All tools"; Recent), "Import files…" and "Import a
 folder…" (library) show Android's system pickers (the Storage Access Framework: `ACTION_OPEN_DOCUMENT` and, for
 folders, `ACTION_OPEN_DOCUMENT_TREE`, which Qt's `FileDialog` and `FolderDialog` use on Android). They return
 `content://` URIs: "Open…" copies the file into "Opened" as above and opens it; the imports copy into the library's
@@ -170,7 +170,7 @@ per-folder packs, the search index, and the folder watcher that sees what the sy
 **Drawing with the finger.** The Fold 7 has no pen, so on Android the finger draws from the first start when the
 device reports no stylus (Android's input devices: no `SOURCE_STYLUS`; checked once, at the first start, through
 `XournalActivity.hasStylus()`; a tablet with an S Pen starts with it off, as the desktop does). The finger button
-in the tool bar (next to the hand) and Settings → Touch → "Draw with the finger" turn it on and off on every
+in the tool bar (next to the hand; on a phone in "All tools") and Settings → Touch → "Draw with the finger" turn it on and off on every
 platform: one finger draws with the current tool, two fingers scroll and zoom (a stroke the first finger began is
 taken back), the hand tool still scrolls, and while a pen is near the finger is ignored (palm rejection).
 
@@ -253,6 +253,7 @@ never in the repository.
 | `.deb` packaging (`XqtPackage.cmake`) | replaced by `XqtAndroid.cmake` |
 | D-Bus ("Show in file manager") | no Qt D-Bus on Android (already optional); the menu items are hidden, as no intent opens a folder in the Files app reliably |
 | Single instance (local socket per library) | Android starts one activity (`singleTop`) |
+| A document in a window of its own (a tab dragged off the strip, "Move to a window of its own") | one window (`AdaptiveLayout.mobilePlatform`); tabs are moved about in the strip only |
 | Crash handlers (`SessionRecovery::installCrashHandlers`) | they replace the system's handlers, and a crash would leave no backtrace in logcat; to be chained later |
 | Audio, Lua plugins, X11, gtksourceview | already off in the Qt build |
 | Floating point `std::from_chars` | missing in the NDK's libc++; upstream's `g_ascii_strtod` fallback is used (the same check as upstream's CMake) |

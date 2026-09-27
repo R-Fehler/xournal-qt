@@ -2334,8 +2334,9 @@ The reference (open another document as reference, and "Show this document besid
 - [ ] Laptop with the sidebar open (halves of about 530 px): the reference's pill still shows all its buttons.
 
 The view pill:
-- [ ] Phone upright: undo, redo, the contents, "3 / 12", the zoom %; a tap on "3 / 12" opens all pages; the pill lies
-      inside the page area with room at both ends. ⋮ → View → Page layout… is there.
+- [ ] Phone upright in the compact chrome (Settings → Display → Controls at this size → Compact; the phone's own chrome
+      has the dock instead, below): undo, redo, the contents, "3 / 12", the zoom %; a tap on "3 / 12" opens all pages;
+      the pill lies inside the page area with room at both ends. ⋮ → View → Page layout… is there.
 - [ ] Beside a reference or the Markdown source on a small desktop window: the pill stays in its own half.
 - [ ] Select strokes on a phone: the selection's pill sits above the view pill, not over it. Jump to a page from the
       contents: the back/forward pill does not cover the view pill either.
@@ -2357,3 +2358,57 @@ The format bar:
       plain "+" for the inserts.
 - [ ] With a finger: the heading buttons are a bit wider; holding one shows "Heading 1".
 - [ ] Phone: the row scrolls sideways; a fade at the edge where more buttons are.
+
+## Phone chrome (qt/phone-chrome)
+
+qt/docs/adaptive-layout.md, "The phone chrome". Open three or four documents (a notes document with several pages, a
+PDF with a table of contents, a `.md`). On the Fold 7 with the finger; the desktop with a window dragged small works
+for most of it.
+
+Fold 7 folded (412 × 915):
+- [ ] No tab strip. At the top a slim bar below the status bar: the library, the document's title (long names
+      shortened in the middle) with small dots under it, a square with the number of open documents, ⋮.
+- [ ] Swipe left along the bar: the next document; right: the previous one. A swipe on the page draws or scrolls as
+      always, it never switches documents.
+- [ ] Tap the square: after a short moment all open documents ("+" there makes a new one). Double tap it: straight
+      back to the document used before, again: back. Open A, then B, then C; double tap: B. Hold the square: a sheet
+      "Used lately" with C, B, A; pick A.
+- [ ] Hold the library button, the square: their names (the square: the list). Nothing switches by holding.
+- [ ] At the bottom, above the gesture bar (not under it): the pen, All tools, the color, the width, undo, redo,
+      "3 / 12". Tap the pen: the highlighter (tap again: the pen); hold it: both with their names.
+- [ ] All tools: a sheet with every tool and its variants with names (pen, highlighter, eraser, whiteout, whole strokes,
+      hand, the finger draws, text box, write on the page, sticky note, mark PDF text; select ×4; shapes ×7; setsquare,
+      compass; image, add a page; search, present, full screen, settings, new, open, save). Tap "Lasso": the sheet
+      goes, the dock shows the lasso. Hold "Add a page": Insert pages…
+- [ ] The color: a tap the next one; hold it: all colors as a sheet at the bottom. The width the same.
+- [ ] "3 / 12": all pages; its pill has Select, the contents, the zoom % (a sheet with the fits; Fit the width goes
+      back to the page) and ×; pinch the grid for more or fewer columns.
+- [ ] The page keeps the whole width between the bar and the dock; an A4 page fit to the width shows whole.
+- [ ] ⋮: Save as, Share, Print, …; View has Page layout… and Read, but no Tool bar position and no All open documents.
+- [ ] A `.md`: the dock has All tools, undo, redo, the page number (no pen, color, width); the format bar below the top
+      bar.
+- [ ] The library (tap the library button): the same top bar, the library button marked, the title of the document
+      behind it in grey (tap it: back to that document), no ⋮. At the library's top no breadcrumb row with only the
+      library's name; in a folder the breadcrumbs are there.
+- [ ] ⋮ → View → Read: only the page. A dot in the lower left corner, faint; hold it: "Show the tools"; tap it: the bars
+      are back.
+
+Fold 7 folded, held sideways (915 × 412):
+- [ ] The top bar across; the dock is a column at the right edge (pen, All tools, color, width, undo, redo, page
+      number from the top), all inside the screen; the page between the left edge and the column.
+
+Fold 7 unfolded (900 × 1000):
+- [ ] The tablet's layout: the tab strip, two tool rows at the top, the view pill; no top bar, no dock.
+- [ ] Unfold while a document is open: the layout changes at once to the tablet's; fold again: back to the phone
+      chrome, the same document, page and tool. Choices made in one (Read, the source split) stay with that state.
+- [ ] Drag a tab of the tab strip down: nothing happens (no window of its own on Android); press and hold a tab: its
+      menu has no "Move to a window of its own".
+
+Split screen or the pop-up view (a window under 360 px either way):
+- [ ] Only the page (the reader), with the faint dot in the lower left corner; tap it: the phone chrome, the dock's
+      cells a bit narrower but all there. Back to full screen: the phone chrome as before.
+
+Presenting (the Fold 7 unfolded, or a desktop):
+- [ ] Present: a dot in the accent color in a ring in the lower left corner, pulsing once at the start; hover it (or
+      hold it with a finger): "Hide the tools". Tap it: the tools go, the dot is faint and grey; "Show the tools"; tap:
+      back.
