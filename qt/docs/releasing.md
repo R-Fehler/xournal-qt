@@ -62,8 +62,11 @@ Android (vcpkg, qpdf 12.4) use their package manager's qpdf, which is new enough
 
 ## Windows and macOS
 
-They do not need another machine: GitHub runs `windows-latest` and `macos-14` runners, and both jobs would live in
-the same release workflow. What is missing is the environment and the packaging, not the hardware:
+Since 0.4.0 every release also carries the **Windows** portable zip and the **Android** APK: the release workflow
+calls `xqt-windows.yml` and `xqt-android.yml` (both also run by hand) and puts `xournal-qt-<version>-windows-x64.zip`
+and `xournal-qt-<version>-android-arm64.apk` (signed with the release key from the repository secrets; Android 9 or
+newer, arm64) into the draft. **macOS** would need no other machine either (GitHub's `macos-14` runners); what is
+missing is the environment, the packaging and, for a smooth first start, Apple's signing and notarization:
 
 - **macOS**: Homebrew has everything the core needs (`glib`, `cairo`, `pango`, `poppler`, `libzip`, `qpdf`,
   `gdk-pixbuf`, `qt@6`, and `kf6-syntax-highlighting` for code blocks). The app bundle and the `.dmg` come from
@@ -75,4 +78,4 @@ the same release workflow. What is missing is the environment and the packaging,
 - Open questions on both: the pen and touch input (Qt's tablet events on Windows Ink and on macOS), the file
   associations, and the places where the fork writes its settings and cache (`Util::getCacheSubfolder`).
 
-Until then the releases are Linux only; the Windows zip is a test build.
+Until then macOS is not built; Windows has no installer and no file associations yet.

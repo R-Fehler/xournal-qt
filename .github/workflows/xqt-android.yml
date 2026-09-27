@@ -9,6 +9,7 @@ name: xournal-qt Android
 
 on:
   workflow_dispatch:
+  workflow_call:  # (the release workflow builds it for every release, with its secrets)
   push:
     branches: [qt/android-build]
 
