@@ -9,6 +9,10 @@ Item {
     property Item canvasItem
     /// Room kept free at the right (the strip that brings a right tool bar back)
     property real rightInset: 0
+    /// Room kept free at the other edges (the safe area's insets over the canvas: Main.qml)
+    property real leftInset: 0
+    property real topInset: 0
+    property real bottomInset: 0
     property bool hidden: false
     /// "" for the notes; the reference's bars are named "reference…"
     property string namePrefix: ""
@@ -21,11 +25,12 @@ Item {
         objectName: bars.named("verticalScrollBar")
         orientation: Qt.Vertical
         anchors.top: parent.top
+        anchors.topMargin: bars.topInset
         anchors.right: parent.right
         // (beside the strip that brings a right tool bar back, not under it)
         anchors.rightMargin: bars.rightInset
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: hbar.visible ? hbar.height : 0
+        anchors.bottomMargin: (hbar.visible ? hbar.height : 0) + bars.bottomInset
         visible: bars.canvasItem.contentHeight > bars.canvasItem.height + 1 && !bars.hidden
         policy: ScrollBar.AlwaysOn
         padding: 6
@@ -51,9 +56,11 @@ Item {
         objectName: bars.named("horizontalScrollBar")
         orientation: Qt.Horizontal
         anchors.left: parent.left
+        anchors.leftMargin: bars.leftInset
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.rightMargin: vbar.visible ? vbar.width : 0
+        anchors.bottomMargin: bars.bottomInset
+        anchors.rightMargin: (vbar.visible ? vbar.width : 0) + bars.rightInset
         visible: bars.canvasItem.contentWidth > bars.canvasItem.width + 1 && !bars.hidden
         policy: ScrollBar.AlwaysOn
         padding: 6

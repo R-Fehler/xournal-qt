@@ -30,6 +30,8 @@ Item {
     /// not while the divider is dragged.
     /// (a value, not a binding: orient() sets it as the size changes)
     property bool vertical: false
+    /// Room at the split's bottom for the navigation bar and the soft keyboard (Main.qml): the reference's pill above it
+    property real bottomInset: 0
     Component.onCompleted: orient()
     function orient() {
         if (dividerDrag.active) return
@@ -116,6 +118,8 @@ Item {
             canvasItem: referenceCanvas
             namePrefix: "reference"
             hidden: referenceGrid.visible
+            // (above the navigation bar where the reference reaches the split's bottom)
+            bottomInset: Math.max(0, split.bottomInset - (split.height - referenceScope.y - referenceScope.height))
         }
         PdfTextHandles {
             canvasItem: referenceCanvas
@@ -290,7 +294,8 @@ Item {
             id: referencePill
             objectName: "referencePill"
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 24
+            // (at the split's bottom: above the navigation bar; in the upper half of a split top and bottom, no room needed)
+            anchors.bottomMargin: 24 + Math.max(0, split.bottomInset - (split.height - referenceScope.y - referenceScope.height))
             anchors.horizontalCenter: parent.horizontalCenter
             padding: 2
             leftPadding: 6

@@ -34,7 +34,8 @@ Rectangle {
     readonly property bool touch: adaptive !== null && adaptive.touchProfile
     /// What a finger needs (48 with the touch profile, else 40)
     readonly property int minTarget: adaptive ? adaptive.minTarget : 40
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.safeBottom ? win.safeBottom : 0
+    /// The part of its bottom under the navigation bar (not where the soft keyboard's room is below it)
+    readonly property real safeBottom: typeof win !== "undefined" && win && win.contentBottomInset ? win.contentBottomInset : 0
     /// Room below the last cards for the floating "+" of a phone
     readonly property real fabSpace: phoneLayout ? 72 : 0
 
@@ -2823,6 +2824,6 @@ Rectangle {
         z: 30
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: addFab.visible ? 88 + home.safeBottom : 32
+        anchors.bottomMargin: (addFab.visible ? 88 : 32) + home.safeBottom
     }
 }

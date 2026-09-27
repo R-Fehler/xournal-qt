@@ -31,6 +31,9 @@ Rectangle {
     signal tableRequested()
     /// The color the fading edges fade into (the bar's own, or the panel's behind a transparent bar)
     property color fadeColor: color
+    /// Room at the sides for a camera cut-out or the navigation bar (a phone held sideways)
+    property real leftInset: 0
+    property real rightInset: 0
 
     implicitHeight: 44
     color: "#ffffff"
@@ -133,7 +136,7 @@ Rectangle {
         id: trailingSlot
         objectName: bar.named("formatBarTrailing")
         anchors.right: parent.right
-        anchors.rightMargin: 6
+        anchors.rightMargin: 6 + bar.rightInset
         anchors.verticalCenter: parent.verticalCenter
         width: childrenRect.width
         height: parent.height
@@ -146,8 +149,8 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: trailingSlot.left
-        anchors.leftMargin: 6
-        anchors.rightMargin: trailingSlot.width > 0 ? 4 : 0
+        anchors.leftMargin: 6 + bar.leftInset
+        anchors.rightMargin: trailingSlot.width > 0 ? 4 : bar.rightInset
         contentWidth: row.implicitWidth
         contentHeight: height
         flickableDirection: Flickable.HorizontalFlick

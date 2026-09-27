@@ -26,6 +26,15 @@ Popup {
     width: parent ? parent.width : 800
     height: parent ? parent.height : 600
     padding: 0
+    // Its controls clear of the system's bars, a cut-out and the soft keyboard (Main.qml); its color under them
+    readonly property bool inWindow: typeof win !== "undefined" && win !== null && win.safeInsets !== undefined
+    /// The buttons of a card (×, the star, the reference): a finger's size in the touch profile (audit F14)
+    readonly property bool touch: inWindow && win.adaptive.touchProfile
+    readonly property int cardTarget: touch ? win.adaptive.minTarget : 40
+    topPadding: inWindow ? win.safeTop : 0
+    leftPadding: inWindow ? win.safeLeft : 0
+    rightPadding: inWindow ? win.safeRight : 0
+    bottomPadding: inWindow ? Math.max(win.keyboardHeight, win.safeBottom) : 0
     /// A card's name is being edited (Escape cancels that, it does not close the overview)
     property bool renaming: false
     closePolicy: renaming ? Popup.NoAutoClose : Popup.CloseOnEscape

@@ -29,18 +29,23 @@ Rectangle {
     /// The view pill (the lower right corner): where the two would meet, this one moves up above it
     property Item avoid: null
 
-    // Where it sits: at its side, moved along it by penPillOffset (dragging moves it and may change the side)
-    readonly property real homeX: side === "left" ? gap
-                                  : side === "right" ? parent.width - width - gap
-                                  : Math.round((parent.width - width) * app.penPillOffset)
-    readonly property real homeY: side === "top" ? gap
-                                  : side === "bottom" ? parent.height - height - gap
-                                  : Math.round((parent.height - height) * app.penPillOffset)
+    // Where it sits: at its side, moved along it by penPillOffset (dragging moves it and may change the side); inside
+    // the safe area (a cut-out at a side, the navigation bar) and above the soft keyboard (Main.qml's controls*)
+    readonly property real roomLeft: win.controlsLeft
+    readonly property real roomRight: win.controlsRight
+    readonly property real roomTop: win.controlsTop
+    readonly property real roomBottom: win.controlsBottom
+    readonly property real homeX: side === "left" ? roomLeft + gap
+                                  : side === "right" ? roomRight - width - gap
+                                  : roomLeft + Math.round((roomRight - roomLeft - width) * app.penPillOffset)
+    readonly property real homeY: side === "top" ? roomTop + gap
+                                  : side === "bottom" ? roomBottom - height - gap
+                                  : roomTop + Math.round((roomBottom - roomTop - height) * app.penPillOffset)
     readonly property bool meets: avoid !== null && avoid.visible && homeX - 8 < avoid.x + avoid.width
                                   && homeX + width + 8 > avoid.x && homeY - 8 < avoid.y + avoid.height
                                   && homeY + height + 8 > avoid.y
     x: dragging ? x : homeX
-    y: dragging ? y : meets ? Math.max(gap, avoid.y - height - 12) : homeY
+    y: dragging ? y : meets ? Math.max(roomTop + gap, avoid.y - height - 12) : homeY
     property bool dragging: false
 
     Behavior on x { enabled: !pill.dragging; NumberAnimation { duration: 120 } }

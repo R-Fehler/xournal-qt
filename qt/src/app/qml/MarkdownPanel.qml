@@ -26,6 +26,19 @@ Pane {
         }
     }
 
+    /// On a phone while the soft keyboard is open for the source (the panel ends above it): its format bar at the
+    /// panel's bottom, right above the keyboard, as the page's format bar
+    readonly property bool barDocked: typeof win !== "undefined" && win !== null && win.phoneLayout === true
+                                      && win.keyboardOpen && area.activeFocus
+    /// The text's cursor scrolled into view in its scroll view
+    function showCursor() {
+        const f = areaScroll.contentItem
+        if (!f || f.contentY === undefined) return
+        const r = area.cursorRectangle
+        const top = r.y - 8, bottom = r.y + r.height + 8
+        if (top < f.contentY) f.contentY = Math.max(0, top)
+        else if (bottom > f.contentY + f.height) f.contentY = Math.max(0, Math.min(bottom - f.height, f.contentHeight - f.height))
+    }
     property int zoomBefore: 100
     function open(page) { start(app.beginMarkdown(page === undefined ? -1 : page)) }
     /// The Markdown text box at a point of a page (page coordinates), or a new one there.
@@ -183,9 +196,17 @@ Pane {
             Button { objectName: "markdownDone"; text: qsTr("Done"); highlighted: true; onClicked: panel.close(true) }
         }
 
-        // The formatting tools (as on the page)
-        MarkdownFormatBar {
+        // The formatting tools (as on the page): here, or on a phone while the soft keyboard is open, at the panel's
+        // bottom, right above the keyboard (panelBarBottom)
+        Item {
+            id: panelBarTop
             Layout.fillWidth: true
+            Layout.preferredHeight: panelBar.parent === panelBarTop ? panelBar.implicitHeight : 0
+        }
+        MarkdownFormatBar {
+            id: panelBar
+            parent: panel.barDocked ? panelBarBottom : panelBarTop
+            width: parent ? parent.width : 0
             namePrefix: "panel"
             color: "transparent"
             fadeColor: "#fafafa"
@@ -246,10 +267,13 @@ Pane {
         }
 
         ScrollView {
+            id: areaScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.margins: 8
             clip: true
+            // Shorter (the soft keyboard came, the format bar moved down): the cursor stays in view
+            onHeightChanged: if (area.activeFocus) Qt.callLater(panel.showCursor)
             background: Rectangle { color: "#ffffff"; border.width: 1; border.color: "#d5d8dc"; radius: 4 }
             TextArea {
                 id: area
@@ -313,6 +337,12 @@ Pane {
                     }
                 }
             }
+        }
+
+        Item {
+            id: panelBarBottom
+            Layout.fillWidth: true
+            Layout.preferredHeight: panelBar.parent === panelBarBottom ? panelBar.implicitHeight : 0
         }
     }
 

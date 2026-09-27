@@ -2094,6 +2094,16 @@ bool CanvasView::insertAtTextCursor(const std::string& text) {
     return true;
 }
 
+bool CanvasView::scrollToTextCursor() {
+    CanvasTextInput* editor = getTextInput();
+    const auto index = editor ? indexOf(&editor->getPage()) : std::nullopt;
+    if (!index) {
+        return false;
+    }
+    viewController.scrollToPageRect(*index, editor->cursorRectOnPage().adjusted(-20, -20, 20, 20));
+    return true;
+}
+
 double CanvasView::getZoom() const { return viewController.zoom(); }
 XournalppCursor* CanvasView::getCursor() const { return session.getCursor(); }
 Control* CanvasView::getControl() const { return &session; }

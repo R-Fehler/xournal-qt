@@ -30,7 +30,7 @@ Pane {
         x = Math.max(c.x + 8, Math.min(c.x + box.x, c.x + c.width - w - 8))
         const above = c.y + box.y - h - 12
         const below = c.y + box.y + box.height + 16
-        y = above >= c.y + 8 ? above : Math.min(below, c.y + c.height - h - 8)
+        y = above >= c.y + 8 ? above : Math.min(below, Math.min(c.y + c.height, bottomLimit) - h - 8)
         if (box.y + box.height < 0 || box.y > c.height) y = c.y + 12
         // Not over the view pill (the canvas's lower right corner): above it where the two would meet
         const a = avoid
@@ -39,6 +39,9 @@ Pane {
     }
     /// The view pill of the canvas, kept clear of (Main.qml)
     property Item avoid: null
+    /// Where controls may go at the bottom (the parent's coordinates; Main.qml: above the navigation bar and the keyboard)
+    property real bottomLimit: Infinity
+    onBottomLimitChanged: if (visible) refresh()
     /// Smaller where the canvas is narrower than the pill (half of the window beside a reference, a phone)
     scale: Math.min(1, Math.max(0.5, (canvasItem.width - 16) / Math.max(1, width)))
     transformOrigin: Item.TopLeft

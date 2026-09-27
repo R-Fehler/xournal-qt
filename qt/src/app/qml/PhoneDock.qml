@@ -20,6 +20,10 @@ Rectangle {
     property bool vertical: false
     /// Room below it for the system's navigation bar
     property real safeBottom: 0
+    /// Room at the sides for a camera cut-out or the navigation bar (a phone held sideways: the rail at the right
+    /// takes the right one)
+    property real safeLeft: 0
+    property real safeRight: 0
     readonly property Item colorSlot: colorHolder
     readonly property Item widthSlot: widthHolder
     signal toolsRequested()
@@ -29,7 +33,7 @@ Rectangle {
     /// A button: a finger's size (48) where there is room
     readonly property int target: win.adaptive.touchProfile ? win.adaptive.minTarget : 48
     implicitHeight: vertical ? 0 : barSize + safeBottom
-    implicitWidth: vertical ? barSize : 0
+    implicitWidth: vertical ? barSize + safeRight : 0
     color: "#ffffff"
 
     /// The group of the tool in use (a cycling button), or ""
@@ -67,9 +71,9 @@ Rectangle {
 
     GridLayout {
         id: row
-        x: dock.vertical ? 0 : 4
+        x: dock.vertical ? 0 : 4 + dock.safeLeft
         y: dock.vertical ? 4 : 0
-        width: dock.vertical ? dock.barSize : dock.width - 8
+        width: dock.vertical ? dock.barSize : dock.width - 8 - dock.safeLeft - dock.safeRight
         height: dock.vertical ? dock.height - 8 - dock.safeBottom : dock.barSize
         columns: dock.vertical ? 1 : 7
         rows: dock.vertical ? 7 : 1

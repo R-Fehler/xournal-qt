@@ -15,6 +15,9 @@ Rectangle {
     visible: false
     focus: visible
     property real thumbHeight: 190
+    /// Room at the bottom and the right for the navigation bar, a cut-out and the keyboard (Main.qml)
+    property real bottomInset: 0
+    property real rightInset: 0
 
     function open() {
         visible = true
@@ -164,9 +167,12 @@ Rectangle {
 
     // Zoom and close
     Pane {
+        objectName: "contentsPill"
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 20
+        anchors.rightMargin: 20 + overview.rightInset
+        anchors.bottomMargin: 20 + overview.bottomInset
         padding: 2
         Material.foreground: "#303030"
         background: Rectangle { radius: height / 2; color: "#f2fafafa"; border.width: 1; border.color: "#40000000" }

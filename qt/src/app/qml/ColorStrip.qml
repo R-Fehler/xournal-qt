@@ -183,13 +183,13 @@ Item {
         readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout
         modal: asSheet
         dim: asSheet
-        width: asSheet && parent ? Math.min(parent.width, 640) : implicitWidth
-        bottomPadding: asSheet && typeof win !== "undefined" && win ? 10 + 8 + win.safeBottom : 10
+        width: asSheet && parent ? win.sheetWidth : implicitWidth
+        bottomPadding: asSheet ? 10 + 8 + win.sheetBottomPadding : 10
         parent: asSheet ? Overlay.overlay : lastCell
         // (margins: kept inside the window)
-        x: asSheet ? Math.round((parent.width - width) / 2)
+        x: asSheet ? win.sheetX
            : strip.side === "left" ? parent.width + 4 : strip.side === "right" ? -width - 4 : 0
-        y: asSheet ? parent.height - height
+        y: asSheet ? win.sheetBottom - height
            : strip.side === "top" ? parent.height + 4 : strip.side === "bottom" ? -height - 4 : 0
         margins: asSheet ? 0 : 8
         padding: 10

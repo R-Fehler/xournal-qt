@@ -21,6 +21,10 @@ Rectangle {
     /// The phone chrome (its page number opens the grid): the contents and the zoom are here, the columns follow the
     /// pinch (no − / +: no room)
     property bool phoneTools: false
+    /// Room at the bottom for the navigation bar and the soft keyboard (Main.qml): the pills stay above it
+    property real bottomInset: 0
+    /// Room at the right for a cut-out or the navigation bar at the side
+    property real rightInset: 0
     signal contentsRequested()
     signal zoomRequested()
     readonly property int columns: Math.max(1, Math.min(12, Math.round(grid.width / cellTarget)))
@@ -263,7 +267,7 @@ Rectangle {
         visible: pageGrid.selectionMode || app.pages.selectionCount > 0
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 88
+        anchors.bottomMargin: 88 + pageGrid.bottomInset
         padding: 2
         leftPadding: 12
         rightPadding: 4
@@ -318,8 +322,8 @@ Rectangle {
         objectName: "pageGridPill"
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.rightMargin: pageGrid.phoneTools ? 12 : 28
-        anchors.bottomMargin: 24
+        anchors.rightMargin: (pageGrid.phoneTools ? 12 : 28) + pageGrid.rightInset
+        anchors.bottomMargin: 24 + pageGrid.bottomInset
         padding: 2
         leftPadding: 4
         rightPadding: 4
