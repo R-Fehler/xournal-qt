@@ -11,6 +11,8 @@ import QtQuick.Window
 
 Item {
     id: panel
+    /// Its buttons: a finger's size in the touch profile (audit F14)
+    readonly property int target: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
     /// An annotation was tapped: its place is shown (the sidebar as a drawer closes then)
     signal picked()
     readonly property var model: app.annotations
@@ -84,8 +86,8 @@ Item {
         ToolButton {
             id: filterButton
             objectName: "annotationFilter"
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: panel.target
+            implicitHeight: panel.target
             icon.source: app.iconUrl("xqt-filter")
             icon.width: 18
             icon.height: 18
@@ -97,8 +99,8 @@ Item {
         }
         ToolButton {
             objectName: "annotationExport"
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: panel.target
+            implicitHeight: panel.target
             enabled: panel.model.available
             icon.source: app.iconUrl("xqt-download")
             icon.width: 18

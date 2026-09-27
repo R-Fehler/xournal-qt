@@ -3329,3 +3329,48 @@ TEST_F(SafeAreasKeyboardTest, theSourcePanelsFormatBarAndCursorWithTheKeyboard) 
     EXPECT_NEAR(sceneRect(bar).top(), barTopBefore, 1) << "back at the panel's top";
     QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
 }
+
+// The touch profile: the tab strip's buttons and the overview's card buttons (×, the star, the reference) are a
+// finger's size (audit F14); the star is there without hover
+TEST_F(SafeAreasKeyboardTest, touchTargetsOfTheTabStripTheOverviewAndTheSidebar) {
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "on"));
+    openThree();
+    resize(1280, 800);
+    const double target = adaptive->property("minTarget").toDouble();
+    ASSERT_EQ(target, 48);
+    for (const char* name: {"overviewButton", "previousTabButton", "nextTabButton", "newTabButton", "tabCloseButton"}) {
+        auto* b = findItem(name);
+        ASSERT_NE(b, nullptr) << name;
+        EXPECT_GE(b->width(), target) << name;
+        EXPECT_GE(b->height(), target) << name;
+    }
+    EXPECT_TRUE(insideWindow(sceneRect(named("tabStrip"))));
+    auto* overview = window->findChild<QObject*>("tabOverview");
+    QMetaObject::invokeMethod(overview, "open");
+    ASSERT_TRUE(opened(overview, true));
+    settled(overview);
+    for (const char* name: {"overviewCloseButton", "overviewStar", "overviewReferenceButton"}) {
+        int seen = 0;
+        for (QQuickItem* b: itemsNamed(popupItem(overview), name)) {
+            ++seen;
+            EXPECT_GE(b->width(), target) << name;
+            EXPECT_GE(b->height(), target) << name;
+        }
+        EXPECT_GT(seen, 0) << name << " shown (the star too: no hover with fingers)";
+    }
+    QTest::keyClick(window, Qt::Key_Escape);
+    EXPECT_TRUE(opened(overview, false));
+    // The sidebar's layers
+    auto* sidebar = named("sidebar");
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));
+    sidebar->setProperty("mode", "layers");
+    wait(150);
+    for (const char* name: {"layerVisibleButton", "showAllLayersButton"}) {
+        auto* b = findItem(name);
+        ASSERT_NE(b, nullptr) << name;
+        EXPECT_GE(b->width(), target) << name;
+        EXPECT_GE(b->height(), target) << name;
+    }
+    sidebar->setProperty("mode", "pages");
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "auto"));
+}

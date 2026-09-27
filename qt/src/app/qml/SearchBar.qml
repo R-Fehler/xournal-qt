@@ -77,7 +77,9 @@ Pane {
             objectName: "searchNowButton"
             iconName: "xqt-search"
             tip: qsTr("Search (Enter)")
-            implicitWidth: 36; implicitHeight: 36
+            // (a finger's size in the touch profile: audit F14)
+            implicitWidth: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
+            implicitHeight: implicitWidth
             icon.width: 20; icon.height: 20
             checked: bar.waitingForEnter
             onClicked: bar.searchNow()

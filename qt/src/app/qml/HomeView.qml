@@ -1884,7 +1884,7 @@ Rectangle {
                     ToolTip.delay: 300
                     HoverHandler { id: hintHover }
                 }
-                FuzzyToggle { objectName: "librarySearchFuzzy"; implicitHeight: 40 }
+                FuzzyToggle { objectName: "librarySearchFuzzy"; implicitHeight: home.minTarget }
                 // The reduced search: names only (of documents, and of folders unless the list is flat)
                 ToolButton {
                     id: namesOnly
@@ -1893,7 +1893,7 @@ Rectangle {
                     checkable: true
                     checked: home.lib.namesOnly
                     onToggled: home.lib.namesOnly = checked
-                    implicitHeight: 40
+                    implicitHeight: home.minTarget
                     leftPadding: 6
                     rightPadding: 6
                     font.pixelSize: 13

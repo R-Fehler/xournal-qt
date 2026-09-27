@@ -8,6 +8,8 @@ import "Popups.js" as Popups
 
 Item {
     id: panel
+    /// Its buttons: a finger's size in the touch profile (audit F14)
+    readonly property int target: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 34
 
     ListView {
         id: list
@@ -45,7 +47,7 @@ Item {
                     objectName: "layerVisibleButton"
                     iconName: row.layerVisible ? "xqt-eye" : "xqt-eye-off"
                     tip: row.layerVisible ? qsTr("Hide this layer") : qsTr("Show this layer")
-                    implicitWidth: 34; implicitHeight: 34
+                    implicitWidth: panel.target; implicitHeight: panel.target
                     icon.width: 19; icon.height: 19
                     icon.color: row.layerVisible ? "#3c4043" : "#9aa0a6"
                     enabled: !row.isBackground
@@ -73,7 +75,7 @@ Item {
                     objectName: "layerMenuButton"
                     iconName: "xqt-more"
                     tip: qsTr("More")
-                    implicitWidth: 34; implicitHeight: 34
+                    implicitWidth: panel.target; implicitHeight: panel.target
                     icon.width: 18; icon.height: 18
                     visible: !row.isBackground
                     onClicked: Popups.openAt(layerMenu)
@@ -117,7 +119,7 @@ Item {
             objectName: "showAllLayersButton"
             iconName: "xqt-eye"
             tip: qsTr("Show all layers")
-            implicitWidth: 38; implicitHeight: 38
+            implicitWidth: Math.max(38, panel.target); implicitHeight: Math.max(38, panel.target)
             icon.width: 20; icon.height: 20
             onClicked: app.layers.showAll(true)
         }

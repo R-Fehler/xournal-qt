@@ -91,8 +91,8 @@ Rectangle {
             objectName: "overviewButton"
             iconName: "xqt-tabs-grid"
             tip: qsTr("All open documents (Ctrl+Shift+E)")
-            implicitWidth: 38
-            implicitHeight: 38
+            implicitWidth: strip.target
+            implicitHeight: strip.target
             icon.width: 22
             icon.height: 22
             Layout.rightMargin: 4
@@ -105,8 +105,8 @@ Rectangle {
             visible: app.tabs.count > 1
             iconName: "xqt-chevron-left"
             tip: qsTr("Previous document (Ctrl+PgUp)")
-            implicitWidth: 38
-            implicitHeight: 38
+            implicitWidth: strip.target
+            implicitHeight: strip.target
             icon.width: 22
             icon.height: 22
             Layout.alignment: Qt.AlignVCenter
@@ -117,8 +117,8 @@ Rectangle {
             visible: app.tabs.count > 1
             iconName: "xqt-chevron-right"
             tip: qsTr("Next document (Ctrl+PgDown)")
-            implicitWidth: 38
-            implicitHeight: 38
+            implicitWidth: strip.target
+            implicitHeight: strip.target
             icon.width: 22
             icon.height: 22
             Layout.rightMargin: 4
@@ -323,9 +323,10 @@ Rectangle {
                         onAccepted: function(name) { app.renameTab(tab.index, name) }
                     }
                     ToolButton {
+                        objectName: "tabCloseButton"
                         Layout.topMargin: 4
-                        implicitWidth: 36
-                        implicitHeight: 36
+                        implicitWidth: strip.touch ? strip.target : 36
+                        implicitHeight: strip.touch ? strip.target : 36
                         icon.source: app.iconUrl("xqt-close")
                         icon.width: 16
                         icon.height: 16
@@ -339,8 +340,8 @@ Rectangle {
         ToolButton {
             objectName: "newTabButton"
             Layout.alignment: Qt.AlignVCenter
-            implicitWidth: 44
-            implicitHeight: 40
+            implicitWidth: Math.max(44, strip.target)
+            implicitHeight: strip.target
             text: "+"
             font.pixelSize: 22
             Material.foreground: "#3c4043"
