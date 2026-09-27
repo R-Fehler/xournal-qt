@@ -1379,11 +1379,9 @@ ApplicationWindow {
             onClicked: canvasEmojiPicker.open()
             EmojiPicker {
                 id: canvasEmojiPicker
-                parent: win.phoneChrome ? Overlay.overlay : emojiButton
-                x: win.phoneChrome ? Math.round((parent.width - width) / 2)
-                   : toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
-                y: win.phoneChrome ? parent.height - height - phoneDock.height - 8
-                   : toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
+                owner: emojiButton
+                ownerX: toolArea.popupSide === "left" ? emojiButton.width : toolArea.popupSide === "right" ? -width : 0
+                ownerY: toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? emojiButton.height : 0
                 onPicked: function(emoji) { close(); canvas.insertText(emoji) }
             }
         }

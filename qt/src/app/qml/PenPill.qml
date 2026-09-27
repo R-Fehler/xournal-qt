@@ -117,11 +117,12 @@ Rectangle {
                         border.color: Qt.colorEqual(app.color, dot.modelData) ? Material.accentColor : "#9e9e9e"
                     }
                 }
-                Menu {
+                AdaptiveMenu {
                     id: dotMenu
-                    MenuItem { text: qsTr("Remove this color"); onTriggered: app.removePenColor(dot.index) }
-                    MenuItem { text: qsTr("Add a color…"); onTriggered: pillColorDialog.open() }
-                    MenuItem { text: qsTr("Default colors"); onTriggered: app.resetPenColors() }
+                    objectName: "penPillColorMenu"
+                    AdaptiveMenuItem { text: qsTr("Remove this color"); onTriggered: app.removePenColor(dot.index) }
+                    AdaptiveMenuItem { text: qsTr("Add a color…"); onTriggered: pillColorDialog.open() }
+                    AdaptiveMenuItem { text: qsTr("Default colors"); onTriggered: app.resetPenColors() }
                 }
             }
         }

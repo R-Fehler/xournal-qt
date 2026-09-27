@@ -79,23 +79,26 @@ Item {
                     icon.width: 18; icon.height: 18
                     visible: !row.isBackground
                     onClicked: Popups.openAt(layerMenu)
-                    Menu {
+                    AdaptiveMenu {
                         id: layerMenu
                         objectName: "layerMenu"
-                        MenuItem { text: qsTr("Rename…"); onTriggered: { renameField.text = row.name; renameDialog.row = row.index; renameDialog.open() } }
-                        MenuItem { text: qsTr("Duplicate"); onTriggered: app.layers.duplicate(row.index) }
-                        MenuItem { text: qsTr("Move up"); enabled: row.index > 0; onTriggered: app.layers.moveUp(row.index) }
-                        MenuItem {
+                        title: row.name
+                        AdaptiveMenuItem { objectName: "renameLayerItem"; text: qsTr("Rename…"); onTriggered: { renameField.text = row.name; renameDialog.row = row.index; renameDialog.open() } }
+                        AdaptiveMenuItem { objectName: "duplicateLayerItem"; text: qsTr("Duplicate"); onTriggered: app.layers.duplicate(row.index) }
+                        AdaptiveMenuItem { objectName: "layerUpItem"; text: qsTr("Move up"); enabled: row.index > 0; onTriggered: app.layers.moveUp(row.index) }
+                        AdaptiveMenuItem {
+                            objectName: "layerDownItem"
                             text: qsTr("Move down")
                             enabled: row.index < app.layers.count - 2
                             onTriggered: app.layers.moveDown(row.index)
                         }
-                        MenuItem {
+                        AdaptiveMenuItem {
+                            objectName: "mergeLayerItem"
                             text: qsTr("Merge into the one below")
                             enabled: row.index < app.layers.count - 2
                             onTriggered: app.layers.mergeDown(row.index)
                         }
-                        MenuItem { text: qsTr("Delete"); onTriggered: app.layers.remove(row.index) }
+                        AdaptiveMenuItem { objectName: "deleteLayerItem"; text: qsTr("Delete"); onTriggered: app.layers.remove(row.index) }
                     }
                 }
             }

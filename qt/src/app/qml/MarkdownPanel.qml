@@ -244,8 +244,9 @@ Pane {
                 onClicked: panelEmojiPicker.open()
                 EmojiPicker {
                     id: panelEmojiPicker
-                    y: parent.height
-                    x: Math.min(0, panel.width - width - emojiButton.mapToItem(panel, 0, 0).x - 8)
+                    owner: emojiButton
+                    ownerY: emojiButton.height
+                    ownerX: Math.min(0, panel.width - width - emojiButton.mapToItem(panel, 0, 0).x - 8)
                     onPicked: function(emoji) { close(); panel.insertEmoji(emoji) }
                 }
             }

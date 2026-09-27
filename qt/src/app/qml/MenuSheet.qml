@@ -254,8 +254,11 @@ Popup {
                                 /// The menu's entry this row stands for
                                 readonly property var menuEntry: entry.source
                                 visible: (entry.kind === "item" || entry.kind === "submenu") && menuEntry.offered !== false
+                                /// A second line under the name (an entry's `detail`: the look-up menu's web addresses)
+                                readonly property string detail: menuEntry && typeof menuEntry.detail === "string" ? menuEntry.detail : ""
                                 width: parent.width
-                                height: sheet.rowHeight
+                                height: sheet.rowHeight + (detail !== "" ? 18 : 0)
+                                bottomPadding: detail !== "" ? 24 : 6
                                 enabled: menuEntry.enabled
                                 highlighted: sheet.keyIndex === entry.index
                                 text: menuEntry.text !== undefined ? menuEntry.text : ""
@@ -266,6 +269,18 @@ Popup {
                                 rightPadding: 20 + (marker.visible ? marker.width + 12 : 0)
                                 focusPolicy: Qt.NoFocus
                                 onClicked: sheet.activate(menuEntry)
+                                Label {
+                                    objectName: "menuSheetRowDetail"
+                                    visible: row.detail !== ""
+                                    text: row.detail
+                                    x: row.leftPadding
+                                    width: row.width - row.leftPadding - row.rightPadding
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 8
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 11
+                                    color: "#6b6f75"
+                                }
                                 // A check mark (a checked choice) or the arrow of a submenu
                                 Item {
                                     id: marker

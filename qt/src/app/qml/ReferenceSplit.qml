@@ -324,6 +324,7 @@ Item {
             RowLayout {
                 spacing: 0
                 ToolButton {
+                    id: referencePageButton
                     objectName: "referencePageButton"
                     text: app.reference.pageNumber + " / " + app.reference.pageCount
                     focusPolicy: Qt.NoFocus
@@ -332,11 +333,36 @@ Item {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Go to page…")
                     ToolTip.delay: 600
+                    // Above the pill; in the phone classes a bottom sheet (the window's, above the soft keyboard)
                     Popup {
                         id: referencePagePopup
                         objectName: "referencePagePopup"
-                        y: -height - 8
+                        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout === true
+                        parent: asSheet ? Overlay.overlay : referencePageButton
+                        modal: asSheet
+                        dim: asSheet
+                        x: asSheet ? win.sheetX : 0
+                        y: asSheet ? win.sheetBottom - height : -height - 8
+                        width: asSheet ? win.sheetWidth : implicitWidth
                         padding: 8
+                        leftPadding: asSheet ? 20 : 8
+                        rightPadding: asSheet ? 20 : 8
+                        topPadding: asSheet ? 16 : 8
+                        bottomPadding: asSheet ? 16 + win.sheetBottomPadding : 8
+                        background: Rectangle {
+                            color: "#ffffff"
+                            radius: referencePagePopup.asSheet ? 16 : 4
+                            border.width: referencePagePopup.asSheet ? 0 : 1
+                            border.color: "#d5d8dc"
+                            Rectangle {  // (a sheet: square at the bottom)
+                                visible: referencePagePopup.asSheet
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: parent.radius
+                                color: parent.color
+                            }
+                        }
                         onOpened: { pageField.text = ""; pageField.forceActiveFocus() }
                         onClosed: referencePill.focusReference()
                         RowLayout {

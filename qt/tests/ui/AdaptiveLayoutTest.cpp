@@ -3186,7 +3186,8 @@ TEST_F(SafeAreasKeyboardTest, controlsStayOutOfTheSafeArea) {
         expectClear("pageGridPill", at);
         QMetaObject::invokeMethod(grid, "close");
         until([&] { return !grid->isVisible(); });
-        // The compact chrome: the tool square, the pen pill, the tab dots
+        // The compact chrome: the tool square, the pen pill (with the pen in hand), the tab dots
+        controller->selectTool("pen");
         QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
         wait(150);
         shot("insets-compact-" + at);
@@ -3373,4 +3374,75 @@ TEST_F(SafeAreasKeyboardTest, touchTargetsOfTheTabStripTheOverviewAndTheSidebar)
     }
     sidebar->setProperty("mode", "pages");
     QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "auto"));
+}
+
+// The menus that were plain menus open as the sheet on a phone: the layer menu, the annotations' filter, a bookmark's
+// menu, the look-up menu (the web addresses as the rows' second line), the table editor's cell menu, the pen pill's
+// color menu; the reference's page field and the emoji picker are sheets there too
+TEST_F(SafeAreasKeyboardTest, theRemainingMenusAreSheetsOnAPhone) {
+    openDocument();
+    ASSERT_TRUE(controller->toggleBookmark(0));
+    resize(412, 915);
+    setInsets(32, 0, 24, 0);
+    auto* sidebar = named("sidebar");
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));
+    sidebar->setProperty("mode", "layers");
+    wait(150);
+    click(findItem("layerMenuButton"));
+    expectSheetOf(anywhere("layerMenu"), "layers");
+    sidebar->setProperty("mode", "annotations");
+    wait(150);
+    click(findItem("annotationFilter"));
+    expectSheetOf(anywhere("annotationFilterMenu"), "annotations");
+    sidebar->setProperty("mode", "contents");
+    wait(150);
+    auto* bookmark = findItem("bookmarkEntry");
+    ASSERT_NE(bookmark, nullptr);
+    QMetaObject::invokeMethod(bookmark, "pressAndHold");  // (a long press on it)
+    expectSheetOf(anywhere("bookmarkMenu"), "a bookmark");
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, false));
+    wait(250);
+
+    QObject* lookUp = anywhere("lookUpMenu");
+    ASSERT_NE(lookUp, nullptr);
+    lookUp->setProperty("text", "Kalman filter");
+    openMenu(lookUp);
+    ASSERT_TRUE(opened(sheet(), true));
+    bool detail = false;
+    for (QQuickItem* row: sheetRows()) {
+        for (QQuickItem* c: row->childItems()) {
+            detail = detail || (c->objectName() == "menuSheetRowDetail" && c->isVisible() &&
+                                !c->property("text").toString().isEmpty());
+        }
+    }
+    EXPECT_TRUE(detail) << "the web address under the entry's name";
+    shot("sheet-look-up");
+    QTest::keyClick(window, Qt::Key_Escape);
+    EXPECT_TRUE(opened(sheet(), false));
+    openMenu(lookUp);
+    expectSheetOf(lookUp, "look up");
+
+    QObject* cellMenu = anywhere("tableCellMenu");
+    ASSERT_NE(cellMenu, nullptr);
+    openMenu(cellMenu);
+    expectSheetOf(cellMenu, "a table cell");
+    QObject* colorMenu = anywhere("penPillColorMenu");
+    ASSERT_NE(colorMenu, nullptr);
+    openMenu(colorMenu);
+    expectSheetOf(colorMenu, "the pen pill's color");
+
+    for (const char* name: {"referencePagePopup", "emojiPicker"}) {
+        QObject* popup = anywhere(name);
+        ASSERT_NE(popup, nullptr) << name;
+        EXPECT_TRUE(popup->property("asSheet").toBool()) << name;
+        QMetaObject::invokeMethod(popup, "open");
+        ASSERT_TRUE(opened(popup, true)) << name;
+        wait(100);
+        const QRectF r = popupRect(popup);
+        EXPECT_NEAR(r.bottom(), 915, 1.5) << name << ": at the bottom";
+        EXPECT_NEAR(r.width(), 412, 1) << name << ": across the width";
+        expectClear(popupItem(popup), name);
+        QMetaObject::invokeMethod(popup, "close");
+        EXPECT_TRUE(opened(popup, false)) << name;
+    }
 }
