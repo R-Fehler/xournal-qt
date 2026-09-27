@@ -34,7 +34,8 @@ Rectangle {
     readonly property bool touch: adaptive !== null && adaptive.touchProfile
     /// What a finger needs (48 with the touch profile, else 40)
     readonly property int minTarget: adaptive ? adaptive.minTarget : 40
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.safeBottom ? win.safeBottom : 0
+    /// The part of its bottom under the navigation bar (not where the soft keyboard's room is below it)
+    readonly property real safeBottom: typeof win !== "undefined" && win && win.contentBottomInset ? win.contentBottomInset : 0
     /// Room below the last cards for the floating "+" of a phone
     readonly property real fabSpace: phoneLayout ? 72 : 0
 
@@ -291,6 +292,7 @@ Rectangle {
                 spacing: 2
                 IconButton {
                     objectName: "clearSelectionButton"
+                    label: qsTr("Clear the selection")
                     iconName: "xqt-close"
                     tip: qsTr("Clear the selection (Esc)")
                     onClicked: home.currentModel.clearSelection()
@@ -450,6 +452,7 @@ Rectangle {
             IconButton {
                 id: newButton
                 objectName: "newDocumentButton"
+                label: qsTr("New")
                 visible: !home.phoneLayout
                 iconName: home.expanded ? "xqt-file-plus" : "xqt-plus"
                 tip: home.expanded ? (app.newTextAsPdf ? qsTr("New document, text document or text file")
@@ -522,6 +525,7 @@ Rectangle {
             }
             IconButton {
                 objectName: "importButton"
+                label: qsTr("Import")
                 visible: home.expanded && home.page === 0 && app.library.available
                 iconName: "xqt-import"
                 tip: qsTr("Import PDFs and Xournal files, or a whole folder (copies them into this folder)")
@@ -535,6 +539,7 @@ Rectangle {
             }
             IconButton {
                 objectName: "newFolderButton"
+                label: qsTr("New folder")
                 visible: home.expanded && home.page === 0 && app.library.available
                 enabled: !app.library.flat && !home.searching
                 iconName: "xqt-folder-plus"
@@ -543,6 +548,7 @@ Rectangle {
             }
             IconButton {
                 objectName: "flatButton"
+                label: app.library.flat ? qsTr("Show folders") : qsTr("All documents at once")
                 visible: home.expanded && home.page === 0 && app.library.available
                 iconName: app.library.flat ? "xqt-layout-grid" : "xqt-folder-tree"
                 tip: app.library.flat ? qsTr("All documents (show folders)") : qsTr("Folders (show all documents at once)")
@@ -553,6 +559,7 @@ Rectangle {
             IconButton {
                 id: showButton
                 objectName: "showButton"
+                label: qsTr("Show")
                 visible: home.expanded && (home.page === 0 || home.page === 2) && app.library.available
                 iconName: "xqt-filter"
                 tip: app.library.showFiltered ? qsTr("Show: some kinds of files are hidden or added") : qsTr("Show: which kinds of files")
@@ -562,6 +569,7 @@ Rectangle {
             }
             IconButton {
                 objectName: "sortButton"
+                label: qsTr("Sort")
                 visible: home.expanded && home.page === 0 && app.library.available
                 iconName: "xqt-sort"
                 tip: qsTr("Sort")
@@ -570,6 +578,7 @@ Rectangle {
             }
             IconButton {
                 objectName: "openFileButton"
+                label: qsTr("Open a file")
                 visible: home.expanded && home.page === 1
                 iconName: "xopp-document-open"
                 tip: qsTr("Open a file")
@@ -606,6 +615,7 @@ Rectangle {
             IconButton {
                 id: viewButton
                 objectName: "homeViewButton"
+                label: qsTr("View")
                 visible: !home.expanded
                 implicitWidth: home.phoneLayout ? 44 : 48
                 iconName: "xqt-sliders"
@@ -685,6 +695,7 @@ Rectangle {
             // (the tool bar with its menu is not there while the library is shown)
             IconButton {
                 objectName: "homeSettingsButton"
+                label: qsTr("Settings")
                 implicitWidth: home.phoneLayout ? 44 : 48
                 iconName: "xqt-settings"
                 tip: qsTr("Settings (Ctrl+,)")
@@ -1583,6 +1594,7 @@ Rectangle {
 
         IconButton {
             objectName: "folderUpButton"
+            label: qsTr("Up")
             iconName: "xqt-arrow-up"
             tip: qsTr("Up (Backspace)")
             implicitWidth: home.touch ? 44 : 40
@@ -1883,7 +1895,7 @@ Rectangle {
                     ToolTip.delay: 300
                     HoverHandler { id: hintHover }
                 }
-                FuzzyToggle { objectName: "librarySearchFuzzy"; implicitHeight: 40 }
+                FuzzyToggle { objectName: "librarySearchFuzzy"; implicitHeight: home.minTarget }
                 // The reduced search: names only (of documents, and of folders unless the list is flat)
                 ToolButton {
                     id: namesOnly
@@ -1892,7 +1904,7 @@ Rectangle {
                     checkable: true
                     checked: home.lib.namesOnly
                     onToggled: home.lib.namesOnly = checked
-                    implicitHeight: 40
+                    implicitHeight: home.minTarget
                     leftPadding: 6
                     rightPadding: 6
                     font.pixelSize: 13
@@ -1926,6 +1938,7 @@ Rectangle {
         }
         IconButton {
             objectName: "extendedSearchButton"
+            label: qsTr("Extended search")
             iconName: "xqt-pages-grid"
             tip: qsTr("Extended search: show the pages with hits of every result")
             checked: home.extended
@@ -2823,6 +2836,6 @@ Rectangle {
         z: 30
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: addFab.visible ? 88 + home.safeBottom : 32
+        anchors.bottomMargin: (addFab.visible ? 88 : 32) + home.safeBottom
     }
 }

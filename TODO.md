@@ -103,43 +103,38 @@ is built.
 ### Adaptive UI ([ui-adaptive-audit.md](qt/docs/ui-adaptive-audit.md), [adaptive-layout.md](qt/docs/adaptive-layout.md))
 - [x] Block 1 `qt/adaptive-foundation`: size classes, touch profile, choices per class, the sidebar binding and
   drawer, chromeMode apart from full screen, `AdaptiveLayoutTest`.
-- [ ] Left from block 1: the tab strip's 38 px buttons and the other F14 targets are not sized by `minTarget` yet
-  (the Markdown panel and reference split done in block 5, HomeView and TabOverview in block 6).
+- [x] Left from block 1: the tab strip's 38 px buttons and the other F14 targets sized by `minTarget` (the Markdown
+  panel and reference split in block 5, HomeView and TabOverview in block 6, the rest in block 8).
 - [x] Block 2 `qt/adaptive-menus`: `AdaptiveMenu` (width of its entries, never taller than the window, clear of its
   button; a bottom sheet with drill-in in the phone classes, `MenuSheet`), the ⋮ regrouping (10 entries, Document /
   Export / Page / View), used for ⋮, library, card, tab, layout and page menus; `menusFitAtFiveSizes`,
   `menusAreSheetsOnPhones`.
-- [ ] Left from block 2: the other menus are plain `Menu`s still (colors, PDF text, writing, the
-  view pill's fit, the sidebar's layer / outline / bookmark menus, the look-up
-  menu, the table editor's cell menu): switch them to `AdaptiveMenu` (the shapes menu, about 620 px, is taller than a
-  phone-landscape window). On a phone the tool bar buttons that went into ⋮'s overflow should come back in the sheet
-  (with `qt/adaptive-toolbar`). The sheet is not checked on the Fold 7 yet (Android back key, the navigation bar via
-  `safeBottom`). Unchecked choices show no box in the sheet (only a check mark when chosen).
+- [ ] Left from block 2: (every menu is an `AdaptiveMenu` now, block 8.) The sheet is not checked on the Fold 7 yet
+  (Android back key, the navigation bar via `safeBottom`). Unchecked choices show no box in the sheet (only a check
+  mark when chosen).
 - [x] Block 3 `qt/adaptive-dialogs`: `AdaptiveDialog` for all dialogs and sheets (scrolling body, full-screen sheet,
   bottom sheet, stacked footer buttons, back key), Settings as a list of sections on phones, the quick tools popup.
 - [ ] Left from block 3: the bottom sheet keeps Material's rounded corners at the bottom edge and opens with the
-  dialog's grow animation (no slide); the Settings sheet is its own popup, not an `AdaptiveDialog`; the tab overview,
-  the Markdown table editor, the look-up menu and the small anchored popups (link, page jump, custom width) are
-  not adapted; the dialogs are not checked against the bottom safe area (block 8).
+  dialog's grow animation (no slide); the Settings sheet is its own popup, not an `AdaptiveDialog`; the Markdown table
+  editor and the small anchored popups (link, page jump, custom width) are not adapted (the tab overview keeps to the
+  safe area since block 8; the look-up menu is an `AdaptiveMenu`).
 - [ ] Left from block 4 `qt/adaptive-toolbar` (tool bar layouts, "more tools", cycling buttons, the view pill, the
-  sidebar arrow, the text document's bar in the format bar): docking the format bar above the soft keyboard on
-  phones (`qt/safe-areas-keyboard`); (done in `qt/phone-chrome`: the palette and the widths as sheets on phones, the
-  bottom dock, "more tools" as the dock's "All tools" sheet); menus still plain `Menu`s: the sidebar's layer / outline / bookmark menus, the look-up menu, the table editor's
-  cell menu; the pen pill's width and colors are not cycling buttons with lists yet.
+  sidebar arrow, the text document's bar in the format bar): the pen pill's width and colors are not cycling buttons
+  with lists yet. (Done: the palette, the widths, the dock and "All tools" in `qt/phone-chrome`; the format bar above
+  the soft keyboard and the remaining plain menus in block 8.)
 - [ ] Left from block 6 `qt/adaptive-home` (the switch as name ▾ + Recent / ★ / Bookmarks icons, the library header's
   ladder with "+" and View, the floating "+", the
-  breadcrumbs "…", the selection's bar at the bottom, the tab overview's wrapping header and aspect cells): give the
-  home screen's `IconButton`s a short `label` once `qt/adaptive-toolbar`'s long-press label is merged (until then a
-  held finger shows their tip); (the phone's tab strip: done, the app bar of `qt/phone-chrome`); a list view of the library for phones (audit D7, "consider") is not
-  built; the overview cards' ×, star and reference buttons are 40 px, not `minTarget`.
+  breadcrumbs "…", the selection's bar at the bottom, the tab overview's wrapping header and aspect cells): a list view
+  of the library for phones (audit D7, "consider") is not built. (Done: the phone's tab strip, the app bar of
+  `qt/phone-chrome`; the `IconButton`s' short labels and the overview cards' finger-sized buttons in block 8.)
 - [x] Block 5 `qt/adaptive-panels`: the Markdown source below the page in portrait (a draggable divider, remembered per
   class), the reference top and bottom in a portrait area (ratio kept), the reference's narrow pill (page + ⋮), the
   compact view pill, pills kept clear of the view pill, the drawer's slide / Esc / back key / phone width, the format
   bar's Insert overflow and fading edges.
 - [ ] Left from block 5: the format bar still scrolls below ~680 px on a desktop (600×800); the Markdown panel's
-  title and size rows are not made smaller on a phone; the reference pill's page popup and the source panel's emoji
-  picker are plain popups; the pen pill is still tall in phone landscape (only in the compact chrome now: the phone
-  chrome has the dock).
+  title and size rows are not made smaller on a phone; the pen pill is still tall in phone landscape (only in the
+  compact chrome now: the phone chrome has the dock). (The reference's page field and the emoji picker are sheets on
+  phones since block 8.)
 - [x] Block 7 `qt/phone-chrome` (was `qt/compact-chrome`): in the phone classes the app bar (the library, the title
   with tab dots and a swipe for the next / previous document, the tab count: tap all, double tap the one before, hold
   the ones used lately; ⋮) instead of the tab strip, the tool dock at the bottom (a rail at the side in landscape)
@@ -147,11 +142,22 @@ is built.
   the widths as sheets; the reader automatic only in tiny windows; the presenting / reader corner field highlighted
   with its names; no windows of their own on Android / iOS; no breadcrumbs at the library's top; `PhoneChromeTest`.
 - [ ] Left from block 7: the dock and the app bar are not checked on the Fold 7 yet (device checklist, "Phone
-  chrome"); the left / right safe areas and cut-outs (the rail's side), the soft keyboard (the format bar above it, the
-  caret into view, the dock under it) and the remaining F14 targets are `qt/safe-areas-keyboard`'s; the compact chrome
-  (chosen by hand on a phone) still has the tool square, the pen pill and the tab dots of full screen; the tab menu
+  chrome"); the compact chrome (chosen by hand on a phone) still has the tool square, the pen pill and the tab dots of full screen; the tab menu
   (rename, reference, share) is not reachable from the phone's app bar (the overview's cards have rename, reference and
   close; ⋮ has share and rename); the page layout on a phone is only in ⋮ → View.
+- [x] Block 8 `qt/safe-areas-keyboard`: `win.safeInsets` on all four edges (Qt 6.9+ safe area margins for every
+  window, fake ones for the tests and `XQT_SAFE_AREA`), every control kept clear of them while the page is drawn under
+  them; the soft keyboard (`win.keyboardTop`, the footer makes room for it, the dock goes, the format bar docks right
+  above it on a phone, also the source panel's; the text cursor scrolled into view; sheets, menus and dialogs above
+  it); the remaining F14 targets; the remaining plain menus as `AdaptiveMenu`s; the home screen's short labels;
+  `SafeAreasKeyboardTest`.
+- [ ] Left from block 8: nothing of it is checked on the Fold 7 yet (device checklist, "Safe areas and the soft
+  keyboard"), and the APK was not built with it (the Qt 6.9+ part compiles against Qt 6.11's headers). How Qt 6.11 on
+  Android 16 reports the keyboard (screen pixels, and whether the window is still made smaller) is taken from the New
+  document dialog's experience: check it. Not adapted: the deprecated text flow panel (no insets, no keyboard room of
+  its own), the link popup and the page jump (in the middle of the page, so clear of the bars anyway). The emoji
+  button is in "All tools", which is out of reach while the keyboard is open (the dock goes): the keyboard's own emoji
+  or closing the keyboard.
 
 ---
 

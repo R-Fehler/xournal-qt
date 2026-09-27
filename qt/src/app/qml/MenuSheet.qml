@@ -30,16 +30,23 @@ Popup {
     property int keyIndex: -1
     readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
     readonly property int rowHeight: Math.max(48, adaptiveLayout ? adaptiveLayout.minTarget : 48)
-    readonly property real safeTop: typeof win !== "undefined" && win && win.safeTop ? win.safeTop : 0
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.safeBottom ? win.safeBottom : 0
+    // (the window's safe area and the soft keyboard: Main.qml)
+    readonly property bool inWindow: typeof win !== "undefined" && win !== null && win.safeInsets !== undefined
+    readonly property real safeTop: inWindow ? win.safeTop : 0
+    readonly property real safeLeft: inWindow ? win.safeLeft : 0
+    readonly property real safeRight: inWindow ? win.safeRight : 0
+    /// Room below its last row for the navigation bar (none while the keyboard is open: the sheet sits on the keyboard)
+    readonly property real safeBottom: inWindow && !win.keyboardOpen ? win.safeBottom : 0
+    /// Its bottom edge: the window's, or the soft keyboard's top while it is open
+    readonly property real bottomEdge: parent ? (inWindow ? Math.min(parent.height, win.keyboardTop) : parent.height) : 0
     /// The window left the phone classes: the menu is a menu again, so the sheet goes
     readonly property bool phoneClass: adaptiveLayout !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptiveLayout.layoutClass) >= 0
     onPhoneClassChanged: if (!phoneClass && visible) close()
 
-    width: parent ? Math.min(parent.width, 640) : 360
-    x: parent ? Math.round((parent.width - width) / 2) : 0
-    height: parent ? Math.min(implicitHeight, Math.round(parent.height * 0.85), parent.height - safeTop - 8) : implicitHeight
-    y: parent ? parent.height - height + handle.offset + slide : 0
+    width: parent ? Math.min(parent.width - safeLeft - safeRight, 640) : 360
+    x: parent ? safeLeft + Math.round((parent.width - safeLeft - safeRight - width) / 2) : 0
+    height: parent ? Math.min(implicitHeight, Math.round(bottomEdge * 0.85), bottomEdge - safeTop - 8) : implicitHeight
+    y: parent ? bottomEdge - height + handle.offset + slide : 0
     /// Slides it in and out
     property real slide: 0
     enter: Transition { NumberAnimation { property: "slide"; from: sheet.height; to: 0; duration: 180; easing.type: Easing.OutCubic } }
@@ -247,8 +254,11 @@ Popup {
                                 /// The menu's entry this row stands for
                                 readonly property var menuEntry: entry.source
                                 visible: (entry.kind === "item" || entry.kind === "submenu") && menuEntry.offered !== false
+                                /// A second line under the name (an entry's `detail`: the look-up menu's web addresses)
+                                readonly property string detail: menuEntry && typeof menuEntry.detail === "string" ? menuEntry.detail : ""
                                 width: parent.width
-                                height: sheet.rowHeight
+                                height: sheet.rowHeight + (detail !== "" ? 18 : 0)
+                                bottomPadding: detail !== "" ? 24 : 6
                                 enabled: menuEntry.enabled
                                 highlighted: sheet.keyIndex === entry.index
                                 text: menuEntry.text !== undefined ? menuEntry.text : ""
@@ -259,6 +269,18 @@ Popup {
                                 rightPadding: 20 + (marker.visible ? marker.width + 12 : 0)
                                 focusPolicy: Qt.NoFocus
                                 onClicked: sheet.activate(menuEntry)
+                                Label {
+                                    objectName: "menuSheetRowDetail"
+                                    visible: row.detail !== ""
+                                    text: row.detail
+                                    x: row.leftPadding
+                                    width: row.width - row.leftPadding - row.rightPadding
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 8
+                                    elide: Text.ElideRight
+                                    font.pixelSize: 11
+                                    color: "#6b6f75"
+                                }
                                 // A check mark (a checked choice) or the arrow of a submenu
                                 Item {
                                     id: marker

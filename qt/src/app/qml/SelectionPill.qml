@@ -21,7 +21,9 @@ Pane {
     /// A pill at the same bottom edge to keep clear of (the notes' view pill): where the two would meet, this one goes
     /// above it
     property Item avoid: null
-    readonly property real lowY: canvasItem.y + canvasItem.height - bottomMargin - height
+    /// Where controls may go at the bottom (the parent's coordinates; Main.qml: above the navigation bar and the keyboard)
+    property real bottomLimit: Infinity
+    readonly property real lowY: Math.min(canvasItem.y + canvasItem.height, bottomLimit) - bottomMargin - height
     readonly property bool meets: avoid !== null && avoid.visible && x - 8 < avoid.x + avoid.width && x + width + 8 > avoid.x
                                   && lowY < avoid.y + avoid.height && lowY + height > avoid.y
     y: meets ? avoid.y - height - 12 : lowY

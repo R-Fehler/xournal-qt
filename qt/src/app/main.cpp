@@ -52,6 +52,42 @@
 
 Q_IMPORT_QML_PLUGIN(XournalQtPlugin)
 
+namespace {
+/// The window's safe area (Main.qml's safeTop, safeRight, safeBottom, safeLeft; qt/docs/adaptive-layout.md, "Safe
+/// areas"): edge to edge (Android 15 and newer, iOS) the status bar lies over the window's top, the navigation bar or
+/// the gesture bar over its bottom, and a camera cut-out over a side when the phone is held sideways. The controls stay
+/// clear of them; the pages are drawn under them. Qt 6.9+ reports them (and when they change: the phone turned, folded
+/// or unfolded); older Qt: 0. XQT_SAFE_AREA="top,right,bottom,left" sets them by hand (to look at a phone's insets on the
+/// desktop); XQT_FAKE_KEYBOARD=<height> shows the layout with a soft keyboard of that height (Main.qml's
+/// fakeKeyboardHeight).
+void watchSafeArea(QQuickWindow* w) {
+    if (!w) {
+        return;
+    }
+    if (const QStringList fake = qEnvironmentVariable("XQT_SAFE_AREA").split(','); fake.size() == 4) {
+        const char* names[] = {"safeTop", "safeRight", "safeBottom", "safeLeft"};
+        for (int i = 0; i < 4; ++i) {
+            w->setProperty(names[i], fake[i].trimmed().toDouble());
+        }
+    } else {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+        auto apply = [w] {
+            const QMargins m = w->safeAreaMargins();
+            w->setProperty("safeTop", m.top());
+            w->setProperty("safeRight", m.right());
+            w->setProperty("safeBottom", m.bottom());
+            w->setProperty("safeLeft", m.left());
+        };
+        QObject::connect(w, &QWindow::safeAreaMarginsChanged, w, apply);
+        apply();
+#endif
+    }
+    if (const int keyboard = qEnvironmentVariableIntValue("XQT_FAKE_KEYBOARD"); keyboard > 0) {
+        w->setProperty("fakeKeyboardHeight", keyboard);
+    }
+}
+}  // namespace
+
 int main(int argc, char* argv[]) {
     // Deliver every pen/touch sample (upstream Xournal++ also disables event compression).
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, false);
@@ -198,6 +234,7 @@ int main(int argc, char* argv[]) {
         object->setParent(window);
         if (auto* w = qobject_cast<QQuickWindow*>(object)) {
             AppController::watchWindow(w);
+            watchSafeArea(w);
             w->show();
             w->requestActivate();
         }
@@ -207,19 +244,7 @@ int main(int argc, char* argv[]) {
             Qt::QueuedConnection);
     engine.loadFromModule("XournalQt", "Main");
     AppController::watchWindow(qobject_cast<QWindow*>(engine.rootObjects().value(0)));
-#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-    // Edge to edge (Android 15 and newer): the status bar lies over the top of the window, so the tab strip starts
-    // below it (Main.qml's safeTop; 0 on the desktop), and the navigation bar over the bottom, above which the menus'
-    // bottom sheets end (safeBottom)
-    if (auto* w = qobject_cast<QQuickWindow*>(engine.rootObjects().value(0))) {
-        auto applySafeArea = [w] {
-            w->setProperty("safeTop", w->safeAreaMargins().top());
-            w->setProperty("safeBottom", w->safeAreaMargins().bottom());
-        };
-        QObject::connect(w, &QWindow::safeAreaMarginsChanged, w, applySafeArea);
-        applySafeArea();
-    }
-#endif
+    watchSafeArea(qobject_cast<QQuickWindow*>(engine.rootObjects().value(0)));
 #ifdef Q_OS_ANDROID
     // A phone without a pen (the Galaxy Fold 7) is written on with the finger: drawing with the finger is on at the
     // first start there, off where a stylus is attached (as on the desktop)

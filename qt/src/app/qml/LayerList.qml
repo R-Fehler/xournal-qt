@@ -8,6 +8,8 @@ import "Popups.js" as Popups
 
 Item {
     id: panel
+    /// Its buttons: a finger's size in the touch profile (audit F14)
+    readonly property int target: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 34
 
     ListView {
         id: list
@@ -45,7 +47,7 @@ Item {
                     objectName: "layerVisibleButton"
                     iconName: row.layerVisible ? "xqt-eye" : "xqt-eye-off"
                     tip: row.layerVisible ? qsTr("Hide this layer") : qsTr("Show this layer")
-                    implicitWidth: 34; implicitHeight: 34
+                    implicitWidth: panel.target; implicitHeight: panel.target
                     icon.width: 19; icon.height: 19
                     icon.color: row.layerVisible ? "#3c4043" : "#9aa0a6"
                     enabled: !row.isBackground
@@ -73,27 +75,30 @@ Item {
                     objectName: "layerMenuButton"
                     iconName: "xqt-more"
                     tip: qsTr("More")
-                    implicitWidth: 34; implicitHeight: 34
+                    implicitWidth: panel.target; implicitHeight: panel.target
                     icon.width: 18; icon.height: 18
                     visible: !row.isBackground
                     onClicked: Popups.openAt(layerMenu)
-                    Menu {
+                    AdaptiveMenu {
                         id: layerMenu
                         objectName: "layerMenu"
-                        MenuItem { text: qsTr("Rename…"); onTriggered: { renameField.text = row.name; renameDialog.row = row.index; renameDialog.open() } }
-                        MenuItem { text: qsTr("Duplicate"); onTriggered: app.layers.duplicate(row.index) }
-                        MenuItem { text: qsTr("Move up"); enabled: row.index > 0; onTriggered: app.layers.moveUp(row.index) }
-                        MenuItem {
+                        title: row.name
+                        AdaptiveMenuItem { objectName: "renameLayerItem"; text: qsTr("Rename…"); onTriggered: { renameField.text = row.name; renameDialog.row = row.index; renameDialog.open() } }
+                        AdaptiveMenuItem { objectName: "duplicateLayerItem"; text: qsTr("Duplicate"); onTriggered: app.layers.duplicate(row.index) }
+                        AdaptiveMenuItem { objectName: "layerUpItem"; text: qsTr("Move up"); enabled: row.index > 0; onTriggered: app.layers.moveUp(row.index) }
+                        AdaptiveMenuItem {
+                            objectName: "layerDownItem"
                             text: qsTr("Move down")
                             enabled: row.index < app.layers.count - 2
                             onTriggered: app.layers.moveDown(row.index)
                         }
-                        MenuItem {
+                        AdaptiveMenuItem {
+                            objectName: "mergeLayerItem"
                             text: qsTr("Merge into the one below")
                             enabled: row.index < app.layers.count - 2
                             onTriggered: app.layers.mergeDown(row.index)
                         }
-                        MenuItem { text: qsTr("Delete"); onTriggered: app.layers.remove(row.index) }
+                        AdaptiveMenuItem { objectName: "deleteLayerItem"; text: qsTr("Delete"); onTriggered: app.layers.remove(row.index) }
                     }
                 }
             }
@@ -117,7 +122,7 @@ Item {
             objectName: "showAllLayersButton"
             iconName: "xqt-eye"
             tip: qsTr("Show all layers")
-            implicitWidth: 38; implicitHeight: 38
+            implicitWidth: Math.max(38, panel.target); implicitHeight: Math.max(38, panel.target)
             icon.width: 20; icon.height: 20
             onClicked: app.layers.showAll(true)
         }

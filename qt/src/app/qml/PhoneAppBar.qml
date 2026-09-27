@@ -16,6 +16,9 @@ Rectangle {
     objectName: "phoneAppBar"
     /// Room at the top for the system's status bar
     property real topInset: 0
+    /// Room at the sides for a camera cut-out or the navigation bar (a phone held sideways)
+    property real leftInset: 0
+    property real rightInset: 0
     /// Where ⋮ goes (Main.qml puts the tool bar's end there)
     readonly property Item moreSlot: moreHolder
     signal overviewRequested()
@@ -53,8 +56,8 @@ Rectangle {
     RowLayout {
         anchors.fill: parent
         anchors.topMargin: bar.topInset
-        anchors.leftMargin: 2
-        anchors.rightMargin: 2
+        anchors.leftMargin: 2 + bar.leftInset
+        anchors.rightMargin: 2 + bar.rightInset
         spacing: 0
 
         IconButton {

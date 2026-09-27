@@ -4,6 +4,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtQuick.Window
 import XournalQt
 import XournalQt.Canvas
 import "Popups.js" as Popups
@@ -24,10 +25,57 @@ ApplicationWindow {
     color: app.presenting ? "#000000" : "#5f6368"  // (presenting: black around the pages, like a projector)
 
     property var afterDiscardCheck: null
-    /// The part of the window's top under the system's status bar (edge to edge on Android; set by main.cpp)
-    property real safeTop: 0
-    /// The part of the window's bottom under the system's navigation bar (edge to edge on Android; set by main.cpp)
-    property real safeBottom: 0
+
+    // --- safe areas and the soft keyboard (qt/docs/adaptive-layout.md, "Safe areas", "The soft keyboard") ----------
+    /// The parts of the window under the system's bars and a camera cut-out (edge to edge on Android and iOS; set by
+    /// main.cpp from the window's safe area margins on Qt 6.9+, 0 elsewhere; the tests set them by hand): the status
+    /// bar at the top, the navigation or gesture bar at the bottom, a cut-out at a side when the phone is held
+    /// sideways. The controls stay clear of them; the pages are drawn under them (edge to edge).
+    QtObject {
+        id: safeInsetsObject
+        objectName: "safeInsets"
+        property real top: 0
+        property real right: 0
+        property real bottom: 0
+        property real left: 0
+    }
+    property alias safeInsets: safeInsetsObject
+    property alias safeTop: safeInsetsObject.top
+    property alias safeRight: safeInsetsObject.right
+    property alias safeBottom: safeInsetsObject.bottom
+    property alias safeLeft: safeInsetsObject.left
+    /// Where the controls over the pages may go, in the content item's coordinates (the pages under the header and
+    /// above the footer): clear of the safe area's insets, and above the soft keyboard
+    readonly property real controlsLeft: safeLeft
+    readonly property real controlsRight: contentItem.width - safeRight
+    readonly property real controlsTop: Math.max(0, safeTop - contentItem.y)
+    readonly property real controlsBottom: Math.min(contentItem.height, height - safeBottom - contentItem.y,
+                                                    keyboardTop - contentItem.y)
+    /// How much of the content item's bottom lies under the bottom inset (0 where the footer took it: the dock, the
+    /// tool bar at the bottom, the room for the keyboard)
+    readonly property real contentBottomInset: Math.max(0, contentItem.y + contentItem.height - (height - safeBottom))
+    /// A bottom sheet of the phone classes (the overlay's coordinates): as wide as the safe area (at most 640 px) and
+    /// centred in it, resting on the soft keyboard while it is open, else on the window's edge with room for the
+    /// navigation bar below its content (MenuSheet, BottomSheet, the page menu, the palette and the widths)
+    readonly property real sheetWidth: Math.min(width - safeLeft - safeRight, 640)
+    readonly property real sheetX: safeLeft + Math.round((width - safeLeft - safeRight - sheetWidth) / 2)
+    readonly property real sheetBottom: keyboardTop
+    readonly property real sheetBottomPadding: keyboardOpen ? 0 : safeBottom
+    /// A soft keyboard of this height at the window's bottom instead of the real one (the tests; XQT_FAKE_KEYBOARD)
+    property real fakeKeyboardHeight: 0
+    /// The top of the soft keyboard in the window, while it is open (else the window's height). Android reports the
+    /// keyboard in the screen's pixels. Where the platform makes the window smaller instead, it is the window's height.
+    readonly property real keyboardTop: {
+        if (fakeKeyboardHeight > 0) return height - fakeKeyboardHeight
+        const r = Qt.inputMethod.keyboardRectangle
+        if (!Qt.inputMethod.visible || r.height <= 0) return height
+        return Math.max(0, Math.min(height, r.y / (Qt.platform.os === "android" ? Screen.devicePixelRatio : 1)))
+    }
+    /// How much of the window the keyboard covers from below (0: none). The footer makes room for it: the pages, the
+    /// Markdown source and the pills end above it (as Android's adjustResize would), the dock goes while it is open,
+    /// and on a phone the format bar sits right above it.
+    readonly property real keyboardHeight: Math.max(0, height - keyboardTop)
+    readonly property bool keyboardOpen: keyboardHeight > 0
     property bool quitting: false
 
     // --- the layout for the window's size (qt/docs/adaptive-layout.md) --------------------------------------------
@@ -105,6 +153,12 @@ ApplicationWindow {
         chooseLayout("sidebar", adaptive.roomForSidebar ? "" : "shown")
     }
 
+    /// The bottom of the canvas where controls may go over it (above the navigation bar and the keyboard), and its
+    /// sides (clear of a cut-out): the pills over the page keep inside them
+    readonly property real canvasControlsBottom: Math.min(canvas.y + canvas.height, controlsBottom)
+    readonly property real canvasControlsLeft: Math.max(canvas.x, controlsLeft)
+    readonly property real canvasControlsRight: Math.min(canvas.x + canvas.width, controlsRight)
+    readonly property real canvasControlsTop: Math.max(canvas.y, controlsTop)
     /// A pill at the canvas's bottom edge (`lowY`: where it would sit) goes above the pills it would meet there
     /// (`others`, from the bottom up): the view pill keeps the lower right corner (audit F6)
     function clearOfPills(item, lowY, others) {
@@ -177,7 +231,8 @@ ApplicationWindow {
     /// The dock is a rail at the right side where the window is held sideways (a phone in landscape, or a tiny window
     /// in landscape); in phone portrait always at the bottom
     readonly property bool dockVertical: adaptive.orientation === "landscape" && adaptive.layoutClass !== "phonePortrait"
-    readonly property bool dockShown: phoneChrome && !app.homeVisible
+    /// (not while the soft keyboard is open: the format bar takes its place above the keyboard)
+    readonly property bool dockShown: phoneChrome && !app.homeVisible && !keyboardOpen
     /// The dock beside the page (a rail): what sits at the window's right edge ends at it
     readonly property bool dockRail: dockShown && dockVertical
 
@@ -514,11 +569,14 @@ ApplicationWindow {
     }
 
     header: Column {
+      id: headerColumn
       // The phone classes: the app bar instead of the tab strip (qt/docs/adaptive-layout.md, "The phone chrome")
       PhoneAppBar {
         id: phoneAppBar
         width: parent.width
         topInset: win.safeTop
+        leftInset: win.safeLeft
+        rightInset: win.safeRight
         visible: win.appBarShown
         onOverviewRequested: tabOverview.open()
         onRecentRequested: Popups.openAt(recentTabsMenu)
@@ -550,6 +608,8 @@ ApplicationWindow {
         objectName: "tabStrip"
         width: parent.width
         topInset: win.safeTop
+        leftInset: win.safeLeft
+        rightInset: win.safeRight
         // (the home screen keeps it: the way back to the documents; the phone classes have the app bar instead)
         visible: (win.fullChrome || app.homeVisible) && !win.phoneLayout
         /// Android and iOS have one window: no tab is dragged out into a window of its own
@@ -578,7 +638,13 @@ ApplicationWindow {
       // document's tool bar is merged into it: ⋮ at its end, its other buttons in "more tools" (F7.2)
       MarkdownFormatBar {
         id: formatBar
-        width: parent.width
+        // On a phone, while the soft keyboard is open for the page's Markdown, right above the keyboard (in the
+        // footer: the keyboard accessory bar of Obsidian, iA Writer and Google Docs), within reach of the thumbs
+        parent: docked ? footerColumn : headerColumn
+        readonly property bool docked: shown && win.phoneLayout && win.keyboardOpen && canvas.activeFocus
+        width: parent ? parent.width : 0
+        leftInset: win.safeLeft
+        rightInset: win.safeRight
         readonly property bool shown: !app.homeVisible && !app.presenting && !win.hudHidden && !markdownPanel.visible
                                       && (app.markdownOnPage || (app.textDocument === "markdown" && app.textEditable) || app.textNotes)
         visible: shown
@@ -595,6 +661,8 @@ ApplicationWindow {
     // Two rows at the bottom (the class's choice; closer to the fingertips, like the address bar of a phone's browser)
     footer: Column {
       id: footerColumn
+      // Room for the soft keyboard: what is above the footer ends above it (the pages, the source, the pills)
+      bottomPadding: win.keyboardHeight
       ToolBar {
         id: bottomTools
         objectName: "bottomTools"
@@ -603,7 +671,7 @@ ApplicationWindow {
                  && !win.phoneChrome
         Material.background: "#ffffff"
         Material.foreground: "#303030"
-        height: visible ? 106 + win.safeBottom : 0
+        height: visible ? 106 + (win.keyboardOpen ? 0 : win.safeBottom) : 0
         Rectangle { width: parent.width; height: 1; color: "#d5d8dc" }  // (the line towards the pages)
       }
     }
@@ -619,6 +687,8 @@ ApplicationWindow {
         x: vertical && parent ? parent.width - width : 0
         z: 3
         safeBottom: win.safeBottom
+        safeLeft: win.safeLeft
+        safeRight: win.safeRight
         onToolsRequested: phoneToolSheet.open()
         onPagesRequested: pageGrid.open()
     }
@@ -635,7 +705,7 @@ ApplicationWindow {
         id: sideTools
         objectName: "sideTools"
         visible: !app.homeVisible && win.sideToolbar && !win.noToolbar && !win.phoneChrome
-        width: visible ? 104 : 0
+        width: visible ? 104 + (win.toolbarPosition === "right" ? win.safeRight : win.safeLeft) : 0
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         x: win.toolbarPosition === "right" ? parent.width - width : 0
@@ -655,9 +725,13 @@ ApplicationWindow {
                 : win.sideToolbar ? sideTools : win.toolbarPosition === "bottom" ? bottomTools : topTools
         anchors.fill: parent
         anchors.topMargin: win.noToolbar ? 0 : 4
-        anchors.bottomMargin: win.toolbarPosition === "bottom" ? 4 + win.safeBottom : win.noToolbar ? 0 : 4
-        anchors.leftMargin: win.sideToolbar ? 3 : win.noToolbar ? 0 : 6
-        anchors.rightMargin: win.sideToolbar ? 3 : win.noToolbar ? 0 : 6
+        anchors.bottomMargin: win.toolbarPosition === "bottom" ? 4 + (win.keyboardOpen ? 0 : win.safeBottom)
+                              : win.noToolbar ? 0
+                              : win.sideToolbar ? 4 + Math.max(0, win.contentItem.height - win.controlsBottom)  // (a rail's ⋮ above the navigation bar)
+                              : 4
+        // (clear of a cut-out or a navigation bar at the side: the bar's own edge, or a rail's)
+        anchors.leftMargin: win.noToolbar ? 0 : (win.sideToolbar ? 3 : 6) + (win.toolbarPosition === "right" ? 0 : win.safeLeft)
+        anchors.rightMargin: win.noToolbar ? 0 : (win.sideToolbar ? 3 : 6) + (win.toolbarPosition === "left" ? 0 : win.safeRight)
         Material.foreground: "#303030"
 
         /// The layout of the plan: "row", "twoRows", "rail", "grid" (the compact chrome's tools) or "merged"
@@ -1305,11 +1379,9 @@ ApplicationWindow {
             onClicked: canvasEmojiPicker.open()
             EmojiPicker {
                 id: canvasEmojiPicker
-                parent: win.phoneChrome ? Overlay.overlay : emojiButton
-                x: win.phoneChrome ? Math.round((parent.width - width) / 2)
-                   : toolArea.popupSide === "left" ? parent.width : toolArea.popupSide === "right" ? -width : 0
-                y: win.phoneChrome ? parent.height - height - phoneDock.height - 8
-                   : toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? parent.height : 0
+                owner: emojiButton
+                ownerX: toolArea.popupSide === "left" ? emojiButton.width : toolArea.popupSide === "right" ? -width : 0
+                ownerY: toolArea.popupSide === "bottom" ? -height : toolArea.popupSide === "top" ? emojiButton.height : 0
                 onPicked: function(emoji) { close(); canvas.insertText(emoji) }
             }
         }
@@ -1446,9 +1518,12 @@ ApplicationWindow {
         objectName: "sidebar"
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        // As a drawer it slides in from the left edge (win.drawerSlide)
-        x: (win.toolbarPosition === "left" ? sideTools.width : 0) - (win.sidebarDocked ? 0 : Math.round((1 - win.drawerSlide) * width))
+        // As a drawer it slides in from the left edge (win.drawerSlide); clear of a cut-out at the window's left edge
+        // (sidebarLeftFill has the sidebar's color there)
+        x: (win.toolbarPosition === "left" && sideTools.width > 0 ? sideTools.width : win.safeLeft)
+           - (win.sidebarDocked ? 0 : Math.round((1 - win.drawerSlide) * (width + win.safeLeft)))
         width: win.sidebarDocked ? 210 : win.drawerWidth
+        bottomInset: Math.max(0, height - win.controlsBottom)
         visible: win.fullChrome && (win.sidebarShown || (win.sidebarAsDrawer && win.drawerSlide > 0))
         // As a drawer (no room beside the page): over the page, below the home screen; it closes once a page is picked
         z: win.sidebarAsDrawer ? 49 : 0
@@ -1465,6 +1540,17 @@ ApplicationWindow {
             background: Rectangle { radius: 12; color: parent.pressed ? "#e8e8e8" : "#ffffff"; border.color: "#d5d8dc" }
         }
     }
+    // The sidebar's color under a cut-out at the window's left edge (the sidebar itself is beside it)
+    Rectangle {
+        objectName: "sidebarLeftFill"
+        visible: sidebar.visible && win.safeLeft > 0 && !(win.toolbarPosition === "left" && sideTools.width > 0)
+        x: sidebar.x - width
+        width: win.safeLeft
+        anchors.top: sidebar.top
+        anchors.bottom: sidebar.bottom
+        z: sidebar.z
+        color: sidebar.color
+    }
     // The page sidebar's tab (qt/docs/adaptive-layout.md, "The page sidebar"): an arrow at the left edge of the canvas
     // area opens it (beside the page where there is room, else as the drawer); at the sidebar's edge, "‹" closes it.
     // A finger's size in the touch profile; not in the compact or reader chrome, nor while presenting, nor while the
@@ -1479,7 +1565,7 @@ ApplicationWindow {
         width: win.adaptive.touchProfile ? win.adaptive.minTarget : 24
         height: win.adaptive.touchProfile ? 64 : 56
         // (40 % down: clear of the search bar at the top and the pills at the bottom)
-        x: open ? sidebar.x + sidebar.width : referenceSplit.x
+        x: open ? sidebar.x + sidebar.width : Math.max(referenceSplit.x, win.controlsLeft)
         y: referenceSplit.y + Math.round(referenceSplit.height * 0.4 - height / 2)
         focusPolicy: Qt.NoFocus
         hoverEnabled: true
@@ -1595,6 +1681,7 @@ ApplicationWindow {
     // Reference mode: another document beside this one (the canvas area is split)
     ReferenceSplit {
         id: referenceSplit
+        bottomInset: y + height - win.controlsBottom
         anchors.top: parent.top
         anchors.bottom: win.sourcePanel && win.sourceAtBottom ? win.sourcePanel.top : parent.bottom
         anchors.right: win.sourcePanel && !win.sourceAtBottom ? win.sourcePanel.left
@@ -1614,9 +1701,9 @@ ApplicationWindow {
         // (bottom left: the search bar is at the top, the page and zoom pill at the bottom right; above them where it
         // would meet them in a narrow canvas)
         anchors.left: canvas.left
-        anchors.leftMargin: presentCornerMark.visible ? 56 : 24  // (presenting, reading: beside the corner mark)
+        anchors.leftMargin: (presentCornerMark.visible ? 56 : 24) + win.canvasControlsLeft - canvas.x  // (presenting, reading: beside the corner mark)
         // (through a property of its own: a binding of y that reads the geometry itself crashes Qt 6.7)
-        readonly property real clearY: win.clearOfPills(shownFileNote, canvas.y + canvas.height - 24 - height, [viewPill, navPill])
+        readonly property real clearY: win.clearOfPills(shownFileNote, win.canvasControlsBottom - 24 - height, [viewPill, navPill])
         y: clearY
         width: Math.min(canvas.width - anchors.leftMargin - 16,
                         Math.max(160, Math.min(canvas.width - viewPill.width - 80, 560)))
@@ -1676,8 +1763,9 @@ ApplicationWindow {
         readonly property rect refPill: Qt.rect(referenceSplit.x + referenceSplit.pillRect.x,
                                                 referenceSplit.y + referenceSplit.pillRect.y,
                                                 referenceSplit.pillRect.width, referenceSplit.pillRect.height)
-        x: Math.max(canvas.x + 8, canvas.x + canvas.width - width - (canvas.width - width >= 56 ? 28 : 8))
-        readonly property real lowY: canvas.y + canvas.height - 24 - height
+        x: Math.max(win.canvasControlsLeft + 8, win.canvasControlsRight - width
+                    - (win.canvasControlsRight - win.canvasControlsLeft - width >= 56 ? 28 : 8))
+        readonly property real lowY: win.canvasControlsBottom - 24 - height
         readonly property bool meetsReference: refPill.width > 0 && x < refPill.x + refPill.width && x + width > refPill.x
                                                && lowY < refPill.y + refPill.height && lowY + height > refPill.y
         y: meetsReference ? refPill.y - height - 12 : lowY
@@ -1982,6 +2070,9 @@ ApplicationWindow {
         id: pageGrid
         objectName: "pageGrid"
         anchors.fill: canvas
+        // (its pill above the navigation bar and the keyboard)
+        bottomInset: canvas.y + canvas.height - win.canvasControlsBottom
+        rightInset: canvas.x + canvas.width - win.canvasControlsRight
         // The phone chrome: the contents and the zoom are here (its page number opens the grid)
         phoneTools: win.phoneChrome
         onContentsRequested: contentsOverview.open()
@@ -2030,6 +2121,10 @@ ApplicationWindow {
     MarkdownPanel {
         id: markdownPanel
         atBottom: win.sourceAtBottom
+        // (its text and buttons clear of the navigation bar and a cut-out at the window's edges)
+        bottomPadding: win.contentBottomInset
+        rightPadding: x + width >= win.contentItem.width - 0.5 ? win.safeRight : 0
+        leftPadding: atBottom && x < 0.5 ? win.safeLeft : 0
         anchors.bottom: parent.bottom
         anchors.right: win.dockRail ? phoneDock.left : win.toolbarPosition === "right" ? sideTools.left : parent.right
         width: !visible ? 0 : atBottom ? referenceSplit.width : win.sourceSideWidth
@@ -2104,6 +2199,8 @@ ApplicationWindow {
     ContentsOverview {
         id: contentsOverview
         anchors.fill: canvas
+        bottomInset: canvas.y + canvas.height - win.canvasControlsBottom
+        rightInset: canvas.x + canvas.width - win.canvasControlsRight
         onVisibleChanged: if (visible && pageGrid.visible) pageGrid.close()
     }
     Connections {
@@ -2118,6 +2215,7 @@ ApplicationWindow {
         canvasItem: canvas
         hidden: pageGrid.visible
         avoid: viewPill
+        bottomLimit: win.controlsBottom
     }
 
     // The selected sticky note: its color, cover mode, delete.
@@ -2126,6 +2224,7 @@ ApplicationWindow {
         objectName: "notePill"
         canvasItem: canvas
         avoid: viewPill
+        bottomLimit: win.controlsBottom
         onImageRequested: imageDialog.open()
         hidden: pageGrid.visible
     }
@@ -2144,8 +2243,8 @@ ApplicationWindow {
         objectName: "navPill"
         visible: (app.canGoBack || app.canGoForward) && !pageGrid.visible && !win.hudHidden
         anchors.left: canvas.left
-        anchors.leftMargin: presentCornerMark.visible ? 56 : 20  // (presenting, reading: beside the corner mark)
-        readonly property real clearY: win.clearOfPills(navPill, canvas.y + canvas.height - 24 - height, [viewPill])
+        anchors.leftMargin: (presentCornerMark.visible ? 56 : 20) + win.canvasControlsLeft - canvas.x  // (presenting, reading: beside the corner mark)
+        readonly property real clearY: win.clearOfPills(navPill, win.canvasControlsBottom - 24 - height, [viewPill])
         y: clearY
         padding: 2
         Material.foreground: "#303030"
@@ -2313,9 +2412,9 @@ ApplicationWindow {
         id: searchBar
         objectName: "searchBar"
         anchors.top: canvas.top
-        anchors.topMargin: 12
+        anchors.topMargin: 12 + win.canvasControlsTop - canvas.y
         anchors.horizontalCenter: canvas.horizontalCenter
-        width: Math.min(implicitWidth, canvas.width - 16)
+        width: Math.min(implicitWidth, win.canvasControlsRight - win.canvasControlsLeft - 16)
     }
 
     // Where the link under the mouse or the hovering pen leads (qt/docs/links.md, "Links with the mouse")
@@ -2326,8 +2425,12 @@ ApplicationWindow {
     // Scroll bars over the canvas: wide enough to be dragged with a finger or the pen.
     CanvasScrollBars {
         canvasItem: canvas
-        // (beside the strip that brings a right tool bar back, not under it)
-        rightInset: toolbarShow.visible && toolbarShow.side === "right" ? toolbarShow.width : 0
+        // (beside the strip that brings a right tool bar back, not under it; clear of the safe area's insets)
+        rightInset: Math.max(toolbarShow.visible && toolbarShow.side === "right" ? toolbarShow.width : 0,
+                             canvas.x + canvas.width - win.canvasControlsRight)
+        leftInset: win.canvasControlsLeft - canvas.x
+        topInset: win.canvasControlsTop - canvas.y
+        bottomInset: canvas.y + canvas.height - win.canvasControlsBottom
         hidden: pageGrid.visible || app.presenting  // (presenting: no scroll bars)
     }
 
@@ -3157,9 +3260,9 @@ ApplicationWindow {
         visible: win.chromeMode === "compact" && !app.presenting && !app.homeVisible && app.tabs.count > 1
                  && !searchBar.visible
         z: 59
-        // at the top, in the middle of the window (over the notes and a reference beside them alike)
+        // at the top, in the middle of the window (over the notes and a reference beside them alike), below the status bar
         anchors.horizontalCenter: parent.horizontalCenter
-        y: 0
+        y: win.controlsTop
         // (thin to look at; for fingers (the touch profile) taller, with arrows as wide as a finger)
         height: win.adaptive.touchProfile ? 36 : 26
         width: Math.max(120, (tabDots.visible ? tabDots.implicitWidth : tabCountLabel.implicitWidth) + 36) + 2 * arrowWidth
@@ -3266,7 +3369,7 @@ ApplicationWindow {
         objectName: "fullScreenTabToast"
         z: 59
         anchors.horizontalCenter: parent.horizontalCenter
-        y: fullScreenTabs.height + 8
+        y: win.controlsTop + fullScreenTabs.height + 8
         visible: opacity > 0 && win.chromeMode === "compact"
         opacity: 0
         width: Math.min(tabToastText.implicitWidth + 28, parent.width - 160)
@@ -3304,7 +3407,7 @@ ApplicationWindow {
         opacity: 0
         anchors.horizontalCenter: canvas.horizontalCenter
         anchors.bottom: canvas.bottom
-        anchors.bottomMargin: 18
+        anchors.bottomMargin: 18 + canvas.y + canvas.height - win.canvasControlsBottom
         width: indicatorText.implicitWidth + 24
         height: 30
         radius: 15
@@ -3348,6 +3451,8 @@ ApplicationWindow {
         z: 91
         anchors.left: canvas.left
         anchors.bottom: canvas.bottom
+        anchors.leftMargin: win.canvasControlsLeft - canvas.x
+        anchors.bottomMargin: canvas.y + canvas.height - win.canvasControlsBottom
         width: 48
         height: 48
         focusPolicy: Qt.NoFocus  // (the keys stay with the page)
@@ -3453,7 +3558,8 @@ ApplicationWindow {
         z: 100
         anchors.horizontalCenter: canvas.horizontalCenter
         anchors.bottom: canvas.bottom
-        anchors.bottomMargin: 96
+        // (above the pills, the navigation bar and the keyboard)
+        anchors.bottomMargin: 96 + canvas.y + canvas.height - win.canvasControlsBottom
     }
     Connections {
         target: app
@@ -3484,9 +3590,18 @@ ApplicationWindow {
     }
 
     // Library and recent documents: over the document area while shown.
+    // The home screen's color under a cut-out or the navigation bar at a side (the home screen itself is beside it)
+    Rectangle {
+        anchors.fill: parent
+        z: 50
+        visible: homeView.visible && (win.safeLeft > 0 || win.safeRight > 0)
+        color: homeView.color
+    }
     HomeView {
         id: homeView
         anchors.fill: parent
+        anchors.leftMargin: win.safeLeft
+        anchors.rightMargin: win.safeRight
         z: 50
         visible: app.homeVisible
         onOpenFileRequested: openDialog.open()
@@ -3516,7 +3631,7 @@ ApplicationWindow {
         // Half over the bar's edge, the rest into the pages
         x: edge === "left" ? sideTools.width - 9 : edge === "right" ? parent.width - sideTools.width - width + 9
            : Math.round((parent.width - width) / 2)
-        y: side ? Math.round(parent.height * 0.75) : edge === "bottom" ? parent.height - height + 9 : -9  // (a rail: clear of the sidebar's arrow)
+        y: side ? Math.round(win.controlsBottom * 0.75) : edge === "bottom" ? parent.height - height + 9 : -9  // (a rail: clear of the sidebar's arrow)
         Rectangle {
             x: parent.edge === "right" ? parent.width - width : 0
             y: parent.edge === "bottom" ? parent.height - height : 0
@@ -3550,8 +3665,9 @@ ApplicationWindow {
         z: 60  // over the edge of the pen pill, which sits at the right edge by default
         width: side === "top" || side === "bottom" ? 96 : 16
         height: side === "top" || side === "bottom" ? 16 : 96
-        x: side === "left" ? 0 : side === "right" ? parent.width - width : Math.round((parent.width - width) / 2)
-        y: side === "top" ? 0 : side === "bottom" ? parent.height - height : Math.round((parent.height - height) / 2)
+        x: side === "left" ? win.controlsLeft : side === "right" ? win.controlsRight - width : Math.round((parent.width - width) / 2)
+        y: side === "top" ? win.controlsTop : side === "bottom" ? win.controlsBottom - height
+                                                                : Math.round((win.controlsBottom - height) / 2)
         radius: 8
         color: "#f1f3f4"
         border.width: 1
@@ -3577,8 +3693,8 @@ ApplicationWindow {
     GeometryPill {
         anchors.top: canvas.top
         anchors.right: canvas.right
-        anchors.topMargin: 12
-        anchors.rightMargin: 20
+        anchors.topMargin: 12 + win.canvasControlsTop - canvas.y
+        anchors.rightMargin: 20 + canvas.x + canvas.width - win.canvasControlsRight
         z: 57
     }
     ColorDialog {
@@ -3594,8 +3710,8 @@ ApplicationWindow {
         // once. Not while presenting without controls, nor in the reader chrome.
         visible: win.chromeMode === "compact" && !app.homeVisible && !win.hudHidden
         z: 60
-        x: canvas.x + 16  // (over the main document, also when a reference is beside it)
-        y: canvas.y + 16
+        x: win.canvasControlsLeft + 16  // (over the main document, also when a reference is beside it)
+        y: win.canvasControlsTop + 16
         width: 56
         height: 56
         radius: 12
@@ -3625,8 +3741,8 @@ ApplicationWindow {
         }
         DragHandler {
             target: parent
-            xAxis.minimum: 0; xAxis.maximum: win.contentItem.width - quickToolSquare.width
-            yAxis.minimum: 0; yAxis.maximum: win.contentItem.height - quickToolSquare.height
+            xAxis.minimum: win.controlsLeft; xAxis.maximum: win.controlsRight - quickToolSquare.width
+            yAxis.minimum: win.controlsTop; yAxis.maximum: win.controlsBottom - quickToolSquare.height
         }
         TapHandler { onTapped: quickTools.visible ? quickTools.close() : quickTools.open() }
     }
@@ -3635,11 +3751,14 @@ ApplicationWindow {
         objectName: "quickTools"
         parent: Overlay.overlay
         // next to the square, inside the window
-        x: Math.min(quickToolSquare.x + quickToolSquare.width + 8, win.contentItem.width - width - 8)
-        y: Math.max(8, Math.min(quickToolSquare.y, win.contentItem.height - height - 8))
+        // (in the window's coordinates: the overlay's; clear of the safe area and the keyboard)
+        readonly property real roomTop: win.contentItem.y + win.controlsTop + 8
+        readonly property real roomBottom: win.contentItem.y + win.controlsBottom - 8
+        x: Math.max(win.controlsLeft + 8, Math.min(quickToolSquare.x + quickToolSquare.width + 8, win.controlsRight - width - 8))
+        y: Math.max(roomTop, Math.min(win.contentItem.y + quickToolSquare.y, roomBottom - height))
         padding: 8
         width: 6 * 50 + 30
-        height: Math.min(win.contentItem.height - 16, quickToolsColumn.implicitHeight + 16)
+        height: Math.min(roomBottom - roomTop, quickToolsColumn.implicitHeight + 16)
         Column {
             id: quickToolsColumn
             width: parent.width
@@ -3649,7 +3768,7 @@ ApplicationWindow {
                 id: quickToolsHolder
                 width: parent.width
                 height: Math.max(0, Math.min(barContent.implicitHeight,
-                                             win.contentItem.height - 16 - quickTools.topPadding - quickTools.bottomPadding
+                                             quickTools.roomBottom - quickTools.roomTop - quickTools.topPadding - quickTools.bottomPadding
                                              - presentToggle.height - leaveFullScreen.height
                                              - 2 * quickToolsColumn.spacing))
             }

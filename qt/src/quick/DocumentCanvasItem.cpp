@@ -541,7 +541,15 @@ void DocumentCanvasItem::geometryChange(const QRectF& newGeometry, const QRectF&
     QQuickItem::geometryChange(newGeometry, oldGeometry);
     if (newGeometry.size() != oldGeometry.size()) {
         updateViewGeometry();
+        if (newGeometry.height() < oldGeometry.height()) {
+            // Shorter while text is written (the soft keyboard came up below it): the cursor stays in view
+            showTextCursor();
+        }
     }
+}
+
+bool DocumentCanvasItem::showTextCursor() {
+    return canvasView && canvasView->getTextInput() && canvasView->scrollToTextCursor();
 }
 
 void DocumentCanvasItem::itemChange(ItemChange change, const ItemChangeData& value) {
@@ -833,6 +841,7 @@ void DocumentCanvasItem::keyPressEvent(QKeyEvent* e) {
     bool finish = false;
     if (editor && canvasView->textKeyPressed(e, finish)) {  // (the emoji suggestions, then the editor)
         if (!finish) {
+            showTextCursor();  // (the Markdown editor follows its cursor itself, an ordinary text does not)
             QGuiApplication::inputMethod()->update(Qt::ImCursorRectangle | Qt::ImSurroundingText |
                                                    Qt::ImCursorPosition | Qt::ImAnchorPosition);
         }
@@ -846,6 +855,7 @@ void DocumentCanvasItem::inputMethodEvent(QInputMethodEvent* e) {
     if (xqt::CanvasTextInput* editor = canvasView ? canvasView->getTextInput() : nullptr) {
         editor->inputMethodEvent(e);
         canvasView->refreshEmojiCompletion();
+        showTextCursor();  // (the soft keyboard's text: the cursor stays in view above it)
         e->accept();
         return;
     }

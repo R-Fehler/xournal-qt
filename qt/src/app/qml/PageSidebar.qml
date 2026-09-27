@@ -18,6 +18,8 @@ Rectangle {
     readonly property bool hasContents: app.outline.available || app.bookmarks.length > 0
     /// A page, an entry of the contents or an annotation was tapped and is shown now (a drawer closes then)
     signal pagePicked()
+    /// Room at the bottom for the system's navigation bar (its lists end above it; the sidebar's color goes on below)
+    property real bottomInset: 0
     // The annotations are read only while they are shown
     Binding { target: app.annotations; property: "active"; value: sidebar.visible && sidebar.mode === "annotations" }
     onModeChanged: if (mode === "contents" && !hasContents) mode = "pages"
@@ -82,6 +84,7 @@ Rectangle {
         anchors.top: switchRow.bottom
         anchors.topMargin: 4
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: sidebar.bottomInset
         anchors.left: parent.left
         anchors.right: parent.right
     }
@@ -90,6 +93,7 @@ Rectangle {
         anchors.top: switchRow.bottom
         anchors.topMargin: 4
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: sidebar.bottomInset
         anchors.left: parent.left
         anchors.right: parent.right
     }
@@ -99,6 +103,7 @@ Rectangle {
         anchors.top: switchRow.bottom
         anchors.topMargin: 4
         anchors.bottom: parent.bottom
+        anchors.bottomMargin: sidebar.bottomInset
         anchors.left: parent.left
         anchors.right: parent.right
     }
@@ -124,7 +129,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.topMargin: 10
-        anchors.bottomMargin: 10
+        anchors.bottomMargin: 10 + sidebar.bottomInset
         spacing: 14
         clip: true
         model: app.filteredPages

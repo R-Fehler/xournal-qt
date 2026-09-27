@@ -2412,3 +2412,66 @@ Presenting (the Fold 7 unfolded, or a desktop):
 - [ ] Present: a dot in the accent color in a ring in the lower left corner, pulsing once at the start; hover it (or
       hold it with a finger): "Hide the tools". Tap it: the tools go, the dot is faint and grey; "Show the tools"; tap:
       back.
+
+## Safe areas and the soft keyboard (qt/safe-areas-keyboard)
+
+qt/docs/adaptive-layout.md, "Safe areas" and "The soft keyboard". On the Fold 7 (Android 16, gesture navigation, the
+camera cut-out). On the desktop, `XQT_SAFE_AREA=32,0,24,40 XQT_FAKE_KEYBOARD=360 xournal-qt` shows the same layout with
+fake insets and a fake keyboard (grey is where the keyboard would be; nothing can be typed into it).
+
+Safe areas, folded (412 × 915):
+- [ ] Nothing to tap lies under the status bar or the gesture bar: the top bar starts below the status bar, the dock
+      ends above the gesture bar; the page itself shows under both (edge to edge).
+- [ ] ⋮, a card's menu, the palette (hold the color), All tools: each sheet's last row above the gesture bar.
+- [ ] "3 / 12" (all pages): its pill above the gesture bar. A snackbar (delete a page, Undo) above the dock.
+- [ ] A dialog that comes up from the bottom (Share…), a full-screen one (Rename…): their buttons above the gesture bar.
+- [ ] Settings, All open documents (tap the square): their top below the status bar, their last row above the gesture
+      bar.
+
+Safe areas, held sideways (915 × 412), both ways round (the cut-out at the left, then at the right):
+- [ ] The top bar's library button and ⋮ clear of the cut-out; the dock's column clear of it when it is at the right.
+- [ ] The page's arrow at the left edge (open the pages) beside the cut-out; the pages drawer opens beside it (the
+      drawer's color under the cut-out), its thumbnails above the gesture bar.
+- [ ] The scroll bars of the page (zoom in) clear of the cut-out and the gesture bar.
+- [ ] ⋮ → View → Read, then the compact chrome (Settings → Display → Controls at this size → Compact): the tool
+      square, the tab dots, the pen pill and the view pill all clear of the cut-out and the bars.
+
+Unfolded (900 × 1000), and unfolded held sideways:
+- [ ] The tab strip below the status bar; the view pill, the back / forward pill and the pages drawer's list above the
+      gesture bar; sideways, the tab strip and the tool bar clear of the cut-out.
+- [ ] Fold and unfold with a document open: the insets follow at once (nothing stays under a bar).
+
+The soft keyboard, folded:
+- [ ] Write on the page (the writing button): the keyboard comes; the dock goes; the format bar (¶ H1 H2 H3, bold …)
+      sits right above the keyboard, scrolls sideways; its buttons work and the keyboard stays.
+- [ ] Type many lines at the bottom of the page: the line being written stays visible above the format bar, also
+      over the end of the page onto the next one.
+- [ ] Put the cursor low on the page with the keyboard closed (the back gesture), then tap to write there: when the
+      keyboard comes, the page scrolls so the cursor is above it.
+- [ ] Close the keyboard (the back gesture): the dock is back at the bottom, the format bar back at the top.
+- [ ] A Markdown text box (the text box tool, then tap the page): the same as above.
+- [ ] Hold the writing button → Markdown source: the source below the page; tap into it: the panel ends at the
+      keyboard, its format bar right above the keyboard, the page still visible above; typing many lines keeps the
+      cursor visible.
+- [ ] While typing: ⋮ opens as a sheet on the keyboard (not under it); the emoji (All tools → Emoji, or the source's
+      🙂): a sheet from the bottom, the search does not open the keyboard until tapped.
+- [ ] Rename… (⋮ → Document) and New document (the library's "+"): the field and the buttons above the keyboard.
+- [ ] The library's search field: the keyboard does not hide the cards' first rows; the floating "+" sits above the
+      keyboard.
+
+Touch targets (Settings → Touch → Buttons sized for fingers: on, or the Fold 7 unfolded):
+- [ ] The tab strip is a bit taller; its overview, ‹ › and + buttons and the tabs' × are a finger wide.
+- [ ] All open documents: each card's ×, star and reference are a finger wide; the star shows on every card (not only
+      under the mouse).
+- [ ] The pages sidebar → Layers: the eye and ⋮ of a layer, and "show all", a finger wide. Annotations: the filter and
+      the export button too.
+
+Menus as sheets, folded:
+- [ ] The pages drawer → Layers → a layer's ⋮; Annotations → the filter; Contents → hold a bookmark or a chapter: each
+      a sheet with the name on top.
+- [ ] Select PDF text → Look up: a sheet; the web entries show their address under the name.
+- [ ] A Markdown table (the format bar's table): hold a cell: its menu as a sheet (over the table editor).
+- [ ] A reference beside the notes (open one from the overview): tap its page number: a sheet at the bottom with the
+      page field, above the keyboard.
+- [ ] The home screen: hold a finger on its icon buttons (View, Settings, Sort, …): a short name ("View", "Settings"),
+      not the long tip.

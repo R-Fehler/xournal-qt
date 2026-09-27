@@ -46,20 +46,24 @@ ListView {
                 bottomPadding: 6
                 highlighted: modelData.page === app.pageNumber - 1
                 onClicked: { app.jumpToPage(modelData.page); list.picked() }
-                onPressAndHold: markMenu.popup()
-                TapHandler { acceptedButtons: Qt.RightButton; onTapped: markMenu.popup() }
-                Menu {
+                onPressAndHold: markMenu.openMenu()
+                TapHandler { acceptedButtons: Qt.RightButton; onTapped: markMenu.openMenu() }
+                AdaptiveMenu {
                     id: markMenu
-                    MenuItem {
+                    objectName: "bookmarkMenu"
+                    title: mark.modelData.label || ""
+                    AdaptiveMenuItem {
+                        objectName: "renameBookmarkItem"
                         text: qsTr("Rename…")
                         onTriggered: renameMark.openFor(mark.modelData.page)
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
                         objectName: "removeBookmarkItem"
                         text: qsTr("Remove bookmark")
                         onTriggered: app.toggleBookmark(mark.modelData.page)
                     }
-                    MenuItem {
+                    AdaptiveMenuItem {
+                        objectName: "copyBookmarkLinkItem"
                         text: qsTr("Copy link to this page")
                         onTriggered: app.copyPageLink(mark.modelData.page)
                     }
@@ -115,11 +119,13 @@ ListView {
         highlighted: index === app.outline.currentRow
         onClicked: if (page >= 0) { app.jumpToPage(page); list.picked() }
         // Press and hold, or a right click: a link to the chapter (qt/docs/links.md)
-        onPressAndHold: if (page >= 0) chapterMenu.popup()
-        TapHandler { acceptedButtons: Qt.RightButton; onTapped: if (entry.page >= 0) chapterMenu.popup() }
-        Menu {
+        onPressAndHold: if (page >= 0) chapterMenu.openMenu()
+        TapHandler { acceptedButtons: Qt.RightButton; onTapped: if (entry.page >= 0) chapterMenu.openMenu() }
+        AdaptiveMenu {
             id: chapterMenu
-            MenuItem {
+            objectName: "chapterMenu"
+            title: entry.title
+            AdaptiveMenuItem {
                 objectName: "copyChapterLink"
                 text: qsTr("Copy link to this chapter")
                 onTriggered: app.copyChapterLink(entry.page, entry.title)

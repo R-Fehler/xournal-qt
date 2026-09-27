@@ -33,17 +33,25 @@ Dialog {
     /// The class the layout follows ("Adapt the layout" off: the desktop's)
     readonly property string sizeClass: adaptive ? adaptive.layoutClass : "desktopWide"
     readonly property real minTarget: adaptive ? adaptive.minTarget : 40
+    /// The window's safe area and the soft keyboard (Main.qml: win.safeInsets, win.keyboardTop)
+    readonly property bool inWindow: win !== null && win !== undefined && win.safeInsets !== undefined
     /// The top of the soft keyboard while it is open (Android reports it in the screen's pixels)
     readonly property real keyboardTop: {
+        if (inWindow) return win.keyboardOpen ? win.keyboardTop : Infinity
         const r = Qt.inputMethod.keyboardRectangle
         return Qt.inputMethod.visible && r.height > 0 ? r.y / (Qt.platform.os === "android" ? Screen.devicePixelRatio : 1)
                                                       : Infinity
     }
-    /// (the status bar over the window's top, Main.qml)
-    readonly property real safeTop: win && win.safeTop !== undefined ? win.safeTop : 0
+    /// (the status bar over the window's top, the navigation bar at its bottom, a cut-out at a side)
+    readonly property real safeTop: inWindow ? win.safeTop : 0
+    readonly property real safeBottom: inWindow ? win.safeBottom : 0
+    readonly property real safeLeft: inWindow ? win.safeLeft : 0
+    readonly property real safeRight: inWindow ? win.safeRight : 0
     readonly property real roomTop: safeTop
-    readonly property real roomBottom: parent ? Math.min(parent.height, keyboardTop) : 600
-    readonly property real parentWidth: parent ? parent.width : 800
+    /// Above the soft keyboard while it is open, else above the navigation bar
+    readonly property real roomBottom: parent ? Math.min(parent.height - safeBottom, keyboardTop) : 600
+    /// The width inside the safe area
+    readonly property real parentWidth: parent ? parent.width - safeLeft - safeRight : 800
     readonly property real margin: 24
 
     /// "centered", "bottom" or "fullScreen"
@@ -126,7 +134,7 @@ Dialog {
         const most = placement === "bottom" ? room - 32 : room - 2 * margin
         return Math.max(0, Math.min(fillBody ? preferredHeight : implicitHeight, most))
     }
-    x: Math.round((parentWidth - width) / 2)
+    x: safeLeft + Math.round((parentWidth - width) / 2)
     y: fullScreen ? roomTop
                   : placement === "bottom" ? roomBottom - height
                                            : Math.round(Math.max(roomTop + margin,

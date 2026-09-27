@@ -19,7 +19,7 @@ Popup {
     readonly property var adaptiveLayout: typeof win !== "undefined" && win ? win.adaptive : null
     property bool asSheet: false
     readonly property int target: adaptiveLayout && adaptiveLayout.touchProfile ? adaptiveLayout.minTarget : 44
-    readonly property real safeBottom: typeof win !== "undefined" && win && win.safeBottom ? win.safeBottom : 0
+    readonly property real safeBottom: typeof win !== "undefined" && win && win.sheetBottomPadding ? win.sheetBottomPadding : 0
     modal: asSheet
     dim: asSheet
     bottomPadding: asSheet ? 12 + safeBottom : 6
@@ -38,9 +38,10 @@ Popup {
         asSheet = adaptiveLayout !== null && ["phonePortrait", "phoneShort", "tiny"].indexOf(adaptiveLayout.layoutClass) >= 0
         if (asSheet) {
             handle.offset = 0
-            menu.width = Qt.binding(function() { return Math.min(Overlay.overlay.width, 640) })
-            menu.x = Qt.binding(function() { return Math.round((Overlay.overlay.width - menu.width) / 2) })
-            menu.y = Qt.binding(function() { return Overlay.overlay.height - menu.height + handle.offset })
+            // (the window's sheet: inside the safe area, on the soft keyboard while it is open)
+            menu.width = Qt.binding(function() { return win.sheetWidth })
+            menu.x = Qt.binding(function() { return win.sheetX })
+            menu.y = Qt.binding(function() { return win.sheetBottom - menu.height + handle.offset })
         } else {
             menu.width = Qt.binding(function() { return menu.implicitWidth })
             // (bindings: its size is known only once it is laid out)

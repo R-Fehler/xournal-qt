@@ -23,13 +23,20 @@ Rectangle {
     signal shareRequested(int index)
     /// Room at the top for the system's status bar (Android draws the window under it)
     property real topInset: 0
-    implicitHeight: 46 + topInset
+    /// Room at the sides for a camera cut-out or the navigation bar (a device held sideways)
+    property real leftInset: 0
+    property real rightInset: 0
+    /// Its buttons: a finger's size in the touch profile (48), else 40 (audit F14; qt/docs/adaptive-layout.md)
+    readonly property bool touch: typeof win !== "undefined" && win !== null && win.adaptive.touchProfile
+    readonly property int target: typeof win !== "undefined" && win !== null ? win.adaptive.minTarget : 40
+    implicitHeight: Math.max(46, target + 6) + topInset
     color: "#dfe1e5"
 
     RowLayout {
         anchors.fill: parent
         anchors.topMargin: strip.topInset
-        anchors.leftMargin: 6
+        anchors.leftMargin: 6 + strip.leftInset
+        anchors.rightMargin: strip.rightInset
         spacing: 0
 
         // The home screen (library, recent documents): always the first tab (not in a window of its own).
@@ -84,8 +91,8 @@ Rectangle {
             objectName: "overviewButton"
             iconName: "xqt-tabs-grid"
             tip: qsTr("All open documents (Ctrl+Shift+E)")
-            implicitWidth: 38
-            implicitHeight: 38
+            implicitWidth: strip.target
+            implicitHeight: strip.target
             icon.width: 22
             icon.height: 22
             Layout.rightMargin: 4
@@ -98,8 +105,8 @@ Rectangle {
             visible: app.tabs.count > 1
             iconName: "xqt-chevron-left"
             tip: qsTr("Previous document (Ctrl+PgUp)")
-            implicitWidth: 38
-            implicitHeight: 38
+            implicitWidth: strip.target
+            implicitHeight: strip.target
             icon.width: 22
             icon.height: 22
             Layout.alignment: Qt.AlignVCenter
@@ -110,8 +117,8 @@ Rectangle {
             visible: app.tabs.count > 1
             iconName: "xqt-chevron-right"
             tip: qsTr("Next document (Ctrl+PgDown)")
-            implicitWidth: 38
-            implicitHeight: 38
+            implicitWidth: strip.target
+            implicitHeight: strip.target
             icon.width: 22
             icon.height: 22
             Layout.rightMargin: 4
@@ -316,9 +323,10 @@ Rectangle {
                         onAccepted: function(name) { app.renameTab(tab.index, name) }
                     }
                     ToolButton {
+                        objectName: "tabCloseButton"
                         Layout.topMargin: 4
-                        implicitWidth: 36
-                        implicitHeight: 36
+                        implicitWidth: strip.touch ? strip.target : 36
+                        implicitHeight: strip.touch ? strip.target : 36
                         icon.source: app.iconUrl("xqt-close")
                         icon.width: 16
                         icon.height: 16
@@ -332,8 +340,8 @@ Rectangle {
         ToolButton {
             objectName: "newTabButton"
             Layout.alignment: Qt.AlignVCenter
-            implicitWidth: 44
-            implicitHeight: 40
+            implicitWidth: Math.max(44, strip.target)
+            implicitHeight: strip.target
             text: "+"
             font.pixelSize: 22
             Material.foreground: "#3c4043"

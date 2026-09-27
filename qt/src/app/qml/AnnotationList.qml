@@ -11,6 +11,8 @@ import QtQuick.Window
 
 Item {
     id: panel
+    /// Its buttons: a finger's size in the touch profile (audit F14)
+    readonly property int target: typeof win !== "undefined" && win && win.adaptive.touchProfile ? win.adaptive.minTarget : 36
     /// An annotation was tapped: its place is shown (the sidebar as a drawer closes then)
     signal picked()
     readonly property var model: app.annotations
@@ -84,8 +86,8 @@ Item {
         ToolButton {
             id: filterButton
             objectName: "annotationFilter"
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: panel.target
+            implicitHeight: panel.target
             icon.source: app.iconUrl("xqt-filter")
             icon.width: 18
             icon.height: 18
@@ -93,12 +95,12 @@ Item {
             display: AbstractButton.IconOnly
             ToolTip.visible: hovered
             ToolTip.text: qsTr("Show…")
-            onClicked: filterMenu.popup(filterButton, 0, filterButton.height)
+            onClicked: filterMenu.openMenu(null, filterButton)
         }
         ToolButton {
             objectName: "annotationExport"
-            implicitWidth: 36
-            implicitHeight: 36
+            implicitWidth: panel.target
+            implicitHeight: panel.target
             enabled: panel.model.available
             icon.source: app.iconUrl("xqt-download")
             icon.width: 18
@@ -110,16 +112,18 @@ Item {
             onClicked: panel.exportMarkdown()
         }
     }
-    Menu {
+    // (an AdaptiveMenu: a sheet on phones; it stays open while kinds are switched only as a menu)
+    AdaptiveMenu {
         id: filterMenu
+        objectName: "annotationFilterMenu"
+        title: qsTr("Show")
         Repeater {
             model: panel.kinds
-            delegate: MenuItem {
+            delegate: AdaptiveMenuItem {
                 required property var modelData
                 objectName: "annotationShow_" + modelData.key
                 // (notes appear once another block makes them)
-                visible: modelData.key !== "note" || panel.model.countOf("note") > 0
-                height: visible ? implicitHeight : 0
+                offered: modelData.key !== "note" || panel.model.countOf("note") > 0
                 checkable: true
                 checked: panel.model.shownKinds.indexOf(modelData.key) >= 0
                 text: modelData.text + " (" + (panel.model.total, panel.model.countOf(modelData.key)) + ")"
@@ -127,7 +131,8 @@ Item {
             }
         }
         MenuSeparator {}
-        MenuItem {
+        AdaptiveMenuItem {
+            objectName: "annotationShowAll"
             text: qsTr("Show all")
             onTriggered: panel.model.shownKinds = panel.kinds.map(k => k.key)
         }

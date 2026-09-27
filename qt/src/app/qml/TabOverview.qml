@@ -26,6 +26,15 @@ Popup {
     width: parent ? parent.width : 800
     height: parent ? parent.height : 600
     padding: 0
+    // Its controls clear of the system's bars, a cut-out and the soft keyboard (Main.qml); its color under them
+    readonly property bool inWindow: typeof win !== "undefined" && win !== null && win.safeInsets !== undefined
+    /// The buttons of a card (×, the star, the reference): a finger's size in the touch profile (audit F14)
+    readonly property bool touch: inWindow && win.adaptive.touchProfile
+    readonly property int cardTarget: touch ? win.adaptive.minTarget : 40
+    topPadding: inWindow ? win.safeTop : 0
+    leftPadding: inWindow ? win.safeLeft : 0
+    rightPadding: inWindow ? win.safeRight : 0
+    bottomPadding: inWindow ? Math.max(win.keyboardHeight, win.safeBottom) : 0
     /// A card's name is being edited (Escape cancels that, it does not close the overview)
     property bool renaming: false
     closePolicy: renaming ? Popup.NoAutoClose : Popup.CloseOnEscape
@@ -467,8 +476,8 @@ Popup {
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.margins: 2
-                        implicitWidth: 40
-                        implicitHeight: 40
+                        implicitWidth: overview.cardTarget
+                        implicitHeight: overview.cardTarget
                         checkable: false
                         icon.source: app.iconUrl("xqt-reference")
                         icon.color: cell.isReference ? Material.accentColor : "#3c4043"
@@ -495,13 +504,14 @@ Popup {
                     ToolButton {
                         id: overviewStar
                         objectName: "overviewStar"
-                        visible: cell.filePath !== "" && (cell.favourite || cellHover.hovered)
+                        // (with the fingers, which do not hover: always)
+                        visible: cell.filePath !== "" && (cell.favourite || cellHover.hovered || overview.touch)
                         anchors.top: parent.top
                         anchors.right: parent.right
-                        anchors.rightMargin: 42
+                        anchors.rightMargin: overview.cardTarget + 2
                         anchors.topMargin: 2
-                        implicitWidth: 40
-                        implicitHeight: 40
+                        implicitWidth: overview.cardTarget
+                        implicitHeight: overview.cardTarget
                         icon.source: app.iconUrl(cell.favourite ? "xqt-star-filled" : "xqt-star")
                         icon.color: "transparent"
                         display: AbstractButton.IconOnly
@@ -511,11 +521,12 @@ Popup {
                     }
                     HoverHandler { id: cellHover }
                     ToolButton {
+                        objectName: "overviewCloseButton"
                         anchors.top: parent.top
                         anchors.right: parent.right
                         anchors.margins: 2
-                        implicitWidth: 40
-                        implicitHeight: 40
+                        implicitWidth: overview.cardTarget
+                        implicitHeight: overview.cardTarget
                         icon.source: app.iconUrl("xqt-close")
                         icon.color: "#3c4043"
                         display: AbstractButton.IconOnly
@@ -596,7 +607,7 @@ Popup {
                 ToolTip.delay: 300
                 HoverHandler { id: syntaxHover }
             }
-            FuzzyToggle { objectName: "overviewSearchFuzzy"; implicitHeight: 40 }
+            FuzzyToggle { objectName: "overviewSearchFuzzy"; implicitHeight: overview.cardTarget }
             // The reduced search: names only (as in the library)
             ToolButton {
                 id: namesOnlyButton
@@ -605,7 +616,7 @@ Popup {
                 checkable: true
                 checked: overview.namesOnly
                 onToggled: overview.namesOnly = checked
-                implicitHeight: 40
+                implicitHeight: overview.cardTarget
                 leftPadding: 6
                 rightPadding: 6
                 font.pixelSize: 13

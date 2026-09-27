@@ -410,6 +410,10 @@ public:
     /// An emoji (the picker) at the cursor of the text being written, in place of its selection. False if nothing is
     /// being written.
     bool insertAtTextCursor(const std::string& text);
+    /// The cursor of the text being written scrolled into view (with a little room around it), if it is out of it:
+    /// the view became shorter (the soft keyboard came, qt/docs/adaptive-layout.md "The soft keyboard"), or a text
+    /// editor that does not follow its cursor itself moved it. False if nothing is being written.
+    bool scrollToTextCursor();
     /// Whether the page's Markdown text (the box at its margins) is at a point (page coordinates).
     bool markdownBoxAt(CanvasPage& page, double x, double y) const;
     /// Write the selected sticky note's Markdown text (the note's pill: "Text"): started, or edited with the cursor at

@@ -142,7 +142,7 @@ Popup {
         aligns = copy
         focusCell()
     }
-    function openMenu(item, x, y) { cellMenu.popup(item, x, y) }
+    function openMenu(item, x, y) { cellMenu.openMenu(Qt.point(x, y), item) }
     function accept() {
         const writer = onAccept
         const out = cells.map(function(r) { return r.slice() })
@@ -355,21 +355,21 @@ Popup {
         }
     }
 
-    // A cell's, a row's or a column's menu
-    Menu {
+    // A cell's, a row's or a column's menu (an AdaptiveMenu: a sheet on phones)
+    AdaptiveMenu {
         id: cellMenu
         objectName: editor.named("tableCellMenu")
         onClosed: editor.focusCell()
-        MenuItem { text: qsTr("Row above"); enabled: editor.row > 0; onTriggered: editor.insertRow(editor.row) }
-        MenuItem { text: qsTr("Row below"); onTriggered: editor.insertRow(editor.row + 1) }
-        MenuItem { text: qsTr("Remove row"); enabled: editor.row > 0; onTriggered: editor.removeRow(editor.row) }
+        AdaptiveMenuItem { text: qsTr("Row above"); enabled: editor.row > 0; onTriggered: editor.insertRow(editor.row) }
+        AdaptiveMenuItem { text: qsTr("Row below"); onTriggered: editor.insertRow(editor.row + 1) }
+        AdaptiveMenuItem { text: qsTr("Remove row"); enabled: editor.row > 0; onTriggered: editor.removeRow(editor.row) }
         MenuSeparator {}
-        MenuItem { text: qsTr("Column left"); onTriggered: editor.insertColumn(editor.column) }
-        MenuItem { text: qsTr("Column right"); onTriggered: editor.insertColumn(editor.column + 1) }
-        MenuItem { text: qsTr("Remove column"); enabled: editor.columnCount > 1; onTriggered: editor.removeColumn(editor.column) }
+        AdaptiveMenuItem { text: qsTr("Column left"); onTriggered: editor.insertColumn(editor.column) }
+        AdaptiveMenuItem { text: qsTr("Column right"); onTriggered: editor.insertColumn(editor.column + 1) }
+        AdaptiveMenuItem { text: qsTr("Remove column"); enabled: editor.columnCount > 1; onTriggered: editor.removeColumn(editor.column) }
         MenuSeparator {}
-        MenuItem { text: qsTr("Align left"); checkable: true; checked: editor.aligns[editor.column] === "left"; onTriggered: editor.setAlign("left") }
-        MenuItem { text: qsTr("Center"); checkable: true; checked: editor.aligns[editor.column] === "center"; onTriggered: editor.setAlign("center") }
-        MenuItem { text: qsTr("Align right"); checkable: true; checked: editor.aligns[editor.column] === "right"; onTriggered: editor.setAlign("right") }
+        AdaptiveMenuItem { text: qsTr("Align left"); checkable: true; checked: editor.aligns[editor.column] === "left"; onTriggered: editor.setAlign("left") }
+        AdaptiveMenuItem { text: qsTr("Center"); checkable: true; checked: editor.aligns[editor.column] === "center"; onTriggered: editor.setAlign("center") }
+        AdaptiveMenuItem { text: qsTr("Align right"); checkable: true; checked: editor.aligns[editor.column] === "right"; onTriggered: editor.setAlign("right") }
     }
 }

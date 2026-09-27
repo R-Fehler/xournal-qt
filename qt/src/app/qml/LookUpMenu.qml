@@ -3,16 +3,17 @@
 // a bibliography entry's paper in the library (FindPaperSheet) and arXiv, then the web (the search engine of
 // Settings, Google Scholar, a translator). Each
 // entry that leads to the web shows its address under its name, so the address is seen before it is chosen; the
-// window then asks with the whole address (WebConfirm) unless that was turned off.
+// window then asks with the whole address (WebConfirm) unless that was turned off. An AdaptiveMenu: a sheet on phones,
+// where the address is the row's second line (`detail`).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
-Menu {
+AdaptiveMenu {
     id: menu
     objectName: named("lookUpMenu")
-    width: 340
+    minimumWidth: 340
     /// The selected text it looks up (set before it opens)
     property string text: ""
     property string namePrefix: ""
@@ -30,16 +31,17 @@ Menu {
     readonly property string translateUrl: (app.settings.revision, text !== "" ? app.citations.translateUrl(text) : "")
 
     /// An entry with its web address as a second line
-    component WebItem: MenuItem {
+    component WebItem: AdaptiveMenuItem {
         id: item
         property string url: ""
         property string label: ""
         property string purpose: label
         /// What it does instead of opening the address in the browser (null: that)
         property var run: null
+        /// The address, under the name (the phone's sheet shows it too)
+        readonly property string detail: url !== "" ? app.citations.displayUrl(url) : ""
         text: label
-        height: visible ? implicitHeight : 0
-        visible: url !== ""
+        offered: url !== ""
         contentItem: ColumnLayout {
             spacing: 0
             Label { text: item.label; font: item.font; color: item.enabled ? "#202124" : "#9aa0a6" }
@@ -56,26 +58,26 @@ Menu {
     }
 
     // The searches here, with the text
-    MenuItem {
+    AdaptiveMenuItem {
         objectName: menu.named("lookUpSearchDocument")
         text: menu.inReference && !app.reference.self ? qsTr("Search in “%1”").arg(app.title) : qsTr("Search in this document")
         enabled: menu.query !== ""
         onTriggered: win.searchInDocument(menu.query)
     }
-    MenuItem {
+    AdaptiveMenuItem {
         objectName: menu.named("lookUpSearchTabs")
         text: qsTr("Search in open tabs")
         enabled: menu.query !== ""
         onTriggered: win.searchOpenTabs(menu.query)
     }
-    MenuItem {
+    AdaptiveMenuItem {
         objectName: menu.named("lookUpSearchLibrary")
         text: qsTr("Search in the library")
         enabled: menu.query !== "" && app.library.available
         onTriggered: win.searchLibraryFor(menu.query)
     }
     MenuSeparator {}
-    MenuItem {
+    AdaptiveMenuItem {
         objectName: menu.named("lookUpFindPaper")
         text: qsTr("Find this paper in the library")
         enabled: menu.text !== ""

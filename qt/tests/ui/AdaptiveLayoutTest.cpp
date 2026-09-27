@@ -35,7 +35,9 @@
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QStyleHints>
+#include <QImage>
 #include <QJSValue>
+#include <QPainter>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -2731,6 +2733,13 @@ TEST_F(PhoneChromeTest, thePaletteTheWidthsAndAllToolsAreSheets) {
         QTest::keyClick(window, Qt::Key_Escape);
         EXPECT_TRUE(opened(popup, false)) << what;
     };
+    // (the dock laid out with the cycling buttons in it: a loaded machine may take a moment after the resize)
+    until([&] {
+        auto* dock = named("phoneDock");
+        auto* color = named("colorCycleButton");
+        return dock && color && dock->isVisible() && color->isVisible() &&
+               sceneRect(dock).adjusted(-1, -1, 1, 1).contains(sceneRect(color));
+    });
     QMetaObject::invokeMethod(named("colorCycleButton"), "pressAndHold");
     atTheBottom(window->findChild<QObject*>("colorPalette"), "the palette");
     QMetaObject::invokeMethod(named("widthButton"), "pressAndHold");
@@ -2939,4 +2948,528 @@ TEST_F(PhoneChromeTest, theFold7FoldedAndUnfolded) {
             expectInside("doc");
         }
     }
+}
+
+// --- safe areas and the soft keyboard (qt/safe-areas-keyboard) -----------------------------------------------------
+
+namespace {
+class SafeAreasKeyboardTest: public PhoneChromeTest {
+protected:
+    void TearDown() override {
+        if (window) {
+            setInsets(0, 0, 0, 0);
+            window->setProperty("fakeKeyboardHeight", 0);
+        }
+        PhoneChromeTest::TearDown();
+    }
+    double top = 0, right = 0, bottom = 0, left = 0;
+    /// Fake safe area margins (as main.cpp sets them from the window's on Qt 6.9+)
+    void setInsets(double t, double r, double b, double l) {
+        top = t, right = r, bottom = b, left = l;
+        window->setProperty("safeTop", t);
+        window->setProperty("safeRight", r);
+        window->setProperty("safeBottom", b);
+        window->setProperty("safeLeft", l);
+        wait(100);
+    }
+    /// A fake soft keyboard of this height at the window's bottom (0: none)
+    void setKeyboard(double height) {
+        window->setProperty("fakeKeyboardHeight", height);
+        wait(150);
+    }
+    double keyboardTop() const { return window->property("keyboardTop").toDouble(); }
+    QRectF safeRect() const { return QRectF(left, top, window->width() - left - right, window->height() - top - bottom); }
+    /// The enabled controls under `root` (buttons, fields) whose shown part lies in the insets (or below `bottomEdge`)
+    QStringList inInsets(QQuickItem* root, double bottomEdge = -1) const {
+        QRectF safe = safeRect();
+        if (bottomEdge >= 0) {
+            safe.setBottom(std::min(safe.bottom(), bottomEdge));
+        }
+        QStringList found;
+        std::function<void(QQuickItem*, QRectF)> walk = [&](QQuickItem* i, QRectF clip) {
+            if (!i->isVisible() || i->opacity() <= 0.01) {
+                return;
+            }
+            const QRectF r = sceneRect(i);
+            const bool control = i->inherits("QQuickAbstractButton") || i->inherits("QQuickTextInput") ||
+                                 i->inherits("QQuickTextEdit") || i->inherits("QQuickScrollBar");
+            const QRectF shown = r.intersected(clip);
+            if (control && i->isEnabled() && shown.width() > 1 && shown.height() > 1 &&
+                !safe.contains(shown.adjusted(0.5, 0.5, -0.5, -0.5))) {
+                found << QString("%1@%2,%3 %4x%5")
+                                 .arg(xqt::uitest::labelOf(i))
+                                 .arg(shown.x())
+                                 .arg(shown.y())
+                                 .arg(shown.width())
+                                 .arg(shown.height());
+            }
+            const QRectF inner = i->clip() ? clip.intersected(r) : clip;
+            for (QQuickItem* c: i->childItems()) {
+                walk(c, inner);
+            }
+        };
+        walk(root, QRectF(-1e6, -1e6, 2e6, 2e6));
+        return found;
+    }
+    void expectClear(QQuickItem* root, const std::string& what, double bottomEdge = -1) {
+        ASSERT_NE(root, nullptr) << what;
+        const QStringList found = inInsets(root, bottomEdge);
+        EXPECT_TRUE(found.isEmpty()) << what << ": in the safe area's insets: " << found.join("; ").toStdString();
+    }
+    void expectClear(const char* name, const std::string& at) {
+        QQuickItem* item = named(name);
+        if (item && item->isVisible()) {
+            expectClear(item, at + ": " + name);
+        }
+    }
+    /// An object by its name anywhere in the scene: an item, or an object declared in one (a menu in a delegate)
+    QObject* anywhere(const char* name) const {
+        QObject* found = nullptr;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (found) {
+                return;
+            }
+            if (i->objectName() == name) {
+                found = i;
+                return;
+            }
+            for (QObject* o: i->children()) {
+                if (o->objectName() == name) {
+                    found = o;
+                    return;
+                }
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(window->contentItem());
+        return found ? found : window->findChild<QObject*>(name);  // (in a popup that is not open)
+    }
+    /// The visible items of this name under `root`
+    std::vector<QQuickItem*> itemsNamed(QQuickItem* root, const char* name) const {
+        std::vector<QQuickItem*> items;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (i->objectName() == name && i->isVisible()) {
+                items.push_back(i);
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(root);
+        return items;
+    }
+    /// XQT_SAFE_AREA_SHOTS=<folder>: a picture of the window now (to look at; the insets are drawn as red bands)
+    void shot(const std::string& name) {
+        const QString dir = qEnvironmentVariable("XQT_SAFE_AREA_SHOTS");
+        if (dir.isEmpty()) {
+            return;
+        }
+        wait(250);
+        QImage img = window->grabWindow();
+        QPainter p(&img);
+        const QColor band(255, 0, 0, 60);
+        const double w = window->width(), h = window->height();
+        p.fillRect(QRectF(0, 0, w, top), band);
+        p.fillRect(QRectF(0, h - bottom, w, bottom), band);
+        p.fillRect(QRectF(0, 0, left, h), band);
+        p.fillRect(QRectF(w - right, 0, right, h), band);
+        if (window->property("keyboardHeight").toDouble() > 0) {
+            p.fillRect(QRectF(0, keyboardTop(), w, h - keyboardTop()), QColor(60, 60, 60, 200));
+        }
+        p.end();
+        QDir().mkpath(dir);
+        img.save(dir + "/" + QString::fromStdString(name) + ".png");
+    }
+    QQuickItem* popupItem(QObject* popup) const {
+        auto* content = popup->property("contentItem").value<QQuickItem*>();
+        return content ? content->parentItem() : nullptr;
+    }
+    void openMenu(QObject* menu) {
+        QMetaObject::invokeMethod(menu, "openMenu", Q_ARG(QVariant, QVariant()), Q_ARG(QVariant, QVariant()));
+    }
+    /// The menu opened as the phone's sheet, at the window's bottom (or on the keyboard); closed again
+    void expectSheetOf(QObject* menu, const std::string& at) {
+        ASSERT_NE(menu, nullptr) << at;
+        QObject* s = sheet();
+        ASSERT_TRUE(opened(s, true)) << at << ": " << menu->objectName().toStdString() << " as a sheet";
+        EXPECT_EQ(s->property("menu").value<QObject*>(), menu) << at;
+        EXPECT_FALSE(menu->property("visible").toBool()) << at << ": the menu itself stays closed";
+        settled(s);
+        const QRectF r = popupRect(s);
+        EXPECT_TRUE(insideWindow(r)) << at;
+        EXPECT_NEAR(r.bottom(), keyboardTop(), 1.5) << at << ": at the bottom";
+        EXPECT_FALSE(sheetRows().empty()) << at;
+        QTest::keyClick(window, Qt::Key_Escape);
+        EXPECT_TRUE(opened(s, false)) << at;
+    }
+    /// Writing the page's Markdown on the page, the canvas with the keys
+    QQuickItem* writeOnPage() {
+        EXPECT_TRUE(controller->writeMarkdownOnPage());
+        until([&] { return controller->markdownOnPage(); });
+        auto* canvas = named("canvas");
+        canvas->forceActiveFocus();
+        wait(80);
+        return canvas;
+    }
+    /// The text cursor of the canvas, in the window
+    QRectF caretOnScreen(QQuickItem* canvas) const {
+        const QRectF c = canvas->inputMethodQuery(Qt::ImCursorRectangle).toRectF();
+        return canvas->mapRectToScene(c);
+    }
+};
+}  // namespace
+
+// With a status bar (32), a gesture bar (24) and, sideways, a camera cut-out at the left (40): at the Fold 7's sizes
+// no control of the app bar, the tab strip, the tool bar, the dock (or its rail), the pills, the drawer, the sheets,
+// a dialog and the snackbar lies in them; the pages go on under them (edge to edge)
+TEST_F(SafeAreasKeyboardTest, controlsStayOutOfTheSafeArea) {
+    openThree();
+    struct Case {
+        WindowSize size;
+        double left;
+    };
+    for (const Case& c: {Case{{412, 915, "phone-portrait"}, 0}, Case{{915, 412, "phone-landscape"}, 40},
+                         Case{{900, 1000, "fold7-inner"}, 0}}) {
+        resize(c.size.w, c.size.h);
+        setInsets(32, 0, 24, c.left);
+        const std::string at = std::to_string(c.size.w) + "x" + std::to_string(c.size.h);
+        shot("insets-" + at);
+        for (const char* name: {"phoneAppBar", "tabStrip", "topTools", "phoneDock", "viewPill", "navPill", "sidebarArrow",
+                                "horizontalScrollBar", "verticalScrollBar"}) {
+            expectClear(name, at);
+        }
+        // The pages under the bars: edge to edge where no bar is in the way
+        const QRectF canvas = sceneRect(named("canvas"));
+        EXPECT_NEAR(canvas.left(), 0, 1) << at << ": the page goes on under a cut-out";
+        if (!phoneChrome()) {
+            EXPECT_NEAR(canvas.bottom(), c.size.h, 1) << at << ": the page goes on under the gesture bar";
+        }
+        // The snackbar
+        auto* snackbar = named("snackbar");
+        QMetaObject::invokeMethod(snackbar, "show", Q_ARG(QVariant, "Page deleted"), Q_ARG(QVariant, true),
+                                  Q_ARG(QVariant, QVariant()), Q_ARG(QVariant, QVariant()));
+        wait(50);
+        expectClear(snackbar, at + ": the snackbar");
+        snackbar->setProperty("visible", false);
+        // The sidebar as a drawer
+        QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));
+        until([&] { return window->property("drawerSlide").toDouble() >= 1; });
+        shot("insets-drawer-" + at);
+        expectClear(named("sidebar"), at + ": the drawer");
+        EXPECT_GE(sceneRect(named("sidebar")).left(), c.left - 0.5) << at << ": the drawer beside the cut-out";
+        QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, false));
+        until([&] { return window->property("drawerSlide").toDouble() <= 0; });
+        // ⋮: a sheet on a phone, a menu on the tablet
+        click(named("moreButton"));
+        if (phoneClass()) {
+            ASSERT_TRUE(opened(sheet(), true)) << at;
+            settled(sheet());
+            shot("insets-sheet-" + at);
+            expectClear(popupItem(sheet()), at + ": the menu's sheet");
+            QTest::keyClick(window, Qt::Key_Escape);
+            EXPECT_TRUE(opened(sheet(), false)) << at;
+        } else {
+            QObject* menu = window->findChild<QObject*>("moreMenu");
+            ASSERT_TRUE(opened(menu, true)) << at;
+            settled(menu);
+            expectClear(popupItem(menu), at + ": ⋮");
+            QTest::keyClick(window, Qt::Key_Escape);
+            EXPECT_TRUE(opened(menu, false)) << at;
+        }
+        // A dialog (a question: at the bottom of a phone upright, full screen held sideways)
+        QObject* dialog = window->findChild<QObject*>("shareDialog");
+        QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, ""));
+        ASSERT_TRUE(opened(dialog, true)) << at;
+        settled(dialog);
+        expectClear(popupItem(dialog), at + ": a dialog");
+        QMetaObject::invokeMethod(dialog, "close");
+        EXPECT_TRUE(opened(dialog, false)) << at;
+        // All pages: its pill
+        auto* grid = named("pageGrid");
+        QMetaObject::invokeMethod(grid, "open");
+        until([&] { return grid->isVisible(); });
+        expectClear("pageGridPill", at);
+        QMetaObject::invokeMethod(grid, "close");
+        until([&] { return !grid->isVisible(); });
+        // The compact chrome: the tool square, the pen pill (with the pen in hand), the tab dots
+        controller->selectTool("pen");
+        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+        wait(150);
+        shot("insets-compact-" + at);
+        for (const char* name: {"quickToolSquare", "penPill", "fullScreenTabs", "viewPill"}) {
+            expectClear(name, at + " compact");
+        }
+        EXPECT_TRUE(named("quickToolSquare")->isVisible()) << at;
+        EXPECT_TRUE(named("penPill")->isVisible()) << at;
+        QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+        wait(100);
+        expectInside("doc");
+    }
+}
+
+// A soft keyboard (fake, 360 px) while Markdown is written on the page at 412 x 915: the dock goes, the format bar sits
+// right above the keyboard, the page ends above it and keeps the text cursor in view while lines are typed at the
+// page's bottom; a sheet, a dialog and the snackbar sit above the keyboard; without it all is back
+TEST_F(SafeAreasKeyboardTest, theFormatBarDocksAboveTheKeyboardAndTheCursorStaysInView) {
+    openDocument();
+    resize(412, 915);
+    setInsets(32, 0, 24, 0);
+    auto* canvas = writeOnPage();
+    auto* bar = named("markdownFormatBar");
+    ASSERT_NE(bar, nullptr);
+    ASSERT_TRUE(bar->isVisible());
+    EXPECT_LT(sceneRect(bar).top(), 200) << "without the keyboard: at the top";
+    EXPECT_TRUE(named("phoneDock")->isVisible());
+
+    setKeyboard(360);
+    const double kb = keyboardTop();
+    EXPECT_NEAR(kb, 915 - 360, 0.5);
+    EXPECT_FALSE(named("phoneDock")->isVisible()) << "the dock goes while the keyboard is open";
+    ASSERT_TRUE(bar->isVisible());
+    EXPECT_TRUE(bar->property("docked").toBool());
+    EXPECT_NEAR(sceneRect(bar).bottom(), kb, 1) << "the format bar right above the keyboard";
+    EXPECT_LE(sceneRect(canvas).bottom(), sceneRect(bar).top() + 1) << "the page ends above it";
+    expectClear(bar, "the docked format bar", kb);
+
+    // Lines typed: the cursor stays in view above the bar
+    for (int i = 0; i < 30; ++i) {
+        for (const char ch: std::string("line")) {
+            QTest::keyClick(window, ch);
+        }
+        QTest::keyClick(window, Qt::Key_Return);
+        wait(10);
+        if (i % 5 == 4) {
+            const QRectF caret = caretOnScreen(canvas);
+            EXPECT_GE(caret.top(), sceneRect(canvas).top() - 0.5) << "line " << i;
+            EXPECT_LE(caret.bottom(), sceneRect(bar).top() + 0.5) << "line " << i << ": the cursor above the bar";
+        }
+    }
+    shot("keyboard-format-bar");
+    // The keyboard opening while the cursor is low on the screen (below where the keyboard comes): the page scrolls it
+    // into view
+    setKeyboard(0);
+    const double lowest = sceneRect(canvas).bottom() - 30;
+    until([&] {  // (the layout of the text typed may still settle)
+        const double down = lowest - caretOnScreen(canvas).bottom();
+        QMetaObject::invokeMethod(canvas, "scrollTo", Q_ARG(qreal, canvas->property("contentX").toDouble()),
+                                  Q_ARG(qreal, canvas->property("contentY").toDouble() - down));
+        wait(30);
+        return caretOnScreen(canvas).bottom() > kb;
+    });
+    ASSERT_GT(caretOnScreen(canvas).bottom(), kb) << "(without the keyboard the cursor is where the keyboard comes)";
+    setKeyboard(360);
+    EXPECT_LE(caretOnScreen(canvas).bottom(), sceneRect(bar).top() + 0.5) << "scrolled into view when the keyboard came";
+
+    // The snackbar above it
+    auto* snackbar = named("snackbar");
+    QMetaObject::invokeMethod(snackbar, "show", Q_ARG(QVariant, "Page deleted"), Q_ARG(QVariant, true),
+                              Q_ARG(QVariant, QVariant()), Q_ARG(QVariant, QVariant()));
+    wait(50);
+    EXPECT_LE(sceneRect(snackbar).bottom(), kb) << "the snackbar above the keyboard";
+    snackbar->setProperty("visible", false);
+    // A sheet and a dialog on the keyboard
+    openMenu(window->findChild<QObject*>("moreMenu"));
+    expectSheetOf(window->findChild<QObject*>("moreMenu"), "⋮ with the keyboard");
+    QObject* dialog = window->findChild<QObject*>("shareDialog");
+    QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, ""));
+    ASSERT_TRUE(opened(dialog, true));
+    settled(dialog);
+    EXPECT_LE(popupRect(dialog).bottom(), kb + 0.5) << "a dialog above the keyboard";
+    QMetaObject::invokeMethod(dialog, "close");
+    EXPECT_TRUE(opened(dialog, false));
+
+    // Without the keyboard: the dock again, the bar at the top
+    setKeyboard(0);
+    EXPECT_TRUE(named("phoneDock")->isVisible());
+    EXPECT_FALSE(bar->property("docked").toBool());
+    EXPECT_LT(sceneRect(bar).top(), 200);
+    controller->endMarkdownOnPage();
+}
+
+// The Markdown source below the page at 412 x 915 with the keyboard: the panel ends above it, its format bar sits right
+// above the keyboard, and the text's cursor stays in view while lines are typed
+TEST_F(SafeAreasKeyboardTest, theSourcePanelsFormatBarAndCursorWithTheKeyboard) {
+    openDocument();
+    resize(412, 915);
+    setInsets(32, 0, 24, 0);
+    auto* panel = named("markdownPanel");
+    ASSERT_NE(panel, nullptr);
+    QMetaObject::invokeMethod(panel, "open", Q_ARG(QVariant, 0));
+    until([&] { return panel->isVisible(); });
+    auto* area = findItem("markdownArea");
+    ASSERT_NE(area, nullptr);
+    area->forceActiveFocus();
+    wait(50);
+    auto* bar = findItem("panelMarkdownFormatBar");
+    ASSERT_NE(bar, nullptr);
+    EXPECT_LE(sceneRect(panel).bottom(), 915 - 56 + 1) << "above the dock";
+    const double barTopBefore = sceneRect(bar).top();
+
+    setKeyboard(360);
+    const double kb = keyboardTop();
+    EXPECT_LE(sceneRect(panel).bottom(), kb + 0.5) << "the panel ends above the keyboard";
+    EXPECT_NEAR(sceneRect(bar).bottom(), kb, 1.5) << "its format bar right above the keyboard";
+    EXPECT_GT(sceneRect(bar).top(), barTopBefore) << "moved down from the panel's top";
+    shot("keyboard-source-panel-before");
+    for (int i = 0; i < 25; ++i) {
+        for (const char ch: std::string("text")) {
+            QTest::keyClick(window, ch);
+        }
+        QTest::keyClick(window, Qt::Key_Return);
+        wait(5);
+    }
+    wait(100);
+    shot("keyboard-source-panel");
+    auto* scroll = area->parentItem();
+    while (scroll && !scroll->inherits("QQuickFlickable")) {
+        scroll = scroll->parentItem();
+    }
+    ASSERT_NE(scroll, nullptr);
+    const QRectF caret = area->mapRectToScene(area->property("cursorRectangle").toRectF());
+    const QRectF view = sceneRect(scroll);
+    EXPECT_GE(caret.top(), view.top() - 0.5) << "the cursor in the text's view";
+    EXPECT_LE(caret.bottom(), view.bottom() + 0.5) << "the cursor in the text's view";
+    EXPECT_LE(caret.bottom(), sceneRect(bar).top() + 0.5) << "above the format bar and the keyboard";
+
+    setKeyboard(0);
+    EXPECT_NEAR(sceneRect(bar).top(), barTopBefore, 1) << "back at the panel's top";
+    QMetaObject::invokeMethod(panel, "close", Q_ARG(QVariant, false));
+}
+
+// The touch profile: the tab strip's buttons and the overview's card buttons (×, the star, the reference) are a
+// finger's size (audit F14); the star is there without hover
+TEST_F(SafeAreasKeyboardTest, touchTargetsOfTheTabStripTheOverviewAndTheSidebar) {
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "on"));
+    openThree();
+    resize(1280, 800);
+    const double target = adaptive->property("minTarget").toDouble();
+    ASSERT_EQ(target, 48);
+    for (const char* name: {"overviewButton", "previousTabButton", "nextTabButton", "newTabButton", "tabCloseButton"}) {
+        auto* b = findItem(name);
+        ASSERT_NE(b, nullptr) << name;
+        EXPECT_GE(b->width(), target) << name;
+        EXPECT_GE(b->height(), target) << name;
+    }
+    EXPECT_TRUE(insideWindow(sceneRect(named("tabStrip"))));
+    auto* overview = window->findChild<QObject*>("tabOverview");
+    QMetaObject::invokeMethod(overview, "open");
+    ASSERT_TRUE(opened(overview, true));
+    settled(overview);
+    for (const char* name: {"overviewCloseButton", "overviewStar", "overviewReferenceButton"}) {
+        int seen = 0;
+        for (QQuickItem* b: itemsNamed(popupItem(overview), name)) {
+            ++seen;
+            EXPECT_GE(b->width(), target) << name;
+            EXPECT_GE(b->height(), target) << name;
+        }
+        EXPECT_GT(seen, 0) << name << " shown (the star too: no hover with fingers)";
+    }
+    QTest::keyClick(window, Qt::Key_Escape);
+    EXPECT_TRUE(opened(overview, false));
+    // The sidebar's layers
+    auto* sidebar = named("sidebar");
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));
+    sidebar->setProperty("mode", "layers");
+    wait(150);
+    for (const char* name: {"layerVisibleButton", "showAllLayersButton"}) {
+        auto* b = findItem(name);
+        ASSERT_NE(b, nullptr) << name;
+        EXPECT_GE(b->width(), target) << name;
+        EXPECT_GE(b->height(), target) << name;
+    }
+    sidebar->setProperty("mode", "pages");
+    QMetaObject::invokeMethod(settings, "set", Q_ARG(QString, "touchProfile"), Q_ARG(QVariant, "auto"));
+}
+
+// The menus that were plain menus open as the sheet on a phone: the layer menu, the annotations' filter, a bookmark's
+// menu, the look-up menu (the web addresses as the rows' second line), the table editor's cell menu, the pen pill's
+// color menu; the reference's page field and the emoji picker are sheets there too
+TEST_F(SafeAreasKeyboardTest, theRemainingMenusAreSheetsOnAPhone) {
+    openDocument();
+    ASSERT_TRUE(controller->toggleBookmark(0));
+    resize(412, 915);
+    setInsets(32, 0, 24, 0);
+    auto* sidebar = named("sidebar");
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));
+    sidebar->setProperty("mode", "layers");
+    wait(150);
+    click(findItem("layerMenuButton"));
+    expectSheetOf(anywhere("layerMenu"), "layers");
+    sidebar->setProperty("mode", "annotations");
+    wait(150);
+    click(findItem("annotationFilter"));
+    expectSheetOf(anywhere("annotationFilterMenu"), "annotations");
+    sidebar->setProperty("mode", "contents");
+    wait(150);
+    auto* bookmark = findItem("bookmarkEntry");
+    ASSERT_NE(bookmark, nullptr);
+    QMetaObject::invokeMethod(bookmark, "pressAndHold");  // (a long press on it)
+    expectSheetOf(anywhere("bookmarkMenu"), "a bookmark");
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, false));
+    wait(250);
+
+    QObject* lookUp = anywhere("lookUpMenu");
+    ASSERT_NE(lookUp, nullptr);
+    lookUp->setProperty("text", "Kalman filter");
+    openMenu(lookUp);
+    ASSERT_TRUE(opened(sheet(), true));
+    bool detail = false;
+    for (QQuickItem* row: sheetRows()) {
+        for (QQuickItem* c: row->childItems()) {
+            detail = detail || (c->objectName() == "menuSheetRowDetail" && c->isVisible() &&
+                                !c->property("text").toString().isEmpty());
+        }
+    }
+    EXPECT_TRUE(detail) << "the web address under the entry's name";
+    shot("sheet-look-up");
+    QTest::keyClick(window, Qt::Key_Escape);
+    EXPECT_TRUE(opened(sheet(), false));
+    openMenu(lookUp);
+    expectSheetOf(lookUp, "look up");
+
+    QObject* cellMenu = anywhere("tableCellMenu");
+    ASSERT_NE(cellMenu, nullptr);
+    openMenu(cellMenu);
+    expectSheetOf(cellMenu, "a table cell");
+    QObject* colorMenu = anywhere("penPillColorMenu");
+    ASSERT_NE(colorMenu, nullptr);
+    openMenu(colorMenu);
+    expectSheetOf(colorMenu, "the pen pill's color");
+
+    for (const char* name: {"referencePagePopup", "emojiPicker"}) {
+        QObject* popup = anywhere(name);
+        ASSERT_NE(popup, nullptr) << name;
+        EXPECT_TRUE(popup->property("asSheet").toBool()) << name;
+        QMetaObject::invokeMethod(popup, "open");
+        ASSERT_TRUE(opened(popup, true)) << name;
+        wait(100);
+        const QRectF r = popupRect(popup);
+        EXPECT_NEAR(r.bottom(), 915, 1.5) << name << ": at the bottom";
+        EXPECT_NEAR(r.width(), 412, 1) << name << ": across the width";
+        expectClear(popupItem(popup), name);
+        QMetaObject::invokeMethod(popup, "close");
+        EXPECT_TRUE(opened(popup, false)) << name;
+    }
+}
+
+// The home screen's icon buttons have a short name, shown while a finger is held on them (IconButton's label; the
+// tip keeps the longer text for the mouse)
+TEST_F(SafeAreasKeyboardTest, theHomeScreensIconButtonsHaveShortLabels) {
+    int seen = 0;
+    std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+        if (i->inherits("QQuickToolButton") && i->property("ownHold").isValid() &&
+            !i->property("iconName").toString().isEmpty()) {
+            ++seen;
+            const QString label = i->property("label").toString();
+            EXPECT_FALSE(label.isEmpty()) << xqt::uitest::labelOf(i).toStdString() << ": a label";
+            EXPECT_LE(label.size(), 30) << xqt::uitest::labelOf(i).toStdString() << ": short";
+        }
+        for (QQuickItem* c: i->childItems()) {
+            walk(c);
+        }
+    };
+    walk(named("homeView"));
+    EXPECT_GE(seen, 10);
 }

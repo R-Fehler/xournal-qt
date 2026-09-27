@@ -92,7 +92,9 @@ Menu {
             return
         }
         const safeTop = typeof win !== "undefined" && win && win.safeTop ? win.safeTop : 0
-        const safeBottom = typeof win !== "undefined" && win && win.safeBottom ? win.safeBottom : 0
+        // (above the navigation bar, and above the soft keyboard while it is open)
+        const safeBottom = typeof win !== "undefined" && win && win.safeBottom !== undefined
+                           ? Math.max(win.safeBottom, win.keyboardHeight) : 0
         let top = 8 + safeTop, bottom = 8 + safeBottom
         if (anchor && anchor.height <= 96) {
             const r = anchor.mapToItem(null, 0, 0, anchor.width, anchor.height)

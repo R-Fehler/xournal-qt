@@ -30,6 +30,8 @@ Item {
     /// not while the divider is dragged.
     /// (a value, not a binding: orient() sets it as the size changes)
     property bool vertical: false
+    /// Room at the split's bottom for the navigation bar and the soft keyboard (Main.qml): the reference's pill above it
+    property real bottomInset: 0
     Component.onCompleted: orient()
     function orient() {
         if (dividerDrag.active) return
@@ -116,6 +118,8 @@ Item {
             canvasItem: referenceCanvas
             namePrefix: "reference"
             hidden: referenceGrid.visible
+            // (above the navigation bar where the reference reaches the split's bottom)
+            bottomInset: Math.max(0, split.bottomInset - (split.height - referenceScope.y - referenceScope.height))
         }
         PdfTextHandles {
             canvasItem: referenceCanvas
@@ -290,7 +294,8 @@ Item {
             id: referencePill
             objectName: "referencePill"
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 24
+            // (at the split's bottom: above the navigation bar; in the upper half of a split top and bottom, no room needed)
+            anchors.bottomMargin: 24 + Math.max(0, split.bottomInset - (split.height - referenceScope.y - referenceScope.height))
             anchors.horizontalCenter: parent.horizontalCenter
             padding: 2
             leftPadding: 6
@@ -319,6 +324,7 @@ Item {
             RowLayout {
                 spacing: 0
                 ToolButton {
+                    id: referencePageButton
                     objectName: "referencePageButton"
                     text: app.reference.pageNumber + " / " + app.reference.pageCount
                     focusPolicy: Qt.NoFocus
@@ -327,11 +333,36 @@ Item {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Go to page…")
                     ToolTip.delay: 600
+                    // Above the pill; in the phone classes a bottom sheet (the window's, above the soft keyboard)
                     Popup {
                         id: referencePagePopup
                         objectName: "referencePagePopup"
-                        y: -height - 8
+                        readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout === true
+                        parent: asSheet ? Overlay.overlay : referencePageButton
+                        modal: asSheet
+                        dim: asSheet
+                        x: asSheet ? win.sheetX : 0
+                        y: asSheet ? win.sheetBottom - height : -height - 8
+                        width: asSheet ? win.sheetWidth : implicitWidth
                         padding: 8
+                        leftPadding: asSheet ? 20 : 8
+                        rightPadding: asSheet ? 20 : 8
+                        topPadding: asSheet ? 16 : 8
+                        bottomPadding: asSheet ? 16 + win.sheetBottomPadding : 8
+                        background: Rectangle {
+                            color: "#ffffff"
+                            radius: referencePagePopup.asSheet ? 16 : 4
+                            border.width: referencePagePopup.asSheet ? 0 : 1
+                            border.color: "#d5d8dc"
+                            Rectangle {  // (a sheet: square at the bottom)
+                                visible: referencePagePopup.asSheet
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: parent.radius
+                                color: parent.color
+                            }
+                        }
                         onOpened: { pageField.text = ""; pageField.forceActiveFocus() }
                         onClosed: referencePill.focusReference()
                         RowLayout {

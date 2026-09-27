@@ -1,5 +1,7 @@
 // The emoji picker: a search (names, tags, descriptions: "heart", "happy", "flag") and the emoji by category. A tap
-// (or Enter: the first found) picks one (`picked`); Escape or a tap outside closes it.
+// (or Enter: the first found) picks one (`picked`); Escape or a tap outside closes it. In the phone classes it is a
+// bottom sheet (the window's, above the soft keyboard while it is open); elsewhere it opens beside `owner`, at
+// `ownerX`, `ownerY` in its coordinates.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -10,18 +12,51 @@ Popup {
     id: picker
     objectName: "emojiPicker"
     signal picked(string emoji)
-    width: 360
-    height: 400
+    /// The item it opens beside (not a sheet), and where in its coordinates
+    property Item owner: null
+    property real ownerX: 0
+    property real ownerY: 0
+    /// A bottom sheet in the phone classes (Main.qml's sheet geometry)
+    readonly property bool asSheet: typeof win !== "undefined" && win !== null && win.phoneLayout === true
+    parent: asSheet ? Overlay.overlay : owner
+    modal: asSheet
+    dim: asSheet
+    x: asSheet ? win.sheetX : ownerX
+    y: asSheet ? win.sheetBottom - height : ownerY
+    width: asSheet ? win.sheetWidth : 360
+    height: asSheet ? Math.min(420, Math.round((win.sheetBottom - win.safeTop) * 0.85)) : 400
     // (kept inside the window, and less high in a phone's landscape: F13.4)
-    margins: 8
+    margins: asSheet ? 0 : 8
     padding: 8
+    bottomPadding: asSheet ? 8 + win.sheetBottomPadding : 8
     focus: true
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
-    background: Rectangle { color: "#ffffff"; radius: 12; border.width: 1; border.color: "#d5d8dc" }
+    closePolicy: asSheet ? Popup.CloseOnEscape | Popup.CloseOnPressOutside
+                         : Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+    background: Rectangle {
+        color: "#ffffff"
+        radius: picker.asSheet ? 16 : 12
+        border.width: picker.asSheet ? 0 : 1
+        border.color: "#d5d8dc"
+        Rectangle {  // (a sheet: square at the bottom, where it rests on the window's edge or the keyboard)
+            visible: picker.asSheet
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: parent.radius
+            color: parent.color
+        }
+    }
+    // Android's back key closes it (Qt closes a popup on it only while the popup has the keys)
+    Shortcut {
+        sequence: "Back"
+        enabled: picker.opened
+        onActivated: picker.close()
+    }
 
     property var results: Emoji.search("")
     function refresh() { results = Emoji.search(search.text) }
-    onOpened: { search.text = ""; refresh(); search.forceActiveFocus() }
+    // (on a phone the search does not take the keys at once: that would open the soft keyboard over the emoji)
+    onOpened: { search.text = ""; refresh(); if (!asSheet) search.forceActiveFocus() }
 
     ColumnLayout {
         anchors.fill: parent

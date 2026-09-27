@@ -22,15 +22,21 @@ Popup {
     readonly property bool narrow: width < 600
     /// On a phone: a section is shown (else the list of them)
     property bool sectionShown: false
+    /// The window's safe area and the soft keyboard (Main.qml: win.safeInsets, win.keyboardTop)
+    readonly property bool inWindow: win !== null && win !== undefined && win.safeInsets !== undefined
     readonly property real keyboardTop: {
+        if (inWindow) return win.keyboardOpen ? win.keyboardTop : Infinity
         const r = Qt.inputMethod.keyboardRectangle
         return Qt.inputMethod.visible && r.height > 0 ? r.y / (Qt.platform.os === "android" ? Screen.devicePixelRatio : 1)
                                                       : Infinity
     }
-    readonly property real safeTop: win && win.safeTop !== undefined ? win.safeTop : 0
-    readonly property real roomBottom: parent ? Math.min(parent.height, keyboardTop) : 700
-    readonly property real parentWidth: parent ? parent.width : 900
-    x: phone ? 0 : Math.round((parentWidth - width) / 2)
+    readonly property real safeTop: inWindow ? win.safeTop : 0
+    readonly property real safeLeft: inWindow ? win.safeLeft : 0
+    readonly property real safeRight: inWindow ? win.safeRight : 0
+    /// Above the soft keyboard while it is open, else above the navigation bar
+    readonly property real roomBottom: parent ? Math.min(parent.height - (inWindow ? win.safeBottom : 0), keyboardTop) : 700
+    readonly property real parentWidth: parent ? parent.width - safeLeft - safeRight : 900
+    x: safeLeft + (phone ? 0 : Math.round((parentWidth - width) / 2))
     y: phone ? safeTop : Math.round(Math.max(safeTop + 24, ((parent ? parent.height : 700) - height) / 2))
     width: phone ? parentWidth : Math.min(parentWidth - 32, 920)
     height: Math.max(0, roomBottom - safeTop - (phone ? 0 : 48))
