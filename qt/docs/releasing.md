@@ -14,6 +14,24 @@ or carry `if: github.repository == 'xournalpp/xournalpp'`.
 Qt 6.5 or newer is needed, which the GitHub runners' own Ubuntu 24.04 does not have (6.4). Every job therefore builds
 in a container; `qt/scripts/linux-deps.sh` installs the packages (the same script works on a developer machine).
 
+### A test that fails only on GitHub
+
+Run it in the same container here: `qt/scripts/ci-container.sh` builds and tests like the CI does, in `debian`
+(Debian 13, Qt 6.8) or `neon` (Ubuntu 22.04 with KDE neon, Qt 6.7): root, C locale, the fonts the packages bring,
+the checkout mounted read-only, the build folder in `~/.cache/xqt-ci/<name>`. Docker if it runs, else podman; the
+container gets 3 CPUs and 4 GB, and on a shared machine it goes through `qt/scripts/build-slot.sh` as well.
+
+```sh
+qt/scripts/build-slot.sh qt/scripts/ci-container.sh debian build xqt-ui-tests     # about 30 min the first time
+qt/scripts/build-slot.sh qt/scripts/ci-container.sh debian test -R 'AdaptiveLayoutTest\.menus' --repeat until-fail:3
+qt/scripts/ci-container.sh debian run build/xqt-ui-tests --gtest_filter='AdaptiveLayoutTest.*'
+qt/scripts/ci-container.sh neon shell            # look around; `clean` deletes the build folder
+```
+
+What made tests fail there and not on a desktop (2026-09-27): other fonts (other text widths, so a menu a fraction
+of a pixel narrower), and Qt 6.8, whose own file dialogs are windows of their own (off-screen the app's window does
+not get the keys back when one closes) and whose menus take a click on their button only after they have faded out.
+
 ## Cutting a release
 
 1. Everything green on `master-qt`, and the device checklist walked through (`qt/docs/testing/device-checklist.md`).

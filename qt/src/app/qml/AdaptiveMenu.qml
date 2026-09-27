@@ -38,7 +38,9 @@ Menu {
     readonly property real windowWidth: typeof win !== "undefined" && win ? win.width : 100000
     readonly property real windowHeight: typeof win !== "undefined" && win ? win.height : 100000
 
-    implicitWidth: Math.min(windowWidth - 16, Math.max(minimumWidth, Math.min(maximumWidth, entryWidth + leftPadding + rightPadding)))
+    // (whole pixels: the text widths are fractional, and a row of controls (a RowLayout) puts its buttons on whole
+    // pixels, so its last button stuck out of a menu a fraction of a pixel wide)
+    implicitWidth: Math.min(windowWidth - 16, Math.max(minimumWidth, Math.min(maximumWidth, Math.ceil(entryWidth + leftPadding + rightPadding))))
     margins: 8
     verticalPadding: 6
 
