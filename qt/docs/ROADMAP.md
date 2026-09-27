@@ -705,6 +705,16 @@
   table cell, pen colours) and the emoji picker / page field as sheets on phones. This completes the adaptive-UI
   blocks of the audit; next: the device pass on the Fold 7 and the Surface.
 
+- **Android keyboard on the page (2026-09-27, on the Fold 7).** The canvas has `inputMethodHints` (Qt's Android input
+  drops the keyboard's text otherwise), keeps the focus while text is written, rebinds the keyboard when it starts
+  taking text, shows it on a tap, and reports Enter as Default (Return closed the keyboard). Enter in Markdown: a line
+  break (two trailing spaces), Enter twice a paragraph, Shift+Enter a paragraph at once, on every device.
+- **Releases carry Windows and Android (0.4.0).** `xqt-release.yml` calls `xqt-windows.yml` and `xqt-android.yml`.
+- **First macOS build, `qt/macos-build` (2026-09-27).** `xqt-macos.yml` on `macos-15`: Homebrew's libraries and Qt
+  6.11, `macdeployqt` + the libraries Homebrew names through `@rpath`, an unsigned `.dmg` (Apple Silicon, macOS 15+),
+  smoke-tested without Homebrew. Intel needs the libraries from elsewhere; signing needs an Apple account
+  (`qt/docs/macos.md`).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
