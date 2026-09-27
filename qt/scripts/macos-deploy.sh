@@ -113,23 +113,116 @@ step "macdeployqt"
 # expected.
 "$macdeployqt" "$app" -qmldir="$qml_sources" -verbose=1 ${extra[@]+"${extra[@]}"}
 
-# --- Check: nothing refers to a library outside the bundle ---------------------------------------------------------
+# --- What macdeployqt leaves out -------------------------------------------------------------------------------------
+# macdeployqt copies the libraries that the program and Qt name by their full path, but not those that Homebrew's
+# libraries name through @rpath (libpoppler-glib -> @rpath/libpoppler.164.dylib, with the rpath @loader_path/../lib,
+# which in the bundle points nowhere: run 1 of the CI, 2026-09-27). Every such reference is pointed at
+# Contents/Frameworks, and a library that is not there yet is copied from Homebrew, until nothing is left.
+frameworks="$contents/Frameworks"
 macho_files() { find "$contents" -type f \( -perm -u+x -o -name '*.dylib' -o -name '*.so' \) -print0 |
     while IFS= read -r -d '' f; do file -b "$f" | grep -q 'Mach-O' && printf '%s\0' "$f"; done; }
-
-step "Libraries outside the bundle"
-outside=0
-while IFS= read -r -d '' f; do
-    id=$(otool -D "$f" | tail -n +2)  # (a library's own name, listed first: not a dependency)
+deps_of() {  # the libraries a Mach-O file refers to, without its own name
+    local id lib
+    id=$(otool -D "$1" | tail -n +2)
     while IFS= read -r lib; do
-        [[ "$lib" == "$id" ]] && continue
-        case "$lib" in
+        if [[ "$lib" != "$id" ]]; then
+            echo "$lib"
+        fi
+    done < <(otool -L "$1" | tail -n +2 | awk '{print $1}')
+}
+rpaths_of() { otool -l "$1" | awk '/cmd LC_RPATH/{r=1} r && $1=="path"{print $2; r=0}'; }
+# resolves <file> <reference>: the reference names a file in the bundle (or of macOS). @rpath: only Qt's frameworks
+# (macdeployqt puts them into Frameworks, and the program has the rpath to it); any other @rpath is pointed at
+# Frameworks explicitly.
+resolves() {
+    case "$2" in
+        /System/* | /usr/lib/*) return 0 ;;
+        @executable_path/*) [[ -e "$contents/MacOS/${2#@executable_path/}" ]] ;;
+        @loader_path/*) [[ -e "$(dirname "$1")/${2#@loader_path/}" ]] ;;
+        @rpath/*.framework/*) [[ -e "$frameworks/${2#@rpath/}" ]] ;;
+        *) return 1 ;;
+    esac
+}
+from_homebrew() {  # from_homebrew <library file name>: where Homebrew has it
+    if [[ -e "$brew_prefix/lib/$1" ]]; then
+        echo "$brew_prefix/lib/$1"
+    else
+        find -L "$brew_prefix/opt" -maxdepth 3 -name "$1" -print 2> /dev/null | head -n 1
+    fi
+}
+step "Libraries that macdeployqt left outside the bundle"
+unresolved=0
+for pass in 1 2 3 4 5 6 7 8; do
+    changed=0
+    unresolved=0
+    while IFS= read -r -d '' f; do
+        while IFS= read -r lib; do
+            if resolves "$f" "$lib"; then
+                continue
+            fi
+            name=$(basename "$lib")
+            case "$lib" in
+                *.framework/*)
+                    error "${f#"$contents"/} refers to $lib, which is not in the bundle"
+                    unresolved=$((unresolved + 1))
+                    continue
+                    ;;
+            esac
+            if [[ ! -e "$frameworks/$name" ]]; then
+                src=""
+                if [[ "$lib" == /* && -e "$lib" ]]; then
+                    src=$lib
+                else
+                    src=$(from_homebrew "$name")
+                fi
+                if [[ -z "$src" ]]; then
+                    error "${f#"$contents"/} refers to $lib, which is neither in the bundle nor in Homebrew"
+                    unresolved=$((unresolved + 1))
+                    continue
+                fi
+                cp -L "$src" "$frameworks/$name"
+                chmod u+w "$frameworks/$name"
+                install_name_tool -id "@executable_path/../Frameworks/$name" "$frameworks/$name" 2> /dev/null
+                echo "added $name from $src"
+            fi
+            echo "${f#"$contents"/}: $lib -> @executable_path/../Frameworks/$name"
+            install_name_tool -change "$lib" "@executable_path/../Frameworks/$name" "$f" 2> /dev/null
+            changed=1
+        done < <(deps_of "$f")
+    done < <(macho_files)
+    echo "pass $pass: $([[ $changed == 1 ]] && echo "changes made" || echo "nothing to change")"
+    if ((changed == 0)); then
+        break
+    fi
+done
+# rpaths into Homebrew or the build folder: dropped (they would find Homebrew's libraries on the build machine and
+# hide a library missing from the bundle)
+while IFS= read -r -d '' f; do
+    while IFS= read -r rp; do
+        case "$rp" in
             "$brew_prefix"/* | /opt/* | /usr/local/* | /Users/*)
-                error "${f#"$contents"/} refers to $lib"
-                outside=$((outside + 1))
+                echo "${f#"$contents"/}: rpath $rp removed"
+                install_name_tool -delete_rpath "$rp" "$f" 2> /dev/null
                 ;;
         esac
-    done < <(otool -L "$f" | tail -n +2 | awk '{print $1}')
+    done < <(rpaths_of "$f")
+done < <(macho_files)
+for exe in "$contents/MacOS/xournal-qt" "$contents/MacOS/xournal-qt-cli"; do
+    if [[ -f "$exe" ]] && ! rpaths_of "$exe" | grep -qx '@executable_path/../Frameworks'; then
+        install_name_tool -add_rpath @executable_path/../Frameworks "$exe" 2> /dev/null
+    fi
+done
+
+# --- Check: nothing refers to a library outside the bundle ---------------------------------------------------------
+step "Libraries outside the bundle"
+outside=$unresolved
+while IFS= read -r -d '' f; do
+    while IFS= read -r lib; do
+        if ! resolves "$f" "$lib"; then
+            error "${f#"$contents"/} refers to $lib"
+            outside=$((outside + 1))
+        fi
+    done < <(deps_of "$f")
 done < <(macho_files)
 echo "$outside reference(s) to libraries outside the bundle"
 

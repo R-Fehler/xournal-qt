@@ -127,11 +127,27 @@ jobs:
           compression-level: 0  # (a .dmg is compressed already)
           if-no-files-found: error
 
+      # Homebrew out of the way while the bundle runs: a library missing from the bundle then fails here, as it would
+      # on a Mac without Homebrew (dyld would otherwise still find it in /opt/homebrew).
+      - name: Hide Homebrew
+        run: |
+          prefix=$(brew --prefix)
+          echo "BREW_PREFIX=$prefix" >> "$GITHUB_ENV"
+          sudo mv "$prefix" "$prefix.hidden"
+
       - name: Smoke test (CLI exports, the app off-screen; lldb backtraces of what fails)
         timeout-minutes: 30
+        shell: /bin/bash --noprofile --norc -eo pipefail {0}  # (the system's bash: Homebrew's is hidden)
         run: |
-          set -euo pipefail
-          bash qt/scripts/macos-smoke.sh dist/xournal-qt.app smoke
+          /bin/bash qt/scripts/macos-smoke.sh dist/xournal-qt.app smoke
+
+      - name: Bring Homebrew back
+        if: always()
+        shell: /bin/bash --noprofile --norc -eo pipefail {0}
+        run: |
+          if [[ -n "${BREW_PREFIX:-}" && -d "$BREW_PREFIX.hidden" ]]; then
+            sudo mv "$BREW_PREFIX.hidden" "$BREW_PREFIX"
+          fi
 
       - name: Keep the smoke test output
         if: always()

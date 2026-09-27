@@ -8,13 +8,11 @@
 #   1. xournal-qt-cli --version
 #   2. exports that tell apart what fails: strokes to PNG (raster, no text), text to PDF (text, no raster), text to
 #      PNG (both), images to PDF (gdk-pixbuf), a PDF background to PDF (poppler, qpdf)
-#   3. text-probe (qt/tools/text-probe.c), for information: which font map Pango takes (Core Text or fontconfig)
-#   4. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits. dyld
-#      lists the libraries it loads: one from Homebrew instead of the bundle is reported (a Mac without Homebrew
-#      would not have it).
+#   3. the app off-screen: opens a library and a document, saves a screenshot of its window after 5 s, quits
 #
+# The CI hides Homebrew (/opt/homebrew) while this runs, so that a library missing from the bundle fails here and not
+# on a Mac without Homebrew.
 # A step that fails (not one that hangs) runs again under lldb, which prints the backtraces of every thread.
-# Only the steps of 1, 2 and 4 count as failures.
 set -uo pipefail
 
 if [[ $# -ne 2 ]]; then
@@ -27,7 +25,6 @@ out=$(cd "$2" && pwd)
 source_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 fixtures="$source_dir/test/files"
 macos="$app/Contents/MacOS"
-brew_prefix=$(brew --prefix 2> /dev/null || echo /opt/homebrew)
 
 failures=0
 lldb_runs=0
@@ -35,7 +32,7 @@ max_lldb_runs=6
 
 # run_limited <seconds> <log> [VAR=value ...] <program> <arguments...>: runs it with the variables set, output into
 # the log; exit code 124 when the time ran out. Plain bash, no timeout(1) (macOS has none) and no /usr/bin/env or perl
-# in between: macOS drops DYLD_* variables when it starts a system program, so they would not reach the app.
+# in between (macOS drops DYLD_* variables when it starts a system program: DYLD_PRINT_LIBRARIES=1 reaches the app).
 run_limited() {
     local seconds=$1 log=$2
     shift 2
@@ -88,7 +85,8 @@ debug() {
     printf '\n=== %s under lldb\n' "$step"
     run_limited 300 "$out/$step.lldb.log" ${envs[@]+"${envs[@]}"} lldb --batch -o run -k 'thread backtrace all' \
         -k 'image list' -k quit -- "$@"
-    cat "$out/$step.lldb.log"
+    # (the backtraces, not the list of the hundreds of images loaded)
+    sed -n '1,/image list/p' "$out/$step.lldb.log" | tail -n 400
 }
 
 # attempt <step> <seconds> [VAR=value ...] <program> <arguments...>: runs it; on failure once more under lldb.
@@ -98,7 +96,7 @@ attempt() {
     printf '\n=== %s: %s\n' "$step" "$*"
     local rc=0
     run_limited "$seconds" "$out/$step.log" "$@" || rc=$?
-    grep -v '^dyld\[' "$out/$step.log" | tail -n 200
+    tail -n 200 "$out/$step.log"
     if ((rc == 124)); then
         echo "::error::$step: still running after $seconds s (killed)"
     elif ((rc != 0)); then
@@ -147,26 +145,10 @@ expect_file cli-image-pdf "$out/image.pdf"
 attempt cli-pdf-background 120 "$cli" "$library/old.xopp" "--create-pdf=$out/old.pdf" || failures=$((failures + 1))
 expect_file cli-pdf-background "$out/old.pdf"
 
-# --- Pango and Cairo alone (information) ---------------------------------------------------------------------------
-if command -v cc > /dev/null && pkg-config --exists pangocairo cairo-pdf; then
-    printf '\n=== text-probe (diagnostic)\n'
-    # shellcheck disable=SC2046  # pkg-config's flags are words
-    if cc -O1 -g "$source_dir/qt/tools/text-probe.c" $(pkg-config --cflags --libs pangocairo cairo-pdf) \
-        -o "$out/text-probe" > "$out/text-probe-build.log" 2>&1; then
-        run_limited 120 "$out/text-probe.log" "$out/text-probe" "$out/probe"
-        echo "exit code $?"
-        cat "$out/text-probe.log"
-    else
-        cat "$out/text-probe-build.log"
-        echo "::warning::text-probe did not build (text-probe-build.log)"
-    fi
-fi
-
 # --- The app -------------------------------------------------------------------------------------------------------
-# Off-screen, Qt Quick's software renderer. DYLD_PRINT_LIBRARIES: dyld names every library it loads (lines "dyld[pid]:
-# <path>"), so that one taken from Homebrew rather than from the bundle shows.
+# Off-screen, Qt Quick's software renderer.
 app_env=(QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XQT_SCREENSHOT_DELAY_MS=5000)
-if ! attempt app 300 "${app_env[@]}" DYLD_PRINT_LIBRARIES=1 "XQT_SCREENSHOT=$out/app.png" "$macos/xournal-qt" \
+if ! attempt app 300 "${app_env[@]}" "XQT_SCREENSHOT=$out/app.png" "$macos/xournal-qt" \
     "$library" "$text"; then
     failures=$((failures + 1))
     # Again, with Qt saying which plugins it looks for and why they do not load.
@@ -177,18 +159,6 @@ if ! attempt app 300 "${app_env[@]}" DYLD_PRINT_LIBRARIES=1 "XQT_SCREENSHOT=$out
     tail -n 300 "$out/app-plugins.log"
 fi
 expect_file app "$out/app.png"
-
-printf '\n=== Libraries the app loaded from outside the bundle\n'
-foreign=$(grep -E "^dyld\[[0-9]+\]: <[^>]*> ($brew_prefix|/opt/|/usr/local/)|^dyld\[[0-9]+\]: ($brew_prefix|/opt/|/usr/local/)" \
-    "$out/app.log" | sed -E 's/^dyld\[[0-9]+\]: (<[^>]*> )?//' | sort -u)
-if [[ -n "$foreign" ]]; then
-    while IFS= read -r lib; do
-        echo "::warning::the app loaded $lib (from Homebrew, not from the bundle)"
-    done <<< "$foreign"
-else
-    echo "none"
-fi
-echo "$(grep -c '^dyld\[' "$out/app.log") libraries loaded in all"
 
 printf '\n=== %d failure(s)\n' "$failures"
 ((failures == 0))
