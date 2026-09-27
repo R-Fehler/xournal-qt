@@ -58,10 +58,13 @@ The pen changes nothing (a 2-in-1 user writes with the pen and scrolls with a fi
 let go, never under it. The setting **Settings → Touch → Buttons sized for fingers** (`touchProfile`: auto / on /
 off) overrides it.
 
-`minTarget` is 48 with the touch profile and 40 without. So far it sizes the page sidebar's switch (Pages, Layers,
+`minTarget` is 48 with the touch profile and 40 without. It sizes the page sidebar's switch (Pages, Layers,
 Contents, Annotations), the full-screen tab bar (36 px high, arrows 48 wide), the title row and stacked buttons of
-the dialogs (below), the sidebar's arrow and the target of the tab that puts the tool bar away. The later blocks size
-their own targets with it (audit F14).
+the dialogs (below), the sidebar's arrow and the target of the tab that puts the tool bar away, and since
+qt/safe-areas-keyboard the rest of the audit's F14: the tab strip's overview, ‹ ›, + and the tabs' × (the strip grows
+to 54 px with the touch profile), the tab overview's card buttons (×, the star, the reference; the star shows on every
+card with the touch profile: no hover), the layer list's eye, ⋮ and "show all", the annotations' filter and export,
+the fuzzy and names toggles of the library and the overview, and the document search's button.
 
 ## Choices made by hand, per class
 
@@ -144,8 +147,10 @@ tiny window "full" is stored). Settings → Display → "Controls at this size" 
 
 ## Menus (`qt/adaptive-menus`)
 
-`AdaptiveMenu.qml` is the menu of the app's main menus: ⋮, the library menu, the card menus of the home screen (and
-the page-with-hits menu of a card), the tab menu and the layout menu. `PageMenu.qml` (the page menu of the sidebar
+`AdaptiveMenu.qml` is the menu of the app's menus: ⋮, the library menu, the card menus of the home screen (and
+the page-with-hits menu of a card), the tab menu and the layout menu; since qt/safe-areas-keyboard also the layer menu,
+the annotations' filter, a bookmark's and a chapter's menu in the sidebar, the look-up menu, the table editor's cell
+menu and the pen pill's color menu (every menu of the app now). `PageMenu.qml` (the page menu of the sidebar
 and the page grid, a popup of icons) follows the same rules.
 
 - **Desktop and tablet classes**: a `Menu`
@@ -159,9 +164,9 @@ and the page grid, a popup of icons) follows the same rules.
 - **Phone classes** (the layout class is phone portrait, phone short or tiny; "Adapt the layout" off keeps the menus):
   the menu itself stays closed and **`MenuSheet.qml`** shows its entries, one sheet per window (`menuSheet` in
   `Main.qml`):
-  - a bottom sheet, as wide as the window (at most 640 px, centred), at most 85 % of the window high (the rest
-    scrolls), above the bottom safe area (`win.safeBottom`, set by `main.cpp` from the window's safe area margins on
-    Qt 6.9+);
+  - a bottom sheet, as wide as the safe area (at most 640 px, centred in it), at most 85 % of the window high (the
+    rest scrolls), its last row above the bottom safe area (`win.safeBottom`); while the soft keyboard is open it
+    rests on the keyboard (below, "Safe areas and the soft keyboard");
   - rows of at least 48 px; a check mark for a checked choice, an arrow for a submenu;
   - **a submenu drills in**: the sheet shows its entries, with a back arrow and its title (and deeper: View → Tool
     bar position). A menu with a `title` (the tab menu: the tab's name; a card's menu: the file's name) shows it on
@@ -180,7 +185,8 @@ How a menu uses it:
 - Open it with `Popups.openAt(menu, pos)` or `menu.openMenu(pos, anchor)`, not `popup()`: only these know the sheet
   and keep it clear of its button.
 - Entries that come and go are `AdaptiveMenuItem`s with **`offered`**, not `visible`: every item of a closed menu
-  reads as invisible, and the sheet asks while the menu is closed. A separator that comes and goes gets a `property
+  reads as invisible, and the sheet asks while the menu is closed. An entry with a string property `detail` shows it
+  as the row's second line in the sheet (the look-up menu's web addresses). A separator that comes and goes gets a `property
   bool offered` too. A submenu is an `AdaptiveMenu` with a `title`, and its `offered` hides its entry.
 
 ### The ⋮ menu
@@ -402,8 +408,9 @@ the split between 20 % and 80 %; the page's share is remembered per size class (
 
 Why the split and not a full-screen sheet on a phone: the page formats as one types, and that is the point of the
 panel; a sheet would hide it. At 412×915 the page above is 412 px wide (fit to the width) and about 330 px high,
-the source below about 490 px (title, format bar, size, and the text). The soft keyboard (qt/compact-chrome) will
-cover the lower part of the source; the page stays visible above it.
+the source below about 490 px (title, format bar, size, and the text). While the soft keyboard is open the panel ends
+above it (the split applies to the room above the keyboard), its format bar moves to the panel's bottom, right above
+the keyboard, and the text keeps its cursor in view; the page stays visible above it.
 
 ### The reference split
 
@@ -430,15 +437,15 @@ A text document's merged bar (» and ⋮ at its end): all buttons at 1024 px and
 at 720 (a 2-in-1 upright), scrolling at 600.
 
 The marks and the lists always stay in the row. On a phone the row scrolls sideways (the norm of mobile editors), with
-fading edges where there is more (`formatBarFadeLeft`, `formatBarFadeRight`); docking it above the soft keyboard is
-qt/compact-chrome's. The level buttons are 40 px wide in the touch profile (F7.4); a finger held on any button shows
+fading edges where there is more (`formatBarFadeLeft`, `formatBarFadeRight`); while the soft keyboard is open for the
+page's Markdown it docks right above the keyboard (below, "The soft keyboard"). The level buttons are 40 px wide in the touch profile (F7.4); a finger held on any button shows
 its name. The panel's own bar (beside or below the page) follows the same rules for its own width.
 
 ### What the later blocks can use
 
-`win.sourceAtBottom` and `win.sourceBottomHeight` (the panel's place; a keyboard can shrink it), `win.drawerWidth`,
-`viewPill.compact`, `MarkdownFormatBar.phone` (its scrolling form, the one to dock above the keyboard),
-`win.clearOfPills` (for pills that float over the page). The phone chrome (below) took the drawer's width and the
+`win.sourceAtBottom` and `win.sourceBottomHeight` (the panel's place; the keyboard shrinks the room it is taken
+from), `win.drawerWidth`, `viewPill.compact`, `MarkdownFormatBar.phone` (its scrolling form, the one docked above the
+keyboard), `win.clearOfPills` (for pills that float over the page). The phone chrome (below) took the drawer's width and the
 format bar as they are; its dock is a bar of its own (the page ends above it), so no pill needs to go above it.
 
 ## Dialogs and sheets: `AdaptiveDialog` (qt/adaptive-dialogs)
@@ -566,9 +573,10 @@ Select all and, on Recent, Remove from list), icons above their words, as Androi
 - On a phone it opens from the tab dots of the compact chrome (a tap between their arrows; with more than 12 documents
   the count "3 / 14" is there instead) and from the tab strip's overview button.
 
-**Labels without hover**: the icon buttons of the home screen are `IconButton`s, which get the long-press label of
-`qt/adaptive-toolbar` when it is merged (their `tip` until they have a `label`). The home screen's own buttons (the
-switch's icons and ★, ▾, the floating "+") show their word while a finger is held on them.
+**Labels without hover**: the icon buttons of the home screen are `IconButton`s with a short `label` (New, Import,
+View, Settings, Sort, Up, …; qt/safe-areas-keyboard) that a held finger shows; the longer `tip` stays for the mouse.
+The home screen's own buttons (the switch's icons and ★, ▾, the floating "+") show their word while a finger is held
+on them.
 
 ## The phone chrome (qt/phone-chrome)
 
@@ -647,10 +655,61 @@ the top, every size; `crumbBar.needed`), unless it shows the library importing o
 once (the foundation's jump rule); the phone chrome and the tablet's layout switch cleanly, and the choices of each
 class are kept apart.
 
-Hooks for qt/safe-areas-keyboard: the app bar takes `safeTop`, the dock `safeBottom` (at the bottom and at the rail's
-end); a left or right cut-out (`safeInsets` on all edges) would go into the rail's side and the app bar's ends. The
-dock is the footer of the window: a soft keyboard can hide it (or dock the format bar above the keyboard in its
-place) without moving anything over the page. The remaining small targets (F14) and the plain menus are that block's.
+The safe areas and the soft keyboard (qt/safe-areas-keyboard, below): the app bar takes `safeTop` and the side insets
+at its ends, the dock `safeBottom` (at the bottom and at the rail's end) and the side insets (the rail the right one).
+While the soft keyboard is open the dock goes and, on a phone, the format bar takes its place right above the
+keyboard.
+
+## Safe areas and the soft keyboard (qt/safe-areas-keyboard)
+
+The window is drawn edge to edge on Android 15+ (and on iOS): the status bar lies over its top, the navigation or
+gesture bar over its bottom, and a camera cut-out over a side when a phone is held sideways (audit D11, D12, F15).
+
+### Safe areas
+
+`win.safeInsets` (`top`, `right`, `bottom`, `left`; `win.safeTop`, `safeRight`, `safeBottom`, `safeLeft` are its
+aliases): set by `main.cpp` for every window (also a tab's window of its own) from `QWindow::safeAreaMargins()` on Qt
+6.9+, and again when they change (turned, folded, unfolded); 0 with the desktop's Qt 6.7. `XQT_SAFE_AREA="t,r,b,l"`
+sets them by hand (to look at a phone's insets on the desktop); the tests set the properties.
+
+**The pages go on under the bars** (edge to edge); only the controls keep clear. Where the controls over the pages may
+go, in the content item's coordinates (the area between the header and the footer): `win.controlsLeft`,
+`controlsRight`, `controlsTop`, `controlsBottom` (the last also above the keyboard), and over the canvas
+`win.canvasControlsLeft/Right/Top/Bottom`. `win.contentBottomInset` is how much of the content item lies under the
+bottom inset (0 where a footer took it: the dock, two tool rows at the bottom, the keyboard's room).
+
+| Edge | What keeps clear |
+| --- | --- |
+| top | the app bar (`topInset`), the tab strip, the tab dots and the tool square of the compact chrome, the search bar, the geometry pill, full-screen sheets and dialogs, Settings, the tab overview |
+| bottom | the dock, two tool rows at the bottom, the view pill, the back / forward pill, the note of a file shown read-only, the selection and note pills, the snackbar (in the document and on the home screen), the page grid's and the contents' pills, the reference's pill, the canvas's scroll bars, the presenting corner field and page number, the drawer's lists, the Markdown source's text, bottom sheets (menus, palette, widths, page menu, emoji, the reference's page field), dialogs, Settings, the tab overview, the home screen's "+" and selection bar |
+| left / right | the app bar's and the tab strip's ends, the tool bar (and a rail: it grows by the inset), the dock's rail (the right inset) and its row, the drawer (beside a left cut-out, `sidebarLeftFill` has its color under it), the sidebar's arrow, the pen pill, the tool square, the view pill, the scroll bars, the Markdown source beside the page, the format bar's row, the home screen (its color under the insets), the sheets (as wide as the safe area, centred in it), dialogs, Settings, the tab overview |
+
+Bottom sheets take their place from `win.sheetWidth`, `sheetX`, `sheetBottom` (the keyboard's top while it is open,
+else the window's bottom) and `sheetBottomPadding` (the room for the navigation bar under their last row);
+`MenuSheet` and `BottomSheet` compute the same.
+
+### The soft keyboard
+
+`win.keyboardTop` (the keyboard's top in the window; the window's height while it is closed), `keyboardHeight` and
+`keyboardOpen`, from `Qt.inputMethod.keyboardRectangle` (Android reports it in the screen's pixels: divided by the
+device pixel ratio; the logic `NewDocumentDialog` had). Where the platform makes the window smaller instead, the
+keyboard lies below the window and nothing changes. `win.fakeKeyboardHeight` (tests; `XQT_FAKE_KEYBOARD=<height>`)
+puts a keyboard of that height at the bottom.
+
+- **The footer makes room for it** (`bottomPadding: keyboardHeight`), as Android's `adjustResize` would: the pages,
+  the Markdown source, the pills, the home screen and the snackbar end above the keyboard. AdaptiveDialog, Settings,
+  the sheets and the menus (the desktop menus' bottom margin) keep above it.
+- **The dock goes** while it is open (`dockShown`), also the rail held sideways: the format bar takes its place.
+- **The format bar docks right above the keyboard** on a phone (`win.phoneLayout`) while it is open and the page's
+  Markdown (in place, a text box, a text document) has the keys (`formatBar.docked`: it moves into the footer), as
+  Obsidian, iA Writer and Google Docs have it. The source panel's bar moves to the panel's bottom
+  (`MarkdownPanel.barDocked`), right above the keyboard too. On a tablet the bar stays at the top.
+- **The text cursor stays in view.** The canvas scrolls it into view when the canvas becomes shorter (the keyboard
+  came: `DocumentCanvasItem::geometryChange`), after each key and each input method event (`showTextCursor()`,
+  `CanvasView::scrollToTextCursor`; the Markdown editor followed its cursor already, an ordinary text did not). The
+  source panel's text scrolls its cursor into view when its view becomes shorter (`MarkdownPanel.showCursor`).
+- The emoji picker's search does not take the keys when it opens as a sheet (that would open the keyboard over the
+  emoji); a tap on it does.
 
 ## The collapse ladder (what the later blocks build)
 
@@ -768,6 +827,16 @@ so they are not size classes either:
   top; the Fold 7 folded and unfolded (900 × 1000 and 960 × 1392 keep two tool rows). In the checks at the five sizes
   and the full walk, `checkPhoneChrome` replaces the tool bar's checks in the phone classes. `Tabs.theOrderOfUse`
   (label `shell`): the order of use.
+- Safe areas and the soft keyboard (qt/safe-areas-keyboard), `SafeAreasKeyboardTest.*` (label `ui`, about 25 s):
+  `controlsStayOutOfTheSafeArea` (insets of 32 at the top and 24 at the bottom, and a 40 px cut-out at the left held
+  sideways, at 412 × 915, 915 × 412 and 900 × 1000: no control of the app bar, the tab strip, the tool bar, the dock,
+  the pills, the scroll bars, the drawer, ⋮ (sheet or menu), a dialog, the page grid's pill, the compact chrome and
+  the snackbar in them; the page edge to edge), `theFormatBarDocksAboveTheKeyboardAndTheCursorStaysInView` (a fake
+  keyboard of 360 px: the dock gone, the bar right above the keyboard, the cursor above it while 30 lines are typed
+  and when the keyboard comes, the snackbar, ⋮'s sheet and a dialog above it),
+  `theSourcePanelsFormatBarAndCursorWithTheKeyboard`, `touchTargetsOfTheTabStripTheOverviewAndTheSidebar`,
+  `theRemainingMenusAreSheetsOnAPhone`, `theHomeScreensIconButtonsHaveShortLabels`.
+  `XQT_SAFE_AREA_SHOTS=<folder>` saves pictures of them with the insets drawn as red bands and the keyboard grey.
 - `SettingsModelTest.layoutChoicesPerSizeClass` (label `shell`): the storage.
 - The audit's own walk (`XQT_UI_AUDIT`, pictures and `report.tsv`, now with the class) shares the walker
   (`qt/tests/ui/LayoutWalk.h`). Its screens `allTools`, `recentTabs` and `dockPages` show the phone chrome's sheets;

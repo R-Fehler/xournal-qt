@@ -26,8 +26,9 @@ keyboard. Mobile UI work waits until mobile testing is a real concern. Items are
 A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translation; see [android.md](android.md)).
 
 - Done (`qt/android-basics`): **edge-to-edge**: the tab strip starts below the status bar (the window's safe area
-  margin, `Main.qml` `safeTop`; the New document dialog keeps below it too). Only the top is handled: the bottom
-  gesture bar and a side cut-out in landscape still overlap the canvas edge (harmless so far).
+  margin, `Main.qml` `safeTop`; the New document dialog keeps below it too). Done (`qt/safe-areas-keyboard`): all four
+  edges (the gesture bar, a side cut-out in landscape): the controls keep clear, the page is drawn under them
+  (adaptive-layout.md, "Safe areas and the soft keyboard"). Not checked on the Fold 7 yet (device checklist).
 - Done: **missing symbols**: the tab close button and the sidebar's page menu button are the SVG icons now (as on
   the desktop), and a small symbol font (a DejaVu Sans subset, `qt/resources/fonts`) is Qt's fallback on Android
   for ✓ ✎ ☐ ● ⋮ ↵ and the arrows in texts. The phones have "Noto Sans Symbols" with them, but split over two
@@ -63,9 +64,12 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   side button.
 - (E) **Right click and hover** exist with a mouse (the author's first test), not with a finger: context menus
   (page menu, library cards) need a long press everywhere.
-- (E) **Keyboard shortcuts** work with a hardware keyboard. The soft keyboard covers the lower half of the screen
-  while typing in a text box or Markdown box; the manifest asks for `adjustResize`, but the canvas does not yet scroll
-  the caret into view.
+- (E) **Keyboard shortcuts** work with a hardware keyboard. Done (`qt/safe-areas-keyboard`): the **soft keyboard**
+  while typing in a text box or Markdown box: the window makes room for it (the footer, as `adjustResize` would; with
+  edge to edge Android may not resize the window; where it still does, nothing changes), the page scrolls the caret
+  into view when the keyboard comes and while typing, the dock goes and the format bar docks right above the keyboard
+  on a phone; the Markdown source panel keeps its cursor in view the same way. Not checked on the Fold 7 yet (device
+  checklist, "Safe areas and the soft keyboard").
 
 ## Files
 
@@ -107,8 +111,9 @@ A headless tablet emulator (2560×1600, Android 15, arm64 through ARM translatio
   tool dock; unfolded (900 × 1000) the tablet's layout.
 - Done (`qt/phone-chrome`): **undocked windows** make no sense on Android: no tab is dragged out of the tab strip
   and the tab menu offers no window of its own there.
-- (E) **Safe areas**: the status bar and the gesture bar overlap the window in edge-to-edge mode (target SDK 35+
-  forces edge-to-edge). Qt 6.9+ exposes `SafeArea` margins in QML; the tool bar and the bottom sheets need them.
+- Done (`qt/safe-areas-keyboard`): **safe areas**: the status bar, the gesture bar and a cut-out overlap the window in
+  edge-to-edge mode (target SDK 35+ forces edge-to-edge); `main.cpp` reads `QWindow::safeAreaMargins()` (Qt 6.9+)
+  into `win.safeInsets` for every window, and the chrome, the pills, the sheets and the dialogs keep clear of them.
 - (E) **Density**: Qt scales by the device pixel ratio; the Material style's touch targets are fine, the canvas
   zoom levels and the pen widths in pixels need checking at DPR 2.6–3.
 
