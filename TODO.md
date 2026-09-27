@@ -509,6 +509,10 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   `XQT_LOG_WINDOW=1` and look for a touch cancel, or an odd touch end, just before the resize.
 
 ### Flaky tests
+- [ ] UI tests that wait fixed times fail on GitHub's slower runners (2026-09-27, release v0.4.0:
+  `AdaptiveLayoutTest.theHomeScreensPlusAndViewMenusWork` and `menusAreSheetsOnPhones`, one per job, both pass
+  locally). CI now repeats a failed test up to twice (`--repeat until-pass:3`); harden them to wait for the state
+  (like `PhoneChromeTest` after resizes) and drop the repeat again.
 - [x] `CanvasMemoryTest.twoViewsOfOneDocumentShareTheLimit` was a real overshoot: renders a trimmed view started
   earlier landed after the trim uncounted. Fixed in `qt/two-views-memory` (2026-09-26): a trimmed view re-plans on
   every render that lands.
