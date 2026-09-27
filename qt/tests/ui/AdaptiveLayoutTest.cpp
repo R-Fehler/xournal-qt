@@ -3446,3 +3446,23 @@ TEST_F(SafeAreasKeyboardTest, theRemainingMenusAreSheetsOnAPhone) {
         EXPECT_TRUE(opened(popup, false)) << name;
     }
 }
+
+// The home screen's icon buttons have a short name, shown while a finger is held on them (IconButton's label; the
+// tip keeps the longer text for the mouse)
+TEST_F(SafeAreasKeyboardTest, theHomeScreensIconButtonsHaveShortLabels) {
+    int seen = 0;
+    std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+        if (i->inherits("QQuickToolButton") && i->property("ownHold").isValid() &&
+            !i->property("iconName").toString().isEmpty()) {
+            ++seen;
+            const QString label = i->property("label").toString();
+            EXPECT_FALSE(label.isEmpty()) << xqt::uitest::labelOf(i).toStdString() << ": a label";
+            EXPECT_LE(label.size(), 30) << xqt::uitest::labelOf(i).toStdString() << ": short";
+        }
+        for (QQuickItem* c: i->childItems()) {
+            walk(c);
+        }
+    };
+    walk(named("homeView"));
+    EXPECT_GE(seen, 10);
+}
