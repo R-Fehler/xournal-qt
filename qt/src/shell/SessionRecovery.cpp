@@ -30,6 +30,10 @@
 #endif
 #include <windows.h>
 #endif
+#ifdef __APPLE__
+#include <libproc.h>    // proc_name
+#include <sys/param.h>  // MAXCOMLEN
+#endif
 
 namespace xqt {
 
@@ -284,6 +288,13 @@ bool SessionRecovery::processAlive(qint64 pid) {
     }
     const std::string name =
             QFileInfo(QString::fromWCharArray(image.data(), static_cast<qsizetype>(size))).fileName().toStdString();
+#elif defined(__APPLE__)
+    // (no /proc on macOS: the kernel's name of the process, the first 16 bytes of the program's file name)
+    std::array<char, 2 * MAXCOMLEN + 1> buffer{};
+    if (proc_name(static_cast<int>(pid), buffer.data(), static_cast<uint32_t>(buffer.size())) <= 0) {
+        return false;
+    }
+    const std::string name(buffer.data());
 #else
     std::ifstream comm("/proc/" + std::to_string(pid) + "/comm");
     std::string name;
