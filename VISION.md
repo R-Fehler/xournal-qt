@@ -30,7 +30,7 @@ Qt 6 / Qt Quick frontend: tabs, libraries of documents, and touch-first controls
   Files the app cannot handle open in the system's app.
 - The cache stays small and out of the way: one hidden folder per folder, easy to remove, or kept in the app's
   cache so synced folders stay clean.
-
+- opening documents from the file browser open up as a new tab and ask the user whether they want to import the file (copy to the library, then view/edit) or just edit in place. This is meant for ephemeral quick edits of PDFs somewhere. 
 ### Markdown as a first-class document
 - Markdown boxes inside `.xopp` pages (exists) and plain `.md` files as documents of their own.
 - A good Markdown editor: an infinite canvas, with a paginated view for printing and PDF export.
