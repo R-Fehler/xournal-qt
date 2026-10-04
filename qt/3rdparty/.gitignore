@@ -1,0 +1,6 @@
+# Global ignore files often ignore lib/, src/, env/ and similar names: vendored sources must stay tracked (AGENTS.md
+# rule 7).
+!libogg/
+!libogg/**
+!libvorbis/
+!libvorbis/**

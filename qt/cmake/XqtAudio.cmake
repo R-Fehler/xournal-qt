@@ -1,0 +1,58 @@
+# Audio recordings (qt/docs/audio.md): the Ogg Vorbis codec, vendored (qt/3rdparty/libogg, qt/3rdparty/libvorbis),
+# so recordings are written and read the same way on every platform, with no system library and no FFmpeg.
+
+# --- libogg 1.3.6 -----------------------------------------------------------------------------------------------------
+set(XQT_OGG_DIR "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libogg")
+# Its config_types.h, as its own CMakeLists.txt makes it (the C99 fixed-size types)
+set(INCLUDE_INTTYPES_H 1)
+set(INCLUDE_STDINT_H 1)
+set(INCLUDE_SYS_TYPES_H 1)
+set(SIZE16 int16_t)
+set(USIZE16 uint16_t)
+set(SIZE32 int32_t)
+set(USIZE32 uint32_t)
+set(SIZE64 int64_t)
+set(USIZE64 uint64_t)
+configure_file("${XQT_OGG_DIR}/include/ogg/config_types.h.in" "${CMAKE_CURRENT_BINARY_DIR}/libogg/ogg/config_types.h" @ONLY)
+add_library(xqt-ogg STATIC
+    ${XQT_OGG_DIR}/src/bitwise.c
+    ${XQT_OGG_DIR}/src/framing.c)
+target_include_directories(xqt-ogg PUBLIC "${XQT_OGG_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/libogg")
+
+# --- libvorbis 1.3.7: the codec, the encoder (vorbisenc) and the file reader (vorbisfile) in one library -------------
+set(XQT_VORBIS_DIR "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libvorbis")
+add_library(xqt-vorbis STATIC
+    ${XQT_VORBIS_DIR}/lib/mdct.c
+    ${XQT_VORBIS_DIR}/lib/smallft.c
+    ${XQT_VORBIS_DIR}/lib/block.c
+    ${XQT_VORBIS_DIR}/lib/envelope.c
+    ${XQT_VORBIS_DIR}/lib/window.c
+    ${XQT_VORBIS_DIR}/lib/lsp.c
+    ${XQT_VORBIS_DIR}/lib/lpc.c
+    ${XQT_VORBIS_DIR}/lib/analysis.c
+    ${XQT_VORBIS_DIR}/lib/synthesis.c
+    ${XQT_VORBIS_DIR}/lib/psy.c
+    ${XQT_VORBIS_DIR}/lib/info.c
+    ${XQT_VORBIS_DIR}/lib/floor1.c
+    ${XQT_VORBIS_DIR}/lib/floor0.c
+    ${XQT_VORBIS_DIR}/lib/res0.c
+    ${XQT_VORBIS_DIR}/lib/mapping0.c
+    ${XQT_VORBIS_DIR}/lib/registry.c
+    ${XQT_VORBIS_DIR}/lib/codebook.c
+    ${XQT_VORBIS_DIR}/lib/sharedbook.c
+    ${XQT_VORBIS_DIR}/lib/lookup.c
+    ${XQT_VORBIS_DIR}/lib/bitrate.c
+    ${XQT_VORBIS_DIR}/lib/vorbisenc.c
+    ${XQT_VORBIS_DIR}/lib/vorbisfile.c)
+target_include_directories(xqt-vorbis PUBLIC "${XQT_VORBIS_DIR}/include" PRIVATE "${XQT_VORBIS_DIR}/lib")
+target_link_libraries(xqt-vorbis PUBLIC xqt-ogg)
+if(NOT WIN32 AND NOT APPLE)
+    target_link_libraries(xqt-vorbis PRIVATE m)
+endif()
+foreach(_xqt_codec xqt-ogg xqt-vorbis)
+    set_target_properties(${_xqt_codec} PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF POSITION_INDEPENDENT_CODE ON
+        C_STANDARD 99)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${_xqt_codec} PRIVATE -w)  # (third-party code: its warnings are not ours)
+    endif()
+endforeach()
