@@ -2847,6 +2847,9 @@ letter words only where the recogniser is sure.
       are back in ⋮.
 - [ ] A `.md` document at 1366: undo and redo at the start of the format bar, search, full screen, save before »;
       narrower: the inserts fold first, then the other commands go into », then the headings, then search and save.
+- [ ] ⋮ → View → Read: no tools, the pen scrolls (no ink), PDF text can be selected and copied; the reading pill at the
+      bottom fades after 2 s and comes back when scrolling; sideways and "Pages / Free" work (up and down: a fling
+      comes to rest on a page top with "Pages"); Esc and ✕ leave reading.
 - [ ] Settings → Pen → Tools: "Classic tool bar" brings back the old bar, pen pill and tool square; "My toolbox" brings
       the toolbox back; "Back to the first tools…" resets it.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser

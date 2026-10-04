@@ -232,6 +232,12 @@ ApplicationWindow {
     /// Nothing over the page but the page: presenting without controls, or the reader chrome
     readonly property bool hudHidden: cleanPage || (chromeMode === "reader" && !app.homeVisible)
     onHudHiddenChanged: if (hudHidden) { quickTools.close(); phoneToolSheet.close() }
+    /// Reading (qt/docs/toolbox.md, "Reading and presenting"): the reader chrome of this size class (⋮ → View → Read;
+    /// automatic in a tiny window) - the page only, and the page cannot be written on: the pen and the fingers scroll,
+    /// PDF text can still be selected, copied and looked up, no ink by accident. The reading pill shows the page and how
+    /// it scrolls. Esc, the pill's ✕ or the corner field leave it. (Presenting is the other mode over the same "tools
+    /// hidden" view: writing on the slides stays possible there.)
+    readonly property bool reading: chromeMode === "reader" && !app.homeVisible && !app.presenting
     function chooseChrome(mode) { chooseLayout("chrome", mode === chromeAuto ? "" : mode) }
 
     // --- the phone chrome (qt/docs/adaptive-layout.md, "The phone chrome") -------------------------------------------
@@ -1508,7 +1514,7 @@ ApplicationWindow {
                         AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
                         // The reader chrome of this window size: only the page; the mark in the lower left corner
                         // brings the controls back (qt/docs/adaptive-layout.md)
-                        AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page)"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: win.chooseChrome("reader") }
+                        AdaptiveMenuItem { objectName: "readItem"; text: qsTr("Read (only the page, no ink)"); icon.source: app.iconUrl("xqt-book-open"); onTriggered: win.chooseChrome("reader") }
                         MenuSeparator {}
                         // Where the tool bar is, in this size class (the automatic place: "Automatic"); the phone
                         // classes have their dock instead
@@ -2232,6 +2238,8 @@ ApplicationWindow {
         height: referenceSplit.mainHeight
         clip: true  // zoomed-in pages must not paint over the sidebar
         view: app.view
+        readingOnly: win.reading
+        snapVertically: win.reading
 
         // Picture files dropped on Markdown being written (a .md, a text document, Markdown on a page): saved with
         // the document and linked at the cursor (qt/docs/md-images.md)
@@ -4180,6 +4188,155 @@ ApplicationWindow {
             if (reading) win.chooseChrome("full")
             else win.presentClean = !win.presentClean
         }
+    }
+    // Reading (qt/docs/toolbox.md): the page number (all pages), ‹ ›, up and down or sideways, whole pages or free,
+    // the width or the whole page, ✕ (back to the tools). It fades 2 s after the last scroll or touch, and comes back
+    // when the view moves, the page changes or the pointer comes near.
+    Item {  // (the pointer near the bottom of the page wakes it; presses go through to the page)
+        visible: readingPill.visible
+        z: 89
+        x: canvas.x
+        width: canvas.width
+        y: win.canvasControlsBottom - 140
+        height: 140
+        HoverHandler { onHoveredChanged: if (hovered) readingPill.wake() }
+    }
+    Pane {
+        id: readingPill
+        objectName: "readingPill"
+        visible: win.reading && !pageGrid.visible && !contentsOverview.visible
+        z: 90
+        x: Math.round(canvas.x + (canvas.width - width) / 2)
+        y: win.canvasControlsBottom - height - 24
+        padding: 2
+        leftPadding: 8
+        rightPadding: 4
+        Material.foreground: "#303030"
+        /// Shown (it fades out 2 s after the last scroll or touch)
+        property bool awake: true
+        opacity: awake ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 250 } }
+        function wake() {
+            awake = true
+            fadeTimer.restart()
+        }
+        Timer {
+            id: fadeTimer
+            interval: 2000
+            onTriggered: if (!pillHover.hovered) readingPill.awake = false
+        }
+        HoverHandler { id: pillHover; onHoveredChanged: hovered ? readingPill.wake() : fadeTimer.restart() }
+        onVisibleChanged: if (visible) wake()
+        Connections {
+            target: app
+            enabled: readingPill.visible
+            function onPageChanged() { readingPill.wake() }
+        }
+        Connections {
+            target: canvas
+            enabled: readingPill.visible
+            function onViewportChanged() { readingPill.wake() }
+        }
+        background: Rectangle {
+            radius: height / 2
+            color: "#f2fafafa"
+            border.width: 1
+            border.color: "#40000000"
+        }
+        RowLayout {
+            spacing: 0
+            ToolButton {
+                objectName: "readingPageButton"
+                focusPolicy: Qt.NoFocus
+                text: app.pageNumber + " / " + app.pageCount
+                font.pixelSize: 14
+                Accessible.name: qsTr("All pages")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("All pages")
+                ToolTip.delay: 600
+                onClicked: pageGrid.open()
+            }
+            IconButton {
+                objectName: "readingPreviousButton"
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                iconName: "xqt-chevron-left"
+                tip: qsTr("Previous page")
+                enabled: app.pageNumber > 1
+                onClicked: { readingPill.wake(); app.previousPage() }
+            }
+            IconButton {
+                objectName: "readingNextButton"
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                iconName: "xqt-chevron-right"
+                tip: qsTr("Next page")
+                enabled: app.pageNumber < app.pageCount
+                onClicked: { readingPill.wake(); app.nextPage() }
+            }
+            ToolSeparator {}
+            // Up and down, or sideways
+            IconButton {
+                objectName: "readingSidewaysButton"
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                iconName: app.horizontalScrolling ? "xqt-chevron-right" : "xqt-chevron-down"
+                label: app.horizontalScrolling ? qsTr("Sideways") : qsTr("Up and down")
+                tip: app.horizontalScrolling ? qsTr("Scrolling sideways (tap: up and down)") : qsTr("Scrolling up and down (tap: sideways)")
+                onClicked: { readingPill.wake(); app.horizontalScrolling = !app.horizontalScrolling }
+            }
+            // Whole pages, or free with momentum
+            ToolButton {
+                objectName: "readingSnapButton"
+                focusPolicy: Qt.NoFocus
+                text: app.snapPages ? qsTr("Pages") : qsTr("Free")
+                font.pixelSize: 13
+                checkable: false
+                ToolTip.visible: hovered
+                ToolTip.text: app.snapPages ? qsTr("Comes to rest on whole pages (tap: scrolls freely)")
+                                            : qsTr("Scrolls freely, with momentum (tap: whole pages)")
+                ToolTip.delay: 600
+                onClicked: { readingPill.wake(); app.snapPages = !app.snapPages }
+            }
+            // The width, or the whole page
+            IconButton {
+                objectName: "readingFitButton"
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                property bool whole: false
+                iconName: whole ? "xqt-page-single" : "xqt-scaling"
+                label: whole ? qsTr("Whole page") : qsTr("Page width")
+                tip: whole ? qsTr("The whole page (tap: the width)") : qsTr("The width of the page (tap: the whole page)")
+                onClicked: {
+                    readingPill.wake()
+                    whole = !whole
+                    whole ? app.fitPage() : app.fitWidth()
+                }
+            }
+            ToolSeparator {}
+            IconButton {
+                objectName: "readingCloseButton"
+                implicitWidth: 40; implicitHeight: 40
+                icon.width: 20; icon.height: 20
+                iconName: "xqt-close"
+                label: qsTr("Stop reading")
+                tip: qsTr("Stop reading: the tools again (Esc)")
+                onClicked: win.chooseChrome("full")
+            }
+        }
+        // Faded: a touch on it only shows it again (no button is pressed blindly)
+        MouseArea {
+            anchors.fill: parent
+            visible: !readingPill.awake
+            onPressed: readingPill.wake()
+        }
+    }
+    // Esc leaves reading (a selection first loses its selection)
+    Shortcut {
+        sequence: "Escape"
+        enabled: win.reading && !app.hasSelection && !app.pdfTextIsSelected && !win.sidebarDrawerOpen
+                 && !app.curtainHandles && app.snip === "" && !win.fullScreenMode
+        onActivated: win.chooseChrome("full")
     }
     // Digits typed while the page is at hand: go to that page (Enter)
     PageJump {

@@ -710,3 +710,49 @@ TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
     until([&] { return !inside(find("searchButton"), commands); });
     EXPECT_FALSE(shown(find("searchButton")) && inside(find("searchButton"), commands)) << "in \"more tools\" at 720";
 }
+
+TEST_F(ToolboxTest, readingIsReadOnlyWithItsPillAndEscLeavesIt) {
+    controller->applyToolEntry(nth("pen"));
+    auto* canvas = find("canvas");
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "reader"));
+    until([&] { return win("reading").toBool(); });
+    ASSERT_TRUE(win("reading").toBool());
+    EXPECT_TRUE(canvas->property("readingOnly").toBool());
+    EXPECT_TRUE(canvas->property("snapVertically").toBool());
+    EXPECT_FALSE(shown(find("toolbox")));
+    EXPECT_FALSE(shown(find("topTools")));
+    auto* pill = find("readingPill");
+    ASSERT_TRUE(shown(pill));
+    EXPECT_TRUE(shown(find("readingSnapButton")));
+    // The pen writes nothing (it scrolls)
+    const size_t before = [&] {
+        auto* page = controller->tabManager().currentSession()->getDocument()->getPage(0).get();
+        return page->getSelectedLayer()->getElements().size();
+    }();
+    const QPoint a = rectOf(canvas).center().toPoint();
+    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, a);
+    for (int k = 1; k <= 6; ++k) {
+        QTest::mouseMove(window, a + QPoint(10 * k, 8 * k));
+        wait(10);
+    }
+    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, a + QPoint(60, 48));
+    wait(100);
+    auto* page = controller->tabManager().currentSession()->getDocument()->getPage(0).get();
+    EXPECT_EQ(page->getSelectedLayer()->getElements().size(), before) << "no ink by accident";
+    // It fades after 2 s
+    until([&] { return pill->opacity() < 0.01; }, 4000);
+    EXPECT_LT(pill->opacity(), 0.01);
+    // Sideways from the pill
+    QMetaObject::invokeMethod(pill, "wake");
+    until([&] { return pill->opacity() > 0.99; });
+    click(find("readingSidewaysButton"));
+    until([&] { return controller->horizontalScrolling(); });
+    EXPECT_TRUE(controller->horizontalScrolling());
+    controller->setHorizontalScrolling(false);
+    // Esc: the tools again
+    QTest::keyClick(window, Qt::Key_Escape);
+    until([&] { return !win("reading").toBool(); });
+    EXPECT_FALSE(win("reading").toBool());
+    EXPECT_FALSE(canvas->property("readingOnly").toBool());
+    EXPECT_TRUE(shown(find("toolbox")));
+}
