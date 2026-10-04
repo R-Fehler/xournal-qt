@@ -5,7 +5,7 @@
  */
 #include <clocale>
 
-#include <QCoreApplication>
+#include <QGuiApplication>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
     qputenv("XDG_CACHE_HOME", (home.path() + "/cache").toUtf8());
     qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
     qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());
-    QCoreApplication app(argc, argv);
+    QGuiApplication app(argc, argv);
     setlocale(LC_NUMERIC, "C");
     xqt::AppContext::installQtUiThreadDispatcher();
     ::testing::InitGoogleTest(&argc, argv);

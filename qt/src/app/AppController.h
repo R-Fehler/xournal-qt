@@ -38,9 +38,14 @@
 class QQuickTextDocument;
 class QWindow;
 
+namespace xqt::hwr {
+class HandwritingSearch;
+}
+
 namespace xqt {
 class AppContext;
 class Citations;
+class LibraryInkJob;
 class CanvasView;
 class LibraryArchive;
 class LibraryBookmarksModel;
@@ -1344,6 +1349,15 @@ private:
     AppController* primary = nullptr;  ///< the main window's controller (nullptr: this is the main window)
     bool windowGone = false;           ///< its window was closed (it is on its way out)
     std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
+    /// The handwriting search (the main window's, shared by the others; before `tabs`: goes after the documents)
+    std::unique_ptr<xqt::hwr::HandwritingSearch> ownHandwriting;
+    xqt::hwr::HandwritingSearch* handwriting = nullptr;
+    /// Reads the handwriting of the rest of the library (the main window's)
+    std::unique_ptr<xqt::LibraryInkJob> libraryInk;
+    /// The open documents of this window to the handwriting search
+    void syncHandwriting();
+    /// The handwriting read in a saved document, to the library's cache
+    void handOverHandwriting(xqt::DocumentSession& s);
     std::unique_ptr<xqt::TabManager> tabs;
     std::unique_ptr<xqt::ReferenceMode> referenceMode;  ///< (after `tabs`, reset before it)
     std::unique_ptr<xqt::Citations> citations;

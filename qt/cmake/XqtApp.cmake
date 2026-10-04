@@ -57,6 +57,10 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/GridSelection.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryCache.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/InkTextStore.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/InkTextStore.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryInkJob.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryInkJob.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h
@@ -113,7 +117,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
-target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas)
+target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas xqt-hwr)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
 # "Show in file manager" on Linux: org.freedesktop.FileManager1 over D-Bus, when Qt has D-Bus (not on Android; Qt
 # on Windows and macOS has D-Bus too, but the file manager is reached another way there, see SystemApps.cpp)

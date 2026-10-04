@@ -1,5 +1,8 @@
 #include "AppController.h"
 
+#include "hwr/HandwritingSearch.h"
+#include "shell/LibraryInkJob.h"
+
 #include <utility>
 
 #include <QPointer>
@@ -162,6 +165,8 @@ AppController::AppController(QObject* parent): QObject(parent) {
     settingsView = ownSettingsView.get();
     ownShortcuts = std::make_unique<ShortcutsModel>(*app->getSettings());
     shortcuts = ownShortcuts.get();
+    ownHandwriting = std::make_unique<hwr::HandwritingSearch>(*app);
+    handwriting = ownHandwriting.get();
     makeTabs();
     ownLibrary = std::make_unique<LibraryModel>();
     library = ownLibrary.get();
@@ -173,6 +178,34 @@ AppController::AppController(QObject* parent): QObject(parent) {
     DocumentTextIndex::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& pdf) {
         LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
         return index ? index->knownPdfText(pdf) : std::map<int, QString>();
+    });
+    // ... and the handwriting it read before (opening a document reads none of it again)
+    hwr::HandwritingSearch::setSeeder([lib = QPointer<LibraryModel>(library)](const fs::path& file,
+                                                                              const QString& recognizer) {
+        hwr::HandwritingSearch::LineResults out;
+        LibraryIndex* index = lib ? lib->searchIndex() : nullptr;
+        if (auto doc = index ? index->inkOf(file) : nullptr; doc && doc->recognizer == recognizer) {
+            for (const auto& page: doc->pages) {
+                for (const hwr::LineRef& l: page) {
+                    if (l.result) {
+                        out.emplace_back(l.hash, l.result);
+                    }
+                }
+            }
+        }
+        return out;
+    });
+    // The library's handwriting: read in the background while the search is on (and on mains power)
+    libraryInk = std::make_unique<LibraryInkJob>(handwriting->service());
+    libraryInk->setIndex(library->searchIndex());
+    libraryInk->setEnabled(handwriting->enabled());
+    connect(handwriting, &hwr::HandwritingSearch::enabledChanged, libraryInk.get(),
+            [this] { libraryInk->setEnabled(handwriting->enabled()); });
+    connect(library, &LibraryModel::indexChanged, libraryInk.get(), [this] {
+        libraryInk->setIndex(library->searchIndex());
+        if (!library->indexing()) {
+            libraryInk->check();  // (documents changed or came)
+        }
     });
     library->onFilesChanged = [this](const DocumentFiles::Result& r) { filesChanged(r); };
     // The fuzzy search's toggle is an app-wide setting (shared by all windows through the library model)
@@ -223,6 +256,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     recent = mainWindow.recent;
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     libraryBookmarks = mainWindow.libraryBookmarks;
+    handwriting = mainWindow.handwriting;
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
@@ -247,6 +281,8 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
 void AppController::makeTabs() {
     tabs = std::make_unique<TabManager>(*app);
     connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::currentTabChanged);
+    connect(tabs.get(), &TabManager::currentTabChanged, this, &AppController::syncHandwriting);
+    connect(tabs.get(), &TabManager::countChanged, this, &AppController::syncHandwriting);
     referenceMode = std::make_unique<ReferenceMode>(*tabs, app->getSettings());
     connect(referenceMode.get(), &ReferenceMode::openExternal, this, &AppController::openLink);
     connect(referenceMode.get(), &ReferenceMode::openDocumentLink, this, [this](const QString& uri, const QString& from) {
@@ -318,7 +354,23 @@ AppController::~AppController() {
     layers->setSession(nullptr);
     recovery.reset();  // unregisters the sessions from the crash handler before they go away
     referenceMode.reset();
+    if (handwriting) {
+        handwriting->setSessions(this, {}, nullptr);
+    }
     tabs.reset();
+}
+
+void AppController::syncHandwriting() {
+    if (!handwriting || !tabs) {
+        return;
+    }
+    std::vector<DocumentSession*> sessions;
+    for (int i = 0; i < tabs->count(); ++i) {
+        if (DocumentSession* s = tabs->session(i)) {
+            sessions.push_back(s);
+        }
+    }
+    handwriting->setSessions(this, sessions, tabs->currentSession());
 }
 
 namespace {
@@ -3071,6 +3123,7 @@ bool AppController::startSave(SaveWay way, const fs::path& target, std::function
                     trashOldXopp(saved, previous, saved.getFilePath());
                 }
                 afterHybridSave(saved);  // (the library index reads a hybrid PDF itself)
+                handOverHandwriting(saved);
                 if (!r.exportError.empty()) {
                     Q_EMIT message(tr("Export for Xournal++ failed"), QString::fromStdString(r.exportError), true);
                 }
@@ -3260,6 +3313,28 @@ void AppController::handOverToLibrary(DocumentSession& s) {
     if (LibraryIndex* index = library->searchIndex()) {
         index->documentSaved(s.getFilePath(), *s.getDocument(), s.search().textIndex().pdfTexts());
     }
+    handOverHandwriting(s);
+}
+
+void AppController::handOverHandwriting(DocumentSession& s) {
+    // The handwriting it read goes to the library's cache (searched there; not read again when it is opened next)
+    LibraryIndex* index = library->searchIndex();
+    hwr::InkTextIndexer* indexer = handwriting ? handwriting->indexerOf(&s) : nullptr;
+    if (!index || !indexer || !s.hasFilePath()) {
+        return;
+    }
+    const auto pages = indexer->pages();
+    if (pages.empty() || !std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.known; })) {
+        return;  // (not all read yet: the library's job reads it)
+    }
+    InkDoc doc;
+    doc.stamp = fileStamp(s.getFilePath());
+    doc.recognizer = handwriting->service().recognizerId();
+    doc.complete = std::all_of(pages.begin(), pages.end(), [](const auto& p) { return p.complete; });
+    for (const auto& p: pages) {
+        doc.pages.push_back(p.lines);
+    }
+    index->inkText().put(s.getFilePath(), std::move(doc));
 }
 
 namespace {

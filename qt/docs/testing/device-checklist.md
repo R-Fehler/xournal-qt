@@ -2531,3 +2531,21 @@ Handwritten words become searchable (never converted to text). The steps below n
 [qt/docs/handwriting-search.md](../handwriting-search.md). Matching rules (unit-tested, `xqt-hwr-tests`): readings of a
 word that the recogniser found likely take part; a word of 3+ letters is found with a typo even with Fuzzy off; 1-2
 letter words only where the recogniser is sure.
+- [ ] Settings → Search → "Search handwriting" on (with the model): open a `.xopp` with handwritten notes. After a few
+      seconds (the page in view first, then the rest), Ctrl+F for a handwritten word finds it: the box around the ink
+      word is marked; words the recogniser was unsure of are marked lighter. A typo (`kalmna` for "Kalman", 5+
+      letters) finds it with Fuzzy off.
+- [ ] Write a new word while the search bar is open: about two seconds after the pen stops, the word is found; the
+      pen never stutters while the worker reads (it waits while you write and while pages are drawn). `top` shows the
+      worker at idle priority (`ps -eLo pid,cls,comm | grep IDL`).
+- [ ] Move a line of handwriting with the lasso: it is found at once at its new place (nothing read again). Undo:
+      the same.
+- [ ] Save the document, close it, open it again: its handwriting is found at once (from the library's cache
+      `.xournal_library/ink-text.pack`), nothing is read again (no CPU).
+- [ ] The library's search (Fuzzy off and on) finds documents by their handwriting; a document found only through
+      unsure readings is listed after the others; its snippet shows the words read around the hit.
+- [ ] On mains power, the library's other `.xopp` files get read in the background (CPU at idle priority); unplug
+      the laptop: it stops within a minute; plug it in: it goes on. Without the model nothing is read and nothing
+      breaks.
+- [ ] Switch "Search handwriting" off: hits in handwriting disappear from open documents at once; the library's
+      cache stays (switching it on again needs no reading).

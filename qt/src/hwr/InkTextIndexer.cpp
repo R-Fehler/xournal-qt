@@ -32,12 +32,7 @@ InkTextIndexer::InkTextIndexer(DocumentSession& session, InkRecognitionService& 
         this->service.noteActivity();  // (the user writes: the worker waits)
         timer.start(delayMs);
     });
-    connect(&session, &DocumentSession::currentPageChanged, this, [this] {
-        for (auto& [id, o]: outstanding) {
-            Q_UNUSED(o);
-        }
-        pump();
-    });
+    connect(&session, &DocumentSession::currentPageChanged, this, [this] { pump(); });
     connect(&service, &InkRecognitionService::recognizerChanged, this, [this] {
         if (started) {
             scan();
