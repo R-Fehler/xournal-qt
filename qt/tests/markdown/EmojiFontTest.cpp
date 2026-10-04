@@ -179,7 +179,8 @@ TEST(EmojiFont, emojiAreTakenFromTheAppsColourFont) {
         EXPECT_EQ(r.family, emoji::FONT_FAMILY) << r.text;
         EXPECT_TRUE(r.color) << r.text;
         // (the app's file, not a system's font of the same name)
-        EXPECT_EQ(std::filesystem::path(r.file), std::filesystem::path(XQT_EMOJI_FONT)) << r.text;
+        // (compared as resolved paths: fontconfig may hand back ".../qt/resources/..." for ".../qt/cmake/../resources/...")
+        EXPECT_EQ(std::filesystem::weakly_canonical(r.file), std::filesystem::weakly_canonical(XQT_EMOJI_FONT)) << r.text;
     }
     EXPECT_GE(emojiRuns, 1);
     // A sequence (ZWJ, flag, skin tone, VS16) is one picture
