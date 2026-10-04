@@ -32,6 +32,8 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include "HoverPointer.h"
+
 namespace xqt {
 class AppContext;
 class CanvasInput;
@@ -146,12 +148,14 @@ public:
         int displays = 0;
     };
     GeometryShown geometryShown() const { return geometryStats; }
-    /// The pointer the canvas draws itself (tests; qt/docs/hover-cursors.md): only for a pen the platform shows no
-    /// cursor for. Shown or not, where its middle is (item coordinates) and its side (logical pixels).
+    /// The pointer the canvas draws itself (tests; qt/docs/hover-cursors.md): for a pen the platform shows no cursor
+    /// for, and an eraser too big for a cursor. Shown or not, where its middle is (item coordinates), its side (logical
+    /// pixels), and the eraser it shows (none: the dot).
     struct HoverMarkShown {
         bool visible = false;
         QPointF center;
         double side = 0;
+        std::optional<xqt::hover::EraserMark> eraser;
     };
     HoverMarkShown hoverMarkShown() const;
 
@@ -208,8 +212,9 @@ private:
     /// The tool's pointer anew (the setting, the screen's pixel ratio, ...) and whether the canvas draws it itself
     void refreshPointer();
     void applyCursor();
-    /// The mouse or the pen is over the canvas at this place (item coordinates), or not any more
-    void pointerMoved(QPointF itemPos, PointerSource source);
+    /// The mouse or the pen (its eraser end: `eraserEnd`) is over the canvas at this place (item coordinates), or not
+    /// any more
+    void pointerMoved(QPointF itemPos, PointerSource source, bool eraserEnd = false);
     void pointerGone(PointerSource source);
     /// The drawn pointer to where the pointer is (only its position changes: no page is drawn anew)
     void placeHoverMark();
@@ -247,10 +252,12 @@ private:
     PointerKind pointerKind = PointerKind::Tool;
     PointerSource pointerSource = PointerSource::Mouse;
     std::optional<QPointF> pointerPos;  ///< where the pointer of pointerSource is over the canvas
+    bool pointerEraserEnd = false;      ///< the pen hovers with its eraser end
     QCursor toolCursor{Qt::CrossCursor};
-    QString toolCursorKey;     ///< what toolCursor shows ("dot@<dpr>", "cross")
+    QString toolCursorKey;     ///< what toolCursor shows ("dot@<dpr>", "cross", "eraser:<size>:...@<dpr>")
     QString appliedCursorKey;  ///< what the item's cursor shows
     bool markWanted = false;   ///< the canvas draws the pointer (hoverMark) while it is over it
+    std::optional<xqt::hover::EraserMark> markEraser;  ///< ... the eraser's outline (none: the dot)
     HoverMarkItem* hoverMark = nullptr;
     std::optional<QCursor> windowCursorBeforePen;  ///< the window's cursor before the pen took it (showCursorForPen)
     QPointer<xqt::AppContext> pointerApp;          ///< whose settings and tools it follows

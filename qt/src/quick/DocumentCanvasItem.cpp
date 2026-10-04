@@ -23,11 +23,10 @@
 #include <QMatrix4x4>
 #include <QQmlEngine>
 #include <QNativeGestureEvent>
-#include <QPainter>
 #include <QPixmap>
-#include <QQuickPaintedItem>
 #include <QQuickWindow>
 #include <QSGClipNode>
+#include <QSGFlatColorMaterial>
 #include <QSGGeometry>
 #include <QSGSimpleRectNode>
 #include <QSGSimpleTextureNode>
@@ -269,17 +268,141 @@ std::vector<DocumentCanvasItem*>& allCanvases() {
 }
 }  // namespace
 
+namespace {
+constexpr double PI = 3.14159265358979323846;
+
+/// Triangles of a line `width` wide along the closed polygon `points`; dashed when `dash` > 0 (that long on, that
+/// long off, measured along it)
+void addStroke(std::vector<QPointF>& triangles, const std::vector<QPointF>& points, double width, double dash) {
+    const auto quad = [&](QPointF a, QPointF b, QPointF normal) {
+        triangles.insert(triangles.end(), {a + normal, a - normal, b + normal, b + normal, a - normal, b - normal});
+    };
+    double along = 0;
+    for (size_t i = 0; i < points.size(); ++i) {
+        const QPointF a = points[i], b = points[(i + 1) % points.size()];
+        const double length = std::hypot(b.x() - a.x(), b.y() - a.y());
+        if (length <= 0) {
+            continue;
+        }
+        const QPointF dir = (b - a) / length;
+        const QPointF normal(-dir.y() * width / 2, dir.x() * width / 2);
+        if (dash <= 0) {
+            quad(a - dir * (width / 2), b + dir * (width / 2), normal);  // (longer by half the width: closed corners)
+            continue;
+        }
+        for (double t = 0; t < length;) {
+            const double phase = std::fmod(along, 2 * dash);
+            const double step = std::min(phase < dash ? dash - phase : 2 * dash - phase, length - t);
+            if (phase < dash) {
+                quad(a + dir * t, a + dir * (t + step), normal);
+            }
+            t += step;
+            along += step;
+        }
+    }
+}
+
+QSGGeometryNode* trianglesNode(const std::vector<QPointF>& triangles, const QColor& color) {
+    auto* geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), static_cast<int>(triangles.size()));
+    geometry->setDrawingMode(QSGGeometry::DrawTriangles);
+    QSGGeometry::Point2D* v = geometry->vertexDataAsPoint2D();
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        v[i].set(static_cast<float>(triangles[i].x()), static_cast<float>(triangles[i].y()));
+    }
+    auto* material = new QSGFlatColorMaterial;
+    material->setColor(color);
+    auto* node = new QSGGeometryNode;
+    node->setGeometry(geometry);
+    node->setMaterial(material);
+    node->setFlags(QSGNode::OwnsGeometry | QSGNode::OwnsMaterial);
+    return node;
+}
+}  // namespace
+
 /// The pointer drawn by the canvas (qt/docs/hover-cursors.md): an item of its own over the pages, so that following
-/// the pen moves only it (a new position in the scene graph) and draws no page anew. Painted again only when what it
-/// shows changes.
-class HoverMarkItem final: public QQuickPaintedItem {
+/// the pen moves only it (a new position in the scene graph) and draws no page anew. Its nodes are made again only
+/// when what it shows changes. The dot is a small texture; the eraser's outline is geometry (no texture however big
+/// it is: a big eraser at a high zoom is thousands of pixels wide).
+class HoverMarkItem final: public QQuickItem {
 public:
-    explicit HoverMarkItem(QQuickItem* parent): QQuickPaintedItem(parent) {
-        setAntialiasing(true);
+    explicit HoverMarkItem(QQuickItem* parent): QQuickItem(parent) {
+        setFlag(ItemHasContents, true);
         setAcceptedMouseButtons(Qt::NoButton);
         setSize(QSizeF(xqt::hover::dotSide(), xqt::hover::dotSide()));
     }
-    void paint(QPainter* p) override { xqt::hover::paintDot(*p, QPointF(width() / 2, height() / 2)); }
+    /// The eraser's outline, or (none) the dot
+    void show(const std::optional<xqt::hover::EraserMark>& mark) {
+        if (mark == eraser) {
+            return;
+        }
+        eraser = mark;
+        const int side = eraser ? xqt::hover::eraserSide(*eraser) : xqt::hover::dotSide();
+        setSize(QSizeF(side, side));
+        update();
+    }
+    std::optional<xqt::hover::EraserMark> eraser;
+
+protected:
+    void itemChange(ItemChange change, const ItemChangeData& value) override {
+        if (change == ItemDevicePixelRatioHasChanged) {
+            update();  // (the dot's picture for the new pixel ratio)
+        }
+        QQuickItem::itemChange(change, value);
+    }
+    QSGNode* updatePaintNode(QSGNode* old, UpdatePaintNodeData*) override {
+        auto* root = static_cast<QSGTransformNode*>(old);
+        if (!root) {
+            root = new QSGTransformNode;  // (a transform node: see CanvasRootNode)
+        }
+        const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
+        if (root->firstChild() && builtFor == eraser && builtDpr == dpr) {
+            return root;
+        }
+        builtFor = eraser;
+        builtDpr = dpr;
+        while (QSGNode* child = root->firstChild()) {
+            root->removeChildNode(child);
+            delete child;
+        }
+        const QPointF center(width() / 2, height() / 2);
+        if (!eraser) {
+            auto* dot = new QSGSimpleTextureNode;
+            dot->setTexture(window()->createTextureFromImage(xqt::hover::dotImage(dpr)));
+            dot->setOwnsTexture(true);
+            dot->setFiltering(QSGTexture::Linear);
+            dot->setRect(QRectF(0, 0, width(), height()));
+            root->appendChildNode(dot);
+            return root;
+        }
+        // As hover::paintEraser draws it: a faint gray inside, a light halo, the gray outline (dashed: whole strokes)
+        const double r = eraser->size / 2;
+        std::vector<QPointF> outline;
+        if (eraser->round) {
+            const int n = std::clamp(static_cast<int>(std::ceil(PI * eraser->size / 3)), 24, 720);
+            for (int i = 0; i < n; ++i) {
+                const double a = 2 * PI * i / n;
+                outline.push_back(center + QPointF(r * std::cos(a), r * std::sin(a)));
+            }
+        } else {
+            outline = {center + QPointF(-r, -r), center + QPointF(r, -r), center + QPointF(r, r),
+                       center + QPointF(-r, r)};
+        }
+        std::vector<QPointF> fill;
+        for (size_t i = 0; i < outline.size(); ++i) {
+            fill.insert(fill.end(), {center, outline[i], outline[(i + 1) % outline.size()]});
+        }
+        root->appendChildNode(trianglesNode(fill, xqt::hover::ERASER_FILL));
+        std::vector<QPointF> halo, line;
+        addStroke(halo, outline, xqt::hover::HALO_WIDTH, 0);
+        addStroke(line, outline, xqt::hover::LINE_WIDTH, eraser->wholeStrokes ? xqt::hover::DASH : 0);
+        root->appendChildNode(trianglesNode(halo, xqt::hover::HALO));
+        root->appendChildNode(trianglesNode(line, xqt::hover::ERASER_LINE));
+        return root;
+    }
+
+private:
+    std::optional<xqt::hover::EraserMark> builtFor;
+    double builtDpr = 0;
 };
 
 void xqt::registerQuickTypes() {
@@ -397,13 +520,31 @@ void DocumentCanvasItem::refreshPointer() {
     const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
     const auto pointer = canvasView ? xqt::hover::pointerSetting(*canvasView->getSession().getSettings())
                                     : xqt::hover::Pointer::Dot;
+    // With the eraser (also the pen's eraser end, a side button that erases): the eraser itself, its size at this zoom.
+    // Not where nothing is erased: a document shown for reading, a text file (pen and mouse put the cursor there).
+    std::optional<xqt::hover::EraserMark> eraser;
+    if (canvasView && !canvasView->isReadingOnly() && !canvasView->textMode()) {
+        auto& session = canvasView->getSession();
+        eraser = xqt::hover::eraserMark(*session.getToolHandler(), *session.getSettings(),
+                                        pointerSource == PointerSource::Pen && pointerEraserEnd,
+                                        canvasView->getViewController().zoom());
+    }
+    const bool eraserCursor = eraser && xqt::hover::eraserFitsCursor(*eraser, dpr);
     // The tool's pointer is a cursor of the platform: the compositor moves it with the pointer, before the app sees
     // the move (a picture drawn by the app is a frame or more behind)
-    const QString key = pointer == xqt::hover::Pointer::Crosshair ? QStringLiteral("cross")
-                                                                  : QStringLiteral("dot@%1").arg(dpr);
+    const QString key = eraserCursor ? QStringLiteral("eraser:%1:%2:%3@%4")
+                                               .arg(eraser->size)
+                                               .arg(eraser->round)
+                                               .arg(eraser->wholeStrokes)
+                                               .arg(dpr)
+                        : pointer == xqt::hover::Pointer::Crosshair ? QStringLiteral("cross")
+                                                                    : QStringLiteral("dot@%1").arg(dpr);
     if (key != toolCursorKey) {
         toolCursorKey = key;
-        if (pointer == xqt::hover::Pointer::Crosshair) {
+        if (eraserCursor) {
+            const int middle = xqt::hover::eraserSide(*eraser) / 2;
+            toolCursor = QCursor(QPixmap::fromImage(xqt::hover::eraserImage(*eraser, dpr)), middle, middle);
+        } else if (pointer == xqt::hover::Pointer::Crosshair) {
             toolCursor = QCursor(Qt::CrossCursor);
         } else {
             const int middle = xqt::hover::dotSide() / 2;
@@ -411,8 +552,14 @@ void DocumentCanvasItem::refreshPointer() {
         }
         applyCursor();
     }
-    // A pen the platform shows no cursor for (Android, iOS): the canvas draws the dot where the pen is
-    markWanted = pointerSource == PointerSource::Pen && !xqt::hover::platformShowsPenCursor();
+    // A pen the platform shows no cursor for (Android, iOS): the canvas draws the dot (or the eraser) where the pen is.
+    // An eraser too big for a cursor: drawn as well, around the dot or crosshair.
+    const bool penWithoutCursor = pointerSource == PointerSource::Pen && !xqt::hover::platformShowsPenCursor();
+    markWanted = penWithoutCursor || (eraser && !eraserCursor);
+    markEraser = markWanted ? eraser : std::nullopt;
+    if (hoverMark) {
+        hoverMark->show(markEraser);
+    }
     placeHoverMark();
 }
 
@@ -433,10 +580,11 @@ void DocumentCanvasItem::applyCursor() {
     }
 }
 
-void DocumentCanvasItem::pointerMoved(QPointF itemPos, PointerSource source) {
+void DocumentCanvasItem::pointerMoved(QPointF itemPos, PointerSource source, bool eraserEnd) {
     pointerPos = itemPos;
-    if (source != pointerSource) {
+    if (source != pointerSource || eraserEnd != pointerEraserEnd) {
         pointerSource = source;
+        pointerEraserEnd = eraserEnd;
         refreshPointer();
     } else {
         placeHoverMark();
@@ -460,6 +608,7 @@ void DocumentCanvasItem::placeHoverMark() {
     if (!hoverMark) {
         hoverMark = new HoverMarkItem(this);
         hoverMark->setZ(1);  // (over nothing else of the canvas's own: it has no other children)
+        hoverMark->show(markEraser);
     }
     // Whole device pixels: the picture stays sharp
     const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
@@ -474,6 +623,7 @@ DocumentCanvasItem::HoverMarkShown DocumentCanvasItem::hoverMarkShown() const {
         shown.visible = true;
         shown.side = hoverMark->width();
         shown.center = hoverMark->position() + QPointF(hoverMark->width() / 2, hoverMark->height() / 2);
+        shown.eraser = hoverMark->eraser;
     }
     return shown;
 }
@@ -592,6 +742,11 @@ void DocumentCanvasItem::setView(QObject* object) {
         // The pointer follows the settings (dot or crosshair)
         pointerApp = &canvasView->getSession().getApp();
         connect(pointerApp, &xqt::AppContext::settingsChanged, this, &DocumentCanvasItem::refreshPointer);
+        // ... the tool (the eraser's size and kind; a side button that erases while it is held), and the zoom
+        connect(pointerApp, &xqt::AppContext::activeToolChanged, this, &DocumentCanvasItem::refreshPointer);
+        connect(pointerApp, &xqt::AppContext::toolPropertiesChanged, this, &DocumentCanvasItem::refreshPointer);
+        connect(&canvasView->getViewController(), &xqt::ViewController::changed, this,
+                &DocumentCanvasItem::refreshPointer);
         connect(canvasView, &xqt::CanvasView::emojiCompletionChanged, this, &DocumentCanvasItem::emojiCompletionChanged);
         // (the hint that a note's text goes on below the note: with the cursor, and where the note is shown)
         connect(canvasView, &xqt::CanvasView::markdownCursorChanged, this, &DocumentCanvasItem::noteTextHintChanged);
@@ -630,6 +785,7 @@ void DocumentCanvasItem::setReadingOnly(bool on) {
     if (canvasView) {
         canvasView->setReadingOnly(on);
     }
+    refreshPointer();  // (no eraser where nothing is erased)
     Q_EMIT readingOnlyChanged();
 }
 
@@ -847,7 +1003,8 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 penGrab = false;
             }
             input->tabletEvent(t, mapFromScene(t->position()));
-            pointerMoved(mapFromScene(t->position()), PointerSource::Pen);
+            pointerMoved(mapFromScene(t->position()), PointerSource::Pen,
+                         t->pointerType() == QPointingDevice::PointerType::Eraser);
             showCursorForPen();
             // The pen hovering: where a link under it leads (the pen itself keeps its tool: no pointing hand)
             if (e->type() == QEvent::TabletMove && t->buttons() == Qt::NoButton && !penGrab) {

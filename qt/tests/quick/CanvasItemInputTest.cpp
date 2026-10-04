@@ -564,3 +564,148 @@ TEST_F(CanvasItemInputTest, aPenWithACursorOfThePlatformShowsTheCanvassCursor) {
     window->unsetCursor();
     hover::setPlatformShowsPenCursorForTests(std::nullopt);
 }
+
+namespace {
+/// The side of the cursor's picture, logical pixels
+int cursorSide(const QCursor& c) { return c.pixmap().deviceIndependentSize().toSize().width(); }
+}  // namespace
+
+// The eraser as the pointer (qt/docs/hover-cursors.md): gray, its real size at the zoom (upstream's square, 2 × its
+// width a side), following the zoom and the eraser's size; dashed when it deletes whole strokes, round for whiteout.
+TEST_F(CanvasItemInputTest, theEraserCursorHasTheErasersSizeAtTheZoom) {
+    ToolHandler* tools = app->getToolHandler();
+    tools->selectTool(TOOL_ERASER);
+    tools->setEraserSize(TOOL_SIZE_MEDIUM);
+    tools->fireToolChanged();
+    QTest::mouseMove(window, QPoint(300, 300));
+    wait(20);
+    const double thickness = tools->getThickness();
+    auto expected = [&](double size) { return hover::eraserSide(hover::EraserMark{size}); };
+    double zoom = view->getViewController().zoom();
+    ASSERT_EQ(canvas->cursor().shape(), Qt::BitmapCursor);
+    EXPECT_EQ(cursorSide(canvas->cursor()), expected(2 * thickness * zoom)) << "the eraser's square";
+    EXPECT_EQ(canvas->cursor().hotSpot(), QPoint(cursorSide(canvas->cursor()) / 2, cursorSide(canvas->cursor()) / 2));
+
+    // The zoom
+    view->getViewController().setZoom(zoom * 2, QPointF(300, 300));
+    wait(20);
+    zoom = view->getViewController().zoom();
+    EXPECT_EQ(cursorSide(canvas->cursor()), expected(2 * thickness * zoom)) << "twice as big at twice the zoom";
+
+    // The eraser's size
+    tools->setEraserSize(TOOL_SIZE_FINE);
+    wait(20);
+    EXPECT_EQ(cursorSide(canvas->cursor()), expected(2 * tools->getThickness() * zoom));
+    const QImage standard = canvas->cursor().pixmap().toImage();
+
+    // Whole strokes: the same square, dashed
+    tools->setEraserType(ERASER_TYPE_DELETE_STROKE);
+    Q_EMIT app->settingsChanged();  // (as the settings do)
+    const QImage dashed = canvas->cursor().pixmap().toImage();
+    ASSERT_EQ(dashed.size(), standard.size());
+    EXPECT_NE(dashed, standard) << "dashed";
+
+    // Whiteout: a round brush as wide as the eraser
+    tools->setEraserSize(TOOL_SIZE_VERY_THICK);  // (big enough to tell a circle from a square)
+    tools->setEraserType(ERASER_TYPE_WHITEOUT);
+    Q_EMIT app->settingsChanged();
+    EXPECT_EQ(cursorSide(canvas->cursor()), expected(tools->getThickness() * zoom));
+    const QImage round = canvas->cursor().pixmap().toImage();
+    const int edge = static_cast<int>(3 * round.devicePixelRatio()) + 1;  // (inside the halo's room)
+    EXPECT_EQ(qAlpha(round.pixel(edge, edge)), 0) << "no corner: round";
+    EXPECT_GT(qAlpha(round.pixel(round.width() / 2, edge)), 0) << "its edge at the middle of the side";
+    tools->setEraserType(ERASER_TYPE_DEFAULT);
+
+    // The pen again: the dot
+    tools->selectTool(TOOL_PEN);
+    tools->fireToolChanged();
+    EXPECT_EQ(cursorSide(canvas->cursor()), hover::dotSide());
+    EXPECT_FALSE(canvas->hoverMarkShown().visible);
+}
+
+// An eraser bigger than a cursor may be (MAX_CURSOR_PX): the cursor is the dot, the canvas draws the eraser around
+// it and moves it with the mouse.
+TEST_F(CanvasItemInputTest, anEraserTooBigForACursorIsDrawnByTheCanvas) {
+    ToolHandler* tools = app->getToolHandler();
+    tools->selectTool(TOOL_ERASER);
+    tools->setCustomThickness(TOOL_ERASER, 100, true);
+    tools->fireToolChanged();
+    const QPoint at(310, 290);  // (not where an earlier test left the mouse: Qt drops a move to the same place)
+    QTest::mouseMove(window, at);
+    wait(50);
+    const double size = 200 * view->getViewController().zoom();
+    ASSERT_GT(size * window->effectiveDevicePixelRatio(), hover::MAX_CURSOR_PX);
+    EXPECT_EQ(cursorSide(canvas->cursor()), hover::dotSide()) << "the dot in its middle";
+    auto shown = canvas->hoverMarkShown();
+    ASSERT_TRUE(shown.visible);
+    ASSERT_TRUE(shown.eraser);
+    EXPECT_DOUBLE_EQ(shown.eraser->size, size);
+    EXPECT_NEAR(shown.center.x(), canvas->mapFromScene(at).x(), 0.5);
+    QTest::mouseMove(window, at + QPoint(40, 20));
+    wait(20);
+    shown = canvas->hoverMarkShown();
+    EXPECT_NEAR(shown.center.x(), canvas->mapFromScene(at).x() + 40, 0.5) << "it follows the mouse";
+    EXPECT_NEAR(shown.center.y(), canvas->mapFromScene(at).y() + 20, 0.5);
+
+    // Zoomed out it fits a cursor again
+    view->getViewController().setZoom(view->getViewController().zoom() / 4, QPointF(300, 300));
+    wait(20);
+    EXPECT_FALSE(canvas->hoverMarkShown().visible);
+    EXPECT_GT(cursorSide(canvas->cursor()), hover::dotSide());
+    tools->setCustomThickness(TOOL_ERASER, 100, false);
+    tools->selectTool(TOOL_PEN);
+    tools->fireToolChanged();
+}
+
+// The pen's eraser end, and a side button that erases while it is held, show the eraser too; the pen tip the dot.
+TEST_F(CanvasItemInputTest, thePensEraserEndAndSideButtonShowTheEraser) {
+    QPointingDevice eraserEnd{"test pen eraser", 2002, QInputDevice::DeviceType::Stylus,
+                              QPointingDevice::PointerType::Eraser,
+                              QInputDevice::Capability::Position | QInputDevice::Capability::Pressure, 1, 3};
+    QWindowSystemInterface::registerInputDevice(&eraserEnd);
+    const QPointF at(300, 250);
+    const auto hoverWith = [&](QPointingDevice* device, QPointF pos, Qt::MouseButtons buttons = Qt::NoButton) {
+        QWindowSystemInterface::handleTabletEvent(window, timestamp, device, pos, window->mapToGlobal(pos), buttons,
+                                                  0.0, 0, 0, 0, 0, 0, Qt::NoModifier);
+        timestamp += 5;
+        QWindowSystemInterface::flushWindowSystemEvents();
+    };
+
+    // A platform with a cursor for the pen: the cursor is the eraser
+    hover::setPlatformShowsPenCursorForTests(true);
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &eraserEnd, true, at,
+                                                                 window->mapToGlobal(at));
+    hoverWith(&eraserEnd, at);
+    wait(20);
+    EXPECT_GT(cursorSide(canvas->cursor()), hover::dotSide()) << "the eraser end: the eraser";
+    EXPECT_EQ(app->getToolHandler()->getToolType(), TOOL_PEN) << "the tool changes only when it touches";
+    hoverWith(&pen, at);
+    wait(20);
+    EXPECT_EQ(cursorSide(canvas->cursor()), hover::dotSide()) << "the tip: the dot";
+
+    // The lower side button (erases by default) held while hovering
+    hoverWith(&pen, at, Qt::MiddleButton);
+    wait(20);
+    EXPECT_EQ(app->getToolHandler()->getToolType(), TOOL_ERASER);
+    EXPECT_GT(cursorSide(canvas->cursor()), hover::dotSide()) << "the side button erases: the eraser";
+    hoverWith(&pen, at);
+    wait(20);
+    EXPECT_EQ(cursorSide(canvas->cursor()), hover::dotSide()) << "let go: the dot";
+
+    // No cursor for the pen (Android): the canvas draws the eraser at the eraser end
+    hover::setPlatformShowsPenCursorForTests(false);
+    hoverWith(&eraserEnd, at + QPointF(10, 0));
+    wait(20);
+    auto shown = canvas->hoverMarkShown();
+    ASSERT_TRUE(shown.visible);
+    EXPECT_TRUE(shown.eraser) << "the eraser's outline";
+    hoverWith(&pen, at + QPointF(20, 0));
+    wait(20);
+    shown = canvas->hoverMarkShown();
+    ASSERT_TRUE(shown.visible);
+    EXPECT_FALSE(shown.eraser) << "the dot";
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(window, timestamp++, &pen, false, at,
+                                                                 window->mapToGlobal(at));
+    QWindowSystemInterface::flushWindowSystemEvents();
+    hover::setPlatformShowsPenCursorForTests(std::nullopt);
+}

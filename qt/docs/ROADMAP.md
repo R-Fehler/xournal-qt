@@ -731,6 +731,14 @@
   follows a palette switch (`setPaletteColor`, `followPalette` for `qt/toolbox`). Strokes still use upstream's fixed
   highlighter opacity ([color-palettes.md](color-palettes.md)).
 
+- **Pointer over the page, `qt/hover-cursors` (2026-10-04).** The pen's hover dot was drawn in the canvas's scene
+  graph (a frame of the whole canvas per move, two to three frames behind the compositor's crosshair). Now it is a
+  cursor of its own (a small dot for the screen's pixel ratio); the crosshair is a setting (Settings → Pen → Pointer
+  over the page). The hovering pen takes the window's cursor where the platform shows one for it; elsewhere
+  (Android, iOS) the dot is an item of its own that only moves. The eraser (tool bar, eraser end, a side button)
+  shows itself: a gray square of its real size at the zoom, dashed for whole strokes, round for whiteout; a cursor up
+  to 256 device pixels, drawn as geometry above that ([hover-cursors.md](hover-cursors.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

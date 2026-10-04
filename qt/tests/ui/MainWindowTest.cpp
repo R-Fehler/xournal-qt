@@ -454,6 +454,14 @@ TEST_F(MainWindowTest, thePointerOverThePageIsADotOrTheCrosshair) {
     ASSERT_TRUE(waitOpened(sheet, false));
     settings->set("hoverPointer", "dot");
     EXPECT_EQ(canvas->cursor().shape(), Qt::BitmapCursor);
+    const int dot = canvas->cursor().pixmap().deviceIndependentSize().toSize().width();
+
+    // The eraser from the tool bar: the eraser's square instead, bigger with a bigger eraser
+    controller->selectTool("eraser");
+    const int eraser = canvas->cursor().pixmap().deviceIndependentSize().toSize().width();
+    EXPECT_GT(eraser, dot) << "the eraser's outline";
+    controller->selectTool("pen");
+    EXPECT_EQ(canvas->cursor().pixmap().deviceIndependentSize().toSize().width(), dot) << "the pen: the dot again";
 }
 
 // Drawing with the finger: a toggle in the tool bar and the same setting in Settings -> Touch (off on the desktop).
