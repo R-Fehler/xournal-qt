@@ -552,11 +552,11 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   long). Bring the Markdown document's tool bar in line with it, with fewer entries behind "»" on wide screens
   (search, full screen, …). A reading / zen mode (no edit tools; vertical and sideways scrolling, snapping or
   momentum), possibly one flow with the presentation mode.
-- [?] `qt/stickers`: reusable content ("stickers", templates) per library: save a selection (ink, text, images,
+- [x] `qt/stickers`: reusable content ("stickers", templates) per library: save a selection (ink, text, images,
   optionally a picture of the PDF behind it) to the library's sticker set, stored as `.xopp` files so they can be
   shared, viewed and copied to other libraries; a sticker tool opens a grid (last used or own order, subfolders);
-  choosing one pastes it into the page, selected. Grouping elements: upstream has none, so a proposal for how a
-  group can be stored without breaking `.xopp` in upstream.
+  choosing one pastes it into the page, selected. Built (qt/docs/stickers.md). Left: grouping (`qt/groups`, pasted
+  stickers become groups); the picker's search by the stickers' text; the device checks.
 - [?] `qt/audio`: recordings tied to pages or strokes, compatible with upstream's audio (`ts`/`fn` on strokes and
   texts). In a PDF with notes the audio files are attachments with the page number in their names, so they can be
   found without the app.

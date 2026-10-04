@@ -2852,3 +2852,5 @@ letter words only where the recogniser is sure.
       folder's hidden `.sticker-order.json` syncs it to another device with the library), Move to folder…, Open (the
       sticker as a document; changed and saved, the picker shows it new), Copy to all libraries / Copy to this
       library, Copy to library… (another library's `Stickers/`), Delete (to the trash).
+- [ ] The library: the `Stickers` folder's card has a sticker mark; its stickers are cards with previews, the library
+      search finds their text, a sticker opens as a document.

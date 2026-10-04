@@ -515,3 +515,23 @@ TEST_F(StickerToolTest, theCardsMenuReordersAndDeletes) {
     EXPECT_EQ(model->rowCount(), 1);
 }
 
+// --- in the library -------------------------------------------------------------------------------------------------
+
+TEST_F(StickerToolTest, theLibrarysStickersFolderHasItsMark) {
+    fs::create_directories(library / "Stickers");
+    fs::create_directories(library / "Other");
+    controller->setLibraryRoot(library);  // (read again)
+    controller->setHomeVisible(true);
+    const auto marked = [&] {
+        std::vector<std::string> names;
+        for (QQuickItem* card: delegates("libraryGrid")) {
+            auto* m = card->findChild<QQuickItem*>("stickersMark");
+            if (m && m->isVisible()) {
+                names.push_back(card->property("name").toString().toStdString());
+            }
+        }
+        return names;
+    };
+    until([&] { return !marked().empty(); });
+    EXPECT_EQ(marked(), std::vector<std::string>{"Stickers"}) << "the Stickers folder's card, and only it";
+}

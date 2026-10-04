@@ -56,7 +56,7 @@ A normal `.xopp` that Xournal++ opens (upstream's LoadHandler reads it without a
   “name”" says it worked.
 - **It is on the clipboard too** (as the author wanted): the sticker as the app copies a selection of notes and
   elements (`sticky::GROUP_CLIPBOARD_MIME`), with its picture for other apps. Ctrl+V pastes it again at once.
-- Not in a document opened for reading only? Saving is reading: it works there too. Not in a Markdown or text
+- Saving works in a document opened for reading only too (nothing in it changes). Not in a Markdown or text
   document (no selection of elements there).
 
 ## Using a sticker
@@ -74,7 +74,8 @@ A normal `.xopp` that Xournal++ opens (upstream's LoadHandler reads it without a
   a document opened for reading only (the button is not offered there).
 - **A picture sticker** is pasted as an image at the size its resolution says (else a point a pixel), made smaller to
   fit the visible part of the page as pasted pictures are.
-- **In a Markdown or text document** the sticker's picture is pasted as a picture the Markdown way.
+- **A Markdown or text document** has no sticker button. A sticker used elsewhere is on the clipboard, and Ctrl+V
+  in Markdown pastes its picture the Markdown way ([md-images.md](md-images.md)).
 
 ## Managing stickers
 
@@ -98,8 +99,8 @@ card says "Stickers" and has a sticker badge. Pictures dropped into it in a file
 | --- | --- |
 | `qt/src/session/StickerFile.*` | A sticker's document from content (`makeDocument`), writing it, reading one back as content (`read`), the clipboard bytes. Qt-light, any thread. |
 | `qt/src/shell/Stickers.*` | The sets on disk: where they are, listing (folders, stickers), unique names, own order (`.sticker-order.json`), last used, rename, move, copy, trash. `StickersModel`: the picker's list (scope, folder, search, sort). |
-| `CanvasView::stickerSource`, `saveSticker`, `pasteSticker` | The selection as a sticker's content (copies; the lasso it was made with), the picture and the file off the UI thread, the paste (centred, fitted, selected, one step). |
-| `MixedSelection::paste` (`centre`, `fit`) | The pasting of notes and elements together, at a point and made smaller to fit. |
+| `qt/src/canvas/CanvasStickers.cpp` (`CanvasView::stickerSource`, `saveSticker`, `loadSticker`, `pasteSticker`) | The selection as a sticker's content (copies; the lasso it was made with, `selectedWith` from `CanvasPage`), the picture and the file written or read off the UI thread (the view waits for it when it goes), the paste. |
+| `MixedSelection::pasteAt`, `setClipboard` | Notes and elements pasted together at a point, made smaller only to fit the page, selected, one step; the clipboard entry with its picture for other apps. |
 | `qt/src/app/AppStickers.cpp` | `app.stickers` (the model), `saveSticker`, `pasteSticker`, the card actions. |
 | `StickerButton.qml`, `StickerPicker.qml`, `StickerSaveDialog.qml` | The button (self-contained, for the toolbox), the picker, the dialog. `SelectionPill.qml` and `NotePill.qml`: "Save as sticker…". |
 
