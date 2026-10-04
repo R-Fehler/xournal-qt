@@ -56,3 +56,22 @@ foreach(_xqt_codec xqt-ogg xqt-vorbis)
         target_compile_options(${_xqt_codec} PRIVATE -w)  # (third-party code: its warnings are not ours)
     endif()
 endforeach()
+
+# --- the recordings ---------------------------------------------------------------------------------------------------
+# xqt-audio: the files (OggVorbis), the recorder and player behind interfaces, the fake devices of the tests.
+add_library(xqt-audio STATIC
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/OggVorbis.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/audio/OggVorbis.cpp)
+target_include_directories(xqt-audio PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src")
+target_link_libraries(xqt-audio PUBLIC Qt6::Core PRIVATE xqt-vorbis)
+set_target_properties(xqt-audio PROPERTIES AUTOMOC ON)
+
+if(XQT_BUILD_TESTS)
+    add_executable(xqt-audio-tests
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/main.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/audio/OggVorbisTest.cpp)
+    target_link_libraries(xqt-audio-tests PRIVATE xqt-audio Qt6::Test GTest::gtest)
+    target_include_directories(xqt-audio-tests PRIVATE "${TEST_CONFIG_DIR}")
+    gtest_discover_tests(xqt-audio-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS audio
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
