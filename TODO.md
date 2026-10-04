@@ -455,6 +455,85 @@ Research is already done in `../cross-platform-qt-research/` (03-android-plan, 0
   - [ ] Remember the Favourites chip across starts; a star in the tab overview for annotated PDFs without a path.
 - Backlog: visual text diff between PDF versions; cryptographic signing.
 
+### Ideas round of 2026-10-04 (the author)
+Sorted into blocks by the integrating session (cloud session, integration branch `claude/admiring-pascal-hekja6`
+standing in for `master-qt`). Facts found while sorting: upstream already has the laser pointer tools
+(`TOOL_LASER_POINTER_PEN/HIGHLIGHTER`, not wired up here), `LineStyle` (dash/dot, saved in `.xopp`), stroke fill and
+per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of elements. The canvas cursor is the system's
+`Qt::CrossCursor`, which is why the crosshair feels faster than a drawn dot.
+
+**Wave 1: clear, built right away**
+- [ ] `qt/md-tables`: table columns in rendered Markdown are too narrow in some cases. Size them like VS Code's
+  preview / GitHub (the browser's automatic table layout: min-content and max-content widths per column, spread
+  over the width; wrap inside cells; a table wider than the text column scrolls or shrinks, never overlaps). Then a
+  research note on a **two-column Markdown mode** (a comment marker, e.g. `<!-- xqt:columns 2 -->`, for `.md`
+  files and page-wise text), and the mode itself as an option if it is easy. Wide tables and images span both
+  columns.
+- [ ] `qt/pen-styles`: line styles (solid, dashed, dash-dot, dotted, as upstream, saved in `.xopp`); filling shapes
+  (and closed freehand strokes) with the stroke's color or another color, with upstream's fill opacity; the
+  **laser pointer** (upstream's laser pen and highlighter tools: ink that fades after N seconds, a setting; never
+  saved, never on the undo stack), reachable from the presentation mode.
+- [ ] `qt/color-palettes`: the author's role-based palettes (Classic, Marker, Pastel study, Colorblind-safe 8 and
+  6, Dark; JSON spec in the prompt of 2026-10-04, kept as a resource) as tabs in the color chooser, next to the
+  existing picker and hex field. Roles keep their meaning across palettes (the role name shows as a tooltip); a
+  palette may omit roles; each role has an ink and a highlight color; highlighter opacity 0.5 on light paper, 0.8
+  on dark. The chosen palette is a setting. A color picked from a palette remembers its role, so tool presets can
+  follow a palette switch (used by `qt/toolbox`).
+- [ ] `qt/hover-cursors`: the pen's hover dot as fast as the crosshair (a cursor of its own instead of a drawn
+  item, if that is the cause), the crosshair as a setting, and an **eraser preview**: a gray circle of the eraser's
+  size and shape while hovering.
+- [ ] `qt/undo-redo`: in Markdown text documents redo is grayed out in the bottom-right pill while Ctrl+Shift+Z
+  works (bug: failing test first). Undo and redo are hard to find: make them visible buttons in the tool bar and the
+  phone chrome (their final place follows `qt/toolbox`).
+- [ ] `qt/curtain`: a **curtain** for teaching and presenting: a black area that hides part of the page, and its
+  inverse, a **spotlight** (only a rectangle stays visible). Placed and moved, turned and resized with handles like
+  the setsquare (`GeometryToolLayer`); a tap on the black part shows the handles. Only on screen: never saved,
+  printed or exported. Works in full screen and the presentation mode.
+- [ ] `qt/page-ops`: a long press on a page in the page grid or the sidebar starts the selection mode with that
+  page selected; moving the finger after the long press still drags the pages, as today. **Rotate pages** by 90°
+  left or right (current page, selected pages, all pages), undoable, in the page menu. Pages without a PDF
+  background first; PDF pages need a decision (see the questions below).
+- [ ] `qt/hidpi-fractional`: check fractional scaling (125 %, 150 %, 175 %) on Plasma and GNOME (Wayland and X11),
+  Windows and macOS: Qt 6 passes the factor through (`HighDpiScaleFactorRoundingPolicy::PassThrough`); check that
+  nothing in the app rounds it, that pages, thumbnails and the setsquare are sharp, and that lines and borders of
+  the UI do not blur or jump. Tests with `QT_SCALE_FACTOR=1.25/1.5`.
+- [ ] `qt/snip`: a quick **area screenshot**: a lasso or rectangle (reusing the selection tools) copies the
+  canvas's pixels (ink and background, at a good resolution) to the clipboard as an image. In the selection tools'
+  cycle and in the insert image entry. Pasting it into a xournal-qt document offers to add a link to the source
+  page next to it (`qt/links`).
+- [ ] `qt/onboarding`: a short intro on the first start (what the document modes mean, that PDFs are editable here,
+  Markdown documents and turning them into PDFs to write on), ending in the existing document mode choice;
+  reachable again from Settings / Help. A **tutorial document** that asks the user to try the tools, modes, search
+  and menus, written in Markdown with marked placeholders for the author's ink and screenshots, opened from Help (a
+  copy, so it can be written on).
+
+**Designs first (a proposal goes to the author before anything is built)**
+- [?] `qt/toolbox`: user-defined tools as the tool bar (Drawboard-like), the default mode: each entry is a tool
+  with its settings (pen, highlighter, shapes, sticky notes, …, with color, width, line style, fill), in a fixed
+  order with dividers; added with "+", edited, reordered (arrows in its menu, long-press drag), the first N shown
+  and the rest in a popup on smaller screens. It replaces the pen pill with its cycling width. Converge the tool
+  pill of full screen and the normal tool bar into one element, docked to a side of the canvas (scrolling when
+  long). Bring the Markdown document's tool bar in line with it, with fewer entries behind "»" on wide screens
+  (search, full screen, …). A reading / zen mode (no edit tools; vertical and sideways scrolling, snapping or
+  momentum), possibly one flow with the presentation mode.
+- [?] `qt/stickers`: reusable content ("stickers", templates) per library: save a selection (ink, text, images,
+  optionally a picture of the PDF behind it) to the library's sticker set, stored as `.xopp` files so they can be
+  shared, viewed and copied to other libraries; a sticker tool opens a grid (last used or own order, subfolders);
+  choosing one pastes it into the page, selected. Grouping elements: upstream has none, so a proposal for how a
+  group can be stored without breaking `.xopp` in upstream.
+- [?] `qt/audio`: recordings tied to pages or strokes, compatible with upstream's audio (`ts`/`fn` on strokes and
+  texts). In a PDF with notes the audio files are attachments with the page number in their names, so they can be
+  found without the app.
+- [?] `qt/hwr-search`: an MVP of handwriting search on Linux from the research (`qt/docs/research/
+  handwriting-recognition.md`): search only, no training on user data, fuzzy matching over the model's candidates.
+  Where the results live: the library's dot folder cache, the `.xopp`, and an invisible text layer in PDFs with
+  notes so other PDF viewers find the words too (the best candidate only there).
+- [?] Rotating the canvas (like Krita): the rotate gesture, reset by a double tap or the fit buttons. A feasibility
+  check first.
+- [?] To-dos: how they could work (Markdown task lists, ink checkboxes, a list across the library?), whether the
+  app may hand them to the system (calendars, reminders), and whether a script interpreter could ship (upstream
+  has Lua plugins).
+
 ### Faster PDF saves, then a PDF-only mode (the author, 2026-09-24)
 1. [x] **`qt/pdf-incremental`: incremental saves for hybrid and archive PDFs** (merged 2026-09-24; left: a message
    when a save falls back to a full write, and a check in MuPDF and pdf.js).
