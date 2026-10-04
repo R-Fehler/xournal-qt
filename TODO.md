@@ -463,12 +463,12 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 `Qt::CrossCursor`, which is why the crosshair feels faster than a drawn dot.
 
 **Wave 1: clear, built right away**
-- [ ] `qt/md-tables`: table columns in rendered Markdown are too narrow in some cases. Size them like VS Code's
+- [x] `qt/md-tables`: table columns in rendered Markdown are too narrow in some cases. Size them like VS Code's
   preview / GitHub (the browser's automatic table layout: min-content and max-content widths per column, spread
   over the width; wrap inside cells; a table wider than the text column scrolls or shrinks, never overlaps). Then a
   research note on a **two-column Markdown mode** (a comment marker, e.g. `<!-- xqt:columns 2 -->`, for `.md`
   files and page-wise text), and the mode itself as an option if it is easy. Wide tables and images span both
-  columns.
+  columns. Done: columns sized by min-/max-content, a table too wide drawn smaller (down to 60 %), never over the box; two-column note in `qt/docs/md-columns.md`: not easy (pagination split search and editor hit test / Up-Down need column cases), not built. Left: the author's call on building columns; column widths can differ per page of a table split over pages.
 - [ ] `qt/pen-styles`: line styles (solid, dashed, dash-dot, dotted, as upstream, saved in `.xopp`); filling shapes
   (and closed freehand strokes) with the stroke's color or another color, with upstream's fill opacity; the
   **laser pointer** (upstream's laser pen and highlighter tools: ink that fades after N seconds, a setting; never

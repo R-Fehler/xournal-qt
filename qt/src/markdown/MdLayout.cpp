@@ -184,6 +184,46 @@ double pangoHeight(PangoLayout* l) {
 }
 double baseline(PangoLayout* l) { return pango_layout_get_baseline(l) / static_cast<double>(PANGO_SCALE); }
 
+/// The widest piece of a laid out text that a line cannot break inside (`chars`: one character, else one word, as
+/// UAX #14 says where a line may break), without the blanks at its end: a browser's min-content width of the text.
+/// A formula or a picture is a piece of its own, as wide as it is drawn.
+double widestPiece(PangoLayout* l, bool chars) {
+    const char* text = pango_layout_get_text(l);
+    int n = 0;
+    const PangoLogAttr* attrs = pango_layout_get_log_attrs_readonly(l, &n);  // (one per character, and the end)
+    double widest = 0;
+    int pieceStart = 0;  // (bytes)
+    int lastInk = -1;    // the last character of the piece that is not blank
+    const char* p = text;
+    for (int i = 0; i < n; ++i) {
+        const int at = static_cast<int>(p - text);
+        const bool end = i == n - 1;
+        if (i > 0 && (end || (chars ? attrs[i].is_cursor_position : attrs[i].is_line_break))) {
+            if (lastInk >= 0) {
+                int line0 = 0;
+                int line1 = 0;
+                int x0 = 0;
+                int x1 = 0;
+                pango_layout_index_to_line_x(l, pieceStart, false, &line0, &x0);
+                pango_layout_index_to_line_x(l, lastInk, true, &line1, &x1);
+                if (line0 == line1) {
+                    widest = std::max(widest, std::abs(x1 - x0) / static_cast<double>(PANGO_SCALE));
+                }
+            }
+            pieceStart = at;
+            lastInk = -1;
+        }
+        if (end || *p == '\0') {
+            break;
+        }
+        if (!attrs[i].is_white) {
+            lastInk = at;
+        }
+        p = g_utf8_next_char(p);
+    }
+    return widest;
+}
+
 /// A laid out text and where its links are.
 struct Laid {
     xoj::util::GObjectSPtr<PangoLayout> layout;
@@ -1004,19 +1044,94 @@ private:
         margin(0.75 * st.size);
     }
 
-    void table(const Block& b, double x, double w, const Ctx& c) {
-        struct Row {
-            const Block* block;
-            bool header;
+    /// A row of a table (the header first).
+    struct TableRow {
+        const Block* block;
+        bool header;
+    };
+
+    /// Per column of a table, padding included: its widest character, its widest word (min-content) and its longest
+    /// line (max-content), for its text at a size.
+    struct ColumnWidths {
+        std::vector<double> chars, words, lines;
+        static double sum(const std::vector<double>& v) {
+            double s = 0;
+            for (double x: v) {
+                s += x;
+            }
+            return s;
+        }
+    };
+    ColumnWidths measureColumns(const std::vector<TableRow>& rows, size_t columns, double size) {
+        const double pad = 0.4 * size;
+        ColumnWidths m{std::vector<double>(columns, 2 * pad + 1), std::vector<double>(columns, 2 * pad + 1),
+                       std::vector<double>(columns, 2 * size)};
+        for (const TableRow& r: rows) {
+            for (size_t i = 0; i < r.block->children.size() && i < columns; ++i) {
+                const std::vector<Run>& runs = r.block->children[i].runs;
+                if (runs.empty()) {
+                    continue;
+                }
+                auto l = text(runs, {size, r.header});
+                m.chars[i] = std::max(m.chars[i], widestPiece(l.get(), true) + 2 * pad + 1);
+                m.words[i] = std::max(m.words[i], widestPiece(l.get(), false) + 2 * pad + 1);
+                m.lines[i] = std::max(m.lines[i], pangoWidth(l.get()) + 2 * pad + 1);
+            }
+        }
+        for (size_t i = 0; i < columns; ++i) {
+            m.words[i] = std::max(m.words[i], m.chars[i]);
+            m.lines[i] = std::max(m.lines[i], m.words[i]);
+        }
+        return m;
+    }
+
+    /// A table's columns share the width as in a browser's automatic table layout (CSS 2.1 §17.5.2.2, the HTML
+    /// table algorithm, as VS Code's preview and GitHub lay out a table): every column its longest line if they all
+    /// fit; else every column its widest word, and the rest of the width in proportion to how much more its longest
+    /// line needs. Words are only broken when even they do not fit at the smallest size a table is drawn at
+    /// (MIN_TABLE_SCALE); then every column gets its widest character at least, so no cell runs over the next.
+    static std::vector<double> columnWidths(const ColumnWidths& m, double w) {
+        const auto between = [w](const std::vector<double>& lo, const std::vector<double>& hi) {
+            const double sumLo = ColumnWidths::sum(lo);
+            const double sumHi = ColumnWidths::sum(hi);
+            const double f = sumHi > sumLo ? std::clamp((w - sumLo) / (sumHi - sumLo), 0.0, 1.0) : 0.0;
+            std::vector<double> out(lo.size());
+            for (size_t i = 0; i < lo.size(); ++i) {
+                out[i] = lo[i] + f * (hi[i] - lo[i]);
+            }
+            return out;
         };
-        std::vector<Row> rows;
+        if (ColumnWidths::sum(m.lines) <= w) {
+            return m.lines;
+        }
+        if (ColumnWidths::sum(m.words) <= w) {
+            return between(m.words, m.lines);
+        }
+        if (ColumnWidths::sum(m.chars) <= w) {
+            return between(m.chars, m.words);
+        }
+        std::vector<double> out = m.chars;  // (not even the characters fit: in proportion to them)
+        const double f = w / ColumnWidths::sum(m.chars);
+        for (double& x: out) {
+            x *= f;
+        }
+        return out;
+    }
+
+    /// The smallest a table is drawn (of the text's size) to keep its words whole when they do not fit side by side:
+    /// a table wider than the box is drawn smaller instead (a page does not scroll), down to this; below it, words
+    /// break, and only when not even single characters fit is it drawn smaller still.
+    static constexpr double MIN_TABLE_SCALE = 0.6;
+
+    void table(const Block& b, double x, double w, const Ctx& c) {
+        std::vector<TableRow> rows;
         for (const Block& part: b.children) {
             for (const Block& row: part.children) {
                 rows.push_back({&row, part.kind == BlockKind::TableHead});
             }
         }
         size_t columns = 0;
-        for (const Row& r: rows) {
+        for (const TableRow& r: rows) {
             columns = std::max(columns, r.block->children.size());
         }
         if (columns == 0) {
@@ -1024,27 +1139,31 @@ private:
         }
         margin(0.75 * st.size);
         open();
-        const double pad = 0.4 * st.size;
-        // Column widths: as wide as their widest cell, narrowed to the box together if needed
-        std::vector<double> widths(columns, 2 * st.size);
-        for (const Row& r: rows) {
-            for (size_t i = 0; i < r.block->children.size(); ++i) {
-                auto l = text(r.block->children[i].runs, {st.size, r.header});
-                widths[i] = std::max(widths[i], pangoWidth(l.get()) + 2 * pad + 1);
+        // The size of its text: the body's, smaller when its words (or, past MIN_TABLE_SCALE, its characters) do not
+        // fit side by side. Measured again at the smaller size (a formula or a picture does not shrink in proportion
+        // to the text), a few times at most.
+        double size = st.size;
+        ColumnWidths m = measureColumns(rows, columns, size);
+        for (int k = 0; k < 4; ++k) {
+            const double words = ColumnWidths::sum(m.words);
+            const double chars = ColumnWidths::sum(m.chars);
+            double next = size;
+            if (words > w + 0.01 && size > st.size * MIN_TABLE_SCALE + 0.001) {
+                next = std::max(st.size * MIN_TABLE_SCALE, size * w / words);
+            } else if (words > w + 0.01 && chars > w + 0.01) {
+                next = size * w / chars;
             }
-        }
-        double total = 0;
-        for (double cw: widths) {
-            total += cw;
-        }
-        if (total > w) {
-            for (double& cw: widths) {
-                cw *= w / total;
+            if (next >= size - 0.001) {
+                break;
             }
-            total = w;
+            size = next;
+            m = measureColumns(rows, columns, size);
         }
+        const std::vector<double> widths = columnWidths(m, w);
+        const double total = ColumnWidths::sum(widths);
+        const double pad = 0.4 * size;
         const double start = y;
-        for (const Row& r: rows) {
+        for (const TableRow& r: rows) {
             std::vector<Laid> cells;
             double h = 0;
             for (size_t i = 0; i < columns; ++i) {
@@ -1056,8 +1175,8 @@ private:
                 } else if (cell && cell->align == Align::Right) {
                     align = PANGO_ALIGN_RIGHT;
                 }
-                cells.push_back(text(cell ? cell->runs : none, {st.size, r.header, false, widths[i] - 2 * pad,
-                                                                 LINE_SPACING, align}));
+                cells.push_back(text(cell ? cell->runs : none,
+                                     {size, r.header, false, std::max(widths[i] - 2 * pad, 0.01), LINE_SPACING, align}));
                 h = std::max(h, pangoHeight(cells.back().get()));
             }
             if (r.header) {

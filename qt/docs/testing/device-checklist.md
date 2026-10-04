@@ -2504,3 +2504,22 @@ Finder:
 - [ ] Double-click a .xopp in Finder: it opens in Xournal Qt (also while Xournal Qt is running already).
 - [ ] Right-click a PDF and a .md file → Open With → Xournal Qt: it opens.
 - [ ] Drop a PDF on the Dock icon: it opens.
+
+## Markdown table columns (qt/md-tables)
+
+- [ ] Open a `.md` with a table of a short column ("Status", "Owner") beside a column of long sentences: the short
+      column keeps its words on one line, the long one wraps between words, the table goes from margin to margin.
+      Compare with VS Code's preview of the same file: the columns share the width alike.
+- [ ] A table with inline code (`a_long_identifier`), a formula and a small picture in cells: none of them is broken
+      or made smaller; the other columns wrap around them.
+- [ ] A table with many columns (8 or more, long headers): drawn smaller than the text, inside the margins, no text
+      over a rule or the next cell. Zoom in: still sharp. Export as PDF: the same.
+- [ ] A small table (two short columns): as wide as its text, not stretched.
+- [ ] Write in a table cell on the page (the table shows its source while the cursor is in it); leave it: the table
+      is drawn again with its columns as above. A long table flowing onto the next page repeats its header there.
+- [ ] A Markdown text box with a table in a `.xopp`: narrow it with the ⟷ knob: the columns share the new width as
+      above, words break only when the box is narrower than the table at its smallest.
+
+- [ ] Two columns (decision aid for `qt/docs/md-columns.md`): open a long `.md` as pages on the tablet in landscape,
+      turn on "Two pages side by side": does reading two pages side by side give what a two-column mode was wanted
+      for? If not, note what is missing (one page in two columns, printing handouts, ...).

@@ -50,6 +50,18 @@ Writing:
   shows it formatted while typing. The text tool always writes on the page, as in a `.md`; the font menu's switch
   that sent it beside the page is gone (2026-09-26), and a value an earlier version stored is not read.
 
+## Tables
+Columns are as wide as a browser makes them (VS Code's preview, GitHub: CSS's automatic table layout). A table whose
+cells fit side by side on one line each is as wide as its text (not stretched to the box). Otherwise every column
+gets at least its widest word (an inline code, a formula or a picture counts as one word) and the rest of the width
+goes to the columns in proportion to how much more room their longest line needs; text wraps between words inside a
+cell. A table whose words do not fit side by side (many columns) is drawn smaller, down to 60 % of the text's size;
+only past that do words break, and a table is never wider than the box and no cell runs over the next. Code:
+`Layouter::table` in `qt/src/markdown/MdLayout.cpp`.
+
+Each page lays out the rows it holds on its own, so a table split over pages can have slightly different column
+widths on each page.
+
 ## Flowing onto pages
 The page's Markdown text goes on on the next pages when it is longer than the page: while typing, it is split onto
 the pages again, pages are added after them (the same size and background; after a PDF page a plain one), and the
