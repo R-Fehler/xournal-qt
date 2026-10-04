@@ -12,6 +12,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import "Fuzzy.js" as Fuzzy
+import "DevicePixels.js" as DevicePixels
 
 Item {
     id: card
@@ -506,7 +507,7 @@ Item {
                             width: parent.width
                             height: hitPage.thumbHeight
                             color: "#ffffff"
-                            border.width: hitPage.hovered ? 2 : 1
+                            border.width: DevicePixels.whole(hitPage.hovered ? 2 : 1, Screen.devicePixelRatio)
                             border.color: hitPage.hovered ? Material.accentColor : "#d5d8dc"
                             Image {
                                 anchors.fill: parent

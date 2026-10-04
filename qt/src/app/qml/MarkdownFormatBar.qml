@@ -37,7 +37,7 @@ Rectangle {
 
     implicitHeight: 44
     color: "#ffffff"
-    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#e3e5e8" }
+    Hairline { anchors.bottom: parent.bottom; width: parent.width; color: "#e3e5e8" }
 
     function act(action, arg) { bar.formatRequested(action, arg === undefined ? "" : arg) }
 

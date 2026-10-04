@@ -172,7 +172,7 @@ AdaptiveDialog {
         }
 
         // Not in the library: the web, with its address shown
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#e3e5e8" }
+        Hairline { Layout.fillWidth: true; color: "#e3e5e8" }
         Label {
             text: sheet.hits.length === 0 && !sheet.searching ? qsTr("Not in the library? Search the web:")
                                                                : qsTr("Or search the web:")

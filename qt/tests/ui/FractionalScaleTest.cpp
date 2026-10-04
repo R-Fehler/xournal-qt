@@ -5,12 +5,15 @@
  *
  * @license GNU GPLv2 or later
  */
+#include <cmath>
 #include <functional>
 
+#include <QColor>
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTemporaryDir>
@@ -126,4 +129,74 @@ TEST_F(FractionalScale, sidebarThumbnailsAreDrawnWithThePixelsOfTheirFrame) {
     EXPECT_GE(pixels, frame * dpr - 1) << "sharp on this screen";
     EXPECT_LT(pixels, frame * dpr + xqt::ThumbnailProvider::WIDTH_STEP)
             << "drawn " << pixels << " pixels wide for a frame of " << frame * dpr << " pixels (dpr " << dpr << ")";
+}
+
+namespace {
+/// The lines of the window's own QML (Rectangles a pixel thin, and frames of square Rectangles) whose thickness is
+/// not a whole number of device pixels: at 125 % or 150 % they come out 1 or 2 pixels thick, depending on where they
+/// land, so lines of the same kind look uneven.
+QStringList unevenLines(QQuickItem* root, double dpr) {
+    QStringList found;
+    const auto whole = [&](double logical) {
+        const double px = logical * dpr;
+        return std::abs(px - std::round(px)) < 0.01;
+    };
+    std::function<void(QQuickItem*)> walk = [&](QQuickItem* item) {
+        if (!item->isVisible() || item->opacity() <= 0.01) {
+            return;
+        }
+        const QQmlContext* context = qmlContext(item);
+        // (the app's own QML; Qt's controls draw their separators themselves, see qt/docs/hidpi.md)
+        const bool own = context && context->baseUrl().toString().startsWith("qrc:/qt/qml/XournalQt/");
+        if (own && QString(item->metaObject()->className()).startsWith("QQuickRectangle")) {
+            // (its file, and the nearest named item above it)
+            QString near;
+            for (QQuickItem* up = item->parentItem(); up && near.isEmpty(); up = up->parentItem()) {
+                near = up->objectName();
+            }
+            const QString name = context->baseUrl().fileName() + " near " + near + " (" +
+                                 item->property("color").value<QColor>().name() + ")";
+            const double w = item->width(), h = item->height();
+            if ((h > 0 && h <= 1.01 && w >= 8 && !whole(h)) || (w > 0 && w <= 1.01 && h >= 8 && !whole(w))) {
+                found << QStringLiteral("line in %1 (%2 x %3)").arg(name).arg(w).arg(h);
+            }
+            // (a border is drawn once its width or colour is set; unset it is 1 and black)
+            const auto* border = item->property("border").value<QObject*>();
+            const double bw = border ? border->property("width").toDouble() : 0;
+            const bool drawn = border && (bw != 1.0 || border->property("color").value<QColor>() != QColor(Qt::black));
+            if (drawn && bw > 0 && item->property("radius").toDouble() == 0 && w >= 8 && h >= 8 && !whole(bw)) {
+                found << QStringLiteral("frame of %1 (%2)").arg(name).arg(bw);
+            }
+        }
+        for (QQuickItem* child: item->childItems()) {
+            walk(child);
+        }
+    };
+    walk(root);
+    found.removeDuplicates();
+    return found;
+}
+}  // namespace
+
+// The separators and frames of the window are whole device pixels thick (1 at 125 %, 150 % and 175 %, 2 at 200 %), so
+// they look alike wherever they are, as at 100 %.
+TEST_F(FractionalScale, linesAndFramesOfTheWindowAreWholeDevicePixels) {
+    const double dpr = window->effectiveDevicePixelRatio();
+    QQuickItem* root = window->contentItem();  // (the root: with the overlay, menus and sheets)
+    QStringList found = unevenLines(root, dpr);
+    // A document with the page sidebar, the page grid, the settings
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(100);
+    QMetaObject::invokeMethod(window, "showSidebar", Q_ARG(QVariant, true));
+    wait(300);
+    found << unevenLines(root, dpr);
+    QTest::keyClick(window, Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    wait(400);
+    found << unevenLines(root, dpr);
+    QTest::keyClick(window, Qt::Key_G, Qt::ControlModifier | Qt::AltModifier);
+    QTest::keyClick(window, Qt::Key_Comma, Qt::ControlModifier);
+    wait(500);
+    found << unevenLines(root, dpr);
+    found.removeDuplicates();
+    EXPECT_TRUE(found.isEmpty()) << found.join("\n").toStdString();
 }

@@ -185,10 +185,12 @@ set(XQT_QML_FILES
     src/app/qml/ShortcutSheet.qml
     src/app/qml/LayerList.qml
     src/app/qml/PagePicture.qml
+    src/app/qml/Hairline.qml
     src/app/qml/RaceWatch.qml
     src/app/qml/FuzzyToggle.qml
     src/app/qml/FuzzyHelp.qml
     src/app/qml/Fuzzy.js
+    src/app/qml/DevicePixels.js
     src/app/qml/ReferenceSplit.qml
     src/app/qml/CanvasScrollBars.qml
     src/app/qml/LinkStatusLine.qml

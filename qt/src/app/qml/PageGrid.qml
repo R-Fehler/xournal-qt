@@ -7,6 +7,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtQuick.Window
+import "DevicePixels.js" as DevicePixels
 
 Rectangle {
     id: pageGrid
@@ -150,7 +151,7 @@ Rectangle {
                 height: Math.round(cell.frameW * cell.aspect)
                 color: "white"
                 // The current page, and pages with search hits
-                border.width: cell.current || cell.selected || cell.searchHitCount > 0 ? 3 : 0
+                border.width: DevicePixels.whole(cell.current || cell.selected || cell.searchHitCount > 0 ? 3 : 0, Screen.devicePixelRatio)
                 border.color: cell.current || cell.selected ? Material.accentColor : "#f9a825"
 
                 // The sketch right away, the sharp one on top of it (small cells: from the sketch too)

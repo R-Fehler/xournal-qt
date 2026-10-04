@@ -206,10 +206,9 @@ Dialog {
                 onClicked: dlg.reject()
             }
         }
-        Rectangle {  // a line under the title once the body is scrolled under it
+        Hairline {  // a line under the title once the body is scrolled under it
             anchors.bottom: parent.bottom
             width: parent.width
-            height: 1
             color: "#e0e0e0"
             visible: flick.contentY > 1
         }

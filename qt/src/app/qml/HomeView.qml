@@ -1157,7 +1157,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 60 + home.safeBottom
             color: "#ffffff"
-            Rectangle { width: parent.width; height: 1; color: "#dadce0" }
+            Hairline { width: parent.width; color: "#dadce0" }
             RowLayout {
                 anchors.left: parent.left
                 anchors.right: parent.right

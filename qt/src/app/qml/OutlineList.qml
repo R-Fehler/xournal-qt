@@ -92,11 +92,10 @@ ListView {
                 }
             }
         }
-        Rectangle {
+        Hairline {
             visible: app.outline.available
             width: parent.width - 16
             x: 8
-            height: 1
             color: "#d5d8dc"
         }
         Item { width: 1; height: 4; visible: app.outline.available }

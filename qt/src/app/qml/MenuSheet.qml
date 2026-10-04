@@ -307,11 +307,10 @@ Popup {
                                     }
                                 }
                             }
-                            Rectangle {
+                            Hairline {
                                 visible: entry.kind === "separator"
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: parent.width
-                                height: 1
                                 color: "#e2e5e9"
                             }
                             Label {

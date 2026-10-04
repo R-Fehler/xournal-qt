@@ -2632,3 +2632,10 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] Curtain (B) at 125 % and 150 %: its square handles have frames equally thick on all four sides, wherever it is
       moved; the round knob above it is crisp. Move the window to a screen of another scale (Windows, two monitors):
       the knob is still crisp there (it was drawn once, for the first screen).
+- [ ] At 125 % and 150 %: the lines of the window are alike: the line between the tool bar and the pages, the
+      dividers between the tool bar's groups, the lines in Settings, the page menu, the find-paper sheet, the
+      Markdown format bar, a dialog's line under its title. Each is one pixel thin (two at 200 %), none of them
+      thicker than the others. The frames around the pages in the sidebar, page grid, reference grid, contents
+      overview and bookmarks are equally thick on all four sides (the current page's thick frame too).
+- [ ] (Known, from Qt's own style: the separators inside the pills and menus, ToolSeparator and MenuSeparator, may
+      still be one pixel on some and two on others. Note if it is noticeable.)
