@@ -206,11 +206,14 @@ QRectF StickyNotes::selectedViewBox() const {
 
 // --- placing -----------------------------------------------------------------------------------------------------
 
-bool StickyNotes::insert() {
+bool StickyNotes::insert(std::optional<Color> color) {
     DocumentSession& session = view.getSession();
     const size_t pNr = view.currentPageNo();  // (a second view of the document: its own page)
     if (pNr >= view.pageCount() || session.isReadOnly() || view.isReadingOnly()) {
         return false;
+    }
+    if (color) {
+        lastColor = *color;  // (the toolbox's sticky note: its color)
     }
     view.endTextEditing();
     view.clearSelection();

@@ -77,6 +77,7 @@ is stored per class in the app's settings (the `xournalQt` part of `settings.xml
 | `chrome` | `compact`, `reader` (none: automatic, the full chrome) | this block |
 | `toolbar` | `top`, `twoRowsTop`, `twoRowsBottom`, `railLeft`, `railRight` (none: automatic) | `qt/adaptive-toolbar` (below) |
 | `sourceSplit` | the page's share of the height above the Markdown source below it, `0.2` to `0.8` (none: 0.5, a phone 0.4) | `qt/adaptive-panels` (below) |
+| `toolbox` | `left`, `right`, `top`, `bottom` (none: automatic, the right; a phone upright: the bottom) | `qt/toolbox` ([toolbox.md](toolbox.md)) |
 
 `app.settings.layoutChoice(class, what)`, `setLayoutChoice(class, what, value)` ("" or "auto" removes it),
 `hasLayoutChoices()` and `resetLayoutChoices()` (`SettingsModel`). A change counts as a settings revision, so QML
@@ -212,6 +213,11 @@ press). Entries and submenus have icons where an obvious one exists (`AdaptiveMe
 the phone sheet shows them too.
 
 ## The tool bar (`qt/adaptive-toolbar`)
+
+Since `qt/toolbox` this is the **classic** tool bar (Settings → Pen → Tools: "Classic tool bar"). With the toolbox (the
+default, [toolbox.md](toolbox.md)) the tools, colors and widths are the toolbox's, and the bar is one row of commands
+at the top (the same plan, without the tools; entries of ⋮ as buttons where there is room); the tool square, the quick
+tools and the pen pill of full screen are classic only.
 
 The author's decisions of 2026-09-26: a single A4 page stays well visible (no side chrome that narrows the page in
 portrait); two rows at the top on a portrait tablet; the tools grouped and prioritised for everyone, ⋮ pinned at the

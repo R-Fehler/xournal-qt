@@ -273,6 +273,28 @@ Popup {
                     width: parent.width - 48
                     x: 24
                     spacing: 10
+                    // The toolbox or the classic tool bar (qt/docs/toolbox.md)
+                    SectionTitle { text: qsTr("Tools") }
+                    ComboRow {
+                        objectName: "toolbarModeRow"
+                        key: "toolbarMode"; text: qsTr("The tools")
+                        options: [
+                            { text: qsTr("My toolbox (my own pens, highlighters, …)"), value: "toolbox" },
+                            { text: qsTr("Classic tool bar"), value: "classic" }
+                        ]
+                    }
+                    Hint {
+                        text: qsTr("The toolbox holds your own tools, each with its color and width, beside the page "
+                                   + "(drag its dotted grip to another edge). Tap a tool to take it, tap it again to "
+                                   + "change it; hold it for its menu, hold and move it to sort it. The classic tool "
+                                   + "bar stays for one more release.")
+                    }
+                    Button {
+                        objectName: "resetToolboxButton"
+                        visible: (sheet.s.revision, sheet.s.get("toolbarMode")) === "toolbox"
+                        text: qsTr("Back to the first tools…")
+                        onClicked: resetToolboxDialog.open()
+                    }
                     SectionTitle { text: qsTr("Pressure") }
                     SwitchRow { key: "pressureSensitivity"; text: qsTr("Pressure changes the line width") }
                     SliderRow {
@@ -1608,5 +1630,26 @@ Popup {
             }
         }
         function textOf(combination) { return app.shortcuts.keyText(combination) }
+    }
+    // The toolbox back to its first tools (its order, colors and widths are lost)
+    AdaptiveDialog {
+        id: resetToolboxDialog
+        objectName: "resetToolboxDialog"
+        kind: "question"
+        preferredWidth: 420
+        title: qsTr("Back to the first tools?")
+        Label {
+            width: resetToolboxDialog.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("Your tools, their order and their settings are replaced by the toolbox of the first start.")
+        }
+        footer: DialogButtonBox {
+            Button { objectName: "resetToolboxConfirm"; text: qsTr("Reset"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+            Button { text: qsTr("Cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        onAccepted: {
+            app.toolbox.reset()
+            app.applyToolEntry(app.toolbox.active)
+        }
     }
 }

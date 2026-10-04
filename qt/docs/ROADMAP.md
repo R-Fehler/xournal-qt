@@ -822,6 +822,19 @@
   region renderer) and its recognised words. "Add to calendar": an all-day VEVENT `.ics` handed to the system (Android:
   the calendar's new-event intent); exports of the open ones as `.ics` and Markdown. One way ([todos.md](todos.md)).
 
+- **The toolbox, `qt/toolbox` (2026-10-04).** The tool bar's tools become the user's own tools, as pens taken from a
+  sorted box (Drawboard): each entry a pen, highlighter, shape, eraser, text box, sticky note or laser pointer with its
+  settings (palette role or color, width, line style, filling, eraser kind, font), in sections, in one rail docked to
+  a side of the canvas (right by default; left, top, bottom by its grip or ⋮ → View, per window size), floating in
+  full screen and while presenting, the dock of a phone. Undo and redo lead it. A tap takes a tool, a tap on the tool
+  in hand edits it (written at once), the wheel sets the width, a long press opens its menu (move, replace, duplicate,
+  add one here, divider, remove), a long press and a move carries it; "+" adds one prefilled from the last of its
+  kind; a short rail folds sections into stacks. The tool bar becomes a command bar with entries of ⋮ where there is
+  room; a text document's format bar has undo, redo and its commands by one ladder. Reading (⋮ → View → Read) is
+  read-only with a fading reading pill and snapping up and down; presenting keeps the tools. Stored per device
+  (`ToolboxModel`, JSON in the settings); the classic bar stays for one release (Settings → Pen → Tools)
+  ([toolbox.md](toolbox.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

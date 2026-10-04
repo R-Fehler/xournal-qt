@@ -53,6 +53,10 @@ public:
     /// ("handWhenOpening" in the touch part). On by default on Android, where one finger is expected to scroll; off
     /// on the desktop, where the tool stays as it was.
     static bool handWhenOpening(Settings& settings);
+    /// The tools: "toolbox" (the docked toolbox of one's own tools, qt/docs/toolbox.md; the default) or "classic" (the
+    /// tool bar of before, kept for one release). Setting "toolbarMode" in the xournalQt part; while it is not set,
+    /// XQT_TOOLBAR_MODE gives the default (the UI tests of the classic bar set it).
+    static QString toolbarMode(Settings& settings);
     int systemMemory() const;
 
     int revision() const { return rev; }

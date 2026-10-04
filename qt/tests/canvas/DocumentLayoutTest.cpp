@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <memory>
 
+#include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 
@@ -21,6 +23,7 @@
 
 #include "CanvasView.h"
 #include "DocumentLayout.h"
+#include "ViewController.h"
 
 using namespace xqt;
 
@@ -253,6 +256,51 @@ TEST(DocumentLayout, fitWidthFitsThePageInView) {
     EXPECT_NEAR(vc2.fitWidthZoom(0), std::min((1200 - B) / (rowPts + 20), (1200 - 2 * P - B - 4) / rowPts), 1e-6)
             << "the first row: two A4 pages";
     EXPECT_LT(vc2.fitWidthZoom(2), vc2.fitWidthZoom(0)) << "the second row holds the slide: wider";
+}
+
+// Reading (qt/docs/toolbox.md): up and down, a drag or a fling comes to rest on a row of pages, as sideways
+TEST(ViewSnapping, upAndDownWhileReadingARowOfPagesComesToRest) {
+    const QSizeF a4(595.27559, 841.88976);
+    Pages pages({a4, a4, a4, a4});
+    DocumentLayout layout = pages.layout({});
+    ViewController vc(&layout);
+    vc.setViewSize(QSizeF(800, 600));  // (fit to the width: a page is taller than the view)
+    vc.setSnapping(true);
+    EXPECT_FALSE(vc.snapping()) << "up and down only while reading";
+    vc.setSnappingVertically(true);
+    ASSERT_TRUE(vc.snapping());
+    auto settle = [&] {
+        QElapsedTimer t;
+        t.start();
+        while (vc.isAnimating() && t.elapsed() < 3000) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+    };
+    const double pad = layout.padding();
+    const QRectF p1 = layout.pageRect(1, vc.zoom());
+    const QRectF p2 = layout.pageRect(2, vc.zoom());
+    // Let go slowly with most of page 2 in view: its top comes to the view's top
+    vc.setScrollPosition(QPointF(0, p1.top() - 120));
+    vc.endScroll({});
+    settle();
+    EXPECT_NEAR(vc.scrollPosition().y(), p1.top() - pad, 1);
+    // Within a page taller than the view: it stays where it is let go
+    vc.setScrollPosition(QPointF(0, p1.top() + 100));
+    vc.endScroll({});
+    settle();
+    EXPECT_NEAR(vc.scrollPosition().y(), p1.top() + 100, 1);
+    // A fling at the page's end goes on to the next page's top
+    vc.setScrollPosition(QPointF(0, p1.bottom() + pad - 600));
+    vc.endScroll(QPointF(0, -1.0));
+    settle();
+    EXPECT_NEAR(vc.scrollPosition().y(), p2.top() - pad, 1);
+    // A page that fits rests in the middle
+    vc.setZoom(vc.zoom() * 0.5, QPointF(400, 300));
+    const QRectF small = layout.pageRect(2, vc.zoom());
+    vc.setScrollPosition(QPointF(vc.scrollPosition().x(), small.center().y() - 300 + 40));
+    vc.endScroll({});
+    settle();
+    EXPECT_NEAR(vc.scrollPosition().y(), small.center().y() - 300, 1);
 }
 
 TEST(PdfLinks, linksAreFoundAtTheirPlace) {

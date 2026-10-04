@@ -132,6 +132,17 @@ Rectangle {
 
     /// At the end of the bar, outside what scrolls: a text document's ⋮ and "more tools" (Main.qml puts them here)
     property alias trailing: trailingSlot
+    /// At its start, outside what scrolls: a text document's undo and redo with the toolbox (Main.qml puts them here)
+    property alias leading: leadingSlot
+    Item {
+        id: leadingSlot
+        objectName: bar.named("formatBarLeading")
+        anchors.left: parent.left
+        anchors.leftMargin: 6 + bar.leftInset
+        anchors.verticalCenter: parent.verticalCenter
+        width: childrenRect.width
+        height: parent.height
+    }
     Item {
         id: trailingSlot
         objectName: bar.named("formatBarTrailing")
@@ -147,9 +158,9 @@ Rectangle {
         objectName: bar.named("formatBarFlick")
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.left: parent.left
+        anchors.left: leadingSlot.width > 0 ? leadingSlot.right : parent.left
         anchors.right: trailingSlot.left
-        anchors.leftMargin: 6 + bar.leftInset
+        anchors.leftMargin: leadingSlot.width > 0 ? 4 : 6 + bar.leftInset
         anchors.rightMargin: trailingSlot.width > 0 ? 4 : bar.rightInset
         contentWidth: row.implicitWidth
         contentHeight: height

@@ -10,7 +10,11 @@ import QtQuick.Controls.Material
 BottomSheet {
     id: sheet
     objectName: "phoneToolSheet"
-    title: qsTr("All tools")
+    title: toolbox ? qsTr("My tools") : qsTr("All tools")
+    /// With the toolbox (qt/docs/toolbox.md, "On a phone"): the user's tools first (a tap takes one, a tap on the one
+    /// in hand edits it, a long press: its menu), "+", then the other tools; the pens, erasers, shapes, text boxes and
+    /// sticky notes are the user's tools then
+    readonly property bool toolbox: win.toolboxMode
 
     /// The tool bar's buttons by name (Main.qml's toolArea.slots)
     readonly property var slots: toolArea.slots
@@ -22,11 +26,12 @@ BottomSheet {
         return groups.variants(group).map(function(v) { return { group: group, key: v.key } })
     }
     readonly property var sections: [
-        { name: "draw", title: qsTr("Write and draw"),
-          cells: variantCells("pen").concat(variantCells("eraser"), [{ slot: "hand" }, { slot: "touchDrawing" },
-                 { slot: "text" }, { slot: "write" }, { slot: "sticky" }, { slot: "pdfText" }, { slot: "emoji" }]) },
+        { name: "draw", title: toolbox ? qsTr("Other tools") : qsTr("Write and draw"),
+          cells: toolbox ? [{ slot: "hand" }, { slot: "touchDrawing" }, { slot: "write" }, { slot: "pdfText" }, { slot: "emoji" }]
+                         : variantCells("pen").concat(variantCells("eraser"), [{ slot: "hand" }, { slot: "touchDrawing" },
+                           { slot: "text" }, { slot: "write" }, { slot: "sticky" }, { slot: "pdfText" }, { slot: "emoji" }]) },
         { name: "select", title: qsTr("Select"), cells: variantCells("select") },
-        { name: "shape", title: qsTr("Shapes"), cells: variantCells("shape") },
+        { name: "shape", title: qsTr("Shapes"), cells: toolbox ? [] : variantCells("shape") },
         { name: "geometry", title: qsTr("Setsquare, compass and curtain"), cells: variantCells("geometry") },
         { name: "insert", title: qsTr("Insert"), cells: [{ slot: "image" }, { slot: "sticker" }, { slot: "addPage" }] },
         { name: "document", title: qsTr("Document and view"),
@@ -64,6 +69,90 @@ BottomSheet {
         bottomPadding: 4
         readonly property int columns: Math.max(4, Math.floor((width - 16) / 76))
         readonly property real cellWidth: Math.floor((width - 16) / columns)
+        // The user's tools (the toolbox), and "+"
+        Column {
+            objectName: "phoneToolSection_mine"
+            visible: sheet.toolbox && !win.textDoc
+            width: parent.width
+            Flow {
+                x: 8
+                width: parent.width - 16
+                Repeater {
+                    model: sheet.toolbox ? (app.toolbox.revision, app.toolbox.tools()) : []
+                    delegate: Item {
+                        id: mine
+                        required property var modelData
+                        width: grid.cellWidth
+                        height: 76
+                        ToolEntryButton {
+                            objectName: "sheetEntry_" + mine.modelData.id
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 2
+                            cell: 48
+                            reorderable: false
+                            entry: mine.modelData
+                            name: win.toolEntryName(mine.modelData)
+                            inkColor: (app.colorPalette, app.toolbox.revision, app.toolEntryColor(mine.modelData))
+                            inHand: toolboxPane.inHand(mine.modelData)
+                            towardsPage: "up"
+                            onClicked: {
+                                const e = mine.modelData
+                                const editing = toolboxPane.inHand(e)
+                                sheet.close()
+                                if (editing) Qt.callLater(function() { toolEditor.openFor(e, toolboxPane, "bottom") })
+                                else app.applyToolEntry(e.id)
+                            }
+                            onHeld: {
+                                const e = mine.modelData
+                                sheet.close()
+                                Qt.callLater(function() { toolEntryMenu.openFor(e, toolboxPane, undefined) })
+                            }
+                            onSecondaryClicked: held(Qt.point(0, 0))
+                        }
+                        Label {
+                            x: 2
+                            y: 50
+                            width: parent.width - 4
+                            horizontalAlignment: Text.AlignHCenter
+                            text: win.toolEntryName(mine.modelData)
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
+                            font.pixelSize: 11
+                            lineHeight: 0.9
+                            color: "#3c4043"
+                        }
+                    }
+                }
+                AbstractButton {
+                    objectName: "sheetAddTool"
+                    width: grid.cellWidth
+                    height: 76
+                    focusPolicy: Qt.NoFocus
+                    onClicked: {
+                        sheet.close()
+                        Qt.callLater(function() { toolTypeMenu.ask("add", "", toolboxPane) })
+                    }
+                    contentItem: Item {
+                        Image {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 12
+                            source: app.iconUrl("xqt-plus")
+                            sourceSize.width: 26
+                            sourceSize.height: 26
+                        }
+                        Label {
+                            y: 50
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            text: qsTr("Add a tool")
+                            font.pixelSize: 11
+                            color: "#3c4043"
+                        }
+                    }
+                }
+            }
+        }
         Repeater {
             model: sheet.sections
             delegate: Column {

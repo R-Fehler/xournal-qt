@@ -550,7 +550,7 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   exports. Left: the device checks (Android's calendar intent and `.ics` hand-off above all).*
 - Rotating PDF pages in a `.xopp`: a turned copy in the hidden `.name.pages.pdf` (Xournal++ reads it too).
 - Highlighter opacity on strokes: stays upstream's (compatibility).
-- [?] `qt/toolbox`: user-defined tools as the tool bar (Drawboard-like), the default mode: each entry is a tool
+- [x] `qt/toolbox`: user-defined tools as the tool bar (Drawboard-like), the default mode: each entry is a tool
   with its settings (pen, highlighter, shapes, sticky notes, …, with color, width, line style, fill), in a fixed
   order with dividers; added with "+", edited, reordered (arrows in its menu, long-press drag), the first N shown
   and the rest in a popup on smaller screens. It replaces the pen pill with its cycling width. Converge the tool
