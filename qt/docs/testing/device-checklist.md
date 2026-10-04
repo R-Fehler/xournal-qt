@@ -2504,3 +2504,16 @@ Finder:
 - [ ] Double-click a .xopp in Finder: it opens in Xournal Qt (also while Xournal Qt is running already).
 - [ ] Right-click a PDF and a .md file → Open With → Xournal Qt: it opens.
 - [ ] Drop a PDF on the Dock icon: it opens.
+
+## Line styles, fill and the laser pointer (qt/pen-styles)
+
+Line styles:
+- [ ] With the pen in hand, hold (or right-click) the pen button: below its entries the line styles show as samples
+      (solid, dashed, dash-dot, dotted). A tap on one chooses it; the pen draws with it at once, also with pressure (the
+      dashes follow the pen, no gaps or blobs at fast strokes).
+- [ ] The same options in the shapes button's menu: a rectangle, an ellipse and an arrow drawn dashed.
+- [ ] With the highlighter in hand the options are not offered (upstream: the highlighter has no line styles).
+- [ ] The pen pill (full screen, without the bar): hold its pen button; the line styles are there too.
+- [ ] On a phone (the menu is a bottom sheet): the samples are in the sheet and can be tapped.
+- [ ] Save, close, open again: the dashes are kept. The .xopp opens in Xournal++ with the same dashes.
+- [ ] Export a PDF and print: the dashes look as on the screen.

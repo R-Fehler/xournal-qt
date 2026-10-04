@@ -4806,7 +4806,8 @@ TEST_F(MainWindowTest, cyclingToolButtons) {
     ASSERT_TRUE(shapes->property("visible").toBool()) << "a long press: the list";
     EXPECT_EQ(shapes->property("title").toString(), QStringLiteral("Shapes"));
     ASSERT_NE(entryOf(shapes, "variant_arrow"), nullptr);
-    EXPECT_EQ(shapes->property("count").toInt(), 8) << "the seven shapes (and the geometry's entry, not offered)";
+    EXPECT_EQ(shapes->property("count").toInt(), 9)
+            << "the seven shapes (and the geometry's entry, not offered; the pen's options)";
     QMetaObject::invokeMethod(entryOf(shapes, "variant_arrow"), "triggered");
     until([&] { return !shapes->property("visible").toBool(); });
     EXPECT_EQ(controller->drawingType(), QStringLiteral("arrow"));
@@ -4839,6 +4840,60 @@ TEST_F(MainWindowTest, cyclingToolButtons) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
     settings->set("toolVariants", "");
     controller->selectTool("pen");
+}
+
+// The pen's options (qt/pen-styles): the menu of the pen and shape buttons offers upstream's line styles while the pen
+// is in hand (the highlighter has none, as upstream); the pen keeps the one chosen, also over a restart.
+TEST_F(MainWindowTest, thePensMenuOffersItsLineStyles) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setWidth(1920);
+    wait(100);
+    controller->selectTool("pen");
+    controller->setDrawingType("default");
+    controller->setLineStyle("plain");
+    auto* pen = find<QQuickItem>("penButton");
+    auto* menu = find<QObject>("penButtonVariants");
+    ASSERT_NE(pen, nullptr);
+    ASSERT_NE(menu, nullptr);
+    QMetaObject::invokeMethod(pen, "pressAndHold");
+    until([&] { return menu->property("visible").toBool(); });
+    ASSERT_TRUE(menu->property("visible").toBool());
+    auto* options = qobject_cast<QQuickItem*>(entryOf(menu, "penStyleOptions"));
+    ASSERT_NE(options, nullptr);
+    EXPECT_TRUE(options->isVisible());
+    EXPECT_GT(options->height(), 0);
+    const auto childNamed = [](QQuickItem* root, const QString& name) {
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* it) -> QQuickItem* {
+            if (it->objectName() == name) return it;
+            for (QQuickItem* c: it->childItems()) {
+                if (QQuickItem* f = walk(c)) return f;
+            }
+            return nullptr;
+        };
+        return walk(root);
+    };
+    for (const char* name: {"lineStyle_plain", "lineStyle_dash", "lineStyle_dashdot", "lineStyle_dot"}) {
+        EXPECT_NE(childNamed(options, name), nullptr) << name;
+    }
+    auto* dash = childNamed(options, "lineStyle_dash");
+    ASSERT_NE(dash, nullptr);
+    until([&] { return dash->isVisible() && dash->width() > 0; });
+    click(dash);
+    EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "a tap on the sample chooses it";
+    QMetaObject::invokeMethod(menu, "close");
+    until([&] { return !menu->property("visible").toBool(); });
+
+    // The highlighter has no line styles: no options for it
+    controller->selectTool("highlighter");
+    EXPECT_FALSE(controller->hasLineStyle());
+    EXPECT_FALSE(options->property("offered").toBool());
+    controller->selectTool("pen");
+    EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash")) << "the pen kept its style";
+
+    // Kept over a restart (upstream's tool settings)
+    restart();
+    EXPECT_EQ(controller->lineStyle(), QStringLiteral("dash"));
+    controller->setLineStyle("plain");
 }
 
 // On a touch screen a finger held on a plain button shows its name above the finger, and letting go does not press it

@@ -153,6 +153,11 @@ class AppController: public QObject {
     /// Upstream's drawing type of the tool: default (freehand), strokeRecognizer, line, rectangle, ellipse, arrow,
     /// doubleArrow, drawCoordinateSystem
     Q_PROPERTY(QString drawingType READ drawingType WRITE setDrawingType NOTIFY toolChanged)
+    /// The pen's line style, by upstream's names (StrokeStyle): plain, dash, dashdot, dot ("custom": dashes of a file
+    /// or of upstream's settings). Upstream keeps it per tool, in its settings, and in .xopp (`style`).
+    Q_PROPERTY(QString lineStyle READ lineStyle WRITE setLineStyle NOTIFY toolChanged)
+    /// The tool in hand draws with a line style (upstream: the pen only, TOOL_CAP_LINE_STYLE)
+    Q_PROPERTY(bool hasLineStyle READ hasLineStyle NOTIFY toolChanged)
     /// 0 = very fine ... 4 = very thick (upstream ToolSize), 5 = the tool's own width (customWidth)
     Q_PROPERTY(int size READ size NOTIFY toolChanged)
     /// The adjustable width of the tool (points; 0: the tool has no sizes). Setting it selects it (size 5).
@@ -335,6 +340,9 @@ public:
     Q_INVOKABLE QStringList fontFamilies() const;
     QString drawingType() const;
     void setDrawingType(const QString& type);
+    QString lineStyle() const;
+    void setLineStyle(const QString& name);
+    bool hasLineStyle() const;
     int size() const;
     QVariantList palette() const;
     QVariantList toolbarColors() const;
