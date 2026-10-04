@@ -1,6 +1,7 @@
 // Without a tool bar (full screen, or the bar put away) and with pen or highlighter in hand: a small pill at a side
 // of the screen with the colors one draws with, the width and a pen / highlighter switch. Drag it to another side.
 // The width knob: a tap goes to the next of the five widths of the tool bar (the fifth is the one set there).
+// "+": the color chooser (ColorChooser.qml): these colors and "Add a color…", then the color palettes.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -127,12 +128,13 @@ Rectangle {
             }
         }
         AbstractButton {
+            id: addColor
             objectName: "penPillAddColor"
             implicitWidth: pill.button
             implicitHeight: pill.button
-            onClicked: pillColorDialog.open()
+            onClicked: pillChooser.open()
             ToolTip.visible: hovered
-            ToolTip.text: qsTr("Add a color (press and hold one to remove it)")
+            ToolTip.text: qsTr("More colors: palettes, add a color (press and hold one to remove it)")
             ToolTip.delay: 600
             contentItem: Item {
                 Rectangle {
@@ -142,6 +144,45 @@ Rectangle {
                     border.width: 1
                     border.color: "#9e9e9e"
                     Label { anchors.centerIn: parent; text: "+"; font.pixelSize: 16; color: "#5f6368" }
+                }
+            }
+            // The color chooser: the pill's colors and "Add a color…", then the color palettes
+            ColorChooser {
+                id: pillChooser
+                objectName: "penPillChooser"
+                anchorItem: addColor
+                side: pill.side
+                Label { text: qsTr("Pen colors"); font.weight: Font.DemiBold; color: "#5f6368" }
+                Grid {
+                    columns: pillChooser.columns
+                    columnSpacing: pillChooser.asSheet ? 8 : 0
+                    Repeater {
+                        model: pillChooser.opened ? app.penColors : []
+                        delegate: AbstractButton {
+                            id: chooserDot
+                            required property color modelData
+                            objectName: "penPillChooserColor"
+                            implicitWidth: 40
+                            implicitHeight: 44
+                            focusPolicy: Qt.NoFocus
+                            onClicked: { app.setColor(modelData); pillChooser.close() }
+                            contentItem: Item {
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: 28; height: 28; radius: 14
+                                    color: chooserDot.modelData
+                                    border.width: Qt.colorEqual(app.color, chooserDot.modelData) ? 3 : 1
+                                    border.color: Qt.colorEqual(app.color, chooserDot.modelData) ? Material.accentColor : "#9e9e9e"
+                                }
+                            }
+                        }
+                    }
+                }
+                Button {
+                    objectName: "penPillChooserAdd"
+                    flat: true
+                    text: qsTr("Add a color…")
+                    onClicked: { pillChooser.close(); pillColorDialog.open() }
                 }
             }
         }

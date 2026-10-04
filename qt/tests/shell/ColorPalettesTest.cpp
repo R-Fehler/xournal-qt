@@ -186,3 +186,45 @@ TEST(ColorPalettes, theHighlighterOpacityFollowsTheCurrentPage) {
     EXPECT_DOUBLE_EQ(c.highlighterOpacity(), 0.8) << "dark paper";
     c.shutdown();
 }
+
+TEST(ColorPalettes, aColorTakenFromAPaletteRemembersItsRole) {
+    AppController c;
+    c.setColorPalette("classic");
+    c.newDocument();
+    c.selectTool("pen");
+    c.setPaletteColor("marker", "ideas");
+    EXPECT_EQ(c.color(), QColor("#9C36B5"));
+    EXPECT_EQ(c.colorRole(), "marker:ideas");
+    EXPECT_EQ(c.colorPalette(), "marker") << "its palette is the chosen one";
+    c.selectTool("highlighter");
+    EXPECT_EQ(c.colorRole(), "") << "per tool";
+    c.setPaletteColor("marker", "keyTerms");
+    EXPECT_EQ(c.color(), QColor("#FFE066")) << "the highlighter takes the highlight color";
+    EXPECT_EQ(c.colorRoleOf("highlighter"), "marker:keyTerms");
+    EXPECT_EQ(c.colorRoleOf("pen"), "marker:ideas");
+
+    // Another palette: the colors follow their roles; a role it leaves out keeps its color (and its role)
+    c.setColorPalette("colorblind-6");
+    EXPECT_EQ(c.color(), QColor("#F0E442")) << "the key terms highlight there";
+    EXPECT_EQ(c.colorRoleOf("highlighter"), "colorblind-6:keyTerms");
+    EXPECT_EQ(c.colorRoleOf("pen"), "marker:ideas") << "no ideas in Colorblind-safe (6)";
+    c.selectTool("pen");
+    EXPECT_EQ(c.color(), QColor("#9C36B5"));
+    c.setColorPalette("pastel");
+    EXPECT_EQ(c.color(), QColor("#B5578A")) << "follows again where the role is";
+    EXPECT_EQ(c.colorRole(), "pastel:ideas");
+
+    // A color of one's own: no role
+    c.setColor(QColor("#123456"));
+    EXPECT_EQ(c.colorRole(), "");
+    c.setColorPalette("classic");
+    EXPECT_EQ(c.color(), QColor("#123456")) << "stays";
+
+    // For tool presets (qt/toolbox)
+    EXPECT_EQ(c.paletteColor("dark", "warnings", true), QColor("#803026"));
+    EXPECT_FALSE(c.paletteColor("colorblind-6", "definitions", false).isValid());
+    EXPECT_EQ(c.followPalette("marker:headings", "colorblind-6", false), QColor("#0072B2"));
+    EXPECT_FALSE(c.followPalette("marker:ideas", "colorblind-6", false).isValid());
+    c.setColorPalette("classic");
+    c.shutdown();
+}

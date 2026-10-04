@@ -245,9 +245,10 @@ tools" are pinned at the end, outside the part that could scroll.
 The bar is a flexible space filler: each group has several forms, and the bar takes the richest that fits, in this
 order of compression as the room runs short:
 
-1. everything expanded: all palette colors and "+", the five widths;
+1. everything expanded: all palette colors and "+" (the color chooser, [color-palettes.md](color-palettes.md)), the
+   five widths;
 2. the widths become **one cycling width button** (a tap: the next width, as the pen pill's; a long press: the five);
-3. the colors become **the current color, the recent ones and a palette button**: at least 4 recent colors (used
+3. the colors become **the current color, the recent ones and a palette button** (the color chooser): at least 4 recent colors (used
    last, then the palette's), as many as fit (they are the filler: more room, more colors);
 4. low-priority buttons go into **"more tools"**, one by one: New, Open, Save, Settings, Present, Full screen, Edit as
    notes, Open externally, Search, Add a page, Image, Emoji, Mark PDF text, Setsquare/compass, Shapes;

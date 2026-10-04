@@ -2504,3 +2504,36 @@ Finder:
 - [ ] Double-click a .xopp in Finder: it opens in Xournal Qt (also while Xournal Qt is running already).
 - [ ] Right-click a PDF and a .md file → Open With → Xournal Qt: it opens.
 - [ ] Drop a PDF on the Dock icon: it opens.
+
+## Color palettes (qt/color-palettes)
+
+qt/docs/color-palettes.md. A document of notes, and one page with a dark background (Page → Background, a dark color;
+or a page made dark in Xournal++).
+
+- [ ] Desktop, wide window: "+" after the tool bar's colors opens the color chooser: the tab "Colors" (the tool bar's
+      colors, the ones used lately, "Add a color…" opens the picker with the hex field), then Classic, Marker, Pastel
+      study, Colorblind-safe (8), Colorblind-safe (6), Dark. The tab bar scrolls sideways with a finger and the mouse
+      wheel; every tab can be reached.
+- [ ] A palette's tab: each color on a small piece of the page's paper, its role's name under it (Body, Warnings,
+      Key terms, …), the name also as a tool tip. Colorblind-safe (6) shows six (no Definitions, no Ideas). Marker and
+      the colorblind palettes show their sources (Open Color, Okabe-Ito, Paul Tol) in small gray text.
+- [ ] Take Marker → Warnings with the pen: the pen writes in Marker's red; the chooser closes. Open it again: it opens
+      on Marker with Warnings marked.
+- [ ] Highlighter in hand: the tabs show the highlight colors as marker strokes, "at 50 % on this page". Take Marker →
+      Key terms: the highlighter is yellow. On the dark page: "at 80 %", the strokes in the cells stronger.
+- [ ] Settings → Pen → Colors: the palette is Marker now (taking a color made it the chosen one); the dots under it
+      are its ink colors with their names as tool tips. Choose Colorblind-safe (6): the pen (Warnings) and the
+      highlighter (Key terms) take that palette's colors at once. Choose Classic: they follow again.
+- [ ] Pen with Marker → Ideas, then Colorblind-safe (6) in the settings: the pen keeps its grape (no Ideas there);
+      Pastel study: the pen turns pastel pink.
+- [ ] A color from the "Colors" tab (or the tool bar): no role is marked in the palette tabs any more; switching the
+      palette leaves that color alone.
+- [ ] Narrower window (recent colors): the palette button opens the same chooser below it, inside the window.
+- [ ] Tool bar at the left or right (rail): the chooser opens beside the bar, inside the window.
+- [ ] Phone (or a window narrower than 600 px): a long press on the dock's color button: the chooser as a sheet at
+      the bottom, with the same tabs; the roles in rows across the sheet, all visible; Android's back closes it.
+- [ ] Full screen (compact chrome), pen in hand: the pen pill's "+" opens the chooser beside the pill, with the
+      pill's colors and "Add a color…" in the first tab; drag the pill to the other sides: it still opens inside the
+      window.
+- [ ] (Known) A stroke of the highlighter on the dark page is drawn like on light paper (upstream's fixed opacity,
+      multiplied): it hardly shows. Only the chooser applies the 0.8 so far.

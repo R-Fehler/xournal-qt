@@ -715,6 +715,15 @@
   smoke-tested without Homebrew. Intel needs the libraries from elsewhere; signing needs an Apple account
   (`qt/docs/macos.md`).
 
+- **Color palettes, `qt/color-palettes` (2026-10-04).** The author's role-based palettes (Classic, Marker, Pastel
+  study, Colorblind-safe 8 and 6, Dark; `qt/resources/palettes/palettes.json`, kept verbatim) as tabs of a color
+  chooser (`ColorChooser.qml`) beside the tool bar's colors and "Add a color…": in the tool bar ("+", the palette
+  button), the phone dock's sheet and the pen pill. A tab shows only the roles its palette defines, with their names;
+  the highlighter gets the highlight colors at the opacity of the page's paper (0.5 light, 0.8 dark). The chosen
+  palette is a setting (Settings → Pen → Colors); a color taken from a palette remembers `palette:role` per tool and
+  follows a palette switch (`setPaletteColor`, `followPalette` for `qt/toolbox`). Strokes still use upstream's fixed
+  highlighter opacity ([color-palettes.md](color-palettes.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

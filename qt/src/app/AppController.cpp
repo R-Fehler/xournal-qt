@@ -1551,7 +1551,120 @@ void AppController::setColorPalette(const QString& id) {
     }
     app->getSettings()->getCustomElement(CUSTOM).setString("colorPalette", id.toStdString());
     app->getSettings()->customSettingsChanged();
+    followColorPalette(id);
     Q_EMIT colorPaletteChanged();
+}
+
+namespace {
+/// The tools whose colors can come from a palette, and which of a role's colors they take
+std::optional<std::pair<ToolType, ColorPalettes::Kind>> paletteTool(const QString& tool) {
+    if (tool == "pen") {
+        return std::pair{TOOL_PEN, ColorPalettes::Kind::Ink};
+    }
+    if (tool == "highlighter") {
+        return std::pair{TOOL_HIGHLIGHTER, ColorPalettes::Kind::Highlight};
+    }
+    if (tool == "text") {
+        return std::pair{TOOL_TEXT, ColorPalettes::Kind::Ink};
+    }
+    return std::nullopt;
+}
+}  // namespace
+
+QMap<QString, QString> AppController::colorRoles() const {
+    std::string stored;
+    app->getSettings()->getCustomElement(CUSTOM).getString("colorRoles", stored);
+    QMap<QString, QString> roles;
+    for (const QString& entry: QString::fromStdString(stored).split(';', Qt::SkipEmptyParts)) {
+        const QString tool = entry.section('=', 0, 0).trimmed();
+        const ColorRef ref = ColorRef::parse(entry.section('=', 1));
+        if (paletteTool(tool) && ref.valid()) {
+            roles.insert(tool, ref.toString());
+        }
+    }
+    return roles;
+}
+
+void AppController::storeColorRoles(const QMap<QString, QString>& roles) {
+    QStringList entries;
+    for (auto it = roles.begin(); it != roles.end(); ++it) {
+        entries << it.key() + '=' + it.value();
+    }
+    app->getSettings()->getCustomElement(CUSTOM).setString("colorRoles", entries.join(';').toStdString());
+    app->getSettings()->customSettingsChanged();
+}
+
+QString AppController::colorRoleOf(const QString& tool) const {
+    const auto t = paletteTool(tool);
+    const ColorRef ref = ColorRef::parse(colorRoles().value(tool));
+    if (!t || !ref.valid()) {
+        return {};
+    }
+    // Only while the tool still has that color (it may have been changed another way since)
+    const auto c = ColorPalettes::builtIn().color(ref, t->second);
+    const Color now = app->getToolHandler()->getTool(t->first).getColor();
+    return c && toQColor(now) == *c ? ref.toString() : QString();
+}
+
+QString AppController::colorRole() const { return colorRoleOf(tool()); }
+
+void AppController::setPaletteColor(const QString& paletteId, const QString& role) {
+    const QString inHand = tool();
+    const auto t = paletteTool(inHand);
+    const auto c = ColorPalettes::builtIn().color(paletteId, role,
+                                                  t ? t->second : ColorPalettes::Kind::Ink);
+    if (!c) {
+        return;
+    }
+    app->getToolHandler()->setColor(toColor(*c), true);
+    if (t) {
+        QMap<QString, QString> roles = colorRoles();
+        roles.insert(inHand, ColorRef{paletteId, role}.toString());
+        storeColorRoles(roles);
+    }
+    setColorPalette(paletteId);  // (the other tools' palette colors follow)
+    Q_EMIT toolChanged();
+}
+
+void AppController::followColorPalette(const QString& paletteId) {
+    QMap<QString, QString> roles = colorRoles();
+    ToolHandler* th = app->getToolHandler();
+    bool changed = false;
+    for (const QString& tool: {QStringLiteral("pen"), QStringLiteral("highlighter"), QStringLiteral("text")}) {
+        const QString ref = colorRoleOf(tool);
+        if (ref.isEmpty()) {
+            continue;
+        }
+        const auto t = paletteTool(tool);
+        const auto c = ColorPalettes::builtIn().follow(ColorRef::parse(ref), paletteId, t->second);
+        if (!c) {
+            continue;  // (that palette leaves the role out: the color stays, and follows again later)
+        }
+        if (th->getToolType() == t->first) {
+            th->setColor(toColor(*c), false);
+        } else {
+            th->getTool(t->first).setColor(toColor(*c));
+        }
+        roles.insert(tool, ColorRef{paletteId, ColorRef::parse(ref).role}.toString());
+        changed = true;
+    }
+    if (changed) {
+        storeColorRoles(roles);
+        Q_EMIT toolChanged();
+    }
+}
+
+QColor AppController::paletteColor(const QString& paletteId, const QString& role, bool highlight) const {
+    return ColorPalettes::builtIn()
+            .color(paletteId, role, highlight ? ColorPalettes::Kind::Highlight : ColorPalettes::Kind::Ink)
+            .value_or(QColor());
+}
+
+QColor AppController::followPalette(const QString& ref, const QString& paletteId, bool highlight) const {
+    return ColorPalettes::builtIn()
+            .follow(ColorRef::parse(ref), paletteId,
+                    highlight ? ColorPalettes::Kind::Highlight : ColorPalettes::Kind::Ink)
+            .value_or(QColor());
 }
 
 QColor AppController::paperColor() const {
@@ -4081,6 +4194,9 @@ void AppController::selectTool(const QString& name) {
 
 void AppController::setColor(const QColor& c) {
     app->getToolHandler()->setColor(toColor(c), true);
+    if (QMap<QString, QString> roles = colorRoles(); roles.remove(tool()) > 0) {
+        storeColorRoles(roles);  // (a color of one's own: no role)
+    }
     Q_EMIT toolChanged();
 }
 

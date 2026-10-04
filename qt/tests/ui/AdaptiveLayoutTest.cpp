@@ -3551,3 +3551,232 @@ TEST_F(PhoneChromeTest, writingChosenFromTheSheetKeepsTheFocusOnThePage) {
     wait(100);
     EXPECT_FALSE(canvas->hasActiveFocus()) << "no text written: the focus stays where it went";
 }
+
+// --- the color palettes (qt/color-palettes) -------------------------------------------------------------------------
+
+namespace {
+/// The color chooser (ColorChooser.qml): its tabs and the roles of the palette shown
+class ColorChooserTest: public PhoneChromeTest {
+protected:
+    QQuickItem* inPopup(QObject* popup, const QString& name) const {
+        std::function<QQuickItem*(QQuickItem*)> walk = [&](QQuickItem* i) -> QQuickItem* {
+            if (i->objectName() == name && i->isVisible()) {
+                return i;
+            }
+            for (QQuickItem* c: i->childItems()) {
+                if (QQuickItem* f = walk(c)) {
+                    return f;
+                }
+            }
+            return nullptr;
+        };
+        auto* content = popup->property("contentItem").value<QQuickItem*>();
+        return content ? walk(content) : nullptr;
+    }
+    /// The role cells shown, by role key
+    QStringList rolesShown(QObject* popup) const {
+        QStringList keys;
+        std::function<void(QQuickItem*)> walk = [&](QQuickItem* i) {
+            if (i->objectName().startsWith("paletteRole_") && i->isVisible()) {
+                keys << i->objectName().mid(12);
+            }
+            for (QQuickItem* c: i->childItems()) {
+                walk(c);
+            }
+        };
+        walk(popup->property("contentItem").value<QQuickItem*>());
+        return keys;
+    }
+    /// The tab of a palette ("colors": the first), as a tap on it does (it may be scrolled out of the tab bar)
+    void showTab(QObject* popup, const QString& paletteId) {
+        QQuickItem* tabs = inPopup(popup, popup->objectName() + "Tabs");
+        ASSERT_NE(tabs, nullptr);
+        int at = -1;
+        for (int i = 0; i < tabs->property("count").toInt(); ++i) {
+            QQuickItem* tab = nullptr;
+            QMetaObject::invokeMethod(tabs, "itemAt", Q_RETURN_ARG(QQuickItem*, tab), Q_ARG(int, i));
+            at = tab && tab->objectName() == "colorTab_" + paletteId ? i : at;
+        }
+        ASSERT_GE(at, 0) << paletteId.toStdString();
+        tabs->setProperty("currentIndex", at);
+        wait(80);
+    }
+    QColor color() const { return controller->property("color").value<QColor>(); }
+    void setUpPalettes() {
+        controller->setColorPalette("classic");
+        controller->selectTool("pen");
+        controller->setColor(Qt::black);
+    }
+};
+}  // namespace
+
+// The chooser has the tool bar's colors and a tab per palette; a palette's tab shows only the roles it defines, with
+// their names; a color taken from it remembers its role and makes its palette the chosen one
+TEST_F(ColorChooserTest, aTabPerPaletteWithItsRoles) {
+    openDocument();
+    setUpPalettes();
+    resize(1280, 800);
+    auto* chooser = window->findChild<QObject*>("colorPalette");
+    ASSERT_NE(chooser, nullptr);
+    click(named("paletteButton"));
+    ASSERT_TRUE(opened(chooser, true));
+    settled(chooser);
+    EXPECT_TRUE(insideWindow(popupRect(chooser)));
+    auto* tabs = inPopup(chooser, "colorPaletteTabs");
+    ASSERT_NE(tabs, nullptr);
+    EXPECT_EQ(tabs->property("count").toInt(), 7) << "the colors and six palettes";
+    EXPECT_NE(inPopup(chooser, "paletteAddColor"), nullptr) << "the first tab: the colors and \"Add a color…\"";
+    EXPECT_TRUE(rolesShown(chooser).isEmpty());
+
+    showTab(chooser, "marker");
+    EXPECT_EQ(rolesShown(chooser), QStringList({"body", "warnings", "keyTerms", "examples", "definitions", "headings",
+                                                "questions", "ideas"}));
+    EXPECT_EQ(inPopup(chooser, "paletteAddColor"), nullptr);
+    auto* keyTerms = inPopup(chooser, "paletteRole_keyTerms");
+    ASSERT_NE(keyTerms, nullptr);
+    EXPECT_EQ(keyTerms->property("roleName").toString(), "Key terms") << "its name (label and tool tip)";
+    EXPECT_EQ(keyTerms->property("roleColor").value<QColor>(), QColor("#E8590C")) << "the pen: ink";
+    ASSERT_NE(inPopup(chooser, "paletteSource"), nullptr);
+    EXPECT_TRUE(inPopup(chooser, "paletteSource")->property("text").toString().contains("Open Color (MIT)"));
+    EXPECT_TRUE(insideWindow(popupRect(chooser)));
+
+    showTab(chooser, "colorblind-6");
+    EXPECT_EQ(rolesShown(chooser), QStringList({"body", "warnings", "keyTerms", "examples", "headings", "questions"}))
+            << "only the roles it defines";
+
+    showTab(chooser, "marker");
+    click(inPopup(chooser, "paletteRole_warnings"));
+    EXPECT_TRUE(opened(chooser, false)) << "a color taken: closed";
+    EXPECT_EQ(color(), QColor("#E03131"));
+    EXPECT_EQ(controller->colorRole(), "marker:warnings");
+    EXPECT_EQ(controller->colorPalette(), "marker") << "its palette is the chosen one now";
+
+    // Another palette chosen (Settings): the color follows its role
+    controller->setColorPalette("colorblind-6");
+    EXPECT_EQ(color(), QColor("#D55E00"));
+    EXPECT_EQ(controller->colorRole(), "colorblind-6:warnings");
+    // Opened again: on the palette of the color in hand, which is marked
+    click(named("paletteButton"));
+    ASSERT_TRUE(opened(chooser, true));
+    EXPECT_EQ(tabs->property("currentIndex").toInt(), 5) << "Colorblind-safe (6)";
+    ASSERT_NE(inPopup(chooser, "paletteRole_warnings"), nullptr);
+    EXPECT_TRUE(inPopup(chooser, "paletteRole_warnings")->property("current").toBool());
+    // A color of the first tab: no role any more
+    showTab(chooser, "colors");
+    auto* swatch = inPopup(chooser, "paletteSwatch");
+    ASSERT_NE(swatch, nullptr);
+    click(swatch);
+    EXPECT_TRUE(opened(chooser, false));
+    EXPECT_EQ(controller->colorRole(), "");
+    controller->setColorPalette("classic");
+}
+
+// With the highlighter the palettes give their highlight colors, at the opacity of the page's paper: 0.5 on light, 0.8
+// on dark
+TEST_F(ColorChooserTest, theHighlighterTakesHighlightColors) {
+    openDocument();
+    setUpPalettes();
+    resize(1920, 1080);
+    EXPECT_EQ(named("colorStrip")->property("mode").toString(), "full");
+    auto* chooser = window->findChild<QObject*>("colorPalette");
+    controller->selectTool("highlighter");
+    click(named("addColorButton"));
+    ASSERT_TRUE(opened(chooser, true)) << "\"+\" opens the chooser (with \"Add a color…\" in its first tab)";
+    settled(chooser);
+    EXPECT_TRUE(insideWindow(popupRect(chooser)));
+    showTab(chooser, "marker");
+    auto* keyTerms = inPopup(chooser, "paletteRole_keyTerms");
+    ASSERT_NE(keyTerms, nullptr);
+    EXPECT_EQ(keyTerms->property("roleColor").value<QColor>(), QColor("#FFE066")) << "yellow 3";
+    EXPECT_DOUBLE_EQ(chooser->property("highlightOpacity").toDouble(), 0.5);
+    EXPECT_TRUE(inPopup(chooser, "paletteHint")->property("text").toString().contains("50 %"));
+    click(keyTerms);
+    EXPECT_TRUE(opened(chooser, false));
+    EXPECT_EQ(color(), QColor("#FFE066"));
+    EXPECT_EQ(controller->colorRole(), "marker:keyTerms");
+    controller->selectTool("pen");
+    EXPECT_EQ(controller->colorRole(), "") << "kept per tool: the pen's color has none";
+    controller->selectTool("highlighter");
+    EXPECT_EQ(controller->colorRole(), "marker:keyTerms");
+
+    // Dark paper: 0.8
+    {
+        Document* doc = controller->tabManager().currentSession()->getDocument();
+        std::unique_lock lock(*doc);
+        doc->getPage(controller->tabManager().currentSession()->getCurrentPageNo())->setBackgroundColor(Color(0x1e1f22U));
+    }
+    click(named("addColorButton"));
+    ASSERT_TRUE(opened(chooser, true));
+    EXPECT_DOUBLE_EQ(chooser->property("highlightOpacity").toDouble(), 0.8);
+    EXPECT_TRUE(inPopup(chooser, "paletteHint")->property("text").toString().contains("80 %"));
+    QTest::keyClick(window, Qt::Key_Escape);
+    EXPECT_TRUE(opened(chooser, false));
+    controller->setColorPalette("classic");
+}
+
+// On a phone the chooser is a sheet at the bottom with the same tabs; the pen pill of the compact chrome has it too;
+// Settings, Pen chooses the palette
+TEST_F(ColorChooserTest, onAPhoneInThePenPillAndInTheSettings) {
+    openDocument();
+    setUpPalettes();
+    resize(412, 915);
+    until([&] { return named("colorCycleButton") && named("colorCycleButton")->isVisible(); });
+    auto* chooser = window->findChild<QObject*>("colorPalette");
+    QMetaObject::invokeMethod(named("colorCycleButton"), "pressAndHold");
+    ASSERT_TRUE(opened(chooser, true));
+    settled(chooser);
+    EXPECT_TRUE(chooser->property("asSheet").toBool());
+    showTab(chooser, "pastel");
+    const QRectF r = popupRect(chooser);
+    EXPECT_TRUE(insideWindow(r));
+    EXPECT_NEAR(r.bottom(), window->height(), 1.5) << "at the bottom";
+    EXPECT_EQ(rolesShown(chooser).size(), 8);
+    for (const QString& key: rolesShown(chooser)) {
+        EXPECT_TRUE(r.adjusted(-1, -1, 1, 1).contains(sceneRect(inPopup(chooser, "paletteRole_" + key))))
+                << key.toStdString();
+    }
+    click(inPopup(chooser, "paletteRole_headings"));
+    EXPECT_TRUE(opened(chooser, false));
+    EXPECT_EQ(color(), QColor("#4C7BB8"));
+
+    // The pen pill (the compact chrome of a wide window)
+    resize(1280, 800);
+    controller->selectTool("pen");
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "compact"));
+    until([&] { return named("penPill")->isVisible(); });
+    ASSERT_TRUE(named("penPill")->isVisible());
+    auto* pillChooser = window->findChild<QObject*>("penPillChooser");
+    ASSERT_NE(pillChooser, nullptr);
+    click(findItem("penPillAddColor"));
+    ASSERT_TRUE(opened(pillChooser, true));
+    settled(pillChooser);
+    EXPECT_TRUE(insideWindow(popupRect(pillChooser)));
+    EXPECT_EQ(pillChooser->property("shownPalette").toMap().value("id").toString(), "pastel")
+            << "opens on the palette the color in hand came from";
+    showTab(pillChooser, "colors");
+    EXPECT_NE(inPopup(pillChooser, "penPillChooserAdd"), nullptr) << "\"Add a color…\"";
+    EXPECT_NE(inPopup(pillChooser, "penPillChooserColor"), nullptr) << "the pill's colors";
+    showTab(pillChooser, "dark");
+    EXPECT_EQ(rolesShown(pillChooser).size(), 8);
+    click(inPopup(pillChooser, "paletteRole_ideas"));
+    EXPECT_TRUE(opened(pillChooser, false));
+    EXPECT_EQ(color(), QColor("#FF6EC7"));
+    EXPECT_EQ(controller->colorPalette(), "dark");
+    QMetaObject::invokeMethod(window, "chooseChrome", Q_ARG(QVariant, "full"));
+    wait(100);
+
+    // Settings, Pen: the palette
+    auto* row = named("colorPaletteRow");
+    ASSERT_NE(row, nullptr);
+    QQuickItem* combo = nullptr;
+    for (QQuickItem* c: row->childItems()) {
+        combo = c->inherits("QQuickComboBox") ? c : combo;
+    }
+    ASSERT_NE(combo, nullptr);
+    EXPECT_EQ(combo->property("currentText").toString(), "Dark");
+    controller->setColorPalette("colorblind-8");
+    wait(50);
+    EXPECT_EQ(combo->property("currentText").toString(), "Colorblind-safe (8)");
+    EXPECT_EQ(color(), QColor("#882255")) << "ideas, in the palette chosen";
+    controller->setColorPalette("classic");
+}

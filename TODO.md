@@ -473,12 +473,14 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   (and closed freehand strokes) with the stroke's color or another color, with upstream's fill opacity; the
   **laser pointer** (upstream's laser pen and highlighter tools: ink that fades after N seconds, a setting; never
   saved, never on the undo stack), reachable from the presentation mode.
-- [ ] `qt/color-palettes`: the author's role-based palettes (Classic, Marker, Pastel study, Colorblind-safe 8 and
+- [x] `qt/color-palettes`: the author's role-based palettes (Classic, Marker, Pastel study, Colorblind-safe 8 and
   6, Dark; JSON spec in the prompt of 2026-10-04, kept as a resource) as tabs in the color chooser, next to the
   existing picker and hex field. Roles keep their meaning across palettes (the role name shows as a tooltip); a
   palette may omit roles; each role has an ink and a highlight color; highlighter opacity 0.5 on light paper, 0.8
   on dark. The chosen palette is a setting. A color picked from a palette remembers its role, so tool presets can
   follow a palette switch (used by `qt/toolbox`).
+  Done (qt/docs/color-palettes.md); left: strokes still use upstream's fixed highlighter opacity (0.47, multiplied),
+  so 0.8 on dark paper shows only in the chooser until a per-stroke opacity seam is decided.
 - [ ] `qt/hover-cursors`: the pen's hover dot as fast as the crosshair (a cursor of its own instead of a drawn
   item, if that is the cause), the crosshair as a setting, and an **eraser preview**: a gray circle of the eraser's
   size and shape while hovering.
