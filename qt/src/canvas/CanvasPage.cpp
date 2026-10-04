@@ -523,6 +523,11 @@ bool CanvasPage::onButtonReleaseEvent(const PositionInputData& pos) {
     }
     if (this->selector) {
         // Port of XojPageView::onButtonReleaseEvent (selector part)
+        // xournal-qt: the lasso the selection is made with (a sticker's picture is cut to it: qt/docs/stickers.md)
+        const bool lassoUsed = dynamic_cast<LassoSelector*>(this->selector.get()) != nullptr &&
+                               !this->selector->userTapped(getZoom());
+        view.selectedWith(this->page, lassoUsed ? this->selector->getBoundary()
+                                                : std::vector<xoj::util::Point<double>>());
         const bool add = pos.isShiftDown() || pos.isControlDown() || view.selectingMore();
         const bool together = view.notes().hasSelection() || view.mixed().active();
         const bool aggregate = add && (view.getSelection() || together);

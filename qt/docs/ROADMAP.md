@@ -801,6 +801,16 @@
   into a document of the app the picture has its size from the page, and a note offers a link marker to the source
   page (a Markdown link in Markdown). Works in the reference and in text documents ([snip.md](snip.md)).
 
+- **Stickers, `qt/stickers` (2026-10-04).** A selection (ink, text, images, Markdown boxes, sticky notes) saved as a
+  sticker: a one-page `.xopp` of its size in the library's visible `Stickers/` folder (subfolders for topics) or in
+  the app-wide set, optionally with a picture of the PDF behind it (the region renderer, background only, cut to the
+  lasso), and on the clipboard. The sticker button (beside the image button; the phone's Insert section) opens a
+  picker of previews (this library / all libraries, folders, search, last used / own order / name / date added); a
+  tap pastes the sticker at its size in the middle of the visible page, selected, one undo step (smaller only to fit
+  the page). Own order in a hidden `.sticker-order.json` per folder (it syncs); last used per library in its config
+  folder. Card menu: rename, reorder, move, open, copy to all libraries / another library, delete
+  ([stickers.md](stickers.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

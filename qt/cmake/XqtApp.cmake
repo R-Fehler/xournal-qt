@@ -44,6 +44,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageFilterModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageClipboard.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/PageClipboard.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Stickers.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Stickers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/SettingsModel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ColorPalettes.h
@@ -118,6 +120,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppSnip.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppStickers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
@@ -240,7 +243,10 @@ set(XQT_QML_FILES
     src/app/qml/BottomSheet.qml
     src/app/qml/PhoneAppBar.qml
     src/app/qml/PhoneDock.qml
-    src/app/qml/PhoneToolSheet.qml)
+    src/app/qml/PhoneToolSheet.qml
+    src/app/qml/StickerButton.qml
+    src/app/qml/StickerPicker.qml
+    src/app/qml/StickerSaveDialog.qml)
 foreach(f ${XQT_QML_FILES})
     get_filename_component(alias ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${alias})
@@ -301,6 +307,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/StickerToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
@@ -350,7 +357,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/TextPdfTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/PdfPrintingTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/CitationLibraryTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ArxivTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/ArxivTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/StickersTest.cpp)
     target_link_libraries(xqt-shell-tests PRIVATE xqt-shell Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-shell-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-shell-tests PRIVATE "${TEST_CONFIG_DIR}")

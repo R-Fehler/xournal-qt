@@ -89,6 +89,8 @@ add_library(xqt-session STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/DocumentLink.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickyNote.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickerFile.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/session/StickerFile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/PageNoteSpace.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/session/Citation.h
@@ -163,6 +165,7 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/MixedSelection.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/Snip.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/Snip.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasStickers.cpp
 )
 target_include_directories(xqt-canvas PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src/canvas")
 target_link_libraries(xqt-canvas PUBLIC Qt6::Gui xqt-session xoj-tools)
@@ -181,6 +184,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/TextFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/DocumentLinkTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickyNoteTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/session/StickerFileTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/NoteSpaceTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/CitationTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/session/BookmarksTest.cpp)

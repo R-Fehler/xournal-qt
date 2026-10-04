@@ -78,15 +78,23 @@ public:
     /// Delete everything selected: one undo step (`what`: its name in the undo list)
     void deleteAll(const char* what = nullptr);
     static bool clipboardHas();
+    /// Notes and elements (sticky::serializeGroup) onto the clipboard, as copy() puts them there
+    static void setClipboard(const std::string& bytes);
     /// The copied notes and elements onto a page of this view, in their layout: where they were when it fits, else
     /// moved inside the page, a little further while a note would lie exactly on one there. Selected; one undo step.
     bool paste(size_t page);
+    /// Notes and elements (sticky::serializeGroup) onto a page, in their layout, centred at `centre` (page
+    /// coordinates) and kept inside the page, made smaller only when they are larger than the page (a sticker:
+    /// qt/docs/stickers.md). Selected; one undo step named `what`.
+    bool pasteAt(size_t page, const std::string& bytes, QPointF centre, const char* what);
 
     /// Something changed (undo, a layer went, a page went): what is no longer where it was leaves the selection
     void validate();
     void pageGoing(const CanvasPage* page);
 
 private:
+    /// Paste a group: moved by `offset` (nothing: where groupPastePlace puts it)
+    bool pasteGroup(size_t page, sticky::Group group, std::optional<QPointF> centre, const char* what);
     /// Under the document's lock
     std::optional<xoj::util::Rectangle<double>> boundsLocked() const;
     void repaint(const xoj::util::Rectangle<double>& area) const;

@@ -1955,7 +1955,7 @@ TEST_F(AdaptiveLayoutTest, twoRowsFitAt720) {
     EXPECT_EQ(toolPlan().value("layout").toString(), "twoRows");
     checkToolBar("720x1232");
     const QStringList lowPriority{"new", "open", "save", "settings", "present", "fullScreen", "search", "editAsNotes",
-                                  "openExternally", "addPage", "image", "emoji", "pdfText", "geometry", "shape"};
+                                  "openExternally", "addPage", "sticker", "image", "emoji", "pdfText", "geometry", "shape"};
     for (const QString& n: overflowNames()) {
         EXPECT_TRUE(lowPriority.contains(n)) << n.toStdString() << " is not a low-priority button";
     }

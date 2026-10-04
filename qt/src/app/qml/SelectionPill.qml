@@ -12,6 +12,8 @@ Pane {
     property Item canvasItem
     property var target: app
     property bool hidden: false
+    /// "Save as sticker…" (qt/docs/stickers.md): the window opens its dialog
+    signal stickerRequested()
     property string namePrefix: ""
     function named(n) { return namePrefix === "" ? n : namePrefix + n.charAt(0).toUpperCase() + n.slice(1) }
     readonly property bool readingOnly: canvasItem.readingOnly
@@ -64,6 +66,13 @@ Pane {
         IconButton { objectName: pill.named("selectionCopy"); iconName: "xopp-edit-copy"; tip: qsTr("Copy (Ctrl+C)"); onClicked: pill.target.copySelection() }
         IconButton { objectName: pill.named("selectionCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut (Ctrl+X)"); onClicked: pill.target.cutSelection() }
         IconButton { objectName: pill.named("selectionPaste"); visible: !pill.readingOnly; iconName: "xopp-edit-paste"; tip: qsTr("Paste (Ctrl+V)"); onClicked: pill.target.pasteElements() }
+        IconButton {
+            objectName: pill.named("selectionSticker")
+            visible: pill.target === app  // (the notes; not the reference beside them)
+            iconName: "xqt-sticker"
+            tip: qsTr("Save as sticker… (to paste it again from the sticker button)")
+            onClicked: pill.stickerRequested()
+        }
         IconButton { objectName: pill.named("selectionDelete"); visible: !pill.readingOnly; iconName: "xqt-delete"; tip: qsTr("Delete (Del)"); onClicked: pill.target.deleteSelection() }
         ToolSeparator {}
         // Select more (qt/touch-multiselect): taps add notes and elements to the selection or take them away

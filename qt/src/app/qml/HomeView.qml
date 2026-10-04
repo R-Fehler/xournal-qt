@@ -879,6 +879,7 @@ Rectangle {
                         nameMarks: home.searching && home.lib.fuzzySearch ? model.nameMarks : []
                         path: model.path
                         isFolder: model.isFolder
+                        isStickers: model.isFolder && model.path === app.stickers.libraryFolder
                         preview: model.preview
                         hasPdf: model.hasPdf
                         lastRead: model.lastRead ? home.formatDate(model.lastRead) : ""

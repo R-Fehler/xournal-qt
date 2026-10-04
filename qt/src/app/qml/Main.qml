@@ -804,13 +804,14 @@ ApplicationWindow {
             undo: undoTool, redo: redoTool,
             pen: penTool, eraser: eraserTool, hand: handTool, touchDrawing: touchDrawingTool, select: selectTool,
             text: textTool, write: writeButton, sticky: stickyTool, shape: shapeTool, geometry: geometryTool,
-            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, addPage: addPageTool, search: searchTool,
+            pdfText: pdfTextTool, emoji: emojiButton, image: imageTool, sticker: stickerTool, addPage: addPageTool,
+            search: searchTool,
             fullScreen: fullScreenTool, present: presentTool, settings: settingsTool, new: newTool, open: openTool,
             save: saveTool, editAsNotes: editAsNotesTool, openExternally: openExternallyTool
         })
         readonly property var order: ["undo", "redo",
                                       "pen", "eraser", "hand", "touchDrawing", "select", "text", "write", "sticky",
-                                      "shape", "geometry", "pdfText", "emoji", "image", "addPage", "search",
+                                      "shape", "geometry", "pdfText", "emoji", "image", "sticker", "addPage", "search",
                                       "fullScreen", "present", "settings", "new", "open", "save", "editAsNotes",
                                       "openExternally"]
         /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
@@ -1542,6 +1543,14 @@ ApplicationWindow {
                     onTriggered: app.startSnip("lasso")
                 }
             }
+        }
+        // Stickers (qt/docs/stickers.md): saved content of the library, pasted with a tap (self-contained:
+        // StickerButton.qml brings its picker and its dialog)
+        StickerButton {
+            id: stickerTool
+            parent: toolBank
+            property bool offered: !win.textDoc
+            popupSide: toolArea.popupSide
         }
         IconButton {
             id: addPageTool
@@ -2367,6 +2376,7 @@ ApplicationWindow {
         hidden: pageGrid.visible
         avoid: viewPill
         bottomLimit: win.controlsBottom
+        onStickerRequested: stickerSaveDialog.openForSelection()
     }
 
     // The selected sticky note: its color, cover mode, delete.
@@ -2377,8 +2387,11 @@ ApplicationWindow {
         avoid: viewPill
         bottomLimit: win.controlsBottom
         onImageRequested: imageDialog.open()
+        onStickerRequested: stickerSaveDialog.openForSelection()
         hidden: pageGrid.visible
     }
+    // "Save as sticker…" of the pills (qt/docs/stickers.md)
+    StickerSaveDialog { id: stickerSaveDialog }
 
     // Selected PDF text: mark or copy it (at the text, going along with it).
     PdfTextPill {
