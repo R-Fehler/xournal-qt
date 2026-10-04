@@ -600,13 +600,14 @@ protected:
                     << at << ": " << name << " fits without scrolling";
         }
     }
-    /// ⋮: at most 12 entries at the top; each of its submenus fits too (desktop, if `submenus`)
+    /// ⋮: at most 10 entries at the top (Help joined in qt/onboarding); each of its submenus fits too (desktop, if
+    /// `submenus`)
     void checkMoreMenu(const std::string& at, bool submenus) {
         auto* button = findItem("moreButton");
         auto* more = window->findChild<QObject*>("moreMenu");
         ASSERT_NE(button, nullptr);
         ASSERT_NE(more, nullptr);
-        EXPECT_LE(menuEntries(more).size(), 9u) << at << ": ⋮ has at most 9 entries at the top";
+        EXPECT_LE(menuEntries(more).size(), 10u) << at << ": ⋮ has at most 10 entries at the top";
         QMetaObject::invokeMethod(button, "clicked");
         checkOpenMenu(at, more, button, sizeClass() == "desktopWide");
         if (phoneClass() || !submenus) {
