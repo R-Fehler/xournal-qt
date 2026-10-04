@@ -94,6 +94,10 @@ void ReferenceMode::update() {
         // (its own page: the session's is the tab's view's when it shows the same document)
         connections.push_back(connect(v, &CanvasView::currentPageChanged, this, &ReferenceMode::pageChanged));
         connections.push_back(connect(s, &DocumentSession::filePathChanged, this, &ReferenceMode::changed));
+        connections.push_back(
+                connect(s, &DocumentSession::undoRedoStateChanged, this, &ReferenceMode::undoRedoChanged));
+        connections.push_back(connect(v, &CanvasView::markdownUndoChanged, this, &ReferenceMode::undoRedoChanged));
+        connections.push_back(connect(v, &CanvasView::textEditingChanged, this, &ReferenceMode::undoRedoChanged));
         connections.push_back(connect(v, &CanvasView::pagesChanged, this, &ReferenceMode::pageChanged));
         connections.push_back(connect(&v->getViewController(), &ViewController::zoomChanged, this,
                                       &ReferenceMode::zoomChanged));

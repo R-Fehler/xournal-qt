@@ -2289,6 +2289,50 @@ TEST_F(HomeScreenMarkdownTest, aMarkdownFileIsWrittenInAndSavedBack) {
     EXPECT_EQ(controller->tabManager().currentSession()->currentText(), "# Third\n");
 }
 
+// The undo and redo buttons go step by step through the text being written, as Ctrl+Z and Ctrl+Shift+Z do, and say
+// what they can do. Redo was greyed out after an undo: the buttons asked only the document's undo stack, which holds
+// the whole edit as one step while the text is written (the steps are the editor's own), and nothing told them when
+// the editor's steps changed.
+TEST_F(HomeScreenMarkdownTest, theUndoAndRedoButtonsFollowTheTextBeingWritten) {
+    ASSERT_TRUE(controller->openPath(QString::fromStdString((root / "kalman.md").string())));
+    wait(100);
+    auto* canvas = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvas->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    click(canvas);
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    const std::string before = editor->text();
+    auto* undoButton = find<QQuickItem>("undoButton");
+    auto* redoButton = find<QQuickItem>("redoButton");
+    ASSERT_NE(undoButton, nullptr);
+    ASSERT_NE(redoButton, nullptr);
+    ASSERT_TRUE(redoButton->isVisible()) << "a text document: in the view pill (its tool bar is in the format bar)";
+    EXPECT_FALSE(find<QQuickItem>("toolUndoButton")->isVisible()) << "one place at a time";
+    EXPECT_FALSE(controller->canRedo());
+
+    type("Hello");
+    EXPECT_TRUE(undoButton->isEnabled());
+    EXPECT_FALSE(redoButton->isEnabled()) << "nothing undone yet";
+    click(undoButton);
+    ASSERT_EQ(view->getMarkdownEditor(), editor) << "still writing";
+    EXPECT_EQ(editor->text(), before) << "the word typed is undone";
+    EXPECT_TRUE(controller->canRedo());
+    EXPECT_TRUE(redoButton->isEnabled()) << "and offered to be redone";
+    click(redoButton);
+    EXPECT_NE(editor->text().find("Hello"), std::string::npos) << "redone";
+    EXPECT_FALSE(redoButton->isEnabled());
+
+    // The buttons follow the keys
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(editor->text(), before);
+    EXPECT_TRUE(redoButton->isEnabled());
+    key(Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+    EXPECT_NE(editor->text().find("Hello"), std::string::npos);
+    EXPECT_FALSE(redoButton->isEnabled());
+    EXPECT_TRUE(undoButton->isEnabled());
+}
+
 TEST_F(HomeScreenMarkdownTest, aTxtFileIsEditedAsPlainText) {
     const fs::path file = root / "todo.txt";
     std::ofstream(file, std::ios::binary) << "# not a heading\n**not bold**\n";
@@ -5425,8 +5469,8 @@ TEST_F(MainWindowTest, addingAPageIsUndoneLikeEverythingElse) {
     until([&] { return snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")); });
     EXPECT_TRUE(snackbarText->property("text").toString().startsWith(QStringLiteral("Redone:")));
 
-    // The undo button of the pill as well
-    click(find<QQuickItem>("undoButton"));
+    // The undo button of the tool bar as well
+    click(find<QQuickItem>("toolUndoButton"));
     EXPECT_EQ(controller->pageCount(), pages);
 }
 
@@ -5831,6 +5875,63 @@ TEST_F(MainWindowTest, markdownTextBoxesAnywhereWithTheTextTool) {
         plain = plain || (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e.get())->getText() == "plain");
     }
     EXPECT_TRUE(plain);
+}
+
+// A Markdown text box written on a page: the undo and redo buttons go through the text being written as Ctrl+Z and
+// Ctrl+Shift+Z do (they ended the edit and undid all of it at once); once it is done, the whole edit is one step.
+TEST_F(MainWindowTest, theUndoAndRedoButtonsFollowAMarkdownBoxBeingWritten) {
+    controller->setMarkdownInPanel(false);  // (written on the page)
+    controller->setTextMarkdown(true);
+    controller->selectTool("text");
+    auto* canvasItem = find<QQuickItem>("canvas");
+    auto* view = qobject_cast<xqt::CanvasView*>(canvasItem->property("view").value<QObject*>());
+    ASSERT_NE(view, nullptr);
+    view->getViewController().scrollToPageRect(0, QRectF(200, 300, 200, 300));
+    wait(100);
+    const auto pagePoint = [&](double x, double y) {
+        return canvasItem
+                ->mapToScene(view->pageViewRect(0).topLeft() + QPointF(x, y) * view->getViewController().zoom())
+                .toPoint();
+    };
+    auto* undoButton = find<QQuickItem>("toolUndoButton");
+    auto* redoButton = find<QQuickItem>("toolRedoButton");
+    ASSERT_NE(undoButton, nullptr);
+    ASSERT_NE(redoButton, nullptr);
+    ASSERT_TRUE(undoButton->isVisible());
+    ASSERT_TRUE(redoButton->isVisible());
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, pagePoint(200, 300));
+    wait(50);
+    xqt::MarkdownEditor* editor = view->getMarkdownEditor();
+    ASSERT_NE(editor, nullptr);
+    type("Some");
+    key(Qt::Key_Space);
+    type("words");
+    EXPECT_TRUE(undoButton->isEnabled());
+    EXPECT_FALSE(redoButton->isEnabled());
+    click(undoButton);
+    ASSERT_EQ(view->getMarkdownEditor(), editor) << "still writing";
+    EXPECT_EQ(editor->text(), "Some ") << "one step back, as Ctrl+Z";
+    EXPECT_TRUE(redoButton->isEnabled());
+    click(redoButton);
+    EXPECT_EQ(editor->text(), "Some words");
+    EXPECT_FALSE(redoButton->isEnabled());
+
+    // Done: the whole edit is one step of the document
+    key(Qt::Key_Escape);
+    ASSERT_EQ(view->getMarkdownEditor(), nullptr);
+    const PageRef page = controller->tabManager().currentSession()->getDocument()->getPage(0);
+    const auto box = [&]() -> const Text* {
+        Layer* layer = xqt::md::markdownLayer(page);
+        return layer ? xqt::md::boxAt(*layer, 205, 300) : nullptr;
+    };
+    ASSERT_NE(box(), nullptr);
+    EXPECT_TRUE(undoButton->isEnabled());
+    click(undoButton);
+    EXPECT_EQ(box(), nullptr) << "the box is gone";
+    EXPECT_TRUE(redoButton->isEnabled());
+    click(redoButton);
+    ASSERT_NE(box(), nullptr);
+    EXPECT_EQ(box()->getText(), "Some words");
 }
 
 // Markdown text boxes are selected (rectangle, lasso, tap) and moved like other elements: in their layer
@@ -6268,13 +6369,13 @@ TEST_F(MainWindowTest, textModeTypesThePageText) {
     click(find<QQuickItem>("textFlowDone"));
     EXPECT_FALSE(panel->isVisible());
     EXPECT_FALSE(controller->textFlowActive());
-    // One step for the whole text; undo / redo are in the page pill
-    auto* undoButton = find<QQuickItem>("undoButton");
+    // One step for the whole text; undo / redo lead the tool bar
+    auto* undoButton = find<QQuickItem>("toolUndoButton");
     ASSERT_NE(undoButton, nullptr);
-    EXPECT_TRUE(find<QQuickItem>("viewPill")->isAncestorOf(undoButton));
+    EXPECT_TRUE(find<QQuickItem>("toolRow")->isAncestorOf(undoButton));
     click(undoButton);
     EXPECT_TRUE(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).empty());
-    click(find<QQuickItem>("redoButton"));
+    click(find<QQuickItem>("toolRedoButton"));
     EXPECT_EQ(xqt::TextFlow::read(page, xqt::TextFlow::Style{}).size(), 5u);
 
     // Cancel restores the page

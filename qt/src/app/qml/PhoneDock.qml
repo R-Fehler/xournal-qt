@@ -158,7 +158,7 @@ Rectangle {
                 implicitHeight: parent.side
                 iconName: "xopp-edit-undo"
                 label: qsTr("Undo")
-                tip: qsTr("Undo (Ctrl+Z)")
+                tip: win.withKeys(qsTr("Undo"), "undo")
                 enabled: app.canUndo
                 onClicked: app.undo()
             }
@@ -171,7 +171,7 @@ Rectangle {
                 implicitHeight: parent.side
                 iconName: "xopp-edit-redo"
                 label: qsTr("Redo")
-                tip: qsTr("Redo (Ctrl+Y)")
+                tip: win.withKeys(qsTr("Redo"), "redo")
                 enabled: app.canRedo
                 onClicked: app.redo()
             }

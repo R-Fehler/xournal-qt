@@ -482,6 +482,9 @@ Q_SIGNALS:
     void textEditingChanged(bool editing);
     /// The Markdown being written changed, or its cursor moved (the formatting bar shows what is at the cursor).
     void markdownCursorChanged();
+    /// The undo or redo steps of the Markdown being written changed (MarkdownEditor::canUndo / canRedo): the undo
+    /// and redo buttons follow them.
+    void markdownUndoChanged();
     /// A long press with a finger, or a right click: the UI shows what can be done here (paste, ...).
     void contextRequested(QPointF viewPos);
     /// The emoji suggestions for a shortcode being typed were shown, changed or closed (emojiCompletion()).

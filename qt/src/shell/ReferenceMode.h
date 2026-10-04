@@ -198,6 +198,8 @@ Q_SIGNALS:
     void navigationChanged();
     void layoutChanged();
     void pagesShownChanged();
+    /// What undo and redo can do in the reference changed (its document's history, or the Markdown written in it).
+    void undoRedoChanged();
     /// A link was tapped in the reference: uri (external) or page of the reference; rect in its canvas coordinates.
     void linkTapped(const QString& uri, int page, QRectF rect);
     /// An external link should be opened (AppController::openLink).

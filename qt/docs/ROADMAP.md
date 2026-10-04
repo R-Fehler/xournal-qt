@@ -728,6 +728,12 @@
   past that, never wider than the box or over the next cell. A research note on a two-column mode
   ([md-columns.md](md-columns.md)): feasible (about 8 to 9 days), not built; paired pages give two columns of
   reading today.
+- **Undo and redo, `qt/undo-redo` (2026-10-04).** The buttons ask what undo and redo act on: the steps of the Markdown
+  being written (a `.md`, a `.txt`, a PDF text document, a Markdown box on a page: step by step, as Ctrl+Z), else
+  the document with the keys (the edited reference too); redo was greyed out in text documents. Undo and redo lead
+  the tool bar (group "edit", never in "more tools"); the view pill has them only while the bar is not shown (put
+  away, compact chrome, a text document's format bar), the phone's dock as before and, with the soft keyboard open,
+  the end of the format bar. Tips show the keys as set. Their final place follows `qt/toolbox`.
 
 - **Color palettes, `qt/color-palettes` (2026-10-04).** The author's role-based palettes (Classic, Marker, Pastel
   study, Colorblind-safe 8 and 6, Dark; `qt/resources/palettes/palettes.json`, kept verbatim) as tabs of a color

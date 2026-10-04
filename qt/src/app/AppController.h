@@ -61,6 +61,7 @@ class OutlineModel;
 class AnnotationsModel;
 class TextFlowSession;
 class MarkdownSession;
+class MarkdownEditor;
 class PageClipboard;
 class SettingsModel;
 class SessionRecovery;
@@ -1371,6 +1372,10 @@ private:
     /// The reference while it has the keys and is written in (its edit switch), else nullptr: then undo, cut,
     /// paste, delete and select all act on it.
     xqt::CanvasView* editedReference() const;
+    /// What undo and redo act on: the Markdown being written in the canvas with the keys (its own steps first;
+    /// nullptr: none), and the document with the keys (the reference while it is written in, else the tab's).
+    xqt::MarkdownEditor* undoneMarkdown() const;
+    xqt::DocumentSession* undoneSession() const;
     bool savesWithoutDialog(const xqt::DocumentSession* s) const;
     /// Something was copied onto the clipboard (`ok`): it is pasted before copied pages (pastesNoteBeforePages)
     bool copied(bool ok);

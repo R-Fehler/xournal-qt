@@ -629,6 +629,19 @@ TEST_F(ReferenceWindowTest, theEditSwitchLetsThePenWriteInTheReference) {
     key(Qt::Key_Z, Qt::ControlModifier);
     EXPECT_EQ(elements(1), 1u);
     EXPECT_EQ(elements(0), 0u);
+    // The undo and redo buttons are the reference's then: what they offer is its history, not the notes' (the redo
+    // button stayed grey: it asked the notes, which have nothing to redo)
+    EXPECT_TRUE(controller->canUndo());
+    EXPECT_TRUE(controller->canRedo()) << "the stroke undone in the reference can be redone";
+    auto* redo = findItem("toolRedoButton");
+    ASSERT_NE(redo, nullptr);
+    ASSERT_TRUE(redo->isVisible());
+    EXPECT_TRUE(redo->isEnabled());
+    click(redo);
+    EXPECT_EQ(elements(1), 2u) << "redone in the reference";
+    EXPECT_FALSE(controller->canRedo());
+    key(Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(elements(1), 1u);
 
     // Switched off: for reading again
     click(edit);

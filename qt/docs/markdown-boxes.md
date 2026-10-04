@@ -42,7 +42,8 @@ Writing:
   - The formatting bar, a row under the tool bar while Markdown is written, has these and the other tools (lists,
     check boxes, quote, code block, formula, table editor, rule, image, page break): [md-editor.md](md-editor.md),
     "Formatting bar".
-  - Ctrl+Z / Ctrl+Shift+Z undo and redo in the text being written; once it is done, the whole edit is one undo step.
+  - Ctrl+Z / Ctrl+Shift+Z and the undo and redo buttons undo and redo in the text being written; once it is done, the
+    whole edit is one undo step.
   - Escape (or a tap elsewhere) is done.
   - Ctrl+Alt+M opens the same text beside the page.
 - **Beside the page** (the writing button's menu: "Markdown source beside the page", or Ctrl+Alt+M while writing on

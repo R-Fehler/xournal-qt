@@ -488,9 +488,11 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   Done (qt/docs/hover-cursors.md): the dot is a cursor (the drawn dot lagged two to three frames), Dot/Crosshair in
   Settings → Pen, the eraser as a gray square (dashed: whole strokes, round: whiteout) at its zoomed size. Left: check
   on the device that Wayland shows the cursor for the pen (assumed from Qt 6.7; `XQT_PEN_CURSOR` overrides it).
-- [ ] `qt/undo-redo`: in Markdown text documents redo is grayed out in the bottom-right pill while Ctrl+Shift+Z
+- [x] `qt/undo-redo`: in Markdown text documents redo is grayed out in the bottom-right pill while Ctrl+Shift+Z
   works (bug: failing test first). Undo and redo are hard to find: make them visible buttons in the tool bar and the
-  phone chrome (their final place follows `qt/toolbox`).
+  phone chrome (their final place follows `qt/toolbox`). Done: the buttons follow the editor's steps and the edited
+  reference; undo/redo lead the tool bar (the pill only while the bar is not shown; a text document keeps them in the
+  pill). Left: their final place in `qt/toolbox`'s docked toolbox; the device pass.
 - [x] `qt/curtain`: a **curtain** for teaching and presenting: a black area that hides part of the page, and its
   inverse, a **spotlight** (only a rectangle stays visible). Placed and moved, turned and resized with handles like
   the setsquare (`GeometryToolLayer`); a tap on the black part shows the handles. Only on screen: never saved,
