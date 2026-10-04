@@ -4,7 +4,15 @@
 
 add_library(xqt-hwr STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkLayout.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkLayout.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/InkLayout.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/Recognizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/Recognizer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FakeRecognizer.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/FakeRecognizer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LineImage.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/LineImage.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/WordAlignment.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/hwr/WordAlignment.cpp)
 target_include_directories(xqt-hwr PUBLIC "${CMAKE_CURRENT_LIST_DIR}/../src" "${CMAKE_CURRENT_LIST_DIR}/../src/hwr")
 target_link_libraries(xqt-hwr PUBLIC xqt-session)
 set_target_properties(xqt-hwr PROPERTIES AUTOMOC ON)
@@ -14,7 +22,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkSearchTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLayoutTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/RecognizerTest.cpp)
     target_link_libraries(xqt-hwr-tests PRIVATE xqt-hwr Qt6::Test GTest::gtest)
     target_include_directories(xqt-hwr-tests PRIVATE "${TEST_CONFIG_DIR}")
     target_compile_definitions(xqt-hwr-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
