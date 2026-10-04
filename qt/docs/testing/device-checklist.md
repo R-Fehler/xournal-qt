@@ -2822,3 +2822,15 @@ letter words only where the recogniser is sure.
 - [ ] A big area at a high zoom (a whole A3 poster at 400 %): it takes a moment at most, the UI does not freeze, the
       picture is about 4 megapixels.
 - [ ] Windows, Android: the picture reaches other apps through the system clipboard (Android: paste into a messenger).
+
+## To-dos: the index and the setting (qt/todos)
+
+- [ ] A library with a few `.xopp` with Markdown boxes "- [ ] todo: …", a sticky note with one, a `.md` with some and a
+      PDF text document with some: after indexing (the breadcrumb row's count) the To-dos tab lists exactly the lines
+      with "todo:" (also "TODO:", "Todo:" in the middle of the line), without the marker.
+- [ ] Settings → To-dos → "Every check box": shopping-list items without the marker are listed too; back to "Lines
+      marked as to-dos": gone again at once (nothing is read again: no indexing count).
+- [ ] Settings → To-dos → Marker "#task": only lines with "#task" are listed.
+- [ ] `📅 2026-10-12` and `due:2026-10-12` show as a date chip; typing 📅 with the emoji picker works the same.
+- [ ] A library indexed by an older build: opening it reads its documents once more (a short indexing count), then
+      not again at the next start.

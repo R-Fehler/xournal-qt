@@ -59,6 +59,8 @@ std::optional<MathHit> mathAt(const Text& text, double x, double y);
 std::optional<std::string> imageButtonAt(const Text& text, double x, double y);
 /// The check box of a task drawn at a point of the page (page coordinates): its mark's offset in the box's text.
 std::optional<size_t> checkBoxAt(const Text& text, double x, double y);
+/// Where the check box of the task whose mark is at `mark` is drawn (page coordinates), if the box draws one.
+std::optional<Rect> checkBoxRect(const Text& text, size_t mark);
 /// Where a text is shown in a box (case-insensitive; page coordinates): as the box is drawn, also while it is written
 /// on the page (see setWritingCursor).
 std::vector<Rect> findText(const Text& text, const std::string& search);

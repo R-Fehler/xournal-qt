@@ -42,8 +42,10 @@
 
 #include "MarkdownFile.h"
 #include "MdBookmarks.h"
+#include "MdBox.h"
 #include "MdImages.h"
 #include "MdPassages.h"
+#include "MdTasks.h"
 #include "Previews.h"
 
 namespace xqt {
@@ -457,12 +459,12 @@ bool LibraryIndex::Entry::pdfKindMissing() const { return pdfKind == PdfKind::Un
 
 bool LibraryIndex::Entry::onlyMetaMissing(const DocumentItem& item) const {
     return (!titleRead || pdfKindMissing()) && file == item.main() && xoppStamp == ownStamp(item) &&
-           pdfStamp == fileStamp(pdf) && linksRead;
+           pdfStamp == fileStamp(pdf) && linksRead && todosRead;
 }
 
 bool LibraryIndex::Entry::upToDate(const DocumentItem& item) const {
     return file == item.main() && xoppStamp == ownStamp(item) && pdfStamp == fileStamp(pdf) && linksRead &&
-           titleRead && !pdfKindMissing();
+           todosRead && titleRead && !pdfKindMissing();
 }
 
 // --- the packs: entries by file name
@@ -501,6 +503,28 @@ QCborMap LibraryIndex::notesOf(const Entry& e) const {
             marks.insert(page, label);
         }
         notes.insert(QStringLiteral("bookmarks"), marks);
+    }
+    if (e.kind != QLatin1String("image") && e.kind != QLatin1String("text")) {
+        // Its to-dos (also none: they were read)
+        QCborArray todos;
+        for (const Todo& t: e.todos) {
+            QCborMap m{{QStringLiteral("p"), t.page},  {QStringLiteral("b"), t.box},
+                       {QStringLiteral("l"), t.line},  {QStringLiteral("t"), t.text},
+                       {QStringLiteral("d"), t.done},  {QStringLiteral("x"), t.x},
+                       {QStringLiteral("y"), t.y},     {QStringLiteral("f"), t.size},
+                       {QStringLiteral("w"), t.pageWidth}};
+            if (t.occurrence > 0) {
+                m.insert(QStringLiteral("o"), t.occurrence);
+            }
+            if (!t.due.isEmpty()) {
+                m.insert(QStringLiteral("due"), t.due);
+            }
+            if (t.stamp) {
+                m.insert(QStringLiteral("s"), true);
+            }
+            todos.append(m);
+        }
+        notes.insert(QStringLiteral("todos"), todos);
     }
     if (e.kind == QLatin1String("md")) {
         QCborArray levels;
@@ -595,6 +619,28 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::entryOf(const fs::path& folde
     }
     // What its PDF is (added 2026-09: an entry without it gets only that read, from the PDF's marker)
     e->pdfKind = e->isPdf() ? pdfKindNamed(notes.value(QStringLiteral("pdfKind")).toString()) : PdfKind::Unknown;
+    // Its to-dos (added 2026-10 with qt/todos: an entry without them is read again once; a plain PDF has none)
+    e->todosRead = notes.contains(QStringLiteral("todos")) || e->kind == QLatin1String("image") ||
+                   e->kind == QLatin1String("text") || e->pdfKind == PdfKind::Plain;
+    for (const auto& v: notes.value(QStringLiteral("todos")).toArray()) {
+        const QCborMap m = v.toMap();
+        Todo t;
+        t.page = static_cast<int>(m.value(QStringLiteral("p")).toInteger(-1));
+        t.box = static_cast<int>(m.value(QStringLiteral("b")).toInteger(-1));
+        t.line = static_cast<int>(m.value(QStringLiteral("l")).toInteger());
+        t.occurrence = static_cast<int>(m.value(QStringLiteral("o")).toInteger());
+        t.text = m.value(QStringLiteral("t")).toString();
+        t.done = m.value(QStringLiteral("d")).toBool();
+        t.due = m.value(QStringLiteral("due")).toString();
+        t.stamp = m.value(QStringLiteral("s")).toBool();
+        t.x = m.value(QStringLiteral("x")).toDouble();
+        t.y = m.value(QStringLiteral("y")).toDouble();
+        t.size = m.value(QStringLiteral("f")).toDouble();
+        t.pageWidth = m.value(QStringLiteral("w")).toDouble();
+        if (t.page < texts.size()) {
+            e->todos.push_back(std::move(t));
+        }
+    }
     if (e->showsPdfPages()) {
         // Its PDF's title (added 2026-09: an entry without it is read once more, without its PDF text)
         e->titleRead = notes.contains(QStringLiteral("title"));
@@ -653,6 +699,7 @@ void LibraryIndex::load(const fs::path& folder) {
         f.docs = std::move(stored);
         ++kindChanges;  // (the kinds stored in its packs are known now)
         ++markChanges;  // (and their bookmarks)
+        ++todoChangeCount;  // (and their to-dos)
     }
 }
 
@@ -679,6 +726,9 @@ void LibraryIndex::put(const EntryPtr& e) {
     if ((slot ? slot->bookmarks : std::map<int, QString>()) != e->bookmarks) {
         ++markChanges;
     }
+    if ((slot ? slot->todos : std::vector<Todo>()) != e->todos) {
+        ++todoChangeCount;
+    }
     slot = e;
     scheduler->changed();
 }
@@ -689,6 +739,7 @@ void LibraryIndex::erase(const fs::path& file) {
     if (f != folders.end() && f->second.docs.erase(file.filename().string())) {
         ++kindChanges;
         ++markChanges;
+        ++todoChangeCount;
         f->second.notesChanged = f->second.textChanged = true;
         scheduler->changed();
     }
@@ -885,6 +936,9 @@ std::shared_ptr<LibraryIndex::Entry> LibraryIndex::read(const DocumentItem& item
         for (const md::LinkTarget& l: md::linksOf(doc)) {
             (l.wiki ? e->wikiLinks : e->links) << QString::fromStdString(l.target);
         }
+        // Its to-dos (by their lines in the file; their pages are found when one is opened)
+        addTodos(*e, source, -1, -1, nullptr, 0);
+        numberTodos(*e);
         return e;
     }
     if (!item.other.empty()) {
@@ -1031,8 +1085,54 @@ bool LibraryIndex::fillPages(Entry& e, Document& doc, const EntryPtr& donor, boo
         if (const auto& mark = page->getBookmark()) {
             e.bookmarks[static_cast<int>(i)] = QString::fromStdString(*mark);
         }
+        // Its to-dos: the task lines of its Markdown boxes (the Markdown layer's, the sticky notes' texts)
+        const std::vector<Text*> boxes = md::boxesOf(*page);
+        for (size_t b = 0; b < boxes.size(); ++b) {
+            addTodos(e, boxes[b]->getText(), static_cast<int>(i), static_cast<int>(b), boxes[b], page->getWidth());
+        }
     }
+    numberTodos(e);
+    e.todosRead = true;
     return true;
+}
+
+void LibraryIndex::addTodos(Entry& e, const std::string& source, int page, int box, const Text* text,
+                            double pageWidth) {
+    const std::vector<md::tasks::Task> tasks = md::tasks::find(source);
+    if (tasks.empty()) {
+        return;
+    }
+    const bool stamp = text && md::tasks::isStamp(source);
+    for (const md::tasks::Task& task: tasks) {
+        Todo t;
+        t.page = page;
+        t.box = box;
+        t.line = task.line;
+        t.text = QString::fromStdString(task.text);
+        t.done = task.done;
+        t.due = QString::fromStdString(md::tasks::dueDate(task.text));
+        t.stamp = stamp;
+        if (text) {
+            t.x = text->getOrigin().x;
+            t.y = text->getOrigin().y;
+            t.size = text->getFontSize();
+            t.pageWidth = pageWidth;
+            // A stamp: where its check box is drawn (the handwriting beside it is the to-do)
+            if (const auto box = stamp ? md::checkBoxRect(*text, task.mark) : std::nullopt) {
+                t.x = box->x;
+                t.y = box->y;
+                t.size = box->width;
+            }
+        }
+        e.todos.push_back(std::move(t));
+    }
+}
+
+void LibraryIndex::numberTodos(Entry& e) {
+    std::map<QString, int> seen;
+    for (Todo& t: e.todos) {
+        t.occurrence = seen[t.text]++;
+    }
 }
 
 bool LibraryIndex::documentSaved(const fs::path& file, Document& doc, const std::map<int, QString>& pdfText) {
@@ -1385,6 +1485,20 @@ std::vector<LibraryIndex::Bookmark> LibraryIndex::bookmarks() const {
                                               ? MarkdownFile::PAGE_HEIGHT / MarkdownFile::PAGE_WIDTH  // (A4)
                                               : 0;
                 out.push_back({e->file, page, label, aspect});
+            }
+        }
+    }
+    return out;
+}
+
+std::vector<LibraryIndex::Todo> LibraryIndex::todos() const {
+    std::vector<Todo> out;
+    std::lock_guard lock(mtx);
+    for (const auto& [folder, f]: folders) {
+        for (const auto& [name, e]: f.docs) {
+            for (const Todo& t: e->todos) {
+                out.push_back(t);
+                out.back().file = e->file;
             }
         }
     }

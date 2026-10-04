@@ -53,6 +53,8 @@ add_library(xqt-markdown STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPaginate.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBookmarks.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdBookmarks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdTasks.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdTasks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/MdPassages.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/markdown/EmojiFont.h
