@@ -33,6 +33,10 @@
 #endif
 
 #include "AppController.h"
+#include "hwr/HandwritingSearch.h"
+#ifdef XQT_HWR_ONNX
+#include "hwr/TrocrRecognizer.h"
+#endif
 #include "EmojiFont.h"
 #include "shell/HitPages.h"
 #include "shell/MdSnippets.h"
@@ -201,6 +205,11 @@ int main(int argc, char* argv[]) {
 
     QQuickStyle::setStyle("Material");
     xqt::registerQuickTypes();
+#ifdef XQT_HWR_ONNX
+    // The handwriting search's recogniser: TrOCR in ONNX Runtime (loaded only when the search is switched on)
+    xqt::hwr::HandwritingSearch::setFactory(
+            [](const QString& dir) { return std::make_shared<xqt::hwr::TrocrRecognizer>(dir); });
+#endif
     AppController controller;
 #ifdef Q_OS_ANDROID
     // The libraries' home: the phone's Documents/Xournal_Libraries once they were moved there (with "All files

@@ -235,7 +235,8 @@ PdfPageLayout PdfLayoutReader::layout(int nr) {
     return l;
 }
 
-std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms) {
+std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const std::vector<textmatch::Term>& terms,
+                              const ink::PageText* ink) {
     std::vector<QRectF> out;
     if (terms.empty()) {
         return out;
@@ -254,6 +255,12 @@ std::vector<QRectF> termRects(const XojPage& page, PdfLayoutReader* pdf, const s
         for (const auto& m: textmatch::find(s.text, terms)) {
             const auto rects = elementRects(piece, s.origin[static_cast<size_t>(m.start)],
                                             s.origin[static_cast<size_t>(m.end - 1)] + 1);
+            out.insert(out.end(), rects.begin(), rects.end());
+        }
+    }
+    if (ink) {
+        for (const ink::Hit& h: ink::find(*ink, terms)) {
+            const auto rects = ink::rectsOf(*ink, h);
             out.insert(out.end(), rects.begin(), rects.end());
         }
     }
@@ -566,6 +573,9 @@ int DocumentTextIndex::count(size_t page, QStringView query) {
     if (p.pdf >= 0 && pdfKnown[static_cast<size_t>(p.pdf)]) {
         n += textmatch::count(pdfText[static_cast<size_t>(p.pdf)], query);
     }
+    if (p.ink && !query.isEmpty()) {
+        n += static_cast<int>(ink::find(*p.ink, {{query.toString(), textmatch::Anywhere}}).size());
+    }
     return n;
 }
 
@@ -586,6 +596,9 @@ int DocumentTextIndex::count(size_t page, const words::Terms& terms) {
     if (nr >= 0 && pdfKnown[static_cast<size_t>(nr)]) {
         n += terms.count({pdfText[static_cast<size_t>(nr)]}, fuzzy ? pdfWordsOf(nr) : nullptr);
     }
+    if (const auto& ink = pages[page].ink) {
+        n += static_cast<int>(ink::find(*ink, terms.counted()).size());
+    }
     return n;
 }
 
@@ -604,7 +617,40 @@ bool DocumentTextIndex::contains(size_t page, const words::Terms& terms, size_t 
     const int nr = pages[page].pdf;
     return terms.contains(i, {pages[page].elements}, fuzzy ? elementWords(page) : nullptr) ||
            (nr >= 0 && pdfKnown[static_cast<size_t>(nr)] &&
-            terms.contains(i, {pdfText[static_cast<size_t>(nr)]}, fuzzy ? pdfWordsOf(nr) : nullptr));
+            terms.contains(i, {pdfText[static_cast<size_t>(nr)]}, fuzzy ? pdfWordsOf(nr) : nullptr)) ||
+           (pages[page].ink && i < terms.all().size() && ink::contains(*pages[page].ink, terms.all()[i]));
+}
+
+void DocumentTextIndex::setInk(size_t page, std::shared_ptr<const ink::PageText> ink) {
+    if (page >= pages.size() || pages[page].ink == ink) {
+        return;
+    }
+    if (ink && ink->empty() && !pages[page].ink) {
+        pages[page].ink = std::move(ink);  // (no words before either: no change to the hits)
+        return;
+    }
+    pages[page].ink = std::move(ink);
+    Q_EMIT textChanged({page});
+}
+
+const ink::PageText* DocumentTextIndex::inkOf(size_t page) const {
+    return page < pages.size() ? pages[page].ink.get() : nullptr;
+}
+
+std::shared_ptr<const ink::PageText> DocumentTextIndex::inkShared(size_t page) const {
+    return page < pages.size() ? pages[page].ink : nullptr;
+}
+
+size_t DocumentTextIndex::inkPages() const {
+    return static_cast<size_t>(std::count_if(pages.begin(), pages.end(), [](const Page& p) { return p.ink != nullptr; }));
+}
+
+size_t DocumentTextIndex::inkBytes() const {
+    size_t bytes = 0;
+    for (const Page& p: pages) {
+        bytes += p.ink ? p.ink->bytes() : 0;
+    }
+    return bytes;
 }
 
 void DocumentTextIndex::prepareWords() {

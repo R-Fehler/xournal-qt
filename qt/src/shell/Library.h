@@ -22,6 +22,11 @@
  * only. A text or code file's entry (kind "text") has its text, if the file is not bigger than TEXT_LIMIT (else its
  * name only). Other files are not in the index.
  *
+ * The handwriting recognised in documents (qt/docs/handwriting-search.md) is kept apart, in the pack "ink-text" of each
+ * folder (InkTextStore.h, inkText()): the search counts it with the rules of InkText.h when the document's main file is
+ * still the one its handwriting was read from. A document found only through handwriting the recogniser was unsure of
+ * is listed after those with exact hits (fuzzyOnly), the surer ones first (inkScore).
+ *
  * @license GNU GPLv2 or later
  */
 #pragma once
@@ -45,6 +50,7 @@
 
 #include "filesystem.h"
 #include "DocumentFiles.h"
+#include "InkTextStore.h"
 #include "LibraryCache.h"
 #include "LinkRewrite.h"
 #include "session/DocumentLink.h"
@@ -220,7 +226,9 @@ public:
         int nameScore = 0;               ///< fuzzy search: fzf's score of the name and folder path (0: not in them)
         std::vector<int> nameMarks;      ///< fuzzy search: the characters of the name that matched
         bool fuzzyOnly = false;          ///< fuzzy search: its hits in the text are all words that only match
-                                         ///< fuzzily (WordMatch.h: ranked after documents with exact ones)
+                                         ///< fuzzily (WordMatch.h: ranked after documents with exact ones); also
+                                         ///< (any search) when its hits are all unsure handwriting (InkText.h)
+        float inkScore = 0;              ///< the shares of the readings of its hits in handwriting (ties)
     };
     /// The text of the pages of this PDF read before (by PDF page, 0-based), if it was read from the file as it is now
     /// (same size and time): an open document takes it for its search instead of reading it again.
@@ -259,6 +267,15 @@ public:
     std::vector<Bookmark> bookmarks() const;
     /// Changes when the bookmarks of a document changed, or a document with bookmarks came or went.
     quint64 bookmarkChanges() const { return markChanges.load(); }
+    /// The handwriting recognised in the library's documents (its pack per folder).
+    InkTextStore& inkText() { return *inks; }
+    const InkTextStore& inkText() const { return *inks; }
+    /// The handwriting of an indexed document, if it was read from its main file as it is now (else null).
+    std::shared_ptr<const InkDoc> inkOf(const fs::path& file) const;
+    /// Documents whose handwriting is to be read (LibraryInkJob): .xopp files and PDFs with notes without handwriting
+    /// read from them as they are now, or read by another recogniser, or (`incomplete`) not read in full. Pageless
+    /// documents (Markdown, text, images) and PDFs without our notes have none.
+    std::vector<fs::path> inkCandidates(const QString& recognizer, bool incomplete) const;
     /// Pages of an indexed document (-1: not indexed yet).
     int pageCount(const fs::path& file) const;
     /// What an indexed PDF is, the main file of a document (a PDF alone, a PDF with notes): PdfKind::Unknown when it
@@ -412,6 +429,9 @@ private:
     std::unique_ptr<QThreadPool> pool;    ///< reading, one document after the other (also orders moves and updates)
     std::unique_ptr<QThreadPool> writer;  ///< writing packs (while reading goes on)
     std::unique_ptr<WriteScheduler> scheduler;
+    std::unique_ptr<InkTextStore> inks;
+    /// The handwriting of an entry, if it is of its main file as it is now
+    std::shared_ptr<const InkDoc> inkOf(const Entry& e) const;
     mutable std::mutex mtx;
     std::mutex writeMtx;
     mutable std::mutex wordsMtx;

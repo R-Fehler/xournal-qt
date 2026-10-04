@@ -1591,6 +1591,7 @@ Rectangle {
         readonly property bool atRoot: showCrumbs && app.library.folder === ""
         readonly property bool needed: !atRoot || app.library.importing
                                        || (app.library.indexing && app.library.indexTotal > 0)
+                                       || (app.handwriting.enabled && app.handwriting.libraryLeft > 0)
 
         IconButton {
             objectName: "folderUpButton"
@@ -1785,6 +1786,14 @@ Rectangle {
             visible: app.library.indexing && app.library.indexTotal > 0
             text: home.shortLayout ? qsTr("Indexing %1/%2").arg(app.library.indexed).arg(app.library.indexTotal)
                                    : qsTr("Indexing for search %1/%2").arg(app.library.indexed).arg(app.library.indexTotal)
+            font.pixelSize: 12
+            color: "#6b6f75"
+        }
+        Label {
+            objectName: "handwritingLibraryStatus"
+            visible: app.handwriting.enabled && app.handwriting.libraryLeft > 0
+            text: home.shortLayout ? qsTr("Handwriting: %1 left").arg(app.handwriting.libraryLeft)
+                                   : qsTr("Reading handwriting: %1 documents left").arg(app.handwriting.libraryLeft)
             font.pixelSize: 12
             color: "#6b6f75"
         }

@@ -9,6 +9,8 @@
  *     for the page of the current hit: rectsOn() asks for them, the current page first, and keeps them per page until
  *     the query or the page changes. Their text is the index's, matched the same way (TextMatch), so the count and
  *     the marks agree.
+ * Handwriting is searched too, in the words its recogniser read (InkText.h, handed to the index by the handwriting
+ * search): a hit is the box around the ink word(s), marked lighter when the recogniser was unsure.
  * The current hit is a page and a hit on it; stepping to a page whose hits are not placed yet counts on the page's
  * count and scrolls there once they are.
  *
@@ -51,6 +53,8 @@ public:
     struct Place {
         QRectF rect;
         QRectF more;  ///< null: all on one line
+        /// Handwriting the recogniser was not sure of (InkText.h: under WEAK_P of its guesses): marked lighter
+        bool faint = false;
     };
 
     explicit DocumentSearch(DocumentSession& session);

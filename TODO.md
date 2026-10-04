@@ -538,10 +538,14 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
 - [?] `qt/audio`: recordings tied to pages or strokes, compatible with upstream's audio (`ts`/`fn` on strokes and
   texts). In a PDF with notes the audio files are attachments with the page number in their names, so they can be
   found without the app.
-- [?] `qt/hwr-search`: an MVP of handwriting search on Linux from the research (`qt/docs/research/
+- [x] `qt/hwr-search`: an MVP of handwriting search on Linux from the research (`qt/docs/research/
   handwriting-recognition.md`): search only, no training on user data, fuzzy matching over the model's candidates.
   Where the results live: the library's dot folder cache, the `.xopp`, and an invisible text layer in PDFs with
-  notes so other PDF viewers find the words too (the best candidate only there).
+  notes so other PDF viewers find the words too (the best candidate only there). Done (qt/docs/handwriting-search.md):
+  ink layout, TrOCR in ONNX Runtime (dlopen), worker + indexer, `ink-text.pack`, library search, PDF text layer,
+  Settings with the model's download. Left: pin the model's revision and sha256s (`qt/scripts/hwr-model.sh` prints
+  them) and run the real-model device checks; bundle the runtime in packages; text layer in plain "Export as PDF";
+  German.
 - [?] Rotating the canvas (like Krita): the rotate gesture, reset by a double tap or the fit buttons. A feasibility
   check first.
 - [?] To-dos: how they could work (Markdown task lists, ink checkboxes, a list across the library?), whether the

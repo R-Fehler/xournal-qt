@@ -2745,3 +2745,56 @@ See qt/docs/page-rotation.md. With pen, finger and mouse; a `.xopp` and a PDF wi
       (search hits and text selection at the turned place, links still work). Saved: Okular, Evince, Firefox/pdf.js,
       Chrome, Acrobat, Xodo, Drawboard show the page turned with the ink on the right place; xournal-qt opens it again
       turned. Turning a page several times quickly on a long scanned PDF: how long it waits (each turn merges a copy).
+
+## Handwriting search (qt/hwr-search)
+
+Handwritten words become searchable (never converted to text). The steps below need the model: run
+`qt/scripts/hwr-model.sh` once (or let Settings download it, once that is built), see
+[qt/docs/handwriting-search.md](../handwriting-search.md). Matching rules (unit-tested, `xqt-hwr-tests`): readings of a
+word that the recogniser found likely take part; a word of 3+ letters is found with a typo even with Fuzzy off; 1-2
+letter words only where the recogniser is sure.
+- [ ] Settings → Search → "Search handwriting" on (with the model): open a `.xopp` with handwritten notes. After a few
+      seconds (the page in view first, then the rest), Ctrl+F for a handwritten word finds it: the box around the ink
+      word is marked; words the recogniser was unsure of are marked lighter. A typo (`kalmna` for "Kalman", 5+
+      letters) finds it with Fuzzy off.
+- [ ] Write a new word while the search bar is open: about two seconds after the pen stops, the word is found; the
+      pen never stutters while the worker reads (it waits while you write and while pages are drawn). `top` shows the
+      worker at idle priority (`ps -eLo pid,cls,comm | grep IDL`).
+- [ ] Move a line of handwriting with the lasso: it is found at once at its new place (nothing read again). Undo:
+      the same.
+- [ ] Save the document, close it, open it again: its handwriting is found at once (from the library's cache
+      `.xournal_library/ink-text.pack`), nothing is read again (no CPU).
+- [ ] The library's search (Fuzzy off and on) finds documents by their handwriting; a document found only through
+      unsure readings is listed after the others; its snippet shows the words read around the hit.
+- [ ] On mains power, the library's other `.xopp` files get read in the background (CPU at idle priority); unplug
+      the laptop: it stops within a minute; plug it in: it goes on. Without the model nothing is read and nothing
+      breaks.
+- [ ] Switch "Search handwriting" off: hits in handwriting disappear from open documents at once; the library's
+      cache stays (switching it on again needs no reading).
+- [ ] Text layer for other PDF apps: a PDF with notes whose handwriting was read (Settings on, the model there):
+      save it, open it in Okular, Evince, Firefox (pdf.js) and MuPDF: Ctrl+F for a handwritten word finds it where
+      the ink is; selecting across the ink selects words, copying gives the recognised text; nothing extra is drawn
+      (the text is invisible), printing shows only the ink. Words the recogniser was unsure of are not there.
+- [ ] Archive PDF (Export as archive PDF) of the same document: the same in the four viewers; veraPDF
+      (`verapdf --flavour 3b file.pdf`) still says PDF/A-3b compliant.
+- [ ] Write more on a page, wait, Ctrl+S: the save is still incremental (the save message), and the new words are
+      found in Okular after reloading. Open the PDF in xournal-qt again: a search finds each handwritten word once
+      (not twice: the text layer is not read back as PDF text).
+- [ ] The model and the runtime (the author's machine, once): run `qt/scripts/hwr-model.sh` (it copies the model
+      from `~/.cache/huggingface` where the research put it, else downloads it) and note the revision and the
+      sha256 lines it prints; pin them in `qt/src/shell/ModelDownload.cpp` (`builtIn()`: revision, sha256 and size
+      of each file). Install ONNX Runtime (`pip install --user onnxruntime` and
+      `export XQT_ONNXRUNTIME=$(python3 -c 'import onnxruntime,os;print(os.path.dirname(onnxruntime.__file__))')/capi/libonnxruntime.so.1.*`,
+      or a distribution package with `libonnxruntime.so.1`).
+- [ ] The real-model tests: `XQT_HWR_MODEL=~/.local/share/xournal-qt/models/trocr-small-hw-int8
+      XQT_ONNXRUNTIME=<the .so> XQT_BENCH_HWR=1 build-qt/xqt-hwr-tests --gtest_filter='Trocr*'`: the benchmark line
+      is read ("This is a dumb test …"), at least two of "this", "dumb", "test" among the readings; the time per
+      line printed (research: about 0.2 s per 8 words on 2 threads). The tiny-model test passes too.
+- [ ] Settings → Search with the search on and no model in the app's data folder: the address
+      (huggingface.co/Xenova/trocr-small-handwritten/tree/<revision>) and "64 MB" are shown before anything is
+      downloaded; Download shows progress; Cancel stops it; Download again goes on after the files already done;
+      "Remove the model" frees the folder and the status says the model is missing. With `XQT_HWR_MODEL` set, the
+      Settings say the model is that folder and offer neither download nor removal.
+- [ ] Without ONNX Runtime installed: Settings says it is not installed; the app works as before; nothing is read.
+- [ ] The library shows "Reading handwriting: N documents left" while it reads (wide window), "Handwriting: N left"
+      on a phone-wide window.

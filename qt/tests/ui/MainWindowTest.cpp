@@ -7301,6 +7301,41 @@ TEST_F(MainWindowTest, settingsSearchTabSetsTheFuzzySearch) {
     ASSERT_TRUE(waitOpened(sheet, false));
 }
 
+// Settings → Search: the handwriting search's switch (off until switched on), its status, and the model's download
+// offered with its address and size shown (nothing is downloaded until the button is pressed).
+TEST_F(MainWindowTest, settingsSearchTabSwitchesTheHandwritingSearch) {
+    QObject* hw = controller->property("handwriting").value<QObject*>();
+    ASSERT_NE(hw, nullptr);
+    hw->setProperty("enabled", false);  // (the tests share the config folder)
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    click(findItem("searchTab"));
+    auto* toggle = findItem("handwritingSearchSwitch");
+    ASSERT_NE(toggle, nullptr);
+    until([&] { return toggle->isVisible(); });
+    EXPECT_FALSE(toggle->property("checked").toBool()) << "off until switched on";
+    EXPECT_FALSE(findItem("handwritingStatus")->isVisible());
+    click(toggle);
+    until([&] { return hw->property("enabled").toBool(); });
+    EXPECT_TRUE(hw->property("enabled").toBool());
+    auto* status = findItem("handwritingStatus");
+    until([&] { return status->isVisible(); });
+    EXPECT_FALSE(status->property("text").toString().isEmpty());
+    if (!hw->property("modelInstalled").toBool()) {
+        auto* offer = findItem("handwritingDownload");
+        until([&] { return offer->isVisible(); });
+        EXPECT_TRUE(offer->isVisible());
+        EXPECT_TRUE(findItem("handwritingModelSource")->property("text").toString().startsWith("https://huggingface.co/"));
+        EXPECT_FALSE(hw->property("downloading").toBool()) << "nothing before the button";
+    }
+    click(toggle);
+    until([&] { return !hw->property("enabled").toBool(); });
+    EXPECT_FALSE(hw->property("enabled").toBool());
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+}
+
 // A hybrid PDF whose ink another app moved: the window says so and offers to keep ours or import theirs.
 TEST_F(MainWindowTest, inkChangedInAnotherAppIsAskedAbout) {
     QTemporaryDir dir;

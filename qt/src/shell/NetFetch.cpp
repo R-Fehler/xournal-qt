@@ -52,23 +52,33 @@ QNetworkAccessManager* QtNetFetch::manager() {
 }
 
 void QtNetFetch::get(const QUrl& url, int timeoutMs, qint64 maxBytes, Done done) {
+    download(url, timeoutMs, maxBytes, {}, std::move(done));
+}
+
+void QtNetFetch::download(const QUrl& url, int timeoutMs, qint64 maxBytes, Progress progress, Done done) {
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, userAgent());
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setTransferTimeout(timeoutMs);  // (no data for that long: aborted, OperationCanceledError)
     QNetworkReply* reply = manager()->get(request);
-    QObject::connect(reply, &QNetworkReply::downloadProgress, reply, [reply, maxBytes](qint64 received, qint64 total) {
-        if (received > maxBytes || total > maxBytes) {
-            reply->setProperty("xqtTooBig", true);
-            reply->abort();
-        }
-    });
+    QObject::connect(reply, &QNetworkReply::downloadProgress, reply,
+                     [reply, maxBytes, progress = std::move(progress)](qint64 received, qint64 total) {
+                         if (received > maxBytes || total > maxBytes) {
+                             reply->setProperty("xqtTooBig", true);
+                             reply->abort();
+                         } else if (progress && !progress(received, total)) {
+                             reply->setProperty("xqtCancelled", true);
+                             reply->abort();
+                         }
+                     });
     QObject::connect(reply, &QNetworkReply::finished, reply, [reply, url, timeoutMs, done = std::move(done)] {
         Reply r;
         r.url = url;
         r.status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (reply->property("xqtTooBig").toBool()) {
             r.error = QCoreApplication::translate("NetFetch", "The answer is too big.");
+        } else if (reply->property("xqtCancelled").toBool()) {
+            r.error = QCoreApplication::translate("NetFetch", "Cancelled.");
         } else if (reply->error() == QNetworkReply::OperationCanceledError ||
                    reply->error() == QNetworkReply::TimeoutError) {
             r.error = QCoreApplication::translate("NetFetch", "%1 did not answer within %2 s.")

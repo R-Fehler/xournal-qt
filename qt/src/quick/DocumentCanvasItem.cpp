@@ -1652,7 +1652,10 @@ void DocumentCanvasItem::updateSearchHits(QSGNode* pageNode, size_t pageIndex, d
     }
     const int current = search.currentPage() == pageIndex ? search.currentOnPage() : -1;
     for (size_t i = 0; i < places->size(); ++i) {
-        const QColor color = static_cast<int>(i) == current ? QColor(255, 120, 0, 150) : QColor(255, 210, 0, 110);
+        // (handwriting the recogniser was unsure of: lighter)
+        const bool faint = (*places)[i].faint;
+        const QColor color = static_cast<int>(i) == current ? QColor(255, 120, 0, faint ? 100 : 150)
+                                                             : QColor(255, 210, 0, faint ? 60 : 110);
         for (const QRectF& rect: {(*places)[i].rect, (*places)[i].more}) {
             if (rect.isNull()) {
                 continue;

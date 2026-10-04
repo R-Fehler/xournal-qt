@@ -35,6 +35,10 @@
 class Document;
 class XojPage;
 
+namespace xqt::ink {
+struct PageText;
+}
+
 namespace xqt::HybridPdf {
 
 constexpr int FORMAT_VERSION = 1;
@@ -64,6 +68,9 @@ struct WriteOptions {
     bool compact = false;
     /// Receives what the file is now (for the next incremental save).
     Revision* written = nullptr;
+    /// The handwriting recognised per page of the document (InkTextLayer.h): written as invisible text, so other PDF
+    /// viewers find the words. nullptr: none.
+    const std::vector<std::shared_ptr<const ink::PageText>>* inkText = nullptr;
 };
 
 /// An incremental save writes the whole file anew instead when the file would then have grown by more than this
@@ -112,8 +119,10 @@ Result write(Document& doc, const fs::path& target, const BasePageOf& baseOf = {
 /// content, links as /Link annotations, the .xopp embedded as the file's source data, the marker (so the app opens it
 /// again like a hybrid PDF). The result says whether it is PDF/A and, if not, why. Saving such a file again in the
 /// app (write) keeps it an archive PDF.
+/// `inkText`: as WriteOptions::inkText.
 Result writeArchive(Document& doc, const fs::path& target, const BasePageOf& baseOf = {}, size_t pdfPageCount = npos,
-                    const LinkMap& links = {});
+                    const LinkMap& links = {},
+                    const std::vector<std::shared_ptr<const ink::PageText>>* inkText = nullptr);
 
 /// Export for Xournal++: a plain `xopp` whose background is `pdf`, the document's base pages in document order (the
 /// hybrid PDF without our annotations and data). The document keeps its own files. `attached`: `pdf` is upstream's

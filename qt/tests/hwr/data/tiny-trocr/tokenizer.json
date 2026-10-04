@@ -1,0 +1,1 @@
+{"model": {"type": "Unigram", "vocab": [["<s>", 0], ["\u2581a", 0], ["\u2581b", 0], ["\u2581c", 0], ["</s>", 0]]}, "decoder": {"type": "Metaspace"}, "added_tokens": [{"id": 0, "content": "<s>", "special": true}, {"id": 4, "content": "</s>", "special": true}]}

@@ -60,8 +60,9 @@ int editDistance(QStringView a, QStringView b, int max);
 /// One term, prepared for matching many words.
 class Rule {
 public:
-    /// `term`: prepare()d and perWord(); `typos`: the typo tolerance.
-    Rule(QStringView term, int typos);
+    /// `term`: prepare()d and perWord(); `typos`: the typo tolerance. `inOrder`: rule 2 applies (off: only the word
+    /// containing the term or a typo; recognised handwriting matched by the plain search, InkText.h).
+    Rule(QStringView term, int typos, bool inOrder = true);
     /// How `word` (case folded, as TextMatch::words() gives it) matches.
     Quality match(QStringView word) const;
     const QString& term() const { return text; }

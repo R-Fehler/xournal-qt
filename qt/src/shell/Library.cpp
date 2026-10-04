@@ -391,6 +391,7 @@ LibraryIndex::LibraryIndex(fs::path root, CacheLocation location, QObject* paren
     pool->setMaxThreadCount(1);  // in the background, one document after the other (also orders moves and updates)
     writer->setMaxThreadCount(1);
     scheduler = std::make_unique<WriteScheduler>([this] { writer->start([this] { writeChanged(); }); });
+    inks = std::make_unique<InkTextStore>(where);
 }
 
 LibraryIndex::~LibraryIndex() {
@@ -408,6 +409,7 @@ void LibraryIndex::flush() {
     writer->waitForDone();
     scheduler->cancel();
     writeChanged();
+    inks->flush();
 }
 
 void LibraryIndex::setWriteDelays(int quietMs, int maxDelayMs) { scheduler->setDelays(quietMs, maxDelayMs); }
@@ -418,6 +420,7 @@ void LibraryIndex::discard() {
     pool->waitForDone();
     writer->waitForDone();
     scheduler->cancel();
+    inks->discard();
     std::lock_guard lock(mtx);
     folders.clear();
     running = false;
@@ -436,6 +439,9 @@ void LibraryIndex::update(std::vector<DocumentItem> items) {
 }
 
 void LibraryIndex::moved(const std::vector<std::pair<fs::path, fs::path>>& moves) {
+    for (const auto& [from, to]: moves) {
+        inks->moved(from, to);  // (a document's handwriting follows it; a folder's goes with its cache)
+    }
     if (!moves.empty() && !discarded) {
         pool->start([this, moves] { applyMoves(moves); });
     }
@@ -616,6 +622,7 @@ void LibraryIndex::load(const fs::path& folder) {
             return;
         }
     }
+    inks->load(folder);  // (the handwriting read in its documents)
     // Where the library keeps it; else where it may have been kept before (a folder that cannot be written now,
     // or the other cache location)
     fs::path dir = where.dirOf(folder);
@@ -677,6 +684,7 @@ void LibraryIndex::put(const EntryPtr& e) {
 }
 
 void LibraryIndex::erase(const fs::path& file) {
+    inks->erase(file);
     auto f = folders.find(file.parent_path());
     if (f != folders.end() && f->second.docs.erase(file.filename().string())) {
         ++kindChanges;
@@ -1383,6 +1391,60 @@ std::vector<LibraryIndex::Bookmark> LibraryIndex::bookmarks() const {
     return out;
 }
 
+std::shared_ptr<const InkDoc> LibraryIndex::inkOf(const Entry& e) const {
+    auto doc = inks->find(e.file);
+    const QString stamp = e.xoppStamp.isEmpty() ? e.pdfStamp : e.xoppStamp;
+    return doc && !stamp.isEmpty() && doc->stamp == stamp ? doc : nullptr;
+}
+
+std::shared_ptr<const InkDoc> LibraryIndex::inkOf(const fs::path& file) const {
+    EntryPtr e;
+    {
+        std::lock_guard lock(mtx);
+        e = find(file);
+    }
+    return e ? inkOf(*e) : nullptr;
+}
+
+std::vector<fs::path> LibraryIndex::inkCandidates(const QString& recognizer, bool incomplete) const {
+    std::vector<EntryPtr> all;
+    {
+        std::lock_guard lock(mtx);
+        for (const auto& [folder, f]: folders) {
+            for (const auto& [name, e]: f.docs) {
+                all.push_back(e);
+            }
+        }
+    }
+    std::vector<fs::path> out;
+    for (const EntryPtr& e: all) {
+        const bool withInk = e->kind == QLatin1String("xopp") ||
+                             (e->isPdf() && e->pdfKind != PdfKind::Plain && e->pdfKind != PdfKind::Unknown);
+        if (!withInk || e->pageCount() == 0) {
+            continue;
+        }
+        const auto doc = inkOf(*e);
+        if (!doc || doc->recognizer != recognizer || (incomplete && !doc->complete)) {
+            out.push_back(e->file);
+        }
+    }
+    return out;
+}
+
+namespace {
+/// The words of handwriting around a hit (for a snippet).
+QString inkSnippet(const ink::PageText& text, const ink::Hit& hit) {
+    const uint32_t from = hit.first >= 4 ? hit.first - 4 : 0;
+    const auto to = std::min<uint32_t>(static_cast<uint32_t>(text.words.size()), hit.last + 5);
+    QStringList words;
+    for (uint32_t i = from; i < to; ++i) {
+        words << text.words[i].text;
+    }
+    return (from > 0 ? QStringLiteral("…") : QString()) + words.join(u' ') +
+           (to < text.words.size() ? QStringLiteral("…") : QString());
+}
+}  // namespace
+
 std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const {
     const QString q = simplified(query).trimmed();
     const QString folded = textmatch::prepare(q);
@@ -1441,6 +1503,9 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
                 headings.emplace_back(level, e->blockText[b]);
             }
         }
+        const auto ink = inkOf(*e);
+        int textHits = h.count;  // (of the text, not the handwriting: exact)
+        bool inkExact = false;
         for (int p = 0; p < e->pageCount(); ++p) {
             int n = 0;
             if (const int pdfNr = e->pdfPage[static_cast<size_t>(p)]; pdfNr >= 0) {
@@ -1452,6 +1517,19 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
             if (auto mark = e->bookmarks.find(p); mark != e->bookmarks.end()) {
                 n += count(mark->second);  // (its bookmark's label)
             }
+            textHits += n;
+            if (const auto& text = ink && static_cast<size_t>(p) < ink->texts.size() ? ink->texts[static_cast<size_t>(p)]
+                                                                                  : nullptr) {
+                const auto found = ink::find(*text, {{folded, textmatch::Anywhere}});
+                for (const ink::Hit& hit: found) {
+                    inkExact = inkExact || hit.exact;
+                    h.inkScore += hit.p;
+                }
+                if (!found.empty() && h.snippet.isEmpty()) {
+                    h.snippet = inkSnippet(*text, found.front());
+                }
+                n += static_cast<int>(found.size());
+            }
             if (n > 0) {
                 h.count += n;
                 ++h.pages;
@@ -1461,6 +1539,7 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
                 h.pageHits.push_back({p, n, e->aspects[static_cast<size_t>(p)]});
             }
         }
+        h.fuzzyOnly = h.count > 0 && textHits == 0 && !inkExact;
         if (h.count > 0 || h.inName) {
             hits.push_back(std::move(h));
         }
@@ -1469,7 +1548,13 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const QString& query) const 
         if (a.inName != b.inName) {
             return a.inName;
         }
-        return a.count > b.count;
+        if (a.fuzzyOnly != b.fuzzyOnly) {
+            return b.fuzzyOnly;  // (found only in handwriting the recogniser was unsure of: after the others)
+        }
+        if (a.count != b.count) {
+            return a.count > b.count;
+        }
+        return a.inkScore > b.inkScore;
     });
     return hits;
 }
@@ -1523,10 +1608,22 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
         std::vector<char> inText(terms.size(), 0);
         std::vector<Unit> units;  // with hits
         const QString* snippetText = nullptr;
-        auto examine = [&](int index, std::initializer_list<QStringView> texts) {
+        const auto ink = inkOf(*e);
+        auto examine = [&](int index, std::initializer_list<QStringView> texts, const ink::PageText* handwriting = nullptr) {
             const auto unit = static_cast<size_t>(index);
-            const words::Terms::Found f =
+            words::Terms::Found f =
                     prepared.examine(texts, vocab && unit < vocab->units.size() ? &vocab->units[unit] : nullptr);
+            if (handwriting) {
+                // (the handwriting of the page: its hits, and which terms are in it, InkText.h)
+                for (const ink::Hit& hit: ink::find(*handwriting, prepared.counted())) {
+                    ++f.count;
+                    f.exact = f.exact || hit.exact;
+                    h.inkScore += hit.p;
+                }
+                for (size_t t = 0; t < terms.size(); ++t) {
+                    f.on[t] = f.on[t] || ink::contains(*handwriting, prepared.all()[t]);
+                }
+            }
             for (size_t t = 0; t < terms.size(); ++t) {
                 inText[t] |= f.on[t];
             }
@@ -1551,7 +1648,10 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
             const QString& elements = e->elementText[p];
             const auto mark = e->bookmarks.find(p);
             const QStringView label = mark != e->bookmarks.end() ? QStringView(mark->second) : QStringView();
-            if (Unit u = examine(p, {pdfText ? QStringView(*pdfText) : QStringView(), elements, label}); u.count > 0) {
+            const ink::PageText* handwriting =
+                    ink && static_cast<size_t>(p) < ink->texts.size() ? ink->texts[static_cast<size_t>(p)].get() : nullptr;
+            if (Unit u = examine(p, {pdfText ? QStringView(*pdfText) : QStringView(), elements, label}, handwriting);
+                u.count > 0) {
                 if (!snippetText) {
                     // (from the PDF text if that has hits, else from the text elements)
                     snippetText = pdfText && !textmatch::find(*pdfText, marks).empty() ? pdfText : &elements;
@@ -1592,6 +1692,18 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
                             (start + length < snippetText->size() ? QStringLiteral("…") : QString());
             }
         }
+        if (h.snippet.isEmpty() && ink && pagesOf) {
+            // (found in handwriting only: the words read around the first hit)
+            for (const Unit& u: units) {
+                const auto page = static_cast<size_t>(u.index);
+                if (page < ink->texts.size() && ink->texts[page]) {
+                    if (const auto found = ink::find(*ink->texts[page], marks); !found.empty()) {
+                        h.snippet = inkSnippet(*ink->texts[page], found.front());
+                        break;
+                    }
+                }
+            }
+        }
         if (e->kind == QLatin1String("md")) {
             // Each passage with the headings above it
             std::vector<std::pair<int, QString>> headings;
@@ -1629,7 +1741,10 @@ std::vector<LibraryIndex::Hit> LibraryIndex::search(const FuzzyQuery& query) con
         if (a.fuzzyOnly != b.fuzzyOnly) {
             return b.fuzzyOnly;  // exact words before words that only match fuzzily
         }
-        return a.count > b.count;
+        if (a.count != b.count) {
+            return a.count > b.count;
+        }
+        return a.inkScore > b.inkScore;
     });
     return hits;
 }

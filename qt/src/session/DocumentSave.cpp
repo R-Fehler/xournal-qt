@@ -55,6 +55,8 @@
 #include "DocumentImages.h"
 #include "DocumentMode.h"
 #include "DocumentSaveTask.h"
+#include "DocumentSearch.h"
+#include "DocumentTextIndex.h"
 #include "DocumentSession.h"
 #include "HybridPdf.h"
 #include "MergedPdf.h"
@@ -602,6 +604,14 @@ void DocumentSession::takeSnapshot() {
         }
         t.snapshot = snapshotOf(*doc);
         t.pdfPageCount = doc->getPdfPageCount();
+        if (t.hybrid) {
+            // The handwriting read so far, for the text layer other PDF viewers search
+            const DocumentTextIndex& index = search().textIndex();
+            t.inkText.clear();
+            for (size_t i = 0; i < doc->getPageCount(); ++i) {
+                t.inkText.push_back(index.pageCount() == doc->getPageCount() ? index.inkShared(i) : nullptr);
+            }
+        }
         t.pathWhenTaken = doc->getFilepath();
         t.createBackup = doc->shouldCreateBackupOnSave();
         if (doc->getPageCount() > 0) {
@@ -671,7 +681,8 @@ void DocumentSession::takeSnapshot() {
                         };
                     }
                     if (archive) {
-                        const auto r = HybridPdf::writeArchive(*t.snapshot, t.target, baseOf, t.pdfPageCount);
+                        const auto r =
+                                HybridPdf::writeArchive(*t.snapshot, t.target, baseOf, t.pdfPageCount, {}, &t.inkText);
                         t.result = r.ok ? SaveResult{true, {}, {}, r.pdfa, r.notPdfA, r.adjusted}
                                         : SaveResult{false,
                                                      FS(_F("Could not write the archive PDF \"{1}\": {2}") %
@@ -683,6 +694,7 @@ void DocumentSession::takeSnapshot() {
                     options.revision = t.revision.valid() ? &t.revision : nullptr;
                     options.compact = t.request.compact;
                     options.written = exporting ? nullptr : &t.written;
+                    options.inkText = &t.inkText;
                     const auto r = HybridPdf::write(*t.snapshot, t.target, baseOf, t.pdfPageCount,
                                                     exporting ? fs::path() : t.request.recordExport, options);
                     if (!r.ok) {
