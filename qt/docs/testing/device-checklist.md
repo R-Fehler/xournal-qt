@@ -2825,6 +2825,26 @@ letter words only where the recogniser is sure.
 
 ## The toolbox (qt/toolbox)
 
+- [ ] The toolbox at the right of a document (1920×1080, 1366×768, a Surface upright): undo and redo at its top, the
+      tools, the fixed tools (hand, select, write on the page, setsquare, mark PDF text, the finger draws), "+". A tap
+      takes a tool (it moves a little towards the page), its color and width are used at once with the pen.
+- [ ] A tap on the tool in hand opens its editor beside it: the width slider, the five dots, a role of the palette, a
+      color used lately, a hex code, dashed, filled — the next stroke shows each change; Esc closes it.
+- [ ] The mouse wheel over the tool in hand: its width changes a step per notch.
+- [ ] Hold a tool (finger, pen, mouse) without moving: its menu (Move up / down, Replace with…, Duplicate, Add a tool
+      here…, divider, Remove; the only eraser cannot be removed). Hold, then move: the tool is lifted (bigger, a
+      shadow), a line shows where it goes; let go: there. Let go far from the rail: nothing changes. A quick drag on a
+      long rail scrolls it.
+- [ ] The dotted grip: drag it to the left edge, the top, the bottom: the edge lights up, the rail goes there; another
+      window size keeps its own edge.
+- [ ] A short window (1366×600): the fixed tools fold into one button, then sections into stacks with dots; the tool in
+      hand is always visible; a tap on a stack in hand opens its list beside it.
+- [ ] Full screen (F11): the same toolbox floats at the right, rounded; ⋯ has present, search, settings, leave full
+      screen. F5: it stays (write on the slides); the corner field hides it and shows it again.
+- [ ] Phone (Fold 7 folded): the dock has undo, redo, the first tools, "My tools", the page number; the tool in hand is
+      always in the dock; "My tools" lists all, "Add a tool" works; sideways the dock is a rail at the right.
+- [ ] Settings → Pen → Tools: "Classic tool bar" brings back the old bar, pen pill and tool square; "My toolbox" brings
+      the toolbox back; "Back to the first tools…" resets it.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser
       erases as it did (standard, whiteout or whole strokes); the text box has the font of before.
 - [ ] Restart: the tool in hand is the entry taken last, with its color and width.

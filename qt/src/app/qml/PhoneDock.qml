@@ -26,6 +26,9 @@ Rectangle {
     property real safeRight: 0
     readonly property Item colorSlot: colorHolder
     readonly property Item widthSlot: widthHolder
+    /// The toolbox fills the dock (qt/docs/toolbox.md, "On a phone"): its own cells give way
+    property bool hostsToolbox: false
+    readonly property Item toolboxSlot: toolboxHolder
     signal toolsRequested()
     signal pagesRequested()
     /// The bar's thickness
@@ -69,8 +72,17 @@ Rectangle {
         readonly property real side: Math.min(dock.target, width, height)
     }
 
+    Item {
+        id: toolboxHolder
+        objectName: "dockToolboxSlot"
+        visible: dock.hostsToolbox
+        x: dock.vertical ? 0 : dock.safeLeft
+        width: dock.vertical ? dock.barSize : dock.width - dock.safeLeft - dock.safeRight
+        height: dock.vertical ? dock.height - dock.safeBottom : dock.barSize
+    }
     GridLayout {
         id: row
+        visible: !dock.hostsToolbox
         x: dock.vertical ? 0 : 4 + dock.safeLeft
         y: dock.vertical ? 4 : 0
         width: dock.vertical ? dock.barSize : dock.width - 8 - dock.safeLeft - dock.safeRight
