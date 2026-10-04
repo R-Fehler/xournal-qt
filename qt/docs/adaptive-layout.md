@@ -251,7 +251,8 @@ order of compression as the room runs short:
 3. the colors become **the current color, the recent ones and a palette button**: at least 4 recent colors (used
    last, then the palette's), as many as fit (they are the filler: more room, more colors);
 4. low-priority buttons go into **"more tools"**, one by one: New, Open, Save, Settings, Present, Full screen, Edit as
-   notes, Open externally, Search, Add a page, Image, Emoji, Mark PDF text, Setsquare/compass, Shapes;
+   notes, Search, Open externally (after Search: for a file shown here it is how the file is edited; at 1280 px it
+   stays in the bar next to undo and redo), Add a page, Image, Emoji, Mark PDF text, Setsquare/compass, Shapes;
 5. the colors become **one cycling color button** (a tap: the next of the first five palette colors; a long press:
    the palette) – phone-sized rooms only;
 6. on phones, last: Sticky note, Write on the page, Text box, The finger draws, Select, Hand. Pen/highlighter and the

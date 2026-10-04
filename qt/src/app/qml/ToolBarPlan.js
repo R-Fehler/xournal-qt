@@ -18,7 +18,8 @@
 var LADDER = [
     "widths:single",
     "colors:recent",
-    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "openExternally", "search",
+    // (Open externally after Search: for a file shown here, a text file or an image, it is how the file is edited)
+    "new", "open", "save", "settings", "present", "fullScreen", "editAsNotes", "search", "openExternally",
     "addPage", "image", "emoji", "pdfText", "geometry", "shape",
     "colors:single",
     "sticky", "write", "text", "touchDrawing", "select", "hand"
