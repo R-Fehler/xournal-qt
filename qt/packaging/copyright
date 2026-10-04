@@ -12,6 +12,14 @@ License: GPL-2+
  On Debian systems, the complete text of the GNU General Public License version 2 can be found in
  /usr/share/common-licenses/GPL-2.
 
+Files: qt/resources/palettes/palettes.json
+Copyright: xournal-qt contributors; the Marker palette's colors: 2016 heeyeun (Open Color)
+Comment: The Marker palette uses Open Color (https://yeun.github.io/open-color/, MIT). The colorblind-safe palettes
+ use the Okabe-Ito colors (Masataka Okabe and Kei Ito, "Color Universal Design", 2008) and two colors of Paul Tol's
+ schemes (https://personal.sron.nl/~pault/). See qt/resources/palettes/README.md.
+License: Expat
+ (the full Expat text is given for qt/3rdparty/md4c/* below)
+
 Files: qt/3rdparty/md4c/*
 Copyright: 2016-2024 Martin Mitas
 License: Expat

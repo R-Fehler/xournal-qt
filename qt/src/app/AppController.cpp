@@ -62,6 +62,7 @@
 #include "session/DocumentMode.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
+#include "shell/ColorPalettes.h"
 #include "shell/ContentFiles.h"
 #include "shell/DocumentFiles.h"
 #include "shell/DocumentPlaces.h"
@@ -1534,6 +1535,39 @@ void AppController::removeToolbarColor(int index) {
 }
 
 void AppController::resetToolbarColors() { storeToolbarColors(defaultToolbarColors()); }
+
+QVariantList AppController::colorPalettes() const { return ColorPalettes::builtIn().toVariant(); }
+
+QString AppController::colorPalette() const {
+    std::string stored;
+    app->getSettings()->getCustomElement(CUSTOM).getString("colorPalette", stored);
+    const QString id = QString::fromStdString(stored);
+    return ColorPalettes::builtIn().palette(id) ? id : ColorPalettes::builtIn().defaultId();
+}
+
+void AppController::setColorPalette(const QString& id) {
+    if (id == colorPalette() || !ColorPalettes::builtIn().palette(id)) {
+        return;
+    }
+    app->getSettings()->getCustomElement(CUSTOM).setString("colorPalette", id.toStdString());
+    app->getSettings()->customSettingsChanged();
+    Q_EMIT colorPaletteChanged();
+}
+
+QColor AppController::paperColor() const {
+    if (!session()) {
+        return QColor(Qt::white);
+    }
+    Document* doc = session()->getDocument();
+    std::shared_lock lock(*doc);
+    if (doc->getPageCount() == 0) {
+        return QColor(Qt::white);
+    }
+    const PageRef p = doc->getPage(std::min(session()->getCurrentPageNo(), doc->getPageCount() - 1));
+    return toQColor(p->getBackgroundColor());
+}
+
+double AppController::highlighterOpacity() const { return ColorPalettes::highlighterOpacity(paperColor()); }
 
 bool AppController::textMarkdown() const {
     bool on = false;

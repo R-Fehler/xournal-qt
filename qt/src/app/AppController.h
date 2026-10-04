@@ -163,6 +163,11 @@ class AppController: public QObject {
     /// Color of PDF text highlights, one of three presets
     Q_PROPERTY(QColor pdfHighlightColor READ pdfHighlightColor WRITE setPdfHighlightColor NOTIFY pdfTextModeChanged)
     Q_PROPERTY(QVariantList pdfHighlightColors READ pdfHighlightColors CONSTANT)
+    /// The color palettes of the color chooser (ColorPalettes.h, qt/resources/palettes/palettes.json):
+    /// [{ id, name, source, background, dark, roles: [{ key, name, ink, highlight }] }]
+    Q_PROPERTY(QVariantList colorPalettes READ colorPalettes CONSTANT)
+    /// The chosen palette's id (setting "colorPalette"; default: the first, "classic")
+    Q_PROPERTY(QString colorPalette READ colorPalette WRITE setColorPalette NOTIFY colorPaletteChanged)
     /// The text mode edits the typed text of a page (textFlowPage, 0-based); how far it goes below the page (points)
     Q_PROPERTY(bool textFlowActive READ textFlowActive NOTIFY textFlowChanged)
     Q_PROPERTY(int textFlowPage READ textFlowPage NOTIFY textFlowChanged)
@@ -350,6 +355,14 @@ public:
     QColor pdfHighlightColor() const;
     void setPdfHighlightColor(const QColor& color);
     QVariantList pdfHighlightColors() const;
+    QVariantList colorPalettes() const;
+    QString colorPalette() const;
+    void setColorPalette(const QString& id);
+    /// The background color of the current page (white without a document)
+    Q_INVOKABLE QColor paperColor() const;
+    /// The highlighter's opacity on the current page's paper: 0.5 on light paper, 0.8 on dark
+    /// (ColorPalettes::highlighterOpacity)
+    Q_INVOKABLE double highlighterOpacity() const;
     QString toolbarPosition() const;
     bool toolbarHidden() const;
     void setToolbarHidden(bool hidden);
@@ -1221,6 +1234,7 @@ Q_SIGNALS:
     void linkTargetMissing(const QString& name);
     void copiedPagesChanged();
     void toolbarColorsChanged();
+    void colorPaletteChanged();
     void insertPagesRequested(int position);
     void pageBackgroundRequested(const QList<int>& pages);
     void noteSpaceRequested(const QList<int>& pages, bool allPages);
