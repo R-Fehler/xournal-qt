@@ -2523,3 +2523,9 @@ See qt/docs/curtain.md. On the 2-in-1 with pen and fingers, and with a mouse.
 - [ ] Moving it, turning it and sizing it are smooth on a big page at 200 % (nothing of the page is drawn again).
 - [ ] Not in the thumbnails, the page grid, the sidebar, export, print, nor after saving and opening again. Each tab
       has its own; closing the tab takes it away.
+- [ ] Shift+B (and the lists): the spotlight. The whole canvas is black (around the page, the other pages, the gray
+      around them) but its hole with rounded corners in the middle of the view; the pen writes in the hole as usual and
+      nowhere else. A tap on the black shows the hole's handles; the hole is moved, sized and turned as the curtain.
+      Two fingers on the black zoom the page while its handles are hidden, and carry the hole while they are shown.
+- [ ] The pill's second button switches between curtain and spotlight; presenting, the spotlight stays at its place on
+      each page.

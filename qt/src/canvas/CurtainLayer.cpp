@@ -108,12 +108,18 @@ void CurtainLayer::placeDefault(CanvasPage& page) {
     if (!inView.isEmpty() && z > 0) {
         part = QRectF((inView.topLeft() - r.topLeft()) / z, inView.size() / z);
     }
+    turn = 0;
+    if (shown == Shape::Spotlight) {
+        // The hole in the middle of the part in view, about the size of a paragraph
+        middle = part.center();
+        extent = QSizeF(std::max(MIN_SIDE, part.width() * 0.6), std::max(MIN_SIDE, part.height() * 0.3));
+        return;
+    }
     // Over its lower half, down to the bottom of the page and a little beyond its sides
     const double top = part.center().y();
     const QRectF sheet(QPointF(-MARGIN, top), QPointF(width + MARGIN, std::max(top + MIN_SIDE, height + MARGIN)));
     middle = sheet.center();
     extent = sheet.size();
-    turn = 0;
 }
 
 void CurtainLayer::put(CanvasPage& page) {
@@ -144,7 +150,18 @@ bool CurtainLayer::covers(QPointF viewPos) const {
         return false;
     }
     const QPointF own = fromView(viewPos);
-    return std::abs(own.x()) <= extent.width() / 2 && std::abs(own.y()) <= extent.height() / 2;
+    const double x = std::abs(own.x()), y = std::abs(own.y());
+    const double w = extent.width() / 2, h = extent.height() / 2;
+    bool inside = x <= w && y <= h;
+    if (shown == Shape::Spotlight) {
+        // Outside the hole, whose corners are rounded
+        const double r = cornerRadius();
+        if (inside && x > w - r && y > h - r) {
+            inside = std::hypot(x - (w - r), y - (h - r)) <= r;
+        }
+        return !inside;
+    }
+    return inside;
 }
 
 std::vector<std::pair<CurtainLayer::Handle, QPointF>> CurtainLayer::handles() const {

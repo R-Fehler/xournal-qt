@@ -148,7 +148,8 @@ public:
     struct CurtainShown {
         bool shown = false;
         QMatrix4x4 body;
-        QRectF sheet;
+        QRectF sheet;  ///< (the spotlight: its hole)
+        bool spotlight = false;
         int handles = 0;
     };
     CurtainShown curtainShown() const { return curtainStats; }

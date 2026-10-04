@@ -1057,6 +1057,7 @@ ApplicationWindow {
                         }
                         // A black sheet over part of the page, for teaching and presenting (qt/docs/curtain.md)
                         AdaptiveMenuItem { objectName: "curtainItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "curtain"; text: qsTr("Curtain (B)"); icon.source: app.iconUrl("xqt-curtain"); onTriggered: app.toggleCurtain("curtain") }
+                        AdaptiveMenuItem { objectName: "spotlightItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "spotlight"; text: qsTr("Spotlight (Shift+B)"); icon.source: app.iconUrl("xqt-spotlight"); onTriggered: app.toggleCurtain("spotlight") }
                         AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
                         // The reader chrome of this window size: only the page; the mark in the lower left corner
                         // brings the controls back (qt/docs/adaptive-layout.md)
@@ -3795,21 +3796,35 @@ ApplicationWindow {
                 height: Math.max(0, Math.min(barContent.implicitHeight,
                                              quickTools.roomBottom - quickTools.roomTop - quickTools.topPadding - quickTools.bottomPadding
                                              - presentToggle.height - leaveFullScreen.height
-                                             - (curtainToggle.visible ? curtainToggle.height + quickToolsColumn.spacing : 0)
+                                             - (curtainToggles.visible ? curtainToggles.height + quickToolsColumn.spacing : 0)
                                              - 2 * quickToolsColumn.spacing))
             }
-            // The curtain (B): hiding part of the page while presenting
-            Button {
-                id: curtainToggle
-                objectName: "curtainToggleButton"
+            // The curtain (B) and the spotlight (Shift+B): hiding part of the page while presenting
+            Row {
+                id: curtainToggles
                 width: parent.width
-                flat: true
                 visible: !win.textDoc
-                icon.source: app.iconUrl("xqt-curtain")
-                text: app.curtain !== "" ? qsTr("Take the curtain away (B)") : qsTr("Curtain (B)")
-                onClicked: {
-                    quickTools.close()
-                    app.toggleCurtain(app.curtain !== "" ? "" : "curtain")
+                Button {
+                    objectName: "curtainToggleButton"
+                    width: parent.width / 2
+                    flat: true
+                    icon.source: app.iconUrl("xqt-curtain")
+                    text: app.curtain === "curtain" ? qsTr("Curtain off") : qsTr("Curtain")
+                    onClicked: {
+                        quickTools.close()
+                        app.toggleCurtain("curtain")
+                    }
+                }
+                Button {
+                    objectName: "spotlightToggleButton"
+                    width: parent.width / 2
+                    flat: true
+                    icon.source: app.iconUrl("xqt-spotlight")
+                    text: app.curtain === "spotlight" ? qsTr("Spotlight off") : qsTr("Spotlight")
+                    onClicked: {
+                        quickTools.close()
+                        app.toggleCurtain("spotlight")
+                    }
                 }
             }
             Button {
@@ -3979,6 +3994,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
     // The curtain: out or away again (whatever is out); Esc hides its handles first
     Shortcut { sequences: win.keysOf("curtain"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain(app.curtain !== "" ? "" : "curtain") }
+    Shortcut { sequences: win.keysOf("spotlight"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain("spotlight") }
     Shortcut { sequence: "Escape"; enabled: docKeys && app.curtainHandles; onActivated: app.curtainHandles = false }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
     // (the reference, while it has the keys and is written in)

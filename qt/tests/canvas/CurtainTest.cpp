@@ -316,3 +316,52 @@ TEST_F(CurtainTest, itGoesAlongToTheCurrentPage) {
     EXPECT_EQ(curtain().page(), view->getPage(0));
     EXPECT_EQ(curtain().centre(), QPointF(200, 600));
 }
+
+// The spotlight: everything is black but its hole, in the middle of the view, with rounded corners; beyond the page
+// as well (the space around the pages, the other pages). The pen writes in the hole and nowhere else; its handles are
+// on the hole's edges. Put out, it takes the place of the curtain.
+TEST_F(CurtainTest, theSpotlightShowsOnlyItsHole) {
+    curtain().show(CurtainLayer::Shape::Curtain);
+    curtain().toggle(CurtainLayer::Shape::Spotlight);
+    ASSERT_EQ(curtain().shape(), CurtainLayer::Shape::Spotlight) << "instead of the curtain";
+    ASSERT_TRUE(curtain().visible());
+    const QPointF middle = at(0, curtain().centre());
+    const QRectF r = view->pageViewRect(0);
+    const QRectF inView = r.intersected(QRectF(0, 0, 900, 1400));
+    EXPECT_NEAR(middle.x(), inView.center().x(), 1) << "in the middle of the part of the page in view";
+    EXPECT_NEAR(middle.y(), inView.center().y(), 1);
+    EXPECT_FALSE(curtain().covers(middle)) << "its hole shows the page";
+    EXPECT_TRUE(curtain().covers(at(0, QPointF(10, 10)))) << "the rest of the page is black";
+    EXPECT_TRUE(curtain().covers(QPointF(2, 2))) << "and the space around it";
+    EXPECT_TRUE(curtain().covers(at(1, QPointF(100, 100)))) << "and the other pages";
+
+    // The hole's corners are rounded: just inside its corner is black, just inside its edges is not
+    curtain().place(QPointF(300, 400), QSizeF(200, 100), 0);
+    const double r0 = curtain().cornerRadius();
+    ASSERT_DOUBLE_EQ(r0, CurtainLayer::RADIUS);
+    EXPECT_TRUE(curtain().covers(at(0, QPointF(201, 351)))) << "the corner is cut off";
+    EXPECT_FALSE(curtain().covers(at(0, QPointF(201, 400)))) << "inside the left edge";
+    EXPECT_FALSE(curtain().covers(at(0, QPointF(300, 351)))) << "inside the top edge";
+
+    // The pen: in the hole it writes; on the black nothing; a tap on the black shows the handles
+    curtain().setHandlesShown(false);
+    penDrag(at(0, QPointF(250, 380)), at(0, QPointF(350, 420)));
+    processEvents();
+    EXPECT_EQ(elements(), 1u) << "written in the hole";
+    penDrag(at(0, QPointF(100, 100)), at(0, QPointF(150, 150)));
+    processEvents();
+    EXPECT_EQ(elements(), 1u) << "nothing on the black";
+    penTap(at(0, QPointF(100, 100)));
+    EXPECT_TRUE(curtain().handlesShown());
+
+    // Its handles are the hole's: the right edge wider, the left one stays
+    const QPointF right = at(0, QPointF(400, 400));
+    ASSERT_EQ(curtain().handleAt(right, CurtainLayer::REACH), CurtainLayer::Handle::Right);
+    penDrag(right, right + QPointF(50, 0) * view->getViewController().zoom());
+    EXPECT_NEAR(curtain().size().width(), 250, 0.5);
+    EXPECT_NEAR(curtain().centre().x() - curtain().size().width() / 2, 200, 0.5);
+    // A drag on the black moves it, the hole along
+    penDrag(at(0, QPointF(100, 100)), at(0, QPointF(100, 160)));
+    EXPECT_NEAR(curtain().centre().y(), 460, 0.5);
+    EXPECT_EQ(elements(), 1u);
+}

@@ -81,6 +81,7 @@ ShortcutsModel::ShortcutsModel(Settings& settings, QObject* parent): QAbstractLi
             {"insertImage", tr("Insert an image…"), tools, {"I"}},
             // (B as PowerPoint's black screen: a black sheet over part of the page)
             {"curtain", tr("Curtain (hide part of the page)"), tools, {"B"}},
+            {"spotlight", tr("Spotlight (only a part of the page shown)"), tools, {"Shift+B"}},
 
             {"find", tr("Search"), search, standard(QKeySequence::Find)},
             {"searchAllDocuments", tr("Search all open documents"), search, {"Ctrl+Shift+F"}},

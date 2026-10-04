@@ -4033,7 +4033,8 @@ QString AppController::curtain() const {
     if (!canvas() || !canvas()->curtain().active()) {
         return {};
     }
-    return QStringLiteral("curtain");
+    return canvas()->curtain().shape() == CurtainLayer::Shape::Spotlight ? QStringLiteral("spotlight")
+                                                                           : QStringLiteral("curtain");
 }
 
 void AppController::toggleCurtain(const QString& which) {
@@ -4042,6 +4043,8 @@ void AppController::toggleCurtain(const QString& which) {
     }
     if (which == QLatin1String("curtain")) {
         canvas()->curtain().toggle(CurtainLayer::Shape::Curtain);
+    } else if (which == QLatin1String("spotlight")) {
+        canvas()->curtain().toggle(CurtainLayer::Shape::Spotlight);
     } else {
         canvas()->curtain().hide();
     }

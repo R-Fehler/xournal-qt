@@ -230,7 +230,9 @@ public:
 };
 
 /// The curtain (CurtainLayer): black over part of the page under a transform of its own (moving, turning and sizing
-/// it change only that and the size of the black), cut at the edges of the canvas; its handles over it.
+/// it change only that and the size of the black), cut at the edges of the canvas; its handles over it. The spotlight:
+/// four black rectangles around its hole, reaching beyond the canvas, and its rounded corners as four small pictures
+/// (made once).
 class CurtainNode final: public QSGTransformNode {
 public:
     static constexpr int HANDLES = 8;
@@ -241,6 +243,10 @@ public:
         clip->appendChildNode(body);
         sheet = new QSGSimpleRectNode(QRectF(), Qt::black);
         body->appendChildNode(sheet);
+        for (auto*& f: around) {
+            f = new QSGSimpleRectNode(QRectF(), Qt::black);
+            body->appendChildNode(f);
+        }
         for (int i = 0; i < HANDLES; ++i) {
             frames[i] = new QSGSimpleRectNode(QRectF(), HANDLE_COLOR);
             clip->appendChildNode(frames[i]);
@@ -250,7 +256,52 @@ public:
     }
     void clear() {
         sheet->setRect(QRectF());
+        hideHole();
         hideHandles();
+    }
+    void hideHole() {
+        for (auto* f: around) {
+            f->setRect(QRectF());
+        }
+        for (TileNode* c: corners) {
+            if (c && c->parent()) {
+                body->removeChildNode(c);
+            }
+        }
+    }
+    /// The spotlight: black around a hole of `w` x `h` (points, around the origin) with corners of radius `r`, as far
+    /// as `reach` from its middle
+    void showHole(QQuickWindow* window, double w, double h, double r, double reach) {
+        const double x = w / 2, y = h / 2;
+        around[0]->setRect(QRectF(QPointF(-reach, -reach), QPointF(reach, -y)));  // above
+        around[1]->setRect(QRectF(QPointF(-reach, y), QPointF(reach, reach)));    // below
+        around[2]->setRect(QRectF(QPointF(-reach, -y), QPointF(-x, y)));          // left
+        around[3]->setRect(QRectF(QPointF(x, -y), QPointF(reach, y)));            // right
+        const QRectF at[4] = {QRectF(-x, -y, r, r), QRectF(x - r, -y, r, r), QRectF(-x, y - r, r, r),
+                              QRectF(x - r, y - r, r, r)};
+        for (int i = 0; i < 4; ++i) {
+            if (!corners[i]) {
+                // Black with a quarter of a disc left out: its middle at the corner of the picture towards the hole
+                constexpr int N = 128;
+                QImage image(N, N, QImage::Format_ARGB32_Premultiplied);
+                image.fill(Qt::black);
+                QPainter painter(&image);
+                painter.setRenderHint(QPainter::Antialiasing);
+                painter.setCompositionMode(QPainter::CompositionMode_Clear);
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(Qt::black);
+                const QPointF centre(i % 2 == 0 ? N : 0, i < 2 ? N : 0);
+                painter.drawEllipse(centre, N, N);
+                painter.end();
+                corners[i] = new TileNode;
+                corners[i]->setFiltering(QSGTexture::Linear);
+                corners[i]->setTexture(window->createTextureFromImage(image));
+            }
+            corners[i]->setRect(at[i]);
+            if (!corners[i]->parent()) {
+                body->appendChildNode(corners[i]);
+            }
+        }
     }
     void hideHandles() {
         for (int i = 0; i < HANDLES; ++i) {
@@ -284,8 +335,14 @@ public:
         }
     }
     ~CurtainNode() override {
+        // (in the tree they go with it)
         if (knob && !knob->parent()) {
-            delete knob;  // (in the tree it goes with it)
+            delete knob;
+        }
+        for (TileNode* c: corners) {
+            if (c && !c->parent()) {
+                delete c;
+            }
         }
     }
     static inline const QColor HANDLE_COLOR{0x3f, 0x51, 0xb5};  // (the window's accent, Material Indigo)
@@ -293,7 +350,9 @@ public:
     static constexpr double KNOB = 20;
     PageClipNode* clip;
     QSGTransformNode* body;  ///< its own coordinates (points from its middle, unturned)
-    QSGSimpleRectNode* sheet;
+    QSGSimpleRectNode* sheet;                    ///< the curtain
+    std::array<QSGSimpleRectNode*, 4> around{};  ///< the spotlight: black above, below, left and right of its hole
+    std::array<TileNode*, 4> corners{};          ///< ... and in its corners (top left, top right, bottom left, right)
     std::array<QSGSimpleRectNode*, HANDLES> frames{};
     std::array<QSGSimpleRectNode*, HANDLES> fills{};
     TileNode* knob = nullptr;
@@ -1210,7 +1269,21 @@ void DocumentCanvasItem::updateCurtainNode(QSGNode* rootNode, double zoom, doubl
     c->body->setMatrix(m);
     c->clip->setRect(QRectF(0, 0, width(), height()));
     const QSizeF size = curtain.size();
-    c->sheet->setRect(QRectF(QPointF(-size.width() / 2, -size.height() / 2), size));
+    const bool spotlight = curtain.shape() == xqt::CurtainLayer::Shape::Spotlight;
+    if (spotlight) {
+        // Black as far as the farthest corner of the canvas (whichever way it is turned)
+        const QPointF centre = m.map(QPointF(0, 0));
+        double farthest = 0;
+        for (const QPointF corner: {QPointF(0, 0), QPointF(width(), 0), QPointF(0, height()), QPointF(width(), height())}) {
+            farthest = std::max(farthest, std::hypot(corner.x() - centre.x(), corner.y() - centre.y()));
+        }
+        const double reach = farthest / std::max(zoom, 1e-6) + std::max(size.width(), size.height()) + 10;
+        c->sheet->setRect(QRectF());
+        c->showHole(window(), size.width(), size.height(), curtain.cornerRadius(), reach);
+    } else {
+        c->hideHole();
+        c->sheet->setRect(QRectF(QPointF(-size.width() / 2, -size.height() / 2), size));
+    }
 
     // The handles: squares at the corners and edges, the knob above (item pixels, not turned)
     const auto handles = curtain.handles();
@@ -1236,7 +1309,8 @@ void DocumentCanvasItem::updateCurtainNode(QSGNode* rootNode, double zoom, doubl
     }
     curtainStats.shown = true;
     curtainStats.body = m;
-    curtainStats.sheet = c->sheet->rect();
+    curtainStats.sheet = QRectF(QPointF(-size.width() / 2, -size.height() / 2), size);
+    curtainStats.spotlight = spotlight;
     curtainStats.handles = static_cast<int>(handles.size());
 }
 

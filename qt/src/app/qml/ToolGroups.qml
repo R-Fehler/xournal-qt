@@ -5,8 +5,8 @@
 //   pen       pen ↔ highlighter (freehand)
 //   select    rectangle ↔ lasso (the multi-layer ones only in the list)
 //   shape     line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes (the pen draws them)
-//   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); the curtain only in the list (it is
-//             not a tool of its own: it lies over the page whatever tool is in hand, qt/docs/curtain.md)
+//   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); curtain and spotlight only in the list (they are
+//             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/curtain.md)
 //   eraser    standard ↔ whiteout ↔ whole strokes (its size: the widths of the tool bar)
 // The keyboard's tools (P, H, S, L, E) take a variant directly; the button follows and remembers it.
 import QtQuick
@@ -48,7 +48,8 @@ QtObject {
             variants: [
                 { key: "setsquare", icon: "xopp-setsquare", name: qsTr("Setsquare") },
                 { key: "compass", icon: "xopp-compass", name: qsTr("Compass") },
-                { key: "curtain", icon: "xqt-curtain", name: qsTr("Curtain (B)"), listOnly: true, curtain: true }
+                { key: "curtain", icon: "xqt-curtain", name: qsTr("Curtain (B)"), listOnly: true, curtain: true },
+                { key: "spotlight", icon: "xqt-spotlight", name: qsTr("Spotlight (Shift+B)"), listOnly: true, curtain: true }
             ]
         },
         "eraser": {

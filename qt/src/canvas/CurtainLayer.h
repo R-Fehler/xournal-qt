@@ -1,9 +1,11 @@
 /*
- * xournal-qt: the curtain, for teaching and presenting (qt/docs/curtain.md).
+ * xournal-qt: the curtain and the spotlight, for teaching and presenting (qt/docs/curtain.md).
  *
- * A black sheet over part of the page, like a sheet of paper on an overhead projector: the audience does not see what
- * lies under it. It is put out over the lower half of the part of the page in view, and moved, turned and sized like
- * the setsquare: two fingers on it carry, turn and size it, and while its handles are shown (a tap on the black shows
+ * The curtain is a black sheet over part of the page, like a sheet of paper on an overhead projector: the audience
+ * does not see what lies under it. It is put out over the lower half of the part of the page in view. The spotlight is
+ * its inverse: everything of the canvas is black (the other pages and the space around them too) but a rectangle with
+ * rounded corners, put out in the middle of the view. Both are moved, turned and sized like the setsquare (the
+ * spotlight by its hole): two fingers on it carry, turn and size it, and while its handles are shown (a tap on the black shows
  * them, Esc or a press beside it hides them) a drag on it moves it, its corners and edges size it and the knob above
  * it turns it.
  *
@@ -20,6 +22,7 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <optional>
@@ -38,7 +41,7 @@ class CanvasView;
 
 class CurtainLayer {
 public:
-    enum class Shape { Curtain };
+    enum class Shape { Curtain, Spotlight };
     /// What a press is on. `Body`: the black itself (moves it while the handles are shown).
     enum class Handle { None, Body, Rotate, Left, Right, Top, Bottom, TopLeft, TopRight, BottomLeft, BottomRight };
 
@@ -56,7 +59,8 @@ public:
     /// The canvas page it lies on
     CanvasPage* page() const { return onPage; }
 
-    /// Where it is: its middle (page points), its size (points) and how it is turned (radians, clockwise)
+    /// Where it is: its middle (page points), its size (points) and how it is turned (radians, clockwise). For the
+    /// spotlight that is its hole.
     QPointF centre() const { return middle; }
     QSizeF size() const { return extent; }
     double rotation() const { return turn; }
@@ -99,6 +103,9 @@ public:
 
     /// How small it can be made (points a side)
     static constexpr double MIN_SIDE = 24;
+    /// The corners of the spotlight's hole are rounded with this radius (points; less on a small hole)
+    static constexpr double RADIUS = 12;
+    double cornerRadius() const { return std::min({RADIUS, extent.width() / 2, extent.height() / 2}); }
     /// The knob that turns it: this far above its top edge (view pixels)
     static constexpr double KNOB_DISTANCE = 36;
     /// How far a press may be from a handle: pen and mouse, finger (view pixels)
@@ -111,7 +118,8 @@ public:
 
 private:
     void put(CanvasPage& page);
-    /// Where it goes when it is put out on this page: over the lower half of the part of the page in view
+    /// Where it goes when it is put out on this page: the curtain over the lower half of the part of the page in view,
+    /// the spotlight's hole in its middle
     void placeDefault(CanvasPage& page);
     /// The page of the view (none: no pages)
     CanvasPage* currentPage() const;

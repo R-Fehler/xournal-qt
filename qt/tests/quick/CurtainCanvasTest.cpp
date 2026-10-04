@@ -175,3 +175,29 @@ TEST_F(CurtainCanvasTest, thePagesOwnPictureHasNothingOfIt) {
     ASSERT_FALSE(tile.isNull());
     EXPECT_FALSE(black(tile.pixel(128, 128))) << "the page under the curtain is drawn as it is";
 }
+
+// The spotlight: the whole canvas is black (around the page as well) but its hole, whose corners are rounded.
+TEST_F(CurtainCanvasTest, theSpotlightIsBlackAllAroundItsHole) {
+    CurtainLayer& curtain = view->curtain();
+    curtain.show(CurtainLayer::Shape::Spotlight);
+    curtain.place(QPointF(300, 300), QSizeF(200, 120), 0.3);
+    curtain.setHandlesShown(false);
+    ASSERT_TRUE(nextFrame());
+    settle(100);
+    const QImage image = shot();
+    const double dpr = window->effectiveDevicePixelRatio();
+    EXPECT_TRUE(black(image.pixel(QPoint(3, 3) * dpr))) << "the corner of the window (beside the page) is black";
+    EXPECT_TRUE(black(image.pixel(QPoint(996, 796) * dpr)));
+    EXPECT_TRUE(black(image.pixel(inShot(QPointF(50, 50))))) << "the page outside the hole is black";
+    EXPECT_FALSE(black(image.pixel(inShot(QPointF(300, 300))))) << "its hole shows the page";
+    // Turned by 0.3: a point 80 points along its long side from its middle is in the hole
+    const QPointF along(80 * std::cos(0.3), 80 * std::sin(0.3));
+    EXPECT_FALSE(black(image.pixel(inShot(QPointF(300, 300) + along))));
+    EXPECT_TRUE(black(image.pixel(inShot(QPointF(300, 300) + along * 1.5))));
+    // Its corner (2 points inside, where a square corner would be in the hole) is black
+    const QPointF corner(98, -58);
+    const QPointF c(corner.x() * std::cos(0.3) - corner.y() * std::sin(0.3),
+                    corner.x() * std::sin(0.3) + corner.y() * std::cos(0.3));
+    EXPECT_TRUE(black(image.pixel(inShot(QPointF(300, 300) + c)))) << "rounded";
+    EXPECT_TRUE(canvas->curtainShown().spotlight);
+}

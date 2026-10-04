@@ -4496,7 +4496,8 @@ TEST_F(MainWindowTest, theGeometryButtonPutsTheSetsquareOnThePage) {
 }
 
 // The curtain (qt/docs/curtain.md): B puts it out and takes it away; the setsquare button's list and ⋮ → View have it
-// too; Esc hides its handles (before it leaves full screen); its pill's × takes it away. Each tab has its own.
+// too; Esc hides its handles (before it leaves full screen); its pill switches to the spotlight (Shift+B too) and its ×
+// takes it away. Each tab has its own.
 TEST_F(MainWindowTest, theCurtainComesWithBAndTheSetsquaresList) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(50);
@@ -4556,6 +4557,17 @@ TEST_F(MainWindowTest, theCurtainComesWithBAndTheSetsquaresList) {
     controller->setCurrentTab(first);
     wait(100);
     EXPECT_EQ(controller->curtain(), QStringLiteral("curtain")) << "back: still out";
+
+    // The spotlight instead: the pill's second button, Shift+B, and back
+    click(find<QQuickItem>("curtainShape"));
+    EXPECT_EQ(controller->curtain(), QStringLiteral("spotlight")) << "the pill: the spotlight instead";
+    click(find<QQuickItem>("curtainShape"));
+    EXPECT_EQ(controller->curtain(), QStringLiteral("curtain")) << "and the curtain again";
+    key(Qt::Key_B, Qt::ShiftModifier);
+    EXPECT_EQ(controller->curtain(), QStringLiteral("spotlight")) << "Shift+B";
+    auto* spotlightItem = find<QObject>("spotlightItem");
+    ASSERT_NE(spotlightItem, nullptr);
+    EXPECT_TRUE(spotlightItem->property("checked").toBool()) << "⋮ → View shows it";
 
     // The pill's × takes it away
     click(find<QQuickItem>("curtainClose"));

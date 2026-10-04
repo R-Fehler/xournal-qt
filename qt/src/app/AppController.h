@@ -1012,8 +1012,9 @@ public:
     /// For the screenshot hook (it calls methods without arguments)
     Q_INVOKABLE void toggleSetsquare() { toggleGeometryTool("setsquare"); }
     Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
-    /// The curtain over part of the page (qt/docs/curtain.md; this tab's, only on the screen): "curtain" puts it out
-    /// (or takes it away again), "" takes it away.
+    /// The curtain over part of the page, or the spotlight (all black but a rectangle; qt/docs/curtain.md; this tab's,
+    /// only on the screen): "curtain" / "spotlight" puts it out (instead of the other one; the same again takes it
+    /// away), "" takes it away.
     Q_INVOKABLE void toggleCurtain(const QString& which);
     /// Which one is out ("" if none)
     Q_PROPERTY(QString curtain READ curtain NOTIFY curtainChanged)
