@@ -25,6 +25,7 @@
 #include "shell/Thumbnails.h"
 
 #include "CanvasMemory.h"
+#include "HoverPointer.h"
 #include "ScreenCalibration.h"
 
 namespace xqt {
@@ -160,6 +161,16 @@ SettingsModel::SettingsModel(AppContext& app, QObject* parent):
             if (type != ERASER_TYPE_NONE) {
                 app.getToolHandler()->setEraserType(type);
             }
+        });
+    // The tool's pointer over the page: a small dot or the crosshair (qt/docs/hover-cursors.md)
+    add("hoverPointer",
+        [&s] {
+            return QVariant(QString::fromLatin1(hover::pointerSetting(s) == hover::Pointer::Crosshair ? "crosshair"
+                                                                                                     : "dot"));
+        },
+        [&s](const QVariant& v) {
+            hover::setPointerSetting(s, v.toString() == QLatin1String("crosshair") ? hover::Pointer::Crosshair
+                                                                                   : hover::Pointer::Dot);
         });
 
     // Open documents at the page they were left at (off: at their first page)

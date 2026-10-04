@@ -481,9 +481,12 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   follow a palette switch (used by `qt/toolbox`).
   Done (qt/docs/color-palettes.md); left: strokes still use upstream's fixed highlighter opacity (0.47, multiplied),
   so 0.8 on dark paper shows only in the chooser until a per-stroke opacity seam is decided.
-- [ ] `qt/hover-cursors`: the pen's hover dot as fast as the crosshair (a cursor of its own instead of a drawn
+- [x] `qt/hover-cursors`: the pen's hover dot as fast as the crosshair (a cursor of its own instead of a drawn
   item, if that is the cause), the crosshair as a setting, and an **eraser preview**: a gray circle of the eraser's
   size and shape while hovering.
+  Done (qt/docs/hover-cursors.md): the dot is a cursor (the drawn dot lagged two to three frames), Dot/Crosshair in
+  Settings → Pen, the eraser as a gray square (dashed: whole strokes, round: whiteout) at its zoomed size. Left: check
+  on the device that Wayland shows the cursor for the pen (assumed from Qt 6.7; `XQT_PEN_CURSOR` overrides it).
 - [ ] `qt/undo-redo`: in Markdown text documents redo is grayed out in the bottom-right pill while Ctrl+Shift+Z
   works (bug: failing test first). Undo and redo are hard to find: make them visible buttons in the tool bar and the
   phone chrome (their final place follows `qt/toolbox`).

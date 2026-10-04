@@ -10,11 +10,11 @@ cd build-qt
 ## Pen
 - [ ] Writing: pressure visible, looks like Xournal++, no gaps when writing fast, ink follows the tip without lag.
 - [ ] Highlighter: translucent, multiplies with what is underneath (text stays readable).
-- [ ] Both side buttons of the pen erase while held (the default), also while drawing; the pen draws again afterwards. The hover dot turns red.
+- [ ] Both side buttons of the pen erase while held (the default), also while drawing; the pen draws again afterwards. While held, the pointer is the eraser's gray square.
 - [ ] Turning the pen around (eraser end) erases as well.
 - [ ] Eraser tool from the tool bar.
 - [ ] Hand tool: dragging with the pen scrolls.
-- [ ] Hover: the dot follows the pen above the screen.
+- [ ] Hover: the dot follows the pen above the screen (see "The pointer over the page" below).
 - [ ] A stroke from one page into the next continues on the next page (split into two strokes, as in Xournal++).
 
 ## Touch and palm rejection
@@ -2585,3 +2585,32 @@ See qt/docs/curtain.md. On the 2-in-1 with pen and fingers, and with a mouse.
       reveal the next line; the spotlight's hole is made wider from just outside its edge; writing just inside the
       hole's edge still writes. Elsewhere on the black a finger still scrolls.
 - [ ] B, move the curtain, B (away), B: it is back where it was; the same for the spotlight; another tab has its own.
+
+## The pointer over the page (qt/hover-cursors)
+qt/docs/hover-cursors.md.
+
+- [ ] Mouse over the page: a small dark dot with a light ring (no crosshair), sharp at the screen's scaling (100 %,
+      150 %, 200 %); it moves as fast as the arrow does over the tool bar. On a dark page it still shows.
+- [ ] Pen hovering over the page (Plasma Wayland, Surface): the same dot, as fast as the crosshair was. Move the
+      mouse onto the tool bar first, then hover the pen over the page: still the dot (not the arrow). Hover the pen
+      over the tool bar: the arrow there; back on the page: the dot.
+- [ ] No second, slower dot trails behind the pen any more. If no pointer shows at all for the pen: start with
+      `XQT_PEN_CURSOR=0 ./xournal-qt` (the drawn dot) and note the platform and Qt version.
+- [ ] Settings → Pen → Pointer over the page → Crosshair: the crosshair at once, for the mouse and the pen; back to
+      Dot.
+- [ ] A link with the mouse: the pointing hand; off it the dot again. The width handle of a Markdown box: the
+      arrows, the dot again away from it.
+- [ ] Android (Fold 7, S Pen): hovering the S Pen shows the drawn dot under the tip; it goes when the pen goes away.
+- [ ] Eraser from the tool bar, mouse over the page: a gray square with a faint gray inside, as big as the eraser
+      erases (erase across a line: what the square covered is gone). Zoom in and out (Ctrl + wheel, pinch): the square
+      grows and shrinks with the page. Another eraser size: the square follows at once.
+- [ ] Settings → Pen → Eraser → Whole strokes: the square's line is dashed. Whiteout: a circle as wide as the white
+      line it draws. Standard again: the solid square.
+- [ ] On a dark page the eraser's outline still shows (light halo).
+- [ ] Pen (Surface, Plasma Wayland): turn it around, hover with the eraser end: the gray square (the tool bar still
+      shows the pen); the tip again: the dot. Hold a side button while hovering: the square; let go: the dot.
+- [ ] A large eraser of its own width (the eraser's widths: the last one, up to 150 pt) at a high zoom: the square
+      is bigger than a cursor; the dot stays in the middle and the square is drawn around it, following the mouse
+      and the pen without lag in the page's drawing (it may trail the dot a little).
+- [ ] Android: the S Pen's side button held while hovering shows the drawn gray square under the tip.
+- [ ] The reference beside a document (read only): no eraser square there, the dot.
