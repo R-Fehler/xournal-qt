@@ -1,4 +1,7 @@
+#include <algorithm>
+#include <cctype>
 #include <string>
+#include <vector>
 
 #include <cairo-pdf.h>
 #include <cairo.h>
@@ -245,4 +248,186 @@ TEST(MdLayout, sourceRangesAreWhereTheyAreDrawn) {
     const auto word = sourceRects(l, strong, strong + 8);  // "**strong": the mark and the word
     ASSERT_EQ(word.size(), 1u);
     EXPECT_NEAR(word[0].x, findText(l, "strong")[0].x, 0.01) << "only the word";
+}
+
+// --- tables: column widths as a browser's automatic table layout (VS Code's preview, GitHub) ----------------------
+namespace {
+/// A table's column edges (its vertical rules), left to right.
+std::vector<double> columnEdges(const Layout& l, size_t block) {
+    std::vector<double> edges;
+    for (const Item& it: l.items) {
+        if (it.block == block && it.kind == Item::Kind::Line && it.width == 0 && it.height > 0) {
+            edges.push_back(it.x);
+        }
+    }
+    std::sort(edges.begin(), edges.end());
+    return edges;
+}
+/// The text items of a table's cells, row by row.
+std::vector<const Item*> cells(const Layout& l, size_t block) {
+    std::vector<const Item*> out;
+    for (const Item& it: l.items) {
+        if (it.block == block && it.kind == Item::Kind::Text) {
+            out.push_back(&it);
+        }
+    }
+    return out;
+}
+std::string textOf(const Item& it) { return pango_layout_get_text(it.layout.get()); }
+const Item* cell(const Layout& l, size_t block, const std::string& text) {
+    for (const Item* it: cells(l, block)) {
+        if (textOf(*it) == text) {
+            return it;
+        }
+    }
+    return nullptr;
+}
+int lineCount(const Item& it) { return pango_layout_get_line_count(it.layout.get()); }
+/// Whether a text's lines break inside a word: a line after the first that starts right after a letter or digit.
+bool breaksInAWord(const Item& it) {
+    const std::string t = textOf(it);
+    for (GSList* l = pango_layout_get_lines_readonly(it.layout.get()); l; l = l->next) {
+        const auto* line = static_cast<PangoLayoutLine*>(l->data);
+        const int at = line->start_index;
+        if (at > 0 && at <= static_cast<int>(t.size()) && std::isalnum(static_cast<unsigned char>(t[at - 1]))) {
+            return true;
+        }
+    }
+    return false;
+}
+/// Every cell's text lies inside its column (columns: the table's column count).
+void expectCellsInsideTheirColumns(const Layout& l, size_t block, size_t columns, const std::string& what) {
+    const auto edges = columnEdges(l, block);
+    ASSERT_EQ(edges.size(), columns + 1) << what;
+    const auto all = cells(l, block);
+    ASSERT_EQ(all.size() % columns, 0u) << what;
+    for (size_t k = 0; k < all.size(); ++k) {
+        const size_t i = k % columns;
+        EXPECT_GE(all[k]->x, edges[i] - 0.01) << what << ": " << textOf(*all[k]);
+        EXPECT_LE(all[k]->x + all[k]->width, edges[i + 1] + 0.01) << what << ": " << textOf(*all[k]) << " overlaps";
+    }
+}
+const std::string LONG_TEXT = "This column holds a long description that goes on and on, much longer than the page "
+                              "is wide, so that it has to wrap over several lines while the short columns beside it "
+                              "keep their words whole, as a browser lays out the table.";
+}  // namespace
+
+// A short column next to a column of long text keeps its width: its words stay on one line (the browser gives each
+// column at least its widest word and spreads the rest by how much more text a column has). Before, every column
+// was narrowed by the same factor, so "Status" broke into letters.
+TEST(MdLayout, aShortColumnBesideALongOneKeepsItsWords) {
+    const std::string src = "| Key | Description |\n|---|---|\n| Status | " + LONG_TEXT + " |\n| Owner | short |\n";
+    const Layout l = lay(src, 400);
+    for (const std::string word: {"Key", "Status", "Owner"}) {
+        const Item* c = cell(l, 0, word);
+        ASSERT_NE(c, nullptr) << word;
+        EXPECT_EQ(lineCount(*c), 1) << word << " is broken";
+    }
+    const Item* d = cell(l, 0, LONG_TEXT);
+    ASSERT_NE(d, nullptr);
+    EXPECT_GT(lineCount(*d), 2) << "the long text wraps";
+    EXPECT_FALSE(breaksInAWord(*d));
+    const auto edges = columnEdges(l, 0);
+    ASSERT_EQ(edges.size(), 3u);
+    EXPECT_NEAR(edges.back() - edges.front(), 400, 0.5) << "a table with more text than room is as wide as the box";
+    expectCellsInsideTheirColumns(l, 0, 2, "short and long");
+}
+
+// Headers and words in cells wrap between words, not inside them, as long as the widest words fit.
+TEST(MdLayout, tableCellsWrapBetweenWords) {
+    const std::string src = "| Identifier | Description | Temperature | Remarks |\n|---|---|---|---|\n"
+                            "| alpha | A short sentence about the first thing in this table | 21.5 | none |\n"
+                            "| beta | Another sentence, about the second thing, longer than the first one by far "
+                            "and wrapping | 19.0 | " +
+                            LONG_TEXT + " |\n";
+    const Layout l = lay(src, 400);
+    for (const Item* c: cells(l, 0)) {
+        EXPECT_FALSE(breaksInAWord(*c)) << textOf(*c);
+    }
+    for (const std::string word: {"Identifier", "Description", "Temperature", "Remarks", "alpha", "21.5"}) {
+        const Item* c = cell(l, 0, word);
+        ASSERT_NE(c, nullptr) << word;
+        EXPECT_EQ(lineCount(*c), 1) << word;
+    }
+    expectCellsInsideTheirColumns(l, 0, 4, "four columns");
+}
+
+// Inline code and formulas in a cell are words that cannot break: the column is as wide as they are, and a formula
+// keeps the size it has in a paragraph (it is not made smaller to fit a narrow column).
+TEST(MdLayout, codeAndFormulasInCellsKeepTheirWidth) {
+    const std::string src = "| Name | Formula | Notes |\n|---|---|---|\n| `configuration_value_name` | "
+                            "$\\alpha + \\beta + \\gamma = \\delta$ | " +
+                            LONG_TEXT + " |\n";
+    const Layout l = lay(src, 400);
+    const Item* code = cell(l, 0, "configuration_value_name");
+    ASSERT_NE(code, nullptr);
+    EXPECT_EQ(lineCount(*code), 1) << "inline code broken inside";
+    const Layout para = lay("$\\alpha + \\beta + \\gamma = \\delta$", 400);
+    ASSERT_EQ(para.items.size(), 1u);
+    ASSERT_EQ(para.items[0].maths.size(), 1u);
+    const double natural = para.items[0].maths[0].inkWidth;
+    const Item* formula = nullptr;
+    for (const Item* c: cells(l, 0)) {
+        formula = c->maths.empty() ? formula : c;
+    }
+    ASSERT_NE(formula, nullptr);
+    EXPECT_NEAR(formula->maths[0].inkWidth, natural, 0.01) << "the formula was made smaller";
+    expectCellsInsideTheirColumns(l, 0, 3, "code and formula");
+}
+
+// A table that fits is as wide as its text (as a browser's table: not stretched to the box), each cell on one line.
+TEST(MdLayout, aTableThatFitsIsAsWideAsItsText) {
+    const Layout l = lay("| a | bb |\n|---|---|\n| one | two three |\n", 400);
+    const auto edges = columnEdges(l, 0);
+    ASSERT_EQ(edges.size(), 3u);
+    EXPECT_LT(edges.back() - edges.front(), 200);
+    for (const Item* c: cells(l, 0)) {
+        EXPECT_EQ(lineCount(*c), 1) << textOf(*c);
+    }
+}
+
+// Of two columns of long text, the one with more text gets more of the room.
+TEST(MdLayout, theRoomGoesToTheColumnWithMoreText) {
+    const std::string shorter = "Some words that are more than fit on one line of this column, a few of them.";
+    const std::string src = "| A | B |\n|---|---|\n| " + shorter + " | " + LONG_TEXT + " " + LONG_TEXT + " |\n";
+    const Layout l = lay(src, 400);
+    const auto edges = columnEdges(l, 0);
+    ASSERT_EQ(edges.size(), 3u);
+    EXPECT_GT(edges[2] - edges[1], edges[1] - edges[0]);
+    expectCellsInsideTheirColumns(l, 0, 2, "two long columns");
+}
+
+// A table whose words do not fit side by side is drawn smaller to fit the box (its words stay whole while it is not
+// much too wide), and never wider than the box nor over its neighbouring cells.
+TEST(MdLayout, aTableTooWideForTheBoxIsDrawnSmaller) {
+    const std::string head = "| Temperature | Measurement | Description | Calibration | Uncertainty | Reference |\n"
+                             "|---|---|---|---|---|---|\n";
+    const std::string row = "| 21.5 | thermometer | indoors | yesterday | small | handbook |\n";
+    const Layout l = lay(head + row, 400);
+    for (const Item* c: cells(l, 0)) {
+        EXPECT_FALSE(breaksInAWord(*c)) << textOf(*c);
+        EXPECT_EQ(lineCount(*c), 1) << textOf(*c);
+    }
+    const auto edges = columnEdges(l, 0);
+    ASSERT_EQ(edges.size(), 7u);
+    EXPECT_LE(edges.back(), 400.01);
+    EXPECT_GE(edges.front(), -0.01);
+    expectCellsInsideTheirColumns(l, 0, 6, "six wide columns");
+    // Far too wide (many columns): still inside the box, no cell over the next one
+    std::string many = "|";
+    std::string rule = "|";
+    std::string cellsRow = "|";
+    for (int i = 0; i < 40; ++i) {
+        many += " Heading" + std::to_string(i) + " |";
+        rule += "---|";
+        cellsRow += " word" + std::to_string(i) + " |";
+    }
+    const Layout m = lay(many + "\n" + rule + "\n" + cellsRow + "\n", 300);
+    const auto e = columnEdges(m, 0);
+    ASSERT_EQ(e.size(), 41u);
+    EXPECT_LE(e.back(), 300.01);
+    for (const Item& it: m.items) {
+        EXPECT_LE(it.x + it.width, 300.01);
+    }
+    expectCellsInsideTheirColumns(m, 0, 40, "forty columns");
 }

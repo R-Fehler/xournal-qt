@@ -283,6 +283,26 @@ TEST(MdImages, InlineImageIsAsHighAsTheLine) {
     EXPECT_NEAR(bottom0 - bottom1, 0.22 * 12 - 0.25 * 6, 0.01);
 }
 
+// A picture in a table's cell is a word that cannot break: its column is as wide as the picture, which keeps the size
+// it has in a line of text, also beside a column of long text (qt/docs/md-images.md).
+TEST(MdImages, PictureInATableCellKeepsItsSize) {
+    TempDir t;
+    writePng(t.dir / "banner.png", 400, 20);  // 300 × 15 pt: in a line of text 288 × 14.4 pt
+    images::RootHandle root(images::Root{t.dir.string(), "", ""});
+    std::string text;
+    for (int i = 0; i < 12; ++i) {
+        text += "a long description beside the picture ";
+    }
+    const Layout l = lay("| Picture | Text |\n|---|---|\n| ![](banner.png) | " + text + "|\n", 400);
+    const auto pics = drawnPictures(l);
+    ASSERT_EQ(pics.size(), 1u);
+    EXPECT_NEAR(pics[0].rect.width, 288, 0.1) << "made smaller to fit a squeezed column";
+    EXPECT_NEAR(pics[0].rect.height, 14.4, 0.1);
+    for (const Item& it: l.items) {
+        EXPECT_LE(it.x + it.width, 400.01);
+    }
+}
+
 TEST(MdImages, MissingPictureShowsItsAltTextAndPath) {
     TempDir t;
     images::RootHandle root(images::Root{t.dir.string(), "", ""});
