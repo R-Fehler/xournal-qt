@@ -1460,11 +1460,12 @@ private:
     std::vector<AppController*> windows;  ///< the main window: the windows of undocked documents
     /// The handwriting search (the main window's, shared by the others; before `tabs`: goes after the documents)
     std::unique_ptr<xqt::hwr::HandwritingSearch> ownHandwriting;
-    xqt::hwr::HandwritingSearch* handwriting = nullptr;
+    /// (QPointer: a second window is a child of the main one, deleted after the main one's members are gone)
+    QPointer<xqt::hwr::HandwritingSearch> handwriting;
     /// Reads the handwriting of the rest of the library (the main window's)
     std::unique_ptr<xqt::LibraryInkJob> libraryInk;
     std::unique_ptr<xqt::HandwritingSettings> ownHandwritingView;
-    xqt::HandwritingSettings* handwritingView = nullptr;
+    QPointer<xqt::HandwritingSettings> handwritingView;  ///< (as `handwriting`)
     /// The open documents of this window to the handwriting search
     void syncHandwriting();
     /// The handwriting read in a saved document, to the library's cache
