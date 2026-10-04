@@ -2523,3 +2523,14 @@ Finder:
 - [ ] Two columns (decision aid for `qt/docs/md-columns.md`): open a long `.md` as pages on the tablet in landscape,
       turn on "Two pages side by side": does reading two pages side by side give what a two-column mode was wanted
       for? If not, note what is missing (one page in two columns, printing handouts, ...).
+
+## Undo and redo buttons (qt/undo-redo)
+
+- [ ] Open a `.md`, type a few words: the undo button of the pill in the lower right corner is active, redo is grey.
+      Tap undo: the last word goes (the cursor stays in the text, the keyboard stays). Redo is active now; tap it:
+      the word is back, redo grey again. Ctrl+Z / Ctrl+Shift+Z do the same, and the buttons follow the keys.
+- [ ] The same in a `.txt`, and in a PDF text document (⋮ → Document → Open as PDF document) while writing in it.
+- [ ] A Markdown text box on a page of a `.xopp`: while writing, undo and redo go word by word as Ctrl+Z does; after
+      Esc, undo takes the whole box away and redo brings it back.
+- [ ] A reference beside the notes, its edit switch on: write a stroke into it, tap the reference, Ctrl+Z. The redo
+      button is active (it was grey: it asked the notes) and redoes the stroke in the reference, not in the notes.

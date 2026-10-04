@@ -262,6 +262,11 @@ void AppController::makeTabs() {
     connect(referenceMode.get(), &ReferenceMode::changed, this, &AppController::applyMarkdownText);
     connect(referenceMode.get(), &ReferenceMode::markdownRequested, this, &AppController::markdownRequested);
     connect(referenceMode.get(), &ReferenceMode::markdownBoxRequested, this, &AppController::markdownBoxRequested);
+    // Undo and redo act on the reference while it is written in and has the keys (editedReference): the buttons
+    // follow its history then
+    connect(referenceMode.get(), &ReferenceMode::undoRedoChanged, this, &AppController::undoRedoChanged);
+    connect(referenceMode.get(), &ReferenceMode::focusedChanged, this, &AppController::undoRedoChanged);
+    connect(referenceMode.get(), &ReferenceMode::changed, this, &AppController::undoRedoChanged);
     connect(tabs.get(), &TabManager::pdfPagesFailed, this, [this](const QString& error) {
         Q_EMIT message(tr("Pasting PDF pages failed"),
                        tr("The pasted pages show their PDF page as a picture (its text cannot be searched).\n\n%1")
@@ -751,6 +756,10 @@ void AppController::currentTabChanged() {
                 connect(v, &CanvasView::textEditingChanged, this, &AppController::markdownFormatChanged));
         currentConnections.push_back(
                 connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
+        // (the text being written has undo steps of its own: the undo and redo buttons follow them)
+        currentConnections.push_back(
+                connect(v, &CanvasView::markdownUndoChanged, this, &AppController::undoRedoChanged));
+        currentConnections.push_back(connect(v, &CanvasView::textEditingChanged, this, &AppController::undoRedoChanged));
         currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
         currentConnections.push_back(connect(v, &CanvasView::imageLoadRequested, this, [this](const QString& url) {
             std::string access;
@@ -1370,8 +1379,18 @@ QString AppController::shownFileNote() const {
     return tr("%1 is the background of this new page. Saving keeps what you write as %2 next to it.")
             .arg(name, QString::fromStdString(xopp.filename().string()));
 }
-bool AppController::canUndo() const { return session() && session()->getUndoRedoHandler()->canUndo(); }
-bool AppController::canRedo() const { return session() && session()->getUndoRedoHandler()->canRedo(); }
+// What undo() and redo() would do: the steps of the text being written, else the history of the document with the
+// keys (the reference while it is written in)
+bool AppController::canUndo() const {
+    const MarkdownEditor* editor = undoneMarkdown();
+    const DocumentSession* s = undoneSession();
+    return (editor && editor->canUndo()) || (s && s->getUndoRedoHandler()->canUndo());
+}
+bool AppController::canRedo() const {
+    const MarkdownEditor* editor = undoneMarkdown();
+    const DocumentSession* s = undoneSession();
+    return (editor && editor->canRedo()) || (s && s->getUndoRedoHandler()->canRedo());
+}
 
 QString AppController::tool() const {
     // Upstream's tool names (pen, highlighter, eraser, hand, selectRect, selectRegion, text, image, ...).
@@ -3828,7 +3847,20 @@ bool AppController::saveAs(const QUrl& url) {
            (waitForSave(), ok);
 }
 
+MarkdownEditor* AppController::undoneMarkdown() const {
+    CanvasView* v = editedReference() ? editedReference() : canvas();
+    return v ? v->getMarkdownEditor() : nullptr;
+}
+
+DocumentSession* AppController::undoneSession() const {
+    return editedReference() ? &editedReference()->getSession() : session();
+}
+
 void AppController::undo() {
+    if (MarkdownEditor* editor = undoneMarkdown(); editor && editor->canUndo()) {
+        editor->undo();  // the text being written, step by step as Ctrl+Z (not the whole edit at once)
+        return;
+    }
     if (editedReference()) {
         referenceMode->undo();  // (the canvas last written on has the keys)
         return;
@@ -3836,19 +3868,18 @@ void AppController::undo() {
     if (!session()) {
         return;
     }
-    if (MarkdownEditor* editor = canvas() && canvas()->textMode() ? canvas()->getMarkdownEditor() : nullptr;
-        editor && editor->canUndo()) {
-        editor->undo();  // a text file: the text being written, step by step (not the whole edit at once)
-        return;
-    }
     session()->clearSelectionEndText();  // first: finishing a text edit is itself an undo step
     endMarkdown(true);                   // (as is the Markdown being written beside the page)
-    if (canUndo()) {
+    if (session()->getUndoRedoHandler()->canUndo()) {
         session()->getUndoRedoHandler()->undo();
     }
 }
 
 void AppController::redo() {
+    if (MarkdownEditor* editor = undoneMarkdown(); editor && editor->canRedo()) {
+        editor->redo();
+        return;
+    }
     if (editedReference()) {
         referenceMode->redo();
         return;
@@ -3856,14 +3887,9 @@ void AppController::redo() {
     if (!session()) {
         return;
     }
-    if (MarkdownEditor* editor = canvas() && canvas()->textMode() ? canvas()->getMarkdownEditor() : nullptr;
-        editor && editor->canRedo()) {
-        editor->redo();
-        return;
-    }
     session()->clearSelectionEndText();
     endMarkdown(true);
-    if (canRedo()) {
+    if (session()->getUndoRedoHandler()->canRedo()) {
         session()->getUndoRedoHandler()->redo();
     }
 }

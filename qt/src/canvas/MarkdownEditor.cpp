@@ -513,6 +513,7 @@ void MarkdownEditor::edit(size_t from, size_t to, const std::string& with, EditK
     caret = anchor = from + with.size();
     md.update(text);
     changed(false);
+    Q_EMIT view.markdownUndoChanged();
 }
 
 void MarkdownEditor::insert(const std::string& s, EditKind kind) {
@@ -547,6 +548,7 @@ void MarkdownEditor::undoEdit(bool redo) {
         to.push_back(std::move(c));
         lastWasTyping = false;
         changed(false);
+        Q_EMIT view.markdownUndoChanged();
         return;
     }
     std::string text = md.text();
@@ -561,6 +563,7 @@ void MarkdownEditor::undoEdit(bool redo) {
     lastWasTyping = false;
     md.update(text);
     changed(false);
+    Q_EMIT view.markdownUndoChanged();
 }
 
 void MarkdownEditor::setCursorPosition(size_t offset) {
@@ -604,6 +607,7 @@ void MarkdownEditor::recordWidthChange(double before) {
     undoStack.push_back(std::move(c));
     redoStack.clear();
     lastWasTyping = false;
+    Q_EMIT view.markdownUndoChanged();
 }
 
 // --- input -------------------------------------------------------------------------------------------------------
