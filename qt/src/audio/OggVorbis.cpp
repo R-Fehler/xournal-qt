@@ -8,6 +8,7 @@
 #include <ogg/ogg.h>
 #include <vorbis/codec.h>
 #include <vorbis/vorbisenc.h>
+#define OV_EXCLUDE_STATIC_CALLBACKS  // (not used: our own, for wide paths)
 #include <vorbis/vorbisfile.h>
 
 namespace xqt::audio {

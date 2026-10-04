@@ -37,6 +37,7 @@
 #include "SessionActions.h"
 #include "filesystem.h"
 
+class AudioContent;
 class LayerController;
 
 namespace xqt {
@@ -405,6 +406,20 @@ public:
     /// Emits bookmarksChanged if one changed.
     void syncTextBookmarks();
 
+    // --- audio recordings (audio/DocumentAudio.h, qt/docs/audio.md) ----------------------------------------------------
+    /// A recording runs for this document: new pen strokes and texts are tied to it, its name (upstream's fn) and
+    /// the time in it now from `clock` (ms, upstream's ts). An empty name: none runs.
+    void setRecording(const std::string& name, std::function<size_t()> clock);
+    const std::string& recordingName() const { return recording; }
+    /// Ties the running recording to an element being made (a pen stroke, a new text). False when none runs.
+    bool stampAudio(AudioContent& element) const;
+    /// Adds the recording `name` to the voice memos of page `page` (one undo step, "Record audio"). False if it is
+    /// one already.
+    bool addVoiceMemo(size_t page, const std::string& name);
+    /// Removes the recording `name` from the document: the stamps of its strokes and texts and its memos (one undo
+    /// step; the file stays). Returns how many strokes, texts and memos had it.
+    size_t removeRecording(const std::string& name);
+
     // --- several pages at once (sidebar / page grid selection) --------------------------------------------------
     /// The undo stack that page changes go onto: the one of everything (as in upstream), see addPageUndoAction().
     UndoRedoHandler* getPageUndoRedoHandler() const { return undoRedo.get(); }
@@ -456,6 +471,9 @@ Q_SIGNALS:
     void pageRevisionsChanged();
     /// A page's bookmark was set, renamed or removed (also by undo and redo).
     void bookmarksChanged();
+    /// The document's recordings changed: a voice memo or the recording of elements (also by undo and redo; not for
+    /// every stroke stamped while recording).
+    void audioChanged();
     /// Show this rectangle of a page (page points), e.g. a search hit.
     void scrollToRectRequested(qulonglong page, QRectF rect);
 
@@ -467,6 +485,8 @@ private:
     void updatePageActions();
     void applyBookmark(const PageRef& page, const std::optional<std::string>& label);
     bool textBookmarksQueued = false;
+    std::string recording;               ///< setRecording
+    std::function<size_t()> recordingClock;
     void setLastAutosaveFile(fs::path file);
     static void updatePreview(Document& doc);
 

@@ -217,6 +217,9 @@ bool CanvasPage::onButtonPressEvent(const PositionInputData& pos) {
         this->inputHandler->onButtonPressEvent(pos, zoom);
         if (Stroke* stroke = this->inputHandler->getStroke()) {
             penfill::apply(*control.getSettings(), *h, *stroke);  // (its fill color, before its view is made)
+            if (h->getToolType() == TOOL_PEN) {
+                control.stampAudio(*stroke);  // (a recording runs: upstream's InputHandler::createStroke, qt/docs/audio.md)
+            }
         }
         this->overlayViews.emplace_back(this->inputHandler->createView(this));
     } else if (toolType == TOOL_LASER_POINTER_PEN || toolType == TOOL_LASER_POINTER_HIGHLIGHTER) {

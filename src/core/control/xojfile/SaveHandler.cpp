@@ -297,6 +297,9 @@ void SaveHandler::visitPage(XmlNode* root, ConstPageRef p, const Document* doc, 
     if (const auto& bookmark = p->getBookmark()) {  // xournal-qt: qt/docs/bookmarks.md
         page->setAttrib(xoj::xml_attrs::BOOKMARK_STR, *bookmark);
     }
+    if (const auto& memos = p->getAudioMemos(); !memos.empty()) {  // xournal-qt: qt/docs/audio.md
+        page->setAttrib(xoj::xml_attrs::PAGE_AUDIO_STR, memos);
+    }
 
     auto* background = new XmlNode(TAG_NAMES[TagType::BACKGROUND]);
     page->addChild(background);

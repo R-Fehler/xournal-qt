@@ -47,6 +47,8 @@ public:
     virtual void setPageNoteSpace(double /*left*/, double /*top*/, double /*right*/, double /*bottom*/) {}
     /// xournal-qt: the page's bookmark label (qt/docs/bookmarks.md); after addPage
     virtual void setPageBookmark(const std::string& /*label*/) {}
+    /// xournal-qt: the page's voice memos (qt/docs/audio.md); after addPage
+    virtual void setPageAudio(const std::string& /*memos*/) {}
     virtual void finalizePage() = 0;
     virtual void addAudioAttachment(const fs::path& filename) = 0;
     virtual void setBgName(const std::string& name) = 0;

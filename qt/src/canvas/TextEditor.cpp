@@ -115,6 +115,7 @@ TextEditor::TextEditor(DocumentSession& session, CanvasPage& page, double x, dou
         }
         textElement->setTransformation(
                 xoj::util::Matrix::TRANSLATION(x, y - textElement->getBoundingBox().height / 2));
+        session.stampAudio(*textElement);  // (a recording runs: as upstream's TextEditor, qt/docs/audio.md)
         if (markdown && !md::isMarkdownLayer(*layer)) {
             useMarkdownLayer();
         }

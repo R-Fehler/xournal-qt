@@ -72,6 +72,13 @@ public:
     const std::optional<std::string>& getBookmark() const;
     void setBookmark(std::optional<std::string> label);
 
+    /**
+     * xournal-qt: the recordings tied to the page as a whole, its voice memos (qt/docs/audio.md): their file names as in
+     * an element's audio filename, separated by "|". Saved as the page attribute xqt-audio="…"; "": none.
+     */
+    const std::string& getAudioMemos() const;
+    void setAudioMemos(std::string memos);
+
     bool isAnnotated() const;
 
     void setBackgroundColor(Color color);
@@ -141,6 +148,11 @@ private:
      * xournal-qt: the page's bookmark (see getBookmark)
      */
     std::optional<std::string> bookmark;
+
+    /**
+     * xournal-qt: the page's voice memos (see getAudioMemos)
+     */
+    std::string audioMemos;
 
     /**
      * The background color if the background type is plain

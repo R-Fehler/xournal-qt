@@ -66,3 +66,33 @@ the silence warning and its end, a microphone that cannot be opened or is unplug
 player against what the fake speaker gets, pause/resume/seek forwards, back and beyond the end, a missing file, an
 unplugged speaker; one test each with the fakes' timers). `RecorderTest.theRealMicrophone` records a second from the
 real microphone with `XQT_AUDIO_DEVICE=1` in a build with Qt Multimedia (skipped otherwise).
+
+## In the document
+
+`qt/src/audio/DocumentAudio.*`, `DocumentSession` ("audio recordings").
+
+- **Strokes and texts, as upstream**: while a recording runs for a document (`DocumentSession::setRecording`, set by
+  the app for the tab that records), every **pen** stroke (shapes drawn with the pen too) and every **new text** gets
+  the recording's name (`fn`) and the time in it (`ts`, ms) when it is started, exactly where upstream does it
+  (`InputHandler::createStroke`, `TextEditor`; here `CanvasPage` and `TextEditor`). The highlighter and the eraser
+  do not, as upstream. The recognised shape of a stroke keeps it (`Stroke::applyStyleFrom`).
+- **Voice memos**: a recording is also tied to the page it was started on (`DocumentSession::addVoiceMemo`, one undo
+  step "Record audio"). It is the page attribute `xqt-audio="2026-10-04_14-03-22.ogg|…"` (`XojPage::getAudioMemos`, an
+  upstream seam like `xqt-bookmark`, [ADR 0002](adr/0002-upstream-seams.md)). So a recording without ink is not lost,
+  and it follows its page when pages move; a duplicated page keeps it, as its strokes keep theirs. Xournal++ ignores
+  the attribute and drops it when it saves; the strokes' recordings keep working there.
+- **Names**: as upstream, the time the recording started, `2026-10-04_14-03-22.ogg` (`-2`, `-3` … when taken), written
+  bare into the file and found in the audio folder (see "Storage").
+- `recordingsOf(doc)`: every recording a document refers to, with its pages (memos and elements), its count of
+  elements and their first and last moments; `momentsOf(doc, name)`: its elements in time order (the ticks on the
+  playback slider); `hitAt(page, x, y)`: what the play tool plays (the nearest visible element with a recording within
+  15 points, upstream's radius).
+- **Removing a recording** from a document (`DocumentSession::removeRecording`) clears the `fn`/`ts` of its strokes and
+  texts and its memos in one undo step. The file stays where it is (another document may use it; upstream never
+  deletes recordings either).
+
+Tests: `AudioDocumentTest` (label `canvas`): pen strokes and pen shapes stamped through replayed tablet input, the
+highlighter and strokes after the recording not, undo/redo keeping the stamp; a new text stamped at the moment its box
+opened; memos and removing as one undo step each; the `.xopp` round trip (the raw XML: `ts`/`fn` as upstream writes
+them and `xqt-audio` on the page and its duplicate); upstream's `old.xopp` with its recording; the play tool's hit
+(nearest, too far, no recording, hidden layer); the names.
