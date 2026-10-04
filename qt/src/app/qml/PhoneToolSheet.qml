@@ -27,7 +27,7 @@ BottomSheet {
                  { slot: "text" }, { slot: "write" }, { slot: "sticky" }, { slot: "pdfText" }, { slot: "emoji" }]) },
         { name: "select", title: qsTr("Select"), cells: variantCells("select") },
         { name: "shape", title: qsTr("Shapes"), cells: variantCells("shape") },
-        { name: "geometry", title: qsTr("Setsquare and compass"), cells: variantCells("geometry") },
+        { name: "geometry", title: qsTr("Setsquare, compass and curtain"), cells: variantCells("geometry") },
         { name: "insert", title: qsTr("Insert"), cells: [{ slot: "image" }, { slot: "addPage" }] },
         { name: "document", title: qsTr("Document and view"),
           cells: [{ slot: "search" }, { slot: "present" }, { slot: "fullScreen" }, { slot: "settings" }, { slot: "new" },
@@ -99,8 +99,9 @@ BottomSheet {
                             height: 72
                             focusPolicy: Qt.NoFocus
                             enabled: !button || button.enabled
-                            checked: isVariant ? (sheet.groups.isActive(modelData.group)
-                                                  && sheet.groups.current(modelData.group) === modelData.key)
+                            checked: isVariant ? (variant.curtain === true ? app.curtain === modelData.key
+                                                  : sheet.groups.isActive(modelData.group)
+                                                    && sheet.groups.current(modelData.group) === modelData.key)
                                                : (button ? button.checked : false)
                             Accessible.name: name
                             onClicked: sheet.take(modelData)

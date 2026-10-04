@@ -139,6 +139,8 @@ CanvasView::CanvasView(DocumentSession& session, QObject* parent):
             Q_EMIT currentPageChanged(page);
         }
     });
+    // The curtain goes along to the page the view is at
+    connect(this, &CanvasView::currentPageChanged, this, [this] { curtainLayer.currentPageChanged(); });
     // Search hits are drawn by the canvas item over the pages.
     connect(&session.search(), &DocumentSearch::changed, this, &CanvasView::updateRequested);
     // Upstream's Control::clearSelectionEndText (before saving, undo, page operations, ...): the elements go back.
@@ -198,6 +200,7 @@ CanvasView::~CanvasView() {
     cancelRenders();  // (first: the workers start nothing of this view while it is taken down)
     CanvasMemory::instance().remove(this);
     geometry.hide();  // before its page goes
+    curtainLayer.hide();
     endTextEditing();
     pdfSelection.reset();
     selection.reset();  // the selected elements go back into the document
@@ -289,6 +292,7 @@ void CanvasView::rebuildPages() {
     mixedSelection->pageGoing(mixedSelection->selectedPage());
     boxResizer->pagesGoing();
     geometry.allPagesGoing();
+    curtainLayer.allPagesGoing();
     sharpWanted.clear();
     cancelRenders();
     pages.clear();
@@ -306,6 +310,7 @@ void CanvasView::rebuildPages() {
     }
     refreshLayout();
     geometry.pagesChanged();
+    curtainLayer.pagesChanged();
 }
 
 DocumentLayout::Config CanvasView::layoutConfig() const {
@@ -2576,6 +2581,7 @@ void CanvasView::pageInserted(size_t page) {
         restorePlace(here);
     }
     geometry.pagesChanged();  // a page moved elsewhere comes back as a new one
+    curtainLayer.pagesChanged();
 }
 
 void CanvasView::pageDeleted(size_t page) {
@@ -2584,6 +2590,7 @@ void CanvasView::pageDeleted(size_t page) {
         stickyNotes->pageGoing(pages[page].get());
         mixedSelection->pageGoing(pages[page].get());
         geometry.pageGoing(pages[page].get());
+        curtainLayer.pageGoing(pages[page].get());
         sharpWanted.erase(pages[page].get());
         pages.erase(pages.begin() + static_cast<std::ptrdiff_t>(page));
         if (!isPrimary() && page < ownPage) {
@@ -2595,6 +2602,7 @@ void CanvasView::pageDeleted(size_t page) {
         restorePlace(here);  // (not if its page went)
     }
     geometry.pagesChanged();
+    curtainLayer.pagesChanged();
 }
 
 void CanvasView::pageSelected(size_t pageNo) {

@@ -9,7 +9,8 @@
  * tiles on the GPU until the page has been re-rendered at the new zoom. The setsquare or compass is a node of its own
  * over its page: pictures of it (GeometryToolPicture) under a transform, which is all that changes while it is moved,
  * turned or sized; they are drawn anew only for a new size or zoom, once that has been stable for a moment. They are
- * this item's (one set per canvas that shows the tool), at most 4096 pixels a side.
+ * this item's (one set per canvas that shows the tool), at most 4096 pixels a side. The curtain (CurtainLayer) is a
+ * node over everything, black rectangles under a transform, with its handles; it is drawn nowhere else.
  *
  * @license GNU GPLv2 or later
  */
@@ -142,6 +143,16 @@ public:
         int displays = 0;
     };
     GeometryShown geometryShown() const { return geometryStats; }
+    /// The curtain in the last frame (tests): shown or not, the transform of its own coordinates to the item's, its
+    /// black (own coordinates) and how many handles were shown.
+    struct CurtainShown {
+        bool shown = false;
+        QMatrix4x4 body;
+        QRectF sheet;  ///< (the spotlight: its hole)
+        bool spotlight = false;
+        int handles = 0;
+    };
+    CurtainShown curtainShown() const { return curtainStats; }
 
 Q_SIGNALS:
     void viewChanged();
@@ -171,6 +182,7 @@ private:
     void takeKeyboardFocus();
     void updateSelectionNode(QSGNode* root, double zoom, double dpr);
     void updateGeometryNode(QSGNode* root, double zoom, double dpr);
+    void updateCurtainNode(QSGNode* root, double zoom, double dpr);
     bool claims(QPointF scenePos) const;
     /// Another canvas of the window holds the pen, the mouse or the touch (`grab` of that canvas): a stroke that began
     /// there stays there, also where it crosses this canvas.
@@ -224,4 +236,5 @@ private:
     std::atomic<bool> geometrySettled{false};
     QTimer geometryTimer;
     GeometryShown geometryStats;
+    CurtainShown curtainStats;
 };

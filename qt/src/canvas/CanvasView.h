@@ -47,6 +47,7 @@
 #include "ViewController.h"
 #include "pdf/base/XojPdfPage.h"  // for XojPdfPageSelectionStyle
 
+#include "CurtainLayer.h"
 #include "GeometryToolLayer.h"
 #include "MixedSelection.h"
 #include "ScreenCalibration.h"
@@ -346,6 +347,9 @@ public:
     /// The setsquare / compass on the canvas.
     GeometryToolLayer& geometryTool() { return geometry; }
     const GeometryToolLayer& geometryTool() const { return geometry; }
+    /// The curtain over part of the page (teaching, presenting; only on the screen).
+    CurtainLayer& curtain() { return curtainLayer; }
+    const CurtainLayer& curtain() const { return curtainLayer; }
     void pdfTextPress(CanvasPage& page, double x, double y);
     void pdfTextMove(CanvasPage& page, double x, double y);
     void pdfTextRelease(CanvasPage& page);
@@ -497,6 +501,8 @@ Q_SIGNALS:
     void pdfTextSelectionCleared();
     /// The setsquare / compass changed on its own (e.g. put aside because its page went).
     void geometryChanged();
+    /// The curtain came or went, or its handles did.
+    void curtainChanged();
     /// Something went wrong that the user should know (e.g. a pasted picture could not be saved).
     void messageRequested(const QString& title, const QString& text);
     /// The "Load image" of a web picture in a Markdown text was tapped (qt/docs/md-images.md): the UI shows the
@@ -605,6 +611,7 @@ private:
     double markdownTextSize = 10;    ///< of this font size
     bool markdownInPanel = false;    ///< Markdown text boxes are edited beside the page (tests; normally on the page)
     GeometryToolLayer geometry{*this};
+    CurtainLayer curtainLayer{*this};
     std::unique_ptr<StickyNotes> stickyNotes;
     std::unique_ptr<MixedSelection> mixedSelection;
     std::unique_ptr<MarkdownBoxResize> boxResizer;

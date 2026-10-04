@@ -5,7 +5,8 @@
 //   pen       pen ↔ highlighter (freehand)
 //   select    rectangle ↔ lasso (the multi-layer ones only in the list)
 //   shape     line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes (the pen draws them)
-//   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away)
+//   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away); curtain and spotlight only in the list (they are
+//             not tools of their own: they lie over the page whatever tool is in hand, qt/docs/curtain.md)
 //   eraser    standard ↔ whiteout ↔ whole strokes (its size: the widths of the tool bar)
 // The keyboard's tools (P, H, S, L, E) take a variant directly; the button follows and remembers it.
 import QtQuick
@@ -43,10 +44,12 @@ QtObject {
             ]
         },
         "geometry": {
-            name: qsTr("Setsquare and compass"),
+            name: qsTr("Setsquare, compass and curtain"),
             variants: [
                 { key: "setsquare", icon: "xopp-setsquare", name: qsTr("Setsquare") },
-                { key: "compass", icon: "xopp-compass", name: qsTr("Compass") }
+                { key: "compass", icon: "xopp-compass", name: qsTr("Compass") },
+                { key: "curtain", icon: "xqt-curtain", name: qsTr("Curtain (B)"), listOnly: true, curtain: true },
+                { key: "spotlight", icon: "xqt-spotlight", name: qsTr("Spotlight (Shift+B)"), listOnly: true, curtain: true }
             ]
         },
         "eraser": {
@@ -63,6 +66,11 @@ QtObject {
     function variants(group) { return defs[group].variants }
     /// The variants a tap goes through (not the list-only ones)
     function cycle(group) { return defs[group].variants.filter(function(v) { return !v.listOnly }) }
+    /// A variant that is the curtain (put out or taken away beside the group's tool, never remembered as its variant)
+    function isCurtain(group, key) {
+        const v = defs[group].variants.filter(function(v) { return v.key === key })
+        return v.length > 0 && v[0].curtain === true
+    }
     function variant(group, key) {
         const vs = defs[group].variants
         for (let i = 0; i < vs.length; ++i) if (vs[i].key === key) return vs[i]
@@ -123,6 +131,10 @@ QtObject {
     /// Takes the group's tool with this variant (default: the one last used)
     function activate(group, key) {
         if (key === undefined || key === "") key = last(group)
+        if (isCurtain(group, key)) {
+            app.toggleCurtain(key)
+            return
+        }
         if (group === "pen") {
             app.selectTool(key)
             app.drawingType = "default"  // (the pen keeps its shape: back to freehand)

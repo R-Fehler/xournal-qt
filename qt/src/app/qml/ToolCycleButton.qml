@@ -68,7 +68,8 @@ IconButton {
                 text: modelData.name
                 icon.source: app.iconUrl(modelData.icon)
                 checkable: true
-                checked: button.active && button.currentKey === modelData.key
+                checked: modelData.curtain === true ? app.curtain === modelData.key
+                                                    : button.active && button.currentKey === modelData.key
                 onTriggered: button.groups.activate(button.group, modelData.key)
             }
         }

@@ -96,8 +96,8 @@ void CanvasInput::startPenHold(const Event& event) {
     penHoldTimer.stop();
     // Only with the pen or highlighter (the press began a stroke) or the hand; not on a selection, which the pen
     // moves then, nor on the setsquare or the compass being dragged
-    if (event.deviceClass != DeviceClass::Pen || !inputRunning || draggingGeometryTool || view.getSelection() ||
-        view.mixed().active() || !penHoldTool()) {
+    if (event.deviceClass != DeviceClass::Pen || !inputRunning || draggingGeometryTool || curtainPress ||
+        view.getSelection() || view.mixed().active() || !penHoldTool()) {
         return;
     }
     penHoldPos = event.viewPos;
@@ -301,7 +301,8 @@ bool CanvasInput::mouseEvent(QMouseEvent* e, QPointF viewPos) {
             // tool selects what it clicks; with nothing there it follows the link on the release, as with a tap.)
             if (e->button() == Qt::LeftButton &&
                 view.getSession().getToolHandler()->getToolType() != TOOL_SELECT_OBJECT &&
-                !(onGeometryTool(viewPos) && view.getSession().getToolHandler()->isDrawingTool())) {
+                !(onGeometryTool(viewPos) && view.getSession().getToolHandler()->isDrawingTool()) &&
+                view.curtain().handleAt(viewPos, curtainReach(DeviceClass::Mouse)) == CurtainLayer::Handle::None) {
                 if (const auto link = view.hoverLinkAt(viewPos); link && clickFollowsLink(link->editing, e->modifiers())) {
                     linkPress = ev;
                     view.getViewController().stopMomentum();
@@ -446,6 +447,21 @@ void CanvasInput::updateLastEvent(const Event& event) {
     }
 }
 
+double CanvasInput::curtainReach(DeviceClass device) {
+    return device == DeviceClass::Touch ? CurtainLayer::FINGER_REACH : CurtainLayer::REACH;
+}
+
+void CanvasInput::endCurtainTouch() {
+    if (touchCurtain || curtainGesture) {
+        view.curtain().endDrag();
+        view.curtain().endGesture();
+    }
+    touchCurtain = false;
+    touchCurtainId = -1;
+    curtainGesture = false;
+    curtainGestureFingers = {-1, -1};
+}
+
 QPointF CanvasInput::onGeometryPage(QPointF viewPos) const {
     CanvasPage* page = view.geometryTool().page();
     return page ? pageCoordinates(*page, viewPos) : QPointF();
@@ -556,6 +572,25 @@ bool CanvasInput::actionStart(const Event& event) {
     this->pressViewPos = event.viewPos;
     this->pressTimeMs = monotonicMs();
     this->toggleOnTap.reset();
+    // The curtain over everything: a press on its handles works them; on the black nothing is written, erased or
+    // followed (the hand still scrolls, and a tap shows the handles); while its handles are shown, a press on the
+    // black moves it, a press beside it hides them (and goes on as usual).
+    this->curtainPress.reset();
+    this->curtainScrolls = false;
+    if (CurtainLayer& curtain = view.curtain(); curtain.visible()) {
+        const CurtainLayer::Handle handle = curtain.handleAt(event.viewPos, curtainReach(event.deviceClass));
+        if (handle != CurtainLayer::Handle::None) {
+            this->curtainPress = handle;
+            this->sequenceStartPage = nullptr;
+            if (curtain.handlesShown() || handle != CurtainLayer::Handle::Body) {
+                curtain.beginDrag(handle, event.viewPos);  // (an edge pushed also with the handles hidden)
+            } else {
+                this->curtainScrolls = toolType == TOOL_HAND;
+            }
+            return true;
+        }
+        curtain.setHandlesShown(false);
+    }
     // A text file edited: the pen and the mouse put the cursor into the text, whatever the tool (a drag selects)
     if (view.textMode() && toolType != TOOL_HAND) {
         this->textPress = true;
@@ -692,6 +727,16 @@ bool CanvasInput::actionStart(const Event& event) {
 bool CanvasInput::actionMotion(const Event& event) {
     ToolHandler* toolHandler = view.getSession().getToolHandler();
     this->changeTool(event);
+
+    if (curtainPress) {
+        if (view.curtain().dragging()) {
+            view.curtain().dragTo(event.viewPos);
+        } else if (curtainScrolls && deviceClassPressed) {
+            handleScrollEvent(event);
+        }
+        this->updateLastEvent(event);
+        return true;
+    }
 
     if (draggingGeometryTool) {
         // In the coordinates of the tool's page, wherever the pointer is (over another page, between the pages)
@@ -848,6 +893,26 @@ bool CanvasInput::actionEnd(const Event& event) {
     const std::optional<QPointF> tapped = std::exchange(toggleOnTap, std::nullopt);
     const std::optional<QPointF> toggle =
             tapped && barelyMoved(event) && view.movingSelection() ? tapped : std::nullopt;
+    if (std::exchange(this->curtainPress, std::nullopt)) {
+        // The curtain: a drag of it ends; a tap on the black shows its handles
+        if (view.curtain().dragging()) {
+            view.curtain().endDrag();
+            if (isClick(event)) {
+                view.curtain().setHandlesShown(true);  // (a tap close to an edge is a tap on the black)
+            }
+        } else if (isClick(event)) {
+            view.curtain().setHandlesShown(true);
+        } else if (curtainScrolls && view.getViewController().snapping()) {
+            view.getViewController().endScroll({});
+        }
+        curtainScrolls = false;
+        this->sequenceStartPage = nullptr;
+        if (toolHandler->pointActiveToolToToolbarTool()) {
+            toolHandler->fireToolChanged();
+        }
+        this->inputRunning = false;
+        return false;
+    }
     if (std::exchange(this->textPress, false)) {
         this->sequenceStartPage = nullptr;
         this->inputRunning = false;
@@ -1126,6 +1191,7 @@ void CanvasInput::cancelFingerStroke() {
 
 void CanvasInput::cancelTouchGesture() {
     cancelFingerStroke();
+    endCurtainTouch();
     if (pinching) {
         view.getViewController().pinchEnd();
     }
@@ -1169,6 +1235,8 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
             toolGesture = false;
             toolGestureFingers = {-1, -1};
         }
+        endCurtainTouch();
+        touchOnCurtain = false;
         touches.clear();
         pinching = panning = false;
         touchSessionIgnored = false;
@@ -1185,16 +1253,31 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         touchSessionStartMs = now;
         if (!e->points().isEmpty()) {
             touchSessionStartPos = sceneToView(e->points().first().scenePosition());
+            // On the curtain: with its handles shown the finger works them (or moves it), else it scrolls as usual
+            // and a tap shows them. Nothing under the curtain is selected, moved or followed.
+            endCurtainTouch();
+            touchOnCurtain = false;
+            if (!touchSessionIgnored) {
+                CurtainLayer& curtain = view.curtain();
+                const CurtainLayer::Handle handle = curtain.handleAt(touchSessionStartPos, CurtainLayer::FINGER_REACH);
+                touchOnCurtain = handle != CurtainLayer::Handle::None;
+                if (touchOnCurtain && (curtain.handlesShown() || handle != CurtainLayer::Handle::Body)) {
+                    curtain.beginDrag(handle, touchSessionStartPos);
+                    touchCurtain = true;
+                    touchCurtainId = e->points().first().id();
+                }
+            }
             // On a selection of elements (inside it or on one of its handles) the finger works it, it does not scroll
-            if (!touchSessionIgnored && startTouchSelection(touchSessionStartPos)) {
+            if (!touchSessionIgnored && !touchOnCurtain && startTouchSelection(touchSessionStartPos)) {
                 touchSelection = true;
                 touchSelectionId = e->points().first().id();
             }
         }
         touchSessionTravel = 0;
         longPressFired = false;
-        if (!touchSelection) {
-            // (On a selection a finger drags it, held still as well: its actions are in the selection's pill)
+        if (!touchSelection && !touchOnCurtain) {
+            // (On a selection a finger drags it, held still as well: its actions are in the selection's pill. On the
+            // curtain there is nothing to offer.)
             longPressTimer.start();
         }
         velocitySamples.clear();
@@ -1218,7 +1301,7 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
 
     // Drawing with the finger: the first finger of a touch draws with the tool, like the pen
     if (touchSessionMaxPoints == 1 && touches.size() == 1 && !fingerDrawing && !touchSessionIgnored &&
-        !touchSelection && !longPressFired && fingerDraws()) {
+        !touchSelection && !touchOnCurtain && !longPressFired && fingerDraws()) {
         for (const auto& pt: e->points()) {
             if (pt.state() == QEventPoint::State::Pressed) {
                 fingerDrawing = true;
@@ -1318,11 +1401,46 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         // Two fingers on the setsquare or the compass: this touch belongs to the tool until the last finger is up.
         // It follows the first two fingers (a third one changes nothing).
         const QPointF pairCentre = pts.size() >= 2 ? (pts[0] + pts[1]) / 2 : centroid;
-        if (!toolGesture && !pinching && pts.size() >= 2 && onGeometryTool(pairCentre)) {
+        // The curtain with its handles shown: a second finger turns the drag of the first into carrying, turning and
+        // sizing it; two fingers on the black do the same
+        if (touchCurtain && pts.size() >= 2) {
+            view.curtain().endDrag();
+            touchCurtain = false;
+            curtainGesture = true;
+            curtainGestureFingers = {-1, -1};
+        }
+        if (!curtainGesture && !touchCurtain && !toolGesture && !pinching && pts.size() >= 2 &&
+            view.curtain().handlesShown() && view.curtain().covers(pairCentre)) {
+            curtainGesture = true;
+            curtainGestureFingers = {-1, -1};
+        }
+        if (!toolGesture && !curtainGesture && !touchCurtain && !pinching && pts.size() >= 2 &&
+            onGeometryTool(pairCentre)) {
             toolGesture = true;
             toolGestureFingers = {-1, -1};
         }
-        if (toolGesture) {
+        if (touchCurtain) {
+            if (auto it = touches.find(touchCurtainId); it != touches.end()) {
+                view.curtain().dragTo(it->second.pos);
+                lastCentroid = it->second.pos;  // (where the finger is: a tap if it stays close)
+            }
+            panning = false;
+        } else if (curtainGesture) {
+            if (pts.size() >= 2 && view.curtain().visible()) {
+                const double dist = std::hypot(pts[0].x() - pts[1].x(), pts[0].y() - pts[1].y());
+                const double angle = std::atan2(pts[1].y() - pts[0].y(), pts[1].x() - pts[0].x());
+                const std::pair<int, int> fingers{ids[0], ids[1]};
+                if (fingers != curtainGestureFingers) {
+                    view.curtain().beginGesture(pairCentre, angle, dist);
+                    curtainGestureFingers = fingers;
+                } else {
+                    view.curtain().moveGesture(pairCentre, angle, dist);
+                }
+            } else {
+                curtainGestureFingers = {-1, -1};  // one finger left: it rests
+            }
+            panning = false;
+        } else if (toolGesture) {
             if (pts.size() >= 2 && view.geometryTool().visible()) {
                 const double dist = std::hypot(pts[0].x() - pts[1].x(), pts[0].y() - pts[1].y());
                 const double angle = std::atan2(pts[1].y() - pts[0].y(), pts[1].x() - pts[0].x());
@@ -1391,6 +1509,22 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
         velocitySamples.clear();
         return true;  // no tap, no double tap, no fling: that session belonged to the selection
     }
+    if (touches.empty() && (touchCurtain || curtainGesture)) {
+        // A tap close to an edge (it pushed nothing): a tap on the black, its handles
+        const bool tap = touchCurtain && touchSessionMaxPoints == 1 && now - touchSessionStartMs <= TAP_MAX_MS &&
+                         std::hypot(lastCentroid.x() - touchSessionStartPos.x(),
+                                    lastCentroid.y() - touchSessionStartPos.y()) <= TAP_SLOP_PX;
+        endCurtainTouch();
+        if (tap) {
+            view.curtain().setHandlesShown(true);
+        }
+        touchOnCurtain = false;
+        longPressTimer.stop();
+        longPressFired = false;
+        touchSessionIgnored = false;
+        velocitySamples.clear();
+        return true;  // no tap, no undo, no fling: that touch worked the curtain
+    }
     if (touches.empty() && toolGesture) {
         view.geometryTool().endGesture();
         toolGesture = false;
@@ -1422,7 +1556,13 @@ bool CanvasInput::touchEvent(QTouchEvent* e, const MapToView& sceneToView) {
                     redo();
                 }
             } else if (duration <= TAP_MAX_MS && touchSessionTravel <= TAP_SLOP_PX && touchSessionMaxPoints == 1) {
-                if (view.hasPdfTextSelection() && !view.pdfTextSelectionContains(touchSessionStartPos)) {
+                if (!touchOnCurtain) {
+                    view.curtain().setHandlesShown(false);  // a tap beside the curtain hides its handles
+                }
+                if (touchOnCurtain) {
+                    view.curtain().setHandlesShown(true);  // a tap on the black: its handles (never a link under it)
+                    lastTapMs = 0;
+                } else if (view.hasPdfTextSelection() && !view.pdfTextSelectionContains(touchSessionStartPos)) {
                     view.clearPdfTextSelection();  // a tap beside the selected text unselects it and nothing else
                     lastTapMs = 0;
                 } else if (view.selectingMore() && view.toggleAt(touchSessionStartPos)) {

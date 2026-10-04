@@ -2556,3 +2556,32 @@ or a page made dark in Xournal++).
       window.
 - [ ] (Known) A stroke of the highlighter on the dark page is drawn like on light paper (upstream's fixed opacity,
       multiplied): it hardly shows. Only the chooser applies the 0.8 so far.
+
+## Curtain (qt/curtain)
+
+See qt/docs/curtain.md. On the 2-in-1 with pen and fingers, and with a mouse.
+- [ ] B puts the curtain over the lower half of the page in view (to the bottom of the page, a little beyond its sides),
+      with its handles; B again takes it away. The same from the setsquare button's list (held), ⋮ → View, and in full
+      screen / presenting from the tool square.
+- [ ] The pen on the black: no ink, no dot, no eraser, no lasso; a tap shows the handles. A link under it is not
+      followed (pen, finger, mouse), and the mouse shows no link target over it.
+- [ ] Handles shown: the pen, the mouse and a finger move it by its black, size it by its corners and edges (the opposite
+      side stays), turn it by the knob (it snaps straight near 0° / 90°). Two fingers carry, turn and size it; the page
+      neither scrolls nor zooms meanwhile.
+- [ ] Esc, a tap beside it and the pill's curtain icon hide the handles; with them hidden a finger on the black scrolls
+      the page, and Esc in full screen / presenting leaves those again.
+- [ ] Presenting (F5): the curtain stays on each page as it goes on (Space, arrows, a swipe), at the same place; the
+      audience sees black, the pill only while the controls are shown.
+- [ ] Moving it, turning it and sizing it are smooth on a big page at 200 % (nothing of the page is drawn again).
+- [ ] Not in the thumbnails, the page grid, the sidebar, export, print, nor after saving and opening again. Each tab
+      has its own; closing the tab takes it away.
+- [ ] Shift+B (and the lists): the spotlight. The whole canvas is black (around the page, the other pages, the gray
+      around them) but its hole with rounded corners in the middle of the view; the pen writes in the hole as usual and
+      nowhere else. A tap on the black shows the hole's handles; the hole is moved, sized and turned as the curtain.
+      Two fingers on the black zoom the page while its handles are hidden, and carry the hole while they are shown.
+- [ ] The pill's second button switches between curtain and spotlight; presenting, the spotlight stays at its place on
+      each page.
+- [ ] Handles hidden: pen, mouse and finger pull the curtain's top edge down (a press on the black close to it) to
+      reveal the next line; the spotlight's hole is made wider from just outside its edge; writing just inside the
+      hole's edge still writes. Elsewhere on the black a finger still scrolls.
+- [ ] B, move the curtain, B (away), B: it is back where it was; the same for the spotlight; another tab has its own.

@@ -731,6 +731,14 @@
   follows a palette switch (`setPaletteColor`, `followPalette` for `qt/toolbox`). Strokes still use upstream's fixed
   highlighter opacity ([color-palettes.md](color-palettes.md)).
 
+- **Curtain and spotlight, `qt/curtain` (2026-10-04).** For teaching and presenting: a black sheet over part of the
+  page (B), or everything black but a rounded rectangle (Shift+B); also in the setsquare button's list, ⋮ → View and
+  the tool square of full screen / presenting. Moved, turned and sized like the setsquare (handles after a tap on the
+  black, two fingers; edges pushed also with the handles hidden). Input that starts on the black writes and follows
+  nothing. The view's, not the document's: a node of the canvas item over the pages (no page drawn again while it
+  moves), never saved, printed, exported or in previews; it goes along to the current page and comes back where it
+  was (per tab). `qt/docs/curtain.md`.
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

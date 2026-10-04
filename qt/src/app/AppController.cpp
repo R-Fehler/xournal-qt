@@ -753,6 +753,7 @@ void AppController::currentTabChanged() {
         currentConnections.push_back(
                 connect(v, &CanvasView::markdownCursorChanged, this, &AppController::markdownFormatChanged));
         currentConnections.push_back(connect(v, &CanvasView::geometryChanged, this, &AppController::toolChanged));
+        currentConnections.push_back(connect(v, &CanvasView::curtainChanged, this, &AppController::curtainChanged));
         currentConnections.push_back(connect(v, &CanvasView::imageLoadRequested, this, [this](const QString& url) {
             std::string access;
             app->getSettings()->getCustomElement("xournalQt").getString("networkAccess", access);
@@ -801,6 +802,7 @@ void AppController::currentTabChanged() {
     Q_EMIT navigationChanged();
     Q_EMIT pdfTextSelectionChanged();
     Q_EMIT toolChanged();  // the setsquare / compass of that tab
+    Q_EMIT curtainChanged();  // its curtain
     Q_EMIT titlePageChanged();
     Q_EMIT markdownOnPageChanged();
     Q_EMIT bookmarksChanged();
@@ -4173,6 +4175,35 @@ void AppController::setGeometryAngleSteps(bool steps) {
 }
 
 QObject* AppController::penHover() const { return &PenHover::instance(); }
+
+QString AppController::curtain() const {
+    if (!canvas() || !canvas()->curtain().active()) {
+        return {};
+    }
+    return canvas()->curtain().shape() == CurtainLayer::Shape::Spotlight ? QStringLiteral("spotlight")
+                                                                           : QStringLiteral("curtain");
+}
+
+void AppController::toggleCurtain(const QString& which) {
+    if (!canvas()) {
+        return;
+    }
+    if (which == QLatin1String("curtain")) {
+        canvas()->curtain().toggle(CurtainLayer::Shape::Curtain);
+    } else if (which == QLatin1String("spotlight")) {
+        canvas()->curtain().toggle(CurtainLayer::Shape::Spotlight);
+    } else {
+        canvas()->curtain().hide();
+    }
+}
+
+bool AppController::curtainHandles() const { return canvas() && canvas()->curtain().handlesShown(); }
+
+void AppController::setCurtainHandles(bool shown) {
+    if (canvas()) {
+        canvas()->curtain().setHandlesShown(shown);
+    }
+}
 
 QString AppController::geometryTool() const {
     if (!canvas() || !canvas()->geometryTool().active()) {

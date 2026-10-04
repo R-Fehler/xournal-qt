@@ -1042,6 +1042,17 @@ public:
     /// For the screenshot hook (it calls methods without arguments)
     Q_INVOKABLE void toggleSetsquare() { toggleGeometryTool("setsquare"); }
     Q_INVOKABLE void toggleCompass() { toggleGeometryTool("compass"); }
+    /// The curtain over part of the page, or the spotlight (all black but a rectangle; qt/docs/curtain.md; this tab's,
+    /// only on the screen): "curtain" / "spotlight" puts it out (instead of the other one; the same again takes it
+    /// away), "" takes it away.
+    Q_INVOKABLE void toggleCurtain(const QString& which);
+    /// Which one is out ("" if none)
+    Q_PROPERTY(QString curtain READ curtain NOTIFY curtainChanged)
+    QString curtain() const;
+    /// Its handles are shown (a tap on the black shows them, Esc hides them)
+    Q_PROPERTY(bool curtainHandles READ curtainHandles WRITE setCurtainHandles NOTIFY curtainChanged)
+    bool curtainHandles() const;
+    void setCurtainHandles(bool shown);
     // --- sticky notes (qt/docs/sticky-notes.md) ---
     /// A new sticky note in the middle of the visible part of the current page, selected so that it can be moved
     /// and resized right away (a select tool is chosen, as for an image). One undo step.
@@ -1199,6 +1210,8 @@ Q_SIGNALS:
     void anySavingChanged();
     void undoRedoChanged();
     void toolChanged();
+    /// The curtain came or went, or its handles did (also: another tab)
+    void curtainChanged();
     void zoomChanged();
     void pageChanged();
     /// A sticky note was selected or unselected, or the selected one changed
