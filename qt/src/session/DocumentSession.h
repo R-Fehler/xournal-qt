@@ -316,6 +316,10 @@ public:
     /// (pages added to it, or a copy of it): the views swap their PDF without drawing those pages again. False if it
     /// did not load (Document::getLastErrorMsg).
     bool loadPdfKeepingPictures(const fs::path& pdf);
+    /// A page was given a new PDF page of the background PDF (a number added just now, e.g. a turned copy: PageRotate.h):
+    /// it is that page from now on, not an old number of its PDF page from before a save renumbered them
+    /// (PdfPageKeeper::adopt). Call before the page's change is fired.
+    void adoptPdfPage(const PageRef& page);
     /// Within loadPdfKeepingPictures (for the views).
     bool pdfKeepsPictures() const { return keepingPictures; }
 

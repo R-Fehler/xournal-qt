@@ -9,7 +9,7 @@
  * - the page's own Markdown text stays at the page's margins and flows anew on the new size (as PageResize.h does);
  * - space for notes beside a slide turns with the page (the space on the left is above it after a turn to the right);
  * - the background: plain, ruled, graph, ... follow the new size; an image background is turned (a new picture,
- *   attached to the document); a PDF page depends on the document (PdfPages).
+ *   attached to the document); a PDF page is turned in a copy of it (PdfPages).
  * Any number of pages is one undo step. Undo puts every point and transformation back exactly as it was (they are
  * kept); redo turns again.
  *
@@ -47,15 +47,16 @@ enum class Turn {
     Right,  ///< clockwise
 };
 
-/// What happens to pages with a PDF background. The author has not decided yet how a turned PDF page is kept in a
-/// .xopp (upstream shows a PDF page only as the PDF has it); a rotation that only xournal-qt reads would be one more
-/// value here (blockedOf, turnPdfPages and the undo's PDF step are the places that look at it).
+/// What happens to pages with a PDF background. The app turns them (InPdf) in every document (the author,
+/// 2026-10-04); Kept is there for a document that must not get a merged PDF (none so far).
 enum class PdfPages {
-    /// Left as they are (a .xopp, or a document that will be saved as one)
+    /// Left as they are
     Kept,
     /// The PDF page itself is turned: a copy of it with its /Rotate changed goes into the document's merged PDF (as a
     /// pasted page does, PdfPageKeeper) and the page shows that. A PDF with notes then has it turned for every PDF
-    /// app, with the embedded .xopp and our annotations to match (HybridPdf.h turns them with the page's /Rotate).
+    /// app, with the embedded .xopp and our annotations to match (HybridPdf.h turns them with the page's /Rotate); a
+    /// .xopp refers to the hidden ".name.pages.pdf" for it, which upstream Xournal++ reads as well. The PDF the
+    /// document annotates is never changed.
     InPdf,
 };
 

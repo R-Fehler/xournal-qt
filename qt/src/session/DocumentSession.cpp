@@ -1089,6 +1089,8 @@ bool DocumentSession::loadPdfKeepingPictures(const fs::path& pdf) {
 
 quint64 DocumentSession::pdfNumbering() const { return pdfPages->numbering(); }
 
+void DocumentSession::adoptPdfPage(const PageRef& page) { pdfPages->adopt(page); }
+
 fs::path DocumentSession::mergedPdfPlace() const { return pdfPages->placeFor(getFilePath()); }
 
 std::string DocumentSession::getDisplayName() const {

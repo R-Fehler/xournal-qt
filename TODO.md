@@ -498,7 +498,8 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   left or right (current page, selected pages, all pages), undoable, in the page menu. Pages without a PDF
   background first; PDF pages need a decision (see the questions below). *Built (qt/docs/page-rotation.md): the
   sidebar got a selection mode with a bar; PDF pages turn in PDF files with notes (the PDF page's /Rotate, through the
-  merged PDF) and stay in a `.xopp` (the author's decision is open). Left: the device pass; no haptic tick (none in
+  merged PDF) and, as the author decided, in a `.xopp` too (a turned copy in the hidden `.name.pages.pdf` that
+  Xournal++ reads). Left: the device pass; no haptic tick (none in
   the app); Markdown boxes and sticky notes stay upright.*
 - [ ] `qt/hidpi-fractional`: check fractional scaling (125 %, 150 %, 175 %) on Plasma and GNOME (Wayland and X11),
   Windows and macOS: Qt 6 passes the factor through (`HighDpiScaleFactorRoundingPolicy::PassThrough`); check that

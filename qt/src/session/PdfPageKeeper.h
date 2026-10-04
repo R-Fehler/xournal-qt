@@ -133,6 +133,11 @@ public:
     /// done when the keeper goes).
     void discardCached();
 
+    /// The page shows a new PDF page now (its number was just set, e.g. a turned copy of its PDF page: PageRotate.h),
+    /// not one of the numbers it had before a save renumbered the pages (those would be put back by pageChanged).
+    /// Call before the page's change is fired.
+    void adopt(const PageRef& page);
+
     void documentChanged(DocumentChangeType type) override;
     void pageInserted(size_t page) override;
     void pageChanged(size_t page) override;

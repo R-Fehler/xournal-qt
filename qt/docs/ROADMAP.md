@@ -744,8 +744,8 @@
   selection; the mouse is unchanged. Pages rotate by a quarter turn left or right (the page, the selection, all
   pages: page menu, grid action bar, ⋮ → Page → Rotate), one undo step that restores every point exactly: the size
   swaps, ink, texts, images and TeX turn, Markdown boxes and sticky notes stay upright, the page's text flows anew,
-  image backgrounds turn. PDF pages turn in PDF files with notes (a copy with its `/Rotate` through the merged PDF)
-  and stay in a `.xopp` with a reason in the menu, until the author decides (`qt/docs/page-rotation.md`).
+  image backgrounds turn. PDF pages turn as a copy with its `/Rotate` through the merged PDF: saved into a PDF with
+  notes, or into the hidden `.name.pages.pdf` of a `.xopp`, which Xournal++ reads too (`qt/docs/page-rotation.md`).
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

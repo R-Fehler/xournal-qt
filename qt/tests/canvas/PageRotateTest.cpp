@@ -33,11 +33,13 @@
 #include "model/Point.h"
 #include "model/Stroke.h"
 #include "model/Text.h"
+#include "control/xojfile/LoadHandler.h"
 #include "model/XojPage.h"
 #include "pdf/base/XojPdfDocument.h"
 #include "session/AppContext.h"
 #include "session/DocumentSession.h"
 #include "session/HybridPdf.h"
+#include "session/MergedPdf.h"
 #include "session/PageMargins.h"
 #include "session/PageNoteSpace.h"
 #include "session/StickyNote.h"
@@ -371,9 +373,9 @@ TEST_F(PageRotateTest, spaceForNotesAndImageBackgroundsTurn) {
     EXPECT_EQ(photo->getWidth(), 200);
 }
 
-// In a .xopp a PDF page stays as it is (counted, so the menu can say why); the other pages turn. Every turned page
+// PdfPages::Kept (not used by the app): a PDF page stays as it is (counted); the other pages turn. Every turned page
 // gets a new revision (its thumbnail is drawn again), and again on undo
-TEST_F(PageRotateTest, pdfPagesStayInAXoppAndThumbnailsFollow) {
+TEST_F(PageRotateTest, keptPdfPagesStayAndThumbnailsFollow) {
     openPdf({"one", "two"});
     session->insertPages({std::make_shared<XojPage>(A4_W, A4_H)}, 2);
     session->getUndoRedoHandler()->clearContents();
@@ -546,4 +548,92 @@ TEST_F(PageRotateTest, aPdfNotSavedYetIsTurnedWhenSavedIntoItself) {
     ASSERT_TRUE(again.document) << again.error;
     EXPECT_NEAR(again.document->getPage(1)->getWidth(), 842, 0.5);
     EXPECT_NEAR(again.document->getPage(0)->getWidth(), 595, 0.5);
+}
+
+
+// The author's decision for a .xopp: a turned PDF page is a turned copy in the hidden ".name.pages.pdf" next to it,
+// which upstream Xournal++ reads too. The PDF the .xopp annotates stays as it is; undo and turning twice work across
+// saves; our loader and upstream's LoadHandler open it with the page turned
+TEST_F(PageRotateTest, aXoppTurnsItsPdfPageInItsPagesPdf) {
+    openPdf({"lectureone", "lecturetwo"});
+    const fs::path pdf = path("slides.pdf");
+    const auto bytes = [](const fs::path& p) {
+        std::ifstream in(p, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    };
+    const std::string original = bytes(pdf);
+    Stroke* stroke = addStroke(*session, 0, {Point(100, 200), Point(300, 200)}, 8, Color(0xffff0000U));
+    const fs::path xopp = path("lecture.xopp");
+    ASSERT_TRUE(session->saveAs(xopp).ok);
+    session->getUndoRedoHandler()->clearContents();
+    const fs::path pagesPdf = MergedPdf::sidecarOf(xopp);
+    EXPECT_FALSE(fs::exists(pagesPdf)) << "no pages PDF before";
+
+    // Our loader and upstream's: the page, its size, its PDF page; the user's PDF untouched
+    const auto check = [&](double width, int rotate) {
+        auto ours = DocumentSession::loadFile(xopp);
+        ASSERT_TRUE(ours.document) << ours.error;
+        const PageRef p0 = ours.document->getPage(0);
+        EXPECT_NEAR(p0->getWidth(), width, 0.5);
+        ASSERT_TRUE(p0->getBackgroundType().isPdfPage());
+        EXPECT_NEAR(ours.document->getPdfPage(p0->getPdfPageNr())->getWidth(), width, 0.5);
+        EXPECT_NEAR(ours.document->getPage(1)->getWidth(), 595, 0.5);
+        LoadHandler handler;
+        auto upstream = handler.loadDocument(xopp);
+        ASSERT_TRUE(upstream) << "upstream's loader";
+        EXPECT_TRUE(handler.getMissingPdfFilename().empty());
+        const PageRef u0 = upstream->getPage(0);
+        EXPECT_NEAR(u0->getWidth(), width, 0.5);
+        auto pdfPage = upstream->getPdfPage(u0->getPdfPageNr());
+        ASSERT_NE(pdfPage, nullptr);
+        EXPECT_NEAR(pdfPage->getWidth(), width, 0.5) << "Xournal++ shows the PDF page turned";
+        EXPECT_FALSE(pdfPage->findText("lectureone").empty());
+        EXPECT_EQ(rotateOf(upstream->getPdfFilepath(), u0->getPdfPageNr()), rotate);
+        const Stroke* s = nullptr;
+        for (const Element* e: u0->getSelectedLayer()->getElementsView()) {
+            s = dynamic_cast<const Stroke*>(e);
+        }
+        ASSERT_NE(s, nullptr);
+        EXPECT_NEAR(s->getPointVector()[0].x, rotate == 90 ? 642 : rotate == 180 ? 495 : 100, 0.5)
+                << "the ink turned with it";
+        EXPECT_EQ(bytes(pdf), original) << "the PDF the notes annotate is never changed";
+    };
+
+    auto r = turn({0}, Turn::Right, PdfPages::InPdf);
+    ASSERT_EQ(r.pages, 1u) << r.error;
+    EXPECT_NEAR(page(0)->getWidth(), 842, 0.5);
+    EXPECT_DOUBLE_EQ(stroke->getPointVector()[0].x, page(0)->getWidth() - 200);
+    ASSERT_TRUE(session->save().ok);
+    EXPECT_TRUE(fs::exists(pagesPdf)) << "the hidden pages PDF";
+    {
+        SCOPED_TRACE("turned right");
+        check(842, 90);
+    }
+
+    // Undo (after the save may have renumbered the pages PDF), saved: as it was
+    undo()->undo();
+    EXPECT_NEAR(page(0)->getWidth(), 595, 0.5);
+    EXPECT_EQ(stroke->getPointVector()[0].x, 100);
+    ASSERT_TRUE(session->save().ok);
+    {
+        SCOPED_TRACE("undone");
+        check(595, 0);
+    }
+
+    // Twice in a row: upside down
+    ASSERT_EQ(turn({0}, Turn::Right, PdfPages::InPdf).pages, 1u);
+    ASSERT_EQ(turn({0}, Turn::Right, PdfPages::InPdf).pages, 1u);
+    EXPECT_NEAR(page(0)->getWidth(), 595, 0.5);
+    ASSERT_TRUE(session->save().ok);
+    {
+        SCOPED_TRACE("turned twice");
+        check(595, 180);
+    }
+    undo()->undo();
+    undo()->undo();
+    ASSERT_TRUE(session->save().ok);
+    {
+        SCOPED_TRACE("both undone");
+        check(595, 0);
+    }
 }

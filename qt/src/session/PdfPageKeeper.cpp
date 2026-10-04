@@ -419,6 +419,15 @@ void PdfPageKeeper::pageInserted(size_t index) {
     }
 }
 
+void PdfPageKeeper::adopt(const PageRef& page) {
+    if (!isPdf(page)) {
+        return;
+    }
+    Tracked& t = track(page);
+    t.last = page->getPdfPageNr();
+    t.aliases.erase(std::remove(t.aliases.begin(), t.aliases.end(), t.last), t.aliases.end());
+}
+
 void PdfPageKeeper::pageChanged(size_t index) {
     PageRef page;
     {
