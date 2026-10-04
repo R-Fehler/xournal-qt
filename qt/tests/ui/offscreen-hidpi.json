@@ -1,0 +1,5 @@
+{
+    "screens": [
+        { "name": "OffscreenHiDpi", "x": 0, "y": 0, "width": 3200, "height": 2400, "logicalDpi": 96, "logicalBaseDpi": 96 }
+    ]
+}

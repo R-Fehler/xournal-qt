@@ -289,10 +289,11 @@ if(XQT_BUILD_TESTS)
     target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-    # The same window on a screen at 150 % (qt/docs/hidpi.md): Qt's own scale factor, as on Wayland, X11 and Windows
+    # The same window on a screen at 150 % (qt/docs/hidpi.md): Qt's own scale factor, as on Wayland, X11 and Windows.
+    # (A screen big enough for the desktop layout: the default off-screen one, 800 x 600 pixels, is 533 x 400 at 150 %.)
     add_test(NAME FractionalScale.ui@150 COMMAND xqt-ui-tests --gtest_filter=FractionalScale.*)
-    set_tests_properties(FractionalScale.ui@150 PROPERTIES LABELS ui
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.5")
+    set_tests_properties(FractionalScale.ui@150 PROPERTIES LABELS ui ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-hidpi.json;QT_SCALE_FACTOR=1.5")
 
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
