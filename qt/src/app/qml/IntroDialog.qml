@@ -210,8 +210,8 @@ AdaptiveDialog {
                     wrapMode: Text.Wrap
                     color: "#6b6f75"
                     font.pixelSize: 13
-                    text: qsTr("This introduction is in Help (⋮ → Help, or Settings → Help), with keyboard "
-                               + "shortcuts.")
+                    text: qsTr("Help (⋮ → Help, or Settings → Help) has a tutorial to try everything on, this "
+                               + "introduction and the keyboard shortcuts.")
                 }
             }
         }

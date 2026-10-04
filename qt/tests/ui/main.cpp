@@ -22,6 +22,7 @@ int main(int argc, char* argv[]) {
     QTemporaryDir home;
     qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());
     qputenv("XDG_CACHE_HOME", (home.path() + "/cache").toUtf8());
+    qputenv("XDG_DATA_HOME", (home.path() + "/data").toUtf8());  // (the tutorial's copy, qt/docs/onboarding.md)
     qputenv("XQT_RESOURCE_DIR", XQT_BUILD_RESOURCE_DIR);
     // The first start asks how to keep documents (DocumentMode.h): the tests work with Xournal++ files unless they set
     // another mode, and the question stays away (the tests of the question unset this)

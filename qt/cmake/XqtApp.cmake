@@ -111,10 +111,19 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownFormat.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppMarkdownImages.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppHelp.cpp)
 target_include_directories(xqt-shell PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../src ${CMAKE_CURRENT_LIST_DIR}/../src/app)
 target_link_libraries(xqt-shell PUBLIC Qt6::Network Qt6::PrintSupport Qt6::Widgets Qt6::Quick xqt-canvas)
 set_target_properties(xqt-shell PROPERTIES AUTOMOC ON)
+# Help (qt/docs/onboarding.md): the tutorial's Markdown, a finished tutorial.pdf if the author ships one, and the
+# pictures the text links to, compiled in as :/xqt-help/…
+set(XQT_HELP_DIR "${CMAKE_CURRENT_LIST_DIR}/../resources/help")
+file(GLOB_RECURSE XQT_HELP_PICTURES CONFIGURE_DEPENDS RELATIVE "${XQT_HELP_DIR}" "${XQT_HELP_DIR}/tutorial.assets/*")
+file(GLOB XQT_HELP_PDF CONFIGURE_DEPENDS RELATIVE "${XQT_HELP_DIR}" "${XQT_HELP_DIR}/tutorial.pdf")
+set(XQT_HELP_FILES tutorial.md ${XQT_HELP_PDF} ${XQT_HELP_PICTURES})
+list(TRANSFORM XQT_HELP_FILES PREPEND "${XQT_HELP_DIR}/")
+qt_add_resources(xqt-shell xqt_help PREFIX /xqt-help BASE "${XQT_HELP_DIR}" FILES ${XQT_HELP_FILES})
 # "Show in file manager" on Linux: org.freedesktop.FileManager1 over D-Bus, when Qt has D-Bus (not on Android; Qt
 # on Windows and macOS has D-Bus too, but the file manager is reached another way there, see SystemApps.cpp)
 if(TARGET Qt6::DBus AND NOT ANDROID AND NOT WIN32 AND NOT APPLE)

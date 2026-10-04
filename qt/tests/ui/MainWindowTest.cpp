@@ -22,7 +22,9 @@
 
 #include <QElapsedTimer>
 #include <iostream>
+#include <QDateTime>
 #include <QFile>
+#include <QRegularExpression>
 #include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
@@ -7938,6 +7940,98 @@ TEST_F(MainWindowTest, theIntroductionIsInHelp) {
     click(findItem("introNext"));
     ASSERT_TRUE(waitOpened(intro, false));
     EXPECT_EQ(xqt::DocumentMode::stored(s), xqt::DocumentMode::Mode::Pdf);
+}
+
+// The tutorial (qt/docs/onboarding.md): Markdown in the resources, with sections that ask the user to do something and
+// marked placeholders for the author's ink and screenshots. Help → Tutorial opens a copy to write on: a PDF text
+// document in the app's data folder (not in the library), the same file the next time, a fresh one on "start again".
+TEST_F(MainWindowTest, theTutorialOpensAsACopy) {
+    QFile resource(AppController::tutorialResource());
+    ASSERT_TRUE(resource.open(QIODevice::ReadOnly)) << "compiled into the program";
+    const QString text = QString::fromUtf8(resource.readAll());
+    EXPECT_TRUE(text.startsWith("# Tutorial"));
+    EXPECT_GE(text.count(QRegularExpression("^## ", QRegularExpression::MultilineOption)), 10) << "short sections";
+    EXPECT_TRUE(text.contains("> **PLACEHOLDER · INK:**"));
+    EXPECT_TRUE(text.contains("> **PLACEHOLDER · SCREENSHOT:**"));
+
+    const QString file = controller->tutorialFile();
+    const QString data = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    ASSERT_FALSE(data.isEmpty());
+    EXPECT_TRUE(file.startsWith(data)) << "in the app's data folder: " << file.toStdString();
+    if (const QString library = controller->libraryModel()->property("rootPath").toString(); !library.isEmpty()) {
+        EXPECT_FALSE(file.startsWith(library)) << "not in the library";
+    }
+    QFile::remove(file);
+    struct Remove {  // (the tests share the data folder)
+        QString f;
+        ~Remove() { QFile::remove(f); }
+    } remove{file};
+    EXPECT_FALSE(controller->tutorialExists());
+
+    // Help → Tutorial: the copy is made, saved and opened, a text document to write on
+    const int tabs = controller->tabManager().count();
+    QQuickItem* entry = openMoreMenuAt("helpTutorialItem");
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(find<QQuickItem>("helpRestartTutorialItem")->property("offered").toBool(), false) << "no copy yet";
+    click(entry);
+    until([&] { return controller->tabManager().count() == tabs + 1 && !controller->anySaving(); }, 20000);
+    ASSERT_EQ(controller->tabManager().count(), tabs + 1);
+    EXPECT_TRUE(controller->tutorialExists());
+    EXPECT_TRUE(QFileInfo(file).isWritable());
+    EXPECT_TRUE(xqt::HybridPdf::isHybrid(fs::path(file.toStdString()))) << "a PDF with notes";
+    xqt::DocumentSession* s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(QString::fromStdString(s->getFilePath().string()), file);
+    {
+        std::shared_lock lock(*s->getDocument());
+        EXPECT_TRUE(xqt::TextDocument::isTextDocument(*s->getDocument())) << "its text stays editable";
+        EXPECT_GE(s->getDocument()->getPageCount(), 10u) << "a page per section";
+    }
+    EXPECT_TRUE(controller->textNotes());
+    EXPECT_FALSE(controller->modified());
+
+    // Written on and saved: Help → Tutorial switches to it; closed, it opens the same file with what was written
+    drawStroke(*s, 1);
+    EXPECT_TRUE(controller->modified());
+    ASSERT_TRUE(controller->save());
+    until([&] { return !controller->anySaving(); }, 20000);
+    EXPECT_FALSE(controller->modified());
+    const QDateTime saved = QFileInfo(file).lastModified();
+    EXPECT_TRUE(controller->openTutorial());
+    EXPECT_EQ(controller->tabManager().count(), tabs + 1) << "its tab";
+    controller->closeTab(controller->tabManager().currentIndex());
+    ASSERT_EQ(controller->tabManager().count(), tabs);
+    EXPECT_TRUE(controller->openTutorial());  // (in place of the untouched new document: as any document opened)
+    s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(QString::fromStdString(s->getFilePath().string()), file);
+    EXPECT_EQ(QFileInfo(file).lastModified(), saved) << "not made again";
+    auto strokes = [](xqt::DocumentSession& d) {
+        std::shared_lock lock(*d.getDocument());
+        return strokesOn(*d.getDocument(), 1);
+    };
+    EXPECT_EQ(strokes(*s), 1u) << "with what was written on it";
+
+    // Start again: asked first; a fresh copy, without the ink
+    const int open = controller->tabManager().count();
+    QSignalSpy changed(controller.get(), &AppController::tutorialChanged);
+    QSignalSpy messages(controller.get(), &AppController::message);
+    QObject* ask = find("restartTutorialDialog");
+    wait(300);  // (the tool bar laid out for the document opened in place of the other)
+    entry = openMoreMenuAt("helpRestartTutorialItem");
+    ASSERT_NE(entry, nullptr);
+    click(entry);
+    ASSERT_TRUE(waitOpened(ask, true));
+    click(findItem("restartTutorialConfirm"));
+    ASSERT_TRUE(waitOpened(ask, false));
+    until([&] { return changed.count() == 2 && !controller->anySaving(); }, 20000);
+    EXPECT_EQ(controller->tabManager().count(), open) << "the old tab closed, the new one open";
+    EXPECT_EQ(changed.count(), 2) << "removed, made again";
+    EXPECT_TRUE(messages.isEmpty());
+    s = controller->tabManager().currentSession();
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(QString::fromStdString(s->getFilePath().string()), file);
+    EXPECT_EQ(strokes(*s), 0u);
 }
 
 // PDF files mode in the window: Save as starts on "PDF with notes" for a new document; Ctrl+S on an annotated PDF

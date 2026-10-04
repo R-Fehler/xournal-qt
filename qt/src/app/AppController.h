@@ -246,6 +246,8 @@ class AppController: public QObject {
     /// The introduction was shown (qt/docs/onboarding.md): finished or skipped, at the first start or later from Help.
     /// The setting "introSeen" (stored at once).
     Q_PROPERTY(bool introSeen READ introSeen WRITE setIntroSeen NOTIFY documentModeChanged)
+    /// The user's copy of the tutorial is there (Help → Start the tutorial again is offered).
+    Q_PROPERTY(bool tutorialExists READ tutorialExists NOTIFY tutorialChanged)
     /// The mode in effect is "PDF files".
     Q_PROPERTY(bool pdfOnly READ pdfOnly NOTIFY documentModeChanged)
     /// New text documents are PDF text documents (the setting "newTextDocuments", qt/docs/md-pdf.md), not ".md" files.
@@ -805,6 +807,16 @@ public:
     /// The first start shows the introduction, which ends in the document mode question: that question is due
     /// (askDocumentMode) and the introduction was not shown yet.
     Q_INVOKABLE bool askIntro() const;
+    /// The tutorial (AppHelp.cpp): a copy to write on, a PDF text document in the app's data folder, made from the
+    /// Markdown in the resources the first time and opened again with what was written on it afterwards.
+    Q_INVOKABLE bool openTutorial();
+    /// A fresh copy instead of the one there (its tab is closed first, without asking: the window asked).
+    Q_INVOKABLE bool restartTutorial();
+    bool tutorialExists() const;
+    /// Where the copy is: <AppDataLocation>/Tutorial/Tutorial.pdf
+    QString tutorialFile() const;
+    /// The tutorial's Markdown in the resources
+    static QString tutorialResource();
     /// Save as: the type the dialog starts on, "pdf" (PDF with notes) or "xopp". A hybrid PDF stays a PDF, a .xopp a
     /// .xopp; other documents (new ones, annotated PDFs, images) take the mode's: "pdf" in PDF files mode.
     Q_INVOKABLE QString saveFormat() const;
@@ -1198,6 +1210,8 @@ Q_SIGNALS:
     void raiseRequested();
     void recoveryChanged();
     void documentModeChanged();
+    /// The tutorial's copy was made or removed (tutorialExists)
+    void tutorialChanged();
     /// exportAnnotations is done: the file written, or why not (`error`).
     void annotationsExported(const QString& file, const QString& error);
     void searchChanged();

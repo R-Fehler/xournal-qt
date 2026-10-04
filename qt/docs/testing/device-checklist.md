@@ -2525,3 +2525,19 @@ touched).
 - [ ] ⋮ → Help → Introduction and Settings → Help → Show the introduction open it again; there Skip, Esc and ×
       close it, the last page shows the way chosen now, and Done changes it only when another card was tapped.
 - [ ] ⋮ → Help → Keyboard shortcuts opens the shortcut sheet (as F1 does).
+
+## The tutorial (qt/onboarding)
+
+- [ ] ⋮ → Help → Tutorial (and Settings → Help → Open the tutorial) opens "Tutorial" in a new tab, a text document
+      with a page per section; the library shows nothing new (the copy is in `~/.local/share/…/Tutorial/` on Linux,
+      the app's storage on Android).
+- [ ] Each exercise works on it: the pen and highlighter write on the pages, colors and widths change, the eraser and
+      Select work, Ctrl+Z / two-finger tap undo, Add a page adds a page, the grid and the sidebar show the pages (the
+      Contents lists the sections), Ctrl+F finds "turbine" and Fuzzy finds "turbnie".
+- [ ] The text tool tapped into a paragraph edits the text; ink drawn on a page stays where it was.
+- [ ] The PLACEHOLDER quotes are visible as quotes with a bold label.
+- [ ] Ctrl+S saves it; close the tab, Help → Tutorial again: the same copy with the ink.
+- [ ] Help → Start the tutorial again… asks first; Start again closes the tab and opens a fresh copy without the ink.
+- [ ] ⋮ → Save as… puts it into a folder of the library (a PDF with notes or a .xopp); the copy in the app's folder
+      stays.
+- [ ] On the phone: the tutorial's pages are readable at fit width; the Help entries are in the ⋮ sheet.

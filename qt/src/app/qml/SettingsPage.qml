@@ -57,8 +57,11 @@ Popup {
         sectionShown = true
     }
     function showShortcuts() { showSection(shortcutsSection) }
-    /// Help (qt/docs/onboarding.md): the window shows the introduction (the sheet is closed first)
+    /// Help (qt/docs/onboarding.md): the window shows the introduction, the tutorial, the question whether to start
+    /// the tutorial again (the sheet is closed first)
     signal introRequested()
+    signal tutorialRequested()
+    signal restartTutorialRequested()
 
     readonly property var s: app.settings
     /// The cache was removed: the window closes (so the app does not build it again at once)
@@ -1273,6 +1276,27 @@ Popup {
                         objectName: "showIntroButton"
                         text: qsTr("Show the introduction")
                         onClicked: { sheet.close(); sheet.introRequested() }
+                    }
+                    SectionTitle { text: qsTr("Tutorial") }
+                    Hint {
+                        text: qsTr("A document that asks you to try the tools, pages, search, tabs, Markdown and the "
+                                   + "library, one page each. It is your copy to write on, kept in the app's own "
+                                   + "folder, not in your library.")
+                    }
+                    RowLayout {
+                        spacing: 8
+                        Button {
+                            objectName: "openTutorialButton"
+                            text: qsTr("Open the tutorial")
+                            onClicked: { sheet.close(); sheet.tutorialRequested() }
+                        }
+                        Button {
+                            objectName: "restartTutorialButton"
+                            visible: app.tutorialExists
+                            flat: true
+                            text: qsTr("Start it again…")
+                            onClicked: { sheet.close(); sheet.restartTutorialRequested() }
+                        }
                     }
                     SectionTitle { text: qsTr("Keyboard shortcuts") }
                     Hint { text: qsTr("F1 shows them over the page; Shortcuts here changes them.") }
