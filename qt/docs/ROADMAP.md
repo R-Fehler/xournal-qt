@@ -793,6 +793,17 @@
   into a document of the app the picture has its size from the page, and a note offers a link marker to the source
   page (a Markdown link in Markdown). Works in the reference and in text documents ([snip.md](snip.md)).
 
+- **To-dos, `qt/todos` (2026-10-04).** Every Markdown task line (`- [ ]`, `* [x]`, `1. [ ]`; boxes, sticky notes, PDF
+  text documents, `.md` files) is read into the library index's "notes" pack with its page, line, state and due date
+  (Obsidian's `📅 2026-10-12` or `due:2026-10-12`). The library home's To-dos tab lists those with the marker
+  (`todo:` by default, a setting; or every check box), grouped by document or folder with counts, sorted by due
+  date, document or last change, filtered by state, due date, text and folder. A tap opens the line; the check box
+  ticks it in the open document (one undo step) or in the closed file (a `.md` byte for byte, a `.xopp` or PDF with
+  notes saved as the app saves); read-only and archive files are refused with a message. A check-box stamp (image
+  button's list) puts `- [ ] ` at the tap for handwritten to-dos, listed with a picture of the handwriting (the
+  region renderer) and its recognised words. "Add to calendar": an all-day VEVENT `.ics` handed to the system (Android:
+  the calendar's new-event intent); exports of the open ones as `.ics` and Markdown. One way ([todos.md](todos.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).
