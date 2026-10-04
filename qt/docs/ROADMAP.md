@@ -746,6 +746,14 @@
   (Android, iOS) the dot is an item of its own that only moves. The eraser (tool bar, eraser end, a side button)
   shows itself: a gray square of its real size at the zoom, dashed for whole strokes, round for whiteout; a cursor up
   to 256 device pixels, drawn as geometry above that ([hover-cursors.md](hover-cursors.md)).
+- **Fractional scaling, `qt/hidpi-fractional` (2026-10-04).** An audit of 125 %, 150 %, 175 %
+  ([hidpi.md](hidpi.md)): the app never rounds Qt's pass-through factor; page tiles were already 1:1 with the
+  screen. Fixed: the pictures of pages in lists (sidebar, grids, overviews, hits) were drawn at dpr² because Qt Quick
+  multiplies an image provider's `sourceSize` itself (5x the pixels at 150 %); the selection, the curtain's handles
+  and knob and the pen's drawn dot lie on whole device pixels, and the selection and the knob follow a move to a
+  screen of another scale; the app's separators and page frames are whole device pixels (`Hairline.qml`,
+  `DevicePixels.js`). The quick tests pass at any `QT_SCALE_FACTOR`; CTest runs the new `FractionalScale*` tests at
+  1.25, 1.5 and 1.67.
 
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):

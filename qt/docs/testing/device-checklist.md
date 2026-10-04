@@ -2642,3 +2642,18 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
 - [ ] GNOME with fractional scaling at an odd scale (e.g. 133 % or 166 %), Windows at 110 %: the mouse's dot over
       the page is crisp. With `XQT_PEN_CURSOR=0 ./xournal-qt` (the dot drawn by the app, as on Android) the pen's
       dot is crisp too, not soft.
+- Per platform (each at 125 % and 150 %, then 175 % where offered; at each scale: open a PDF and a note, look at a
+  page at 100 % zoom next to the same page at 100 % scale: text and ink as sharp; the setsquare's marks crisp; the
+  tool bar and pills the same size relative to the screen as the system's own apps):
+  - [ ] Kubuntu / Plasma, Wayland session (System Settings → Display → Scale). The calibration page says "scaled
+        125 %" (or 150 %). Change the scale while the app runs: the window follows without a restart, pages sharp.
+  - [ ] Plasma, X11 session ("Plasma (X11)" at the login): the same; if it says 100 % or 200 %, note `xrdb -query |
+        grep dpi` and `env | grep QT_`.
+  - [ ] GNOME, Wayland, with fractional scaling turned on (Settings → Displays): 125 %, 150 % and an odd one GNOME
+        offers (e.g. 166 %). Start with `QT_QPA_PLATFORM=wayland ./xournal-qt` once to be sure it is not XWayland.
+  - [ ] Windows (Surface): 125 %, 150 %, 175 % (Settings → System → Display → Scale), each without a restart of the
+        app. Two monitors at different scales: drag the window from one to the other and back; pages, the sidebar's
+        pages, a selection, the curtain's knob and the mouse's dot are sharp on both, and their size follows.
+  - [ ] macOS: the default and a "scaled" resolution: everything as sharp as other Mac apps (the app gets 2x only).
+  - [ ] Optional: `QT_SCALE_FACTOR_ROUNDING_POLICY=Round ./xournal-qt` at 125 %: the app at 100 % (smaller, crisper
+        controls). Only for comparison; the default is meant to stay.
