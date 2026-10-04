@@ -85,6 +85,8 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Todos.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTodos.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryTodos.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TodoCalendar.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/TodoCalendar.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentChapters.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/DocumentLinks.h

@@ -8,6 +8,8 @@
 
 #include <QCoreApplication>
 #include <QMetaObject>
+#include <QFileInfo>
+#include <QSaveFile>
 #include <QPointer>
 #include <QThreadPool>
 #include <QTimer>
@@ -26,7 +28,9 @@
 #include "shell/Library.h"
 #include "shell/LibraryModel.h"
 #include "shell/LibraryTodos.h"
+#include "shell/SystemApps.h"
 #include "shell/TabManager.h"
+#include "shell/TodoCalendar.h"
 #include "shell/Todos.h"
 #include "undo/TextBoxUndoAction.h"
 #include "undo/UndoRedoHandler.h"
@@ -309,4 +313,54 @@ void AppController::followTodoStampTool() {
         todostamp::disarm();
         Q_EMIT todoStampChanged();
     }
+}
+
+// --- to the calendar, one way (TodoCalendar.h) ---
+
+bool AppController::addTodoToCalendar(const QVariantMap& row) {
+    const todocal::Item item = todocal::itemOf(row);
+    if (!item.due.isValid()) {
+        Q_EMIT message(tr("Not added to the calendar"), tr("This to-do has no due date."), false);
+        return false;
+    }
+    if (todocal::insertIntoCalendar(item)) {
+        return true;  // (Android: the calendar app's new event, filled in)
+    }
+    const QString file = todocal::writeToCache(item);
+    if (file.isEmpty()) {
+        Q_EMIT message(tr("Not added to the calendar"), tr("The calendar file could not be written."), true);
+        return false;
+    }
+    if (!SystemApps::instance().openWithSystemApp(file)) {
+        Q_EMIT message(tr("No calendar app"),
+                       tr("No app opened the calendar file. It is here, to import it by hand:\n%1").arg(file), false);
+        return false;
+    }
+    return true;
+}
+
+bool AppController::exportTodos(const QUrl& target) {
+    QString path = target.isLocalFile() ? target.toLocalFile() : target.toString();
+    if (path.isEmpty()) {
+        return false;
+    }
+    const bool calendar = path.endsWith(QLatin1String(".ics"), Qt::CaseInsensitive);
+    if (!calendar && !path.endsWith(QLatin1String(".md"), Qt::CaseInsensitive)) {
+        path += QStringLiteral(".md");
+    }
+    std::vector<todocal::Item> items;
+    for (const QVariant& row: libraryTodos->listed()) {
+        if (!row.toMap().value("done").toBool()) {
+            items.push_back(todocal::itemOf(row.toMap()));
+        }
+    }
+    const QByteArray bytes = calendar ? todocal::ics(items)
+                                      : todocal::markdown(items, tr("To-dos of %1").arg(library->name())).toUtf8();
+    QSaveFile f(path);
+    if (!f.open(QIODevice::WriteOnly) || f.write(bytes) < 0 || !f.commit()) {
+        Q_EMIT message(tr("Export failed"), f.errorString(), true);
+        return false;
+    }
+    Q_EMIT pageActionDone(tr("Exported to %1").arg(QFileInfo(path).fileName()), false);
+    return true;
 }

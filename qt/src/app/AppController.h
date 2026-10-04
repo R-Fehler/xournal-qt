@@ -759,6 +759,13 @@ public:
     Q_INVOKABLE bool setTodoDone(const QString& path, const QString& rawText, int occurrence, bool done);
     /// Open a to-do's document at its page, with its line in view (`page`: where the index has it, -1: not known).
     Q_INVOKABLE bool openTodo(const QString& path, const QString& rawText, int occurrence, int page);
+    /// "Add to calendar" of a to-do with a due date (a row of the To-dos view, LibraryTodosModel::get): on Android the
+    /// calendar app's new event, filled in; else (or when none takes it) an .ics of it in the app's cache, opened with
+    /// the system's app for it. One way (TodoCalendar.h).
+    Q_INVOKABLE bool addTodoToCalendar(const QVariantMap& row);
+    /// Export the open to-dos the To-dos view lists to `target`: an .ics (those with a due date, all-day events) or a
+    /// Markdown list (.md, any other name: .md is added)
+    Q_INVOKABLE bool exportTodos(const QUrl& target);
     /// The check-box stamp for a handwritten to-do is armed (TodoStamp.h): the next tap on a page places it
     Q_PROPERTY(bool todoStamp READ todoStampArmed NOTIFY todoStampChanged)
     bool todoStampArmed() const;

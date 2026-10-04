@@ -7,6 +7,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import "Popups.js" as Popups
 
@@ -166,6 +167,32 @@ FocusScope {
                               { value: "changed", text: qsTr("Last changed first") }]
                     onPicked: function(v) { view.todos.sortBy = v }
                 }
+                // Export the open to-dos listed: to a calendar (.ics), or as a Markdown list (one way)
+                IconButton {
+                    id: todosMore
+                    objectName: "todosMoreButton"
+                    label: qsTr("More")
+                    iconName: "xqt-more"
+                    tip: qsTr("Export the open to-dos")
+                    onClicked: Popups.openAt(todosMenu)
+                    AdaptiveMenu {
+                        id: todosMenu
+                        objectName: "todosMenu"
+                        title: qsTr("To-dos")
+                        AdaptiveMenuItem {
+                            objectName: "exportTodosIcsItem"
+                            text: qsTr("Export open to-dos for a calendar (.ics)…")
+                            enabled: view.todos.count > 0
+                            onTriggered: { exportDialog.calendar = true; exportDialog.open() }
+                        }
+                        AdaptiveMenuItem {
+                            objectName: "exportTodosMdItem"
+                            text: qsTr("Export open to-dos as Markdown (.md)…")
+                            enabled: view.todos.count > 0
+                            onTriggered: { exportDialog.calendar = false; exportDialog.open() }
+                        }
+                    }
+                }
             }
         }
 
@@ -254,6 +281,12 @@ FocusScope {
                         onTriggered: app.openTodo(row.model.path, row.model.rawText, row.model.occurrence, row.model.page)
                     }
                     AdaptiveMenuItem {
+                        objectName: "addTodoToCalendarItem"
+                        text: qsTr("Add to calendar")
+                        offered: row.model.due !== ""
+                        onTriggered: app.addTodoToCalendar(view.todos.get(row.index))
+                    }
+                    AdaptiveMenuItem {
                         objectName: "toggleTodoItem"
                         text: row.model.done ? qsTr("Mark as open") : qsTr("Mark as done")
                         onTriggered: app.setTodoDone(row.model.path, row.model.rawText, row.model.occurrence, !row.model.done)
@@ -338,6 +371,17 @@ FocusScope {
                 }
             }
         }
+    }
+
+    FileDialog {
+        id: exportDialog
+        objectName: "todosExportDialog"
+        property bool calendar: true
+        title: calendar ? qsTr("Export open to-dos for a calendar") : qsTr("Export open to-dos as Markdown")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: calendar ? "ics" : "md"
+        nameFilters: calendar ? [qsTr("Calendar (*.ics)")] : [qsTr("Markdown (*.md)")]
+        onAccepted: app.exportTodos(selectedFile)
     }
 
     ColumnLayout {

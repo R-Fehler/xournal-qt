@@ -12,6 +12,7 @@
 
 #include <QCborMap>
 #include <QDate>
+#include <QFile>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -27,6 +28,7 @@
 #include "shell/LibraryCache.h"
 #include "shell/LibraryModel.h"
 #include "shell/LibraryTodos.h"
+#include "shell/TodoCalendar.h"
 #include "shell/Todos.h"
 
 #include "MarkdownFile.h"
@@ -390,4 +392,52 @@ TEST(Todos, theyAreFoundAgainAndWritten) {
     writeFile(root / "old.xoj", "x");
     EXPECT_NE(todos::whyNotWritable(root / "old.xoj", PdfKind::Unknown), "");
     EXPECT_NE(todos::whyNotWritable(root / "gone.md", PdfKind::Unknown), "");
+}
+
+// One way to the calendar: an all-day VEVENT per to-do with a due date (RFC 5545: CRLF, folded lines, escaped text),
+// with a link back to the page; the Markdown export
+TEST(Todos, calendarFilesAndTheMarkdownExport) {
+    QVariantMap row{{"text", "Call the lab, then; write \\ report"},
+                    {"due", "2026-10-12"},
+                    {"name", "lecture"},
+                    {"page", 2},
+                    {"path", "/tmp/lib/lecture.xopp"},
+                    {"rawText", "todo: Call the lab"},
+                    {"occurrence", 0}};
+    const todocal::Item item = todocal::itemOf(row);
+    EXPECT_EQ(item.due, QDate(2026, 10, 12));
+    EXPECT_EQ(item.link.toString(), "file:///tmp/lib/lecture.xopp#page=3");
+    const QString ics = QString::fromUtf8(todocal::ics({item}));
+    EXPECT_TRUE(ics.startsWith("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"));
+    EXPECT_TRUE(ics.contains("BEGIN:VEVENT\r\n"));
+    EXPECT_TRUE(ics.contains("DTSTART;VALUE=DATE:20261012\r\n"));
+    EXPECT_TRUE(ics.contains("DTEND;VALUE=DATE:20261013\r\n"));
+    EXPECT_TRUE(ics.contains("SUMMARY:Call the lab\\, then\; write \\\\ report\r\n"));
+    EXPECT_TRUE(ics.contains("URL:file:///tmp/lib/lecture.xopp#page=3\r\n"));
+    EXPECT_TRUE(ics.endsWith("END:VCALENDAR\r\n"));
+    EXPECT_FALSE(ics.contains("VTODO"));
+    for (const QString& l: ics.split("\r\n")) {
+        EXPECT_LE(l.toUtf8().size(), 75) << l.toStdString();
+    }
+    // A long text is folded (lines go on with a space), not cut inside a character
+    todocal::Item longOne = item;
+    longOne.text = QString(30, QChar(0x00E4)) + QString(40, 'x');
+    const QByteArray folded = todocal::ics({longOne});
+    EXPECT_TRUE(folded.contains("\r\n "));
+    EXPECT_TRUE(QString::fromUtf8(folded).remove("\r\n ").contains("SUMMARY:" + longOne.text));
+    // Without a due date: not in the calendar
+    todocal::Item undated = item;
+    undated.due = QDate();
+    EXPECT_FALSE(todocal::ics({undated}).contains("VEVENT"));
+    // Markdown: by document, with due dates and links
+    const QString md = todocal::markdown({item, undated}, "To-dos");
+    EXPECT_TRUE(md.startsWith("# To-dos\n\n## lecture\n\n- [ ] Call the lab, then; write \\ report \xF0\x9F\x93\x85 2026-10-12 "
+                              "([page 3](file:///tmp/lib/lecture.xopp#page=3))\n"));
+    // The cache's file
+    const QString file = todocal::writeToCache(item);
+    ASSERT_FALSE(file.isEmpty());
+    QFile f(file);
+    ASSERT_TRUE(f.open(QIODevice::ReadOnly));
+    EXPECT_TRUE(f.readAll().contains("DTSTART;VALUE=DATE:20261012"));
+    EXPECT_FALSE(todocal::insertIntoCalendar(item)) << "only on Android";
 }

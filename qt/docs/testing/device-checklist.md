@@ -2863,3 +2863,15 @@ letter words only where the recogniser is sure.
       with a picture of the handwriting beside it, sharp at the screen's resolution.
 - [ ] With handwriting search on and the page read: the row shows the recognised words; the text filter finds them.
 - [ ] Xournal++ opens the file: the stamp is a small "- [ ]" text.
+
+## To-dos: calendar (qt/todos)
+
+- [ ] Linux (KDE: Merkuro/KOrganizer; GNOME: Calendar; Thunderbird): a row with a due date → Add to calendar: the
+      calendar app imports an all-day event on that day, titled with the to-do, "To-do in <doc>, page N" and the link
+      in its notes; it does not block the day as busy.
+- [ ] Windows (Outlook / Calendar) and macOS (Calendar): the same with the `.ics`.
+- [ ] Android: the calendar app's "New event" screen opens, all day, on the right day (not the day before in a time
+      zone west of UTC), with the title and the notes; Back without saving adds nothing. Without a calendar app: the
+      `.ics` is offered instead (or the message with its path).
+- [ ] ⋮ → Export open to-dos (.ics): Google Calendar's import (web) takes all dated ones; (.md): readable list by
+      document with links that open the pages in the app.

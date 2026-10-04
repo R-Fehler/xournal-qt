@@ -481,3 +481,49 @@ TEST_F(TodosUiTest, theCheckBoxStampForHandwrittenToDos) {
     std::shared_lock lock(*doc);
     EXPECT_EQ(boxesOnPage(*doc, 0)[0]->getText(), "- [x] ");
 }
+
+namespace {
+class FakeApps final: public xqt::SystemApps {
+public:
+    bool openWithSystemApp(const QString& path) override {
+        opened << path;
+        return true;
+    }
+    QStringList opened;
+};
+}  // namespace
+
+// "Add to calendar": an .ics of an all-day event on the due date handed to the system's app (on the desktop); the
+// open to-dos exported as .ics and as Markdown
+TEST_F(TodosUiTest, toTheCalendarOneWay) {
+    FakeApps apps;
+    xqt::SystemApps::setInstance(&apps);
+    showTodos();
+    until([&] { return todos->count() == 3; });
+    ASSERT_EQ(todos->data(todos->index(0), xqt::LibraryTodosModel::TextRole).toString(), "call the lab");
+    EXPECT_TRUE(controller->addTodoToCalendar(todos->get(0)));
+    ASSERT_EQ(apps.opened.size(), 1);
+    EXPECT_TRUE(apps.opened[0].endsWith(".ics"));
+    {
+        QFile f(apps.opened[0]);
+        ASSERT_TRUE(f.open(QIODevice::ReadOnly));
+        const QByteArray ics = f.readAll();
+        EXPECT_TRUE(ics.contains("DTSTART;VALUE=DATE:" +
+                                 QDate::currentDate().addDays(1).toString("yyyyMMdd").toLatin1()));
+        EXPECT_TRUE(ics.contains("SUMMARY:call the lab"));
+    }
+    EXPECT_FALSE(controller->addTodoToCalendar(todos->get(1))) << "no due date";
+    EXPECT_EQ(apps.opened.size(), 1);
+    // Exports of the open to-dos listed
+    const fs::path out = fs::path(tmp.path().toStdString()) / "out";
+    fs::create_directories(out);
+    ASSERT_TRUE(controller->exportTodos(QUrl::fromLocalFile(QString::fromStdString((out / "todos.ics").string()))));
+    EXPECT_EQ(QString::fromStdString(readFile(out / "todos.ics")).count("BEGIN:VEVENT"), 1) << "the one with a date";
+    ASSERT_TRUE(controller->exportTodos(QUrl::fromLocalFile(QString::fromStdString((out / "todos").string()))));
+    const std::string md = readFile(out / "todos.md");
+    EXPECT_NE(md.find("- [ ] write the report"), std::string::npos);
+    EXPECT_NE(md.find("- [ ] buy milk"), std::string::npos);
+    EXPECT_EQ(md.find("done one"), std::string::npos) << "open ones only";
+    EXPECT_NE(findItem("todosMoreButton"), nullptr);
+    xqt::SystemApps::setInstance(nullptr);
+}
