@@ -134,7 +134,7 @@ FocusScope {
                                         fillMode: Image.PreserveAspectFit
                                         verticalAlignment: Image.AlignTop
                                         source: view.shown ? doc.model.pageBase + "/" + page.modelData.page : ""
-                                        sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                        sourceSize.width: Math.ceil(width)
                                     }
                                     // The ribbon of a bookmarked page
                                     Image {

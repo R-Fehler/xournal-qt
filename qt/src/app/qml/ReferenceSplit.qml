@@ -266,7 +266,7 @@ Item {
                             anchors.margins: refFrame.border.width
                             sketch: refCell.sketch
                             thumbnail: refCell.thumbnail
-                            sourceWidth: Math.ceil(refFrame.width * Screen.devicePixelRatio / 128) * 128
+                            sourceWidth: Math.ceil(Math.ceil(refFrame.width * Screen.devicePixelRatio / 128) * 128 / Screen.devicePixelRatio)
                         }
                     }
                     Label {

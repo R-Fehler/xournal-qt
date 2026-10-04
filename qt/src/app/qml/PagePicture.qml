@@ -7,7 +7,7 @@ Item {
     id: picture
     property string sketch
     property string thumbnail
-    property int sourceWidth: 160
+    property int sourceWidth: 160  // (logical pixels: Qt Quick asks the provider for this times the pixel ratio)
     readonly property alias sourceSize: sharp.sourceSize
     property bool racing: false
     property bool sharpWanted: false

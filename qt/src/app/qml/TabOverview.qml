@@ -313,7 +313,7 @@ Popup {
                                 // Only while the overview is open (the cards of many tabs would keep their pictures
                                 // in memory); when it opens again the card shows its sketch until this is loaded
                                 source: overview.visible ? cell.thumbnail : ""
-                                sourceSize.width: Math.round(width * Screen.devicePixelRatio)
+                                sourceSize.width: Math.round(width)
                             }
                         }
                         RowLayout {
@@ -430,7 +430,7 @@ Popup {
                                             // Kept by QML (as in the library): finding another hit rebuilds this
                                             // list, and the pictures must not blink away
                                             source: hitPage.modelData.thumbnail
-                                            sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                            sourceSize.width: Math.ceil(width)
                                         }
                                         Repeater {
                                             model: hitPage.modelData.rects

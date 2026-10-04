@@ -3917,9 +3917,9 @@ TEST_F(MainWindowTest, sidebarThumbnailsStayWhenTheCurrentPageChanges) {
     ASSERT_NE(image, nullptr);
     QQuickItem* frame = image->parentItem();
     ASSERT_NE(frame, nullptr);
-    const qreal dpr = window->effectiveDevicePixelRatio();
+    // (logical pixels: Qt Quick asks the provider for them times the pixel ratio, see FractionalScaleTest)
     const auto drawnAtFrameWidth = [&] {
-        return image->property("sourceSize").toSize().width() == qRound(frame->width() * dpr);
+        return image->property("sourceSize").toSize().width() == qRound(frame->width());
     };
     EXPECT_TRUE(drawnAtFrameWidth());
     controller->goToPage(1);  // the second page becomes the current one: its frame gets the thick border

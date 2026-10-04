@@ -184,7 +184,7 @@ Rectangle {
                     racing: list.race.racing
                     // By the frame, not by this image: the frame's border is thicker on the current page, and a new
                     // size would draw the page again - each page that is scrolled past blinked
-                    sourceWidth: Math.round(frame.width * Screen.devicePixelRatio)
+                    sourceWidth: Math.round(frame.width)
                 }
                 Repeater {
                     model: entry.searchHits

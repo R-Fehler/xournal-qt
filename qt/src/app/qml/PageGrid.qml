@@ -160,8 +160,8 @@ Rectangle {
                     sketch: cell.sketch
                     thumbnail: cell.thumbnail
                     racing: grid.race.racing
-                    // In steps, so zooming does not render every size.
-                    sourceWidth: Math.ceil(cell.frameW * cell.dpr / 128) * 128
+                    // In steps of 128 pixels of the screen, so zooming does not render every size.
+                    sourceWidth: Math.ceil(Math.ceil(cell.frameW * cell.dpr / 128) * 128 / cell.dpr)
                 }
                 // Search hits
                 Repeater {

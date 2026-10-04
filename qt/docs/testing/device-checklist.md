@@ -2614,3 +2614,13 @@ qt/docs/hover-cursors.md.
       and the pen without lag in the page's drawing (it may trail the dot a little).
 - [ ] Android: the S Pen's side button held while hovering shows the drawn gray square under the tip.
 - [ ] The reference beside a document (read only): no eraser square there, the dot.
+
+## Fractional scaling: 125 %, 150 %, 175 % (qt/hidpi-fractional)
+qt/docs/hidpi.md (what the app does at each scale, per platform). The screen calibration page in Settings says the
+scale the app got ("This screen: …, scaled 125 %."); if it says 100 % or 200 % on a screen set to 125 % or 150 %,
+note the platform, the session (Wayland or X11) and `env | grep QT_`.
+
+- [ ] Kubuntu / Plasma Wayland, display at 125 %, then 150 %: the page sidebar, the page grid (four fingers or the
+      grid button), the tab overview, the contents overview and the library's page hits show sharp pages, as sharp
+      as at 100 %. Scroll quickly through a long PDF in the sidebar: no stutter, the pages appear as fast as at 100 %.
+      (They were drawn 2.25 times too wide at 150 %, 4 times at 200 %.)

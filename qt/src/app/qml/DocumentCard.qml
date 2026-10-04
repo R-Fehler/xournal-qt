@@ -446,8 +446,8 @@ Item {
                                     verticalAlignment: Image.AlignTop
                                     source: card.active && card.hitPassageBase !== ""
                                             ? card.hitPassageBase + "/" + passageCard.modelData.passage : ""
-                                    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
-                                    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
+                                    sourceSize.width: Math.ceil(width)  // (Qt Quick asks the provider for these times the pixel ratio)
+                                    sourceSize.height: Math.ceil(height)
                                 }
                             }
                         }
@@ -514,7 +514,7 @@ Item {
                                 asynchronous: true
                                 fillMode: Image.PreserveAspectFit
                                 source: card.active && card.hitPageBase !== "" ? card.hitPageBase + "/" + hitPage.modelData.page : ""
-                                sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                sourceSize.width: Math.ceil(width)
                             }
                             HitBadge {
                                 anchors.right: parent.right

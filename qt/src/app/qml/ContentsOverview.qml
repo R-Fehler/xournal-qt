@@ -129,7 +129,7 @@ Rectangle {
                             asynchronous: true
                             fillMode: Image.PreserveAspectFit
                             source: overview.visible ? app.pages.thumbnailUrl(pageItem.pageNo) : ""
-                            sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                            sourceSize.width: Math.ceil(width)
                         }
                         TapHandler { onTapped: overview.choose(pageItem.pageNo) }
                     }

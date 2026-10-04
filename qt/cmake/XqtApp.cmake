@@ -274,13 +274,18 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveAuditTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveLayoutTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/FractionalScaleTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
         GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # The same window on a screen at 150 % (qt/docs/hidpi.md): Qt's own scale factor, as on Wayland, X11 and Windows
+    add_test(NAME FractionalScale.ui@150 COMMAND xqt-ui-tests --gtest_filter=FractionalScale.*)
+    set_tests_properties(FractionalScale.ui@150 PROPERTIES LABELS ui
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.5")
 
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp
