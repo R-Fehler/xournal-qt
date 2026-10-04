@@ -85,6 +85,16 @@ void HandwritingSearch::applySettings() {
     Q_EMIT enabledChanged();
 }
 
+void HandwritingSearch::reloadModel() {
+    if (on) {
+        modelFolder = modelDir(*app.getSettings());
+        worker.setRecognizer(factory() ? factory()(modelFolder) : nullptr);
+    }
+    Q_EMIT enabledChanged();
+}
+
+QString HandwritingSearch::modelFolderInUse() const { return modelDir(*app.getSettings()); }
+
 void HandwritingSearch::dropIndexers() {
     for (auto& [session, indexer]: indexers) {
         delete indexer.data();
@@ -152,6 +162,14 @@ void HandwritingSearch::update() {
         }
         indexer->setFocused(inFront);
     }
+}
+
+int HandwritingSearch::pagesWaiting() const {
+    int n = 0;
+    for (const auto& [session, indexer]: indexers) {
+        n += indexer ? indexer->pagesWaiting() : 0;
+    }
+    return n;
 }
 
 InkTextIndexer* HandwritingSearch::indexerOf(const DocumentSession* session) const {

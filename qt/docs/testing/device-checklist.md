@@ -2568,3 +2568,11 @@ letter words only where the recogniser is sure.
       XQT_ONNXRUNTIME=<the .so> XQT_BENCH_HWR=1 build-qt/xqt-hwr-tests --gtest_filter='Trocr*'`: the benchmark line
       is read ("This is a dumb test …"), at least two of "this", "dumb", "test" among the readings; the time per
       line printed (research: about 0.2 s per 8 words on 2 threads). The tiny-model test passes too.
+- [ ] Settings → Search with the search on and no model in the app's data folder: the address
+      (huggingface.co/Xenova/trocr-small-handwritten/tree/<revision>) and "64 MB" are shown before anything is
+      downloaded; Download shows progress; Cancel stops it; Download again goes on after the files already done;
+      "Remove the model" frees the folder and the status says the model is missing. With `XQT_HWR_MODEL` set, the
+      Settings say the model is that folder and offer neither download nor removal.
+- [ ] Without ONNX Runtime installed: Settings says it is not installed; the app works as before; nothing is read.
+- [ ] The library shows "Reading handwriting: N documents left" while it reads (wide window), "Handwriting: N left"
+      on a phone-wide window.

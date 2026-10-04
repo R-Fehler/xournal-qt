@@ -61,6 +61,10 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/InkTextStore.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryInkJob.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryInkJob.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ModelDownload.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/ModelDownload.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HandwritingSettings.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/shell/HandwritingSettings.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/Library.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/shell/LibraryModel.h

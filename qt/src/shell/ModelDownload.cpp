@@ -1,0 +1,251 @@
+#include "ModelDownload.h"
+
+#include <QCryptographicHash>
+#include <QDir>
+#include <QDirIterator>
+#include <QFile>
+#include <QFileInfo>
+#include <QSaveFile>
+
+#include "NetFetch.h"
+
+namespace xqt {
+
+namespace {
+/// The model this build downloads: Xenova's ONNX export of TrOCR-small handwritten (MIT), int8. The revision and the
+/// sha256 of each file are pinned by the author (qt/scripts/hwr-model.sh prints them); until then nothing is
+/// downloaded, and the model comes from the script (qt/docs/handwriting-search.md).
+ModelDownload::Model builtIn() {
+    ModelDownload::Model m;
+    m.name = QStringLiteral("trocr-small-hw-int8");
+    m.source = QStringLiteral("https://huggingface.co/Xenova/trocr-small-handwritten");
+    m.revision = QString();  // TODO(author): the commit hwr-model.sh printed
+    m.encoder = QStringLiteral("onnx/encoder_model_quantized.onnx");
+    m.decoder = QStringLiteral("onnx/decoder_model_merged_quantized.onnx");
+    m.tokenizer = QStringLiteral("tokenizer.json");
+    // (sizes: about 23 and 41 MB, measured in the research; the exact ones and the sha256 are pinned with the revision)
+    m.files = {{m.encoder, QString(), 23 * 1024 * 1024},
+               {m.decoder, QString(), 41 * 1024 * 1024},
+               {m.tokenizer, QString(), 1024 * 1024},
+               {QStringLiteral("generation_config.json"), QString(), 1024},
+               {QStringLiteral("preprocessor_config.json"), QString(), 1024}};
+    return m;
+}
+
+const ModelDownload::Model* testModel = nullptr;
+
+QString sha256Of(const QByteArray& data) {
+    return QString::fromLatin1(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex());
+}
+
+bool fileMatches(const QString& path, const ModelDownload::File& f) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly) || (f.size > 0 && file.size() != f.size)) {
+        return false;
+    }
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(&file);
+    return QString::fromLatin1(hash.result().toHex()) == f.sha256.toLower();
+}
+}  // namespace
+
+QUrl ModelDownload::Model::urlOf(const File& f) const {
+    return QUrl(source + QStringLiteral("/resolve/") + revision + u'/' + f.path);
+}
+
+qint64 ModelDownload::Model::bytes() const {
+    qint64 b = 0;
+    for (const File& f: files) {
+        b += f.size;
+    }
+    return b;
+}
+
+bool ModelDownload::Model::pinned() const {
+    return !revision.isEmpty() && !files.empty() &&
+           std::all_of(files.begin(), files.end(), [](const File& f) { return f.sha256.size() == 64; });
+}
+
+const ModelDownload::Model& ModelDownload::model() {
+    static const Model m = builtIn();
+    return testModel ? *testModel : m;
+}
+
+void ModelDownload::setModel(const Model* m) { testModel = m; }
+
+QByteArray ModelDownload::manifestOf(const Model& m) {
+    QString s = QStringLiteral("{\n  \"name\": \"%1\",\n  \"source\": \"%2\",\n  \"revision\": \"%3\",\n"
+                               "  \"license\": \"MIT\",\n  \"encoder\": \"%4\",\n  \"decoder\": \"%5\",\n"
+                               "  \"tokenizer\": \"%6\",\n  \"decoder_start_token_id\": %7,\n  \"eos_token_id\": %8,\n"
+                               "  \"image_size\": 384,\n  \"files\": {\n")
+                        .arg(m.name, m.source, m.revision, m.encoder, m.decoder, m.tokenizer)
+                        .arg(m.start)
+                        .arg(m.end);
+    for (size_t i = 0; i < m.files.size(); ++i) {
+        s += QStringLiteral("    \"%1\": {\"sha256\": \"%2\", \"size\": %3}%4\n")
+                     .arg(m.files[i].path, m.files[i].sha256.toLower())
+                     .arg(m.files[i].size)
+                     .arg(i + 1 < m.files.size() ? QStringLiteral(",") : QString());
+    }
+    s += QStringLiteral("  }\n}\n");
+    return s.toUtf8();
+}
+
+ModelDownload::ModelDownload(QString folder, QObject* parent):
+        QObject(parent), target(std::move(folder)), staging(target + QStringLiteral(".part")) {}
+
+ModelDownload::~ModelDownload() { ++generation; }
+
+bool ModelDownload::installed(const QString& folder) {
+    return QFileInfo::exists(QDir(folder).filePath(QStringLiteral("model.json")));
+}
+
+bool ModelDownload::remove(const QString& folder, QString* error) {
+    bool ok = true;
+    for (const QString& dir: {folder, folder + QStringLiteral(".part")}) {
+        if (QFileInfo::exists(dir) && !QDir(dir).removeRecursively()) {
+            ok = false;
+        }
+    }
+    if (!ok && error) {
+        *error = QStringLiteral("Could not remove %1").arg(folder);
+    }
+    return ok;
+}
+
+qint64 ModelDownload::sizeOnDisk(const QString& folder) {
+    qint64 bytes = 0;
+    QDirIterator it(folder, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        bytes += it.nextFileInfo().size();
+    }
+    return bytes;
+}
+
+void ModelDownload::start() {
+    if (running()) {
+        return;
+    }
+    ++generation;
+    why.clear();
+    if (!model().pinned()) {
+        fail(tr("This version of the app does not name the model's files yet: install it with "
+                "qt/scripts/hwr-model.sh (see the handwriting search's documentation)."));
+        return;
+    }
+    if (!QDir().mkpath(staging)) {
+        fail(tr("Could not create %1").arg(staging));
+        return;
+    }
+    now = State::Downloading;
+    index = 0;
+    done = 0;
+    current = 0;
+    Q_EMIT changed();
+    next();
+}
+
+void ModelDownload::cancel() {
+    if (!running()) {
+        return;
+    }
+    ++generation;
+    now = State::Cancelled;
+    current = 0;
+    Q_EMIT changed();
+    Q_EMIT finished(false);
+}
+
+void ModelDownload::fail(const QString& reason) {
+    ++generation;
+    now = State::Failed;
+    why = reason;
+    current = 0;
+    Q_EMIT changed();
+    Q_EMIT finished(false);
+}
+
+void ModelDownload::next() {
+    const Model& m = model();
+    while (index < m.files.size()) {
+        const File& f = m.files[index];
+        const QString local = QDir(staging).filePath(f.path);
+        if (!fileMatches(local, f)) {
+            break;
+        }
+        done += f.size;  // (downloaded before: a download that went on)
+        ++index;
+    }
+    if (index >= m.files.size()) {
+        finish();
+        return;
+    }
+    const File f = m.files[index];
+    currentFile = f.path;
+    current = 0;
+    Q_EMIT changed();
+    const quint64 gen = generation;
+    const qint64 limit = (f.size > 0 ? f.size : 100 * 1024 * 1024) + 1024 * 1024;
+    NetFetch::instance().download(
+            m.urlOf(f), 60000, limit,
+            [this, gen](qint64 received, qint64) {
+                if (gen != generation) {
+                    return false;  // (cancelled)
+                }
+                current = received;
+                Q_EMIT changed();
+                return true;
+            },
+            [this, gen, f](const NetFetch::Reply& r) {
+                if (gen != generation) {
+                    return;
+                }
+                if (!r.error.isEmpty() || r.status != 200) {
+                    fail(r.error.isEmpty() ? tr("%1 answered with %2.").arg(r.url.host()).arg(r.status) : r.error);
+                    return;
+                }
+                if ((f.size > 0 && r.body.size() != f.size) || sha256Of(r.body) != f.sha256.toLower()) {
+                    fail(tr("%1 is not the file this version of the app expects (another size or checksum): "
+                            "nothing was kept.")
+                                 .arg(f.path));
+                    return;
+                }
+                const QString local = QDir(staging).filePath(f.path);
+                QDir().mkpath(QFileInfo(local).path());
+                QSaveFile out(local);
+                if (!out.open(QIODevice::WriteOnly) || out.write(r.body) != r.body.size() || !out.flush() ||
+                    !out.commit()) {
+                    fail(tr("Could not write %1").arg(local));
+                    return;
+                }
+                done += f.size;
+                current = 0;
+                ++index;
+                next();
+            });
+}
+
+void ModelDownload::finish() {
+    const Model& m = model();
+    QSaveFile manifest(QDir(staging).filePath(QStringLiteral("model.json")));
+    const QByteArray bytes = manifestOf(m);
+    if (!manifest.open(QIODevice::WriteOnly) || manifest.write(bytes) != bytes.size() || !manifest.commit()) {
+        fail(tr("Could not write the model's manifest"));
+        return;
+    }
+    // In the model's place (a model there before goes)
+    if (QFileInfo::exists(target) && !QDir(target).removeRecursively()) {
+        fail(tr("Could not replace %1").arg(target));
+        return;
+    }
+    if (!QDir().rename(staging, target)) {
+        fail(tr("Could not move the model to %1").arg(target));
+        return;
+    }
+    now = State::Done;
+    currentFile.clear();
+    Q_EMIT changed();
+    Q_EMIT finished(true);
+}
+
+}  // namespace xqt

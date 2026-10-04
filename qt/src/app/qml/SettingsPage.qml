@@ -1038,6 +1038,112 @@ Popup {
                                    + "letters may have two (trasnfromation finds \"transformation\"), shorter ones "
                                    + "one. Documents with the word as typed come first.")
                     }
+
+                    // --- Handwriting (qt/docs/handwriting-search.md) ---
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("Search handwriting")
+                        }
+                        Switch {
+                            objectName: "handwritingSearchSwitch"
+                            checked: app.handwriting.enabled
+                            onToggled: app.handwriting.enabled = checked
+                        }
+                    }
+                    Hint {
+                        text: qsTr("Handwritten words become searchable: in open documents, in the library, and (as "
+                                   + "invisible text) in PDFs with notes and archive PDFs that other PDF apps open. "
+                                   + "The handwriting is never turned into text. English only for now. The recogniser "
+                                   + "runs on this computer at low priority; the library's other documents are read "
+                                   + "only on mains power.")
+                    }
+                    Label {
+                        objectName: "handwritingStatus"
+                        visible: app.handwriting.enabled
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: app.handwriting.status
+                        color: app.handwriting.ready ? "#1e7e34" : "#6b6f75"
+                    }
+                    ColumnLayout {
+                        // The model is downloaded only when the user asks, its address and size shown first
+                        objectName: "handwritingDownload"
+                        visible: app.handwriting.enabled && app.handwriting.ownModel && !app.handwriting.modelInstalled
+                        Layout.fillWidth: true
+                        spacing: 6
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: qsTr("The recogniser needs its model (%1), downloaded once from:")
+                                  .arg(app.handwriting.downloadSize)
+                        }
+                        TextEdit {
+                            objectName: "handwritingModelSource"
+                            Layout.fillWidth: true
+                            readOnly: true
+                            selectByMouse: true
+                            wrapMode: TextEdit.WrapAnywhere
+                            text: app.handwriting.downloadSource
+                            font.pixelSize: 13
+                            color: "#3c4043"
+                        }
+                        RowLayout {
+                            Button {
+                                objectName: "handwritingDownloadButton"
+                                text: qsTr("Download the model")
+                                enabled: app.handwriting.downloadAvailable && !app.handwriting.downloading
+                                onClicked: app.handwriting.download()
+                            }
+                            Button {
+                                objectName: "handwritingCancelDownload"
+                                visible: app.handwriting.downloading
+                                text: qsTr("Cancel")
+                                onClicked: app.handwriting.cancelDownload()
+                            }
+                        }
+                        ProgressBar {
+                            objectName: "handwritingDownloadProgress"
+                            visible: app.handwriting.downloading
+                            Layout.fillWidth: true
+                            value: app.handwriting.downloadProgress
+                        }
+                        Label {
+                            visible: app.handwriting.downloadError !== ""
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: app.handwriting.downloadError
+                            color: "#c5221f"
+                        }
+                        Hint {
+                            visible: !app.handwriting.downloadAvailable
+                            text: qsTr("This version of the app cannot download it yet: install it with "
+                                       + "qt/scripts/hwr-model.sh (see the documentation of the handwriting search).")
+                        }
+                    }
+                    RowLayout {
+                        visible: app.handwriting.ownModel && app.handwriting.modelInstalled
+                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WrapAnywhere
+                            text: qsTr("The model is in %1").arg(app.handwriting.modelFolder)
+                            font.pixelSize: 12
+                            color: "#6b6f75"
+                        }
+                        Button {
+                            objectName: "handwritingRemoveModel"
+                            text: qsTr("Remove the model")
+                            onClicked: app.handwriting.removeModel()
+                        }
+                    }
+                    Hint {
+                        visible: app.handwriting.enabled && !app.handwriting.ownModel
+                        text: qsTr("The model is the one in %1 (XQT_HWR_MODEL or the setting \"handwritingModel\"): "
+                                   + "it is never downloaded over or removed here.").arg(app.handwriting.modelFolder)
+                    }
                     Item { Layout.preferredHeight: 16 }
                 }
             }

@@ -722,6 +722,15 @@
   ([md-columns.md](md-columns.md)): feasible (about 8 to 9 days), not built; paired pages give two columns of
   reading today.
 
+- **Handwriting search, `qt/hwr-search` (2026-10-04).** Handwritten words become searchable, never converted
+  ([handwriting-search.md](handwriting-search.md)): ink laid out into lines and words from the strokes and their order
+  (`qt/src/hwr/InkLayout`), read by TrOCR-small int8 in ONNX Runtime (opened at run time; beam search, readings per
+  word box with their shares) on one idle-priority worker; the search matches all likely readings with typo
+  tolerance, also with Fuzzy off. Open documents are read as they change (line hashes: only touched lines), the
+  library in the background on mains power; results in a per-folder `ink-text.pack`; an invisible text layer in PDFs
+  with notes and archive PDFs (still PDF/A-3b) for other viewers. Off until switched on; the model (64 MB) is
+  downloaded from Settings with consent once its sha256s are pinned (until then `qt/scripts/hwr-model.sh`).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

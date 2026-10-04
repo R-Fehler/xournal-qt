@@ -48,7 +48,8 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/RecognizerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkIndexerTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkLibraryTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextLayerTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/InkTextLayerTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/ModelDownloadTest.cpp)
     if(XQT_HWR_ONNX)
         target_sources(xqt-hwr-tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../tests/hwr/TrocrTest.cpp)
     endif()

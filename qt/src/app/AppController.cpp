@@ -1,6 +1,7 @@
 #include "AppController.h"
 
 #include "hwr/HandwritingSearch.h"
+#include "shell/HandwritingSettings.h"
 #include "shell/LibraryInkJob.h"
 
 #include <utility>
@@ -201,6 +202,8 @@ AppController::AppController(QObject* parent): QObject(parent) {
     libraryInk->setEnabled(handwriting->enabled());
     connect(handwriting, &hwr::HandwritingSearch::enabledChanged, libraryInk.get(),
             [this] { libraryInk->setEnabled(handwriting->enabled()); });
+    ownHandwritingView = std::make_unique<HandwritingSettings>(*app, *handwriting, libraryInk.get());
+    handwritingView = ownHandwritingView.get();
     connect(library, &LibraryModel::indexChanged, libraryInk.get(), [this] {
         libraryInk->setIndex(library->searchIndex());
         if (!library->indexing()) {
@@ -257,6 +260,7 @@ AppController::AppController(AppController& mainWindow, QObject* parent): QObjec
     pageClipboard = mainWindow.pageClipboard;  // copied pages can be pasted in any window
     libraryBookmarks = mainWindow.libraryBookmarks;
     handwriting = mainWindow.handwriting;
+    handwritingView = mainWindow.handwritingView;
     connect(library, &LibraryModel::favouriteToggled, this, &AppController::favouriteChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::toolChanged);
     connect(app.get(), &AppContext::activeToolChanged, this, &AppController::selectMoreChanged);  // (available)
@@ -359,6 +363,8 @@ AppController::~AppController() {
     }
     tabs.reset();
 }
+
+QObject* AppController::handwritingSettings() const { return handwritingView; }
 
 void AppController::syncHandwriting() {
     if (!handwriting || !tabs) {

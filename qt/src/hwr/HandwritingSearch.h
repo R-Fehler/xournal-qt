@@ -69,10 +69,16 @@ public:
     /// Read the settings again (switched on or off, another model).
     void applySettings();
     bool enabled() const { return on; }
+    /// Make the recogniser anew (the model was downloaded or removed).
+    void reloadModel();
+    /// The model's folder in use.
+    QString modelFolderInUse() const;
     InkRecognitionService& service() { return worker; }
 
     /// The open documents of a window (`window`: any key; several windows share the search), and the one in front.
     void setSessions(const QObject* window, const std::vector<DocumentSession*>& sessions, DocumentSession* current);
+    /// Pages of the open documents waiting to be read.
+    int pagesWaiting() const;
     /// The indexer of an open document (null: none, the search is off).
     InkTextIndexer* indexerOf(const DocumentSession* session) const;
 

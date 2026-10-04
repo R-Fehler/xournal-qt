@@ -41,6 +41,14 @@ public:
     /// GET `url`; `done` is called later on the calling (UI) thread. `timeoutMs`: no answer, or no progress, for that
     /// long is an error. `maxBytes`: a bigger answer is an error.
     virtual void get(const QUrl& url, int timeoutMs, qint64 maxBytes, Done done) = 0;
+    /// Progress of a download: bytes received and in all (-1: not known). Returns false to stop it (cancelled).
+    using Progress = std::function<bool(qint64 received, qint64 total)>;
+    /// A GET of a big file (the handwriting search's model) that tells its progress and can be stopped; the default
+    /// (the tests' fake) is get() without progress.
+    virtual void download(const QUrl& url, int timeoutMs, qint64 maxBytes, Progress progress, Done done) {
+        Q_UNUSED(progress);
+        get(url, timeoutMs, maxBytes, std::move(done));
+    }
 
     /// "xournal-qt/<version> (+https://github.com/R-Fehler/xournal-qt)"
     static QByteArray userAgent();
@@ -57,6 +65,7 @@ public:
     QtNetFetch();
     ~QtNetFetch() override;
     void get(const QUrl& url, int timeoutMs, qint64 maxBytes, Done done) override;
+    void download(const QUrl& url, int timeoutMs, qint64 maxBytes, Progress progress, Done done) override;
 
 private:
     QNetworkAccessManager* manager();
