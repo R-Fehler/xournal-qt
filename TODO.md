@@ -523,6 +523,27 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   the `PLACEHOLDER` quotes of `qt/resources/help/tutorial.md`, and the device checks.
 
 **Designs first (a proposal goes to the author before anything is built)**
+
+*Decided by the author, 2026-10-04* (the proposals are summarised in the blocks' prompts and docs):
+- `qt/toolbox`: build as designed. The toolbox is a rail docked to any side of the canvas (left, right, top, bottom),
+  **right by default**. Classic tool bar kept for one release; the eraser is an entry; a folded section opens a list;
+  tools stored per device. Reading vs presenting (the integrator's call, asked to decide): two modes over one
+  "tools hidden" view. **Reading** (⋮ → View → Read) is read-only (pen and fingers scroll; text selection, copy and
+  look-up work; no ink by accident) with a reading pill (page, ‹ ›, vertical/sideways, snap/momentum, fit).
+  **Presenting** (F5) keeps writing on slides; the corner field hides and shows the toolbox.
+- `qt/stickers`: yes (a visible `Stickers/` folder per library, an app-wide set in the app's data folder, own order
+  in a hidden file that syncs, pasted at original size). `qt/groups`: yes, after the stickers, with the `xqt-group`
+  attribute seam; Ctrl+G groups, Ctrl+Shift+G ungroups (one undo step each); any member selects the group; pasted
+  stickers become groups.
+- `qt/audio`: yes (Qt audio + bundled Ogg Vorbis; `.xopp` recordings in the app's audio folder as upstream; PDF
+  attachments with page numbers; voice memos per page; Android foreground service; 2 s lead-in).
+- Canvas rotation (`qt/canvas-rotate`): yes, after `qt/toolbox` (90° steps first, then free with snapping).
+- `qt/todos`: a library-wide To-dos list from Markdown task lines, **grouped and filtered** (by document and
+  folder, open/done, due date, text), sortable; Obsidian-style due dates; a check-box stamp for handwritten to-dos;
+  "Add to calendar" as a one-way `.ics` / Android intent. A setting collects only lines marked as to-dos (default:
+  the marker `todo:`, configurable, or all check boxes); stamped boxes always count. No scripting for now.
+- Rotating PDF pages in a `.xopp`: a turned copy in the hidden `.name.pages.pdf` (Xournal++ reads it too).
+- Highlighter opacity on strokes: stays upstream's (compatibility).
 - [?] `qt/toolbox`: user-defined tools as the tool bar (Drawboard-like), the default mode: each entry is a tool
   with its settings (pen, highlighter, shapes, sticky notes, …, with color, width, line style, fill), in a fixed
   order with dividers; added with "+", edited, reordered (arrows in its menu, long-press drag), the first N shown
