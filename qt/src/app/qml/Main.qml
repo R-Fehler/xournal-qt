@@ -362,6 +362,8 @@ ApplicationWindow {
     /// not (the compact or reader chrome, the bar put away, a text document's tool bar merged into its format bar),
     /// the dock in the phone chrome: one place at a time (qt/docs/adaptive-layout.md, "One place for each action")
     readonly property bool undoInToolBar: !noToolbar && !toolsInFormatBar && !phoneChrome && !toolboxShown
+    /// A text document with the toolbox: undo and redo lead its format bar (qt/docs/toolbox.md, "Text documents")
+    readonly property bool undoInFormatBar: toolboxMode && toolsInFormatBar
 
     // --- the toolbox (qt/docs/toolbox.md) ----------------------------------------------------------------------------
     /// The toolbox of one's own tools (the default) instead of the classic tool bar (setting toolbarMode)
@@ -783,6 +785,43 @@ ApplicationWindow {
             onClicked: app.redo()
         }
     }
+    // A text document with the toolbox: undo and redo at the start of its format bar
+    Row {
+        objectName: "formatUndo"
+        parent: formatBar.leading
+        visible: win.undoInFormatBar
+        width: visible ? implicitWidth : 0
+        anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+        IconButton {
+            objectName: "formatUndoButton"
+            implicitWidth: 40; implicitHeight: 40
+            icon.width: 22; icon.height: 22
+            iconName: "xopp-edit-undo"
+            label: qsTr("Undo")
+            tip: win.withKeys(qsTr("Undo"), "undo")
+            enabled: app.canUndo
+            onClicked: app.undo()
+        }
+        IconButton {
+            objectName: "formatRedoButton"
+            implicitWidth: 40; implicitHeight: 40
+            icon.width: 22; icon.height: 22
+            iconName: "xopp-edit-redo"
+            label: qsTr("Redo")
+            tip: win.withKeys(qsTr("Redo"), "redo")
+            enabled: app.canRedo
+            onClicked: app.redo()
+        }
+        ToolSeparator {}
+    }
+    // ... and the commands that fit at its end, before ⋮ and "more tools" (search, full screen, save first)
+    Row {
+        id: formatCommands
+        objectName: "formatCommands"
+        parent: formatBar.trailing
+        spacing: 2
+        y: -2
+    }
     // The table editor of the formatting bar (the notes' canvas; the editor beside the page has its own)
     MarkdownTableEditor {
         id: tableEditor
@@ -1115,6 +1154,7 @@ ApplicationWindow {
         function inBar(n) { return barNames.indexOf(n) >= 0 }
         /// What the plan depends on: a change lays the bar out again (once, after the bindings settle)
         readonly property var planKey: [planLayout, win.phoneChrome, width, height, win.textDoc, app.toolbarColors.length,
+                                        formatBar.width, win.toolboxMode,
                                         colorStrip.others.length, order.map(function(n) { return slots[n].offered !== false }),
                                         win.toolboxShown, toolboxPane.fixedButtons.length]
         /// The buttons the toolbox holds while it is shown (the fixed tools: lent to it, placed by it)
@@ -1161,6 +1201,7 @@ ApplicationWindow {
                 Qt.callLater(relayout)  // (also where the layout stays the same)
                 return
             }
+            if (input.layout === "merged") input.keep = formatBarKeeps(input.items)
             let p = ToolBarPlan.plan(input)
             // The hysteresis: a bar that grows takes a richer plan only once there are 24 px to spare (the same
             // buttons and layout otherwise: no flicker at an edge)
@@ -1178,6 +1219,28 @@ ApplicationWindow {
             }
             lastInput = input
             apply(p)
+        }
+        /// A text document with the toolbox (qt/docs/toolbox.md, "Text documents"): the commands its format bar has room
+        /// for, by one ladder with the bar's own folding - the inserts into "+ Insert" first, then the commands of low
+        /// priority into "more tools", then the headings into one button, then search, full screen and save too; then
+        /// the row scrolls. (The classic bar: everything in "more tools".)
+        readonly property var keyCommands: ["search", "fullScreen", "save"]
+        function formatBarKeeps(items) {
+            if (!win.toolboxMode) return []
+            const fb = formatBar
+            const cmds = items.filter(function(n) { return slots[n] && slots[n].promoted !== true })
+            const key = cmds.filter(function(n) { return keyCommands.indexOf(n) >= 0 })
+            function w(n) { return n > 0 ? n * 48 + (n - 1) * 2 + 4 : 0 }
+            const room = fb.width - fb.leftInset - fb.rightInset - 12 - (win.undoInFormatBar ? 96 : 0)
+                         - 48 /* ⋮ */ - 4
+            const more = 50  // ("more tools", once something is in it)
+            const full = fb.levelsWidth + fb.marksWidth + fb.insertsWidth + 4
+            const inserts = fb.levelsWidth + fb.marksWidth + fb.insertLabelWidth + 4
+            const levels = fb.levelButtonWidth + fb.marksWidth + fb.insertLabelWidth + 4
+            const rest = cmds.length > key.length ? more : 0
+            if (room - full >= w(cmds) || room - inserts >= w(cmds)) return cmds
+            if (room - inserts >= w(key) + rest || room - levels >= w(key) + rest) return key
+            return []
         }
         /// The same plan, with the end at the bar's end again
         function relocate(p, input) {
@@ -1198,6 +1261,8 @@ ApplicationWindow {
                     item.parent = barContent
                     item.x = at.x
                     item.y = at.y
+                } else if (p.layout === "merged" && at === undefined && p.overflow.indexOf(n) < 0) {
+                    item.parent = toolBank
                 } else if (p.overflow.indexOf(n) >= 0 && item.promoted === true) {
                     item.parent = toolBank  // (an entry of ⋮ without room: in ⋮ again)
                 } else if (p.overflow.indexOf(n) >= 0) {
@@ -1240,7 +1305,12 @@ ApplicationWindow {
             // "All tools" holds what does not fit)
             toolEnd.parent = dock ? phoneAppBar.moreSlot : p.layout === "merged" ? formatBar.trailing
                              : p.layout === "grid" ? barContent : toolArea
-            toolEnd.x = dock || p.layout === "merged" ? 0 : p.end.x
+            // (the commands kept in a text document's format bar: before ⋮)
+            const keep = p.layout === "merged" ? (p.kept || []) : []
+            keep.forEach(function(n) { slots[n].parent = formatCommands })
+            barNames = barNames.concat(keep)
+            toolEnd.x = dock ? 0 : p.layout === "merged" ? Qt.binding(function() { return formatCommands.width > 0 ? formatCommands.width + 4 : 0 })
+                                                         : p.end.x
             toolEnd.y = dock ? 0 : p.layout === "merged" ? -2 : p.layout === "rail" ? toolArea.height - toolEnd.height : p.end.y
             moreToolsButton.offered = shown.length > 0 && p.layout !== "grid" && !dock
         }
@@ -2323,7 +2393,7 @@ ApplicationWindow {
             // Undo and redo while the tool bar is not shown (it leads with them otherwise: one place at a time)
             IconButton {
                 objectName: "undoButton"
-                visible: !win.undoInToolBar && !win.toolboxShown
+                visible: !win.undoInToolBar && !win.toolboxShown && !win.undoInFormatBar
                 iconName: "xopp-edit-undo"
                 label: qsTr("Undo")
                 tip: win.withKeys(qsTr("Undo"), "undo")
@@ -2334,7 +2404,7 @@ ApplicationWindow {
             }
             IconButton {
                 objectName: "redoButton"
-                visible: !win.undoInToolBar && !win.toolboxShown && !viewPill.tight
+                visible: !win.undoInToolBar && !win.toolboxShown && !win.undoInFormatBar && !viewPill.tight
                 iconName: "xopp-edit-redo"
                 label: qsTr("Redo")
                 tip: win.withKeys(qsTr("Redo"), "redo")
@@ -2343,7 +2413,7 @@ ApplicationWindow {
                 enabled: app.canRedo
                 onClicked: app.redo()
             }
-            ToolSeparator { visible: !win.undoInToolBar && !win.toolboxShown && !viewPill.tight }
+            ToolSeparator { visible: !win.undoInToolBar && !win.toolboxShown && !win.undoInFormatBar && !viewPill.tight }
             IconButton {
                 objectName: "layoutButton"
                 visible: viewPill.layoutShown

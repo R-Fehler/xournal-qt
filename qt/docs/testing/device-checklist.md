@@ -2845,6 +2845,8 @@ letter words only where the recogniser is sure.
       always in the dock; "My tools" lists all, "Add a tool" works; sideways the dock is a rail at the right.
 - [ ] The command bar at 1920 has share, print, bookmark, favourite as buttons and ⋮ does not list them; at 1024 they
       are back in ⋮.
+- [ ] A `.md` document at 1366: undo and redo at the start of the format bar, search, full screen, save before »;
+      narrower: the inserts fold first, then the other commands go into », then the headings, then search and save.
 - [ ] Settings → Pen → Tools: "Classic tool bar" brings back the old bar, pen pill and tool square; "My toolbox" brings
       the toolbox back; "Back to the first tools…" resets it.
 - [ ] First start after the update: the toolbox's first pen has the pen's color and width of before; the eraser

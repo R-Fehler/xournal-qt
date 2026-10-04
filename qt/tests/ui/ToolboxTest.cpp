@@ -678,3 +678,35 @@ TEST_F(ToolboxTest, theCommandBarShowsEntriesOfTheMoreMenuWhereThereIsRoom) {
     check(1024, 700);
     check(800, 600);
 }
+
+TEST_F(ToolboxTest, aTextDocumentHasUndoRedoAndItsCommandsInTheFormatBar) {
+    QTemporaryDir dir;
+    const QString md = dir.path() + "/notes.md";
+    {
+        QFile f(md);
+        ASSERT_TRUE(f.open(QIODevice::WriteOnly));
+        f.write("# Notes\n\nSome text.\n");
+    }
+    resize(1366, 768);
+    ASSERT_TRUE(controller->openPath(md));
+    until([&] { return shown(find("formatUndoButton")); });
+    EXPECT_FALSE(shown(find("toolbox"))) << "no ink tools in a text document";
+    EXPECT_TRUE(shown(find("formatUndoButton")));
+    EXPECT_TRUE(shown(find("formatRedoButton")));
+    EXPECT_FALSE(find("undoButton")->isVisible()) << "not in the view pill too";
+    auto* commands = find("formatCommands");
+    ASSERT_NE(commands, nullptr);
+    until([&] { return inside(find("searchButton"), commands); });
+    for (const char* name: {"searchButton", "fullScreenButton", "saveButton"}) {
+        EXPECT_TRUE(shown(find(name)) && inside(find(name), commands)) << name << " stays at 1366";
+    }
+    EXPECT_FALSE(find<QObject>("formatBarFlick")->property("interactive").toBool()) << "no scrolling at 1366";
+    resize(1920, 1080);
+    until([&] { return inside(find("settingsButton"), commands); });
+    for (const char* name: {"searchButton", "fullScreenButton", "saveButton", "settingsButton"}) {
+        EXPECT_TRUE(shown(find(name)) && inside(find(name), commands)) << name << " at 1920";
+    }
+    resize(720, 1000);
+    until([&] { return !inside(find("searchButton"), commands); });
+    EXPECT_FALSE(shown(find("searchButton")) && inside(find("searchButton"), commands)) << "in \"more tools\" at 720";
+}

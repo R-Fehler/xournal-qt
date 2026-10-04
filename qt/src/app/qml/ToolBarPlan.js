@@ -175,9 +175,12 @@ function plan(input) {
     var maxRecent = Math.max(MIN_RECENT, input.recents || 0)
     var layout = input.layout
     if (layout === "merged") {
+        // (a text document: everything in "more tools", but what its format bar keeps; ⋮'s entries back in ⋮)
+        var keep = input.keep || []
         for (var m = 0; m < items.length; ++m) {
+            if (keep.indexOf(items[m]) >= 0) continue
             state.cut[items[m]] = true
-            state.more = true
+            if (PROMOTED.indexOf(items[m]) < 0) state.more = true
         }
     } else if (layout === "row") {
         fitZone(items, state, function(s) { return rowWidth(GROUPS, items, s, input, true) <= input.width }, maxRecent, input)
@@ -204,7 +207,10 @@ function place(input, items, state) {
         cell: SWATCH, contentWidth: 0, contentHeight: 0, end: { x: 0, y: 0 }
     }
     var layout = input.layout
-    if (layout === "merged") return result
+    if (layout === "merged") {
+        result.kept = items.filter(function(n) { return !state.cut[n] })
+        return result
+    }
     var vertical = layout === "rail" || layout === "grid"
     var columns = layout === "grid" ? 6 : 2
     var cellW = vertical ? Math.floor((input.width + GAP) / columns) : 0
