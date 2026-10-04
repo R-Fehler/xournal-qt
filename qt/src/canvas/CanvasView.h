@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -27,6 +28,7 @@
 #include <QObject>
 #include <QPointF>
 #include <QRectF>
+#include <QSizeF>
 #include <QString>
 #include <QTimer>
 
@@ -55,6 +57,7 @@
 #include "session/StickyNote.h"
 
 class EditSelection;
+class Image;
 class Settings;
 class PdfCache;
 class PdfElemSelection;
@@ -222,7 +225,26 @@ public:
     /// fitted into it, as a selection to move or resize (port of ImageHandler::addImageToDocument). False if the data
     /// is not an image. Into a sticky note when one is selected or lies there (`viewPos`: where it was pasted, else the
     /// middle of the visible part), fitted into the note (qt/docs/sticky-notes.md, "Notes as containers").
-    bool insertImage(const QByteArray& data, std::optional<QPointF> viewPos = std::nullopt);
+    /// `size`: its size on the page (points; a snip: the size it had on its page), else its pixels' (each a point).
+    /// `inserted`: the image made.
+    bool insertImage(const QByteArray& data, std::optional<QPointF> viewPos = std::nullopt,
+                     std::optional<QSizeF> size = std::nullopt, const Image** inserted = nullptr);
+
+    // --- the snip tool (Snip.h, qt/docs/snip.md) ---
+    /// A snip dragged on a page: the picture of what `outline` encloses (page coordinates: a rectangle's corners or
+    /// a lasso; `rectangle`: its bounds, else cut to its shape) is drawn off the UI thread, then `snipped`. False:
+    /// nothing of the page in it, or a snip is still being drawn.
+    bool snip(CanvasPage& page, const std::vector<xoj::util::Point<double>>& outline, bool rectangle);
+    /// A snip is being drawn
+    bool snipBusy() const;
+    /// A picture pasted from a snip (snip::Source) with a link to where it came from: the link is offered
+    /// (snipLinkOffered). `image`: the image element made; `markdown`: or the picture's Markdown in the text being
+    /// written.
+    void offerSnipLink(const QString& title, const QString& link, const Image* image, const PageRef& page,
+                       const std::string& markdown = {});
+    /// Add the link offered: a link marker under the picture (as "Copy link" pasted, qt/docs/links.md), or in the
+    /// Markdown being written a Markdown link after the picture's. False: the picture (or the text) is gone.
+    bool addSnipLink();
     /// Where the mouse rests on this view's canvas (view coordinates; nothing: not over the canvas), asked by a paste
     /// with the keys: over a sticky note it goes into the note. Set by the canvas item that shows the view.
     void setMousePointerSource(std::function<std::optional<QPointF>()> source) { mousePointer = std::move(source); }
@@ -508,6 +530,10 @@ Q_SIGNALS:
     /// The "Load image" of a web picture in a Markdown text was tapped (qt/docs/md-images.md): the UI shows the
     /// address and fetches it when the user agrees.
     void imageLoadRequested(const QString& url);
+    /// A snip's picture was drawn (null: nothing to copy): of the page (0-based), the area (page points)
+    void snipped(const QImage& image, int page, const QRectF& area);
+    /// A pasted snip came with a link to its source page (offerSnipLink): the UI offers to add it
+    void snipLinkOffered(const QString& title);
 
 private:
     void rebuildPages();
@@ -639,6 +665,19 @@ private:
     quint64 selectionRev = 0;
     bool selectMore = false;
     ToolType selectMoreTool = TOOL_NONE;  ///< the tool it was switched on with (another tool ends it)
+    /// The snip being drawn (waited for when the view goes)
+    std::future<void> snipJob;
+    /// The link offered for a pasted snip (offerSnipLink)
+    struct SnipLink {
+        QString title;
+        QString link;
+        const Image* image = nullptr;  ///< (only compared, never read: it may be gone)
+        PageRef page;
+        std::string markdown;
+    };
+    std::optional<SnipLink> snipLink;
+    /// A link marker (pasteLinkMarker): its text, on the page at that point (points)
+    bool addLinkMarker(const QString& text, size_t page, QPointF onPage);
 };
 
 }  // namespace xqt

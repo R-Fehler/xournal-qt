@@ -762,6 +762,14 @@
   QTimer; the ink fades after upstream's `laserPointerFadeOutTime` (Settings → Pen), never in the document, the
   undo stack or the pictures of the page. In the pen button's list, and one tap from the tool square while presenting.
 
+- **Snip, `qt/snip` (2026-10-04).** A rectangle or lasso (the select tools' list, the image button's list, Shift+S /
+  Shift+L) copies the picture of what is there to the clipboard (PNG, at least 200 dpi and the screen's resolution,
+  at most about 4 MP, transparent outside a lasso), then the tool before comes back. Drawn off the UI thread by a
+  reusable region renderer (`qt/src/render/RegionRender.*`, the PDF drawn without the document lock), for
+  `qt/stickers` too. Beside the picture a fork entry `application/x-xournal-qt-snip` says where it came from: pasted
+  into a document of the app the picture has its size from the page, and a note offers a link marker to the source
+  page (a Markdown link in Markdown). Works in the reference and in text documents ([snip.md](snip.md)).
+
 ## Backlog (decide later)
 - **Searchable text in pages pasted from another PDF** (user, 2026-09-19). Today a PDF page pasted into a document with another (or no) background PDF becomes an image background: it looks the same, but its text is no longer searchable or selectable. Cause: the .xopp model (and file format) has *one* background PDF per document; pages refer to page numbers in it. Options, to decide with the MuPDF work (MuPDF can write PDFs; poppler cannot):
   1. On paste, write a merged background PDF (the document's PDF + the pasted pages, e.g. `name.pages.pdf` next to the .xopp) and renumber the pages. Text stays searchable; the file stays upstream-compatible (still one PDF).

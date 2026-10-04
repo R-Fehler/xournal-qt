@@ -109,6 +109,7 @@ add_library(xqt-shell STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppController.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppTextFiles.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppLinks.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppSnip.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppRename.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppBookmarks.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/app/AppAnnotations.cpp
@@ -281,6 +282,7 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/MainWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/ReferenceWindowTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/DocumentLinksTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/SnipTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AnnotationsPanelTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/CitationsTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h

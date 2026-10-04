@@ -31,3 +31,5 @@ rounded hole: the spotlight) are drawn in the same style.
 
 `xqt-help` is Lucide's `circle-help`: Help (the introduction, the tutorial, the keyboard shortcuts; qt/docs/onboarding.md);
 `xqt-keyboard` is Lucide's `keyboard`: Help → Keyboard shortcuts.
+
+`xqt-snip` is Lucide's `scissors`: the snip tool (copy the picture of a part of a page, qt/docs/snip.md).

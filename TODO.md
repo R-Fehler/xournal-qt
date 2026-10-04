@@ -505,10 +505,11 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   Windows and macOS: Qt 6 passes the factor through (`HighDpiScaleFactorRoundingPolicy::PassThrough`); check that
   nothing in the app rounds it, that pages, thumbnails and the setsquare are sharp, and that lines and borders of
   the UI do not blur or jump. Tests with `QT_SCALE_FACTOR=1.25/1.5`.
-- [ ] `qt/snip`: a quick **area screenshot**: a lasso or rectangle (reusing the selection tools) copies the
+- [x] `qt/snip`: a quick **area screenshot**: a lasso or rectangle (reusing the selection tools) copies the
   canvas's pixels (ink and background, at a good resolution) to the clipboard as an image. In the selection tools'
   cycle and in the insert image entry. Pasting it into a xournal-qt document offers to add a link to the source
-  page next to it (`qt/links`).
+  page next to it (`qt/links`). Built (qt/docs/snip.md; region renderer `qt/src/render/RegionRender.*` for
+  `qt/stickers`). Left: no link offer in the Markdown panel beside the page; a snip stays on one page; the device checks.
 - [x] `qt/onboarding`: a short intro on the first start (what the document modes mean, that PDFs are editable here,
   Markdown documents and turning them into PDFs to write on), ending in the existing document mode choice;
   reachable again from Settings / Help. A **tutorial document** that asks the user to try the tools, modes, search
