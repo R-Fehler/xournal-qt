@@ -257,11 +257,16 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasItemRenderTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/GeometryToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CurtainCanvasTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/FractionalScaleTest.cpp)
     target_link_libraries(xqt-quick-tests PRIVATE xqt-quick Qt6::QuickControls2 Qt6::GuiPrivate Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # The canvas on a screen at 125 % (qt/docs/hidpi.md)
+    add_test(NAME FractionalScaleCanvas.quick@125 COMMAND xqt-quick-tests --gtest_filter=FractionalScaleCanvas.*)
+    set_tests_properties(FractionalScaleCanvas.quick@125 PROPERTIES LABELS quick
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.25")
 
     # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
     add_executable(xqt-ui-tests

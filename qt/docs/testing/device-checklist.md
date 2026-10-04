@@ -2624,3 +2624,8 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       grid button), the tab overview, the contents overview and the library's page hits show sharp pages, as sharp
       as at 100 %. Scroll quickly through a long PDF in the sidebar: no stutter, the pages appear as fast as at 100 %.
       (They were drawn 2.25 times too wide at 150 %, 4 times at 200 %.)
+- [ ] At 125 % and 150 % (and at 100 %, at an odd zoom such as after a pinch): select a few strokes with the lasso.
+      The selection's dashed frame and its knobs are as crisp as the ink beside them (they were a little blurred),
+      and the frame sits exactly around the ink; moving and turning the selection keeps it crisp.
+- [ ] Windows (or Plasma with two screens of different scales): with a selection on the page, move the window from a
+      100 % screen to a 150 % one: the selection is drawn anew for that screen (crisp), as are the pages.

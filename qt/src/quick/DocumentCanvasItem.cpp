@@ -384,7 +384,8 @@ public:
     TileNode* selection = nullptr;
     quint64 selectionRevision = ~quint64(0);
     double selectionZoom = 0;
-    QRectF selectionRegion;  ///< in the selection page's view pixels
+    double selectionDpr = 0;  ///< the pixel ratio it was drawn for (a window moved to another screen: drawn anew)
+    QRectF selectionRegion;   ///< in the selection page's view pixels (whole device pixels)
     std::unordered_map<const xqt::CanvasPage*, PageNode*> pages;
 };
 
@@ -1412,25 +1413,31 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
             root->selection = nullptr;
         }
         root->selectionRevision = ~quint64(0);
+        selectionStats = {};
         return;
     }
-    const QPointF pageOrigin = canvasView->pageViewRect(*idx).topLeft();
-    if (!root->selection || root->selectionRevision != canvasView->selectionRevision() || root->selectionZoom != zoom) {
+    // Where the page's tiles are: on a whole device pixel
+    const QRectF pageRect = canvasView->pageViewRect(*idx);
+    const QPointF pageOrigin(snap(pageRect.x(), dpr), snap(pageRect.y(), dpr));
+    if (!root->selection || root->selectionRevision != canvasView->selectionRevision() || root->selectionZoom != zoom ||
+        root->selectionDpr != dpr) {
         // Upstream's XournalWidget draws the selection in its page's pixel coordinates: selection->paint(cr, zoom).
-        // Render the part around it (handles, rotation) into a texture.
+        // Render the part around it (handles, rotation) into a texture, of whole device pixels from the page's top
+        // left (so it lands on the screen's pixels as the tiles do, also at 125 % or 150 %).
         const double cx = (sel->getXOnView() + sel->getWidth() / 2) * zoom;
         const double cy = (sel->getYOnView() + sel->getHeight() / 2) * zoom;
         const double r = std::hypot(sel->getWidth(), sel->getHeight()) / 2 * zoom + 60;
-        const QRectF region(std::floor(cx - r), std::floor(cy - r), std::ceil(2 * r), std::ceil(2 * r));
-        QImage img(QSize(std::max(1, static_cast<int>(region.width() * dpr)),
-                         std::max(1, static_cast<int>(region.height() * dpr))),
-                   QImage::Format_ARGB32_Premultiplied);
+        const int left = static_cast<int>(std::floor((cx - r) * dpr));
+        const int top = static_cast<int>(std::floor((cy - r) * dpr));
+        const QRect pixels(left, top, std::max(1, static_cast<int>(std::ceil((cx + r) * dpr)) - left),
+                           std::max(1, static_cast<int>(std::ceil((cy + r) * dpr)) - top));
+        QImage img(pixels.size(), QImage::Format_ARGB32_Premultiplied);
         img.fill(Qt::transparent);
         cairo_surface_t* surface = cairo_image_surface_create_for_data(
                 img.bits(), CAIRO_FORMAT_ARGB32, img.width(), img.height(), static_cast<int>(img.bytesPerLine()));
         cairo_t* cr = cairo_create(surface);
+        cairo_translate(cr, -pixels.x(), -pixels.y());
         cairo_scale(cr, dpr, dpr);
-        cairo_translate(cr, -region.x(), -region.y());
         sel->paint(cr, zoom);
         canvasView->boxResize().paintOverSelection(cr, zoom);  // (a Markdown text box: its right knob sets the width)
         cairo_destroy(cr);
@@ -1448,9 +1455,11 @@ void DocumentCanvasItem::updateSelectionNode(QSGNode* rootNode, double zoom, dou
         }
         root->selectionRevision = canvasView->selectionRevision();
         root->selectionZoom = zoom;
-        root->selectionRegion = region;
+        root->selectionDpr = dpr;
+        root->selectionRegion = QRectF(pixels.x() / dpr, pixels.y() / dpr, pixels.width() / dpr, pixels.height() / dpr);
     }
     root->selection->setRect(root->selectionRegion.translated(pageOrigin));
+    selectionStats = {true, root->selection->rect(), root->selection->texture()->textureSize(), root->selectionDpr};
 }
 
 void DocumentCanvasItem::updateGeometryNode(QSGNode* rootNode, double zoom, double dpr) {

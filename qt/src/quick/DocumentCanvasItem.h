@@ -159,6 +159,15 @@ public:
         int handles = 0;
     };
     CurtainShown curtainShown() const { return curtainStats; }
+    /// The selection's picture in the last frame (tests): shown or not, where (item coordinates), its pixels and the
+    /// pixel ratio it was drawn for.
+    struct SelectionShown {
+        bool shown = false;
+        QRectF rect;
+        QSize pixels;
+        double dpr = 0;
+    };
+    SelectionShown selectionShown() const { return selectionStats; }
     /// The pointer the canvas draws itself (tests; qt/docs/hover-cursors.md): for a pen the platform shows no cursor
     /// for, and an eraser too big for a cursor. Shown or not, where its middle is (item coordinates), its side (logical
     /// pixels), and the eraser it shows (none: the dot).
@@ -286,4 +295,5 @@ private:
     QTimer geometryTimer;
     GeometryShown geometryStats;
     CurtainShown curtainStats;
+    SelectionShown selectionStats;
 };
