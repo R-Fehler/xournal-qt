@@ -273,8 +273,25 @@ FocusScope {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 0
+                        // A stamp: the handwriting beside its check box, as a picture (its line of the page)
+                        Image {
+                            objectName: "todoInk"
+                            visible: row.model.picture !== ""
+                            readonly property real aspect: row.model.place.size > 0
+                                ? Math.max(1, (row.model.place.pageWidth * 0.96 - row.model.place.x) / (4.5 * row.model.place.size)) : 8
+                            Layout.preferredHeight: view.phone ? 40 : 34
+                            Layout.preferredWidth: Math.min(Layout.preferredHeight * aspect, list.width - 120)
+                            Layout.maximumWidth: list.width - 120
+                            fillMode: Image.PreserveAspectFit
+                            horizontalAlignment: Image.AlignLeft
+                            asynchronous: true
+                            source: view.shown && visible ? row.model.picture : ""
+                            sourceSize.width: Math.ceil(Layout.preferredWidth * Screen.devicePixelRatio)
+                            opacity: row.model.done ? 0.5 : 1
+                        }
                         Label {
                             objectName: "todoText"
+                            visible: row.model.picture === "" || row.model.text !== ""
                             Layout.fillWidth: true
                             text: row.model.text !== "" ? row.model.text
                                                         : (row.model.stamp ? qsTr("Handwritten to-do") : qsTr("(no text)"))

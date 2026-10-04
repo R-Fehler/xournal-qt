@@ -61,6 +61,7 @@
 #include "MarkdownEditor.h"
 #include "MarkdownFile.h"
 #include "MdBox.h"
+#include "TodoStamp.h"
 #include "session/PageMargins.h"
 #include "session/TextDocument.h"
 #include "PageNoteSpace.h"
@@ -1197,6 +1198,17 @@ bool CanvasView::toggleMarkdownCheckBox(CanvasPage& page, double x, double y) {
 }
 
 bool CanvasView::tapAt(QPointF viewPos) {
+    // The check-box stamp is armed: it goes where the tap is (TodoStamp.h)
+    if (CanvasPage* page = todostamp::isArmed() && !readingOnly && !session.isReadOnly() ? pageAt(viewPos) : nullptr) {
+        if (const auto idx = indexOf(page)) {
+            const QRectF r = pageViewRect(*idx);
+            const double zoom = viewController.zoom();
+            if (addTodoStamp(*idx, QPointF((viewPos.x() - r.x()) / zoom, (viewPos.y() - r.y()) / zoom))) {
+                todostamp::stamped();
+                return true;
+            }
+        }
+    }
     // A covering sticky note: it peeks, or covers again
     if (CanvasPage* page = pageAt(viewPos)) {
         if (const auto idx = indexOf(page)) {

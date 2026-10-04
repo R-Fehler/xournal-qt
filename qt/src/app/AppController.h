@@ -759,6 +759,13 @@ public:
     Q_INVOKABLE bool setTodoDone(const QString& path, const QString& rawText, int occurrence, bool done);
     /// Open a to-do's document at its page, with its line in view (`page`: where the index has it, -1: not known).
     Q_INVOKABLE bool openTodo(const QString& path, const QString& rawText, int occurrence, int page);
+    /// The check-box stamp for a handwritten to-do is armed (TodoStamp.h): the next tap on a page places it
+    Q_PROPERTY(bool todoStamp READ todoStampArmed NOTIFY todoStampChanged)
+    bool todoStampArmed() const;
+    /// Arm it (the hand tool meanwhile, so the tap writes nothing); after the stamp, the tool used before comes back
+    /// (also on any tool chosen, or cancelTodoStamp)
+    Q_INVOKABLE void startTodoStamp();
+    Q_INVOKABLE void cancelTodoStamp();
 
     /// The title page of the current document (its preview in the library and the overview; 0-based, -1: the
     /// document has no file yet, so there is nowhere to keep it).
@@ -1335,6 +1342,7 @@ Q_SIGNALS:
     /// Select more became available or not, was switched on or off, or what is selected changed (its count)
     void selectMoreChanged();
     void snipChanged();
+    void todoStampChanged();
     /// A snip from a document with a file was pasted: the window offers to add a link to its page (addSnipLink)
     void snipLinkOffered(const QString& title);
     void fontChanged();
@@ -1475,6 +1483,11 @@ private:
     /// Follow the snip tool: armed, the tool changing to another one ends it
     void followSnipTool();
     QString snipPreviousTool;           ///< the tool before the snip ("": none)
+    QString stampPreviousTool;          ///< the tool before the check-box stamp ("": none)
+    /// The stamp ends (`restore`: the tool before it back)
+    void endTodoStamp(bool restore);
+    /// Another tool chosen while the stamp is armed: it ends, that tool stays
+    void followTodoStampTool();
     ToolType snipTool = TOOL_NONE;      ///< the select tool the snip uses
     QPointer<xqt::CanvasView> snipLinkView;  ///< the view a snip with a link was pasted into
     /// Editing beside the page: the page's text, or the text box at a point.

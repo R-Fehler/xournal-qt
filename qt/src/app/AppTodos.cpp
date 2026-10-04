@@ -14,6 +14,7 @@
 
 #include "AppController.h"
 #include "control/ScrollHandler.h"
+#include "control/ToolHandler.h"
 #include "model/Document.h"
 #include "model/Layer.h"
 #include "model/Text.h"
@@ -30,8 +31,10 @@
 #include "undo/TextBoxUndoAction.h"
 #include "undo/UndoRedoHandler.h"
 
+#include "CanvasView.h"
 #include "MdBox.h"
 #include "MdTasks.h"
+#include "TodoStamp.h"
 
 using namespace xqt;
 
@@ -256,4 +259,54 @@ bool AppController::openTodo(const QString& path, const QString& rawText, int oc
         });
     }
     return true;
+}
+
+// --- the check-box stamp for handwritten to-dos (TodoStamp.h) ---
+
+bool AppController::todoStampArmed() const { return todostamp::isArmed(); }
+
+void AppController::startTodoStamp() {
+    DocumentSession* s = session();
+    if (!s || s->isReadOnly() || !canvas()) {
+        return;
+    }
+    if (!todostamp::isArmed()) {
+        stampPreviousTool = tool();
+    }
+    canvas()->clearSelection();  // (a tap on a selection would not reach the page)
+    todostamp::disarm();  // (the tool changes: not the end of this stamp)
+    ToolHandler* th = app->getToolHandler();
+    th->selectTool(TOOL_HAND);  // (the tap writes nothing)
+    th->fireToolChanged();
+    QPointer<AppController> self(this);
+    todostamp::arm([self] {
+        if (self) {
+            self->endTodoStamp(true);
+        }
+    });
+    Q_EMIT todoStampChanged();
+    Q_EMIT toolChanged();
+    Q_EMIT pageActionDone(tr("Tap where the check box goes, then write the to-do beside it"), false);
+}
+
+void AppController::cancelTodoStamp() { endTodoStamp(true); }
+
+void AppController::endTodoStamp(bool restore) {
+    const QString previous = std::exchange(stampPreviousTool, QString());
+    const bool wasArmed = todostamp::isArmed();
+    todostamp::disarm();
+    if (restore && !previous.isEmpty() && app->getToolHandler()->getToolType() == TOOL_HAND) {
+        selectTool(previous);
+    }
+    if (wasArmed || restore) {
+        Q_EMIT todoStampChanged();
+    }
+}
+
+void AppController::followTodoStampTool() {
+    if (todostamp::isArmed() && app->getToolHandler()->getToolType() != TOOL_HAND) {
+        stampPreviousTool.clear();
+        todostamp::disarm();
+        Q_EMIT todoStampChanged();
+    }
 }

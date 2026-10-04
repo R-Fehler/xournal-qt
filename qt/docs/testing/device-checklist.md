@@ -2853,3 +2853,13 @@ letter words only where the recogniser is sure.
 - [ ] A read-only `.md` (chmod 444, not as root) or an archive PDF: a message says why, nothing changes.
 - [ ] Phone (portrait): the filters scroll sideways in one row, the rows are easy to hit, the check box does not open
       the document; press and hold a row: the sheet with Open, Mark as done, Add to calendar.
+
+## To-dos: the check-box stamp (qt/todos)
+
+- [ ] Image button, press and hold → "Check box for a handwritten to-do": a note says to tap; the tap puts a small
+      check box exactly under the pen tip / finger; the pen is back: write the to-do beside it.
+- [ ] Escape before tapping, or another tool: no stamp, that tool stays.
+- [ ] Tap the stamp's check box: it ticks (one undo step); the To-dos tab lists it (also with the marker setting)
+      with a picture of the handwriting beside it, sharp at the screen's resolution.
+- [ ] With handwriting search on and the page read: the row shows the recognised words; the text filter finds them.
+- [ ] Xournal++ opens the file: the stamp is a small "- [ ]" text.

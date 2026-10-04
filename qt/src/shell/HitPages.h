@@ -18,6 +18,7 @@
 #pragma once
 
 #include <QImage>
+#include <QRectF>
 #include <QQuickAsyncImageProvider>
 #include <QString>
 
@@ -36,6 +37,12 @@ public:
     /// URL of a document's pages for a search; append "/<page>" (0-based). `marks`: the plain search's query, or
     /// marksOf() the fuzzy search's terms.
     static QString baseUrl(const DocumentItem& item, const QString& marks);
+    /// URL of the picture of an area of a page (page points; the handwriting beside a to-do's check-box stamp,
+    /// qt/docs/todos.md): appended to baseUrl(item, ""), drawn by renderArea.
+    static QString areaUrl(const QString& base, int page, const QRectF& area);
+    /// Draw an area of a page `width` pixels wide (as the screen shows it, RegionRender.h), from the same kept
+    /// documents. Blocks; any thread.
+    static QImage renderArea(const fs::path& file, int page, const QRectF& area, int width);
     /// Draw a page `width` pixels wide (rounded up to 64) with the hits of `marks` marked. Blocks; any thread.
     static QImage render(const fs::path& file, int page, const QString& marks, int width);
     /// The terms of a fuzzy search as `marks` (TextMatch.h), and what is marked for `marks` (of a plain query: the

@@ -14,6 +14,7 @@
 
 #include "model/Document.h"
 #include "model/XojPage.h"
+#include "render/RegionImage.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentImages.h"
 #include "session/DocumentSession.h"
@@ -141,6 +142,60 @@ QString HitPageProvider::baseUrl(const DocumentItem& item, const QString& marks)
            '/' + encode(marks.startsWith(TERMS) ? marks : LibraryIndex::simplified(marks).trimmed());
 }
 
+namespace {
+/// The kept document of `item` (loaded if needed; the caller holds its mutex)
+void load(CachedDocument& cached, const DocumentItem& item) {
+    if (!cached.loaded) {
+        cached.loaded = true;
+        // One document is read at a time: the loader (and poppler behind it) is not made for several threads.
+        static std::mutex loading;
+        std::lock_guard loadLock(loading);
+        if (!item.md.empty()) {
+            // A Markdown file (its bookmarks, qt/docs/bookmarks.md): its pages as it opens, with its pictures
+            cached.pictures = std::make_unique<md::images::RootHandle>(DocumentImages::markdownRoot(item.md));
+            cached.doc = MarkdownFile::document(MarkdownFile::read(item.md));
+        } else {
+            cached.doc = DocumentSession::loadFile(item.main()).document;
+        }
+    }
+}
+}  // namespace
+
+QString HitPageProvider::areaUrl(const QString& base, int page, const QRectF& area) {
+    return base + '/' + QString::number(page) + QStringLiteral("/area/") +
+           QStringLiteral("%1,%2,%3,%4").arg(area.x()).arg(area.y()).arg(area.width()).arg(area.height());
+}
+
+QImage HitPageProvider::renderArea(const fs::path& file, int pageNo, const QRectF& area, int width) {
+    const DocumentItem item = DocumentFiles::itemOf(file);
+    if (!item.valid() || pageNo < 0 || area.width() <= 0 || area.height() <= 0) {
+        return {};
+    }
+    width = std::clamp(width, 16, 2048);
+    const QString docKey = QString::fromStdString(item.main().string()) + '|' + documentStamp(item);
+    auto cached = caches().document(docKey);
+    std::lock_guard lock(cached->mtx);
+    load(*cached, item);
+    Document* doc = cached->doc.get();
+    if (!doc) {
+        return {};
+    }
+    PageRef page;
+    {
+        std::shared_lock docLock(*doc);
+        if (static_cast<size_t>(pageNo) >= doc->getPageCount()) {
+            return {};
+        }
+        page = doc->getPage(static_cast<size_t>(pageNo));
+    }
+    region::Request r;
+    r.area = {area.x(), area.y(), area.width(), area.height()};
+    r.scale = width / area.width();
+    r.forScreen = false;
+    ++caches().renders;
+    return region::renderImage(*doc, page, r);
+}
+
 QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& query, int width) {
     const DocumentItem item = DocumentFiles::itemOf(file);
     if (!item.valid() || pageNo < 0) {
@@ -151,19 +206,7 @@ QImage HitPageProvider::render(const fs::path& file, int pageNo, const QString& 
     auto cached = caches().document(docKey);
 
     std::lock_guard lock(cached->mtx);
-    if (!cached->loaded) {
-        cached->loaded = true;
-        // One document is read at a time: the loader (and poppler behind it) is not made for several threads.
-        static std::mutex loading;
-        std::lock_guard loadLock(loading);
-        if (!item.md.empty()) {
-            // A Markdown file (its bookmarks, qt/docs/bookmarks.md): its pages as it opens, with its pictures
-            cached->pictures = std::make_unique<md::images::RootHandle>(DocumentImages::markdownRoot(item.md));
-            cached->doc = MarkdownFile::document(MarkdownFile::read(item.md));
-        } else {
-            cached->doc = DocumentSession::loadFile(item.main()).document;
-        }
-    }
+    load(*cached, item);
     Document* doc = cached->doc.get();
     if (!doc) {
         return {};
@@ -231,10 +274,15 @@ QQuickImageResponse* HitPageProvider::requestImageResponse(const QString& id, co
     const QString query = decode(parts.value(2));
     const int page = parts.value(3).toInt();
     const int width = requestedSize.width() > 0 ? requestedSize.width() : 200;
-    pool().start([response, file, query, page, width] {
+    // (…/<page>/area/<x>,<y>,<w>,<h>: an area of the page, areaUrl)
+    const QStringList area = parts.value(4) == QLatin1String("area") ? parts.value(5).split(',') : QStringList();
+    const QRectF rect = area.size() == 4 ? QRectF(area[0].toDouble(), area[1].toDouble(), area[2].toDouble(),
+                                                  area[3].toDouble())
+                                         : QRectF();
+    pool().start([response, file, query, page, width, rect] {
         QImage img;
         if (!response->cancelled) {  // scrolled away meanwhile: not drawn
-            img = render(file, page, query, width);
+            img = rect.isValid() ? renderArea(file, page, rect, width) : render(file, page, query, width);
         }
         QMetaObject::invokeMethod(
                 response,

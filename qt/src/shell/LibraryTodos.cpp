@@ -5,7 +5,10 @@
 #include <QFileInfo>
 #include <QLocale>
 
+#include "session/InkText.h"
+
 #include "DocumentPlaces.h"
+#include "HitPages.h"
 #include "LibraryModel.h"
 
 namespace xqt {
@@ -140,6 +143,33 @@ void LibraryTodosModel::setRules(const todos::Rules& r) {
 
 QDate LibraryTodosModel::today() const { return fixedToday.isValid() ? fixedToday : QDate::currentDate(); }
 
+QRectF LibraryTodosModel::stampArea(const LibraryIndex::Todo& t) {
+    const double side = t.size > 0 ? t.size : 8;
+    const double left = t.x - 0.25 * side;
+    const double right = std::max(left + 8 * side, t.pageWidth > 0 ? t.pageWidth * 0.96 : left + 400);
+    const double height = 4.5 * side;
+    return {left, t.y + side / 2 - height / 2, right - left, height};
+}
+
+namespace {
+/// The best readings of the handwriting in `area` right of `from` (page points), left to right
+QString inkIn(const ink::PageText& page, const QRectF& area, double from) {
+    std::vector<const ink::Word*> words;
+    for (const ink::Word& w: page.words) {
+        const QPointF c = w.box.center();
+        if (area.contains(c) && c.x() > from && !w.text.isEmpty()) {
+            words.push_back(&w);
+        }
+    }
+    std::sort(words.begin(), words.end(), [](const ink::Word* a, const ink::Word* b) { return a->box.x() < b->box.x(); });
+    QStringList out;
+    for (const ink::Word* w: words) {
+        out << w->text;
+    }
+    return out.join(QLatin1Char(' '));
+}
+}  // namespace
+
 QString LibraryTodosModel::dueState(const QString& due, const QDate& today) {
     const QDate d = QDate::fromString(due, Qt::ISODate);
     if (!d.isValid()) {
@@ -189,8 +219,9 @@ void LibraryTodosModel::refresh() {
         const fs::path folderDir = lib.root() / toPath(library->folder());
         struct Doc {
             bool shown = false;
-            QString name, folder;
+            QString name, folder, pageBase;
             qint64 changed = 0;
+            std::shared_ptr<const InkDoc> ink;
         };
         std::map<fs::path, Doc> docs;
         int order = 0;
@@ -222,6 +253,10 @@ void LibraryTodosModel::refresh() {
                 d.name = QString::fromStdString(item.valid() ? item.name() : t.file.stem().string());
                 d.folder = QString::fromStdString(lib.relative(t.file.parent_path()));
                 d.changed = QFileInfo(QString::fromStdString(t.file.string())).lastModified().toMSecsSinceEpoch();
+                if (item.valid()) {
+                    d.pageBase = HitPageProvider::baseUrl(item, QString());
+                }
+                d.ink = idx->inkOf(t.file);
                 it = docs.emplace(t.file, std::move(d)).first;
             }
             const Doc& d = it->second;
@@ -244,6 +279,16 @@ void LibraryTodosModel::refresh() {
             }
             Row r;
             r.shown = todos::shownText(t.text, rules.marker);
+            if (t.stamp && t.page >= 0) {
+                // The handwriting beside it: its picture, and what the handwriting search read there
+                const QRectF area = stampArea(t);
+                if (!d.pageBase.isEmpty()) {
+                    r.picture = HitPageProvider::areaUrl(d.pageBase, t.page, area);
+                }
+                if (d.ink && static_cast<size_t>(t.page) < d.ink->texts.size() && d.ink->texts[t.page]) {
+                    r.shown = inkIn(*d.ink->texts[t.page], area, t.x + t.size);
+                }
+            }
             if (!query.isEmpty() && !r.shown.contains(query, Qt::CaseInsensitive) &&
                 !d.name.contains(query, Qt::CaseInsensitive) && !d.folder.contains(query, Qt::CaseInsensitive)) {
                 continue;
@@ -386,6 +431,10 @@ QVariant LibraryTodosModel::data(const QModelIndex& index, int role) const {
             return r.pending;
         case BoxRole:
             return r.todo.box;
+        case PictureRole:
+            return r.picture;
+        case InkTextRole:
+            return r.todo.stamp ? r.shown : QString();
         case PlaceRole:
             return QVariantMap{{"x", r.todo.x}, {"y", r.todo.y}, {"size", r.todo.size}, {"pageWidth", r.todo.pageWidth}};
         default:
@@ -399,7 +448,8 @@ QHash<int, QByteArray> LibraryTodosModel::roleNames() const {
             {PathRole, "path"},           {NameRole, "name"},             {FolderRole, "folder"},
             {PageRole, "page"},           {LineRole, "line"},             {StampRole, "stamp"},
             {GroupRole, "group"},         {GroupLabelRole, "groupLabel"}, {GroupCountRole, "groupCount"},
-            {PendingRole, "pending"},     {BoxRole, "box"},               {PlaceRole, "place"}};
+            {PendingRole, "pending"},     {BoxRole, "box"},               {PlaceRole, "place"},
+            {PictureRole, "picture"},     {InkTextRole, "inkText"}};
 }
 
 }  // namespace xqt

@@ -21,6 +21,7 @@
 #include <QAbstractListModel>
 #include <QDate>
 #include <QPointer>
+#include <QRectF>
 #include <QTimer>
 
 #include "filesystem.h"
@@ -75,7 +76,11 @@ public:
         PendingRole,     ///< ticked in the view, not in the index yet
         BoxRole,         ///< its box on the page
         PlaceRole,       ///< { x, y, size, pageWidth } of its box (page coordinates)
+        PictureRole,     ///< a stamp: image URL of the handwriting beside it (HitPageProvider::areaUrl; "": none)
+        InkTextRole,     ///< a stamp: the handwriting beside it as recognised (handwriting search; "": not read)
     };
+    /// A stamp's handwriting: from its check box to the page's right margin, about one line high (page points)
+    static QRectF stampArea(const LibraryIndex::Todo& todo);
 
     explicit LibraryTodosModel(LibraryModel* library, QObject* parent = nullptr);
 
@@ -130,7 +135,7 @@ Q_SIGNALS:
 private:
     struct Row {
         LibraryIndex::Todo todo;
-        QString shown, name, folder, group, groupLabel, dueState;
+        QString shown, name, folder, group, groupLabel, dueState, picture;
         int groupCount = 0;
         bool pending = false;
         qint64 changed = 0;  ///< its document's file: last changed (ms since the epoch)

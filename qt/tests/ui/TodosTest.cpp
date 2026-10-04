@@ -369,3 +369,115 @@ TEST_F(TodosUiTest, onAPhoneTheListFitsTheWidth) {
     ASSERT_NE(field, nullptr);
     EXPECT_GT(field->width(), 100);
 }
+
+namespace {
+/// Box texts of page 1 of a document
+std::vector<const Text*> boxesOnPage(Document& doc, size_t page) {
+    std::vector<const Text*> out;
+    for (const Layer* l: doc.getPage(page)->getLayers()) {
+        for (const Element* e: l->getElementsView()) {
+            if (e->getType() == ELEMENT_TEXT && static_cast<const Text*>(e)->isMarkdown()) {
+                out.push_back(static_cast<const Text*>(e));
+            }
+        }
+    }
+    return out;
+}
+}  // namespace
+
+// The check-box stamp (the image button's list): the next tap puts a tiny Markdown box "- [ ] " with its check box where
+// the tap was, then the pen is back. The To-dos tab lists it whatever the marker, with the handwriting beside it as a
+// picture; ticking it there ticks the box in the document
+TEST_F(TodosUiTest, theCheckBoxStampForHandwrittenToDos) {
+    controller->newDocument();
+    ASSERT_TRUE(controller->saveAs(QUrl::fromLocalFile(QString::fromStdString((root / "ink.xopp").string()))));
+    view()->getViewController().scrollToPageRect(0, QRectF(0, 0, 400, 400));
+    wait(200);
+    controller->selectTool("pen");
+    auto* imageMenu = window->findChild<QObject*>("imageMenu");
+    ASSERT_NE(imageMenu, nullptr);
+    QObject* entry = entryOf(imageMenu, "todoStampItem");
+    ASSERT_NE(entry, nullptr) << "in the image button's list";
+    QMetaObject::invokeMethod(entry, "triggered");
+    until([&] { return controller->todoStampArmed(); });
+    ASSERT_TRUE(controller->todoStampArmed());
+    EXPECT_EQ(controller->tool(), "hand") << "the tap writes nothing";
+    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, onPage(100, 200));
+    until([&] { return !controller->todoStampArmed(); });
+    EXPECT_FALSE(controller->todoStampArmed());
+    EXPECT_EQ(controller->tool(), "pen") << "the pen is back to write the to-do";
+    Document* doc = current()->getDocument();
+    {
+        std::shared_lock lock(*doc);
+        const auto boxes = boxesOnPage(*doc, 0);
+        ASSERT_EQ(boxes.size(), 1u);
+        EXPECT_EQ(boxes[0]->getText(), std::string(xqt::md::tasks::STAMP));
+        const auto box = xqt::md::checkBoxRect(*boxes[0], 3);
+        ASSERT_TRUE(box);
+        EXPECT_NEAR(box->x + box->width / 2, 100, 2) << "its check box where the tap was";
+        EXPECT_NEAR(box->y + box->height / 2, 200, 2);
+    }
+    EXPECT_TRUE(current()->getUndoRedoHandler()->canUndo());
+    // The to-do written beside it (a stroke), saved
+    auto stroke = std::make_unique<Stroke>();
+    stroke->setWidth(2);
+    stroke->setColor(Colors::black);
+    for (int x = 120; x <= 260; x += 10) {
+        stroke->addPoint(Point(x, 195 + (x / 10) % 2 * 8, -1));
+    }
+    {
+        std::unique_lock lock(*doc);
+        doc->getPage(0)->getSelectedLayer()->addElement(std::move(stroke));
+    }
+    doc->getPage(0)->firePageChanged();
+    ASSERT_TRUE(controller->save());
+    library->refresh();
+    until([&] { return !library->indexing() && library->searchIndex()->todos().size() == 6; });
+
+    controller->setHomeVisible(true);
+    showTodos();
+    until([&] { return todos->count() == 4; });
+    ASSERT_EQ(todos->count(), 4) << "the stamp is listed although it has no marker";
+    int row = -1;
+    for (int i = 0; i < todos->count(); ++i) {
+        if (todos->data(todos->index(i), xqt::LibraryTodosModel::StampRole).toBool()) {
+            row = i;
+        }
+    }
+    ASSERT_GE(row, 0);
+    const QString picture = todos->data(todos->index(row), xqt::LibraryTodosModel::PictureRole).toString();
+    EXPECT_TRUE(picture.startsWith("image://hitpage/")) << picture.toStdString();
+    EXPECT_TRUE(picture.contains("/0/area/"));
+    until([&] { return findItem("todoInk") != nullptr; });
+    EXPECT_NE(findItem("todoInk"), nullptr);
+    // The picture: the handwriting beside the check box
+    xqt::LibraryIndex::Todo stamp;
+    for (const auto& t: library->searchIndex()->todos()) {
+        if (t.stamp) {
+            stamp = t;
+        }
+    }
+    const QRectF area = xqt::LibraryTodosModel::stampArea(stamp);
+    EXPECT_TRUE(area.contains(QPointF(200, 200)));
+    const QImage img = xqt::HitPageProvider::renderArea(root / "ink.xopp", 0, area, 400);
+    ASSERT_FALSE(img.isNull());
+    int dark = 0;
+    for (int y = 0; y < img.height(); ++y) {
+        for (int x = img.width() / 4; x < img.width(); ++x) {
+            dark += qGray(img.pixel(x, y)) < 100 ? 1 : 0;
+        }
+    }
+    EXPECT_GT(dark, 20) << "the stroke is in it";
+
+    // Ticked in the list: in the open document, one undo step
+    todos->setStatus("all");
+    for (int i = 0; i < todos->count(); ++i) {
+        if (todos->data(todos->index(i), xqt::LibraryTodosModel::StampRole).toBool()) {
+            row = i;
+        }
+    }
+    ASSERT_TRUE(controller->setTodoDone(todos->data(todos->index(row), xqt::LibraryTodosModel::PathRole).toString(),
+                                        "", 0, true));
+    std::shared_lock lock(*doc);
+    EXPECT_EQ(boxesOnPage(*doc, 0)[0]->getText(), "- [x] ");
+}
