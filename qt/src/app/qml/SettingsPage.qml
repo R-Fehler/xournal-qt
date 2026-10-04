@@ -322,6 +322,18 @@ Popup {
                             { text: qsTr("Whiteout"), value: "whiteout" }
                         ]
                     }
+                    ComboRow {
+                        objectName: "hoverPointerRow"
+                        key: "hoverPointer"; text: qsTr("Pointer over the page")
+                        options: [
+                            { text: qsTr("Dot"), value: "dot" },
+                            { text: qsTr("Crosshair"), value: "crosshair" }
+                        ]
+                    }
+                    Hint {
+                        text: qsTr("What the mouse and the hovering pen show over the page: a small dot where the "
+                                   + "pen will write, or the crosshair.")
+                    }
                     SectionTitle { text: qsTr("Grid") }
                     SwitchRow { objectName: "snapGridSwitch"; key: "snapGrid"; text: qsTr("Snap to the grid") }
                     Hint {

@@ -14,7 +14,7 @@ cd build-qt
 - [ ] Turning the pen around (eraser end) erases as well.
 - [ ] Eraser tool from the tool bar.
 - [ ] Hand tool: dragging with the pen scrolls.
-- [ ] Hover: the dot follows the pen above the screen.
+- [ ] Hover: the dot follows the pen above the screen (see "The pointer over the page" below).
 - [ ] A stroke from one page into the next continues on the next page (split into two strokes, as in Xournal++).
 
 ## Touch and palm rejection
@@ -2556,3 +2556,19 @@ or a page made dark in Xournal++).
       window.
 - [ ] (Known) A stroke of the highlighter on the dark page is drawn like on light paper (upstream's fixed opacity,
       multiplied): it hardly shows. Only the chooser applies the 0.8 so far.
+
+## The pointer over the page (qt/hover-cursors)
+qt/docs/hover-cursors.md.
+
+- [ ] Mouse over the page: a small dark dot with a light ring (no crosshair), sharp at the screen's scaling (100 %,
+      150 %, 200 %); it moves as fast as the arrow does over the tool bar. On a dark page it still shows.
+- [ ] Pen hovering over the page (Plasma Wayland, Surface): the same dot, as fast as the crosshair was. Move the
+      mouse onto the tool bar first, then hover the pen over the page: still the dot (not the arrow). Hover the pen
+      over the tool bar: the arrow there; back on the page: the dot.
+- [ ] No second, slower dot trails behind the pen any more. If no pointer shows at all for the pen: start with
+      `XQT_PEN_CURSOR=0 ./xournal-qt` (the drawn dot) and note the platform and Qt version.
+- [ ] Settings → Pen → Pointer over the page → Crosshair: the crosshair at once, for the mouse and the pen; back to
+      Dot.
+- [ ] A link with the mouse: the pointing hand; off it the dot again. The width handle of a Markdown box: the
+      arrows, the dot again away from it.
+- [ ] Android (Fold 7, S Pen): hovering the S Pen shows the drawn dot under the tip; it goes when the pen goes away.

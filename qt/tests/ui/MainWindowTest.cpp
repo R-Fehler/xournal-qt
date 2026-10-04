@@ -423,6 +423,39 @@ TEST_F(MainWindowTest, penHeightIsOfferedOnceThePenTellsIt) {
     xqt::PenHover::instance().reset();
 }
 
+// The pointer over the page (qt/docs/hover-cursors.md): a small dot by default, the crosshair as a setting
+// (Settings -> Pen); the canvas follows at once.
+TEST_F(MainWindowTest, thePointerOverThePageIsADotOrTheCrosshair) {
+    auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());
+    ASSERT_NE(settings, nullptr);
+    EXPECT_EQ(settings->get("hoverPointer").toString(), "dot") << "the dot by default";
+    controller->newDocument();
+    auto* canvas = find<QQuickItem>("canvas");
+    ASSERT_NE(canvas, nullptr);
+    EXPECT_EQ(canvas->cursor().shape(), Qt::BitmapCursor) << "the dot (a cursor of its own)";
+
+    QObject* sheet = find("settingsPage");
+    key(Qt::Key_Comma, Qt::ControlModifier);
+    ASSERT_TRUE(waitOpened(sheet, true));
+    auto* row = findItem("hoverPointerRow");
+    ASSERT_NE(row, nullptr);
+    until([&] { return row->isVisible(); });
+    EXPECT_TRUE(row->isVisible()) << "on the Pen tab";
+    QQuickItem* combo = nullptr;
+    for (QQuickItem* c: row->childItems()) {
+        combo = c->inherits("QQuickComboBox") ? c : combo;
+    }
+    ASSERT_NE(combo, nullptr);
+    EXPECT_EQ(combo->property("currentText").toString(), "Dot");
+    ASSERT_TRUE(settings->set("hoverPointer", "crosshair"));
+    EXPECT_EQ(combo->property("currentText").toString(), "Crosshair");
+    EXPECT_EQ(canvas->cursor().shape(), Qt::CrossCursor) << "at once";
+    key(Qt::Key_Escape);
+    ASSERT_TRUE(waitOpened(sheet, false));
+    settings->set("hoverPointer", "dot");
+    EXPECT_EQ(canvas->cursor().shape(), Qt::BitmapCursor);
+}
+
 // Drawing with the finger: a toggle in the tool bar and the same setting in Settings -> Touch (off on the desktop).
 TEST_F(MainWindowTest, fingerDrawingIsAToggleInTheToolBarAndASetting) {
     auto* settings = qobject_cast<xqt::SettingsModel*>(controller->settingsModel());

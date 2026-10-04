@@ -21,6 +21,7 @@
 #include <optional>
 #include <utility>
 
+#include <QCursor>
 #include <QMatrix4x4>
 #include <QPointF>
 #include <QPointer>
@@ -32,12 +33,15 @@
 #include <QVariantMap>
 
 namespace xqt {
+class AppContext;
 class CanvasInput;
 class CanvasView;
 
 /// Registers the QML types of the canvas: `import XournalQt.Canvas` provides `DocumentCanvas`.
 void registerQuickTypes();
 }  // namespace xqt
+
+class HoverMarkItem;
 
 class DocumentCanvasItem: public QQuickItem {
     Q_OBJECT
@@ -142,6 +146,14 @@ public:
         int displays = 0;
     };
     GeometryShown geometryShown() const { return geometryStats; }
+    /// The pointer the canvas draws itself (tests; qt/docs/hover-cursors.md): only for a pen the platform shows no
+    /// cursor for. Shown or not, where its middle is (item coordinates) and its side (logical pixels).
+    struct HoverMarkShown {
+        bool visible = false;
+        QPointF center;
+        double side = 0;
+    };
+    HoverMarkShown hoverMarkShown() const;
 
 Q_SIGNALS:
     void viewChanged();
@@ -184,8 +196,27 @@ private:
     /// The mouse (`mouse`) or the hovering pen is at this place (item coordinates): the link there, if any, is shown
     /// after LINK_HOVER_MS, and the mouse's cursor becomes a pointing hand where a click follows it.
     void linkHovers(QPointF itemPos, Qt::KeyboardModifiers modifiers, bool mouse);
-    /// Nothing is hovered any more (left, pressed, the pen went away): the cursor is `shape` again
-    void endLinkHover(Qt::CursorShape shape = Qt::CrossCursor);
+    /// Nothing is hovered any more (left, pressed, the pen went away): the cursor is the tool's again (or the width
+    /// handle's, `widthHandle`)
+    void endLinkHover(bool widthHandle = false);
+
+    // --- the pointer over the page (qt/docs/hover-cursors.md) ---
+    /// What the cursor is: the tool's pointer, a pointing hand on a link a click follows, the width handle's arrows
+    enum class PointerKind { Tool, Link, WidthHandle };
+    enum class PointerSource { Mouse, Pen };
+    void setPointerKind(PointerKind kind);
+    /// The tool's pointer anew (the setting, the screen's pixel ratio, ...) and whether the canvas draws it itself
+    void refreshPointer();
+    void applyCursor();
+    /// The mouse or the pen is over the canvas at this place (item coordinates), or not any more
+    void pointerMoved(QPointF itemPos, PointerSource source);
+    void pointerGone(PointerSource source);
+    /// The drawn pointer to where the pointer is (only its position changes: no page is drawn anew)
+    void placeHoverMark();
+    /// The pen hovers the canvas: the window's cursor (which the platform shows for the pen) is the canvas's, also
+    /// when Qt Quick last set it for a control under the mouse. Given back when the pen leaves or the mouse moves.
+    void showCursorForPen();
+    void giveBackWindowCursor();
 
     QPointer<xqt::CanvasView> canvasView;
     std::unique_ptr<xqt::CanvasInput> input;
@@ -212,6 +243,17 @@ private:
     QTimer linkTimer;
     bool linkHoverByMouse = false;
     std::optional<QPointF> linkHoverAt;  ///< where the pointer was last (to look again when the pages move under it)
+    // the pointer (refreshPointer)
+    PointerKind pointerKind = PointerKind::Tool;
+    PointerSource pointerSource = PointerSource::Mouse;
+    std::optional<QPointF> pointerPos;  ///< where the pointer of pointerSource is over the canvas
+    QCursor toolCursor{Qt::CrossCursor};
+    QString toolCursorKey;     ///< what toolCursor shows ("dot@<dpr>", "cross")
+    QString appliedCursorKey;  ///< what the item's cursor shows
+    bool markWanted = false;   ///< the canvas draws the pointer (hoverMark) while it is over it
+    HoverMarkItem* hoverMark = nullptr;
+    std::optional<QCursor> windowCursorBeforePen;  ///< the window's cursor before the pen took it (showCursorForPen)
+    QPointer<xqt::AppContext> pointerApp;          ///< whose settings and tools it follows
     std::atomic<int> shownPreviews{0};
     std::atomic<int> mostTiles{0};
     std::atomic<int> previewFrames{0};

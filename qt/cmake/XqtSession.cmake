@@ -119,6 +119,8 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasInput.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PenHover.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/PenHover.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/HoverPointer.h
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/HoverPointer.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextEditor.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextEditor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/TextFlow.h

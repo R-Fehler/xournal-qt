@@ -23,6 +23,9 @@
 #include <QMatrix4x4>
 #include <QQmlEngine>
 #include <QNativeGestureEvent>
+#include <QPainter>
+#include <QPixmap>
+#include <QQuickPaintedItem>
 #include <QQuickWindow>
 #include <QSGClipNode>
 #include <QSGGeometry>
@@ -44,7 +47,9 @@
 #include "StickyNotes.h"
 #include "GeometryToolLayer.h"
 #include "GeometryToolPicture.h"
+#include "HoverPointer.h"
 #include "TextEditor.h"
+#include "session/AppContext.h"
 #include "session/DocumentSearch.h"
 #include "session/DocumentSession.h"
 
@@ -239,8 +244,6 @@ public:
         appendChildNode(geometry);
         selectionRoot = new QSGTransformNode;
         appendChildNode(selectionRoot);
-        hover = new QSGSimpleRectNode(QRectF(), QColor(0x1d, 0x2b, 0x8f));
-        appendChildNode(hover);
     }
     QSGTransformNode* pagesRoot;
     GeometryNode* geometry;  ///< the setsquare or compass, over the pages and under the selection
@@ -249,7 +252,6 @@ public:
     quint64 selectionRevision = ~quint64(0);
     double selectionZoom = 0;
     QRectF selectionRegion;  ///< in the selection page's view pixels
-    QSGSimpleRectNode* hover;
     std::unordered_map<const xqt::CanvasPage*, PageNode*> pages;
 };
 
@@ -267,6 +269,19 @@ std::vector<DocumentCanvasItem*>& allCanvases() {
 }
 }  // namespace
 
+/// The pointer drawn by the canvas (qt/docs/hover-cursors.md): an item of its own over the pages, so that following
+/// the pen moves only it (a new position in the scene graph) and draws no page anew. Painted again only when what it
+/// shows changes.
+class HoverMarkItem final: public QQuickPaintedItem {
+public:
+    explicit HoverMarkItem(QQuickItem* parent): QQuickPaintedItem(parent) {
+        setAntialiasing(true);
+        setAcceptedMouseButtons(Qt::NoButton);
+        setSize(QSizeF(xqt::hover::dotSide(), xqt::hover::dotSide()));
+    }
+    void paint(QPainter* p) override { xqt::hover::paintDot(*p, QPointF(width() / 2, height() / 2)); }
+};
+
 void xqt::registerQuickTypes() {
     qmlRegisterType<DocumentCanvasItem>("XournalQt.Canvas", 1, 0, "DocumentCanvas");
     qmlRegisterType<TextFlowEditor>("XournalQt.Canvas", 1, 0, "TextFlowEditor");
@@ -279,7 +294,7 @@ void xqt::registerQuickTypes() {
 DocumentCanvasItem::DocumentCanvasItem(QQuickItem* parent): QQuickItem(parent) {
     setFlag(ItemHasContents, true);
     setAcceptTouchEvents(true);
-    setCursor(Qt::CrossCursor);
+    refreshPointer();
     // Proximity events are only delivered to the application object.
     qApp->installEventFilter(this);
     xqt::AdaptiveLayout::watchBeforeCanvases();  // (it sees the strokes on this canvas too: they hold the size class)
@@ -321,7 +336,7 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
     }
     if (!link) {
         const bool width = mouse && canvasView && input && canvasView->boxResize().onHandle(itemPos);
-        endLinkHover(width ? Qt::SizeHorCursor : Qt::CrossCursor);  // (the handle that sets a box's width)
+        endLinkHover(width);  // (the handle that sets a box's width)
         linkHoverAt = itemPos;
         return;
     }
@@ -358,13 +373,10 @@ void DocumentCanvasItem::linkHovers(QPointF itemPos, Qt::KeyboardModifiers modif
     // The mouse's cursor: a pointing hand where a click follows the link
     const bool hand = mouse && !linkCovered && input->clickFollowsLink(link->editing, modifiers);
     const bool width = mouse && !hand && canvasView->boxResize().onHandle(itemPos);
-    const Qt::CursorShape shape = hand ? Qt::PointingHandCursor : width ? Qt::SizeHorCursor : Qt::CrossCursor;
-    if (cursor().shape() != shape) {
-        setCursor(shape);
-    }
+    setPointerKind(hand ? PointerKind::Link : width ? PointerKind::WidthHandle : PointerKind::Tool);
 }
 
-void DocumentCanvasItem::endLinkHover(Qt::CursorShape shape) {
+void DocumentCanvasItem::endLinkHover(bool widthHandle) {
     linkHoverAt.reset();
     linkId = {nullptr, 0};
     linkCovered = false;
@@ -373,9 +385,127 @@ void DocumentCanvasItem::endLinkHover(Qt::CursorShape shape) {
         linkShown.clear();
         Q_EMIT hoveredLinkChanged();
     }
-    if (cursor().shape() != shape) {
-        setCursor(shape);
+    setPointerKind(widthHandle ? PointerKind::WidthHandle : PointerKind::Tool);
+}
+
+void DocumentCanvasItem::setPointerKind(PointerKind kind) {
+    pointerKind = kind;
+    applyCursor();
+}
+
+void DocumentCanvasItem::refreshPointer() {
+    const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
+    const auto pointer = canvasView ? xqt::hover::pointerSetting(*canvasView->getSession().getSettings())
+                                    : xqt::hover::Pointer::Dot;
+    // The tool's pointer is a cursor of the platform: the compositor moves it with the pointer, before the app sees
+    // the move (a picture drawn by the app is a frame or more behind)
+    const QString key = pointer == xqt::hover::Pointer::Crosshair ? QStringLiteral("cross")
+                                                                  : QStringLiteral("dot@%1").arg(dpr);
+    if (key != toolCursorKey) {
+        toolCursorKey = key;
+        if (pointer == xqt::hover::Pointer::Crosshair) {
+            toolCursor = QCursor(Qt::CrossCursor);
+        } else {
+            const int middle = xqt::hover::dotSide() / 2;
+            toolCursor = QCursor(QPixmap::fromImage(xqt::hover::dotImage(dpr)), middle, middle);
+        }
+        applyCursor();
     }
+    // A pen the platform shows no cursor for (Android, iOS): the canvas draws the dot where the pen is
+    markWanted = pointerSource == PointerSource::Pen && !xqt::hover::platformShowsPenCursor();
+    placeHoverMark();
+}
+
+void DocumentCanvasItem::applyCursor() {
+    const QString key = pointerKind == PointerKind::Link          ? QStringLiteral("hand")
+                        : pointerKind == PointerKind::WidthHandle ? QStringLiteral("width")
+                                                                  : toolCursorKey;
+    if (key == appliedCursorKey) {
+        return;
+    }
+    appliedCursorKey = key;
+    const QCursor c = pointerKind == PointerKind::Link          ? QCursor(Qt::PointingHandCursor)
+                      : pointerKind == PointerKind::WidthHandle ? QCursor(Qt::SizeHorCursor)
+                                                                : toolCursor;
+    setCursor(c);
+    if (windowCursorBeforePen && window()) {
+        window()->setCursor(c);  // (the pen shows it: the window's cursor)
+    }
+}
+
+void DocumentCanvasItem::pointerMoved(QPointF itemPos, PointerSource source) {
+    pointerPos = itemPos;
+    if (source != pointerSource) {
+        pointerSource = source;
+        refreshPointer();
+    } else {
+        placeHoverMark();
+    }
+}
+
+void DocumentCanvasItem::pointerGone(PointerSource source) {
+    if (source == pointerSource && pointerPos) {
+        pointerPos.reset();
+        placeHoverMark();
+    }
+}
+
+void DocumentCanvasItem::placeHoverMark() {
+    if (!markWanted || !pointerPos || !isVisible()) {
+        if (hoverMark) {
+            hoverMark->setVisible(false);
+        }
+        return;
+    }
+    if (!hoverMark) {
+        hoverMark = new HoverMarkItem(this);
+        hoverMark->setZ(1);  // (over nothing else of the canvas's own: it has no other children)
+    }
+    // Whole device pixels: the picture stays sharp
+    const double dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
+    const QPointF topLeft = *pointerPos - QPointF(hoverMark->width() / 2, hoverMark->height() / 2);
+    hoverMark->setPosition(QPointF(std::round(topLeft.x() * dpr) / dpr, std::round(topLeft.y() * dpr) / dpr));
+    hoverMark->setVisible(true);
+}
+
+DocumentCanvasItem::HoverMarkShown DocumentCanvasItem::hoverMarkShown() const {
+    HoverMarkShown shown;
+    if (hoverMark && hoverMark->isVisible()) {
+        shown.visible = true;
+        shown.side = hoverMark->width();
+        shown.center = hoverMark->position() + QPointF(hoverMark->width() / 2, hoverMark->height() / 2);
+    }
+    return shown;
+}
+
+void DocumentCanvasItem::showCursorForPen() {
+    QWindow* w = window();
+    if (!w || !xqt::hover::platformShowsPenCursor()) {
+        return;
+    }
+    // Qt Quick sets the window's cursor from the item under the mouse; the pen's events go to the canvas before Qt
+    // Quick sees them, so the window may still have the cursor of a control the mouse was last over
+    const QCursor want = cursor();
+    const QCursor have = w->cursor();
+    if (have.shape() == want.shape() &&
+        (want.shape() != Qt::BitmapCursor || have.pixmap().cacheKey() == want.pixmap().cacheKey())) {
+        return;
+    }
+    if (!windowCursorBeforePen) {
+        windowCursorBeforePen = have;
+    }
+    w->setCursor(want);
+}
+
+void DocumentCanvasItem::giveBackWindowCursor() {
+    if (!windowCursorBeforePen) {
+        return;
+    }
+    // (what Qt Quick last set: it sets it again only when the item under the mouse changes)
+    if (window()) {
+        window()->setCursor(*windowCursorBeforePen);
+    }
+    windowCursorBeforePen.reset();
 }
 
 void DocumentCanvasItem::mouseHovers(QPointF scenePos) {
@@ -425,6 +555,10 @@ void DocumentCanvasItem::setView(QObject* object) {
         }
     }
     endLinkHover();
+    if (pointerApp) {
+        disconnect(pointerApp, nullptr, this, nullptr);
+        pointerApp = nullptr;
+    }
     input.reset();
     canvasView = v;
     viewReplaced = true;
@@ -455,7 +589,9 @@ void DocumentCanvasItem::setView(QObject* object) {
             viewReplaced = true;
             update();
         });
-        connect(input.get(), &xqt::CanvasInput::hoverChanged, this, &QQuickItem::update);
+        // The pointer follows the settings (dot or crosshair)
+        pointerApp = &canvasView->getSession().getApp();
+        connect(pointerApp, &xqt::AppContext::settingsChanged, this, &DocumentCanvasItem::refreshPointer);
         connect(canvasView, &xqt::CanvasView::emojiCompletionChanged, this, &DocumentCanvasItem::emojiCompletionChanged);
         // (the hint that a note's text goes on below the note: with the cursor, and where the note is shown)
         connect(canvasView, &xqt::CanvasView::markdownCursorChanged, this, &DocumentCanvasItem::noteTextHintChanged);
@@ -480,6 +616,7 @@ void DocumentCanvasItem::setView(QObject* object) {
         });
         updateViewGeometry();
     }
+    refreshPointer();
     Q_EMIT viewChanged();
     Q_EMIT viewportChanged();
     update();
@@ -571,8 +708,13 @@ void DocumentCanvasItem::itemChange(ItemChange change, const ItemChangeData& val
                                        &DocumentCanvasItem::updateViewGeometry);
             updateViewGeometry();
         }
+        windowCursorBeforePen.reset();
+        refreshPointer();  // (the cursor's pixels: this window's pixel ratio)
     } else if (change == ItemDevicePixelRatioHasChanged) {
         updateViewGeometry();
+        refreshPointer();
+    } else if (change == ItemVisibleHasChanged) {
+        placeHoverMark();
     }
     QQuickItem::itemChange(change, value);
 }
@@ -662,6 +804,10 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             if (e->type() == QEvent::TabletLeaveProximity && linkHoverAt && !linkHoverByMouse) {
                 endLinkHover();  // (the pen went away)
             }
+            if (e->type() == QEvent::TabletLeaveProximity) {
+                pointerGone(PointerSource::Pen);
+                giveBackWindowCursor();
+            }
         }
         return false;
     }
@@ -681,6 +827,8 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 if (linkHoverAt && !linkHoverByMouse) {
                     endLinkHover();  // (the pen hovers a control now)
                 }
+                pointerGone(PointerSource::Pen);
+                giveBackWindowCursor();
                 xqt::inputlog::decision(e, false, "not on this canvas (a control, a menu, another canvas)");
                 return false;  // unaccepted: Qt synthesizes mouse events for the QML controls
             }
@@ -699,6 +847,8 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
                 penGrab = false;
             }
             input->tabletEvent(t, mapFromScene(t->position()));
+            pointerMoved(mapFromScene(t->position()), PointerSource::Pen);
+            showCursorForPen();
             // The pen hovering: where a link under it leads (the pen itself keeps its tool: no pointing hand)
             if (e->type() == QEvent::TabletMove && t->buttons() == Qt::NoButton && !penGrab) {
                 linkHovers(mapFromScene(t->position()), t->modifiers(), false);
@@ -738,6 +888,18 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
         case QEvent::MouseMove: {
             auto* m = static_cast<QMouseEvent*>(e);
             xqt::Perf::add(xqt::Perf::MouseEvents);
+            const auto mouseType = m->device() ? m->device()->type() : QInputDevice::DeviceType::Mouse;
+            const bool realMouse =
+                    mouseType == QInputDevice::DeviceType::Mouse || mouseType == QInputDevice::DeviceType::TouchPad;
+            if (realMouse) {
+                giveBackWindowCursor();  // (Qt Quick sets the window's cursor for the mouse again)
+                const QPointF itemPos = mapFromScene(m->scenePosition());
+                if (QRectF(0, 0, width(), height()).contains(itemPos)) {
+                    pointerMoved(itemPos, PointerSource::Mouse);
+                } else {
+                    pointerGone(PointerSource::Mouse);
+                }
+            }
             // Without the hit test of the item under the pointer: moving without a button never draws, and a drag
             // that began elsewhere (a scroll bar) stays there - the mouse sends more moves than there are frames.
             if (!mouseGrab && (m->buttons() == Qt::NoButton ? e->type() == QEvent::MouseMove : mouseElsewhere)) {
@@ -754,7 +916,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             if (e->type() == QEvent::MouseButtonPress) {
                 // (a click may follow it: the sheet or the page comes; a Markdown box's width handle keeps its
                 // cursor while it is dragged)
-                endLinkHover(cursor().shape() == Qt::SizeHorCursor ? Qt::SizeHorCursor : Qt::CrossCursor);
+                endLinkHover(pointerKind == PointerKind::WidthHandle);
             }
             const bool inside = !heldByAnother(&DocumentCanvasItem::mouseGrab) && claims(m->scenePosition());
             xqt::Perf::add(xqt::Perf::MouseClaimed, inside ? 1 : 0);
@@ -792,6 +954,7 @@ bool DocumentCanvasItem::eventFilter(QObject* watched, QEvent* e) {
             return false;
         case QEvent::Leave:
             mouseOverWindow = false;
+            pointerGone(PointerSource::Mouse);
             if (linkHoverAt && linkHoverByMouse) {
                 endLinkHover();  // the mouse left the window
             }
@@ -1165,7 +1328,6 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
         viewReplaced = false;
     }
     if (!canvasView) {
-        root->hover->setRect(QRectF());
         return root;
     }
 
@@ -1330,12 +1492,5 @@ QSGNode* DocumentCanvasItem::updatePaintNode(QSGNode* old, UpdatePaintNodeData*)
     }
     updateGeometryNode(root, zoom, dpr);
     updateSelectionNode(root, zoom, dpr);
-
-    if (auto h = input ? input->hoverPosition() : std::nullopt) {
-        root->hover->setRect(QRectF(h->x() - 3, h->y() - 3, 6, 6));
-        root->hover->setColor(input->hoverIsEraser() ? QColor(0xd0, 0x30, 0x30) : QColor(0x1d, 0x2b, 0x8f));
-    } else {
-        root->hover->setRect(QRectF());
-    }
     return root;
 }
