@@ -3757,6 +3757,108 @@ TEST_F(MainWindowTest, spaceForNotesFromThePageMenuAndForAllPages) {
 
 // Changing a page's size (qt/page-size-change): "Page size…" in the page menu opens the dialog for the page; A7 makes
 // it a card (what no longer fits is counted in the dialog and kept), one undo step; then the selection and all pages
+// The author: "rotate all pages / selected pages / current page by 90 degree left or right". The page menu turns the
+// page or the selection, ⋮ → Page → Rotate this page or all; one undo step each; the thumbnail is drawn again. In a
+// .xopp a PDF page cannot turn, and the menus say why.
+TEST_F(MainWindowTest, rotatingPagesFromTheMenus) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(80);
+    auto* s = controller->tabManager().currentSession();
+    auto pageOf = [&](size_t i) { return s->getDocument()->getPage(i); };
+    const size_t pages = s->getDocument()->getPageCount();
+    std::vector<QSizeF> sizes;
+    for (size_t i = 0; i < pages; ++i) {
+        sizes.emplace_back(pageOf(i)->getWidth(), pageOf(i)->getHeight());
+    }
+    const auto turned = [&](size_t i) {
+        return pageOf(i)->getWidth() == sizes[i].height() && pageOf(i)->getHeight() == sizes[i].width();
+    };
+    const auto upright = [&](size_t i) {
+        return pageOf(i)->getWidth() == sizes[i].width() && pageOf(i)->getHeight() == sizes[i].height();
+    };
+    auto* pagesModel = qobject_cast<xqt::PagesModel*>(controller->pagesModel());
+    const QString thumbnail = pagesModel->thumbnailUrl(1);
+
+    // The page menu: this page
+    auto* menu = find<QObject>("pageMenu");
+    ASSERT_NE(menu, nullptr);
+    menu->setProperty("page", 1);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    auto* right = find<QQuickItem>("pageMenuRotateRight");
+    ASSERT_NE(right, nullptr);
+    EXPECT_TRUE(right->isEnabled());
+    EXPECT_FALSE(find<QQuickItem>("pageMenuRotateReason")->isVisible());
+    click(right);
+    wait(50);
+    EXPECT_TRUE(turned(1));
+    EXPECT_TRUE(upright(0)) << "only this page";
+    EXPECT_NE(pagesModel->thumbnailUrl(1), thumbnail) << "its thumbnail is drawn again";
+    EXPECT_TRUE(controller->canUndoPages());
+    controller->undoPages();
+    EXPECT_TRUE(upright(1));
+
+    // The selection
+    pagesModel->selectPages({2, 3});
+    menu->setProperty("page", 2);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    EXPECT_EQ(menu->property("what").toString(), "2 pages");
+    click(find<QQuickItem>("pageMenuRotateLeft"));
+    wait(50);
+    EXPECT_TRUE(turned(2));
+    EXPECT_TRUE(turned(3));
+    EXPECT_TRUE(upright(4));
+    controller->undoPages();
+    EXPECT_TRUE(upright(2));
+    pagesModel->clearSelection();
+
+    // ⋮ → Page → Rotate: this page, all pages
+    controller->jumpToPage(4);
+    wait(50);
+    auto* thisRight = find<QObject>("rotatePageRightItem");
+    ASSERT_NE(thisRight, nullptr);
+    EXPECT_TRUE(thisRight->property("enabled").toBool());
+    QMetaObject::invokeMethod(thisRight, "triggered");
+    wait(50);
+    EXPECT_TRUE(turned(4));
+    controller->undoPages();
+    QMetaObject::invokeMethod(find<QObject>("rotateAllLeftItem"), "triggered");
+    wait(50);
+    for (size_t i = 0; i < pages; ++i) {
+        EXPECT_TRUE(turned(i)) << i;
+    }
+    controller->undoPages();
+    for (size_t i = 0; i < pages; ++i) {
+        EXPECT_TRUE(upright(i)) << "one step: " << i;
+    }
+
+    // A PDF in Xournal++ files mode (a .xopp when saved): its pages stay, the menus say why
+    QTemporaryDir dir;
+    const std::string pdf = (dir.path() + "/slides.pdf").toStdString();
+    cairo_surface_t* surface = cairo_pdf_surface_create(pdf.c_str(), 595, 842);
+    cairo_t* cr = cairo_create(surface);
+    cairo_show_page(cr);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+    ASSERT_TRUE(controller->openPath(QString::fromStdString(pdf)));
+    wait(80);
+    EXPECT_EQ(controller->saveFormat(), "xopp");
+    menu->setProperty("page", 0);
+    QMetaObject::invokeMethod(menu, "open");
+    until([&] { return menu->property("opened").toBool(); });
+    EXPECT_FALSE(find<QQuickItem>("pageMenuRotateRight")->isEnabled());
+    auto* reason = find<QQuickItem>("pageMenuRotateReason");
+    EXPECT_TRUE(reason->isVisible());
+    EXPECT_EQ(reason->property("text").toString(), "PDF pages can only be rotated in PDF files with notes");
+    QMetaObject::invokeMethod(menu, "close");
+    EXPECT_FALSE(find<QObject>("rotatePageRightItem")->property("enabled").toBool());
+    EXPECT_EQ(find<QObject>("rotateReasonItem")->property("text").toString(),
+              "PDF pages can only be rotated in PDF files with notes");
+    EXPECT_EQ(controller->rotatePages({0}, true), 0);
+    EXPECT_NEAR(controller->tabManager().currentSession()->getDocument()->getPage(0)->getWidth(), 595, 0.5);
+}
+
 TEST_F(MainWindowTest, pageSizeFromThePageMenu) {
     ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
     wait(80);

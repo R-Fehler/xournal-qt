@@ -31,6 +31,8 @@ Popup {
     readonly property var pages: (app.pages.selectionCount, app.pages.isSelected(page) ? app.pages.selectedPages() : [page])
     readonly property string what: pages.length > 1 ? qsTr("%1 pages").arg(pages.length) : qsTr("page")
     readonly property int lastPage: pages[pages.length - 1]
+    /// Turning them (AppController::rotationOf): possible, and why not (PDF pages in a .xopp)
+    readonly property var rotation: visible ? app.rotationOf(pages) : ({})
 
     /// Open it where the page was pressed (`x`, `y` in the coordinates of `item`), and keep it inside the window.
     /// In the phone classes: a sheet at the bottom instead.
@@ -206,10 +208,43 @@ Popup {
                 }
             }
         }
-        PageLine {
-            objectName: "insertPagesItem"
-            text: qsTr("Insert pages…")
-            onClicked: { app.requestInsertPages(menu.lastPage + 1); menu.close() }
+        // Inserting pages, and a quarter turn of the page or the selection (qt/docs/page-rotation.md; why not: below)
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 0
+            PageLine {
+                objectName: "insertPagesItem"
+                text: qsTr("Insert pages…")
+                onClicked: { app.requestInsertPages(menu.lastPage + 1); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuRotateLeft"
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-rotate-left"
+                tip: qsTr("Rotate %1 left").arg(menu.what)
+                enabled: menu.rotation.possible === true
+                onClicked: { app.rotatePages(menu.pages, false); menu.close() }
+            }
+            PageAction {
+                objectName: "pageMenuRotateRight"
+                implicitHeight: menu.asSheet ? Math.max(48, menu.target) : 38
+                iconName: "xqt-rotate-right"
+                tip: qsTr("Rotate %1 right").arg(menu.what)
+                enabled: menu.rotation.possible === true
+                onClicked: { app.rotatePages(menu.pages, true); menu.close() }
+            }
+        }
+        Label {
+            objectName: "pageMenuRotateReason"
+            visible: (menu.rotation.reason || "") !== ""
+            text: menu.rotation.reason || ""
+            Layout.fillWidth: true
+            Layout.preferredWidth: 1  // (as wide as the menu, not wider: it wraps)
+            Layout.leftMargin: 8
+            Layout.rightMargin: 8
+            wrapMode: Text.WordWrap
+            font.pixelSize: 12
+            color: "#5f6368"
         }
         // Its preview in the library and in the overview of open documents
         PageLine {

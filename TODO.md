@@ -493,10 +493,13 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   printed or exported. Works in full screen and the presentation mode. *Built (qt/docs/curtain.md: B / Shift+B, the
   setsquare button's list, ⋮ → View, the tool square; edges pushed with the handles hidden, its place remembered per
   tab). Left: the device pass; QML overlays (selection pill, PDF text knobs, sticky note pill) still show over it.*
-- [ ] `qt/page-ops`: a long press on a page in the page grid or the sidebar starts the selection mode with that
+- [x] `qt/page-ops`: a long press on a page in the page grid or the sidebar starts the selection mode with that
   page selected; moving the finger after the long press still drags the pages, as today. **Rotate pages** by 90°
   left or right (current page, selected pages, all pages), undoable, in the page menu. Pages without a PDF
-  background first; PDF pages need a decision (see the questions below).
+  background first; PDF pages need a decision (see the questions below). *Built (qt/docs/page-rotation.md): the
+  sidebar got a selection mode with a bar; PDF pages turn in PDF files with notes (the PDF page's /Rotate, through the
+  merged PDF) and stay in a `.xopp` (the author's decision is open). Left: the device pass; no haptic tick (none in
+  the app); Markdown boxes and sticky notes stay upright.*
 - [ ] `qt/hidpi-fractional`: check fractional scaling (125 %, 150 %, 175 %) on Plasma and GNOME (Wayland and X11),
   Windows and macOS: Qt 6 passes the factor through (`HighDpiScaleFactorRoundingPolicy::PassThrough`); check that
   nothing in the app rounds it, that pages, thumbnails and the setsquare are sharp, and that lines and borders of

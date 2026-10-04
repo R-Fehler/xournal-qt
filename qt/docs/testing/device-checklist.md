@@ -2602,3 +2602,22 @@ On the 2-in-1 with a finger, the pen and a mouse; on Android (phone and tablet).
 - [ ] The mouse is as before: a long click opens the page, Ctrl/Shift+click selects, right click the menu, press and
       hold then move drags.
 - [ ] No haptic tick yet (the app has none anywhere): check whether the hold feels clear enough without one.
+
+## Rotating pages (qt/page-ops)
+
+See qt/docs/page-rotation.md. With pen, finger and mouse; a `.xopp` and a PDF with notes.
+- [ ] Page menu (sidebar ⋮, right click, grid): the two rotate icons beside "Insert pages…" turn the page a quarter
+      left / right; on a selected page they turn the selection. The grid's action bar has them too. ⋮ → Page → Rotate:
+      this page, all pages. Ctrl+Z (or the undo button) turns them back in one step.
+- [ ] The canvas, the sidebar thumbnail, the grid preview and the library/tab preview show the turned page at once,
+      with the right shape (landscape / portrait).
+- [ ] Ink, a plain text, an image and a TeX formula turn with the page and stay editable (select, move, erase);
+      Markdown boxes and sticky notes stay upright at the turned place; the page's Markdown text stays at the margins.
+- [ ] A ruled / graph page: the lines follow the new shape. A photo opened to write on: the picture turns.
+- [ ] Save, close, open again: the same. The `.xopp` opens in upstream Xournal++ with the turned ink and texts.
+- [ ] A `.xopp` with a PDF (Xournal++ files mode): on a PDF page the icons are grey and the menu says "PDF pages can
+      only be rotated in PDF files with notes"; "All pages" turns only the pages without PDF and says how many stayed.
+- [ ] A PDF with notes (and a PDF annotated in PDF files mode, before its first save): a PDF page turns with its text
+      (search hits and text selection at the turned place, links still work). Saved: Okular, Evince, Firefox/pdf.js,
+      Chrome, Acrobat, Xodo, Drawboard show the page turned with the ink on the right place; xournal-qt opens it again
+      turned. Turning a page several times quickly on a long scanned PDF: how long it waits (each turn merges a copy).

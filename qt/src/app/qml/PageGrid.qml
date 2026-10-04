@@ -304,6 +304,26 @@ Rectangle {
                 text: qsTr("Print")
                 onClicked: app.requestPrint(app.pages.selectionCount > 0 ? app.pages.selectedPages() : [])
             }
+            // A quarter turn of the selected pages (qt/docs/page-rotation.md)
+            IconButton {
+                id: rotateLeftButton
+                objectName: "pageGridRotateLeft"
+                iconName: "xqt-rotate-left"
+                implicitWidth: 44; implicitHeight: 44
+                readonly property var rotation: (app.pages.selectionCount, actionBar.visible ? app.rotationOf(app.pages.selectedPages()) : ({}))
+                tip: rotation.possible === false && (rotation.reason || "") !== "" ? rotation.reason : qsTr("Rotate left")
+                enabled: rotation.possible === true
+                onClicked: app.rotatePages(app.pages.selectedPages(), false)
+            }
+            IconButton {
+                objectName: "pageGridRotateRight"
+                iconName: "xqt-rotate-right"
+                implicitWidth: 44; implicitHeight: 44
+                tip: rotateLeftButton.rotation.possible === false && (rotateLeftButton.rotation.reason || "") !== ""
+                     ? rotateLeftButton.rotation.reason : qsTr("Rotate right")
+                enabled: rotateLeftButton.enabled
+                onClicked: app.rotatePages(app.pages.selectedPages(), true)
+            }
             ToolButton {
                 text: qsTr("Delete")
                 enabled: app.pages.selectionCount > 0 && app.pages.selectionCount < app.pages.count

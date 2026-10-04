@@ -31,18 +31,11 @@ constexpr double TOLERANCE = 0.5;
 
 bool sameSize(double a, double b) { return std::abs(a - b) < 0.01; }
 
-/// The page's own Markdown text box, if it has text (the document is locked)
-const Text* pageText(const PageRef& page) {
-    const Layer* layer = md::markdownLayer(page);
-    const Text* box = layer ? PageMargins::pageBox(*layer, page) : nullptr;
-    return box && !box->getText().empty() ? box : nullptr;
-}
-
 size_t outsideOf(const PageRef& page, double width, double height) {
     const auto beyond = [&](double right, double bottom) {
         return right > width + TOLERANCE || bottom > height + TOLERANCE;
     };
-    const Text* flow = pageText(page);  // (flows anew: never beyond)
+    const Text* flow = pageTextOf(page);  // (flows anew: never beyond)
     size_t n = 0;
     for (const Layer* layer: page->getLayersView()) {
         if (const auto look = sticky::lookOf(*layer)) {
@@ -60,6 +53,64 @@ size_t outsideOf(const PageRef& page, double width, double height) {
     return n;
 }
 }  // namespace
+
+const Text* pageTextOf(const PageRef& page) {
+    const Layer* layer = md::markdownLayer(page);
+    const Text* box = layer ? PageMargins::pageBox(*layer, page) : nullptr;
+    return box && !box->getText().empty() ? box : nullptr;
+}
+
+TextReflow::TextReflow(DocumentSession& session, const std::vector<PageRef>& pages) {
+    Document* doc = session.getDocument();
+    std::vector<size_t> starts;  // the first page of each page's text on these pages
+    {
+        std::shared_lock lock(*doc);
+        std::set<size_t> seen;
+        for (const PageRef& page: pages) {
+            if (!pageTextOf(page)) {
+                continue;
+            }
+            const size_t index = doc->indexOf(page);
+            if (index == npos) {
+                continue;
+            }
+            // (from the page it starts on, as MarkdownSession::begin takes it up)
+            size_t first = index;
+            while (first > 0) {
+                const Text* t = pageTextOf(doc->getPage(first));
+                if (!t || !md::continues(t->getText())) {
+                    break;
+                }
+                --first;
+            }
+            if (seen.insert(first).second) {
+                starts.push_back(first);
+            }
+        }
+    }
+    for (size_t index: starts) {
+        auto group = std::make_unique<GroupUndoAction>();
+        auto text = std::make_unique<MarkdownSession>(session);
+        text->recordInto(group.get());
+        text->begin(index, md::Style{});
+        texts.push_back(std::move(text));
+        groups.push_back(std::move(group));
+    }
+}
+
+TextReflow::~TextReflow() = default;
+
+std::vector<UndoActionPtr> TextReflow::finish() {
+    std::vector<UndoActionPtr> steps;
+    for (size_t i = 0; i < texts.size(); ++i) {
+        texts[i]->reflow();
+        texts[i]->finish();
+        steps.push_back(std::move(groups[i]));  // (empty when the text stayed as it was: nothing to do)
+    }
+    texts.clear();
+    groups.clear();
+    return steps;
+}
 
 bool canResize(const XojPage& page) { return !page.getBackgroundType().isPdfPage(); }
 
@@ -96,11 +147,10 @@ size_t apply(DocumentSession& session, const std::vector<size_t>& pages, double 
     }
     Document* doc = session.getDocument();
     std::vector<PageSizeUndoAction::Change> changes;
-    std::vector<PageRef> textStarts;  // the first page of each page's text on a changed page
+    std::vector<PageRef> changed;
     {
         std::shared_lock lock(*doc);
         std::set<size_t> seen;
-        std::set<size_t> starts;
         for (size_t index: pages) {
             if (index >= doc->getPageCount() || !seen.insert(index).second) {
                 continue;
@@ -111,20 +161,7 @@ size_t apply(DocumentSession& session, const std::vector<size_t>& pages, double 
                 continue;
             }
             changes.push_back({page, page->getWidth(), page->getHeight(), width, height, page->getNoteSpace()});
-            if (pageText(page)) {
-                // (from the page it starts on, as MarkdownSession::begin takes it up)
-                size_t first = index;
-                while (first > 0) {
-                    const Text* t = pageText(doc->getPage(first));
-                    if (!t || !md::continues(t->getText())) {
-                        break;
-                    }
-                    --first;
-                }
-                if (starts.insert(first).second) {
-                    textStarts.push_back(doc->getPage(first));
-                }
-            }
+            changed.push_back(page);
         }
     }
     if (changes.empty()) {
@@ -133,28 +170,9 @@ size_t apply(DocumentSession& session, const std::vector<size_t>& pages, double 
     session.clearSelectionEndText();
 
     // The page's texts are taken up at their places on the pages as they are, flowed anew on the new sizes
-    std::vector<std::unique_ptr<MarkdownSession>> texts;
-    std::vector<std::unique_ptr<GroupUndoAction>> groups;
-    for (const PageRef& start: textStarts) {
-        size_t index = npos;
-        {
-            std::shared_lock lock(*doc);
-            index = doc->indexOf(start);
-        }
-        auto group = std::make_unique<GroupUndoAction>();
-        auto text = std::make_unique<MarkdownSession>(session);
-        text->recordInto(group.get());
-        text->begin(index, md::Style{});
-        texts.push_back(std::move(text));
-        groups.push_back(std::move(group));
-    }
+    TextReflow texts(session, changed);
     PageSizeUndoAction::set(&session, changes, true);
-    std::vector<UndoActionPtr> textSteps;
-    for (size_t i = 0; i < texts.size(); ++i) {
-        texts[i]->reflow();
-        texts[i]->finish();
-        textSteps.push_back(std::move(groups[i]));  // (empty when the text stayed as it was: nothing to do)
-    }
+    std::vector<UndoActionPtr> textSteps = texts.finish();
     const size_t n = changes.size();
     session.addPageUndoAction(std::make_unique<PageSizeUndoAction>(std::move(changes), std::move(textSteps)));
     return n;

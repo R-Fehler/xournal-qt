@@ -1004,6 +1004,14 @@ public:
     /// Give these pages width × height (points): the content stays where it is, PDF pages keep theirs, the page's
     /// text flows anew. One undo step. Returns how many pages changed.
     Q_INVOKABLE int applyPageSize(const QList<int>& pages, double width, double height);
+    /// Turning pages a quarter to the left or right (qt/src/canvas/PageRotate.h, qt/docs/page-rotation.md). What it
+    /// would do to these pages (0-based): { possible (some turn), pages (that turn), leftOut (PDF pages that stay),
+    /// reason (why not, or why some stay; "": nothing to say) }. PDF pages turn only in a PDF with notes (or a
+    /// document that will be saved as one); in a .xopp they stay as they are.
+    Q_INVOKABLE QVariantMap rotationOf(const QList<int>& pages) const;
+    /// Turn these pages (0-based) a quarter to the right (or left): one undo step. Returns how many turned; the window
+    /// says what was done (pageActionDone) or why not (message).
+    Q_INVOKABLE int rotatePages(const QList<int>& pages, bool right);
     /// Ask the window for the "new chapter" dialog on that page.
     Q_INVOKABLE void requestChapter(int page) { Q_EMIT chapterRequested(page); }
     /// Write a chapter heading on a page (level 0-2): the contents sidebar and overview show it. Undoable.

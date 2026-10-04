@@ -28,3 +28,6 @@ The adaptive tool bar (qt/adaptive-toolbar; icons that must be clear without a t
 
 `xqt-curtain` (a page with its lower part covered: the curtain, qt/docs/curtain.md) and `xqt-spotlight` (black with a
 rounded hole: the spotlight) are drawn in the same style.
+
+`xqt-rotate-left` and `xqt-rotate-right` are Lucide's `rotate-ccw-square` and `rotate-cw-square`: turning pages
+(qt/docs/page-rotation.md).
