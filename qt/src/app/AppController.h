@@ -77,6 +77,7 @@ class Library;
 class LibraryModel;
 class RecentFiles;
 class ReferenceMode;
+class StickersModel;
 namespace DocumentFiles {
 struct Result;
 }
@@ -1113,6 +1114,25 @@ public:
     QString snipShape() const;
     /// The link offered for a pasted snip (snipLinkOffered): a link to its source page next to the picture
     Q_INVOKABLE bool addSnipLink();
+
+    // --- stickers (AppStickers.cpp, qt/docs/stickers.md) ---
+    /// The picker's list (StickersModel): the library's Stickers folder or the app-wide set
+    Q_PROPERTY(QObject* stickers READ stickersModel CONSTANT)
+    QObject* stickersModel() const;
+    /// What a sticker of the selection would be: { offered: something is selected, name: the name suggested,
+    /// picture: a picture of the page behind it can go with it (a PDF page or a picture there), folders: of the set }
+    Q_INVOKABLE QVariantMap stickerDraft(bool appWide = false) const;
+    /// Save what is selected as a sticker named `name` in `folder` (relative to the set; "": its root; a new name
+    /// makes it) of the library's set or (`appWide`) the app-wide one, with the picture of the page behind it
+    /// (`withPicture`). Written off the UI thread: then it is on the clipboard too, "Saved sticker" says so
+    /// (stickerSaved). False: nothing selected, or a sticker is being written.
+    Q_INVOKABLE bool saveSticker(const QString& name, const QString& folder, bool withPicture, bool appWide);
+    /// Paste a sticker (its file): read off the UI thread, then on the clipboard and pasted on the current page,
+    /// selected (stickerPasted). False: no document to paste into, read-only, or a sticker is being read.
+    Q_INVOKABLE bool pasteSticker(const QString& path);
+    /// Stickers can be pasted into the current document (a page of notes, not read-only)
+    Q_PROPERTY(bool canPasteSticker READ canPasteSticker NOTIFY selectionChanged)
+    bool canPasteSticker() const;
     /// Put the setsquare ("setsquare") or the compass ("compass") on the page, or take it away again.
     Q_INVOKABLE void toggleGeometryTool(const QString& which);
     /// For the screenshot hook (it calls methods without arguments)
@@ -1321,6 +1341,12 @@ Q_SIGNALS:
     /// Select more became available or not, was switched on or off, or what is selected changed (its count)
     void selectMoreChanged();
     void snipChanged();
+    /// A sticker was written (`path`) and is on the clipboard; or (`error` not empty) it could not be
+    void stickerSaved(const QString& path, const QString& error);
+    /// A sticker was pasted (or `error`)
+    void stickerPasted(const QString& path, const QString& error);
+    /// A sticker file is being written or read
+    void stickerBusyChanged();
     /// A snip from a document with a file was pasted: the window offers to add a link to its page (addSnipLink)
     void snipLinkOffered(const QString& title);
     void fontChanged();
@@ -1463,6 +1489,10 @@ private:
     QString snipPreviousTool;           ///< the tool before the snip ("": none)
     ToolType snipTool = TOOL_NONE;      ///< the select tool the snip uses
     QPointer<xqt::CanvasView> snipLinkView;  ///< the view a snip with a link was pasted into
+    // --- stickers (AppStickers.cpp) ---
+    mutable std::unique_ptr<xqt::StickersModel> stickers;
+    /// The stickers' list follows the library
+    void syncStickers() const;
     /// Editing beside the page: the page's text, or the text box at a point.
     QString startMarkdown(int page, std::optional<QPointF> at);
     /// After a change of the Markdown being edited: its pages and how far it goes below one.

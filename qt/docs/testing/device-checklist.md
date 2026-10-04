@@ -2828,3 +2828,27 @@ letter words only where the recogniser is sure.
 - [ ] A sticker file (`<library>/Stickers/….xopp`) opens in Xournal++ 1.2 / 1.3 without a message: one page of the
       content's size on plain paper, the ink in "Layer 1", Markdown boxes as their source text, notes as coloured
       rectangles with their ink, the picture of the PDF (when saved with it) in "Sticker picture" at the bottom.
+- [ ] Select ink and a text with the lasso, the pill's sticker button "Save as sticker…": the name is the text's first
+      words; Save: "Saved sticker “…”"; `<library>/Stickers/<name>.xopp` is there (a file manager shows it). Ctrl+V at
+      once pastes it again (it is on the clipboard).
+- [ ] A selected sticky note: its pill's sticker button saves the whole note. Several notes with ink (Ctrl+click):
+      the selection's pill saves them all.
+- [ ] A new folder typed in the dialog ("Lecture 3") is made in `Stickers/`; "In all libraries" saves into the
+      app's data folder instead (Linux: `~/.local/share/xournal-qt/stickers/`), and its folder list shows that set's.
+- [ ] On a PDF page: "With the PDF behind it" is offered (not on plain paper). Saved with it, the sticker shows the
+      PDF's lines, figure or formula behind the ink, sharp (at least 200 dpi); with a lasso selection the picture is
+      cut to the lasso's shape. Moved after selecting: the rectangle around it instead.
+- [ ] The sticker button (next to the image button; phone: All tools → Insert → Stickers): the picker beside the
+      button (a bottom sheet on a phone), the previews of the library's stickers, three in a row on a phone.
+- [ ] A tap on a sticker: it is pasted in the middle of the visible part of the page at its own size, selected with
+      the rectangle tool (drag to move, handles to scale); Undo takes it away in one step; Ctrl+V pastes it again.
+- [ ] A sticker larger than the page (saved from an A3 poster, pasted into A5) is made as large as the page.
+- [ ] "All libraries": the app-wide stickers; folders as chips; the search finds by name and folder; the order
+      "Last used" puts the sticker just used first (also after a restart).
+- [ ] A document opened for reading only: a tap says stickers cannot be pasted there; a `.md` or text document has no
+      sticker button.
+- [ ] A picture (PNG, JPEG) copied into `Stickers/` with a file manager is a sticker: pasted as an image.
+- [ ] Press and hold (right-click) a sticker: Rename…, Move up / Move down (the order switches to "Own order"; the
+      folder's hidden `.sticker-order.json` syncs it to another device with the library), Move to folder…, Open (the
+      sticker as a document; changed and saved, the picker shows it new), Copy to all libraries / Copy to this
+      library, Copy to library… (another library's `Stickers/`), Delete (to the trash).

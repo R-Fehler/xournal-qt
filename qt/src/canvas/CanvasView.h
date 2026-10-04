@@ -237,6 +237,36 @@ public:
     bool snip(CanvasPage& page, const std::vector<xoj::util::Point<double>>& outline, bool rectangle);
     /// A snip is being drawn
     bool snipBusy() const;
+
+    // --- stickers (qt/docs/stickers.md) ---
+    /// What is selected, as a sticker's content: copies of the elements and notes (an element selection, several
+    /// notes with elements, one selected note) where they are, their page, its paper, whether the page shows a PDF
+    /// page or a picture (a picture of it can go with the sticker), and the lasso the selection was made with while
+    /// the content still lies inside it. Nothing: nothing is selected.
+    struct StickerSource {
+        sticky::Group content;
+        PageRef page;
+        Color paper{};
+        bool pictureOffered = false;
+        std::vector<xoj::util::Point<double>> outline;
+    };
+    std::optional<StickerSource> stickerSource() const;
+    /// Write a sticker of `source` into `target` (.xopp) off the UI thread, with the picture of the page's background
+    /// behind it (`withPicture`: cut to the lasso). Then `done` on this thread: the error ("": written) and the
+    /// sticker as the clipboard holds it. Not called when the view goes first (it waits for the work). False: another
+    /// sticker is still being written.
+    bool saveSticker(std::shared_ptr<StickerSource> source, bool withPicture, fs::path target,
+                     std::function<void(const QString& error, const std::string& bytes)> done);
+    /// A sticker (its content in the clipboard's format of notes and elements) pasted on the current page: in the
+    /// middle of the visible part, at its size (made smaller only when it is larger than the page), selected, one undo
+    /// step. False: read-only, or nothing to paste.
+    bool pasteSticker(const std::string& bytes);
+    /// A sticker's file read off the UI thread, then `done` on this thread: the error ("": read), its content (a .xopp:
+    /// in the clipboard's format of notes and elements; a picture: the file's bytes) and whether it is a picture. Not
+    /// called when the view goes first (it waits for the work). False: a sticker is still being read or written.
+    bool loadSticker(fs::path file, std::function<void(const QString& error, const std::string& bytes, bool picture)> done);
+    /// The rectangle or lasso of a select tool let go on a page (CanvasPage): a lasso's shape, else nothing
+    void selectedWith(const PageRef& page, std::vector<xoj::util::Point<double>> lasso);
     /// A picture pasted from a snip (snip::Source) with a link to where it came from: the link is offered
     /// (snipLinkOffered). `image`: the image element made; `markdown`: or the picture's Markdown in the text being
     /// written.
@@ -670,6 +700,11 @@ private:
     ToolType selectMoreTool = TOOL_NONE;  ///< the tool it was switched on with (another tool ends it)
     /// The snip being drawn (waited for when the view goes)
     std::future<void> snipJob;
+    /// The sticker being written (waited for when the view goes)
+    std::future<void> stickerJob;
+    /// The lasso the last selection was made with, on its page (stickerSource)
+    PageRef lassoPage;
+    std::vector<xoj::util::Point<double>> lasso;
     /// The link offered for a pasted snip (offerSnipLink)
     struct SnipLink {
         QString title;

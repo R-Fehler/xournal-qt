@@ -521,6 +521,10 @@ bool MixedSelection::cut() {
     return true;
 }
 
+void MixedSelection::setClipboard(const std::string& bytes) {
+    QGuiApplication::clipboard()->setMimeData(new GroupMimeData(bytes));
+}
+
 bool MixedSelection::clipboardHas() {
     const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
     return mime && mime->hasFormat(sticky::GROUP_CLIPBOARD_MIME);
@@ -580,13 +584,32 @@ void MixedSelection::deleteAll(const char* what) {
 }
 
 bool MixedSelection::paste(size_t pNr) {
-    DocumentSession& session = view.getSession();
-    if (pNr >= view.pageCount() || session.isReadOnly() || view.isReadingOnly() || !clipboardHas()) {
+    if (!clipboardHas()) {
         return false;
     }
     const QByteArray bytes = QGuiApplication::clipboard()->mimeData()->data(sticky::GROUP_CLIPBOARD_MIME);
     auto group = sticky::deserializeGroup(bytes.constData(), static_cast<size_t>(bytes.size()));
-    if (!group || (group->notes.empty() && group->elements.empty())) {
+    if (!group) {
+        return false;
+    }
+    return pasteGroup(pNr, std::move(*group), std::nullopt, "Paste");
+}
+
+bool MixedSelection::pasteAt(size_t pNr, const std::string& bytes, QPointF centre, const char* what) {
+    auto group = sticky::deserializeGroup(bytes.data(), bytes.size());
+    if (!group) {
+        return false;
+    }
+    return pasteGroup(pNr, std::move(*group), centre, what);
+}
+
+bool MixedSelection::pasteGroup(size_t pNr, sticky::Group content, std::optional<QPointF> centre, const char* what) {
+    DocumentSession& session = view.getSession();
+    if (pNr >= view.pageCount() || session.isReadOnly() || view.isReadingOnly()) {
+        return false;
+    }
+    sticky::Group* group = &content;
+    if (group->notes.empty() && group->elements.empty()) {
         return false;
     }
     view.endTextEditing();
@@ -608,9 +631,33 @@ bool MixedSelection::paste(size_t pNr) {
                 taken.push_back(look->rect);
             }
         }
-        offset = sticky::groupPastePlace(group->bounds, noteRects, onPage->getWidth(), onPage->getHeight(), taken);
+        if (centre) {
+            // At a point (a sticker): made smaller only to fit the page, then centred there and kept inside the page
+            const double pageWidth = onPage->getWidth();
+            const double pageHeight = onPage->getHeight();
+            Rectangle<double>& b = group->bounds;
+            const double f = std::min({1.0, pageWidth / std::max(1e-6, b.width), pageHeight / std::max(1e-6, b.height)});
+            if (f < 1) {
+                for (auto& e: group->elements) {
+                    e->scale(b.x, b.y, f, f, 0, false);
+                }
+                for (auto& note: group->notes) {
+                    for (auto& e: note->getElements()) {
+                        e->scale(b.x, b.y, f, f, 0, false);
+                    }
+                }
+                b.width *= f;
+                b.height *= f;
+            }
+            const double x = std::clamp(centre->x() - b.width / 2, 0.0, std::max(0.0, pageWidth - b.width));
+            const double y = std::clamp(centre->y() - b.height / 2, 0.0, std::max(0.0, pageHeight - b.height));
+            offset = {x - b.x, y - b.y};
+        } else {
+            offset = sticky::groupPastePlace(group->bounds, noteRects, onPage->getWidth(), onPage->getHeight(),
+                                             taken);
+        }
     }
-    auto steps = std::make_unique<sticky::UndoSteps>(tr("Paste"));
+    auto steps = std::make_unique<sticky::UndoSteps>(tr(what));
     // The elements into the page's own layer (Markdown boxes: its Markdown layer)
     sticky::leaveNoteLayer(*doc, onPage);
     Layer* own = nullptr;

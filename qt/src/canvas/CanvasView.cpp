@@ -203,6 +203,9 @@ CanvasView::~CanvasView() {
     if (snipJob.valid()) {
         snipJob.wait();  // (it draws a page of this document)
     }
+    if (stickerJob.valid()) {
+        stickerJob.wait();  // (it draws a page of this document)
+    }
     cancelRenders();  // (first: the workers start nothing of this view while it is taken down)
     CanvasMemory::instance().remove(this);
     geometry.hide();  // before its page goes

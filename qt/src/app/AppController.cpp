@@ -82,6 +82,7 @@
 #include "shell/LibraryMigration.h"
 #include "shell/LibraryBookmarks.h"
 #include "shell/LibraryModel.h"
+#include "shell/Stickers.h"
 #include "shell/DocumentChapters.h"
 #include "shell/LayersModel.h"
 #include "shell/ShortcutsModel.h"

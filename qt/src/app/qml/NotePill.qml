@@ -18,6 +18,8 @@ Pane {
     readonly property bool readingOnly: canvasItem.readingOnly
     /// "Image…": the window's file dialog; the image goes onto the selected note (target.insertImage)
     signal imageRequested()
+    /// "Save as sticker…" (qt/docs/stickers.md): the window opens its dialog
+    signal stickerRequested()
     visible: target.noteSelected && !hidden
     /// Above the note (below it where there is no room), going along with it; at the top of the canvas when the
     /// note is out of sight
@@ -145,6 +147,13 @@ Pane {
         ToolSeparator { visible: !pill.readingOnly }
         IconButton { objectName: pill.named("noteCopy"); iconName: "xopp-edit-copy"; tip: qsTr("Copy the note (Ctrl+C), to paste it on another page"); onClicked: pill.target.copyStickyNote() }
         IconButton { objectName: pill.named("noteCut"); visible: !pill.readingOnly; iconName: "xopp-edit-cut"; tip: qsTr("Cut the note (Ctrl+X): paste it on another page to move it there"); onClicked: pill.target.cutStickyNote() }
+        IconButton {
+            objectName: pill.named("noteSticker")
+            visible: pill.target === app  // (the notes; not the reference beside them)
+            iconName: "xqt-sticker"
+            tip: qsTr("Save the note as a sticker…")
+            onClicked: pill.stickerRequested()
+        }
         IconButton { objectName: pill.named("noteDelete"); visible: !pill.readingOnly; iconName: "xqt-delete"; tip: qsTr("Delete the note (Del)"); onClicked: pill.target.deleteStickyNote() }
         // Select more (qt/touch-multiselect): taps add notes and elements to the selection or take them away
         IconButton {
