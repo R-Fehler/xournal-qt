@@ -2739,8 +2739,10 @@ See qt/docs/page-rotation.md. With pen, finger and mouse; a `.xopp` and a PDF wi
       Markdown boxes and sticky notes stay upright at the turned place; the page's Markdown text stays at the margins.
 - [ ] A ruled / graph page: the lines follow the new shape. A photo opened to write on: the picture turns.
 - [ ] Save, close, open again: the same. The `.xopp` opens in upstream Xournal++ with the turned ink and texts.
-- [ ] A `.xopp` with a PDF (Xournal++ files mode): on a PDF page the icons are grey and the menu says "PDF pages can
-      only be rotated in PDF files with notes"; "All pages" turns only the pages without PDF and says how many stayed.
+- [ ] A `.xopp` with a PDF (Xournal++ files mode): a PDF page turns (its text: search and selection at the turned
+      place). Saved: a hidden `.name.pages.pdf` appears next to the `.xopp`, `name.pdf` itself is unchanged (its date
+      and size). Open the `.xopp` in Xournal++: the page is turned, with the ink on the right place. Undo, save, open
+      again in both apps: upright again.
 - [ ] A PDF with notes (and a PDF annotated in PDF files mode, before its first save): a PDF page turns with its text
       (search hits and text selection at the turned place, links still work). Saved: Okular, Evince, Firefox/pdf.js,
       Chrome, Acrobat, Xodo, Drawboard show the page turned with the ink on the right place; xournal-qt opens it again

@@ -773,8 +773,8 @@
   selection; the mouse is unchanged. Pages rotate by a quarter turn left or right (the page, the selection, all
   pages: page menu, grid action bar, ⋮ → Page → Rotate), one undo step that restores every point exactly: the size
   swaps, ink, texts, images and TeX turn, Markdown boxes and sticky notes stay upright, the page's text flows anew,
-  image backgrounds turn. PDF pages turn in PDF files with notes (a copy with its `/Rotate` through the merged PDF)
-  and stay in a `.xopp` with a reason in the menu, until the author decides (`qt/docs/page-rotation.md`).
+  image backgrounds turn. PDF pages turn as a copy with its `/Rotate` through the merged PDF: saved into a PDF with
+  notes, or into the hidden `.name.pages.pdf` of a `.xopp`, which Xournal++ reads too (`qt/docs/page-rotation.md`).
 
 - **Handwriting search, `qt/hwr-search` (2026-10-04).** Handwritten words become searchable, never converted
   ([handwriting-search.md](handwriting-search.md)): ink laid out into lines and words from the strokes and their order

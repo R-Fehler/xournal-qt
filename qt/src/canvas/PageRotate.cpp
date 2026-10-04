@@ -190,8 +190,14 @@ void turnContent(const PageRef& page, Turn turn) {
     page->setNoteSpace(turned(page->getNoteSpace(), turn));
 }
 
-/// Pages changed: drawn again, their thumbnails too (their revision)
+/// Pages changed: drawn again, their thumbnails too (their revision). The PDF pages they show now are theirs (not old
+/// numbers the merged PDF's keeper would put back after a save renumbered them)
 void fireChanged(DocumentSession& session, const std::vector<PageRotateUndoAction::Change>& changes) {
+    for (const auto& c: changes) {
+        if (c.pdf) {
+            session.adoptPdfPage(c.page);
+        }
+    }
     std::vector<size_t> indices;
     {
         Document* doc = session.getDocument();

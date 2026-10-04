@@ -30,25 +30,27 @@ Every command is one undo step (Ctrl+Z in the sidebar or grid, the canvas's undo
   from that same state. Turned pages get a new revision, so the canvas, the thumbnails and the previews are drawn again.
 
 ## PDF pages
-The author has not decided yet how a turned PDF page is kept in a `.xopp` (upstream draws a PDF page only as the PDF
-has it). So, for now (`pagerotate::PdfPages`, chosen by `AppController` from the document's save format):
-- **A PDF with notes, and PDF files mode** (the document is or will be saved as a PDF with notes): the PDF page itself
-  turns. A copy of the page with its `/Rotate` changed goes into the document's merged PDF in the cache (the way a
-  pasted PDF page does, `PdfPageKeeper`), and the page shows that copy. Saving copies it into the file as the page's
-  base page: every PDF app shows it turned, our ink annotations are placed on it as for any page with a `/Rotate`
-  (`HybridPdf`), the embedded `.xopp` has the turned size and turned ink, and the PDF's text is found at its turned
-  place. A PDF that is annotated but not saved yet is not touched until its first save. Undo shows the page from
-  before again (while the merged PDF's page numbers stay; after a save renumbered them, the PDF page is turned back
-  the same way). A page turned twice in a row waits for the first copy to be merged (a moment on a long PDF).
-- **A `.xopp`** (Xournal++ files mode, or a `.xopp` that is open): PDF pages are left as they are; the other pages of a
-  selection or of "all pages" turn. The page menu and ⋮ → Page → Rotate say why ("PDF pages can only be rotated in
-  PDF files with notes"), and the message after turning says how many PDF pages stayed.
+A PDF page turns in a copy of it (`pagerotate::PdfPages::InPdf`, in every document; the author decided this for
+`.xopp` files on 2026-10-04). The copy, with its `/Rotate` changed, goes into the document's merged PDF in the cache
+(the way a pasted PDF page does, `PdfPageKeeper`), and the page shows it. The PDF the document annotates is never
+changed.
+- **A `.xopp`:** saving puts the merged PDF next to it as the hidden `.name.pages.pdf` (as for pasted pages,
+  `qt/docs/hybrid-pdf.md` / `MergedPdf.h`), and the `.xopp` refers to it. Upstream Xournal++ opens that pair as it is:
+  poppler shows the page with its `/Rotate`, and the `.xopp` has the turned size and the turned ink. The PDF next to
+  the `.xopp` (`lecture.pdf`) stays as it was.
+- **A PDF with notes, and PDF files mode:** saving copies the turned page into the file as the page's base page:
+  every PDF app shows it turned, our ink annotations are placed on it as for any page with a `/Rotate` (`HybridPdf`),
+  the embedded `.xopp` has the turned size and turned ink, and the PDF's text is found at its turned place. A PDF
+  that is annotated but not saved yet is not touched until its first save.
+- Undo shows the page from before again while the merged PDF's page numbers stay; after a save renumbered them (a
+  `.xopp` save drops the PDF pages nothing shows any more), the PDF page is turned back the same way. The page then
+  adopts its new PDF page (`DocumentSession::adoptPdfPage`), so the keeper does not take the new number for an old
+  one of the page from before the renumbering.
+- A page turned twice in a row waits for the first copy to be merged (a moment on a long PDF).
+- Search, text selection and links of the PDF follow the turned page (poppler reads the `/Rotate`).
 
-A later decision to keep a turned PDF page in a `.xopp` as an attribute only xournal-qt reads would be another value
-of `PdfPages`: `blockedOf` lets the pages through, the page keeps its PDF page and records the turn, and the PDF
-background drawing (`notespace::renderPdf` and the views), the PDF text (search, selection, links) and the writers
-apply it. The same turned-copy route also works in a `.xopp` (its merged PDF is the hidden `.name.pages.pdf`), if the
-author prefers that: one line in `pdfRotation` (`AppController.cpp`).
+`PdfPages::Kept` (PDF pages left as they are, with a reason in the menus) stays in the code for a document that must
+not get a merged PDF; the app does not use it.
 
 ## Not done
 - Turning by other angles, or the canvas view (a separate item in TODO.md).
