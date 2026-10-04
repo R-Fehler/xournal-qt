@@ -1055,6 +1055,8 @@ ApplicationWindow {
                             icon.source: app.iconUrl("xqt-book-open")
                             onTriggered: win.openAfterMenus(layoutMenu)
                         }
+                        // A black sheet over part of the page, for teaching and presenting (qt/docs/curtain.md)
+                        AdaptiveMenuItem { objectName: "curtainItem"; offered: !win.textDoc; checkable: true; checked: app.curtain === "curtain"; text: qsTr("Curtain (B)"); icon.source: app.iconUrl("xqt-curtain"); onTriggered: app.toggleCurtain("curtain") }
                         AdaptiveMenuItem { objectName: "presentCleanItem"; text: qsTr("Present without controls (Ctrl+F5)"); icon.source: app.iconUrl("xopp-presentation-mode"); onTriggered: win.startPresenting(true) }
                         // The reader chrome of this window size: only the page; the mark in the lower left corner
                         // brings the controls back (qt/docs/adaptive-layout.md)
@@ -3705,9 +3707,18 @@ ApplicationWindow {
     PenPill { avoid: viewPill }
     // The setsquare / compass: what it can do, and putting it aside for a moment
     GeometryPill {
+        id: geometryPill
         anchors.top: canvas.top
         anchors.right: canvas.right
         anchors.topMargin: 12 + win.canvasControlsTop - canvas.y
+        anchors.rightMargin: 20 + canvas.x + canvas.width - win.canvasControlsRight
+        z: 57
+    }
+    // The curtain: its handles, taking it away (below the setsquare's pill when that is out too)
+    CurtainPill {
+        anchors.top: geometryPill.visible ? geometryPill.bottom : canvas.top
+        anchors.right: canvas.right
+        anchors.topMargin: geometryPill.visible ? 8 : 12 + win.canvasControlsTop - canvas.y
         anchors.rightMargin: 20 + canvas.x + canvas.width - win.canvasControlsRight
         z: 57
     }
@@ -3784,7 +3795,22 @@ ApplicationWindow {
                 height: Math.max(0, Math.min(barContent.implicitHeight,
                                              quickTools.roomBottom - quickTools.roomTop - quickTools.topPadding - quickTools.bottomPadding
                                              - presentToggle.height - leaveFullScreen.height
+                                             - (curtainToggle.visible ? curtainToggle.height + quickToolsColumn.spacing : 0)
                                              - 2 * quickToolsColumn.spacing))
+            }
+            // The curtain (B): hiding part of the page while presenting
+            Button {
+                id: curtainToggle
+                objectName: "curtainToggleButton"
+                width: parent.width
+                flat: true
+                visible: !win.textDoc
+                icon.source: app.iconUrl("xqt-curtain")
+                text: app.curtain !== "" ? qsTr("Take the curtain away (B)") : qsTr("Curtain (B)")
+                onClicked: {
+                    quickTools.close()
+                    app.toggleCurtain(app.curtain !== "" ? "" : "curtain")
+                }
             }
             Button {
                 id: presentToggle
@@ -3951,6 +3977,9 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("toolLasso"); enabled: toolKeys; onActivated: app.selectTool("selectRegion") }
     Shortcut { sequences: win.keysOf("toolHand"); enabled: toolKeys; onActivated: app.selectTool("hand") }
     Shortcut { sequences: win.keysOf("insertImage"); enabled: toolKeys; onActivated: imageDialog.open() }
+    // The curtain: out or away again (whatever is out); Esc hides its handles first
+    Shortcut { sequences: win.keysOf("curtain"); enabled: toolKeys && !win.textDoc; onActivated: app.toggleCurtain(app.curtain !== "" ? "" : "curtain") }
+    Shortcut { sequence: "Escape"; enabled: docKeys && app.curtainHandles; onActivated: app.curtainHandles = false }
     Shortcut { sequences: win.keysOf("redo"); enabled: docKeys; onActivated: app.redo() }
     // (the reference, while it has the keys and is written in)
     Shortcut { sequences: win.keysOf("save"); enabled: docKeys; onActivated: if (!app.saveReferenceInHand()) saveOrAsk(null) }
@@ -4012,14 +4041,14 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("shortcuts"); onActivated: shortcutSheet.open() }
     // (not StandardKey.FullScreen as well: it is F11 on KDE, twice the same key is ambiguous)
     Shortcut { sequences: win.keysOf("fullScreen"); enabled: !app.homeVisible; onActivated: win.fullScreenMode = !win.fullScreenMode }
-    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection && !app.presenting; onActivated: win.fullScreenMode = false }
+    Shortcut { sequence: "Escape"; enabled: win.fullScreenMode && !app.hasSelection && !app.presenting && !app.curtainHandles; onActivated: win.fullScreenMode = false }
     // Presenting: F5 starts and ends it, Escape ends it (full screen stays: a second Escape leaves that too)
     Shortcut {
         sequences: win.keysOf("present")
         enabled: !app.homeVisible
         onActivated: app.presenting ? (app.presenting = false) : win.startPresenting()
     }
-    Shortcut { sequence: "Escape"; enabled: app.presenting && !app.hasSelection; onActivated: app.presenting = false }
+    Shortcut { sequence: "Escape"; enabled: app.presenting && !app.hasSelection && !app.curtainHandles; onActivated: app.presenting = false }
     // Without controls: Ctrl+F5 starts presenting so, and while presenting hides or shows the controls
     Shortcut {
         sequences: win.keysOf("presentClean")
@@ -4053,7 +4082,7 @@ ApplicationWindow {
     Shortcut { sequences: win.keysOf("paste"); enabled: docKeys; onActivated: app.pasteElements() }
     Shortcut { sequences: win.keysOf("deleteSelection"); enabled: docKeys && (app.hasSelection || app.noteSelected); onActivated: app.deleteSelection() }
     Shortcut { sequences: win.keysOf("selectAll"); enabled: docKeys; onActivated: app.selectAllOnPage() }
-    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected) && !win.sidebarDrawerOpen; onActivated: app.clearSelection() }
+    Shortcut { sequence: "Escape"; enabled: docKeys && (app.hasSelection || app.noteSelected) && !win.sidebarDrawerOpen && !app.curtainHandles; onActivated: app.clearSelection() }
     Shortcut { sequences: win.keysOf("findNext"); enabled: docKeys; onActivated: app.searchNext() }
     Shortcut { sequences: win.keysOf("findPrevious"); enabled: docKeys; onActivated: app.searchPrevious() }
     Shortcut { sequences: win.keysOf("zoomIn"); enabled: docKeys; onActivated: app.zoomIn() }

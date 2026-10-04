@@ -4495,6 +4495,73 @@ TEST_F(MainWindowTest, theGeometryButtonPutsTheSetsquareOnThePage) {
     controller->toggleGeometryTool("");
 }
 
+// The curtain (qt/docs/curtain.md): B puts it out and takes it away; the setsquare button's list and ⋮ → View have it
+// too; Esc hides its handles (before it leaves full screen); its pill's × takes it away. Each tab has its own.
+TEST_F(MainWindowTest, theCurtainComesWithBAndTheSetsquaresList) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    wait(50);
+    window->setWidth(1920);  // (the setsquare button in sight)
+    wait(100);
+    EXPECT_TRUE(controller->curtain().isEmpty());
+    key(Qt::Key_B);
+    until([&] { return controller->curtain() == QStringLiteral("curtain"); });
+    ASSERT_EQ(controller->curtain(), QStringLiteral("curtain"));
+    EXPECT_TRUE(controller->curtainHandles()) << "put out with its handles";
+    EXPECT_TRUE(controller->geometryTool().isEmpty()) << "not the setsquare";
+    auto* pill = find<QQuickItem>("curtainPill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    EXPECT_TRUE(pill->isVisible());
+
+    // Esc: the handles go, the curtain stays (and the window stays in full screen)
+    window->setProperty("fullScreenMode", true);
+    wait(100);
+    key(Qt::Key_Escape);
+    EXPECT_FALSE(controller->curtainHandles());
+    EXPECT_EQ(controller->curtain(), QStringLiteral("curtain"));
+    EXPECT_TRUE(window->property("fullScreenMode").toBool()) << "the first Esc is the curtain's";
+    window->setProperty("fullScreenMode", false);
+    wait(100);
+    click(find<QQuickItem>("curtainHandles"));
+    EXPECT_TRUE(controller->curtainHandles()) << "the pill shows them again";
+
+    key(Qt::Key_B);
+    until([&] { return controller->curtain().isEmpty(); });
+    EXPECT_TRUE(controller->curtain().isEmpty()) << "B again: away";
+    until([&] { return !pill->isVisible(); });
+    EXPECT_FALSE(pill->isVisible());
+
+    // The setsquare button's list: the curtain, beside the setsquare and the compass
+    auto* button = find<QQuickItem>("geometryButton");
+    ASSERT_NE(button, nullptr);
+    auto* variants = find<QObject>("geometryButtonVariants");
+    ASSERT_NE(variants, nullptr);
+    QMetaObject::invokeMethod(button, "pressAndHold");
+    until([&] { return variants->property("visible").toBool(); });
+    QObject* entry = entryOf(variants, "variant_curtain");
+    ASSERT_NE(entry, nullptr);
+    QMetaObject::invokeMethod(entry, "triggered");
+    until([&] { return controller->curtain() == QStringLiteral("curtain"); });
+    EXPECT_EQ(controller->curtain(), QStringLiteral("curtain"));
+    EXPECT_TRUE(controller->geometryTool().isEmpty()) << "the setsquare stays where it is";
+    EXPECT_FALSE(button->property("checked").toBool()) << "the button is the setsquare's";
+    until([&] { return !variants->property("visible").toBool(); });
+
+    // A tab of its own: no curtain there; back, it is still out
+    const int first = controller->currentTab();
+    controller->newDocument();
+    wait(100);
+    ASSERT_NE(controller->currentTab(), first);
+    EXPECT_TRUE(controller->curtain().isEmpty()) << "another tab, its own curtain";
+    controller->setCurrentTab(first);
+    wait(100);
+    EXPECT_EQ(controller->curtain(), QStringLiteral("curtain")) << "back: still out";
+
+    // The pill's × takes it away
+    click(find<QQuickItem>("curtainClose"));
+    EXPECT_TRUE(controller->curtain().isEmpty());
+}
+
 // Selected PDF text used to freeze the canvas: its knobs lie over the whole canvas, and after copying nothing
 // told the UI that nothing is selected any more, so the (still visible) overlay swallowed every press.
 TEST_F(MainWindowTest, theCanvasKeepsItsInputWhilePdfTextIsSelected) {

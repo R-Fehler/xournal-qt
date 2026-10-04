@@ -25,3 +25,5 @@ The adaptive tool bar (qt/adaptive-toolbar; icons that must be clear without a t
   text box) and `xqt-eraser-stroke` (a small eraser over a stroke: erase whole strokes).
 
 `xqt-sliders` is Lucide's `sliders-horizontal`: the library's **View** button (how the cards are shown).
+
+`xqt-curtain` (a page with its lower part covered: the curtain, qt/docs/curtain.md) is drawn in the same style.

@@ -1,0 +1,60 @@
+# The curtain (qt/curtain)
+
+For teaching and presenting: a black sheet over part of the page, like a sheet of paper on an overhead projector. The
+audience sees only what is not covered; the next step of a calculation, the answer of an exercise stays hidden until
+the curtain is moved.
+
+## Putting it out
+
+- **B** (Settings → Shortcuts: "Curtain"), again B takes it away.
+- The setsquare button of the tool bar, held (or right-clicked): **Curtain (B)** in its list. A tap on the button still
+  goes from the setsquare to the compass: the curtain is not a tool of its own, it lies over the page whatever tool is
+  in hand.
+- ⋮ → View → **Curtain (B)**.
+- Full screen and presenting: the tool square → **Curtain (B)**.
+- On a phone: All tools → Setsquare, compass and curtain.
+
+It comes over the lower half of the part of the page in view, down to the bottom of the page and a little beyond its
+sides, with its handles shown. A pill at the top right of the canvas (below the setsquare's) shows or hides the handles
+and takes the curtain away (×).
+
+## Moving, turning and sizing it
+
+Like the setsquare:
+- **A tap on the black** shows its handles (pen, mouse or finger). **Esc**, a tap beside it or the pill hides them.
+- While the handles are shown: a **drag on the black** moves it; the **corners** and the **middles of the edges** size
+  it (the opposite side stays where it is); the **knob** above its top edge turns it (it stays straight within 4° of a
+  right angle). **Two fingers** on the black carry it, turn it and size it (as the setsquare: only once the fingers
+  clearly turn or spread).
+- While they are hidden, a finger on the black scrolls the page as usual, and the hand tool too.
+
+## What it does not do
+
+- **Nothing is written on it.** Pen, eraser, select tools, a text box, a link: a press that starts on the black does
+  nothing (only its handles act, and a tap shows them). No invisible ink, nothing erased that one cannot see, no link
+  followed under it; the mouse shows no link target under it either. A stroke that starts beside it may run under it.
+- **It is not part of the document.** It belongs to the view (each tab has its own) and is drawn only on the screen, by
+  the canvas: it is never saved, printed or exported, and never in the thumbnails, previews or the page grid. It is gone
+  when the tab is closed.
+
+## Where it lies
+
+On a page, in the page's coordinates: it scrolls and zooms with what it covers. When the view goes to another page (the
+next slide while presenting, scrolling on, a page chosen in the sidebar) it goes along, to the same place of that page:
+flipping through a presentation keeps each page covered as far. When its page is deleted it goes onto the page the view
+is at.
+
+## How it is built
+
+- `qt/src/canvas/CurtainLayer.*`: the curtain of a view (CanvasView::curtain()): where it lies, its handles, the hit tests
+  and the drags; two fingers as in GeometryToolLayer.
+- `qt/src/canvas/CanvasInput.cpp`: a press on it goes to it before anything else (actionStart; for touch at the start
+  of a touch).
+- `qt/src/quick/DocumentCanvasItem.cpp` (CurtainNode): black rectangles under a transform of their own, over the pages,
+  the selection and the setsquare (only the pen's hover dot is above it), cut at the canvas' edges; its handles as
+  small squares and a knob. Moving, turning or sizing it changes only that node: nothing is drawn on the CPU, no page
+  tile is composed again.
+- `qt/src/app/qml/CurtainPill.qml`, `AppController::toggleCurtain`, `curtain`, `curtainHandles`.
+
+Tests: `CurtainTest.*` (canvas: placing, input, handles, fingers, pages) and `CurtainCanvasTest.*` (quick: the window's
+picture, no page drawn again while it moves, nothing in the page's own picture).

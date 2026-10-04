@@ -32,6 +32,8 @@
 
 #include "gui/inputdevices/PositionInputData.h"
 
+#include "CurtainLayer.h"
+
 class QMouseEvent;
 class QNativeGestureEvent;
 class QTabletEvent;
@@ -182,6 +184,21 @@ private:
     bool toolGesture = false;
     /// The two fingers the tool follows; other ones (a finger lifted, another one down) start measuring anew
     std::pair<int, int> toolGestureFingers{-1, -1};
+    /// The curtain (CurtainLayer): a press of the pen or the mouse on it, and what it took (a handle, or the black
+    /// itself); `curtainScrolls`: the hand on the black with the handles hidden scrolls as usual
+    std::optional<CurtainLayer::Handle> curtainPress;
+    bool curtainScrolls = false;
+    /// How far a press may be from a handle of the curtain for this device
+    static double curtainReach(DeviceClass device);
+    /// A touch that began on the curtain: no long press, no link, a tap shows its handles
+    bool touchOnCurtain = false;
+    /// ... with its handles shown: the first finger drags what it is on (`touchCurtainId`), two fingers carry, turn
+    /// and size it (`curtainGesture`, following `curtainGestureFingers`)
+    bool touchCurtain = false;
+    int touchCurtainId = -1;
+    bool curtainGesture = false;
+    std::pair<int, int> curtainGestureFingers{-1, -1};
+    void endCurtainTouch();
     /// The setsquare / compass under this place of the view (in the coordinates of its page)?
     bool onGeometryTool(QPointF viewPos) const;
     QPointF onGeometryPage(QPointF viewPos) const;
