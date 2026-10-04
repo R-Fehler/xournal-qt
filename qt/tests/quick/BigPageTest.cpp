@@ -35,6 +35,7 @@
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
 #include "ScreenCalibration.h"
 
@@ -163,7 +164,7 @@ protected:
         const QImage shot = window->grabWindow();
         const QRectF page = view->pageViewRect(0);
         const QPointF at = canvas->mapToScene(page.topLeft() + QPointF(MARK_X, MARK_Y) * view->getViewController().zoom());
-        const QColor c(shot.pixel(at.toPoint()));
+        const QColor c(xqt::test::pixelAt(shot, window, at));
         return c.red() > 200 && c.green() < 80 && c.blue() < 80;
     }
     /// Show the point (x, y) of the poster (points) in the middle of the view

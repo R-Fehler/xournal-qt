@@ -7,6 +7,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtQuick.Window
+import "DevicePixels.js" as DevicePixels
 
 Rectangle {
     id: overview
@@ -121,7 +122,7 @@ Rectangle {
                         width: parent.width
                         height: overview.thumbHeight
                         color: "#ffffff"
-                        border.width: pageItem.pageNo === app.pageNumber - 1 ? 3 : 0
+                        border.width: DevicePixels.whole(pageItem.pageNo === app.pageNumber - 1 ? 3 : 0, Screen.devicePixelRatio)
                         border.color: Material.accentColor
                         Image {
                             anchors.fill: parent
@@ -129,7 +130,7 @@ Rectangle {
                             asynchronous: true
                             fillMode: Image.PreserveAspectFit
                             source: overview.visible ? app.pages.thumbnailUrl(pageItem.pageNo) : ""
-                            sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                            sourceSize.width: Math.ceil(width)
                         }
                         TapHandler { onTapped: overview.choose(pageItem.pageNo) }
                     }

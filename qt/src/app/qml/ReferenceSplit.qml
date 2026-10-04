@@ -16,6 +16,7 @@ import QtQuick.Layouts
 import QtQuick.Window
 import XournalQt.Canvas
 import "Popups.js" as Popups
+import "DevicePixels.js" as DevicePixels
 
 Item {
     id: split
@@ -259,14 +260,14 @@ Item {
                         width: parent.width - 16
                         height: parent.height - 32
                         color: "#ffffff"
-                        border.width: refCell.current ? 3 : 1
+                        border.width: DevicePixels.whole(refCell.current ? 3 : 1, Screen.devicePixelRatio)
                         border.color: refCell.current ? Material.accentColor : "#c9ccd1"
                         PagePicture {
                             anchors.fill: parent
                             anchors.margins: refFrame.border.width
                             sketch: refCell.sketch
                             thumbnail: refCell.thumbnail
-                            sourceWidth: Math.ceil(refFrame.width * Screen.devicePixelRatio / 128) * 128
+                            sourceWidth: Math.ceil(Math.ceil(refFrame.width * Screen.devicePixelRatio / 128) * 128 / Screen.devicePixelRatio)
                         }
                     }
                     Label {

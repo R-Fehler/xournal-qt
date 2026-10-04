@@ -8,6 +8,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtQuick.Window
+import "DevicePixels.js" as DevicePixels
 
 Rectangle {
     id: pageGrid
@@ -151,7 +152,7 @@ Rectangle {
                 height: Math.round(cell.frameW * cell.aspect)
                 color: "white"
                 // The current page, and pages with search hits
-                border.width: cell.current || cell.selected || cell.searchHitCount > 0 ? 3 : 0
+                border.width: DevicePixels.whole(cell.current || cell.selected || cell.searchHitCount > 0 ? 3 : 0, Screen.devicePixelRatio)
                 border.color: cell.current || cell.selected ? Material.accentColor : "#f9a825"
 
                 // The sketch right away, the sharp one on top of it (small cells: from the sketch too)
@@ -161,8 +162,8 @@ Rectangle {
                     sketch: cell.sketch
                     thumbnail: cell.thumbnail
                     racing: grid.race.racing
-                    // In steps, so zooming does not render every size.
-                    sourceWidth: Math.ceil(cell.frameW * cell.dpr / 128) * 128
+                    // In steps of 128 pixels of the screen, so zooming does not render every size.
+                    sourceWidth: Math.ceil(Math.ceil(cell.frameW * cell.dpr / 128) * 128 / cell.dpr)
                 }
                 // Search hits
                 Repeater {

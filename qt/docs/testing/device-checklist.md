@@ -2824,3 +2824,46 @@ letter words only where the recogniser is sure.
 - [ ] A big area at a high zoom (a whole A3 poster at 400 %): it takes a moment at most, the UI does not freeze, the
       picture is about 4 megapixels.
 - [ ] Windows, Android: the picture reaches other apps through the system clipboard (Android: paste into a messenger).
+
+## Fractional scaling: 125 %, 150 %, 175 % (qt/hidpi-fractional)
+qt/docs/hidpi.md (what the app does at each scale, per platform). The screen calibration page in Settings says the
+scale the app got ("This screen: …, scaled 125 %."); if it says 100 % or 200 % on a screen set to 125 % or 150 %,
+note the platform, the session (Wayland or X11) and `env | grep QT_`.
+
+- [ ] Kubuntu / Plasma Wayland, display at 125 %, then 150 %: the page sidebar, the page grid (four fingers or the
+      grid button), the tab overview, the contents overview and the library's page hits show sharp pages, as sharp
+      as at 100 %. Scroll quickly through a long PDF in the sidebar: no stutter, the pages appear as fast as at 100 %.
+      (They were drawn 2.25 times too wide at 150 %, 4 times at 200 %.)
+- [ ] At 125 % and 150 % (and at 100 %, at an odd zoom such as after a pinch): select a few strokes with the lasso.
+      The selection's dashed frame and its knobs are as crisp as the ink beside them (they were a little blurred),
+      and the frame sits exactly around the ink; moving and turning the selection keeps it crisp.
+- [ ] Windows (or Plasma with two screens of different scales): with a selection on the page, move the window from a
+      100 % screen to a 150 % one: the selection is drawn anew for that screen (crisp), as are the pages.
+- [ ] Curtain (B) at 125 % and 150 %: its square handles have frames equally thick on all four sides, wherever it is
+      moved; the round knob above it is crisp. Move the window to a screen of another scale (Windows, two monitors):
+      the knob is still crisp there (it was drawn once, for the first screen).
+- [ ] At 125 % and 150 %: the lines of the window are alike: the line between the tool bar and the pages, the
+      dividers between the tool bar's groups, the lines in Settings, the page menu, the find-paper sheet, the
+      Markdown format bar, a dialog's line under its title. Each is one pixel thin (two at 200 %), none of them
+      thicker than the others. The frames around the pages in the sidebar, page grid, reference grid, contents
+      overview and bookmarks are equally thick on all four sides (the current page's thick frame too).
+- [ ] (Known, from Qt's own style: the separators inside the pills and menus, ToolSeparator and MenuSeparator, may
+      still be one pixel on some and two on others. Note if it is noticeable.)
+- [ ] GNOME with fractional scaling at an odd scale (e.g. 133 % or 166 %), Windows at 110 %: the mouse's dot over
+      the page is crisp. With `XQT_PEN_CURSOR=0 ./xournal-qt` (the dot drawn by the app, as on Android) the pen's
+      dot is crisp too, not soft.
+- Per platform (each at 125 % and 150 %, then 175 % where offered; at each scale: open a PDF and a note, look at a
+  page at 100 % zoom next to the same page at 100 % scale: text and ink as sharp; the setsquare's marks crisp; the
+  tool bar and pills the same size relative to the screen as the system's own apps):
+  - [ ] Kubuntu / Plasma, Wayland session (System Settings → Display → Scale). The calibration page says "scaled
+        125 %" (or 150 %). Change the scale while the app runs: the window follows without a restart, pages sharp.
+  - [ ] Plasma, X11 session ("Plasma (X11)" at the login): the same; if it says 100 % or 200 %, note `xrdb -query |
+        grep dpi` and `env | grep QT_`.
+  - [ ] GNOME, Wayland, with fractional scaling turned on (Settings → Displays): 125 %, 150 % and an odd one GNOME
+        offers (e.g. 166 %). Start with `QT_QPA_PLATFORM=wayland ./xournal-qt` once to be sure it is not XWayland.
+  - [ ] Windows (Surface): 125 %, 150 %, 175 % (Settings → System → Display → Scale), each without a restart of the
+        app. Two monitors at different scales: drag the window from one to the other and back; pages, the sidebar's
+        pages, a selection, the curtain's knob and the mouse's dot are sharp on both, and their size follows.
+  - [ ] macOS: the default and a "scaled" resolution: everything as sharp as other Mac apps (the app gets 2x only).
+  - [ ] Optional: `QT_SCALE_FACTOR_ROUNDING_POLICY=Round ./xournal-qt` at 125 %: the app at 100 % (smaller, crisper
+        controls). Only for comparison; the default is meant to stay.

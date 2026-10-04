@@ -9,6 +9,7 @@ import XournalQt
 import XournalQt.Canvas
 import "Popups.js" as Popups
 import "ToolBarPlan.js" as ToolBarPlan
+import "DevicePixels.js" as DevicePixels
 
 ApplicationWindow {
     id: win
@@ -695,7 +696,7 @@ ApplicationWindow {
         Material.background: "#ffffff"
         Material.foreground: "#303030"
         height: visible ? 106 + (win.keyboardOpen ? 0 : win.safeBottom) : 0
-        Rectangle { width: parent.width; height: 1; color: "#d5d8dc" }  // (the line towards the pages)
+        Hairline { width: parent.width; color: "#d5d8dc" }  // (the line towards the pages)
       }
     }
     // The phone's tool dock: at the bottom (in the footer, above the navigation bar), or a rail at the right side when
@@ -765,11 +766,10 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         x: win.toolbarPosition === "right" ? parent.width - width : 0
         color: "#ffffff"
-        Rectangle {  // the line towards the pages
-            width: 1
+        Hairline {  // the line towards the pages
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            x: win.toolbarPosition === "right" ? 0 : parent.width - 1
+            x: win.toolbarPosition === "right" ? 0 : parent.width - thickness
             color: "#d5d8dc"
         }
     }
@@ -963,8 +963,9 @@ ApplicationWindow {
                         required property var modelData
                         x: modelData.x
                         y: modelData.y
-                        width: modelData.w
-                        height: modelData.h
+                        // (a line: whole device pixels thin)
+                        width: modelData.w <= 1 ? DevicePixels.whole(modelData.w, Screen.devicePixelRatio) : modelData.w
+                        height: modelData.h <= 1 ? DevicePixels.whole(modelData.h, Screen.devicePixelRatio) : modelData.h
                         color: "#d5d8dc"
                     }
                 }

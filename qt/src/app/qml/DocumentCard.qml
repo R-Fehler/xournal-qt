@@ -12,6 +12,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import "Fuzzy.js" as Fuzzy
+import "DevicePixels.js" as DevicePixels
 
 Item {
     id: card
@@ -446,8 +447,8 @@ Item {
                                     verticalAlignment: Image.AlignTop
                                     source: card.active && card.hitPassageBase !== ""
                                             ? card.hitPassageBase + "/" + passageCard.modelData.passage : ""
-                                    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
-                                    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
+                                    sourceSize.width: Math.ceil(width)  // (Qt Quick asks the provider for these times the pixel ratio)
+                                    sourceSize.height: Math.ceil(height)
                                 }
                             }
                         }
@@ -506,7 +507,7 @@ Item {
                             width: parent.width
                             height: hitPage.thumbHeight
                             color: "#ffffff"
-                            border.width: hitPage.hovered ? 2 : 1
+                            border.width: DevicePixels.whole(hitPage.hovered ? 2 : 1, Screen.devicePixelRatio)
                             border.color: hitPage.hovered ? Material.accentColor : "#d5d8dc"
                             Image {
                                 anchors.fill: parent
@@ -514,7 +515,7 @@ Item {
                                 asynchronous: true
                                 fillMode: Image.PreserveAspectFit
                                 source: card.active && card.hitPageBase !== "" ? card.hitPageBase + "/" + hitPage.modelData.page : ""
-                                sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                sourceSize.width: Math.ceil(width)
                             }
                             HitBadge {
                                 anchors.right: parent.right

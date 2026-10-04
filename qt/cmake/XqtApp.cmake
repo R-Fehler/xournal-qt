@@ -205,10 +205,12 @@ set(XQT_QML_FILES
     src/app/qml/ShortcutSheet.qml
     src/app/qml/LayerList.qml
     src/app/qml/PagePicture.qml
+    src/app/qml/Hairline.qml
     src/app/qml/RaceWatch.qml
     src/app/qml/FuzzyToggle.qml
     src/app/qml/FuzzyHelp.qml
     src/app/qml/Fuzzy.js
+    src/app/qml/DevicePixels.js
     src/app/qml/ReferenceSplit.qml
     src/app/qml/CanvasScrollBars.qml
     src/app/qml/LinkStatusLine.qml
@@ -278,11 +280,19 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CanvasItemRenderTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/GeometryToolTest.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/CurtainCanvasTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/ReferenceCanvasTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/quick/FractionalScaleTest.cpp)
     target_link_libraries(xqt-quick-tests PRIVATE xqt-quick Qt6::QuickControls2 Qt6::GuiPrivate Qt6::Test GTest::gtest)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # The canvas on a screen at 125 % and at 166.7 % (a scale GNOME offers; its pictures' pixels are not whole there)
+    add_test(NAME FractionalScaleCanvas.quick@125 COMMAND xqt-quick-tests --gtest_filter=FractionalScaleCanvas.*)
+    set_tests_properties(FractionalScaleCanvas.quick@125 PROPERTIES LABELS quick
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.25")
+    add_test(NAME FractionalScaleCanvas.quick@167 COMMAND xqt-quick-tests --gtest_filter=FractionalScaleCanvas.*)
+    set_tests_properties(FractionalScaleCanvas.quick@167 PROPERTIES LABELS quick
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.6666667")
 
     # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
     add_executable(xqt-ui-tests
@@ -296,13 +306,19 @@ if(XQT_BUILD_TESTS)
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.h
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/LayoutWalk.cpp
         ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveAuditTest.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveLayoutTest.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/AdaptiveLayoutTest.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/../tests/ui/FractionalScaleTest.cpp)
     target_link_libraries(xqt-ui-tests PRIVATE xqt-quick xqt-shell xqt-uiplugin Qt6::QuickControls2 Qt6::Test
         GTest::gtest)
     target_compile_definitions(xqt-ui-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     target_include_directories(xqt-ui-tests PRIVATE "${TEST_CONFIG_DIR}")
     gtest_discover_tests(xqt-ui-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS ui
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # The same window on a screen at 150 % (qt/docs/hidpi.md): Qt's own scale factor, as on Wayland, X11 and Windows.
+    # (A screen big enough for the desktop layout: the default off-screen one, 800 x 600 pixels, is 533 x 400 at 150 %.)
+    add_test(NAME FractionalScale.ui@150 COMMAND xqt-ui-tests --gtest_filter=FractionalScale.*)
+    set_tests_properties(FractionalScale.ui@150 PROPERTIES LABELS ui ENVIRONMENT
+        "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_LIST_DIR}/../tests/ui/offscreen-hidpi.json;QT_SCALE_FACTOR=1.5")
 
     add_executable(xqt-shell-tests
         ${CMAKE_CURRENT_LIST_DIR}/../tests/shell/main.cpp

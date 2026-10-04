@@ -29,6 +29,7 @@
 #include "CanvasMemory.h"
 #include "CanvasPage.h"
 #include "CanvasView.h"
+#include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
 #include "ScreenCalibration.h"
 
@@ -129,7 +130,7 @@ protected:
             // (the lines of the ruled paper are light blue: look at a few pixels)
             Shows what = Shows::Page;
             for (int dy: {0, 7, 13}) {
-                const QColor c(shot.pixel(r.center().toPoint() + QPoint(0, dy)));
+                const QColor c(xqt::test::pixelAt(shot, window, r.center().toPoint() + QPoint(0, dy)));
                 if (c == QColor(Qt::red)) {
                     what = Shows::Preview;
                 } else if (c.lightness() < 150) {
@@ -212,11 +213,11 @@ TEST_F(CanvasItemRenderTest, aPinchThatEndedIsRenderedWithoutTheZoomWait) {
 }
 
 // Screen calibration (ScreenCalibration.h): at 100 % a line of 10 cm on the page is 10 cm on the calibrated screen,
-// 10 / 2.54 * dpi logical pixels (the window's device pixel ratio is 1 off-screen).
+// 10 / 2.54 * dpi logical pixels, 10 / 2.54 * dpi * dpr pixels of the screen (dpr: 1 off-screen, or QT_SCALE_FACTOR).
 TEST_F(CanvasItemRenderTest, aTenCentimetreLineIsTenCentimetresLongAtHundredPercent) {
     const auto display = ScreenCalibration::displayOf(window->screen(), window->effectiveDevicePixelRatio());
     ASSERT_FALSE(display.key.isEmpty());
-    ASSERT_DOUBLE_EQ(display.dpr, 1.0);
+    const double dpr = display.dpr;
     ViewController& vc = view->getViewController();
     // (not what the screen says: the calibration is what counts)
     const double dpi = 150.0;
@@ -244,8 +245,8 @@ TEST_F(CanvasItemRenderTest, aTenCentimetreLineIsTenCentimetresLongAtHundredPerc
     const QImage shot = window->grabWindow();
     const QRectF page = view->pageViewRect(0);
     const QPointF start = canvas->mapToScene(page.topLeft() + from * vc.zoom());
-    const int y = static_cast<int>(std::lround(start.y()));
-    ASSERT_LT(start.x() + tenCm * vc.zoom() + 10, shot.width()) << "the line is in view";
+    const int y = xqt::test::devicePixel(window, start).y();
+    ASSERT_LT((start.x() + tenCm * vc.zoom() + 10) * dpr, shot.width()) << "the line is in view";
     int first = -1, last = -1;
     for (int x = 0; x < shot.width(); ++x) {
         const QColor c(shot.pixel(x, y));
@@ -256,6 +257,6 @@ TEST_F(CanvasItemRenderTest, aTenCentimetreLineIsTenCentimetresLongAtHundredPerc
     }
     ASSERT_GE(first, 0) << "the line is drawn";
     // The round caps add half the line's width at each end
-    const double length = (last - first + 1) - 1.0 * vc.zoom();
-    EXPECT_NEAR(length, 10.0 / 2.54 * dpi, 2.0) << "from x " << first << " to " << last;
+    const double length = (last - first + 1) - 1.0 * vc.zoom() * dpr;
+    EXPECT_NEAR(length, 10.0 / 2.54 * dpi * dpr, 2.0) << "from x " << first << " to " << last;
 }

@@ -507,10 +507,13 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   merged PDF) and, as the author decided, in a `.xopp` too (a turned copy in the hidden `.name.pages.pdf` that
   Xournal++ reads). Left: the device pass; no haptic tick (none in
   the app); Markdown boxes and sticky notes stay upright.*
-- [ ] `qt/hidpi-fractional`: check fractional scaling (125 %, 150 %, 175 %) on Plasma and GNOME (Wayland and X11),
+- [x] `qt/hidpi-fractional`: check fractional scaling (125 %, 150 %, 175 %) on Plasma and GNOME (Wayland and X11),
   Windows and macOS: Qt 6 passes the factor through (`HighDpiScaleFactorRoundingPolicy::PassThrough`); check that
   nothing in the app rounds it, that pages, thumbnails and the setsquare are sharp, and that lines and borders of
-  the UI do not blur or jump. Tests with `QT_SCALE_FACTOR=1.25/1.5`.
+  the UI do not blur or jump. Tests with `QT_SCALE_FACTOR=1.25/1.5`. *Audited and fixed (qt/docs/hidpi.md):
+  thumbnails were drawn at dpr², the selection, curtain handles and the drawn pen dot were off device pixels, the
+  app's lines and page frames uneven. Left: the device pass; Qt's own ToolSeparator/MenuSeparator are still uneven
+  (author's call), CurtainCanvasTest at 200 % in the software renderer.*
 - [x] `qt/snip`: a quick **area screenshot**: a lasso or rectangle (reusing the selection tools) copies the
   canvas's pixels (ink and background, at a good resolution) to the clipboard as an image. In the selection tools'
   cycle and in the insert image entry. Pasting it into a xournal-qt document offers to add a link to the source

@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import "DevicePixels.js" as DevicePixels
 
 FocusScope {
     id: view
@@ -124,7 +125,7 @@ FocusScope {
                                     width: parent.width
                                     height: Math.round(view.thumbWidth * Math.min(page.aspect, 1.6))
                                     color: "#ffffff"
-                                    border.width: page.hovered ? 2 : 1
+                                    border.width: DevicePixels.whole(page.hovered ? 2 : 1, Screen.devicePixelRatio)
                                     border.color: page.hovered ? Material.accentColor : "#d5d8dc"
                                     clip: true
                                     Image {
@@ -134,7 +135,7 @@ FocusScope {
                                         fillMode: Image.PreserveAspectFit
                                         verticalAlignment: Image.AlignTop
                                         source: view.shown ? doc.model.pageBase + "/" + page.modelData.page : ""
-                                        sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+                                        sourceSize.width: Math.ceil(width)
                                     }
                                     // The ribbon of a bookmarked page
                                     Image {

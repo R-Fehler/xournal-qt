@@ -9,6 +9,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtQuick.Window
+import "DevicePixels.js" as DevicePixels
 
 Rectangle {
     id: sidebar
@@ -226,7 +227,7 @@ Rectangle {
                 width: list.width - 36
                 height: width * entry.aspect
                 color: "white"
-                border.width: entry.current || entry.selected || entry.searchHitCount > 0 ? 3 : 1
+                border.width: DevicePixels.whole(entry.current || entry.selected || entry.searchHitCount > 0 ? 3 : 1, Screen.devicePixelRatio)
                 border.color: entry.selected || entry.current ? Material.accentColor
                             : (entry.searchHitCount > 0 ? "#f9a825" : "#b9bcc1")
                 PagePicture {
@@ -238,7 +239,7 @@ Rectangle {
                     racing: list.race.racing
                     // By the frame, not by this image: the frame's border is thicker on the current page, and a new
                     // size would draw the page again - each page that is scrolled past blinked
-                    sourceWidth: Math.round(frame.width * Screen.devicePixelRatio)
+                    sourceWidth: Math.round(frame.width)
                 }
                 Repeater {
                     model: entry.searchHits

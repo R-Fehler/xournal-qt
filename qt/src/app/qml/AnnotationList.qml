@@ -227,8 +227,7 @@ Item {
                         source: entry.picture
                         // (the row's width, not the image's: that one changes while the row is laid out, and each
                         // width would be a picture drawn)
-                        sourceSize.width: Math.round((entry.width - entry.leftPadding - entry.rightPadding - 9)
-                                                     * Screen.devicePixelRatio)
+                        sourceSize.width: Math.round(entry.width - entry.leftPadding - entry.rightPadding - 9)
                         fillMode: Image.PreserveAspectFit
                         horizontalAlignment: Image.AlignLeft
                         asynchronous: true

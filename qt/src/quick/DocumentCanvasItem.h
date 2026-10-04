@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include <QCursor>
 #include <QMatrix4x4>
@@ -157,8 +158,21 @@ public:
         QRectF sheet;  ///< (the spotlight: its hole)
         bool spotlight = false;
         int handles = 0;
+        std::vector<QRectF> handleFrames;  ///< the square handles (item coordinates)
+        std::vector<QRectF> handleFills;   ///< ... their white inside
+        QRectF knob;                       ///< the knob that turns it (item coordinates; empty: none)
+        QSize knobPixels;                  ///< its picture's pixels
     };
     CurtainShown curtainShown() const { return curtainStats; }
+    /// The selection's picture in the last frame (tests): shown or not, where (item coordinates), its pixels and the
+    /// pixel ratio it was drawn for.
+    struct SelectionShown {
+        bool shown = false;
+        QRectF rect;
+        QSize pixels;
+        double dpr = 0;
+    };
+    SelectionShown selectionShown() const { return selectionStats; }
     /// The pointer the canvas draws itself (tests; qt/docs/hover-cursors.md): for a pen the platform shows no cursor
     /// for, and an eraser too big for a cursor. Shown or not, where its middle is (item coordinates), its side (logical
     /// pixels), and the eraser it shows (none: the dot).
@@ -167,6 +181,8 @@ public:
         QPointF center;
         double side = 0;
         std::optional<xqt::hover::EraserMark> eraser;
+        QRectF dot;       ///< the dot's picture (item coordinates of the mark; empty: none drawn yet)
+        QSize dotPixels;  ///< ... and its pixels
     };
     HoverMarkShown hoverMarkShown() const;
 
@@ -286,4 +302,5 @@ private:
     QTimer geometryTimer;
     GeometryShown geometryStats;
     CurtainShown curtainStats;
+    SelectionShown selectionStats;
 };

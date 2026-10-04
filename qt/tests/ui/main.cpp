@@ -17,7 +17,10 @@
 Q_IMPORT_QML_PLUGIN(XournalQtPlugin)
 
 int main(int argc, char* argv[]) {
-    qputenv("QT_QPA_PLATFORM", "offscreen");
+    // (or offscreen with options: FractionalScale.ui@150 gives it a bigger screen, qt/tests/ui/offscreen-hidpi.json)
+    if (!qEnvironmentVariable("QT_QPA_PLATFORM").startsWith("offscreen")) {
+        qputenv("QT_QPA_PLATFORM", "offscreen");
+    }
     // The controller uses the default config/cache folders: keep them out of the user's home.
     QTemporaryDir home;
     qputenv("XDG_CONFIG_HOME", (home.path() + "/config").toUtf8());

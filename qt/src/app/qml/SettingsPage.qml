@@ -257,7 +257,7 @@ Popup {
             TabButton { objectName: "shortcutsTab"; text: qsTr("Shortcuts"); width: implicitWidth }
             TabButton { objectName: "helpTab"; text: qsTr("Help"); width: implicitWidth }
         }
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#e0e0e0"; visible: !sheet.phone || sheet.sectionShown }
+        Hairline { Layout.fillWidth: true; color: "#e0e0e0"; visible: !sheet.phone || sheet.sectionShown }
 
         StackLayout {
             objectName: "settingsSections"

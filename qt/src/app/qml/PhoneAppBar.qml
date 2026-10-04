@@ -27,10 +27,9 @@ Rectangle {
     implicitHeight: 48 + topInset
     color: "#f1f3f4"
 
-    Rectangle {  // the line towards the page
+    Hairline {  // the line towards the page
         anchors.bottom: parent.bottom
         width: parent.width
-        height: 1
         color: "#d5d8dc"
     }
 

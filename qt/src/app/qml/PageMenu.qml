@@ -172,7 +172,7 @@ Popup {
                 onClicked: { app.reference.showBeside(menu.page); menu.close(); menu.referenced() }
             }
         }
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#e2e5e9" }
+        Hairline { Layout.fillWidth: true; color: "#e2e5e9" }
         // The page's background and its size, side by side (the menu stays short)
         RowLayout {
             Layout.fillWidth: true
