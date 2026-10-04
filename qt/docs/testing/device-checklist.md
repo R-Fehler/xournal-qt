@@ -2834,3 +2834,22 @@ letter words only where the recogniser is sure.
 - [ ] `📅 2026-10-12` and `due:2026-10-12` show as a date chip; typing 📅 with the emoji picker works the same.
 - [ ] A library indexed by an older build: opening it reads its documents once more (a short indexing count), then
       not again at the next start.
+
+## To-dos: the view (qt/todos)
+
+- [ ] Library home → To-dos (the switch, after Bookmarks): groups by document with the count at the right; the
+      folder beside the name. "By folder" and "Not grouped" (then each row says its document).
+- [ ] Sort: due date (overdue in red, today in amber, this week in blue), document, last changed (a document saved
+      just now comes first).
+- [ ] Filters: Open / Done / Open and done; Overdue, Due today, Due this week, No due date; the text field (Escape
+      clears it); "Only in <folder>" after going into a folder in the Library tab.
+- [ ] Tap a row: the document opens at the page with the to-do's line in view (also a `.md`: the right page).
+- [ ] Tick a to-do of a closed `.md`: the file changes only in that character (diff it); of a closed `.xopp`: no tab
+      opens, the file is saved, the row disappears from "Open" after a moment.
+- [ ] Tick a to-do of a closed PDF with notes / PDF text document: saved into the PDF (another PDF app shows the box
+      ticked), no tab.
+- [ ] Tick a to-do of an open document: ticked there, Ctrl+Z in the document takes it back; a document with other
+      unsaved changes stays unsaved (the row shows the tick until it is saved).
+- [ ] A read-only `.md` (chmod 444, not as root) or an archive PDF: a message says why, nothing changes.
+- [ ] Phone (portrait): the filters scroll sideways in one row, the rows are easy to hit, the check box does not open
+      the document; press and hold a row: the sheet with Open, Mark as done, Add to calendar.

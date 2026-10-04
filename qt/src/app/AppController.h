@@ -53,6 +53,7 @@ class HandwritingSettings;
 class CanvasView;
 class LibraryArchive;
 class LibraryBookmarksModel;
+class LibraryTodosModel;
 class LibraryMove;
 namespace LibraryMigration {
 struct Plan;
@@ -745,6 +746,19 @@ public:
     /// Open a document at a page (a bookmark of the library's Bookmarks view).
     Q_INVOKABLE bool openBookmark(const QString& path, int page);
     QObject* libraryBookmarksModel() const;
+
+    // --- to-dos (AppTodos.cpp, qt/docs/todos.md) ---
+    /// The library's To-dos view (LibraryTodosModel)
+    Q_PROPERTY(QObject* libraryTodos READ libraryTodosModel CONSTANT)
+    QObject* libraryTodosModel() const;
+    /// Tick or untick a to-do of the To-dos view (its text as written and its occurrence, LibraryIndex::Todo): in its
+    /// document where it is open (one undo step there; saved when it had no other changes), else in its file in the
+    /// background (a Markdown file through its text; a .xopp or a PDF with notes loaded, changed and saved as the app
+    /// saves them). A file that cannot be changed (read-only, an archive PDF, ...) is not: a message says why. False if
+    /// it was not done (or is not started).
+    Q_INVOKABLE bool setTodoDone(const QString& path, const QString& rawText, int occurrence, bool done);
+    /// Open a to-do's document at its page, with its line in view (`page`: where the index has it, -1: not known).
+    Q_INVOKABLE bool openTodo(const QString& path, const QString& rawText, int occurrence, int page);
 
     /// The title page of the current document (its preview in the library and the overview; 0-based, -1: the
     /// document has no file yet, so there is nowhere to keep it).
@@ -1529,6 +1543,16 @@ private:
     std::unique_ptr<xqt::LibraryModel> ownLibrary;
     std::unique_ptr<xqt::LibraryBookmarksModel> ownLibraryBookmarks;
     xqt::LibraryBookmarksModel* libraryBookmarks = nullptr;
+    std::unique_ptr<xqt::LibraryTodosModel> ownLibraryTodos;
+    xqt::LibraryTodosModel* libraryTodos = nullptr;
+    /// Documents that are not open, loaded to tick a to-do in them and saved (gone once saved)
+    std::vector<std::unique_ptr<xqt::DocumentSession>> todoSaves;
+    /// Tabs of all windows of this process whose document is `file` (its .xopp or PDF, or a text file edited)
+    std::vector<std::pair<AppController*, xqt::DocumentSession*>> tabsShowing(const fs::path& file) const;
+    /// Set a to-do in an open document: one undo step (false: it is not there)
+    bool setTodoIn(xqt::DocumentSession& s, const QString& rawText, int occurrence, bool done);
+    /// The to-dos setting into the view (it changes with the settings)
+    void applyTodoRules();
     std::unique_ptr<xqt::RecentFiles> ownRecent;
     xqt::SettingsModel* settingsView = nullptr;
     xqt::LibraryModel* library = nullptr;

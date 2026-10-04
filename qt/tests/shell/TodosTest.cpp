@@ -11,6 +11,7 @@
 #include <memory>
 
 #include <QCborMap>
+#include <QDate>
 #include <QTemporaryDir>
 #include <gtest/gtest.h>
 
@@ -24,6 +25,8 @@
 #include "shell/DocumentFiles.h"
 #include "shell/Library.h"
 #include "shell/LibraryCache.h"
+#include "shell/LibraryModel.h"
+#include "shell/LibraryTodos.h"
 #include "shell/Todos.h"
 
 #include "MarkdownFile.h"
@@ -271,6 +274,75 @@ TEST(Todos, entriesFromBeforeAreReadAgainOnce) {
     third.update(DocumentFiles::scanRecursive(root));
     third.waitForDone();
     EXPECT_EQ(third.documentsRead(), 0) << "once";
+}
+
+// The To-dos view: grouped by document with counts, sorted by due date (done ones last), filtered by state, due date,
+// text and the library's current folder; the setting decides which lines are listed
+TEST(Todos, theViewGroupsSortsAndFilters) {
+    QTemporaryDir tmp;
+    const fs::path root = fs::path(tmp.path().toStdString()) / "Library";
+    writeFile(root / "alpha.md", "- [ ] todo: late due:2026-10-01\n- [ ] todo: no date\n- [x] todo: finished\n"
+                                 "- [ ] plain item\n");
+    writeFile(root / "Sub" / "beta.md", "- [ ] todo: soon \xF0\x9F\x93\x85 2026-10-06\n- [ ] todo: today due:2026-10-04\n");
+    LibraryModel model;
+    model.setLibrary(std::make_unique<Library>(root));
+    model.searchIndex()->waitForDone();
+    LibraryTodosModel view(&model);
+    view.setToday(QDate(2026, 10, 4));  // (a Sunday: the week ends today where it begins on Monday)
+    EXPECT_EQ(view.count(), 0) << "made only while shown";
+    view.setActive(true);
+    auto shown = [&] {
+        std::vector<std::string> out;
+        for (int i = 0; i < view.count(); ++i) {
+            out.push_back(view.data(view.index(i), LibraryTodosModel::TextRole).toString().toStdString());
+        }
+        return out;
+    };
+    // By due date; grouped by document in the order the groups first come
+    EXPECT_EQ(shown(), (std::vector<std::string>{"late", "no date", "today", "soon"}));
+    EXPECT_EQ(view.total(), 5) << "the marked ones, also done";
+    EXPECT_EQ(view.data(view.index(0), LibraryTodosModel::GroupCountRole).toInt(), 2);
+    EXPECT_EQ(view.data(view.index(0), LibraryTodosModel::DueStateRole).toString(), "overdue");
+    EXPECT_EQ(view.data(view.index(2), LibraryTodosModel::DueStateRole).toString(), "today");
+    EXPECT_EQ(view.groupOf(QString::fromStdString((root / "Sub" / "beta.md").string())).value("folder").toString(),
+              "Sub");
+    view.setGrouping("none");
+    EXPECT_EQ(shown(), (std::vector<std::string>{"late", "today", "soon", "no date"}));
+    view.setSortBy("document");
+    EXPECT_EQ(shown(), (std::vector<std::string>{"late", "no date", "soon", "today"}));
+    view.setSortBy("due");
+    view.setStatus("all");
+    EXPECT_EQ(shown().back(), "finished");
+    view.setStatus("done");
+    EXPECT_EQ(shown(), (std::vector<std::string>{"finished"}));
+    view.setStatus("open");
+    view.setDue("overdue");
+    EXPECT_EQ(shown(), (std::vector<std::string>{"late"}));
+    view.setDue("week");
+    EXPECT_EQ(shown(), (std::vector<std::string>{"today"})) << "the week ends today";
+    view.setDue("none");
+    EXPECT_EQ(shown(), (std::vector<std::string>{"no date"}));
+    view.setDue("any");
+    view.setQuery("SOO");
+    EXPECT_EQ(shown(), (std::vector<std::string>{"soon"}));
+    view.setQuery("");
+    model.setFolder("Sub");
+    view.setFolderOnly(true);
+    EXPECT_EQ(shown(), (std::vector<std::string>{"today", "soon"}));
+    view.setFolderOnly(false);
+    todos::Rules all;
+    all.all = true;
+    view.setRules(all);
+    EXPECT_EQ(view.count(), 5);
+    // A to-do ticked: shown so at once, until the index has it
+    view.setRules({});
+    view.setPending(QString::fromStdString((root / "alpha.md").string()), "todo: late due:2026-10-01", 0, true);
+    EXPECT_TRUE(view.data(view.index(0), LibraryTodosModel::DoneRole).toBool());
+    EXPECT_TRUE(view.data(view.index(0), LibraryTodosModel::PendingRole).toBool());
+    view.refresh();
+    EXPECT_EQ(view.count(), 3) << "a pending done one is not open";
+    view.clearPending(QString::fromStdString((root / "alpha.md").string()), "todo: late due:2026-10-01", 0);
+    EXPECT_EQ(view.count(), 4);
 }
 
 // Written back: a Markdown file through its text (only the mark changes; the same text twice: the right one); a
