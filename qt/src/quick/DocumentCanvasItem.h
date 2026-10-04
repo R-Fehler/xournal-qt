@@ -181,6 +181,8 @@ public:
         QPointF center;
         double side = 0;
         std::optional<xqt::hover::EraserMark> eraser;
+        QRectF dot;       ///< the dot's picture (item coordinates of the mark; empty: none drawn yet)
+        QSize dotPixels;  ///< ... and its pixels
     };
     HoverMarkShown hoverMarkShown() const;
 

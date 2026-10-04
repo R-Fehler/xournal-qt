@@ -2639,3 +2639,6 @@ note the platform, the session (Wayland or X11) and `env | grep QT_`.
       overview and bookmarks are equally thick on all four sides (the current page's thick frame too).
 - [ ] (Known, from Qt's own style: the separators inside the pills and menus, ToolSeparator and MenuSeparator, may
       still be one pixel on some and two on others. Note if it is noticeable.)
+- [ ] GNOME with fractional scaling at an odd scale (e.g. 133 % or 166 %), Windows at 110 %: the mouse's dot over
+      the page is crisp. With `XQT_PEN_CURSOR=0 ./xournal-qt` (the dot drawn by the app, as on Android) the pen's
+      dot is crisp too, not soft.

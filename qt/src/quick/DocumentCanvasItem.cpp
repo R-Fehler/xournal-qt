@@ -492,6 +492,8 @@ public:
         update();
     }
     std::optional<xqt::hover::EraserMark> eraser;
+    QRectF dotRect;  ///< the dot's picture in the last frame (tests)
+    QSize dotPixels;
 
 protected:
     void itemChange(ItemChange change, const ItemChangeData& value) override {
@@ -518,10 +520,15 @@ protected:
         const QPointF center(width() / 2, height() / 2);
         if (!eraser) {
             auto* dot = new QSGSimpleTextureNode;
-            dot->setTexture(window()->createTextureFromImage(xqt::hover::dotImage(dpr)));
+            const QImage picture = xqt::hover::dotImage(dpr);
+            dot->setTexture(window()->createTextureFromImage(picture));
             dot->setOwnsTexture(true);
             dot->setFiltering(QSGTexture::Linear);
-            dot->setRect(QRectF(0, 0, width(), height()));
+            // One pixel of it for each of the screen, from the item's top left (on a whole device pixel): its
+            // ceil(side * dpr) pixels are a little more than the side at a ratio such as 1.1 or 1.33
+            dot->setRect(QRectF(0, 0, picture.width() / dpr, picture.height() / dpr));
+            dotRect = dot->rect();
+            dotPixels = dot->texture()->textureSize();
             root->appendChildNode(dot);
             return root;
         }
@@ -776,6 +783,8 @@ DocumentCanvasItem::HoverMarkShown DocumentCanvasItem::hoverMarkShown() const {
         shown.side = hoverMark->width();
         shown.center = hoverMark->position() + QPointF(hoverMark->width() / 2, hoverMark->height() / 2);
         shown.eraser = hoverMark->eraser;
+        shown.dot = hoverMark->dotRect;
+        shown.dotPixels = hoverMark->dotPixels;
     }
     return shown;
 }

@@ -265,10 +265,13 @@ if(XQT_BUILD_TESTS)
     target_compile_definitions(xqt-quick-tests PRIVATE XQT_BUILD_RESOURCE_DIR="${XQT_BUILD_RESOURCE_DIR}")
     gtest_discover_tests(xqt-quick-tests DISCOVERY_TIMEOUT 30 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-    # The canvas on a screen at 125 % (qt/docs/hidpi.md)
+    # The canvas on a screen at 125 % and at 166.7 % (a scale GNOME offers; its pictures' pixels are not whole there)
     add_test(NAME FractionalScaleCanvas.quick@125 COMMAND xqt-quick-tests --gtest_filter=FractionalScaleCanvas.*)
     set_tests_properties(FractionalScaleCanvas.quick@125 PROPERTIES LABELS quick
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.25")
+    add_test(NAME FractionalScaleCanvas.quick@167 COMMAND xqt-quick-tests --gtest_filter=FractionalScaleCanvas.*)
+    set_tests_properties(FractionalScaleCanvas.quick@167 PROPERTIES LABELS quick
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_SCALE_FACTOR=1.6666667")
 
     # The real window (Main.qml) with an AppController, off-screen: shortcuts, sheets, tab overview.
     add_executable(xqt-ui-tests

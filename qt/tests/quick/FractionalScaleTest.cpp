@@ -35,6 +35,7 @@
 #include "CurtainLayer.h"
 #include "DevicePixels.h"
 #include "DocumentCanvasItem.h"
+#include "HoverPointer.h"
 
 using namespace xqt;
 
@@ -246,4 +247,54 @@ TEST_F(FractionalScaleCanvas, aScreenOfAnotherScaleGetsPicturesForItsPixels) {
     const auto shown = canvas->curtainShown();
     EXPECT_NEAR(shown.knobPixels.width(), shown.knob.width() * now, 1e-6) << "the curtain's knob";
 #endif
+}
+
+// A pen the platform shows no cursor for (Android): the canvas draws the dot. Its picture (ceil(side * dpr) pixels) is
+// shown with one pixel for each of the screen, on whole device pixels. Where side * dpr is not whole (ratios such as
+// 1.1, 1.33 or 1.67, which GNOME and Windows offer) it was squeezed into the item's side, a fraction of a pixel less,
+// and blurred. (CTest runs this at 1.25 and 1.67.)
+TEST_F(FractionalScaleCanvas, theDrawnDotOfThePenIsShownPixelForPixel) {
+    QPointingDevice pen{"fractional pen",
+                        2101,
+                        QInputDevice::DeviceType::Stylus,
+                        QPointingDevice::PointerType::Pen,
+                        QInputDevice::Capability::Position | QInputDevice::Capability::Pressure,
+                        1,
+                        3};
+    QWindowSystemInterface::registerInputDevice(&pen);
+    hover::setPlatformShowsPenCursorForTests(false);
+    struct Restore {
+        ~Restore() { hover::setPlatformShowsPenCursorForTests(std::nullopt); }
+    } restore;
+    const QPointF at(300.3, 250.6);
+    ulong timestamp = 1000;
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &pen, true, xqt::test::nativeLocal(window, at), xqt::test::nativeGlobal(window, at));
+    QWindowSystemInterface::handleTabletEvent(window, timestamp++, &pen, xqt::test::nativeLocal(window, at),
+                                              xqt::test::nativeGlobal(window, at), Qt::NoButton, 0, 0, 0, 0, 0, 0,
+                                              Qt::NoModifier);
+    QWindowSystemInterface::flushWindowSystemEvents();
+    settle(200);
+    const auto shown = canvas->hoverMarkShown();
+    ASSERT_TRUE(shown.visible);
+    ASSERT_FALSE(shown.dot.isEmpty());
+    EXPECT_NEAR(shown.dotPixels.width(), shown.dot.width() * dpr, 1e-3) << "one pixel of it for each of the screen";
+    EXPECT_EQ(shown.dotPixels.width(), static_cast<int>(std::ceil(hover::dotSide() * dpr)));
+    const QPointF topLeft =
+            canvas->mapToScene(shown.center - QPointF(shown.side / 2, shown.side / 2)) + shown.dot.topLeft();
+    EXPECT_TRUE(whole(topLeft.x() * dpr) && whole(topLeft.y() * dpr)) << "on whole device pixels";
+    QWindowSystemInterface::handleTabletEnterLeaveProximityEvent(
+            window, timestamp++, &pen, false, xqt::test::nativeLocal(window, at), xqt::test::nativeGlobal(window, at));
+    QWindowSystemInterface::flushWindowSystemEvents();
+}
+
+// The mouse's dot is a cursor of the platform: its pixmap has the screen's pixels and says its pixel ratio, so the
+// platform shows it at its size and sharp (Wayland, X11 and Windows scale a cursor without a ratio).
+TEST_F(FractionalScaleCanvas, theDotCursorHasTheScreensPixels) {
+    QTest::mouseMove(window, QPoint(300, 300));
+    settle(50);
+    ASSERT_EQ(canvas->cursor().shape(), Qt::BitmapCursor);
+    const QPixmap dot = canvas->cursor().pixmap();
+    EXPECT_DOUBLE_EQ(dot.devicePixelRatio(), dpr);
+    EXPECT_EQ(dot.width(), static_cast<int>(std::ceil(hover::dotSide() * dpr)));
 }
