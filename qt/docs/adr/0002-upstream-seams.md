@@ -15,7 +15,8 @@ The Qt build compiles upstream Xournal++ sources from `src/` unchanged wherever 
 | `qt/compat/include/control/Control.h` | **Shadow of the GTK application object.** An abstract *per-document session* interface with the subset of upstream `Control` methods that reused code calls (same names and signatures). It derives from `DocumentHandler`, so the `fire*` events are upstream's. The Qt app implements it once per tab. |
 | `qt/compat/include/gui/MainWindow.h`, `gui/XournalView.h`, `gui/XournalppCursor.h`, `control/ScrollHandler.h` | Abstract shadows of the GTK glue classes that reused code reaches through `Control` (for example `control->getWindow()->getXournal()->recreatePdfCache()`). |
 | `qt/compat/DeviceId.cpp` | GDK-free implementation of upstream `gui/inputdevices/DeviceId.h` (device identity = address of the `QPointingDevice`). |
-| `qt/compat/include/gui/PageView.h` | `XojPageView` as seen by the selection code (page, pixel position, selection color, re-render); implemented by `CanvasPage`. |
+| `qt/compat/include/gui/PageView.h` | `XojPageView` as seen by the selection code (page, pixel position, selection color, re-render) and the laser pointer (`deleteLaserPointerHandler`); implemented by `CanvasPage`. |
+| `qt/compat/include/control/tools/LaserPointerHandler.h` | Upstream's `LaserPointerHandler` with the same API, so upstream's `view/overlays/LaserPointerView.cpp` compiles unmodified; implemented by `qt/src/canvas/LaserPointerHandler.cpp` (a port: QTimer instead of GLib timeouts, which need a GLib main loop that Qt has not on Windows, Android or macOS). |
 | `qt/compat/include/gui/Layout.h` | Page at a point, total size, visible rectangle, relative scroll (moving a selection across pages, edge scrolling); implemented by `CanvasView`. |
 | `qt/compat/include/control/zoom/ZoomControl.h` | Zoom values and zoom listeners for reused tools (spline, selection), fed by the canvas' `ViewController`. |
 | `qt/compat/gtkshim/gdk/gdkkeysyms.h` | GDK key symbol values used by reused tools. |
@@ -61,7 +62,8 @@ Each port records its upstream origin in a comment. Re-check them after upstream
 |-----------|-----------------|
 | `qt/src/render/PageRaster.*` | `control/jobs/RenderJob.cpp`; buffer handling of `gui/PageView.cpp` (`rerenderPage`, `rerenderRect`). Additions: fractional DPI (scaled template surface for `Mask`), and the PDF background rendered outside the document lock. |
 | `qt/src/render/RenderService.*` | `control/jobs/Scheduler.cpp` / `XournalScheduler.cpp` (render part, including `blockRerenderZoom`). Several worker threads instead of one. |
-| `qt/src/canvas/CanvasPage.*` | `gui/PageView.cpp` (`XojPageView`): `onButtonPressEvent/onMotionNotifyEvent/onButtonReleaseEvent/onSequenceCancelEvent` (pen/highlighter/whiteout, eraser), `drawAndDeleteToolView`, `elementChanged`, `paintPage` (buffer plus overlays, now per tile). |
+| `qt/src/canvas/CanvasPage.*` | `gui/PageView.cpp` (`XojPageView`): `onButtonPressEvent/onMotionNotifyEvent/onButtonReleaseEvent/onSequenceCancelEvent` (pen/highlighter/whiteout, eraser, laser pointer), `deleteLaserPointerHandler`, `drawAndDeleteToolView`, `elementChanged`, `paintPage` (buffer plus overlays, now per tile). |
+| `qt/src/canvas/LaserPointerHandler.cpp` | `control/tools/LaserPointerHandler.cpp`: the same steps and timing (the fade starts `laserPointerFadeOutTime` after the pen is lifted, then 50 ms steps of alpha 25), with a QTimer. |
 | `qt/src/canvas/CanvasInput.*` | `gui/inputdevices/PenInputHandler.cpp` (`actionStart/Motion/End`, `filterPressure`, `inferPressureValue`, page crossing), `StylusInputHandler.cpp` (barrel buttons, `changeTool`), `MouseInputHandler.cpp`, `AbstractInputHandler::getInputDataRelativeToCurrentPage`. Touch navigation and palm rejection follow the M0 spike and Krita (ADR-0001). |
 | `qt/src/canvas/CanvasView.*`, `DocumentLayout.*`, `ViewController.*` | `gui/XournalView.cpp` (page views, `cleanupBufferCache`), `gui/Layout.cpp` + `gui/LayoutMapper.cpp` (row-major columns, paired pages with offset, fixed pixel paddings), `control/zoom/ZoomControl.cpp` (anchored zoom, fit width, zoom limits). |
 | `qt/src/session/DocumentSession.*` | `Control::openXoppFile/openPdfFile/createNewDocument/addDefaultPage/insertPage/deletePage/duplicatePage/movePageTowardsBeginning/movePageTowardsEnd/updatePageActions/resetSavedStatus/setLastAutosaveFile`, `SaveJob::save/updatePreview`, `AutosaveJob::run`, `PageBackgroundChangeController::insertNewPage/copyBackgroundFromOtherPage` (default branch). |
@@ -75,7 +77,7 @@ Each port records its upstream origin in a comment. Re-check them after upstream
 - `src/core`: everything not listed in `qt/cmake/XojSources.cmake`.
   - For M1 that includes all of `gui/`, except `LayoutMapper.cpp`, `GladeSearchpath.cpp` and `toolbarMenubar/model/ColorPalette.cpp`.
   - `undo/*`, `control/layer/*` and the tool layer (`xoj-tools`: `InputHandler`, `StrokeHandler`, `StrokeStabilizer`, `SnapToGridInputHandler`, `EraseHandler`, the stroke overlay views, `InputUtils`, `LegacyRedrawable`) **are** compiled, unmodified, against the shadow interfaces.
-  - Not yet: selection, text, shapes, spline, laser, vertical space, geometry tools.
+  - Not yet: selection, text, shapes, spline, vertical space, geometry tools (the laser pointer: its view is compiled, its handler ported, see below).
 
 ## Verification
 - `qt/tests/golden/run_golden.sh`: `xournal-qt-cli` PNG and PDF export are pixel identical to upstream `xournalpp` built at the merge base, and `.xopp` round trips keep the document structure.

@@ -2529,3 +2529,16 @@ Filling:
 - [ ] Copy and paste a filled shape (also into another tab): the fill color comes along.
 - [ ] Save, close, open again; export a PDF; print: the fillings look the same. In Xournal++ the file opens; a
       filling of another color shows there in the line's color (upstream has no fill color).
+
+Laser pointer:
+- [ ] Hold the pen button: "Laser pointer" and "Laser highlighter" in its list. Write with them: red ink (the
+      highlighter: broad and translucent) follows the pen without lag and fades about half a second after the pen
+      is lifted (Settings → Pen → Laser pointer: the time before it fades).
+- [ ] Several strokes in a row: they stay while writing on, and fade together.
+- [ ] The ink is never kept: undo does nothing, the document is not marked changed, the page's thumbnail and the
+      sidebar never show it, a save or an export does not contain it.
+- [ ] Presenting (F5): tap the tool square, "Laser pointer"; point at the slide; the tool square, again: "Back to
+      the pen". The pen pill shows the laser's colors and widths.
+- [ ] A PDF shown read-only beside another document (the reference): the laser points on it too.
+- [ ] A finger (with "the finger draws" on), the mouse and the pen each draw laser ink.
+- [ ] Two views of the same document: the ink shows on the view written on.

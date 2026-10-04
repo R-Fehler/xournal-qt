@@ -1,6 +1,6 @@
 /*
- * xournal-qt: the pen's styles (qt/pen-styles): upstream's line styles drawn by the canvas, kept in .xopp and shown
- * the same in an export.
+ * xournal-qt: the pen's styles (qt/pen-styles): upstream's line styles and fillings drawn by the canvas, kept in
+ * .xopp and shown the same in an export; the laser pointer, whose ink fades and is never in the document.
  *
  * @license GNU GPLv2 or later
  */
@@ -36,6 +36,8 @@
 #include "session/PenFill.h"
 #include "undo/UndoRedoHandler.h"
 #include "util/GzUtil.h"
+#include "view/DocumentView.h"
+#include "control/settings/Settings.h"
 #include "util/serializing/BinObjectEncoding.h"
 #include "util/serializing/ObjectInputStream.h"
 #include "util/serializing/ObjectOutputStream.h"
@@ -430,4 +432,82 @@ TEST_F(PenStylesTest, theFillingIsSavedCopiedAndExported) {
     EXPECT_TRUE(grayish(pdfAt(pdf, QPointF(175, 150)))) << pdfAt(pdf, QPointF(175, 150)).name().toStdString();
     EXPECT_TRUE(reddish(pdfAt(pdf, QPointF(375, 150)))) << pdfAt(pdf, QPointF(375, 150)).name().toStdString();
     penfill::setColor(*app->getSettings(), TOOL_PEN, std::nullopt);
+}
+
+// The laser pointer (upstream's laser pen and highlighter): ink over the page that fades out a while after the pen is
+// lifted (upstream's setting, laserPointerFadeOutTime); never in the document, the undo stack, the file or the
+// pictures of the page (thumbnails, previews, exports draw the document).
+TEST_F(PenStylesTest, theLaserPointersInkFadesAndIsNeverInTheDocument) {
+    app->getSettings()->setLaserPointerFadeOutTime(400);
+    drawLine(QPointF(100, 200), QPointF(400, 200));  // a stroke of the pen, to compare
+    ASSERT_EQ(strokes().size(), 1u);
+    session->getUndoRedoHandler()->clearContents();
+    const fs::path xopp = fs::path(tmp.filePath("laser.xopp").toStdString());
+    ASSERT_TRUE(session->saveAs(xopp).ok);
+    ASSERT_FALSE(session->isModified());
+
+    tools()->selectTool(TOOL_LASER_POINTER_PEN);
+    drawLine(QPointF(100, 300), QPointF(400, 300));
+    CanvasPage* page = view->getPage(0);
+    EXPECT_TRUE(page->hasLaserInk());
+    EXPECT_TRUE(reddish(canvasAt(QPointF(250, 300)))) << "the laser's red ink on the canvas";
+    EXPECT_EQ(strokes().size(), 1u) << "not in the document";
+    EXPECT_FALSE(session->getUndoRedoHandler()->canUndo()) << "not on the undo stack";
+    EXPECT_FALSE(session->isModified()) << "nothing to save";
+
+    // The picture of the page as thumbnails, previews and exports draw it: without the laser's ink
+    {
+        const double scale = 2;
+        cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, static_cast<int>(600 * scale),
+                                                              static_cast<int>(850 * scale));
+        cairo_t* cr = cairo_create(surface);
+        cairo_scale(cr, scale, scale);
+        DocumentView().drawPage(session->getDocument()->getPage(0), cr, false, xoj::view::BACKGROUND_SHOW_ALL);
+        cairo_destroy(cr);
+        cairo_surface_flush(surface);
+        const auto pixel = [&](double x, double y) {
+            const unsigned char* px = cairo_image_surface_get_data(surface) +
+                                      static_cast<int>(y * scale) * cairo_image_surface_get_stride(surface) +
+                                      4 * static_cast<int>(x * scale);
+            return QColor(px[2], px[1], px[0]);
+        };
+        EXPECT_FALSE(reddish(pixel(250, 300))) << "the laser's ink in the page's picture";
+        EXPECT_LT(pixel(250, 200).lightness(), 200) << "(the pen's stroke is there)";
+        cairo_surface_destroy(surface);
+    }
+
+    // Another stroke while it is there: one handler, both fade together
+    drawLine(QPointF(100, 350), QPointF(400, 350));
+    EXPECT_TRUE(reddish(canvasAt(QPointF(250, 350))));
+    // It fades: gone a while after the delay (upstream's steps: 50 ms each, about half a second)
+    QElapsedTimer t;
+    t.start();
+    while (page->hasLaserInk() && t.elapsed() < 5000) {
+        processEvents(50);
+    }
+    EXPECT_FALSE(page->hasLaserInk()) << "the ink did not fade";
+    EXPECT_GE(t.elapsed(), 300) << "it faded before the delay set";
+    EXPECT_FALSE(page->hasOverlays());
+    EXPECT_FALSE(reddish(canvasAt(QPointF(250, 300))));
+    EXPECT_FALSE(reddish(canvasAt(QPointF(250, 350))));
+
+    // The laser highlighter as well
+    tools()->selectTool(TOOL_LASER_POINTER_HIGHLIGHTER);
+    drawLine(QPointF(100, 450), QPointF(400, 450));
+    EXPECT_TRUE(page->hasLaserInk());
+    EXPECT_EQ(strokes().size(), 1u);
+    EXPECT_FALSE(session->getUndoRedoHandler()->canUndo());
+    tools()->selectTool(TOOL_PEN);  // (the ink still fades)
+    t.restart();
+    while (page->hasLaserInk() && t.elapsed() < 5000) {
+        processEvents(50);
+    }
+    EXPECT_FALSE(page->hasLaserInk());
+    EXPECT_FALSE(session->isModified());
+
+    // The file has the pen's stroke only
+    ASSERT_TRUE(session->saveAs(xopp).ok);
+    auto loaded = DocumentSession::loadFile(xopp);
+    ASSERT_TRUE(loaded.document) << loaded.error;
+    EXPECT_EQ(loaded.document->getPage(0)->getSelectedLayer()->getElementsView().size(), 1u);
 }

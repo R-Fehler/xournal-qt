@@ -35,6 +35,7 @@ class EraseHandler;
 class OverlayBase;
 class Selector;
 class InputHandler;
+class LaserPointerHandler;
 class PositionInputData;
 
 namespace xoj::view {
@@ -64,6 +65,9 @@ public:
     const PageRef getPage() const override { return page; }
     XournalView* getXournal() const override;
     xoj::util::Point<int> getPixelPosition() const override;
+    void deleteLaserPointerHandler() override;
+    /// The laser pointer's ink is on the page (it fades a while after the pen is lifted; never in the document)
+    bool hasLaserInk() const { return laserPointer != nullptr; }
 
     PageRaster& getRaster() const { return *raster; }
     /// Page rectangle in view coordinates at the current zoom.
@@ -139,6 +143,9 @@ private:
 
     std::vector<std::unique_ptr<xoj::view::OverlayView>> overlayViews;
     std::unique_ptr<InputHandler> inputHandler;
+    std::unique_ptr<LaserPointerHandler> laserPointer;  ///< port of XojPageView's (its ink, until it faded)
+    /// An overlay view drawn once off screen (its first draw prepares its picture)
+    void drawOnce(const xoj::view::OverlayView& v);
     std::unique_ptr<LegacyRedrawable> eraserRedraw;  ///< the eraser's redraws, told to every view of the page
     std::unique_ptr<EraseHandler> eraser;
     bool inEraser = false;

@@ -469,10 +469,11 @@ per-stroke audio (`ts`/`fn` attributes). Upstream has **no grouping** of element
   research note on a **two-column Markdown mode** (a comment marker, e.g. `<!-- xqt:columns 2 -->`, for `.md`
   files and page-wise text), and the mode itself as an option if it is easy. Wide tables and images span both
   columns.
-- [ ] `qt/pen-styles`: line styles (solid, dashed, dash-dot, dotted, as upstream, saved in `.xopp`); filling shapes
+- [x] `qt/pen-styles`: line styles (solid, dashed, dash-dot, dotted, as upstream, saved in `.xopp`); filling shapes
   (and closed freehand strokes) with the stroke's color or another color, with upstream's fill opacity; the
   **laser pointer** (upstream's laser pen and highlighter tools: ink that fades after N seconds, a setting; never
-  saved, never on the undo stack), reachable from the presentation mode.
+  saved, never on the undo stack), reachable from the presentation mode. (Built 2026-10-04. Left: changing the line
+  style or filling of a selection; a fill color for the highlighter; the device checks.)
 - [ ] `qt/color-palettes`: the author's role-based palettes (Classic, Marker, Pastel study, Colorblind-safe 8 and
   6, Dark; JSON spec in the prompt of 2026-10-04, kept as a resource) as tabs in the color chooser, next to the
   existing picker and hex field. Roles keep their meaning across palettes (the role name shows as a tooltip); a

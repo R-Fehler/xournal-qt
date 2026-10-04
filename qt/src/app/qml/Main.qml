@@ -3736,7 +3736,8 @@ ApplicationWindow {
             "pen": "xopp-tool-pencil", "highlighter": "xopp-tool-highlighter", "eraser": "xopp-tool-eraser",
             "hand": "xopp-hand", "text": "xopp-tool-text", "selectRect": "xopp-select-rect",
             "selectRegion": "xopp-select-lasso", "selectPdfTextLinear": "xopp-select-pdf-text-ht",
-            "selectPdfTextRect": "xopp-select-pdf-text-area"
+            "selectPdfTextRect": "xopp-select-pdf-text-area", "laserPointerPen": "xopp-laser-pointer",
+            "laserPointerHighlighter": "xopp-laser-pointer"
         })
         Image {
             anchors.centerIn: parent
@@ -3783,8 +3784,24 @@ ApplicationWindow {
                 width: parent.width
                 height: Math.max(0, Math.min(barContent.implicitHeight,
                                              quickTools.roomBottom - quickTools.roomTop - quickTools.topPadding - quickTools.bottomPadding
-                                             - presentToggle.height - leaveFullScreen.height
-                                             - 2 * quickToolsColumn.spacing))
+                                             - laserToggle.height - presentToggle.height - leaveFullScreen.height
+                                             - 3 * quickToolsColumn.spacing))
+            }
+            // The laser pointer at once (presenting: point at what is said; its ink fades): again, back to the pen
+            Button {
+                id: laserToggle
+                objectName: "laserPointerButton"
+                width: parent.width
+                flat: true
+                readonly property bool on: win.toolGroups.isLaser(app.tool)
+                highlighted: on
+                icon.source: app.iconUrl("xopp-laser-pointer")
+                text: on ? qsTr("Back to the pen") : qsTr("Laser pointer")
+                onClicked: {
+                    quickTools.close()
+                    if (win.toolGroups.isLaser(app.tool)) win.toolGroups.activate("pen", "pen")
+                    else win.toolGroups.activate("pen", "laserPointerPen")
+                }
             }
             Button {
                 id: presentToggle

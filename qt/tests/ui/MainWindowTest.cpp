@@ -4915,6 +4915,53 @@ TEST_F(MainWindowTest, thePensMenuOffersItsLineStyles) {
     controller->setLineStyle("plain");
 }
 
+// The laser pointer (qt/pen-styles): upstream's laser pen and highlighter in the pen button's list, and at once from
+// the tools of full screen and presenting (the tool square); the pen pill stays for it (its color, its width).
+TEST_F(MainWindowTest, theLaserPointerIsAtHandWhilePresenting) {
+    ASSERT_TRUE(controller->openPath(fixturePath(u8"load/pages.xopp")));
+    window->setWidth(1920);
+    wait(100);
+    controller->selectTool("pen");
+    controller->setDrawingType("default");
+    auto* menu = find<QObject>("penButtonVariants");
+    ASSERT_NE(menu, nullptr);
+    ASSERT_NE(entryOf(menu, "variant_laserPointerPen"), nullptr) << "in the pen button's list";
+    ASSERT_NE(entryOf(menu, "variant_laserPointerHighlighter"), nullptr);
+    QMetaObject::invokeMethod(entryOf(menu, "variant_laserPointerHighlighter"), "triggered");
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerHighlighter"));
+    EXPECT_TRUE(find<QQuickItem>("penButton")->property("checked").toBool()) << "the pen button shows it";
+    click(find<QQuickItem>("penButton"));
+    EXPECT_EQ(controller->tool(), QStringLiteral("pen")) << "a tap: back to the pen";
+
+    QMetaObject::invokeMethod(window, "startPresenting", Q_ARG(QVariant, false));  // (F5)
+    ASSERT_TRUE(controller->presenting());
+    auto* square = find<QQuickItem>("quickToolSquare");
+    ASSERT_NE(square, nullptr);
+    until([&] { return square->isVisible(); });
+    ASSERT_TRUE(square->isVisible()) << "presenting: the tool square";
+    QObject* tools = find("quickTools");
+    click(square);
+    ASSERT_TRUE(waitOpened(tools, true));
+    QQuickItem* laser = findItem("laserPointerButton");
+    ASSERT_NE(laser, nullptr);
+    click(laser);
+    EXPECT_EQ(controller->tool(), QStringLiteral("laserPointerPen")) << "one tap from the tool square";
+    ASSERT_TRUE(waitOpened(tools, false));
+    auto* pill = find<QQuickItem>("penPill");
+    ASSERT_NE(pill, nullptr);
+    until([&] { return pill->isVisible(); });
+    EXPECT_TRUE(pill->isVisible()) << "the pen pill for its color and width";
+    click(square);
+    ASSERT_TRUE(waitOpened(tools, true));
+    laser = findItem("laserPointerButton");
+    EXPECT_EQ(laser->property("text").toString(), QStringLiteral("Back to the pen"));
+    click(laser);
+    EXPECT_EQ(controller->tool(), QStringLiteral("pen"));
+    ASSERT_TRUE(waitOpened(tools, false));
+    window->setProperty("fullScreenMode", false);  // (stops presenting)
+    until([&] { return !controller->presenting(); });
+}
+
 // On a touch screen a finger held on a plain button shows its name above the finger, and letting go does not press it
 // (no hover on a touch screen); a button with a long press of its own keeps it (the zoom percentage: the whole page).
 TEST_F(MainWindowTest, aFingerHeldOnAButtonShowsItsName) {

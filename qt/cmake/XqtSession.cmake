@@ -107,6 +107,7 @@ add_library(xqt-canvas STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/ScreenCalibration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasPage.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/LaserPointerHandler.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasView.h
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/CanvasView.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/canvas/Perf.h

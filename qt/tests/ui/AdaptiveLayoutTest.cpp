@@ -1907,7 +1907,7 @@ TEST_F(AdaptiveLayoutTest, quickToolsFitAShortWindow) {
         ASSERT_NE(popup, nullptr);
         QMetaObject::invokeMethod(popup, "open");
         until([&] { return popup->property("opened").toBool(); });
-        for (const char* name: {"presentToggleButton", "leaveFullScreenButton"}) {
+        for (const char* name: {"laserPointerButton", "presentToggleButton", "leaveFullScreenButton"}) {
             auto* b = findItem(name);
             ASSERT_NE(b, nullptr) << name;
             const QRectF r = b->mapRectToScene(QRectF(0, 0, b->width(), b->height()));

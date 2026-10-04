@@ -2,7 +2,7 @@
 // button. A tap on it while its tool is in use takes the next variant; a tap while another tool is in use takes it
 // with the variant last used (remembered per group, in the settings); a long press lists all variants. The tool bar,
 // the tools of the compact chrome and the pen pill use the same groups, so they behave alike.
-//   pen       pen ↔ highlighter (freehand)
+//   pen       pen ↔ highlighter (freehand); the laser pointer and laser highlighter in the list only
 //   select    rectangle ↔ lasso (the multi-layer ones only in the list)
 //   shape     line, rectangle, ellipse, arrow, double arrow, coordinate system, recognized shapes (the pen draws them)
 //   geometry  setsquare ↔ compass (on the page; the geometry pill takes it away)
@@ -18,7 +18,10 @@ QtObject {
             name: qsTr("Pen and highlighter"),
             variants: [
                 { key: "pen", icon: "xopp-tool-pencil", name: qsTr("Pen") },
-                { key: "highlighter", icon: "xopp-tool-highlighter", name: qsTr("Highlighter") }
+                { key: "highlighter", icon: "xopp-tool-highlighter", name: qsTr("Highlighter") },
+                // Upstream's laser tools: ink that fades a while after the pen is lifted, never in the document
+                { key: "laserPointerPen", icon: "xopp-laser-pointer", name: qsTr("Laser pointer"), listOnly: true },
+                { key: "laserPointerHighlighter", icon: "xopp-laser-pointer", name: qsTr("Laser highlighter"), listOnly: true }
             ]
         },
         "select": {
@@ -73,7 +76,8 @@ QtObject {
     function activeKey(group) {
         const tool = app.tool, type = app.drawingType
         if (group === "pen")
-            return (tool === "pen" || tool === "highlighter") && type === "default" ? tool : ""
+            return (tool === "pen" || tool === "highlighter") && type === "default" ? tool
+                   : isLaser(tool) ? tool : ""
         if (group === "shape")
             return (tool === "pen" || tool === "highlighter") && type !== "default" && type !== "dontChange"
                    && type !== "spline" ? type : ""
@@ -83,6 +87,8 @@ QtObject {
         if (group === "eraser") return tool === "eraser" ? last("eraser") : ""
         return ""
     }
+    /// Upstream's laser tools (laserPointerPen, laserPointerHighlighter)
+    function isLaser(tool) { return tool === "laserPointerPen" || tool === "laserPointerHighlighter" }
     function isActive(group) { return activeKey(group) !== "" }
     /// The variant the button shows: the one in use, else the one last used
     function current(group) {
@@ -125,7 +131,7 @@ QtObject {
         if (key === undefined || key === "") key = last(group)
         if (group === "pen") {
             app.selectTool(key)
-            app.drawingType = "default"  // (the pen keeps its shape: back to freehand)
+            if (!isLaser(key)) app.drawingType = "default"  // (the pen keeps its shape: back to freehand)
         } else if (group === "shape") {
             app.drawingType = key  // (the pen, or the highlighter in hand, draws it)
         } else if (group === "select") {

@@ -1508,7 +1508,8 @@ double AppController::sizeWidth(int s) const {
         return th->getCustomThickness(type);
     }
     const bool sized = std::any_of(CUSTOM_WIDTH_TOOLS.begin(), CUSTOM_WIDTH_TOOLS.end(),
-                                   [type](const auto& t) { return t.first == type; });
+                                   [type](const auto& t) { return t.first == type; }) ||
+                       type == TOOL_LASER_POINTER_PEN || type == TOOL_LASER_POINTER_HIGHLIGHTER;  // (no own width)
     return sized && s >= 0 && s < 5 ? th->getToolThickness(type)[s] : 0;
 }
 

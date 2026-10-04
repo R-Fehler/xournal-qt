@@ -1,7 +1,8 @@
 /*
  * xournal-qt: shadow of upstream gui/PageView.h (XojPageView).
  *
- * The page view as seen by reused upstream code (selection: EditSelection, EditSelectionContents). Implemented by
+ * The page view as seen by reused upstream code (selection: EditSelection, EditSelectionContents; the laser pointer:
+ * LaserPointerHandler). Implemented by
  * the Qt canvas' CanvasPage. Same bases and method names as upstream.
  *
  * @license GNU GPLv2 or later
@@ -24,4 +25,6 @@ public:
     virtual const PageRef getPage() const = 0;
     /// Position of the page in the layout (content pixels, independent of scrolling).
     virtual xoj::util::Point<int> getPixelPosition() const = 0;
+    /// The laser pointer's ink faded out: its handler goes (control/tools/LaserPointerHandler.h)
+    virtual void deleteLaserPointerHandler() = 0;
 };
